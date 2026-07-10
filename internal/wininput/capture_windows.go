@@ -19,6 +19,7 @@ const (
 	whMouseLL         = 14
 	hcAction          = 0
 	wmQuit            = 0x0012
+	wmCaptureReady    = 0x8001
 	wmKeyDown         = 0x0100
 	wmKeyUp           = 0x0101
 	wmSysKeyDown      = 0x0104
@@ -113,9 +114,16 @@ func (p *Platform) Capture(ctx context.Context, options lab.CaptureOptions, repo
 		return err
 	}
 
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
+	completed := make(chan error, 1)
+	go func() {
+		runtime.LockOSThread()
+		// Exiting while locked retires this OS thread, so a later hook session cannot inherit its message queue.
+		completed <- captureOnDedicatedThread(ctx, options, report)
+	}()
+	return <-completed
+}
 
+func captureOnDedicatedThread(ctx context.Context, options lab.CaptureOptions, report func(lab.CaptureSnapshot)) error {
 	threadID, _, _ := procGetCurrentThreadID.Call()
 	var bootstrapMessage message
 	procPeekMessageW.Call(uintptr(unsafe.Pointer(&bootstrapMessage)), 0, 0, 0, pmNoRemove)
@@ -172,7 +180,10 @@ func (p *Platform) Capture(ctx context.Context, options lab.CaptureOptions, repo
 	}
 	defer cleanupHooks()
 	if options.Ready != nil {
-		options.Ready()
+		result, _, postErr := procPostThreadMessageW.Call(threadID, wmCaptureReady, 0, 0)
+		if result == 0 {
+			return fmt.Errorf("PostThreadMessageW(capture ready) failed: %w", postErr)
+		}
 	}
 
 	started := time.Now()
@@ -201,7 +212,7 @@ func (p *Platform) Capture(ctx context.Context, options lab.CaptureOptions, repo
 		}
 	}()
 
-	loopErr := runMessageLoop()
+	loopErr := runMessageLoop(options.Ready)
 	unhookErr := cleanupHooks()
 	close(stopMessageLoop)
 	close(stopReporter)
@@ -217,7 +228,7 @@ func (p *Platform) Capture(ctx context.Context, options lab.CaptureOptions, repo
 	return ctx.Err()
 }
 
-func runMessageLoop() error {
+func runMessageLoop(ready func()) error {
 	var msg message
 	for {
 		result, _, callErr := procGetMessageW.Call(uintptr(unsafe.Pointer(&msg)), 0, 0, 0)
@@ -228,6 +239,13 @@ func runMessageLoop() error {
 		case 0:
 			return nil
 		default:
+			if msg.Message == wmCaptureReady {
+				if ready != nil {
+					ready()
+					ready = nil
+				}
+				continue
+			}
 			procTranslateMessage.Call(uintptr(unsafe.Pointer(&msg)))
 			procDispatchMessageW.Call(uintptr(unsafe.Pointer(&msg)))
 		}

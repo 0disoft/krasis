@@ -3,9 +3,13 @@ package labcli
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/0disoft/krasis/internal/lab"
 )
@@ -189,5 +193,106 @@ func TestSelfTestInjectFailureReturnsRuntimeExit(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), `"failureCode":"injected_events_not_observed"`) {
 		t.Fatalf("stdout does not contain failure code: %q", stdout.String())
+	}
+}
+
+func TestProbeWritesIndependentAggregateReport(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	outputPath := filepath.Join(t.TempDir(), "home-a.json")
+	platform := fakePlatform{
+		diagnostics: lab.Diagnostics{
+			SchemaVersion: lab.DiagnoseSchemaVersion,
+			OS:            "windows",
+			Architecture:  "amd64",
+		},
+		capture: []lab.CaptureSnapshot{{
+			SchemaVersion: lab.CaptureSchemaVersion,
+			ElapsedMillis: 25,
+			Keyboard:      lab.EventCounts{PhysicalDown: 1, PhysicalUp: 1},
+		}},
+		selfTest: lab.SelfTestResult{
+			SchemaVersion:   lab.SelfTestSchemaVersion,
+			Passed:          true,
+			Sent:            2,
+			Observed:        2,
+			PointerRestored: true,
+		},
+	}
+
+	exitCode := Run(context.Background(), []string{
+		"probe",
+		"--device", "H-A",
+		"--duration", "25ms",
+		"--output", outputPath,
+	}, &stdout, &stderr, platform)
+
+	if exitCode != exitSuccess {
+		t.Fatalf("exit code = %d, stderr = %q", exitCode, stderr.String())
+	}
+	data, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatalf("read probe report: %v", err)
+	}
+	var report lab.ProbeReport
+	if err := json.Unmarshal(data, &report); err != nil {
+		t.Fatalf("decode probe report: %v", err)
+	}
+	if report.SchemaVersion != lab.ProbeSchemaVersion || report.DeviceAlias != "H-A" || !report.Completed {
+		t.Fatalf("unexpected probe report: %+v", report)
+	}
+	if report.RequestedDurationMs != 25 {
+		t.Fatalf("requested duration = %d, want 25", report.RequestedDurationMs)
+	}
+	for _, forbidden := range []string{`"vkCode"`, `"scanCode"`, `"coordinates"`, `"hostname"`, `"windowTitle"`} {
+		if strings.Contains(string(data), forbidden) {
+			t.Fatalf("probe report contains forbidden field %s: %s", forbidden, data)
+		}
+	}
+	if !strings.Contains(stdout.String(), "H-A") || !strings.Contains(stdout.String(), outputPath) {
+		t.Fatalf("stdout does not identify probe and report: %q", stdout.String())
+	}
+}
+
+func TestProbeFailureStillWritesPartialReport(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	outputPath := filepath.Join(t.TempDir(), "study-b.json")
+	platform := fakePlatform{diagnoseErr: errors.New("diagnostics unavailable")}
+
+	exitCode := Run(context.Background(), []string{
+		"probe",
+		"--device=S-B",
+		"--duration=100ms",
+		"--output=" + outputPath,
+	}, &stdout, &stderr, platform)
+
+	if exitCode != exitRuntime {
+		t.Fatalf("exit code = %d, want %d", exitCode, exitRuntime)
+	}
+	data, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatalf("read partial report: %v", err)
+	}
+	var report lab.ProbeReport
+	if err := json.Unmarshal(data, &report); err != nil {
+		t.Fatalf("decode partial report: %v", err)
+	}
+	if report.Completed || report.FailureCode != "diagnose_failed" {
+		t.Fatalf("unexpected partial report: %+v", report)
+	}
+	if !strings.Contains(stderr.String(), "runtime_error:") {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func TestParseProbeArgsRejectsUnknownAlias(t *testing.T) {
+	_, err := parseProbeArgs([]string{
+		"--device", "LAPTOP-REAL-NAME",
+		"--duration", time.Second.String(),
+		"--output", "probe.json",
+	})
+	if err == nil {
+		t.Fatal("parseProbeArgs accepted an unknown device alias")
 	}
 }

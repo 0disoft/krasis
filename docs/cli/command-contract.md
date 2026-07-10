@@ -46,12 +46,28 @@
 
 이 명령은 injected 입력 식별을 검증한다. 아직 outbound 전송 경로가 없으므로 재전달 차단 전체를 증명하지 않는다.
 
+### `probe`
+
+대상 노트북 한 대에서 `diagnose`, bounded `capture`, `selftest-inject`를 순서대로 실행하고 독립적인 증거 파일 하나를 만든다.
+
+- 사용법: `krasis-lab probe --device H-A|H-B|S-A|S-B --duration DURATION --output PATH.json`
+- 네 대를 동시에 실행할 필요가 없으며 각 장비 결과는 다른 날짜와 장소에서 따로 수집할 수 있다.
+- `--device`는 실제 host name 대신 장비 원장의 고정 별칭만 허용한다.
+- `--duration`은 aggregate input capture 구간이며 Go duration 형식의 양수만 허용한다.
+- `--output`의 부모 directory는 미리 존재해야 하고 확장자는 `.json`이어야 한다.
+- 기존 output은 덮어쓰지 않는다. 임시 파일을 같은 directory에 flush한 뒤 교체 없는 승격을 시도한다.
+- 중간 단계가 실패해도 가능한 범위의 부분 보고서와 안정적인 `failureCode`를 기록하고 exit `1`로 종료한다.
+- 보고서에는 raw key, 입력 문자열, pointer 좌표, host name, 사용자 이름, window title과 network identifier를 넣지 않는다.
+
+`probe`는 장비별 기초 증거 수집기다. 두 노트북 간 연결, 입력 전달, 억제, crash recovery 또는 네트워크 동작을 검증하지 않는다.
+
 ## 출력 방식
 
 - 기본 출력은 사람이 읽는 누적 snapshot이다.
 - `--json`은 한 줄에 하나의 JSON object를 출력한다.
 - `capture`의 기본 보고 간격은 현재 실험 구현에서 1초다. 이는 제품 성능 목표가 아니라 관찰용 sampling cadence다.
 - `selftest-inject`의 짧은 deadline과 sampling cadence도 제품 지연 목표가 아니라 유한한 안전 실험 경계다.
+- `probe`의 duration은 장비별 수집자가 명시하며 보고서에 millisecond 단위로 기록한다. 서로 다른 duration의 결과는 동일 조건의 성능 비교로 취급하지 않는다.
 
 ## 취소와 종료
 

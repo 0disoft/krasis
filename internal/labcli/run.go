@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/0disoft/krasis/internal/buildinfo"
+	"github.com/0disoft/krasis/internal/evidence"
 	"github.com/0disoft/krasis/internal/lab"
 )
 
@@ -38,11 +40,153 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, platform 
 		return runCapture(ctx, commandArgs, stdout, stderr, platform)
 	case "selftest-inject":
 		return runSelfTestInject(ctx, commandArgs, stdout, stderr, platform)
+	case "probe":
+		return runProbe(ctx, commandArgs, stdout, stderr, platform)
 	default:
 		fmt.Fprintf(stderr, "unknown command: %s\n", command)
 		writeUsage(stderr)
 		return exitUsage
 	}
+}
+
+type probeArgs struct {
+	deviceAlias string
+	duration    time.Duration
+	outputPath  string
+}
+
+var validProbeDeviceAliases = map[string]struct{}{
+	"H-A": {},
+	"H-B": {},
+	"S-A": {},
+	"S-B": {},
+}
+
+func runProbe(ctx context.Context, args []string, stdout, stderr io.Writer, platform lab.Platform) int {
+	options, err := parseProbeArgs(args)
+	if err != nil {
+		fmt.Fprintf(stderr, "invalid probe options: %v\n", err)
+		fmt.Fprintln(stderr, "usage: krasis-lab probe --device H-A|H-B|S-A|S-B --duration DURATION --output PATH.json")
+		return exitUsage
+	}
+	if err := evidence.ValidateJSONOutputPath(options.outputPath); err != nil {
+		fmt.Fprintf(stderr, "invalid probe output: %v\n", err)
+		return exitUsage
+	}
+
+	build := buildinfo.Read()
+	report := lab.ProbeReport{
+		SchemaVersion:       lab.ProbeSchemaVersion,
+		DeviceAlias:         options.deviceAlias,
+		CollectedAt:         time.Now().UTC(),
+		BuildRevision:       build.Revision,
+		BuildModified:       build.Modified,
+		RequestedDurationMs: options.duration.Milliseconds(),
+	}
+	finish := func(failureCode string, runtimeErr error) int {
+		report.FailureCode = failureCode
+		report.Completed = failureCode == ""
+		if err := evidence.WriteJSONExclusive(options.outputPath, report); err != nil {
+			fmt.Fprintf(stderr, "output_error: %v\n", err)
+			return exitRuntime
+		}
+		fmt.Fprintf(stdout, "Probe report: %s\n", options.outputPath)
+		if runtimeErr != nil {
+			fmt.Fprintf(stderr, "runtime_error: %s\n", strings.TrimSpace(runtimeErr.Error()))
+		}
+		if failureCode != "" {
+			return exitRuntime
+		}
+		return exitSuccess
+	}
+
+	diagnostics, err := platform.Diagnose(ctx)
+	if err != nil {
+		return finish("diagnose_failed", err)
+	}
+	report.Diagnostics = &diagnostics
+
+	fmt.Fprintf(stdout, "Probe %s: move the pointer, use the wheel and buttons, and type during the %s capture.\n", options.deviceAlias, options.duration)
+	captureContext, cancelCapture := context.WithTimeout(ctx, options.duration)
+	var finalSnapshot lab.CaptureSnapshot
+	err = platform.Capture(captureContext, lab.CaptureOptions{ReportInterval: time.Second}, func(snapshot lab.CaptureSnapshot) {
+		finalSnapshot = snapshot
+	})
+	cancelCapture()
+	if finalSnapshot.SchemaVersion != "" {
+		report.Capture = &finalSnapshot
+	}
+	if ctx.Err() != nil {
+		return finish("probe_canceled", ctx.Err())
+	}
+	if err != nil && !errors.Is(err, context.DeadlineExceeded) {
+		return finish("capture_failed", err)
+	}
+	if report.Capture == nil {
+		return finish("capture_missing", errors.New("capture completed without an aggregate snapshot"))
+	}
+
+	selfTest, err := platform.SelfTestInject(ctx)
+	if err != nil {
+		return finish("selftest_failed", err)
+	}
+	report.SelfTest = &selfTest
+	if !selfTest.Passed {
+		return finish("selftest_failed", errors.New("SendInput self-test did not pass"))
+	}
+	return finish("", nil)
+}
+
+func parseProbeArgs(args []string) (probeArgs, error) {
+	var parsed probeArgs
+	for index := 0; index < len(args); index++ {
+		argument := args[index]
+		name, value, hasInlineValue := strings.Cut(argument, "=")
+		switch name {
+		case "--device", "--duration", "--output":
+			if !hasInlineValue {
+				if index+1 >= len(args) {
+					return probeArgs{}, fmt.Errorf("%s requires a value", name)
+				}
+				index++
+				value = args[index]
+			}
+			if value == "" {
+				return probeArgs{}, fmt.Errorf("%s requires a value", name)
+			}
+		default:
+			return probeArgs{}, fmt.Errorf("unknown option %q", argument)
+		}
+
+		switch name {
+		case "--device":
+			if parsed.deviceAlias != "" {
+				return probeArgs{}, fmt.Errorf("--device may be specified only once")
+			}
+			if _, ok := validProbeDeviceAliases[value]; !ok {
+				return probeArgs{}, fmt.Errorf("unsupported device alias %q", value)
+			}
+			parsed.deviceAlias = value
+		case "--duration":
+			if parsed.duration > 0 {
+				return probeArgs{}, fmt.Errorf("--duration may be specified only once")
+			}
+			duration, err := parsePositiveDuration(value)
+			if err != nil {
+				return probeArgs{}, err
+			}
+			parsed.duration = duration
+		case "--output":
+			if parsed.outputPath != "" {
+				return probeArgs{}, fmt.Errorf("--output may be specified only once")
+			}
+			parsed.outputPath = value
+		}
+	}
+	if parsed.deviceAlias == "" || parsed.duration == 0 || parsed.outputPath == "" {
+		return probeArgs{}, errors.New("--device, --duration, and --output are required")
+	}
+	return parsed, nil
 }
 
 func runSelfTestInject(ctx context.Context, args []string, stdout, stderr io.Writer, platform lab.Platform) int {
@@ -282,5 +426,6 @@ func writeUsage(output io.Writer) {
 	fmt.Fprintln(output, "  krasis-lab diagnose [--json]")
 	fmt.Fprintln(output, "  krasis-lab capture [--json] [--duration DURATION]")
 	fmt.Fprintln(output, "  krasis-lab selftest-inject [--json]")
+	fmt.Fprintln(output, "  krasis-lab probe --device H-A|H-B|S-A|S-B --duration DURATION --output PATH.json")
 	fmt.Fprintln(output, "  krasis-lab help")
 }

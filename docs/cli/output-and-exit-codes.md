@@ -10,7 +10,7 @@
 | --- | --- |
 | `0` | 명령 완료 또는 사용자가 요청한 정상 취소 |
 | `1` | Windows API, hook, message loop 또는 출력 runtime 오류 |
-| `2` | 알 수 없는 명령, flag 또는 잘못된 duration |
+| `2` | 알 수 없는 명령, flag, 장비 별칭, 잘못된 duration 또는 사용할 수 없는 output path |
 | `3` | 현재 운영체제나 platform에서 지원하지 않음 |
 
 ## 오류 출력
@@ -80,6 +80,33 @@
 
 `passed=false`는 JSON을 정상 출력하더라도 exit `1`이다. UIPI 차단은 `SendInput` return이나 `GetLastError`만으로 정확히 구분되지 않을 수 있으므로 별도 성공으로 취급하지 않는다.
 
+## `probe`
+
+- schema: `krasis.lab.probe/v1`
+- 출력: `--output`으로 지정한 단일 JSON file
+- stdout: 수집 안내와 생성된 report path
+
+필드:
+
+- `deviceAlias`: `H-A`, `H-B`, `S-A`, `S-B` 중 하나
+- `collectedAt`: UTC 수집 시각
+- `buildRevision`, `buildModified`: 실행 binary의 Go VCS build 정보
+- `requestedDurationMillis`: 요청한 capture duration
+- `completed`, `failureCode`: 전체 완료 여부와 실패 stage
+- `diagnostics`: `krasis.lab.diagnose/v1` 결과
+- `capture`: 마지막 `krasis.lab.capture/v1` 누적 snapshot
+- `selfTest`: `krasis.lab.selftest-inject/v1` 결과
+
+상위 실패 분류:
+
+- `diagnose_failed`
+- `capture_failed`
+- `capture_missing`
+- `probe_canceled`
+- `selftest_failed`
+
+`completed=false`인 부분 보고서도 원인 분석에 쓰는 유효한 증거다. 동일 output path를 다시 사용하면 기존 증거를 보존하고 실패한다.
+
 ## 호환성
 
-두 schema는 Phase 0 실험 계약이다. 정식 제품 API가 아니므로 변경될 수 있지만, 변경 시 schema version과 관련 test를 함께 검토한다.
+네 schema는 Phase 0 실험 계약이다. 정식 제품 API가 아니므로 변경될 수 있지만, 변경 시 schema version과 관련 test를 함께 검토한다.

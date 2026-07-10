@@ -10,6 +10,7 @@ const (
 	DiagnoseSchemaVersion = "krasis.lab.diagnose/v1"
 	CaptureSchemaVersion  = "krasis.lab.capture/v1"
 	SelfTestSchemaVersion = "krasis.lab.selftest-inject/v1"
+	ProbeSchemaVersion    = "krasis.lab.probe/v1"
 )
 
 var ErrUnsupported = errors.New("operation is not supported on this platform")
@@ -99,4 +100,18 @@ type SelfTestResult struct {
 	Observed        uint64 `json:"observed"`
 	PointerRestored bool   `json:"pointerRestored"`
 	FailureCode     string `json:"failureCode,omitempty"`
+}
+
+type ProbeReport struct {
+	SchemaVersion       string           `json:"schemaVersion"`
+	DeviceAlias         string           `json:"deviceAlias"`
+	CollectedAt         time.Time        `json:"collectedAt"`
+	BuildRevision       string           `json:"buildRevision"`
+	BuildModified       bool             `json:"buildModified"`
+	RequestedDurationMs int64            `json:"requestedDurationMillis"`
+	Completed           bool             `json:"completed"`
+	FailureCode         string           `json:"failureCode,omitempty"`
+	Diagnostics         *Diagnostics     `json:"diagnostics,omitempty"`
+	Capture             *CaptureSnapshot `json:"capture,omitempty"`
+	SelfTest            *SelfTestResult  `json:"selfTest,omitempty"`
 }
