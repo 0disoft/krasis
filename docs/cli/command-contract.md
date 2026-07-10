@@ -31,11 +31,27 @@
 - 입력을 억제하거나 변경하거나 주입하지 않는다.
 - hook callback은 atomic counter만 변경하고 출력은 별도 reporter가 수행한다.
 
+### `selftest-inject`
+
+`SendInput`과 low-level hook의 injected 분류가 같은 process에서 왕복하는지 확인한다.
+
+- 사용법: `krasis-lab selftest-inject [--json]`
+- selftest 전용 `dwExtraInfo` 표식을 붙인 상대 mouse move 두 건만 주입한다.
+- 이동은 `+1/-1` 쌍이며 click, wheel과 keyboard event를 만들지 않는다.
+- 두 event에는 `MOUSEEVENTF_MOVE_NOCOALESCE`를 사용한다.
+- 실행 전후 cursor 위치가 다르면 강제로 되돌리지 않고 실패한다.
+- low-level hook에서 injected flag와 selftest 표식이 모두 확인된 event만 관찰 성공으로 센다.
+- 실행은 내부 deadline으로 제한되며 hook을 해제한 뒤 종료한다.
+- `SendInput`은 UIPI 적용을 받으므로 높은 integrity level의 대상으로 주입할 수 있다는 뜻이 아니다.
+
+이 명령은 injected 입력 식별을 검증한다. 아직 outbound 전송 경로가 없으므로 재전달 차단 전체를 증명하지 않는다.
+
 ## 출력 방식
 
 - 기본 출력은 사람이 읽는 누적 snapshot이다.
 - `--json`은 한 줄에 하나의 JSON object를 출력한다.
 - `capture`의 기본 보고 간격은 현재 실험 구현에서 1초다. 이는 제품 성능 목표가 아니라 관찰용 sampling cadence다.
+- `selftest-inject`의 짧은 deadline과 sampling cadence도 제품 지연 목표가 아니라 유한한 안전 실험 경계다.
 
 ## 취소와 종료
 

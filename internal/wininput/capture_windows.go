@@ -15,28 +15,29 @@ import (
 )
 
 const (
-	whKeyboardLL  = 13
-	whMouseLL     = 14
-	hcAction      = 0
-	wmQuit        = 0x0012
-	wmKeyDown     = 0x0100
-	wmKeyUp       = 0x0101
-	wmSysKeyDown  = 0x0104
-	wmSysKeyUp    = 0x0105
-	wmMouseMove   = 0x0200
-	wmLButtonDown = 0x0201
-	wmLButtonUp   = 0x0202
-	wmRButtonDown = 0x0204
-	wmRButtonUp   = 0x0205
-	wmMButtonDown = 0x0207
-	wmMButtonUp   = 0x0208
-	wmMouseWheel  = 0x020A
-	wmXButtonDown = 0x020B
-	wmXButtonUp   = 0x020C
-	wmMouseHWheel = 0x020E
-	llkhfInjected = 0x00000010
-	llmhfInjected = 0x00000001
-	pmNoRemove    = 0x0000
+	whKeyboardLL      = 13
+	whMouseLL         = 14
+	hcAction          = 0
+	wmQuit            = 0x0012
+	wmKeyDown         = 0x0100
+	wmKeyUp           = 0x0101
+	wmSysKeyDown      = 0x0104
+	wmSysKeyUp        = 0x0105
+	wmMouseMove       = 0x0200
+	wmLButtonDown     = 0x0201
+	wmLButtonUp       = 0x0202
+	wmRButtonDown     = 0x0204
+	wmRButtonUp       = 0x0205
+	wmMButtonDown     = 0x0207
+	wmMButtonUp       = 0x0208
+	wmMouseWheel      = 0x020A
+	wmXButtonDown     = 0x020B
+	wmXButtonUp       = 0x020C
+	wmMouseHWheel     = 0x020E
+	llkhfInjected     = 0x00000010
+	llmhfInjected     = 0x00000001
+	pmNoRemove        = 0x0000
+	selfTestExtraInfo = 0x4B525349
 )
 
 var (
@@ -84,20 +85,21 @@ type mouseHookData struct {
 }
 
 type captureCounters struct {
-	keyboardPhysicalDown    atomic.Uint64
-	keyboardPhysicalUp      atomic.Uint64
-	keyboardInjectedDown    atomic.Uint64
-	keyboardInjectedUp      atomic.Uint64
-	keyboardOther           atomic.Uint64
-	mousePhysicalMove       atomic.Uint64
-	mouseInjectedMove       atomic.Uint64
-	mousePhysicalButtonDown atomic.Uint64
-	mousePhysicalButtonUp   atomic.Uint64
-	mouseInjectedButtonDown atomic.Uint64
-	mouseInjectedButtonUp   atomic.Uint64
-	mousePhysicalWheel      atomic.Uint64
-	mouseInjectedWheel      atomic.Uint64
-	mouseOther              atomic.Uint64
+	keyboardPhysicalDown      atomic.Uint64
+	keyboardPhysicalUp        atomic.Uint64
+	keyboardInjectedDown      atomic.Uint64
+	keyboardInjectedUp        atomic.Uint64
+	keyboardOther             atomic.Uint64
+	mousePhysicalMove         atomic.Uint64
+	mouseInjectedMove         atomic.Uint64
+	mousePhysicalButtonDown   atomic.Uint64
+	mousePhysicalButtonUp     atomic.Uint64
+	mouseInjectedButtonDown   atomic.Uint64
+	mouseInjectedButtonUp     atomic.Uint64
+	mousePhysicalWheel        atomic.Uint64
+	mouseInjectedWheel        atomic.Uint64
+	mouseOther                atomic.Uint64
+	mouseSelfTestInjectedMove atomic.Uint64
 }
 
 func (p *Platform) Capture(ctx context.Context, options lab.CaptureOptions, report func(lab.CaptureSnapshot)) error {
@@ -130,7 +132,7 @@ func (p *Platform) Capture(ctx context.Context, options lab.CaptureOptions, repo
 	mouseCallback := syscall.NewCallback(func(code int, wParam uintptr, lParam uintptr) uintptr {
 		if code == hcAction && lParam != 0 {
 			data := (*mouseHookData)(unsafe.Pointer(lParam))
-			counters.observeMouse(uint32(wParam), data.Flags&llmhfInjected != 0)
+			counters.observeMouse(uint32(wParam), data.Flags&llmhfInjected != 0, data.ExtraInfo)
 		}
 		result, _, _ := procCallNextHookEx.Call(0, uintptr(code), wParam, lParam)
 		return result
@@ -169,6 +171,9 @@ func (p *Platform) Capture(ctx context.Context, options lab.CaptureOptions, repo
 		return firstErr
 	}
 	defer cleanupHooks()
+	if options.Ready != nil {
+		options.Ready()
+	}
 
 	started := time.Now()
 	stopReporter := make(chan struct{})
@@ -248,11 +253,14 @@ func (c *captureCounters) observeKeyboard(message uint32, injected bool) {
 	}
 }
 
-func (c *captureCounters) observeMouse(message uint32, injected bool) {
+func (c *captureCounters) observeMouse(message uint32, injected bool, extraInfo uintptr) {
 	switch message {
 	case wmMouseMove:
 		if injected {
 			c.mouseInjectedMove.Add(1)
+			if extraInfo == selfTestExtraInfo {
+				c.mouseSelfTestInjectedMove.Add(1)
+			}
 		} else {
 			c.mousePhysicalMove.Add(1)
 		}
@@ -292,15 +300,16 @@ func (c *captureCounters) snapshot(elapsed time.Duration) lab.CaptureSnapshot {
 			Other:        c.keyboardOther.Load(),
 		},
 		Mouse: lab.MouseCounts{
-			PhysicalMove:       c.mousePhysicalMove.Load(),
-			InjectedMove:       c.mouseInjectedMove.Load(),
-			PhysicalButtonDown: c.mousePhysicalButtonDown.Load(),
-			PhysicalButtonUp:   c.mousePhysicalButtonUp.Load(),
-			InjectedButtonDown: c.mouseInjectedButtonDown.Load(),
-			InjectedButtonUp:   c.mouseInjectedButtonUp.Load(),
-			PhysicalWheel:      c.mousePhysicalWheel.Load(),
-			InjectedWheel:      c.mouseInjectedWheel.Load(),
-			Other:              c.mouseOther.Load(),
+			PhysicalMove:         c.mousePhysicalMove.Load(),
+			InjectedMove:         c.mouseInjectedMove.Load(),
+			PhysicalButtonDown:   c.mousePhysicalButtonDown.Load(),
+			PhysicalButtonUp:     c.mousePhysicalButtonUp.Load(),
+			InjectedButtonDown:   c.mouseInjectedButtonDown.Load(),
+			InjectedButtonUp:     c.mouseInjectedButtonUp.Load(),
+			PhysicalWheel:        c.mousePhysicalWheel.Load(),
+			InjectedWheel:        c.mouseInjectedWheel.Load(),
+			Other:                c.mouseOther.Load(),
+			SelfTestInjectedMove: c.mouseSelfTestInjectedMove.Load(),
 		},
 	}
 }

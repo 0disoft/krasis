@@ -26,15 +26,15 @@ func TestObserveKeyboardSeparatesPhysicalAndInjected(t *testing.T) {
 
 func TestObserveMouseSeparatesEventClasses(t *testing.T) {
 	var counters captureCounters
-	counters.observeMouse(wmMouseMove, false)
-	counters.observeMouse(wmMouseMove, true)
-	counters.observeMouse(wmLButtonDown, false)
-	counters.observeMouse(wmLButtonUp, false)
-	counters.observeMouse(wmXButtonDown, true)
-	counters.observeMouse(wmXButtonUp, true)
-	counters.observeMouse(wmMouseWheel, false)
-	counters.observeMouse(wmMouseHWheel, true)
-	counters.observeMouse(0, false)
+	counters.observeMouse(wmMouseMove, false, 0)
+	counters.observeMouse(wmMouseMove, true, selfTestExtraInfo)
+	counters.observeMouse(wmLButtonDown, false, 0)
+	counters.observeMouse(wmLButtonUp, false, 0)
+	counters.observeMouse(wmXButtonDown, true, 0)
+	counters.observeMouse(wmXButtonUp, true, 0)
+	counters.observeMouse(wmMouseWheel, false, 0)
+	counters.observeMouse(wmMouseHWheel, true, 0)
+	counters.observeMouse(0, false, 0)
 
 	snapshot := counters.snapshot(0)
 	if snapshot.Mouse.PhysicalMove != 1 || snapshot.Mouse.InjectedMove != 1 {
@@ -51,5 +51,8 @@ func TestObserveMouseSeparatesEventClasses(t *testing.T) {
 	}
 	if snapshot.Mouse.Other != 1 {
 		t.Fatalf("mouse other = %d, want 1", snapshot.Mouse.Other)
+	}
+	if snapshot.Mouse.SelfTestInjectedMove != 1 {
+		t.Fatalf("self-test injected move = %d, want 1", snapshot.Mouse.SelfTestInjectedMove)
 	}
 }

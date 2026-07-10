@@ -58,6 +58,28 @@
 - window handle, 제목과 process 이름
 - 사용자나 장치 식별자
 
+## `selftest-inject --json`
+
+- schema: `krasis.lab.selftest-inject/v1`
+- 출력: 단일 JSON object
+
+필드:
+
+- `passed`: 전체 판정
+- `sent`: `SendInput`이 수락한 selftest event 수
+- `observed`: hook에서 표식까지 확인한 injected event 수
+- `pointerRestored`: 실행 전후 cursor 위치 일치 여부
+- `failureCode`: 실패한 경우의 안정적인 분류
+
+실패 분류:
+
+- `send_input_failed`
+- `send_input_incomplete`
+- `injected_events_not_observed`
+- `pointer_position_changed`
+
+`passed=false`는 JSON을 정상 출력하더라도 exit `1`이다. UIPI 차단은 `SendInput` return이나 `GetLastError`만으로 정확히 구분되지 않을 수 있으므로 별도 성공으로 취급하지 않는다.
+
 ## 호환성
 
 두 schema는 Phase 0 실험 계약이다. 정식 제품 API가 아니므로 변경될 수 있지만, 변경 시 schema version과 관련 test를 함께 검토한다.

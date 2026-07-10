@@ -9,6 +9,7 @@ import (
 const (
 	DiagnoseSchemaVersion = "krasis.lab.diagnose/v1"
 	CaptureSchemaVersion  = "krasis.lab.capture/v1"
+	SelfTestSchemaVersion = "krasis.lab.selftest-inject/v1"
 )
 
 var ErrUnsupported = errors.New("operation is not supported on this platform")
@@ -16,6 +17,7 @@ var ErrUnsupported = errors.New("operation is not supported on this platform")
 type Platform interface {
 	Diagnose(context.Context) (Diagnostics, error)
 	Capture(context.Context, CaptureOptions, func(CaptureSnapshot)) error
+	SelfTestInject(context.Context) (SelfTestResult, error)
 }
 
 type Diagnostics struct {
@@ -58,6 +60,7 @@ type Capabilities struct {
 
 type CaptureOptions struct {
 	ReportInterval time.Duration
+	Ready          func()
 }
 
 type CaptureSnapshot struct {
@@ -77,13 +80,23 @@ type EventCounts struct {
 }
 
 type MouseCounts struct {
-	PhysicalMove       uint64 `json:"physicalMove"`
-	InjectedMove       uint64 `json:"injectedMove"`
-	PhysicalButtonDown uint64 `json:"physicalButtonDown"`
-	PhysicalButtonUp   uint64 `json:"physicalButtonUp"`
-	InjectedButtonDown uint64 `json:"injectedButtonDown"`
-	InjectedButtonUp   uint64 `json:"injectedButtonUp"`
-	PhysicalWheel      uint64 `json:"physicalWheel"`
-	InjectedWheel      uint64 `json:"injectedWheel"`
-	Other              uint64 `json:"other"`
+	PhysicalMove         uint64 `json:"physicalMove"`
+	InjectedMove         uint64 `json:"injectedMove"`
+	PhysicalButtonDown   uint64 `json:"physicalButtonDown"`
+	PhysicalButtonUp     uint64 `json:"physicalButtonUp"`
+	InjectedButtonDown   uint64 `json:"injectedButtonDown"`
+	InjectedButtonUp     uint64 `json:"injectedButtonUp"`
+	PhysicalWheel        uint64 `json:"physicalWheel"`
+	InjectedWheel        uint64 `json:"injectedWheel"`
+	Other                uint64 `json:"other"`
+	SelfTestInjectedMove uint64 `json:"-"`
+}
+
+type SelfTestResult struct {
+	SchemaVersion   string `json:"schemaVersion"`
+	Passed          bool   `json:"passed"`
+	Sent            uint32 `json:"sent"`
+	Observed        uint64 `json:"observed"`
+	PointerRestored bool   `json:"pointerRestored"`
+	FailureCode     string `json:"failureCode,omitempty"`
 }

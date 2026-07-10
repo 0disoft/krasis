@@ -36,11 +36,42 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, platform 
 		return runDiagnose(ctx, commandArgs, stdout, stderr, platform)
 	case "capture":
 		return runCapture(ctx, commandArgs, stdout, stderr, platform)
+	case "selftest-inject":
+		return runSelfTestInject(ctx, commandArgs, stdout, stderr, platform)
 	default:
 		fmt.Fprintf(stderr, "unknown command: %s\n", command)
 		writeUsage(stderr)
 		return exitUsage
 	}
+}
+
+func runSelfTestInject(ctx context.Context, args []string, stdout, stderr io.Writer, platform lab.Platform) int {
+	jsonOutput, ok := parseOutputFlag(args)
+	if !ok {
+		fmt.Fprintln(stderr, "usage: krasis-lab selftest-inject [--json]")
+		return exitUsage
+	}
+
+	result, err := platform.SelfTestInject(ctx)
+	if err != nil {
+		return writeError(stderr, err)
+	}
+
+	if jsonOutput {
+		if exitCode := writeJSON(stdout, stderr, result); exitCode != exitSuccess {
+			return exitCode
+		}
+	} else {
+		fmt.Fprintf(stdout, "SendInput self-test: passed=%t sent=%d observed=%d pointer-restored=%t\n", result.Passed, result.Sent, result.Observed, result.PointerRestored)
+		if result.FailureCode != "" {
+			fmt.Fprintf(stdout, "Failure: %s\n", result.FailureCode)
+		}
+	}
+
+	if !result.Passed {
+		return exitRuntime
+	}
+	return exitSuccess
 }
 
 func runDiagnose(ctx context.Context, args []string, stdout, stderr io.Writer, platform lab.Platform) int {
@@ -250,5 +281,6 @@ func writeUsage(output io.Writer) {
 	fmt.Fprintln(output, "Usage:")
 	fmt.Fprintln(output, "  krasis-lab diagnose [--json]")
 	fmt.Fprintln(output, "  krasis-lab capture [--json] [--duration DURATION]")
+	fmt.Fprintln(output, "  krasis-lab selftest-inject [--json]")
 	fmt.Fprintln(output, "  krasis-lab help")
 }

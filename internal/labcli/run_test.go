@@ -15,6 +15,8 @@ type fakePlatform struct {
 	diagnoseErr error
 	capture     []lab.CaptureSnapshot
 	captureErr  error
+	selfTest    lab.SelfTestResult
+	selfTestErr error
 }
 
 type failingWriter struct{}
@@ -32,6 +34,10 @@ func (f fakePlatform) Capture(_ context.Context, _ lab.CaptureOptions, report fu
 		report(snapshot)
 	}
 	return f.captureErr
+}
+
+func (f fakePlatform) SelfTestInject(context.Context) (lab.SelfTestResult, error) {
+	return f.selfTest, f.selfTestErr
 }
 
 func TestRunRequiresCommand(t *testing.T) {
@@ -141,5 +147,47 @@ func TestCaptureOutputFailureReturnsRuntimeError(t *testing.T) {
 	}
 	if !strings.HasPrefix(stderr.String(), "output_error:") {
 		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func TestSelfTestInjectJSONSuccess(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	platform := fakePlatform{selfTest: lab.SelfTestResult{
+		SchemaVersion:   lab.SelfTestSchemaVersion,
+		Passed:          true,
+		Sent:            2,
+		Observed:        2,
+		PointerRestored: true,
+	}}
+
+	exitCode := Run(context.Background(), []string{"selftest-inject", "--json"}, &stdout, &stderr, platform)
+
+	if exitCode != exitSuccess {
+		t.Fatalf("exit code = %d, stderr = %q", exitCode, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), `"schemaVersion":"krasis.lab.selftest-inject/v1"`) {
+		t.Fatalf("stdout does not contain self-test schema: %q", stdout.String())
+	}
+}
+
+func TestSelfTestInjectFailureReturnsRuntimeExit(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	platform := fakePlatform{selfTest: lab.SelfTestResult{
+		SchemaVersion: lab.SelfTestSchemaVersion,
+		Passed:        false,
+		Sent:          2,
+		Observed:      0,
+		FailureCode:   "injected_events_not_observed",
+	}}
+
+	exitCode := Run(context.Background(), []string{"selftest-inject", "--json"}, &stdout, &stderr, platform)
+
+	if exitCode != exitRuntime {
+		t.Fatalf("exit code = %d, want %d", exitCode, exitRuntime)
+	}
+	if !strings.Contains(stdout.String(), `"failureCode":"injected_events_not_observed"`) {
+		t.Fatalf("stdout does not contain failure code: %q", stdout.String())
 	}
 }

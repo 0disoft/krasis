@@ -22,3 +22,7 @@ func (p *Platform) Diagnose(context.Context) (lab.Diagnostics, error) {
 func (p *Platform) Capture(context.Context, lab.CaptureOptions, func(lab.CaptureSnapshot)) error {
 	return fmt.Errorf("%w: krasis-lab requires Windows", lab.ErrUnsupported)
 }
+
+func (p *Platform) SelfTestInject(context.Context) (lab.SelfTestResult, error) {
+	return lab.SelfTestResult{}, fmt.Errorf("%w: krasis-lab requires Windows", lab.ErrUnsupported)
+}

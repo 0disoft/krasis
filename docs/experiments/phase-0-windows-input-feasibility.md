@@ -108,12 +108,15 @@ watchdog과 독립 복구 수단이 없는 구현은 기능이 동작하더라�
 
 - `diagnose`: 구현 및 현재 개발 호스트 smoke 완료
 - `capture`: low-level keyboard/mouse hook, aggregate counter, bounded duration과 정상 hook 해제 구현
-- `inject`, `suppress`, `edge`, `recover`: 미구현
+- `selftest-inject`: tagged relative mouse move 왕복 검증 구현
+- 일반 `inject`, `suppress`, `edge`, `recover`: 미구현
 - Raw Input 비교 adapter: 미구현
 
 현재 개발 호스트에서 확인한 값은 Windows `10.0` build `26200`, `amd64`, 일반 권한 process, 단일 monitor다. 이는 H-A/H-B/S-A/S-B 중 어느 장비인지 확인되지 않았으므로 장비 원장에는 반영하지 않았다. 같은 smoke에서 low-level keyboard/mouse hook, Raw Input과 `SendInput` API 존재를 확인했다.
 
 1초 bounded `capture` smoke는 두 hook의 설치, 실제 물리 mouse move와 wheel callback, aggregate count 증가와 자동 hook 해제를 확인했다. 출력에는 좌표나 raw key가 포함되지 않았다. 1초는 제품 성능 목표가 아니라 자동 검증을 유한하게 끝내기 위한 실행 경계다. keyboard callback과 injected event 분류는 unit test로만 검증됐으며 실제 장비 입력 증거는 아직 필요하다.
+
+첫 `selftest-inject` 시도에서 zero-delta mouse move 두 건은 `SendInput`이 수락했지만 hook에서 관찰되지 않아 실패했다. 실패를 성공으로 완화하지 않고 `MOUSEEVENTF_MOVE_NOCOALESCE`를 적용한 `+1/-1` 상대 이동 쌍으로 변경했다. 후속 smoke에서 전송 두 건, selftest 표식과 injected flag가 일치한 관찰 두 건, 실행 전후 cursor 위치 일치를 확인했다. 이 결과는 현재 개발 호스트의 증거이며 네 대의 대상 노트북과 UIPI 경계에서는 다시 검증해야 한다.
 
 ## 공통 기록 항목
 
