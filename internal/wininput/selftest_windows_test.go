@@ -18,6 +18,16 @@ func TestInputStructMatchesWindowsABI(t *testing.T) {
 	}
 }
 
+func TestKeyboardInputStructMatchesWindowsABI(t *testing.T) {
+	want := uintptr(16)
+	if unsafe.Sizeof(uintptr(0)) == 8 {
+		want = 24
+	}
+	if got := unsafe.Sizeof(keyboardInput{}); got != want {
+		t.Fatalf("KEYBDINPUT size = %d, want %d", got, want)
+	}
+}
+
 func TestClassifySelfTest(t *testing.T) {
 	tests := []struct {
 		name          string

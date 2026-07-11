@@ -14,32 +14,15 @@ import (
 )
 
 const (
-	inputMouse               = 0
-	mouseEventMove           = 0x0001
-	mouseEventMoveNoCoalesce = 0x2000
-	selfTestEventCount       = 2
-	selfTestDeadline         = 2 * time.Second
-	selfTestReportInterval   = 10 * time.Millisecond
+	selfTestEventCount     = 2
+	selfTestDeadline       = 2 * time.Second
+	selfTestReportInterval = 10 * time.Millisecond
 )
 
 var (
-	procSendInput    = user32.NewProc("SendInput")
 	procGetCursorPos = user32.NewProc("GetCursorPos")
+	procSetCursorPos = user32.NewProc("SetCursorPos")
 )
-
-type mouseInput struct {
-	DX        int32
-	DY        int32
-	MouseData uint32
-	Flags     uint32
-	Time      uint32
-	ExtraInfo uintptr
-}
-
-type input struct {
-	Type  uint32
-	Mouse mouseInput
-}
 
 type injectionOutcome struct {
 	sent            uint32
@@ -166,7 +149,18 @@ func sendTaggedRelativeMoves() (uint32, bool, error) {
 	if err != nil {
 		return uint32(sent), false, err
 	}
-	return uint32(sent), before == after, nil
+	if before == after {
+		return uint32(sent), true, nil
+	}
+	result, _, callErr := procSetCursorPos.Call(uintptr(before.X), uintptr(before.Y))
+	if result == 0 {
+		return uint32(sent), false, fmt.Errorf("SetCursorPos(restore) failed: %w", callErr)
+	}
+	restored, err := cursorPosition()
+	if err != nil {
+		return uint32(sent), false, err
+	}
+	return uint32(sent), before == restored, nil
 }
 
 func cursorPosition() (point, error) {

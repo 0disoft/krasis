@@ -1,7 +1,7 @@
 {
   "tool": "ssealed",
   "version": "0.6.11",
-  "generatedAt": "2026-07-11T04:55:21.489Z",
+  "generatedAt": "2026-07-11T05:04:48.734Z",
   "scope": "general",
   "profile": "desktop-app",
   "addons": [
@@ -540,24 +540,24 @@
     },
     {
       "path": "docs/architecture/01-domain-model.md",
-      "checksum": "sha256:c3932ea1d2387fca25cbb883ad1024f9d6cba56f715ab610f65683c0c538ebd5",
+      "checksum": "sha256:8f509b9f63196d56897be3bd2d9047cdf54b1cff7bb76f152efeb581e062f965",
       "kind": "document",
       "ownership": "seeded",
       "presence": "optional",
       "status": "active",
       "initialChecksum": "sha256:3a6ade5fdc3cb4fd6036e0c72d83d26fedeefd3aff76c11f748d0d81e26b66fb",
-      "acceptedChecksum": "sha256:c3932ea1d2387fca25cbb883ad1024f9d6cba56f715ab610f65683c0c538ebd5",
+      "acceptedChecksum": "sha256:8f509b9f63196d56897be3bd2d9047cdf54b1cff7bb76f152efeb581e062f965",
       "generatedChecksum": "sha256:3a6ade5fdc3cb4fd6036e0c72d83d26fedeefd3aff76c11f748d0d81e26b66fb"
     },
     {
       "path": "docs/architecture/02-runtime-flow.md",
-      "checksum": "sha256:071588b3acd4d5979fcbbca99d2e9a3243b9df3739a785d3be87465711e4604b",
+      "checksum": "sha256:607174d9893f52d7da42b641a4198d7868725799c6e283a82b82e7d34f5bf209",
       "kind": "document",
       "ownership": "seeded",
       "presence": "optional",
       "status": "active",
       "initialChecksum": "sha256:c0f5d7adf6082d4abc8e950b6b4f30103fcc40b32341513690ec00a2b2f7c288",
-      "acceptedChecksum": "sha256:071588b3acd4d5979fcbbca99d2e9a3243b9df3739a785d3be87465711e4604b",
+      "acceptedChecksum": "sha256:607174d9893f52d7da42b641a4198d7868725799c6e283a82b82e7d34f5bf209",
       "generatedChecksum": "sha256:c0f5d7adf6082d4abc8e950b6b4f30103fcc40b32341513690ec00a2b2f7c288"
     },
     {

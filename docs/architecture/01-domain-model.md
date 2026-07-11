@@ -55,7 +55,9 @@ transition effect는 로컬 입력 억제, 활성화, lease registry 무효화�
 
 ## 정규화 입력 action
 
-`InputAction`은 keyboard key down/up, mouse button down/up, relative pointer move와 horizontal/vertical wheel delta를 표현한다. key와 button은 opaque code만 가지며 delta를 가질 수 없고, move와 wheel은 code 없이 하나 이상의 non-zero delta가 필요하다. 구체적인 Windows virtual-key, scan-code와 button mapping은 Win32 adapter 검증 전까지 결정하지 않는다.
+`InputAction`은 keyboard key down/up, mouse button down/up, relative pointer move와 horizontal/vertical wheel delta를 표현한다. key와 button은 opaque code만 가지며 delta를 가질 수 없고, move와 wheel은 code 없이 하나 이상의 non-zero delta가 필요하다.
+
+Windows keyboard code는 low-level hook의 non-zero scan code를 하위 16비트에 넣고 bit 16 하나로 extended-key 여부를 표시한다. 나머지 상위 비트는 금지한다. destination은 virtual-key로 다시 해석하지 않고 `KEYEVENTF_SCANCODE`와 필요할 때 `KEYEVENTF_EXTENDEDKEY`를 사용해 주입한다. mouse button code는 `1=left`, `2=right`, `3=middle`, `4=X1`, `5=X2`만 허용한다. 이 mapping은 transport payload와 `PressedState`가 공유하는 실행 계약이다.
 
 Application은 action을 검증한 뒤 현재 session·epoch·sequence를 승인하고 같은 `SessionRuntime` 직렬 경계 안에서 adapter를 호출한다. adapter 호출이 실패하면 승인한 sequence를 재시도하지 않고 해당 session을 fault cleanup한다.
 
@@ -67,7 +69,7 @@ peer가 보낸 wall clock을 신뢰하지 않고 로컬 수신 시각을 사용�
 
 ## PressedState와 ReleaseAll
 
-`PressedState`는 원격에 down을 반영하려는 keyboard key와 mouse button의 opaque normalized token을 메모리에 기록한다. token의 구체적인 Windows code mapping은 입력 adapter 검증 뒤 확정한다.
+`PressedState`는 원격에 down을 반영하려는 keyboard key와 mouse button의 normalized token을 메모리에 기록한다. keyboard token은 위 scan-code encoding을, mouse token은 닫힌 button code 집합을 사용한다.
 
 - down 주입 전에 token을 먼저 기록한다.
 - 같은 token의 반복 down은 상태를 중복시키지 않는다.
