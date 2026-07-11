@@ -96,6 +96,107 @@ func TestPeerSessionsCompleteOutboundInputAndReturnRevokeRoundTrip(t *testing.T)
 	}
 }
 
+func TestPeerSessionsReuseOneConnectionForBothDirections(t *testing.T) {
+	leftSide, rightSide := openFramedPipe(t)
+	leftInput := &integrationInputPort{moves: make(chan [2]int32, 1)}
+	rightInput := &integrationInputPort{moves: make(chan [2]int32, 1)}
+	leftRuntime := newIntegrationRuntime(t, leftInput)
+	rightRuntime := newIntegrationRuntime(t, rightInput)
+	leftActivation := newIntegrationSourceActivation()
+	rightActivation := newIntegrationSourceActivation()
+	leftOutbound, err := NewOutboundController(leftSide, leftRuntime, leftActivation)
+	if err != nil {
+		t.Fatalf("NewOutboundController(left) error = %v", err)
+	}
+	rightOutbound, err := NewOutboundController(rightSide, rightRuntime, rightActivation)
+	if err != nil {
+		t.Fatalf("NewOutboundController(right) error = %v", err)
+	}
+	leftReturns := &integrationReturnBoundary{}
+	rightReturns := &integrationReturnBoundary{}
+	leftResponder := &LeaseResponder{
+		Writer:     leftSide,
+		Runtime:    leftRuntime,
+		Authorizer: staticLeaseAuthorizer{leaseID: "lease-left", accepted: true},
+		Entry:      integrationCursorEntry{},
+		Returns:    leftReturns,
+	}
+	rightResponder := &LeaseResponder{
+		Writer:     rightSide,
+		Runtime:    rightRuntime,
+		Authorizer: staticLeaseAuthorizer{leaseID: "lease-right", accepted: true},
+		Entry:      integrationCursorEntry{},
+		Returns:    rightReturns,
+	}
+	leftReturnController, err := NewReturnController(leftSide, leftRuntime, leftReturns)
+	if err != nil {
+		t.Fatalf("NewReturnController(left) error = %v", err)
+	}
+	rightReturnController, err := NewReturnController(rightSide, rightRuntime, rightReturns)
+	if err != nil {
+		t.Fatalf("NewReturnController(right) error = %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 2)
+	go func() {
+		done <- RunSessionWithLifecycle(ctx, leftSide, leftRuntime, leftResponder, leftOutbound, time.Now)
+	}()
+	go func() {
+		done <- RunSessionWithLifecycle(ctx, rightSide, rightRuntime, rightResponder, rightOutbound, time.Now)
+	}()
+	t.Cleanup(func() {
+		cancel()
+		_ = leftSide.Close()
+		_ = rightSide.Close()
+		for range 2 {
+			select {
+			case <-done:
+			case <-time.After(2 * time.Second):
+				t.Fatal("bidirectional peer session did not stop")
+			}
+		}
+	})
+
+	leftIdentity := OutboundIdentity{SessionID: "session-left", Epoch: "epoch-left"}
+	if err := leftOutbound.BeginBoundary(
+		ctx,
+		control.BoundaryIntent{Edge: control.ScreenEdgeRight, X: 1919},
+		leftIdentity,
+	); err != nil {
+		t.Fatalf("BeginBoundary(left) error = %v", err)
+	}
+	waitSignal(t, leftActivation.activated, "left source activation")
+	if err := SendInputAction(ctx, leftSide, leftRuntime, control.InputAction{Kind: control.InputPointerMove, DeltaX: 7, DeltaY: -2}); err != nil {
+		t.Fatalf("SendInputAction(left) error = %v", err)
+	}
+	waitMove(t, rightInput.moves, [2]int32{7, -2}, "right")
+	if err := rightReturnController.Revoke(ctx, control.ReturnIntent{SessionID: leftIdentity.SessionID, Epoch: leftIdentity.Epoch}); err != nil {
+		t.Fatalf("Revoke(right) error = %v", err)
+	}
+	waitSignal(t, leftActivation.deactivated, "left source deactivation")
+	assertIntegrationRuntimesLocal(t, leftRuntime, rightRuntime, "left-to-right transfer")
+
+	rightIdentity := OutboundIdentity{SessionID: "session-right", Epoch: "epoch-right"}
+	if err := rightOutbound.BeginBoundary(
+		ctx,
+		control.BoundaryIntent{Edge: control.ScreenEdgeLeft, X: 0},
+		rightIdentity,
+	); err != nil {
+		t.Fatalf("BeginBoundary(right) error = %v", err)
+	}
+	waitSignal(t, rightActivation.activated, "right source activation")
+	if err := SendInputAction(ctx, rightSide, rightRuntime, control.InputAction{Kind: control.InputPointerMove, DeltaX: -9, DeltaY: 3}); err != nil {
+		t.Fatalf("SendInputAction(right) error = %v", err)
+	}
+	waitMove(t, leftInput.moves, [2]int32{-9, 3}, "left")
+	if err := leftReturnController.Revoke(ctx, control.ReturnIntent{SessionID: rightIdentity.SessionID, Epoch: rightIdentity.Epoch}); err != nil {
+		t.Fatalf("Revoke(left) error = %v", err)
+	}
+	waitSignal(t, rightActivation.deactivated, "right source deactivation")
+	assertIntegrationRuntimesLocal(t, leftRuntime, rightRuntime, "right-to-left transfer")
+}
+
 func TestPeerSessionsReconnectWithNewSessionAndEpoch(t *testing.T) {
 	sourceRuntime := newIntegrationRuntime(t, &integrationInputPort{moves: make(chan [2]int32, 2)})
 	destinationInput := &integrationInputPort{moves: make(chan [2]int32, 2)}
@@ -274,6 +375,30 @@ func waitSignal(t *testing.T, signal <-chan struct{}, name string) {
 	case <-signal:
 	case <-time.After(2 * time.Second):
 		t.Fatalf("timed out waiting for %s", name)
+	}
+}
+
+func waitMove(t *testing.T, moves <-chan [2]int32, want [2]int32, destination string) {
+	t.Helper()
+	select {
+	case got := <-moves:
+		if got != want {
+			t.Fatalf("%s move = %v, want %v", destination, got, want)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("%s did not inject input", destination)
+	}
+}
+
+func assertIntegrationRuntimesLocal(
+	t *testing.T,
+	left *application.SessionRuntime,
+	right *application.SessionRuntime,
+	phase string,
+) {
+	t.Helper()
+	if left.Snapshot().Control.State != control.StateLocal || right.Snapshot().Control.State != control.StateLocal {
+		t.Fatalf("%s did not finish local: left=%s right=%s", phase, left.Snapshot(), right.Snapshot())
 	}
 }
 
