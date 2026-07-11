@@ -70,6 +70,19 @@ server와 client TLS config는 TLS 1.3만 허용하고 `krasis/1` ALPN을 사용
 
 `PeerConnection`은 mutual TLS와 ALPN 검증이 완료된 뒤에만 bounded frame reader/writer를 노출한다. writer 호출은 connection 안에서 직렬화해 여러 producer의 frame bytes가 섞이지 않게 한다. input dispatcher는 payload decode가 실패하면 활성 `SessionRuntime`을 fault cleanup하고, router가 잘못 전달한 non-input frame은 runtime state를 건드리지 않고 거부한다.
 
+## 상주 agent session 조립
+
+`internal/agent.RunSession`은 인증이 끝난 peer connection 하나에 다음 lifecycle을 한꺼번에 묶는다.
+
+- `SourceSession` worker를 먼저 시작하고 ready 이후에만 low-level source hook과 boundary orchestrator를 시작한다.
+- 같은 `SessionRuntime`과 connection을 outbound controller, inbound lease responder, return controller가 공유한다.
+- 한 peer가 경계를 넘으면 source suppression은 exact lease grant 뒤에만 활성화된다.
+- 반대 peer가 경계를 넘으면 같은 process가 destination input adapter와 return controller로 동작한다.
+- source worker, hook, boundary orchestrator, return controller, peer reader 중 하나가 비정상 종료하면 공통 context를 취소하고 나머지를 모두 회수한다.
+- 종료 결과가 `LOCAL`이 아니면 정상 종료로 보고하지 않는다.
+
+이 조립 경계는 이미 구성된 단일 authenticated connection의 session lifecycle만 소유한다. listen/dial, credential storage, reconnect backoff, 단일 instance, tray와 process supervisor는 그 바깥 책임이며 아직 상주 executable로 조립되지 않았다.
+
 control payload는 wire 전용 `LeaseRequest`, `LeaseGrant`, `LeaseReject`, `LeaseRevoke` 명령만 허용한다. 모든 명령은 session과 epoch를 포함하고, grant와 revoke만 lease를 포함한다. `FAULT_DETECTED`, `RELEASE_ALL_SUCCEEDED` 같은 내부 상태 머신 event는 wire command가 아니며 peer가 직렬화하거나 주입할 수 없다.
 
 인증된 peer session read loop는 control, input, heartbeat frame을 한 ordered stream에서 순차 dispatch한다. payload 오류, 잘못된 방향, handler 실패, EOF와 context 취소는 모두 connection을 닫고 runtime의 fault cleanup을 호출한다. EOF는 정상적인 제어 종료로 취급하지 않으며 명시적인 revoke 없이 연결이 끝난 경우에도 `ReleaseAll` 후 `LOCAL`로 수렴해야 한다.

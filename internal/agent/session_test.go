@@ -1,0 +1,215 @@
+package agent
+
+import (
+	"context"
+	"errors"
+	"net"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/transport"
+	"github.com/0disoft/krasis/internal/wininput"
+)
+
+func TestRunSessionWiresBoundaryInputReturnAndLocalCleanup(t *testing.T) {
+	leftConnection, rightConnection := openConnectionPair(t)
+	leftHook := &triggerHook{returned: make(chan struct{})}
+	rightHook := &idleHook{}
+	leftInput := newTestInput(false)
+	rightInput := newTestInput(true)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	type outcome struct {
+		result Result
+		err    error
+	}
+	done := make(chan outcome, 2)
+	config := DefaultConfig(control.BoundaryConfig{
+		Edge: control.ScreenEdgeRight, ScreenLeft: 0, ScreenWidth: 100,
+		ActivationGap: 0, RearmDistance: 10,
+	})
+	go func() {
+		result, err := RunSession(ctx, config, Dependencies{
+			Connection: leftConnection, Hook: leftHook, Input: leftInput,
+			Effects: noopEffects{}, Authorizer: acceptingAuthorizer{},
+		})
+		done <- outcome{result: result, err: err}
+	}()
+	go func() {
+		result, err := RunSession(ctx, config, Dependencies{
+			Connection: rightConnection, Hook: rightHook, Input: rightInput,
+			Effects: noopEffects{}, Authorizer: acceptingAuthorizer{},
+		})
+		done <- outcome{result: result, err: err}
+	}()
+
+	select {
+	case move := <-rightInput.moves:
+		if move != [2]int32{7, -3} {
+			t.Fatalf("destination move = %v", move)
+		}
+	case <-ctx.Done():
+		t.Fatalf("destination input timeout: %v", ctx.Err())
+	}
+	select {
+	case <-leftHook.returned:
+	case <-ctx.Done():
+		t.Fatalf("source return timeout: %v", ctx.Err())
+	}
+	cancel()
+	for range 2 {
+		select {
+		case finished := <-done:
+			if !errors.Is(finished.err, context.Canceled) {
+				t.Fatalf("RunSession() error = %v", finished.err)
+			}
+			if finished.result.FinalState != control.StateLocal {
+				t.Fatalf("final state = %s", finished.result.FinalState)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("agent session did not stop")
+		}
+	}
+}
+
+func TestRunSessionRejectsIncompleteDependencies(t *testing.T) {
+	_, err := RunSession(context.Background(), Config{}, Dependencies{})
+	if err == nil {
+		t.Fatal("RunSession() accepted incomplete dependencies")
+	}
+}
+
+type triggerHook struct {
+	returned chan struct{}
+}
+
+func (hook *triggerHook) RunWithBoundary(ctx context.Context, session *wininput.SourceSession, boundary wininput.BoundaryObserver, ready func()) error {
+	if ready != nil {
+		ready()
+	}
+	if err := boundary.Observe(control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}, 99); err != nil {
+		return err
+	}
+	ticker := time.NewTicker(time.Millisecond)
+	defer ticker.Stop()
+	for !session.Active() {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
+	}
+	if !session.Offer(control.InputAction{Kind: control.InputPointerMove, DeltaX: 7, DeltaY: -3}) {
+		return errors.New("source action was not accepted")
+	}
+	for session.Active() {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
+	}
+	close(hook.returned)
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+type idleHook struct{}
+
+func (*idleHook) RunWithBoundary(ctx context.Context, _ *wininput.SourceSession, _ wininput.BoundaryObserver, ready func()) error {
+	if ready != nil {
+		ready()
+	}
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+type testInput struct {
+	mu         sync.Mutex
+	intent     control.ReturnIntent
+	returnNext bool
+	returns    chan control.ReturnIntent
+	moves      chan [2]int32
+}
+
+func newTestInput(returnNext bool) *testInput {
+	return &testInput{returnNext: returnNext, returns: make(chan control.ReturnIntent, 1), moves: make(chan [2]int32, 1)}
+}
+
+func (*testInput) Press(context.Context, control.PressedToken) error   { return nil }
+func (*testInput) Release(context.Context, control.PressedToken) error { return nil }
+func (*testInput) Wheel(context.Context, int32, int32) error           { return nil }
+func (*testInput) Enter(context.Context, control.ScreenEdge) error     { return nil }
+func (input *testInput) Move(_ context.Context, x, y int32) error {
+	input.moves <- [2]int32{x, y}
+	input.mu.Lock()
+	intent := input.intent
+	shouldReturn := input.returnNext
+	input.returnNext = false
+	input.mu.Unlock()
+	if shouldReturn {
+		input.returns <- intent
+	}
+	return nil
+}
+func (input *testInput) ArmReturn(intent control.ReturnIntent, _ control.ScreenEdge) error {
+	input.mu.Lock()
+	input.intent = intent
+	input.mu.Unlock()
+	return nil
+}
+func (*testInput) RearmReturn(control.ReturnIntent) {}
+func (input *testInput) DisarmReturn(control.ReturnIntent) {
+	input.mu.Lock()
+	input.intent = control.ReturnIntent{}
+	input.mu.Unlock()
+}
+func (input *testInput) ReturnIntents() <-chan control.ReturnIntent { return input.returns }
+
+type noopEffects struct{}
+
+func (noopEffects) Execute(context.Context, control.Effect) error { return nil }
+
+type acceptingAuthorizer struct{}
+
+func (acceptingAuthorizer) AuthorizeLease(context.Context, string, string, time.Time) (string, bool, error) {
+	return "lease-agent-test", true, nil
+}
+
+type framedConnection struct {
+	net.Conn
+	reader *transport.Reader
+	writer *transport.Writer
+	mu     sync.Mutex
+}
+
+func openConnectionPair(t *testing.T) (*framedConnection, *framedConnection) {
+	t.Helper()
+	left, right := net.Pipe()
+	makeConnection := func(connection net.Conn) *framedConnection {
+		reader, err := transport.NewReader(connection)
+		if err != nil {
+			t.Fatal(err)
+		}
+		writer, err := transport.NewWriter(connection)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return &framedConnection{Conn: connection, reader: reader, writer: writer}
+	}
+	return makeConnection(left), makeConnection(right)
+}
+
+func (connection *framedConnection) ReadFrame() (transport.Frame, error) {
+	return connection.reader.ReadFrame()
+}
+func (connection *framedConnection) WriteFrameContext(ctx context.Context, frame transport.Frame) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	connection.mu.Lock()
+	defer connection.mu.Unlock()
+	return connection.writer.WriteFrame(frame)
+}

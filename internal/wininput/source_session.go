@@ -129,6 +129,10 @@ func (session *SourceSession) Abort(cause error) {
 }
 
 func (session *SourceSession) Run(ctx context.Context) error {
+	return session.RunWithReady(ctx, nil)
+}
+
+func (session *SourceSession) RunWithReady(ctx context.Context, ready func()) error {
 	if session == nil || session.sink == nil {
 		return errors.New("source session is not initialized")
 	}
@@ -140,6 +144,9 @@ func (session *SourceSession) Run(ctx context.Context) error {
 	}
 	if !session.started.CompareAndSwap(false, true) {
 		return errors.New("source session worker is already running")
+	}
+	if ready != nil {
+		ready()
 	}
 	defer session.started.Store(false)
 	defer session.terminal.Store(true)
