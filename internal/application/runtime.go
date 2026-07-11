@@ -244,6 +244,19 @@ func (runtime *SessionRuntime) CheckLiveness(
 	return faulted, err
 }
 
+func (runtime *SessionRuntime) Fail(ctx context.Context, cause error) error {
+	if cause == nil {
+		cause = errors.New("peer session failed")
+	}
+	runtime.mu.Lock()
+	defer runtime.mu.Unlock()
+	if runtime.control.State == control.StateLocal {
+		return cause
+	}
+	_, err := runtime.faultLocked(ctx, cause)
+	return err
+}
+
 func (runtime *SessionRuntime) faultLocked(ctx context.Context, cause error) (ControlOutcome, error) {
 	outcome, faultErr := HandleControlEvent(
 		ctx,

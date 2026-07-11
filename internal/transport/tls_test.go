@@ -229,6 +229,36 @@ func handshakePair(
 	clientConfig *tls.Config,
 ) (tls.ConnectionState, tls.ConnectionState, error, error) {
 	t.Helper()
+	server, client := openTLSPair(t, serverConfig, clientConfig)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	type result struct {
+		server bool
+		err    error
+	}
+	done := make(chan result, 2)
+	go func() { done <- result{server: true, err: AuthenticatePeer(ctx, server)} }()
+	go func() { done <- result{server: false, err: AuthenticatePeer(ctx, client)} }()
+	first := <-done
+	if first.err != nil {
+		_ = server.NetConn().Close()
+		_ = client.NetConn().Close()
+	}
+	second := <-done
+	var serverErr, clientErr error
+	for _, outcome := range []result{first, second} {
+		if outcome.server {
+			serverErr = outcome.err
+		} else {
+			clientErr = outcome.err
+		}
+	}
+	return server.ConnectionState(), client.ConnectionState(), serverErr, clientErr
+}
+
+func openTLSPair(t *testing.T, serverConfig, clientConfig *tls.Config) (*tls.Conn, *tls.Conn) {
+	t.Helper()
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen on loopback: %v", err)
@@ -262,31 +292,7 @@ func handshakePair(
 		_ = serverSide.Close()
 		_ = clientSide.Close()
 	})
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	type result struct {
-		server bool
-		err    error
-	}
-	done := make(chan result, 2)
-	go func() { done <- result{server: true, err: AuthenticatePeer(ctx, server)} }()
-	go func() { done <- result{server: false, err: AuthenticatePeer(ctx, client)} }()
-	first := <-done
-	if first.err != nil {
-		_ = serverSide.Close()
-		_ = clientSide.Close()
-	}
-	second := <-done
-	var serverErr, clientErr error
-	for _, outcome := range []result{first, second} {
-		if outcome.server {
-			serverErr = outcome.err
-		} else {
-			clientErr = outcome.err
-		}
-	}
-	return server.ConnectionState(), client.ConnectionState(), serverErr, clientErr
+	return server, client
 }
 
 func assertHandshakeRejected(t *testing.T, serverErr, clientErr error) {
