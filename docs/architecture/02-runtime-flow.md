@@ -113,6 +113,8 @@ ADR 0005의 `SessionWriteCoordinator`는 grant, reject, revoke, input과 heartbe
 구현됐다. caller가 명시적인 interval과 더 긴 timeout policy를 주입하면 optional worker가 같은
 coordinator를 획득한 뒤 fresh local monotonic observation을 읽어 deadline 확인과 heartbeat
 write를 수행한다. coordinator 대기 전 ticker 시각은 deadline 근거로 재사용하지 않는다.
+deadline fault cleanup은 session cancellation을 떼어낸 bounded context를 사용해 held input
+release가 동시 취소에 잘리지 않게 한다.
 policy가 없으면 worker는 없고
 제품 기본값과 `agent-session` evidence 계약은 여전히 `UNDECIDED`다.
 inbound input과 heartbeat dispatch는 coordinator 안에서 runtime을 변경하고 malformed control은

@@ -41,7 +41,8 @@ reject, revoke, input과 heartbeat 사이에서 어떤 runtime 결정이 어떤 
 - timeout 판정은 peer timestamp가 아닌 local monotonic observation을 사용하며, coordinator를
   획득한 뒤 현재 시각을 읽어 대기 시간을 deadline에서 빼먹지 않는다. timeout이나
   heartbeat write failure는 bounded cleanup context에서 `ReleaseAll`과 `LOCAL` 수렴을
-  시도한다.
+  시도한다. 이 cleanup context는 session 취소를 상속하지 않아 동시 cancellation이 held input
+  release를 선점하지 못한다.
 - `HEARTBEAT` payload v1의 session ID 계약은 바꾸지 않는다. epoch 추가 필요성은 실제 stale
   session 충돌 증거가 생길 때 별도 protocol ADR로 판단한다.
 
@@ -53,6 +54,7 @@ reject, revoke, input과 heartbeat 사이에서 어떤 runtime 결정이 어떤 
 - heartbeat 중단 시 destination의 held input이 `ReleaseAll`되고 양쪽이 `LOCAL`로 수렴함
 - heartbeat write가 block되거나 실패해도 coordinator와 runtime이 무기한 잠기지 않음
 - coordinator 대기 중 deadline이 지나면 과거 ticker 시각으로 heartbeat를 보내지 않음
+- deadline 판정과 session cancellation이 겹쳐도 held input cleanup이 완료됨
 - 서로 다른 interval 또는 timeout의 Phase 0 evidence가 통과하지 않음
 
 ## 결과

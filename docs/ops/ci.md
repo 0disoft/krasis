@@ -21,7 +21,8 @@ coordinator 밖에서 runtime을 바꾸지 않고 malformed control이 connectio
 optional liveness worker 테스트는 잘못된 interval/timeout 관계를 거부하고, inactive runtime에서
 frame을 만들지 않으며, active session heartbeat를 기록하고, silent peer deadline과 heartbeat
 write failure에서 runtime을 `LOCAL`로 cleanup하며, deadline의 held input release와 blocked
-write 취소 뒤 coordinator 재사용, coordinator 대기 뒤 fresh deadline observation을 검증한다. 실제
+write 취소 뒤 coordinator 재사용, coordinator 대기 뒤 fresh deadline observation, deadline과
+session cancellation 경합에서 bounded held-input cleanup을 검증한다. 실제
 timer cadence, congestion과 절전 중 false timeout은 장비 실험 범위다.
 
 agent assembly 통합 테스트는 두 agent session을 실제 framed pipe로 연결하고 source worker ready, boundary intent, lease grant 이후 suppression, normalized input 전달, destination return intent, source deactivation과 양쪽 `LOCAL` cleanup을 한 경로에서 검증한다. 테스트는 OS hook과 `SendInput` 대신 같은 interface의 deterministic port를 사용하므로 실제 Windows callback과 주입 검증을 대체하지 않는다.

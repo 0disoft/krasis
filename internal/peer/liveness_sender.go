@@ -33,7 +33,9 @@ func PulseLiveness(
 		}
 		active = true
 		observedAt := now()
-		faulted, err := runtime.CheckLiveness(ctx, observedAt, timeout)
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), CleanupTimeout)
+		defer cancel()
+		faulted, err := runtime.CheckLiveness(cleanupCtx, observedAt, timeout)
 		if err != nil {
 			return err
 		}

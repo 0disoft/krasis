@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/transport"
 )
@@ -157,6 +158,39 @@ func TestPulseLivenessReadsDeadlineClockAfterCoordinatorWait(t *testing.T) {
 	}
 }
 
+func TestPulseLivenessTimeoutCleanupSurvivesConcurrentSessionCancellation(t *testing.T) {
+	input := &cancelAwareInputPort{}
+	runtime, err := application.NewSessionRuntime(effectExecutor{}, input)
+	if err != nil {
+		t.Fatalf("NewSessionRuntime() error = %v", err)
+	}
+	if _, err := runtime.GrantInbound(context.Background(), control.Event{
+		Kind: control.EventInboundLeaseGranted, SessionID: "session-1", LeaseID: "lease-1",
+	}, "epoch-1", time.Unix(100, 0)); err != nil {
+		t.Fatalf("GrantInbound() error = %v", err)
+	}
+	token := control.PressedToken{Kind: control.PressedKeyboardKey, Code: 65}
+	if err := runtime.HandlePressedInput(context.Background(), control.InputEnvelope{
+		SessionID: "session-1", Epoch: "epoch-1", Sequence: 1,
+	}, token, true); err != nil {
+		t.Fatalf("HandlePressedInput() error = %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	active, err := PulseLiveness(ctx, testWriteCoordinator(t, &recordingFrameWriter{}), runtime, func() time.Time {
+		cancel()
+		return time.Unix(103, 0)
+	}, 3*time.Second)
+	if !active || !errors.Is(err, ErrPeerLivenessExpired) {
+		t.Fatalf("PulseLiveness(canceled timeout) = active %t error %v", active, err)
+	}
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal || snapshot.PressedCount != 0 {
+		t.Fatalf("canceled timeout runtime = %s", snapshot)
+	}
+	if len(input.releases) != 1 || input.releases[0] != token {
+		t.Fatalf("canceled timeout releases = %+v", input.releases)
+	}
+}
+
 type blockingLivenessWriter struct {
 	started chan struct{}
 }
@@ -166,3 +200,18 @@ func (writer *blockingLivenessWriter) WriteFrameContext(ctx context.Context, _ t
 	<-ctx.Done()
 	return ctx.Err()
 }
+
+type cancelAwareInputPort struct {
+	releases []control.PressedToken
+}
+
+func (*cancelAwareInputPort) Press(context.Context, control.PressedToken) error { return nil }
+func (port *cancelAwareInputPort) Release(ctx context.Context, token control.PressedToken) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	port.releases = append(port.releases, token)
+	return nil
+}
+func (*cancelAwareInputPort) Move(context.Context, int32, int32) error  { return nil }
+func (*cancelAwareInputPort) Wheel(context.Context, int32, int32) error { return nil }
