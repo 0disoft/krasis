@@ -19,7 +19,9 @@ Krasis는 control lease, heartbeat와 입력 event의 의미 순서를 보존해
 
 `INPUT` payload version 1은 session ID, epoch, sequence와 정규화 action을 big-endian binary로 담는다. session ID와 epoch는 각각 최대 255 bytes이며 payload는 정확한 길이만 허용한다. action kind와 field 조합, reserved field, zero sequence, trailing bytes가 유효하지 않으면 runtime에 전달하지 않는다.
 
-`HEARTBEAT` payload version 1은 최대 255 bytes의 session ID만 담는다. peer wall-clock이나 timestamp는 전송하지 않고 수신측의 local observation time만 liveness에 사용한다. `CONTROL` payload 형식은 아직 `UNDECIDED`다.
+`HEARTBEAT` payload version 1은 최대 255 bytes의 session ID만 담는다. peer wall-clock이나 timestamp는 전송하지 않고 수신측의 local observation time만 liveness에 사용한다.
+
+`CONTROL` payload version 2는 command kind, session ID, lease ID, epoch와 source boundary edge를 담는다. `LeaseRequest`만 필수 `LEFT` 또는 `RIGHT` edge를 포함하고 grant, reject와 revoke에는 edge가 없어야 한다. destination은 source의 `RIGHT` request를 local virtual desktop의 왼쪽 안쪽으로, source의 `LEFT` request를 오른쪽 안쪽으로 배치한 뒤에만 inbound lease와 grant를 확정한다. 정의되지 않은 edge code, command별 금지 field, 길이 불일치와 reserved field는 payload 오류다. version 1 control payload와의 호환은 출시 전 계약이므로 유지하지 않는다.
 
 ## 결과
 

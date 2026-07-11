@@ -13,6 +13,10 @@ type InputAdapter struct{}
 
 func NewInputAdapter() *InputAdapter { return &InputAdapter{} }
 
+func (adapter *InputAdapter) Enter(context.Context, control.ScreenEdge) error {
+	return fmt.Errorf("%w: input adapter requires Windows", ErrUnsupportedInput)
+}
+
 func (adapter *InputAdapter) Press(context.Context, control.PressedToken) error {
 	return fmt.Errorf("%w: input adapter requires Windows", ErrUnsupportedInput)
 }

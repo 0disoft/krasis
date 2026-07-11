@@ -3,6 +3,8 @@ package wininput
 import (
 	"errors"
 	"testing"
+
+	"github.com/0disoft/krasis/internal/control"
 )
 
 func TestScanCodeEncodingRoundTrip(t *testing.T) {
@@ -18,6 +20,37 @@ func TestScanCodeEncodingRoundTrip(t *testing.T) {
 		if scanCode != 0x1D || gotExtended != extended {
 			t.Fatalf("decoded = (%x, %t)", scanCode, gotExtended)
 		}
+	}
+}
+
+func TestCursorEntryPointUsesOppositeVirtualScreenEdge(t *testing.T) {
+	tests := []struct {
+		source control.ScreenEdge
+		wantX  int32
+	}{
+		{source: control.ScreenEdgeRight, wantX: -1919},
+		{source: control.ScreenEdgeLeft, wantX: -2},
+	}
+	for _, test := range tests {
+		x, y, err := cursorEntryPoint(test.source, -1920, -100, 1920, 1000)
+		if err != nil {
+			t.Fatalf("cursorEntryPoint(%s) error = %v", test.source, err)
+		}
+		if x != test.wantX || y != 400 {
+			t.Fatalf("cursorEntryPoint(%s) = (%d,%d), want (%d,400)", test.source, x, y, test.wantX)
+		}
+	}
+}
+
+func TestCursorEntryPointRejectsInvalidGeometry(t *testing.T) {
+	if _, _, err := cursorEntryPoint("", 0, 0, 1920, 1080); !errors.Is(err, ErrUnsupportedInput) {
+		t.Fatalf("invalid edge error = %v", err)
+	}
+	if _, _, err := cursorEntryPoint(control.ScreenEdgeRight, 0, 0, 2, 1080); !errors.Is(err, ErrUnsupportedInput) {
+		t.Fatalf("invalid width error = %v", err)
+	}
+	if _, _, err := cursorEntryPoint(control.ScreenEdgeRight, 2147483640, 0, 100, 1080); !errors.Is(err, ErrUnsupportedInput) {
+		t.Fatalf("overflow error = %v", err)
 	}
 }
 

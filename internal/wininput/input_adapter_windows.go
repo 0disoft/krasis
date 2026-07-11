@@ -9,10 +9,46 @@ import (
 	"github.com/0disoft/krasis/internal/control"
 )
 
+var (
+	callGetCursorPos = procGetCursorPos.Call
+	callSetCursorPos = procSetCursorPos.Call
+)
+
 type InputAdapter struct{}
 
 func NewInputAdapter() *InputAdapter {
 	return &InputAdapter{}
+}
+
+func (adapter *InputAdapter) Enter(ctx context.Context, sourceEdge control.ScreenEdge) error {
+	if adapter == nil {
+		return fmt.Errorf("%w: input adapter is not initialized", ErrInputInjection)
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	x, y, err := cursorEntryPoint(
+		sourceEdge,
+		systemMetric(smXVIRTUALSCREEN),
+		systemMetric(smYVIRTUALSCREEN),
+		systemMetric(smCXVIRTUALSCREEN),
+		systemMetric(smCYVIRTUALSCREEN),
+	)
+	if err != nil {
+		return err
+	}
+	result, _, callErr := callSetCursorPos(uintptr(uint32(x)), uintptr(uint32(y)))
+	if result == 0 {
+		return fmt.Errorf("%w: SetCursorPos failed: %v", ErrInputInjection, callErr)
+	}
+	position, err := cursorPosition()
+	if err != nil {
+		return fmt.Errorf("%w: verify cursor entry: %v", ErrInputInjection, err)
+	}
+	if position.X != x || position.Y != y {
+		return fmt.Errorf("%w: cursor entry was clipped to (%d,%d)", ErrInputInjection, position.X, position.Y)
+	}
+	return nil
 }
 
 func (adapter *InputAdapter) Press(ctx context.Context, token control.PressedToken) error {

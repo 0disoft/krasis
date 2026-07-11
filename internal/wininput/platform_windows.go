@@ -38,6 +38,8 @@ var (
 	procOpenProcessToken     = advapi32.NewProc("OpenProcessToken")
 	procGetTokenInformation  = advapi32.NewProc("GetTokenInformation")
 	procGetSystemMetrics     = user32.NewProc("GetSystemMetrics")
+	procGetCursorPos         = user32.NewProc("GetCursorPos")
+	procSetCursorPos         = user32.NewProc("SetCursorPos")
 )
 
 type Platform struct{}

@@ -5,11 +5,13 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/0disoft/krasis/internal/control"
 )
 
 func TestControlPayloadRoundTrip(t *testing.T) {
 	commands := []ControlCommand{
-		{Kind: ControlLeaseRequest, SessionID: "session-1", Epoch: "epoch-1"},
+		{Kind: ControlLeaseRequest, SessionID: "session-1", Epoch: "epoch-1", Edge: control.ScreenEdgeRight},
 		{Kind: ControlLeaseGrant, SessionID: "session-1", LeaseID: "lease-1", Epoch: "epoch-1"},
 		{Kind: ControlLeaseReject, SessionID: "session-1", Epoch: "epoch-1"},
 		{Kind: ControlLeaseRevoke, SessionID: "session-1", LeaseID: "lease-1", Epoch: "epoch-1"},
@@ -33,11 +35,13 @@ func TestControlPayloadRejectsInvalidCommands(t *testing.T) {
 	tests := []ControlCommand{
 		{},
 		{Kind: ControlLeaseRequest, SessionID: "session-1"},
-		{Kind: ControlLeaseRequest, SessionID: "session-1", LeaseID: "lease-1", Epoch: "epoch-1"},
+		{Kind: ControlLeaseRequest, SessionID: "session-1", Epoch: "epoch-1"},
+		{Kind: ControlLeaseRequest, SessionID: "session-1", LeaseID: "lease-1", Epoch: "epoch-1", Edge: control.ScreenEdgeRight},
 		{Kind: ControlLeaseGrant, SessionID: "session-1", Epoch: "epoch-1"},
 		{Kind: ControlLeaseReject, SessionID: "session-1", LeaseID: "lease-1", Epoch: "epoch-1"},
 		{Kind: ControlLeaseRevoke, SessionID: "session-1", Epoch: "epoch-1"},
-		{Kind: ControlLeaseRequest, SessionID: strings.Repeat("s", maxIdentifierSize+1), Epoch: "epoch-1"},
+		{Kind: ControlLeaseRequest, SessionID: strings.Repeat("s", maxIdentifierSize+1), Epoch: "epoch-1", Edge: control.ScreenEdgeRight},
+		{Kind: ControlLeaseGrant, SessionID: "session-1", LeaseID: "lease-1", Epoch: "epoch-1", Edge: control.ScreenEdgeLeft},
 	}
 	for _, command := range tests {
 		if _, err := EncodeControlPayload(command); !errors.Is(err, ErrInvalidControlPayload) {
@@ -64,7 +68,8 @@ func TestControlPayloadRejectsMalformedPayload(t *testing.T) {
 		{name: "truncated", mutate: func(payload []byte) []byte { return payload[:controlHeaderSize-1] }, want: ErrInvalidControlPayload},
 		{name: "version", mutate: func(payload []byte) []byte { payload[0]++; return payload }, want: ErrUnsupportedControlPayload},
 		{name: "kind", mutate: func(payload []byte) []byte { payload[1] = 99; return payload }, want: ErrUnsupportedControlPayload},
-		{name: "reserved", mutate: func(payload []byte) []byte { payload[5] = 1; return payload }, want: ErrUnsupportedControlPayload},
+		{name: "edge", mutate: func(payload []byte) []byte { payload[5] = 99; return payload }, want: ErrUnsupportedControlPayload},
+		{name: "reserved", mutate: func(payload []byte) []byte { payload[6] = 1; return payload }, want: ErrUnsupportedControlPayload},
 		{name: "missing lease", mutate: func(payload []byte) []byte { payload[3] = 0; return payload }, want: ErrInvalidControlPayload},
 		{name: "trailing", mutate: func(payload []byte) []byte { return append(payload, 0) }, want: ErrInvalidControlPayload},
 	}

@@ -35,14 +35,19 @@ func NewOutboundController(
 	return &OutboundController{Writer: writer, Runtime: runtime, Source: source}, nil
 }
 
-func (controller *OutboundController) Begin(ctx context.Context, sessionID, epoch string) error {
+func (controller *OutboundController) Begin(
+	ctx context.Context,
+	sessionID string,
+	epoch string,
+	edge control.ScreenEdge,
+) error {
 	if err := controller.validate(); err != nil {
 		return err
 	}
 	if !controller.Ready() {
 		return ErrOutboundNotReady
 	}
-	return BeginOutboundSession(ctx, controller.Writer, controller.Runtime, sessionID, epoch)
+	return BeginOutboundSession(ctx, controller.Writer, controller.Runtime, sessionID, epoch, edge)
 }
 
 func (controller *OutboundController) Ready() bool {
@@ -58,7 +63,7 @@ func (controller *OutboundController) BeginBoundary(
 	if intent.Edge != control.ScreenEdgeLeft && intent.Edge != control.ScreenEdgeRight {
 		return errors.New("outbound boundary intent requires a LEFT or RIGHT edge")
 	}
-	return controller.Begin(ctx, identity.SessionID, identity.Epoch)
+	return controller.Begin(ctx, identity.SessionID, identity.Epoch, intent.Edge)
 }
 
 func (controller *OutboundController) GrantPeer(

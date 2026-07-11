@@ -18,7 +18,7 @@ func TestOutboundControllerActivatesSourceOnlyAfterGrant(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewOutboundController() error = %v", err)
 	}
-	if err := controller.Begin(context.Background(), "session-1", "epoch-1"); err != nil {
+	if err := controller.Begin(context.Background(), "session-1", "epoch-1", control.ScreenEdgeRight); err != nil {
 		t.Fatalf("Begin() error = %v", err)
 	}
 	if source.active {
@@ -48,7 +48,7 @@ func TestOutboundControllerActivationFailureCleansGrantedLease(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewOutboundController() error = %v", err)
 	}
-	if err := controller.Begin(context.Background(), "session-1", "epoch-1"); err != nil {
+	if err := controller.Begin(context.Background(), "session-1", "epoch-1", control.ScreenEdgeRight); err != nil {
 		t.Fatalf("Begin() error = %v", err)
 	}
 	grant := transport.ControlCommand{Kind: transport.ControlLeaseGrant, SessionID: "session-1", LeaseID: "lease-1", Epoch: "epoch-1"}
@@ -90,7 +90,7 @@ func TestLifecycleDispatcherUsesOutboundController(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewOutboundController() error = %v", err)
 	}
-	if err := controller.Begin(context.Background(), "session-1", "epoch-1"); err != nil {
+	if err := controller.Begin(context.Background(), "session-1", "epoch-1", control.ScreenEdgeRight); err != nil {
 		t.Fatalf("Begin() error = %v", err)
 	}
 	frame := controlFrame(t, transport.ControlCommand{

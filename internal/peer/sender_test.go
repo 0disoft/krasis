@@ -14,11 +14,11 @@ import (
 func TestBeginOutboundSessionWritesLeaseRequest(t *testing.T) {
 	runtime := newLocalRuntime(t)
 	writer := &recordingFrameWriter{}
-	if err := BeginOutboundSession(context.Background(), writer, runtime, "session-1", "epoch-1"); err != nil {
+	if err := BeginOutboundSession(context.Background(), writer, runtime, "session-1", "epoch-1", control.ScreenEdgeRight); err != nil {
 		t.Fatalf("BeginOutboundSession() error = %v", err)
 	}
 	command := decodeWrittenControl(t, writer)
-	if command.Kind != transport.ControlLeaseRequest || command.SessionID != "session-1" || command.Epoch != "epoch-1" {
+	if command.Kind != transport.ControlLeaseRequest || command.SessionID != "session-1" || command.Epoch != "epoch-1" || command.Edge != control.ScreenEdgeRight {
 		t.Fatalf("command = %+v", command)
 	}
 	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StatePending {
@@ -68,7 +68,7 @@ func TestOutboundActionSinkFailCleansRuntime(t *testing.T) {
 func TestBeginOutboundSessionWriteFailureCleansRuntime(t *testing.T) {
 	runtime := newLocalRuntime(t)
 	writer := &recordingFrameWriter{err: errors.New("write failed")}
-	if err := BeginOutboundSession(context.Background(), writer, runtime, "session-1", "epoch-1"); err == nil {
+	if err := BeginOutboundSession(context.Background(), writer, runtime, "session-1", "epoch-1", control.ScreenEdgeRight); err == nil {
 		t.Fatal("BeginOutboundSession() error = nil")
 	}
 	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal || snapshot.HasOutboundStream {
@@ -118,18 +118,23 @@ func TestSendInputActionWriteFailureDoesNotReuseSequence(t *testing.T) {
 func TestLeaseResponderGrantsAuthorizedRequest(t *testing.T) {
 	runtime := newLocalRuntime(t)
 	writer := &recordingFrameWriter{}
+	entry := &recordingCursorEntry{runtime: runtime}
 	responder := &LeaseResponder{
 		Writer:     writer,
 		Runtime:    runtime,
 		Authorizer: staticLeaseAuthorizer{leaseID: "lease-1", accepted: true},
+		Entry:      entry,
 	}
-	command := transport.ControlCommand{Kind: transport.ControlLeaseRequest, SessionID: "session-1", Epoch: "epoch-1"}
+	command := transport.ControlCommand{Kind: transport.ControlLeaseRequest, SessionID: "session-1", Epoch: "epoch-1", Edge: control.ScreenEdgeRight}
 	if err := responder.HandleLeaseRequest(context.Background(), command, time.Unix(100, 0)); err != nil {
 		t.Fatalf("HandleLeaseRequest() error = %v", err)
 	}
 	grant := decodeWrittenControl(t, writer)
 	if grant.Kind != transport.ControlLeaseGrant || grant.LeaseID != "lease-1" {
 		t.Fatalf("grant = %+v", grant)
+	}
+	if len(entry.edges) != 1 || entry.edges[0] != control.ScreenEdgeRight || len(entry.states) != 1 || entry.states[0] != control.StateLocal {
+		t.Fatalf("entry = %+v", entry)
 	}
 	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateInboundActive || !snapshot.HasStream {
 		t.Fatalf("snapshot = %s", snapshot)
@@ -139,12 +144,14 @@ func TestLeaseResponderGrantsAuthorizedRequest(t *testing.T) {
 func TestLeaseResponderRejectsWithoutActivatingRuntime(t *testing.T) {
 	runtime := newLocalRuntime(t)
 	writer := &recordingFrameWriter{}
+	entry := &recordingCursorEntry{}
 	responder := &LeaseResponder{
 		Writer:     writer,
 		Runtime:    runtime,
 		Authorizer: staticLeaseAuthorizer{},
+		Entry:      entry,
 	}
-	command := transport.ControlCommand{Kind: transport.ControlLeaseRequest, SessionID: "session-1", Epoch: "epoch-1"}
+	command := transport.ControlCommand{Kind: transport.ControlLeaseRequest, SessionID: "session-1", Epoch: "epoch-1", Edge: control.ScreenEdgeRight}
 	if err := responder.HandleLeaseRequest(context.Background(), command, time.Unix(100, 0)); err != nil {
 		t.Fatalf("HandleLeaseRequest() error = %v", err)
 	}
@@ -154,6 +161,31 @@ func TestLeaseResponderRejectsWithoutActivatingRuntime(t *testing.T) {
 	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal {
 		t.Fatalf("snapshot = %s", snapshot)
 	}
+	if len(entry.edges) != 0 {
+		t.Fatalf("rejected request moved cursor: %+v", entry.edges)
+	}
+}
+
+func TestLeaseResponderEntryFailureDoesNotGrantInbound(t *testing.T) {
+	runtime := newLocalRuntime(t)
+	writer := &recordingFrameWriter{}
+	cause := errors.New("cursor placement failed")
+	responder := &LeaseResponder{
+		Writer:     writer,
+		Runtime:    runtime,
+		Authorizer: staticLeaseAuthorizer{leaseID: "lease-1", accepted: true},
+		Entry:      &recordingCursorEntry{err: cause},
+	}
+	command := transport.ControlCommand{Kind: transport.ControlLeaseRequest, SessionID: "session-1", Epoch: "epoch-1", Edge: control.ScreenEdgeLeft}
+	if err := responder.HandleLeaseRequest(context.Background(), command, time.Unix(100, 0)); !errors.Is(err, cause) {
+		t.Fatalf("HandleLeaseRequest() error = %v", err)
+	}
+	if len(writer.frames) != 0 {
+		t.Fatalf("entry failure wrote frames: %+v", writer.frames)
+	}
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal || snapshot.HasStream {
+		t.Fatalf("entry failure granted inbound: %s", snapshot)
+	}
 }
 
 func TestLeaseResponderGrantWriteFailureCleansInboundRuntime(t *testing.T) {
@@ -162,8 +194,9 @@ func TestLeaseResponderGrantWriteFailureCleansInboundRuntime(t *testing.T) {
 		Writer:     &recordingFrameWriter{err: errors.New("write failed")},
 		Runtime:    runtime,
 		Authorizer: staticLeaseAuthorizer{leaseID: "lease-1", accepted: true},
+		Entry:      &recordingCursorEntry{},
 	}
-	command := transport.ControlCommand{Kind: transport.ControlLeaseRequest, SessionID: "session-1", Epoch: "epoch-1"}
+	command := transport.ControlCommand{Kind: transport.ControlLeaseRequest, SessionID: "session-1", Epoch: "epoch-1", Edge: control.ScreenEdgeRight}
 	if err := responder.HandleLeaseRequest(context.Background(), command, time.Unix(100, 0)); err == nil {
 		t.Fatal("HandleLeaseRequest() error = nil")
 	}
@@ -207,6 +240,21 @@ type staticLeaseAuthorizer struct {
 	leaseID  string
 	accepted bool
 	err      error
+}
+
+type recordingCursorEntry struct {
+	runtime *application.SessionRuntime
+	edges   []control.ScreenEdge
+	states  []control.State
+	err     error
+}
+
+func (entry *recordingCursorEntry) Enter(_ context.Context, edge control.ScreenEdge) error {
+	entry.edges = append(entry.edges, edge)
+	if entry.runtime != nil {
+		entry.states = append(entry.states, entry.runtime.Snapshot().Control.State)
+	}
+	return entry.err
 }
 
 func (authorizer staticLeaseAuthorizer) AuthorizeLease(

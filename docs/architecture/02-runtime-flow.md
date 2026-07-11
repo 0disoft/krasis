@@ -52,6 +52,8 @@ source session은 hook callback과 network sender 사이에 고정 용량 queue�
 
 `BoundaryOrchestrator`는 용량 1 intent queue를 순차 소비하고 각 새 outbound 요청에 `crypto/rand` 기반 128-bit session ID와 별도 128-bit epoch를 생성한다. runtime이 `LOCAL`이 아니거나 source suppression이 이미 활성화된 동안 도착한 intent는 현재 session을 건드리지 않고 버린다. entropy 생성 실패와 최초 request write 실패는 orchestrator error로 supervisor에 전달한다.
 
+`LeaseRequest`는 source가 넘은 `LEFT` 또는 `RIGHT` edge를 포함한다. destination `CursorEntryPort`는 승인된 `RIGHT` request를 virtual desktop 왼쪽에서 1px 안쪽, `LEFT` request를 오른쪽에서 1px 안쪽, 세로 중앙에 배치한다. cursor 배치가 성공한 뒤에만 inbound runtime을 활성화하고 grant를 쓴다. authorization reject는 cursor를 움직이지 않으며 cursor 배치 실패는 inbound lease나 grant를 만들지 않고 session failure로 처리한다.
+
 runtime은 port 호출이 끝날 때까지 owner lock을 유지한다. 따라서 effect와 input port는 같은 runtime API로 재진입하지 않아야 하며, 느린 I/O를 직접 수행하는 대신 adapter 내부의 명확히 제한된 호출만 제공해야 한다. transport와 Windows adapter는 이 runtime 경계를 통해서만 event와 input을 전달한다.
 
 durable state commit, optimistic version compare-and-swap, transition history, command idempotency와 별도 crash guard는 아직 후속 경계다. 따라서 이 단계의 테스트는 process 내부 수렴을 증명하지만 process가 죽은 뒤의 복구를 증명하지 않는다.

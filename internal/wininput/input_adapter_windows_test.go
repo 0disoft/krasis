@@ -109,3 +109,72 @@ func TestInputAdapterRejectsInvalidTokensBeforeCallingWindows(t *testing.T) {
 		t.Fatalf("Press(invalid) error=%v called=%t", err, called)
 	}
 }
+
+func TestInputAdapterEntryCallsSetCursorPosInsideOppositeEdge(t *testing.T) {
+	originalGet := callGetCursorPos
+	originalSet := callSetCursorPos
+	var gotX, gotY uintptr
+	callSetCursorPos = func(args ...uintptr) (uintptr, uintptr, error) {
+		gotX, gotY = args[0], args[1]
+		return 1, 0, nil
+	}
+	wantX, wantY, err := cursorEntryPoint(
+		control.ScreenEdgeRight,
+		systemMetric(smXVIRTUALSCREEN),
+		systemMetric(smYVIRTUALSCREEN),
+		systemMetric(smCXVIRTUALSCREEN),
+		systemMetric(smCYVIRTUALSCREEN),
+	)
+	if err != nil {
+		t.Fatalf("cursorEntryPoint() error = %v", err)
+	}
+	callGetCursorPos = func(args ...uintptr) (uintptr, uintptr, error) {
+		position := (*point)(unsafe.Pointer(args[0]))
+		position.X, position.Y = wantX, wantY
+		return 1, 0, nil
+	}
+	t.Cleanup(func() {
+		callGetCursorPos = originalGet
+		callSetCursorPos = originalSet
+	})
+	adapter := NewInputAdapter()
+	if err := adapter.Enter(context.Background(), control.ScreenEdgeRight); err != nil {
+		t.Fatalf("Enter() error = %v", err)
+	}
+	if gotX != uintptr(uint32(wantX)) || gotY != uintptr(uint32(wantY)) {
+		t.Fatalf("SetCursorPos = (%d,%d), want (%d,%d)", gotX, gotY, uint32(wantX), uint32(wantY))
+	}
+}
+
+func TestInputAdapterEntryHonorsCancellationBeforeWindowsCall(t *testing.T) {
+	original := callSetCursorPos
+	called := false
+	callSetCursorPos = func(...uintptr) (uintptr, uintptr, error) {
+		called = true
+		return 1, 0, nil
+	}
+	t.Cleanup(func() { callSetCursorPos = original })
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := NewInputAdapter().Enter(ctx, control.ScreenEdgeLeft); !errors.Is(err, context.Canceled) || called {
+		t.Fatalf("Enter(canceled) error=%v called=%t", err, called)
+	}
+}
+
+func TestInputAdapterEntryRejectsClippedCursor(t *testing.T) {
+	originalGet := callGetCursorPos
+	originalSet := callSetCursorPos
+	callSetCursorPos = func(...uintptr) (uintptr, uintptr, error) { return 1, 0, nil }
+	callGetCursorPos = func(args ...uintptr) (uintptr, uintptr, error) {
+		position := (*point)(unsafe.Pointer(args[0]))
+		position.X, position.Y = 0, 0
+		return 1, 0, nil
+	}
+	t.Cleanup(func() {
+		callGetCursorPos = originalGet
+		callSetCursorPos = originalSet
+	})
+	if err := NewInputAdapter().Enter(context.Background(), control.ScreenEdgeRight); !errors.Is(err, ErrInputInjection) {
+		t.Fatalf("Enter(clipped) error = %v", err)
+	}
+}

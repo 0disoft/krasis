@@ -46,6 +46,7 @@ func BeginOutboundSession(
 	runtime *application.SessionRuntime,
 	sessionID string,
 	epoch string,
+	edge control.ScreenEdge,
 ) error {
 	if writer == nil || runtime == nil {
 		return errors.New("frame writer and runtime are required")
@@ -57,6 +58,7 @@ func BeginOutboundSession(
 		Kind:      transport.ControlLeaseRequest,
 		SessionID: sessionID,
 		Epoch:     epoch,
+		Edge:      edge,
 	})
 }
 
@@ -112,10 +114,15 @@ type LeaseAuthorizer interface {
 	AuthorizeLease(context.Context, string, string, time.Time) (leaseID string, accepted bool, err error)
 }
 
+type CursorEntryPort interface {
+	Enter(context.Context, control.ScreenEdge) error
+}
+
 type LeaseResponder struct {
 	Writer     FrameWriter
 	Runtime    *application.SessionRuntime
 	Authorizer LeaseAuthorizer
+	Entry      CursorEntryPort
 }
 
 func (responder *LeaseResponder) HandleLeaseRequest(
@@ -123,7 +130,7 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 	command transport.ControlCommand,
 	observedAt time.Time,
 ) error {
-	if responder == nil || responder.Writer == nil || responder.Runtime == nil || responder.Authorizer == nil {
+	if responder == nil || responder.Writer == nil || responder.Runtime == nil || responder.Authorizer == nil || responder.Entry == nil {
 		return errors.New("lease responder is not initialized")
 	}
 	if command.Kind != transport.ControlLeaseRequest {
@@ -142,6 +149,9 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 	}
 	if leaseID == "" {
 		return errors.New("accepted lease requires an identifier")
+	}
+	if err := responder.Entry.Enter(ctx, command.Edge); err != nil {
+		return err
 	}
 	if _, err := responder.Runtime.GrantInbound(ctx, control.Event{
 		Kind:      control.EventInboundLeaseGranted,

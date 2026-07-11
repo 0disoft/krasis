@@ -33,6 +33,8 @@
 
 `SessionID`는 연결마다 새로 생성되는 application 입력이고 `LeaseID`는 peer가 승인한 제어권 식별자다. `PENDING`에서 받은 grant의 session이 현재 session과 다르면 stale event로 거부한다. `LOCAL`로 돌아갈 때 두 식별자를 모두 지우므로 재연결이 이전 lease를 이어받을 수 없다.
 
+outbound boundary intent의 `Edge`는 source에서 넘은 방향이다. `RIGHT`는 destination의 왼쪽 edge 진입, `LEFT`는 destination의 오른쪽 edge 진입을 뜻한다. edge는 `LeaseRequest`에만 실리며 lease identity나 권한을 대신하지 않는다.
+
 현재 table은 순수 결정만 소유한다. effect 실행, transition history, durable compare-and-swap, event idempotency key와 네트워크 재조정은 Application 계층 책임이며 아직 구현되지 않았다. `ReleaseAll` 실패를 성공이나 로컬 복귀로 바꾸지 않는 것이 이 단계의 fail-safe 경계다.
 
 ## 입력 stream gate

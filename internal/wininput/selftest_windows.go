@@ -19,11 +19,6 @@ const (
 	selfTestReportInterval = 10 * time.Millisecond
 )
 
-var (
-	procGetCursorPos = user32.NewProc("GetCursorPos")
-	procSetCursorPos = user32.NewProc("SetCursorPos")
-)
-
 type injectionOutcome struct {
 	sent            uint32
 	pointerRestored bool
@@ -165,7 +160,7 @@ func sendTaggedRelativeMoves() (uint32, bool, error) {
 
 func cursorPosition() (point, error) {
 	var position point
-	result, _, callErr := procGetCursorPos.Call(uintptr(unsafe.Pointer(&position)))
+	result, _, callErr := callGetCursorPos(uintptr(unsafe.Pointer(&position)))
 	if result == 0 {
 		return point{}, fmt.Errorf("GetCursorPos failed: %w", callErr)
 	}

@@ -64,7 +64,7 @@ func TestDispatchControlRequestUsesPolicyHandler(t *testing.T) {
 		t.Fatalf("NewSessionRuntime() error = %v", err)
 	}
 	requests := &recordingLeaseRequests{}
-	command := transport.ControlCommand{Kind: transport.ControlLeaseRequest, SessionID: "session-1", Epoch: "epoch-1"}
+	command := transport.ControlCommand{Kind: transport.ControlLeaseRequest, SessionID: "session-1", Epoch: "epoch-1", Edge: control.ScreenEdgeRight}
 	if err := DispatchControlFrame(context.Background(), controlFrame(t, command), time.Unix(101, 0), runtime, requests); err != nil {
 		t.Fatalf("DispatchControlFrame() error = %v", err)
 	}
