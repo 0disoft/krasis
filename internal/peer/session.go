@@ -1,0 +1,72 @@
+package peer
+
+import (
+	"context"
+	"errors"
+	"io"
+	"time"
+
+	"github.com/0disoft/krasis/internal/application"
+	"github.com/0disoft/krasis/internal/transport"
+)
+
+type SessionConnection interface {
+	ReadFrame() (transport.Frame, error)
+	Close() error
+}
+
+type ObservationClock func() time.Time
+
+func RunSession(
+	ctx context.Context,
+	connection SessionConnection,
+	runtime *application.SessionRuntime,
+	requests LeaseRequestHandler,
+	now ObservationClock,
+) error {
+	if connection == nil || runtime == nil || now == nil {
+		return errors.New("session connection, runtime, and observation clock are required")
+	}
+	stopCancelClose := context.AfterFunc(ctx, func() {
+		_ = connection.Close()
+	})
+	defer stopCancelClose()
+	defer connection.Close()
+
+	for {
+		frame, err := connection.ReadFrame()
+		if err != nil {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return failSession(ctx, runtime, ctxErr)
+			}
+			if errors.Is(err, io.EOF) {
+				err = io.ErrUnexpectedEOF
+			}
+			return failSession(ctx, runtime, err)
+		}
+		observedAt := now()
+		switch frame.Kind {
+		case transport.MessageControl:
+			err = DispatchControlFrame(ctx, frame, observedAt, runtime, requests)
+		case transport.MessageInput:
+			err = DispatchInputFrame(ctx, frame, runtime)
+		case transport.MessageHeartbeat:
+			err = DispatchHeartbeatFrame(ctx, frame, observedAt, runtime)
+		default:
+			err = transport.ErrUnsupportedFrame
+		}
+		if err != nil {
+			return failSession(ctx, runtime, err)
+		}
+	}
+}
+
+func failSession(ctx context.Context, runtime *application.SessionRuntime, cause error) error {
+	if cause == nil {
+		cause = errors.New("peer session terminated")
+	}
+	if err := runtime.Fail(context.WithoutCancel(ctx), cause); err != nil {
+		return err
+	}
+	return cause
+}

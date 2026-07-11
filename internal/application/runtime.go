@@ -78,6 +78,9 @@ func (runtime *SessionRuntime) Dispatch(
 	if event.Kind == control.EventOutboundLeaseGranted {
 		return ControlOutcome{}, errors.New("outbound lease grants require GrantOutbound")
 	}
+	if event.Kind == control.EventOutboundLeaseRejected {
+		return ControlOutcome{}, errors.New("outbound lease rejections require RejectOutbound")
+	}
 	if event.Kind == control.EventReleaseAllSucceeded || event.Kind == control.EventReleaseAllFailed {
 		return ControlOutcome{}, errors.New("ReleaseAll completion events are runtime-internal")
 	}
@@ -167,6 +170,50 @@ func (runtime *SessionRuntime) NextOutboundEnvelope(ctx context.Context) (contro
 	return envelope, nil
 }
 
+func (runtime *SessionRuntime) RejectOutbound(
+	ctx context.Context,
+	sessionID string,
+	epoch string,
+) (ControlOutcome, error) {
+	runtime.mu.Lock()
+	defer runtime.mu.Unlock()
+	if runtime.control.State != control.StatePending || runtime.outbound.SessionID == "" {
+		return ControlOutcome{}, errors.New("outbound rejection requires a pending outbound stream")
+	}
+	if runtime.outbound.SessionID != sessionID || runtime.outbound.Epoch != epoch {
+		return runtime.faultLocked(ctx, errors.New("outbound rejection does not match pending session and epoch"))
+	}
+	outcome, err := HandleControlEvent(ctx, runtime.control, control.Event{
+		Kind:      control.EventOutboundLeaseRejected,
+		SessionID: sessionID,
+	}, runtime.executor)
+	runtime.applyOutcomeLocked(outcome)
+	return outcome, err
+}
+
+func (runtime *SessionRuntime) RevokePeer(
+	ctx context.Context,
+	sessionID string,
+	leaseID string,
+	epoch string,
+) (ControlOutcome, error) {
+	runtime.mu.Lock()
+	defer runtime.mu.Unlock()
+	if runtime.control.State != control.StateInboundActive && runtime.control.State != control.StateOutboundActive {
+		return ControlOutcome{}, errors.New("peer revocation requires an active lease")
+	}
+	currentEpoch := runtime.stream.Epoch
+	if runtime.control.State == control.StateOutboundActive {
+		currentEpoch = runtime.outbound.Epoch
+	}
+	if runtime.control.SessionID != sessionID || runtime.control.LeaseID != leaseID || currentEpoch != epoch {
+		return runtime.faultLocked(ctx, errors.New("peer revocation does not match active session, lease, and epoch"))
+	}
+	outcome, err := HandleControlEvent(ctx, runtime.control, control.Event{Kind: control.EventRevokeRequested}, runtime.executor)
+	runtime.applyOutcomeLocked(outcome)
+	return outcome, err
+}
+
 func (runtime *SessionRuntime) GrantInbound(
 	ctx context.Context,
 	event control.Event,
@@ -239,6 +286,10 @@ func (runtime *SessionRuntime) HandleInputAction(
 	defer runtime.mu.Unlock()
 
 	if runtime.control.State != control.StateInboundActive || runtime.stream.SessionID == "" {
+		if runtime.control.State != control.StateLocal {
+			_, faultErr := runtime.faultLocked(ctx, ErrRuntimeNotInbound)
+			return faultErr
+		}
 		return ErrRuntimeNotInbound
 	}
 	if err := action.Validate(); err != nil {

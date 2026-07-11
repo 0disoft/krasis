@@ -49,6 +49,8 @@
 
 outbound source는 `SessionRuntime.BeginOutbound`에서 session과 epoch를 함께 만들고 `PENDING`부터 `OutboundStream`을 소유한다. 같은 session과 epoch를 포함한 grant만 `OUTBOUND_ACTIVE`로 전환할 수 있으며, runtime이 sequence를 `1`부터 단조 증가시킨다. 예약한 sequence의 전송 결과가 불확실하면 재사용하지 않고 session 전체를 폐기해야 한다.
 
+pending request의 정상 거절은 `OUTBOUND_LEASE_REJECTED` event로 `REVOKING`을 거쳐 `LOCAL`로 수렴한다. active peer의 revoke는 현재 session, lease와 epoch가 모두 일치할 때만 정상 전이하며, 하나라도 어긋나면 stale control command로 간주해 전체 session을 fail-safe cleanup한다.
+
 ## 정규화 입력 action
 
 `InputAction`은 keyboard key down/up, mouse button down/up, relative pointer move와 horizontal/vertical wheel delta를 표현한다. key와 button은 opaque code만 가지며 delta를 가질 수 없고, move와 wheel은 code 없이 하나 이상의 non-zero delta가 필요하다. 구체적인 Windows virtual-key, scan-code와 button mapping은 Win32 adapter 검증 전까지 결정하지 않는다.

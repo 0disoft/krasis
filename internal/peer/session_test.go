@@ -1,0 +1,122 @@
+package peer
+
+import (
+	"context"
+	"errors"
+	"io"
+	"testing"
+	"time"
+
+	"github.com/0disoft/krasis/internal/application"
+	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/transport"
+)
+
+func TestRunSessionRoutesInputAndFailsSafeOnEOF(t *testing.T) {
+	runtime, port := newInboundRuntime(t)
+	payload, err := transport.EncodeInputPayload(
+		control.InputEnvelope{SessionID: "session-1", Epoch: "epoch-1", Sequence: 1},
+		control.InputAction{Kind: control.InputPointerMove, DeltaX: 3, DeltaY: -2},
+	)
+	if err != nil {
+		t.Fatalf("EncodeInputPayload() error = %v", err)
+	}
+	connection := &scriptedConnection{frames: []transport.Frame{{Kind: transport.MessageInput, Payload: payload}}}
+	err = RunSession(context.Background(), connection, runtime, nil, fixedClock(time.Unix(101, 0)))
+	if !errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Fatalf("RunSession() error = %v, want unexpected EOF", err)
+	}
+	if len(port.moves) != 1 || port.moves[0] != [2]int32{3, -2} {
+		t.Fatalf("moves = %v", port.moves)
+	}
+	if !connection.closed {
+		t.Fatal("connection was not closed")
+	}
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal {
+		t.Fatalf("runtime did not fail safe: %s", snapshot)
+	}
+}
+
+func TestRunSessionRoutesControlGrantThenHeartbeat(t *testing.T) {
+	runtime := newOutboundRuntime(t)
+	grant := controlFrame(t, transport.ControlCommand{
+		Kind:      transport.ControlLeaseGrant,
+		SessionID: "session-1",
+		LeaseID:   "lease-1",
+		Epoch:     "epoch-1",
+	})
+	heartbeatPayload, err := transport.EncodeHeartbeatPayload("session-1")
+	if err != nil {
+		t.Fatalf("EncodeHeartbeatPayload() error = %v", err)
+	}
+	connection := &scriptedConnection{frames: []transport.Frame{
+		grant,
+		{Kind: transport.MessageHeartbeat, Payload: heartbeatPayload},
+	}}
+	observedAt := time.Unix(101, 0)
+	err = RunSession(context.Background(), connection, runtime, nil, fixedClock(observedAt))
+	if !errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Fatalf("RunSession() error = %v, want unexpected EOF", err)
+	}
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal {
+		t.Fatalf("runtime did not clean up after EOF: %s", snapshot)
+	}
+}
+
+func TestRunSessionFailsSafeOnMalformedFramePayload(t *testing.T) {
+	runtime, _ := newInboundRuntime(t)
+	connection := &scriptedConnection{frames: []transport.Frame{{Kind: transport.MessageInput, Payload: []byte{1}}}}
+	err := RunSession(context.Background(), connection, runtime, nil, fixedClock(time.Unix(101, 0)))
+	if !errors.Is(err, transport.ErrInvalidInputPayload) {
+		t.Fatalf("RunSession() error = %v, want ErrInvalidInputPayload", err)
+	}
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal {
+		t.Fatalf("runtime did not fail safe: %s", snapshot)
+	}
+}
+
+func TestRunSessionWrongDirectionInputFailsOutboundRuntime(t *testing.T) {
+	runtime := newOutboundRuntime(t)
+	if _, err := runtime.GrantOutbound(context.Background(), "session-1", "lease-1", "epoch-1", time.Unix(100, 0)); err != nil {
+		t.Fatalf("GrantOutbound() error = %v", err)
+	}
+	payload, err := transport.EncodeInputPayload(
+		control.InputEnvelope{SessionID: "session-1", Epoch: "epoch-1", Sequence: 1},
+		control.InputAction{Kind: control.InputPointerMove, DeltaX: 1},
+	)
+	if err != nil {
+		t.Fatalf("EncodeInputPayload() error = %v", err)
+	}
+	connection := &scriptedConnection{frames: []transport.Frame{{Kind: transport.MessageInput, Payload: payload}}}
+	err = RunSession(context.Background(), connection, runtime, nil, fixedClock(time.Unix(101, 0)))
+	if !errors.Is(err, application.ErrRuntimeNotInbound) {
+		t.Fatalf("RunSession() error = %v, want wrong-direction error", err)
+	}
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal {
+		t.Fatalf("runtime did not fail safe: %s", snapshot)
+	}
+}
+
+type scriptedConnection struct {
+	frames []transport.Frame
+	index  int
+	closed bool
+}
+
+func (connection *scriptedConnection) ReadFrame() (transport.Frame, error) {
+	if connection.index >= len(connection.frames) {
+		return transport.Frame{}, io.EOF
+	}
+	frame := connection.frames[connection.index]
+	connection.index++
+	return frame, nil
+}
+
+func (connection *scriptedConnection) Close() error {
+	connection.closed = true
+	return nil
+}
+
+func fixedClock(observedAt time.Time) ObservationClock {
+	return func() time.Time { return observedAt }
+}

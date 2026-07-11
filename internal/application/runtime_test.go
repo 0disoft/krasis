@@ -268,6 +268,54 @@ func TestSessionRuntimeRejectsOutboundLifecycleThroughGenericDispatch(t *testing
 	}
 }
 
+func TestSessionRuntimeRejectsPendingOutboundLeaseCleanly(t *testing.T) {
+	runtime := newTestRuntime(t, &recordingInputPort{})
+	if _, err := runtime.BeginOutbound(context.Background(), "session-1", "epoch-1"); err != nil {
+		t.Fatalf("BeginOutbound() error = %v", err)
+	}
+	if _, err := runtime.RejectOutbound(context.Background(), "session-1", "epoch-1"); err != nil {
+		t.Fatalf("RejectOutbound() error = %v", err)
+	}
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal || snapshot.HasOutboundStream {
+		t.Fatalf("rejected runtime = %s", snapshot)
+	}
+}
+
+func TestSessionRuntimeStaleOutboundRejectionFailsSafe(t *testing.T) {
+	runtime := newTestRuntime(t, &recordingInputPort{})
+	if _, err := runtime.BeginOutbound(context.Background(), "session-1", "epoch-1"); err != nil {
+		t.Fatalf("BeginOutbound() error = %v", err)
+	}
+	if _, err := runtime.RejectOutbound(context.Background(), "session-1", "old-epoch"); err == nil {
+		t.Fatal("RejectOutbound(stale epoch) error = nil")
+	}
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal || snapshot.HasOutboundStream {
+		t.Fatalf("runtime did not fail safe: %s", snapshot)
+	}
+}
+
+func TestSessionRuntimeAcceptsExactPeerRevoke(t *testing.T) {
+	runtime := newTestRuntime(t, &recordingInputPort{})
+	grantInbound(t, runtime, time.Unix(100, 0))
+	if _, err := runtime.RevokePeer(context.Background(), "session-1", "lease-1", "epoch-1"); err != nil {
+		t.Fatalf("RevokePeer() error = %v", err)
+	}
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal || snapshot.HasStream {
+		t.Fatalf("revoked runtime = %s", snapshot)
+	}
+}
+
+func TestSessionRuntimeStalePeerRevokeFailsSafe(t *testing.T) {
+	runtime := newTestRuntime(t, &recordingInputPort{})
+	grantInbound(t, runtime, time.Unix(100, 0))
+	if _, err := runtime.RevokePeer(context.Background(), "session-1", "lease-1", "old-epoch"); err == nil {
+		t.Fatal("RevokePeer(stale epoch) error = nil")
+	}
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal || snapshot.HasStream {
+		t.Fatalf("runtime did not fail safe: %s", snapshot)
+	}
+}
+
 func TestSessionRuntimeRejectsReleaseCompletionThroughGenericDispatch(t *testing.T) {
 	runtime := newTestRuntime(t, &recordingInputPort{})
 	grantInbound(t, runtime, time.Unix(100, 0))

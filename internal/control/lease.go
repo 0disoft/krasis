@@ -21,6 +21,7 @@ type EventKind string
 const (
 	EventOutboundIntentDetected EventKind = "OUTBOUND_INTENT_DETECTED"
 	EventOutboundLeaseGranted   EventKind = "OUTBOUND_LEASE_GRANTED"
+	EventOutboundLeaseRejected  EventKind = "OUTBOUND_LEASE_REJECTED"
 	EventInboundLeaseGranted    EventKind = "INBOUND_LEASE_GRANTED"
 	EventRevokeRequested        EventKind = "REVOKE_REQUESTED"
 	EventFaultDetected          EventKind = "FAULT_DETECTED"
@@ -81,6 +82,7 @@ type rule struct {
 var transitionRules = []rule{
 	{from: StateLocal, event: EventOutboundIntentDetected, to: StatePending, effects: []Effect{EffectRequestOutboundLease}, guard: requireSessionWithoutLease, update: setSession},
 	{from: StatePending, event: EventOutboundLeaseGranted, to: StateOutboundActive, effects: []Effect{EffectBeginOutbound}, guard: requireMatchingSessionAndLease, update: setLease},
+	{from: StatePending, event: EventOutboundLeaseRejected, to: StateRevoking, effects: []Effect{EffectStopRemoteControl, EffectReleaseAll}, guard: requireMatchingSessionWithoutLease},
 	{from: StateLocal, event: EventInboundLeaseGranted, to: StateInboundActive, effects: []Effect{EffectBeginInbound}, guard: requireSessionAndLease, update: setSessionAndLease},
 
 	{from: StatePending, event: EventRevokeRequested, to: StateRevoking, effects: []Effect{EffectStopRemoteControl, EffectRevokeLease, EffectReleaseAll}},
@@ -169,6 +171,13 @@ func requireSessionAndLease(_ Snapshot, event Event) error {
 func requireMatchingSessionAndLease(current Snapshot, event Event) error {
 	if event.SessionID == "" || event.SessionID != current.SessionID || event.LeaseID == "" {
 		return errors.New("outbound lease grant must match the pending session and include a lease")
+	}
+	return nil
+}
+
+func requireMatchingSessionWithoutLease(current Snapshot, event Event) error {
+	if event.SessionID == "" || event.SessionID != current.SessionID || event.LeaseID != "" {
+		return errors.New("outbound lease rejection must match the pending session and omit a lease")
 	}
 	return nil
 }
