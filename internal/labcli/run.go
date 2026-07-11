@@ -49,6 +49,8 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, platform 
 		return runProbeCheck(commandArgs, stdout, stderr)
 	case "guided-probe":
 		return runGuidedProbe(ctx, commandArgs, stdout, stderr, platform)
+	case "peer-probe":
+		return runPeerProbe(ctx, commandArgs, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "unknown command: %s\n", command)
 		writeUsage(stderr)
@@ -562,5 +564,6 @@ func writeUsage(output io.Writer) {
 	fmt.Fprintln(output, "  krasis-lab probe --device H-A|H-B|S-A|S-B --duration DURATION --output PATH.json")
 	fmt.Fprintln(output, "  krasis-lab probe-check [--json] REPORT.json [REPORT.json ...]")
 	fmt.Fprintln(output, "  krasis-lab guided-probe --device H-A|H-B|S-A|S-B --stage-duration DURATION --output PATH.json")
+	fmt.Fprintln(output, "  krasis-lab peer-probe listen|connect [options]")
 	fmt.Fprintln(output, "  krasis-lab help")
 }

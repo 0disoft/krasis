@@ -21,3 +21,7 @@ coverage/
 tmp/
 *.tsbuildinfo
 # <<< ssealed ignore patterns <<<
+
+# Local peer-probe credentials and collected evidence.
+/secrets/
+/reports/

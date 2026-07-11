@@ -142,6 +142,28 @@ guided stage failure code:
 
 상위 `guided_input_incomplete`는 하나 이상의 stage가 요구 event 종류를 관찰하지 못했다는 뜻이다.
 
+## `peer-probe`
+
+- schema: `krasis.lab.peer-probe/v1`
+- 출력: 각 장비가 `--output`으로 지정한 단일 JSON file
+
+허용 필드:
+
+- `role`: `listen` 또는 `connect`
+- `deviceAlias`, `collectedAt`, `buildRevision`, `buildModified`
+- `completed`, `failureCode`
+- `authenticated`, `tlsVersion`, `alpn`
+- `sessionsCompleted`, `leaseRoundTrips`, `inputFramesChecked`, `freshIdentities`
+
+금지 필드:
+
+- local 또는 remote network address
+- certificate, private key와 certificate fingerprint
+- session ID, epoch와 lease ID
+- pointer 좌표, key 또는 button 값
+
+정상 완료는 TLS 1.3 mTLS와 `krasis/1` ALPN으로 인증된 새 connection 두 개가 각각 lease, input envelope, revoke round trip을 완료했다는 뜻이다. 인증서 load, listen/connect, 인증 또는 session 단계가 실패하면 부분 report를 저장하고 exit `1`로 종료한다.
+
 ## 호환성
 
-현재 CLI가 출력하거나 저장하는 일곱 schema는 Phase 0 실험 계약이다. 정식 제품 API가 아니므로 변경될 수 있지만, 변경 시 schema version과 관련 test를 함께 검토한다.
+현재 CLI가 출력하거나 저장하는 schema는 Phase 0 실험 계약이다. 정식 제품 API가 아니므로 변경될 수 있지만, 변경 시 schema version과 관련 test를 함께 검토한다.

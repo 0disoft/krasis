@@ -49,6 +49,26 @@ $reports = @(Get-ChildItem -LiteralPath .\reports -Filter '*-basic-*.json' -File
 
 서로 다른 build revision, dirty build, duration 또는 중복 장비 별칭이 섞이면 비교 불가능으로 판정한다. `Guided` report는 현재 `probe-check` 입력이 아니며 stage별 `passed`와 `failureCodes`를 직접 확인한다.
 
+## 두 장비 peer probe
+
+네 대를 동시에 켤 필요는 없다. 집에서는 `H-A`와 `H-B`, 스터디카페에서는 별도 날짜에 `S-A`와 `S-B`로 같은 절차를 반복한다.
+
+사전에 test 전용 CA와 listener/client identity file을 안전한 경로에 준비한다. private key는 Git, report 폴더 또는 동기화 드라이브에 넣지 않는다. 현재 `krasis-lab`은 pairing credential을 생성하지 않으므로 제품용 인증서나 임의로 내려받은 인증서를 대신 사용하지 않는다.
+
+listener에서 먼저 실행한다.
+
+```powershell
+.\krasis-lab.exe peer-probe listen --device H-A --address 0.0.0.0:24876 --ca .\secrets\ca.pem --cert .\secrets\listener.pem --key .\secrets\listener-key.pem --output .\reports\H-A-peer.json
+```
+
+Windows 방화벽과 같은 LAN에서 listener의 실제 IP와 port 접근을 허용한 뒤 connector에서 실행한다. 아래 주소와 server name은 문서용 예시이므로 실제 listener 주소와 certificate name으로 바꾼다.
+
+```powershell
+.\krasis-lab.exe peer-probe connect --device H-B --address 192.0.2.10:24876 --server-name peer.test --ca .\secrets\ca.pem --cert .\secrets\connector.pem --key .\secrets\connector-key.pem --output .\reports\H-B-peer.json
+```
+
+두 report 모두 `completed=true`, `authenticated=true`, `sessionsCompleted=2`, `freshIdentities=true`여야 한다. report에는 주소나 session identifier가 저장되지 않는다.
+
 ## 실패 처리
 
 - exit `0`: 모든 단계가 완료된 보고서가 생성됨
@@ -60,4 +80,4 @@ JSON에는 원시 key, 입력 문자열, pointer 좌표, host name과 window tit
 
 ## 아직 증명하지 않는 것
 
-이 probe는 한 장비의 hook, aggregate capture와 tagged `SendInput`만 검사한다. 두 노트북 사이의 연결, 입력 전달, 억제, 절전, 강제 종료와 `ReleaseAll`은 별도 실험이다.
+basic/guided probe는 한 장비의 hook, aggregate capture와 tagged `SendInput`만 검사한다. `peer-probe`는 두 노트북 사이의 인증된 연결과 protocol frame 왕복만 검사한다. 실제 입력 억제, cursor entry, 절전, 강제 종료와 `ReleaseAll`은 별도 실험이다.

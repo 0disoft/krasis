@@ -92,6 +92,21 @@
 - 누락된 event 종류는 stage별 stable failure code로 기록하고 나머지 stage도 계속 실행한다.
 - stage 누락이 있으면 `guided_input_incomplete`와 exit `1`이지만 수집된 부분 증거는 보존한다.
 
+### `peer-probe`
+
+같은 장소에 있는 노트북 두 대 사이에서 실제 TCP, TLS 1.3 mTLS, `krasis/1` ALPN과 ordered peer frame 계약을 검증한다.
+
+- listener 사용법: `krasis-lab peer-probe listen --device ALIAS --address ADDRESS --ca CA.pem --cert CERT.pem --key KEY.pem --output REPORT.json [--timeout DURATION]`
+- connector 사용법: `krasis-lab peer-probe connect --device ALIAS --address ADDRESS --server-name NAME --ca CA.pem --cert CERT.pem --key KEY.pem --output REPORT.json [--timeout DURATION]`
+- listener와 connector는 같은 test CA가 서명한 서로 다른 identity를 사용해야 한다. connector의 `--server-name`은 listener certificate의 이름과 일치해야 한다.
+- 한 번의 실행에서 새 random session ID와 epoch를 사용하는 두 개의 독립 connection을 연속으로 만든다.
+- 각 connection은 lease request/grant, 상대 pointer move envelope 검증, lease revoke를 수행한다. 실제 pointer를 움직이거나 입력을 주입하지 않는다.
+- report는 주소, certificate 내용, fingerprint, session ID, epoch, 원시 입력을 저장하지 않는다.
+- `--output`은 기존 file을 덮어쓰지 않는다. 실패 시에도 가능한 부분 report를 저장한다.
+- 기본 timeout은 2분이며 양쪽에서 별도로 지정할 수 있다.
+
+이 명령은 실제 peer network와 protocol compatibility를 검증하지만 Windows hook suppression, `SendInput`, cursor entry, crash recovery를 검증하지 않는다. 집의 두 대와 스터디카페의 두 대는 서로 다른 시점에 같은 절차로 실행해도 된다.
+
 ## 출력 방식
 
 - 기본 출력은 사람이 읽는 누적 snapshot이다.
