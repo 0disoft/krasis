@@ -103,6 +103,27 @@ func TestPeerConnectionSerializesConcurrentWrites(t *testing.T) {
 	}
 }
 
+func TestPeerConnectionWriteHonorsCanceledContextBeforeWriting(t *testing.T) {
+	fixture := newTLSFixture(t)
+	serverTLS, clientTLS := openTLSPair(
+		t,
+		mustServerTLSConfig(t, fixture.serverIdentity, fixture.roots),
+		mustClientTLSConfig(t, fixture.clientIdentity, fixture.roots, fixture.serverName),
+	)
+	server, client, serverErr, clientErr := authenticateConnectionPair(t, serverTLS, clientTLS)
+	if serverErr != nil || clientErr != nil {
+		t.Fatalf("peer authentication errors: server=%v client=%v", serverErr, clientErr)
+	}
+	defer server.Close()
+	defer client.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := client.WriteFrameContext(ctx, Frame{Kind: MessageHeartbeat, Payload: []byte{1}})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("WriteFrameContext() error = %v, want context.Canceled", err)
+	}
+}
+
 func authenticateConnectionPair(
 	t *testing.T,
 	serverTLS *tls.Conn,

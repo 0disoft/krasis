@@ -32,13 +32,12 @@ const (
 type Effect string
 
 const (
-	EffectRequestOutboundLease Effect = "REQUEST_OUTBOUND_LEASE"
-	EffectBeginOutbound        Effect = "BEGIN_OUTBOUND"
-	EffectBeginInbound         Effect = "BEGIN_INBOUND"
-	EffectStopRemoteControl    Effect = "STOP_REMOTE_CONTROL"
-	EffectRevokeLease          Effect = "REVOKE_LEASE"
-	EffectReleaseAll           Effect = "RELEASE_ALL"
-	EffectResumeLocal          Effect = "RESUME_LOCAL"
+	EffectBeginOutbound     Effect = "BEGIN_OUTBOUND"
+	EffectBeginInbound      Effect = "BEGIN_INBOUND"
+	EffectStopRemoteControl Effect = "STOP_REMOTE_CONTROL"
+	EffectRevokeLease       Effect = "REVOKE_LEASE"
+	EffectReleaseAll        Effect = "RELEASE_ALL"
+	EffectResumeLocal       Effect = "RESUME_LOCAL"
 )
 
 var (
@@ -80,7 +79,7 @@ type rule struct {
 }
 
 var transitionRules = []rule{
-	{from: StateLocal, event: EventOutboundIntentDetected, to: StatePending, effects: []Effect{EffectRequestOutboundLease}, guard: requireSessionWithoutLease, update: setSession},
+	{from: StateLocal, event: EventOutboundIntentDetected, to: StatePending, guard: requireSessionWithoutLease, update: setSession},
 	{from: StatePending, event: EventOutboundLeaseGranted, to: StateOutboundActive, effects: []Effect{EffectBeginOutbound}, guard: requireMatchingSessionAndLease, update: setLease},
 	{from: StatePending, event: EventOutboundLeaseRejected, to: StateRevoking, effects: []Effect{EffectStopRemoteControl, EffectReleaseAll}, guard: requireMatchingSessionWithoutLease},
 	{from: StateLocal, event: EventInboundLeaseGranted, to: StateInboundActive, effects: []Effect{EffectBeginInbound}, guard: requireSessionAndLease, update: setSessionAndLease},

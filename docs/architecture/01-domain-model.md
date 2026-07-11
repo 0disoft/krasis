@@ -51,6 +51,8 @@ outbound source는 `SessionRuntime.BeginOutbound`에서 session과 epoch를 함�
 
 pending request의 정상 거절은 `OUTBOUND_LEASE_REJECTED` event로 `REVOKING`을 거쳐 `LOCAL`로 수렴한다. active peer의 revoke는 현재 session, lease와 epoch가 모두 일치할 때만 정상 전이하며, 하나라도 어긋나면 stale control command로 간주해 전체 session을 fail-safe cleanup한다.
 
+transition effect는 로컬 입력 억제, 활성화, lease registry 무효화와 `ReleaseAll` 같은 process 내부 작업만 뜻한다. wire request, grant, reject, revoke와 input write는 전이 결과와 runtime snapshot을 받은 peer session orchestrator가 runtime lock 밖에서 수행한다.
+
 ## 정규화 입력 action
 
 `InputAction`은 keyboard key down/up, mouse button down/up, relative pointer move와 horizontal/vertical wheel delta를 표현한다. key와 button은 opaque code만 가지며 delta를 가질 수 없고, move와 wheel은 code 없이 하나 이상의 non-zero delta가 필요하다. 구체적인 Windows virtual-key, scan-code와 button mapping은 Win32 adapter 검증 전까지 결정하지 않는다.

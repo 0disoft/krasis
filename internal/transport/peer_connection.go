@@ -4,14 +4,14 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
-	"sync"
+	"time"
 )
 
 type PeerConnection struct {
 	connection *tls.Conn
 	reader     *Reader
 	writer     *Writer
-	writeMu    sync.Mutex
+	writeGate  chan struct{}
 }
 
 func NewPeerConnection(ctx context.Context, connection *tls.Conn) (*PeerConnection, error) {
@@ -29,7 +29,9 @@ func NewPeerConnection(ctx context.Context, connection *tls.Conn) (*PeerConnecti
 	if err != nil {
 		return nil, err
 	}
-	return &PeerConnection{connection: connection, reader: reader, writer: writer}, nil
+	writeGate := make(chan struct{}, 1)
+	writeGate <- struct{}{}
+	return &PeerConnection{connection: connection, reader: reader, writer: writer, writeGate: writeGate}, nil
 }
 
 func (connection *PeerConnection) ReadFrame() (Frame, error) {
@@ -40,12 +42,44 @@ func (connection *PeerConnection) ReadFrame() (Frame, error) {
 }
 
 func (connection *PeerConnection) WriteFrame(frame Frame) error {
-	if connection == nil || connection.writer == nil {
+	return connection.WriteFrameContext(context.Background(), frame)
+}
+
+func (connection *PeerConnection) WriteFrameContext(ctx context.Context, frame Frame) error {
+	if connection == nil || connection.writer == nil || connection.connection == nil || connection.writeGate == nil {
 		return errors.New("peer connection is not initialized")
 	}
-	connection.writeMu.Lock()
-	defer connection.writeMu.Unlock()
-	return connection.writer.WriteFrame(frame)
+	if ctx == nil {
+		return errors.New("write context is required")
+	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-connection.writeGate:
+	}
+	defer func() { connection.writeGate <- struct{}{} }()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	deadline, hasDeadline := ctx.Deadline()
+	if hasDeadline {
+		if err := connection.connection.SetWriteDeadline(deadline); err != nil {
+			return err
+		}
+	}
+	stopCancel := context.AfterFunc(ctx, func() {
+		_ = connection.connection.SetWriteDeadline(time.Now())
+	})
+	err := connection.writer.WriteFrame(frame)
+	if stopCancel() {
+		_ = connection.connection.SetWriteDeadline(time.Time{})
+	}
+	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
+	}
+	return err
 }
 
 func (connection *PeerConnection) Close() error {

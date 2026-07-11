@@ -14,7 +14,7 @@ func TestTransitionTable(t *testing.T) {
 		state   State
 		effects []Effect
 	}{
-		{name: "outbound intent", current: InitialSnapshot(), event: Event{Kind: EventOutboundIntentDetected, SessionID: "session-1"}, state: StatePending, effects: []Effect{EffectRequestOutboundLease}},
+		{name: "outbound intent", current: InitialSnapshot(), event: Event{Kind: EventOutboundIntentDetected, SessionID: "session-1"}, state: StatePending},
 		{name: "outbound grant", current: Snapshot{State: StatePending, SessionID: "session-1", Version: 1}, event: Event{Kind: EventOutboundLeaseGranted, SessionID: "session-1", LeaseID: "lease-1"}, state: StateOutboundActive, effects: []Effect{EffectBeginOutbound}},
 		{name: "outbound reject", current: Snapshot{State: StatePending, SessionID: "session-1", Version: 1}, event: Event{Kind: EventOutboundLeaseRejected, SessionID: "session-1"}, state: StateRevoking, effects: []Effect{EffectStopRemoteControl, EffectReleaseAll}},
 		{name: "inbound grant", current: InitialSnapshot(), event: Event{Kind: EventInboundLeaseGranted, SessionID: "session-1", LeaseID: "lease-1"}, state: StateInboundActive, effects: []Effect{EffectBeginInbound}},

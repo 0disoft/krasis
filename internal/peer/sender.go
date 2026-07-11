@@ -1,0 +1,149 @@
+package peer
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	"github.com/0disoft/krasis/internal/application"
+	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/transport"
+)
+
+type FrameWriter interface {
+	WriteFrameContext(context.Context, transport.Frame) error
+}
+
+func BeginOutboundSession(
+	ctx context.Context,
+	writer FrameWriter,
+	runtime *application.SessionRuntime,
+	sessionID string,
+	epoch string,
+) error {
+	if writer == nil || runtime == nil {
+		return errors.New("frame writer and runtime are required")
+	}
+	if _, err := runtime.BeginOutbound(ctx, sessionID, epoch); err != nil {
+		return err
+	}
+	return writeControlOrFail(ctx, writer, runtime, transport.ControlCommand{
+		Kind:      transport.ControlLeaseRequest,
+		SessionID: sessionID,
+		Epoch:     epoch,
+	})
+}
+
+func SendInputAction(
+	ctx context.Context,
+	writer FrameWriter,
+	runtime *application.SessionRuntime,
+	action control.InputAction,
+) error {
+	if writer == nil || runtime == nil {
+		return errors.New("frame writer and runtime are required")
+	}
+	if err := action.Validate(); err != nil {
+		return err
+	}
+	envelope, err := runtime.NextOutboundEnvelope(ctx)
+	if err != nil {
+		return err
+	}
+	payload, err := transport.EncodeInputPayload(envelope, action)
+	if err != nil {
+		return runtime.Fail(context.WithoutCancel(ctx), err)
+	}
+	if err := writer.WriteFrameContext(ctx, transport.Frame{Kind: transport.MessageInput, Payload: payload}); err != nil {
+		return runtime.Fail(context.WithoutCancel(ctx), err)
+	}
+	return nil
+}
+
+func SendHeartbeat(
+	ctx context.Context,
+	writer FrameWriter,
+	runtime *application.SessionRuntime,
+) error {
+	if writer == nil || runtime == nil {
+		return errors.New("frame writer and runtime are required")
+	}
+	snapshot := runtime.Snapshot()
+	if snapshot.Control.State != control.StateInboundActive && snapshot.Control.State != control.StateOutboundActive {
+		return errors.New("heartbeat requires an active lease")
+	}
+	payload, err := transport.EncodeHeartbeatPayload(snapshot.Control.SessionID)
+	if err != nil {
+		return runtime.Fail(context.WithoutCancel(ctx), err)
+	}
+	if err := writer.WriteFrameContext(ctx, transport.Frame{Kind: transport.MessageHeartbeat, Payload: payload}); err != nil {
+		return runtime.Fail(context.WithoutCancel(ctx), err)
+	}
+	return nil
+}
+
+type LeaseAuthorizer interface {
+	AuthorizeLease(context.Context, string, string, time.Time) (leaseID string, accepted bool, err error)
+}
+
+type LeaseResponder struct {
+	Writer     FrameWriter
+	Runtime    *application.SessionRuntime
+	Authorizer LeaseAuthorizer
+}
+
+func (responder *LeaseResponder) HandleLeaseRequest(
+	ctx context.Context,
+	command transport.ControlCommand,
+	observedAt time.Time,
+) error {
+	if responder == nil || responder.Writer == nil || responder.Runtime == nil || responder.Authorizer == nil {
+		return errors.New("lease responder is not initialized")
+	}
+	if command.Kind != transport.ControlLeaseRequest {
+		return errors.New("lease responder requires a lease request")
+	}
+	leaseID, accepted, err := responder.Authorizer.AuthorizeLease(ctx, command.SessionID, command.Epoch, observedAt)
+	if err != nil {
+		return err
+	}
+	if !accepted {
+		return writeControlOrFail(ctx, responder.Writer, responder.Runtime, transport.ControlCommand{
+			Kind:      transport.ControlLeaseReject,
+			SessionID: command.SessionID,
+			Epoch:     command.Epoch,
+		})
+	}
+	if leaseID == "" {
+		return errors.New("accepted lease requires an identifier")
+	}
+	if _, err := responder.Runtime.GrantInbound(ctx, control.Event{
+		Kind:      control.EventInboundLeaseGranted,
+		SessionID: command.SessionID,
+		LeaseID:   leaseID,
+	}, command.Epoch, observedAt); err != nil {
+		return err
+	}
+	return writeControlOrFail(ctx, responder.Writer, responder.Runtime, transport.ControlCommand{
+		Kind:      transport.ControlLeaseGrant,
+		SessionID: command.SessionID,
+		LeaseID:   leaseID,
+		Epoch:     command.Epoch,
+	})
+}
+
+func writeControlOrFail(
+	ctx context.Context,
+	writer FrameWriter,
+	runtime *application.SessionRuntime,
+	command transport.ControlCommand,
+) error {
+	payload, err := transport.EncodeControlPayload(command)
+	if err != nil {
+		return runtime.Fail(context.WithoutCancel(ctx), err)
+	}
+	if err := writer.WriteFrameContext(ctx, transport.Frame{Kind: transport.MessageControl, Payload: payload}); err != nil {
+		return runtime.Fail(context.WithoutCancel(ctx), err)
+	}
+	return nil
+}
