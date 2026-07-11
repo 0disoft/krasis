@@ -16,12 +16,14 @@ var (
 )
 
 type RuntimeSnapshot struct {
-	Control      control.Snapshot
-	InputStream  control.InputStream
-	HasStream    bool
-	Liveness     control.PeerLiveness
-	HasLiveness  bool
-	PressedCount int
+	Control           control.Snapshot
+	InputStream       control.InputStream
+	HasStream         bool
+	OutboundStream    control.OutboundStream
+	HasOutboundStream bool
+	Liveness          control.PeerLiveness
+	HasLiveness       bool
+	PressedCount      int
 }
 
 // SessionRuntime is the single serialized owner of one peer session's mutable
@@ -30,6 +32,7 @@ type SessionRuntime struct {
 	mu       sync.Mutex
 	control  control.Snapshot
 	stream   control.InputStream
+	outbound control.OutboundStream
 	liveness control.PeerLiveness
 	pressed  control.PressedState
 	executor *SafetyEffectExecutor
@@ -69,6 +72,12 @@ func (runtime *SessionRuntime) Dispatch(
 	if event.Kind == control.EventInboundLeaseGranted {
 		return ControlOutcome{}, errors.New("inbound lease grants require GrantInbound")
 	}
+	if event.Kind == control.EventOutboundIntentDetected {
+		return ControlOutcome{}, errors.New("outbound intents require BeginOutbound")
+	}
+	if event.Kind == control.EventOutboundLeaseGranted {
+		return ControlOutcome{}, errors.New("outbound lease grants require GrantOutbound")
+	}
 	if event.Kind == control.EventReleaseAllSucceeded || event.Kind == control.EventReleaseAllFailed {
 		return ControlOutcome{}, errors.New("ReleaseAll completion events are runtime-internal")
 	}
@@ -77,14 +86,85 @@ func (runtime *SessionRuntime) Dispatch(
 	if err != nil {
 		return outcome, err
 	}
-	if outcome.Snapshot.State == control.StateOutboundActive {
-		liveness, livenessErr := control.NewPeerLiveness(outcome.Snapshot.SessionID, observedAt)
-		if livenessErr != nil {
-			return runtime.faultLocked(ctx, livenessErr)
-		}
-		runtime.liveness = liveness
-	}
 	return outcome, nil
+}
+
+func (runtime *SessionRuntime) BeginOutbound(
+	ctx context.Context,
+	sessionID string,
+	epoch string,
+) (ControlOutcome, error) {
+	runtime.mu.Lock()
+	defer runtime.mu.Unlock()
+
+	stream, err := control.NewOutboundStream(sessionID, epoch)
+	if err != nil {
+		return ControlOutcome{}, err
+	}
+	outcome, err := HandleControlEvent(ctx, runtime.control, control.Event{
+		Kind:      control.EventOutboundIntentDetected,
+		SessionID: sessionID,
+	}, runtime.executor)
+	runtime.applyOutcomeLocked(outcome)
+	if err != nil {
+		return outcome, err
+	}
+	if outcome.Snapshot.State != control.StatePending {
+		return runtime.faultLocked(ctx, errors.New("outbound intent did not produce pending state"))
+	}
+	runtime.outbound = stream
+	return outcome, nil
+}
+
+func (runtime *SessionRuntime) GrantOutbound(
+	ctx context.Context,
+	sessionID string,
+	leaseID string,
+	epoch string,
+	observedAt time.Time,
+) (ControlOutcome, error) {
+	runtime.mu.Lock()
+	defer runtime.mu.Unlock()
+
+	if runtime.control.State != control.StatePending || runtime.outbound.SessionID == "" {
+		return ControlOutcome{}, errors.New("outbound grant requires a pending outbound stream")
+	}
+	if runtime.outbound.SessionID != sessionID || runtime.outbound.Epoch != epoch {
+		return runtime.faultLocked(ctx, errors.New("outbound grant does not match pending session and epoch"))
+	}
+	if leaseID == "" {
+		return runtime.faultLocked(ctx, errors.New("outbound grant requires a lease identifier"))
+	}
+	liveness, err := control.NewPeerLiveness(sessionID, observedAt)
+	if err != nil {
+		return runtime.faultLocked(ctx, err)
+	}
+	outcome, err := HandleControlEvent(ctx, runtime.control, control.Event{
+		Kind:      control.EventOutboundLeaseGranted,
+		SessionID: sessionID,
+		LeaseID:   leaseID,
+	}, runtime.executor)
+	runtime.applyOutcomeLocked(outcome)
+	if err != nil {
+		return outcome, err
+	}
+	runtime.liveness = liveness
+	return outcome, nil
+}
+
+func (runtime *SessionRuntime) NextOutboundEnvelope(ctx context.Context) (control.InputEnvelope, error) {
+	runtime.mu.Lock()
+	defer runtime.mu.Unlock()
+	if runtime.control.State != control.StateOutboundActive || runtime.outbound.SessionID == "" {
+		return control.InputEnvelope{}, errors.New("outbound input requires an outbound-active stream")
+	}
+	envelope, next, err := runtime.outbound.Next()
+	if err != nil {
+		_, faultErr := runtime.faultLocked(ctx, err)
+		return control.InputEnvelope{}, faultErr
+	}
+	runtime.outbound = next
+	return envelope, nil
 }
 
 func (runtime *SessionRuntime) GrantInbound(
@@ -279,6 +359,9 @@ func (runtime *SessionRuntime) applyOutcomeLocked(outcome ControlOutcome) {
 	if runtime.control.State != control.StateInboundActive {
 		runtime.stream = control.InputStream{}
 	}
+	if runtime.control.State != control.StatePending && runtime.control.State != control.StateOutboundActive {
+		runtime.outbound = control.OutboundStream{}
+	}
 	if runtime.control.State != control.StateInboundActive && runtime.control.State != control.StateOutboundActive {
 		runtime.liveness = control.PeerLiveness{}
 	}
@@ -286,21 +369,24 @@ func (runtime *SessionRuntime) applyOutcomeLocked(outcome ControlOutcome) {
 
 func (runtime *SessionRuntime) snapshotLocked() RuntimeSnapshot {
 	return RuntimeSnapshot{
-		Control:      runtime.control,
-		InputStream:  runtime.stream,
-		HasStream:    runtime.stream.SessionID != "",
-		Liveness:     runtime.liveness,
-		HasLiveness:  runtime.liveness.SessionID != "",
-		PressedCount: runtime.pressed.Count(),
+		Control:           runtime.control,
+		InputStream:       runtime.stream,
+		HasStream:         runtime.stream.SessionID != "",
+		OutboundStream:    runtime.outbound,
+		HasOutboundStream: runtime.outbound.SessionID != "",
+		Liveness:          runtime.liveness,
+		HasLiveness:       runtime.liveness.SessionID != "",
+		PressedCount:      runtime.pressed.Count(),
 	}
 }
 
 func (snapshot RuntimeSnapshot) String() string {
 	return fmt.Sprintf(
-		"state=%s version=%d stream=%t liveness=%t pressed=%d",
+		"state=%s version=%d inbound_stream=%t outbound_stream=%t liveness=%t pressed=%d",
 		snapshot.Control.State,
 		snapshot.Control.Version,
 		snapshot.HasStream,
+		snapshot.HasOutboundStream,
 		snapshot.HasLiveness,
 		snapshot.PressedCount,
 	)

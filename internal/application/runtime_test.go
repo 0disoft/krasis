@@ -203,6 +203,71 @@ func TestSessionRuntimeRejectsInboundGrantThroughGenericDispatch(t *testing.T) {
 	}
 }
 
+func TestSessionRuntimeOwnsOutboundEpochAndSequence(t *testing.T) {
+	runtime := newTestRuntime(t, &recordingInputPort{})
+	if _, err := runtime.BeginOutbound(context.Background(), "session-1", "epoch-1"); err != nil {
+		t.Fatalf("BeginOutbound() error = %v", err)
+	}
+	pending := runtime.Snapshot()
+	if pending.Control.State != control.StatePending || !pending.HasOutboundStream || pending.OutboundStream.Epoch != "epoch-1" {
+		t.Fatalf("pending snapshot = %s", pending)
+	}
+	if _, err := runtime.GrantOutbound(context.Background(), "session-1", "lease-1", "epoch-1", time.Unix(100, 0)); err != nil {
+		t.Fatalf("GrantOutbound() error = %v", err)
+	}
+	for want := uint64(1); want <= 2; want++ {
+		envelope, err := runtime.NextOutboundEnvelope(context.Background())
+		if err != nil {
+			t.Fatalf("NextOutboundEnvelope() error = %v", err)
+		}
+		if envelope.SessionID != "session-1" || envelope.Epoch != "epoch-1" || envelope.Sequence != want {
+			t.Fatalf("envelope = %+v", envelope)
+		}
+	}
+}
+
+func TestSessionRuntimeEmptyOutboundLeaseFailsSafe(t *testing.T) {
+	runtime := newTestRuntime(t, &recordingInputPort{})
+	if _, err := runtime.BeginOutbound(context.Background(), "session-1", "epoch-1"); err != nil {
+		t.Fatalf("BeginOutbound() error = %v", err)
+	}
+	_, err := runtime.GrantOutbound(context.Background(), "session-1", "", "epoch-1", time.Unix(100, 0))
+	if err == nil {
+		t.Fatal("GrantOutbound(empty lease) error = nil")
+	}
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal || snapshot.HasOutboundStream {
+		t.Fatalf("runtime did not fail safe: %s", snapshot)
+	}
+}
+
+func TestSessionRuntimeStaleOutboundGrantFailsSafe(t *testing.T) {
+	runtime := newTestRuntime(t, &recordingInputPort{})
+	if _, err := runtime.BeginOutbound(context.Background(), "session-1", "epoch-1"); err != nil {
+		t.Fatalf("BeginOutbound() error = %v", err)
+	}
+	_, err := runtime.GrantOutbound(context.Background(), "session-1", "lease-1", "old-epoch", time.Unix(100, 0))
+	if err == nil {
+		t.Fatal("GrantOutbound(stale epoch) error = nil")
+	}
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal || snapshot.HasOutboundStream {
+		t.Fatalf("runtime did not fail safe: %s", snapshot)
+	}
+}
+
+func TestSessionRuntimeRejectsOutboundLifecycleThroughGenericDispatch(t *testing.T) {
+	runtime := newTestRuntime(t, &recordingInputPort{})
+	_, err := runtime.Dispatch(context.Background(), control.Event{
+		Kind:      control.EventOutboundIntentDetected,
+		SessionID: "session-1",
+	}, time.Time{})
+	if err == nil {
+		t.Fatal("Dispatch(outbound intent) error = nil")
+	}
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal {
+		t.Fatalf("snapshot = %s, want LOCAL", snapshot)
+	}
+}
+
 func TestSessionRuntimeRejectsReleaseCompletionThroughGenericDispatch(t *testing.T) {
 	runtime := newTestRuntime(t, &recordingInputPort{})
 	grantInbound(t, runtime, time.Unix(100, 0))
