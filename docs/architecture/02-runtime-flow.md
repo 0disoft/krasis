@@ -18,6 +18,8 @@
 
 상태 변경은 `internal/control` transition table에서만 결정한다. table이 반환한 effect는 Application이 순서대로 실행하고 성공 또는 실패 event를 다시 상태 머신에 넣는다. 현재 구현은 순수 transition core까지이며 peer transport와 effect executor는 후속 단계다.
 
+활성 lease에서 받은 입력은 실행 전에 `InputStream` gate를 통과한다. session, epoch 또는 정확한 다음 sequence가 하나라도 맞지 않으면 해당 payload를 실행하지 않고 제어권 장애 처리로 넘긴다. 재연결은 새 session과 epoch, sequence `1`에서 시작한다.
+
 ## 장애와 종료
 
 1. 추가 입력 억제와 전달을 중단한다.

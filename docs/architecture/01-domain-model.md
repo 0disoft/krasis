@@ -35,6 +35,18 @@
 
 현재 table은 순수 결정만 소유한다. effect 실행, transition history, durable compare-and-swap, event idempotency key와 네트워크 재조정은 Application 계층 책임이며 아직 구현되지 않았다. `ReleaseAll` 실패를 성공이나 로컬 복귀로 바꾸지 않는 것이 이 단계의 fail-safe 경계다.
 
+## 입력 stream gate
+
+`internal/control.InputStream`은 활성 연결의 `SessionID`, 일회성 `Epoch`와 정확히 다음에 받을 `Sequence`를 소유한다. 첫 sequence는 `1`이며 현재 session·epoch와 정확히 일치하는 다음 sequence만 승인한다.
+
+- 이전 session 또는 epoch의 envelope는 stale 입력으로 거부한다.
+- 이미 본 sequence는 duplicate로 거부하고 다시 실행하지 않는다.
+- 다음 값보다 큰 sequence는 gap으로 거부하며 빠진 입력을 추측하거나 건너뛰지 않는다.
+- sequence가 wraparound에 도달하면 stream을 계속 쓰지 않고 새 operational session이 필요하다.
+- 거부된 envelope는 stream snapshot을 전진시키지 않는다.
+
+이 gate는 message payload나 직렬화 형식을 정하지 않는다. transport adapter가 인증과 decode를 끝낸 뒤 Application이 envelope metadata를 gate에 넣고, 승인된 경우에만 입력 payload를 해석하고 실행해야 한다.
+
 ## 불변조건
 
 - 활성 `ControlLease`는 기기 쌍에서 하나뿐이다.
