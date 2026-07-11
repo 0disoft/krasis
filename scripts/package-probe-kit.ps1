@@ -75,7 +75,23 @@ try {
         $utf8NoBom
     )
 
-    & (Join-Path $stagingRoot 'verify-kit.ps1')
+    $verifier = Join-Path $stagingRoot 'verify-kit.ps1'
+    $unexpected = Join-Path $stagingRoot 'UNEXPECTED.txt'
+    [System.IO.File]::WriteAllText($unexpected, "probe kit verifier negative check`n", $utf8NoBom)
+    $unexpectedRejected = $false
+    try {
+        & $verifier | Out-Null
+    }
+    catch {
+        $unexpectedRejected = $true
+    }
+    finally {
+        Remove-Item -LiteralPath $unexpected -Force
+    }
+    if (-not $unexpectedRejected) {
+        throw 'Probe kit verifier accepted an unexpected file.'
+    }
+    & $verifier
 
     Compress-Archive -Path (Join-Path $stagingRoot '*') -DestinationPath $OutputPath
 }

@@ -12,8 +12,9 @@ GitHub Actions의 `krasis-probe-kit-windows-amd64-<commit>.zip` artifact를 한 
 
 ## 무결성 확인
 
-압축을 푼 directory에서 실행 파일, helper, runbook과 build metadata 전체의 SHA-256을
-확인한다. 아래 PowerShell은 사람의 수동 확인용이며 agent command 권한을 부여하지 않는다.
+새 directory에 압축을 푼 직후 실행 파일, helper, runbook과 build metadata 전체의 SHA-256을
+확인한다. 검증기는 manifest에 없는 추가 파일이나 하위 directory도 거부한다. 아래 PowerShell은
+사람의 수동 확인용이며 agent command 권한을 부여하지 않는다.
 
 ```powershell
 .\verify-kit.ps1

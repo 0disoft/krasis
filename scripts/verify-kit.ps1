@@ -17,6 +17,18 @@ $requiredFiles = @(
     'README.md'
     'BUILD.json'
 )
+$allowedEntries = @($requiredFiles) + 'SHA256SUMS.txt'
+foreach ($entry in Get-ChildItem -LiteralPath $PSScriptRoot -Force) {
+    if ($entry.PSIsContainer -or $allowedEntries -notcontains $entry.Name) {
+        throw "Unexpected probe kit entry: $($entry.Name)"
+    }
+}
+foreach ($name in $allowedEntries) {
+    if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot $name) -PathType Leaf)) {
+        throw "Required probe kit file was not found: $name"
+    }
+}
+
 $expected = @{}
 foreach ($line in Get-Content -LiteralPath $manifestPath) {
     if ($line -notmatch '^([0-9a-f]{64})  ([^/\\]+)$') {
@@ -39,9 +51,6 @@ if ($expected.Count -ne $requiredFiles.Count) {
 
 foreach ($name in $requiredFiles) {
     $path = Join-Path $PSScriptRoot $name
-    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
-        throw "Required probe kit file was not found: $name"
-    }
     $actual = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($actual -ne $expected[$name]) {
         throw "Checksum mismatch: $name"
