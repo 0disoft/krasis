@@ -10,11 +10,13 @@
 
 순서는 format 검사, `go test ./...`, `go vet`, Windows CLI build와 장비 실행 kit 생성이다. Win32 callback의 `LPARAM` 변환 package만 `unsafeptr` 검사를 제외하고 나머지 vet analyzer는 유지한다. 성공한 build는 실행 파일, 수집 script, 장비 runbook, build identity와 실행 파일 SHA-256을 zip 하나로 묶고 commit SHA가 포함된 artifact 이름으로 올린다.
 
+peer 통합 테스트는 먼저 한 process 안의 두 `RunSession`을 실제 framed stream으로 연결해 request, grant, input, return revoke와 양쪽 `LOCAL` 수렴을 검증한다. 별도 subprocess 테스트는 임시 test CA와 identity를 test temp directory에만 생성하고 source와 destination test process를 localhost TCP로 연결한다. 양쪽은 제품 `PeerConnection`을 사용해 TLS 1.3 mutual authentication과 `krasis/1` ALPN을 통과한 뒤 동일한 왕복을 수행해야 하며 두 process가 모두 success exit code를 반환해야 한다. test certificate와 private key는 artifact에 포함하지 않는다.
+
 checkout, Go setup과 artifact upload action은 tag가 아니라 검토한 commit SHA로 고정한다. Go version은 `go.mod`의 language floor를 사용하고 dependency가 없는 현재 module에서는 setup action cache를 끈다.
 
 ## CI가 증명하지 않는 것
 
-hosted runner는 실제 사용자의 interactive desktop 입력 장치와 네 대상 노트북을 대표하지 않는다. 따라서 `diagnose`, low-level hook `capture`, `SendInput` selftest와 `probe`는 CI에서 실행하지 않는다. 이 동작은 대상 Windows session에서 별도 smoke와 장비별 report로 검증한다.
+hosted runner는 실제 사용자의 interactive desktop 입력 장치와 네 대상 노트북을 대표하지 않는다. subprocess peer test도 localhost의 정상 연결만 검증하며 공용 Wi-Fi, 방화벽, packet loss, 절전, process 강제 종료와 실제 두 장비의 지연을 증명하지 않는다. 따라서 `diagnose`, low-level hook `capture`, `SendInput` selftest와 `probe`는 CI에서 실행하지 않는다. 이 동작은 대상 Windows session에서 별도 smoke와 장비별 report로 검증한다.
 
 ## 실패 정책
 
