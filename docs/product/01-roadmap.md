@@ -33,6 +33,8 @@
 
 - 인증된 연결과 입력 순서 보장
 - 제어권 획득, 갱신, 취소와 재연결
+- ADR 0005의 semantic write coordinator를 먼저 구현한 뒤 heartbeat sender와 deadline 감시 연결
+- heartbeat interval과 timeout을 실제 pair congestion·절전 실험으로 결정
 - 장애 주입 테스트
 
 ### Phase 4: Windows 입력 통합
@@ -50,6 +52,7 @@
 - bounded live-input `krasis-lab agent-session`과 로컬 긴급 해제는 구현됨
 - 별도 Phase 0 crash guard, parent-kill subprocess 복구와 report gate는 구현됨
 - 장소별 순차 수집을 합치는 `phase0-check` evidence gate는 구현됨
+- heartbeat payload와 liveness domain은 구현됐지만 semantic write coordinator와 timer 배선은 미구현
 - 정식 agent executable, 단일 instance와 tray lifecycle은 미구현
 
 ### Phase 6: Wails v3 + Svelte UI
