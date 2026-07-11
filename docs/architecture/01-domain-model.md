@@ -47,6 +47,27 @@
 
 이 gate는 message payload나 직렬화 형식을 정하지 않는다. transport adapter가 인증과 decode를 끝낸 뒤 Application이 envelope metadata를 gate에 넣고, 승인된 경우에만 입력 payload를 해석하고 실행해야 한다.
 
+## Peer liveness
+
+`PeerLiveness`는 현재 `SessionID`와 마지막 heartbeat를 로컬에서 관찰한 시각만 가진다. timeout 값은 domain 상수가 아니라 Application이 실측 또는 설정에서 전달하는 값이다. deadline에 도달하면 `FAULT_DETECTED` event를 만들며, 이전 session의 heartbeat와 시간이 뒤로 이동한 관찰은 liveness를 갱신하지 않는다.
+
+peer가 보낸 wall clock을 신뢰하지 않고 로컬 수신 시각을 사용해야 한다. 실제 timer 소유권, heartbeat cadence와 timeout 값은 transport 및 성능 실험 전까지 `UNDECIDED`다.
+
+## PressedState와 ReleaseAll
+
+`PressedState`는 원격에 down을 반영하려는 keyboard key와 mouse button의 opaque normalized token을 메모리에 기록한다. token의 구체적인 Windows code mapping은 입력 adapter 검증 뒤 확정한다.
+
+- down 주입 전에 token을 먼저 기록한다.
+- 같은 token의 반복 down은 상태를 중복시키지 않는다.
+- up 주입이 성공한 뒤에만 token을 제거한다.
+- `ReleaseAll`은 최초 down의 역순으로 모든 token을 시도하며 중간 실패 뒤에도 나머지를 계속 해제한다.
+- 성공한 token만 제거하고 실패한 token은 다음 retry를 위해 유지한다.
+- 빈 상태의 `ReleaseAll`은 아무 입력도 만들지 않는다.
+
+`PressedState`는 원시 입력 log가 아니다. 메모리상 복구 책임에만 사용하며 support bundle, 진단 출력과 일반 log에 token code를 복제하지 않는다. durable crash journal 형식과 암호화·수명 정책은 crash guard 설계 전까지 미구현이다.
+
+Application의 단일 session runtime이 `ControlLease`, `InputStream`, `PeerLiveness`, `PressedState` 접근을 직렬화해야 한다. 현재 값 객체와 coordinator 함수는 자체 lock을 제공하지 않으므로 여러 goroutine에서 직접 공유하는 사용은 지원하지 않는다.
+
 ## 불변조건
 
 - 활성 `ControlLease`는 기기 쌍에서 하나뿐이다.
