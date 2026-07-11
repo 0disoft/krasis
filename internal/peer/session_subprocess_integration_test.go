@@ -26,14 +26,97 @@ import (
 )
 
 const (
-	peerProcessRoleEnv  = "KRASIS_TEST_PEER_ROLE"
-	peerProcessAddress  = "KRASIS_TEST_PEER_ADDRESS"
-	peerProcessCA       = "KRASIS_TEST_PEER_CA"
-	peerProcessCert     = "KRASIS_TEST_PEER_CERT"
-	peerProcessKey      = "KRASIS_TEST_PEER_KEY"
-	peerProcessReadyTag = "KRASIS_PEER_READY="
-	peerTestServerName  = "peer.test"
+	peerProcessRoleEnv      = "KRASIS_TEST_PEER_ROLE"
+	peerProcessAddress      = "KRASIS_TEST_PEER_ADDRESS"
+	peerProcessCA           = "KRASIS_TEST_PEER_CA"
+	peerProcessCert         = "KRASIS_TEST_PEER_CERT"
+	peerProcessKey          = "KRASIS_TEST_PEER_KEY"
+	peerProcessScenario     = "KRASIS_TEST_PEER_SCENARIO"
+	peerProcessReadyTag     = "KRASIS_PEER_READY="
+	peerProcessActiveTag    = "KRASIS_PEER_ACTIVE="
+	peerProcessRecoveredTag = "KRASIS_PEER_RECOVERED="
+	peerTestServerName      = "peer.test"
 )
+
+func TestPeerSourceRecoversWhenDestinationProcessIsKilled(t *testing.T) {
+	fixture := writeProcessTLSFixture(t)
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatalf("os.Executable() error = %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	destination := startMonitoredPeerProcess(t, ctx, executable, []string{
+		peerProcessRoleEnv + "=destination",
+		peerProcessScenario + "=kill_destination",
+		peerProcessCA + "=" + fixture.ca,
+		peerProcessCert + "=" + fixture.serverCert,
+		peerProcessKey + "=" + fixture.serverKey,
+	})
+	address := waitPeerProcessTag(t, ctx, destination.events, peerProcessReadyTag)
+	source := startMonitoredPeerProcess(t, ctx, executable, []string{
+		peerProcessRoleEnv + "=source",
+		peerProcessScenario + "=kill_destination",
+		peerProcessAddress + "=" + address,
+		peerProcessCA + "=" + fixture.ca,
+		peerProcessCert + "=" + fixture.clientCert,
+		peerProcessKey + "=" + fixture.clientKey,
+	})
+	if got := waitPeerProcessTag(t, ctx, destination.events, peerProcessActiveTag); got != "destination" {
+		t.Fatalf("active process = %q", got)
+	}
+	if err := destination.command.Process.Kill(); err != nil {
+		t.Fatalf("kill destination process: %v", err)
+	}
+	destinationOutput, destinationErr := destination.wait()
+	if destinationErr == nil {
+		t.Fatalf("killed destination exited successfully:\n%s", destinationOutput)
+	}
+	sourceOutput, sourceErr := source.wait()
+	if sourceErr != nil || !strings.Contains(sourceOutput, peerProcessRecoveredTag+"source") {
+		t.Fatalf("source did not recover: error=%v\nsource output:\n%s\ndestination output:\n%s", sourceErr, sourceOutput, destinationOutput)
+	}
+}
+
+func TestPeerDestinationRecoversWhenSourceProcessIsKilled(t *testing.T) {
+	fixture := writeProcessTLSFixture(t)
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatalf("os.Executable() error = %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	destination := startMonitoredPeerProcess(t, ctx, executable, []string{
+		peerProcessRoleEnv + "=destination",
+		peerProcessScenario + "=kill_source",
+		peerProcessCA + "=" + fixture.ca,
+		peerProcessCert + "=" + fixture.serverCert,
+		peerProcessKey + "=" + fixture.serverKey,
+	})
+	address := waitPeerProcessTag(t, ctx, destination.events, peerProcessReadyTag)
+	source := startMonitoredPeerProcess(t, ctx, executable, []string{
+		peerProcessRoleEnv + "=source",
+		peerProcessScenario + "=kill_source",
+		peerProcessAddress + "=" + address,
+		peerProcessCA + "=" + fixture.ca,
+		peerProcessCert + "=" + fixture.clientCert,
+		peerProcessKey + "=" + fixture.clientKey,
+	})
+	if got := waitPeerProcessTag(t, ctx, destination.events, peerProcessActiveTag); got != "destination" {
+		t.Fatalf("active process = %q", got)
+	}
+	if err := source.command.Process.Kill(); err != nil {
+		t.Fatalf("kill source process: %v", err)
+	}
+	sourceOutput, sourceErr := source.wait()
+	if sourceErr == nil {
+		t.Fatalf("killed source exited successfully:\n%s", sourceOutput)
+	}
+	destinationOutput, destinationErr := destination.wait()
+	if destinationErr != nil || !strings.Contains(destinationOutput, peerProcessRecoveredTag+"destination") {
+		t.Fatalf("destination did not recover: error=%v\ndestination output:\n%s\nsource output:\n%s", destinationErr, destinationOutput, sourceOutput)
+	}
+}
 
 func TestPeerSessionsRoundTripAcrossTLSPeerProcesses(t *testing.T) {
 	fixture := writeProcessTLSFixture(t)
@@ -146,7 +229,11 @@ func runDestinationPeerProcess(t *testing.T, ctx context.Context) {
 	}
 	defer peerConnection.Close()
 
-	input := &integrationInputPort{moves: make(chan [2]int32, 1)}
+	input := &integrationInputPort{
+		moves:    make(chan [2]int32, 1),
+		presses:  make(chan control.PressedToken, 1),
+		releases: make(chan control.PressedToken, 1),
+	}
 	runtime := newIntegrationRuntime(t, input)
 	returns := &integrationReturnBoundary{}
 	responder := &LeaseResponder{
@@ -171,6 +258,41 @@ func runDestinationPeerProcess(t *testing.T, ctx context.Context) {
 		}
 	case <-ctx.Done():
 		t.Fatalf("destination input timeout: %v", ctx.Err())
+	}
+	scenario := os.Getenv(peerProcessScenario)
+	if scenario == "kill_destination" {
+		fmt.Printf("%sdestination\n", peerProcessActiveTag)
+		<-ctx.Done()
+		return
+	}
+	if scenario == "kill_source" {
+		select {
+		case token := <-input.presses:
+			if token.Kind != control.PressedKeyboardKey || token.Code != 1 {
+				t.Fatalf("destination press = %+v", token)
+			}
+		case <-ctx.Done():
+			t.Fatalf("destination key press timeout: %v", ctx.Err())
+		}
+		fmt.Printf("%sdestination\n", peerProcessActiveTag)
+		select {
+		case <-sessionDone:
+		case <-ctx.Done():
+			t.Fatalf("destination recovery timeout: %v", ctx.Err())
+		}
+		if runtime.Snapshot().Control.State != control.StateLocal {
+			t.Fatalf("destination did not recover local: %s", runtime.Snapshot())
+		}
+		select {
+		case token := <-input.releases:
+			if token.Kind != control.PressedKeyboardKey || token.Code != 1 {
+				t.Fatalf("destination release = %+v", token)
+			}
+		default:
+			t.Fatal("destination cleanup did not release held key")
+		}
+		fmt.Printf("%sdestination\n", peerProcessRecoveredTag)
+		return
 	}
 	if err := returnController.Revoke(ctx, control.ReturnIntent{SessionID: "session-1", Epoch: "epoch-1"}); err != nil {
 		t.Fatalf("return Revoke() error = %v", err)
@@ -218,6 +340,29 @@ func runSourcePeerProcess(t *testing.T, ctx context.Context) {
 	if err := SendInputAction(ctx, peerConnection, runtime, control.InputAction{Kind: control.InputPointerMove, DeltaX: 7, DeltaY: -3}); err != nil {
 		t.Fatalf("SendInputAction() error = %v", err)
 	}
+	scenario := os.Getenv(peerProcessScenario)
+	if scenario == "kill_source" {
+		if err := SendInputAction(ctx, peerConnection, runtime, control.InputAction{Kind: control.InputKeyDown, Code: 1}); err != nil {
+			t.Fatalf("SendInputAction(key down) error = %v", err)
+		}
+		fmt.Printf("%ssource\n", peerProcessActiveTag)
+		<-ctx.Done()
+		return
+	}
+	if scenario == "kill_destination" {
+		fmt.Printf("%ssource\n", peerProcessActiveTag)
+		select {
+		case <-sessionDone:
+		case <-ctx.Done():
+			t.Fatalf("source recovery timeout: %v", ctx.Err())
+		}
+		waitSignal(t, activation.deactivated, "source suppression recovery")
+		if runtime.Snapshot().Control.State != control.StateLocal || activation.Active() {
+			t.Fatalf("source did not recover local: runtime=%s active=%t", runtime.Snapshot(), activation.Active())
+		}
+		fmt.Printf("%ssource\n", peerProcessRecoveredTag)
+		return
+	}
 	waitSignal(t, activation.deactivated, "TLS source return revoke")
 	if runtime.Snapshot().Control.State != control.StateLocal {
 		t.Fatalf("source runtime = %s", runtime.Snapshot())
@@ -228,6 +373,76 @@ func runSourcePeerProcess(t *testing.T, ctx context.Context) {
 	case <-ctx.Done():
 		t.Fatalf("source session shutdown timeout: %v", ctx.Err())
 	}
+}
+
+type monitoredPeerProcess struct {
+	command    *exec.Cmd
+	events     <-chan string
+	outputDone <-chan string
+	stderr     *bytes.Buffer
+}
+
+func startMonitoredPeerProcess(
+	t *testing.T,
+	ctx context.Context,
+	executable string,
+	environment []string,
+) *monitoredPeerProcess {
+	t.Helper()
+	command := exec.CommandContext(ctx, executable, "-test.run=^TestPeerTLSProcessHelper$", "-test.v")
+	command.Env = append(os.Environ(), environment...)
+	stdout, err := command.StdoutPipe()
+	if err != nil {
+		t.Fatalf("peer StdoutPipe() error = %v", err)
+	}
+	stderr := &bytes.Buffer{}
+	command.Stderr = stderr
+	events := make(chan string, 8)
+	outputDone := make(chan string, 1)
+	go func() {
+		var output strings.Builder
+		scanner := bufio.NewScanner(stdout)
+		for scanner.Scan() {
+			line := scanner.Text()
+			output.WriteString(line)
+			output.WriteByte('\n')
+			if strings.HasPrefix(line, "KRASIS_PEER_") {
+				events <- line
+			}
+		}
+		close(events)
+		outputDone <- output.String()
+	}()
+	if err := command.Start(); err != nil {
+		t.Fatalf("start peer process: %v", err)
+	}
+	return &monitoredPeerProcess{command: command, events: events, outputDone: outputDone, stderr: stderr}
+}
+
+func waitPeerProcessTag(t *testing.T, ctx context.Context, events <-chan string, prefix string) string {
+	t.Helper()
+	for {
+		select {
+		case line, ok := <-events:
+			if !ok {
+				t.Fatalf("peer process exited before %s", prefix)
+			}
+			if value, found := strings.CutPrefix(line, prefix); found {
+				return value
+			}
+		case <-ctx.Done():
+			t.Fatalf("timed out waiting for %s: %v", prefix, ctx.Err())
+		}
+	}
+}
+
+func (process *monitoredPeerProcess) wait() (string, error) {
+	err := process.command.Wait()
+	output := <-process.outputDone
+	if process.stderr.Len() != 0 {
+		output += process.stderr.String()
+	}
+	return output, err
 }
 
 type processTLSFixture struct {

@@ -115,11 +115,23 @@ func waitSignal(t *testing.T, signal <-chan struct{}, name string) {
 }
 
 type integrationInputPort struct {
-	moves chan [2]int32
+	moves    chan [2]int32
+	presses  chan control.PressedToken
+	releases chan control.PressedToken
 }
 
-func (*integrationInputPort) Press(context.Context, control.PressedToken) error   { return nil }
-func (*integrationInputPort) Release(context.Context, control.PressedToken) error { return nil }
+func (port *integrationInputPort) Press(_ context.Context, token control.PressedToken) error {
+	if port.presses != nil {
+		port.presses <- token
+	}
+	return nil
+}
+func (port *integrationInputPort) Release(_ context.Context, token control.PressedToken) error {
+	if port.releases != nil {
+		port.releases <- token
+	}
+	return nil
+}
 func (port *integrationInputPort) Move(_ context.Context, deltaX, deltaY int32) error {
 	port.moves <- [2]int32{deltaX, deltaY}
 	return nil
