@@ -197,6 +197,112 @@ func TestPeerSessionsReuseOneConnectionForBothDirections(t *testing.T) {
 	assertIntegrationRuntimesLocal(t, leftRuntime, rightRuntime, "right-to-left transfer")
 }
 
+func TestPeerSessionsFailSafeWhenBothPeersRequestControl(t *testing.T) {
+	leftSide, rightSide := openFramedPipe(t)
+	leftRuntime := newIntegrationRuntime(t, &integrationInputPort{moves: make(chan [2]int32, 1)})
+	rightRuntime := newIntegrationRuntime(t, &integrationInputPort{moves: make(chan [2]int32, 1)})
+	leftActivation := newIntegrationSourceActivation()
+	rightActivation := newIntegrationSourceActivation()
+	leftOutbound, err := NewOutboundController(leftSide, leftRuntime, leftActivation)
+	if err != nil {
+		t.Fatalf("NewOutboundController(left) error = %v", err)
+	}
+	rightOutbound, err := NewOutboundController(rightSide, rightRuntime, rightActivation)
+	if err != nil {
+		t.Fatalf("NewOutboundController(right) error = %v", err)
+	}
+	leftResponder := &LeaseResponder{
+		Writer:     leftSide,
+		Runtime:    leftRuntime,
+		Authorizer: staticLeaseAuthorizer{leaseID: "lease-left", accepted: true},
+		Entry:      integrationCursorEntry{},
+		Returns:    &integrationReturnBoundary{},
+	}
+	rightResponder := &LeaseResponder{
+		Writer:     rightSide,
+		Runtime:    rightRuntime,
+		Authorizer: staticLeaseAuthorizer{leaseID: "lease-right", accepted: true},
+		Entry:      integrationCursorEntry{},
+		Returns:    &integrationReturnBoundary{},
+	}
+	leftIdentity := OutboundIdentity{SessionID: "session-left", Epoch: "epoch-left"}
+	rightIdentity := OutboundIdentity{SessionID: "session-right", Epoch: "epoch-right"}
+	if _, err := leftRuntime.BeginOutbound(context.Background(), leftIdentity.SessionID, leftIdentity.Epoch); err != nil {
+		t.Fatalf("BeginOutbound(left) error = %v", err)
+	}
+	if _, err := rightRuntime.BeginOutbound(context.Background(), rightIdentity.SessionID, rightIdentity.Epoch); err != nil {
+		t.Fatalf("BeginOutbound(right) error = %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	done := make(chan error, 2)
+	go func() {
+		done <- RunSessionWithLifecycle(ctx, leftSide, leftRuntime, leftResponder, leftOutbound, time.Now)
+	}()
+	go func() {
+		done <- RunSessionWithLifecycle(ctx, rightSide, rightRuntime, rightResponder, rightOutbound, time.Now)
+	}()
+	t.Cleanup(func() {
+		_ = leftSide.Close()
+		_ = rightSide.Close()
+	})
+
+	requests := []struct {
+		writer  FrameWriter
+		command transport.ControlCommand
+	}{
+		{
+			writer: leftSide,
+			command: transport.ControlCommand{
+				Kind: transport.ControlLeaseRequest, SessionID: leftIdentity.SessionID,
+				Epoch: leftIdentity.Epoch, Edge: control.ScreenEdgeRight,
+			},
+		},
+		{
+			writer: rightSide,
+			command: transport.ControlCommand{
+				Kind: transport.ControlLeaseRequest, SessionID: rightIdentity.SessionID,
+				Epoch: rightIdentity.Epoch, Edge: control.ScreenEdgeLeft,
+			},
+		},
+	}
+	writes := make(chan error, len(requests))
+	for _, request := range requests {
+		request := request
+		go func() {
+			payload, encodeErr := transport.EncodeControlPayload(request.command)
+			if encodeErr != nil {
+				writes <- encodeErr
+				return
+			}
+			writes <- request.writer.WriteFrameContext(ctx, transport.Frame{Kind: transport.MessageControl, Payload: payload})
+		}()
+	}
+	for range requests {
+		select {
+		case <-writes:
+		case <-ctx.Done():
+			t.Fatalf("simultaneous lease request write did not finish: %v", ctx.Err())
+		}
+	}
+	for range 2 {
+		select {
+		case sessionErr := <-done:
+			if sessionErr == nil {
+				t.Fatal("colliding peer session exited without an error")
+			}
+		case <-ctx.Done():
+			t.Fatalf("colliding peer session did not stop: %v", ctx.Err())
+		}
+	}
+
+	assertIntegrationRuntimesLocal(t, leftRuntime, rightRuntime, "simultaneous control requests")
+	if leftActivation.Active() || rightActivation.Active() {
+		t.Fatalf("source activation survived collision: left=%t right=%t", leftActivation.Active(), rightActivation.Active())
+	}
+}
+
 func TestPeerSessionsReconnectWithNewSessionAndEpoch(t *testing.T) {
 	sourceRuntime := newIntegrationRuntime(t, &integrationInputPort{moves: make(chan [2]int32, 2)})
 	destinationInput := &integrationInputPort{moves: make(chan [2]int32, 2)}
