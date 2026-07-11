@@ -10,7 +10,7 @@ Krasis는 control lease, heartbeat와 입력 event의 의미 순서를 보존해
 ## 결정
 
 - MVP peer session은 하나의 ordered byte stream을 사용한다.
-- 실제 네트워크 연결은 TLS 1.3 mutual authentication을 통과한 뒤에만 frame을 전달한다. 인증서 발급과 pairing 확인 방식은 별도 ADR 전까지 `UNDECIDED`다.
+- 실제 네트워크 연결은 TLS 1.3 mutual authentication과 `krasis/1` ALPN 협상을 통과한 뒤에만 frame을 전달한다. 인증서 발급과 pairing 확인 방식은 별도 ADR 전까지 `UNDECIDED`다.
 - wire frame은 magic, protocol version, message kind, reserved flags와 payload length를 가진 고정 header 뒤에 opaque payload를 둔다.
 - payload는 최대 65,536 bytes다. 이 값은 작은 control/input message에 비해 충분한 여유를 두면서 peer가 선언하는 메모리 사용량을 제한하기 위한 초기 방어선이며, 실제 payload 측정 뒤 축소할 수 있다.
 - 정의되지 않은 version, message kind, flags, oversized payload와 truncated frame은 연결 오류다. 부분 frame을 추측하거나 재생하지 않는다.
@@ -22,3 +22,5 @@ Krasis는 control lease, heartbeat와 입력 event의 의미 순서를 보존해
 control과 input 사이의 순서를 하나의 stream에서 설명할 수 있고 frame decode 전에 메모리 상한을 적용할 수 있다. 대신 대량 input이 heartbeat를 늦추는 head-of-line blocking 가능성이 남는다. 실제 두 기기 측정에서 이 문제가 확인될 때에만 독립 channel과 cross-channel epoch 규칙을 새 ADR로 도입한다.
 
 `net.Pipe` loopback 검증은 framing과 순서를 증명하지만 TLS, Wi-Fi 장애, 방화벽, 지연 또는 packet loss를 증명하지 않는다.
+
+TLS loopback 검증은 양쪽 인증서 검증, TLS version과 ALPN을 증명한다. test 인증서는 메모리에서만 생성하며 제품 pairing과 certificate storage를 대신하지 않는다.
