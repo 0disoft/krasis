@@ -133,10 +133,12 @@ source에서 key를 놓고 destination의 입력이 즉시 정상인지 확인�
 ## 순차 Phase 0 집계
 
 집과 스터디카페에서 같은 clean build와 duration으로 모은 파일을 한 directory에 복사한 뒤
-아래 사람 전용 명령을 실행한다. 수집 날짜가 달라도 되고 네 장비를 동시에 켤 필요는 없다.
+파일 이름을 `H-A-agent.json`, `H-B-agent.json`, `S-A-agent.json`, `S-B-agent.json`과
+각 alias의 `*-recovery.json`으로 맞춘다. probe kit의 아래 사람 전용 helper를 실행한다.
+수집 날짜가 달라도 되고 네 장비를 동시에 켤 필요는 없다.
 
 ```powershell
-.\krasis-lab.exe phase0-check --home .\reports\H-A-agent.json --home .\reports\H-B-agent.json --study .\reports\S-A-agent.json --study .\reports\S-B-agent.json --recovery .\reports\H-A-recovery.json --recovery .\reports\H-B-recovery.json --recovery .\reports\S-A-recovery.json --recovery .\reports\S-B-recovery.json
+.\check-phase0.ps1 -ReportDirectory .\reports
 ```
 
 `passed=true`와 exit `0`이 모두 나와야 이 범위의 Phase 0 evidence gate가 통과한다.

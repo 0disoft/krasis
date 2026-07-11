@@ -41,6 +41,7 @@ try {
     $null = New-Item -ItemType Directory -Path $stagingRoot
     Copy-Item -LiteralPath $BinaryPath -Destination (Join-Path $stagingRoot 'krasis-lab.exe')
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'collect-probe.ps1') -Destination $stagingRoot
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'check-phase0.ps1') -Destination $stagingRoot
     Copy-Item -LiteralPath (Join-Path $projectRoot 'docs/experiments/device-probe-runbook.md') -Destination (Join-Path $stagingRoot 'README.md')
 
     $executableHash = (Get-FileHash -LiteralPath (Join-Path $stagingRoot 'krasis-lab.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
