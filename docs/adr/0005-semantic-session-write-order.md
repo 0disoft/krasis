@@ -46,6 +46,9 @@ reject, revoke, input과 heartbeat 사이에서 어떤 runtime 결정이 어떤 
   heartbeat write failure는 bounded cleanup context에서 `ReleaseAll`과 `LOCAL` 수렴을
   시도한다. 이 cleanup context는 session 취소를 상속하지 않아 동시 cancellation이 held input
   release를 선점하지 못한다.
+- cleanup coordinator를 제한 시간 안에 획득하지 못하면 runtime을 coordinator 밖에서 변경하지
+  않는다. 반환 오류에는 cleanup deadline뿐 아니라 cleanup을 시작시킨 원래 session fault도
+  함께 보존해 상위 supervisor가 원인과 incomplete cleanup을 모두 판단할 수 있게 한다.
 - heartbeat 수신도 coordinator를 획득한 뒤 새 local observation을 읽고, 현재 liveness가 이미
   timeout에 도달했는지 먼저 판정한다. 만료된 lease는 늦게 도착한 heartbeat로
   `LastObserved`를 갱신하지 않고 `ReleaseAll`과 `LOCAL` cleanup으로 수렴한다.
@@ -62,6 +65,7 @@ reject, revoke, input과 heartbeat 사이에서 어떤 runtime 결정이 어떤 
 - coordinator 대기 중 deadline이 지나면 과거 ticker 시각으로 heartbeat를 보내지 않음
 - deadline에 도달한 뒤 수신된 heartbeat가 만료 세션을 되살리지 않고 held input을 해제함
 - deadline 판정과 session cancellation이 겹쳐도 held input cleanup이 완료됨
+- cleanup coordinator 획득 timeout이 원래 session fault를 가리지 않음
 - 서로 다른 interval 또는 timeout의 Phase 0 evidence가 통과하지 않음
 - heartbeat 송수신과 같은-session gap evidence가 없는 Phase 0 report는 통과하지 않음
 

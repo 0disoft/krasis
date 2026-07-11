@@ -2,6 +2,7 @@ package peer
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/0disoft/krasis/internal/application"
@@ -22,12 +23,27 @@ func failRuntimeCoordinated(
 	cause error,
 	beforeCleanup func(),
 ) error {
-	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), CleanupTimeout)
+	return failRuntimeCoordinatedWithin(ctx, coordinator, runtime, cause, beforeCleanup, CleanupTimeout)
+}
+
+func failRuntimeCoordinatedWithin(
+	ctx context.Context,
+	coordinator *SessionWriteCoordinator,
+	runtime *application.SessionRuntime,
+	cause error,
+	beforeCleanup func(),
+	timeout time.Duration,
+) error {
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), timeout)
 	defer cancel()
-	return coordinator.Execute(cleanupCtx, func(FrameWriter) error {
+	err := coordinator.Execute(cleanupCtx, func(FrameWriter) error {
 		if beforeCleanup != nil {
 			beforeCleanup()
 		}
 		return runtime.Fail(cleanupCtx, cause)
 	})
+	if cause != nil && !errors.Is(err, cause) {
+		return errors.Join(cause, err)
+	}
+	return err
 }
