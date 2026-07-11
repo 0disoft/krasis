@@ -14,7 +14,7 @@ import (
 func TestBeginOutboundSessionWritesLeaseRequest(t *testing.T) {
 	runtime := newLocalRuntime(t)
 	writer := &recordingFrameWriter{}
-	if err := BeginOutboundSession(context.Background(), writer, runtime, "session-1", "epoch-1", control.ScreenEdgeRight); err != nil {
+	if err := BeginOutboundSession(context.Background(), testWriteCoordinator(t, writer), runtime, "session-1", "epoch-1", control.ScreenEdgeRight); err != nil {
 		t.Fatalf("BeginOutboundSession() error = %v", err)
 	}
 	command := decodeWrittenControl(t, writer)
@@ -32,7 +32,7 @@ func TestOutboundActionSinkWritesThroughRuntimeSequence(t *testing.T) {
 		t.Fatalf("GrantOutbound() error = %v", err)
 	}
 	writer := &recordingFrameWriter{}
-	sink, err := NewOutboundActionSink(writer, runtime)
+	sink, err := NewOutboundActionSink(testWriteCoordinator(t, writer), runtime)
 	if err != nil {
 		t.Fatalf("NewOutboundActionSink() error = %v", err)
 	}
@@ -53,7 +53,7 @@ func TestOutboundActionSinkFailCleansRuntime(t *testing.T) {
 	if _, err := runtime.GrantOutbound(context.Background(), "session-1", "lease-1", "epoch-1", time.Unix(100, 0)); err != nil {
 		t.Fatalf("GrantOutbound() error = %v", err)
 	}
-	sink, err := NewOutboundActionSink(&recordingFrameWriter{}, runtime)
+	sink, err := NewOutboundActionSink(testWriteCoordinator(t, &recordingFrameWriter{}), runtime)
 	if err != nil {
 		t.Fatalf("NewOutboundActionSink() error = %v", err)
 	}
@@ -68,7 +68,7 @@ func TestOutboundActionSinkFailCleansRuntime(t *testing.T) {
 func TestBeginOutboundSessionWriteFailureCleansRuntime(t *testing.T) {
 	runtime := newLocalRuntime(t)
 	writer := &recordingFrameWriter{err: errors.New("write failed")}
-	if err := BeginOutboundSession(context.Background(), writer, runtime, "session-1", "epoch-1", control.ScreenEdgeRight); err == nil {
+	if err := BeginOutboundSession(context.Background(), testWriteCoordinator(t, writer), runtime, "session-1", "epoch-1", control.ScreenEdgeRight); err == nil {
 		t.Fatal("BeginOutboundSession() error = nil")
 	}
 	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal || snapshot.HasOutboundStream {
@@ -82,8 +82,9 @@ func TestSendInputActionWritesMonotonicEnvelopes(t *testing.T) {
 		t.Fatalf("GrantOutbound() error = %v", err)
 	}
 	writer := &recordingFrameWriter{}
+	coordinator := testWriteCoordinator(t, writer)
 	for range 2 {
-		if err := SendInputAction(context.Background(), writer, runtime, control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}); err != nil {
+		if err := SendInputAction(context.Background(), coordinator, runtime, control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}); err != nil {
 			t.Fatalf("SendInputAction() error = %v", err)
 		}
 	}
@@ -107,7 +108,7 @@ func TestSendInputActionWriteFailureDoesNotReuseSequence(t *testing.T) {
 		t.Fatalf("GrantOutbound() error = %v", err)
 	}
 	writer := &recordingFrameWriter{err: errors.New("uncertain write")}
-	if err := SendInputAction(context.Background(), writer, runtime, control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}); err == nil {
+	if err := SendInputAction(context.Background(), testWriteCoordinator(t, writer), runtime, control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}); err == nil {
 		t.Fatal("SendInputAction() error = nil")
 	}
 	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal || snapshot.HasOutboundStream {
@@ -120,11 +121,11 @@ func TestLeaseResponderGrantsAuthorizedRequest(t *testing.T) {
 	writer := &recordingFrameWriter{}
 	entry := &recordingCursorEntry{runtime: runtime}
 	responder := &LeaseResponder{
-		Writer:     writer,
-		Runtime:    runtime,
-		Authorizer: staticLeaseAuthorizer{leaseID: "lease-1", accepted: true},
-		Entry:      entry,
-		Returns:    entry,
+		Coordinator: testWriteCoordinator(t, writer),
+		Runtime:     runtime,
+		Authorizer:  staticLeaseAuthorizer{leaseID: "lease-1", accepted: true},
+		Entry:       entry,
+		Returns:     entry,
 	}
 	command := transport.ControlCommand{Kind: transport.ControlLeaseRequest, SessionID: "session-1", Epoch: "epoch-1", Edge: control.ScreenEdgeRight}
 	if err := responder.HandleLeaseRequest(context.Background(), command, time.Unix(100, 0)); err != nil {
@@ -147,11 +148,11 @@ func TestLeaseResponderRejectsWithoutActivatingRuntime(t *testing.T) {
 	writer := &recordingFrameWriter{}
 	entry := &recordingCursorEntry{}
 	responder := &LeaseResponder{
-		Writer:     writer,
-		Runtime:    runtime,
-		Authorizer: staticLeaseAuthorizer{},
-		Entry:      entry,
-		Returns:    entry,
+		Coordinator: testWriteCoordinator(t, writer),
+		Runtime:     runtime,
+		Authorizer:  staticLeaseAuthorizer{},
+		Entry:       entry,
+		Returns:     entry,
 	}
 	command := transport.ControlCommand{Kind: transport.ControlLeaseRequest, SessionID: "session-1", Epoch: "epoch-1", Edge: control.ScreenEdgeRight}
 	if err := responder.HandleLeaseRequest(context.Background(), command, time.Unix(100, 0)); err != nil {
@@ -174,11 +175,11 @@ func TestLeaseResponderEntryFailureDoesNotGrantInbound(t *testing.T) {
 	cause := errors.New("cursor placement failed")
 	entry := &recordingCursorEntry{err: cause}
 	responder := &LeaseResponder{
-		Writer:     writer,
-		Runtime:    runtime,
-		Authorizer: staticLeaseAuthorizer{leaseID: "lease-1", accepted: true},
-		Entry:      entry,
-		Returns:    entry,
+		Coordinator: testWriteCoordinator(t, writer),
+		Runtime:     runtime,
+		Authorizer:  staticLeaseAuthorizer{leaseID: "lease-1", accepted: true},
+		Entry:       entry,
+		Returns:     entry,
 	}
 	command := transport.ControlCommand{Kind: transport.ControlLeaseRequest, SessionID: "session-1", Epoch: "epoch-1", Edge: control.ScreenEdgeLeft}
 	if err := responder.HandleLeaseRequest(context.Background(), command, time.Unix(100, 0)); !errors.Is(err, cause) {
@@ -198,12 +199,13 @@ func TestLeaseResponderEntryFailureDoesNotGrantInbound(t *testing.T) {
 func TestLeaseResponderGrantWriteFailureCleansInboundRuntime(t *testing.T) {
 	runtime := newLocalRuntime(t)
 	entry := &recordingCursorEntry{}
+	writer := &recordingFrameWriter{err: errors.New("write failed")}
 	responder := &LeaseResponder{
-		Writer:     &recordingFrameWriter{err: errors.New("write failed")},
-		Runtime:    runtime,
-		Authorizer: staticLeaseAuthorizer{leaseID: "lease-1", accepted: true},
-		Entry:      entry,
-		Returns:    entry,
+		Coordinator: testWriteCoordinator(t, writer),
+		Runtime:     runtime,
+		Authorizer:  staticLeaseAuthorizer{leaseID: "lease-1", accepted: true},
+		Entry:       entry,
+		Returns:     entry,
 	}
 	command := transport.ControlCommand{Kind: transport.ControlLeaseRequest, SessionID: "session-1", Epoch: "epoch-1", Edge: control.ScreenEdgeRight}
 	if err := responder.HandleLeaseRequest(context.Background(), command, time.Unix(100, 0)); err == nil {
@@ -224,6 +226,15 @@ func newLocalRuntime(t *testing.T) *application.SessionRuntime {
 		t.Fatalf("NewSessionRuntime() error = %v", err)
 	}
 	return runtime
+}
+
+func testWriteCoordinator(t *testing.T, writer FrameWriter) *SessionWriteCoordinator {
+	t.Helper()
+	coordinator, err := NewSessionWriteCoordinator(writer)
+	if err != nil {
+		t.Fatalf("NewSessionWriteCoordinator() error = %v", err)
+	}
+	return coordinator
 }
 
 func decodeWrittenControl(t *testing.T, writer *recordingFrameWriter) transport.ControlCommand {

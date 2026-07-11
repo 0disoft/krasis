@@ -14,7 +14,7 @@ func TestOutboundControllerActivatesSourceOnlyAfterGrant(t *testing.T) {
 	runtime := newLocalRuntime(t)
 	writer := &recordingFrameWriter{}
 	source := &recordingSourceActivation{}
-	controller, err := NewOutboundController(writer, runtime, source)
+	controller, err := NewOutboundController(testWriteCoordinator(t, writer), runtime, source)
 	if err != nil {
 		t.Fatalf("NewOutboundController() error = %v", err)
 	}
@@ -44,7 +44,7 @@ func TestOutboundControllerActivatesSourceOnlyAfterGrant(t *testing.T) {
 func TestOutboundControllerActivationFailureCleansGrantedLease(t *testing.T) {
 	runtime := newLocalRuntime(t)
 	source := &recordingSourceActivation{activateErr: errors.New("hook worker unavailable")}
-	controller, err := NewOutboundController(&recordingFrameWriter{}, runtime, source)
+	controller, err := NewOutboundController(testWriteCoordinator(t, &recordingFrameWriter{}), runtime, source)
 	if err != nil {
 		t.Fatalf("NewOutboundController() error = %v", err)
 	}
@@ -65,7 +65,7 @@ func TestOutboundControllerActivationFailureCleansGrantedLease(t *testing.T) {
 
 func TestOutboundControllerRejectsSecondBoundaryWhilePending(t *testing.T) {
 	runtime := newLocalRuntime(t)
-	controller, err := NewOutboundController(&recordingFrameWriter{}, runtime, &recordingSourceActivation{})
+	controller, err := NewOutboundController(testWriteCoordinator(t, &recordingFrameWriter{}), runtime, &recordingSourceActivation{})
 	if err != nil {
 		t.Fatalf("NewOutboundController() error = %v", err)
 	}
@@ -86,7 +86,7 @@ func TestOutboundControllerRejectsSecondBoundaryWhilePending(t *testing.T) {
 func TestLifecycleDispatcherUsesOutboundController(t *testing.T) {
 	runtime := newLocalRuntime(t)
 	source := &recordingSourceActivation{}
-	controller, err := NewOutboundController(&recordingFrameWriter{}, runtime, source)
+	controller, err := NewOutboundController(testWriteCoordinator(t, &recordingFrameWriter{}), runtime, source)
 	if err != nil {
 		t.Fatalf("NewOutboundController() error = %v", err)
 	}
@@ -120,7 +120,7 @@ func TestOutboundControllerRevokeDisablesSourceBeforeRuntimeCleanup(t *testing.T
 		t.Fatalf("GrantOutbound() error = %v", err)
 	}
 	source := &recordingSourceActivation{active: true}
-	controller, err := NewOutboundController(&recordingFrameWriter{}, runtime, source)
+	controller, err := NewOutboundController(testWriteCoordinator(t, &recordingFrameWriter{}), runtime, source)
 	if err != nil {
 		t.Fatalf("NewOutboundController() error = %v", err)
 	}

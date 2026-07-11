@@ -12,6 +12,11 @@
 
 peer 통합 테스트는 먼저 한 process 안의 두 `RunSession`을 실제 framed stream으로 연결해 request, grant, input, return revoke와 양쪽 `LOCAL` 수렴을 검증한다. 별도 subprocess 테스트는 임시 test CA와 identity를 test temp directory에만 생성하고 source와 destination test process를 localhost TCP로 연결한다. 양쪽은 제품 `PeerConnection`을 사용해 TLS 1.3 mutual authentication과 `krasis/1` ALPN을 통과한 뒤 동일한 왕복을 수행해야 하며 두 process가 모두 success exit code를 반환해야 한다. test certificate와 private key는 artifact에 포함하지 않는다.
 
+semantic write coordinator 테스트는 operation 직렬화, 취소된 waiter 미실행, heartbeat/revoke
+순서, revoke 뒤 heartbeat 폐기, connection-close-before-cleanup과 concurrent source activation
+뒤 suppression 재해제를 검증한다. heartbeat timer와 실제 congestion timeout은 아직 CI 범위가
+아니다.
+
 agent assembly 통합 테스트는 두 agent session을 실제 framed pipe로 연결하고 source worker ready, boundary intent, lease grant 이후 suppression, normalized input 전달, destination return intent, source deactivation과 양쪽 `LOCAL` cleanup을 한 경로에서 검증한다. 테스트는 OS hook과 `SendInput` 대신 같은 interface의 deterministic port를 사용하므로 실제 Windows callback과 주입 검증을 대체하지 않는다.
 
 supervisor 테스트는 명시적인 transition table, exponential backoff cap, acquire failure 뒤 retry, `LOCAL` session failure 뒤 reconnect와 non-local failure의 즉시 중단을 검증한다. network source 통합 테스트는 `peer-credentials`가 만든 역할 분리 identity로 실제 localhost listener/dial을 열고 양쪽 `PeerConnection`의 mTLS와 ALPN 인증을 통과시킨다.

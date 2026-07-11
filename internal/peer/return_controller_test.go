@@ -14,7 +14,7 @@ func TestReturnControllerCleansInboundBeforeWritingExactRevoke(t *testing.T) {
 	runtime, _ := newInboundRuntime(t)
 	writer := &stateRecordingWriter{runtime: runtime}
 	returns := &recordingReturnBoundary{}
-	controller, err := NewReturnController(writer, runtime, returns)
+	controller, err := NewReturnController(testWriteCoordinator(t, writer), runtime, returns)
 	if err != nil {
 		t.Fatalf("NewReturnController() error = %v", err)
 	}
@@ -35,7 +35,7 @@ func TestReturnControllerCleansInboundBeforeWritingExactRevoke(t *testing.T) {
 
 func TestReturnControllerIgnoresStaleQueuedIntent(t *testing.T) {
 	runtime, _ := newInboundRuntime(t)
-	controller, _ := NewReturnController(&recordingFrameWriter{}, runtime, &recordingReturnBoundary{})
+	controller, _ := NewReturnController(testWriteCoordinator(t, &recordingFrameWriter{}), runtime, &recordingReturnBoundary{})
 	intents := make(chan control.ReturnIntent, 2)
 	intents <- control.ReturnIntent{SessionID: "stale", Epoch: "stale"}
 	intents <- control.ReturnIntent{SessionID: "session-1", Epoch: "epoch-1"}
@@ -59,7 +59,7 @@ func TestReturnControllerDoesNotWriteWhenInputIsHeld(t *testing.T) {
 	}
 	writer := &recordingFrameWriter{}
 	returns := &recordingReturnBoundary{}
-	controller, _ := NewReturnController(writer, runtime, returns)
+	controller, _ := NewReturnController(testWriteCoordinator(t, writer), runtime, returns)
 	err := controller.Revoke(context.Background(), control.ReturnIntent{SessionID: "session-1", Epoch: "epoch-1"})
 	if !errors.Is(err, application.ErrRuntimeInputHeld) || len(writer.frames) != 0 {
 		t.Fatalf("Revoke(held) error=%v frames=%d", err, len(writer.frames))
@@ -79,7 +79,7 @@ func TestReturnControllerRunContinuesAfterHeldInputRace(t *testing.T) {
 		t.Fatalf("HandleInputAction(down) error = %v", err)
 	}
 	returns := &recordingReturnBoundary{}
-	controller, _ := NewReturnController(&recordingFrameWriter{}, runtime, returns)
+	controller, _ := NewReturnController(testWriteCoordinator(t, &recordingFrameWriter{}), runtime, returns)
 	intents := make(chan control.ReturnIntent, 1)
 	intents <- control.ReturnIntent{SessionID: "session-1", Epoch: "epoch-1"}
 	close(intents)

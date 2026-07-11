@@ -19,20 +19,22 @@ func TestPeerSessionsCompleteOutboundInputAndReturnRevokeRoundTrip(t *testing.T)
 	destinationInput := &integrationInputPort{moves: make(chan [2]int32, 1)}
 	sourceRuntime := newIntegrationRuntime(t, sourceInput)
 	destinationRuntime := newIntegrationRuntime(t, destinationInput)
+	sourceCoordinator := testWriteCoordinator(t, sourceSide)
+	destinationCoordinator := testWriteCoordinator(t, destinationSide)
 	sourceActivation := newIntegrationSourceActivation()
-	outbound, err := NewOutboundController(sourceSide, sourceRuntime, sourceActivation)
+	outbound, err := NewOutboundController(sourceCoordinator, sourceRuntime, sourceActivation)
 	if err != nil {
 		t.Fatalf("NewOutboundController() error = %v", err)
 	}
 	returnBoundary := &integrationReturnBoundary{}
 	responder := &LeaseResponder{
-		Writer:     destinationSide,
-		Runtime:    destinationRuntime,
-		Authorizer: staticLeaseAuthorizer{leaseID: "lease-1", accepted: true},
-		Entry:      integrationCursorEntry{},
-		Returns:    returnBoundary,
+		Coordinator: destinationCoordinator,
+		Runtime:     destinationRuntime,
+		Authorizer:  staticLeaseAuthorizer{leaseID: "lease-1", accepted: true},
+		Entry:       integrationCursorEntry{},
+		Returns:     returnBoundary,
 	}
-	returnController, err := NewReturnController(destinationSide, destinationRuntime, returnBoundary)
+	returnController, err := NewReturnController(destinationCoordinator, destinationRuntime, returnBoundary)
 	if err != nil {
 		t.Fatalf("NewReturnController() error = %v", err)
 	}
@@ -72,7 +74,7 @@ func TestPeerSessionsCompleteOutboundInputAndReturnRevokeRoundTrip(t *testing.T)
 	}
 
 	action := control.InputAction{Kind: control.InputPointerMove, DeltaX: 12, DeltaY: -4}
-	if err := SendInputAction(ctx, sourceSide, sourceRuntime, action); err != nil {
+	if err := SendInputAction(ctx, sourceCoordinator, sourceRuntime, action); err != nil {
 		t.Fatalf("SendInputAction() error = %v", err)
 	}
 	select {
@@ -102,37 +104,39 @@ func TestPeerSessionsReuseOneConnectionForBothDirections(t *testing.T) {
 	rightInput := &integrationInputPort{moves: make(chan [2]int32, 1)}
 	leftRuntime := newIntegrationRuntime(t, leftInput)
 	rightRuntime := newIntegrationRuntime(t, rightInput)
+	leftCoordinator := testWriteCoordinator(t, leftSide)
+	rightCoordinator := testWriteCoordinator(t, rightSide)
 	leftActivation := newIntegrationSourceActivation()
 	rightActivation := newIntegrationSourceActivation()
-	leftOutbound, err := NewOutboundController(leftSide, leftRuntime, leftActivation)
+	leftOutbound, err := NewOutboundController(leftCoordinator, leftRuntime, leftActivation)
 	if err != nil {
 		t.Fatalf("NewOutboundController(left) error = %v", err)
 	}
-	rightOutbound, err := NewOutboundController(rightSide, rightRuntime, rightActivation)
+	rightOutbound, err := NewOutboundController(rightCoordinator, rightRuntime, rightActivation)
 	if err != nil {
 		t.Fatalf("NewOutboundController(right) error = %v", err)
 	}
 	leftReturns := &integrationReturnBoundary{}
 	rightReturns := &integrationReturnBoundary{}
 	leftResponder := &LeaseResponder{
-		Writer:     leftSide,
-		Runtime:    leftRuntime,
-		Authorizer: staticLeaseAuthorizer{leaseID: "lease-left", accepted: true},
-		Entry:      integrationCursorEntry{},
-		Returns:    leftReturns,
+		Coordinator: leftCoordinator,
+		Runtime:     leftRuntime,
+		Authorizer:  staticLeaseAuthorizer{leaseID: "lease-left", accepted: true},
+		Entry:       integrationCursorEntry{},
+		Returns:     leftReturns,
 	}
 	rightResponder := &LeaseResponder{
-		Writer:     rightSide,
-		Runtime:    rightRuntime,
-		Authorizer: staticLeaseAuthorizer{leaseID: "lease-right", accepted: true},
-		Entry:      integrationCursorEntry{},
-		Returns:    rightReturns,
+		Coordinator: rightCoordinator,
+		Runtime:     rightRuntime,
+		Authorizer:  staticLeaseAuthorizer{leaseID: "lease-right", accepted: true},
+		Entry:       integrationCursorEntry{},
+		Returns:     rightReturns,
 	}
-	leftReturnController, err := NewReturnController(leftSide, leftRuntime, leftReturns)
+	leftReturnController, err := NewReturnController(leftCoordinator, leftRuntime, leftReturns)
 	if err != nil {
 		t.Fatalf("NewReturnController(left) error = %v", err)
 	}
-	rightReturnController, err := NewReturnController(rightSide, rightRuntime, rightReturns)
+	rightReturnController, err := NewReturnController(rightCoordinator, rightRuntime, rightReturns)
 	if err != nil {
 		t.Fatalf("NewReturnController(right) error = %v", err)
 	}
@@ -167,7 +171,7 @@ func TestPeerSessionsReuseOneConnectionForBothDirections(t *testing.T) {
 		t.Fatalf("BeginBoundary(left) error = %v", err)
 	}
 	waitSignal(t, leftActivation.activated, "left source activation")
-	if err := SendInputAction(ctx, leftSide, leftRuntime, control.InputAction{Kind: control.InputPointerMove, DeltaX: 7, DeltaY: -2}); err != nil {
+	if err := SendInputAction(ctx, leftCoordinator, leftRuntime, control.InputAction{Kind: control.InputPointerMove, DeltaX: 7, DeltaY: -2}); err != nil {
 		t.Fatalf("SendInputAction(left) error = %v", err)
 	}
 	waitMove(t, rightInput.moves, [2]int32{7, -2}, "right")
@@ -186,7 +190,7 @@ func TestPeerSessionsReuseOneConnectionForBothDirections(t *testing.T) {
 		t.Fatalf("BeginBoundary(right) error = %v", err)
 	}
 	waitSignal(t, rightActivation.activated, "right source activation")
-	if err := SendInputAction(ctx, rightSide, rightRuntime, control.InputAction{Kind: control.InputPointerMove, DeltaX: -9, DeltaY: 3}); err != nil {
+	if err := SendInputAction(ctx, rightCoordinator, rightRuntime, control.InputAction{Kind: control.InputPointerMove, DeltaX: -9, DeltaY: 3}); err != nil {
 		t.Fatalf("SendInputAction(right) error = %v", err)
 	}
 	waitMove(t, leftInput.moves, [2]int32{-9, 3}, "left")
@@ -201,29 +205,31 @@ func TestPeerSessionsFailSafeWhenBothPeersRequestControl(t *testing.T) {
 	leftSide, rightSide := openFramedPipe(t)
 	leftRuntime := newIntegrationRuntime(t, &integrationInputPort{moves: make(chan [2]int32, 1)})
 	rightRuntime := newIntegrationRuntime(t, &integrationInputPort{moves: make(chan [2]int32, 1)})
+	leftCoordinator := testWriteCoordinator(t, leftSide)
+	rightCoordinator := testWriteCoordinator(t, rightSide)
 	leftActivation := newIntegrationSourceActivation()
 	rightActivation := newIntegrationSourceActivation()
-	leftOutbound, err := NewOutboundController(leftSide, leftRuntime, leftActivation)
+	leftOutbound, err := NewOutboundController(leftCoordinator, leftRuntime, leftActivation)
 	if err != nil {
 		t.Fatalf("NewOutboundController(left) error = %v", err)
 	}
-	rightOutbound, err := NewOutboundController(rightSide, rightRuntime, rightActivation)
+	rightOutbound, err := NewOutboundController(rightCoordinator, rightRuntime, rightActivation)
 	if err != nil {
 		t.Fatalf("NewOutboundController(right) error = %v", err)
 	}
 	leftResponder := &LeaseResponder{
-		Writer:     leftSide,
-		Runtime:    leftRuntime,
-		Authorizer: staticLeaseAuthorizer{leaseID: "lease-left", accepted: true},
-		Entry:      integrationCursorEntry{},
-		Returns:    &integrationReturnBoundary{},
+		Coordinator: leftCoordinator,
+		Runtime:     leftRuntime,
+		Authorizer:  staticLeaseAuthorizer{leaseID: "lease-left", accepted: true},
+		Entry:       integrationCursorEntry{},
+		Returns:     &integrationReturnBoundary{},
 	}
 	rightResponder := &LeaseResponder{
-		Writer:     rightSide,
-		Runtime:    rightRuntime,
-		Authorizer: staticLeaseAuthorizer{leaseID: "lease-right", accepted: true},
-		Entry:      integrationCursorEntry{},
-		Returns:    &integrationReturnBoundary{},
+		Coordinator: rightCoordinator,
+		Runtime:     rightRuntime,
+		Authorizer:  staticLeaseAuthorizer{leaseID: "lease-right", accepted: true},
+		Entry:       integrationCursorEntry{},
+		Returns:     &integrationReturnBoundary{},
 	}
 	leftIdentity := OutboundIdentity{SessionID: "session-left", Epoch: "epoch-left"}
 	rightIdentity := OutboundIdentity{SessionID: "session-right", Epoch: "epoch-right"}
@@ -336,18 +342,20 @@ func TestPeerSessionsRejectStaleInputAfterReconnect(t *testing.T) {
 	completeIntegrationRoundTrip(t, sourceRuntime, destinationRuntime, destinationInput, oldIdentity, [2]int32{2, 1})
 
 	sourceSide, destinationSide := openFramedPipe(t)
+	sourceCoordinator := testWriteCoordinator(t, sourceSide)
+	destinationCoordinator := testWriteCoordinator(t, destinationSide)
 	sourceActivation := newIntegrationSourceActivation()
-	outbound, err := NewOutboundController(sourceSide, sourceRuntime, sourceActivation)
+	outbound, err := NewOutboundController(sourceCoordinator, sourceRuntime, sourceActivation)
 	if err != nil {
 		t.Fatalf("NewOutboundController() error = %v", err)
 	}
 	returnBoundary := &integrationReturnBoundary{}
 	responder := &LeaseResponder{
-		Writer:     destinationSide,
-		Runtime:    destinationRuntime,
-		Authorizer: staticLeaseAuthorizer{leaseID: "lease-new", accepted: true},
-		Entry:      integrationCursorEntry{},
-		Returns:    returnBoundary,
+		Coordinator: destinationCoordinator,
+		Runtime:     destinationRuntime,
+		Authorizer:  staticLeaseAuthorizer{leaseID: "lease-new", accepted: true},
+		Entry:       integrationCursorEntry{},
+		Returns:     returnBoundary,
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 2)
@@ -405,20 +413,22 @@ func completeIntegrationRoundTrip(
 ) {
 	t.Helper()
 	sourceSide, destinationSide := openFramedPipe(t)
+	sourceCoordinator := testWriteCoordinator(t, sourceSide)
+	destinationCoordinator := testWriteCoordinator(t, destinationSide)
 	sourceActivation := newIntegrationSourceActivation()
-	outbound, err := NewOutboundController(sourceSide, sourceRuntime, sourceActivation)
+	outbound, err := NewOutboundController(sourceCoordinator, sourceRuntime, sourceActivation)
 	if err != nil {
 		t.Fatalf("NewOutboundController() error = %v", err)
 	}
 	returns := &integrationReturnBoundary{}
 	responder := &LeaseResponder{
-		Writer:     destinationSide,
-		Runtime:    destinationRuntime,
-		Authorizer: staticLeaseAuthorizer{leaseID: "lease-" + identity.SessionID, accepted: true},
-		Entry:      integrationCursorEntry{},
-		Returns:    returns,
+		Coordinator: destinationCoordinator,
+		Runtime:     destinationRuntime,
+		Authorizer:  staticLeaseAuthorizer{leaseID: "lease-" + identity.SessionID, accepted: true},
+		Entry:       integrationCursorEntry{},
+		Returns:     returns,
 	}
-	returnController, err := NewReturnController(destinationSide, destinationRuntime, returns)
+	returnController, err := NewReturnController(destinationCoordinator, destinationRuntime, returns)
 	if err != nil {
 		t.Fatalf("NewReturnController() error = %v", err)
 	}
@@ -436,7 +446,7 @@ func completeIntegrationRoundTrip(
 		t.Fatalf("BeginBoundary(%s) error = %v", identity.SessionID, err)
 	}
 	waitSignal(t, sourceActivation.activated, "round-trip source activation")
-	if err := SendInputAction(ctx, sourceSide, sourceRuntime, control.InputAction{Kind: control.InputPointerMove, DeltaX: move[0], DeltaY: move[1]}); err != nil {
+	if err := SendInputAction(ctx, sourceCoordinator, sourceRuntime, control.InputAction{Kind: control.InputPointerMove, DeltaX: move[0], DeltaY: move[1]}); err != nil {
 		t.Fatalf("SendInputAction(%s) error = %v", identity.SessionID, err)
 	}
 	select {

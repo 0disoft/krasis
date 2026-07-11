@@ -69,7 +69,7 @@ func TestRunSessionEOFDisablesOutboundSuppression(t *testing.T) {
 		t.Fatalf("GrantOutbound() error = %v", err)
 	}
 	source := &recordingSourceActivation{active: true}
-	controller, err := NewOutboundController(&recordingFrameWriter{}, runtime, source)
+	controller, err := NewOutboundController(testWriteCoordinator(t, &recordingFrameWriter{}), runtime, source)
 	if err != nil {
 		t.Fatalf("NewOutboundController() error = %v", err)
 	}
@@ -83,6 +83,29 @@ func TestRunSessionEOFDisablesOutboundSuppression(t *testing.T) {
 	}
 	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal {
 		t.Fatalf("runtime did not fail safe: %s", snapshot)
+	}
+}
+
+func TestRunSessionClosesConnectionBeforeRuntimeCleanup(t *testing.T) {
+	connection := &scriptedConnection{}
+	effects := &closeCheckingEffects{connection: connection}
+	runtime, err := application.NewSessionRuntime(effects, &inputPort{})
+	if err != nil {
+		t.Fatalf("NewSessionRuntime() error = %v", err)
+	}
+	if _, err := runtime.GrantInbound(context.Background(), control.Event{
+		Kind: control.EventInboundLeaseGranted, SessionID: "session-1", LeaseID: "lease-1",
+	}, "epoch-1", time.Unix(100, 0)); err != nil {
+		t.Fatalf("GrantInbound() error = %v", err)
+	}
+	effects.calls = 0
+	effects.closedForEveryCall = true
+	err = RunSession(context.Background(), connection, runtime, nil, fixedClock(time.Unix(101, 0)))
+	if !errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Fatalf("RunSession() error = %v, want unexpected EOF", err)
+	}
+	if effects.calls == 0 || !effects.closedForEveryCall {
+		t.Fatalf("cleanup observed open connection: calls=%d all_closed=%t", effects.calls, effects.closedForEveryCall)
 	}
 }
 
@@ -124,6 +147,21 @@ type scriptedConnection struct {
 	frames []transport.Frame
 	index  int
 	closed bool
+}
+
+type closeCheckingEffects struct {
+	connection         *scriptedConnection
+	calls              int
+	closedForEveryCall bool
+}
+
+func (effects *closeCheckingEffects) Execute(context.Context, control.Effect) error {
+	if effects.calls == 0 {
+		effects.closedForEveryCall = true
+	}
+	effects.calls++
+	effects.closedForEveryCall = effects.closedForEveryCall && effects.connection.closed
+	return nil
 }
 
 func (connection *scriptedConnection) ReadFrame() (transport.Frame, error) {

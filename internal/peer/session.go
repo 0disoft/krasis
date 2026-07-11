@@ -58,6 +58,7 @@ func runSession(
 	for {
 		frame, err := connection.ReadFrame()
 		if err != nil {
+			_ = connection.Close()
 			if ctxErr := ctx.Err(); ctxErr != nil {
 				return failSessionWithLifecycle(ctx, runtime, outbound, ctxErr)
 			}
@@ -78,6 +79,7 @@ func runSession(
 			err = transport.ErrUnsupportedFrame
 		}
 		if err != nil {
+			_ = connection.Close()
 			return failSessionWithLifecycle(ctx, runtime, outbound, err)
 		}
 	}

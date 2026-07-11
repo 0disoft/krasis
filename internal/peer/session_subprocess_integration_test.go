@@ -235,15 +235,16 @@ func runDestinationPeerProcess(t *testing.T, ctx context.Context) {
 		releases: make(chan control.PressedToken, 1),
 	}
 	runtime := newIntegrationRuntime(t, input)
+	coordinator := testWriteCoordinator(t, peerConnection)
 	returns := &integrationReturnBoundary{}
 	responder := &LeaseResponder{
-		Writer:     peerConnection,
-		Runtime:    runtime,
-		Authorizer: staticLeaseAuthorizer{leaseID: "lease-1", accepted: true},
-		Entry:      integrationCursorEntry{},
-		Returns:    returns,
+		Coordinator: coordinator,
+		Runtime:     runtime,
+		Authorizer:  staticLeaseAuthorizer{leaseID: "lease-1", accepted: true},
+		Entry:       integrationCursorEntry{},
+		Returns:     returns,
 	}
-	returnController, err := NewReturnController(peerConnection, runtime, returns)
+	returnController, err := NewReturnController(coordinator, runtime, returns)
 	if err != nil {
 		t.Fatalf("NewReturnController() error = %v", err)
 	}
@@ -320,8 +321,9 @@ func runSourcePeerProcess(t *testing.T, ctx context.Context) {
 	defer peerConnection.Close()
 
 	runtime := newIntegrationRuntime(t, &integrationInputPort{moves: make(chan [2]int32, 1)})
+	coordinator := testWriteCoordinator(t, peerConnection)
 	activation := newIntegrationSourceActivation()
-	outbound, err := NewOutboundController(peerConnection, runtime, activation)
+	outbound, err := NewOutboundController(coordinator, runtime, activation)
 	if err != nil {
 		t.Fatalf("NewOutboundController() error = %v", err)
 	}
@@ -337,12 +339,12 @@ func runSourcePeerProcess(t *testing.T, ctx context.Context) {
 		t.Fatalf("BeginBoundary() error = %v", err)
 	}
 	waitSignal(t, activation.activated, "TLS source activation")
-	if err := SendInputAction(ctx, peerConnection, runtime, control.InputAction{Kind: control.InputPointerMove, DeltaX: 7, DeltaY: -3}); err != nil {
+	if err := SendInputAction(ctx, coordinator, runtime, control.InputAction{Kind: control.InputPointerMove, DeltaX: 7, DeltaY: -3}); err != nil {
 		t.Fatalf("SendInputAction() error = %v", err)
 	}
 	scenario := os.Getenv(peerProcessScenario)
 	if scenario == "kill_source" {
-		if err := SendInputAction(ctx, peerConnection, runtime, control.InputAction{Kind: control.InputKeyDown, Code: 1}); err != nil {
+		if err := SendInputAction(ctx, coordinator, runtime, control.InputAction{Kind: control.InputKeyDown, Code: 1}); err != nil {
 			t.Fatalf("SendInputAction(key down) error = %v", err)
 		}
 		fmt.Printf("%ssource\n", peerProcessActiveTag)

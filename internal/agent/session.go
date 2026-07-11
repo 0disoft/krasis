@@ -67,7 +67,11 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	if err != nil {
 		return Result{}, err
 	}
-	actionSink, err := peer.NewOutboundActionSink(dependencies.Connection, runtime)
+	coordinator, err := peer.NewSessionWriteCoordinator(dependencies.Connection)
+	if err != nil {
+		return Result{}, err
+	}
+	actionSink, err := peer.NewOutboundActionSink(coordinator, runtime)
 	if err != nil {
 		return Result{}, err
 	}
@@ -79,7 +83,7 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	if err != nil {
 		return Result{}, err
 	}
-	outbound, err := peer.NewOutboundController(dependencies.Connection, runtime, source)
+	outbound, err := peer.NewOutboundController(coordinator, runtime, source)
 	if err != nil {
 		return Result{}, err
 	}
@@ -88,10 +92,10 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 		return Result{}, err
 	}
 	responder := &peer.LeaseResponder{
-		Writer: dependencies.Connection, Runtime: runtime, Authorizer: dependencies.Authorizer,
+		Coordinator: coordinator, Runtime: runtime, Authorizer: dependencies.Authorizer,
 		Entry: dependencies.Input, Returns: dependencies.Input,
 	}
-	returns, err := peer.NewReturnController(dependencies.Connection, runtime, dependencies.Input)
+	returns, err := peer.NewReturnController(coordinator, runtime, dependencies.Input)
 	if err != nil {
 		return Result{}, err
 	}

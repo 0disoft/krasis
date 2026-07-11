@@ -59,6 +59,13 @@ heartbeat timer를 바로 붙이는 것보다 coordinator 도입이 먼저다. �
 byte-level ordered stream 위에서 application 의미 순서가 다시 깨진다. coordinator는 input
 hot path에 lock 하나를 추가하므로 실제 polling-rate 측정에서 contention을 확인해야 한다.
 
+`SessionWriteCoordinator`는 boundary request, grant/reject/revoke dispatch, destination grant,
+return revoke, input, heartbeat write와 failure cleanup에 연결됐다. coordinator lock을 기다리는
+중에도 context 취소가 가능하고, read/dispatch failure는 connection을 먼저 닫아 막힌 write를
+깨운 뒤 bounded cleanup을 수행한다. source suppression은 cleanup 대기 전과 coordinator를
+획득한 뒤에 모두 해제해 concurrent activation 뒤 다시 켜진 상태를 남기지 않는다.
+
 이 ADR은 heartbeat 숫자를 확정하거나 별도 heartbeat connection을 허용하지 않는다. 단일
 ordered stream에서 head-of-line blocking이 실제로 확인될 때만 ADR 0003을 대체하는 transport
-결정을 추가한다.
+결정을 추가한다. 주기 sender와 deadline worker, interval/timeout evidence 계약은 아직
+미구현이다.

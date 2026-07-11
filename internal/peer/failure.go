@@ -14,3 +14,20 @@ func failRuntime(ctx context.Context, runtime *application.SessionRuntime, cause
 	defer cancel()
 	return runtime.Fail(cleanupCtx, cause)
 }
+
+func failRuntimeCoordinated(
+	ctx context.Context,
+	coordinator *SessionWriteCoordinator,
+	runtime *application.SessionRuntime,
+	cause error,
+	beforeCleanup func(),
+) error {
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), CleanupTimeout)
+	defer cancel()
+	return coordinator.Execute(cleanupCtx, func(FrameWriter) error {
+		if beforeCleanup != nil {
+			beforeCleanup()
+		}
+		return runtime.Fail(cleanupCtx, cause)
+	})
+}
