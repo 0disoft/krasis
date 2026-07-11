@@ -80,6 +80,12 @@ peer가 보낸 wall clock을 신뢰하지 않고 로컬 수신 시각을 사용�
 
 `PressedState`는 원시 입력 log가 아니다. 메모리상 복구 책임에만 사용하며 support bundle, 진단 출력과 일반 log에 token code를 복제하지 않는다. durable crash journal 형식과 암호화·수명 정책은 crash guard 설계 전까지 미구현이다.
 
+## 화면 경계 intent
+
+`BoundaryDetector`는 한 peer 배치에 대해 `LEFT` 또는 `RIGHT` edge 하나를 감시한다. virtual screen의 left 좌표와 width, activation gap, rearm distance를 명시적으로 받으며 음수 virtual-screen 좌표도 지원한다. pointer가 edge 방향으로 이동하며 activation band에 도달하고 physical key/button pressed set이 비어 있을 때만 intent를 한 번 만든다. intent 뒤에는 안쪽 rearm distance까지 이동해야 다시 armed 상태가 된다.
+
+MVP에서는 key나 mouse button을 누른 채 화면을 넘는 전환을 허용하지 않는다. edge intent 자체는 lease나 suppression을 시작하지 않으며 application orchestrator가 peer 준비와 grant를 확인한 뒤에만 source session을 활성화해야 한다.
+
 Application의 `SessionRuntime`이 `ControlLease`, `InputStream`, `PeerLiveness`, `PressedState` 접근을 하나의 lock 아래 직렬화한다. 값 객체와 coordinator 함수를 runtime 밖의 여러 goroutine에서 직접 공유하는 사용은 지원하지 않는다. runtime이 호출하는 effect와 input port도 같은 runtime으로 재진입하면 안 된다.
 
 ## 불변조건
