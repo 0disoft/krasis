@@ -59,12 +59,12 @@ func runSession(
 		frame, err := connection.ReadFrame()
 		if err != nil {
 			if ctxErr := ctx.Err(); ctxErr != nil {
-				return failSession(ctx, runtime, ctxErr)
+				return failSessionWithLifecycle(ctx, runtime, outbound, ctxErr)
 			}
 			if errors.Is(err, io.EOF) {
 				err = io.ErrUnexpectedEOF
 			}
-			return failSession(ctx, runtime, err)
+			return failSessionWithLifecycle(ctx, runtime, outbound, err)
 		}
 		observedAt := now()
 		switch frame.Kind {
@@ -78,9 +78,24 @@ func runSession(
 			err = transport.ErrUnsupportedFrame
 		}
 		if err != nil {
-			return failSession(ctx, runtime, err)
+			return failSessionWithLifecycle(ctx, runtime, outbound, err)
 		}
 	}
+}
+
+func failSessionWithLifecycle(
+	ctx context.Context,
+	runtime *application.SessionRuntime,
+	outbound OutboundLifecycle,
+	cause error,
+) error {
+	if outbound != nil {
+		if cause == nil {
+			cause = errors.New("peer session terminated")
+		}
+		return outbound.Fail(ctx, cause)
+	}
+	return failSession(ctx, runtime, cause)
 }
 
 func failSession(ctx context.Context, runtime *application.SessionRuntime, cause error) error {

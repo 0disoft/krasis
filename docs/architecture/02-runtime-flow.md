@@ -56,6 +56,8 @@ source session은 hook callback과 network sender 사이에 고정 용량 queue�
 
 destination input adapter는 현재 inbound session·epoch로 return detector를 arm한다. source `RIGHT` 진입은 destination 왼쪽 끝, source `LEFT` 진입은 destination 오른쪽 끝에서 return intent를 non-blocking으로 한 번만 발행한다. 오래된 queued intent는 새 session arm에서 폐기하고 runtime은 현재 inbound session·epoch가 정확히 일치하며 pressed input이 없을 때만 local revoke를 승인한다. 승인된 revoke는 destination을 먼저 `LOCAL`로 cleanup한 뒤 exact session·lease·epoch의 `LeaseRevoke`를 쓰며 source는 이를 받은 뒤 suppression을 해제한다. intent와 button-down의 경합은 session failure가 아니라 detector rearm으로 처리한다.
 
+source `RunSession`의 EOF, cancellation, malformed frame과 dispatcher failure는 outbound lifecycle의 `Fail`을 통과해야 한다. 이 경로는 source suppression을 먼저 해제한 뒤 bounded runtime cleanup을 수행한다. runtime만 `LOCAL`로 돌리고 hook suppression을 남기는 종료 경로는 허용하지 않는다.
+
 runtime은 port 호출이 끝날 때까지 owner lock을 유지한다. 따라서 effect와 input port는 같은 runtime API로 재진입하지 않아야 하며, 느린 I/O를 직접 수행하는 대신 adapter 내부의 명확히 제한된 호출만 제공해야 한다. transport와 Windows adapter는 이 runtime 경계를 통해서만 event와 input을 전달한다.
 
 durable state commit, optimistic version compare-and-swap, transition history, command idempotency와 별도 crash guard는 아직 후속 경계다. 따라서 이 단계의 테스트는 process 내부 수렴을 증명하지만 process가 죽은 뒤의 복구를 증명하지 않는다.

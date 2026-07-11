@@ -63,6 +63,29 @@ func TestRunSessionRoutesControlGrantThenHeartbeat(t *testing.T) {
 	}
 }
 
+func TestRunSessionEOFDisablesOutboundSuppression(t *testing.T) {
+	runtime := newOutboundRuntime(t)
+	if _, err := runtime.GrantOutbound(context.Background(), "session-1", "lease-1", "epoch-1", time.Unix(100, 0)); err != nil {
+		t.Fatalf("GrantOutbound() error = %v", err)
+	}
+	source := &recordingSourceActivation{active: true}
+	controller, err := NewOutboundController(&recordingFrameWriter{}, runtime, source)
+	if err != nil {
+		t.Fatalf("NewOutboundController() error = %v", err)
+	}
+	connection := &scriptedConnection{}
+	err = RunSessionWithLifecycle(context.Background(), connection, runtime, nil, controller, fixedClock(time.Unix(101, 0)))
+	if !errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Fatalf("RunSessionWithLifecycle() error = %v", err)
+	}
+	if source.active {
+		t.Fatal("source suppression remained active after EOF")
+	}
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal {
+		t.Fatalf("runtime did not fail safe: %s", snapshot)
+	}
+}
+
 func TestRunSessionFailsSafeOnMalformedFramePayload(t *testing.T) {
 	runtime, _ := newInboundRuntime(t)
 	connection := &scriptedConnection{frames: []transport.Frame{{Kind: transport.MessageInput, Payload: []byte{1}}}}

@@ -136,4 +136,5 @@ type OutboundLifecycle interface {
 	GrantPeer(context.Context, transport.ControlCommand, time.Time) error
 	RejectPeer(context.Context, transport.ControlCommand) error
 	RevokePeer(context.Context, transport.ControlCommand) error
+	Fail(context.Context, error) error
 }
