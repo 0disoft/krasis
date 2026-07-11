@@ -59,6 +59,41 @@ func TestCheckRejectsMixedBuildAndDuplicateRecovery(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsDifferentSequentialLocationLivenessPolicy(t *testing.T) {
+	directory := t.TempDir()
+	build := "abc123"
+	now := time.Date(2026, 7, 11, 0, 0, 0, 0, time.UTC)
+	home := []string{
+		writeAgent(t, directory, "H-A", "listen", "RIGHT", build, 120_000, now),
+		writeAgent(t, directory, "H-B", "connect", "LEFT", build, 120_000, now),
+	}
+	study := []string{
+		writeAgent(t, directory, "S-A", "listen", "RIGHT", build, 120_000, now),
+		writeAgent(t, directory, "S-B", "connect", "LEFT", build, 120_000, now),
+	}
+	for _, path := range study {
+		var report lab.AgentSessionReport
+		payload, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read report %q: %v", path, err)
+		}
+		if err := json.Unmarshal(payload, &report); err != nil {
+			t.Fatalf("decode report %q: %v", path, err)
+		}
+		report.HeartbeatMillis = 750
+		report.PeerTimeoutMillis = 4_000
+		writeJSON(t, path, report)
+	}
+	recoveries := []string{
+		writeRecovery(t, directory, "H-A", build, now), writeRecovery(t, directory, "H-B", build, now),
+		writeRecovery(t, directory, "S-A", build, now), writeRecovery(t, directory, "S-B", build, now),
+	}
+	result := Check(home, study, recoveries)
+	if result.Passed || !hasIssue(result.Issues, "mixed_agent_heartbeat_interval") || !hasIssue(result.Issues, "mixed_agent_peer_timeout") {
+		t.Fatalf("Check() = %+v", result)
+	}
+}
+
 func writeAgent(t *testing.T, directory, alias, role, edge, build string, duration int64, collectedAt time.Time) string {
 	t.Helper()
 	guardName := alias + "-disarm.json"
@@ -69,6 +104,7 @@ func writeAgent(t *testing.T, directory, alias, role, edge, build string, durati
 	report := lab.AgentSessionReport{
 		SchemaVersion: lab.AgentSessionSchemaVersion, DeviceAlias: alias, Role: role, Edge: edge,
 		CollectedAt: collectedAt, BuildRevision: build, RequestedMillis: duration,
+		HeartbeatMillis: 500, PeerTimeoutMillis: 3_000,
 		Completed: true, Passed: true, StopReason: "duration_elapsed",
 		CrashGuard:       lab.CrashGuardEvidence{Started: true, CleanShutdown: true, ReportFile: guardName},
 		Supervisor:       lab.SupervisorEvidence{FinalState: "STOPPED", ActiveCount: 1},

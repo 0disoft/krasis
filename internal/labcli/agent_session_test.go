@@ -25,13 +25,64 @@ func TestParseAgentSessionConnectArgs(t *testing.T) {
 	options, err := parseAgentSessionArgs([]string{
 		"connect", "--device", "H-B", "--address", "192.0.2.10:24876", "--server-name", "192.0.2.10",
 		"--ca", "ca.pem", "--cert", "identity.pem", "--key", "identity-key.pem",
-		"--edge", "left", "--duration", "2m", "--output", "report.json", "--guard-output", "guard.json", "--allow-live-input",
+		"--edge", "left", "--duration", "2m", "--heartbeat-interval", "500ms", "--peer-timeout", "3s",
+		"--output", "report.json", "--guard-output", "guard.json", "--allow-live-input",
 	})
 	if err != nil {
 		t.Fatalf("parseAgentSessionArgs() error = %v", err)
 	}
-	if options.edge != control.ScreenEdgeLeft || options.duration != 2*time.Minute || options.rearmDistance != defaultAgentRearmDistance {
+	if options.edge != control.ScreenEdgeLeft || options.duration != 2*time.Minute || options.heartbeat != 500*time.Millisecond || options.peerTimeout != 3*time.Second || options.rearmDistance != defaultAgentRearmDistance {
 		t.Fatalf("options = %+v", options)
+	}
+}
+
+func TestParseAgentSessionRequiresValidExplicitLivenessPolicy(t *testing.T) {
+	base := []string{
+		"listen", "--device", "H-A", "--address", ":24876", "--ca", "ca.pem",
+		"--cert", "identity.pem", "--key", "identity-key.pem", "--edge", "RIGHT",
+		"--duration", "1m", "--output", "report.json", "--guard-output", "guard.json", "--allow-live-input",
+	}
+	if _, err := parseAgentSessionArgs(base); err == nil {
+		t.Fatal("parseAgentSessionArgs accepted missing liveness policy")
+	}
+	inverted := append([]string{}, base...)
+	inverted = append(inverted, "--heartbeat-interval", "3s", "--peer-timeout", "1s")
+	if _, err := parseAgentSessionArgs(inverted); err == nil {
+		t.Fatal("parseAgentSessionArgs accepted inverted liveness policy")
+	}
+}
+
+func TestParseAgentSessionRejectsDurationThatCannotRoundTripThroughEvidence(t *testing.T) {
+	for _, argument := range []string{"--duration", "--heartbeat-interval", "--peer-timeout"} {
+		args := []string{
+			"listen", "--device", "H-A", "--address", ":24876", "--ca", "ca.pem",
+			"--cert", "identity.pem", "--key", "identity-key.pem", "--edge", "RIGHT",
+			"--duration", "1m", "--heartbeat-interval", "500ms", "--peer-timeout", "3s",
+			"--output", "report.json", "--guard-output", "guard.json", "--allow-live-input",
+		}
+		for index := range args {
+			if args[index] == argument {
+				args[index+1] = "1500us"
+				break
+			}
+		}
+		if _, err := parseAgentSessionArgs(args); err == nil {
+			t.Fatalf("parseAgentSessionArgs accepted non-millisecond %s", argument)
+		}
+	}
+}
+
+func TestNewAgentSessionConfigWiresExplicitLivenessPolicy(t *testing.T) {
+	options := agentSessionArgs{
+		edge: control.ScreenEdgeRight, rearmDistance: 48,
+		heartbeat: 750 * time.Millisecond, peerTimeout: 4 * time.Second,
+	}
+	config := newAgentSessionConfig(options, -100, 200)
+	if config.Liveness == nil || config.Liveness.HeartbeatInterval != options.heartbeat || config.Liveness.PeerTimeout != options.peerTimeout {
+		t.Fatalf("liveness config = %+v", config.Liveness)
+	}
+	if config.Boundary.Edge != options.edge || config.Boundary.ScreenLeft != -100 || config.Boundary.ScreenWidth != 200 || config.Boundary.RearmDistance != 48 {
+		t.Fatalf("boundary config = %+v", config.Boundary)
 	}
 }
 
@@ -39,7 +90,8 @@ func TestParseAgentSessionRequiresLiveInputAcknowledgement(t *testing.T) {
 	_, err := parseAgentSessionArgs([]string{
 		"listen", "--device", "H-A", "--address", ":24876", "--ca", "ca.pem",
 		"--cert", "identity.pem", "--key", "identity-key.pem", "--edge", "RIGHT",
-		"--duration", "1m", "--output", "report.json", "--guard-output", "guard.json",
+		"--duration", "1m", "--heartbeat-interval", "500ms", "--peer-timeout", "3s",
+		"--output", "report.json", "--guard-output", "guard.json",
 	})
 	if err == nil {
 		t.Fatal("parseAgentSessionArgs() accepted missing acknowledgement")

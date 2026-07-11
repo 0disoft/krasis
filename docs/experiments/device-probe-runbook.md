@@ -84,20 +84,29 @@ Windows 방화벽과 같은 LAN에서 listener의 실제 IP와 port 접근을 �
 listener 예시:
 
 ```powershell
-.\krasis-lab.exe agent-session listen --device H-A --address 0.0.0.0:24876 --ca .\secrets\listener\ca.pem --cert .\secrets\listener\identity.pem --key .\secrets\listener\identity-key.pem --edge RIGHT --duration 2m --output .\reports\H-A-agent.json --guard-output .\reports\H-A-guard.json --allow-live-input
+$HeartbeatInterval = Read-Host 'heartbeat interval'
+$PeerTimeout = Read-Host 'peer timeout (must be longer)'
+.\krasis-lab.exe agent-session listen --device H-A --address 0.0.0.0:24876 --ca .\secrets\listener\ca.pem --cert .\secrets\listener\identity.pem --key .\secrets\listener\identity-key.pem --edge RIGHT --duration 2m --heartbeat-interval $HeartbeatInterval --peer-timeout $PeerTimeout --output .\reports\H-A-agent.json --guard-output .\reports\H-A-guard.json --allow-live-input
 ```
 
 connector 예시:
 
 ```powershell
-.\krasis-lab.exe agent-session connect --device H-B --address 192.0.2.10:24876 --server-name 192.0.2.10 --ca .\secrets\connector\ca.pem --cert .\secrets\connector\identity.pem --key .\secrets\connector\identity-key.pem --edge LEFT --duration 2m --output .\reports\H-B-agent.json --guard-output .\reports\H-B-guard.json --allow-live-input
+$HeartbeatInterval = Read-Host 'same heartbeat interval used by the listener'
+$PeerTimeout = Read-Host 'same peer timeout used by the listener'
+.\krasis-lab.exe agent-session connect --device H-B --address 192.0.2.10:24876 --server-name 192.0.2.10 --ca .\secrets\connector\ca.pem --cert .\secrets\connector\identity.pem --key .\secrets\connector\identity-key.pem --edge LEFT --duration 2m --heartbeat-interval $HeartbeatInterval --peer-timeout $PeerTimeout --output .\reports\H-B-agent.json --guard-output .\reports\H-B-guard.json --allow-live-input
 ```
+
+두 값은 제품 기본값이 아니라 이번 evidence set의 실험 입력이다. 집과 스터디카페 실행에서
+같은 값을 다시 입력하고 report의 millisecond 필드로 일치 여부를 검증한다. 측정 전에 특정
+숫자를 제품 기본값으로 승인하지 않는다.
 
 실행 중 A의 오른쪽 끝에서 B로 넘어가 pointer, wheel, 기본 button과 안전한 test key를 확인한다. B의 왼쪽 끝에서 A로 돌아온 뒤 반대 방향도 반복한다. key나 button을 누른 상태로 경계를 넘지 않는다. 이상 동작, stuck input 또는 예상하지 않은 suppression이 보이면 즉시 긴급 해제를 누른다.
 
-양쪽 report가 모두 `schemaVersion=krasis.lab.agent-session/v3`, `completed=true`,
+양쪽 report가 모두 `schemaVersion=krasis.lab.agent-session/v4`, `completed=true`,
 `passed=true`, `crashGuard.started=true`, `crashGuard.cleanShutdown=true`,
-`supervisor.activeCount>=1`, `destinationInput.entries>=1`이어야 해당 pair의 bounded 양방향
+양수 `heartbeatIntervalMillis`, 그보다 큰 `peerTimeoutMillis`, `supervisor.activeCount>=1`,
+`destinationInput.entries>=1`이어야 해당 pair의 bounded 양방향
 실험이 통과한 것이다. 집 pair와 스터디카페 pair는 서로 다른 날짜에 반복해도 된다.
 
 두 report를 한 directory에 모은 뒤 strict pair checker를 실행한다.
@@ -134,7 +143,7 @@ source에서 key를 놓고 destination의 입력이 즉시 정상인지 확인�
 
 ## 순차 Phase 0 집계
 
-집과 스터디카페에서 같은 clean build와 duration으로 모은 파일을 한 directory에 복사한 뒤
+집과 스터디카페에서 같은 clean build, duration, heartbeat interval과 peer timeout으로 모은 파일을 한 directory에 복사한 뒤
 파일 이름을 `H-A-agent.json`, `H-B-agent.json`, `S-A-agent.json`, `S-B-agent.json`, 각 alias의
 `*-guard.json`과 `*-recovery.json`으로 맞춘다. probe kit의 아래 사람 전용 helper를 실행한다.
 수집 날짜가 달라도 되고 네 장비를 동시에 켤 필요는 없다.

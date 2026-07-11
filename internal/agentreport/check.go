@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	SchemaVersion = "krasis.lab.agent-session-check/v1"
+	SchemaVersion = "krasis.lab.agent-session-check/v2"
 	maxReportSize = 1 << 20
 )
 
@@ -27,20 +27,22 @@ type Report struct {
 }
 
 type FileResult struct {
-	File            string   `json:"file"`
-	Valid           bool     `json:"valid"`
-	Issues          []string `json:"issues"`
-	DeviceAlias     string   `json:"deviceAlias,omitempty"`
-	Role            string   `json:"role,omitempty"`
-	Edge            string   `json:"edge,omitempty"`
-	BuildRevision   string   `json:"buildRevision,omitempty"`
-	BuildModified   bool     `json:"buildModified"`
-	RequestedMillis int64    `json:"requestedDurationMillis"`
-	Completed       bool     `json:"completed"`
-	Passed          bool     `json:"passed"`
-	GuardReport     string   `json:"guardReport,omitempty"`
-	GuardValid      bool     `json:"guardValid"`
-	GuardIssues     []string `json:"guardIssues"`
+	File              string   `json:"file"`
+	Valid             bool     `json:"valid"`
+	Issues            []string `json:"issues"`
+	DeviceAlias       string   `json:"deviceAlias,omitempty"`
+	Role              string   `json:"role,omitempty"`
+	Edge              string   `json:"edge,omitempty"`
+	BuildRevision     string   `json:"buildRevision,omitempty"`
+	BuildModified     bool     `json:"buildModified"`
+	RequestedMillis   int64    `json:"requestedDurationMillis"`
+	HeartbeatMillis   int64    `json:"heartbeatIntervalMillis"`
+	PeerTimeoutMillis int64    `json:"peerTimeoutMillis"`
+	Completed         bool     `json:"completed"`
+	Passed            bool     `json:"passed"`
+	GuardReport       string   `json:"guardReport,omitempty"`
+	GuardValid        bool     `json:"guardValid"`
+	GuardIssues       []string `json:"guardIssues"`
 }
 
 func Check(paths []string) Report {
@@ -108,6 +110,8 @@ func checkFile(path string) (FileResult, lab.AgentSessionReport) {
 	result.BuildRevision = report.BuildRevision
 	result.BuildModified = report.BuildModified
 	result.RequestedMillis = report.RequestedMillis
+	result.HeartbeatMillis = report.HeartbeatMillis
+	result.PeerTimeoutMillis = report.PeerTimeoutMillis
 	result.Completed = report.Completed
 	result.Passed = report.Passed
 	result.Issues = validate(report)
@@ -165,6 +169,9 @@ func validate(report lab.AgentSessionReport) []string {
 	if report.RequestedMillis <= 0 {
 		issues = append(issues, "invalid_duration")
 	}
+	if report.HeartbeatMillis <= 0 || report.PeerTimeoutMillis <= report.HeartbeatMillis {
+		issues = append(issues, "invalid_liveness_policy")
+	}
 	if !report.Completed || !report.Passed || report.FailureCode != "" {
 		issues = append(issues, "session_not_passed")
 	}
@@ -206,6 +213,12 @@ func comparePair(first, second lab.AgentSessionReport) []string {
 	}
 	if first.RequestedMillis != second.RequestedMillis {
 		issues = append(issues, "mixed_duration")
+	}
+	if first.HeartbeatMillis != second.HeartbeatMillis {
+		issues = append(issues, "mixed_heartbeat_interval")
+	}
+	if first.PeerTimeoutMillis != second.PeerTimeoutMillis {
+		issues = append(issues, "mixed_peer_timeout")
 	}
 	return issues
 }

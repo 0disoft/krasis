@@ -6,7 +6,7 @@ import (
 	"github.com/0disoft/krasis/internal/guardreport"
 )
 
-const SchemaVersion = "krasis.lab.phase0-check/v1"
+const SchemaVersion = "krasis.lab.phase0-check/v2"
 
 type Report struct {
 	SchemaVersion string                    `json:"schemaVersion"`
@@ -43,6 +43,8 @@ func Check(homePaths, studyPaths, recoveryPaths []string) Report {
 	agentBuilds := make(map[string]string, 4)
 	var commonBuild string
 	var commonDuration int64
+	var commonHeartbeat int64
+	var commonPeerTimeout int64
 	for _, file := range append(append([]agentreport.FileResult{}, result.Home.Files...), result.Study.Files...) {
 		if !file.Valid {
 			continue
@@ -57,6 +59,16 @@ func Check(homePaths, studyPaths, recoveryPaths []string) Report {
 			commonDuration = file.RequestedMillis
 		} else if commonDuration != file.RequestedMillis {
 			result.Issues = appendOnce(result.Issues, "mixed_agent_duration")
+		}
+		if commonHeartbeat == 0 {
+			commonHeartbeat = file.HeartbeatMillis
+		} else if commonHeartbeat != file.HeartbeatMillis {
+			result.Issues = appendOnce(result.Issues, "mixed_agent_heartbeat_interval")
+		}
+		if commonPeerTimeout == 0 {
+			commonPeerTimeout = file.PeerTimeoutMillis
+		} else if commonPeerTimeout != file.PeerTimeoutMillis {
+			result.Issues = appendOnce(result.Issues, "mixed_agent_peer_timeout")
 		}
 	}
 

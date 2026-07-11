@@ -60,7 +60,7 @@ func TestCheckRejectsReportWithoutCrashGuardEvidence(t *testing.T) {
 
 func TestCheckRejectsUnknownFields(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "unknown.json")
-	if err := os.WriteFile(path, []byte(`{"schemaVersion":"krasis.lab.agent-session/v3","surprise":true}`), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(`{"schemaVersion":"krasis.lab.agent-session/v4","surprise":true}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	result := Check([]string{path})
@@ -69,11 +69,33 @@ func TestCheckRejectsUnknownFields(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsInvalidOrMixedLivenessPolicy(t *testing.T) {
+	directory := t.TempDir()
+	invalidReport := passingReport("H-A", "listen", "RIGHT")
+	invalidReport.PeerTimeoutMillis = invalidReport.HeartbeatMillis
+	invalid := writeReport(t, directory, "invalid.json", invalidReport)
+	result := Check([]string{invalid})
+	if result.Valid || !hasIssue(result.Files[0].Issues, "invalid_liveness_policy") {
+		t.Fatalf("Check(invalid policy) = %+v", result)
+	}
+
+	first := writeReport(t, directory, "H-A.json", passingReport("H-A", "listen", "RIGHT"))
+	secondReport := passingReport("H-B", "connect", "LEFT")
+	secondReport.HeartbeatMillis = 750
+	secondReport.PeerTimeoutMillis = 4_000
+	second := writeReport(t, directory, "H-B.json", secondReport)
+	result = Check([]string{first, second})
+	if !result.Valid || result.PairPassed || !hasIssue(result.Issues, "mixed_heartbeat_interval") || !hasIssue(result.Issues, "mixed_peer_timeout") {
+		t.Fatalf("Check(mixed policy) = %+v", result)
+	}
+}
+
 func passingReport(alias, role, edge string) lab.AgentSessionReport {
 	return lab.AgentSessionReport{
 		SchemaVersion: lab.AgentSessionSchemaVersion, DeviceAlias: alias, Role: role, Edge: edge,
 		CollectedAt:   time.Date(2026, time.July, 11, 0, 0, 0, 0, time.UTC),
-		BuildRevision: "abc123", RequestedMillis: 120_000, Completed: true, Passed: true, StopReason: "duration_elapsed",
+		BuildRevision: "abc123", RequestedMillis: 120_000, HeartbeatMillis: 500, PeerTimeoutMillis: 3_000,
+		Completed: true, Passed: true, StopReason: "duration_elapsed",
 		CrashGuard:       lab.CrashGuardEvidence{Started: true, CleanShutdown: true, ReportFile: alias + "-guard.json"},
 		Supervisor:       lab.SupervisorEvidence{FinalState: "STOPPED", ActiveCount: 1},
 		DestinationInput: lab.InputEvidence{Entries: 1, PointerMoves: 1, ReturnArms: 1},

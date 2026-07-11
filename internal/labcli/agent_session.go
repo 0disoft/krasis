@@ -36,6 +36,8 @@ type agentSessionArgs struct {
 	key           string
 	edge          control.ScreenEdge
 	duration      time.Duration
+	heartbeat     time.Duration
+	peerTimeout   time.Duration
 	rearmDistance int32
 	output        string
 	guardOutput   string
@@ -71,7 +73,8 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 		SchemaVersion: lab.AgentSessionSchemaVersion, DeviceAlias: options.device,
 		Role: options.role, Edge: string(options.edge), CollectedAt: time.Now().UTC(),
 		BuildRevision: build.Revision, BuildModified: build.Modified,
-		RequestedMillis: options.duration.Milliseconds(),
+		RequestedMillis: options.duration.Milliseconds(), HeartbeatMillis: options.heartbeat.Milliseconds(),
+		PeerTimeoutMillis: options.peerTimeout.Milliseconds(),
 	}
 	var guard *crashguard.Process
 	guardClosed := false
@@ -173,11 +176,9 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 		case <-runContext.Done():
 		}
 	}()
+	sessionConfig := newAgentSessionConfig(options, diagnostics.Display.Left, diagnostics.Display.Width)
 	err = agent.RunSupervisor(runContext, agent.SupervisorConfig{
-		Session: agent.DefaultConfig(control.BoundaryConfig{
-			Edge: options.edge, ScreenLeft: diagnostics.Display.Left, ScreenWidth: diagnostics.Display.Width,
-			ActivationGap: 0, RearmDistance: options.rearmDistance,
-		}),
+		Session: sessionConfig,
 		Backoff: agent.DefaultBackoffPolicy(), Now: time.Now, Wait: agent.Wait, Observer: observer,
 	}, agent.SupervisorDependencies{
 		Source: source, Hook: wininput.NewSourceHook(), Input: input,
@@ -255,9 +256,11 @@ func parseAgentSessionArgs(args []string) (agentSessionArgs, error) {
 		"--ca": &parsed.ca, "--cert": &parsed.cert, "--key": &parsed.key, "--output": &parsed.output,
 		"--guard-output": &parsed.guardOutput,
 	}
-	var edgeValue, durationValue, rearmValue string
+	var edgeValue, durationValue, heartbeatValue, peerTimeoutValue, rearmValue string
 	values["--edge"] = &edgeValue
 	values["--duration"] = &durationValue
+	values["--heartbeat-interval"] = &heartbeatValue
+	values["--peer-timeout"] = &peerTimeoutValue
 	values["--rearm-distance"] = &rearmValue
 	for index := 1; index < len(args); index++ {
 		argument := args[index]
@@ -291,8 +294,8 @@ func parseAgentSessionArgs(args []string) (agentSessionArgs, error) {
 	if !lab.ValidProbeDeviceAlias(parsed.device) {
 		return agentSessionArgs{}, fmt.Errorf("unsupported device alias %q", parsed.device)
 	}
-	if parsed.address == "" || parsed.ca == "" || parsed.cert == "" || parsed.key == "" || parsed.output == "" || parsed.guardOutput == "" || edgeValue == "" || durationValue == "" {
-		return agentSessionArgs{}, errors.New("device, address, credentials, edge, duration, and output are required")
+	if parsed.address == "" || parsed.ca == "" || parsed.cert == "" || parsed.key == "" || parsed.output == "" || parsed.guardOutput == "" || edgeValue == "" || durationValue == "" || heartbeatValue == "" || peerTimeoutValue == "" {
+		return agentSessionArgs{}, errors.New("device, address, credentials, edge, duration, heartbeat interval, peer timeout, and output are required")
 	}
 	parsed.edge = control.ScreenEdge(strings.ToUpper(edgeValue))
 	if parsed.edge != control.ScreenEdgeLeft && parsed.edge != control.ScreenEdgeRight {
@@ -302,7 +305,30 @@ func parseAgentSessionArgs(args []string) (agentSessionArgs, error) {
 	if err != nil {
 		return agentSessionArgs{}, err
 	}
+	if err := validateEvidenceDuration("--duration", duration); err != nil {
+		return agentSessionArgs{}, err
+	}
 	parsed.duration = duration
+	heartbeat, err := parsePositiveDuration(heartbeatValue)
+	if err != nil {
+		return agentSessionArgs{}, fmt.Errorf("invalid --heartbeat-interval: %w", err)
+	}
+	if err := validateEvidenceDuration("--heartbeat-interval", heartbeat); err != nil {
+		return agentSessionArgs{}, err
+	}
+	peerTimeout, err := parsePositiveDuration(peerTimeoutValue)
+	if err != nil {
+		return agentSessionArgs{}, fmt.Errorf("invalid --peer-timeout: %w", err)
+	}
+	if err := validateEvidenceDuration("--peer-timeout", peerTimeout); err != nil {
+		return agentSessionArgs{}, err
+	}
+	policy := agent.LivenessPolicy{HeartbeatInterval: heartbeat, PeerTimeout: peerTimeout}
+	if err := policy.Validate(); err != nil {
+		return agentSessionArgs{}, fmt.Errorf("invalid liveness policy: %w", err)
+	}
+	parsed.heartbeat = heartbeat
+	parsed.peerTimeout = peerTimeout
 	if rearmValue != "" {
 		value, err := strconv.ParseInt(rearmValue, 10, 32)
 		if err != nil || value <= 0 {
@@ -319,8 +345,27 @@ func parseAgentSessionArgs(args []string) (agentSessionArgs, error) {
 	return parsed, nil
 }
 
+func validateEvidenceDuration(name string, value time.Duration) error {
+	if value < time.Millisecond || value%time.Millisecond != 0 {
+		return fmt.Errorf("%s must be a whole number of milliseconds", name)
+	}
+	return nil
+}
+
+func newAgentSessionConfig(options agentSessionArgs, screenLeft, screenWidth int32) agent.Config {
+	config := agent.DefaultConfig(control.BoundaryConfig{
+		Edge: options.edge, ScreenLeft: screenLeft, ScreenWidth: screenWidth,
+		ActivationGap: 0, RearmDistance: options.rearmDistance,
+	})
+	config.Liveness = &agent.LivenessPolicy{
+		HeartbeatInterval: options.heartbeat,
+		PeerTimeout:       options.peerTimeout,
+	}
+	return config
+}
+
 func writeAgentSessionUsage(output io.Writer) {
-	fmt.Fprintln(output, "usage: krasis-lab agent-session listen|connect --device ALIAS --address ADDRESS [--server-name NAME] --ca CA.pem --cert CERT.pem --key KEY.pem --edge LEFT|RIGHT --duration DURATION --output REPORT.json --guard-output GUARD.json [--rearm-distance PIXELS] --allow-live-input")
+	fmt.Fprintln(output, "usage: krasis-lab agent-session listen|connect --device ALIAS --address ADDRESS [--server-name NAME] --ca CA.pem --cert CERT.pem --key KEY.pem --edge LEFT|RIGHT --duration DURATION --heartbeat-interval DURATION --peer-timeout DURATION --output REPORT.json --guard-output GUARD.json [--rearm-distance PIXELS] --allow-live-input")
 }
 
 type countingInput struct {

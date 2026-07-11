@@ -2,24 +2,26 @@ package lab
 
 import "time"
 
-const AgentSessionSchemaVersion = "krasis.lab.agent-session/v3"
+const AgentSessionSchemaVersion = "krasis.lab.agent-session/v4"
 
 type AgentSessionReport struct {
-	SchemaVersion    string             `json:"schemaVersion"`
-	DeviceAlias      string             `json:"deviceAlias"`
-	Role             string             `json:"role"`
-	Edge             string             `json:"edge"`
-	CollectedAt      time.Time          `json:"collectedAt"`
-	BuildRevision    string             `json:"buildRevision"`
-	BuildModified    bool               `json:"buildModified"`
-	RequestedMillis  int64              `json:"requestedDurationMillis"`
-	Completed        bool               `json:"completed"`
-	Passed           bool               `json:"passed"`
-	StopReason       string             `json:"stopReason"`
-	FailureCode      string             `json:"failureCode,omitempty"`
-	CrashGuard       CrashGuardEvidence `json:"crashGuard"`
-	Supervisor       SupervisorEvidence `json:"supervisor"`
-	DestinationInput InputEvidence      `json:"destinationInput"`
+	SchemaVersion     string             `json:"schemaVersion"`
+	DeviceAlias       string             `json:"deviceAlias"`
+	Role              string             `json:"role"`
+	Edge              string             `json:"edge"`
+	CollectedAt       time.Time          `json:"collectedAt"`
+	BuildRevision     string             `json:"buildRevision"`
+	BuildModified     bool               `json:"buildModified"`
+	RequestedMillis   int64              `json:"requestedDurationMillis"`
+	HeartbeatMillis   int64              `json:"heartbeatIntervalMillis"`
+	PeerTimeoutMillis int64              `json:"peerTimeoutMillis"`
+	Completed         bool               `json:"completed"`
+	Passed            bool               `json:"passed"`
+	StopReason        string             `json:"stopReason"`
+	FailureCode       string             `json:"failureCode,omitempty"`
+	CrashGuard        CrashGuardEvidence `json:"crashGuard"`
+	Supervisor        SupervisorEvidence `json:"supervisor"`
+	DestinationInput  InputEvidence      `json:"destinationInput"`
 }
 
 type CrashGuardEvidence struct {
