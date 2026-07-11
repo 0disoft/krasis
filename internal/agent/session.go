@@ -150,7 +150,7 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 			if runErr == nil {
 				runErr = fmt.Errorf("%s stopped unexpectedly", current.name)
 			}
-			if !errors.Is(runErr, context.Canceled) && !errors.Is(runErr, context.DeadlineExceeded) {
+			if runContext.Err() == nil {
 				cancel(fmt.Errorf("%s: %w", current.name, runErr))
 			}
 		}()

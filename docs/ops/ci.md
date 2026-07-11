@@ -29,6 +29,10 @@ coordinator 획득 뒤 deadline에 도달한 heartbeat가 `LastObserved`를 갱�
 timer cadence, congestion과 절전 중 false timeout은 장비 실험 범위다.
 
 agent assembly 통합 테스트는 두 agent session을 실제 framed pipe로 연결하고 source worker ready, boundary intent, lease grant 이후 suppression, normalized input 전달, destination return intent, source deactivation과 양쪽 `LOCAL` cleanup을 한 경로에서 검증한다. 테스트는 OS hook과 `SendInput` 대신 같은 interface의 deterministic port를 사용하므로 실제 Windows callback과 주입 검증을 대체하지 않는다.
+별도 component lifecycle 테스트는 session context가 살아 있는 동안 worker가 독립적인
+`context.Canceled` 또는 `context.DeadlineExceeded`를 반환하면 전체 session이 즉시 취소되고
+`LOCAL`로 끝나는지 검증한다.
+부모 cancellation에서 파생된 worker 종료만 기존 teardown cause를 보존해야 한다.
 
 supervisor 테스트는 명시적인 transition table, exponential backoff cap, acquire failure 뒤 retry, `LOCAL` session failure 뒤 reconnect와 non-local failure의 즉시 중단을 검증한다. network source 통합 테스트는 `peer-credentials`가 만든 역할 분리 identity로 실제 localhost listener/dial을 열고 양쪽 `PeerConnection`의 mTLS와 ALPN 인증을 통과시킨다.
 

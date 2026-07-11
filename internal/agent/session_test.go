@@ -81,6 +81,55 @@ func TestRunSessionRejectsIncompleteDependencies(t *testing.T) {
 	}
 }
 
+func TestRunSessionTreatsIndependentComponentContextErrorAsFailure(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		err  error
+	}{
+		{name: "canceled", err: context.Canceled},
+		{name: "deadline", err: context.DeadlineExceeded},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			connection, peerConnection := openConnectionPair(t)
+			defer peerConnection.Close()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			type outcome struct {
+				result Result
+				err    error
+			}
+			done := make(chan outcome, 1)
+			go func() {
+				result, err := RunSession(ctx, DefaultConfig(control.BoundaryConfig{
+					Edge: control.ScreenEdgeRight, ScreenLeft: 0, ScreenWidth: 100,
+					ActivationGap: 0, RearmDistance: 10,
+				}), Dependencies{
+					Connection: connection, Hook: contextErrorHook{err: test.err}, Input: newTestInput(false),
+					Effects: noopEffects{}, Authorizer: acceptingAuthorizer{},
+				})
+				done <- outcome{result: result, err: err}
+			}()
+
+			select {
+			case finished := <-done:
+				if !errors.Is(finished.err, test.err) {
+					t.Fatalf("RunSession() error = %v, want component error %v", finished.err, test.err)
+				}
+				if finished.result.FinalState != control.StateLocal {
+					t.Fatalf("final state = %s", finished.result.FinalState)
+				}
+			case <-time.After(time.Second):
+				cancel()
+				select {
+				case <-done:
+				case <-time.After(time.Second):
+				}
+				t.Fatalf("independent component error %v did not stop agent session", test.err)
+			}
+		})
+	}
+}
+
 type triggerHook struct {
 	returned chan struct{}
 }
@@ -124,6 +173,14 @@ func (*idleHook) RunWithBoundary(ctx context.Context, _ *wininput.SourceSession,
 	}
 	<-ctx.Done()
 	return ctx.Err()
+}
+
+type contextErrorHook struct {
+	err error
+}
+
+func (hook contextErrorHook) RunWithBoundary(context.Context, *wininput.SourceSession, wininput.BoundaryObserver, func()) error {
+	return hook.err
 }
 
 type testInput struct {

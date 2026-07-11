@@ -90,6 +90,9 @@ server와 client TLS config는 TLS 1.3만 허용하고 `krasis/1` ALPN을 사용
 - 한 peer가 경계를 넘으면 source suppression은 exact lease grant 뒤에만 활성화된다.
 - 반대 peer가 경계를 넘으면 같은 process가 destination input adapter와 return controller로 동작한다.
 - source worker, hook, boundary orchestrator, return controller, peer reader 중 하나가 비정상 종료하면 공통 context를 취소하고 나머지를 모두 회수한다.
+- worker가 반환한 `context.Canceled` 또는 `context.DeadlineExceeded`도 공통 session context가 이미
+  취소된 경우에만 정상적인 teardown 결과로 취급한다. session context가 살아 있는데 component
+  자체 취소나 deadline으로 종료하면 component failure로 승격해 나머지 worker를 회수한다.
 - 종료 결과가 `LOCAL`이 아니면 정상 종료로 보고하지 않는다.
 
 `internal/agent.RunSupervisor`는 이 session 조립 경계 바깥에서 listen 또는 dial connection source를 반복 실행한다. supervisor 상태는 `STOPPED`, `ACQUIRING`, `ACTIVE`, `BACKOFF`이며 transition table에 없는 전이는 거부한다. connection 획득 실패와 active session 실패는 서로 다른 failure kind로 관찰되지만 주소, certificate, session ID와 원시 오류 문자열은 snapshot에 넣지 않는다.
