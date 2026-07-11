@@ -46,6 +46,9 @@ reject, revoke, input과 heartbeat 사이에서 어떤 runtime 결정이 어떤 
   heartbeat write failure는 bounded cleanup context에서 `ReleaseAll`과 `LOCAL` 수렴을
   시도한다. 이 cleanup context는 session 취소를 상속하지 않아 동시 cancellation이 held input
   release를 선점하지 못한다.
+- heartbeat 수신도 coordinator를 획득한 뒤 새 local observation을 읽고, 현재 liveness가 이미
+  timeout에 도달했는지 먼저 판정한다. 만료된 lease는 늦게 도착한 heartbeat로
+  `LastObserved`를 갱신하지 않고 `ReleaseAll`과 `LOCAL` cleanup으로 수렴한다.
 - `HEARTBEAT` payload v1의 session ID 계약은 바꾸지 않는다. epoch 추가 필요성은 실제 stale
   session 충돌 증거가 생길 때 별도 protocol ADR로 판단한다.
 
@@ -57,6 +60,7 @@ reject, revoke, input과 heartbeat 사이에서 어떤 runtime 결정이 어떤 
 - heartbeat 중단 시 destination의 held input이 `ReleaseAll`되고 양쪽이 `LOCAL`로 수렴함
 - heartbeat write가 block되거나 실패해도 coordinator와 runtime이 무기한 잠기지 않음
 - coordinator 대기 중 deadline이 지나면 과거 ticker 시각으로 heartbeat를 보내지 않음
+- deadline에 도달한 뒤 수신된 heartbeat가 만료 세션을 되살리지 않고 held input을 해제함
 - deadline 판정과 session cancellation이 겹쳐도 held input cleanup이 완료됨
 - 서로 다른 interval 또는 timeout의 Phase 0 evidence가 통과하지 않음
 - heartbeat 송수신과 같은-session gap evidence가 없는 Phase 0 report는 통과하지 않음
@@ -74,6 +78,8 @@ return revoke, input, heartbeat write와 failure cleanup에 연결됐다. coordi
 획득한 뒤에 모두 해제해 concurrent activation 뒤 다시 켜진 상태를 남기지 않는다.
 inbound input과 heartbeat dispatch도 같은 coordinator operation에서 실행하며 malformed control은
 직접 runtime을 변경하지 않고 connection close 뒤 coordinated cleanup으로 넘긴다.
+heartbeat receive operation은 coordinator 대기 뒤 읽은 시각으로 기존 deadline을 먼저 검사하므로,
+timeout에 도달한 frame은 관찰 evidence에 포함하거나 세션을 연장하지 않는다.
 
 이 ADR은 heartbeat 숫자를 확정하거나 별도 heartbeat connection을 허용하지 않는다. 단일
 ordered stream에서 head-of-line blocking이 실제로 확인될 때만 ADR 0003을 대체하는 transport

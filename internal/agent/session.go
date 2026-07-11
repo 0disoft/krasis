@@ -104,6 +104,10 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 
 	runContext, cancel := context.WithCancelCause(ctx)
 	defer cancel(context.Canceled)
+	var peerTimeout time.Duration
+	if config.Liveness != nil {
+		peerTimeout = config.Liveness.PeerTimeout
+	}
 	sourceReady := make(chan struct{})
 	components := []component{
 		{name: "source-session", run: func() error {
@@ -119,7 +123,7 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 			return returns.Run(runContext, dependencies.Input.ReturnIntents())
 		}},
 		{name: "peer-session", run: func() error {
-			return peer.RunSessionWithLifecycleObserved(runContext, dependencies.Connection, coordinator, runtime, responder, outbound, config.Now, config.LivenessObserver)
+			return peer.RunSessionWithLifecycleObserved(runContext, dependencies.Connection, coordinator, runtime, responder, outbound, config.Now, peerTimeout, config.LivenessObserver)
 		}},
 	}
 	if config.Liveness != nil {

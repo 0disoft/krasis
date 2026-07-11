@@ -10,6 +10,7 @@
 | Critical | 합성 입력이 다시 전달됨 | 입력 폭주 또는 무한 루프 | 주입 표식 누락과 hook 재진입 | 합성 입력 식별, fail-open |
 | High | 두 기기가 동시에 제어권을 가짐 | 충돌, 순서 역전 | 동시 경계 진입 | 단일 lease와 epoch |
 | High | revoke 뒤 낡은 heartbeat가 기록됨 | 정상 복귀 직후 connection fault와 불필요한 재연결 | heartbeat/revoke 순서 강제 테스트 | ADR 0005 semantic write coordinator 선행 |
+| High | timeout 뒤 늦은 heartbeat가 만료 세션을 되살림 | 끊긴 peer가 살아 있다고 판단해 원격 입력 상태가 남음 | deadline 경계의 heartbeat 수신 경합 테스트 | 수신 coordinator 안에서 갱신 전 deadline 판정 |
 | High | 공용 Wi-Fi가 peer 통신을 차단 | 발견 또는 연결 실패 | 스터디카페 실망 테스트 | 직접 주소 입력, 대체망 운영 안내 검토 |
 | High | 높은 polling rate 또는 터치패드에서 hook 지연 | 커서 끊김, 입력 누락 | 실제 장비 부하 측정 | 최소 작업 hook, native fallback 판단 |
 | High | 절전과 잠금 뒤 낡은 세션이 살아남음 | 엉뚱한 기기로 입력 전달 | Modern Standby와 잠금 반복 | 세션 폐기 후 명시적 재연결 |

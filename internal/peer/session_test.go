@@ -75,13 +75,107 @@ func TestRunSessionObservedReportsOnlyAcceptedHeartbeat(t *testing.T) {
 	observedAt := time.Unix(101, 0)
 	err = RunSessionWithLifecycleObserved(
 		context.Background(), connection, testWriteCoordinator(t, &recordingFrameWriter{}), runtime,
-		nil, nil, fixedClock(observedAt), observer,
+		nil, nil, fixedClock(observedAt), 3*time.Second, observer,
 	)
 	if !errors.Is(err, io.ErrUnexpectedEOF) {
 		t.Fatalf("RunSessionWithLifecycleObserved() error = %v", err)
 	}
 	if len(observer.received) != 1 || observer.received[0].sessionID != "session-1" || !observer.received[0].observedAt.Equal(observedAt) {
 		t.Fatalf("received observations = %+v", observer.received)
+	}
+}
+
+func TestRunSessionObservedRejectsHeartbeatAtExpiredDeadline(t *testing.T) {
+	runtime, port := newInboundRuntime(t)
+	if err := runtime.HandlePressedInput(context.Background(), control.InputEnvelope{
+		SessionID: "session-1", Epoch: "epoch-1", Sequence: 1,
+	}, control.PressedToken{Kind: control.PressedKeyboardKey, Code: 30}, true); err != nil {
+		t.Fatalf("HandlePressedInput() error = %v", err)
+	}
+	payload, err := transport.EncodeHeartbeatPayload("session-1")
+	if err != nil {
+		t.Fatalf("EncodeHeartbeatPayload() error = %v", err)
+	}
+	connection := &scriptedConnection{frames: []transport.Frame{{Kind: transport.MessageHeartbeat, Payload: payload}}}
+	observer := &sessionLivenessObserver{}
+	err = RunSessionWithLifecycleObserved(
+		context.Background(), connection, testWriteCoordinator(t, &recordingFrameWriter{}), runtime,
+		nil, nil, fixedClock(time.Unix(103, 0)), 3*time.Second, observer,
+	)
+	if !errors.Is(err, ErrPeerLivenessExpired) {
+		t.Fatalf("RunSessionWithLifecycleObserved() error = %v, want peer liveness expired", err)
+	}
+	if len(observer.received) != 0 {
+		t.Fatalf("expired heartbeat observations = %+v", observer.received)
+	}
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal || snapshot.HasLiveness || snapshot.PressedCount != 0 {
+		t.Fatalf("expired heartbeat did not clean runtime: %s", snapshot)
+	}
+	if len(port.releases) == 0 {
+		t.Fatal("expired heartbeat did not release held input")
+	}
+}
+
+func TestRunSessionObservedReadsHeartbeatClockAfterCoordinatorWait(t *testing.T) {
+	runtime, _ := newInboundRuntime(t)
+	payload, err := transport.EncodeHeartbeatPayload("session-1")
+	if err != nil {
+		t.Fatalf("EncodeHeartbeatPayload() error = %v", err)
+	}
+	connection := newObservedFrameConnection(transport.Frame{Kind: transport.MessageHeartbeat, Payload: payload})
+	coordinator := testWriteCoordinator(t, &recordingFrameWriter{})
+	coordinatorAcquired := make(chan struct{})
+	releaseCoordinator := make(chan struct{})
+	coordinatorDone := make(chan error, 1)
+	go func() {
+		coordinatorDone <- coordinator.Execute(context.Background(), func(FrameWriter) error {
+			close(coordinatorAcquired)
+			<-releaseCoordinator
+			return nil
+		})
+	}()
+	select {
+	case <-coordinatorAcquired:
+	case <-time.After(time.Second):
+		t.Fatal("blocking coordinator operation did not acquire coordinator")
+	}
+
+	sessionDone := make(chan error, 1)
+	go func() {
+		sessionDone <- RunSessionWithLifecycleObserved(
+			context.Background(), connection, coordinator, runtime, nil, nil,
+			func() time.Time {
+				select {
+				case <-releaseCoordinator:
+					return time.Unix(103, 0)
+				default:
+					return time.Unix(101, 0)
+				}
+			},
+			3*time.Second, nil,
+		)
+	}()
+	select {
+	case <-connection.read:
+	case <-time.After(time.Second):
+		t.Fatal("session did not read heartbeat frame")
+	}
+	close(releaseCoordinator)
+	select {
+	case err := <-coordinatorDone:
+		if err != nil {
+			t.Fatalf("blocking coordinator operation error = %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("blocking coordinator operation did not finish")
+	}
+	select {
+	case err := <-sessionDone:
+		if !errors.Is(err, ErrPeerLivenessExpired) {
+			t.Fatalf("RunSessionWithLifecycleObserved() error = %v, want peer liveness expired", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("session did not reject expired heartbeat")
 	}
 }
 

@@ -23,7 +23,9 @@ frame을 만들지 않으며, active session heartbeat를 기록하고, silent p
 write failure에서 runtime을 `LOCAL`로 cleanup하며, deadline의 held input release와 blocked
 write 취소 뒤 coordinator 재사용, coordinator 대기 뒤 fresh deadline observation, deadline과
 session cancellation 경합에서 bounded held-input cleanup을 검증한다. observer 테스트는 성공한
-송수신만 집계하고 session 경계를 넘는 gap을 만들지 않는지 검증한다. 실제
+송수신만 집계하고 session 경계를 넘는 gap을 만들지 않는지 검증한다. lifecycle receive 테스트는
+coordinator 획득 뒤 deadline에 도달한 heartbeat가 `LastObserved`를 갱신하거나 observer에
+기록되지 않고 held input을 해제하는지 검증한다. 실제
 timer cadence, congestion과 절전 중 false timeout은 장비 실험 범위다.
 
 agent assembly 통합 테스트는 두 agent session을 실제 framed pipe로 연결하고 source worker ready, boundary intent, lease grant 이후 suppression, normalized input 전달, destination return intent, source deactivation과 양쪽 `LOCAL` cleanup을 한 경로에서 검증한다. 테스트는 OS hook과 `SendInput` 대신 같은 interface의 deterministic port를 사용하므로 실제 Windows callback과 주입 검증을 대체하지 않는다.

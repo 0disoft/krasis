@@ -24,7 +24,7 @@ func RunSession(
 	requests LeaseRequestHandler,
 	now ObservationClock,
 ) error {
-	return runSession(ctx, connection, nil, runtime, requests, nil, now, nil)
+	return runSession(ctx, connection, nil, runtime, requests, nil, now, 0, nil)
 }
 
 func RunSessionWithLifecycle(
@@ -39,7 +39,7 @@ func RunSessionWithLifecycle(
 	if coordinator == nil {
 		return errors.New("lifecycle session write coordinator is required")
 	}
-	return runSession(ctx, connection, coordinator, runtime, requests, outbound, now, nil)
+	return runSession(ctx, connection, coordinator, runtime, requests, outbound, now, 0, nil)
 }
 
 func RunSessionWithLifecycleObserved(
@@ -50,12 +50,16 @@ func RunSessionWithLifecycleObserved(
 	requests LeaseRequestHandler,
 	outbound OutboundLifecycle,
 	now ObservationClock,
+	peerTimeout time.Duration,
 	observer LivenessObserver,
 ) error {
 	if coordinator == nil {
 		return errors.New("lifecycle session write coordinator is required")
 	}
-	return runSession(ctx, connection, coordinator, runtime, requests, outbound, now, observer)
+	if peerTimeout < 0 {
+		return errors.New("peer timeout cannot be negative")
+	}
+	return runSession(ctx, connection, coordinator, runtime, requests, outbound, now, peerTimeout, observer)
 }
 
 func runSession(
@@ -66,6 +70,7 @@ func runSession(
 	requests LeaseRequestHandler,
 	outbound OutboundLifecycle,
 	now ObservationClock,
+	peerTimeout time.Duration,
 	observer LivenessObserver,
 ) error {
 	if connection == nil || runtime == nil || now == nil {
@@ -89,10 +94,11 @@ func runSession(
 			}
 			return failSessionWithLifecycle(ctx, coordinator, runtime, outbound, err)
 		}
-		observedAt := now()
+		var observedAt time.Time
 		var heartbeat HeartbeatObservation
 		switch frame.Kind {
 		case transport.MessageControl:
+			observedAt = now()
 			err = DispatchControlFrameWithLifecycle(ctx, frame, observedAt, runtime, requests, outbound)
 		case transport.MessageInput:
 			err = coordinateDispatch(ctx, coordinator, func() error {
@@ -100,6 +106,18 @@ func runSession(
 			})
 		case transport.MessageHeartbeat:
 			err = coordinateDispatch(ctx, coordinator, func() error {
+				observedAt = now()
+				if peerTimeout > 0 {
+					cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), CleanupTimeout)
+					defer cancel()
+					faulted, livenessErr := runtime.CheckLiveness(cleanupCtx, observedAt, peerTimeout)
+					if livenessErr != nil {
+						return livenessErr
+					}
+					if faulted {
+						return ErrPeerLivenessExpired
+					}
+				}
 				var dispatchErr error
 				heartbeat, dispatchErr = DispatchHeartbeatFrame(ctx, frame, observedAt, runtime)
 				return dispatchErr
