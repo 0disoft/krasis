@@ -20,6 +20,15 @@ func NewSourceHook() *SourceHook {
 }
 
 func (hook *SourceHook) Run(ctx context.Context, session *SourceSession, ready func()) error {
+	return hook.RunWithBoundary(ctx, session, nil, ready)
+}
+
+func (hook *SourceHook) RunWithBoundary(
+	ctx context.Context,
+	session *SourceSession,
+	boundary BoundaryObserver,
+	ready func(),
+) error {
 	if hook == nil || session == nil {
 		return errors.New("source hook and session are required")
 	}
@@ -37,12 +46,17 @@ func (hook *SourceHook) Run(ctx context.Context, session *SourceSession, ready f
 	completed := make(chan error, 1)
 	go func() {
 		runtime.LockOSThread()
-		completed <- runSourceHookOnDedicatedThread(ctx, session, ready)
+		completed <- runSourceHookOnDedicatedThread(ctx, session, boundary, ready)
 	}()
 	return <-completed
 }
 
-func runSourceHookOnDedicatedThread(ctx context.Context, session *SourceSession, ready func()) error {
+func runSourceHookOnDedicatedThread(
+	ctx context.Context,
+	session *SourceSession,
+	boundary BoundaryObserver,
+	ready func(),
+) error {
 	threadID, _, _ := procGetCurrentThreadID.Call()
 	var bootstrapMessage message
 	procPeekMessageW.Call(uintptr(unsafe.Pointer(&bootstrapMessage)), 0, 0, 0, pmNoRemove)
@@ -55,7 +69,7 @@ func runSourceHookOnDedicatedThread(ctx context.Context, session *SourceSession,
 				if session.Active() {
 					session.Abort(err)
 				}
-			} else if emitted && session.Offer(action) {
+			} else if emitted && routePhysicalAction(session, boundary, action, 0) {
 				return 1
 			}
 		}
@@ -69,7 +83,7 @@ func runSourceHookOnDedicatedThread(ctx context.Context, session *SourceSession,
 				if session.Active() {
 					session.Abort(err)
 				}
-			} else if emitted && session.Offer(action) {
+			} else if emitted && routePhysicalAction(session, boundary, action, data.Point.X) {
 				return 1
 			}
 		}

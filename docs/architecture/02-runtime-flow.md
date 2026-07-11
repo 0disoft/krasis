@@ -46,9 +46,11 @@ source mapper는 physical keyboard hook의 scan code와 extended flag를 canonic
 
 source session은 hook callback과 network sender 사이에 고정 용량 queue를 둔다. callback은 현재 outbound generation에 action을 non-blocking enqueue한 경우에만 해당 물리 event를 억제할 수 있다. queue overflow, invalid mapping 또는 sender 실패는 suppression을 즉시 끄고 generation을 폐기하며, worker가 runtime fault cleanup을 수행한다. 폐기된 generation의 queued action은 원격으로 보내지 않는다. queue 용량은 설정 가능한 `1..65536` 범위이며 실제 기본값과 성능 예산은 source hook 통합 측정 뒤 확정한다.
 
-`SourceHook`은 별도 고정 OS thread에 `WH_KEYBOARD_LL`과 `WH_MOUSE_LL`을 설치한다. callback은 mapper와 `SourceSession.Offer`만 호출하고, offer가 성공한 physical event만 non-zero hook result로 억제한다. inactive, injected, mapping error 또는 overflow event는 `CallNextHookEx`로 로컬 처리에 넘긴다. 제품 source hook와 lab capture는 process-global hook gate를 공유하므로 같은 process에서 동시에 설치되지 않는다.
+`SourceHook`은 별도 고정 OS thread에 `WH_KEYBOARD_LL`과 `WH_MOUSE_LL`을 설치한다. callback은 mapper, `BoundaryIntentEmitter.Observe`, `SourceSession.Offer`만 호출하고, offer가 성공한 physical event만 non-zero hook result로 억제한다. boundary intent handoff는 용량 1 queue에 non-blocking으로 수행하며 이미 intent가 대기 중이면 새 intent를 버리고 해당 physical event는 로컬 처리한다. inactive, injected, mapping error 또는 source queue overflow event도 `CallNextHookEx`로 로컬 처리에 넘긴다. 제품 source hook와 lab capture는 process-global hook gate를 공유하므로 같은 process에서 동시에 설치되지 않는다.
 
 `OutboundController`는 boundary orchestrator와 control dispatcher가 공유하는 source-side lifecycle owner다. boundary intent에서는 `LeaseRequest`만 보내고 source suppression을 켜지 않는다. 정확한 session·epoch의 `LeaseGrant`가 runtime을 `OUTBOUND_ACTIVE`로 만든 뒤에만 `SourceSession.Activate`를 호출한다. activation 실패, reject, revoke와 session failure에서는 suppression을 먼저 끄고 runtime cleanup으로 수렴한다.
+
+`BoundaryOrchestrator`는 용량 1 intent queue를 순차 소비하고 각 새 outbound 요청에 `crypto/rand` 기반 128-bit session ID와 별도 128-bit epoch를 생성한다. runtime이 `LOCAL`이 아니거나 source suppression이 이미 활성화된 동안 도착한 intent는 현재 session을 건드리지 않고 버린다. entropy 생성 실패와 최초 request write 실패는 orchestrator error로 supervisor에 전달한다.
 
 runtime은 port 호출이 끝날 때까지 owner lock을 유지한다. 따라서 effect와 input port는 같은 runtime API로 재진입하지 않아야 하며, 느린 I/O를 직접 수행하는 대신 adapter 내부의 명확히 제한된 호출만 제공해야 한다. transport와 Windows adapter는 이 runtime 경계를 통해서만 event와 input을 전달한다.
 

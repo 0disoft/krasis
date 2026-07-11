@@ -63,6 +63,26 @@ func TestOutboundControllerActivationFailureCleansGrantedLease(t *testing.T) {
 	}
 }
 
+func TestOutboundControllerRejectsSecondBoundaryWhilePending(t *testing.T) {
+	runtime := newLocalRuntime(t)
+	controller, err := NewOutboundController(&recordingFrameWriter{}, runtime, &recordingSourceActivation{})
+	if err != nil {
+		t.Fatalf("NewOutboundController() error = %v", err)
+	}
+	intent := control.BoundaryIntent{Edge: control.ScreenEdgeRight, X: 99}
+	if err := controller.BeginBoundary(context.Background(), intent, OutboundIdentity{SessionID: "session-1", Epoch: "epoch-1"}); err != nil {
+		t.Fatalf("first BeginBoundary() error = %v", err)
+	}
+	err = controller.BeginBoundary(context.Background(), intent, OutboundIdentity{SessionID: "session-2", Epoch: "epoch-2"})
+	if !errors.Is(err, ErrOutboundNotReady) {
+		t.Fatalf("second BeginBoundary() error = %v", err)
+	}
+	snapshot := runtime.Snapshot()
+	if snapshot.Control.State != control.StatePending || snapshot.Control.SessionID != "session-1" {
+		t.Fatalf("pending session changed = %s", snapshot)
+	}
+}
+
 func TestLifecycleDispatcherUsesOutboundController(t *testing.T) {
 	runtime := newLocalRuntime(t)
 	source := &recordingSourceActivation{}

@@ -6,8 +6,11 @@ import (
 	"time"
 
 	"github.com/0disoft/krasis/internal/application"
+	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/transport"
 )
+
+var ErrOutboundNotReady = errors.New("outbound controller is not ready")
 
 type SourceActivation interface {
 	Activate() error
@@ -36,10 +39,26 @@ func (controller *OutboundController) Begin(ctx context.Context, sessionID, epoc
 	if err := controller.validate(); err != nil {
 		return err
 	}
-	if controller.Source.Active() {
-		return errors.New("source suppression is already active")
+	if !controller.Ready() {
+		return ErrOutboundNotReady
 	}
 	return BeginOutboundSession(ctx, controller.Writer, controller.Runtime, sessionID, epoch)
+}
+
+func (controller *OutboundController) Ready() bool {
+	return controller != nil && controller.Writer != nil && controller.Runtime != nil && controller.Source != nil &&
+		!controller.Source.Active() && controller.Runtime.Snapshot().Control.State == control.StateLocal
+}
+
+func (controller *OutboundController) BeginBoundary(
+	ctx context.Context,
+	intent control.BoundaryIntent,
+	identity OutboundIdentity,
+) error {
+	if intent.Edge != control.ScreenEdgeLeft && intent.Edge != control.ScreenEdgeRight {
+		return errors.New("outbound boundary intent requires a LEFT or RIGHT edge")
+	}
+	return controller.Begin(ctx, identity.SessionID, identity.Epoch)
 }
 
 func (controller *OutboundController) GrantPeer(
