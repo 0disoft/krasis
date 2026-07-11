@@ -26,6 +26,45 @@ func TestBeginOutboundSessionWritesLeaseRequest(t *testing.T) {
 	}
 }
 
+func TestOutboundActionSinkWritesThroughRuntimeSequence(t *testing.T) {
+	runtime := newOutboundRuntime(t)
+	if _, err := runtime.GrantOutbound(context.Background(), "session-1", "lease-1", "epoch-1", time.Unix(100, 0)); err != nil {
+		t.Fatalf("GrantOutbound() error = %v", err)
+	}
+	writer := &recordingFrameWriter{}
+	sink, err := NewOutboundActionSink(writer, runtime)
+	if err != nil {
+		t.Fatalf("NewOutboundActionSink() error = %v", err)
+	}
+	if err := sink.SendAction(context.Background(), control.InputAction{Kind: control.InputPointerMove, DeltaX: 2}); err != nil {
+		t.Fatalf("SendAction() error = %v", err)
+	}
+	envelope, action, err := transport.DecodeInputPayload(writer.frames[0].Payload)
+	if err != nil {
+		t.Fatalf("DecodeInputPayload() error = %v", err)
+	}
+	if envelope.Sequence != 1 || action.DeltaX != 2 {
+		t.Fatalf("payload = envelope:%+v action:%+v", envelope, action)
+	}
+}
+
+func TestOutboundActionSinkFailCleansRuntime(t *testing.T) {
+	runtime := newOutboundRuntime(t)
+	if _, err := runtime.GrantOutbound(context.Background(), "session-1", "lease-1", "epoch-1", time.Unix(100, 0)); err != nil {
+		t.Fatalf("GrantOutbound() error = %v", err)
+	}
+	sink, err := NewOutboundActionSink(&recordingFrameWriter{}, runtime)
+	if err != nil {
+		t.Fatalf("NewOutboundActionSink() error = %v", err)
+	}
+	if err := sink.Fail(context.Background(), errors.New("capture overflow")); err == nil {
+		t.Fatal("Fail() error = nil")
+	}
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal {
+		t.Fatalf("runtime did not fail safe: %s", snapshot)
+	}
+}
+
 func TestBeginOutboundSessionWriteFailureCleansRuntime(t *testing.T) {
 	runtime := newLocalRuntime(t)
 	writer := &recordingFrameWriter{err: errors.New("write failed")}

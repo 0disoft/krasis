@@ -14,6 +14,32 @@ type FrameWriter interface {
 	WriteFrameContext(context.Context, transport.Frame) error
 }
 
+type OutboundActionSink struct {
+	Writer  FrameWriter
+	Runtime *application.SessionRuntime
+}
+
+func NewOutboundActionSink(writer FrameWriter, runtime *application.SessionRuntime) (*OutboundActionSink, error) {
+	if writer == nil || runtime == nil {
+		return nil, errors.New("frame writer and runtime are required")
+	}
+	return &OutboundActionSink{Writer: writer, Runtime: runtime}, nil
+}
+
+func (sink *OutboundActionSink) SendAction(ctx context.Context, action control.InputAction) error {
+	if sink == nil || sink.Writer == nil || sink.Runtime == nil {
+		return errors.New("outbound action sink is not initialized")
+	}
+	return SendInputAction(ctx, sink.Writer, sink.Runtime, action)
+}
+
+func (sink *OutboundActionSink) Fail(ctx context.Context, cause error) error {
+	if sink == nil || sink.Runtime == nil {
+		return errors.New("outbound action sink is not initialized")
+	}
+	return sink.Runtime.Fail(ctx, cause)
+}
+
 func BeginOutboundSession(
 	ctx context.Context,
 	writer FrameWriter,

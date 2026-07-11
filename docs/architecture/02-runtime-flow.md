@@ -42,7 +42,9 @@ Win32 destination adapter는 keyboard scan-code down/up, left/right/middle/X1/X2
 
 lab self-test의 tagged `+1/-1` 상대 이동은 두 injection이 hook으로 돌아오는지 검증하는 probe이며, Windows pointer acceleration과 pixel rounding 때문에 두 delta가 좌표상 정확히 상쇄된다고 가정하지 않는다. 두 event 뒤 좌표가 남으면 `SetCursorPos`로 시작 좌표를 복구하고 그 결과까지 확인한다. 이 복구는 명시적인 bounded self-test에만 사용하며 제품의 일반 pointer 전달 경로에는 사용하지 않는다.
 
-source mapper는 physical keyboard hook의 scan code와 extended flag를 canonical key code로 바꾸고, mouse hook의 좌표 변화·button·signed wheel 값을 normalized action으로 바꾼다. injected flag 또는 Krasis tag가 있는 keyboard/mouse event는 다시 전송하지 않는다. injected mouse move도 다음 physical delta가 튀지 않도록 좌표 baseline만 갱신한다. 이 mapper는 아직 입력 억제나 네트워크 송신을 하지 않으며, hook callback의 bounded queue와 overflow fail-open/fault 정책은 별도 source session owner가 담당한다.
+source mapper는 physical keyboard hook의 scan code와 extended flag를 canonical key code로 바꾸고, mouse hook의 좌표 변화·button·signed wheel 값을 normalized action으로 바꾼다. injected flag 또는 Krasis tag가 있는 keyboard/mouse event는 다시 전송하지 않는다. injected mouse move도 다음 physical delta가 튀지 않도록 좌표 baseline만 갱신한다.
+
+source session은 hook callback과 network sender 사이에 고정 용량 queue를 둔다. callback은 현재 outbound generation에 action을 non-blocking enqueue한 경우에만 해당 물리 event를 억제할 수 있다. queue overflow, invalid mapping 또는 sender 실패는 suppression을 즉시 끄고 generation을 폐기하며, worker가 runtime fault cleanup을 수행한다. 폐기된 generation의 queued action은 원격으로 보내지 않는다. queue 용량은 설정 가능한 `1..65536` 범위이며 실제 기본값과 성능 예산은 source hook 통합 측정 뒤 확정한다.
 
 runtime은 port 호출이 끝날 때까지 owner lock을 유지한다. 따라서 effect와 input port는 같은 runtime API로 재진입하지 않아야 하며, 느린 I/O를 직접 수행하는 대신 adapter 내부의 명확히 제한된 호출만 제공해야 한다. transport와 Windows adapter는 이 runtime 경계를 통해서만 event와 input을 전달한다.
 
