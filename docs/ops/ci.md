@@ -18,6 +18,11 @@ semantic write coordinator 테스트는 operation 직렬화, 취소된 waiter �
 coordinator 밖에서 runtime을 바꾸지 않고 malformed control이 connection close 뒤 cleanup되는지
 검증한다. heartbeat timer와 실제 congestion timeout은 아직 CI 범위가 아니다.
 
+optional liveness worker 테스트는 잘못된 interval/timeout 관계를 거부하고, inactive runtime에서
+frame을 만들지 않으며, active session heartbeat를 기록하고, silent peer deadline과 heartbeat
+write failure에서 runtime을 `LOCAL`로 cleanup하며, context 취소를 보존하는지 검증한다. 실제
+timer cadence, congestion과 절전 중 false timeout은 장비 실험 범위다.
+
 agent assembly 통합 테스트는 두 agent session을 실제 framed pipe로 연결하고 source worker ready, boundary intent, lease grant 이후 suppression, normalized input 전달, destination return intent, source deactivation과 양쪽 `LOCAL` cleanup을 한 경로에서 검증한다. 테스트는 OS hook과 `SendInput` 대신 같은 interface의 deterministic port를 사용하므로 실제 Windows callback과 주입 검증을 대체하지 않는다.
 
 supervisor 테스트는 명시적인 transition table, exponential backoff cap, acquire failure 뒤 retry, `LOCAL` session failure 뒤 reconnect와 non-local failure의 즉시 중단을 검증한다. network source 통합 테스트는 `peer-credentials`가 만든 역할 분리 identity로 실제 localhost listener/dial을 열고 양쪽 `PeerConnection`의 mTLS와 ALPN 인증을 통과시킨다.

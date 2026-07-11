@@ -33,6 +33,7 @@ type Config struct {
 	Boundary      control.BoundaryConfig
 	QueueCapacity int
 	Now           peer.ObservationClock
+	Liveness      *LivenessPolicy
 }
 
 type Dependencies struct {
@@ -120,6 +121,12 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 			return peer.RunSessionWithLifecycle(runContext, dependencies.Connection, coordinator, runtime, responder, outbound, config.Now)
 		}},
 	}
+	if config.Liveness != nil {
+		policy := *config.Liveness
+		components = append(components, component{name: "peer-liveness", run: func() error {
+			return runLiveness(runContext, coordinator, runtime, policy)
+		}})
+	}
 
 	var workers sync.WaitGroup
 	workers.Add(len(components))
@@ -169,6 +176,11 @@ func validate(config Config, dependencies Dependencies) error {
 	}
 	if config.Now == nil {
 		return errors.New("observation clock is required")
+	}
+	if config.Liveness != nil {
+		if err := config.Liveness.Validate(); err != nil {
+			return err
+		}
 	}
 	if dependencies.Connection == nil || dependencies.Hook == nil || dependencies.Input == nil || dependencies.Effects == nil || dependencies.Authorizer == nil {
 		return errors.New("connection, hook, input, effects, and authorizer are required")

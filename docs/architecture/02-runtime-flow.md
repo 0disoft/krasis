@@ -110,7 +110,9 @@ ADR 0005의 `SessionWriteCoordinator`는 grant, reject, revoke, input과 heartbe
 재확인·예약·write 순서를 함께 소유한다. read 또는 dispatch failure는 connection을 먼저 닫아
 막힌 write를 깨운 뒤 같은 coordinator에서 bounded cleanup하며 source suppression은 lock 대기
 전과 획득 뒤에 모두 해제한다. heartbeat decode, liveness domain과 coordinated send primitive는
-구현됐지만 주기 sender와 deadline worker는 미구현이고 interval과 timeout도 `UNDECIDED`다.
+구현됐다. caller가 명시적인 interval과 더 긴 timeout policy를 주입하면 optional worker가 같은
+coordinator 안에서 deadline 확인과 heartbeat write를 수행한다. policy가 없으면 worker는 없고
+제품 기본값과 `agent-session` evidence 계약은 여전히 `UNDECIDED`다.
 inbound input과 heartbeat dispatch는 coordinator 안에서 runtime을 변경하고 malformed control은
 connection close 뒤 cleanup하므로 fault 전이 뒤 semantic frame이 성공적으로 기록되지 않는다.
 

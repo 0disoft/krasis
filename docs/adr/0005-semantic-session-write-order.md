@@ -69,5 +69,6 @@ inbound input과 heartbeat dispatch도 같은 coordinator operation에서 실행
 
 이 ADR은 heartbeat 숫자를 확정하거나 별도 heartbeat connection을 허용하지 않는다. 단일
 ordered stream에서 head-of-line blocking이 실제로 확인될 때만 ADR 0003을 대체하는 transport
-결정을 추가한다. 주기 sender와 deadline worker, interval/timeout evidence 계약은 아직
-미구현이다.
+결정을 추가한다. caller가 명시적으로 `heartbeat interval < peer timeout` policy를 주입할 때만
+동작하는 주기 sender와 deadline worker는 구현됐다. policy가 없으면 worker를 시작하지 않으며
+제품 기본값과 `agent-session` interval/timeout evidence 계약은 아직 미구현이다.
