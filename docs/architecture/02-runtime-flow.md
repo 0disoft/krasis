@@ -115,6 +115,10 @@ source hook 앞단의 emergency observer는 physical `Ctrl+Alt+Shift+F12`를 감
 control payload는 wire 전용 `LeaseRequest`, `LeaseGrant`, `LeaseReject`, `LeaseRevoke` 명령만 허용한다. 모든 명령은 session과 epoch를 포함하고, grant와 revoke만 lease를 포함한다. `FAULT_DETECTED`, `RELEASE_ALL_SUCCEEDED` 같은 내부 상태 머신 event는 wire command가 아니며 peer가 직렬화하거나 주입할 수 없다.
 
 인증된 peer session read loop는 control, input, heartbeat frame을 한 ordered stream에서 순차 dispatch한다. payload 오류, 잘못된 방향, handler 실패, EOF와 context 취소는 모두 connection을 닫고 runtime의 fault cleanup을 호출한다. EOF는 정상적인 제어 종료로 취급하지 않으며 명시적인 revoke 없이 연결이 끝난 경우에도 `ReleaseAll` 후 `LOCAL`로 수렴해야 한다.
+peer session은 cancellation callback, dispatch failure와 함수 종료가 공유하는 close-once owner로
+connection을 닫는다. 실제 Close는 한 번만 실행하고 첫 오류를 보존하며, EOF·context cancellation·
+runtime cleanup 원인과 connection Close 오류를 함께 호출자에게 반환한다. agent supervisor가 다시
+Close를 요청해도 같은 owner 결과를 사용하고 닫힘 실패가 포함된 session은 reconnect하지 않는다.
 
 frame writer의 byte mutex만으로 runtime transition과 frame의 의미 순서는 보장되지 않는다.
 ADR 0005의 `SessionWriteCoordinator`는 grant, reject, revoke, input과 heartbeat의 state

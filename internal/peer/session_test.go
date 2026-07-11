@@ -38,6 +38,53 @@ func TestRunSessionRoutesInputAndFailsSafeOnEOF(t *testing.T) {
 	}
 }
 
+func TestRunSessionPreservesEOFCauseAndConnectionCloseFailure(t *testing.T) {
+	runtime, _ := newInboundRuntime(t)
+	closeErr := errors.New("connection close failed")
+	connection := &scriptedConnection{closeErr: closeErr}
+	err := RunSession(context.Background(), connection, runtime, nil, fixedClock(time.Unix(101, 0)))
+	if !errors.Is(err, io.ErrUnexpectedEOF) || !errors.Is(err, closeErr) {
+		t.Fatalf("RunSession() error = %v, want EOF and close failure", err)
+	}
+	if connection.closeCalls != 1 {
+		t.Fatalf("connection close calls = %d", connection.closeCalls)
+	}
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal {
+		t.Fatalf("runtime did not fail safe: %s", snapshot)
+	}
+}
+
+func TestRunSessionPreservesCancellationAndConnectionCloseFailure(t *testing.T) {
+	runtime, _ := newInboundRuntime(t)
+	closeErr := errors.New("connection close failed")
+	connection := newCancelBlockingConnection(closeErr)
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		done <- RunSession(ctx, connection, runtime, nil, fixedClock(time.Unix(101, 0)))
+	}()
+	select {
+	case <-connection.readStarted:
+	case <-time.After(time.Second):
+		t.Fatal("session did not start connection read")
+	}
+	cancel()
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) || !errors.Is(err, closeErr) {
+			t.Fatalf("RunSession() error = %v, want cancellation and close failure", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("canceled session did not finish")
+	}
+	if connection.closeCalls != 1 {
+		t.Fatalf("connection close calls = %d", connection.closeCalls)
+	}
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal {
+		t.Fatalf("runtime did not fail safe: %s", snapshot)
+	}
+}
+
 func TestRunSessionRoutesControlGrantThenHeartbeat(t *testing.T) {
 	runtime := newOutboundRuntime(t)
 	grant := controlFrame(t, transport.ControlCommand{
@@ -335,9 +382,11 @@ func TestLifecycleSessionCoordinatesInboundFaultTransitions(t *testing.T) {
 }
 
 type scriptedConnection struct {
-	frames []transport.Frame
-	index  int
-	closed bool
+	frames     []transport.Frame
+	index      int
+	closed     bool
+	closeCalls int
+	closeErr   error
 }
 
 type observedFrameConnection struct {
@@ -346,6 +395,36 @@ type observedFrameConnection struct {
 	read      chan struct{}
 	closed    chan struct{}
 	closeOnce sync.Once
+}
+
+type cancelBlockingConnection struct {
+	readStarted chan struct{}
+	closed      chan struct{}
+	closeOnce   sync.Once
+	closeCalls  int
+	closeErr    error
+}
+
+func newCancelBlockingConnection(closeErr error) *cancelBlockingConnection {
+	return &cancelBlockingConnection{
+		readStarted: make(chan struct{}),
+		closed:      make(chan struct{}),
+		closeErr:    closeErr,
+	}
+}
+
+func (connection *cancelBlockingConnection) ReadFrame() (transport.Frame, error) {
+	close(connection.readStarted)
+	<-connection.closed
+	return transport.Frame{}, errors.New("connection closed")
+}
+
+func (connection *cancelBlockingConnection) Close() error {
+	connection.closeOnce.Do(func() {
+		connection.closeCalls++
+		close(connection.closed)
+	})
+	return connection.closeErr
 }
 
 func newObservedFrameConnection(frame transport.Frame) *observedFrameConnection {
@@ -392,7 +471,8 @@ func (connection *scriptedConnection) ReadFrame() (transport.Frame, error) {
 
 func (connection *scriptedConnection) Close() error {
 	connection.closed = true
-	return nil
+	connection.closeCalls++
+	return connection.closeErr
 }
 
 func fixedClock(observedAt time.Time) ObservationClock {

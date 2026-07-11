@@ -207,6 +207,9 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 			Effects: dependencies.Effects, Authorizer: dependencies.Authorizer,
 		})
 		if closeErr := ownedConnection.Close(); closeErr != nil {
+			if errors.Is(sessionErr, closeErr) {
+				return errors.Join(sessionErr, ctx.Err())
+			}
 			return errors.Join(sessionErr, ctx.Err(), closeErr)
 		}
 		if ctx.Err() != nil {

@@ -14,6 +14,7 @@
 | High | component 자체 취소를 정상 teardown으로 오인함 | 한 worker만 죽고 agent session과 입력 owner가 남음 | 독립 deadline worker 종료 테스트 | 부모 context가 살아 있으면 전체 session failure로 승격 |
 | High | terminal supervisor가 `ACTIVE` snapshot이나 부분 connection을 남김 | tray가 죽은 agent를 활성으로 표시하거나 transport owner가 누수됨 | unsafe/clean return과 partial acquire 테스트 | 모든 terminal return을 `STOPPED`로 수렴하고 부분 connection 회수 |
 | High | connection과 listener Close 실패를 삼킴 | 포트나 transport가 남은 채 재시작·retry하고 원래 장애만 보고됨 | 중복 Close와 close-error 결합 테스트 | close-once owner와 원인 보존 오류 결합, 불확실한 close 뒤 retry 금지 |
+| High | peer session 직접 호출이 Close를 중복 실행하고 오류를 버림 | EOF나 취소 원인이 가려지거나 cleanup 뒤 transport 상태가 불확실함 | EOF/cancellation과 Close 실패 동시 테스트 | session-local close-once owner와 종료 원인 결합 |
 | High | 공용 Wi-Fi가 peer 통신을 차단 | 발견 또는 연결 실패 | 스터디카페 실망 테스트 | 직접 주소 입력, 대체망 운영 안내 검토 |
 | High | 높은 polling rate 또는 터치패드에서 hook 지연 | 커서 끊김, 입력 누락 | 실제 장비 부하 측정 | 최소 작업 hook, native fallback 판단 |
 | High | 절전과 잠금 뒤 낡은 세션이 살아남음 | 엉뚱한 기기로 입력 전달 | Modern Standby와 잠금 반복 | 세션 폐기 후 명시적 재연결 |

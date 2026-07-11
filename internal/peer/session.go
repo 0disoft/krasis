@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync"
 	"time"
 
 	"github.com/0disoft/krasis/internal/application"
@@ -72,20 +73,23 @@ func runSession(
 	now ObservationClock,
 	peerTimeout time.Duration,
 	observer LivenessObserver,
-) error {
+) (returnErr error) {
 	if connection == nil || runtime == nil || now == nil {
 		return errors.New("session connection, runtime, and observation clock are required")
 	}
+	ownedConnection := &sessionConnectionOwner{SessionConnection: connection}
 	stopCancelClose := context.AfterFunc(ctx, func() {
-		_ = connection.Close()
+		_ = ownedConnection.Close()
 	})
-	defer stopCancelClose()
-	defer connection.Close()
+	defer func() {
+		stopCancelClose()
+		returnErr = errors.Join(returnErr, ownedConnection.Close())
+	}()
 
 	for {
-		frame, err := connection.ReadFrame()
+		frame, err := ownedConnection.ReadFrame()
 		if err != nil {
-			_ = connection.Close()
+			_ = ownedConnection.Close()
 			if ctxErr := ctx.Err(); ctxErr != nil {
 				return failSessionWithLifecycle(ctx, coordinator, runtime, outbound, ctxErr)
 			}
@@ -126,13 +130,26 @@ func runSession(
 			err = transport.ErrUnsupportedFrame
 		}
 		if err != nil {
-			_ = connection.Close()
+			_ = ownedConnection.Close()
 			return failSessionWithLifecycle(ctx, coordinator, runtime, outbound, err)
 		}
 		if frame.Kind == transport.MessageHeartbeat && observer != nil {
 			observer.ObserveHeartbeatReceived(heartbeat.SessionID, heartbeat.ObservedAt)
 		}
 	}
+}
+
+type sessionConnectionOwner struct {
+	SessionConnection
+	closeOnce sync.Once
+	closeErr  error
+}
+
+func (connection *sessionConnectionOwner) Close() error {
+	connection.closeOnce.Do(func() {
+		connection.closeErr = connection.SessionConnection.Close()
+	})
+	return connection.closeErr
 }
 
 func failSessionWithLifecycle(

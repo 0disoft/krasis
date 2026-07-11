@@ -16,7 +16,9 @@ semantic write coordinator 테스트는 operation 직렬화, 취소된 waiter �
 순서, revoke 뒤 heartbeat 폐기, connection-close-before-cleanup과 concurrent source activation
 뒤 suppression 재해제를 검증한다. lifecycle session 테스트는 malformed input과 heartbeat가
 coordinator 밖에서 runtime을 바꾸지 않고 malformed control이 connection close 뒤 cleanup되는지
-검증한다. heartbeat timer와 실제 congestion timeout은 아직 CI 범위가 아니다.
+검증한다. peer session close-owner 테스트는 EOF와 context cancellation에서 connection을 한 번만
+닫고 원래 종료 원인, Close 실패와 `LOCAL` cleanup 결과를 함께 보존하는지 검증한다. heartbeat
+timer와 실제 congestion timeout은 아직 CI 범위가 아니다.
 
 optional liveness worker 테스트는 잘못된 interval/timeout 관계를 거부하고, inactive runtime에서
 frame을 만들지 않으며, active session heartbeat를 기록하고, silent peer deadline과 heartbeat
