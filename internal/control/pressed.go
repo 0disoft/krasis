@@ -25,7 +25,7 @@ type PressedState struct {
 }
 
 func (state *PressedState) RecordPress(token PressedToken) (bool, error) {
-	if err := validatePressedToken(token); err != nil {
+	if err := token.Validate(); err != nil {
 		return false, err
 	}
 	if state.pressed == nil {
@@ -40,7 +40,7 @@ func (state *PressedState) RecordPress(token PressedToken) (bool, error) {
 }
 
 func (state *PressedState) RecordRelease(token PressedToken) (bool, error) {
-	if err := validatePressedToken(token); err != nil {
+	if err := token.Validate(); err != nil {
 		return false, err
 	}
 	if _, exists := state.pressed[token]; !exists {
@@ -73,7 +73,7 @@ func (state *PressedState) ReleasePlan() []PressedToken {
 	return plan
 }
 
-func validatePressedToken(token PressedToken) error {
+func (token PressedToken) Validate() error {
 	switch token.Kind {
 	case PressedKeyboardKey, PressedMouseButton:
 		return nil

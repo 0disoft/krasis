@@ -66,7 +66,7 @@ peer가 보낸 wall clock을 신뢰하지 않고 로컬 수신 시각을 사용�
 
 `PressedState`는 원시 입력 log가 아니다. 메모리상 복구 책임에만 사용하며 support bundle, 진단 출력과 일반 log에 token code를 복제하지 않는다. durable crash journal 형식과 암호화·수명 정책은 crash guard 설계 전까지 미구현이다.
 
-Application의 단일 session runtime이 `ControlLease`, `InputStream`, `PeerLiveness`, `PressedState` 접근을 직렬화해야 한다. 현재 값 객체와 coordinator 함수는 자체 lock을 제공하지 않으므로 여러 goroutine에서 직접 공유하는 사용은 지원하지 않는다.
+Application의 `SessionRuntime`이 `ControlLease`, `InputStream`, `PeerLiveness`, `PressedState` 접근을 하나의 lock 아래 직렬화한다. 값 객체와 coordinator 함수를 runtime 밖의 여러 goroutine에서 직접 공유하는 사용은 지원하지 않는다. runtime이 호출하는 effect와 input port도 같은 runtime으로 재진입하면 안 된다.
 
 ## 불변조건
 

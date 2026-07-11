@@ -1,0 +1,255 @@
+package application
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/0disoft/krasis/internal/control"
+)
+
+var (
+	ErrRuntimeNotInbound = errors.New("session runtime is not inbound active")
+	ErrRuntimeNoLiveness = errors.New("session runtime has no active peer liveness")
+)
+
+type RuntimeSnapshot struct {
+	Control      control.Snapshot
+	InputStream  control.InputStream
+	HasStream    bool
+	Liveness     control.PeerLiveness
+	HasLiveness  bool
+	PressedCount int
+}
+
+// SessionRuntime is the single serialized owner of one peer session's mutable
+// control, ordering, liveness, and pressed-input state.
+type SessionRuntime struct {
+	mu       sync.Mutex
+	control  control.Snapshot
+	stream   control.InputStream
+	liveness control.PeerLiveness
+	pressed  control.PressedState
+	executor *SafetyEffectExecutor
+	input    InputPort
+}
+
+func NewSessionRuntime(delegate EffectExecutor, input InputPort) (*SessionRuntime, error) {
+	if delegate == nil || input == nil {
+		return nil, errors.New("effect delegate and input port are required")
+	}
+	runtime := &SessionRuntime{
+		control: control.InitialSnapshot(),
+		input:   input,
+	}
+	executor, err := NewSafetyEffectExecutor(delegate, &runtime.pressed, input)
+	if err != nil {
+		return nil, err
+	}
+	runtime.executor = executor
+	return runtime, nil
+}
+
+func (runtime *SessionRuntime) Snapshot() RuntimeSnapshot {
+	runtime.mu.Lock()
+	defer runtime.mu.Unlock()
+	return runtime.snapshotLocked()
+}
+
+func (runtime *SessionRuntime) Dispatch(
+	ctx context.Context,
+	event control.Event,
+	observedAt time.Time,
+) (ControlOutcome, error) {
+	runtime.mu.Lock()
+	defer runtime.mu.Unlock()
+
+	if event.Kind == control.EventInboundLeaseGranted {
+		return ControlOutcome{}, errors.New("inbound lease grants require GrantInbound")
+	}
+	if event.Kind == control.EventReleaseAllSucceeded || event.Kind == control.EventReleaseAllFailed {
+		return ControlOutcome{}, errors.New("ReleaseAll completion events are runtime-internal")
+	}
+	outcome, err := HandleControlEvent(ctx, runtime.control, event, runtime.executor)
+	runtime.applyOutcomeLocked(outcome)
+	if err != nil {
+		return outcome, err
+	}
+	if outcome.Snapshot.State == control.StateOutboundActive {
+		liveness, livenessErr := control.NewPeerLiveness(outcome.Snapshot.SessionID, observedAt)
+		if livenessErr != nil {
+			return runtime.faultLocked(ctx, livenessErr)
+		}
+		runtime.liveness = liveness
+	}
+	return outcome, nil
+}
+
+func (runtime *SessionRuntime) GrantInbound(
+	ctx context.Context,
+	event control.Event,
+	epoch string,
+	observedAt time.Time,
+) (ControlOutcome, error) {
+	runtime.mu.Lock()
+	defer runtime.mu.Unlock()
+
+	if event.Kind != control.EventInboundLeaseGranted {
+		return ControlOutcome{}, errors.New("GrantInbound requires an inbound lease grant event")
+	}
+	stream, err := control.NewInputStream(event.SessionID, epoch)
+	if err != nil {
+		return ControlOutcome{}, err
+	}
+	liveness, err := control.NewPeerLiveness(event.SessionID, observedAt)
+	if err != nil {
+		return ControlOutcome{}, err
+	}
+	outcome, err := HandleControlEvent(ctx, runtime.control, event, runtime.executor)
+	runtime.applyOutcomeLocked(outcome)
+	if err != nil {
+		return outcome, err
+	}
+	if outcome.Snapshot.State != control.StateInboundActive {
+		return runtime.faultLocked(ctx, errors.New("inbound grant did not produce inbound-active state"))
+	}
+	runtime.stream = stream
+	runtime.liveness = liveness
+	return outcome, nil
+}
+
+func (runtime *SessionRuntime) HandlePressedInput(
+	ctx context.Context,
+	envelope control.InputEnvelope,
+	token control.PressedToken,
+	pressed bool,
+) error {
+	runtime.mu.Lock()
+	defer runtime.mu.Unlock()
+
+	if runtime.control.State != control.StateInboundActive || runtime.stream.SessionID == "" {
+		return ErrRuntimeNotInbound
+	}
+	next, outcome, accepted, err := HandleInputEnvelope(
+		ctx,
+		runtime.control,
+		runtime.stream,
+		envelope,
+		runtime.executor,
+	)
+	runtime.applyOutcomeLocked(outcome)
+	if err != nil {
+		return err
+	}
+	if !accepted {
+		return errors.New("input envelope was not accepted")
+	}
+	runtime.stream = next
+
+	if pressed {
+		err = InjectPress(ctx, &runtime.pressed, runtime.input, token)
+	} else {
+		_, err = InjectRelease(ctx, &runtime.pressed, runtime.input, token)
+	}
+	if err == nil {
+		return nil
+	}
+	_, faultErr := runtime.faultLocked(ctx, err)
+	return faultErr
+}
+
+func (runtime *SessionRuntime) ObserveHeartbeat(
+	ctx context.Context,
+	sessionID string,
+	observedAt time.Time,
+) error {
+	runtime.mu.Lock()
+	defer runtime.mu.Unlock()
+
+	if runtime.control.State != control.StateInboundActive && runtime.control.State != control.StateOutboundActive {
+		return ErrRuntimeNoLiveness
+	}
+	next, err := runtime.liveness.Observe(sessionID, observedAt)
+	if err != nil {
+		_, faultErr := runtime.faultLocked(ctx, err)
+		return faultErr
+	}
+	runtime.liveness = next
+	return nil
+}
+
+func (runtime *SessionRuntime) CheckLiveness(
+	ctx context.Context,
+	now time.Time,
+	timeout time.Duration,
+) (bool, error) {
+	runtime.mu.Lock()
+	defer runtime.mu.Unlock()
+
+	if runtime.control.State != control.StateInboundActive && runtime.control.State != control.StateOutboundActive {
+		return false, ErrRuntimeNoLiveness
+	}
+	outcome, faulted, err := HandleLiveness(
+		ctx,
+		runtime.control,
+		runtime.liveness,
+		now,
+		timeout,
+		runtime.executor,
+	)
+	if faulted {
+		runtime.applyOutcomeLocked(outcome)
+	}
+	return faulted, err
+}
+
+func (runtime *SessionRuntime) faultLocked(ctx context.Context, cause error) (ControlOutcome, error) {
+	outcome, faultErr := HandleControlEvent(
+		ctx,
+		runtime.control,
+		control.Event{Kind: control.EventFaultDetected},
+		runtime.executor,
+	)
+	runtime.applyOutcomeLocked(outcome)
+	if faultErr == nil {
+		return outcome, cause
+	}
+	return outcome, errors.Join(cause, faultErr)
+}
+
+func (runtime *SessionRuntime) applyOutcomeLocked(outcome ControlOutcome) {
+	if outcome.Snapshot.State == "" {
+		return
+	}
+	runtime.control = outcome.Snapshot
+	if runtime.control.State != control.StateInboundActive {
+		runtime.stream = control.InputStream{}
+	}
+	if runtime.control.State != control.StateInboundActive && runtime.control.State != control.StateOutboundActive {
+		runtime.liveness = control.PeerLiveness{}
+	}
+}
+
+func (runtime *SessionRuntime) snapshotLocked() RuntimeSnapshot {
+	return RuntimeSnapshot{
+		Control:      runtime.control,
+		InputStream:  runtime.stream,
+		HasStream:    runtime.stream.SessionID != "",
+		Liveness:     runtime.liveness,
+		HasLiveness:  runtime.liveness.SessionID != "",
+		PressedCount: runtime.pressed.Count(),
+	}
+}
+
+func (snapshot RuntimeSnapshot) String() string {
+	return fmt.Sprintf(
+		"state=%s version=%d stream=%t liveness=%t pressed=%d",
+		snapshot.Control.State,
+		snapshot.Control.Version,
+		snapshot.HasStream,
+		snapshot.HasLiveness,
+		snapshot.PressedCount,
+	)
+}

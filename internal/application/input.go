@@ -31,6 +31,9 @@ func InjectRelease(
 	if state == nil || port == nil {
 		return false, errors.New("pressed state and input port are required")
 	}
+	if err := token.Validate(); err != nil {
+		return false, err
+	}
 	if !state.Contains(token) {
 		return false, nil
 	}

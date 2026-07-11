@@ -95,3 +95,14 @@ func TestInjectReleaseIgnoresUntrackedToken(t *testing.T) {
 		t.Fatalf("untracked release reached adapter: released=%t calls=%v error=%v", released, port.releaseCalls, err)
 	}
 }
+
+func TestInjectReleaseRejectsInvalidUntrackedToken(t *testing.T) {
+	var state control.PressedState
+	port := &recordingInputPort{state: &state}
+	token := control.PressedToken{Kind: "UNKNOWN", Code: 1}
+
+	released, err := InjectRelease(context.Background(), &state, port, token)
+	if !errors.Is(err, control.ErrInvalidPressedToken) || released || len(port.releaseCalls) != 0 {
+		t.Fatalf("invalid release was not rejected: released=%t calls=%v error=%v", released, port.releaseCalls, err)
+	}
+}
