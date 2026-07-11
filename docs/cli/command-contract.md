@@ -107,6 +107,20 @@
 
 이 명령은 실제 peer network와 protocol compatibility를 검증하지만 Windows hook suppression, `SendInput`, cursor entry, crash recovery를 검증하지 않는다. 집의 두 대와 스터디카페의 두 대는 서로 다른 시점에 같은 절차로 실행해도 된다.
 
+### `peer-credentials`
+
+`peer-probe` 전용 단기 mTLS credential bundle을 로컬에 생성한다.
+
+- 사용법: `krasis-lab peer-credentials --output DIRECTORY --server-name NAME`
+- `DIRECTORY`는 존재하지 않아야 하며 기존 file이나 directory를 덮어쓰지 않는다.
+- test CA private key는 memory에서 listener와 connector identity를 서명한 뒤 폐기하며 file로 저장하지 않는다.
+- `listener/`와 `connector/`에는 각 역할의 `ca.pem`, `identity.pem`, `identity-key.pem`만 생성한다.
+- identity 유효 기간은 생성 시점부터 24시간이다. 이는 제품 certificate 수명 정책이 아니다.
+- `--server-name`은 listener가 connector에서 실제로 접근할 DNS name 또는 IP 주소다.
+- bundle 전체를 두 장비에 복제하지 않는다. listener에는 `listener/`만, connector에는 `connector/`만 복사한다.
+
+이 명령은 명시적인 사용자 확인이 있는 제품 pairing을 구현하지 않는다. 생성된 key는 test 종료 뒤 삭제하고 Git, 동기화 드라이브, report 또는 support bundle에 넣지 않는다.
+
 ## 출력 방식
 
 - 기본 출력은 사람이 읽는 누적 snapshot이다.

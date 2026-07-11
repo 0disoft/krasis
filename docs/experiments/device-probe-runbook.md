@@ -53,18 +53,24 @@ $reports = @(Get-ChildItem -LiteralPath .\reports -Filter '*-basic-*.json' -File
 
 네 대를 동시에 켤 필요는 없다. 집에서는 `H-A`와 `H-B`, 스터디카페에서는 별도 날짜에 `S-A`와 `S-B`로 같은 절차를 반복한다.
 
-사전에 test 전용 CA와 listener/client identity file을 안전한 경로에 준비한다. private key는 Git, report 폴더 또는 동기화 드라이브에 넣지 않는다. 현재 `krasis-lab`은 pairing credential을 생성하지 않으므로 제품용 인증서나 임의로 내려받은 인증서를 대신 사용하지 않는다.
+먼저 test 전용 credential bundle을 만든다. `192.0.2.10`은 문서용 예시이므로 listener의 실제 LAN IP 또는 DNS name으로 바꾼다. 생성 directory는 기존에 존재하면 안 된다.
+
+```powershell
+.\krasis-lab.exe peer-credentials --output .\secrets\home-pair --server-name 192.0.2.10
+```
+
+`listener/`만 listener 노트북으로, `connector/`만 connector 노트북으로 안전하게 복사한다. bundle 전체와 상대 역할의 private key를 두 장비에 복제하지 않는다. key는 Git, report 폴더 또는 동기화 드라이브에 넣지 않고 24시간 안에 실험을 마친 뒤 삭제한다.
 
 listener에서 먼저 실행한다.
 
 ```powershell
-.\krasis-lab.exe peer-probe listen --device H-A --address 0.0.0.0:24876 --ca .\secrets\ca.pem --cert .\secrets\listener.pem --key .\secrets\listener-key.pem --output .\reports\H-A-peer.json
+.\krasis-lab.exe peer-probe listen --device H-A --address 0.0.0.0:24876 --ca .\secrets\listener\ca.pem --cert .\secrets\listener\identity.pem --key .\secrets\listener\identity-key.pem --output .\reports\H-A-peer.json
 ```
 
 Windows 방화벽과 같은 LAN에서 listener의 실제 IP와 port 접근을 허용한 뒤 connector에서 실행한다. 아래 주소와 server name은 문서용 예시이므로 실제 listener 주소와 certificate name으로 바꾼다.
 
 ```powershell
-.\krasis-lab.exe peer-probe connect --device H-B --address 192.0.2.10:24876 --server-name peer.test --ca .\secrets\ca.pem --cert .\secrets\connector.pem --key .\secrets\connector-key.pem --output .\reports\H-B-peer.json
+.\krasis-lab.exe peer-probe connect --device H-B --address 192.0.2.10:24876 --server-name 192.0.2.10 --ca .\secrets\connector\ca.pem --cert .\secrets\connector\identity.pem --key .\secrets\connector\identity-key.pem --output .\reports\H-B-peer.json
 ```
 
 두 report 모두 `completed=true`, `authenticated=true`, `sessionsCompleted=2`, `freshIdentities=true`여야 한다. report에는 주소나 session identifier가 저장되지 않는다.

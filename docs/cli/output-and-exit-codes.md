@@ -164,6 +164,19 @@ guided stage failure code:
 
 정상 완료는 TLS 1.3 mTLS와 `krasis/1` ALPN으로 인증된 새 connection 두 개가 각각 lease, input envelope, revoke round trip을 완료했다는 뜻이다. 인증서 load, listen/connect, 인증 또는 session 단계가 실패하면 부분 report를 저장하고 exit `1`로 종료한다.
 
+## `peer-credentials`
+
+- schema: root `manifest.json`의 `krasis.lab.peer-credentials/v1`
+- 출력: 새 directory 안의 `manifest.json`, `listener/`, `connector/`
+- stdout: bundle directory, 만료 시각, 역할별 복사 경고
+
+manifest 허용 필드:
+
+- `createdAt`, `expiresAt`, `serverName`
+- `listenerDirectory`, `connectorDirectory`
+
+private key나 certificate body는 manifest와 stdout에 출력하지 않는다. output directory가 이미 있거나 server name이 잘못됐거나 credential 생성이 실패하면 exit `1`이며, 새로 만들던 불완전 directory는 제거한다.
+
 ## 호환성
 
 현재 CLI가 출력하거나 저장하는 schema는 Phase 0 실험 계약이다. 정식 제품 API가 아니므로 변경될 수 있지만, 변경 시 schema version과 관련 test를 함께 검토한다.
