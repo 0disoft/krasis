@@ -47,7 +47,8 @@
 - 상태, 진단, 페어링, 연결 해제 명령 계약
 - 단일 authenticated connection의 bidirectional session 조립 경계는 구현됨
 - listen/dial adapter와 fail-safe reconnect supervisor는 구현됨
-- 실제 agent executable, 단일 instance와 tray lifecycle은 미구현
+- bounded live-input `krasis-lab agent-session`과 로컬 긴급 해제는 구현됨
+- 정식 agent executable, 단일 instance와 tray lifecycle은 미구현
 
 ### Phase 6: Wails v3 + Svelte UI
 

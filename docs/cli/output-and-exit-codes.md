@@ -177,6 +177,32 @@ manifest 허용 필드:
 
 private key나 certificate body는 manifest와 stdout에 출력하지 않는다. output directory가 이미 있거나 server name이 잘못됐거나 credential 생성이 실패하면 exit `1`이며, 새로 만들던 불완전 directory는 제거한다.
 
+## `agent-session`
+
+- schema: `krasis.lab.agent-session/v1`
+- 출력: `--output`으로 지정한 단일 JSON file
+
+필드:
+
+- `deviceAlias`, `role`, `edge`, `collectedAt`, build 정보와 requested duration
+- `completed`, `passed`, `stopReason`, `failureCode`
+- supervisor의 final state, active 횟수, acquire/session failure 횟수와 emergency stop 횟수
+- destination의 entry, key/button down/up, pointer move, wheel과 return arm 누적 개수
+
+stable failure code:
+
+- `diagnose_failed`
+- `multiple_monitors_unsupported`
+- `credential_load_failed`
+- `tls_config_failed`
+- `listen_failed`
+- `dial_config_failed`
+- `agent_session_failed`
+- `no_authenticated_session`
+- `no_destination_input_observed`
+
+`stopReason`은 `duration_elapsed`, `canceled`, `emergency_release`, `failure` 중 하나다. 긴급 해제는 exit `0`이지만 증거가 통과했다는 뜻은 아니다. raw runtime error는 주소나 입력 정보가 섞일 수 있으므로 terminal에 복제하지 않고 stable failure code와 redacted report만 남긴다.
+
 ## 호환성
 
 현재 CLI가 출력하거나 저장하는 schema는 Phase 0 실험 계약이다. 정식 제품 API가 아니므로 변경될 수 있지만, 변경 시 schema version과 관련 test를 함께 검토한다.

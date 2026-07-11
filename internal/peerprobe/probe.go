@@ -5,13 +5,12 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
-	"fmt"
 	"net"
-	"os"
 	"time"
 
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/peer"
+	"github.com/0disoft/krasis/internal/peercredentials"
 	"github.com/0disoft/krasis/internal/transport"
 )
 
@@ -114,19 +113,7 @@ func (config Config) validate() error {
 }
 
 func loadCredentials(config Config) (tls.Certificate, *x509.CertPool, error) {
-	identity, err := tls.LoadX509KeyPair(config.CertificatePath, config.PrivateKeyPath)
-	if err != nil {
-		return tls.Certificate{}, nil, fmt.Errorf("load identity: %w", err)
-	}
-	caPEM, err := os.ReadFile(config.CAPath)
-	if err != nil {
-		return tls.Certificate{}, nil, fmt.Errorf("read CA: %w", err)
-	}
-	roots := x509.NewCertPool()
-	if !roots.AppendCertsFromPEM(caPEM) {
-		return tls.Certificate{}, nil, errors.New("CA file contains no certificates")
-	}
-	return identity, roots, nil
+	return peercredentials.Load(config.CAPath, config.CertificatePath, config.PrivateKeyPath)
 }
 
 func runListener(ctx context.Context, config Config, identity tls.Certificate, roots *x509.CertPool, result *Result) error {

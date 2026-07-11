@@ -87,6 +87,8 @@ server와 client TLS config는 TLS 1.3만 허용하고 `krasis/1` ALPN을 사용
 
 supervisor는 session 종료 결과가 `LOCAL`일 때만 새 connection을 얻는다. cleanup이 끝나지 않아 `FAULT` 또는 다른 상태에 남으면 reconnect로 덮지 않고 supervisor 자체를 실패시킨다. context 취소는 listener와 active connection을 닫고 `STOPPED`로 수렴한다.
 
+source hook 앞단의 emergency observer는 physical `Ctrl+Alt+Shift+F12`를 감지한다. modifier event는 active session 중 이미 전달됐을 수 있으므로 chord terminator에서 suppression을 먼저 끄고 session fault cleanup을 시작해 destination의 `ReleaseAll`을 유도한다. F12 event 자체는 remote queue에 넣지 않고 로컬 hook chain으로 넘긴다. supervisor는 `ErrEmergencyRelease`를 terminal operator event로 분류해 reconnect하지 않는다. 이 chord는 Phase 0 lab 계약이며 제품 설정 정책은 아직 미결정이다.
+
 `ListenSource`와 `DialSource`는 TCP와 TLS 세부사항을 supervisor core 밖에 둔다. 둘 다 `PeerConnection` 생성 시 TLS 1.3 mTLS와 ALPN 인증을 통과해야 connection을 application에 넘긴다. credential storage, 단일 instance, tray와 최종 agent executable은 아직 바깥 책임이다.
 
 control payload는 wire 전용 `LeaseRequest`, `LeaseGrant`, `LeaseReject`, `LeaseRevoke` 명령만 허용한다. 모든 명령은 session과 epoch를 포함하고, grant와 revoke만 lease를 포함한다. `FAULT_DETECTED`, `RELEASE_ALL_SUCCEEDED` 같은 내부 상태 머신 event는 wire command가 아니며 peer가 직렬화하거나 주입할 수 없다.

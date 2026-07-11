@@ -9,6 +9,7 @@ import (
 
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/transport"
+	"github.com/0disoft/krasis/internal/wininput"
 )
 
 func TestTransitionSupervisorCoversReconnectLifecycle(t *testing.T) {
@@ -109,6 +110,21 @@ func TestRunSupervisorDoesNotReconnectUnsafeSession(t *testing.T) {
 		},
 	})
 	if err == nil || source.nextCalls != 1 {
+		t.Fatalf("RunSupervisor() error = %v, Next calls = %d", err, source.nextCalls)
+	}
+}
+
+func TestRunSupervisorStopsAfterEmergencyRelease(t *testing.T) {
+	source := &scriptedSource{outcomes: []sourceOutcome{{connection: &stubConnection{}}}}
+	err := RunSupervisor(context.Background(), SupervisorConfig{
+		Session: Config{QueueCapacity: 1, Now: time.Now}, Backoff: DefaultBackoffPolicy(), Now: time.Now, Wait: Wait,
+	}, SupervisorDependencies{
+		Source: source, Hook: &idleHook{}, Input: newTestInput(false), Effects: noopEffects{}, Authorizer: acceptingAuthorizer{},
+		RunSession: func(context.Context, Config, Dependencies) (Result, error) {
+			return Result{FinalState: control.StateLocal}, wininput.ErrEmergencyRelease
+		},
+	})
+	if !errors.Is(err, wininput.ErrEmergencyRelease) || source.nextCalls != 1 {
 		t.Fatalf("RunSupervisor() error = %v, Next calls = %d", err, source.nextCalls)
 	}
 }

@@ -75,6 +75,26 @@ Windows 방화벽과 같은 LAN에서 listener의 실제 IP와 port 접근을 �
 
 두 report 모두 `completed=true`, `authenticated=true`, `sessionsCompleted=2`, `freshIdentities=true`여야 한다. report에는 주소나 session identifier가 저장되지 않는다.
 
+## 실제 입력 agent session
+
+먼저 `peer-probe`가 양쪽에서 통과한 같은 장비 pair에서만 진행한다. 두 노트북 모두 손이 닿는 같은 책상에 두고, 중요한 작업을 닫고, 긴급 해제 `Ctrl+Alt+Shift+F12`를 먼저 외운다. 한쪽만 원격 장소에 둔 상태에서는 실행하지 않는다.
+
+listener 예시:
+
+```powershell
+.\krasis-lab.exe agent-session listen --device H-A --address 0.0.0.0:24876 --ca .\secrets\listener\ca.pem --cert .\secrets\listener\identity.pem --key .\secrets\listener\identity-key.pem --edge RIGHT --duration 2m --output .\reports\H-A-agent.json --allow-live-input
+```
+
+connector 예시:
+
+```powershell
+.\krasis-lab.exe agent-session connect --device H-B --address 192.0.2.10:24876 --server-name 192.0.2.10 --ca .\secrets\connector\ca.pem --cert .\secrets\connector\identity.pem --key .\secrets\connector\identity-key.pem --edge LEFT --duration 2m --output .\reports\H-B-agent.json --allow-live-input
+```
+
+실행 중 A의 오른쪽 끝에서 B로 넘어가 pointer, wheel, 기본 button과 안전한 test key를 확인한다. B의 왼쪽 끝에서 A로 돌아온 뒤 반대 방향도 반복한다. key나 button을 누른 상태로 경계를 넘지 않는다. 이상 동작, stuck input 또는 예상하지 않은 suppression이 보이면 즉시 긴급 해제를 누른다.
+
+양쪽 report가 모두 `completed=true`, `passed=true`, `supervisor.activeCount>=1`, `destinationInput.entries>=1`이어야 해당 pair의 bounded 양방향 실험이 통과한 것이다. 집 pair와 스터디카페 pair는 서로 다른 날짜에 반복해도 된다.
+
 ## 실패 처리
 
 - exit `0`: 모든 단계가 완료된 보고서가 생성됨

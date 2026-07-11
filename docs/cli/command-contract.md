@@ -121,6 +121,23 @@
 
 이 명령은 명시적인 사용자 확인이 있는 제품 pairing을 구현하지 않는다. 생성된 key는 test 종료 뒤 삭제하고 Git, 동기화 드라이브, report 또는 support bundle에 넣지 않는다.
 
+### `agent-session`
+
+두 Windows 장비에서 실제 low-level hook, 경계 억제, mTLS peer session과 `SendInput` destination adapter를 bounded하게 실행하는 Phase 0 실험 명령이다.
+
+- 사용법: `krasis-lab agent-session listen|connect --device ALIAS --address ADDRESS [--server-name NAME] --ca CA.pem --cert CERT.pem --key KEY.pem --edge LEFT|RIGHT --duration DURATION --output REPORT.json [--rearm-distance PIXELS] --allow-live-input`
+- `--allow-live-input`이 없으면 실행하지 않는다. 이 flag는 실제 keyboard/mouse event를 억제·전달·주입한다는 명시적 확인이다.
+- `--duration`은 필수 양수이며 무기한 실행을 허용하지 않는다.
+- listener와 connector는 `peer-credentials`가 만든 역할별 identity만 사용한다.
+- `--edge`는 이 장비에서 상대 장비로 넘어가는 화면 끝이다. 왼쪽 노트북은 일반적으로 `RIGHT`, 오른쪽 노트북은 `LEFT`다.
+- MVP대로 active monitor가 정확히 하나가 아니면 hook을 시작하지 않고 실패한다.
+- destination grant 전에는 source suppression을 활성화하지 않는다.
+- physical `Ctrl+Alt+Shift+F12`는 현재 active source session을 즉시 중단한다. F12 terminator는 원격 전송하거나 로컬에서 억제하지 않으며 supervisor는 긴급 해제 뒤 재연결하지 않는다.
+- 기본 rearm distance는 32px이고 activation gap은 0px다. 이는 Phase 0 안전 실험값이며 제품 UX 기본값이 아니다.
+- report에는 aggregate count와 supervisor state만 저장하고 주소, certificate, session/epoch/lease, key code, pointer 좌표와 delta를 저장하지 않는다.
+
+duration 또는 사용자의 취소로 안전 종료해도 인증된 active session과 destination entry·input evidence가 모두 없으면 `passed=false`와 exit `1`이다. 긴급 해제는 의도된 안전 동작이라 exit `0`이지만 `passed=true`로 바꾸지 않는다.
+
 ## 출력 방식
 
 - 기본 출력은 사람이 읽는 누적 snapshot이다.

@@ -9,6 +9,7 @@ import (
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/peer"
+	"github.com/0disoft/krasis/internal/wininput"
 )
 
 type SupervisorState string
@@ -199,6 +200,10 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 		}
 		if sessionErr == nil {
 			return errors.New("agent session ended without a failure or shutdown")
+		}
+		if errors.Is(sessionErr, wininput.ErrEmergencyRelease) {
+			_ = transition(SupervisorStoppedEvent, SupervisorSnapshot{FailureKind: "emergency_release"})
+			return sessionErr
 		}
 		if result.FinalState != control.StateLocal {
 			return fmt.Errorf("agent session cannot reconnect outside LOCAL: %w", sessionErr)

@@ -53,6 +53,8 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, platform 
 		return runPeerProbe(ctx, commandArgs, stdout, stderr)
 	case "peer-credentials":
 		return runPeerCredentials(commandArgs, stdout, stderr)
+	case "agent-session":
+		return runAgentSession(ctx, commandArgs, stdout, stderr, platform)
 	default:
 		fmt.Fprintf(stderr, "unknown command: %s\n", command)
 		writeUsage(stderr)
@@ -568,5 +570,6 @@ func writeUsage(output io.Writer) {
 	fmt.Fprintln(output, "  krasis-lab guided-probe --device H-A|H-B|S-A|S-B --stage-duration DURATION --output PATH.json")
 	fmt.Fprintln(output, "  krasis-lab peer-probe listen|connect [options]")
 	fmt.Fprintln(output, "  krasis-lab peer-credentials --output DIRECTORY --server-name NAME")
+	fmt.Fprintln(output, "  krasis-lab agent-session listen|connect [options] --allow-live-input")
 	fmt.Fprintln(output, "  krasis-lab help")
 }

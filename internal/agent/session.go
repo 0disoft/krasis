@@ -75,6 +75,10 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	if err != nil {
 		return Result{}, err
 	}
+	emergency, err := wininput.NewEmergencyBoundaryObserver(source, emitter)
+	if err != nil {
+		return Result{}, err
+	}
 	outbound, err := peer.NewOutboundController(dependencies.Connection, runtime, source)
 	if err != nil {
 		return Result{}, err
@@ -100,7 +104,7 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 			return source.RunWithReady(runContext, func() { close(sourceReady) })
 		}},
 		{name: "source-hook", wait: sourceReady, run: func() error {
-			return dependencies.Hook.RunWithBoundary(runContext, source, emitter, nil)
+			return dependencies.Hook.RunWithBoundary(runContext, source, emergency, nil)
 		}},
 		{name: "boundary-orchestrator", wait: sourceReady, run: func() error {
 			return orchestrator.Run(runContext, emitter.Intents())
