@@ -96,6 +96,169 @@ func TestPeerSessionsCompleteOutboundInputAndReturnRevokeRoundTrip(t *testing.T)
 	}
 }
 
+func TestPeerSessionsReconnectWithNewSessionAndEpoch(t *testing.T) {
+	sourceRuntime := newIntegrationRuntime(t, &integrationInputPort{moves: make(chan [2]int32, 2)})
+	destinationInput := &integrationInputPort{moves: make(chan [2]int32, 2)}
+	destinationRuntime := newIntegrationRuntime(t, destinationInput)
+	completeIntegrationRoundTrip(
+		t,
+		sourceRuntime,
+		destinationRuntime,
+		destinationInput,
+		OutboundIdentity{SessionID: "session-old", Epoch: "epoch-old"},
+		[2]int32{3, 1},
+	)
+	completeIntegrationRoundTrip(
+		t,
+		sourceRuntime,
+		destinationRuntime,
+		destinationInput,
+		OutboundIdentity{SessionID: "session-new", Epoch: "epoch-new"},
+		[2]int32{-5, 2},
+	)
+	if sourceRuntime.Snapshot().Control.State != control.StateLocal || destinationRuntime.Snapshot().Control.State != control.StateLocal {
+		t.Fatalf("reconnected runtimes did not finish local: source=%s destination=%s", sourceRuntime.Snapshot(), destinationRuntime.Snapshot())
+	}
+}
+
+func TestPeerSessionsRejectStaleInputAfterReconnect(t *testing.T) {
+	sourceRuntime := newIntegrationRuntime(t, &integrationInputPort{moves: make(chan [2]int32, 2)})
+	destinationInput := &integrationInputPort{moves: make(chan [2]int32, 2)}
+	destinationRuntime := newIntegrationRuntime(t, destinationInput)
+	oldIdentity := OutboundIdentity{SessionID: "session-old", Epoch: "epoch-old"}
+	completeIntegrationRoundTrip(t, sourceRuntime, destinationRuntime, destinationInput, oldIdentity, [2]int32{2, 1})
+
+	sourceSide, destinationSide := openFramedPipe(t)
+	sourceActivation := newIntegrationSourceActivation()
+	outbound, err := NewOutboundController(sourceSide, sourceRuntime, sourceActivation)
+	if err != nil {
+		t.Fatalf("NewOutboundController() error = %v", err)
+	}
+	returnBoundary := &integrationReturnBoundary{}
+	responder := &LeaseResponder{
+		Writer:     destinationSide,
+		Runtime:    destinationRuntime,
+		Authorizer: staticLeaseAuthorizer{leaseID: "lease-new", accepted: true},
+		Entry:      integrationCursorEntry{},
+		Returns:    returnBoundary,
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 2)
+	go func() { done <- RunSessionWithLifecycle(ctx, sourceSide, sourceRuntime, nil, outbound, time.Now) }()
+	go func() {
+		done <- RunSessionWithLifecycle(ctx, destinationSide, destinationRuntime, responder, nil, time.Now)
+	}()
+	newIdentity := OutboundIdentity{SessionID: "session-new", Epoch: "epoch-new"}
+	if err := outbound.BeginBoundary(
+		ctx,
+		control.BoundaryIntent{Edge: control.ScreenEdgeRight, X: 1919},
+		newIdentity,
+	); err != nil {
+		t.Fatalf("BeginBoundary() error = %v", err)
+	}
+	waitSignal(t, sourceActivation.activated, "reconnected source activation")
+	payload, err := transport.EncodeInputPayload(
+		control.InputEnvelope{SessionID: oldIdentity.SessionID, Epoch: oldIdentity.Epoch, Sequence: 1},
+		control.InputAction{Kind: control.InputPointerMove, DeltaX: 99},
+	)
+	if err != nil {
+		t.Fatalf("EncodeInputPayload(stale) error = %v", err)
+	}
+	if err := sourceSide.WriteFrameContext(ctx, transport.Frame{Kind: transport.MessageInput, Payload: payload}); err != nil {
+		t.Fatalf("WriteFrameContext(stale) error = %v", err)
+	}
+	waitSignal(t, sourceActivation.deactivated, "source cleanup after stale input")
+	if sourceRuntime.Snapshot().Control.State != control.StateLocal || destinationRuntime.Snapshot().Control.State != control.StateLocal {
+		t.Fatalf("stale input did not fail safe: source=%s destination=%s", sourceRuntime.Snapshot(), destinationRuntime.Snapshot())
+	}
+	select {
+	case move := <-destinationInput.moves:
+		t.Fatalf("stale input was injected: %v", move)
+	default:
+	}
+	cancel()
+	_ = sourceSide.Close()
+	_ = destinationSide.Close()
+	for range 2 {
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Fatal("stale-input peer session did not stop")
+		}
+	}
+}
+
+func completeIntegrationRoundTrip(
+	t *testing.T,
+	sourceRuntime *application.SessionRuntime,
+	destinationRuntime *application.SessionRuntime,
+	destinationInput *integrationInputPort,
+	identity OutboundIdentity,
+	move [2]int32,
+) {
+	t.Helper()
+	sourceSide, destinationSide := openFramedPipe(t)
+	sourceActivation := newIntegrationSourceActivation()
+	outbound, err := NewOutboundController(sourceSide, sourceRuntime, sourceActivation)
+	if err != nil {
+		t.Fatalf("NewOutboundController() error = %v", err)
+	}
+	returns := &integrationReturnBoundary{}
+	responder := &LeaseResponder{
+		Writer:     destinationSide,
+		Runtime:    destinationRuntime,
+		Authorizer: staticLeaseAuthorizer{leaseID: "lease-" + identity.SessionID, accepted: true},
+		Entry:      integrationCursorEntry{},
+		Returns:    returns,
+	}
+	returnController, err := NewReturnController(destinationSide, destinationRuntime, returns)
+	if err != nil {
+		t.Fatalf("NewReturnController() error = %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 2)
+	go func() { done <- RunSessionWithLifecycle(ctx, sourceSide, sourceRuntime, nil, outbound, time.Now) }()
+	go func() {
+		done <- RunSessionWithLifecycle(ctx, destinationSide, destinationRuntime, responder, nil, time.Now)
+	}()
+	if err := outbound.BeginBoundary(
+		ctx,
+		control.BoundaryIntent{Edge: control.ScreenEdgeRight, X: 1919},
+		identity,
+	); err != nil {
+		t.Fatalf("BeginBoundary(%s) error = %v", identity.SessionID, err)
+	}
+	waitSignal(t, sourceActivation.activated, "round-trip source activation")
+	if err := SendInputAction(ctx, sourceSide, sourceRuntime, control.InputAction{Kind: control.InputPointerMove, DeltaX: move[0], DeltaY: move[1]}); err != nil {
+		t.Fatalf("SendInputAction(%s) error = %v", identity.SessionID, err)
+	}
+	select {
+	case got := <-destinationInput.moves:
+		if got != move {
+			t.Fatalf("destination move = %v, want %v", got, move)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("destination did not receive %s input", identity.SessionID)
+	}
+	if err := returnController.Revoke(ctx, control.ReturnIntent{SessionID: identity.SessionID, Epoch: identity.Epoch}); err != nil {
+		t.Fatalf("Revoke(%s) error = %v", identity.SessionID, err)
+	}
+	waitSignal(t, sourceActivation.deactivated, "round-trip source deactivation")
+	if sourceRuntime.Snapshot().Control.State != control.StateLocal || destinationRuntime.Snapshot().Control.State != control.StateLocal {
+		t.Fatalf("round trip did not finish local: source=%s destination=%s", sourceRuntime.Snapshot(), destinationRuntime.Snapshot())
+	}
+	cancel()
+	_ = sourceSide.Close()
+	_ = destinationSide.Close()
+	for range 2 {
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Fatal("round-trip peer session did not stop")
+		}
+	}
+}
+
 func newIntegrationRuntime(t *testing.T, input application.InputPort) *application.SessionRuntime {
 	t.Helper()
 	runtime, err := application.NewSessionRuntime(effectExecutor{}, input)
