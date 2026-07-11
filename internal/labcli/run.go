@@ -13,6 +13,7 @@ import (
 	"github.com/0disoft/krasis/internal/buildinfo"
 	"github.com/0disoft/krasis/internal/evidence"
 	"github.com/0disoft/krasis/internal/lab"
+	"github.com/0disoft/krasis/internal/probereport"
 )
 
 const (
@@ -40,8 +41,14 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, platform 
 		return runCapture(ctx, commandArgs, stdout, stderr, platform)
 	case "selftest-inject":
 		return runSelfTestInject(ctx, commandArgs, stdout, stderr, platform)
+	case "stress-selftest":
+		return runStressSelfTest(ctx, commandArgs, stdout, stderr, platform)
 	case "probe":
 		return runProbe(ctx, commandArgs, stdout, stderr, platform)
+	case "probe-check":
+		return runProbeCheck(commandArgs, stdout, stderr)
+	case "guided-probe":
+		return runGuidedProbe(ctx, commandArgs, stdout, stderr, platform)
 	default:
 		fmt.Fprintf(stderr, "unknown command: %s\n", command)
 		writeUsage(stderr)
@@ -49,17 +56,88 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, platform 
 	}
 }
 
+func runStressSelfTest(ctx context.Context, args []string, stdout, stderr io.Writer, platform lab.Platform) int {
+	options, err := parseCaptureArgs(args)
+	if err != nil || options.duration == 0 {
+		if err == nil {
+			err = errors.New("--duration is required")
+		}
+		fmt.Fprintf(stderr, "invalid stress-selftest options: %v\n", err)
+		fmt.Fprintln(stderr, "usage: krasis-lab stress-selftest [--json] --duration DURATION")
+		return exitUsage
+	}
+
+	started := time.Now()
+	stopStartingAt := started.Add(options.duration)
+	report := lab.StressSelfTestReport{
+		SchemaVersion:       lab.StressSchemaVersion,
+		RequestedDurationMs: options.duration.Milliseconds(),
+	}
+
+	for time.Now().Before(stopStartingAt) && ctx.Err() == nil {
+		result, selfTestErr := platform.SelfTestInject(ctx)
+		if selfTestErr != nil {
+			if ctx.Err() != nil {
+				report.FailureCode = "stress_canceled"
+			} else {
+				report.FailureCode = "selftest_error"
+			}
+			break
+		}
+
+		report.Attempts++
+		report.LastResult = &result
+		if result.FailureCode == "physical_input_interference" {
+			report.InterferenceAttempts++
+			continue
+		}
+		if !result.Passed {
+			report.FailureAttempt = report.Attempts
+			report.FailureCode = result.FailureCode
+			if report.FailureCode == "" {
+				report.FailureCode = "selftest_failed"
+			}
+			break
+		}
+		report.PassedAttempts++
+	}
+
+	report.ElapsedMillis = time.Since(started).Milliseconds()
+	if report.FailureCode == "" && ctx.Err() != nil {
+		report.FailureCode = "stress_canceled"
+	}
+	if report.FailureCode == "" && report.PassedAttempts == 0 {
+		report.FailureCode = "no_clean_attempt_completed"
+	}
+	report.Completed = report.FailureCode == ""
+
+	if options.jsonOutput {
+		if exitCode := writeJSON(stdout, stderr, report); exitCode != exitSuccess {
+			return exitCode
+		}
+	} else {
+		fmt.Fprintf(stdout, "SendInput stress: completed=%t attempts=%d passed=%d interference=%d elapsed=%s\n",
+			report.Completed,
+			report.Attempts,
+			report.PassedAttempts,
+			report.InterferenceAttempts,
+			time.Duration(report.ElapsedMillis)*time.Millisecond,
+		)
+		if report.FailureCode != "" {
+			fmt.Fprintf(stdout, "Failure: attempt=%d code=%s\n", report.FailureAttempt, report.FailureCode)
+		}
+	}
+
+	if !report.Completed {
+		return exitRuntime
+	}
+	return exitSuccess
+}
+
 type probeArgs struct {
 	deviceAlias string
 	duration    time.Duration
 	outputPath  string
-}
-
-var validProbeDeviceAliases = map[string]struct{}{
-	"H-A": {},
-	"H-B": {},
-	"S-A": {},
-	"S-B": {},
 }
 
 func runProbe(ctx context.Context, args []string, stdout, stderr io.Writer, platform lab.Platform) int {
@@ -106,6 +184,17 @@ func runProbe(ctx context.Context, args []string, stdout, stderr io.Writer, plat
 	}
 	report.Diagnostics = &diagnostics
 
+	selfTest, err := platform.SelfTestInject(ctx)
+	var selfTestFailure error
+	if err != nil {
+		selfTestFailure = err
+	} else {
+		report.SelfTest = &selfTest
+		if !selfTest.Passed {
+			selfTestFailure = errors.New("SendInput self-test did not pass")
+		}
+	}
+
 	fmt.Fprintf(stdout, "Probe %s: move the pointer, use the wheel and buttons, and type during the %s capture.\n", options.deviceAlias, options.duration)
 	captureContext, cancelCapture := context.WithTimeout(ctx, options.duration)
 	var finalSnapshot lab.CaptureSnapshot
@@ -125,15 +214,10 @@ func runProbe(ctx context.Context, args []string, stdout, stderr io.Writer, plat
 	if report.Capture == nil {
 		return finish("capture_missing", errors.New("capture completed without an aggregate snapshot"))
 	}
+	if selfTestFailure != nil {
+		return finish("selftest_failed", selfTestFailure)
+	}
 
-	selfTest, err := platform.SelfTestInject(ctx)
-	if err != nil {
-		return finish("selftest_failed", err)
-	}
-	report.SelfTest = &selfTest
-	if !selfTest.Passed {
-		return finish("selftest_failed", errors.New("SendInput self-test did not pass"))
-	}
 	return finish("", nil)
 }
 
@@ -163,7 +247,7 @@ func parseProbeArgs(args []string) (probeArgs, error) {
 			if parsed.deviceAlias != "" {
 				return probeArgs{}, fmt.Errorf("--device may be specified only once")
 			}
-			if _, ok := validProbeDeviceAliases[value]; !ok {
+			if !lab.ValidProbeDeviceAlias(value) {
 				return probeArgs{}, fmt.Errorf("unsupported device alias %q", value)
 			}
 			parsed.deviceAlias = value
@@ -187,6 +271,54 @@ func parseProbeArgs(args []string) (probeArgs, error) {
 		return probeArgs{}, errors.New("--device, --duration, and --output are required")
 	}
 	return parsed, nil
+}
+
+func runProbeCheck(args []string, stdout, stderr io.Writer) int {
+	jsonOutput := false
+	paths := make([]string, 0, len(args))
+	for _, argument := range args {
+		switch {
+		case argument == "--json":
+			if jsonOutput {
+				fmt.Fprintln(stderr, "invalid probe-check options: --json may be specified only once")
+				return exitUsage
+			}
+			jsonOutput = true
+		case strings.HasPrefix(argument, "-"):
+			fmt.Fprintf(stderr, "invalid probe-check options: unknown option %q\n", argument)
+			return exitUsage
+		default:
+			paths = append(paths, argument)
+		}
+	}
+	if len(paths) == 0 {
+		fmt.Fprintln(stderr, "usage: krasis-lab probe-check [--json] REPORT.json [REPORT.json ...]")
+		return exitUsage
+	}
+
+	report := probereport.Check(paths)
+	if jsonOutput {
+		if exitCode := writeJSON(stdout, stderr, report); exitCode != exitSuccess {
+			return exitCode
+		}
+	} else {
+		fmt.Fprintf(stdout, "Probe reports: inputs=%d valid=%t comparable=%t\n", report.InputCount, report.Valid, report.Comparable)
+		for _, file := range report.Files {
+			fmt.Fprintf(stdout, "  %s: valid=%t device=%s completed=%t", file.File, file.Valid, file.DeviceAlias, file.Completed)
+			if len(file.Issues) > 0 {
+				fmt.Fprintf(stdout, " issues=%s", strings.Join(file.Issues, ","))
+			}
+			fmt.Fprintln(stdout)
+		}
+		if len(report.Issues) > 0 {
+			fmt.Fprintf(stdout, "Issues: %s\n", strings.Join(report.Issues, ","))
+		}
+	}
+
+	if !report.Valid || (report.InputCount >= 2 && !report.Comparable) {
+		return exitRuntime
+	}
+	return exitSuccess
 }
 
 func runSelfTestInject(ctx context.Context, args []string, stdout, stderr io.Writer, platform lab.Platform) int {
@@ -426,6 +558,9 @@ func writeUsage(output io.Writer) {
 	fmt.Fprintln(output, "  krasis-lab diagnose [--json]")
 	fmt.Fprintln(output, "  krasis-lab capture [--json] [--duration DURATION]")
 	fmt.Fprintln(output, "  krasis-lab selftest-inject [--json]")
+	fmt.Fprintln(output, "  krasis-lab stress-selftest [--json] --duration DURATION")
 	fmt.Fprintln(output, "  krasis-lab probe --device H-A|H-B|S-A|S-B --duration DURATION --output PATH.json")
+	fmt.Fprintln(output, "  krasis-lab probe-check [--json] REPORT.json [REPORT.json ...]")
+	fmt.Fprintln(output, "  krasis-lab guided-probe --device H-A|H-B|S-A|S-B --stage-duration DURATION --output PATH.json")
 	fmt.Fprintln(output, "  krasis-lab help")
 }

@@ -18,3 +18,4 @@
 - CLI config source: docs/cli/configuration.md
 - CLI output and exit-code source: docs/cli/output-and-exit-codes.md
 - Phase 0 Windows input feasibility plan: docs/experiments/phase-0-windows-input-feasibility.md
+- Phase 0 device probe runbook: docs/experiments/device-probe-runbook.md

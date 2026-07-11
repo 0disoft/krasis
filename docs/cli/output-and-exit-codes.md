@@ -68,6 +68,8 @@
 - `passed`: 전체 판정
 - `sent`: `SendInput`이 수락한 selftest event 수
 - `observed`: hook에서 표식까지 확인한 injected event 수
+- `injectedMoves`: 표식 여부와 무관하게 hook이 관찰한 전체 injected mouse move 수
+- `physicalMoves`: selftest 구간에 겹친 실제 physical pointer move 수
 - `pointerRestored`: 실행 전후 cursor 위치 일치 여부
 - `failureCode`: 실패한 경우의 안정적인 분류
 
@@ -76,6 +78,7 @@
 - `send_input_failed`
 - `send_input_incomplete`
 - `injected_events_not_observed`
+- `physical_input_interference`
 - `pointer_position_changed`
 
 `passed=false`는 JSON을 정상 출력하더라도 exit `1`이다. UIPI 차단은 `SendInput` return이나 `GetLastError`만으로 정확히 구분되지 않을 수 있으므로 별도 성공으로 취급하지 않는다.
@@ -105,8 +108,40 @@
 - `probe_canceled`
 - `selftest_failed`
 
-`completed=false`인 부분 보고서도 원인 분석에 쓰는 유효한 증거다. 동일 output path를 다시 사용하면 기존 증거를 보존하고 실패한다.
+`completed=false`인 부분 보고서도 원인 분석에 쓰는 유효한 증거다. selftest 실패 뒤 성공한 capture가 함께 들어갈 수 있다. 동일 output path를 다시 사용하면 기존 증거를 보존하고 실패한다.
+
+## `stress-selftest --json`
+
+- schema: `krasis.lab.stress-selftest/v1`
+- 출력: 단일 JSON object
+
+`attempts`, `passedAttempts`, `interferenceAttempts`, `elapsedMillis`, `completed`와 마지막 selftest 결과를 포함한다. physical input 간섭 attempt는 pass 수에서 제외한다. 실제 defect의 첫 attempt와 failure code를 보존한다.
+
+## `probe-check --json`
+
+- schema: `krasis.lab.probe-check/v1`
+- 출력: 단일 JSON object
+
+전체 `valid`, 두 개 이상 입력의 `comparable`, stable issue code와 file별 요약을 출력한다. file 표시는 basename이며 원본 JSON 내용이나 전체 local path를 복사하지 않는다.
+
+## `guided-probe`
+
+- schema: `krasis.lab.guided-probe/v1`
+- 출력: `--output`으로 지정한 단일 JSON file
+
+공통 build와 diagnostics 정보, `stageDurationMillis`, selftest 결과와 세 stage를 포함한다. 각 stage는 name, pass 여부, stable failure code 배열과 aggregate capture snapshot만 가진다.
+
+guided stage failure code:
+
+- `keyboard_down_not_observed`
+- `keyboard_up_not_observed`
+- `pointer_move_not_observed`
+- `wheel_not_observed`
+- `mouse_button_down_not_observed`
+- `mouse_button_up_not_observed`
+
+상위 `guided_input_incomplete`는 하나 이상의 stage가 요구 event 종류를 관찰하지 못했다는 뜻이다.
 
 ## 호환성
 
-네 schema는 Phase 0 실험 계약이다. 정식 제품 API가 아니므로 변경될 수 있지만, 변경 시 schema version과 관련 test를 함께 검토한다.
+현재 CLI가 출력하거나 저장하는 일곱 schema는 Phase 0 실험 계약이다. 정식 제품 API가 아니므로 변경될 수 있지만, 변경 시 schema version과 관련 test를 함께 검토한다.

@@ -117,7 +117,8 @@ func (p *Platform) Capture(ctx context.Context, options lab.CaptureOptions, repo
 	completed := make(chan error, 1)
 	go func() {
 		runtime.LockOSThread()
-		// Exiting while locked retires this OS thread, so a later hook session cannot inherit its message queue.
+		// Returning while locked retires the OS thread. A later hook session must not
+		// inherit this session's Win32 message queue or low-level hook state.
 		completed <- captureOnDedicatedThread(ctx, options, report)
 	}()
 	return <-completed
@@ -204,7 +205,9 @@ func captureOnDedicatedThread(ctx context.Context, options lab.CaptureOptions, r
 	}()
 
 	stopMessageLoop := make(chan struct{})
+	stopMessageLoopDone := make(chan struct{})
 	go func() {
+		defer close(stopMessageLoopDone)
 		select {
 		case <-ctx.Done():
 			procPostThreadMessageW.Call(threadID, wmQuit, 0, 0)
@@ -215,6 +218,7 @@ func captureOnDedicatedThread(ctx context.Context, options lab.CaptureOptions, r
 	loopErr := runMessageLoop(options.Ready)
 	unhookErr := cleanupHooks()
 	close(stopMessageLoop)
+	<-stopMessageLoopDone
 	close(stopReporter)
 	<-reporterDone
 	report(counters.snapshot(time.Since(started)))

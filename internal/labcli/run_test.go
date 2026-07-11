@@ -25,8 +25,50 @@ type fakePlatform struct {
 
 type failingWriter struct{}
 
+type stressPlatform struct {
+	calls       int
+	failAt      int
+	interfereAt int
+}
+
 func (failingWriter) Write([]byte) (int, error) {
 	return 0, errors.New("closed output")
+}
+
+func (p *stressPlatform) Diagnose(context.Context) (lab.Diagnostics, error) {
+	return lab.Diagnostics{}, nil
+}
+
+func (p *stressPlatform) Capture(context.Context, lab.CaptureOptions, func(lab.CaptureSnapshot)) error {
+	return nil
+}
+
+func (p *stressPlatform) SelfTestInject(ctx context.Context) (lab.SelfTestResult, error) {
+	p.calls++
+	if p.failAt > 0 && p.calls == p.failAt {
+		return lab.SelfTestResult{
+			SchemaVersion:   lab.SelfTestSchemaVersion,
+			Sent:            2,
+			PointerRestored: true,
+			FailureCode:     "injected_events_not_observed",
+		}, nil
+	}
+	if p.interfereAt > 0 && p.calls == p.interfereAt {
+		return lab.SelfTestResult{
+			SchemaVersion: lab.SelfTestSchemaVersion,
+			Sent:          2,
+			Observed:      2,
+			PhysicalMoves: 1,
+			FailureCode:   "physical_input_interference",
+		}, nil
+	}
+	return lab.SelfTestResult{
+		SchemaVersion:   lab.SelfTestSchemaVersion,
+		Passed:          true,
+		Sent:            2,
+		Observed:        2,
+		PointerRestored: true,
+	}, nil
 }
 
 func (f fakePlatform) Diagnose(context.Context) (lab.Diagnostics, error) {
@@ -196,6 +238,74 @@ func TestSelfTestInjectFailureReturnsRuntimeExit(t *testing.T) {
 	}
 }
 
+func TestStressSelfTestCompletesAfterBoundedDeadline(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	platform := &stressPlatform{}
+
+	exitCode := Run(context.Background(), []string{"stress-selftest", "--json", "--duration", "5ms"}, &stdout, &stderr, platform)
+
+	if exitCode != exitSuccess {
+		t.Fatalf("exit code = %d, stderr = %q", exitCode, stderr.String())
+	}
+	var report lab.StressSelfTestReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("decode stress report: %v", err)
+	}
+	if !report.Completed || report.Attempts < 3 || report.PassedAttempts != report.Attempts {
+		t.Fatalf("unexpected stress report: %+v", report)
+	}
+}
+
+func TestStressSelfTestStopsAtFirstFailure(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	platform := &stressPlatform{failAt: 2}
+
+	exitCode := Run(context.Background(), []string{"stress-selftest", "--json", "--duration", "1s"}, &stdout, &stderr, platform)
+
+	if exitCode != exitRuntime {
+		t.Fatalf("exit code = %d, want %d", exitCode, exitRuntime)
+	}
+	var report lab.StressSelfTestReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("decode stress report: %v", err)
+	}
+	if report.Completed || report.Attempts != 2 || report.FailureAttempt != 2 || report.FailureCode != "injected_events_not_observed" {
+		t.Fatalf("unexpected stress failure report: %+v", report)
+	}
+}
+
+func TestStressSelfTestExcludesPhysicalInputInterference(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	platform := &stressPlatform{interfereAt: 2}
+
+	exitCode := Run(context.Background(), []string{"stress-selftest", "--json", "--duration", "5ms"}, &stdout, &stderr, platform)
+
+	if exitCode != exitSuccess {
+		t.Fatalf("exit code = %d, stderr = %q", exitCode, stderr.String())
+	}
+	var report lab.StressSelfTestReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("decode stress report: %v", err)
+	}
+	if !report.Completed || report.Attempts < 3 || report.InterferenceAttempts != 1 || report.PassedAttempts+report.InterferenceAttempts != report.Attempts {
+		t.Fatalf("unexpected stress report: %+v", report)
+	}
+}
+
+func TestStressSelfTestRequiresDuration(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	exitCode := Run(context.Background(), []string{"stress-selftest", "--json"}, &stdout, &stderr, &stressPlatform{})
+
+	if exitCode != exitUsage {
+		t.Fatalf("exit code = %d, want %d", exitCode, exitUsage)
+	}
+}
+
 func TestProbeWritesIndependentAggregateReport(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -283,6 +393,46 @@ func TestProbeFailureStillWritesPartialReport(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "runtime_error:") {
 		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func TestProbeContinuesCaptureAfterSelfTestFailure(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	outputPath := filepath.Join(t.TempDir(), "selftest-failed.json")
+	platform := fakePlatform{
+		diagnostics: lab.Diagnostics{SchemaVersion: lab.DiagnoseSchemaVersion},
+		selfTest: lab.SelfTestResult{
+			SchemaVersion: lab.SelfTestSchemaVersion,
+			Sent:          2,
+			FailureCode:   "injected_events_not_observed",
+		},
+		capture: []lab.CaptureSnapshot{{
+			SchemaVersion: lab.CaptureSchemaVersion,
+			Mouse:         lab.MouseCounts{PhysicalMove: 1},
+		}},
+	}
+
+	exitCode := Run(context.Background(), []string{
+		"probe",
+		"--device", "H-B",
+		"--duration", "1ms",
+		"--output", outputPath,
+	}, &stdout, &stderr, platform)
+
+	if exitCode != exitRuntime {
+		t.Fatalf("exit code = %d, want %d", exitCode, exitRuntime)
+	}
+	data, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatalf("read partial report: %v", err)
+	}
+	var report lab.ProbeReport
+	if err := json.Unmarshal(data, &report); err != nil {
+		t.Fatalf("decode partial report: %v", err)
+	}
+	if report.Completed || report.FailureCode != "selftest_failed" || report.SelfTest == nil || report.Capture == nil {
+		t.Fatalf("unexpected partial report: %+v", report)
 	}
 }
 

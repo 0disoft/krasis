@@ -102,6 +102,9 @@ watchdog과 독립 복구 수단이 없는 구현은 기능이 동작하더라�
 | `recover` | 눌림 상태 정리와 `ReleaseAll` 검증 |
 | `diagnose` | 환경과 adapter capability 출력 |
 | `probe` | 한 장비의 진단, bounded capture와 주입 selftest를 독립 JSON 증거로 묶음 |
+| `stress-selftest` | 같은 process에서 hook session과 tagged 주입 왕복을 bounded window 동안 반복 |
+| `guided-probe` | keyboard, pointer, wheel/buttons를 단계별 aggregate evidence로 확인 |
+| `probe-check` | 장비별 basic probe JSON의 schema와 비교 가능성 검증 |
 
 각 경계는 사람에게 읽히는 결과와 redacted machine-readable 결과를 같은 내부 결과 model에서 만들어야 한다. 구체적인 flag와 exit code는 구현 직전에 CLI 계약으로 확정한다.
 
@@ -109,8 +112,12 @@ watchdog과 독립 복구 수단이 없는 구현은 기능이 동작하더라�
 
 - `diagnose`: 구현 및 현재 개발 호스트 smoke 완료
 - `capture`: low-level keyboard/mouse hook, aggregate counter, bounded duration과 정상 hook 해제 구현
-- `selftest-inject`: tagged relative mouse move 왕복 검증 구현
+- `selftest-inject`: tagged relative mouse move 왕복의 전송, hook 관찰과 cursor 복귀 검증 구현
+- `stress-selftest`: physical input 간섭 attempt를 분리하면서 첫 clean defect에서 중단하는 반복 검증 구현
 - `probe`: 장비 별칭, build 식별자, 진단, aggregate capture와 selftest를 교체 불가 JSON file로 저장하도록 구현
+- `guided-probe`: keyboard, pointer, wheel/buttons 단계별 누락 code와 aggregate snapshot 저장 구현
+- `probe-check`: unknown field, trailing JSON, size, schema, build와 duration 비교 검증 구현
+- 장비 실행 kit: Windows binary, 수집 script, runbook, build identity와 SHA-256 package 구현
 - 일반 `inject`, `suppress`, `edge`, `recover`: 미구현
 - Raw Input 비교 adapter: 미구현
 
@@ -118,13 +125,15 @@ watchdog과 독립 복구 수단이 없는 구현은 기능이 동작하더라�
 
 1초 bounded `capture` smoke는 두 hook의 설치, 실제 물리 mouse move와 wheel callback, aggregate count 증가와 자동 hook 해제를 확인했다. 출력에는 좌표나 raw key가 포함되지 않았다. 1초는 제품 성능 목표가 아니라 자동 검증을 유한하게 끝내기 위한 실행 경계다. keyboard callback과 injected event 분류는 unit test로만 검증됐으며 실제 장비 입력 증거는 아직 필요하다.
 
-첫 `selftest-inject` 시도에서 zero-delta mouse move 두 건은 `SendInput`이 수락했지만 hook에서 관찰되지 않아 실패했다. 실패를 성공으로 완화하지 않고 `MOUSEEVENTF_MOVE_NOCOALESCE`를 적용한 `+1/-1` 상대 이동 쌍으로 변경했다. 후속 smoke에서 전송 두 건, selftest 표식과 injected flag가 일치한 관찰 두 건, 실행 전후 cursor 위치 일치를 확인했다. 이 결과는 현재 개발 호스트의 증거이며 네 대의 대상 노트북과 UIPI 경계에서는 다시 검증해야 한다.
+`selftest-inject`는 zero-delta event를 사용하지 않고 `+1/-1` 상대 이동 두 건에 selftest 표식을 붙인다. 과거 같은 개발 호스트에서 반복 실행이 통과했지만, 현재 세션의 최신 재검증에서는 `SendInput`이 두 event를 수락하고 cursor도 원위치였음에도 low-level hook의 전체 injected move와 표식 event가 모두 `0`이었다. batch 상대 이동, 순차 상대 이동과 absolute 이동을 대조해도 같은 결과였으므로 현재 입력 desktop 또는 Windows 정책 차이를 포함한 환경 원인을 아직 배제할 수 없다. 따라서 현재 개발 호스트의 selftest와 stress 결과는 `INCONCLUSIVE`이며 네 대의 대상 노트북에서 새 artifact로 다시 검증해야 한다.
 
-같은 process에서 bounded `capture` 직후 `selftest-inject`를 실행한 첫 `probe` 반복에서는 `SendInput`이 두 event를 수락했지만 두 번째 hook session이 이를 관찰하지 못했다. 각 capture session의 Windows message queue를 전용 OS thread에 격리하고 session 종료 때 해당 thread를 retire하도록 변경한 뒤 연속 probe smoke가 통과했다. 이는 현재 개발 호스트에서 확인한 lifecycle 수정이며 대상 장비별 반복 검증은 여전히 필요하다.
+같은 process에서 bounded `capture` 직후 `selftest-inject`를 실행한 첫 `probe` 반복에서는 `SendInput`이 두 event를 수락했지만 두 번째 hook session이 이를 관찰하지 못했다. 각 hook session은 전용 Windows message-loop thread를 새로 만들고 종료 시 그 thread를 폐기해 이전 session의 message queue를 재사용하지 않는다. 종료 message를 게시하는 goroutine도 hook 정리 전에 합류한다. probe 자체는 `diagnose`, selftest, physical capture 순서로 실행한다. 대상 장비별 반복 검증은 여전히 필요하다.
 
 네 대를 같은 시각에 실행하는 것은 요구사항이 아니다. 집에서는 `H-A`, `H-B`, 스터디카페에서는 `S-A`, `S-B` report를 각각 수집하고 나중에 같은 build revision과 실험 조건인지 비교한다. 한 장소의 두 장비가 동시에 필요한 실험은 peer 연결과 장애 경로를 다루는 후속 단계이며, 현재 `probe`는 한 번에 한 장비만 검사한다.
 
 장비별 기초 수집 예시는 `krasis-lab probe --device H-A --duration 30s --output H-A.json` 형태다. output parent는 미리 만들고 장비마다 새 file name을 사용한다. `30s`는 권장 성능 기준이 아니라 손으로 pointer, wheel, button과 keyboard를 한 번씩 조작할 시간을 주는 예시일 뿐이다.
+
+실제 artifact 실행 절차와 checksum 확인은 `docs/experiments/device-probe-runbook.md`가 소유한다.
 
 ## 공통 기록 항목
 

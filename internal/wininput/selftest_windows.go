@@ -68,9 +68,11 @@ func (p *Platform) SelfTestInject(ctx context.Context) (lab.SelfTestResult, erro
 
 	var snapshotMu sync.Mutex
 	var latest lab.CaptureSnapshot
+	var injectionStarted bool
 	captureErr := p.Capture(testContext, lab.CaptureOptions{
 		ReportInterval: selfTestReportInterval,
 		Ready: func() {
+			injectionStarted = true
 			close(ready)
 		},
 	}, func(snapshot lab.CaptureSnapshot) {
@@ -88,19 +90,26 @@ func (p *Platform) SelfTestInject(ctx context.Context) (lab.SelfTestResult, erro
 	if captureErr != nil && !errors.Is(captureErr, context.Canceled) && !errors.Is(captureErr, context.DeadlineExceeded) {
 		return lab.SelfTestResult{}, captureErr
 	}
+	if !injectionStarted {
+		return lab.SelfTestResult{}, fmt.Errorf("self-test injection did not start: %w", testContext.Err())
+	}
 
 	snapshotMu.Lock()
 	observed := latest.Mouse.SelfTestInjectedMove
+	injectedMoves := latest.Mouse.InjectedMove
+	physicalMoves := latest.Mouse.PhysicalMove
 	snapshotMu.Unlock()
 
-	return classifySelfTest(outcome, observed), nil
+	return classifySelfTest(outcome, observed, injectedMoves, physicalMoves), nil
 }
 
-func classifySelfTest(outcome injectionOutcome, observed uint64) lab.SelfTestResult {
+func classifySelfTest(outcome injectionOutcome, observed, injectedMoves, physicalMoves uint64) lab.SelfTestResult {
 	result := lab.SelfTestResult{
 		SchemaVersion:   lab.SelfTestSchemaVersion,
 		Sent:            outcome.sent,
 		Observed:        observed,
+		InjectedMoves:   injectedMoves,
+		PhysicalMoves:   physicalMoves,
 		PointerRestored: outcome.pointerRestored,
 	}
 	switch {
@@ -110,6 +119,8 @@ func classifySelfTest(outcome injectionOutcome, observed uint64) lab.SelfTestRes
 		result.FailureCode = "send_input_incomplete"
 	case observed < selfTestEventCount:
 		result.FailureCode = "injected_events_not_observed"
+	case !outcome.pointerRestored && physicalMoves > 0:
+		result.FailureCode = "physical_input_interference"
 	case !outcome.pointerRestored:
 		result.FailureCode = "pointer_position_changed"
 	default:

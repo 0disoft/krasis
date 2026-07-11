@@ -7,13 +7,24 @@ import (
 )
 
 const (
-	DiagnoseSchemaVersion = "krasis.lab.diagnose/v1"
-	CaptureSchemaVersion  = "krasis.lab.capture/v1"
-	SelfTestSchemaVersion = "krasis.lab.selftest-inject/v1"
-	ProbeSchemaVersion    = "krasis.lab.probe/v1"
+	DiagnoseSchemaVersion    = "krasis.lab.diagnose/v1"
+	CaptureSchemaVersion     = "krasis.lab.capture/v1"
+	SelfTestSchemaVersion    = "krasis.lab.selftest-inject/v1"
+	StressSchemaVersion      = "krasis.lab.stress-selftest/v1"
+	ProbeSchemaVersion       = "krasis.lab.probe/v1"
+	GuidedProbeSchemaVersion = "krasis.lab.guided-probe/v1"
 )
 
 var ErrUnsupported = errors.New("operation is not supported on this platform")
+
+func ValidProbeDeviceAlias(alias string) bool {
+	switch alias {
+	case "H-A", "H-B", "S-A", "S-B":
+		return true
+	default:
+		return false
+	}
+}
 
 type Platform interface {
 	Diagnose(context.Context) (Diagnostics, error)
@@ -98,8 +109,23 @@ type SelfTestResult struct {
 	Passed          bool   `json:"passed"`
 	Sent            uint32 `json:"sent"`
 	Observed        uint64 `json:"observed"`
+	InjectedMoves   uint64 `json:"injectedMoves"`
+	PhysicalMoves   uint64 `json:"physicalMoves"`
 	PointerRestored bool   `json:"pointerRestored"`
 	FailureCode     string `json:"failureCode,omitempty"`
+}
+
+type StressSelfTestReport struct {
+	SchemaVersion        string          `json:"schemaVersion"`
+	RequestedDurationMs  int64           `json:"requestedDurationMillis"`
+	ElapsedMillis        int64           `json:"elapsedMillis"`
+	Attempts             uint64          `json:"attempts"`
+	PassedAttempts       uint64          `json:"passedAttempts"`
+	InterferenceAttempts uint64          `json:"interferenceAttempts"`
+	Completed            bool            `json:"completed"`
+	FailureAttempt       uint64          `json:"failureAttempt,omitempty"`
+	FailureCode          string          `json:"failureCode,omitempty"`
+	LastResult           *SelfTestResult `json:"lastResult,omitempty"`
 }
 
 type ProbeReport struct {
@@ -114,4 +140,25 @@ type ProbeReport struct {
 	Diagnostics         *Diagnostics     `json:"diagnostics,omitempty"`
 	Capture             *CaptureSnapshot `json:"capture,omitempty"`
 	SelfTest            *SelfTestResult  `json:"selfTest,omitempty"`
+}
+
+type GuidedProbeReport struct {
+	SchemaVersion       string             `json:"schemaVersion"`
+	DeviceAlias         string             `json:"deviceAlias"`
+	CollectedAt         time.Time          `json:"collectedAt"`
+	BuildRevision       string             `json:"buildRevision"`
+	BuildModified       bool               `json:"buildModified"`
+	StageDurationMillis int64              `json:"stageDurationMillis"`
+	Completed           bool               `json:"completed"`
+	FailureCode         string             `json:"failureCode,omitempty"`
+	Diagnostics         *Diagnostics       `json:"diagnostics,omitempty"`
+	Stages              []GuidedProbeStage `json:"stages"`
+	SelfTest            *SelfTestResult    `json:"selfTest,omitempty"`
+}
+
+type GuidedProbeStage struct {
+	Name         string          `json:"name"`
+	Passed       bool            `json:"passed"`
+	FailureCodes []string        `json:"failureCodes"`
+	Capture      CaptureSnapshot `json:"capture"`
 }
