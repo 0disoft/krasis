@@ -133,6 +133,10 @@ release가 동시 취소에 잘리지 않게 한다.
 bounded cleanup이 coordinator를 획득하기 전에 timeout되면 runtime state를 coordinator 밖에서
 추측해 바꾸지 않는다. 오류에는 원래 session fault와 cleanup deadline을 함께 남기며 non-`LOCAL`
 snapshot 때문에 supervisor는 reconnect를 중단한다.
+cleanup operation이 실행됐지만 `FAULT`에 남고 context가 살아 있으면 state machine의 기존 fault
+recovery transition을 같은 coordinator 안에서 한 번 더 실행한다. 성공한 release token은
+`PressedState`에서 이미 제거됐으므로 남은 token만 재시도한다. 두 번째 시도도 실패하면 `FAULT`와
+남은 token을 보존하고 supervisor가 종료하며 무한 retry는 만들지 않는다.
 성공한 heartbeat write와 runtime observation 뒤에는 optional observer가 aggregate evidence를
 기록한다. observer는 coordinator 밖에서 호출되고 session ID를 report에 투영하지 않으며,
 새 session에서는 receive gap baseline을 다시 시작한다.

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/0disoft/krasis/internal/application"
+	"github.com/0disoft/krasis/internal/control"
 )
 
 const CleanupTimeout = 2 * time.Second
@@ -13,7 +14,7 @@ const CleanupTimeout = 2 * time.Second
 func failRuntime(ctx context.Context, runtime *application.SessionRuntime, cause error) error {
 	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), CleanupTimeout)
 	defer cancel()
-	return runtime.Fail(cleanupCtx, cause)
+	return failRuntimeWithRecoveryRetry(cleanupCtx, runtime, cause)
 }
 
 func failRuntimeCoordinated(
@@ -40,10 +41,18 @@ func failRuntimeCoordinatedWithin(
 		if beforeCleanup != nil {
 			beforeCleanup()
 		}
-		return runtime.Fail(cleanupCtx, cause)
+		return failRuntimeWithRecoveryRetry(cleanupCtx, runtime, cause)
 	})
 	if cause != nil && !errors.Is(err, cause) {
 		return errors.Join(cause, err)
 	}
 	return err
+}
+
+func failRuntimeWithRecoveryRetry(ctx context.Context, runtime *application.SessionRuntime, cause error) error {
+	firstErr := runtime.Fail(ctx, cause)
+	if runtime.Snapshot().Control.State != control.StateFault || ctx.Err() != nil {
+		return firstErr
+	}
+	return errors.Join(firstErr, runtime.Fail(ctx, cause))
 }

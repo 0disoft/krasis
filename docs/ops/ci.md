@@ -32,6 +32,9 @@ timer cadence, congestion과 절전 중 false timeout은 장비 실험 범위다
 별도 cleanup timeout 테스트는 coordinator가 제한 시간보다 오래 점유됐을 때 operation이 실행되지
 않고 runtime이 기존 non-local state를 유지하며, 반환 오류가 원래 session fault와
 `context.DeadlineExceeded`를 모두 포함하는지 검증한다.
+cleanup recovery 테스트는 첫 `ReleaseAll`에서 실패한 token만 한 번 더 시도해 transient 실패는
+`LOCAL`로 수렴하는지 검증한다. 두 시도 모두 실패하는 경우 정확히 두 번만 release를 호출하고
+`FAULT`와 pressed token을 유지해야 한다.
 
 agent assembly 통합 테스트는 두 agent session을 실제 framed pipe로 연결하고 source worker ready, boundary intent, lease grant 이후 suppression, normalized input 전달, destination return intent, source deactivation과 양쪽 `LOCAL` cleanup을 한 경로에서 검증한다. 테스트는 OS hook과 `SendInput` 대신 같은 interface의 deterministic port를 사용하므로 실제 Windows callback과 주입 검증을 대체하지 않는다.
 별도 component lifecycle 테스트는 session context가 살아 있는 동안 worker가 독립적인

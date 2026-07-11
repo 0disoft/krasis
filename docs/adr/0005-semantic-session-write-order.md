@@ -49,6 +49,10 @@ reject, revoke, input과 heartbeat 사이에서 어떤 runtime 결정이 어떤 
 - cleanup coordinator를 제한 시간 안에 획득하지 못하면 runtime을 coordinator 밖에서 변경하지
   않는다. 반환 오류에는 cleanup deadline뿐 아니라 cleanup을 시작시킨 원래 session fault도
   함께 보존해 상위 supervisor가 원인과 incomplete cleanup을 모두 판단할 수 있게 한다.
+- 첫 cleanup operation이 `FAULT`에 남고 bounded context가 아직 유효하면 이미 정의된
+  `FAULT_DETECTED` recovery transition을 같은 coordinator 안에서 정확히 한 번 실행한다.
+  transient `ReleaseAll` 또는 `RESUME_LOCAL` 실패는 회복할 수 있지만 계속 실패하면 추가 loop 없이
+  남은 pressed token과 `FAULT`를 유지한다.
 - heartbeat 수신도 coordinator를 획득한 뒤 새 local observation을 읽고, 현재 liveness가 이미
   timeout에 도달했는지 먼저 판정한다. 만료된 lease는 늦게 도착한 heartbeat로
   `LastObserved`를 갱신하지 않고 `ReleaseAll`과 `LOCAL` cleanup으로 수렴한다.
@@ -66,6 +70,8 @@ reject, revoke, input과 heartbeat 사이에서 어떤 runtime 결정이 어떤 
 - deadline에 도달한 뒤 수신된 heartbeat가 만료 세션을 되살리지 않고 held input을 해제함
 - deadline 판정과 session cancellation이 겹쳐도 held input cleanup이 완료됨
 - cleanup coordinator 획득 timeout이 원래 session fault를 가리지 않음
+- 부분 `ReleaseAll` 실패는 성공한 token을 다시 해제하지 않고 남은 token만 한 번 재시도함
+- recovery 재시도도 실패하면 무한 반복 없이 `FAULT`와 남은 token을 유지함
 - 서로 다른 interval 또는 timeout의 Phase 0 evidence가 통과하지 않음
 - heartbeat 송수신과 같은-session gap evidence가 없는 Phase 0 report는 통과하지 않음
 
