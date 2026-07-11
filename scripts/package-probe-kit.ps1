@@ -42,14 +42,9 @@ try {
     Copy-Item -LiteralPath $BinaryPath -Destination (Join-Path $stagingRoot 'krasis-lab.exe')
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'collect-probe.ps1') -Destination $stagingRoot
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'check-phase0.ps1') -Destination $stagingRoot
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'verify-kit.ps1') -Destination $stagingRoot
     Copy-Item -LiteralPath (Join-Path $projectRoot 'docs/experiments/device-probe-runbook.md') -Destination (Join-Path $stagingRoot 'README.md')
 
-    $executableHash = (Get-FileHash -LiteralPath (Join-Path $stagingRoot 'krasis-lab.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
-    [System.IO.File]::WriteAllText(
-        (Join-Path $stagingRoot 'SHA256SUMS.txt'),
-        "$executableHash  krasis-lab.exe`n",
-        $utf8NoBom
-    )
     $buildInfo = [ordered]@{
         schemaVersion = 'krasis.build/v1'
         commit = $Commit
@@ -61,6 +56,26 @@ try {
         "$buildInfo`n",
         $utf8NoBom
     )
+
+    $checksumFiles = @(
+        'krasis-lab.exe'
+        'collect-probe.ps1'
+        'check-phase0.ps1'
+        'verify-kit.ps1'
+        'README.md'
+        'BUILD.json'
+    )
+    $checksumLines = foreach ($name in $checksumFiles) {
+        $hash = (Get-FileHash -LiteralPath (Join-Path $stagingRoot $name) -Algorithm SHA256).Hash.ToLowerInvariant()
+        "$hash  $name"
+    }
+    [System.IO.File]::WriteAllText(
+        (Join-Path $stagingRoot 'SHA256SUMS.txt'),
+        (($checksumLines -join "`n") + "`n"),
+        $utf8NoBom
+    )
+
+    & (Join-Path $stagingRoot 'verify-kit.ps1')
 
     Compress-Archive -Path (Join-Path $stagingRoot '*') -DestinationPath $OutputPath
 }

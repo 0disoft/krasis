@@ -12,15 +12,16 @@ GitHub Actions의 `krasis-probe-kit-windows-amd64-<commit>.zip` artifact를 한 
 
 ## 무결성 확인
 
-압축을 푼 directory에서 `SHA256SUMS.txt`에 기록된 값과 `krasis-lab.exe`의 SHA-256을 비교한다. 아래 PowerShell은 사람의 수동 확인용이며 agent command 권한을 부여하지 않는다.
+압축을 푼 directory에서 실행 파일, helper, runbook과 build metadata 전체의 SHA-256을
+확인한다. 아래 PowerShell은 사람의 수동 확인용이며 agent command 권한을 부여하지 않는다.
 
 ```powershell
-$expected = (Get-Content -LiteralPath .\SHA256SUMS.txt -Raw).Split(' ', [System.StringSplitOptions]::RemoveEmptyEntries)[0]
-$actual = (Get-FileHash -LiteralPath .\krasis-lab.exe -Algorithm SHA256).Hash.ToLowerInvariant()
-$expected -eq $actual
+.\verify-kit.ps1
 ```
 
-결과가 `True`가 아니면 실행하지 않는다.
+`Probe kit checksums verified.`가 나오지 않으면 실행하지 않는다. 이 검사는 다운로드 뒤
+부분 변조와 손상을 찾지만, artifact와 `SHA256SUMS.txt`가 함께 교체된 경우를 막는 서명은
+아니다. GitHub workflow run, commit과 artifact 출처도 함께 확인한다.
 
 ## 수집
 
@@ -133,8 +134,8 @@ source에서 key를 놓고 destination의 입력이 즉시 정상인지 확인�
 ## 순차 Phase 0 집계
 
 집과 스터디카페에서 같은 clean build와 duration으로 모은 파일을 한 directory에 복사한 뒤
-파일 이름을 `H-A-agent.json`, `H-B-agent.json`, `S-A-agent.json`, `S-B-agent.json`과
-각 alias의 `*-recovery.json`으로 맞춘다. probe kit의 아래 사람 전용 helper를 실행한다.
+파일 이름을 `H-A-agent.json`, `H-B-agent.json`, `S-A-agent.json`, `S-B-agent.json`, 각 alias의
+`*-guard.json`과 `*-recovery.json`으로 맞춘다. probe kit의 아래 사람 전용 helper를 실행한다.
 수집 날짜가 달라도 되고 네 장비를 동시에 켤 필요는 없다.
 
 ```powershell
