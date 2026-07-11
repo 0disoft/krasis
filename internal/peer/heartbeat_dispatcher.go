@@ -15,24 +15,32 @@ type HeartbeatRuntime interface {
 	Fail(context.Context, error) error
 }
 
+type HeartbeatObservation struct {
+	SessionID  string
+	ObservedAt time.Time
+}
+
 func DispatchHeartbeatFrame(
 	ctx context.Context,
 	frame transport.Frame,
 	observedAt time.Time,
 	runtime HeartbeatRuntime,
-) error {
+) (HeartbeatObservation, error) {
 	if runtime == nil {
-		return errors.New("heartbeat runtime is required")
+		return HeartbeatObservation{}, errors.New("heartbeat runtime is required")
 	}
 	if frame.Kind != transport.MessageHeartbeat {
-		return ErrUnexpectedHeartbeatFrame
+		return HeartbeatObservation{}, ErrUnexpectedHeartbeatFrame
 	}
 	if observedAt.IsZero() {
-		return runtime.Fail(ctx, errors.New("heartbeat observation time is required"))
+		return HeartbeatObservation{}, runtime.Fail(ctx, errors.New("heartbeat observation time is required"))
 	}
 	sessionID, err := transport.DecodeHeartbeatPayload(frame.Payload)
 	if err != nil {
-		return runtime.Fail(ctx, err)
+		return HeartbeatObservation{}, runtime.Fail(ctx, err)
 	}
-	return runtime.ObserveHeartbeat(ctx, sessionID, observedAt)
+	if err := runtime.ObserveHeartbeat(ctx, sessionID, observedAt); err != nil {
+		return HeartbeatObservation{}, err
+	}
+	return HeartbeatObservation{SessionID: sessionID, ObservedAt: observedAt}, nil
 }

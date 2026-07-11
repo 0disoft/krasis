@@ -22,7 +22,8 @@ optional liveness worker 테스트는 잘못된 interval/timeout 관계를 거�
 frame을 만들지 않으며, active session heartbeat를 기록하고, silent peer deadline과 heartbeat
 write failure에서 runtime을 `LOCAL`로 cleanup하며, deadline의 held input release와 blocked
 write 취소 뒤 coordinator 재사용, coordinator 대기 뒤 fresh deadline observation, deadline과
-session cancellation 경합에서 bounded held-input cleanup을 검증한다. 실제
+session cancellation 경합에서 bounded held-input cleanup을 검증한다. observer 테스트는 성공한
+송수신만 집계하고 session 경계를 넘는 gap을 만들지 않는지 검증한다. 실제
 timer cadence, congestion과 절전 중 false timeout은 장비 실험 범위다.
 
 agent assembly 통합 테스트는 두 agent session을 실제 framed pipe로 연결하고 source worker ready, boundary intent, lease grant 이후 suppression, normalized input 전달, destination return intent, source deactivation과 양쪽 `LOCAL` cleanup을 한 경로에서 검증한다. 테스트는 OS hook과 `SendInput` 대신 같은 interface의 deterministic port를 사용하므로 실제 Windows callback과 주입 검증을 대체하지 않는다.
@@ -44,7 +45,7 @@ dirty/mismatched build, unknown field, invalid count와 정상 disarm recovery�
 
 agent report checker 테스트는 strict JSON decoding과 두 file cardinality, 장소별 alias pair,
 listener/connect 역할, 반대 edge, clean 동일 build, 동일 duration/heartbeat interval/peer timeout,
-양쪽 pass, crash guard의
+최소 heartbeat 송수신·same-session gap evidence와 timeout보다 작은 최대 gap, 양쪽 pass, crash guard의
 시작·정상 종료, 같은 directory의 guard report device/build/zero-recovery 및 destination evidence를 검증한다. 전체 path, session identifier나 원시
 입력은 checker output으로 복제하지 않는다.
 

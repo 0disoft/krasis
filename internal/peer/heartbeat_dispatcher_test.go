@@ -17,8 +17,12 @@ func TestDispatchHeartbeatFrameUpdatesLocalObservation(t *testing.T) {
 		t.Fatalf("EncodeHeartbeatPayload() error = %v", err)
 	}
 	observedAt := time.Unix(101, 0)
-	if err := DispatchHeartbeatFrame(context.Background(), transport.Frame{Kind: transport.MessageHeartbeat, Payload: payload}, observedAt, runtime); err != nil {
+	observation, err := DispatchHeartbeatFrame(context.Background(), transport.Frame{Kind: transport.MessageHeartbeat, Payload: payload}, observedAt, runtime)
+	if err != nil {
 		t.Fatalf("DispatchHeartbeatFrame() error = %v", err)
+	}
+	if observation.SessionID != "session-1" || !observation.ObservedAt.Equal(observedAt) {
+		t.Fatalf("observation = %+v", observation)
 	}
 	if snapshot := runtime.Snapshot(); !snapshot.Liveness.LastObserved.Equal(observedAt) {
 		t.Fatalf("last observation = %v", snapshot.Liveness.LastObserved)
@@ -27,7 +31,7 @@ func TestDispatchHeartbeatFrameUpdatesLocalObservation(t *testing.T) {
 
 func TestDispatchMalformedHeartbeatFailsRuntime(t *testing.T) {
 	runtime, _ := newInboundRuntime(t)
-	err := DispatchHeartbeatFrame(
+	_, err := DispatchHeartbeatFrame(
 		context.Background(),
 		transport.Frame{Kind: transport.MessageHeartbeat, Payload: []byte{1}},
 		time.Unix(101, 0),
@@ -47,7 +51,7 @@ func TestDispatchStaleHeartbeatFailsRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EncodeHeartbeatPayload() error = %v", err)
 	}
-	err = DispatchHeartbeatFrame(
+	_, err = DispatchHeartbeatFrame(
 		context.Background(),
 		transport.Frame{Kind: transport.MessageHeartbeat, Payload: payload},
 		time.Unix(101, 0),
@@ -63,7 +67,7 @@ func TestDispatchStaleHeartbeatFailsRuntime(t *testing.T) {
 
 func TestDispatchWrongHeartbeatFrameKindDoesNotMutateRuntime(t *testing.T) {
 	runtime, _ := newInboundRuntime(t)
-	err := DispatchHeartbeatFrame(
+	_, err := DispatchHeartbeatFrame(
 		context.Background(),
 		transport.Frame{Kind: transport.MessageInput},
 		time.Unix(101, 0),

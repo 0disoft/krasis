@@ -60,12 +60,39 @@ func TestCheckRejectsReportWithoutCrashGuardEvidence(t *testing.T) {
 
 func TestCheckRejectsUnknownFields(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "unknown.json")
-	if err := os.WriteFile(path, []byte(`{"schemaVersion":"krasis.lab.agent-session/v4","surprise":true}`), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(`{"schemaVersion":"krasis.lab.agent-session/v5","surprise":true}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	result := Check([]string{path})
 	if result.Valid || !hasIssue(result.Files[0].Issues, "invalid_json") {
 		t.Fatalf("Check() = %+v", result)
+	}
+}
+
+func TestCheckRejectsMissingOrImpossibleLivenessEvidence(t *testing.T) {
+	directory := t.TempDir()
+	missingReport := passingReport("H-A", "listen", "RIGHT")
+	missingReport.Liveness = lab.LivenessEvidence{}
+	missing := writeReport(t, directory, "missing.json", missingReport)
+	result := Check([]string{missing})
+	if result.Valid || !hasIssue(result.Files[0].Issues, "insufficient_liveness_evidence") {
+		t.Fatalf("Check(missing liveness) = %+v", result)
+	}
+
+	impossibleReport := passingReport("H-A", "listen", "RIGHT")
+	impossibleReport.Liveness.ReceiveGapSamples = impossibleReport.Liveness.HeartbeatsReceived
+	impossible := writeReport(t, directory, "impossible.json", impossibleReport)
+	result = Check([]string{impossible})
+	if result.Valid || !hasIssue(result.Files[0].Issues, "invalid_liveness_evidence") {
+		t.Fatalf("Check(impossible liveness) = %+v", result)
+	}
+
+	unsafeReport := passingReport("H-A", "listen", "RIGHT")
+	unsafeReport.Liveness.MaxReceiveGapMillis = unsafeReport.PeerTimeoutMillis
+	unsafe := writeReport(t, directory, "unsafe.json", unsafeReport)
+	result = Check([]string{unsafe})
+	if result.Valid || !hasIssue(result.Files[0].Issues, "liveness_gap_reached_timeout") {
+		t.Fatalf("Check(unsafe gap) = %+v", result)
 	}
 }
 
@@ -96,6 +123,7 @@ func passingReport(alias, role, edge string) lab.AgentSessionReport {
 		CollectedAt:   time.Date(2026, time.July, 11, 0, 0, 0, 0, time.UTC),
 		BuildRevision: "abc123", RequestedMillis: 120_000, HeartbeatMillis: 500, PeerTimeoutMillis: 3_000,
 		Completed: true, Passed: true, StopReason: "duration_elapsed",
+		Liveness:         lab.LivenessEvidence{HeartbeatsSent: 4, HeartbeatsReceived: 4, ReceiveGapSamples: 3, MaxReceiveGapMillis: 600},
 		CrashGuard:       lab.CrashGuardEvidence{Started: true, CleanShutdown: true, ReportFile: alias + "-guard.json"},
 		Supervisor:       lab.SupervisorEvidence{FinalState: "STOPPED", ActiveCount: 1},
 		DestinationInput: lab.InputEvidence{Entries: 1, PointerMoves: 1, ReturnArms: 1},

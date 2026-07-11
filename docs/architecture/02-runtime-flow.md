@@ -115,6 +115,9 @@ coordinator를 획득한 뒤 fresh local monotonic observation을 읽어 deadlin
 write를 수행한다. coordinator 대기 전 ticker 시각은 deadline 근거로 재사용하지 않는다.
 deadline fault cleanup은 session cancellation을 떼어낸 bounded context를 사용해 held input
 release가 동시 취소에 잘리지 않게 한다.
+성공한 heartbeat write와 runtime observation 뒤에는 optional observer가 aggregate evidence를
+기록한다. observer는 coordinator 밖에서 호출되고 session ID를 report에 투영하지 않으며,
+새 session에서는 receive gap baseline을 다시 시작한다.
 policy가 없으면 worker는 없고
 제품 기본값과 `agent-session` evidence 계약은 여전히 `UNDECIDED`다.
 inbound input과 heartbeat dispatch는 coordinator 안에서 runtime을 변경하고 malformed control은

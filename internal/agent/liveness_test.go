@@ -35,18 +35,22 @@ func TestRunLivenessTicksExpiresSilentActivePeer(t *testing.T) {
 		t.Fatalf("NewSessionWriteCoordinator() error = %v", err)
 	}
 	policy := LivenessPolicy{HeartbeatInterval: time.Second, PeerTimeout: 3 * time.Second}
+	observer := &recordingLivenessObserver{}
 	ticks := make(chan time.Time, 2)
 	ticks <- time.Unix(1, 0)
 	ticks <- time.Unix(2, 0)
 	times := make(chan time.Time, 2)
 	times <- time.Unix(101, 0)
 	times <- time.Unix(103, 0)
-	err = runLivenessTicks(context.Background(), coordinator, runtime, policy, func() time.Time { return <-times }, ticks)
+	err = runLivenessTicks(context.Background(), coordinator, runtime, policy, func() time.Time { return <-times }, observer, ticks)
 	if !errors.Is(err, peer.ErrPeerLivenessExpired) {
 		t.Fatalf("runLivenessTicks() error = %v", err)
 	}
 	if len(writer.frames) != 1 || writer.frames[0].Kind != transport.MessageHeartbeat {
 		t.Fatalf("heartbeat frames = %+v", writer.frames)
+	}
+	if len(observer.sent) != 1 || observer.sent[0].sessionID != "session-1" || !observer.sent[0].observedAt.Equal(time.Unix(101, 0)) {
+		t.Fatalf("sent observations = %+v", observer.sent)
 	}
 	if state := runtime.Snapshot().Control.State; state != control.StateLocal {
 		t.Fatalf("silent peer runtime = %s", runtime.Snapshot())
@@ -70,6 +74,7 @@ func TestRunLivenessTicksStopsOnCancellation(t *testing.T) {
 		runtime,
 		LivenessPolicy{HeartbeatInterval: time.Second, PeerTimeout: 3 * time.Second},
 		time.Now,
+		nil,
 		make(chan time.Time),
 	)
 	if !errors.Is(err, context.Canceled) {
@@ -93,6 +98,24 @@ func newLivenessRuntime(t *testing.T) *application.SessionRuntime {
 
 type livenessWriter struct {
 	frames []transport.Frame
+}
+
+type livenessObservation struct {
+	sessionID  string
+	observedAt time.Time
+}
+
+type recordingLivenessObserver struct {
+	sent     []livenessObservation
+	received []livenessObservation
+}
+
+func (observer *recordingLivenessObserver) ObserveHeartbeatSent(sessionID string, observedAt time.Time) {
+	observer.sent = append(observer.sent, livenessObservation{sessionID: sessionID, observedAt: observedAt})
+}
+
+func (observer *recordingLivenessObserver) ObserveHeartbeatReceived(sessionID string, observedAt time.Time) {
+	observer.received = append(observer.received, livenessObservation{sessionID: sessionID, observedAt: observedAt})
 }
 
 func (writer *livenessWriter) WriteFrameContext(_ context.Context, frame transport.Frame) error {

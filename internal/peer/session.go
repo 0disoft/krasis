@@ -24,7 +24,7 @@ func RunSession(
 	requests LeaseRequestHandler,
 	now ObservationClock,
 ) error {
-	return runSession(ctx, connection, nil, runtime, requests, nil, now)
+	return runSession(ctx, connection, nil, runtime, requests, nil, now, nil)
 }
 
 func RunSessionWithLifecycle(
@@ -39,7 +39,23 @@ func RunSessionWithLifecycle(
 	if coordinator == nil {
 		return errors.New("lifecycle session write coordinator is required")
 	}
-	return runSession(ctx, connection, coordinator, runtime, requests, outbound, now)
+	return runSession(ctx, connection, coordinator, runtime, requests, outbound, now, nil)
+}
+
+func RunSessionWithLifecycleObserved(
+	ctx context.Context,
+	connection SessionConnection,
+	coordinator *SessionWriteCoordinator,
+	runtime *application.SessionRuntime,
+	requests LeaseRequestHandler,
+	outbound OutboundLifecycle,
+	now ObservationClock,
+	observer LivenessObserver,
+) error {
+	if coordinator == nil {
+		return errors.New("lifecycle session write coordinator is required")
+	}
+	return runSession(ctx, connection, coordinator, runtime, requests, outbound, now, observer)
 }
 
 func runSession(
@@ -50,6 +66,7 @@ func runSession(
 	requests LeaseRequestHandler,
 	outbound OutboundLifecycle,
 	now ObservationClock,
+	observer LivenessObserver,
 ) error {
 	if connection == nil || runtime == nil || now == nil {
 		return errors.New("session connection, runtime, and observation clock are required")
@@ -73,6 +90,7 @@ func runSession(
 			return failSessionWithLifecycle(ctx, coordinator, runtime, outbound, err)
 		}
 		observedAt := now()
+		var heartbeat HeartbeatObservation
 		switch frame.Kind {
 		case transport.MessageControl:
 			err = DispatchControlFrameWithLifecycle(ctx, frame, observedAt, runtime, requests, outbound)
@@ -82,7 +100,9 @@ func runSession(
 			})
 		case transport.MessageHeartbeat:
 			err = coordinateDispatch(ctx, coordinator, func() error {
-				return DispatchHeartbeatFrame(ctx, frame, observedAt, runtime)
+				var dispatchErr error
+				heartbeat, dispatchErr = DispatchHeartbeatFrame(ctx, frame, observedAt, runtime)
+				return dispatchErr
 			})
 		default:
 			err = transport.ErrUnsupportedFrame
@@ -90,6 +110,9 @@ func runSession(
 		if err != nil {
 			_ = connection.Close()
 			return failSessionWithLifecycle(ctx, coordinator, runtime, outbound, err)
+		}
+		if frame.Kind == transport.MessageHeartbeat && observer != nil {
+			observer.ObserveHeartbeatReceived(heartbeat.SessionID, heartbeat.ObservedAt)
 		}
 	}
 }

@@ -106,6 +106,7 @@ func writeAgent(t *testing.T, directory, alias, role, edge, build string, durati
 		CollectedAt: collectedAt, BuildRevision: build, RequestedMillis: duration,
 		HeartbeatMillis: 500, PeerTimeoutMillis: 3_000,
 		Completed: true, Passed: true, StopReason: "duration_elapsed",
+		Liveness:         lab.LivenessEvidence{HeartbeatsSent: 4, HeartbeatsReceived: 4, ReceiveGapSamples: 3, MaxReceiveGapMillis: 600},
 		CrashGuard:       lab.CrashGuardEvidence{Started: true, CleanShutdown: true, ReportFile: guardName},
 		Supervisor:       lab.SupervisorEvidence{FinalState: "STOPPED", ActiveCount: 1},
 		DestinationInput: lab.InputEvidence{Entries: 1, PointerMoves: 1, ReturnArms: 1},

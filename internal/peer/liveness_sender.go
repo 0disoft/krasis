@@ -21,21 +21,22 @@ func PulseLiveness(
 	runtime *application.SessionRuntime,
 	now ObservationClock,
 	timeout time.Duration,
-) (bool, error) {
+) (LivenessPulse, error) {
 	if coordinator == nil || runtime == nil || now == nil {
-		return false, errors.New("write coordinator, runtime, and observation clock are required")
+		return LivenessPulse{}, errors.New("write coordinator, runtime, and observation clock are required")
 	}
-	active := false
+	pulse := LivenessPulse{}
 	err := coordinator.Execute(ctx, func(writer FrameWriter) error {
 		snapshot := runtime.Snapshot()
 		if snapshot.Control.State != control.StateInboundActive && snapshot.Control.State != control.StateOutboundActive {
 			return nil
 		}
-		active = true
-		observedAt := now()
+		pulse.Active = true
+		pulse.SessionID = snapshot.Control.SessionID
+		pulse.ObservedAt = now()
 		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), CleanupTimeout)
 		defer cancel()
-		faulted, err := runtime.CheckLiveness(cleanupCtx, observedAt, timeout)
+		faulted, err := runtime.CheckLiveness(cleanupCtx, pulse.ObservedAt, timeout)
 		if err != nil {
 			return err
 		}
@@ -49,7 +50,8 @@ func PulseLiveness(
 		if err := writer.WriteFrameContext(ctx, transport.Frame{Kind: transport.MessageHeartbeat, Payload: payload}); err != nil {
 			return failRuntime(ctx, runtime, err)
 		}
+		pulse.Sent = true
 		return nil
 	})
-	return active, err
+	return pulse, err
 }

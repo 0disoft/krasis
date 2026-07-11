@@ -136,21 +136,21 @@
 - physical `Ctrl+Alt+Shift+F12`는 현재 active source session을 즉시 중단한다. F12 terminator는 원격 전송하거나 로컬에서 억제하지 않으며 supervisor는 긴급 해제 뒤 재연결하지 않는다.
 - 같은 executable의 별도 crash guard process가 destination down 전에 token을 ACK하고 성공한 up 뒤 제거한다. guard가 먼저 종료되거나 정상 종료에서 남은 token을 해제하지 못하면 session은 실패한다.
 - 기본 rearm distance는 32px이고 activation gap은 0px다. 이는 Phase 0 안전 실험값이며 제품 UX 기본값이 아니다.
-- report에는 실행한 heartbeat interval과 peer timeout, aggregate count와 supervisor state만 저장하고 주소, certificate, session/epoch/lease, key code, pointer 좌표와 delta를 저장하지 않는다.
+- report에는 실행한 heartbeat interval과 peer timeout, 성공한 heartbeat 송수신 횟수, 같은 session 내부 receive gap sample 수와 최대 gap, aggregate input count와 supervisor state만 저장한다. 주소, certificate, session/epoch/lease, key code, pointer 좌표와 delta는 저장하지 않는다.
 - `--guard-output`은 agent report와 같은 directory의 다른 새 JSON 경로여야 한다. guard는 정상 `DISARM` 또는 parent pipe `PARENT_EOF`에서 aggregate release count만 이 파일에 기록한다.
 
-duration 또는 사용자의 취소로 안전 종료해도 인증된 active session과 destination entry·input evidence가 모두 없으면 `passed=false`와 exit `1`이다. 긴급 해제는 의도된 안전 동작이라 exit `0`이지만 `passed=true`로 바꾸지 않는다.
+duration 또는 사용자의 취소로 안전 종료해도 인증된 active session, 성공한 heartbeat 송신·수신 각각 2회, 같은 session의 receive gap sample 하나, peer timeout보다 작은 최대 receive gap과 destination entry·input evidence가 모두 없으면 `passed=false`와 exit `1`이다. 긴급 해제는 의도된 안전 동작이라 exit `0`이지만 `passed=true`로 바꾸지 않는다.
 
 ### `agent-session-check`
 
-같은 장소의 두 장비에서 수집한 `krasis.lab.agent-session/v4` report가 bounded 양방향 실험을 증명하는지 strict하게 판정한다.
+같은 장소의 두 장비에서 수집한 `krasis.lab.agent-session/v5` report가 bounded 양방향 실험을 증명하는지 strict하게 판정한다.
 
 - 사용법: `krasis-lab agent-session-check [--json] REPORT-A.json REPORT-B.json`
 - 정확히 두 file만 받으며 unknown field, trailing JSON, 1MiB 초과 file과 schema 불일치를 거부한다.
 - file path는 결과에 basename만 남긴다.
 - `H-A/H-B` 또는 `S-A/S-B` 조합만 같은 pair로 인정한다.
 - listener/connect 역할 하나씩, 반대 edge, 같은 clean build revision, requested duration, heartbeat interval과 peer timeout을 요구한다.
-- 두 report 모두 `completed=true`, `passed=true`, crash guard 시작·정상 종료, final supervisor `STOPPED`, authenticated active session과 destination entry·input·return arm evidence를 가져야 한다.
+- 두 report 모두 `completed=true`, `passed=true`, crash guard 시작·정상 종료, final supervisor `STOPPED`, authenticated active session, 최소 liveness aggregate와 destination entry·input·return arm evidence를 가져야 한다.
 
 report가 JSON으로 유효해도 pair 조건을 만족하지 않으면 exit `1`이다. 긴급 해제 report는 안전 동작 증거로 보존하지만 pair pass로 승격하지 않는다.
 

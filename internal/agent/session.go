@@ -30,10 +30,11 @@ type Connection interface {
 }
 
 type Config struct {
-	Boundary      control.BoundaryConfig
-	QueueCapacity int
-	Now           peer.ObservationClock
-	Liveness      *LivenessPolicy
+	Boundary         control.BoundaryConfig
+	QueueCapacity    int
+	Now              peer.ObservationClock
+	Liveness         *LivenessPolicy
+	LivenessObserver peer.LivenessObserver
 }
 
 type Dependencies struct {
@@ -118,13 +119,13 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 			return returns.Run(runContext, dependencies.Input.ReturnIntents())
 		}},
 		{name: "peer-session", run: func() error {
-			return peer.RunSessionWithLifecycle(runContext, dependencies.Connection, coordinator, runtime, responder, outbound, config.Now)
+			return peer.RunSessionWithLifecycleObserved(runContext, dependencies.Connection, coordinator, runtime, responder, outbound, config.Now, config.LivenessObserver)
 		}},
 	}
 	if config.Liveness != nil {
 		policy := *config.Liveness
 		components = append(components, component{name: "peer-liveness", run: func() error {
-			return runLiveness(runContext, coordinator, runtime, policy, config.Now)
+			return runLiveness(runContext, coordinator, runtime, policy, config.Now, config.LivenessObserver)
 		}})
 	}
 

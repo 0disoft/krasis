@@ -64,6 +64,27 @@ func TestRunSessionRoutesControlGrantThenHeartbeat(t *testing.T) {
 	}
 }
 
+func TestRunSessionObservedReportsOnlyAcceptedHeartbeat(t *testing.T) {
+	runtime, _ := newInboundRuntime(t)
+	payload, err := transport.EncodeHeartbeatPayload("session-1")
+	if err != nil {
+		t.Fatalf("EncodeHeartbeatPayload() error = %v", err)
+	}
+	connection := &scriptedConnection{frames: []transport.Frame{{Kind: transport.MessageHeartbeat, Payload: payload}}}
+	observer := &sessionLivenessObserver{}
+	observedAt := time.Unix(101, 0)
+	err = RunSessionWithLifecycleObserved(
+		context.Background(), connection, testWriteCoordinator(t, &recordingFrameWriter{}), runtime,
+		nil, nil, fixedClock(observedAt), observer,
+	)
+	if !errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Fatalf("RunSessionWithLifecycleObserved() error = %v", err)
+	}
+	if len(observer.received) != 1 || observer.received[0].sessionID != "session-1" || !observer.received[0].observedAt.Equal(observedAt) {
+		t.Fatalf("received observations = %+v", observer.received)
+	}
+}
+
 func TestRunSessionEOFDisablesOutboundSuppression(t *testing.T) {
 	runtime := newOutboundRuntime(t)
 	if _, err := runtime.GrantOutbound(context.Background(), "session-1", "lease-1", "epoch-1", time.Unix(100, 0)); err != nil {
@@ -282,4 +303,22 @@ func (connection *scriptedConnection) Close() error {
 
 func fixedClock(observedAt time.Time) ObservationClock {
 	return func() time.Time { return observedAt }
+}
+
+type sessionLivenessObservation struct {
+	sessionID  string
+	observedAt time.Time
+}
+
+type sessionLivenessObserver struct {
+	sent     []sessionLivenessObservation
+	received []sessionLivenessObservation
+}
+
+func (observer *sessionLivenessObserver) ObserveHeartbeatSent(sessionID string, observedAt time.Time) {
+	observer.sent = append(observer.sent, sessionLivenessObservation{sessionID: sessionID, observedAt: observedAt})
+}
+
+func (observer *sessionLivenessObserver) ObserveHeartbeatReceived(sessionID string, observedAt time.Time) {
+	observer.received = append(observer.received, sessionLivenessObservation{sessionID: sessionID, observedAt: observedAt})
 }

@@ -103,9 +103,16 @@ $PeerTimeout = Read-Host 'same peer timeout used by the listener'
 
 실행 중 A의 오른쪽 끝에서 B로 넘어가 pointer, wheel, 기본 button과 안전한 test key를 확인한다. B의 왼쪽 끝에서 A로 돌아온 뒤 반대 방향도 반복한다. key나 button을 누른 상태로 경계를 넘지 않는다. 이상 동작, stuck input 또는 예상하지 않은 suppression이 보이면 즉시 긴급 해제를 누른다.
 
-양쪽 report가 모두 `schemaVersion=krasis.lab.agent-session/v4`, `completed=true`,
+각 방향에서 제어권을 받은 뒤 최소 두 heartbeat interval이 지나도록 active 상태를 유지한다.
+이 시간은 제품 기본값이 아니라 해당 실행에서 직접 입력한 interval의 배수다. 그래야 양쪽
+report에 송수신 각각 2회 이상과 같은 session 내부 receive gap sample이 남는다.
+
+양쪽 report가 모두 `schemaVersion=krasis.lab.agent-session/v5`, `completed=true`,
 `passed=true`, `crashGuard.started=true`, `crashGuard.cleanShutdown=true`,
 양수 `heartbeatIntervalMillis`, 그보다 큰 `peerTimeoutMillis`, `supervisor.activeCount>=1`,
+`liveness.heartbeatsSent>=2`, `liveness.heartbeatsReceived>=2`,
+`liveness.receiveGapSamples>=1`,
+`0<liveness.maxReceiveGapMillis<peerTimeoutMillis`,
 `destinationInput.entries>=1`이어야 해당 pair의 bounded 양방향
 실험이 통과한 것이다. 집 pair와 스터디카페 pair는 서로 다른 날짜에 반복해도 된다.
 

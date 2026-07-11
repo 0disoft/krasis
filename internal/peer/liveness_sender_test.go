@@ -14,22 +14,22 @@ import (
 func TestPulseLivenessSkipsInactiveRuntime(t *testing.T) {
 	runtime := newLocalRuntime(t)
 	writer := &recordingFrameWriter{}
-	active, err := PulseLiveness(
+	pulse, err := PulseLiveness(
 		context.Background(), testWriteCoordinator(t, writer), runtime, fixedClock(time.Unix(101, 0)), 3*time.Second,
 	)
-	if err != nil || active || len(writer.frames) != 0 {
-		t.Fatalf("PulseLiveness(LOCAL) = active %t frames %d error %v", active, len(writer.frames), err)
+	if err != nil || pulse.Active || pulse.Sent || len(writer.frames) != 0 {
+		t.Fatalf("PulseLiveness(LOCAL) = pulse %+v frames %d error %v", pulse, len(writer.frames), err)
 	}
 }
 
 func TestPulseLivenessWritesCurrentSessionHeartbeat(t *testing.T) {
 	runtime, _ := newInboundRuntime(t)
 	writer := &recordingFrameWriter{}
-	active, err := PulseLiveness(
+	pulse, err := PulseLiveness(
 		context.Background(), testWriteCoordinator(t, writer), runtime, fixedClock(time.Unix(101, 0)), 3*time.Second,
 	)
-	if err != nil || !active || len(writer.frames) != 1 || writer.frames[0].Kind != transport.MessageHeartbeat {
-		t.Fatalf("PulseLiveness(active) = active %t frames %+v error %v", active, writer.frames, err)
+	if err != nil || !pulse.Active || !pulse.Sent || pulse.SessionID != "session-1" || !pulse.ObservedAt.Equal(time.Unix(101, 0)) || len(writer.frames) != 1 || writer.frames[0].Kind != transport.MessageHeartbeat {
+		t.Fatalf("PulseLiveness(active) = pulse %+v frames %+v error %v", pulse, writer.frames, err)
 	}
 	sessionID, err := transport.DecodeHeartbeatPayload(writer.frames[0].Payload)
 	if err != nil || sessionID != "session-1" {
@@ -46,11 +46,11 @@ func TestPulseLivenessExpiresWithoutWritingHeartbeat(t *testing.T) {
 		t.Fatalf("HandlePressedInput() error = %v", err)
 	}
 	writer := &recordingFrameWriter{}
-	active, err := PulseLiveness(
+	pulse, err := PulseLiveness(
 		context.Background(), testWriteCoordinator(t, writer), runtime, fixedClock(time.Unix(103, 0)), 3*time.Second,
 	)
-	if !active || !errors.Is(err, ErrPeerLivenessExpired) || len(writer.frames) != 0 {
-		t.Fatalf("PulseLiveness(expired) = active %t frames %+v error %v", active, writer.frames, err)
+	if !pulse.Active || pulse.Sent || !errors.Is(err, ErrPeerLivenessExpired) || len(writer.frames) != 0 {
+		t.Fatalf("PulseLiveness(expired) = pulse %+v frames %+v error %v", pulse, writer.frames, err)
 	}
 	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal || snapshot.PressedCount != 0 {
 		t.Fatalf("expired runtime = %s", snapshot)
@@ -64,11 +64,11 @@ func TestPulseLivenessWriteFailureCleansRuntime(t *testing.T) {
 	runtime, _ := newInboundRuntime(t)
 	cause := errors.New("heartbeat write failed")
 	writer := &recordingFrameWriter{err: cause}
-	active, err := PulseLiveness(
+	pulse, err := PulseLiveness(
 		context.Background(), testWriteCoordinator(t, writer), runtime, fixedClock(time.Unix(101, 0)), 3*time.Second,
 	)
-	if !active || !errors.Is(err, cause) {
-		t.Fatalf("PulseLiveness(write failure) = active %t error %v", active, err)
+	if !pulse.Active || pulse.Sent || !errors.Is(err, cause) {
+		t.Fatalf("PulseLiveness(write failure) = pulse %+v error %v", pulse, err)
 	}
 	if state := runtime.Snapshot().Control.State; state != control.StateLocal {
 		t.Fatalf("write failure runtime = %s", runtime.Snapshot())
@@ -103,9 +103,9 @@ func TestPulseLivenessCanceledBlockedWriteCleansRuntimeAndReleasesCoordinator(t 
 	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal {
 		t.Fatalf("blocked heartbeat runtime = %s", snapshot)
 	}
-	active, err := PulseLiveness(context.Background(), coordinator, runtime, fixedClock(time.Unix(102, 0)), 3*time.Second)
-	if err != nil || active {
-		t.Fatalf("PulseLiveness(after cancel) = active %t error %v", active, err)
+	pulse, err := PulseLiveness(context.Background(), coordinator, runtime, fixedClock(time.Unix(102, 0)), 3*time.Second)
+	if err != nil || pulse.Active || pulse.Sent {
+		t.Fatalf("PulseLiveness(after cancel) = pulse %+v error %v", pulse, err)
 	}
 }
 
@@ -176,12 +176,12 @@ func TestPulseLivenessTimeoutCleanupSurvivesConcurrentSessionCancellation(t *tes
 		t.Fatalf("HandlePressedInput() error = %v", err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	active, err := PulseLiveness(ctx, testWriteCoordinator(t, &recordingFrameWriter{}), runtime, func() time.Time {
+	pulse, err := PulseLiveness(ctx, testWriteCoordinator(t, &recordingFrameWriter{}), runtime, func() time.Time {
 		cancel()
 		return time.Unix(103, 0)
 	}, 3*time.Second)
-	if !active || !errors.Is(err, ErrPeerLivenessExpired) {
-		t.Fatalf("PulseLiveness(canceled timeout) = active %t error %v", active, err)
+	if !pulse.Active || pulse.Sent || !errors.Is(err, ErrPeerLivenessExpired) {
+		t.Fatalf("PulseLiveness(canceled timeout) = pulse %+v error %v", pulse, err)
 	}
 	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal || snapshot.PressedCount != 0 {
 		t.Fatalf("canceled timeout runtime = %s", snapshot)

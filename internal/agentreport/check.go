@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	SchemaVersion = "krasis.lab.agent-session-check/v2"
+	SchemaVersion = "krasis.lab.agent-session-check/v3"
 	maxReportSize = 1 << 20
 )
 
@@ -27,22 +27,23 @@ type Report struct {
 }
 
 type FileResult struct {
-	File              string   `json:"file"`
-	Valid             bool     `json:"valid"`
-	Issues            []string `json:"issues"`
-	DeviceAlias       string   `json:"deviceAlias,omitempty"`
-	Role              string   `json:"role,omitempty"`
-	Edge              string   `json:"edge,omitempty"`
-	BuildRevision     string   `json:"buildRevision,omitempty"`
-	BuildModified     bool     `json:"buildModified"`
-	RequestedMillis   int64    `json:"requestedDurationMillis"`
-	HeartbeatMillis   int64    `json:"heartbeatIntervalMillis"`
-	PeerTimeoutMillis int64    `json:"peerTimeoutMillis"`
-	Completed         bool     `json:"completed"`
-	Passed            bool     `json:"passed"`
-	GuardReport       string   `json:"guardReport,omitempty"`
-	GuardValid        bool     `json:"guardValid"`
-	GuardIssues       []string `json:"guardIssues"`
+	File              string               `json:"file"`
+	Valid             bool                 `json:"valid"`
+	Issues            []string             `json:"issues"`
+	DeviceAlias       string               `json:"deviceAlias,omitempty"`
+	Role              string               `json:"role,omitempty"`
+	Edge              string               `json:"edge,omitempty"`
+	BuildRevision     string               `json:"buildRevision,omitempty"`
+	BuildModified     bool                 `json:"buildModified"`
+	RequestedMillis   int64                `json:"requestedDurationMillis"`
+	HeartbeatMillis   int64                `json:"heartbeatIntervalMillis"`
+	PeerTimeoutMillis int64                `json:"peerTimeoutMillis"`
+	Completed         bool                 `json:"completed"`
+	Passed            bool                 `json:"passed"`
+	Liveness          lab.LivenessEvidence `json:"liveness"`
+	GuardReport       string               `json:"guardReport,omitempty"`
+	GuardValid        bool                 `json:"guardValid"`
+	GuardIssues       []string             `json:"guardIssues"`
 }
 
 func Check(paths []string) Report {
@@ -114,6 +115,7 @@ func checkFile(path string) (FileResult, lab.AgentSessionReport) {
 	result.PeerTimeoutMillis = report.PeerTimeoutMillis
 	result.Completed = report.Completed
 	result.Passed = report.Passed
+	result.Liveness = report.Liveness
 	result.Issues = validate(report)
 	if report.CrashGuard.ReportFile == "" || filepath.Base(report.CrashGuard.ReportFile) != report.CrashGuard.ReportFile {
 		result.Issues = append(result.Issues, "invalid_guard_report_reference")
@@ -171,6 +173,16 @@ func validate(report lab.AgentSessionReport) []string {
 	}
 	if report.HeartbeatMillis <= 0 || report.PeerTimeoutMillis <= report.HeartbeatMillis {
 		issues = append(issues, "invalid_liveness_policy")
+	}
+	liveness := report.Liveness
+	if liveness.ReceiveGapSamples >= liveness.HeartbeatsReceived || (liveness.ReceiveGapSamples > 0 && liveness.MaxReceiveGapMillis <= 0) {
+		issues = append(issues, "invalid_liveness_evidence")
+	}
+	if liveness.HeartbeatsSent < 2 || liveness.HeartbeatsReceived < 2 || liveness.ReceiveGapSamples == 0 {
+		issues = append(issues, "insufficient_liveness_evidence")
+	}
+	if liveness.MaxReceiveGapMillis >= report.PeerTimeoutMillis {
+		issues = append(issues, "liveness_gap_reached_timeout")
 	}
 	if !report.Completed || !report.Passed || report.FailureCode != "" {
 		issues = append(issues, "session_not_passed")

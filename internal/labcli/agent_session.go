@@ -19,6 +19,7 @@ import (
 	"github.com/0disoft/krasis/internal/crashguard"
 	"github.com/0disoft/krasis/internal/evidence"
 	"github.com/0disoft/krasis/internal/lab"
+	"github.com/0disoft/krasis/internal/peer"
 	"github.com/0disoft/krasis/internal/peercredentials"
 	"github.com/0disoft/krasis/internal/transport"
 	"github.com/0disoft/krasis/internal/wininput"
@@ -176,7 +177,7 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 		case <-runContext.Done():
 		}
 	}()
-	sessionConfig := newAgentSessionConfig(options, diagnostics.Display.Left, diagnostics.Display.Width)
+	sessionConfig := newAgentSessionConfig(options, diagnostics.Display.Left, diagnostics.Display.Width, observer)
 	err = agent.RunSupervisor(runContext, agent.SupervisorConfig{
 		Session: sessionConfig,
 		Backoff: agent.DefaultBackoffPolicy(), Now: time.Now, Wait: agent.Wait, Observer: observer,
@@ -185,6 +186,7 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 		Effects: agent.RuntimeEffects{}, Authorizer: agent.AuthenticatedPeerAuthorizer{}, RunSession: agent.RunSession,
 	})
 	report.Supervisor = observer.evidence()
+	report.Liveness = observer.livenessEvidence()
 	report.DestinationInput = input.evidence()
 	select {
 	case <-guard.Done():
@@ -233,6 +235,14 @@ func resolveAgentSessionOutputPaths(report, guard string) (string, string, error
 func agentSessionEvidenceExit(report *lab.AgentSessionReport) int {
 	if report.Supervisor.ActiveCount == 0 {
 		report.FailureCode = "no_authenticated_session"
+		return exitRuntime
+	}
+	if report.Liveness.HeartbeatsSent < 2 || report.Liveness.HeartbeatsReceived < 2 || report.Liveness.ReceiveGapSamples == 0 {
+		report.FailureCode = "insufficient_liveness_evidence"
+		return exitRuntime
+	}
+	if report.Liveness.MaxReceiveGapMillis <= 0 || report.Liveness.MaxReceiveGapMillis >= report.PeerTimeoutMillis {
+		report.FailureCode = "unsafe_liveness_gap"
 		return exitRuntime
 	}
 	input := report.DestinationInput
@@ -352,7 +362,7 @@ func validateEvidenceDuration(name string, value time.Duration) error {
 	return nil
 }
 
-func newAgentSessionConfig(options agentSessionArgs, screenLeft, screenWidth int32) agent.Config {
+func newAgentSessionConfig(options agentSessionArgs, screenLeft, screenWidth int32, observer peer.LivenessObserver) agent.Config {
 	config := agent.DefaultConfig(control.BoundaryConfig{
 		Edge: options.edge, ScreenLeft: screenLeft, ScreenWidth: screenWidth,
 		ActivationGap: 0, RearmDistance: options.rearmDistance,
@@ -361,6 +371,7 @@ func newAgentSessionConfig(options agentSessionArgs, screenLeft, screenWidth int
 		HeartbeatInterval: options.heartbeat,
 		PeerTimeout:       options.peerTimeout,
 	}
+	config.LivenessObserver = observer
 	return config
 }
 
@@ -467,8 +478,38 @@ func (input *countingInput) evidence() lab.InputEvidence {
 }
 
 type agentSessionObserver struct {
-	mu    sync.Mutex
-	value lab.SupervisorEvidence
+	mu                  sync.Mutex
+	value               lab.SupervisorEvidence
+	liveness            lab.LivenessEvidence
+	receiveSession      string
+	lastReceiveObserved time.Time
+}
+
+func (observer *agentSessionObserver) ObserveHeartbeatSent(_ string, _ time.Time) {
+	observer.mu.Lock()
+	observer.liveness.HeartbeatsSent++
+	observer.mu.Unlock()
+}
+
+func (observer *agentSessionObserver) ObserveHeartbeatReceived(sessionID string, observedAt time.Time) {
+	observer.mu.Lock()
+	defer observer.mu.Unlock()
+	observer.liveness.HeartbeatsReceived++
+	if sessionID != observer.receiveSession {
+		observer.receiveSession = sessionID
+		observer.lastReceiveObserved = observedAt
+		return
+	}
+	if !observer.lastReceiveObserved.IsZero() {
+		gap := observedAt.Sub(observer.lastReceiveObserved)
+		if gap >= 0 {
+			observer.liveness.ReceiveGapSamples++
+			if millis := gap.Milliseconds(); millis > observer.liveness.MaxReceiveGapMillis {
+				observer.liveness.MaxReceiveGapMillis = millis
+			}
+		}
+	}
+	observer.lastReceiveObserved = observedAt
 }
 
 func (observer *agentSessionObserver) ObserveSupervisor(snapshot agent.SupervisorSnapshot) {
@@ -491,4 +532,10 @@ func (observer *agentSessionObserver) evidence() lab.SupervisorEvidence {
 	observer.mu.Lock()
 	defer observer.mu.Unlock()
 	return observer.value
+}
+
+func (observer *agentSessionObserver) livenessEvidence() lab.LivenessEvidence {
+	observer.mu.Lock()
+	defer observer.mu.Unlock()
+	return observer.liveness
 }

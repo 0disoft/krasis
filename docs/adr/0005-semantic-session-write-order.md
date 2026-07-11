@@ -38,6 +38,9 @@ reject, revoke, input과 heartbeat 사이에서 어떤 runtime 결정이 어떤 
   길어야 한다. 제품 기본값은 실제 두 장비의 congestion과 절전 실험 전까지 `UNDECIDED`다.
   Phase 0 report에는 실행에 사용한 두 값을 기록하고 pair 및 순차 집계에서 일치 여부를
   검사한다.
+- Phase 0 계측은 성공한 heartbeat 송수신 횟수와 같은 session 내부 수신 gap만 aggregate한다.
+  session ID는 재연결 gap reset에만 사용하고 report에 저장하지 않는다. observer는 성공한
+  semantic operation 밖에서 짧은 in-memory 집계만 수행하며 network 또는 disk I/O를 하지 않는다.
 - timeout 판정은 peer timestamp가 아닌 local monotonic observation을 사용하며, coordinator를
   획득한 뒤 현재 시각을 읽어 대기 시간을 deadline에서 빼먹지 않는다. timeout이나
   heartbeat write failure는 bounded cleanup context에서 `ReleaseAll`과 `LOCAL` 수렴을
@@ -56,6 +59,7 @@ reject, revoke, input과 heartbeat 사이에서 어떤 runtime 결정이 어떤 
 - coordinator 대기 중 deadline이 지나면 과거 ticker 시각으로 heartbeat를 보내지 않음
 - deadline 판정과 session cancellation이 겹쳐도 held input cleanup이 완료됨
 - 서로 다른 interval 또는 timeout의 Phase 0 evidence가 통과하지 않음
+- heartbeat 송수신과 같은-session gap evidence가 없는 Phase 0 report는 통과하지 않음
 
 ## 결과
 
