@@ -113,6 +113,11 @@ func (p *Platform) Capture(ctx context.Context, options lab.CaptureOptions, repo
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	releaseHookSession, err := acquireHookSession(ctx)
+	if err != nil {
+		return err
+	}
+	defer releaseHookSession()
 
 	completed := make(chan error, 1)
 	go func() {
