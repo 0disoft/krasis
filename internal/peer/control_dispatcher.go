@@ -22,6 +22,28 @@ func DispatchControlFrame(
 	runtime *application.SessionRuntime,
 	requests LeaseRequestHandler,
 ) error {
+	return dispatchControlFrame(ctx, frame, observedAt, runtime, requests, nil)
+}
+
+func DispatchControlFrameWithLifecycle(
+	ctx context.Context,
+	frame transport.Frame,
+	observedAt time.Time,
+	runtime *application.SessionRuntime,
+	requests LeaseRequestHandler,
+	outbound OutboundLifecycle,
+) error {
+	return dispatchControlFrame(ctx, frame, observedAt, runtime, requests, outbound)
+}
+
+func dispatchControlFrame(
+	ctx context.Context,
+	frame transport.Frame,
+	observedAt time.Time,
+	runtime *application.SessionRuntime,
+	requests LeaseRequestHandler,
+	outbound OutboundLifecycle,
+) error {
 	if runtime == nil {
 		return errors.New("control runtime is required")
 	}
@@ -45,11 +67,23 @@ func DispatchControlFrame(
 		}
 		return nil
 	case transport.ControlLeaseGrant:
-		_, err = runtime.GrantOutbound(ctx, command.SessionID, command.LeaseID, command.Epoch, observedAt)
+		if outbound != nil {
+			err = outbound.GrantPeer(ctx, command, observedAt)
+		} else {
+			_, err = runtime.GrantOutbound(ctx, command.SessionID, command.LeaseID, command.Epoch, observedAt)
+		}
 	case transport.ControlLeaseReject:
-		_, err = runtime.RejectOutbound(ctx, command.SessionID, command.Epoch)
+		if outbound != nil {
+			err = outbound.RejectPeer(ctx, command)
+		} else {
+			_, err = runtime.RejectOutbound(ctx, command.SessionID, command.Epoch)
+		}
 	case transport.ControlLeaseRevoke:
-		_, err = runtime.RevokePeer(ctx, command.SessionID, command.LeaseID, command.Epoch)
+		if outbound != nil {
+			err = outbound.RevokePeer(ctx, command)
+		} else {
+			_, err = runtime.RevokePeer(ctx, command.SessionID, command.LeaseID, command.Epoch)
+		}
 	default:
 		err = errors.New("decoded unsupported control command")
 	}

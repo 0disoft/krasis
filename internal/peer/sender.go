@@ -78,10 +78,10 @@ func SendInputAction(
 	}
 	payload, err := transport.EncodeInputPayload(envelope, action)
 	if err != nil {
-		return runtime.Fail(context.WithoutCancel(ctx), err)
+		return failRuntime(ctx, runtime, err)
 	}
 	if err := writer.WriteFrameContext(ctx, transport.Frame{Kind: transport.MessageInput, Payload: payload}); err != nil {
-		return runtime.Fail(context.WithoutCancel(ctx), err)
+		return failRuntime(ctx, runtime, err)
 	}
 	return nil
 }
@@ -100,10 +100,10 @@ func SendHeartbeat(
 	}
 	payload, err := transport.EncodeHeartbeatPayload(snapshot.Control.SessionID)
 	if err != nil {
-		return runtime.Fail(context.WithoutCancel(ctx), err)
+		return failRuntime(ctx, runtime, err)
 	}
 	if err := writer.WriteFrameContext(ctx, transport.Frame{Kind: transport.MessageHeartbeat, Payload: payload}); err != nil {
-		return runtime.Fail(context.WithoutCancel(ctx), err)
+		return failRuntime(ctx, runtime, err)
 	}
 	return nil
 }
@@ -166,10 +166,10 @@ func writeControlOrFail(
 ) error {
 	payload, err := transport.EncodeControlPayload(command)
 	if err != nil {
-		return runtime.Fail(context.WithoutCancel(ctx), err)
+		return failRuntime(ctx, runtime, err)
 	}
 	if err := writer.WriteFrameContext(ctx, transport.Frame{Kind: transport.MessageControl, Payload: payload}); err != nil {
-		return runtime.Fail(context.WithoutCancel(ctx), err)
+		return failRuntime(ctx, runtime, err)
 	}
 	return nil
 }

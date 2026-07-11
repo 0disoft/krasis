@@ -24,6 +24,28 @@ func RunSession(
 	requests LeaseRequestHandler,
 	now ObservationClock,
 ) error {
+	return runSession(ctx, connection, runtime, requests, nil, now)
+}
+
+func RunSessionWithLifecycle(
+	ctx context.Context,
+	connection SessionConnection,
+	runtime *application.SessionRuntime,
+	requests LeaseRequestHandler,
+	outbound OutboundLifecycle,
+	now ObservationClock,
+) error {
+	return runSession(ctx, connection, runtime, requests, outbound, now)
+}
+
+func runSession(
+	ctx context.Context,
+	connection SessionConnection,
+	runtime *application.SessionRuntime,
+	requests LeaseRequestHandler,
+	outbound OutboundLifecycle,
+	now ObservationClock,
+) error {
 	if connection == nil || runtime == nil || now == nil {
 		return errors.New("session connection, runtime, and observation clock are required")
 	}
@@ -47,7 +69,7 @@ func RunSession(
 		observedAt := now()
 		switch frame.Kind {
 		case transport.MessageControl:
-			err = DispatchControlFrame(ctx, frame, observedAt, runtime, requests)
+			err = DispatchControlFrameWithLifecycle(ctx, frame, observedAt, runtime, requests, outbound)
 		case transport.MessageInput:
 			err = DispatchInputFrame(ctx, frame, runtime)
 		case transport.MessageHeartbeat:
@@ -65,7 +87,7 @@ func failSession(ctx context.Context, runtime *application.SessionRuntime, cause
 	if cause == nil {
 		cause = errors.New("peer session terminated")
 	}
-	if err := runtime.Fail(context.WithoutCancel(ctx), cause); err != nil {
+	if err := failRuntime(ctx, runtime, cause); err != nil {
 		return err
 	}
 	return cause
