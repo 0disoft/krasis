@@ -1,28 +1,12 @@
 # Architecture Decisions
 
-- Status: Draft
-- Owner: UNASSIGNED
+- 상태: Active
+- 책임자: cherr
 
-## Purpose
+## 결정 목록
 
-This document captures the durable design contract for Architecture Decisions.
-It is intentionally a scaffold and should be filled with project-specific decisions as they become known.
+- `0001-initial-architecture-boundaries.md`: 상주 agent와 projection 분리
+- `0002-contract-source-of-truth.md`: 계약 source of truth
+- `0003-ordered-peer-transport.md`: 단일 ordered peer transport와 bounded frame
 
-## Source of Truth
-
-- Product decision: UNDECIDED
-- Technical owner: UNASSIGNED
-- Related ADR: UNDECIDED
-
-## Required Decisions
-
-- Boundary: UNDECIDED
-- Data ownership: UNDECIDED
-- Failure and recovery behavior: UNDECIDED
-- Validation needed before merge: VALIDATION.md
-
-## Review Blockers
-
-- The change invents a product domain without a source.
-- The change weakens validation or skips required evidence.
-- The change relies on generated, cache, or build output as source truth.
+새 결정은 `0000-template.md`를 복사해 다음 번호로 추가한다. 이미 Accepted인 결정의 의미를 바꿀 때는 기존 문서를 조용히 덮어쓰지 말고 새 ADR에서 대체 관계와 migration 영향을 기록한다.

@@ -47,7 +47,7 @@
 
 - 지원 Windows 버전과 CPU 아키텍처
 - 입력 캡처 방식: 저수준 hook 단독, Raw Input 결합, 또는 작은 native 모듈
-- 전송 방식과 채널 수, 메시지 직렬화 형식
+- control/input/heartbeat payload 직렬화 형식
 - 페어링 확인 방식과 인증서 수명
 - 화면 경계 감도, dwell, 압력과 지연 예산
 - 긴급 해제 키 조합
