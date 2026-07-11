@@ -363,6 +363,11 @@ func TestPeerSessionsRejectStaleInputAfterReconnect(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 2)
+	t.Cleanup(func() {
+		cancel()
+		_ = sourceSide.Close()
+		_ = destinationSide.Close()
+	})
 	go func() {
 		done <- RunSessionWithLifecycle(ctx, sourceSide, sourceCoordinator, sourceRuntime, nil, outbound, time.Now)
 	}()
@@ -389,6 +394,16 @@ func TestPeerSessionsRejectStaleInputAfterReconnect(t *testing.T) {
 		t.Fatalf("WriteFrameContext(stale) error = %v", err)
 	}
 	waitSignal(t, sourceActivation.deactivated, "source cleanup after stale input")
+	for range 2 {
+		select {
+		case sessionErr := <-done:
+			if sessionErr == nil {
+				t.Fatal("stale-input peer session exited without an error")
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("stale-input peer session did not stop")
+		}
+	}
 	if sourceRuntime.Snapshot().Control.State != control.StateLocal || destinationRuntime.Snapshot().Control.State != control.StateLocal {
 		t.Fatalf("stale input did not fail safe: source=%s destination=%s", sourceRuntime.Snapshot(), destinationRuntime.Snapshot())
 	}
@@ -396,16 +411,6 @@ func TestPeerSessionsRejectStaleInputAfterReconnect(t *testing.T) {
 	case move := <-destinationInput.moves:
 		t.Fatalf("stale input was injected: %v", move)
 	default:
-	}
-	cancel()
-	_ = sourceSide.Close()
-	_ = destinationSide.Close()
-	for range 2 {
-		select {
-		case <-done:
-		case <-time.After(2 * time.Second):
-			t.Fatal("stale-input peer session did not stop")
-		}
 	}
 }
 

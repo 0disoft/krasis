@@ -72,11 +72,19 @@ type effectExecutor struct{}
 func (effectExecutor) Execute(context.Context, control.Effect) error { return nil }
 
 type inputPort struct {
-	moves []([2]int32)
+	presses  []control.PressedToken
+	releases []control.PressedToken
+	moves    []([2]int32)
 }
 
-func (port *inputPort) Press(context.Context, control.PressedToken) error   { return nil }
-func (port *inputPort) Release(context.Context, control.PressedToken) error { return nil }
+func (port *inputPort) Press(_ context.Context, token control.PressedToken) error {
+	port.presses = append(port.presses, token)
+	return nil
+}
+func (port *inputPort) Release(_ context.Context, token control.PressedToken) error {
+	port.releases = append(port.releases, token)
+	return nil
+}
 func (port *inputPort) Move(_ context.Context, x, y int32) error {
 	port.moves = append(port.moves, [2]int32{x, y})
 	return nil

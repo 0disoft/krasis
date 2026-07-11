@@ -20,7 +20,8 @@ coordinator 밖에서 runtime을 바꾸지 않고 malformed control이 connectio
 
 optional liveness worker 테스트는 잘못된 interval/timeout 관계를 거부하고, inactive runtime에서
 frame을 만들지 않으며, active session heartbeat를 기록하고, silent peer deadline과 heartbeat
-write failure에서 runtime을 `LOCAL`로 cleanup하며, context 취소를 보존하는지 검증한다. 실제
+write failure에서 runtime을 `LOCAL`로 cleanup하며, deadline의 held input release와 blocked
+write 취소 뒤 coordinator 재사용을 검증한다. 실제
 timer cadence, congestion과 절전 중 false timeout은 장비 실험 범위다.
 
 agent assembly 통합 테스트는 두 agent session을 실제 framed pipe로 연결하고 source worker ready, boundary intent, lease grant 이후 suppression, normalized input 전달, destination return intent, source deactivation과 양쪽 `LOCAL` cleanup을 한 경로에서 검증한다. 테스트는 OS hook과 `SendInput` 대신 같은 interface의 deterministic port를 사용하므로 실제 Windows callback과 주입 검증을 대체하지 않는다.
@@ -52,7 +53,7 @@ Phase 0 checker 테스트는 서로 다른 날짜의 home/study pair를 같은 b
 
 subprocess fault 테스트는 active session에서 destination process를 강제 종료한 뒤 source process가 connection failure를 관찰해 suppression을 해제하고 `LOCAL`로 성공 종료하는지 확인한다. 반대 방향은 destination에 실제 key-down을 전달한 뒤 source process를 강제 종료하고 destination이 해당 key release를 adapter에 실행한 다음 `LOCAL`로 성공 종료하는지 확인한다. 부모 test가 명시적으로 종료한 process의 non-zero exit만 예상 결과로 허용한다.
 
-재연결 통합 테스트는 같은 source와 destination runtime이 첫 session을 `LOCAL`로 종료한 뒤 새 session ID와 epoch로 두 번째 request, grant, input과 revoke 왕복을 완료하는지 확인한다. 별도 stale-input 테스트는 두 번째 active session의 framed stream에 첫 session의 envelope를 주입하고 destination input port가 해당 action을 실행하지 않으며 양쪽 runtime이 fail-safe `LOCAL`로 수렴하는지 확인한다.
+재연결 통합 테스트는 같은 source와 destination runtime이 첫 session을 `LOCAL`로 종료한 뒤 새 session ID와 epoch로 두 번째 request, grant, input과 revoke 왕복을 완료하는지 확인한다. 별도 stale-input 테스트는 두 번째 active session의 framed stream에 첫 session의 envelope를 주입하고 destination input port가 해당 action을 실행하지 않으며 양쪽 session goroutine의 fault cleanup이 끝난 뒤 runtime이 fail-safe `LOCAL`로 수렴하는지 확인한다.
 
 checkout, Go setup과 artifact upload action은 tag가 아니라 검토한 commit SHA로 고정한다. Go version은 `go.mod`의 language floor를 사용하고 dependency가 없는 현재 module에서는 setup action cache를 끈다.
 

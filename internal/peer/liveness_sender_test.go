@@ -37,7 +37,13 @@ func TestPulseLivenessWritesCurrentSessionHeartbeat(t *testing.T) {
 }
 
 func TestPulseLivenessExpiresWithoutWritingHeartbeat(t *testing.T) {
-	runtime, _ := newInboundRuntime(t)
+	runtime, port := newInboundRuntime(t)
+	token := control.PressedToken{Kind: control.PressedKeyboardKey, Code: 65}
+	if err := runtime.HandlePressedInput(context.Background(), control.InputEnvelope{
+		SessionID: "session-1", Epoch: "epoch-1", Sequence: 1,
+	}, token, true); err != nil {
+		t.Fatalf("HandlePressedInput() error = %v", err)
+	}
 	writer := &recordingFrameWriter{}
 	active, err := PulseLiveness(
 		context.Background(), testWriteCoordinator(t, writer), runtime, time.Unix(103, 0), 3*time.Second,
@@ -45,8 +51,11 @@ func TestPulseLivenessExpiresWithoutWritingHeartbeat(t *testing.T) {
 	if !active || !errors.Is(err, ErrPeerLivenessExpired) || len(writer.frames) != 0 {
 		t.Fatalf("PulseLiveness(expired) = active %t frames %+v error %v", active, writer.frames, err)
 	}
-	if state := runtime.Snapshot().Control.State; state != control.StateLocal {
-		t.Fatalf("expired runtime = %s", runtime.Snapshot())
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal || snapshot.PressedCount != 0 {
+		t.Fatalf("expired runtime = %s", snapshot)
+	}
+	if len(port.releases) != 1 || port.releases[0] != token {
+		t.Fatalf("expired runtime releases = %+v", port.releases)
 	}
 }
 
@@ -63,4 +72,48 @@ func TestPulseLivenessWriteFailureCleansRuntime(t *testing.T) {
 	if state := runtime.Snapshot().Control.State; state != control.StateLocal {
 		t.Fatalf("write failure runtime = %s", runtime.Snapshot())
 	}
+}
+
+func TestPulseLivenessCanceledBlockedWriteCleansRuntimeAndReleasesCoordinator(t *testing.T) {
+	runtime, _ := newInboundRuntime(t)
+	writer := &blockingLivenessWriter{started: make(chan struct{})}
+	coordinator := testWriteCoordinator(t, writer)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		_, err := PulseLiveness(ctx, coordinator, runtime, time.Unix(101, 0), 3*time.Second)
+		done <- err
+	}()
+	select {
+	case <-writer.started:
+	case <-time.After(time.Second):
+		t.Fatal("heartbeat write did not start")
+	}
+	cancel()
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("PulseLiveness(blocked) error = %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("canceled heartbeat write remained blocked")
+	}
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal {
+		t.Fatalf("blocked heartbeat runtime = %s", snapshot)
+	}
+	active, err := PulseLiveness(context.Background(), coordinator, runtime, time.Unix(102, 0), 3*time.Second)
+	if err != nil || active {
+		t.Fatalf("PulseLiveness(after cancel) = active %t error %v", active, err)
+	}
+}
+
+type blockingLivenessWriter struct {
+	started chan struct{}
+}
+
+func (writer *blockingLivenessWriter) WriteFrameContext(ctx context.Context, _ transport.Frame) error {
+	close(writer.started)
+	<-ctx.Done()
+	return ctx.Err()
 }
