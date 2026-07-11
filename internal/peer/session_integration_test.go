@@ -42,8 +42,12 @@ func TestPeerSessionsCompleteOutboundInputAndReturnRevokeRoundTrip(t *testing.T)
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 2)
 	now := func() time.Time { return time.Unix(100, 0) }
-	go func() { done <- RunSessionWithLifecycle(ctx, sourceSide, sourceRuntime, nil, outbound, now) }()
-	go func() { done <- RunSessionWithLifecycle(ctx, destinationSide, destinationRuntime, responder, nil, now) }()
+	go func() {
+		done <- RunSessionWithLifecycle(ctx, sourceSide, sourceCoordinator, sourceRuntime, nil, outbound, now)
+	}()
+	go func() {
+		done <- RunSessionWithLifecycle(ctx, destinationSide, destinationCoordinator, destinationRuntime, responder, nil, now)
+	}()
 	t.Cleanup(func() {
 		cancel()
 		_ = sourceSide.Close()
@@ -144,10 +148,10 @@ func TestPeerSessionsReuseOneConnectionForBothDirections(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 2)
 	go func() {
-		done <- RunSessionWithLifecycle(ctx, leftSide, leftRuntime, leftResponder, leftOutbound, time.Now)
+		done <- RunSessionWithLifecycle(ctx, leftSide, leftCoordinator, leftRuntime, leftResponder, leftOutbound, time.Now)
 	}()
 	go func() {
-		done <- RunSessionWithLifecycle(ctx, rightSide, rightRuntime, rightResponder, rightOutbound, time.Now)
+		done <- RunSessionWithLifecycle(ctx, rightSide, rightCoordinator, rightRuntime, rightResponder, rightOutbound, time.Now)
 	}()
 	t.Cleanup(func() {
 		cancel()
@@ -244,10 +248,10 @@ func TestPeerSessionsFailSafeWhenBothPeersRequestControl(t *testing.T) {
 	defer cancel()
 	done := make(chan error, 2)
 	go func() {
-		done <- RunSessionWithLifecycle(ctx, leftSide, leftRuntime, leftResponder, leftOutbound, time.Now)
+		done <- RunSessionWithLifecycle(ctx, leftSide, leftCoordinator, leftRuntime, leftResponder, leftOutbound, time.Now)
 	}()
 	go func() {
-		done <- RunSessionWithLifecycle(ctx, rightSide, rightRuntime, rightResponder, rightOutbound, time.Now)
+		done <- RunSessionWithLifecycle(ctx, rightSide, rightCoordinator, rightRuntime, rightResponder, rightOutbound, time.Now)
 	}()
 	t.Cleanup(func() {
 		_ = leftSide.Close()
@@ -359,9 +363,11 @@ func TestPeerSessionsRejectStaleInputAfterReconnect(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 2)
-	go func() { done <- RunSessionWithLifecycle(ctx, sourceSide, sourceRuntime, nil, outbound, time.Now) }()
 	go func() {
-		done <- RunSessionWithLifecycle(ctx, destinationSide, destinationRuntime, responder, nil, time.Now)
+		done <- RunSessionWithLifecycle(ctx, sourceSide, sourceCoordinator, sourceRuntime, nil, outbound, time.Now)
+	}()
+	go func() {
+		done <- RunSessionWithLifecycle(ctx, destinationSide, destinationCoordinator, destinationRuntime, responder, nil, time.Now)
 	}()
 	newIdentity := OutboundIdentity{SessionID: "session-new", Epoch: "epoch-new"}
 	if err := outbound.BeginBoundary(
@@ -434,9 +440,11 @@ func completeIntegrationRoundTrip(
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 2)
-	go func() { done <- RunSessionWithLifecycle(ctx, sourceSide, sourceRuntime, nil, outbound, time.Now) }()
 	go func() {
-		done <- RunSessionWithLifecycle(ctx, destinationSide, destinationRuntime, responder, nil, time.Now)
+		done <- RunSessionWithLifecycle(ctx, sourceSide, sourceCoordinator, sourceRuntime, nil, outbound, time.Now)
+	}()
+	go func() {
+		done <- RunSessionWithLifecycle(ctx, destinationSide, destinationCoordinator, destinationRuntime, responder, nil, time.Now)
 	}()
 	if err := outbound.BeginBoundary(
 		ctx,

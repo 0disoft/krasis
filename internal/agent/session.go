@@ -117,7 +117,7 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 			return returns.Run(runContext, dependencies.Input.ReturnIntents())
 		}},
 		{name: "peer-session", run: func() error {
-			return peer.RunSessionWithLifecycle(runContext, dependencies.Connection, runtime, responder, outbound, config.Now)
+			return peer.RunSessionWithLifecycle(runContext, dependencies.Connection, coordinator, runtime, responder, outbound, config.Now)
 		}},
 	}
 

@@ -14,8 +14,9 @@ peer 통합 테스트는 먼저 한 process 안의 두 `RunSession`을 실제 fr
 
 semantic write coordinator 테스트는 operation 직렬화, 취소된 waiter 미실행, heartbeat/revoke
 순서, revoke 뒤 heartbeat 폐기, connection-close-before-cleanup과 concurrent source activation
-뒤 suppression 재해제를 검증한다. heartbeat timer와 실제 congestion timeout은 아직 CI 범위가
-아니다.
+뒤 suppression 재해제를 검증한다. lifecycle session 테스트는 malformed input과 heartbeat가
+coordinator 밖에서 runtime을 바꾸지 않고 malformed control이 connection close 뒤 cleanup되는지
+검증한다. heartbeat timer와 실제 congestion timeout은 아직 CI 범위가 아니다.
 
 agent assembly 통합 테스트는 두 agent session을 실제 framed pipe로 연결하고 source worker ready, boundary intent, lease grant 이후 suppression, normalized input 전달, destination return intent, source deactivation과 양쪽 `LOCAL` cleanup을 한 경로에서 검증한다. 테스트는 OS hook과 `SendInput` 대신 같은 interface의 deterministic port를 사용하므로 실제 Windows callback과 주입 검증을 대체하지 않는다.
 

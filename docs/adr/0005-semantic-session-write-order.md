@@ -64,6 +64,8 @@ return revoke, input, heartbeat write와 failure cleanup에 연결됐다. coordi
 중에도 context 취소가 가능하고, read/dispatch failure는 connection을 먼저 닫아 막힌 write를
 깨운 뒤 bounded cleanup을 수행한다. source suppression은 cleanup 대기 전과 coordinator를
 획득한 뒤에 모두 해제해 concurrent activation 뒤 다시 켜진 상태를 남기지 않는다.
+inbound input과 heartbeat dispatch도 같은 coordinator operation에서 실행하며 malformed control은
+직접 runtime을 변경하지 않고 connection close 뒤 coordinated cleanup으로 넘긴다.
 
 이 ADR은 heartbeat 숫자를 확정하거나 별도 heartbeat connection을 허용하지 않는다. 단일
 ordered stream에서 head-of-line blocking이 실제로 확인될 때만 ADR 0003을 대체하는 transport

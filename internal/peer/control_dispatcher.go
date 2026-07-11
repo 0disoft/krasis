@@ -22,7 +22,7 @@ func DispatchControlFrame(
 	runtime *application.SessionRuntime,
 	requests LeaseRequestHandler,
 ) error {
-	return dispatchControlFrame(ctx, frame, observedAt, runtime, requests, nil)
+	return dispatchControlFrame(ctx, frame, observedAt, runtime, requests, nil, false)
 }
 
 func DispatchControlFrameWithLifecycle(
@@ -33,7 +33,7 @@ func DispatchControlFrameWithLifecycle(
 	requests LeaseRequestHandler,
 	outbound OutboundLifecycle,
 ) error {
-	return dispatchControlFrame(ctx, frame, observedAt, runtime, requests, outbound)
+	return dispatchControlFrame(ctx, frame, observedAt, runtime, requests, outbound, true)
 }
 
 func dispatchControlFrame(
@@ -43,6 +43,7 @@ func dispatchControlFrame(
 	runtime *application.SessionRuntime,
 	requests LeaseRequestHandler,
 	outbound OutboundLifecycle,
+	deferFailure bool,
 ) error {
 	if runtime == nil {
 		return errors.New("control runtime is required")
@@ -51,19 +52,19 @@ func dispatchControlFrame(
 		return ErrUnexpectedControlFrame
 	}
 	if observedAt.IsZero() {
-		return runtime.Fail(ctx, errors.New("control observation time is required"))
+		return failControlDispatch(ctx, runtime, errors.New("control observation time is required"), deferFailure)
 	}
 	command, err := transport.DecodeControlPayload(frame.Payload)
 	if err != nil {
-		return runtime.Fail(ctx, err)
+		return failControlDispatch(ctx, runtime, err, deferFailure)
 	}
 	switch command.Kind {
 	case transport.ControlLeaseRequest:
 		if requests == nil {
-			return runtime.Fail(ctx, errors.New("lease request handler is required"))
+			return failControlDispatch(ctx, runtime, errors.New("lease request handler is required"), deferFailure)
 		}
 		if err := requests.HandleLeaseRequest(ctx, command, observedAt); err != nil {
-			return runtime.Fail(ctx, err)
+			return failControlDispatch(ctx, runtime, err, deferFailure)
 		}
 		return nil
 	case transport.ControlLeaseGrant:
@@ -88,4 +89,16 @@ func dispatchControlFrame(
 		err = errors.New("decoded unsupported control command")
 	}
 	return err
+}
+
+func failControlDispatch(
+	ctx context.Context,
+	runtime *application.SessionRuntime,
+	cause error,
+	deferFailure bool,
+) error {
+	if deferFailure {
+		return cause
+	}
+	return runtime.Fail(ctx, cause)
 }

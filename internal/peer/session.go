@@ -24,23 +24,28 @@ func RunSession(
 	requests LeaseRequestHandler,
 	now ObservationClock,
 ) error {
-	return runSession(ctx, connection, runtime, requests, nil, now)
+	return runSession(ctx, connection, nil, runtime, requests, nil, now)
 }
 
 func RunSessionWithLifecycle(
 	ctx context.Context,
 	connection SessionConnection,
+	coordinator *SessionWriteCoordinator,
 	runtime *application.SessionRuntime,
 	requests LeaseRequestHandler,
 	outbound OutboundLifecycle,
 	now ObservationClock,
 ) error {
-	return runSession(ctx, connection, runtime, requests, outbound, now)
+	if coordinator == nil {
+		return errors.New("lifecycle session write coordinator is required")
+	}
+	return runSession(ctx, connection, coordinator, runtime, requests, outbound, now)
 }
 
 func runSession(
 	ctx context.Context,
 	connection SessionConnection,
+	coordinator *SessionWriteCoordinator,
 	runtime *application.SessionRuntime,
 	requests LeaseRequestHandler,
 	outbound OutboundLifecycle,
@@ -60,33 +65,38 @@ func runSession(
 		if err != nil {
 			_ = connection.Close()
 			if ctxErr := ctx.Err(); ctxErr != nil {
-				return failSessionWithLifecycle(ctx, runtime, outbound, ctxErr)
+				return failSessionWithLifecycle(ctx, coordinator, runtime, outbound, ctxErr)
 			}
 			if errors.Is(err, io.EOF) {
 				err = io.ErrUnexpectedEOF
 			}
-			return failSessionWithLifecycle(ctx, runtime, outbound, err)
+			return failSessionWithLifecycle(ctx, coordinator, runtime, outbound, err)
 		}
 		observedAt := now()
 		switch frame.Kind {
 		case transport.MessageControl:
 			err = DispatchControlFrameWithLifecycle(ctx, frame, observedAt, runtime, requests, outbound)
 		case transport.MessageInput:
-			err = DispatchInputFrame(ctx, frame, runtime)
+			err = coordinateDispatch(ctx, coordinator, func() error {
+				return DispatchInputFrame(ctx, frame, runtime)
+			})
 		case transport.MessageHeartbeat:
-			err = DispatchHeartbeatFrame(ctx, frame, observedAt, runtime)
+			err = coordinateDispatch(ctx, coordinator, func() error {
+				return DispatchHeartbeatFrame(ctx, frame, observedAt, runtime)
+			})
 		default:
 			err = transport.ErrUnsupportedFrame
 		}
 		if err != nil {
 			_ = connection.Close()
-			return failSessionWithLifecycle(ctx, runtime, outbound, err)
+			return failSessionWithLifecycle(ctx, coordinator, runtime, outbound, err)
 		}
 	}
 }
 
 func failSessionWithLifecycle(
 	ctx context.Context,
+	coordinator *SessionWriteCoordinator,
 	runtime *application.SessionRuntime,
 	outbound OutboundLifecycle,
 	cause error,
@@ -97,7 +107,17 @@ func failSessionWithLifecycle(
 		}
 		return outbound.Fail(ctx, cause)
 	}
+	if coordinator != nil {
+		return failRuntimeCoordinated(ctx, coordinator, runtime, cause, nil)
+	}
 	return failSession(ctx, runtime, cause)
+}
+
+func coordinateDispatch(ctx context.Context, coordinator *SessionWriteCoordinator, dispatch func() error) error {
+	if coordinator == nil {
+		return dispatch()
+	}
+	return coordinator.Execute(ctx, func(FrameWriter) error { return dispatch() })
 }
 
 func failSession(ctx context.Context, runtime *application.SessionRuntime, cause error) error {

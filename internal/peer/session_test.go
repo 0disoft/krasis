@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync"
 	"testing"
 	"time"
 
@@ -74,7 +75,7 @@ func TestRunSessionEOFDisablesOutboundSuppression(t *testing.T) {
 		t.Fatalf("NewOutboundController() error = %v", err)
 	}
 	connection := &scriptedConnection{}
-	err = RunSessionWithLifecycle(context.Background(), connection, runtime, nil, controller, fixedClock(time.Unix(101, 0)))
+	err = RunSessionWithLifecycle(context.Background(), connection, controller.Coordinator, runtime, nil, controller, fixedClock(time.Unix(101, 0)))
 	if !errors.Is(err, io.ErrUnexpectedEOF) {
 		t.Fatalf("RunSessionWithLifecycle() error = %v", err)
 	}
@@ -143,10 +144,111 @@ func TestRunSessionWrongDirectionInputFailsOutboundRuntime(t *testing.T) {
 	}
 }
 
+func TestLifecycleSessionCoordinatesInboundFaultTransitions(t *testing.T) {
+	tests := []struct {
+		name                string
+		frame               transport.Frame
+		wantConnectionClose bool
+	}{
+		{
+			name:  "input dispatch waits for coordinator",
+			frame: transport.Frame{Kind: transport.MessageInput, Payload: []byte{1}},
+		},
+		{
+			name:                "control decode closes before coordinated cleanup",
+			frame:               transport.Frame{Kind: transport.MessageControl, Payload: []byte{1}},
+			wantConnectionClose: true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			runtime, _ := newInboundRuntime(t)
+			connection := newObservedFrameConnection(test.frame)
+			coordinator := testWriteCoordinator(t, &recordingFrameWriter{})
+			held := make(chan struct{})
+			release := make(chan struct{})
+			holderDone := make(chan error, 1)
+			go func() {
+				holderDone <- coordinator.Execute(context.Background(), func(FrameWriter) error {
+					close(held)
+					<-release
+					return nil
+				})
+			}()
+			<-held
+
+			done := make(chan error, 1)
+			go func() {
+				done <- RunSessionWithLifecycle(
+					context.Background(), connection, coordinator, runtime, nil, nil, fixedClock(time.Unix(101, 0)),
+				)
+			}()
+			<-connection.read
+			if test.wantConnectionClose {
+				select {
+				case <-connection.closed:
+				case <-time.After(time.Second):
+					t.Fatal("control decode failure did not close connection before cleanup")
+				}
+			}
+			if state := runtime.Snapshot().Control.State; state != control.StateInboundActive {
+				t.Fatalf("runtime changed outside coordinator: %s", state)
+			}
+			select {
+			case err := <-done:
+				t.Fatalf("session finished while coordinator was held: %v", err)
+			default:
+			}
+
+			close(release)
+			if err := <-holderDone; err != nil {
+				t.Fatalf("held Execute() error = %v", err)
+			}
+			select {
+			case err := <-done:
+				if err == nil {
+					t.Fatal("malformed frame session error = nil")
+				}
+			case <-time.After(time.Second):
+				t.Fatal("malformed frame session did not finish")
+			}
+			if state := runtime.Snapshot().Control.State; state != control.StateLocal {
+				t.Fatalf("runtime did not finish local: %s", runtime.Snapshot())
+			}
+		})
+	}
+}
+
 type scriptedConnection struct {
 	frames []transport.Frame
 	index  int
 	closed bool
+}
+
+type observedFrameConnection struct {
+	frame     transport.Frame
+	delivered bool
+	read      chan struct{}
+	closed    chan struct{}
+	closeOnce sync.Once
+}
+
+func newObservedFrameConnection(frame transport.Frame) *observedFrameConnection {
+	return &observedFrameConnection{frame: frame, read: make(chan struct{}), closed: make(chan struct{})}
+}
+
+func (connection *observedFrameConnection) ReadFrame() (transport.Frame, error) {
+	if connection.delivered {
+		return transport.Frame{}, io.EOF
+	}
+	connection.delivered = true
+	close(connection.read)
+	return connection.frame, nil
+}
+
+func (connection *observedFrameConnection) Close() error {
+	connection.closeOnce.Do(func() { close(connection.closed) })
+	return nil
 }
 
 type closeCheckingEffects struct {

@@ -111,5 +111,7 @@ ADR 0005의 `SessionWriteCoordinator`는 grant, reject, revoke, input과 heartbe
 막힌 write를 깨운 뒤 같은 coordinator에서 bounded cleanup하며 source suppression은 lock 대기
 전과 획득 뒤에 모두 해제한다. heartbeat decode, liveness domain과 coordinated send primitive는
 구현됐지만 주기 sender와 deadline worker는 미구현이고 interval과 timeout도 `UNDECIDED`다.
+inbound input과 heartbeat dispatch는 coordinator 안에서 runtime을 변경하고 malformed control은
+connection close 뒤 cleanup하므로 fault 전이 뒤 semantic frame이 성공적으로 기록되지 않는다.
 
 wire 송신은 상태 머신 effect executor가 아니라 peer session orchestrator가 runtime 전이 성공 뒤 수행한다. `BeginOutboundSession`은 먼저 `PENDING`을 확정한 뒤 `LeaseRequest`를 쓰며, write 실패 시 pending session을 폐기한다. destination의 `LeaseResponder`는 주입된 authorization policy 결과에 따라 reject를 보내거나 inbound runtime을 활성화한 뒤 grant를 보낸다. grant write가 불확실하면 destination도 즉시 cleanup한다. input write는 runtime이 sequence를 예약한 뒤 수행하며 write 결과가 불확실하면 sequence를 재사용하지 않고 session 전체를 폐기한다.

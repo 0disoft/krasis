@@ -250,7 +250,7 @@ func runDestinationPeerProcess(t *testing.T, ctx context.Context) {
 	}
 	sessionDone := make(chan error, 1)
 	go func() {
-		sessionDone <- RunSessionWithLifecycle(ctx, peerConnection, runtime, responder, nil, time.Now)
+		sessionDone <- RunSessionWithLifecycle(ctx, peerConnection, coordinator, runtime, responder, nil, time.Now)
 	}()
 	select {
 	case move := <-input.moves:
@@ -329,7 +329,7 @@ func runSourcePeerProcess(t *testing.T, ctx context.Context) {
 	}
 	sessionDone := make(chan error, 1)
 	go func() {
-		sessionDone <- RunSessionWithLifecycle(ctx, peerConnection, runtime, nil, outbound, time.Now)
+		sessionDone <- RunSessionWithLifecycle(ctx, peerConnection, coordinator, runtime, nil, outbound, time.Now)
 	}()
 	if err := outbound.BeginBoundary(
 		ctx,
