@@ -165,6 +165,80 @@ func TestRunSupervisorClosesConnectionReturnedWithAcquireError(t *testing.T) {
 	}
 }
 
+func TestRunSupervisorDoesNotRetryWhenPartialAcquireCloseFails(t *testing.T) {
+	acquireErr := errors.New("partial acquire")
+	closeErr := errors.New("partial connection close failed")
+	connection := &stubConnection{closeErr: closeErr}
+	source := &scriptedSource{outcomes: []sourceOutcome{{connection: connection, err: acquireErr}}}
+	observer := &recordingSupervisorObserver{}
+	waitCalled := false
+	err := RunSupervisor(context.Background(), SupervisorConfig{
+		Session: Config{QueueCapacity: 1, Now: time.Now}, Backoff: DefaultBackoffPolicy(), Now: time.Now,
+		Wait: func(context.Context, time.Duration) error { waitCalled = true; return nil }, Observer: observer,
+	}, SupervisorDependencies{
+		Source: source, Hook: &idleHook{}, Input: newTestInput(false), Effects: noopEffects{}, Authorizer: acceptingAuthorizer{},
+		RunSession: RunSession,
+	})
+	if !errors.Is(err, acquireErr) || !errors.Is(err, closeErr) {
+		t.Fatalf("RunSupervisor() error = %v, want acquire and close failures", err)
+	}
+	if waitCalled || source.nextCalls != 1 || connection.closeCalls != 1 {
+		t.Fatalf("wait=%t Next=%d close=%d", waitCalled, source.nextCalls, connection.closeCalls)
+	}
+	if got := observer.states(); !equalStates(got, []SupervisorState{SupervisorAcquiring, SupervisorStopped}) {
+		t.Fatalf("states = %v", got)
+	}
+}
+
+func TestRunSupervisorPropagatesConnectionCloseFailureWithoutRetry(t *testing.T) {
+	closeErr := errors.New("connection close failed")
+	sessionErr := errors.New("session failed")
+	connection := &stubConnection{closeErr: closeErr}
+	source := &scriptedSource{outcomes: []sourceOutcome{{connection: connection}}}
+	observer := &recordingSupervisorObserver{}
+	err := RunSupervisor(context.Background(), SupervisorConfig{
+		Session: Config{QueueCapacity: 1, Now: time.Now}, Backoff: DefaultBackoffPolicy(), Now: time.Now, Wait: Wait, Observer: observer,
+	}, SupervisorDependencies{
+		Source: source, Hook: &idleHook{}, Input: newTestInput(false), Effects: noopEffects{}, Authorizer: acceptingAuthorizer{},
+		RunSession: func(_ context.Context, _ Config, dependencies Dependencies) (Result, error) {
+			_ = dependencies.Connection.Close()
+			return Result{FinalState: control.StateLocal}, sessionErr
+		},
+	})
+	if !errors.Is(err, sessionErr) || !errors.Is(err, closeErr) {
+		t.Fatalf("RunSupervisor() error = %v, want session and close failures", err)
+	}
+	if connection.closeCalls != 1 || source.nextCalls != 1 {
+		t.Fatalf("close calls = %d, Next calls = %d", connection.closeCalls, source.nextCalls)
+	}
+	if got := observer.states(); !equalStates(got, []SupervisorState{SupervisorAcquiring, SupervisorActive, SupervisorStopped}) {
+		t.Fatalf("states = %v", got)
+	}
+}
+
+func TestRunSupervisorPropagatesSourceCloseFailure(t *testing.T) {
+	closeErr := errors.New("source close failed")
+	source := &scriptedSource{outcomes: []sourceOutcome{{connection: &stubConnection{}}}, closeErr: closeErr}
+	observer := &recordingSupervisorObserver{}
+	err := RunSupervisor(context.Background(), SupervisorConfig{
+		Session: Config{QueueCapacity: 1, Now: time.Now}, Backoff: DefaultBackoffPolicy(), Now: time.Now, Wait: Wait, Observer: observer,
+	}, SupervisorDependencies{
+		Source: source, Hook: &idleHook{}, Input: newTestInput(false), Effects: noopEffects{}, Authorizer: acceptingAuthorizer{},
+		RunSession: func(context.Context, Config, Dependencies) (Result, error) {
+			return Result{FinalState: control.StateLocal}, wininput.ErrEmergencyRelease
+		},
+	})
+	if !errors.Is(err, wininput.ErrEmergencyRelease) || !errors.Is(err, closeErr) {
+		t.Fatalf("RunSupervisor() error = %v, want emergency and source close failures", err)
+	}
+	if source.closeCalls != 1 {
+		t.Fatalf("source close calls = %d", source.closeCalls)
+	}
+	if snapshots := observer.snapshotsCopy(); len(snapshots) == 0 || snapshots[len(snapshots)-1].State != SupervisorStopped || snapshots[len(snapshots)-1].FailureKind != "emergency_release" {
+		t.Fatalf("snapshots = %+v", snapshots)
+	}
+}
+
 func TestRunSupervisorStopsAfterEmergencyRelease(t *testing.T) {
 	source := &scriptedSource{outcomes: []sourceOutcome{{connection: &stubConnection{}}}}
 	err := RunSupervisor(context.Background(), SupervisorConfig{
@@ -186,9 +260,11 @@ type sourceOutcome struct {
 }
 
 type scriptedSource struct {
-	outcomes  []sourceOutcome
-	nextCalls int
-	closed    bool
+	outcomes   []sourceOutcome
+	nextCalls  int
+	closed     bool
+	closeCalls int
+	closeErr   error
 }
 
 func (source *scriptedSource) Next(context.Context) (Connection, error) {
@@ -199,9 +275,17 @@ func (source *scriptedSource) Next(context.Context) (Connection, error) {
 	source.nextCalls++
 	return outcome.connection, outcome.err
 }
-func (source *scriptedSource) Close() error { source.closed = true; return nil }
+func (source *scriptedSource) Close() error {
+	source.closed = true
+	source.closeCalls++
+	return source.closeErr
+}
 
-type stubConnection struct{ closed bool }
+type stubConnection struct {
+	closed     bool
+	closeCalls int
+	closeErr   error
+}
 
 func (*stubConnection) ReadFrame() (transport.Frame, error) {
 	return transport.Frame{}, errors.New("unused")
@@ -209,7 +293,11 @@ func (*stubConnection) ReadFrame() (transport.Frame, error) {
 func (*stubConnection) WriteFrameContext(context.Context, transport.Frame) error {
 	return errors.New("unused")
 }
-func (connection *stubConnection) Close() error { connection.closed = true; return nil }
+func (connection *stubConnection) Close() error {
+	connection.closed = true
+	connection.closeCalls++
+	return connection.closeErr
+}
 
 type recordingSupervisorObserver struct {
 	mu        sync.Mutex
@@ -229,6 +317,11 @@ func (observer *recordingSupervisorObserver) states() []SupervisorState {
 		states[index] = snapshot.State
 	}
 	return states
+}
+func (observer *recordingSupervisorObserver) snapshotsCopy() []SupervisorSnapshot {
+	observer.mu.Lock()
+	defer observer.mu.Unlock()
+	return append([]SupervisorSnapshot(nil), observer.snapshots...)
 }
 func equalStates(left, right []SupervisorState) bool {
 	if len(left) != len(right) {

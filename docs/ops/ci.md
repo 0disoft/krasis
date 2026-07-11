@@ -38,7 +38,10 @@ supervisor 테스트는 명시적인 transition table, exponential backoff cap, 
 `LOCAL` session failure 뒤 reconnect와 non-local failure의 즉시 중단을 검증한다. terminal path는
 예상 밖의 clean session return과 unsafe final state에서도 source와 connection을 닫고 마지막
 snapshot을 `STOPPED`로 기록해야 한다. acquire error와 함께 반환된 부분 connection도 retry 전에
-닫히는지 검증한다. network source 통합 테스트는 `peer-credentials`가 만든 역할 분리 identity로 실제 localhost listener/dial을 열고 양쪽 `PeerConnection`의 mTLS와 ALPN 인증을 통과시킨다.
+닫히는지 검증한다. session과 supervisor의 중복 Close는 실제 transport에 한 번만 전달되고,
+connection 또는 source Close 실패는 원래 session·shutdown 오류와 함께 반환되어야 한다.
+network source 테스트는 listener의 첫 Close 오류 보존과 TLS 인증 실패 뒤 raw socket의 close
+오류 결합을 검증한다. 통합 테스트는 `peer-credentials`가 만든 역할 분리 identity로 실제 localhost listener/dial을 열고 양쪽 `PeerConnection`의 mTLS와 ALPN 인증을 통과시킨다.
 
 emergency release 테스트는 modifier press/release, left/right modifier variant, F12 terminator 비전달, source suppression 해제와 worker fault cleanup을 검증한다. `agent-session` parser와 evidence gate 테스트는 explicit live-input acknowledgement, bounded duration, 인증 session 부재와 destination input 부재를 성공으로 가장하지 않는지 확인한다. CI에서는 실제 hook suppression과 `SendInput` 상호작용을 실행하지 않는다.
 

@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,6 +14,34 @@ import (
 	"github.com/0disoft/krasis/internal/peercredentials"
 	"github.com/0disoft/krasis/internal/transport"
 )
+
+func TestListenSourceClosePreservesFirstError(t *testing.T) {
+	closeErr := errors.New("listener close failed")
+	listener := &closeErrorListener{closeErr: closeErr}
+	source := &ListenSource{listener: listener, tlsConfig: &tls.Config{}}
+	if err := source.Close(); !errors.Is(err, closeErr) {
+		t.Fatalf("first Close() error = %v", err)
+	}
+	if err := source.Close(); !errors.Is(err, closeErr) {
+		t.Fatalf("second Close() error = %v", err)
+	}
+	if listener.closeCalls != 1 {
+		t.Fatalf("listener close calls = %d", listener.closeCalls)
+	}
+}
+
+func TestCloseConnectionOnErrorPreservesCauseAndCloseFailure(t *testing.T) {
+	cause := errors.New("authentication failed")
+	closeErr := errors.New("socket close failed")
+	connection := &closeErrorConn{closeErr: closeErr}
+	err := closeConnectionOnError(connection, cause)
+	if !errors.Is(err, cause) || !errors.Is(err, closeErr) {
+		t.Fatalf("closeConnectionOnError() error = %v", err)
+	}
+	if connection.closeCalls != 1 {
+		t.Fatalf("connection close calls = %d", connection.closeCalls)
+	}
+}
 
 func TestListenAndDialSourcesAuthenticatePeerConnection(t *testing.T) {
 	directory := filepath.Join(t.TempDir(), "credentials")
@@ -79,3 +109,29 @@ func loadAgentRoots(t *testing.T, path string) *x509.CertPool {
 	}
 	return roots
 }
+
+type closeErrorListener struct {
+	closeCalls int
+	closeErr   error
+}
+
+func (*closeErrorListener) Accept() (net.Conn, error) { return nil, errors.New("unused") }
+func (listener *closeErrorListener) Close() error {
+	listener.closeCalls++
+	return listener.closeErr
+}
+func (*closeErrorListener) Addr() net.Addr { return nil }
+
+type closeErrorConn struct {
+	closeCalls int
+	closeErr   error
+}
+
+func (*closeErrorConn) Read([]byte) (int, error)         { return 0, errors.New("unused") }
+func (*closeErrorConn) Write([]byte) (int, error)        { return 0, errors.New("unused") }
+func (connection *closeErrorConn) Close() error          { connection.closeCalls++; return connection.closeErr }
+func (*closeErrorConn) LocalAddr() net.Addr              { return nil }
+func (*closeErrorConn) RemoteAddr() net.Addr             { return nil }
+func (*closeErrorConn) SetDeadline(time.Time) error      { return nil }
+func (*closeErrorConn) SetReadDeadline(time.Time) error  { return nil }
+func (*closeErrorConn) SetWriteDeadline(time.Time) error { return nil }

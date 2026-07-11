@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/0disoft/krasis/internal/application"
@@ -135,7 +136,7 @@ type SupervisorDependencies struct {
 	RunSession SessionRunner
 }
 
-func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies SupervisorDependencies) error {
+func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies SupervisorDependencies) (returnErr error) {
 	if ctx == nil {
 		return errors.New("supervisor context is required")
 	}
@@ -156,14 +157,16 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 		return nil
 	}
 	if err := transition(SupervisorStarted, SupervisorSnapshot{}); err != nil {
-		_ = dependencies.Source.Close()
-		return err
+		return errors.Join(err, dependencies.Source.Close())
 	}
+	terminalSnapshot := SupervisorSnapshot{}
 	defer func() {
-		_ = dependencies.Source.Close()
+		sourceCloseErr := dependencies.Source.Close()
+		var transitionErr error
 		if state != SupervisorStopped {
-			_ = transition(SupervisorStoppedEvent, SupervisorSnapshot{})
+			transitionErr = transition(SupervisorStoppedEvent, terminalSnapshot)
 		}
+		returnErr = errors.Join(returnErr, sourceCloseErr, transitionErr)
 	}()
 
 	var attempt uint32
@@ -171,10 +174,11 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 		connection, acquireErr := dependencies.Source.Next(ctx)
 		if acquireErr != nil {
 			if connection != nil {
-				_ = connection.Close()
+				if closeErr := connection.Close(); closeErr != nil {
+					return errors.Join(acquireErr, ctx.Err(), closeErr)
+				}
 			}
 			if ctx.Err() != nil {
-				_ = transition(SupervisorStoppedEvent, SupervisorSnapshot{})
 				return ctx.Err()
 			}
 			attempt++
@@ -193,25 +197,26 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 		if connection == nil {
 			return errors.New("connection source returned a nil connection")
 		}
+		ownedConnection := &supervisedConnection{Connection: connection}
 		if err := transition(SupervisorConnectionAcquired, SupervisorSnapshot{Attempt: attempt}); err != nil {
-			_ = connection.Close()
-			return err
+			return errors.Join(err, ownedConnection.Close())
 		}
 		started := config.Now()
 		result, sessionErr := dependencies.RunSession(ctx, config.Session, Dependencies{
-			Connection: connection, Hook: dependencies.Hook, Input: dependencies.Input,
+			Connection: ownedConnection, Hook: dependencies.Hook, Input: dependencies.Input,
 			Effects: dependencies.Effects, Authorizer: dependencies.Authorizer,
 		})
-		_ = connection.Close()
+		if closeErr := ownedConnection.Close(); closeErr != nil {
+			return errors.Join(sessionErr, ctx.Err(), closeErr)
+		}
 		if ctx.Err() != nil {
-			_ = transition(SupervisorStoppedEvent, SupervisorSnapshot{})
 			return ctx.Err()
 		}
 		if sessionErr == nil {
 			return errors.New("agent session ended without a failure or shutdown")
 		}
 		if errors.Is(sessionErr, wininput.ErrEmergencyRelease) {
-			_ = transition(SupervisorStoppedEvent, SupervisorSnapshot{FailureKind: "emergency_release"})
+			terminalSnapshot.FailureKind = "emergency_release"
 			return sessionErr
 		}
 		if result.FinalState != control.StateLocal {
@@ -236,10 +241,22 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 
 func waitForRetry(ctx context.Context, config SupervisorConfig, attempt uint32, delay time.Duration, transition func(SupervisorEvent, SupervisorSnapshot) error) error {
 	if err := config.Wait(ctx, delay); err != nil {
-		_ = transition(SupervisorStoppedEvent, SupervisorSnapshot{})
 		return err
 	}
 	return transition(SupervisorRetryElapsed, SupervisorSnapshot{Attempt: attempt})
+}
+
+type supervisedConnection struct {
+	Connection
+	closeOnce sync.Once
+	closeErr  error
+}
+
+func (connection *supervisedConnection) Close() error {
+	connection.closeOnce.Do(func() {
+		connection.closeErr = connection.Connection.Close()
+	})
+	return connection.closeErr
 }
 
 func validateSupervisor(config SupervisorConfig, dependencies SupervisorDependencies) error {

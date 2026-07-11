@@ -15,6 +15,7 @@ type ListenSource struct {
 	listener  net.Listener
 	tlsConfig *tls.Config
 	closeOnce sync.Once
+	closeErr  error
 }
 
 func NewListenSource(address string, tlsConfig *tls.Config) (*ListenSource, error) {
@@ -47,8 +48,7 @@ func (source *ListenSource) Next(ctx context.Context) (Connection, error) {
 	}
 	peerConnection, err := transport.NewPeerConnection(ctx, tls.Server(connection, source.tlsConfig.Clone()))
 	if err != nil {
-		_ = connection.Close()
-		return nil, err
+		return nil, closeConnectionOnError(connection, err)
 	}
 	return peerConnection, nil
 }
@@ -57,9 +57,8 @@ func (source *ListenSource) Close() error {
 	if source == nil || source.listener == nil {
 		return nil
 	}
-	var closeErr error
-	source.closeOnce.Do(func() { closeErr = source.listener.Close() })
-	return closeErr
+	source.closeOnce.Do(func() { source.closeErr = source.listener.Close() })
+	return source.closeErr
 }
 
 type DialSource struct {
@@ -86,10 +85,16 @@ func (source *DialSource) Next(ctx context.Context) (Connection, error) {
 	}
 	peerConnection, err := transport.NewPeerConnection(ctx, tls.Client(connection, source.tlsConfig.Clone()))
 	if err != nil {
-		_ = connection.Close()
-		return nil, err
+		return nil, closeConnectionOnError(connection, err)
 	}
 	return peerConnection, nil
 }
 
 func (*DialSource) Close() error { return nil }
+
+func closeConnectionOnError(connection net.Conn, cause error) error {
+	if connection == nil {
+		return cause
+	}
+	return errors.Join(cause, connection.Close())
+}

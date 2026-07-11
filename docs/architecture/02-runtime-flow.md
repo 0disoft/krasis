@@ -99,6 +99,10 @@ server와 client TLS config는 TLS 1.3만 허용하고 `krasis/1` ALPN을 사용
 supervisor가 시작된 뒤 어떤 terminal return을 만나도 connection source를 닫고 마지막 observer
 snapshot을 `STOPPED`로 수렴시킨다. connection source가 acquisition error와 함께 부분 connection을
 반환하면 retry 전에 그 connection도 닫아 owner 없는 transport를 남기지 않는다.
+active connection은 supervisor가 씌운 close-once owner를 session과 공유한다. 두 경계가 동시에
+종료를 시도해도 실제 transport Close는 한 번만 실행되고 첫 Close 결과가 보존된다. connection,
+listener 또는 TLS 인증 실패 뒤 raw socket Close가 실패하면 기존 종료 원인과 close 오류를 함께
+호출자에게 반환하며, 닫힘이 불확실한 connection으로 retry하지 않는다.
 
 재시도 간격은 첫 250ms부터 두 배로 증가하고 30초에서 제한된다. session이 30초 이상 유지된 뒤 실패하면 다음 시도는 첫 간격으로 되돌아간다. 이 값은 현재 단일 peer 실험 기본값이며 실제 장비 측정 전 제품 SLO가 아니다. jitter는 한 listener와 한 connector만 있는 MVP topology에서는 아직 적용하지 않는다.
 
