@@ -55,6 +55,8 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, platform 
 		return runPeerCredentials(commandArgs, stdout, stderr)
 	case "agent-session":
 		return runAgentSession(ctx, commandArgs, stdout, stderr, platform)
+	case "agent-session-check":
+		return runAgentSessionCheck(commandArgs, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "unknown command: %s\n", command)
 		writeUsage(stderr)
@@ -571,5 +573,6 @@ func writeUsage(output io.Writer) {
 	fmt.Fprintln(output, "  krasis-lab peer-probe listen|connect [options]")
 	fmt.Fprintln(output, "  krasis-lab peer-credentials --output DIRECTORY --server-name NAME")
 	fmt.Fprintln(output, "  krasis-lab agent-session listen|connect [options] --allow-live-input")
+	fmt.Fprintln(output, "  krasis-lab agent-session-check [--json] REPORT-A.json REPORT-B.json")
 	fmt.Fprintln(output, "  krasis-lab help")
 }

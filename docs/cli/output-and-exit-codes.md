@@ -203,6 +203,25 @@ stable failure code:
 
 `stopReason`은 `duration_elapsed`, `canceled`, `emergency_release`, `failure` 중 하나다. 긴급 해제는 exit `0`이지만 증거가 통과했다는 뜻은 아니다. raw runtime error는 주소나 입력 정보가 섞일 수 있으므로 terminal에 복제하지 않고 stable failure code와 redacted report만 남긴다.
 
+## `agent-session-check --json`
+
+- schema: `krasis.lab.agent-session-check/v1`
+- 출력: 두 file의 basename 기반 요약, 전체 `valid`, `pairPassed`와 stable issue code
+
+pair issue code:
+
+- `pair_requires_two_reports`
+- `invalid_report`
+- `duplicate_device_alias`
+- `mixed_location_pair`
+- `missing_role_pair`
+- `non_opposite_edges`
+- `mixed_build_revision`
+- `modified_build`
+- `mixed_duration`
+
+file issue에는 schema, alias, role, edge, timestamp, build, duration, pass consistency와 destination evidence 오류가 포함된다. 두 file이 모두 strict valid하고 pair issue가 없을 때만 exit `0`이다.
+
 ## 호환성
 
 현재 CLI가 출력하거나 저장하는 schema는 Phase 0 실험 계약이다. 정식 제품 API가 아니므로 변경될 수 있지만, 변경 시 schema version과 관련 test를 함께 검토한다.

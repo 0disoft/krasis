@@ -95,6 +95,14 @@ connector 예시:
 
 양쪽 report가 모두 `completed=true`, `passed=true`, `supervisor.activeCount>=1`, `destinationInput.entries>=1`이어야 해당 pair의 bounded 양방향 실험이 통과한 것이다. 집 pair와 스터디카페 pair는 서로 다른 날짜에 반복해도 된다.
 
+두 report를 한 directory에 모은 뒤 strict pair checker를 실행한다.
+
+```powershell
+.\krasis-lab.exe agent-session-check .\reports\H-A-agent.json .\reports\H-B-agent.json
+```
+
+`valid=true`, `pairPassed=true`와 exit `0`을 함께 확인한다. report를 손으로 고쳐 통과시키지 않는다. 실패 report와 긴급 해제 report도 원인 분석용으로 별도 보존한다.
+
 ## 실패 처리
 
 - exit `0`: 모든 단계가 완료된 보고서가 생성됨

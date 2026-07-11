@@ -138,6 +138,19 @@
 
 duration 또는 사용자의 취소로 안전 종료해도 인증된 active session과 destination entry·input evidence가 모두 없으면 `passed=false`와 exit `1`이다. 긴급 해제는 의도된 안전 동작이라 exit `0`이지만 `passed=true`로 바꾸지 않는다.
 
+### `agent-session-check`
+
+같은 장소의 두 장비에서 수집한 `krasis.lab.agent-session/v1` report가 bounded 양방향 실험을 증명하는지 strict하게 판정한다.
+
+- 사용법: `krasis-lab agent-session-check [--json] REPORT-A.json REPORT-B.json`
+- 정확히 두 file만 받으며 unknown field, trailing JSON, 1MiB 초과 file과 schema 불일치를 거부한다.
+- file path는 결과에 basename만 남긴다.
+- `H-A/H-B` 또는 `S-A/S-B` 조합만 같은 pair로 인정한다.
+- listener/connect 역할 하나씩, 반대 edge, 같은 clean build revision과 같은 requested duration을 요구한다.
+- 두 report 모두 `completed=true`, `passed=true`, final supervisor `STOPPED`, authenticated active session과 destination entry·input·return arm evidence를 가져야 한다.
+
+report가 JSON으로 유효해도 pair 조건을 만족하지 않으면 exit `1`이다. 긴급 해제 report는 안전 동작 증거로 보존하지만 pair pass로 승격하지 않는다.
+
 ## 출력 방식
 
 - 기본 출력은 사람이 읽는 누적 snapshot이다.
