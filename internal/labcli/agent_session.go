@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"runtime"
 	"strconv"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/0disoft/krasis/internal/agent"
 	"github.com/0disoft/krasis/internal/buildinfo"
 	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/crashguard"
 	"github.com/0disoft/krasis/internal/evidence"
 	"github.com/0disoft/krasis/internal/lab"
 	"github.com/0disoft/krasis/internal/peercredentials"
@@ -60,7 +62,22 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 		BuildRevision: build.Revision, BuildModified: build.Modified,
 		RequestedMillis: options.duration.Milliseconds(),
 	}
+	var guard *crashguard.Process
+	guardClosed := false
 	finish := func(code int) int {
+		if guard != nil && !guardClosed {
+			guardClosed = true
+			if err := guard.Close(); err != nil {
+				report.CrashGuard.CleanShutdown = false
+				report.Passed = false
+				if report.FailureCode == "" {
+					report.FailureCode = "crash_guard_shutdown_failed"
+				}
+				code = exitRuntime
+			} else {
+				report.CrashGuard.CleanShutdown = true
+			}
+		}
 		if err := evidence.WriteJSONExclusive(options.output, report); err != nil {
 			fmt.Fprintf(stderr, "output_error: %v\n", err)
 			return exitRuntime
@@ -117,10 +134,32 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 		}
 		source = dialer
 	}
-	input := newCountingInput(wininput.NewInputAdapter())
+	executable, err := os.Executable()
+	if err != nil {
+		_ = source.Close()
+		report.FailureCode = "crash_guard_executable_failed"
+		report.StopReason = "failure"
+		return finish(exitRuntime)
+	}
+	guard, err = crashguard.Start(executable)
+	if err != nil {
+		_ = source.Close()
+		report.FailureCode = "crash_guard_start_failed"
+		report.StopReason = "failure"
+		return finish(exitRuntime)
+	}
+	report.CrashGuard.Started = true
+	input := newCountingInput(wininput.NewInputAdapter(), guard)
 	observer := &agentSessionObserver{}
 	runContext, cancel := context.WithTimeout(ctx, options.duration)
 	defer cancel()
+	go func() {
+		select {
+		case <-guard.Done():
+			cancel()
+		case <-runContext.Done():
+		}
+	}()
 	err = agent.RunSupervisor(runContext, agent.SupervisorConfig{
 		Session: agent.DefaultConfig(control.BoundaryConfig{
 			Edge: options.edge, ScreenLeft: diagnostics.Display.Left, ScreenWidth: diagnostics.Display.Width,
@@ -133,6 +172,13 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 	})
 	report.Supervisor = observer.evidence()
 	report.DestinationInput = input.evidence()
+	select {
+	case <-guard.Done():
+		report.FailureCode = "crash_guard_stopped"
+		report.StopReason = "failure"
+		return finish(exitRuntime)
+	default:
+	}
 	switch {
 	case errors.Is(err, wininput.ErrEmergencyRelease):
 		report.Completed = true
@@ -249,14 +295,23 @@ func writeAgentSessionUsage(output io.Writer) {
 
 type countingInput struct {
 	delegate *wininput.InputAdapter
+	guard    inputGuard
 	mu       sync.Mutex
 	value    lab.InputEvidence
 }
 
-func newCountingInput(delegate *wininput.InputAdapter) *countingInput {
-	return &countingInput{delegate: delegate}
+type inputGuard interface {
+	PreparePress(control.PressedToken) error
+	Released(control.PressedToken) error
+}
+
+func newCountingInput(delegate *wininput.InputAdapter, guard inputGuard) *countingInput {
+	return &countingInput{delegate: delegate, guard: guard}
 }
 func (input *countingInput) Press(ctx context.Context, token control.PressedToken) error {
+	if err := input.guard.PreparePress(token); err != nil {
+		return fmt.Errorf("prepare crash recovery: %w", err)
+	}
 	if err := input.delegate.Press(ctx, token); err != nil {
 		return err
 	}
@@ -272,6 +327,9 @@ func (input *countingInput) Press(ctx context.Context, token control.PressedToke
 func (input *countingInput) Release(ctx context.Context, token control.PressedToken) error {
 	if err := input.delegate.Release(ctx, token); err != nil {
 		return err
+	}
+	if err := input.guard.Released(token); err != nil {
+		return fmt.Errorf("confirm crash recovery release: %w", err)
 	}
 	input.mu.Lock()
 	if token.Kind == control.PressedKeyboardKey {

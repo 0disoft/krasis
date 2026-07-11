@@ -2,7 +2,7 @@ package lab
 
 import "time"
 
-const AgentSessionSchemaVersion = "krasis.lab.agent-session/v1"
+const AgentSessionSchemaVersion = "krasis.lab.agent-session/v2"
 
 type AgentSessionReport struct {
 	SchemaVersion    string             `json:"schemaVersion"`
@@ -17,8 +17,14 @@ type AgentSessionReport struct {
 	Passed           bool               `json:"passed"`
 	StopReason       string             `json:"stopReason"`
 	FailureCode      string             `json:"failureCode,omitempty"`
+	CrashGuard       CrashGuardEvidence `json:"crashGuard"`
 	Supervisor       SupervisorEvidence `json:"supervisor"`
 	DestinationInput InputEvidence      `json:"destinationInput"`
+}
+
+type CrashGuardEvidence struct {
+	Started       bool `json:"started"`
+	CleanShutdown bool `json:"cleanShutdown"`
 }
 
 type SupervisorEvidence struct {

@@ -80,7 +80,12 @@ peer가 보낸 wall clock을 신뢰하지 않고 로컬 수신 시각을 사용�
 - 성공한 token만 제거하고 실패한 token은 다음 retry를 위해 유지한다.
 - 빈 상태의 `ReleaseAll`은 아무 입력도 만들지 않는다.
 
-`PressedState`는 원시 입력 log가 아니다. 메모리상 복구 책임에만 사용하며 support bundle, 진단 출력과 일반 log에 token code를 복제하지 않는다. durable crash journal 형식과 암호화·수명 정책은 crash guard 설계 전까지 미구현이다.
+`PressedState`는 원시 입력 log가 아니다. 메모리상 복구 책임에만 사용하며 support bundle,
+진단 출력과 일반 log에 token code를 복제하지 않는다. Phase 0 `agent-session`은 별도 crash
+guard process가 같은 normalized token set만 메모리에 복제한다. agent는 down 주입 전에
+`PREPARE_PRESS` ACK를 받고, 성공한 up 뒤 `RELEASED` ACK를 받는다. pipe EOF를 포함한 guard
+종료는 남은 token의 역순 `ReleaseAll`을 먼저 수행한다. durable file journal과 제품 설치
+수명 정책은 도입하지 않았다.
 
 ## 화면 경계 intent
 

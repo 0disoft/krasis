@@ -58,7 +58,7 @@ func TestInjectPressRecordsBeforeCallingAdapter(t *testing.T) {
 func TestInjectPressRetainsRecoveryStateWhenAdapterFails(t *testing.T) {
 	var state control.PressedState
 	port := &recordingInputPort{state: &state, pressErr: errEffectFailed}
-	token := control.PressedToken{Kind: control.PressedMouseButton, Code: 0}
+	token := control.PressedToken{Kind: control.PressedMouseButton, Code: 1}
 
 	err := InjectPress(context.Background(), &state, port, token)
 	if !errors.Is(err, errEffectFailed) || !state.Contains(token) {

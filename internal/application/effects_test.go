@@ -29,7 +29,7 @@ func TestSafetyEffectExecutorMapsReleaseAllToPressedState(t *testing.T) {
 
 func TestSafetyEffectExecutorPreservesFailedReleaseForFaultRetry(t *testing.T) {
 	var pressed control.PressedState
-	token := control.PressedToken{Kind: control.PressedMouseButton, Code: 0}
+	token := control.PressedToken{Kind: control.PressedMouseButton, Code: 1}
 	pressAll(t, &pressed, token)
 	release := &recordingReleasePort{fail: map[control.PressedToken]error{token: errReleaseBlocked}}
 	executor, err := NewSafetyEffectExecutor(&recordingEffectExecutor{}, &pressed, release)
@@ -62,7 +62,7 @@ func TestSafetyEffectExecutorDelegatesNonReleaseEffects(t *testing.T) {
 func TestFaultFlowReleasesPressedStateAndConvergesLocal(t *testing.T) {
 	var pressed control.PressedState
 	key := control.PressedToken{Kind: control.PressedKeyboardKey, Code: 65}
-	button := control.PressedToken{Kind: control.PressedMouseButton, Code: 0}
+	button := control.PressedToken{Kind: control.PressedMouseButton, Code: 1}
 	pressAll(t, &pressed, key, button)
 	delegate := &recordingEffectExecutor{}
 	release := &recordingReleasePort{}

@@ -25,7 +25,7 @@ func TestReleaseAllReleasesInReverseOrderAndClearsState(t *testing.T) {
 	var state control.PressedState
 	first := control.PressedToken{Kind: control.PressedKeyboardKey, Code: 17}
 	second := control.PressedToken{Kind: control.PressedKeyboardKey, Code: 65}
-	third := control.PressedToken{Kind: control.PressedMouseButton, Code: 0}
+	third := control.PressedToken{Kind: control.PressedMouseButton, Code: 1}
 	pressAll(t, &state, first, second, third)
 	port := &recordingReleasePort{}
 

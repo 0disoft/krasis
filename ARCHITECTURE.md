@@ -21,4 +21,4 @@ Domain과 Application은 Win32, Wails, Svelte 및 구체적인 전송 라이브�
 
 ## 결정과 가설의 경계
 
-결정된 것은 실패 안전 방향, 계층 경계, UI 격리, 단일 활성 제어권이다. 저수준 hook과 Raw Input의 조합, TCP 연결 수, Protobuf, mTLS 세부 형식, crash guard 프로세스와 모든 정량 목표는 Phase 0 또는 ADR 검증 전 가설이다.
+결정된 것은 실패 안전 방향, 계층 경계, UI 격리, 단일 활성 제어권, ordered mTLS peer stream과 Phase 0 lab의 별도 crash guard다. Raw Input 추가 여부, 정식 제품의 process/설치 topology와 모든 정량 목표는 Phase 0 실장비 검증 전 가설이다.

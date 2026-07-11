@@ -150,6 +150,9 @@ func validate(report lab.AgentSessionReport) []string {
 	if report.Supervisor.FinalState != "STOPPED" || report.Supervisor.ActiveCount == 0 {
 		issues = append(issues, "missing_authenticated_session")
 	}
+	if !report.CrashGuard.Started || !report.CrashGuard.CleanShutdown {
+		issues = append(issues, "missing_crash_guard_evidence")
+	}
 	input := report.DestinationInput
 	if input.Entries == 0 || input.ReturnArms == 0 || input.KeyDowns+input.KeyUps+input.ButtonDowns+input.ButtonUps+input.PointerMoves+input.Wheels == 0 {
 		issues = append(issues, "missing_destination_evidence")

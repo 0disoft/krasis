@@ -60,7 +60,13 @@ source `RunSession`의 EOF, cancellation, malformed frame과 dispatcher failure�
 
 runtime은 port 호출이 끝날 때까지 owner lock을 유지한다. 따라서 effect와 input port는 같은 runtime API로 재진입하지 않아야 하며, 느린 I/O를 직접 수행하는 대신 adapter 내부의 명확히 제한된 호출만 제공해야 한다. transport와 Windows adapter는 이 runtime 경계를 통해서만 event와 input을 전달한다.
 
-durable state commit, optimistic version compare-and-swap, transition history, command idempotency와 별도 crash guard는 아직 후속 경계다. 따라서 이 단계의 테스트는 process 내부 수렴을 증명하지만 process가 죽은 뒤의 복구를 증명하지 않는다.
+durable state commit, optimistic version compare-and-swap, transition history와 command
+idempotency는 아직 후속 경계다. Phase 0 `agent-session`의 destination discrete input은 별도
+crash guard에 down 의도를 ACK 받은 뒤 주입하고, 성공한 up 뒤 guard 상태를 제거한다.
+parent pipe EOF, protocol 오류와 정상 disarm에서 guard가 남은 token을 역순 해제한다.
+IPC ACK와 process 종료는 각각 2초 안에 끝나야 하며 timeout은 session fault다.
+subprocess test는 parent 강제 종료 뒤 이 독립 cleanup owner가 실행됨을 증명하지만 실제
+`SendInput`, 물리 입력 동시성, guard와 agent 동시 종료 또는 전원 차단은 증명하지 않는다.
 
 ## Peer transport
 

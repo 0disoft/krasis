@@ -179,13 +179,14 @@ private key나 certificate body는 manifest와 stdout에 출력하지 않는다.
 
 ## `agent-session`
 
-- schema: `krasis.lab.agent-session/v1`
+- schema: `krasis.lab.agent-session/v2`
 - 출력: `--output`으로 지정한 단일 JSON file
 
 필드:
 
 - `deviceAlias`, `role`, `edge`, `collectedAt`, build 정보와 requested duration
 - `completed`, `passed`, `stopReason`, `failureCode`
+- crash guard의 시작 여부와 남은 token을 해제한 정상 종료 여부
 - supervisor의 final state, active 횟수, acquire/session failure 횟수와 emergency stop 횟수
 - destination의 entry, key/button down/up, pointer move, wheel과 return arm 누적 개수
 
@@ -197,6 +198,10 @@ stable failure code:
 - `tls_config_failed`
 - `listen_failed`
 - `dial_config_failed`
+- `crash_guard_executable_failed`
+- `crash_guard_start_failed`
+- `crash_guard_stopped`
+- `crash_guard_shutdown_failed`
 - `agent_session_failed`
 - `no_authenticated_session`
 - `no_destination_input_observed`
@@ -220,7 +225,7 @@ pair issue code:
 - `modified_build`
 - `mixed_duration`
 
-file issue에는 schema, alias, role, edge, timestamp, build, duration, pass consistency와 destination evidence 오류가 포함된다. 두 file이 모두 strict valid하고 pair issue가 없을 때만 exit `0`이다.
+file issue에는 schema, alias, role, edge, timestamp, build, duration, pass consistency, crash guard와 destination evidence 오류가 포함된다. 두 file이 모두 strict valid하고 pair issue가 없을 때만 exit `0`이다.
 
 ## 호환성
 

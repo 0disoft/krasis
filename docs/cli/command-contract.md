@@ -133,6 +133,7 @@
 - MVP대로 active monitor가 정확히 하나가 아니면 hook을 시작하지 않고 실패한다.
 - destination grant 전에는 source suppression을 활성화하지 않는다.
 - physical `Ctrl+Alt+Shift+F12`는 현재 active source session을 즉시 중단한다. F12 terminator는 원격 전송하거나 로컬에서 억제하지 않으며 supervisor는 긴급 해제 뒤 재연결하지 않는다.
+- 같은 executable의 별도 crash guard process가 destination down 전에 token을 ACK하고 성공한 up 뒤 제거한다. guard가 먼저 종료되거나 정상 종료에서 남은 token을 해제하지 못하면 session은 실패한다.
 - 기본 rearm distance는 32px이고 activation gap은 0px다. 이는 Phase 0 안전 실험값이며 제품 UX 기본값이 아니다.
 - report에는 aggregate count와 supervisor state만 저장하고 주소, certificate, session/epoch/lease, key code, pointer 좌표와 delta를 저장하지 않는다.
 
@@ -140,14 +141,14 @@ duration 또는 사용자의 취소로 안전 종료해도 인증된 active sess
 
 ### `agent-session-check`
 
-같은 장소의 두 장비에서 수집한 `krasis.lab.agent-session/v1` report가 bounded 양방향 실험을 증명하는지 strict하게 판정한다.
+같은 장소의 두 장비에서 수집한 `krasis.lab.agent-session/v2` report가 bounded 양방향 실험을 증명하는지 strict하게 판정한다.
 
 - 사용법: `krasis-lab agent-session-check [--json] REPORT-A.json REPORT-B.json`
 - 정확히 두 file만 받으며 unknown field, trailing JSON, 1MiB 초과 file과 schema 불일치를 거부한다.
 - file path는 결과에 basename만 남긴다.
 - `H-A/H-B` 또는 `S-A/S-B` 조합만 같은 pair로 인정한다.
 - listener/connect 역할 하나씩, 반대 edge, 같은 clean build revision과 같은 requested duration을 요구한다.
-- 두 report 모두 `completed=true`, `passed=true`, final supervisor `STOPPED`, authenticated active session과 destination entry·input·return arm evidence를 가져야 한다.
+- 두 report 모두 `completed=true`, `passed=true`, crash guard 시작·정상 종료, final supervisor `STOPPED`, authenticated active session과 destination entry·input·return arm evidence를 가져야 한다.
 
 report가 JSON으로 유효해도 pair 조건을 만족하지 않으면 exit `1`이다. 긴급 해제 report는 안전 동작 증거로 보존하지만 pair pass로 승격하지 않는다.
 

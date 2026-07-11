@@ -93,7 +93,10 @@ connector 예시:
 
 실행 중 A의 오른쪽 끝에서 B로 넘어가 pointer, wheel, 기본 button과 안전한 test key를 확인한다. B의 왼쪽 끝에서 A로 돌아온 뒤 반대 방향도 반복한다. key나 button을 누른 상태로 경계를 넘지 않는다. 이상 동작, stuck input 또는 예상하지 않은 suppression이 보이면 즉시 긴급 해제를 누른다.
 
-양쪽 report가 모두 `completed=true`, `passed=true`, `supervisor.activeCount>=1`, `destinationInput.entries>=1`이어야 해당 pair의 bounded 양방향 실험이 통과한 것이다. 집 pair와 스터디카페 pair는 서로 다른 날짜에 반복해도 된다.
+양쪽 report가 모두 `schemaVersion=krasis.lab.agent-session/v2`, `completed=true`,
+`passed=true`, `crashGuard.started=true`, `crashGuard.cleanShutdown=true`,
+`supervisor.activeCount>=1`, `destinationInput.entries>=1`이어야 해당 pair의 bounded 양방향
+실험이 통과한 것이다. 집 pair와 스터디카페 pair는 서로 다른 날짜에 반복해도 된다.
 
 두 report를 한 directory에 모은 뒤 strict pair checker를 실행한다.
 
@@ -114,4 +117,9 @@ JSON에는 원시 key, 입력 문자열, pointer 좌표, host name과 window tit
 
 ## 아직 증명하지 않는 것
 
-basic/guided probe는 한 장비의 hook, aggregate capture와 tagged `SendInput`만 검사한다. `peer-probe`는 두 노트북 사이의 인증된 연결과 protocol frame 왕복만 검사한다. 실제 입력 억제, cursor entry, 절전, 강제 종료와 `ReleaseAll`은 별도 실험이다.
+basic/guided probe는 한 장비의 hook, aggregate capture와 tagged `SendInput`만 검사한다.
+`peer-probe`는 두 노트북 사이의 인증된 연결과 protocol frame 왕복만 검사한다.
+`agent-session` report의 crash guard 정상 종료는 guard process와 IPC가 실행됐음을 증명하지만,
+실제 input이 down인 순간 parent를 강제 종료한 복구를 증명하지 않는다. 그 강제 종료,
+절전·잠금과 실제 `SendInput` release는 두 노트북이 같은 책상에 있을 때 별도 수동
+실험으로 남는다.

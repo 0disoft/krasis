@@ -75,7 +75,16 @@ func (state *PressedState) ReleasePlan() []PressedToken {
 
 func (token PressedToken) Validate() error {
 	switch token.Kind {
-	case PressedKeyboardKey, PressedMouseButton:
+	case PressedKeyboardKey:
+		const allowedKeyboardBits uint32 = 0x1FFFF
+		if token.Code&0xFFFF == 0 || token.Code&^allowedKeyboardBits != 0 {
+			return fmt.Errorf("%w: invalid encoded keyboard scan code", ErrInvalidPressedToken)
+		}
+		return nil
+	case PressedMouseButton:
+		if token.Code < 1 || token.Code > 5 {
+			return fmt.Errorf("%w: unsupported mouse button code", ErrInvalidPressedToken)
+		}
 		return nil
 	default:
 		return fmt.Errorf("%w: unknown kind %q", ErrInvalidPressedToken, token.Kind)

@@ -45,9 +45,20 @@ func TestCheckRejectsIncompleteOrEmergencyReport(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsReportWithoutCrashGuardEvidence(t *testing.T) {
+	directory := t.TempDir()
+	report := passingReport("H-A", "listen", "RIGHT")
+	report.CrashGuard = lab.CrashGuardEvidence{}
+	path := writeReport(t, directory, "missing-guard.json", report)
+	result := Check([]string{path})
+	if result.Valid || !hasIssue(result.Files[0].Issues, "missing_crash_guard_evidence") {
+		t.Fatalf("Check() = %+v", result)
+	}
+}
+
 func TestCheckRejectsUnknownFields(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "unknown.json")
-	if err := os.WriteFile(path, []byte(`{"schemaVersion":"krasis.lab.agent-session/v1","surprise":true}`), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(`{"schemaVersion":"krasis.lab.agent-session/v2","surprise":true}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	result := Check([]string{path})
@@ -61,6 +72,7 @@ func passingReport(alias, role, edge string) lab.AgentSessionReport {
 		SchemaVersion: lab.AgentSessionSchemaVersion, DeviceAlias: alias, Role: role, Edge: edge,
 		CollectedAt:   time.Date(2026, time.July, 11, 0, 0, 0, 0, time.UTC),
 		BuildRevision: "abc123", RequestedMillis: 120_000, Completed: true, Passed: true, StopReason: "duration_elapsed",
+		CrashGuard:       lab.CrashGuardEvidence{Started: true, CleanShutdown: true},
 		Supervisor:       lab.SupervisorEvidence{FinalState: "STOPPED", ActiveCount: 1},
 		DestinationInput: lab.InputEvidence{Entries: 1, PointerMoves: 1, ReturnArms: 1},
 	}

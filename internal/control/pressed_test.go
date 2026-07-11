@@ -10,7 +10,7 @@ func TestPressedStatePlansReversePressOrder(t *testing.T) {
 	var state PressedState
 	first := PressedToken{Kind: PressedKeyboardKey, Code: 17}
 	second := PressedToken{Kind: PressedKeyboardKey, Code: 65}
-	third := PressedToken{Kind: PressedMouseButton, Code: 0}
+	third := PressedToken{Kind: PressedMouseButton, Code: 1}
 	for _, token := range []PressedToken{first, second, third} {
 		added, err := state.RecordPress(token)
 		if err != nil || !added {
@@ -85,5 +85,19 @@ func TestPressedStateRejectsUnknownKind(t *testing.T) {
 	}
 	if state.Count() != 0 {
 		t.Fatalf("invalid token changed state: count=%d", state.Count())
+	}
+}
+
+func TestPressedTokenRejectsInvalidKeyboardAndMouseCodes(t *testing.T) {
+	tests := []PressedToken{
+		{Kind: PressedKeyboardKey, Code: 0},
+		{Kind: PressedKeyboardKey, Code: 0x20000},
+		{Kind: PressedMouseButton, Code: 0},
+		{Kind: PressedMouseButton, Code: 6},
+	}
+	for _, token := range tests {
+		if err := token.Validate(); err == nil {
+			t.Fatalf("Validate() accepted %+v", token)
+		}
 	}
 }

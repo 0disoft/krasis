@@ -18,7 +18,18 @@ supervisor 테스트는 명시적인 transition table, exponential backoff cap, 
 
 emergency release 테스트는 modifier press/release, left/right modifier variant, F12 terminator 비전달, source suppression 해제와 worker fault cleanup을 검증한다. `agent-session` parser와 evidence gate 테스트는 explicit live-input acknowledgement, bounded duration, 인증 session 부재와 destination input 부재를 성공으로 가장하지 않는지 확인한다. CI에서는 실제 hook suppression과 `SendInput` 상호작용을 실행하지 않는다.
 
-agent report checker 테스트는 strict JSON decoding과 두 file cardinality, 장소별 alias pair, listener/connect 역할, 반대 edge, clean 동일 build, 동일 duration, 양쪽 pass 및 destination evidence를 검증한다. 전체 path, session identifier나 원시 입력은 checker output으로 복제하지 않는다.
+crash guard protocol 테스트는 down 전 prepare ACK, up 후 release ACK, 역순 cleanup, malformed
+frame과 release 실패를 검증한다. 별도 subprocess 테스트는 guard에 token을 준비한 parent
+test process의 readiness 신호를 받은 뒤 parent만 강제 종료하고, pipe EOF를 받은 guard가
+독립적으로 recovery marker를 기록하는지 bounded polling으로 확인한다. marker에는 test용
+normalized kind와 code만 있으며 artifact나 제품 report로 보존하지 않는다.
+별도 hung-helper 테스트는 command를 읽고 ACK하지 않는 guard를 사용해 2초 제품 timeout을
+짧은 test timeout으로 대체하고, parent가 IPC 실패를 반환하며 helper를 종료하는지 확인한다.
+
+agent report checker 테스트는 strict JSON decoding과 두 file cardinality, 장소별 alias pair,
+listener/connect 역할, 반대 edge, clean 동일 build, 동일 duration, 양쪽 pass, crash guard의
+시작·정상 종료 및 destination evidence를 검증한다. 전체 path, session identifier나 원시
+입력은 checker output으로 복제하지 않는다.
 
 subprocess fault 테스트는 active session에서 destination process를 강제 종료한 뒤 source process가 connection failure를 관찰해 suppression을 해제하고 `LOCAL`로 성공 종료하는지 확인한다. 반대 방향은 destination에 실제 key-down을 전달한 뒤 source process를 강제 종료하고 destination이 해당 key release를 adapter에 실행한 다음 `LOCAL`로 성공 종료하는지 확인한다. 부모 test가 명시적으로 종료한 process의 non-zero exit만 예상 결과로 허용한다.
 

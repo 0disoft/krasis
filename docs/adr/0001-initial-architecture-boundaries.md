@@ -21,4 +21,5 @@ UI를 교체하거나 닫아도 입력 안전 계약은 유지된다. 대신 age
 
 ## 보류
 
-프로세스 수, crash guard의 별도 프로세스 여부, IPC 방식과 설치 범위는 Phase 0 이후 결정한다.
+Phase 0 lab의 crash guard process와 IPC 순서는 ADR 0004에서 결정했다. 정식 제품의 process
+수, 설치 범위, single-instance와 updater 경계는 여전히 Phase 0 이후 결정한다.
