@@ -65,6 +65,10 @@ idempotency는 아직 후속 경계다. Phase 0 `agent-session`의 destination d
 crash guard에 down 의도를 ACK 받은 뒤 주입하고, 성공한 up 뒤 guard 상태를 제거한다.
 parent pipe EOF, protocol 오류와 정상 disarm에서 guard가 남은 token을 역순 해제한다.
 IPC ACK와 process 종료는 각각 2초 안에 끝나야 하며 timeout은 session fault다.
+guard는 종료 reason과 aggregate release count를 별도 no-replace JSON에 기록한 뒤 종료한다.
+정상 agent report는 이 파일의 basename만 참조하며 checker가 같은 directory 안에서
+device/build와 `DISARM` zero-recovery를 대조한다. parent crash evidence는 `PARENT_EOF`와
+실제 release count를 요구한다.
 subprocess test는 parent 강제 종료 뒤 이 독립 cleanup owner가 실행됨을 증명하지만 실제
 `SendInput`, 물리 입력 동시성, guard와 agent 동시 종료 또는 전원 차단은 증명하지 않는다.
 

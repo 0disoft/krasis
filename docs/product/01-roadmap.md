@@ -49,6 +49,7 @@
 - listen/dial adapter와 fail-safe reconnect supervisor는 구현됨
 - bounded live-input `krasis-lab agent-session`과 로컬 긴급 해제는 구현됨
 - 별도 Phase 0 crash guard, parent-kill subprocess 복구와 report gate는 구현됨
+- 장소별 순차 수집을 합치는 `phase0-check` evidence gate는 구현됨
 - 정식 agent executable, 단일 instance와 tray lifecycle은 미구현
 
 ### Phase 6: Wails v3 + Svelte UI

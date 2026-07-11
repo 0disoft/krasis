@@ -1,6 +1,7 @@
 package labcli
 
 import (
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -8,11 +9,23 @@ import (
 	"github.com/0disoft/krasis/internal/lab"
 )
 
+func TestResolveAgentSessionOutputPathsRequiresSameDirectory(t *testing.T) {
+	first := filepath.Join(t.TempDir(), "agent.json")
+	second := filepath.Join(t.TempDir(), "guard.json")
+	if _, _, err := resolveAgentSessionOutputPaths(first, second); err == nil {
+		t.Fatal("resolveAgentSessionOutputPaths accepted different directories")
+	}
+	directory := t.TempDir()
+	if _, _, err := resolveAgentSessionOutputPaths(filepath.Join(directory, "agent.json"), filepath.Join(directory, "guard.json")); err != nil {
+		t.Fatalf("resolveAgentSessionOutputPaths() error = %v", err)
+	}
+}
+
 func TestParseAgentSessionConnectArgs(t *testing.T) {
 	options, err := parseAgentSessionArgs([]string{
 		"connect", "--device", "H-B", "--address", "192.0.2.10:24876", "--server-name", "192.0.2.10",
 		"--ca", "ca.pem", "--cert", "identity.pem", "--key", "identity-key.pem",
-		"--edge", "left", "--duration", "2m", "--output", "report.json", "--allow-live-input",
+		"--edge", "left", "--duration", "2m", "--output", "report.json", "--guard-output", "guard.json", "--allow-live-input",
 	})
 	if err != nil {
 		t.Fatalf("parseAgentSessionArgs() error = %v", err)
@@ -26,7 +39,7 @@ func TestParseAgentSessionRequiresLiveInputAcknowledgement(t *testing.T) {
 	_, err := parseAgentSessionArgs([]string{
 		"listen", "--device", "H-A", "--address", ":24876", "--ca", "ca.pem",
 		"--cert", "identity.pem", "--key", "identity-key.pem", "--edge", "RIGHT",
-		"--duration", "1m", "--output", "report.json",
+		"--duration", "1m", "--output", "report.json", "--guard-output", "guard.json",
 	})
 	if err == nil {
 		t.Fatal("parseAgentSessionArgs() accepted missing acknowledgement")

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -37,6 +38,7 @@ type agentSessionArgs struct {
 	duration      time.Duration
 	rearmDistance int32
 	output        string
+	guardOutput   string
 	liveInput     bool
 }
 
@@ -53,6 +55,15 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 	}
 	if err := evidence.ValidateJSONOutputPath(options.output); err != nil {
 		fmt.Fprintf(stderr, "invalid agent-session output: %v\n", err)
+		return exitUsage
+	}
+	if err := evidence.ValidateJSONOutputPath(options.guardOutput); err != nil {
+		fmt.Fprintf(stderr, "invalid agent-session guard output: %v\n", err)
+		return exitUsage
+	}
+	_, guardPath, err := resolveAgentSessionOutputPaths(options.output, options.guardOutput)
+	if err != nil {
+		fmt.Fprintln(stderr, "invalid agent-session guard output path")
 		return exitUsage
 	}
 	build := buildinfo.Read()
@@ -141,7 +152,7 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 		report.StopReason = "failure"
 		return finish(exitRuntime)
 	}
-	guard, err = crashguard.Start(executable)
+	guard, err = crashguard.Start(executable, options.device, guardPath)
 	if err != nil {
 		_ = source.Close()
 		report.FailureCode = "crash_guard_start_failed"
@@ -149,6 +160,8 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 		return finish(exitRuntime)
 	}
 	report.CrashGuard.Started = true
+	report.CrashGuard.ReportFile = filepath.Base(guardPath)
+	fmt.Fprintf(stdout, "Crash guard armed: agent_pid=%d report=%s\n", os.Getpid(), options.guardOutput)
 	input := newCountingInput(wininput.NewInputAdapter(), guard)
 	observer := &agentSessionObserver{}
 	runContext, cancel := context.WithTimeout(ctx, options.duration)
@@ -200,6 +213,22 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 	}
 }
 
+func resolveAgentSessionOutputPaths(report, guard string) (string, string, error) {
+	reportPath, err := filepath.Abs(report)
+	if err != nil {
+		return "", "", err
+	}
+	guardPath, err := filepath.Abs(guard)
+	if err != nil {
+		return "", "", err
+	}
+	if strings.EqualFold(filepath.Clean(reportPath), filepath.Clean(guardPath)) ||
+		!strings.EqualFold(filepath.Clean(filepath.Dir(reportPath)), filepath.Clean(filepath.Dir(guardPath))) {
+		return "", "", errors.New("agent and guard outputs must be different files in the same directory")
+	}
+	return reportPath, guardPath, nil
+}
+
 func agentSessionEvidenceExit(report *lab.AgentSessionReport) int {
 	if report.Supervisor.ActiveCount == 0 {
 		report.FailureCode = "no_authenticated_session"
@@ -224,6 +253,7 @@ func parseAgentSessionArgs(args []string) (agentSessionArgs, error) {
 	values := map[string]*string{
 		"--device": &parsed.device, "--address": &parsed.address, "--server-name": &parsed.serverName,
 		"--ca": &parsed.ca, "--cert": &parsed.cert, "--key": &parsed.key, "--output": &parsed.output,
+		"--guard-output": &parsed.guardOutput,
 	}
 	var edgeValue, durationValue, rearmValue string
 	values["--edge"] = &edgeValue
@@ -261,7 +291,7 @@ func parseAgentSessionArgs(args []string) (agentSessionArgs, error) {
 	if !lab.ValidProbeDeviceAlias(parsed.device) {
 		return agentSessionArgs{}, fmt.Errorf("unsupported device alias %q", parsed.device)
 	}
-	if parsed.address == "" || parsed.ca == "" || parsed.cert == "" || parsed.key == "" || parsed.output == "" || edgeValue == "" || durationValue == "" {
+	if parsed.address == "" || parsed.ca == "" || parsed.cert == "" || parsed.key == "" || parsed.output == "" || parsed.guardOutput == "" || edgeValue == "" || durationValue == "" {
 		return agentSessionArgs{}, errors.New("device, address, credentials, edge, duration, and output are required")
 	}
 	parsed.edge = control.ScreenEdge(strings.ToUpper(edgeValue))
@@ -290,7 +320,7 @@ func parseAgentSessionArgs(args []string) (agentSessionArgs, error) {
 }
 
 func writeAgentSessionUsage(output io.Writer) {
-	fmt.Fprintln(output, "usage: krasis-lab agent-session listen|connect --device ALIAS --address ADDRESS [--server-name NAME] --ca CA.pem --cert CERT.pem --key KEY.pem --edge LEFT|RIGHT --duration DURATION --output REPORT.json [--rearm-distance PIXELS] --allow-live-input")
+	fmt.Fprintln(output, "usage: krasis-lab agent-session listen|connect --device ALIAS --address ADDRESS [--server-name NAME] --ca CA.pem --cert CERT.pem --key KEY.pem --edge LEFT|RIGHT --duration DURATION --output REPORT.json --guard-output GUARD.json [--rearm-distance PIXELS] --allow-live-input")
 }
 
 type countingInput struct {

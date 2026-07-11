@@ -31,11 +31,14 @@ type Process struct {
 	stderr  *limitedBuffer
 }
 
-func Start(executable string) (*Process, error) {
+func Start(executable, device, output string) (*Process, error) {
 	if executable == "" || !filepath.IsAbs(executable) {
 		return nil, errors.New("crash guard executable path must be absolute")
 	}
-	command := exec.Command(executable, "crash-guard-internal")
+	if device == "" || output == "" || !filepath.IsAbs(output) {
+		return nil, errors.New("crash guard device and absolute output path are required")
+	}
+	command := exec.Command(executable, "crash-guard-internal", "--device", device, "--output", output)
 	command.Dir = filepath.Dir(executable)
 	return startCommand(command)
 }

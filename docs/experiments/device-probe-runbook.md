@@ -82,18 +82,18 @@ Windows 방화벽과 같은 LAN에서 listener의 실제 IP와 port 접근을 �
 listener 예시:
 
 ```powershell
-.\krasis-lab.exe agent-session listen --device H-A --address 0.0.0.0:24876 --ca .\secrets\listener\ca.pem --cert .\secrets\listener\identity.pem --key .\secrets\listener\identity-key.pem --edge RIGHT --duration 2m --output .\reports\H-A-agent.json --allow-live-input
+.\krasis-lab.exe agent-session listen --device H-A --address 0.0.0.0:24876 --ca .\secrets\listener\ca.pem --cert .\secrets\listener\identity.pem --key .\secrets\listener\identity-key.pem --edge RIGHT --duration 2m --output .\reports\H-A-agent.json --guard-output .\reports\H-A-guard.json --allow-live-input
 ```
 
 connector 예시:
 
 ```powershell
-.\krasis-lab.exe agent-session connect --device H-B --address 192.0.2.10:24876 --server-name 192.0.2.10 --ca .\secrets\connector\ca.pem --cert .\secrets\connector\identity.pem --key .\secrets\connector\identity-key.pem --edge LEFT --duration 2m --output .\reports\H-B-agent.json --allow-live-input
+.\krasis-lab.exe agent-session connect --device H-B --address 192.0.2.10:24876 --server-name 192.0.2.10 --ca .\secrets\connector\ca.pem --cert .\secrets\connector\identity.pem --key .\secrets\connector\identity-key.pem --edge LEFT --duration 2m --output .\reports\H-B-agent.json --guard-output .\reports\H-B-guard.json --allow-live-input
 ```
 
 실행 중 A의 오른쪽 끝에서 B로 넘어가 pointer, wheel, 기본 button과 안전한 test key를 확인한다. B의 왼쪽 끝에서 A로 돌아온 뒤 반대 방향도 반복한다. key나 button을 누른 상태로 경계를 넘지 않는다. 이상 동작, stuck input 또는 예상하지 않은 suppression이 보이면 즉시 긴급 해제를 누른다.
 
-양쪽 report가 모두 `schemaVersion=krasis.lab.agent-session/v2`, `completed=true`,
+양쪽 report가 모두 `schemaVersion=krasis.lab.agent-session/v3`, `completed=true`,
 `passed=true`, `crashGuard.started=true`, `crashGuard.cleanShutdown=true`,
 `supervisor.activeCount>=1`, `destinationInput.entries>=1`이어야 해당 pair의 bounded 양방향
 실험이 통과한 것이다. 집 pair와 스터디카페 pair는 서로 다른 날짜에 반복해도 된다.
@@ -105,6 +105,41 @@ connector 예시:
 ```
 
 `valid=true`, `pairPassed=true`와 exit `0`을 함께 확인한다. report를 손으로 고쳐 통과시키지 않는다. 실패 report와 긴급 해제 report도 원인 분석용으로 별도 보존한다.
+
+## destination 강제 종료 복구
+
+이 단계는 두 장비가 같은 책상에 있고 양쪽 `agent-session-check`가 먼저 통과한 경우에만
+사람이 수동으로 수행한다. agent가 출력한 `agent_pid`를 기록한다. source에서 메모장처럼
+안전한 창에 test key 하나를 누른 상태로 유지하고, destination의 별도 PowerShell에서 아래
+명령으로 **agent PID만** 강제 종료한다. 이 명령은 mustflow agent 실행 권한이 없는
+사람 전용 수동 절차다. guard PID를 종료하지 않는다.
+
+```powershell
+Stop-Process -Id <agent_pid> -Force
+```
+
+source에서 key를 놓고 destination의 입력이 즉시 정상인지 확인한다. guard report가 생기면
+검사한다.
+
+```powershell
+.\krasis-lab.exe crash-recovery-check .\reports\H-A-recovery.json
+```
+
+강제 종료 실험에서는 처음 실행할 때 `--guard-output .\reports\H-A-recovery.json`처럼 기존
+정상 종료 report와 다른 새 경로를 지정한다. `valid=true`, `reason=PARENT_EOF`,
+`attempted>=1`, `released=attempted`, `remaining=0`이어야 한다. H-A, H-B를 각각 destination으로
+한 번씩 반복하고, 다른 날 스터디카페에서 S-A, S-B도 같은 방식으로 반복한다.
+
+## 순차 Phase 0 집계
+
+집과 스터디카페에서 같은 clean build와 duration으로 모은 파일을 한 directory에 복사한 뒤
+아래 사람 전용 명령을 실행한다. 수집 날짜가 달라도 되고 네 장비를 동시에 켤 필요는 없다.
+
+```powershell
+.\krasis-lab.exe phase0-check --home .\reports\H-A-agent.json --home .\reports\H-B-agent.json --study .\reports\S-A-agent.json --study .\reports\S-B-agent.json --recovery .\reports\H-A-recovery.json --recovery .\reports\H-B-recovery.json --recovery .\reports\S-A-recovery.json --recovery .\reports\S-B-recovery.json
+```
+
+`passed=true`와 exit `0`이 모두 나와야 이 범위의 Phase 0 evidence gate가 통과한다.
 
 ## 실패 처리
 

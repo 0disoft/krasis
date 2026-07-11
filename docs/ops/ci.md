@@ -25,11 +25,18 @@ test process의 readiness 신호를 받은 뒤 parent만 강제 종료하고, pi
 normalized kind와 code만 있으며 artifact나 제품 report로 보존하지 않는다.
 별도 hung-helper 테스트는 command를 읽고 ACK하지 않는 guard를 사용해 2초 제품 timeout을
 짧은 test timeout으로 대체하고, parent가 IPC 실패를 반환하며 helper를 종료하는지 확인한다.
+guard child 테스트는 정상 disarm ACK 뒤 process가 종료되기 전에 strict JSON evidence를
+no-replace로 쓰는지 검증한다. guard report checker는 parent EOF에서 실제 release가 없거나,
+dirty/mismatched build, unknown field, invalid count와 정상 disarm recovery를 통과시키지 않는다.
 
 agent report checker 테스트는 strict JSON decoding과 두 file cardinality, 장소별 alias pair,
 listener/connect 역할, 반대 edge, clean 동일 build, 동일 duration, 양쪽 pass, crash guard의
-시작·정상 종료 및 destination evidence를 검증한다. 전체 path, session identifier나 원시
+시작·정상 종료, 같은 directory의 guard report device/build/zero-recovery 및 destination evidence를 검증한다. 전체 path, session identifier나 원시
 입력은 checker output으로 복제하지 않는다.
+
+Phase 0 checker 테스트는 서로 다른 날짜의 home/study pair를 같은 build와 duration으로
+합칠 수 있는지, 네 alias의 parent-EOF recovery가 각각 한 번씩 있는지 검증한다. 네 장비의
+동시 실행이나 같은 수집 timestamp를 요구하지 않는다.
 
 subprocess fault 테스트는 active session에서 destination process를 강제 종료한 뒤 source process가 connection failure를 관찰해 suppression을 해제하고 `LOCAL`로 성공 종료하는지 확인한다. 반대 방향은 destination에 실제 key-down을 전달한 뒤 source process를 강제 종료하고 destination이 해당 key release를 adapter에 실행한 다음 `LOCAL`로 성공 종료하는지 확인한다. 부모 test가 명시적으로 종료한 process의 non-zero exit만 예상 결과로 허용한다.
 

@@ -125,7 +125,7 @@
 
 두 Windows 장비에서 실제 low-level hook, 경계 억제, mTLS peer session과 `SendInput` destination adapter를 bounded하게 실행하는 Phase 0 실험 명령이다.
 
-- 사용법: `krasis-lab agent-session listen|connect --device ALIAS --address ADDRESS [--server-name NAME] --ca CA.pem --cert CERT.pem --key KEY.pem --edge LEFT|RIGHT --duration DURATION --output REPORT.json [--rearm-distance PIXELS] --allow-live-input`
+- 사용법: `krasis-lab agent-session listen|connect --device ALIAS --address ADDRESS [--server-name NAME] --ca CA.pem --cert CERT.pem --key KEY.pem --edge LEFT|RIGHT --duration DURATION --output REPORT.json --guard-output GUARD.json [--rearm-distance PIXELS] --allow-live-input`
 - `--allow-live-input`이 없으면 실행하지 않는다. 이 flag는 실제 keyboard/mouse event를 억제·전달·주입한다는 명시적 확인이다.
 - `--duration`은 필수 양수이며 무기한 실행을 허용하지 않는다.
 - listener와 connector는 `peer-credentials`가 만든 역할별 identity만 사용한다.
@@ -136,12 +136,13 @@
 - 같은 executable의 별도 crash guard process가 destination down 전에 token을 ACK하고 성공한 up 뒤 제거한다. guard가 먼저 종료되거나 정상 종료에서 남은 token을 해제하지 못하면 session은 실패한다.
 - 기본 rearm distance는 32px이고 activation gap은 0px다. 이는 Phase 0 안전 실험값이며 제품 UX 기본값이 아니다.
 - report에는 aggregate count와 supervisor state만 저장하고 주소, certificate, session/epoch/lease, key code, pointer 좌표와 delta를 저장하지 않는다.
+- `--guard-output`은 agent report와 같은 directory의 다른 새 JSON 경로여야 한다. guard는 정상 `DISARM` 또는 parent pipe `PARENT_EOF`에서 aggregate release count만 이 파일에 기록한다.
 
 duration 또는 사용자의 취소로 안전 종료해도 인증된 active session과 destination entry·input evidence가 모두 없으면 `passed=false`와 exit `1`이다. 긴급 해제는 의도된 안전 동작이라 exit `0`이지만 `passed=true`로 바꾸지 않는다.
 
 ### `agent-session-check`
 
-같은 장소의 두 장비에서 수집한 `krasis.lab.agent-session/v2` report가 bounded 양방향 실험을 증명하는지 strict하게 판정한다.
+같은 장소의 두 장비에서 수집한 `krasis.lab.agent-session/v3` report가 bounded 양방향 실험을 증명하는지 strict하게 판정한다.
 
 - 사용법: `krasis-lab agent-session-check [--json] REPORT-A.json REPORT-B.json`
 - 정확히 두 file만 받으며 unknown field, trailing JSON, 1MiB 초과 file과 schema 불일치를 거부한다.
@@ -151,6 +152,23 @@ duration 또는 사용자의 취소로 안전 종료해도 인증된 active sess
 - 두 report 모두 `completed=true`, `passed=true`, crash guard 시작·정상 종료, final supervisor `STOPPED`, authenticated active session과 destination entry·input·return arm evidence를 가져야 한다.
 
 report가 JSON으로 유효해도 pair 조건을 만족하지 않으면 exit `1`이다. 긴급 해제 report는 안전 동작 증거로 보존하지만 pair pass로 승격하지 않는다.
+
+### `crash-recovery-check`
+
+parent agent 강제 종료 뒤 별도 guard가 남긴 report 하나를 strict하게 판정한다.
+
+- 사용법: `krasis-lab crash-recovery-check [--json] GUARD.json`
+- `PARENT_EOF`, clean build, `attempted>=1`, `released=attempted`, `remaining=0`, `passed=true`를 모두 요구한다.
+- 정상 `DISARM`, 빈 recovery, protocol failure와 손으로 수정한 unknown field report는 통과하지 않는다.
+
+### `phase0-check`
+
+서로 다른 날짜에 모은 집 pair, 스터디카페 pair와 네 장비의 crash recovery를 하나로 판정한다.
+
+- 사용법: `krasis-lab phase0-check [--json] --home REPORT x2 --study REPORT x2 --recovery REPORT x4`
+- home은 `H-A/H-B`, study는 `S-A/S-B`여야 하며 네 agent report의 clean build revision과 duration이 같아야 한다.
+- recovery는 네 alias가 정확히 한 번씩 있어야 하고 해당 agent report와 build revision이 같아야 한다.
+- 수집 시각과 장소는 달라도 된다. 네 장비를 동시에 실행할 필요는 없다.
 
 ## 출력 방식
 

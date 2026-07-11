@@ -179,7 +179,7 @@ private key나 certificate body는 manifest와 stdout에 출력하지 않는다.
 
 ## `agent-session`
 
-- schema: `krasis.lab.agent-session/v2`
+- schema: `krasis.lab.agent-session/v3`
 - 출력: `--output`으로 지정한 단일 JSON file
 
 필드:
@@ -187,6 +187,7 @@ private key나 certificate body는 manifest와 stdout에 출력하지 않는다.
 - `deviceAlias`, `role`, `edge`, `collectedAt`, build 정보와 requested duration
 - `completed`, `passed`, `stopReason`, `failureCode`
 - crash guard의 시작 여부와 남은 token을 해제한 정상 종료 여부
+- 같은 directory에서 strict 검증할 guard report basename
 - supervisor의 final state, active 횟수, acquire/session failure 횟수와 emergency stop 횟수
 - destination의 entry, key/button down/up, pointer move, wheel과 return arm 누적 개수
 
@@ -226,6 +227,24 @@ pair issue code:
 - `mixed_duration`
 
 file issue에는 schema, alias, role, edge, timestamp, build, duration, pass consistency, crash guard와 destination evidence 오류가 포함된다. 두 file이 모두 strict valid하고 pair issue가 없을 때만 exit `0`이다.
+
+## `crash-recovery-check --json`
+
+- 입력 schema: `krasis.lab.crash-guard/v1`
+- 출력 schema: `krasis.lab.crash-guard-check/v1`
+- 출력: guard report basename, validity, issue, device/build, reason과 aggregate release count
+
+stable issue에는 schema/JSON/file 오류, invalid alias/build/reason/count, non-passing guard,
+unexpected reason, dirty build와 `no_recovery_attempt`가 포함된다. raw token code는 입력 report와
+checker output 모두에 없다.
+
+## `phase0-check --json`
+
+- schema: `krasis.lab.phase0-check/v1`
+- 출력: home/study pair checker 결과, 네 recovery checker 결과, 전체 `passed`와 issue
+
+stable issue에는 pair cardinality/pass/alias, cross-location build/duration, recovery cardinality,
+invalid/duplicate/missing device와 agent-recovery build mismatch가 포함된다.
 
 ## 호환성
 

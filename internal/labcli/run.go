@@ -57,6 +57,10 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, platform 
 		return runAgentSession(ctx, commandArgs, stdout, stderr, platform)
 	case "agent-session-check":
 		return runAgentSessionCheck(commandArgs, stdout, stderr)
+	case "crash-recovery-check":
+		return runCrashRecoveryCheck(commandArgs, stdout, stderr)
+	case "phase0-check":
+		return runPhase0Check(commandArgs, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "unknown command: %s\n", command)
 		writeUsage(stderr)
@@ -574,5 +578,7 @@ func writeUsage(output io.Writer) {
 	fmt.Fprintln(output, "  krasis-lab peer-credentials --output DIRECTORY --server-name NAME")
 	fmt.Fprintln(output, "  krasis-lab agent-session listen|connect [options] --allow-live-input")
 	fmt.Fprintln(output, "  krasis-lab agent-session-check [--json] REPORT-A.json REPORT-B.json")
+	fmt.Fprintln(output, "  krasis-lab crash-recovery-check [--json] GUARD.json")
+	fmt.Fprintln(output, "  krasis-lab phase0-check [--json] --home REPORT x2 --study REPORT x2 --recovery REPORT x4")
 	fmt.Fprintln(output, "  krasis-lab help")
 }

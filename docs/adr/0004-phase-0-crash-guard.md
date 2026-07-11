@@ -29,6 +29,9 @@ Windows 입력 상태를 대신 해제할 수 없다. down 주입 뒤 파일 jou
   guard를 종료해 agent session을 실패시키며 runtime lock을 무기한 점유하지 않는다.
 - 정상 종료도 guard가 남은 token을 해제한 뒤에만 성공한다. guard가 먼저 종료되면
   agent session을 실패시키며 재연결을 계속하지 않는다.
+- guard는 종료 전에 별도 JSON evidence를 atomic no-replace 방식으로 기록한다. report에는
+  device alias, build, 종료 reason과 aggregate attempted/released/remaining만 있으며 token
+  code는 없다. evidence write 실패는 guard process 실패로 parent에 보인다.
 - 이 결정은 설치 topology를 확정하지 않는다. 정식 agent, single-instance, code signing,
   process ACL과 updater 경계는 Phase 0 뒤 별도 ADR에서 결정한다.
 
@@ -37,6 +40,10 @@ Windows 입력 상태를 대신 해제할 수 없다. down 주입 뒤 파일 jou
 destination agent 단독 crash 뒤에도 독립 process가 합성 key/button을 해제할 수 있고,
 subprocess test로 parent 강제 종료와 EOF 복구를 재현할 수 있다. down 직전의 guard ACK는
 stuck input보다 드문 불필요한 up을 택하는 fail-safe 순서다.
+
+정상 agent report는 같은 directory의 `DISARM` guard report를 참조하고 strict checker가
+device/build와 zero recovery를 대조한다. parent crash에서는 agent report가 없더라도
+`PARENT_EOF` guard report가 남아 별도 recovery checker와 순차 Phase 0 집계에 사용된다.
 
 guard 자체와 agent가 동시에 죽거나 OS가 중단되는 경우, Windows 보안 데스크톱,
 관리자 권한 경계, 실제 물리 key와 같은 token이 동시에 눌린 경우의 영향은 이 구조만으로

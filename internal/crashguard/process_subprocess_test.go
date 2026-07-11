@@ -67,7 +67,7 @@ func TestCrashGuardReleasesInputAfterParentIsKilled(t *testing.T) {
 }
 
 func TestCrashGuardStartRejectsRelativeExecutable(t *testing.T) {
-	if _, err := Start("krasis-lab.exe"); err == nil {
+	if _, err := Start("krasis-lab.exe", "H-A", filepath.Join(t.TempDir(), "guard.json")); err == nil {
 		t.Fatal("Start accepted a relative executable path")
 	}
 }

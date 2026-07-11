@@ -37,57 +37,84 @@ const (
 	statusRejected
 )
 
+type ExitReason string
+
+const (
+	ExitParentEOF     ExitReason = "PARENT_EOF"
+	ExitDisarm        ExitReason = "DISARM"
+	ExitProtocolError ExitReason = "PROTOCOL_ERROR"
+)
+
+type Result struct {
+	Reason    ExitReason
+	Attempted int
+	Released  int
+	Remaining int
+}
+
 // Serve owns the fail-safe copy of pressed input state. EOF means that the
 // parent disappeared and therefore triggers recovery rather than success.
 func Serve(reader io.Reader, writer io.Writer, release application.ReleasePort) error {
+	_, err := ServeWithResult(reader, writer, release)
+	return err
+}
+
+func ServeWithResult(reader io.Reader, writer io.Writer, release application.ReleasePort) (Result, error) {
 	if reader == nil || writer == nil || release == nil {
-		return errors.New("crash guard reader, writer, and release port are required")
+		return Result{}, errors.New("crash guard reader, writer, and release port are required")
 	}
 	var pressed control.PressedState
 	for {
 		command, err := readCommand(reader)
 		if errors.Is(err, io.EOF) {
-			return recoverPressed(&pressed, release)
+			return recoverResult(ExitParentEOF, &pressed, release)
 		}
 		if err != nil {
-			return errors.Join(err, recoverPressed(&pressed, release))
+			result, recoveryErr := recoverResult(ExitProtocolError, &pressed, release)
+			return result, errors.Join(err, recoveryErr)
 		}
 		switch command.operation {
 		case operationPreparePress:
 			if !pressed.Contains(command.token) && pressed.Count() >= maxPressedInputs {
 				_ = writeAck(writer, command.operation, statusRejected)
-				return errors.Join(
+				result, recoveryErr := recoverResult(ExitProtocolError, &pressed, release)
+				return result, errors.Join(
 					errors.New("crash guard pressed-input limit exceeded"),
-					recoverPressed(&pressed, release),
+					recoveryErr,
 				)
 			}
 			if _, err := pressed.RecordPress(command.token); err != nil {
 				_ = writeAck(writer, command.operation, statusRejected)
-				return errors.Join(err, recoverPressed(&pressed, release))
+				result, recoveryErr := recoverResult(ExitProtocolError, &pressed, release)
+				return result, errors.Join(err, recoveryErr)
 			}
 			if err := writeAck(writer, command.operation, statusOK); err != nil {
-				return errors.Join(err, recoverPressed(&pressed, release))
+				result, recoveryErr := recoverResult(ExitProtocolError, &pressed, release)
+				return result, errors.Join(err, recoveryErr)
 			}
 		case operationReleased:
 			if _, err := pressed.RecordRelease(command.token); err != nil {
 				_ = writeAck(writer, command.operation, statusRejected)
-				return errors.Join(err, recoverPressed(&pressed, release))
+				result, recoveryErr := recoverResult(ExitProtocolError, &pressed, release)
+				return result, errors.Join(err, recoveryErr)
 			}
 			if err := writeAck(writer, command.operation, statusOK); err != nil {
-				return errors.Join(err, recoverPressed(&pressed, release))
+				result, recoveryErr := recoverResult(ExitProtocolError, &pressed, release)
+				return result, errors.Join(err, recoveryErr)
 			}
 		case operationDisarm:
-			recoveryErr := recoverPressed(&pressed, release)
+			result, recoveryErr := recoverResult(ExitDisarm, &pressed, release)
 			ackStatus := statusOK
 			if recoveryErr != nil {
 				ackStatus = statusRejected
 			}
 			ackErr := writeAck(writer, command.operation, ackStatus)
-			return errors.Join(recoveryErr, ackErr)
+			return result, errors.Join(recoveryErr, ackErr)
 		default:
-			return errors.Join(
+			result, recoveryErr := recoverResult(ExitProtocolError, &pressed, release)
+			return result, errors.Join(
 				errors.New("crash guard received an unsupported operation"),
-				recoverPressed(&pressed, release),
+				recoveryErr,
 			)
 		}
 	}
@@ -176,15 +203,16 @@ func readAck(reader io.Reader, expected operation) error {
 	return nil
 }
 
-func recoverPressed(pressed *control.PressedState, release application.ReleasePort) error {
+func recoverResult(reason ExitReason, pressed *control.PressedState, release application.ReleasePort) (Result, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), recoveryTimeout)
 	defer cancel()
 	report, err := application.ReleaseAll(ctx, pressed, release)
+	result := Result{Reason: reason, Attempted: report.Attempted, Released: report.Released, Remaining: report.Remaining}
 	if err != nil {
-		return err
+		return result, err
 	}
 	if report.Remaining != 0 {
-		return fmt.Errorf("crash guard recovery left %d pressed inputs", report.Remaining)
+		return result, fmt.Errorf("crash guard recovery left %d pressed inputs", report.Remaining)
 	}
-	return nil
+	return result, nil
 }

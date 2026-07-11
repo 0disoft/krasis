@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0disoft/krasis/internal/crashguard"
+	"github.com/0disoft/krasis/internal/guardreport"
 	"github.com/0disoft/krasis/internal/lab"
 )
 
@@ -58,7 +60,7 @@ func TestCheckRejectsReportWithoutCrashGuardEvidence(t *testing.T) {
 
 func TestCheckRejectsUnknownFields(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "unknown.json")
-	if err := os.WriteFile(path, []byte(`{"schemaVersion":"krasis.lab.agent-session/v2","surprise":true}`), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(`{"schemaVersion":"krasis.lab.agent-session/v3","surprise":true}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	result := Check([]string{path})
@@ -72,7 +74,7 @@ func passingReport(alias, role, edge string) lab.AgentSessionReport {
 		SchemaVersion: lab.AgentSessionSchemaVersion, DeviceAlias: alias, Role: role, Edge: edge,
 		CollectedAt:   time.Date(2026, time.July, 11, 0, 0, 0, 0, time.UTC),
 		BuildRevision: "abc123", RequestedMillis: 120_000, Completed: true, Passed: true, StopReason: "duration_elapsed",
-		CrashGuard:       lab.CrashGuardEvidence{Started: true, CleanShutdown: true},
+		CrashGuard:       lab.CrashGuardEvidence{Started: true, CleanShutdown: true, ReportFile: alias + "-guard.json"},
 		Supervisor:       lab.SupervisorEvidence{FinalState: "STOPPED", ActiveCount: 1},
 		DestinationInput: lab.InputEvidence{Entries: 1, PointerMoves: 1, ReturnArms: 1},
 	}
@@ -80,6 +82,20 @@ func passingReport(alias, role, edge string) lab.AgentSessionReport {
 
 func writeReport(t *testing.T, directory, name string, report lab.AgentSessionReport) string {
 	t.Helper()
+	if report.CrashGuard.ReportFile != "" {
+		guard := guardreport.Report{
+			SchemaVersion: guardreport.SchemaVersion, DeviceAlias: report.DeviceAlias,
+			CollectedAt: report.CollectedAt, BuildRevision: report.BuildRevision,
+			Reason: string(crashguard.ExitDisarm), Completed: true, Passed: true,
+		}
+		guardPayload, err := json.Marshal(guard)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(directory, report.CrashGuard.ReportFile), guardPayload, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
 	data, err := json.Marshal(report)
 	if err != nil {
 		t.Fatal(err)

@@ -21,6 +21,8 @@ Operability standard connects code changes to logs, metrics, traces, rollback, r
   최대 256개 token만 허용한다.
 - payload는 normalized key/button kind와 code만 포함한다. session, peer, 주소, 자격 증명,
   pointer 경로, window 정보와 입력 문자열은 금지한다.
+- 종료 evidence는 token code를 버리고 reason과 aggregate count만 기록한다. output은 사용자가
+  지정한 기존에 없는 JSON이며 agent report는 basename만 참조해 directory traversal을 막는다.
 - protocol 오류나 pipe 단절은 fail-open 입력 계속이 아니라 남은 token 해제와 guard
   종료로 수렴한다. agent는 guard 선종료를 session failure로 취급한다.
 - 같은 사용자 권한의 악성 process, executable 교체, guard와 agent 동시 종료, 전원 차단과

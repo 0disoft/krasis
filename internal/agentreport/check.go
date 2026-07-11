@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/0disoft/krasis/internal/crashguard"
+	"github.com/0disoft/krasis/internal/guardreport"
 	"github.com/0disoft/krasis/internal/lab"
 )
 
@@ -25,15 +27,20 @@ type Report struct {
 }
 
 type FileResult struct {
-	File          string   `json:"file"`
-	Valid         bool     `json:"valid"`
-	Issues        []string `json:"issues"`
-	DeviceAlias   string   `json:"deviceAlias,omitempty"`
-	Role          string   `json:"role,omitempty"`
-	Edge          string   `json:"edge,omitempty"`
-	BuildRevision string   `json:"buildRevision,omitempty"`
-	Completed     bool     `json:"completed"`
-	Passed        bool     `json:"passed"`
+	File            string   `json:"file"`
+	Valid           bool     `json:"valid"`
+	Issues          []string `json:"issues"`
+	DeviceAlias     string   `json:"deviceAlias,omitempty"`
+	Role            string   `json:"role,omitempty"`
+	Edge            string   `json:"edge,omitempty"`
+	BuildRevision   string   `json:"buildRevision,omitempty"`
+	BuildModified   bool     `json:"buildModified"`
+	RequestedMillis int64    `json:"requestedDurationMillis"`
+	Completed       bool     `json:"completed"`
+	Passed          bool     `json:"passed"`
+	GuardReport     string   `json:"guardReport,omitempty"`
+	GuardValid      bool     `json:"guardValid"`
+	GuardIssues     []string `json:"guardIssues"`
 }
 
 func Check(paths []string) Report {
@@ -64,7 +71,7 @@ func Check(paths []string) Report {
 }
 
 func checkFile(path string) (FileResult, lab.AgentSessionReport) {
-	result := FileResult{File: filepath.Base(path), Issues: []string{}}
+	result := FileResult{File: filepath.Base(path), Issues: []string{}, GuardIssues: []string{}}
 	file, err := os.Open(path)
 	if err != nil {
 		result.Issues = append(result.Issues, "open_failed")
@@ -99,9 +106,26 @@ func checkFile(path string) (FileResult, lab.AgentSessionReport) {
 	result.Role = report.Role
 	result.Edge = report.Edge
 	result.BuildRevision = report.BuildRevision
+	result.BuildModified = report.BuildModified
+	result.RequestedMillis = report.RequestedMillis
 	result.Completed = report.Completed
 	result.Passed = report.Passed
 	result.Issues = validate(report)
+	if report.CrashGuard.ReportFile == "" || filepath.Base(report.CrashGuard.ReportFile) != report.CrashGuard.ReportFile {
+		result.Issues = append(result.Issues, "invalid_guard_report_reference")
+	} else {
+		guardPath := filepath.Join(filepath.Dir(path), report.CrashGuard.ReportFile)
+		guardResult := guardreport.Check(guardPath, guardreport.Expectation{
+			Reason: crashguard.ExitDisarm, DeviceAlias: report.DeviceAlias,
+			BuildRevision: report.BuildRevision, RequireCleanBuild: true,
+		})
+		result.GuardReport = guardResult.File
+		result.GuardValid = guardResult.Valid
+		result.GuardIssues = guardResult.Issues
+		if !guardResult.Valid {
+			result.Issues = append(result.Issues, "invalid_guard_report")
+		}
+	}
 	result.Valid = len(result.Issues) == 0
 	return result, report
 }
