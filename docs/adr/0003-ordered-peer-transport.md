@@ -17,6 +17,8 @@ Krasis는 control lease, heartbeat와 입력 event의 의미 순서를 보존해
 - `CONTROL`, `INPUT`, `HEARTBEAT` kind만 transport가 구분한다. payload serialization과 Windows input code mapping은 이 ADR에서 결정하지 않는다.
 - 한 session 안의 writer는 직렬화한다. 여러 goroutine이 같은 writer에 직접 frame을 섞어 쓰지 않는다.
 
+`INPUT` payload version 1은 session ID, epoch, sequence와 정규화 action을 big-endian binary로 담는다. session ID와 epoch는 각각 최대 255 bytes이며 payload는 정확한 길이만 허용한다. action kind와 field 조합, reserved field, zero sequence, trailing bytes가 유효하지 않으면 runtime에 전달하지 않는다. `CONTROL`과 `HEARTBEAT` payload 형식은 아직 `UNDECIDED`다.
+
 ## 결과
 
 control과 input 사이의 순서를 하나의 stream에서 설명할 수 있고 frame decode 전에 메모리 상한을 적용할 수 있다. 대신 대량 input이 heartbeat를 늦추는 head-of-line blocking 가능성이 남는다. 실제 두 기기 측정에서 이 문제가 확인될 때에만 독립 channel과 cross-channel epoch 규칙을 새 ADR로 도입한다.
