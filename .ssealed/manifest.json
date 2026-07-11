@@ -1,7 +1,7 @@
 {
   "tool": "ssealed",
   "version": "0.6.11",
-  "generatedAt": "2026-07-11T05:48:07.460Z",
+  "generatedAt": "2026-07-11T06:00:29.945Z",
   "scope": "general",
   "profile": "desktop-app",
   "addons": [
@@ -551,13 +551,13 @@
     },
     {
       "path": "docs/architecture/02-runtime-flow.md",
-      "checksum": "sha256:c38deec5a0517aa6ad5c98b749fab5d60e5892e2f37b467185365122437da325",
+      "checksum": "sha256:271f9501d8e127176d83fc72c1efd84ceb56328b584a1001b80e6be600ab516b",
       "kind": "document",
       "ownership": "seeded",
       "presence": "optional",
       "status": "active",
       "initialChecksum": "sha256:c0f5d7adf6082d4abc8e950b6b4f30103fcc40b32341513690ec00a2b2f7c288",
-      "acceptedChecksum": "sha256:c38deec5a0517aa6ad5c98b749fab5d60e5892e2f37b467185365122437da325",
+      "acceptedChecksum": "sha256:271f9501d8e127176d83fc72c1efd84ceb56328b584a1001b80e6be600ab516b",
       "generatedChecksum": "sha256:c0f5d7adf6082d4abc8e950b6b4f30103fcc40b32341513690ec00a2b2f7c288"
     },
     {

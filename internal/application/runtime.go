@@ -13,7 +13,15 @@ import (
 var (
 	ErrRuntimeNotInbound = errors.New("session runtime is not inbound active")
 	ErrRuntimeNoLiveness = errors.New("session runtime has no active peer liveness")
+	ErrRuntimeInputHeld  = errors.New("session runtime has pressed input")
+	ErrStaleReturnIntent = errors.New("return intent does not match the active inbound session")
 )
+
+type LeaseIdentity struct {
+	SessionID string
+	LeaseID   string
+	Epoch     string
+}
 
 type RuntimeSnapshot struct {
 	Control           control.Snapshot
@@ -212,6 +220,34 @@ func (runtime *SessionRuntime) RevokePeer(
 	outcome, err := HandleControlEvent(ctx, runtime.control, control.Event{Kind: control.EventRevokeRequested}, runtime.executor)
 	runtime.applyOutcomeLocked(outcome)
 	return outcome, err
+}
+
+func (runtime *SessionRuntime) RevokeLocalReturn(
+	ctx context.Context,
+	intent control.ReturnIntent,
+) (LeaseIdentity, ControlOutcome, error) {
+	runtime.mu.Lock()
+	defer runtime.mu.Unlock()
+	if err := intent.Validate(); err != nil {
+		return LeaseIdentity{}, ControlOutcome{}, err
+	}
+	if runtime.control.State != control.StateInboundActive || runtime.stream.SessionID == "" {
+		return LeaseIdentity{}, ControlOutcome{}, ErrRuntimeNotInbound
+	}
+	if runtime.control.SessionID != intent.SessionID || runtime.stream.Epoch != intent.Epoch {
+		return LeaseIdentity{}, ControlOutcome{}, ErrStaleReturnIntent
+	}
+	if runtime.pressed.Count() != 0 {
+		return LeaseIdentity{}, ControlOutcome{}, ErrRuntimeInputHeld
+	}
+	identity := LeaseIdentity{
+		SessionID: runtime.control.SessionID,
+		LeaseID:   runtime.control.LeaseID,
+		Epoch:     runtime.stream.Epoch,
+	}
+	outcome, err := HandleControlEvent(ctx, runtime.control, control.Event{Kind: control.EventRevokeRequested}, runtime.executor)
+	runtime.applyOutcomeLocked(outcome)
+	return identity, outcome, err
 }
 
 func (runtime *SessionRuntime) GrantInbound(

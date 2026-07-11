@@ -118,11 +118,18 @@ type CursorEntryPort interface {
 	Enter(context.Context, control.ScreenEdge) error
 }
 
+type ReturnBoundaryPort interface {
+	ArmReturn(control.ReturnIntent, control.ScreenEdge) error
+	RearmReturn(control.ReturnIntent)
+	DisarmReturn(control.ReturnIntent)
+}
+
 type LeaseResponder struct {
 	Writer     FrameWriter
 	Runtime    *application.SessionRuntime
 	Authorizer LeaseAuthorizer
 	Entry      CursorEntryPort
+	Returns    ReturnBoundaryPort
 }
 
 func (responder *LeaseResponder) HandleLeaseRequest(
@@ -130,11 +137,14 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 	command transport.ControlCommand,
 	observedAt time.Time,
 ) error {
-	if responder == nil || responder.Writer == nil || responder.Runtime == nil || responder.Authorizer == nil || responder.Entry == nil {
+	if responder == nil || responder.Writer == nil || responder.Runtime == nil || responder.Authorizer == nil || responder.Entry == nil || responder.Returns == nil {
 		return errors.New("lease responder is not initialized")
 	}
 	if command.Kind != transport.ControlLeaseRequest {
 		return errors.New("lease responder requires a lease request")
+	}
+	if responder.Runtime.Snapshot().Control.State != control.StateLocal {
+		return errors.New("lease responder requires a local runtime")
 	}
 	leaseID, accepted, err := responder.Authorizer.AuthorizeLease(ctx, command.SessionID, command.Epoch, observedAt)
 	if err != nil {
@@ -150,7 +160,12 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 	if leaseID == "" {
 		return errors.New("accepted lease requires an identifier")
 	}
+	returnIntent := control.ReturnIntent{SessionID: command.SessionID, Epoch: command.Epoch}
+	if err := responder.Returns.ArmReturn(returnIntent, command.Edge); err != nil {
+		return err
+	}
 	if err := responder.Entry.Enter(ctx, command.Edge); err != nil {
+		responder.Returns.DisarmReturn(returnIntent)
 		return err
 	}
 	if _, err := responder.Runtime.GrantInbound(ctx, control.Event{
@@ -158,14 +173,19 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 		SessionID: command.SessionID,
 		LeaseID:   leaseID,
 	}, command.Epoch, observedAt); err != nil {
+		responder.Returns.DisarmReturn(returnIntent)
 		return err
 	}
-	return writeControlOrFail(ctx, responder.Writer, responder.Runtime, transport.ControlCommand{
+	err = writeControlOrFail(ctx, responder.Writer, responder.Runtime, transport.ControlCommand{
 		Kind:      transport.ControlLeaseGrant,
 		SessionID: command.SessionID,
 		LeaseID:   leaseID,
 		Epoch:     command.Epoch,
 	})
+	if err != nil {
+		responder.Returns.DisarmReturn(returnIntent)
+	}
+	return err
 }
 
 func writeControlOrFail(

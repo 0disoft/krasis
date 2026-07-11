@@ -9,9 +9,7 @@ import (
 	"github.com/0disoft/krasis/internal/control"
 )
 
-type InputAdapter struct{}
-
-func NewInputAdapter() *InputAdapter { return &InputAdapter{} }
+func NewInputAdapter() *InputAdapter { return newInputAdapter() }
 
 func (adapter *InputAdapter) Enter(context.Context, control.ScreenEdge) error {
 	return fmt.Errorf("%w: input adapter requires Windows", ErrUnsupportedInput)

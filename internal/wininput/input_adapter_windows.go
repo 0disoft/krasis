@@ -14,10 +14,8 @@ var (
 	callSetCursorPos = procSetCursorPos.Call
 )
 
-type InputAdapter struct{}
-
 func NewInputAdapter() *InputAdapter {
-	return &InputAdapter{}
+	return newInputAdapter()
 }
 
 func (adapter *InputAdapter) Enter(ctx context.Context, sourceEdge control.ScreenEdge) error {
@@ -52,11 +50,17 @@ func (adapter *InputAdapter) Enter(ctx context.Context, sourceEdge control.Scree
 }
 
 func (adapter *InputAdapter) Press(ctx context.Context, token control.PressedToken) error {
-	return adapter.writeDiscrete(ctx, token, false)
+	if err := adapter.writeDiscrete(ctx, token, false); err != nil {
+		return err
+	}
+	return adapter.recordReturnInput(token, true)
 }
 
 func (adapter *InputAdapter) Release(ctx context.Context, token control.PressedToken) error {
-	return adapter.writeDiscrete(ctx, token, true)
+	if err := adapter.writeDiscrete(ctx, token, true); err != nil {
+		return err
+	}
+	return adapter.recordReturnInput(token, false)
 }
 
 func (adapter *InputAdapter) Move(ctx context.Context, deltaX, deltaY int32) error {
@@ -67,7 +71,14 @@ func (adapter *InputAdapter) Move(ctx context.Context, deltaX, deltaY int32) err
 	if err != nil {
 		return err
 	}
-	return sendInputs(ctx, []input{event})
+	if err := sendInputs(ctx, []input{event}); err != nil {
+		return err
+	}
+	position, err := cursorPosition()
+	if err != nil {
+		return err
+	}
+	return adapter.observeReturnPosition(position.X, systemMetric(smXVIRTUALSCREEN), systemMetric(smCXVIRTUALSCREEN))
 }
 
 func (adapter *InputAdapter) Wheel(ctx context.Context, deltaX, deltaY int32) error {

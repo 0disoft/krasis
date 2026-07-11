@@ -305,6 +305,50 @@ func TestSessionRuntimeAcceptsExactPeerRevoke(t *testing.T) {
 	}
 }
 
+func TestSessionRuntimeRevokesExactLocalReturn(t *testing.T) {
+	runtime := newTestRuntime(t, &recordingInputPort{})
+	grantInbound(t, runtime, time.Unix(100, 0))
+	identity, _, err := runtime.RevokeLocalReturn(context.Background(), control.ReturnIntent{SessionID: "session-1", Epoch: "epoch-1"})
+	if err != nil {
+		t.Fatalf("RevokeLocalReturn() error = %v", err)
+	}
+	if identity.SessionID != "session-1" || identity.LeaseID != "lease-1" || identity.Epoch != "epoch-1" {
+		t.Fatalf("identity = %+v", identity)
+	}
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal || snapshot.HasStream {
+		t.Fatalf("revoked runtime = %s", snapshot)
+	}
+}
+
+func TestSessionRuntimeIgnoresStaleLocalReturnWithoutDestroyingCurrentLease(t *testing.T) {
+	runtime := newTestRuntime(t, &recordingInputPort{})
+	grantInbound(t, runtime, time.Unix(100, 0))
+	_, _, err := runtime.RevokeLocalReturn(context.Background(), control.ReturnIntent{SessionID: "session-old", Epoch: "epoch-old"})
+	if !errors.Is(err, ErrStaleReturnIntent) {
+		t.Fatalf("RevokeLocalReturn(stale) error = %v", err)
+	}
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateInboundActive || !snapshot.HasStream {
+		t.Fatalf("stale return changed runtime = %s", snapshot)
+	}
+}
+
+func TestSessionRuntimeBlocksLocalReturnWhileInputIsHeld(t *testing.T) {
+	port := &recordingInputPort{}
+	runtime := newTestRuntime(t, port)
+	grantInbound(t, runtime, time.Unix(100, 0))
+	envelope := control.InputEnvelope{SessionID: "session-1", Epoch: "epoch-1", Sequence: 1}
+	if err := runtime.HandleInputAction(context.Background(), envelope, control.InputAction{Kind: control.InputKeyDown, Code: 1}); err != nil {
+		t.Fatalf("HandleInputAction() error = %v", err)
+	}
+	_, _, err := runtime.RevokeLocalReturn(context.Background(), control.ReturnIntent{SessionID: "session-1", Epoch: "epoch-1"})
+	if !errors.Is(err, ErrRuntimeInputHeld) {
+		t.Fatalf("RevokeLocalReturn(held) error = %v", err)
+	}
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateInboundActive || snapshot.PressedCount != 1 {
+		t.Fatalf("held return changed runtime = %s", snapshot)
+	}
+}
+
 func TestSessionRuntimeStalePeerRevokeFailsSafe(t *testing.T) {
 	runtime := newTestRuntime(t, &recordingInputPort{})
 	grantInbound(t, runtime, time.Unix(100, 0))

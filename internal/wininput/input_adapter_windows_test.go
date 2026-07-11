@@ -178,3 +178,35 @@ func TestInputAdapterEntryRejectsClippedCursor(t *testing.T) {
 		t.Fatalf("Enter(clipped) error = %v", err)
 	}
 }
+
+func TestInputAdapterMoveEmitsArmedReturnIntent(t *testing.T) {
+	originalGet := callGetCursorPos
+	originalSend := callSendInput
+	callSendInput = func(uintptr, uintptr, uintptr) (uintptr, uintptr, error) { return 1, 0, nil }
+	left := systemMetric(smXVIRTUALSCREEN)
+	callGetCursorPos = func(args ...uintptr) (uintptr, uintptr, error) {
+		position := (*point)(unsafe.Pointer(args[0]))
+		position.X = left
+		return 1, 0, nil
+	}
+	t.Cleanup(func() {
+		callGetCursorPos = originalGet
+		callSendInput = originalSend
+	})
+	adapter := NewInputAdapter()
+	intent := control.ReturnIntent{SessionID: "session-1", Epoch: "epoch-1"}
+	if err := adapter.ArmReturn(intent, control.ScreenEdgeRight); err != nil {
+		t.Fatalf("ArmReturn() error = %v", err)
+	}
+	if err := adapter.Move(context.Background(), -1, 0); err != nil {
+		t.Fatalf("Move() error = %v", err)
+	}
+	select {
+	case got := <-adapter.ReturnIntents():
+		if got != intent {
+			t.Fatalf("return intent = %+v", got)
+		}
+	default:
+		t.Fatal("Move() did not emit return intent")
+	}
+}
