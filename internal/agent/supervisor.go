@@ -142,7 +142,6 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 	if err := validateSupervisor(config, dependencies); err != nil {
 		return err
 	}
-	defer dependencies.Source.Close()
 	state := SupervisorStopped
 	transition := func(event SupervisorEvent, snapshot SupervisorSnapshot) error {
 		next, err := TransitionSupervisor(state, event)
@@ -157,13 +156,23 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 		return nil
 	}
 	if err := transition(SupervisorStarted, SupervisorSnapshot{}); err != nil {
+		_ = dependencies.Source.Close()
 		return err
 	}
+	defer func() {
+		_ = dependencies.Source.Close()
+		if state != SupervisorStopped {
+			_ = transition(SupervisorStoppedEvent, SupervisorSnapshot{})
+		}
+	}()
 
 	var attempt uint32
 	for {
 		connection, acquireErr := dependencies.Source.Next(ctx)
 		if acquireErr != nil {
+			if connection != nil {
+				_ = connection.Close()
+			}
 			if ctx.Err() != nil {
 				_ = transition(SupervisorStoppedEvent, SupervisorSnapshot{})
 				return ctx.Err()

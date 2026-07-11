@@ -96,10 +96,13 @@ server와 client TLS config는 TLS 1.3만 허용하고 `krasis/1` ALPN을 사용
 - 종료 결과가 `LOCAL`이 아니면 정상 종료로 보고하지 않는다.
 
 `internal/agent.RunSupervisor`는 이 session 조립 경계 바깥에서 listen 또는 dial connection source를 반복 실행한다. supervisor 상태는 `STOPPED`, `ACQUIRING`, `ACTIVE`, `BACKOFF`이며 transition table에 없는 전이는 거부한다. connection 획득 실패와 active session 실패는 서로 다른 failure kind로 관찰되지만 주소, certificate, session ID와 원시 오류 문자열은 snapshot에 넣지 않는다.
+supervisor가 시작된 뒤 어떤 terminal return을 만나도 connection source를 닫고 마지막 observer
+snapshot을 `STOPPED`로 수렴시킨다. connection source가 acquisition error와 함께 부분 connection을
+반환하면 retry 전에 그 connection도 닫아 owner 없는 transport를 남기지 않는다.
 
 재시도 간격은 첫 250ms부터 두 배로 증가하고 30초에서 제한된다. session이 30초 이상 유지된 뒤 실패하면 다음 시도는 첫 간격으로 되돌아간다. 이 값은 현재 단일 peer 실험 기본값이며 실제 장비 측정 전 제품 SLO가 아니다. jitter는 한 listener와 한 connector만 있는 MVP topology에서는 아직 적용하지 않는다.
 
-supervisor는 session 종료 결과가 `LOCAL`일 때만 새 connection을 얻는다. cleanup이 끝나지 않아 `FAULT` 또는 다른 상태에 남으면 reconnect로 덮지 않고 supervisor 자체를 실패시킨다. context 취소는 listener와 active connection을 닫고 `STOPPED`로 수렴한다.
+supervisor는 session 종료 결과가 `LOCAL`일 때만 새 connection을 얻는다. cleanup이 끝나지 않아 `FAULT` 또는 다른 상태에 남으면 reconnect로 덮지 않고 supervisor 자체를 실패시킨다. context 취소, 예상 밖의 clean session return과 unsafe final state를 포함한 모든 terminal 종료는 listener와 active connection을 닫고 `STOPPED`로 수렴한다.
 
 source hook 앞단의 emergency observer는 physical `Ctrl+Alt+Shift+F12`를 감지한다. modifier event는 active session 중 이미 전달됐을 수 있으므로 chord terminator에서 suppression을 먼저 끄고 session fault cleanup을 시작해 destination의 `ReleaseAll`을 유도한다. F12 event 자체는 remote queue에 넣지 않고 로컬 hook chain으로 넘긴다. supervisor는 `ErrEmergencyRelease`를 terminal operator event로 분류해 reconnect하지 않는다. 이 chord는 Phase 0 lab 계약이며 제품 설정 정책은 아직 미결정이다.
 

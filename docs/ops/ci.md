@@ -34,7 +34,11 @@ agent assembly 통합 테스트는 두 agent session을 실제 framed pipe로 �
 `LOCAL`로 끝나는지 검증한다.
 부모 cancellation에서 파생된 worker 종료만 기존 teardown cause를 보존해야 한다.
 
-supervisor 테스트는 명시적인 transition table, exponential backoff cap, acquire failure 뒤 retry, `LOCAL` session failure 뒤 reconnect와 non-local failure의 즉시 중단을 검증한다. network source 통합 테스트는 `peer-credentials`가 만든 역할 분리 identity로 실제 localhost listener/dial을 열고 양쪽 `PeerConnection`의 mTLS와 ALPN 인증을 통과시킨다.
+supervisor 테스트는 명시적인 transition table, exponential backoff cap, acquire failure 뒤 retry,
+`LOCAL` session failure 뒤 reconnect와 non-local failure의 즉시 중단을 검증한다. terminal path는
+예상 밖의 clean session return과 unsafe final state에서도 source와 connection을 닫고 마지막
+snapshot을 `STOPPED`로 기록해야 한다. acquire error와 함께 반환된 부분 connection도 retry 전에
+닫히는지 검증한다. network source 통합 테스트는 `peer-credentials`가 만든 역할 분리 identity로 실제 localhost listener/dial을 열고 양쪽 `PeerConnection`의 mTLS와 ALPN 인증을 통과시킨다.
 
 emergency release 테스트는 modifier press/release, left/right modifier variant, F12 terminator 비전달, source suppression 해제와 worker fault cleanup을 검증한다. `agent-session` parser와 evidence gate 테스트는 explicit live-input acknowledgement, bounded duration, 인증 session 부재와 destination input 부재를 성공으로 가장하지 않는지 확인한다. CI에서는 실제 hook suppression과 `SendInput` 상호작용을 실행하지 않는다.
 

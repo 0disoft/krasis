@@ -101,8 +101,9 @@ func TestRunSupervisorRetriesAcquireAndRecoveredSession(t *testing.T) {
 
 func TestRunSupervisorDoesNotReconnectUnsafeSession(t *testing.T) {
 	source := &scriptedSource{outcomes: []sourceOutcome{{connection: &stubConnection{}}}}
+	observer := &recordingSupervisorObserver{}
 	err := RunSupervisor(context.Background(), SupervisorConfig{
-		Session: Config{QueueCapacity: 1, Now: time.Now}, Backoff: DefaultBackoffPolicy(), Now: time.Now, Wait: Wait,
+		Session: Config{QueueCapacity: 1, Now: time.Now}, Backoff: DefaultBackoffPolicy(), Now: time.Now, Wait: Wait, Observer: observer,
 	}, SupervisorDependencies{
 		Source: source, Hook: &idleHook{}, Input: newTestInput(false), Effects: noopEffects{}, Authorizer: acceptingAuthorizer{},
 		RunSession: func(context.Context, Config, Dependencies) (Result, error) {
@@ -111,6 +112,56 @@ func TestRunSupervisorDoesNotReconnectUnsafeSession(t *testing.T) {
 	})
 	if err == nil || source.nextCalls != 1 {
 		t.Fatalf("RunSupervisor() error = %v, Next calls = %d", err, source.nextCalls)
+	}
+	if got := observer.states(); !equalStates(got, []SupervisorState{SupervisorAcquiring, SupervisorActive, SupervisorStopped}) {
+		t.Fatalf("states = %v", got)
+	}
+}
+
+func TestRunSupervisorReportsStoppedAfterUnexpectedCleanSessionReturn(t *testing.T) {
+	connection := &stubConnection{}
+	source := &scriptedSource{outcomes: []sourceOutcome{{connection: connection}}}
+	observer := &recordingSupervisorObserver{}
+	err := RunSupervisor(context.Background(), SupervisorConfig{
+		Session: Config{QueueCapacity: 1, Now: time.Now}, Backoff: DefaultBackoffPolicy(), Now: time.Now, Wait: Wait, Observer: observer,
+	}, SupervisorDependencies{
+		Source: source, Hook: &idleHook{}, Input: newTestInput(false), Effects: noopEffects{}, Authorizer: acceptingAuthorizer{},
+		RunSession: func(context.Context, Config, Dependencies) (Result, error) {
+			return Result{FinalState: control.StateLocal}, nil
+		},
+	})
+	if err == nil {
+		t.Fatal("RunSupervisor() accepted a session without failure or shutdown")
+	}
+	if !connection.closed || !source.closed {
+		t.Fatalf("terminal resources remained open: connection=%t source=%t", connection.closed, source.closed)
+	}
+	if got := observer.states(); !equalStates(got, []SupervisorState{SupervisorAcquiring, SupervisorActive, SupervisorStopped}) {
+		t.Fatalf("states = %v", got)
+	}
+}
+
+func TestRunSupervisorClosesConnectionReturnedWithAcquireError(t *testing.T) {
+	connection := &stubConnection{}
+	source := &scriptedSource{outcomes: []sourceOutcome{{connection: connection, err: errors.New("partial acquire")}}}
+	observer := &recordingSupervisorObserver{}
+	waitErr := errors.New("retry unavailable")
+	err := RunSupervisor(context.Background(), SupervisorConfig{
+		Session: Config{QueueCapacity: 1, Now: time.Now},
+		Backoff: BackoffPolicy{Initial: time.Millisecond, Maximum: time.Millisecond, StableAfter: time.Second},
+		Now:     time.Now, Wait: func(context.Context, time.Duration) error { return waitErr }, Observer: observer,
+	}, SupervisorDependencies{
+		Source: source, Hook: &idleHook{}, Input: newTestInput(false), Effects: noopEffects{}, Authorizer: acceptingAuthorizer{},
+		RunSession: RunSession,
+	})
+	if !errors.Is(err, waitErr) {
+		t.Fatalf("RunSupervisor() error = %v, want retry error", err)
+	}
+	if !connection.closed || !source.closed {
+		t.Fatalf("partial acquire resources remained open: connection=%t source=%t", connection.closed, source.closed)
+	}
+	if got := observer.states(); !equalStates(got, []SupervisorState{SupervisorAcquiring, SupervisorBackoff, SupervisorStopped}) {
+		t.Fatalf("states = %v", got)
 	}
 }
 
