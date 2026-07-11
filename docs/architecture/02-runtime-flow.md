@@ -16,6 +16,8 @@
 4. source가 `OUTBOUND_ACTIVE`, destination이 `INBOUND_ACTIVE`가 된 뒤 입력 전달을 시작한다.
 5. 반대 경계 전환은 같은 절차로 새 제어권을 만든다.
 
+상태 변경은 `internal/control` transition table에서만 결정한다. table이 반환한 effect는 Application이 순서대로 실행하고 성공 또는 실패 event를 다시 상태 머신에 넣는다. 현재 구현은 순수 transition core까지이며 peer transport와 effect executor는 후속 단계다.
+
 ## 장애와 종료
 
 1. 추가 입력 억제와 전달을 중단한다.
