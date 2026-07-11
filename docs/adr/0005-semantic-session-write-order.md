@@ -38,7 +38,8 @@ reject, revoke, input과 heartbeat 사이에서 어떤 runtime 결정이 어떤 
   길어야 한다. 제품 기본값은 실제 두 장비의 congestion과 절전 실험 전까지 `UNDECIDED`다.
   Phase 0 report에는 실행에 사용한 두 값을 기록하고 pair 및 순차 집계에서 일치 여부를
   검사한다.
-- timeout 판정은 peer timestamp가 아닌 local monotonic observation을 사용한다. timeout이나
+- timeout 판정은 peer timestamp가 아닌 local monotonic observation을 사용하며, coordinator를
+  획득한 뒤 현재 시각을 읽어 대기 시간을 deadline에서 빼먹지 않는다. timeout이나
   heartbeat write failure는 bounded cleanup context에서 `ReleaseAll`과 `LOCAL` 수렴을
   시도한다.
 - `HEARTBEAT` payload v1의 session ID 계약은 바꾸지 않는다. epoch 추가 필요성은 실제 stale
@@ -51,6 +52,7 @@ reject, revoke, input과 heartbeat 사이에서 어떤 runtime 결정이 어떤 
 - grant 전과 cleanup 뒤에는 heartbeat가 기록되지 않음
 - heartbeat 중단 시 destination의 held input이 `ReleaseAll`되고 양쪽이 `LOCAL`로 수렴함
 - heartbeat write가 block되거나 실패해도 coordinator와 runtime이 무기한 잠기지 않음
+- coordinator 대기 중 deadline이 지나면 과거 ticker 시각으로 heartbeat를 보내지 않음
 - 서로 다른 interval 또는 timeout의 Phase 0 evidence가 통과하지 않음
 
 ## 결과

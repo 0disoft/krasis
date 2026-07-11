@@ -36,9 +36,12 @@ func TestRunLivenessTicksExpiresSilentActivePeer(t *testing.T) {
 	}
 	policy := LivenessPolicy{HeartbeatInterval: time.Second, PeerTimeout: 3 * time.Second}
 	ticks := make(chan time.Time, 2)
-	ticks <- time.Unix(101, 0)
-	ticks <- time.Unix(103, 0)
-	err = runLivenessTicks(context.Background(), coordinator, runtime, policy, ticks)
+	ticks <- time.Unix(1, 0)
+	ticks <- time.Unix(2, 0)
+	times := make(chan time.Time, 2)
+	times <- time.Unix(101, 0)
+	times <- time.Unix(103, 0)
+	err = runLivenessTicks(context.Background(), coordinator, runtime, policy, func() time.Time { return <-times }, ticks)
 	if !errors.Is(err, peer.ErrPeerLivenessExpired) {
 		t.Fatalf("runLivenessTicks() error = %v", err)
 	}
@@ -66,6 +69,7 @@ func TestRunLivenessTicksStopsOnCancellation(t *testing.T) {
 		coordinator,
 		runtime,
 		LivenessPolicy{HeartbeatInterval: time.Second, PeerTimeout: 3 * time.Second},
+		time.Now,
 		make(chan time.Time),
 	)
 	if !errors.Is(err, context.Canceled) {

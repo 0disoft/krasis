@@ -124,7 +124,7 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	if config.Liveness != nil {
 		policy := *config.Liveness
 		components = append(components, component{name: "peer-liveness", run: func() error {
-			return runLiveness(runContext, coordinator, runtime, policy)
+			return runLiveness(runContext, coordinator, runtime, policy, config.Now)
 		}})
 	}
 

@@ -14,7 +14,7 @@ func TestPulseLivenessSkipsInactiveRuntime(t *testing.T) {
 	runtime := newLocalRuntime(t)
 	writer := &recordingFrameWriter{}
 	active, err := PulseLiveness(
-		context.Background(), testWriteCoordinator(t, writer), runtime, time.Unix(101, 0), 3*time.Second,
+		context.Background(), testWriteCoordinator(t, writer), runtime, fixedClock(time.Unix(101, 0)), 3*time.Second,
 	)
 	if err != nil || active || len(writer.frames) != 0 {
 		t.Fatalf("PulseLiveness(LOCAL) = active %t frames %d error %v", active, len(writer.frames), err)
@@ -25,7 +25,7 @@ func TestPulseLivenessWritesCurrentSessionHeartbeat(t *testing.T) {
 	runtime, _ := newInboundRuntime(t)
 	writer := &recordingFrameWriter{}
 	active, err := PulseLiveness(
-		context.Background(), testWriteCoordinator(t, writer), runtime, time.Unix(101, 0), 3*time.Second,
+		context.Background(), testWriteCoordinator(t, writer), runtime, fixedClock(time.Unix(101, 0)), 3*time.Second,
 	)
 	if err != nil || !active || len(writer.frames) != 1 || writer.frames[0].Kind != transport.MessageHeartbeat {
 		t.Fatalf("PulseLiveness(active) = active %t frames %+v error %v", active, writer.frames, err)
@@ -46,7 +46,7 @@ func TestPulseLivenessExpiresWithoutWritingHeartbeat(t *testing.T) {
 	}
 	writer := &recordingFrameWriter{}
 	active, err := PulseLiveness(
-		context.Background(), testWriteCoordinator(t, writer), runtime, time.Unix(103, 0), 3*time.Second,
+		context.Background(), testWriteCoordinator(t, writer), runtime, fixedClock(time.Unix(103, 0)), 3*time.Second,
 	)
 	if !active || !errors.Is(err, ErrPeerLivenessExpired) || len(writer.frames) != 0 {
 		t.Fatalf("PulseLiveness(expired) = active %t frames %+v error %v", active, writer.frames, err)
@@ -64,7 +64,7 @@ func TestPulseLivenessWriteFailureCleansRuntime(t *testing.T) {
 	cause := errors.New("heartbeat write failed")
 	writer := &recordingFrameWriter{err: cause}
 	active, err := PulseLiveness(
-		context.Background(), testWriteCoordinator(t, writer), runtime, time.Unix(101, 0), 3*time.Second,
+		context.Background(), testWriteCoordinator(t, writer), runtime, fixedClock(time.Unix(101, 0)), 3*time.Second,
 	)
 	if !active || !errors.Is(err, cause) {
 		t.Fatalf("PulseLiveness(write failure) = active %t error %v", active, err)
@@ -82,7 +82,7 @@ func TestPulseLivenessCanceledBlockedWriteCleansRuntimeAndReleasesCoordinator(t 
 	defer cancel()
 	done := make(chan error, 1)
 	go func() {
-		_, err := PulseLiveness(ctx, coordinator, runtime, time.Unix(101, 0), 3*time.Second)
+		_, err := PulseLiveness(ctx, coordinator, runtime, fixedClock(time.Unix(101, 0)), 3*time.Second)
 		done <- err
 	}()
 	select {
@@ -102,9 +102,58 @@ func TestPulseLivenessCanceledBlockedWriteCleansRuntimeAndReleasesCoordinator(t 
 	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal {
 		t.Fatalf("blocked heartbeat runtime = %s", snapshot)
 	}
-	active, err := PulseLiveness(context.Background(), coordinator, runtime, time.Unix(102, 0), 3*time.Second)
+	active, err := PulseLiveness(context.Background(), coordinator, runtime, fixedClock(time.Unix(102, 0)), 3*time.Second)
 	if err != nil || active {
 		t.Fatalf("PulseLiveness(after cancel) = active %t error %v", active, err)
+	}
+}
+
+func TestPulseLivenessReadsDeadlineClockAfterCoordinatorWait(t *testing.T) {
+	runtime, _ := newInboundRuntime(t)
+	writer := &recordingFrameWriter{}
+	coordinator := testWriteCoordinator(t, writer)
+	holderReady := make(chan struct{})
+	releaseHolder := make(chan struct{})
+	holderDone := make(chan error, 1)
+	go func() {
+		holderDone <- coordinator.Execute(context.Background(), func(FrameWriter) error {
+			close(holderReady)
+			<-releaseHolder
+			return nil
+		})
+	}()
+	<-holderReady
+
+	clockCalled := make(chan struct{})
+	clockValue := make(chan time.Time, 1)
+	pulseDone := make(chan error, 1)
+	go func() {
+		_, err := PulseLiveness(context.Background(), coordinator, runtime, func() time.Time {
+			close(clockCalled)
+			return <-clockValue
+		}, 3*time.Second)
+		pulseDone <- err
+	}()
+	select {
+	case <-clockCalled:
+		t.Fatal("deadline clock was read before the coordinator became available")
+	case <-time.After(50 * time.Millisecond):
+	}
+	close(releaseHolder)
+	if err := <-holderDone; err != nil {
+		t.Fatalf("holder operation error = %v", err)
+	}
+	select {
+	case <-clockCalled:
+	case <-time.After(time.Second):
+		t.Fatal("deadline clock was not read after coordinator acquisition")
+	}
+	clockValue <- time.Unix(103, 0)
+	if err := <-pulseDone; !errors.Is(err, ErrPeerLivenessExpired) {
+		t.Fatalf("PulseLiveness(delayed) error = %v", err)
+	}
+	if len(writer.frames) != 0 || runtime.Snapshot().Control.State != control.StateLocal {
+		t.Fatalf("delayed pulse survived timeout: frames=%+v runtime=%s", writer.frames, runtime.Snapshot())
 	}
 }
 

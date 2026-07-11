@@ -1,7 +1,7 @@
 {
   "tool": "ssealed",
   "version": "0.6.11",
-  "generatedAt": "2026-07-11T12:16:36.309Z",
+  "generatedAt": "2026-07-11T12:21:56.968Z",
   "scope": "general",
   "profile": "desktop-app",
   "addons": [
@@ -551,13 +551,13 @@
     },
     {
       "path": "docs/architecture/02-runtime-flow.md",
-      "checksum": "sha256:404fba4e2b531290b768ad80081f051d962eb8dc6e045c66e02a17b7de48573c",
+      "checksum": "sha256:e22c0cd86f8171d6706945518393a340c429d84806878c55dab0b12989983aff",
       "kind": "document",
       "ownership": "seeded",
       "presence": "optional",
       "status": "active",
       "initialChecksum": "sha256:c0f5d7adf6082d4abc8e950b6b4f30103fcc40b32341513690ec00a2b2f7c288",
-      "acceptedChecksum": "sha256:404fba4e2b531290b768ad80081f051d962eb8dc6e045c66e02a17b7de48573c",
+      "acceptedChecksum": "sha256:e22c0cd86f8171d6706945518393a340c429d84806878c55dab0b12989983aff",
       "generatedChecksum": "sha256:c0f5d7adf6082d4abc8e950b6b4f30103fcc40b32341513690ec00a2b2f7c288"
     },
     {
@@ -826,13 +826,13 @@
     },
     {
       "path": "docs/ops/ci.md",
-      "checksum": "sha256:d3fee203548f7532003e256df55a7ccee22ab7f5c210d6caac3a57b5ae16082f",
+      "checksum": "sha256:65e8687e6c7eab53cb5a293b963a223bd2555f9e95ef590e94880b7359b094b2",
       "kind": "document",
       "ownership": "seeded",
       "presence": "optional",
       "status": "active",
       "initialChecksum": "sha256:22ccaa9f1a1371db7743291eebeef85d477ff5bc0838dde24a166722e8bdc525",
-      "acceptedChecksum": "sha256:d3fee203548f7532003e256df55a7ccee22ab7f5c210d6caac3a57b5ae16082f",
+      "acceptedChecksum": "sha256:65e8687e6c7eab53cb5a293b963a223bd2555f9e95ef590e94880b7359b094b2",
       "generatedChecksum": "sha256:22ccaa9f1a1371db7743291eebeef85d477ff5bc0838dde24a166722e8bdc525"
     },
     {

@@ -12,17 +12,18 @@ import (
 
 var ErrPeerLivenessExpired = errors.New("peer liveness expired")
 
-// PulseLiveness checks the current peer deadline and, while the exact session
-// remains active, writes one heartbeat in the same semantic write operation.
+// PulseLiveness acquires the semantic write operation before reading the
+// observation clock, then checks the deadline and writes one heartbeat only
+// while the exact session remains active.
 func PulseLiveness(
 	ctx context.Context,
 	coordinator *SessionWriteCoordinator,
 	runtime *application.SessionRuntime,
-	observedAt time.Time,
+	now ObservationClock,
 	timeout time.Duration,
 ) (bool, error) {
-	if coordinator == nil || runtime == nil {
-		return false, errors.New("write coordinator and runtime are required")
+	if coordinator == nil || runtime == nil || now == nil {
+		return false, errors.New("write coordinator, runtime, and observation clock are required")
 	}
 	active := false
 	err := coordinator.Execute(ctx, func(writer FrameWriter) error {
@@ -31,6 +32,7 @@ func PulseLiveness(
 			return nil
 		}
 		active = true
+		observedAt := now()
 		faulted, err := runtime.CheckLiveness(ctx, observedAt, timeout)
 		if err != nil {
 			return err

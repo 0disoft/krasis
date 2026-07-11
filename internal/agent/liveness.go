@@ -26,13 +26,14 @@ func runLiveness(
 	coordinator *peer.SessionWriteCoordinator,
 	runtime *application.SessionRuntime,
 	policy LivenessPolicy,
+	now peer.ObservationClock,
 ) error {
 	if err := policy.Validate(); err != nil {
 		return err
 	}
 	ticker := time.NewTicker(policy.HeartbeatInterval)
 	defer ticker.Stop()
-	return runLivenessTicks(ctx, coordinator, runtime, policy, ticker.C)
+	return runLivenessTicks(ctx, coordinator, runtime, policy, now, ticker.C)
 }
 
 func runLivenessTicks(
@@ -40,10 +41,11 @@ func runLivenessTicks(
 	coordinator *peer.SessionWriteCoordinator,
 	runtime *application.SessionRuntime,
 	policy LivenessPolicy,
+	now peer.ObservationClock,
 	ticks <-chan time.Time,
 ) error {
-	if ctx == nil || coordinator == nil || runtime == nil || ticks == nil {
-		return errors.New("liveness context, coordinator, runtime, and ticks are required")
+	if ctx == nil || coordinator == nil || runtime == nil || now == nil || ticks == nil {
+		return errors.New("liveness context, coordinator, runtime, observation clock, and ticks are required")
 	}
 	if err := policy.Validate(); err != nil {
 		return err
@@ -52,11 +54,11 @@ func runLivenessTicks(
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case observedAt, ok := <-ticks:
+		case _, ok := <-ticks:
 			if !ok {
 				return errors.New("liveness ticker stopped unexpectedly")
 			}
-			if _, err := peer.PulseLiveness(ctx, coordinator, runtime, observedAt, policy.PeerTimeout); err != nil {
+			if _, err := peer.PulseLiveness(ctx, coordinator, runtime, now, policy.PeerTimeout); err != nil {
 				return err
 			}
 		}
