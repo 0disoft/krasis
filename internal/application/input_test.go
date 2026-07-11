@@ -15,6 +15,10 @@ type recordingInputPort struct {
 	pressCalls     []control.PressedToken
 	releaseCalls   []control.PressedToken
 	recordedBefore bool
+	moves          [][2]int32
+	wheels         [][2]int32
+	moveErr        error
+	wheelErr       error
 }
 
 func (port *recordingInputPort) Press(_ context.Context, token control.PressedToken) error {
@@ -26,6 +30,16 @@ func (port *recordingInputPort) Press(_ context.Context, token control.PressedTo
 func (port *recordingInputPort) Release(_ context.Context, token control.PressedToken) error {
 	port.releaseCalls = append(port.releaseCalls, token)
 	return port.releaseErr
+}
+
+func (port *recordingInputPort) Move(_ context.Context, deltaX, deltaY int32) error {
+	port.moves = append(port.moves, [2]int32{deltaX, deltaY})
+	return port.moveErr
+}
+
+func (port *recordingInputPort) Wheel(_ context.Context, deltaX, deltaY int32) error {
+	port.wheels = append(port.wheels, [2]int32{deltaX, deltaY})
+	return port.wheelErr
 }
 
 func TestInjectPressRecordsBeforeCallingAdapter(t *testing.T) {

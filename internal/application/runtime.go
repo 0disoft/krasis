@@ -126,11 +126,44 @@ func (runtime *SessionRuntime) HandlePressedInput(
 	token control.PressedToken,
 	pressed bool,
 ) error {
+	if err := token.Validate(); err != nil {
+		runtime.mu.Lock()
+		defer runtime.mu.Unlock()
+		if runtime.control.State != control.StateInboundActive || runtime.stream.SessionID == "" {
+			return ErrRuntimeNotInbound
+		}
+		_, faultErr := runtime.faultLocked(ctx, err)
+		return faultErr
+	}
+	kind := control.InputKeyUp
+	switch token.Kind {
+	case control.PressedKeyboardKey:
+		if pressed {
+			kind = control.InputKeyDown
+		}
+	case control.PressedMouseButton:
+		kind = control.InputButtonUp
+		if pressed {
+			kind = control.InputButtonDown
+		}
+	}
+	return runtime.HandleInputAction(ctx, envelope, control.InputAction{Kind: kind, Code: token.Code})
+}
+
+func (runtime *SessionRuntime) HandleInputAction(
+	ctx context.Context,
+	envelope control.InputEnvelope,
+	action control.InputAction,
+) error {
 	runtime.mu.Lock()
 	defer runtime.mu.Unlock()
 
 	if runtime.control.State != control.StateInboundActive || runtime.stream.SessionID == "" {
 		return ErrRuntimeNotInbound
+	}
+	if err := action.Validate(); err != nil {
+		_, faultErr := runtime.faultLocked(ctx, err)
+		return faultErr
 	}
 	next, outcome, accepted, err := HandleInputEnvelope(
 		ctx,
@@ -148,10 +181,16 @@ func (runtime *SessionRuntime) HandlePressedInput(
 	}
 	runtime.stream = next
 
-	if pressed {
-		err = InjectPress(ctx, &runtime.pressed, runtime.input, token)
+	if token, pressed, discrete := action.PressedToken(); discrete {
+		if pressed {
+			err = InjectPress(ctx, &runtime.pressed, runtime.input, token)
+		} else {
+			_, err = InjectRelease(ctx, &runtime.pressed, runtime.input, token)
+		}
+	} else if action.Kind == control.InputPointerMove {
+		err = runtime.input.Move(ctx, action.DeltaX, action.DeltaY)
 	} else {
-		_, err = InjectRelease(ctx, &runtime.pressed, runtime.input, token)
+		err = runtime.input.Wheel(ctx, action.DeltaX, action.DeltaY)
 	}
 	if err == nil {
 		return nil

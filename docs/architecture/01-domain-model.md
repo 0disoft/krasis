@@ -47,6 +47,12 @@
 
 이 gate는 message payload나 직렬화 형식을 정하지 않는다. transport adapter가 인증과 decode를 끝낸 뒤 Application이 envelope metadata를 gate에 넣고, 승인된 경우에만 입력 payload를 해석하고 실행해야 한다.
 
+## 정규화 입력 action
+
+`InputAction`은 keyboard key down/up, mouse button down/up, relative pointer move와 horizontal/vertical wheel delta를 표현한다. key와 button은 opaque code만 가지며 delta를 가질 수 없고, move와 wheel은 code 없이 하나 이상의 non-zero delta가 필요하다. 구체적인 Windows virtual-key, scan-code와 button mapping은 Win32 adapter 검증 전까지 결정하지 않는다.
+
+Application은 action을 검증한 뒤 현재 session·epoch·sequence를 승인하고 같은 `SessionRuntime` 직렬 경계 안에서 adapter를 호출한다. adapter 호출이 실패하면 승인한 sequence를 재시도하지 않고 해당 session을 fault cleanup한다.
+
 ## Peer liveness
 
 `PeerLiveness`는 현재 `SessionID`와 마지막 heartbeat를 로컬에서 관찰한 시각만 가진다. timeout 값은 domain 상수가 아니라 Application이 실측 또는 설정에서 전달하는 값이다. deadline에 도달하면 `FAULT_DETECTED` event를 만들며, 이전 session의 heartbeat와 시간이 뒤로 이동한 관찰은 liveness를 갱신하지 않는다.

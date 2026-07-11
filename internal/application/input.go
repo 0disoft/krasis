@@ -10,6 +10,8 @@ import (
 type InputPort interface {
 	ReleasePort
 	Press(context.Context, control.PressedToken) error
+	Move(context.Context, int32, int32) error
+	Wheel(context.Context, int32, int32) error
 }
 
 func InjectPress(ctx context.Context, state *control.PressedState, port InputPort, token control.PressedToken) error {

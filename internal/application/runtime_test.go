@@ -61,6 +61,58 @@ func TestSessionRuntimeSequenceGapFailsSafe(t *testing.T) {
 	}
 }
 
+func TestSessionRuntimeMovesPointerAndWheelInSequence(t *testing.T) {
+	port := &recordingInputPort{}
+	runtime := newTestRuntime(t, port)
+	grantInbound(t, runtime, time.Unix(100, 0))
+
+	events := []struct {
+		sequence uint64
+		action   control.InputAction
+	}{
+		{sequence: 1, action: control.InputAction{Kind: control.InputPointerMove, DeltaX: -3, DeltaY: 4}},
+		{sequence: 2, action: control.InputAction{Kind: control.InputWheel, DeltaY: 120}},
+	}
+	for _, event := range events {
+		err := runtime.HandleInputAction(context.Background(), control.InputEnvelope{
+			SessionID: "session-1",
+			Epoch:     "epoch-1",
+			Sequence:  event.sequence,
+		}, event.action)
+		if err != nil {
+			t.Fatalf("HandleInputAction(%d) error = %v", event.sequence, err)
+		}
+	}
+	if len(port.moves) != 1 || port.moves[0] != [2]int32{-3, 4} {
+		t.Fatalf("moves = %v", port.moves)
+	}
+	if len(port.wheels) != 1 || port.wheels[0] != [2]int32{0, 120} {
+		t.Fatalf("wheels = %v", port.wheels)
+	}
+	if snapshot := runtime.Snapshot(); snapshot.InputStream.NextSequence != 3 || snapshot.PressedCount != 0 {
+		t.Fatalf("unexpected snapshot: %s", snapshot)
+	}
+}
+
+func TestSessionRuntimePointerFailureFailsSafe(t *testing.T) {
+	moveErr := errors.New("pointer injection failed")
+	port := &recordingInputPort{moveErr: moveErr}
+	runtime := newTestRuntime(t, port)
+	grantInbound(t, runtime, time.Unix(100, 0))
+
+	err := runtime.HandleInputAction(context.Background(), control.InputEnvelope{
+		SessionID: "session-1",
+		Epoch:     "epoch-1",
+		Sequence:  1,
+	}, control.InputAction{Kind: control.InputPointerMove, DeltaX: 1})
+	if !errors.Is(err, moveErr) {
+		t.Fatalf("error = %v, want pointer injection failure", err)
+	}
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal || snapshot.HasStream {
+		t.Fatalf("unexpected snapshot after pointer failure: %s", snapshot)
+	}
+}
+
 func TestSessionRuntimeInvalidReleaseFailsSafe(t *testing.T) {
 	port := &recordingInputPort{}
 	runtime := newTestRuntime(t, port)
