@@ -3,6 +3,7 @@ package peer
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -124,6 +125,7 @@ func TestLeaseResponderGrantsAuthorizedRequest(t *testing.T) {
 		Coordinator: testWriteCoordinator(t, writer),
 		Runtime:     runtime,
 		Authorizer:  staticLeaseAuthorizer{leaseID: "lease-1", accepted: true},
+		Peer:        testAuthenticatedPeer(),
 		Entry:       entry,
 		Returns:     entry,
 	}
@@ -151,6 +153,7 @@ func TestLeaseResponderRejectsWithoutActivatingRuntime(t *testing.T) {
 		Coordinator: testWriteCoordinator(t, writer),
 		Runtime:     runtime,
 		Authorizer:  staticLeaseAuthorizer{},
+		Peer:        testAuthenticatedPeer(),
 		Entry:       entry,
 		Returns:     entry,
 	}
@@ -178,6 +181,7 @@ func TestLeaseResponderEntryFailureDoesNotGrantInbound(t *testing.T) {
 		Coordinator: testWriteCoordinator(t, writer),
 		Runtime:     runtime,
 		Authorizer:  staticLeaseAuthorizer{leaseID: "lease-1", accepted: true},
+		Peer:        testAuthenticatedPeer(),
 		Entry:       entry,
 		Returns:     entry,
 	}
@@ -204,6 +208,7 @@ func TestLeaseResponderGrantWriteFailureCleansInboundRuntime(t *testing.T) {
 		Coordinator: testWriteCoordinator(t, writer),
 		Runtime:     runtime,
 		Authorizer:  staticLeaseAuthorizer{leaseID: "lease-1", accepted: true},
+		Peer:        testAuthenticatedPeer(),
 		Entry:       entry,
 		Returns:     entry,
 	}
@@ -308,9 +313,17 @@ func (entry *recordingCursorEntry) DisarmReturn(intent control.ReturnIntent) {
 
 func (authorizer staticLeaseAuthorizer) AuthorizeLease(
 	context.Context,
+	transport.AuthenticatedPeerContext,
 	string,
 	string,
 	time.Time,
 ) (string, bool, error) {
 	return authorizer.leaseID, authorizer.accepted, authorizer.err
+}
+
+func testAuthenticatedPeer() transport.AuthenticatedPeerContext {
+	return transport.AuthenticatedPeerContext{
+		CertificateSHA256: strings.Repeat("a", 64),
+		Role:              transport.AuthenticatedPeerConnector,
+	}
 }

@@ -3,7 +3,9 @@ package transport
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
+	"encoding/hex"
 	"errors"
 	"sync"
 	"testing"
@@ -35,6 +37,40 @@ func TestPeerConnectionExchangesFramesAfterAuthentication(t *testing.T) {
 	if got.Kind != want.Kind || !bytes.Equal(got.Payload, want.Payload) {
 		t.Fatalf("ReadFrame() = %#v, want %#v", got, want)
 	}
+}
+
+func TestPeerConnectionExposesAuthenticatedCertificateIdentity(t *testing.T) {
+	fixture := newTLSFixture(t)
+	serverTLS, clientTLS := openTLSPair(
+		t,
+		mustServerTLSConfig(t, fixture.serverIdentity, fixture.roots),
+		mustClientTLSConfig(t, fixture.clientIdentity, fixture.roots, fixture.serverName),
+	)
+	server, client, serverErr, clientErr := authenticateConnectionPair(t, serverTLS, clientTLS)
+	if serverErr != nil || clientErr != nil {
+		t.Fatalf("peer authentication errors: server=%v client=%v", serverErr, clientErr)
+	}
+	defer server.Close()
+	defer client.Close()
+	serverPeer, err := server.AuthenticatedPeer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	clientPeer, err := client.AuthenticatedPeer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if serverPeer.CertificateSHA256 != certificateFingerprint(fixture.clientIdentity.Certificate[0]) || serverPeer.Role != AuthenticatedPeerConnector {
+		t.Fatalf("server peer = %+v", serverPeer)
+	}
+	if clientPeer.CertificateSHA256 != certificateFingerprint(fixture.serverIdentity.Certificate[0]) || clientPeer.Role != AuthenticatedPeerListener {
+		t.Fatalf("client peer = %+v", clientPeer)
+	}
+}
+
+func certificateFingerprint(der []byte) string {
+	digest := sha256.Sum256(der)
+	return hex.EncodeToString(digest[:])
 }
 
 func TestPeerConnectionRejectsMissingALPN(t *testing.T) {

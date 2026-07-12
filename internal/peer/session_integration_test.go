@@ -31,6 +31,7 @@ func TestPeerSessionsCompleteOutboundInputAndReturnRevokeRoundTrip(t *testing.T)
 		Coordinator: destinationCoordinator,
 		Runtime:     destinationRuntime,
 		Authorizer:  staticLeaseAuthorizer{leaseID: "lease-1", accepted: true},
+		Peer:        testAuthenticatedPeer(),
 		Entry:       integrationCursorEntry{},
 		Returns:     returnBoundary,
 	}
@@ -126,6 +127,7 @@ func TestPeerSessionsReuseOneConnectionForBothDirections(t *testing.T) {
 		Coordinator: leftCoordinator,
 		Runtime:     leftRuntime,
 		Authorizer:  staticLeaseAuthorizer{leaseID: "lease-left", accepted: true},
+		Peer:        testAuthenticatedPeer(),
 		Entry:       integrationCursorEntry{},
 		Returns:     leftReturns,
 	}
@@ -133,6 +135,7 @@ func TestPeerSessionsReuseOneConnectionForBothDirections(t *testing.T) {
 		Coordinator: rightCoordinator,
 		Runtime:     rightRuntime,
 		Authorizer:  staticLeaseAuthorizer{leaseID: "lease-right", accepted: true},
+		Peer:        testAuthenticatedPeer(),
 		Entry:       integrationCursorEntry{},
 		Returns:     rightReturns,
 	}
@@ -225,6 +228,7 @@ func TestPeerSessionsFailSafeWhenBothPeersRequestControl(t *testing.T) {
 		Coordinator: leftCoordinator,
 		Runtime:     leftRuntime,
 		Authorizer:  staticLeaseAuthorizer{leaseID: "lease-left", accepted: true},
+		Peer:        testAuthenticatedPeer(),
 		Entry:       integrationCursorEntry{},
 		Returns:     &integrationReturnBoundary{},
 	}
@@ -232,6 +236,7 @@ func TestPeerSessionsFailSafeWhenBothPeersRequestControl(t *testing.T) {
 		Coordinator: rightCoordinator,
 		Runtime:     rightRuntime,
 		Authorizer:  staticLeaseAuthorizer{leaseID: "lease-right", accepted: true},
+		Peer:        testAuthenticatedPeer(),
 		Entry:       integrationCursorEntry{},
 		Returns:     &integrationReturnBoundary{},
 	}
@@ -358,6 +363,7 @@ func TestPeerSessionsRejectStaleInputAfterReconnect(t *testing.T) {
 		Coordinator: destinationCoordinator,
 		Runtime:     destinationRuntime,
 		Authorizer:  staticLeaseAuthorizer{leaseID: "lease-new", accepted: true},
+		Peer:        testAuthenticatedPeer(),
 		Entry:       integrationCursorEntry{},
 		Returns:     returnBoundary,
 	}
@@ -436,6 +442,7 @@ func completeIntegrationRoundTrip(
 		Coordinator: destinationCoordinator,
 		Runtime:     destinationRuntime,
 		Authorizer:  staticLeaseAuthorizer{leaseID: "lease-" + identity.SessionID, accepted: true},
+		Peer:        testAuthenticatedPeer(),
 		Entry:       integrationCursorEntry{},
 		Returns:     returns,
 	}

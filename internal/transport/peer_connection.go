@@ -12,13 +12,15 @@ type PeerConnection struct {
 	reader     *Reader
 	writer     *Writer
 	writeGate  chan struct{}
+	peer       AuthenticatedPeerContext
 }
 
 func NewPeerConnection(ctx context.Context, connection *tls.Conn) (*PeerConnection, error) {
 	if connection == nil {
 		return nil, errors.New("TLS connection is required")
 	}
-	if err := AuthenticatePeer(ctx, connection); err != nil {
+	peer, err := AuthenticatePeerContext(ctx, connection)
+	if err != nil {
 		return nil, err
 	}
 	reader, err := NewReader(connection)
@@ -31,7 +33,17 @@ func NewPeerConnection(ctx context.Context, connection *tls.Conn) (*PeerConnecti
 	}
 	writeGate := make(chan struct{}, 1)
 	writeGate <- struct{}{}
-	return &PeerConnection{connection: connection, reader: reader, writer: writer, writeGate: writeGate}, nil
+	return &PeerConnection{connection: connection, reader: reader, writer: writer, writeGate: writeGate, peer: peer}, nil
+}
+
+func (connection *PeerConnection) AuthenticatedPeer() (AuthenticatedPeerContext, error) {
+	if connection == nil {
+		return AuthenticatedPeerContext{}, errors.New("peer connection is not initialized")
+	}
+	if err := connection.peer.Validate(); err != nil {
+		return AuthenticatedPeerContext{}, err
+	}
+	return connection.peer, nil
 }
 
 func (connection *PeerConnection) ReadFrame() (Frame, error) {

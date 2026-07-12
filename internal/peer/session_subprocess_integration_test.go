@@ -241,6 +241,7 @@ func runDestinationPeerProcess(t *testing.T, ctx context.Context) {
 		Coordinator: coordinator,
 		Runtime:     runtime,
 		Authorizer:  staticLeaseAuthorizer{leaseID: "lease-1", accepted: true},
+		Peer:        testAuthenticatedPeer(),
 		Entry:       integrationCursorEntry{},
 		Returns:     returns,
 	}

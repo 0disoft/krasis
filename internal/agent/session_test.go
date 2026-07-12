@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -231,7 +232,7 @@ func (noopEffects) Execute(context.Context, control.Effect) error { return nil }
 
 type acceptingAuthorizer struct{}
 
-func (acceptingAuthorizer) AuthorizeLease(context.Context, string, string, time.Time) (string, bool, error) {
+func (acceptingAuthorizer) AuthorizeLease(context.Context, transport.AuthenticatedPeerContext, string, string, time.Time) (string, bool, error) {
 	return "lease-agent-test", true, nil
 }
 
@@ -240,6 +241,17 @@ type framedConnection struct {
 	reader *transport.Reader
 	writer *transport.Writer
 	mu     sync.Mutex
+}
+
+func (*framedConnection) AuthenticatedPeer() (transport.AuthenticatedPeerContext, error) {
+	return testAuthenticatedPeerContext(), nil
+}
+
+func testAuthenticatedPeerContext() transport.AuthenticatedPeerContext {
+	return transport.AuthenticatedPeerContext{
+		CertificateSHA256: strings.Repeat("b", 64),
+		Role:              transport.AuthenticatedPeerConnector,
+	}
 }
 
 func openConnectionPair(t *testing.T) (*framedConnection, *framedConnection) {

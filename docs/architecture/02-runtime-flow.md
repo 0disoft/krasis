@@ -79,7 +79,7 @@ subprocess test는 parent 강제 종료 뒤 이 독립 cleanup owner가 실행�
 
 MVP transport framing은 `docs/adr/0003-ordered-peer-transport.md`를 따른다. 하나의 ordered stream에서 bounded frame을 순서대로 읽고, transport는 control, input, heartbeat kind와 payload 크기까지만 검증한다. payload decode와 runtime 호출은 인증된 connection을 소유한 adapter 책임이다.
 
-server와 client TLS config는 TLS 1.3만 허용하고 `krasis/1` ALPN을 사용한다. server는 신뢰 root로 검증된 client certificate를 요구하고 client도 명시적인 expected server name과 신뢰 root로 server certificate를 검증한다. system root fallback, insecure skip verify와 익명 연결은 사용하지 않는다.
+server와 client TLS config는 TLS 1.3만 허용하고 `krasis/1` ALPN을 사용한다. server는 신뢰 root로 검증된 client certificate를 요구하고 client도 명시적인 expected server name과 신뢰 root로 server certificate를 검증한다. 인증이 끝나면 leaf certificate의 SHA-256 fingerprint와 EKU 기반 역할을 `AuthenticatedPeerContext`로 만들고, `PeerConnection`에서 agent session과 `LeaseAuthorizer`까지 필수 전달한다. fingerprint는 certificate subject나 원문 인증서를 로그에 복사하지 않는 stable identity다. system root fallback, insecure skip verify와 익명 연결은 사용하지 않는다.
 
 `PeerConnection`은 mutual TLS와 ALPN 검증이 완료된 뒤에만 bounded frame reader/writer를 노출한다. writer 호출은 connection 안에서 직렬화해 여러 producer의 frame bytes가 섞이지 않게 한다. input dispatcher는 payload decode가 실패하면 활성 `SessionRuntime`을 fault cleanup하고, router가 잘못 전달한 non-input frame은 runtime state를 건드리지 않고 거부한다.
 
@@ -147,4 +147,4 @@ policy가 없으면 worker는 없고
 inbound input과 heartbeat dispatch는 coordinator 안에서 runtime을 변경하고 malformed control은
 connection close 뒤 cleanup하므로 fault 전이 뒤 semantic frame이 성공적으로 기록되지 않는다.
 
-wire 송신은 상태 머신 effect executor가 아니라 peer session orchestrator가 runtime 전이 성공 뒤 수행한다. `BeginOutboundSession`은 먼저 `PENDING`을 확정한 뒤 `LeaseRequest`를 쓰며, write 실패 시 pending session을 폐기한다. destination의 `LeaseResponder`는 주입된 authorization policy 결과에 따라 reject를 보내거나 inbound runtime을 활성화한 뒤 grant를 보낸다. grant write가 불확실하면 destination도 즉시 cleanup한다. input write는 runtime이 sequence를 예약한 뒤 수행하며 write 결과가 불확실하면 sequence를 재사용하지 않고 session 전체를 폐기한다.
+wire 송신은 상태 머신 effect executor가 아니라 peer session orchestrator가 runtime 전이 성공 뒤 수행한다. `BeginOutboundSession`은 먼저 `PENDING`을 확정한 뒤 `LeaseRequest`를 쓰며, write 실패 시 pending session을 폐기한다. destination의 `LeaseResponder`는 transport가 검증한 `AuthenticatedPeerContext`와 request metadata를 authorization policy에 함께 넘기고, policy 결과에 따라 reject를 보내거나 inbound runtime을 활성화한 뒤 grant를 보낸다. Phase 0 기본 policy는 유효한 identity가 없으면 거부하지만 아직 fingerprint allowlist나 사용자 승인을 적용하지 않는다. grant write가 불확실하면 destination도 즉시 cleanup한다. input write는 runtime이 sequence를 예약한 뒤 수행하며 write 결과가 불확실하면 sequence를 재사용하지 않고 session 전체를 폐기한다.

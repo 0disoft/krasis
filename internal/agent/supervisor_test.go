@@ -287,6 +287,10 @@ type stubConnection struct {
 	closeErr   error
 }
 
+func (*stubConnection) AuthenticatedPeer() (transport.AuthenticatedPeerContext, error) {
+	return testAuthenticatedPeerContext(), nil
+}
+
 func (*stubConnection) ReadFrame() (transport.Frame, error) {
 	return transport.Frame{}, errors.New("unused")
 }

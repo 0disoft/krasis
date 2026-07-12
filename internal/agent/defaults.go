@@ -8,14 +8,24 @@ import (
 	"time"
 
 	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/transport"
 )
 
 const leaseIdentifierBytes = 16
 
 type AuthenticatedPeerAuthorizer struct{}
 
-func (AuthenticatedPeerAuthorizer) AuthorizeLease(ctx context.Context, sessionID, epoch string, observedAt time.Time) (string, bool, error) {
+func (AuthenticatedPeerAuthorizer) AuthorizeLease(
+	ctx context.Context,
+	peer transport.AuthenticatedPeerContext,
+	sessionID,
+	epoch string,
+	observedAt time.Time,
+) (string, bool, error) {
 	if err := ctx.Err(); err != nil {
+		return "", false, err
+	}
+	if err := peer.Validate(); err != nil {
 		return "", false, err
 	}
 	if sessionID == "" || epoch == "" || observedAt.IsZero() {

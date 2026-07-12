@@ -10,6 +10,7 @@ import (
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/peer"
+	"github.com/0disoft/krasis/internal/transport"
 	"github.com/0disoft/krasis/internal/wininput"
 )
 
@@ -27,6 +28,7 @@ type InputBoundaryPort interface {
 type Connection interface {
 	peer.FrameWriter
 	peer.SessionConnection
+	AuthenticatedPeer() (transport.AuthenticatedPeerContext, error)
 }
 
 type Config struct {
@@ -55,6 +57,10 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 		return Result{}, errors.New("agent context is required")
 	}
 	if err := validate(config, dependencies); err != nil {
+		return Result{}, err
+	}
+	authenticatedPeer, err := dependencies.Connection.AuthenticatedPeer()
+	if err != nil {
 		return Result{}, err
 	}
 	detector, err := control.NewBoundaryDetector(config.Boundary)
@@ -95,7 +101,7 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	}
 	responder := &peer.LeaseResponder{
 		Coordinator: coordinator, Runtime: runtime, Authorizer: dependencies.Authorizer,
-		Entry: dependencies.Input, Returns: dependencies.Input,
+		Peer: authenticatedPeer, Entry: dependencies.Input, Returns: dependencies.Input,
 	}
 	returns, err := peer.NewReturnController(coordinator, runtime, dependencies.Input)
 	if err != nil {

@@ -28,7 +28,7 @@
 | High | 관리자 앱 또는 보안 화면 기대가 어긋남 | 일부 창에서 입력 불가 | 권한 수준별 테스트 | MVP 제한을 UI와 문서에 명시 |
 | Medium | Wails v3 prerelease 변화로 UI 빌드가 깨짐 | 설치물 재현 불가 | exact toolchain 재현 | 호환 세트 고정, UI를 core에서 격리 |
 | Medium | 진단 로그가 사용자 입력을 노출 | 개인정보 유출 | 지원 번들 검토 | allowlist 로그와 민감값 redaction |
-| High | mTLS 인증서를 곧바로 입력 제어 권한으로 취급 | 같은 CA의 유효 key를 가진 peer가 장비 정책 없이 lease를 획득함 | peer fingerprint·role·direction·revocation authorization 테스트 | authenticated peer context와 사용자 승인 trust store를 Phase 2에서 도입 |
+| High | Phase 0 authorization이 유효한 peer identity를 장비 allowlist 없이 승인 | 같은 CA의 유효 key를 가진 peer가 사용자 승인 없이 lease를 획득함 | fingerprint·role 전달 테스트와 향후 direction·revocation policy 테스트 | `AuthenticatedPeerContext` 전달은 구현됨; 사용자 승인 trust store를 Phase 2에서 도입 |
 | High | press 주입 전 실패와 주입 여부 불명 실패를 구분하지 못함 | 유령 token 또는 실제 held input 누락 | guard 거절·IPC 단절·부분 주입 failure-injection 테스트 | prepare/inject/commit과 certainty 모델 설계 전 단순 rollback 금지 |
 | Medium | lease grant 실패 뒤 destination cursor 위치가 복원되지 않음 | 제어권은 없는데 destination cursor만 화면 끝으로 이동함 | entry 성공 뒤 runtime/write 실패 테스트 | cursor snapshot/rollback 또는 ready/commit handshake 설계 |
 | Medium | Windows private key가 상속 DACL에 의존함 | 다른 로컬 계정이 connector key를 읽음 | broad parent ACL 생성·load 테스트 | 사용자 전용 DACL 강제와 load-time ACL 검증 |

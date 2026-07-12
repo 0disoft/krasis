@@ -10,7 +10,7 @@ Krasis는 control lease, heartbeat와 입력 event의 의미 순서를 보존해
 ## 결정
 
 - MVP peer session은 하나의 ordered byte stream을 사용한다.
-- 실제 네트워크 연결은 TLS 1.3 mutual authentication과 `krasis/1` ALPN 협상을 통과한 뒤에만 frame을 전달한다. 인증서 발급과 pairing 확인 방식은 별도 ADR 전까지 `UNDECIDED`다.
+- 실제 네트워크 연결은 TLS 1.3 mutual authentication과 `krasis/1` ALPN 협상을 통과한 뒤에만 frame을 전달한다. transport는 검증된 leaf certificate의 SHA-256 fingerprint와 EKU 기반 `LISTENER`/`CONNECTOR` 역할을 `AuthenticatedPeerContext`로 고정해 session과 authorization policy에 전달한다. 인증서 발급, 사용자 pairing 확인, fingerprint allowlist와 revocation 방식은 별도 ADR 전까지 `UNDECIDED`다.
 - wire frame은 magic, protocol version, message kind, reserved flags와 payload length를 가진 고정 header 뒤에 opaque payload를 둔다.
 - payload는 최대 65,536 bytes다. 이 값은 작은 control/input message에 비해 충분한 여유를 두면서 peer가 선언하는 메모리 사용량을 제한하기 위한 초기 방어선이며, 실제 payload 측정 뒤 축소할 수 있다.
 - 정의되지 않은 version, message kind, flags, oversized payload와 truncated frame은 연결 오류다. 부분 frame을 추측하거나 재생하지 않는다.

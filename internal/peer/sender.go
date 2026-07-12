@@ -129,7 +129,7 @@ func SendHeartbeat(
 }
 
 type LeaseAuthorizer interface {
-	AuthorizeLease(context.Context, string, string, time.Time) (leaseID string, accepted bool, err error)
+	AuthorizeLease(context.Context, transport.AuthenticatedPeerContext, string, string, time.Time) (leaseID string, accepted bool, err error)
 }
 
 type CursorEntryPort interface {
@@ -146,6 +146,7 @@ type LeaseResponder struct {
 	Coordinator *SessionWriteCoordinator
 	Runtime     *application.SessionRuntime
 	Authorizer  LeaseAuthorizer
+	Peer        transport.AuthenticatedPeerContext
 	Entry       CursorEntryPort
 	Returns     ReturnBoundaryPort
 }
@@ -158,6 +159,9 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 	if responder == nil || responder.Coordinator == nil || responder.Runtime == nil || responder.Authorizer == nil || responder.Entry == nil || responder.Returns == nil {
 		return errors.New("lease responder is not initialized")
 	}
+	if err := responder.Peer.Validate(); err != nil {
+		return err
+	}
 	if command.Kind != transport.ControlLeaseRequest {
 		return errors.New("lease responder requires a lease request")
 	}
@@ -165,7 +169,7 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 		if responder.Runtime.Snapshot().Control.State != control.StateLocal {
 			return errors.New("lease responder requires a local runtime")
 		}
-		leaseID, accepted, err := responder.Authorizer.AuthorizeLease(ctx, command.SessionID, command.Epoch, observedAt)
+		leaseID, accepted, err := responder.Authorizer.AuthorizeLease(ctx, responder.Peer, command.SessionID, command.Epoch, observedAt)
 		if err != nil {
 			return err
 		}
