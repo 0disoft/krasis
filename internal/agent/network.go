@@ -12,10 +12,34 @@ import (
 )
 
 type ListenSource struct {
-	listener  net.Listener
-	tlsConfig *tls.Config
-	closeOnce sync.Once
-	closeErr  error
+	listener         net.Listener
+	tlsConfig        *tls.Config
+	handshakeTimeout time.Duration
+	preAuthSlots     chan struct{}
+	shutdown         context.Context
+	cancel           context.CancelFunc
+	roundMu          sync.Mutex
+	round            *listenRound
+	acceptErr        error
+	workers          sync.WaitGroup
+	closeOnce        sync.Once
+	closeErr         error
+}
+
+const (
+	DefaultPreAuthHandshakeTimeout = 5 * time.Second
+	MaxConcurrentPreAuthHandshakes = 4
+)
+
+type listenRound struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+	ready  chan listenResult
+}
+
+type listenResult struct {
+	connection Connection
+	err        error
 }
 
 func NewListenSource(address string, tlsConfig *tls.Config) (*ListenSource, error) {
@@ -26,7 +50,25 @@ func NewListenSource(address string, tlsConfig *tls.Config) (*ListenSource, erro
 	if err != nil {
 		return nil, err
 	}
-	return &ListenSource{listener: listener, tlsConfig: tlsConfig.Clone()}, nil
+	return newListenSource(listener, tlsConfig, DefaultPreAuthHandshakeTimeout, MaxConcurrentPreAuthHandshakes)
+}
+
+func newListenSource(listener net.Listener, tlsConfig *tls.Config, handshakeTimeout time.Duration, maxPreAuth int) (*ListenSource, error) {
+	if listener == nil || tlsConfig == nil || handshakeTimeout <= 0 || maxPreAuth <= 0 {
+		return nil, errors.New("listener, TLS config, positive handshake timeout, and pre-auth limit are required")
+	}
+	shutdown, cancel := context.WithCancel(context.Background())
+	source := &ListenSource{
+		listener:         listener,
+		tlsConfig:        tlsConfig.Clone(),
+		handshakeTimeout: handshakeTimeout,
+		preAuthSlots:     make(chan struct{}, maxPreAuth),
+		shutdown:         shutdown,
+		cancel:           cancel,
+	}
+	source.workers.Add(1)
+	go source.acceptLoop()
+	return source, nil
 }
 
 func (source *ListenSource) Address() string {
@@ -37,28 +79,114 @@ func (source *ListenSource) Address() string {
 }
 
 func (source *ListenSource) Next(ctx context.Context) (Connection, error) {
-	if source == nil || source.listener == nil || source.tlsConfig == nil {
+	if source == nil || source.listener == nil || source.tlsConfig == nil || source.shutdown == nil || ctx == nil {
 		return nil, errors.New("listen source is not initialized")
 	}
-	stop := context.AfterFunc(ctx, func() { _ = source.Close() })
-	defer stop()
-	connection, err := source.listener.Accept()
-	if err != nil {
+	roundCtx, cancel := context.WithCancel(source.shutdown)
+	round := &listenRound{ctx: roundCtx, cancel: cancel, ready: make(chan listenResult)}
+	source.roundMu.Lock()
+	if source.acceptErr != nil {
+		err := source.acceptErr
+		source.roundMu.Unlock()
+		cancel()
 		return nil, err
 	}
-	peerConnection, err := transport.NewPeerConnection(ctx, tls.Server(connection, source.tlsConfig.Clone()))
-	if err != nil {
-		return nil, closeConnectionOnError(connection, err)
+	if source.round != nil {
+		source.roundMu.Unlock()
+		cancel()
+		return nil, errors.New("listen source already has a pending Next call")
 	}
-	return peerConnection, nil
+	source.round = round
+	source.roundMu.Unlock()
+	defer func() {
+		source.roundMu.Lock()
+		if source.round == round {
+			source.round = nil
+		}
+		source.roundMu.Unlock()
+		cancel()
+	}()
+	stop := context.AfterFunc(ctx, cancel)
+	defer stop()
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-source.shutdown.Done():
+		return nil, errors.New("listen source is closed")
+	case result := <-round.ready:
+		return result.connection, result.err
+	}
 }
 
 func (source *ListenSource) Close() error {
 	if source == nil || source.listener == nil {
 		return nil
 	}
-	source.closeOnce.Do(func() { source.closeErr = source.listener.Close() })
+	source.closeOnce.Do(func() {
+		if source.cancel != nil {
+			source.cancel()
+		}
+		source.closeErr = source.listener.Close()
+	})
+	source.workers.Wait()
 	return source.closeErr
+}
+
+func (source *ListenSource) acceptLoop() {
+	defer source.workers.Done()
+	for {
+		connection, err := source.listener.Accept()
+		if err != nil {
+			if source.shutdown.Err() == nil {
+				source.roundMu.Lock()
+				source.acceptErr = err
+				round := source.round
+				source.roundMu.Unlock()
+				if round != nil {
+					source.deliver(round, listenResult{err: err})
+				}
+			}
+			return
+		}
+		source.roundMu.Lock()
+		round := source.round
+		source.roundMu.Unlock()
+		if round == nil {
+			_ = connection.Close()
+			continue
+		}
+		select {
+		case source.preAuthSlots <- struct{}{}:
+			source.workers.Add(1)
+			go source.authenticate(round, connection)
+		default:
+			_ = connection.Close()
+		}
+	}
+}
+
+func (source *ListenSource) authenticate(round *listenRound, connection net.Conn) {
+	defer source.workers.Done()
+	defer func() { <-source.preAuthSlots }()
+	handshakeCtx, cancel := context.WithTimeout(round.ctx, source.handshakeTimeout)
+	defer cancel()
+	peerConnection, err := transport.NewPeerConnection(handshakeCtx, tls.Server(connection, source.tlsConfig.Clone()))
+	if err != nil {
+		_ = connection.Close()
+		return
+	}
+	if !source.deliver(round, listenResult{connection: peerConnection}) {
+		_ = peerConnection.Close()
+	}
+}
+
+func (*ListenSource) deliver(round *listenRound, result listenResult) bool {
+	select {
+	case round.ready <- result:
+		return true
+	case <-round.ctx.Done():
+		return false
+	}
 }
 
 type DialSource struct {

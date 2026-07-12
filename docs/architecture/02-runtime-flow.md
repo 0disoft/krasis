@@ -112,7 +112,7 @@ supervisor는 session 종료 결과가 `LOCAL`일 때만 새 connection을 얻�
 
 source hook 앞단의 emergency observer는 physical `Ctrl+Alt+Shift+F12`를 감지한다. modifier event는 active session 중 이미 전달됐을 수 있으므로 chord terminator에서 suppression을 먼저 끄고 session fault cleanup을 시작해 destination의 `ReleaseAll`을 유도한다. F12 event 자체는 remote queue에 넣지 않고 로컬 hook chain으로 넘긴다. supervisor는 `ErrEmergencyRelease`를 terminal operator event로 분류해 reconnect하지 않는다. 이 chord는 Phase 0 lab 계약이며 제품 설정 정책은 아직 미결정이다.
 
-`ListenSource`와 `DialSource`는 TCP와 TLS 세부사항을 supervisor core 밖에 둔다. 둘 다 `PeerConnection` 생성 시 TLS 1.3 mTLS와 ALPN 인증을 통과해야 connection을 application에 넘긴다. credential storage, 단일 instance, tray와 최종 agent executable은 아직 바깥 책임이다.
+`ListenSource`와 `DialSource`는 TCP와 TLS 세부사항을 supervisor core 밖에 둔다. listener는 accept loop와 pre-auth TLS handshake를 분리하고 최대 4개의 handshake만 동시에 수행하며, 각 handshake를 5초 안에 끝내지 못하면 socket을 닫는다. slot이 모두 찬 동안 새 TCP connection은 즉시 닫고, supervisor가 connection을 기다리지 않는 동안 들어온 connection도 닫아서 다음 session으로 넘기지 않는다. 둘 다 `PeerConnection` 생성 시 TLS 1.3 mTLS와 ALPN 인증을 통과해야 connection을 application에 넘긴다. credential storage, IP별 rate limit, 단일 instance, tray와 최종 agent executable은 아직 바깥 책임이다.
 
 control payload는 wire 전용 `LeaseRequest`, `LeaseGrant`, `LeaseReject`, `LeaseRevoke` 명령만 허용한다. 모든 명령은 session과 epoch를 포함하고, grant와 revoke만 lease를 포함한다. `FAULT_DETECTED`, `RELEASE_ALL_SUCCEEDED` 같은 내부 상태 머신 event는 wire command가 아니며 peer가 직렬화하거나 주입할 수 없다.
 

@@ -88,6 +88,81 @@ func TestListenAndDialSourcesAuthenticatePeerConnection(t *testing.T) {
 	_ = serverResult.connection.Close()
 }
 
+func TestListenSourceDoesNotLetStalledHandshakeBlockAuthenticatedPeer(t *testing.T) {
+	directory := filepath.Join(t.TempDir(), "credentials")
+	if _, err := peercredentials.Generate(directory, "127.0.0.1", time.Now()); err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+	roots := loadAgentRoots(t, filepath.Join(directory, "listener", "ca.pem"))
+	listenerIdentity := loadAgentIdentity(t, filepath.Join(directory, "listener"))
+	connectorIdentity := loadAgentIdentity(t, filepath.Join(directory, "connector"))
+	serverTLS, err := transport.NewServerTLSConfig(listenerIdentity, roots)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clientTLS, err := transport.NewClientTLSConfig(connectorIdentity, roots, "127.0.0.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	listener, err := NewListenSource("127.0.0.1:0", serverTLS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	type result struct {
+		connection Connection
+		err        error
+	}
+	accepted := make(chan result, 1)
+	go func() {
+		connection, nextErr := listener.Next(ctx)
+		accepted <- result{connection: connection, err: nextErr}
+	}()
+	waitForListenRound(t, listener)
+
+	stalled, err := net.DialTimeout("tcp", listener.Address(), time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stalled.Close()
+	if _, err := stalled.Write([]byte{0x16}); err != nil {
+		t.Fatal(err)
+	}
+
+	dialer, err := NewDialSource(listener.Address(), clientTLS, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clientConnection, err := dialer.Next(ctx)
+	if err != nil {
+		t.Fatalf("authenticated peer was blocked by stalled handshake: %v", err)
+	}
+	defer clientConnection.Close()
+	serverResult := <-accepted
+	if serverResult.err != nil {
+		t.Fatalf("ListenSource.Next() error = %v", serverResult.err)
+	}
+	defer serverResult.connection.Close()
+}
+
+func waitForListenRound(t *testing.T, source *ListenSource) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		source.roundMu.Lock()
+		pending := source.round != nil
+		source.roundMu.Unlock()
+		if pending {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatal("ListenSource.Next() did not register an accept round")
+}
+
 func loadAgentIdentity(t *testing.T, directory string) tls.Certificate {
 	t.Helper()
 	identity, err := tls.LoadX509KeyPair(filepath.Join(directory, "identity.pem"), filepath.Join(directory, "identity-key.pem"))
