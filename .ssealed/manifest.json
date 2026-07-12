@@ -1,7 +1,7 @@
 {
   "tool": "ssealed",
   "version": "0.6.11",
-  "generatedAt": "2026-07-12T09:05:36.552Z",
+  "generatedAt": "2026-07-12T09:06:42.668Z",
   "scope": "general",
   "profile": "desktop-app",
   "addons": [
@@ -958,13 +958,13 @@
     },
     {
       "path": "docs/product/03-risk-register.md",
-      "checksum": "sha256:10e26cb10ec51ef175b59ea415bee984c05fb4aa1694407e800d2dc1c8a58709",
+      "checksum": "sha256:c7cb5a41ca4a4b7136327e3b35c2555d40e52d5c002dbe707f885475a8f28d2f",
       "kind": "document",
       "ownership": "seeded",
       "presence": "optional",
       "status": "active",
       "initialChecksum": "sha256:207579a3a910f2ffc320ef9c548882d729d7ba49b17e3cc3c5d6e045d8510b9b",
-      "acceptedChecksum": "sha256:10e26cb10ec51ef175b59ea415bee984c05fb4aa1694407e800d2dc1c8a58709",
+      "acceptedChecksum": "sha256:c7cb5a41ca4a4b7136327e3b35c2555d40e52d5c002dbe707f885475a8f28d2f",
       "generatedChecksum": "sha256:207579a3a910f2ffc320ef9c548882d729d7ba49b17e3cc3c5d6e045d8510b9b"
     },
     {
@@ -991,13 +991,13 @@
     },
     {
       "path": "README.md",
-      "checksum": "sha256:14bfc39f2f37ce92d593b3b5ce233d0a410f03878642650280892d078fcac44d",
+      "checksum": "sha256:d4a8f6ebf1295ba9b4502efe94e203becccc8b700514103fbbec57cd0613123f",
       "kind": "document",
       "ownership": "seeded",
       "presence": "optional",
       "status": "active",
       "initialChecksum": "sha256:14bfc39f2f37ce92d593b3b5ce233d0a410f03878642650280892d078fcac44d",
-      "acceptedChecksum": "sha256:14bfc39f2f37ce92d593b3b5ce233d0a410f03878642650280892d078fcac44d",
+      "acceptedChecksum": "sha256:d4a8f6ebf1295ba9b4502efe94e203becccc8b700514103fbbec57cd0613123f",
       "generatedChecksum": "sha256:14bfc39f2f37ce92d593b3b5ce233d0a410f03878642650280892d078fcac44d"
     },
     {
