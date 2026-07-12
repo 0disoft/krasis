@@ -47,6 +47,8 @@ func TestInputPayloadEncoderRejectsInvalidValues(t *testing.T) {
 		{name: "zero sequence", envelope: control.InputEnvelope{SessionID: "session-1", Epoch: "epoch-1"}, action: validAction},
 		{name: "long epoch", envelope: control.InputEnvelope{SessionID: "session-1", Epoch: strings.Repeat("e", maxIdentifierSize+1), Sequence: 1}, action: validAction},
 		{name: "invalid action", envelope: validEnvelope, action: control.InputAction{Kind: control.InputPointerMove}},
+		{name: "invalid key code", envelope: validEnvelope, action: control.InputAction{Kind: control.InputKeyDown}},
+		{name: "invalid button code", envelope: validEnvelope, action: control.InputAction{Kind: control.InputButtonDown, Code: 999}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -78,6 +80,12 @@ func TestInputPayloadDecoderRejectsMalformedPayload(t *testing.T) {
 		{name: "zero sequence", mutate: func(payload []byte) []byte { binary.BigEndian.PutUint64(payload[4:12], 0); return payload }, want: ErrInvalidInputPayload},
 		{name: "trailing", mutate: func(payload []byte) []byte { return append(payload, 0) }, want: ErrInvalidInputPayload},
 		{name: "invalid action fields", mutate: func(payload []byte) []byte { binary.BigEndian.PutUint32(payload[12:16], 1); return payload }, want: ErrInvalidInputPayload},
+		{name: "invalid discrete code", mutate: func(payload []byte) []byte {
+			payload[1] = encodeInputActionKind(control.InputButtonDown)
+			binary.BigEndian.PutUint32(payload[12:16], 999)
+			binary.BigEndian.PutUint32(payload[16:20], 0)
+			return payload
+		}, want: ErrInvalidInputPayload},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

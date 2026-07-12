@@ -17,6 +17,10 @@ func TestInputActionValidation(t *testing.T) {
 		{name: "wheel", action: InputAction{Kind: InputWheel, DeltaY: 120}},
 		{name: "unknown", action: InputAction{Kind: "UNKNOWN"}, wantErr: true},
 		{name: "discrete delta", action: InputAction{Kind: InputKeyDown, Code: 65, DeltaX: 1}, wantErr: true},
+		{name: "zero key code", action: InputAction{Kind: InputKeyDown}, wantErr: true},
+		{name: "unsupported key bits", action: InputAction{Kind: InputKeyUp, Code: 1 << 31}, wantErr: true},
+		{name: "zero button code", action: InputAction{Kind: InputButtonDown}, wantErr: true},
+		{name: "unsupported button code", action: InputAction{Kind: InputButtonUp, Code: 6}, wantErr: true},
 		{name: "relative code", action: InputAction{Kind: InputPointerMove, Code: 1, DeltaX: 1}, wantErr: true},
 		{name: "empty relative", action: InputAction{Kind: InputWheel}, wantErr: true},
 	}

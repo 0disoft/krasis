@@ -31,6 +31,10 @@ func (action InputAction) Validate() error {
 		if action.DeltaX != 0 || action.DeltaY != 0 {
 			return fmt.Errorf("%w: discrete input must not include deltas", ErrInvalidInputAction)
 		}
+		token, _, _ := action.PressedToken()
+		if err := token.Validate(); err != nil {
+			return fmt.Errorf("%w: %w", ErrInvalidInputAction, err)
+		}
 	case InputPointerMove, InputWheel:
 		if action.Code != 0 {
 			return fmt.Errorf("%w: relative input must not include a code", ErrInvalidInputAction)
