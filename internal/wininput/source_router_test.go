@@ -45,6 +45,28 @@ func TestRoutePhysicalActionAbortsActiveSourceOnBoundaryFailure(t *testing.T) {
 	}
 }
 
+func TestRoutePhysicalActionFailsOpenWhenBoundaryObserverPanics(t *testing.T) {
+	sink := &recordingSourceSink{failed: make(chan error, 1)}
+	session := startSourceSession(t, 1, sink)
+	if routePhysicalAction(session, panickingBoundaryObserver{"private input"}, control.InputAction{Kind: control.InputKeyDown, Code: 1}, 0) {
+		t.Fatal("panicking boundary observer suppressed local input")
+	}
+	select {
+	case err := <-sink.failed:
+		if !errors.Is(err, ErrBoundaryObserverPanic) {
+			t.Fatalf("Fail() cause = %v", err)
+		}
+		if err.Error() != ErrBoundaryObserverPanic.Error() {
+			t.Fatalf("panic payload leaked through failure: %q", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("source did not report boundary observer panic")
+	}
+	if session.Active() {
+		t.Fatal("boundary observer panic left suppression active")
+	}
+}
+
 func newInactiveSourceSession(t *testing.T) *SourceSession {
 	t.Helper()
 	session, err := NewSourceSession(1, &recordingSourceSink{})
@@ -66,4 +88,12 @@ func (observer *recordingBoundaryObserver) Observe(action control.InputAction, p
 	observer.action = action
 	observer.pointerX = pointerX
 	return observer.err
+}
+
+type panickingBoundaryObserver struct {
+	value any
+}
+
+func (observer panickingBoundaryObserver) Observe(control.InputAction, int32) error {
+	panic(observer.value)
 }

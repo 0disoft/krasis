@@ -8,6 +8,7 @@
 | Critical | source 입력이 억제된 채 복구되지 않음 | 사용자가 현재 노트북을 조작할 수 없음 | 프로세스 강제 종료와 adapter 장애 | 준비 확인 전 억제 금지, watchdog, `LOCAL` 복귀 |
 | Critical | 원격 기기에 키나 버튼이 눌린 채 남음 | 단축키 오작동, 계속 드래그됨 | 패킷 유실과 전원 차단 | 눌림 journal, `ReleaseAll`, 새 세션 |
 | Critical | 합성 입력이 다시 전달됨 | 입력 폭주 또는 무한 루프 | 주입 표식 누락과 hook 재진입 | 합성 입력 식별, fail-open |
+| Critical | source boundary observer panic이 hook callback을 이탈함 | 현재 입력이 사라지거나 agent process가 종료됨 | observer panic과 민감한 panic payload 테스트 | 고정 오류로 변환, 현재 event 로컬 통과, source generation 폐기 |
 | High | 두 기기가 동시에 제어권을 가짐 | 충돌, 순서 역전 | 동시 경계 진입 | 단일 lease와 epoch |
 | High | revoke 뒤 낡은 heartbeat가 기록됨 | 정상 복귀 직후 connection fault와 불필요한 재연결 | heartbeat/revoke 순서 강제 테스트 | ADR 0005 semantic write coordinator 선행 |
 | High | timeout 뒤 늦은 heartbeat가 만료 세션을 되살림 | 끊긴 peer가 살아 있다고 판단해 원격 입력 상태가 남음 | deadline 경계의 heartbeat 수신 경합 테스트 | 수신 coordinator 안에서 갱신 전 deadline 판정 |
