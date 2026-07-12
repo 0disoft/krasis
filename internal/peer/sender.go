@@ -17,13 +17,25 @@ type FrameWriter interface {
 type OutboundActionSink struct {
 	Coordinator *SessionWriteCoordinator
 	Runtime     *application.SessionRuntime
+	Connection  interface{ Close() error }
 }
 
-func NewOutboundActionSink(coordinator *SessionWriteCoordinator, runtime *application.SessionRuntime) (*OutboundActionSink, error) {
-	if coordinator == nil || runtime == nil {
-		return nil, errors.New("write coordinator and runtime are required")
+func NewOutboundActionSink(
+	coordinator *SessionWriteCoordinator,
+	runtime *application.SessionRuntime,
+	connection interface{ Close() error },
+) (*OutboundActionSink, error) {
+	if coordinator == nil || runtime == nil || connection == nil {
+		return nil, errors.New("write coordinator, runtime, and connection are required")
 	}
-	return &OutboundActionSink{Coordinator: coordinator, Runtime: runtime}, nil
+	return &OutboundActionSink{Coordinator: coordinator, Runtime: runtime, Connection: connection}, nil
+}
+
+func (sink *OutboundActionSink) Interrupt(error) error {
+	if sink == nil || sink.Connection == nil {
+		return errors.New("outbound action sink is not initialized")
+	}
+	return sink.Connection.Close()
 }
 
 func (sink *OutboundActionSink) SendAction(ctx context.Context, action control.InputAction) error {

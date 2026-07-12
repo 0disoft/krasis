@@ -73,7 +73,7 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	if err != nil {
 		return Result{}, err
 	}
-	actionSink, err := peer.NewOutboundActionSink(coordinator, runtime)
+	actionSink, err := peer.NewOutboundActionSink(coordinator, runtime, dependencies.Connection)
 	if err != nil {
 		return Result{}, err
 	}

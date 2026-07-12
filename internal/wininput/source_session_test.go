@@ -3,6 +3,7 @@ package wininput
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -106,6 +107,38 @@ func TestSourceSessionSendFailureDisablesSuppression(t *testing.T) {
 	}
 }
 
+func TestSourceSessionInterruptsBlockedSendBeforeFaultCleanup(t *testing.T) {
+	sink := &interruptibleSourceSink{
+		started:     make(chan struct{}),
+		interrupted: make(chan struct{}),
+		failed:      make(chan error, 1),
+	}
+	session := startSourceSession(t, 1, sink)
+	action := control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}
+	if !session.Offer(action) {
+		t.Fatal("first action was not accepted")
+	}
+	select {
+	case <-sink.started:
+	case <-time.After(time.Second):
+		t.Fatal("SendAction did not start")
+	}
+	if !session.Offer(action) {
+		t.Fatal("queued action was not accepted")
+	}
+	if session.Offer(action) {
+		t.Fatal("overflowing action was incorrectly accepted")
+	}
+	select {
+	case cause := <-sink.failed:
+		if !errors.Is(cause, ErrSourceQueueOverflow) {
+			t.Fatalf("cleanup cause = %v", cause)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("blocked send prevented fault cleanup")
+	}
+}
+
 func startSourceSession(t *testing.T, capacity int, sink SourceSink) *SourceSession {
 	t.Helper()
 	session, err := NewSourceSession(capacity, sink)
@@ -161,9 +194,35 @@ func (sink *recordingSourceSink) SendAction(_ context.Context, action control.In
 	return sink.sendErr
 }
 
+func (*recordingSourceSink) Interrupt(error) error { return nil }
+
 func (sink *recordingSourceSink) Fail(_ context.Context, cause error) error {
 	if sink.failed != nil {
 		sink.failed <- cause
 	}
+	return nil
+}
+
+type interruptibleSourceSink struct {
+	startedOnce   sync.Once
+	interruptOnce sync.Once
+	started       chan struct{}
+	interrupted   chan struct{}
+	failed        chan error
+}
+
+func (sink *interruptibleSourceSink) SendAction(context.Context, control.InputAction) error {
+	sink.startedOnce.Do(func() { close(sink.started) })
+	<-sink.interrupted
+	return errors.New("send interrupted")
+}
+
+func (sink *interruptibleSourceSink) Interrupt(error) error {
+	sink.interruptOnce.Do(func() { close(sink.interrupted) })
+	return nil
+}
+
+func (sink *interruptibleSourceSink) Fail(_ context.Context, cause error) error {
+	sink.failed <- cause
 	return nil
 }

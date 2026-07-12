@@ -22,6 +22,7 @@ var (
 
 type SourceSink interface {
 	SendAction(context.Context, control.InputAction) error
+	Interrupt(error) error
 	Fail(context.Context, error) error
 }
 
@@ -151,25 +152,67 @@ func (session *SourceSession) RunWithReady(ctx context.Context, ready func()) er
 	defer session.started.Store(false)
 	defer session.terminal.Store(true)
 	defer session.Deactivate()
+	sendCtx, cancelSend := context.WithCancel(ctx)
+	defer cancelSend()
+	senderDone := make(chan error, 1)
+	go func() { senderDone <- session.runSender(sendCtx) }()
 	for {
 		select {
 		case <-ctx.Done():
-			if session.Active() {
-				session.Deactivate()
-				return session.failSink(ctx, ctx.Err())
-			}
-			return ctx.Err()
+			return session.stopSender(ctx, cancelSend, senderDone, ctx.Err(), session.Active())
 		case cause := <-session.faults:
-			return session.failSink(ctx, cause)
+			return session.stopSender(ctx, cancelSend, senderDone, cause, true)
+		case cause := <-senderDone:
+			if cause == nil {
+				cause = errors.New("source sender stopped unexpectedly")
+			}
+			session.Deactivate()
+			return errors.Join(cause, session.sink.Interrupt(cause), session.failSink(ctx, cause))
+		}
+	}
+}
+
+func (session *SourceSession) runSender(ctx context.Context) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
 		case item := <-session.queue:
 			if !session.current(item.generation) {
 				continue
 			}
 			if err := session.sink.SendAction(ctx, item.action); err != nil {
-				session.abort(err)
+				return err
 			}
 		}
 	}
+}
+
+func (session *SourceSession) stopSender(
+	ctx context.Context,
+	cancelSend context.CancelFunc,
+	senderDone <-chan error,
+	cause error,
+	fail bool,
+) error {
+	session.Deactivate()
+	interruptErr := session.sink.Interrupt(cause)
+	cancelSend()
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), SourceCleanupTimeout)
+	defer cancel()
+	var senderErr error
+	select {
+	case senderErr = <-senderDone:
+		if errors.Is(senderErr, context.Canceled) || errors.Is(senderErr, ctx.Err()) {
+			senderErr = nil
+		}
+	case <-cleanupCtx.Done():
+		senderErr = cleanupCtx.Err()
+	}
+	if !fail {
+		return errors.Join(cause, interruptErr, senderErr)
+	}
+	return errors.Join(cause, interruptErr, senderErr, session.failSink(ctx, cause))
 }
 
 func (session *SourceSession) abort(cause error) {

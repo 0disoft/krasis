@@ -45,7 +45,7 @@ lab self-test의 tagged `+1/-1` 상대 이동은 두 injection이 hook으로 돌
 
 source mapper는 physical keyboard hook의 scan code와 extended flag를 canonical key code로 바꾸고, mouse hook의 좌표 변화·button·signed wheel 값을 normalized action으로 바꾼다. injected flag 또는 Krasis tag가 있는 keyboard/mouse event는 다시 전송하지 않는다. injected mouse move도 다음 physical delta가 튀지 않도록 좌표 baseline만 갱신한다.
 
-source session은 hook callback과 network sender 사이에 고정 용량 queue를 둔다. callback은 현재 outbound generation에 action을 non-blocking enqueue한 경우에만 해당 물리 event를 억제할 수 있다. queue overflow, invalid mapping 또는 sender 실패는 suppression을 즉시 끄고 generation을 폐기하며, worker가 runtime fault cleanup을 수행한다. 폐기된 generation의 queued action은 원격으로 보내지 않는다. queue 용량은 설정 가능한 `1..65536` 범위이며 실제 기본값과 성능 예산은 source hook 통합 측정 뒤 확정한다.
+source session은 hook callback과 단일 network sender 사이에 고정 용량 queue를 둔다. callback은 현재 outbound generation에 action을 non-blocking enqueue한 경우에만 해당 물리 event를 억제할 수 있다. sender는 별도 goroutine에서 action 순서를 보존하고, lifecycle owner는 fault channel과 context를 독립적으로 소비한다. queue overflow, invalid mapping, sender 실패 또는 취소가 발생하면 suppression과 generation을 먼저 폐기하고 connection을 닫아 막힌 write를 interrupt한 뒤 bounded runtime fault cleanup을 수행한다. 폐기된 generation의 queued action은 원격으로 보내지 않는다. queue 용량은 설정 가능한 `1..65536` 범위이며 실제 기본값과 성능 예산은 source hook 통합 측정 뒤 확정한다.
 
 normalized discrete input의 code domain은 `PressedToken.Validate`가 단일 source of truth로 소유한다. `InputAction.Validate`는 key와 button action을 token으로 변환해 같은 검증을 수행하므로 source queue, wire encoder, wire decoder와 destination runtime이 zero scan code, 지원하지 않는 keyboard bit와 `1..5` 밖의 mouse button을 동일하게 거부한다.
 

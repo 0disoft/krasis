@@ -32,7 +32,7 @@ func TestOutboundActionSinkWritesThroughRuntimeSequence(t *testing.T) {
 		t.Fatalf("GrantOutbound() error = %v", err)
 	}
 	writer := &recordingFrameWriter{}
-	sink, err := NewOutboundActionSink(testWriteCoordinator(t, writer), runtime)
+	sink, err := NewOutboundActionSink(testWriteCoordinator(t, writer), runtime, &recordingCloser{})
 	if err != nil {
 		t.Fatalf("NewOutboundActionSink() error = %v", err)
 	}
@@ -53,7 +53,7 @@ func TestOutboundActionSinkFailCleansRuntime(t *testing.T) {
 	if _, err := runtime.GrantOutbound(context.Background(), "session-1", "lease-1", "epoch-1", time.Unix(100, 0)); err != nil {
 		t.Fatalf("GrantOutbound() error = %v", err)
 	}
-	sink, err := NewOutboundActionSink(testWriteCoordinator(t, &recordingFrameWriter{}), runtime)
+	sink, err := NewOutboundActionSink(testWriteCoordinator(t, &recordingFrameWriter{}), runtime, &recordingCloser{})
 	if err != nil {
 		t.Fatalf("NewOutboundActionSink() error = %v", err)
 	}
@@ -252,6 +252,16 @@ func decodeWrittenControl(t *testing.T, writer *recordingFrameWriter) transport.
 type recordingFrameWriter struct {
 	frames []transport.Frame
 	err    error
+}
+
+type recordingCloser struct {
+	calls int
+	err   error
+}
+
+func (closer *recordingCloser) Close() error {
+	closer.calls++
+	return closer.err
 }
 
 func (writer *recordingFrameWriter) WriteFrameContext(_ context.Context, frame transport.Frame) error {

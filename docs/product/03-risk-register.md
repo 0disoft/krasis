@@ -21,6 +21,7 @@
 | High | peer session 직접 호출이 Close를 중복 실행하고 오류를 버림 | EOF나 취소 원인이 가려지거나 cleanup 뒤 transport 상태가 불확실함 | EOF/cancellation과 Close 실패 동시 테스트 | session-local close-once owner와 종료 원인 결합 |
 | High | cleanup coordinator timeout이 원래 fault를 가림 | active runtime이 남았는데 timeout만 보여 최초 장애를 진단하지 못함 | coordinator 점유 중 bounded cleanup timeout 테스트 | runtime 무변경, 원래 cause와 deadline 오류 결합, reconnect 중단 |
 | Critical | 부분 `ReleaseAll` 실패 뒤 재시도 가능한 token 상태를 버림 | 원격 기기에 일부 키나 버튼이 계속 눌린 채 남음 | transient/지속 release 실패 recovery 테스트 | 같은 coordinator에서 fault recovery 한 번, 성공 token 제외, 지속 실패는 `FAULT` 유지 |
+| Critical | network write가 source sender를 막아 fault cleanup도 멈춤 | suppression은 꺼졌지만 destination held input이 남음 | blocked send 중 queue overflow 테스트 | sender/lifecycle 분리, connection 선제 close, bounded cleanup |
 | High | 공용 Wi-Fi가 peer 통신을 차단 | 발견 또는 연결 실패 | 스터디카페 실망 테스트 | 직접 주소 입력, 대체망 운영 안내 검토 |
 | High | 높은 polling rate 또는 터치패드에서 hook 지연 | 커서 끊김, 입력 누락 | 실제 장비 부하 측정 | 최소 작업 hook, native fallback 판단 |
 | High | 절전과 잠금 뒤 낡은 세션이 살아남음 | 엉뚱한 기기로 입력 전달 | Modern Standby와 잠금 반복 | 세션 폐기 후 명시적 재연결 |
