@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"syscall"
 	"unsafe"
+
+	"github.com/0disoft/krasis/internal/control"
 )
 
 const wmSourceReady = 0x8002
@@ -63,13 +65,11 @@ func runSourceHookOnDedicatedThread(
 	mapper := &sourceMapper{}
 	keyboardCallback := syscall.NewCallback(func(code int, wParam uintptr, lParam uintptr) uintptr {
 		if code == hcAction && lParam != 0 {
-			data := *(*keyboardHookData)(unsafe.Pointer(lParam))
-			action, emitted, err := mapper.keyboard(uint32(wParam), data)
-			if err != nil {
-				if session.Active() {
-					session.Abort(err)
-				}
-			} else if emitted && routePhysicalAction(session, boundary, action, 0) {
+			if routeMappedPhysicalAction(session, boundary, func() (control.InputAction, bool, int32, error) {
+				data := *(*keyboardHookData)(unsafe.Pointer(lParam))
+				action, emitted, err := mapper.keyboard(uint32(wParam), data)
+				return action, emitted, 0, err
+			}) {
 				return 1
 			}
 		}
@@ -77,13 +77,11 @@ func runSourceHookOnDedicatedThread(
 	})
 	mouseCallback := syscall.NewCallback(func(code int, wParam uintptr, lParam uintptr) uintptr {
 		if code == hcAction && lParam != 0 {
-			data := *(*mouseHookData)(unsafe.Pointer(lParam))
-			action, emitted, err := mapper.mouse(uint32(wParam), data)
-			if err != nil {
-				if session.Active() {
-					session.Abort(err)
-				}
-			} else if emitted && routePhysicalAction(session, boundary, action, data.Point.X) {
+			if routeMappedPhysicalAction(session, boundary, func() (control.InputAction, bool, int32, error) {
+				data := *(*mouseHookData)(unsafe.Pointer(lParam))
+				action, emitted, err := mapper.mouse(uint32(wParam), data)
+				return action, emitted, data.Point.X, err
+			}) {
 				return 1
 			}
 		}

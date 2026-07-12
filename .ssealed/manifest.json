@@ -1,7 +1,7 @@
 {
   "tool": "ssealed",
   "version": "0.6.11",
-  "generatedAt": "2026-07-12T02:08:56.329Z",
+  "generatedAt": "2026-07-12T04:35:44.552Z",
   "scope": "general",
   "profile": "desktop-app",
   "addons": [
@@ -551,13 +551,13 @@
     },
     {
       "path": "docs/architecture/02-runtime-flow.md",
-      "checksum": "sha256:7cc4a1fbead0964abb1b971b6d04b4f2e2e60a52fb13e9966c89dde551bf93df",
+      "checksum": "sha256:ea6139b59f66049d0b78f745da53828de02a8a39d034d0193ea157cf0327c078",
       "kind": "document",
       "ownership": "seeded",
       "presence": "optional",
       "status": "active",
       "initialChecksum": "sha256:c0f5d7adf6082d4abc8e950b6b4f30103fcc40b32341513690ec00a2b2f7c288",
-      "acceptedChecksum": "sha256:7cc4a1fbead0964abb1b971b6d04b4f2e2e60a52fb13e9966c89dde551bf93df",
+      "acceptedChecksum": "sha256:ea6139b59f66049d0b78f745da53828de02a8a39d034d0193ea157cf0327c078",
       "generatedChecksum": "sha256:c0f5d7adf6082d4abc8e950b6b4f30103fcc40b32341513690ec00a2b2f7c288"
     },
     {
@@ -958,13 +958,13 @@
     },
     {
       "path": "docs/product/03-risk-register.md",
-      "checksum": "sha256:b2e977f670da1e7a626222660902ac6294c9853fbd9e966c8e81d7c167b18373",
+      "checksum": "sha256:1bea30b7de37683525b8334403322546124d749c57c62d8e8e14e980f3451f3a",
       "kind": "document",
       "ownership": "seeded",
       "presence": "optional",
       "status": "active",
       "initialChecksum": "sha256:207579a3a910f2ffc320ef9c548882d729d7ba49b17e3cc3c5d6e045d8510b9b",
-      "acceptedChecksum": "sha256:b2e977f670da1e7a626222660902ac6294c9853fbd9e966c8e81d7c167b18373",
+      "acceptedChecksum": "sha256:1bea30b7de37683525b8334403322546124d749c57c62d8e8e14e980f3451f3a",
       "generatedChecksum": "sha256:207579a3a910f2ffc320ef9c548882d729d7ba49b17e3cc3c5d6e045d8510b9b"
     },
     {
