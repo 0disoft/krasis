@@ -25,6 +25,7 @@ func TestParseAgentSessionConnectArgs(t *testing.T) {
 	options, err := parseAgentSessionArgs([]string{
 		"connect", "--device", "H-B", "--address", "192.0.2.10:24876", "--server-name", "192.0.2.10",
 		"--ca", "ca.pem", "--cert", "identity.pem", "--key", "identity-key.pem",
+		"--peer-cert", "peer.pem",
 		"--edge", "left", "--duration", "2m", "--heartbeat-interval", "500ms", "--peer-timeout", "3s",
 		"--output", "report.json", "--guard-output", "guard.json", "--allow-live-input",
 	})
@@ -40,6 +41,7 @@ func TestParseAgentSessionRequiresValidExplicitLivenessPolicy(t *testing.T) {
 	base := []string{
 		"listen", "--device", "H-A", "--address", ":24876", "--ca", "ca.pem",
 		"--cert", "identity.pem", "--key", "identity-key.pem", "--edge", "RIGHT",
+		"--peer-cert", "peer.pem",
 		"--duration", "1m", "--output", "report.json", "--guard-output", "guard.json", "--allow-live-input",
 	}
 	if _, err := parseAgentSessionArgs(base); err == nil {
@@ -57,6 +59,7 @@ func TestParseAgentSessionRejectsDurationThatCannotRoundTripThroughEvidence(t *t
 		args := []string{
 			"listen", "--device", "H-A", "--address", ":24876", "--ca", "ca.pem",
 			"--cert", "identity.pem", "--key", "identity-key.pem", "--edge", "RIGHT",
+			"--peer-cert", "peer.pem",
 			"--duration", "1m", "--heartbeat-interval", "500ms", "--peer-timeout", "3s",
 			"--output", "report.json", "--guard-output", "guard.json", "--allow-live-input",
 		}
@@ -94,6 +97,7 @@ func TestParseAgentSessionRequiresLiveInputAcknowledgement(t *testing.T) {
 	_, err := parseAgentSessionArgs([]string{
 		"listen", "--device", "H-A", "--address", ":24876", "--ca", "ca.pem",
 		"--cert", "identity.pem", "--key", "identity-key.pem", "--edge", "RIGHT",
+		"--peer-cert", "peer.pem",
 		"--duration", "1m", "--heartbeat-interval", "500ms", "--peer-timeout", "3s",
 		"--output", "report.json", "--guard-output", "guard.json",
 	})

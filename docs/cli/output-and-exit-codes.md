@@ -166,8 +166,8 @@ guided stage failure code:
 
 ## `peer-credentials`
 
-- schema: root `manifest.json`의 `krasis.lab.peer-credentials/v1`
-- 출력: 새 directory 안의 `manifest.json`, `listener/`, `connector/`
+- schema: root `manifest.json`의 `krasis.lab.peer-credentials/v2`
+- 출력: 새 directory 안의 `manifest.json`, `listener/`, `connector/`; 각 역할 directory에는 `ca.pem`, `identity.pem`, `identity-key.pem`, 상대 공개 인증서 `peer.pem`이 있다.
 - stdout: bundle directory, 만료 시각, 역할별 복사 경고
 
 manifest 허용 필드:

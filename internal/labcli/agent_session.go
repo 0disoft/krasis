@@ -35,6 +35,7 @@ type agentSessionArgs struct {
 	ca            string
 	cert          string
 	key           string
+	peerCert      string
 	edge          control.ScreenEdge
 	duration      time.Duration
 	heartbeat     time.Duration
@@ -117,6 +118,20 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 		report.StopReason = "failure"
 		return finish(exitRuntime)
 	}
+	trustedPeer, err := peercredentials.LoadTrustedPeer(options.peerCert)
+	if err != nil {
+		report.FailureCode = "trusted_peer_load_failed"
+		report.StopReason = "failure"
+		return finish(exitRuntime)
+	}
+	authorizer, err := agent.NewTrustedPeerAuthorizer([]agent.TrustedPeerGrant{{
+		Peer: trustedPeer, AllowInboundControl: true,
+	}})
+	if err != nil {
+		report.FailureCode = "trust_policy_failed"
+		report.StopReason = "failure"
+		return finish(exitRuntime)
+	}
 	var source agent.ConnectionSource
 	switch options.role {
 	case "listen":
@@ -183,7 +198,7 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 		Backoff: agent.DefaultBackoffPolicy(), Now: time.Now, Wait: agent.Wait, Observer: observer,
 	}, agent.SupervisorDependencies{
 		Source: source, Hook: wininput.NewSourceHook(), Input: input,
-		Effects: agent.RuntimeEffects{}, Authorizer: agent.AuthenticatedPeerAuthorizer{}, RunSession: agent.RunSession,
+		Effects: agent.RuntimeEffects{}, Authorizer: authorizer, RunSession: agent.RunSession,
 	})
 	report.Supervisor = observer.evidence()
 	report.Liveness = observer.livenessEvidence()
@@ -264,6 +279,7 @@ func parseAgentSessionArgs(args []string) (agentSessionArgs, error) {
 	values := map[string]*string{
 		"--device": &parsed.device, "--address": &parsed.address, "--server-name": &parsed.serverName,
 		"--ca": &parsed.ca, "--cert": &parsed.cert, "--key": &parsed.key, "--output": &parsed.output,
+		"--peer-cert":    &parsed.peerCert,
 		"--guard-output": &parsed.guardOutput,
 	}
 	var edgeValue, durationValue, heartbeatValue, peerTimeoutValue, rearmValue string
@@ -304,7 +320,7 @@ func parseAgentSessionArgs(args []string) (agentSessionArgs, error) {
 	if !lab.ValidProbeDeviceAlias(parsed.device) {
 		return agentSessionArgs{}, fmt.Errorf("unsupported device alias %q", parsed.device)
 	}
-	if parsed.address == "" || parsed.ca == "" || parsed.cert == "" || parsed.key == "" || parsed.output == "" || parsed.guardOutput == "" || edgeValue == "" || durationValue == "" || heartbeatValue == "" || peerTimeoutValue == "" {
+	if parsed.address == "" || parsed.ca == "" || parsed.cert == "" || parsed.key == "" || parsed.peerCert == "" || parsed.output == "" || parsed.guardOutput == "" || edgeValue == "" || durationValue == "" || heartbeatValue == "" || peerTimeoutValue == "" {
 		return agentSessionArgs{}, errors.New("device, address, credentials, edge, duration, heartbeat interval, peer timeout, and output are required")
 	}
 	parsed.edge = control.ScreenEdge(strings.ToUpper(edgeValue))
@@ -376,7 +392,7 @@ func newAgentSessionConfig(options agentSessionArgs, screenLeft, screenWidth int
 }
 
 func writeAgentSessionUsage(output io.Writer) {
-	fmt.Fprintln(output, "usage: krasis-lab agent-session listen|connect --device ALIAS --address ADDRESS [--server-name NAME] --ca CA.pem --cert CERT.pem --key KEY.pem --edge LEFT|RIGHT --duration DURATION --heartbeat-interval DURATION --peer-timeout DURATION --output REPORT.json --guard-output GUARD.json [--rearm-distance PIXELS] --allow-live-input")
+	fmt.Fprintln(output, "usage: krasis-lab agent-session listen|connect --device ALIAS --address ADDRESS [--server-name NAME] --ca CA.pem --cert CERT.pem --key KEY.pem --peer-cert PEER.pem --edge LEFT|RIGHT --duration DURATION --heartbeat-interval DURATION --peer-timeout DURATION --output REPORT.json --guard-output GUARD.json [--rearm-distance PIXELS] --allow-live-input")
 }
 
 type countingInput struct {

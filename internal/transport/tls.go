@@ -106,13 +106,24 @@ func AuthenticatePeerContext(ctx context.Context, connection *tls.Conn) (Authent
 		return AuthenticatedPeerContext{}, errors.Join(ErrPeerAuthentication, errors.New("verified peer certificate chain is required"))
 	}
 	certificate := state.PeerCertificates[0]
+	peer, err := AuthenticatedPeerFromCertificate(certificate)
+	if err != nil {
+		return AuthenticatedPeerContext{}, errors.Join(ErrPeerAuthentication, err)
+	}
+	return peer, nil
+}
+
+func AuthenticatedPeerFromCertificate(certificate *x509.Certificate) (AuthenticatedPeerContext, error) {
+	if certificate == nil || len(certificate.Raw) == 0 {
+		return AuthenticatedPeerContext{}, errors.New("authenticated peer certificate is required")
+	}
 	fingerprint := sha256.Sum256(certificate.Raw)
 	peer := AuthenticatedPeerContext{
 		CertificateSHA256: hex.EncodeToString(fingerprint[:]),
 		Role:              authenticatedPeerRole(certificate),
 	}
 	if err := peer.Validate(); err != nil {
-		return AuthenticatedPeerContext{}, errors.Join(ErrPeerAuthentication, err)
+		return AuthenticatedPeerContext{}, err
 	}
 	return peer, nil
 }

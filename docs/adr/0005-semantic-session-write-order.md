@@ -95,6 +95,6 @@ timeout에 도달한 frame은 관찰 evidence에 포함하거나 세션을 연�
 ordered stream에서 head-of-line blocking이 실제로 확인될 때만 ADR 0003을 대체하는 transport
 결정을 추가한다. caller가 명시적으로 `heartbeat interval < peer timeout` policy를 주입할 때만
 동작하는 주기 sender와 deadline worker는 구현됐다. policy가 없으면 worker를 시작하지 않으며
-제품 기본값은 여전히 `UNDECIDED`다. `agent-session`은 두 값을 필수로 받아 v4 report에
+제품 기본값은 여전히 `UNDECIDED`다. `agent-session`은 두 값을 필수로 받아 v5 report에
 millisecond 단위로 기록하며 pair checker와 순차 Phase 0 checker가 각각 같은 장소와 네 장비
 전체의 값 일치를 검증한다. 장소별 수집 날짜가 달라도 이 계약은 동일하다.

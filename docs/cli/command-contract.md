@@ -114,7 +114,7 @@
 - 사용법: `krasis-lab peer-credentials --output DIRECTORY --server-name NAME`
 - `DIRECTORY`는 존재하지 않아야 하며 기존 file이나 directory를 덮어쓰지 않는다.
 - test CA private key는 memory에서 listener와 connector identity를 서명한 뒤 폐기하며 file로 저장하지 않는다.
-- `listener/`와 `connector/`에는 각 역할의 `ca.pem`, `identity.pem`, `identity-key.pem`만 생성한다.
+- `listener/`와 `connector/`에는 각 역할의 `ca.pem`, `identity.pem`, `identity-key.pem`과 상대 역할의 공개 인증서 `peer.pem`을 생성한다. `peer.pem`에는 private key가 없다.
 - identity 유효 기간은 생성 시점부터 24시간이다. 이는 제품 certificate 수명 정책이 아니다.
 - `--server-name`은 listener가 connector에서 실제로 접근할 DNS name 또는 IP 주소다.
 - bundle 전체를 두 장비에 복제하지 않는다. listener에는 `listener/`만, connector에는 `connector/`만 복사한다.
@@ -125,11 +125,12 @@
 
 두 Windows 장비에서 실제 low-level hook, 경계 억제, mTLS peer session과 `SendInput` destination adapter를 bounded하게 실행하는 Phase 0 실험 명령이다.
 
-- 사용법: `krasis-lab agent-session listen|connect --device ALIAS --address ADDRESS [--server-name NAME] --ca CA.pem --cert CERT.pem --key KEY.pem --edge LEFT|RIGHT --duration DURATION --heartbeat-interval DURATION --peer-timeout DURATION --output REPORT.json --guard-output GUARD.json [--rearm-distance PIXELS] --allow-live-input`
+- 사용법: `krasis-lab agent-session listen|connect --device ALIAS --address ADDRESS [--server-name NAME] --ca CA.pem --cert CERT.pem --key KEY.pem --peer-cert PEER.pem --edge LEFT|RIGHT --duration DURATION --heartbeat-interval DURATION --peer-timeout DURATION --output REPORT.json --guard-output GUARD.json [--rearm-distance PIXELS] --allow-live-input`
 - `--allow-live-input`이 없으면 실행하지 않는다. 이 flag는 실제 keyboard/mouse event를 억제·전달·주입한다는 명시적 확인이다.
 - `--duration`은 필수이며 1ms 이상의 정수 millisecond로 왕복 가능해야 한다. 무기한 실행을 허용하지 않는다.
 - `--heartbeat-interval`과 `--peer-timeout`도 1ms 이상의 정수 millisecond이고 timeout이 interval보다 길어야 한다. 제품 기본값은 없으며 같은 Phase 0 evidence set의 네 report에 동일한 실험값을 명시한다.
 - listener와 connector는 `peer-credentials`가 만든 역할별 identity만 사용한다.
+- `--peer-cert`는 같은 역할 directory의 `peer.pem`이어야 한다. TLS가 제시한 peer fingerprint와 역할이 이 공개 인증서에서 만든 immutable in-memory trust grant와 일치하지 않거나 grant가 revoked/권한 없음이면 lease를 거부한다.
 - `--edge`는 이 장비에서 상대 장비로 넘어가는 화면 끝이다. 왼쪽 노트북은 일반적으로 `RIGHT`, 오른쪽 노트북은 `LEFT`다.
 - MVP대로 active monitor가 정확히 하나가 아니면 hook을 시작하지 않고 실패한다.
 - destination grant 전에는 source suppression을 활성화하지 않는다.

@@ -22,7 +22,7 @@ func TestGenerateCreatesSeparatedUsableIdentitiesWithoutCAKey(t *testing.T) {
 		t.Fatalf("validity = %s", manifest.ExpiresAt.Sub(manifest.CreatedAt))
 	}
 	for _, role := range []string{"listener", "connector"} {
-		for _, name := range []string{"ca.pem", "identity.pem", "identity-key.pem"} {
+		for _, name := range []string{"ca.pem", "identity.pem", "identity-key.pem", "peer.pem"} {
 			if _, err := os.Stat(filepath.Join(output, role, name)); err != nil {
 				t.Fatalf("missing %s/%s: %v", role, name, err)
 			}
@@ -39,6 +39,14 @@ func TestGenerateCreatesSeparatedUsableIdentitiesWithoutCAKey(t *testing.T) {
 	}
 	if _, err := transport.NewClientTLSConfig(connector, roots, "peer.test"); err != nil {
 		t.Fatalf("NewClientTLSConfig() error = %v", err)
+	}
+	listenerPeer, err := LoadTrustedPeer(filepath.Join(output, "listener", "peer.pem"))
+	if err != nil || listenerPeer.Role != transport.AuthenticatedPeerConnector {
+		t.Fatalf("listener trusted peer = %+v, %v", listenerPeer, err)
+	}
+	connectorPeer, err := LoadTrustedPeer(filepath.Join(output, "connector", "peer.pem"))
+	if err != nil || connectorPeer.Role != transport.AuthenticatedPeerListener {
+		t.Fatalf("connector trusted peer = %+v, %v", connectorPeer, err)
 	}
 }
 

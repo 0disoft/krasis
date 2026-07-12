@@ -19,17 +19,19 @@ import (
 )
 
 const (
-	SchemaVersion = "krasis.lab.peer-credentials/v1"
+	SchemaVersion = "krasis.lab.peer-credentials/v2"
 	Validity      = 24 * time.Hour
 )
 
 type Manifest struct {
-	SchemaVersion string    `json:"schemaVersion"`
-	CreatedAt     time.Time `json:"createdAt"`
-	ExpiresAt     time.Time `json:"expiresAt"`
-	ServerName    string    `json:"serverName"`
-	ListenerDir   string    `json:"listenerDirectory"`
-	ConnectorDir  string    `json:"connectorDirectory"`
+	SchemaVersion            string    `json:"schemaVersion"`
+	CreatedAt                time.Time `json:"createdAt"`
+	ExpiresAt                time.Time `json:"expiresAt"`
+	ServerName               string    `json:"serverName"`
+	ListenerDir              string    `json:"listenerDirectory"`
+	ConnectorDir             string    `json:"connectorDirectory"`
+	ListenerPeerCertificate  string    `json:"listenerPeerCertificate"`
+	ConnectorPeerCertificate string    `json:"connectorPeerCertificate"`
 }
 
 func Generate(outputDirectory, serverName string, now time.Time) (manifest Manifest, err error) {
@@ -90,11 +92,18 @@ func Generate(outputDirectory, serverName string, now time.Time) (manifest Manif
 	if err := writeIdentity(connectorDirectory, connectorDER, connectorKey); err != nil {
 		return Manifest{}, err
 	}
+	if err := writePEMExclusive(filepath.Join(listenerDirectory, "peer.pem"), "CERTIFICATE", connectorDER); err != nil {
+		return Manifest{}, err
+	}
+	if err := writePEMExclusive(filepath.Join(connectorDirectory, "peer.pem"), "CERTIFICATE", listenerDER); err != nil {
+		return Manifest{}, err
+	}
 
 	manifest = Manifest{
 		SchemaVersion: SchemaVersion,
 		CreatedAt:     now.UTC(), ExpiresAt: expiresAt, ServerName: serverName,
 		ListenerDir: "listener", ConnectorDir: "connector",
+		ListenerPeerCertificate: "peer.pem", ConnectorPeerCertificate: "peer.pem",
 	}
 	if err := writeJSONExclusive(filepath.Join(absolute, "manifest.json"), manifest); err != nil {
 		return Manifest{}, err
