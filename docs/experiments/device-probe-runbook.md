@@ -126,14 +126,26 @@ $PeerTimeout = Read-Host 'same peer timeout used by the listener'
 이 시간은 제품 기본값이 아니라 해당 실행에서 직접 입력한 interval의 배수다. 그래야 양쪽
 report에 송수신 각각 2회 이상과 같은 session 내부 receive gap sample이 남는다.
 
-양쪽 report가 모두 `schemaVersion=krasis.lab.agent-session/v5`, `completed=true`,
+양쪽 report가 모두 `schemaVersion=krasis.lab.agent-session/v6`, `completed=true`,
 `passed=true`, `crashGuard.started=true`, `crashGuard.cleanShutdown=true`,
+`lifecycle.monitorStarted=true`, `lifecycle.cleanShutdown=true`, lifecycle event 없음,
+`lifecycle.rearmRequired=false`,
 양수 `heartbeatIntervalMillis`, 그보다 큰 `peerTimeoutMillis`, `supervisor.activeCount>=1`,
 `liveness.heartbeatsSent>=2`, `liveness.heartbeatsReceived>=2`,
 `liveness.receiveGapSamples>=1`,
 `0<liveness.maxReceiveGapMillis<peerTimeoutMillis`,
 `destinationInput.entries>=1`이어야 해당 pair의 bounded 양방향
 실험이 통과한 것이다. 집 pair와 스터디카페 pair는 서로 다른 날짜에 반복해도 된다.
+
+## Windows lifecycle fault injection
+
+정상 pair 실행과 다른 새 report 경로를 사용해 session을 다시 시작하고, active 상태에서 한 번에
+하나씩 Windows 잠금, 절전·복귀 또는 display topology 변경을 수동으로 발생시킨다. event 뒤 기존
+session이 자동으로 돌아오면 실패다. agent report는 `stopReason=lifecycle_transition`, 해당
+`lifecycle_*` failure code, `lifecycle.rearmRequired=true`, supervisor `STOPPED`와 crash guard 정상
+종료를 남겨야 한다. 이 report는 `agent-session-check` 성공 입력으로 쓰지 않고 fault evidence로
+별도 보존한다. 잠금 해제나 절전 복귀 뒤에는 양쪽 process가 종료된 것을 확인한 다음에만 새 output
+경로로 명시적으로 다시 실행한다.
 
 두 report를 한 directory에 모은 뒤 strict pair checker를 실행한다.
 
@@ -195,5 +207,5 @@ basic/guided probe는 한 장비의 hook, aggregate capture와 tagged `SendInput
 `peer-probe`는 두 노트북 사이의 인증된 연결과 protocol frame 왕복만 검사한다.
 `agent-session` report의 crash guard 정상 종료는 guard process와 IPC가 실행됐음을 증명하지만,
 실제 input이 down인 순간 parent를 강제 종료한 복구를 증명하지 않는다. 그 강제 종료,
-절전·잠금과 실제 `SendInput` release는 두 노트북이 같은 책상에 있을 때 별도 수동
+절전·잠금 message 수신, cleanup 뒤 명시적 rearm과 실제 `SendInput` release는 두 노트북이 같은 책상에 있을 때 별도 수동
 실험으로 남는다.

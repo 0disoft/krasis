@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/0disoft/krasis/internal/agent"
+	"github.com/0disoft/krasis/internal/agentlifecycle"
 	"github.com/0disoft/krasis/internal/buildinfo"
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/crashguard"
@@ -79,19 +80,39 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 		RequestedMillis: options.duration.Milliseconds(), HeartbeatMillis: options.heartbeat.Milliseconds(),
 		PeerTimeoutMillis: options.peerTimeout.Milliseconds(),
 	}
-	var guard *crashguard.Process
-	guardClosed := false
+	var processOwner *agentSessionProcessOwner
 	finish := func(code int) int {
-		if guard != nil && !guardClosed {
-			guardClosed = true
-			if err := guard.Close(); err != nil {
+		if processOwner != nil {
+			closed := processOwner.Close()
+			if event := processOwner.Event(); event != "" {
+				report.Lifecycle.Event = string(event)
+				report.Lifecycle.RearmRequired = true
+				report.Completed = true
+				report.Passed = false
+				report.FailureCode = lifecycleFailureCode(event)
+				report.StopReason = "lifecycle_transition"
+				code = exitRuntime
+			}
+			report.Lifecycle.CleanShutdown = closed.LifecycleErr == nil
+			switch {
+			case closed.GuardErr != nil:
 				report.CrashGuard.CleanShutdown = false
 				report.Passed = false
-				if report.FailureCode == "" {
-					report.FailureCode = "crash_guard_shutdown_failed"
-				}
+				report.FailureCode = "crash_guard_shutdown_failed"
+				report.StopReason = "failure"
 				code = exitRuntime
-			} else {
+			case closed.SourceErr != nil:
+				report.Passed = false
+				report.FailureCode = "connection_source_shutdown_failed"
+				report.StopReason = "failure"
+				code = exitRuntime
+			case closed.LifecycleErr != nil:
+				report.Passed = false
+				report.FailureCode = "lifecycle_monitor_shutdown_failed"
+				report.StopReason = "failure"
+				code = exitRuntime
+			}
+			if report.CrashGuard.Started && closed.GuardErr == nil {
 				report.CrashGuard.CleanShutdown = true
 			}
 		}
@@ -102,7 +123,14 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 		fmt.Fprintf(stdout, "Agent session report: %s\n", options.output)
 		return code
 	}
-	diagnostics, err := platform.Diagnose(ctx)
+	processOwner, err = startAgentSessionProcessOwner(ctx)
+	if err != nil {
+		report.FailureCode = "lifecycle_monitor_start_failed"
+		report.StopReason = "failure"
+		return finish(exitRuntime)
+	}
+	report.Lifecycle.MonitorStarted = true
+	diagnostics, err := platform.Diagnose(processOwner.Context())
 	if err != nil {
 		report.FailureCode = "diagnose_failed"
 		report.StopReason = "failure"
@@ -169,34 +197,37 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 		}
 		source = dialer
 	}
+	if err := processOwner.SetSource(source); err != nil {
+		_ = source.Close()
+		report.FailureCode = "lifecycle_source_ownership_failed"
+		report.StopReason = "failure"
+		return finish(exitRuntime)
+	}
 	executable, err := os.Executable()
 	if err != nil {
-		_ = source.Close()
 		report.FailureCode = "crash_guard_executable_failed"
 		report.StopReason = "failure"
 		return finish(exitRuntime)
 	}
-	guard, err = crashguard.Start(executable, options.device, guardPath)
+	guard, err := crashguard.Start(executable, options.device, guardPath)
 	if err != nil {
-		_ = source.Close()
 		report.FailureCode = "crash_guard_start_failed"
 		report.StopReason = "failure"
 		return finish(exitRuntime)
 	}
 	report.CrashGuard.Started = true
 	report.CrashGuard.ReportFile = filepath.Base(guardPath)
+	if err := processOwner.SetCrashGuard(guard); err != nil {
+		_ = guard.Close()
+		report.FailureCode = "lifecycle_guard_ownership_failed"
+		report.StopReason = "failure"
+		return finish(exitRuntime)
+	}
 	fmt.Fprintf(stdout, "Crash guard armed: agent_pid=%d report=%s\n", os.Getpid(), options.guardOutput)
 	input := newCountingInput(wininput.NewInputAdapter(), guard)
 	observer := &agentSessionObserver{}
-	runContext, cancel := context.WithTimeout(ctx, options.duration)
+	runContext, cancel := context.WithTimeout(processOwner.Context(), options.duration)
 	defer cancel()
-	go func() {
-		select {
-		case <-guard.Done():
-			cancel()
-		case <-runContext.Done():
-		}
-	}()
 	sessionConfig := newAgentSessionConfig(options, diagnostics.Display.Left, diagnostics.Display.Width, observer)
 	err = agent.RunSupervisor(runContext, agent.SupervisorConfig{
 		Session: sessionConfig,
@@ -208,12 +239,21 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 	report.Supervisor = observer.evidence()
 	report.Liveness = observer.livenessEvidence()
 	report.DestinationInput = input.evidence()
-	select {
-	case <-guard.Done():
+	if errors.Is(context.Cause(processOwner.Context()), errCrashGuardStopped) {
 		report.FailureCode = "crash_guard_stopped"
 		report.StopReason = "failure"
 		return finish(exitRuntime)
-	default:
+	}
+	if event := processOwner.Event(); event != "" {
+		report.Completed = true
+		report.FailureCode = lifecycleFailureCode(event)
+		report.StopReason = "lifecycle_transition"
+		return finish(exitRuntime)
+	}
+	if errors.Is(context.Cause(processOwner.Context()), agentlifecycle.ErrMonitorStopped) {
+		report.FailureCode = "lifecycle_monitor_stopped"
+		report.StopReason = "failure"
+		return finish(exitRuntime)
 	}
 	switch {
 	case errors.Is(err, wininput.ErrEmergencyRelease):
@@ -234,6 +274,10 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 		fmt.Fprintln(stderr, "runtime_error: agent session failed; inspect the redacted report")
 		return finish(exitRuntime)
 	}
+}
+
+func lifecycleFailureCode(event agentlifecycle.Event) string {
+	return "lifecycle_" + string(event)
 }
 
 func newTrustStoreAuthorizer(document truststore.Document) (*agent.TrustedPeerAuthorizer, error) {

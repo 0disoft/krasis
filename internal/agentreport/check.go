@@ -187,6 +187,9 @@ func validate(report lab.AgentSessionReport) []string {
 	if !report.Completed || !report.Passed || report.FailureCode != "" {
 		issues = append(issues, "session_not_passed")
 	}
+	if !report.Lifecycle.MonitorStarted || !report.Lifecycle.CleanShutdown || report.Lifecycle.Event != "" || report.Lifecycle.RearmRequired {
+		issues = append(issues, "unsafe_lifecycle_evidence")
+	}
 	if report.StopReason != "duration_elapsed" && report.StopReason != "canceled" {
 		issues = append(issues, "invalid_passing_stop_reason")
 	}

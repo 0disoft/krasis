@@ -42,6 +42,12 @@ func TestTrustStoreAuthorizerMapsActiveAndRevokedRecords(t *testing.T) {
 	}
 }
 
+func TestLifecycleFailureCodeIsStable(t *testing.T) {
+	if code := lifecycleFailureCode("session_lock"); code != "lifecycle_session_lock" {
+		t.Fatalf("lifecycleFailureCode() = %q", code)
+	}
+}
+
 func TestResolveAgentSessionOutputPathsRequiresSameDirectory(t *testing.T) {
 	first := filepath.Join(t.TempDir(), "agent.json")
 	second := filepath.Join(t.TempDir(), "guard.json")

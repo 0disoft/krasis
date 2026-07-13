@@ -58,9 +58,21 @@ func TestCheckRejectsReportWithoutCrashGuardEvidence(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsLifecycleTransitionEvidence(t *testing.T) {
+	directory := t.TempDir()
+	report := passingReport("H-A", "listen", "RIGHT")
+	report.Lifecycle.Event = "suspend"
+	report.Lifecycle.RearmRequired = true
+	path := writeReport(t, directory, "lifecycle.json", report)
+	result := Check([]string{path})
+	if result.Valid || !hasIssue(result.Files[0].Issues, "unsafe_lifecycle_evidence") {
+		t.Fatalf("Check() = %+v", result)
+	}
+}
+
 func TestCheckRejectsUnknownFields(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "unknown.json")
-	if err := os.WriteFile(path, []byte(`{"schemaVersion":"krasis.lab.agent-session/v5","surprise":true}`), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(`{"schemaVersion":"krasis.lab.agent-session/v6","surprise":true}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	result := Check([]string{path})
@@ -123,6 +135,7 @@ func passingReport(alias, role, edge string) lab.AgentSessionReport {
 		CollectedAt:   time.Date(2026, time.July, 11, 0, 0, 0, 0, time.UTC),
 		BuildRevision: "abc123", RequestedMillis: 120_000, HeartbeatMillis: 500, PeerTimeoutMillis: 3_000,
 		Completed: true, Passed: true, StopReason: "duration_elapsed",
+		Lifecycle:        lab.LifecycleEvidence{MonitorStarted: true, CleanShutdown: true},
 		Liveness:         lab.LivenessEvidence{HeartbeatsSent: 4, HeartbeatsReceived: 4, ReceiveGapSamples: 3, MaxReceiveGapMillis: 600},
 		CrashGuard:       lab.CrashGuardEvidence{Started: true, CleanShutdown: true, ReportFile: alias + "-guard.json"},
 		Supervisor:       lab.SupervisorEvidence{FinalState: "STOPPED", ActiveCount: 1},

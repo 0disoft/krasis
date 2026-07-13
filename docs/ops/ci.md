@@ -53,6 +53,11 @@ network source 테스트는 listener의 첫 Close 오류 보존과 TLS 인증 �
 
 emergency release 테스트는 modifier press/release, left/right modifier variant, F12 terminator 비전달, source suppression 해제와 worker fault cleanup을 검증한다. `agent-session` parser와 evidence gate 테스트는 explicit live-input acknowledgement, bounded duration, 인증 session 부재와 destination input 부재를 성공으로 가장하지 않는지 확인한다. CI에서는 실제 hook suppression과 `SendInput` 상호작용을 실행하지 않는다.
 
+Windows lifecycle 테스트는 숨겨진 top-level window monitor의 start/close, power·WTS session·shutdown·
+display message 정규화, 첫 event cancellation, monitor 비정상 종료, guard 선행 종료와 source-before-guard
+close-once 순서를 검증한다. hosted runner는 실제 Modern Standby, 잠금 화면과 display 재구성을
+발생시키지 않으므로 message 수신부터 실제 input cleanup까지의 end-to-end 증거는 장비 실험 범위다.
+
 crash guard protocol 테스트는 down 전 prepare ACK, up 후 release ACK, 역순 cleanup, malformed
 frame과 release 실패를 검증한다. 별도 subprocess 테스트는 guard에 token을 준비한 parent
 test process의 readiness 신호를 받은 뒤 parent만 강제 종료하고, pipe EOF를 받은 guard가
@@ -67,7 +72,7 @@ dirty/mismatched build, unknown field, invalid count와 정상 disarm recovery�
 agent report checker 테스트는 strict JSON decoding과 두 file cardinality, 장소별 alias pair,
 listener/connect 역할, 반대 edge, clean 동일 build, 동일 duration/heartbeat interval/peer timeout,
 최소 heartbeat 송수신·same-session gap evidence와 timeout보다 작은 최대 gap, 양쪽 pass, crash guard의
-시작·정상 종료, 같은 directory의 guard report device/build/zero-recovery 및 destination evidence를 검증한다. 전체 path, session identifier나 원시
+시작·정상 종료, lifecycle monitor의 clean 종료와 event·rearm 부재, 같은 directory의 guard report device/build/zero-recovery 및 destination evidence를 검증한다. 전체 path, session identifier나 원시
 입력은 checker output으로 복제하지 않는다.
 
 Phase 0 checker 테스트는 서로 다른 날짜의 home/study pair를 같은 build, duration과 liveness policy로

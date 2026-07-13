@@ -201,13 +201,14 @@ certificate body, private key, 주소와 operational session 식별자는 저장
 
 ## `agent-session`
 
-- schema: `krasis.lab.agent-session/v5`
+- schema: `krasis.lab.agent-session/v6`
 - 출력: `--output`으로 지정한 단일 JSON file
 
 필드:
 
 - `deviceAlias`, `role`, `edge`, `collectedAt`, build 정보, requested duration, heartbeat interval과 peer timeout
 - `completed`, `passed`, `stopReason`, `failureCode`
+- lifecycle monitor 시작·정상 종료, 정규화된 terminal event와 explicit rearm 필요 여부
 - crash guard의 시작 여부와 남은 token을 해제한 정상 종료 여부
 - 같은 directory에서 strict 검증할 guard report basename
 - supervisor의 final state, active 횟수, acquire/session failure 횟수와 emergency stop 횟수
@@ -228,13 +229,30 @@ stable failure code:
 - `crash_guard_start_failed`
 - `crash_guard_stopped`
 - `crash_guard_shutdown_failed`
+- `connection_source_shutdown_failed`
+- `lifecycle_monitor_start_failed`
+- `lifecycle_monitor_stopped`
+- `lifecycle_monitor_shutdown_failed`
+- `lifecycle_source_ownership_failed`
+- `lifecycle_guard_ownership_failed`
+- `lifecycle_suspend`
+- `lifecycle_resume`
+- `lifecycle_session_lock`
+- `lifecycle_session_disconnect`
+- `lifecycle_logoff`
+- `lifecycle_shutdown`
+- `lifecycle_display_change`
 - `agent_session_failed`
 - `no_authenticated_session`
 - `no_destination_input_observed`
 - `insufficient_liveness_evidence`
 - `unsafe_liveness_gap`
 
-`stopReason`은 `duration_elapsed`, `canceled`, `emergency_release`, `failure` 중 하나다. 긴급 해제는 exit `0`이지만 증거가 통과했다는 뜻은 아니다. raw runtime error는 주소나 입력 정보가 섞일 수 있으므로 terminal에 복제하지 않고 stable failure code와 redacted report만 남긴다.
+`stopReason`은 `duration_elapsed`, `canceled`, `emergency_release`, `lifecycle_transition`,
+`failure` 중 하나다. lifecycle transition은 cleanup 뒤에도 explicit rearm을 요구하므로 exit `1`이고
+pair evidence가 아니다. 긴급 해제는 exit `0`이지만 증거가 통과했다는 뜻은 아니다. raw runtime
+error는 주소나 입력 정보가 섞일 수 있으므로 terminal에 복제하지 않고 stable failure code와
+redacted report만 남긴다.
 
 ## `agent-session-check --json`
 

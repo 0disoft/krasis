@@ -35,6 +35,12 @@ heartbeat deadline은 caller가 제공한다. 만료된 현재-session liveness�
 
 순서를 확정할 수 없는 연결 복구에서는 미전달 입력을 재생하지 않는다. GUI 종료는 agent 종료와 같은 뜻이 아니며, agent 종료 요청은 위 안전 종료 절차를 반드시 거친다.
 
+Phase 0 `agent-session`의 process owner는 숨겨진 top-level window의 Windows lifecycle monitor,
+connection source와 crash guard를 함께 소유한다. suspend, resume, session lock·disconnect, logoff,
+shutdown과 display change의 첫 event는 terminal cancellation이며 기존 session을 resume하지 않는다.
+supervisor cleanup이 끝난 뒤 source, crash guard, monitor 순으로 닫고 다음 실행에서 diagnostics와
+명시적 rearm을 다시 수행한다. monitor 자체의 예기치 않은 종료도 fail-closed failure다.
+
 현재 Application 구현은 in-memory snapshot과 injected adapter port를 대상으로 한다. `SessionRuntime`은 lease transition, input sequence 승인, pressed-state 변경, 실제 key/button 주입과 주입 실패 cleanup을 하나의 직렬 임계구역에서 수행한다. heartbeat 관찰과 만료 판정도 같은 owner를 거친다.
 
 정규화된 pointer move와 wheel action도 같은 sequence와 owner 경계를 통과한다. action 형식 오류나 adapter 주입 실패는 해당 payload를 재생하지 않고 session fault cleanup으로 수렴한다.
