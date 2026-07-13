@@ -13,14 +13,14 @@ import (
 )
 
 const (
-	protocolVersion  byte = 1
+	protocolVersion  byte = 2
 	commandSize           = 12
 	ackSize               = 8
 	maxPressedInputs      = 256
 	recoveryTimeout       = 2 * time.Second
 )
 
-var protocolMagic = [4]byte{'K', 'R', 'G', '1'}
+var protocolMagic = [4]byte{'K', 'R', 'G', '2'}
 
 type operation byte
 
@@ -28,6 +28,7 @@ const (
 	operationPreparePress operation = 1
 	operationReleased     operation = 2
 	operationDisarm       operation = 3
+	operationCancelPress  operation = 4
 )
 
 type status byte
@@ -35,6 +36,7 @@ type status byte
 const (
 	statusOK status = iota
 	statusRejected
+	statusAlreadyPrepared
 )
 
 type ExitReason string
@@ -75,6 +77,7 @@ func ServeWithResult(reader io.Reader, writer io.Writer, release application.Rel
 		}
 		switch command.operation {
 		case operationPreparePress:
+			alreadyPrepared := pressed.Contains(command.token)
 			if !pressed.Contains(command.token) && pressed.Count() >= maxPressedInputs {
 				_ = writeAck(writer, command.operation, statusRejected)
 				result, recoveryErr := recoverResult(ExitProtocolError, &pressed, release)
@@ -88,11 +91,25 @@ func ServeWithResult(reader io.Reader, writer io.Writer, release application.Rel
 				result, recoveryErr := recoverResult(ExitProtocolError, &pressed, release)
 				return result, errors.Join(err, recoveryErr)
 			}
-			if err := writeAck(writer, command.operation, statusOK); err != nil {
+			ackStatus := statusOK
+			if alreadyPrepared {
+				ackStatus = statusAlreadyPrepared
+			}
+			if err := writeAck(writer, command.operation, ackStatus); err != nil {
 				result, recoveryErr := recoverResult(ExitProtocolError, &pressed, release)
 				return result, errors.Join(err, recoveryErr)
 			}
 		case operationReleased:
+			if _, err := pressed.RecordRelease(command.token); err != nil {
+				_ = writeAck(writer, command.operation, statusRejected)
+				result, recoveryErr := recoverResult(ExitProtocolError, &pressed, release)
+				return result, errors.Join(err, recoveryErr)
+			}
+			if err := writeAck(writer, command.operation, statusOK); err != nil {
+				result, recoveryErr := recoverResult(ExitProtocolError, &pressed, release)
+				return result, errors.Join(err, recoveryErr)
+			}
+		case operationCancelPress:
 			if _, err := pressed.RecordRelease(command.token); err != nil {
 				_ = writeAck(writer, command.operation, statusRejected)
 				result, recoveryErr := recoverResult(ExitProtocolError, &pressed, release)
@@ -163,7 +180,7 @@ func encodeCommand(current operation, token control.PressedToken) ([commandSize]
 	if current == operationDisarm {
 		return payload, nil
 	}
-	if current != operationPreparePress && current != operationReleased {
+	if current != operationPreparePress && current != operationReleased && current != operationCancelPress {
 		return payload, errors.New("unsupported crash guard operation")
 	}
 	if err := token.Validate(); err != nil {
@@ -189,18 +206,19 @@ func writeAck(writer io.Writer, current operation, result status) error {
 	return err
 }
 
-func readAck(reader io.Reader, expected operation) error {
+func readAck(reader io.Reader, expected operation) (status, error) {
 	var payload [ackSize]byte
 	if _, err := io.ReadFull(reader, payload[:]); err != nil {
-		return err
+		return statusRejected, err
 	}
 	if [4]byte(payload[0:4]) != protocolMagic || payload[4] != protocolVersion || operation(payload[5]) != expected || payload[7] != 0 {
-		return errors.New("crash guard acknowledgement is invalid")
+		return statusRejected, errors.New("crash guard acknowledgement is invalid")
 	}
-	if status(payload[6]) != statusOK {
-		return fmt.Errorf("crash guard rejected operation %d", expected)
+	result := status(payload[6])
+	if result != statusOK && !(expected == operationPreparePress && result == statusAlreadyPrepared) {
+		return result, fmt.Errorf("crash guard rejected operation %d", expected)
 	}
-	return nil
+	return result, nil
 }
 
 func recoverResult(reason ExitReason, pressed *control.PressedState, release application.ReleasePort) (Result, error) {

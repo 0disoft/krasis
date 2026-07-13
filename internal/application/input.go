@@ -3,9 +3,52 @@ package application
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/0disoft/krasis/internal/control"
 )
+
+type InjectionCertainty string
+
+const (
+	InjectionNotApplied       InjectionCertainty = "NOT_APPLIED"
+	InjectionPartiallyApplied InjectionCertainty = "PARTIALLY_APPLIED"
+	InjectionOutcomeUnknown   InjectionCertainty = "OUTCOME_UNKNOWN"
+)
+
+type InjectionError struct {
+	Certainty InjectionCertainty
+	Requested int
+	Inserted  int
+	Cause     error
+}
+
+func (failure *InjectionError) Error() string {
+	if failure == nil {
+		return "input injection failed"
+	}
+	return fmt.Sprintf(
+		"input injection failed with certainty %s: inserted %d of %d events",
+		failure.Certainty,
+		failure.Inserted,
+		failure.Requested,
+	)
+}
+
+func (failure *InjectionError) Unwrap() error {
+	if failure == nil {
+		return nil
+	}
+	return failure.Cause
+}
+
+func InjectionCertaintyOf(err error) (InjectionCertainty, bool) {
+	var failure *InjectionError
+	if !errors.As(err, &failure) || failure == nil {
+		return "", false
+	}
+	return failure.Certainty, true
+}
 
 type InputPort interface {
 	ReleasePort
@@ -18,10 +61,20 @@ func InjectPress(ctx context.Context, state *control.PressedState, port InputPor
 	if state == nil || port == nil {
 		return errors.New("pressed state and input port are required")
 	}
-	if _, err := state.RecordPress(token); err != nil {
+	recorded, err := state.RecordPress(token)
+	if err != nil {
 		return err
 	}
-	return port.Press(ctx, token)
+	if err := port.Press(ctx, token); err != nil {
+		certainty, classified := InjectionCertaintyOf(err)
+		if recorded && classified && certainty == InjectionNotApplied {
+			if _, rollbackErr := state.RecordRelease(token); rollbackErr != nil {
+				return errors.Join(err, fmt.Errorf("rollback unapplied press: %w", rollbackErr))
+			}
+		}
+		return err
+	}
+	return nil
 }
 
 func InjectRelease(

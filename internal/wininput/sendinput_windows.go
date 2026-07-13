@@ -4,8 +4,10 @@ package wininput
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"unsafe"
+
+	"github.com/0disoft/krasis/internal/application"
 )
 
 const (
@@ -95,21 +97,40 @@ func mouseEvent(flags uint32, data uint32, deltaX, deltaY int32) input {
 
 func sendInputs(ctx context.Context, events []input) error {
 	if ctx == nil {
-		return fmt.Errorf("%w: context is required", ErrInputInjection)
+		return injectionFailure(application.InjectionNotApplied, len(events), 0, errors.New("context is required"))
 	}
 	if err := ctx.Err(); err != nil {
-		return err
+		return injectionFailure(application.InjectionNotApplied, len(events), 0, err)
 	}
 	if len(events) == 0 {
-		return fmt.Errorf("%w: at least one event is required", ErrInputInjection)
+		return injectionFailure(application.InjectionNotApplied, 0, 0, errors.New("at least one event is required"))
 	}
 	sent, _, callErr := callSendInput(
 		uintptr(len(events)),
 		uintptr(unsafe.Pointer(&events[0])),
 		unsafe.Sizeof(input{}),
 	)
-	if int(sent) != len(events) {
-		return fmt.Errorf("%w: SendInput inserted %d of %d events: %v", ErrInputInjection, sent, len(events), callErr)
+	inserted := int(sent)
+	if inserted == len(events) {
+		return nil
 	}
-	return nil
+	certainty := application.InjectionOutcomeUnknown
+	if inserted == 0 {
+		certainty = application.InjectionNotApplied
+	} else if inserted > 0 && inserted < len(events) {
+		certainty = application.InjectionPartiallyApplied
+	}
+	return injectionFailure(certainty, len(events), inserted, callErr)
+}
+
+func injectionFailure(certainty application.InjectionCertainty, requested, inserted int, cause error) error {
+	if cause == nil {
+		cause = errors.New("SendInput did not insert the requested event batch")
+	}
+	return &application.InjectionError{
+		Certainty: certainty,
+		Requested: requested,
+		Inserted:  inserted,
+		Cause:     errors.Join(ErrInputInjection, cause),
+	}
 }

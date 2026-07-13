@@ -35,6 +35,9 @@ Windows 입력 상태를 대신 해제할 수 없다. down 주입 뒤 파일 jou
 - 이 결정은 설치 topology를 확정하지 않는다. 정식 agent, single-instance, code signing,
   process ACL과 updater 경계는 Phase 0 뒤 별도 ADR에서 결정한다.
 
+`SendInput` 실패 확실성에 따른 prepare 취소와 반복 press 구분은 ADR 0008이 이 결정의
+protocol v2 후속 계약으로 보완한다.
+
 ## 결과
 
 destination agent 단독 crash 뒤에도 독립 process가 합성 key/button을 해제할 수 있고,

@@ -14,7 +14,8 @@ import (
 var errCrashGuardStopped = errors.New("crash guard stopped unexpectedly")
 
 type ownedCrashGuard interface {
-	PreparePress(control.PressedToken) error
+	PreparePress(control.PressedToken) (bool, error)
+	CancelPreparedPress(control.PressedToken) error
 	Released(control.PressedToken) error
 	Done() <-chan struct{}
 	Close() error

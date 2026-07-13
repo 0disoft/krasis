@@ -36,10 +36,10 @@ func TestServeRecoversPreparedInputsOnParentEOF(t *testing.T) {
 	}
 	key := control.PressedToken{Kind: control.PressedKeyboardKey, Code: 30}
 	button := control.PressedToken{Kind: control.PressedMouseButton, Code: 1}
-	if err := client.PreparePress(key); err != nil {
+	if prepared, err := client.PreparePress(key); err != nil || !prepared {
 		t.Fatal(err)
 	}
-	if err := client.PreparePress(button); err != nil {
+	if prepared, err := client.PreparePress(button); err != nil || !prepared {
 		t.Fatal(err)
 	}
 	if err := commands.Close(); err != nil {
@@ -62,7 +62,7 @@ func TestServeDoesNotRecoverReleasedInput(t *testing.T) {
 	go func() { done <- Serve(serverInput, serverOutput, release) }()
 	client, _ := NewClient(commands, acknowledgements)
 	token := control.PressedToken{Kind: control.PressedKeyboardKey, Code: 30}
-	if err := client.PreparePress(token); err != nil {
+	if prepared, err := client.PreparePress(token); err != nil || !prepared {
 		t.Fatal(err)
 	}
 	if err := client.Released(token); err != nil {
@@ -76,6 +76,37 @@ func TestServeDoesNotRecoverReleasedInput(t *testing.T) {
 	}
 	if len(release.tokens) != 0 {
 		t.Fatalf("released tokens = %+v", release.tokens)
+	}
+}
+
+func TestServeCancelsOnlyNewPreparedInput(t *testing.T) {
+	serverInput, commands := io.Pipe()
+	acknowledgements, serverOutput := io.Pipe()
+	release := &recordingRelease{fail: map[control.PressedToken]error{}}
+	done := make(chan error, 1)
+	go func() { done <- Serve(serverInput, serverOutput, release) }()
+	client, _ := NewClient(commands, acknowledgements)
+	token := control.PressedToken{Kind: control.PressedKeyboardKey, Code: 30}
+
+	prepared, err := client.PreparePress(token)
+	if err != nil || !prepared {
+		t.Fatalf("first PreparePress() = (%t, %v)", prepared, err)
+	}
+	prepared, err = client.PreparePress(token)
+	if err != nil || prepared {
+		t.Fatalf("duplicate PreparePress() = (%t, %v)", prepared, err)
+	}
+	if err := client.CancelPreparedPress(token); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Disarm(); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-done; err != nil {
+		t.Fatalf("Serve() error = %v", err)
+	}
+	if len(release.tokens) != 0 {
+		t.Fatalf("canceled press was injected as release: %+v", release.tokens)
 	}
 }
 

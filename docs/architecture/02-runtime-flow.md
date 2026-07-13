@@ -45,7 +45,7 @@ supervisor cleanup이 끝난 뒤 source, crash guard, monitor 순으로 닫고 �
 
 정규화된 pointer move와 wheel action도 같은 sequence와 owner 경계를 통과한다. action 형식 오류나 adapter 주입 실패는 해당 payload를 재생하지 않고 session fault cleanup으로 수렴한다.
 
-Win32 destination adapter는 keyboard scan-code down/up, left/right/middle/X1/X2 button down/up, relative pointer move와 vertical/horizontal wheel을 `SendInput`으로 주입한다. 두 wheel 축이 한 action에 있으면 vertical 다음 horizontal 순서의 한 batch로 보낸다. context가 이미 취소됐거나 Windows가 batch 일부만 삽입하면 성공으로 가장하지 않고 adapter 오류를 반환해 session cleanup을 시작한다. 합성 입력에는 Krasis tag를 넣지만 보안 판단은 tag 하나가 아니라 Windows injected flag와 현재 session 방향을 함께 사용해야 한다.
+Win32 destination adapter는 keyboard scan-code down/up, left/right/middle/X1/X2 button down/up, relative pointer move와 vertical/horizontal wheel을 `SendInput`으로 주입한다. 두 wheel 축이 한 action에 있으면 vertical 다음 horizontal 순서의 한 batch로 보낸다. adapter 오류는 `NOT_APPLIED`, `PARTIALLY_APPLIED`, `OUTCOME_UNKNOWN` 확실성을 가진다. 호출 전 취소와 zero insertion은 새 press journal만 rollback하고, 부분·불명 결과와 기존 token의 반복 press는 cleanup owner를 유지한다. release는 실제 up 성공 뒤에만 journal에서 제거한다. 합성 입력에는 Krasis tag를 넣지만 보안 판단은 tag 하나가 아니라 Windows injected flag와 현재 session 방향을 함께 사용해야 한다.
 
 lab self-test의 tagged `+1/-1` 상대 이동은 두 injection이 hook으로 돌아오는지 검증하는 probe이며, Windows pointer acceleration과 pixel rounding 때문에 두 delta가 좌표상 정확히 상쇄된다고 가정하지 않는다. 두 event 뒤 좌표가 남으면 `SetCursorPos`로 시작 좌표를 복구하고 그 결과까지 확인한다. 이 복구는 명시적인 bounded self-test에만 사용하며 제품의 일반 pointer 전달 경로에는 사용하지 않는다.
 
@@ -79,7 +79,7 @@ guard는 종료 reason과 aggregate release count를 별도 no-replace JSON에 �
 device/build와 `DISARM` zero-recovery를 대조한다. parent crash evidence는 `PARENT_EOF`와
 실제 release count를 요구한다.
 subprocess test는 parent 강제 종료 뒤 이 독립 cleanup owner가 실행됨을 증명하지만 실제
-`SendInput`, 물리 입력 동시성, guard와 agent 동시 종료 또는 전원 차단은 증명하지 않는다.
+실제 `SendInput`, 물리 입력 동시성, guard와 agent 동시 종료 또는 전원 차단은 증명하지 않는다.
 
 ## Peer transport
 

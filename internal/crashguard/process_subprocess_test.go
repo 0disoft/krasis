@@ -83,7 +83,7 @@ func TestCrashGuardTimesOutWhenHelperDoesNotAcknowledge(t *testing.T) {
 		t.Fatal(err)
 	}
 	token := control.PressedToken{Kind: control.PressedKeyboardKey, Code: 30}
-	if err := process.PreparePress(token); err == nil || err.Error() != "crash guard IPC timed out" {
+	if _, err := process.PreparePress(token); err == nil || err.Error() != "crash guard IPC timed out" {
 		t.Fatalf("PreparePress() error = %v", err)
 	}
 	select {
@@ -104,7 +104,7 @@ func TestCrashGuardParentHelper(t *testing.T) {
 		t.Fatal(err)
 	}
 	token := control.PressedToken{Kind: control.PressedKeyboardKey, Code: 30}
-	if err := process.PreparePress(token); err != nil {
+	if _, err := process.PreparePress(token); err != nil {
 		t.Fatal(err)
 	}
 	fmt.Println("READY")

@@ -22,12 +22,19 @@ func NewClient(writer io.Writer, reader io.Reader) (*Client, error) {
 	return &Client{writer: writer, reader: reader}, nil
 }
 
-func (client *Client) PreparePress(token control.PressedToken) error {
-	return client.roundTrip(operationPreparePress, token)
+func (client *Client) PreparePress(token control.PressedToken) (bool, error) {
+	result, err := client.roundTrip(operationPreparePress, token)
+	return result == statusOK, err
 }
 
 func (client *Client) Released(token control.PressedToken) error {
-	return client.roundTrip(operationReleased, token)
+	_, err := client.roundTrip(operationReleased, token)
+	return err
+}
+
+func (client *Client) CancelPreparedPress(token control.PressedToken) error {
+	_, err := client.roundTrip(operationCancelPress, token)
+	return err
 }
 
 func (client *Client) Disarm() error {
@@ -44,21 +51,22 @@ func (client *Client) Disarm() error {
 	if _, err := client.writer.Write(payload[:]); err != nil {
 		return err
 	}
-	return readAck(client.reader, operationDisarm)
+	_, err = readAck(client.reader, operationDisarm)
+	return err
 }
 
-func (client *Client) roundTrip(current operation, token control.PressedToken) error {
+func (client *Client) roundTrip(current operation, token control.PressedToken) (status, error) {
 	client.mu.Lock()
 	defer client.mu.Unlock()
 	if client.closed {
-		return errors.New("crash guard client is closed")
+		return statusRejected, errors.New("crash guard client is closed")
 	}
 	payload, err := encodeCommand(current, token)
 	if err != nil {
-		return err
+		return statusRejected, err
 	}
 	if _, err := client.writer.Write(payload[:]); err != nil {
-		return err
+		return statusRejected, err
 	}
 	return readAck(client.reader, current)
 }

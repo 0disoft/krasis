@@ -75,7 +75,8 @@ func TestSendInputsRejectsCanceledContextWithoutCallingWindows(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	err := sendInputs(ctx, []input{mouseEvent(mouseEventMove, 0, 1, 0)})
-	if !errors.Is(err, context.Canceled) || called {
+	certainty, classified := application.InjectionCertaintyOf(err)
+	if !errors.Is(err, context.Canceled) || !classified || certainty != application.InjectionNotApplied || called {
 		t.Fatalf("sendInputs() error=%v called=%t", err, called)
 	}
 }
@@ -90,8 +91,33 @@ func TestSendInputsRejectsPartialInjection(t *testing.T) {
 		mouseEvent(mouseEventWheel, 120, 0, 0),
 		mouseEvent(mouseEventHWheel, 120, 0, 0),
 	})
-	if !errors.Is(err, ErrInputInjection) {
+	certainty, classified := application.InjectionCertaintyOf(err)
+	if !errors.Is(err, ErrInputInjection) || !classified || certainty != application.InjectionPartiallyApplied {
 		t.Fatalf("sendInputs(partial) error = %v", err)
+	}
+}
+
+func TestSendInputsClassifiesZeroAndImpossibleCounts(t *testing.T) {
+	original := callSendInput
+	t.Cleanup(func() { callSendInput = original })
+	events := []input{mouseEvent(mouseEventMove, 0, 1, 0)}
+
+	callSendInput = func(uintptr, uintptr, uintptr) (uintptr, uintptr, error) {
+		return 0, 0, errors.New("blocked")
+	}
+	err := sendInputs(context.Background(), events)
+	certainty, classified := application.InjectionCertaintyOf(err)
+	if !classified || certainty != application.InjectionNotApplied {
+		t.Fatalf("zero insertion certainty = %q, classified=%t, error=%v", certainty, classified, err)
+	}
+
+	callSendInput = func(uintptr, uintptr, uintptr) (uintptr, uintptr, error) {
+		return 2, 0, errors.New("invalid count")
+	}
+	err = sendInputs(context.Background(), events)
+	certainty, classified = application.InjectionCertaintyOf(err)
+	if !classified || certainty != application.InjectionOutcomeUnknown {
+		t.Fatalf("impossible insertion certainty = %q, classified=%t, error=%v", certainty, classified, err)
 	}
 }
 

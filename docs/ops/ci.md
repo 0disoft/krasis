@@ -58,7 +58,8 @@ display message 정규화, 첫 event cancellation, monitor 비정상 종료, gua
 close-once 순서를 검증한다. hosted runner는 실제 Modern Standby, 잠금 화면과 display 재구성을
 발생시키지 않으므로 message 수신부터 실제 input cleanup까지의 end-to-end 증거는 장비 실험 범위다.
 
-crash guard protocol 테스트는 down 전 prepare ACK, up 후 release ACK, 역순 cleanup, malformed
+crash guard protocol 테스트는 down 전 prepare ACK, 중복 prepare 구분, 확실한 무주입의 cancel ACK,
+up 후 release ACK, 역순 cleanup, malformed
 frame과 release 실패를 검증한다. 별도 subprocess 테스트는 guard에 token을 준비한 parent
 test process의 readiness 신호를 받은 뒤 parent만 강제 종료하고, pipe EOF를 받은 guard가
 독립적으로 recovery marker를 기록하는지 bounded polling으로 확인한다. marker에는 test용

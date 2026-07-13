@@ -2,16 +2,96 @@ package labcli
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/lab"
 	"github.com/0disoft/krasis/internal/transport"
 	"github.com/0disoft/krasis/internal/truststore"
 )
+
+type certaintyInput struct {
+	pressErr   error
+	releaseErr error
+	returns    chan control.ReturnIntent
+}
+
+func (input *certaintyInput) Press(context.Context, control.PressedToken) error {
+	return input.pressErr
+}
+func (input *certaintyInput) Release(context.Context, control.PressedToken) error {
+	return input.releaseErr
+}
+func (*certaintyInput) Move(context.Context, int32, int32) error                 { return nil }
+func (*certaintyInput) Wheel(context.Context, int32, int32) error                { return nil }
+func (*certaintyInput) Enter(context.Context, control.ScreenEdge) error          { return nil }
+func (*certaintyInput) ArmReturn(control.ReturnIntent, control.ScreenEdge) error { return nil }
+func (*certaintyInput) RearmReturn(control.ReturnIntent)                         {}
+func (*certaintyInput) DisarmReturn(control.ReturnIntent)                        {}
+func (input *certaintyInput) ReturnIntents() <-chan control.ReturnIntent         { return input.returns }
+
+type certaintyGuard struct {
+	prepared bool
+	canceled []control.PressedToken
+	released []control.PressedToken
+}
+
+func (guard *certaintyGuard) PreparePress(control.PressedToken) (bool, error) {
+	return guard.prepared, nil
+}
+func (guard *certaintyGuard) CancelPreparedPress(token control.PressedToken) error {
+	guard.canceled = append(guard.canceled, token)
+	return nil
+}
+func (guard *certaintyGuard) Released(token control.PressedToken) error {
+	guard.released = append(guard.released, token)
+	return nil
+}
+
+func TestCountingInputCancelsOnlyNewConfirmedUnappliedPress(t *testing.T) {
+	token := control.PressedToken{Kind: control.PressedKeyboardKey, Code: 30}
+	for _, test := range []struct {
+		name      string
+		prepared  bool
+		certainty application.InjectionCertainty
+		canceled  int
+	}{
+		{name: "new unapplied", prepared: true, certainty: application.InjectionNotApplied, canceled: 1},
+		{name: "repeat unapplied", prepared: false, certainty: application.InjectionNotApplied, canceled: 0},
+		{name: "new partial", prepared: true, certainty: application.InjectionPartiallyApplied, canceled: 0},
+		{name: "new unknown", prepared: true, certainty: application.InjectionOutcomeUnknown, canceled: 0},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cause := errors.New("injection failed")
+			delegate := &certaintyInput{pressErr: &application.InjectionError{
+				Certainty: test.certainty, Requested: 1, Inserted: 0, Cause: cause,
+			}}
+			guard := &certaintyGuard{prepared: test.prepared}
+			err := newCountingInput(delegate, guard).Press(context.Background(), token)
+			if !errors.Is(err, cause) || len(guard.canceled) != test.canceled {
+				t.Fatalf("Press() error=%v canceled=%v", err, guard.canceled)
+			}
+		})
+	}
+}
+
+func TestCountingInputKeepsGuardRecordWhenReleaseFails(t *testing.T) {
+	token := control.PressedToken{Kind: control.PressedMouseButton, Code: 1}
+	cause := errors.New("release failed")
+	delegate := &certaintyInput{releaseErr: &application.InjectionError{
+		Certainty: application.InjectionNotApplied, Requested: 1, Inserted: 0, Cause: cause,
+	}}
+	guard := &certaintyGuard{prepared: true}
+	err := newCountingInput(delegate, guard).Release(context.Background(), token)
+	if !errors.Is(err, cause) || len(guard.released) != 0 {
+		t.Fatalf("Release() error=%v released=%v", err, guard.released)
+	}
+}
 
 func TestTrustStoreAuthorizerMapsActiveAndRevokedRecords(t *testing.T) {
 	now := time.Now().UTC()

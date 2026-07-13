@@ -66,6 +66,57 @@ func TestInjectPressRetainsRecoveryStateWhenAdapterFails(t *testing.T) {
 	}
 }
 
+func TestInjectPressRollsBackNewStateWhenInjectionWasNotApplied(t *testing.T) {
+	var state control.PressedState
+	port := &recordingInputPort{state: &state, pressErr: &InjectionError{
+		Certainty: InjectionNotApplied,
+		Requested: 1,
+		Inserted:  0,
+		Cause:     errEffectFailed,
+	}}
+	token := control.PressedToken{Kind: control.PressedKeyboardKey, Code: 65}
+
+	err := InjectPress(context.Background(), &state, port, token)
+	if !errors.Is(err, errEffectFailed) || state.Contains(token) {
+		t.Fatalf("unapplied press retained new recovery state: error=%v plan=%v", err, state.ReleasePlan())
+	}
+}
+
+func TestInjectPressDoesNotRollBackExistingStateForUnappliedRepeat(t *testing.T) {
+	var state control.PressedState
+	token := control.PressedToken{Kind: control.PressedKeyboardKey, Code: 65}
+	pressAll(t, &state, token)
+	port := &recordingInputPort{state: &state, pressErr: &InjectionError{
+		Certainty: InjectionNotApplied,
+		Requested: 1,
+		Inserted:  0,
+		Cause:     errEffectFailed,
+	}}
+
+	err := InjectPress(context.Background(), &state, port, token)
+	if !errors.Is(err, errEffectFailed) || !state.Contains(token) || state.Count() != 1 {
+		t.Fatalf("unapplied repeat lost existing recovery state: error=%v plan=%v", err, state.ReleasePlan())
+	}
+}
+
+func TestInjectPressRetainsStateForPartialOrUnknownOutcome(t *testing.T) {
+	for _, certainty := range []InjectionCertainty{InjectionPartiallyApplied, InjectionOutcomeUnknown} {
+		t.Run(string(certainty), func(t *testing.T) {
+			var state control.PressedState
+			port := &recordingInputPort{state: &state, pressErr: &InjectionError{
+				Certainty: certainty,
+				Requested: 2,
+				Inserted:  1,
+				Cause:     errEffectFailed,
+			}}
+			token := control.PressedToken{Kind: control.PressedMouseButton, Code: 1}
+			if err := InjectPress(context.Background(), &state, port, token); !errors.Is(err, errEffectFailed) || !state.Contains(token) {
+				t.Fatalf("ambiguous press lost recovery state: error=%v plan=%v", err, state.ReleasePlan())
+			}
+		})
+	}
+}
+
 func TestInjectPressForwardsRepeatWithoutDuplicatingState(t *testing.T) {
 	var state control.PressedState
 	port := &recordingInputPort{state: &state}

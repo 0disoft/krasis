@@ -82,11 +82,20 @@ func startCommand(command *exec.Cmd) (*Process, error) {
 	return process, nil
 }
 
-func (process *Process) PreparePress(token control.PressedToken) error {
+func (process *Process) PreparePress(token control.PressedToken) (bool, error) {
 	if process == nil || process.client == nil {
-		return errors.New("crash guard process is not initialized")
+		return false, errors.New("crash guard process is not initialized")
 	}
-	return process.invoke(func() error { return process.client.PreparePress(token) })
+	var prepared bool
+	err := process.invoke(func() error {
+		var err error
+		prepared, err = process.client.PreparePress(token)
+		return err
+	})
+	if err != nil {
+		return false, err
+	}
+	return prepared, nil
 }
 
 func (process *Process) Released(token control.PressedToken) error {
@@ -94,6 +103,13 @@ func (process *Process) Released(token control.PressedToken) error {
 		return errors.New("crash guard process is not initialized")
 	}
 	return process.invoke(func() error { return process.client.Released(token) })
+}
+
+func (process *Process) CancelPreparedPress(token control.PressedToken) error {
+	if process == nil || process.client == nil {
+		return errors.New("crash guard process is not initialized")
+	}
+	return process.invoke(func() error { return process.client.CancelPreparedPress(token) })
 }
 
 func (process *Process) Done() <-chan struct{} {

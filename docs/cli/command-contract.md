@@ -159,7 +159,7 @@ peer별 durable authorization record를 관리한다.
 - MVP대로 active monitor가 정확히 하나가 아니면 hook을 시작하지 않고 실패한다.
 - destination grant 전에는 source suppression을 활성화하지 않는다.
 - physical `Ctrl+Alt+Shift+F12`는 현재 active source session을 즉시 중단한다. F12 terminator는 원격 전송하거나 로컬에서 억제하지 않으며 supervisor는 긴급 해제 뒤 재연결하지 않는다.
-- 같은 executable의 별도 crash guard process가 destination down 전에 token을 ACK하고 성공한 up 뒤 제거한다. guard가 먼저 종료되거나 정상 종료에서 남은 token을 해제하지 못하면 session은 실패한다.
+- 같은 executable의 별도 crash guard process가 destination down 전에 token을 ACK하고 성공한 up 뒤 제거한다. protocol v2는 새 prepare와 기존 반복 token을 구분하며, 새 press가 `NOT_APPLIED`로 확정된 경우에만 주입 없는 cancel로 기록을 제거한다. partial·unknown 결과와 실패한 release는 기록을 유지한다. guard가 먼저 종료되거나 정상 종료에서 남은 token을 해제하지 못하면 session은 실패한다.
 - 숨겨진 Windows lifecycle monitor는 suspend/resume, session lock·disconnect·logoff, shutdown과
   display change를 terminal event로 처리한다. 기존 connection은 resume하지 않으며 source cleanup과
   crash guard disarm 뒤 새 실행에서만 diagnostics와 rearm을 다시 수행한다.

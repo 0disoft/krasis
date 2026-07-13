@@ -126,9 +126,10 @@ type processOwnerGuard struct {
 func newProcessOwnerGuard() *processOwnerGuard {
 	return &processOwnerGuard{done: make(chan struct{})}
 }
-func (*processOwnerGuard) PreparePress(control.PressedToken) error { return nil }
-func (*processOwnerGuard) Released(control.PressedToken) error     { return nil }
-func (guard *processOwnerGuard) Done() <-chan struct{}             { return guard.done }
+func (*processOwnerGuard) PreparePress(control.PressedToken) (bool, error) { return true, nil }
+func (*processOwnerGuard) CancelPreparedPress(control.PressedToken) error  { return nil }
+func (*processOwnerGuard) Released(control.PressedToken) error             { return nil }
+func (guard *processOwnerGuard) Done() <-chan struct{}                     { return guard.done }
 func (guard *processOwnerGuard) Close() error {
 	guard.closeCalls++
 	if guard.close != nil {

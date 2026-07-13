@@ -15,6 +15,7 @@ import (
 
 	"github.com/0disoft/krasis/internal/agent"
 	"github.com/0disoft/krasis/internal/agentlifecycle"
+	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/buildinfo"
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/crashguard"
@@ -460,25 +461,36 @@ func writeAgentSessionUsage(output io.Writer) {
 }
 
 type countingInput struct {
-	delegate *wininput.InputAdapter
-	guard    inputGuard
-	mu       sync.Mutex
-	value    lab.InputEvidence
+	delegate    agent.InputBoundaryPort
+	guard       inputGuard
+	operationMu sync.Mutex
+	mu          sync.Mutex
+	value       lab.InputEvidence
 }
 
 type inputGuard interface {
-	PreparePress(control.PressedToken) error
+	PreparePress(control.PressedToken) (bool, error)
+	CancelPreparedPress(control.PressedToken) error
 	Released(control.PressedToken) error
 }
 
-func newCountingInput(delegate *wininput.InputAdapter, guard inputGuard) *countingInput {
+func newCountingInput(delegate agent.InputBoundaryPort, guard inputGuard) *countingInput {
 	return &countingInput{delegate: delegate, guard: guard}
 }
 func (input *countingInput) Press(ctx context.Context, token control.PressedToken) error {
-	if err := input.guard.PreparePress(token); err != nil {
+	input.operationMu.Lock()
+	defer input.operationMu.Unlock()
+	prepared, err := input.guard.PreparePress(token)
+	if err != nil {
 		return fmt.Errorf("prepare crash recovery: %w", err)
 	}
 	if err := input.delegate.Press(ctx, token); err != nil {
+		certainty, classified := application.InjectionCertaintyOf(err)
+		if prepared && classified && certainty == application.InjectionNotApplied {
+			if cancelErr := input.guard.CancelPreparedPress(token); cancelErr != nil {
+				return errors.Join(err, fmt.Errorf("cancel unapplied crash recovery press: %w", cancelErr))
+			}
+		}
 		return err
 	}
 	input.mu.Lock()
@@ -491,6 +503,8 @@ func (input *countingInput) Press(ctx context.Context, token control.PressedToke
 	return nil
 }
 func (input *countingInput) Release(ctx context.Context, token control.PressedToken) error {
+	input.operationMu.Lock()
+	defer input.operationMu.Unlock()
 	if err := input.delegate.Release(ctx, token); err != nil {
 		return err
 	}
