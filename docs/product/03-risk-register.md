@@ -28,7 +28,7 @@
 | High | 관리자 앱 또는 보안 화면 기대가 어긋남 | 일부 창에서 입력 불가 | 권한 수준별 테스트 | MVP 제한을 UI와 문서에 명시 |
 | Medium | Wails v3 prerelease 변화로 UI 빌드가 깨짐 | 설치물 재현 불가 | exact toolchain 재현 | 호환 세트 고정, UI를 core에서 격리 |
 | Medium | 진단 로그가 사용자 입력을 노출 | 개인정보 유출 | 지원 번들 검토 | allowlist 로그와 민감값 redaction |
-| High | Phase 0 in-memory allowlist가 재시작 뒤 사용자 신뢰 상태를 보존하지 않음 | 새 credential bundle 배포를 수동으로 잘못하거나 폐기 상태를 잃음 | fingerprint·role·permission·revocation 테스트와 향후 persistence migration 테스트 | `peer.pem` 기반 immutable grant는 구현됨; 사용자 승인 trust store를 Phase 2에서 도입 |
+| High | 제품 trust store 경로와 pairing UI가 없어 Phase 0 store를 수동 관리함 | 잘못된 store directory나 alias를 선택하고 key rotation을 놓침 | import/list/revoke, 손상·중복·lock·DACL과 향후 migration 테스트 | atomic `krasis.trust-store/v1`과 immutable runtime snapshot은 구현됨; 제품 default 경로·사용자 승인·rotation UX는 Phase 2 후속 |
 | High | press 주입 전 실패와 주입 여부 불명 실패를 구분하지 못함 | 유령 token 또는 실제 held input 누락 | guard 거절·IPC 단절·부분 주입 failure-injection 테스트 | prepare/inject/commit과 certainty 모델 설계 전 단순 rollback 금지 |
 | Medium | lease grant 실패 뒤 destination cursor 위치가 복원되지 않음 | 제어권은 없는데 destination cursor만 화면 끝으로 이동함 | entry 성공 뒤 runtime/write 실패 테스트 | cursor snapshot/rollback 또는 ready/commit handshake 설계 |
 | Medium | 복사된 Windows private key가 넓은 ACL이나 reparse path에 놓임 | 다른 로컬 계정이 key를 읽거나 교체함 | inherited DACL·non-regular key·역할별 복사 후 재보호 테스트 | 생성·명시적 재보호 시 현재 사용자와 `SYSTEM` 전용 protected DACL 강제, load-time DACL·reparse 검증 구현됨; 이미 노출된 key는 폐기 |

@@ -2,4 +2,4 @@ package peercredentials
 
 import "errors"
 
-var ErrInsecurePrivateKey = errors.New("private key security policy is not satisfied")
+var ErrInsecurePrivateKey = errors.New("security file policy is not satisfied")

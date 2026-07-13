@@ -22,6 +22,7 @@ import (
 	"github.com/0disoft/krasis/internal/peer"
 	"github.com/0disoft/krasis/internal/peercredentials"
 	"github.com/0disoft/krasis/internal/transport"
+	"github.com/0disoft/krasis/internal/truststore"
 	"github.com/0disoft/krasis/internal/wininput"
 )
 
@@ -35,7 +36,7 @@ type agentSessionArgs struct {
 	ca            string
 	cert          string
 	key           string
-	peerCert      string
+	trustStore    string
 	edge          control.ScreenEdge
 	duration      time.Duration
 	heartbeat     time.Duration
@@ -118,15 +119,19 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 		report.StopReason = "failure"
 		return finish(exitRuntime)
 	}
-	trustedPeer, err := peercredentials.LoadTrustedPeer(options.peerCert)
+	store, err := truststore.New(options.trustStore)
 	if err != nil {
-		report.FailureCode = "trusted_peer_load_failed"
+		report.FailureCode = "trust_store_load_failed"
 		report.StopReason = "failure"
 		return finish(exitRuntime)
 	}
-	authorizer, err := agent.NewTrustedPeerAuthorizer([]agent.TrustedPeerGrant{{
-		Peer: trustedPeer, AllowInboundControl: true,
-	}})
+	document, err := store.List()
+	if err != nil {
+		report.FailureCode = "trust_store_load_failed"
+		report.StopReason = "failure"
+		return finish(exitRuntime)
+	}
+	authorizer, err := newTrustStoreAuthorizer(document)
 	if err != nil {
 		report.FailureCode = "trust_policy_failed"
 		report.StopReason = "failure"
@@ -231,6 +236,21 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 	}
 }
 
+func newTrustStoreAuthorizer(document truststore.Document) (*agent.TrustedPeerAuthorizer, error) {
+	grants := make([]agent.TrustedPeerGrant, 0, len(document.Peers))
+	for _, record := range document.Peers {
+		grants = append(grants, agent.TrustedPeerGrant{
+			Peer: transport.AuthenticatedPeerContext{
+				CertificateSHA256: record.Fingerprint,
+				Role:              record.Role,
+			},
+			AllowInboundControl: record.AllowInboundControl,
+			Revoked:             record.RevokedAt != nil,
+		})
+	}
+	return agent.NewTrustedPeerAuthorizer(grants)
+}
+
 func resolveAgentSessionOutputPaths(report, guard string) (string, string, error) {
 	reportPath, err := filepath.Abs(report)
 	if err != nil {
@@ -279,7 +299,7 @@ func parseAgentSessionArgs(args []string) (agentSessionArgs, error) {
 	values := map[string]*string{
 		"--device": &parsed.device, "--address": &parsed.address, "--server-name": &parsed.serverName,
 		"--ca": &parsed.ca, "--cert": &parsed.cert, "--key": &parsed.key, "--output": &parsed.output,
-		"--peer-cert":    &parsed.peerCert,
+		"--trust-store":  &parsed.trustStore,
 		"--guard-output": &parsed.guardOutput,
 	}
 	var edgeValue, durationValue, heartbeatValue, peerTimeoutValue, rearmValue string
@@ -320,7 +340,7 @@ func parseAgentSessionArgs(args []string) (agentSessionArgs, error) {
 	if !lab.ValidProbeDeviceAlias(parsed.device) {
 		return agentSessionArgs{}, fmt.Errorf("unsupported device alias %q", parsed.device)
 	}
-	if parsed.address == "" || parsed.ca == "" || parsed.cert == "" || parsed.key == "" || parsed.peerCert == "" || parsed.output == "" || parsed.guardOutput == "" || edgeValue == "" || durationValue == "" || heartbeatValue == "" || peerTimeoutValue == "" {
+	if parsed.address == "" || parsed.ca == "" || parsed.cert == "" || parsed.key == "" || parsed.trustStore == "" || parsed.output == "" || parsed.guardOutput == "" || edgeValue == "" || durationValue == "" || heartbeatValue == "" || peerTimeoutValue == "" {
 		return agentSessionArgs{}, errors.New("device, address, credentials, edge, duration, heartbeat interval, peer timeout, and output are required")
 	}
 	parsed.edge = control.ScreenEdge(strings.ToUpper(edgeValue))
@@ -392,7 +412,7 @@ func newAgentSessionConfig(options agentSessionArgs, screenLeft, screenWidth int
 }
 
 func writeAgentSessionUsage(output io.Writer) {
-	fmt.Fprintln(output, "usage: krasis-lab agent-session listen|connect --device ALIAS --address ADDRESS [--server-name NAME] --ca CA.pem --cert CERT.pem --key KEY.pem --peer-cert PEER.pem --edge LEFT|RIGHT --duration DURATION --heartbeat-interval DURATION --peer-timeout DURATION --output REPORT.json --guard-output GUARD.json [--rearm-distance PIXELS] --allow-live-input")
+	fmt.Fprintln(output, "usage: krasis-lab agent-session listen|connect --device ALIAS --address ADDRESS [--server-name NAME] --ca CA.pem --cert CERT.pem --key KEY.pem --trust-store DIRECTORY --edge LEFT|RIGHT --duration DURATION --heartbeat-interval DURATION --peer-timeout DURATION --output REPORT.json --guard-output GUARD.json [--rearm-distance PIXELS] --allow-live-input")
 }
 
 type countingInput struct {

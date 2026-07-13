@@ -60,24 +60,55 @@ var (
 )
 
 func ProtectPrivateKeyDirectory(directory string) error {
-	absolute, err := validatePrivateKeyDirectory(directory)
+	absolute, err := ProtectSecurityDirectory(directory)
 	if err != nil {
 		return err
 	}
-	if err := applyCurrentUserDACL(absolute, true); err != nil {
-		return fmt.Errorf("protect credential directory: %w", err)
-	}
 	keyPath := filepath.Join(absolute, "identity-key.pem")
-	if _, err := validateRegularPathWithoutReparse(keyPath); err != nil {
-		return err
-	}
-	if err := applyCurrentUserDACL(keyPath, false); err != nil {
-		return fmt.Errorf("protect private key: %w", err)
-	}
-	return ValidatePrivateKeySecurity(keyPath)
+	return ProtectSecurityFile(keyPath)
 }
 
 func ValidatePrivateKeySecurity(path string) error {
+	return ValidateSecurityFile(path)
+}
+
+func ProtectSecurityDirectory(directory string) (string, error) {
+	absolute, err := validatePrivateKeyDirectory(directory)
+	if err != nil {
+		return "", err
+	}
+	if err := applyCurrentUserDACL(absolute, true); err != nil {
+		return "", fmt.Errorf("protect security directory: %w", err)
+	}
+	if err := validateExactCurrentUserDACL(absolute, objectInheritACE|containerInheritACE); err != nil {
+		return "", fmt.Errorf("%w: security directory: %v", ErrInsecurePrivateKey, err)
+	}
+	return absolute, nil
+}
+
+func ValidateSecurityDirectory(directory string) (string, error) {
+	absolute, err := validatePrivateKeyDirectory(directory)
+	if err != nil {
+		return "", err
+	}
+	if err := validateExactCurrentUserDACL(absolute, objectInheritACE|containerInheritACE); err != nil {
+		return "", fmt.Errorf("%w: security directory: %v", ErrInsecurePrivateKey, err)
+	}
+	return absolute, nil
+}
+
+func ProtectSecurityFile(path string) error {
+	absolute, err := validateRegularPathWithoutReparse(path)
+	if err != nil {
+		return err
+	}
+	if err := applyCurrentUserDACL(absolute, false); err != nil {
+		return fmt.Errorf("protect security file: %w", err)
+	}
+	return ValidateSecurityFile(absolute)
+}
+
+func ValidateSecurityFile(path string) error {
 	absolute, err := validateRegularPathWithoutReparse(path)
 	if err != nil {
 		return err
@@ -114,21 +145,21 @@ func validatePrivateKeyDirectory(directory string) (string, error) {
 
 func validateRegularPathWithoutReparse(path string) (string, error) {
 	if path == "" {
-		return "", errors.New("private key path is required")
+		return "", errors.New("security file path is required")
 	}
 	absolute, err := filepath.Abs(path)
 	if err != nil {
-		return "", fmt.Errorf("resolve private key path: %w", err)
+		return "", fmt.Errorf("resolve security file path: %w", err)
 	}
 	if err := rejectReparseComponents(absolute); err != nil {
 		return "", err
 	}
 	info, err := os.Lstat(absolute)
 	if err != nil {
-		return "", fmt.Errorf("inspect private key: %w", err)
+		return "", fmt.Errorf("inspect security file: %w", err)
 	}
 	if !info.Mode().IsRegular() {
-		return "", errors.New("private key must be a regular file")
+		return "", errors.New("security file must be a regular file")
 	}
 	return absolute, nil
 }

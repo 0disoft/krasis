@@ -132,16 +132,29 @@
 - 성공하면 directory에는 자식 상속이 있는 protected DACL을, private key에는 상속 없는 protected DACL을 적용한다. 둘 다 현재 사용자와 `SYSTEM`만 허용한다.
 - 이 명령은 이미 노출됐을 수 있는 key를 다시 안전하게 만들었다고 보증하지 않는다. 신뢰할 수 없는 위치나 계정을 거친 key는 폐기하고 bundle을 다시 생성한다.
 
+### `trust`
+
+peer별 durable authorization record를 관리한다.
+
+- import: `krasis-lab trust import --store DIRECTORY --peer-cert PEER.pem --alias NAME --allow-inbound-control`
+- list: `krasis-lab trust list --store DIRECTORY [--json]`
+- revoke: `krasis-lab trust revoke --store DIRECTORY --fingerprint SHA256`
+- `DIRECTORY`는 `trust.json`과 `.trust.lock` 전용이고 현재 사용자와 `SYSTEM` 전용 protected DACL인 부모 아래 있어야 한다. Phase 0에서는 `peer-credentials-protect`를 마친 역할 directory 아래 `trust/`를 사용한다.
+- import는 certificate fingerprint와 EKU 역할만 저장하며 certificate body와 private key를 복제하지 않는다. inbound capability flag를 명시하지 않은 import는 거부한다.
+- fingerprint 중복, 폐기 record 재등록, 존재하지 않는 fingerprint 폐기와 repeated revoke는 거부한다.
+- list는 명시적인 관리 명령이므로 fingerprint를 출력한다. report와 일반 진단 log에는 복제하지 않는다.
+- mutation은 non-blocking process lock과 revision increment, flush 뒤 atomic replace를 사용한다. lock contention, 손상, unknown field, trailing JSON, schema·DACL 불일치는 fail-closed한다.
+
 ### `agent-session`
 
 두 Windows 장비에서 실제 low-level hook, 경계 억제, mTLS peer session과 `SendInput` destination adapter를 bounded하게 실행하는 Phase 0 실험 명령이다.
 
-- 사용법: `krasis-lab agent-session listen|connect --device ALIAS --address ADDRESS [--server-name NAME] --ca CA.pem --cert CERT.pem --key KEY.pem --peer-cert PEER.pem --edge LEFT|RIGHT --duration DURATION --heartbeat-interval DURATION --peer-timeout DURATION --output REPORT.json --guard-output GUARD.json [--rearm-distance PIXELS] --allow-live-input`
+- 사용법: `krasis-lab agent-session listen|connect --device ALIAS --address ADDRESS [--server-name NAME] --ca CA.pem --cert CERT.pem --key KEY.pem --trust-store DIRECTORY --edge LEFT|RIGHT --duration DURATION --heartbeat-interval DURATION --peer-timeout DURATION --output REPORT.json --guard-output GUARD.json [--rearm-distance PIXELS] --allow-live-input`
 - `--allow-live-input`이 없으면 실행하지 않는다. 이 flag는 실제 keyboard/mouse event를 억제·전달·주입한다는 명시적 확인이다.
 - `--duration`은 필수이며 1ms 이상의 정수 millisecond로 왕복 가능해야 한다. 무기한 실행을 허용하지 않는다.
 - `--heartbeat-interval`과 `--peer-timeout`도 1ms 이상의 정수 millisecond이고 timeout이 interval보다 길어야 한다. 제품 기본값은 없으며 같은 Phase 0 evidence set의 네 report에 동일한 실험값을 명시한다.
 - listener와 connector는 `peer-credentials`가 만든 역할별 identity만 사용한다.
-- `--peer-cert`는 같은 역할 directory의 `peer.pem`이어야 한다. TLS가 제시한 peer fingerprint와 역할이 이 공개 인증서에서 만든 immutable in-memory trust grant와 일치하지 않거나 grant가 revoked/권한 없음이면 lease를 거부한다.
+- `--trust-store`는 먼저 `trust import`로 만든 전용 directory다. 시작 시 strict snapshot을 읽으며 TLS peer fingerprint·역할이 record와 다르거나 record가 revoked/권한 없음이면 lease를 거부한다. 실행 중 file 변경은 다음 실행 전까지 적용하지 않는다.
 - `--edge`는 이 장비에서 상대 장비로 넘어가는 화면 끝이다. 왼쪽 노트북은 일반적으로 `RIGHT`, 오른쪽 노트북은 `LEFT`다.
 - MVP대로 active monitor가 정확히 하나가 아니면 hook을 시작하지 않고 실패한다.
 - destination grant 전에는 source suppression을 활성화하지 않는다.

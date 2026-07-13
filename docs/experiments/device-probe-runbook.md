@@ -71,6 +71,17 @@ $reports = @(Get-ChildItem -LiteralPath .\reports -Filter '*-basic-*.json' -File
 
 connector 노트북에서는 경로를 `.\secrets\connector`로 바꾼다. reparse point나 공유·동기화 directory를 쓰지 않는다. 보호 전에 신뢰할 수 없는 사용자나 위치에 노출된 key는 이 명령으로 재사용하지 말고 폐기 후 다시 생성한다.
 
+각 대상 노트북에서 자신의 `peer.pem`을 local trust store에 한 번 import한다. alias는 상대 노트북을 구분할 표시 이름이다.
+
+```powershell
+.\krasis-lab.exe trust import --store .\secrets\listener\trust --peer-cert .\secrets\listener\peer.pem --alias H-B --allow-inbound-control
+.\krasis-lab.exe trust list --store .\secrets\listener\trust
+```
+
+connector 노트북에서는 `listener`를 `connector`로, alias를 `H-A`로 바꾼다. fingerprint와 역할을
+확인하지 못했거나 잘못 import했다면 store file을 손으로 편집하지 말고 해당 fingerprint를
+`trust revoke`한 뒤 새 credential bundle로 다시 시작한다.
+
 listener에서 먼저 실행한다.
 
 ```powershell
@@ -94,7 +105,7 @@ listener 예시:
 ```powershell
 $HeartbeatInterval = Read-Host 'heartbeat interval'
 $PeerTimeout = Read-Host 'peer timeout (must be longer)'
-.\krasis-lab.exe agent-session listen --device H-A --address 0.0.0.0:24876 --ca .\secrets\listener\ca.pem --cert .\secrets\listener\identity.pem --key .\secrets\listener\identity-key.pem --peer-cert .\secrets\listener\peer.pem --edge RIGHT --duration 2m --heartbeat-interval $HeartbeatInterval --peer-timeout $PeerTimeout --output .\reports\H-A-agent.json --guard-output .\reports\H-A-guard.json --allow-live-input
+.\krasis-lab.exe agent-session listen --device H-A --address 0.0.0.0:24876 --ca .\secrets\listener\ca.pem --cert .\secrets\listener\identity.pem --key .\secrets\listener\identity-key.pem --trust-store .\secrets\listener\trust --edge RIGHT --duration 2m --heartbeat-interval $HeartbeatInterval --peer-timeout $PeerTimeout --output .\reports\H-A-agent.json --guard-output .\reports\H-A-guard.json --allow-live-input
 ```
 
 connector 예시:
@@ -102,7 +113,7 @@ connector 예시:
 ```powershell
 $HeartbeatInterval = Read-Host 'same heartbeat interval used by the listener'
 $PeerTimeout = Read-Host 'same peer timeout used by the listener'
-.\krasis-lab.exe agent-session connect --device H-B --address 192.0.2.10:24876 --server-name 192.0.2.10 --ca .\secrets\connector\ca.pem --cert .\secrets\connector\identity.pem --key .\secrets\connector\identity-key.pem --peer-cert .\secrets\connector\peer.pem --edge LEFT --duration 2m --heartbeat-interval $HeartbeatInterval --peer-timeout $PeerTimeout --output .\reports\H-B-agent.json --guard-output .\reports\H-B-guard.json --allow-live-input
+.\krasis-lab.exe agent-session connect --device H-B --address 192.0.2.10:24876 --server-name 192.0.2.10 --ca .\secrets\connector\ca.pem --cert .\secrets\connector\identity.pem --key .\secrets\connector\identity-key.pem --trust-store .\secrets\connector\trust --edge LEFT --duration 2m --heartbeat-interval $HeartbeatInterval --peer-timeout $PeerTimeout --output .\reports\H-B-agent.json --guard-output .\reports\H-B-guard.json --allow-live-input
 ```
 
 두 값은 제품 기본값이 아니라 이번 evidence set의 실험 입력이다. 집과 스터디카페 실행에서

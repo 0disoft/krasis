@@ -174,6 +174,7 @@ manifest 허용 필드:
 
 - `createdAt`, `expiresAt`, `serverName`
 - `listenerDirectory`, `connectorDirectory`
+- `listenerPeerCertificate`, `connectorPeerCertificate`
 
 private key나 certificate body는 manifest와 stdout에 출력하지 않는다. output directory가 이미 있거나 server name이 잘못됐거나 credential 생성이 실패하면 exit `1`이며, 새로 만들던 불완전 directory는 제거한다.
 
@@ -184,6 +185,19 @@ private key나 certificate body는 manifest와 stdout에 출력하지 않는다.
 - reparse point, non-regular private key, DACL 적용 또는 검증 실패: exit `1`
 
 stdout과 stderr에는 private key, certificate body, SID 또는 DACL 전문을 출력하지 않는다.
+
+## `trust`
+
+- schema: `trust.json`의 `krasis.trust-store/v1`
+- import 성공: exit `0`, alias, 역할, fingerprint와 inbound capability
+- list 성공: exit `0`, text는 revision·updated time·peer record; `--json`은 strict store document
+- revoke 성공: exit `0`, 폐기한 alias와 fingerprint
+- 잘못된 인자: exit `2`
+- store 없음·손상·schema 불일치·DACL 불일치·lock contention·중복 import·unknown fingerprint·repeated revoke: exit `1`
+
+store record 필드는 `fingerprint`, `role`, `alias`, `allowInboundControl`, `createdAt`, 선택적
+`revokedAt`이다. root는 `schemaVersion`, 단조 증가 `revision`, `updatedAt`, `peers`를 가진다.
+certificate body, private key, 주소와 operational session 식별자는 저장하거나 출력하지 않는다.
 
 ## `agent-session`
 
@@ -205,6 +219,8 @@ stable failure code:
 - `diagnose_failed`
 - `multiple_monitors_unsupported`
 - `credential_load_failed`
+- `trust_store_load_failed`
+- `trust_policy_failed`
 - `tls_config_failed`
 - `listen_failed`
 - `dial_config_failed`

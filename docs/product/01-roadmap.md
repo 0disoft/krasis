@@ -25,9 +25,10 @@
 
 ### Phase 2: 기기 신원과 페어링
 
-- 로컬 기기 신원과 신뢰 peer 저장
+- fingerprint·역할·capability·revocation의 atomic local trust store와 CLI는 구현됨
+- 정식 local device identity와 제품 default trust store 경로
 - 사용자 확인이 포함된 페어링
-- 신뢰 폐기와 키 교체 경로
+- key rotation과 alias·권한 변경 경로
 
 ### Phase 3: 전송과 제어권
 

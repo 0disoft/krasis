@@ -14,6 +14,10 @@
 - `DisplayGeometry`: 활성 디스플레이와 경계 배치
 - `PeerConfig`: 사용자 설정과 연결 정책
 
+`TrustedPeer`의 durable 표현은 `krasis.trust-store/v1` document의 record다. fingerprint와 인증서
+역할은 identity, alias는 표시용 이름, `allowInboundControl`은 명시적 capability, `revokedAt`은
+삭제하지 않는 폐기 증거다. 폐기 record를 같은 fingerprint import로 부활시키지 않는다.
+
 ## 상태
 
 최소 상태 집합은 `LOCAL`, `PENDING`, `OUTBOUND_ACTIVE`, `INBOUND_ACTIVE`, `REVOKING`, `FAULT`다. 세부 상태 추가는 모델 테스트에서 구분 필요성이 증명될 때만 한다.

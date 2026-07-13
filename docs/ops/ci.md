@@ -49,7 +49,7 @@ snapshot을 `STOPPED`로 기록해야 한다. acquire error와 함께 반환된 
 닫히는지 검증한다. session과 supervisor의 중복 Close는 실제 transport에 한 번만 전달되고,
 connection 또는 source Close 실패는 원래 session·shutdown 오류와 함께 반환되어야 한다.
 network source 테스트는 listener의 첫 Close 오류 보존과 TLS 인증 실패 뒤 raw socket의 close
-오류 결합을 검증한다. 통합 테스트는 `peer-credentials`가 만든 역할 분리 identity로 실제 localhost listener/dial을 열고 양쪽 `PeerConnection`의 mTLS와 ALPN 인증을 통과시킨다.
+오류 결합을 검증한다. 통합 테스트는 `peer-credentials`가 만든 역할 분리 identity로 실제 localhost listener/dial을 열고 양쪽 `PeerConnection`의 mTLS와 ALPN 인증을 통과시킨다. trust store 테스트는 import/list/revoke persistence, corrupt·unknown·trailing·oversized JSON 거부, duplicate와 repeated revoke, permissive directory, process lock contention, atomic replace revision과 temporary cleanup을 검증한다.
 
 emergency release 테스트는 modifier press/release, left/right modifier variant, F12 terminator 비전달, source suppression 해제와 worker fault cleanup을 검증한다. `agent-session` parser와 evidence gate 테스트는 explicit live-input acknowledgement, bounded duration, 인증 session 부재와 destination input 부재를 성공으로 가장하지 않는지 확인한다. CI에서는 실제 hook suppression과 `SendInput` 상호작용을 실행하지 않는다.
 

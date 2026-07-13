@@ -1,13 +1,46 @@
 package labcli
 
 import (
+	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/lab"
+	"github.com/0disoft/krasis/internal/transport"
+	"github.com/0disoft/krasis/internal/truststore"
 )
+
+func TestTrustStoreAuthorizerMapsActiveAndRevokedRecords(t *testing.T) {
+	now := time.Now().UTC()
+	peer := transport.AuthenticatedPeerContext{
+		CertificateSHA256: strings.Repeat("a", 64), Role: transport.AuthenticatedPeerConnector,
+	}
+	document := truststore.Document{
+		SchemaVersion: truststore.SchemaVersion, Revision: 1, UpdatedAt: now,
+		Peers: []truststore.PeerRecord{{
+			Fingerprint: peer.CertificateSHA256, Role: peer.Role, Alias: "peer",
+			AllowInboundControl: true, CreatedAt: now,
+		}},
+	}
+	authorizer, err := newTrustStoreAuthorizer(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, accepted, err := authorizer.AuthorizeLease(context.Background(), peer, "session", "epoch", now); err != nil || !accepted {
+		t.Fatalf("active authorization accepted=%t error=%v", accepted, err)
+	}
+	document.Peers[0].RevokedAt = &now
+	authorizer, err = newTrustStoreAuthorizer(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, accepted, err := authorizer.AuthorizeLease(context.Background(), peer, "session", "epoch", now); err != nil || accepted {
+		t.Fatalf("revoked authorization accepted=%t error=%v", accepted, err)
+	}
+}
 
 func TestResolveAgentSessionOutputPathsRequiresSameDirectory(t *testing.T) {
 	first := filepath.Join(t.TempDir(), "agent.json")
@@ -25,7 +58,7 @@ func TestParseAgentSessionConnectArgs(t *testing.T) {
 	options, err := parseAgentSessionArgs([]string{
 		"connect", "--device", "H-B", "--address", "192.0.2.10:24876", "--server-name", "192.0.2.10",
 		"--ca", "ca.pem", "--cert", "identity.pem", "--key", "identity-key.pem",
-		"--peer-cert", "peer.pem",
+		"--trust-store", "trust",
 		"--edge", "left", "--duration", "2m", "--heartbeat-interval", "500ms", "--peer-timeout", "3s",
 		"--output", "report.json", "--guard-output", "guard.json", "--allow-live-input",
 	})
@@ -41,7 +74,7 @@ func TestParseAgentSessionRequiresValidExplicitLivenessPolicy(t *testing.T) {
 	base := []string{
 		"listen", "--device", "H-A", "--address", ":24876", "--ca", "ca.pem",
 		"--cert", "identity.pem", "--key", "identity-key.pem", "--edge", "RIGHT",
-		"--peer-cert", "peer.pem",
+		"--trust-store", "trust",
 		"--duration", "1m", "--output", "report.json", "--guard-output", "guard.json", "--allow-live-input",
 	}
 	if _, err := parseAgentSessionArgs(base); err == nil {
@@ -59,7 +92,7 @@ func TestParseAgentSessionRejectsDurationThatCannotRoundTripThroughEvidence(t *t
 		args := []string{
 			"listen", "--device", "H-A", "--address", ":24876", "--ca", "ca.pem",
 			"--cert", "identity.pem", "--key", "identity-key.pem", "--edge", "RIGHT",
-			"--peer-cert", "peer.pem",
+			"--trust-store", "trust",
 			"--duration", "1m", "--heartbeat-interval", "500ms", "--peer-timeout", "3s",
 			"--output", "report.json", "--guard-output", "guard.json", "--allow-live-input",
 		}
@@ -97,7 +130,7 @@ func TestParseAgentSessionRequiresLiveInputAcknowledgement(t *testing.T) {
 	_, err := parseAgentSessionArgs([]string{
 		"listen", "--device", "H-A", "--address", ":24876", "--ca", "ca.pem",
 		"--cert", "identity.pem", "--key", "identity-key.pem", "--edge", "RIGHT",
-		"--peer-cert", "peer.pem",
+		"--trust-store", "trust",
 		"--duration", "1m", "--heartbeat-interval", "500ms", "--peer-timeout", "3s",
 		"--output", "report.json", "--guard-output", "guard.json",
 	})

@@ -1,0 +1,194 @@
+package truststore
+
+import (
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/0disoft/krasis/internal/peercredentials"
+	"github.com/0disoft/krasis/internal/transport"
+)
+
+func TestStoreImportListRevokeAndPersist(t *testing.T) {
+	parent := protectedParent(t)
+	directory := filepath.Join(parent, "trust")
+	store, err := New(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	peer := testPeer()
+	createdAt := time.Date(2026, time.July, 13, 1, 2, 3, 0, time.UTC)
+	record, err := store.Import(peer, "집 노트북", true, createdAt)
+	if err != nil {
+		t.Fatalf("Import() error = %v", err)
+	}
+	if record.Fingerprint != peer.CertificateSHA256 || !record.AllowInboundControl {
+		t.Fatalf("record = %+v", record)
+	}
+	document, err := store.List()
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+	if document.SchemaVersion != SchemaVersion || document.Revision != 1 || len(document.Peers) != 1 {
+		t.Fatalf("document = %+v", document)
+	}
+	revokedAt := createdAt.Add(time.Hour)
+	revoked, err := store.Revoke(peer.CertificateSHA256, revokedAt)
+	if err != nil {
+		t.Fatalf("Revoke() error = %v", err)
+	}
+	if revoked.RevokedAt == nil || !revoked.RevokedAt.Equal(revokedAt) {
+		t.Fatalf("revoked = %+v", revoked)
+	}
+	reopened, err := New(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	document, err = reopened.List()
+	if err != nil {
+		t.Fatalf("reopened List() error = %v", err)
+	}
+	if document.Revision != 2 || document.Peers[0].RevokedAt == nil {
+		t.Fatalf("reopened document = %+v", document)
+	}
+	entries, err := os.ReadDir(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), ".trust-") && entry.Name() != lockFilename {
+			t.Fatalf("temporary file remained: %s", entry.Name())
+		}
+	}
+}
+
+func TestStoreRejectsDuplicateAndRepeatedRevocation(t *testing.T) {
+	store := mustStore(t)
+	peer := testPeer()
+	now := time.Now().UTC()
+	if _, err := store.Import(peer, "peer", true, now); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Import(peer, "peer again", true, now.Add(time.Second)); !errors.Is(err, ErrPeerExists) {
+		t.Fatalf("duplicate import error = %v", err)
+	}
+	if _, err := store.Revoke(peer.CertificateSHA256, now.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Revoke(peer.CertificateSHA256, now.Add(2*time.Minute)); !errors.Is(err, ErrPeerRevoked) {
+		t.Fatalf("repeated revoke error = %v", err)
+	}
+}
+
+func TestStoreRejectsCorruptOrUnknownJSONWithoutFallback(t *testing.T) {
+	store := mustStore(t)
+	if _, err := store.Import(testPeer(), "peer", true, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(store.directory, storeFilename)
+	for _, payload := range []string{
+		`{"schemaVersion":"krasis.trust-store/v1","revision":1,"updatedAt":"2026-07-13T00:00:00Z","peers":[],"unknown":true}`,
+		`{"schemaVersion":`,
+		`{"schemaVersion":"krasis.trust-store/v1","revision":1,"updatedAt":"2026-07-13T00:00:00Z","peers":[]} {}`,
+		strings.Repeat(" ", maxStoreBytes+1),
+	} {
+		if err := os.WriteFile(path, []byte(payload), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := store.List(); err == nil {
+			t.Fatalf("List() accepted payload %q", payload)
+		}
+	}
+}
+
+func TestStoreRejectsExistingInsecureDirectory(t *testing.T) {
+	directory := filepath.Join(protectedParent(t), "trust")
+	if err := os.Mkdir(directory, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	store, err := New(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Import(testPeer(), "peer", true, time.Now().UTC()); err == nil {
+		t.Fatal("Import() accepted an insecure existing directory")
+	}
+}
+
+func TestStoreRejectsConcurrentMutationLock(t *testing.T) {
+	store := mustStore(t)
+	if _, err := store.Import(testPeer(), "peer", true, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	lock, _, err := openLockFile(filepath.Join(store.directory, lockFilename))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lock.Close()
+	unlock, err := acquireFileLock(lock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unlock()
+	if _, err := store.List(); !errors.Is(err, ErrStoreBusy) {
+		t.Fatalf("List() error = %v, want ErrStoreBusy", err)
+	}
+}
+
+func TestPeerRecordRejectsUnsafeAlias(t *testing.T) {
+	record := PeerRecord{
+		Fingerprint: testPeer().CertificateSHA256, Role: transport.AuthenticatedPeerConnector,
+		Alias: "peer\nforged", CreatedAt: time.Now().UTC(),
+	}
+	if err := record.Validate(); err == nil {
+		t.Fatal("PeerRecord.Validate() accepted a control character")
+	}
+}
+
+func mustStore(t *testing.T) *Store {
+	t.Helper()
+	store, err := New(filepath.Join(protectedParent(t), "trust"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return store
+}
+
+func protectedParent(t *testing.T) string {
+	t.Helper()
+	parent := t.TempDir()
+	if _, err := peercredentials.ProtectSecurityDirectory(parent); err != nil {
+		t.Fatal(err)
+	}
+	return parent
+}
+
+func testPeer() transport.AuthenticatedPeerContext {
+	return transport.AuthenticatedPeerContext{
+		CertificateSHA256: strings.Repeat("a", 64),
+		Role:              transport.AuthenticatedPeerConnector,
+	}
+}
+
+func TestSecurityHelpersProtectStoreFiles(t *testing.T) {
+	directory := filepath.Join(t.TempDir(), "trust")
+	if err := os.Mkdir(directory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := peercredentials.ProtectSecurityDirectory(directory); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(directory, "trust.json")
+	if err := os.WriteFile(path, []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := peercredentials.ProtectSecurityFile(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := peercredentials.ValidateSecurityFile(path); err != nil {
+		t.Fatal(err)
+	}
+}
