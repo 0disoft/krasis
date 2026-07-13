@@ -13,6 +13,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/0disoft/krasis/internal/peercredentials"
 )
 
 func TestRunCompletesTwoAuthenticatedFreshSessions(t *testing.T) {
@@ -80,6 +82,13 @@ type tlsFixture struct {
 func writeTLSFixture(t *testing.T) tlsFixture {
 	t.Helper()
 	directory := t.TempDir()
+	serverDirectory := filepath.Join(directory, "server")
+	clientDirectory := filepath.Join(directory, "client")
+	for _, roleDirectory := range []string{serverDirectory, clientDirectory} {
+		if err := os.Mkdir(roleDirectory, 0o700); err != nil {
+			t.Fatalf("create role directory: %v", err)
+		}
+	}
 	caKey := mustKey(t)
 	now := time.Now().Add(-time.Minute)
 	caTemplate := &x509.Certificate{
@@ -95,11 +104,17 @@ func writeTLSFixture(t *testing.T) tlsFixture {
 	if err != nil {
 		t.Fatalf("parse CA: %v", err)
 	}
-	caPath := filepath.Join(directory, "ca.pem")
-	writePEM(t, caPath, "CERTIFICATE", caDER)
-	serverCert, serverKey := issueIdentity(t, directory, "server", caCert, caKey, []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}, []string{"peer.test"}, 2)
-	clientCert, clientKey := issueIdentity(t, directory, "client", caCert, caKey, []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}, nil, 3)
-	return tlsFixture{ca: caPath, serverCert: serverCert, serverKey: serverKey, clientCert: clientCert, clientKey: clientKey}
+	for _, roleDirectory := range []string{serverDirectory, clientDirectory} {
+		writePEM(t, filepath.Join(roleDirectory, "ca.pem"), "CERTIFICATE", caDER)
+	}
+	serverCert, serverKey := issueIdentity(t, serverDirectory, "server", caCert, caKey, []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}, []string{"peer.test"}, 2)
+	clientCert, clientKey := issueIdentity(t, clientDirectory, "client", caCert, caKey, []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}, nil, 3)
+	for _, roleDirectory := range []string{serverDirectory, clientDirectory} {
+		if err := peercredentials.ProtectPrivateKeyDirectory(roleDirectory); err != nil {
+			t.Fatalf("protect role directory: %v", err)
+		}
+	}
+	return tlsFixture{ca: filepath.Join(serverDirectory, "ca.pem"), serverCert: serverCert, serverKey: serverKey, clientCert: clientCert, clientKey: clientKey}
 }
 
 func issueIdentity(t *testing.T, directory, name string, ca *x509.Certificate, caKey *ecdsa.PrivateKey, usages []x509.ExtKeyUsage, names []string, serial int64) (string, string) {
@@ -114,8 +129,8 @@ func issueIdentity(t *testing.T, directory, name string, ca *x509.Certificate, c
 	if err != nil {
 		t.Fatalf("issue %s certificate: %v", name, err)
 	}
-	certPath := filepath.Join(directory, name+".pem")
-	keyPath := filepath.Join(directory, name+"-key.pem")
+	certPath := filepath.Join(directory, "identity.pem")
+	keyPath := filepath.Join(directory, "identity-key.pem")
 	writePEM(t, certPath, "CERTIFICATE", der)
 	keyDER, err := x509.MarshalPKCS8PrivateKey(key)
 	if err != nil {

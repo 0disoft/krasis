@@ -3,6 +3,7 @@ package peercredentials
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -30,6 +31,9 @@ func TestGenerateCreatesSeparatedUsableIdentitiesWithoutCAKey(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(output, role, "ca-key.pem")); !os.IsNotExist(err) {
 			t.Fatalf("CA private key unexpectedly persisted for %s", role)
 		}
+		if err := ValidatePrivateKeySecurity(filepath.Join(output, role, "identity-key.pem")); err != nil {
+			t.Fatalf("private key security for %s: %v", role, err)
+		}
 	}
 	listener := loadIdentity(t, filepath.Join(output, "listener"))
 	connector := loadIdentity(t, filepath.Join(output, "connector"))
@@ -47,6 +51,56 @@ func TestGenerateCreatesSeparatedUsableIdentitiesWithoutCAKey(t *testing.T) {
 	connectorPeer, err := LoadTrustedPeer(filepath.Join(output, "connector", "peer.pem"))
 	if err != nil || connectorPeer.Role != transport.AuthenticatedPeerListener {
 		t.Fatalf("connector trusted peer = %+v, %v", connectorPeer, err)
+	}
+}
+
+func TestValidatePrivateKeySecurityRejectsCopiedDirectoryUntilProtected(t *testing.T) {
+	directory := filepath.Join(t.TempDir(), "role")
+	if err := os.Mkdir(directory, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	keyPath := filepath.Join(directory, "identity-key.pem")
+	if err := os.WriteFile(keyPath, []byte("test-only"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidatePrivateKeySecurity(keyPath); err == nil {
+		t.Fatal("ValidatePrivateKeySecurity() accepted inherited directory permissions")
+	}
+	if err := ProtectPrivateKeyDirectory(directory); err != nil {
+		t.Fatalf("ProtectPrivateKeyDirectory() error = %v", err)
+	}
+	if err := ValidatePrivateKeySecurity(keyPath); err != nil {
+		t.Fatalf("ValidatePrivateKeySecurity() after protect = %v", err)
+	}
+}
+
+func TestProtectPrivateKeyDirectoryRejectsNonRegularKey(t *testing.T) {
+	directory := filepath.Join(t.TempDir(), "role")
+	if err := os.MkdirAll(filepath.Join(directory, "identity-key.pem"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := ProtectPrivateKeyDirectory(directory); err == nil {
+		t.Fatal("ProtectPrivateKeyDirectory() accepted a directory as the private key")
+	}
+}
+
+func TestLoadRejectsInsecurePrivateKeyBeforeParsingCredentials(t *testing.T) {
+	directory := filepath.Join(t.TempDir(), "role")
+	if err := os.Mkdir(directory, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"ca.pem", "identity.pem", "identity-key.pem"} {
+		if err := os.WriteFile(filepath.Join(directory, name), []byte("invalid-test-fixture"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, _, err := Load(
+		filepath.Join(directory, "ca.pem"),
+		filepath.Join(directory, "identity.pem"),
+		filepath.Join(directory, "identity-key.pem"),
+	)
+	if !errors.Is(err, ErrInsecurePrivateKey) {
+		t.Fatalf("Load() error = %v, want ErrInsecurePrivateKey", err)
 	}
 }
 

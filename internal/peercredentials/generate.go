@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	SchemaVersion = "krasis.lab.peer-credentials/v2"
+	SchemaVersion = "krasis.lab.peer-credentials/v3"
 	Validity      = 24 * time.Hour
 )
 
@@ -96,6 +96,12 @@ func Generate(outputDirectory, serverName string, now time.Time) (manifest Manif
 		return Manifest{}, err
 	}
 	if err := writePEMExclusive(filepath.Join(connectorDirectory, "peer.pem"), "CERTIFICATE", listenerDER); err != nil {
+		return Manifest{}, err
+	}
+	if err := ProtectPrivateKeyDirectory(listenerDirectory); err != nil {
+		return Manifest{}, err
+	}
+	if err := ProtectPrivateKeyDirectory(connectorDirectory); err != nil {
 		return Manifest{}, err
 	}
 

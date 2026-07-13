@@ -166,7 +166,7 @@ guided stage failure code:
 
 ## `peer-credentials`
 
-- schema: root `manifest.json`의 `krasis.lab.peer-credentials/v2`
+- schema: root `manifest.json`의 `krasis.lab.peer-credentials/v3`
 - 출력: 새 directory 안의 `manifest.json`, `listener/`, `connector/`; 각 역할 directory에는 `ca.pem`, `identity.pem`, `identity-key.pem`, 상대 공개 인증서 `peer.pem`이 있다.
 - stdout: bundle directory, 만료 시각, 역할별 복사 경고
 
@@ -176,6 +176,14 @@ manifest 허용 필드:
 - `listenerDirectory`, `connectorDirectory`
 
 private key나 certificate body는 manifest와 stdout에 출력하지 않는다. output directory가 이미 있거나 server name이 잘못됐거나 credential 생성이 실패하면 exit `1`이며, 새로 만들던 불완전 directory는 제거한다.
+
+## `peer-credentials-protect`
+
+- 성공: exit `0`, 보호한 역할 directory 경로 한 줄
+- 잘못된 인자: exit `2`, usage를 stderr에 출력
+- reparse point, non-regular private key, DACL 적용 또는 검증 실패: exit `1`
+
+stdout과 stderr에는 private key, certificate body, SID 또는 DACL 전문을 출력하지 않는다.
 
 ## `agent-session`
 

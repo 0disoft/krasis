@@ -31,7 +31,7 @@
 | High | Phase 0 in-memory allowlist가 재시작 뒤 사용자 신뢰 상태를 보존하지 않음 | 새 credential bundle 배포를 수동으로 잘못하거나 폐기 상태를 잃음 | fingerprint·role·permission·revocation 테스트와 향후 persistence migration 테스트 | `peer.pem` 기반 immutable grant는 구현됨; 사용자 승인 trust store를 Phase 2에서 도입 |
 | High | press 주입 전 실패와 주입 여부 불명 실패를 구분하지 못함 | 유령 token 또는 실제 held input 누락 | guard 거절·IPC 단절·부분 주입 failure-injection 테스트 | prepare/inject/commit과 certainty 모델 설계 전 단순 rollback 금지 |
 | Medium | lease grant 실패 뒤 destination cursor 위치가 복원되지 않음 | 제어권은 없는데 destination cursor만 화면 끝으로 이동함 | entry 성공 뒤 runtime/write 실패 테스트 | cursor snapshot/rollback 또는 ready/commit handshake 설계 |
-| Medium | Windows private key가 상속 DACL에 의존함 | 다른 로컬 계정이 connector key를 읽음 | broad parent ACL 생성·load 테스트 | 사용자 전용 DACL 강제와 load-time ACL 검증 |
+| Medium | 복사된 Windows private key가 넓은 ACL이나 reparse path에 놓임 | 다른 로컬 계정이 key를 읽거나 교체함 | inherited DACL·non-regular key·역할별 복사 후 재보호 테스트 | 생성·명시적 재보호 시 현재 사용자와 `SYSTEM` 전용 protected DACL 강제, load-time DACL·reparse 검증 구현됨; 이미 노출된 key는 폐기 |
 | High | 잠금·절전·로그오프·display 변경의 직접 lifecycle owner가 없음 | stale lease나 geometry가 resume 뒤 남음 | OS lifecycle fault-injection과 실제 장비 반복 | 즉시 disconnect·`ReleaseAll`·재진단 후 명시적 rearm |
 
 정량 임계값은 아직 승인하지 않는다. 지연, soak 시간, 재시도 간격, 경계 감도는 Phase 0 측정 결과로 별도 예산에 확정한다.

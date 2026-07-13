@@ -12,6 +12,9 @@ func Load(caPath, certificatePath, privateKeyPath string) (tls.Certificate, *x50
 	if caPath == "" || certificatePath == "" || privateKeyPath == "" {
 		return tls.Certificate{}, nil, errors.New("CA, certificate, and private key paths are required")
 	}
+	if err := ValidatePrivateKeySecurity(privateKeyPath); err != nil {
+		return tls.Certificate{}, nil, fmt.Errorf("validate private key security: %w", err)
+	}
 	identity, err := tls.LoadX509KeyPair(certificatePath, privateKeyPath)
 	if err != nil {
 		return tls.Certificate{}, nil, fmt.Errorf("load identity: %w", err)

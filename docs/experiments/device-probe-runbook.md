@@ -63,6 +63,14 @@ $reports = @(Get-ChildItem -LiteralPath .\reports -Filter '*-basic-*.json' -File
 
 `listener/`만 listener 노트북으로, `connector/`만 connector 노트북으로 안전하게 복사한다. 각 directory의 `peer.pem`은 상대 역할의 공개 인증서이며 allowlist fingerprint source다. bundle 전체와 상대 역할의 private key를 두 장비에 복제하지 않는다. key는 Git, report 폴더 또는 동기화 드라이브에 넣지 않고 24시간 안에 실험을 마친 뒤 삭제한다.
 
+복사 직후 각 대상 노트북에서 자신의 역할 directory를 현재 Windows 사용자에게 다시 잠근다. 생성 PC의 사용자 SID는 대상 노트북의 SID와 다를 수 있고 일반 파일 복사는 ACL을 풀 수 있으므로 이 단계를 생략하면 `peer-probe`와 `agent-session`이 private key load를 거부한다.
+
+```powershell
+.\krasis-lab.exe peer-credentials-protect --directory .\secrets\listener
+```
+
+connector 노트북에서는 경로를 `.\secrets\connector`로 바꾼다. reparse point나 공유·동기화 directory를 쓰지 않는다. 보호 전에 신뢰할 수 없는 사용자나 위치에 노출된 key는 이 명령으로 재사용하지 말고 폐기 후 다시 생성한다.
+
 listener에서 먼저 실행한다.
 
 ```powershell

@@ -115,11 +115,22 @@
 - `DIRECTORY`는 존재하지 않아야 하며 기존 file이나 directory를 덮어쓰지 않는다.
 - test CA private key는 memory에서 listener와 connector identity를 서명한 뒤 폐기하며 file로 저장하지 않는다.
 - `listener/`와 `connector/`에는 각 역할의 `ca.pem`, `identity.pem`, `identity-key.pem`과 상대 역할의 공개 인증서 `peer.pem`을 생성한다. `peer.pem`에는 private key가 없다.
+- Windows에서는 각 역할 directory와 `identity-key.pem`의 상속 DACL을 제거하고 현재 사용자와 `SYSTEM`에만 full control을 허용한다. private key load는 같은 DACL과 path 전체의 reparse point 부재를 다시 검증하며 불일치하면 fail-closed한다.
 - identity 유효 기간은 생성 시점부터 24시간이다. 이는 제품 certificate 수명 정책이 아니다.
 - `--server-name`은 listener가 connector에서 실제로 접근할 DNS name 또는 IP 주소다.
 - bundle 전체를 두 장비에 복제하지 않는다. listener에는 `listener/`만, connector에는 `connector/`만 복사한다.
 
 이 명령은 명시적인 사용자 확인이 있는 제품 pairing을 구현하지 않는다. 생성된 key는 test 종료 뒤 삭제하고 Git, 동기화 드라이브, report 또는 support bundle에 넣지 않는다.
+
+### `peer-credentials-protect`
+
+다른 Windows 노트북으로 복사한 역할별 credential directory를 대상 노트북의 현재 사용자에게 다시 잠근다.
+
+- 사용법: `krasis-lab peer-credentials-protect --directory ROLE_DIRECTORY`
+- `ROLE_DIRECTORY`는 `identity-key.pem`을 직접 포함해야 한다.
+- directory 또는 private key path에 reparse point가 있거나 private key가 regular file이 아니면 변경하지 않고 실패한다.
+- 성공하면 directory에는 자식 상속이 있는 protected DACL을, private key에는 상속 없는 protected DACL을 적용한다. 둘 다 현재 사용자와 `SYSTEM`만 허용한다.
+- 이 명령은 이미 노출됐을 수 있는 key를 다시 안전하게 만들었다고 보증하지 않는다. 신뢰할 수 없는 위치나 계정을 거친 key는 폐기하고 bundle을 다시 생성한다.
 
 ### `agent-session`
 
