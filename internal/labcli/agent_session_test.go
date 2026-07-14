@@ -27,13 +27,17 @@ func (input *certaintyInput) Press(context.Context, control.PressedToken) error 
 func (input *certaintyInput) Release(context.Context, control.PressedToken) error {
 	return input.releaseErr
 }
-func (*certaintyInput) Move(context.Context, int32, int32) error                 { return nil }
-func (*certaintyInput) Wheel(context.Context, int32, int32) error                { return nil }
-func (*certaintyInput) Enter(context.Context, control.ScreenEdge) error          { return nil }
-func (*certaintyInput) ArmReturn(control.ReturnIntent, control.ScreenEdge) error { return nil }
-func (*certaintyInput) RearmReturn(control.ReturnIntent)                         {}
-func (*certaintyInput) DisarmReturn(control.ReturnIntent)                        {}
-func (input *certaintyInput) ReturnIntents() <-chan control.ReturnIntent         { return input.returns }
+func (*certaintyInput) Move(context.Context, int32, int32) error               { return nil }
+func (*certaintyInput) Wheel(context.Context, int32, int32) error              { return nil }
+func (*certaintyInput) PrepareEntry(context.Context, control.ScreenEdge) error { return nil }
+func (*certaintyInput) CommitEntry()                                           {}
+func (*certaintyInput) RollbackEntry(context.Context) error                    { return nil }
+func (*certaintyInput) ArmReturn(control.ReturnIntent, control.ScreenEdge) error {
+	return nil
+}
+func (*certaintyInput) RearmReturn(control.ReturnIntent)                 {}
+func (*certaintyInput) DisarmReturn(control.ReturnIntent)                {}
+func (input *certaintyInput) ReturnIntents() <-chan control.ReturnIntent { return input.returns }
 
 type certaintyGuard struct {
 	prepared bool
@@ -90,6 +94,26 @@ func TestCountingInputKeepsGuardRecordWhenReleaseFails(t *testing.T) {
 	err := newCountingInput(delegate, guard).Release(context.Background(), token)
 	if !errors.Is(err, cause) || len(guard.released) != 0 {
 		t.Fatalf("Release() error=%v released=%v", err, guard.released)
+	}
+}
+
+func TestCountingInputCountsOnlyCommittedCursorEntry(t *testing.T) {
+	input := newCountingInput(&certaintyInput{}, &certaintyGuard{})
+	if err := input.PrepareEntry(context.Background(), control.ScreenEdgeRight); err != nil {
+		t.Fatal(err)
+	}
+	if evidence := input.evidence(); evidence.Entries != 0 {
+		t.Fatalf("prepared entry evidence = %+v", evidence)
+	}
+	input.CommitEntry()
+	if evidence := input.evidence(); evidence.Entries != 1 {
+		t.Fatalf("committed entry evidence = %+v", evidence)
+	}
+	if err := input.RollbackEntry(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if evidence := input.evidence(); evidence.Entries != 1 {
+		t.Fatalf("rollback changed committed entry evidence = %+v", evidence)
 	}
 }
 

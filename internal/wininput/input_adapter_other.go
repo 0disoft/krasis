@@ -11,7 +11,11 @@ import (
 
 func NewInputAdapter() *InputAdapter { return newInputAdapter() }
 
-func (adapter *InputAdapter) Enter(context.Context, control.ScreenEdge) error {
+func (adapter *InputAdapter) PrepareEntry(context.Context, control.ScreenEdge) error {
+	return fmt.Errorf("%w: input adapter requires Windows", ErrUnsupportedInput)
+}
+
+func (adapter *InputAdapter) RollbackEntry(context.Context) error {
 	return fmt.Errorf("%w: input adapter requires Windows", ErrUnsupportedInput)
 }
 

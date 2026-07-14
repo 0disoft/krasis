@@ -608,7 +608,11 @@ func (source *integrationSourceActivation) Active() bool {
 
 type integrationCursorEntry struct{}
 
-func (integrationCursorEntry) Enter(context.Context, control.ScreenEdge) error { return nil }
+func (integrationCursorEntry) PrepareEntry(context.Context, control.ScreenEdge) error {
+	return nil
+}
+func (integrationCursorEntry) CommitEntry()                        {}
+func (integrationCursorEntry) RollbackEntry(context.Context) error { return nil }
 
 type integrationReturnBoundary struct {
 	mu     sync.Mutex

@@ -133,7 +133,9 @@ type LeaseAuthorizer interface {
 }
 
 type CursorEntryPort interface {
-	Enter(context.Context, control.ScreenEdge) error
+	PrepareEntry(context.Context, control.ScreenEdge) error
+	CommitEntry()
+	RollbackEntry(context.Context) error
 }
 
 type ReturnBoundaryPort interface {
@@ -187,17 +189,21 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 		if err := responder.Returns.ArmReturn(returnIntent, command.Edge); err != nil {
 			return err
 		}
-		if err := responder.Entry.Enter(ctx, command.Edge); err != nil {
+		rollbackEntry := func(cause error) error {
 			responder.Returns.DisarmReturn(returnIntent)
-			return err
+			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), CleanupTimeout)
+			defer cancel()
+			return errors.Join(cause, responder.Entry.RollbackEntry(cleanupCtx))
+		}
+		if err := responder.Entry.PrepareEntry(ctx, command.Edge); err != nil {
+			return rollbackEntry(err)
 		}
 		if _, err := responder.Runtime.GrantInbound(ctx, control.Event{
 			Kind:      control.EventInboundLeaseGranted,
 			SessionID: command.SessionID,
 			LeaseID:   leaseID,
 		}, command.Epoch, observedAt); err != nil {
-			responder.Returns.DisarmReturn(returnIntent)
-			return err
+			return rollbackEntry(err)
 		}
 		err = writeControlOrFail(ctx, writer, responder.Runtime, transport.ControlCommand{
 			Kind:      transport.ControlLeaseGrant,
@@ -206,9 +212,10 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 			Epoch:     command.Epoch,
 		})
 		if err != nil {
-			responder.Returns.DisarmReturn(returnIntent)
+			return rollbackEntry(err)
 		}
-		return err
+		responder.Entry.CommitEntry()
+		return nil
 	})
 }
 

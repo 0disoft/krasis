@@ -140,6 +140,7 @@ func TestInputAdapterEntryCallsSetCursorPosInsideOppositeEdge(t *testing.T) {
 	originalGet := callGetCursorPos
 	originalSet := callSetCursorPos
 	var gotX, gotY uintptr
+	getCalls := 0
 	callSetCursorPos = func(args ...uintptr) (uintptr, uintptr, error) {
 		gotX, gotY = args[0], args[1]
 		return 1, 0, nil
@@ -156,7 +157,12 @@ func TestInputAdapterEntryCallsSetCursorPosInsideOppositeEdge(t *testing.T) {
 	}
 	callGetCursorPos = func(args ...uintptr) (uintptr, uintptr, error) {
 		position := (*point)(unsafe.Pointer(args[0]))
-		position.X, position.Y = wantX, wantY
+		if getCalls == 0 {
+			position.X, position.Y = 100, 200
+		} else {
+			position.X, position.Y = wantX, wantY
+		}
+		getCalls++
 		return 1, 0, nil
 	}
 	t.Cleanup(func() {
@@ -164,9 +170,10 @@ func TestInputAdapterEntryCallsSetCursorPosInsideOppositeEdge(t *testing.T) {
 		callSetCursorPos = originalSet
 	})
 	adapter := NewInputAdapter()
-	if err := adapter.Enter(context.Background(), control.ScreenEdgeRight); err != nil {
-		t.Fatalf("Enter() error = %v", err)
+	if err := adapter.PrepareEntry(context.Background(), control.ScreenEdgeRight); err != nil {
+		t.Fatalf("PrepareEntry() error = %v", err)
 	}
+	adapter.CommitEntry()
 	if gotX != uintptr(uint32(wantX)) || gotY != uintptr(uint32(wantY)) {
 		t.Fatalf("SetCursorPos = (%d,%d), want (%d,%d)", gotX, gotY, uint32(wantX), uint32(wantY))
 	}
@@ -182,8 +189,8 @@ func TestInputAdapterEntryHonorsCancellationBeforeWindowsCall(t *testing.T) {
 	t.Cleanup(func() { callSetCursorPos = original })
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if err := NewInputAdapter().Enter(ctx, control.ScreenEdgeLeft); !errors.Is(err, context.Canceled) || called {
-		t.Fatalf("Enter(canceled) error=%v called=%t", err, called)
+	if err := NewInputAdapter().PrepareEntry(ctx, control.ScreenEdgeLeft); !errors.Is(err, context.Canceled) || called {
+		t.Fatalf("PrepareEntry(canceled) error=%v called=%t", err, called)
 	}
 }
 
@@ -191,17 +198,167 @@ func TestInputAdapterEntryRejectsClippedCursor(t *testing.T) {
 	originalGet := callGetCursorPos
 	originalSet := callSetCursorPos
 	callSetCursorPos = func(...uintptr) (uintptr, uintptr, error) { return 1, 0, nil }
+	getCalls := 0
 	callGetCursorPos = func(args ...uintptr) (uintptr, uintptr, error) {
 		position := (*point)(unsafe.Pointer(args[0]))
-		position.X, position.Y = 0, 0
+		if getCalls == 0 {
+			position.X, position.Y = 100, 200
+		} else {
+			position.X, position.Y = 0, 0
+		}
+		getCalls++
 		return 1, 0, nil
 	}
 	t.Cleanup(func() {
 		callGetCursorPos = originalGet
 		callSetCursorPos = originalSet
 	})
-	if err := NewInputAdapter().Enter(context.Background(), control.ScreenEdgeRight); !errors.Is(err, ErrInputInjection) {
-		t.Fatalf("Enter(clipped) error = %v", err)
+	adapter := NewInputAdapter()
+	if err := adapter.PrepareEntry(context.Background(), control.ScreenEdgeRight); !errors.Is(err, ErrInputInjection) {
+		t.Fatalf("PrepareEntry(clipped) error = %v", err)
+	}
+}
+
+func TestInputAdapterRollbackRestoresOnlyOwnedEntryPosition(t *testing.T) {
+	for _, test := range []struct {
+		name         string
+		currentX     int32
+		currentY     int32
+		wantSetCalls int
+	}{
+		{name: "unchanged entry", wantSetCalls: 2},
+		{name: "cursor moved after entry", currentX: 777, currentY: 888, wantSetCalls: 1},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			originalGet := callGetCursorPos
+			originalSet := callSetCursorPos
+			before := point{X: 100, Y: 200}
+			entryX, entryY, err := cursorEntryPoint(
+				control.ScreenEdgeRight,
+				systemMetric(smXVIRTUALSCREEN),
+				systemMetric(smYVIRTUALSCREEN),
+				systemMetric(smCXVIRTUALSCREEN),
+				systemMetric(smCYVIRTUALSCREEN),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			current := point{X: test.currentX, Y: test.currentY}
+			if test.wantSetCalls == 2 {
+				current = point{X: entryX, Y: entryY}
+			}
+			getCalls := 0
+			callGetCursorPos = func(args ...uintptr) (uintptr, uintptr, error) {
+				position := (*point)(unsafe.Pointer(args[0]))
+				switch getCalls {
+				case 0:
+					*position = before
+				case 1:
+					position.X, position.Y = entryX, entryY
+				case 2:
+					*position = current
+				default:
+					*position = before
+				}
+				getCalls++
+				return 1, 0, nil
+			}
+			setCalls := 0
+			callSetCursorPos = func(...uintptr) (uintptr, uintptr, error) {
+				setCalls++
+				return 1, 0, nil
+			}
+			t.Cleanup(func() {
+				callGetCursorPos = originalGet
+				callSetCursorPos = originalSet
+			})
+			adapter := NewInputAdapter()
+			if err := adapter.PrepareEntry(context.Background(), control.ScreenEdgeRight); err != nil {
+				t.Fatalf("PrepareEntry() error = %v", err)
+			}
+			if err := adapter.RollbackEntry(context.Background()); err != nil {
+				t.Fatalf("RollbackEntry() error = %v", err)
+			}
+			if setCalls != test.wantSetCalls {
+				t.Fatalf("SetCursorPos calls = %d, want %d", setCalls, test.wantSetCalls)
+			}
+		})
+	}
+}
+
+func TestInputAdapterCommitPreventsRollback(t *testing.T) {
+	originalGet := callGetCursorPos
+	originalSet := callSetCursorPos
+	getCalls := 0
+	callGetCursorPos = func(args ...uintptr) (uintptr, uintptr, error) {
+		position := (*point)(unsafe.Pointer(args[0]))
+		if getCalls == 0 {
+			position.X, position.Y = 100, 200
+		} else {
+			position.X, position.Y, _ = cursorEntryPoint(
+				control.ScreenEdgeRight,
+				systemMetric(smXVIRTUALSCREEN),
+				systemMetric(smYVIRTUALSCREEN),
+				systemMetric(smCXVIRTUALSCREEN),
+				systemMetric(smCYVIRTUALSCREEN),
+			)
+		}
+		getCalls++
+		return 1, 0, nil
+	}
+	setCalls := 0
+	callSetCursorPos = func(...uintptr) (uintptr, uintptr, error) {
+		setCalls++
+		return 1, 0, nil
+	}
+	t.Cleanup(func() {
+		callGetCursorPos = originalGet
+		callSetCursorPos = originalSet
+	})
+	adapter := NewInputAdapter()
+	if err := adapter.PrepareEntry(context.Background(), control.ScreenEdgeRight); err != nil {
+		t.Fatal(err)
+	}
+	adapter.CommitEntry()
+	if err := adapter.RollbackEntry(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if setCalls != 1 {
+		t.Fatalf("SetCursorPos calls = %d, want 1", setCalls)
+	}
+}
+
+func TestInputAdapterRollbackRefusesUnknownEntryPosition(t *testing.T) {
+	originalGet := callGetCursorPos
+	originalSet := callSetCursorPos
+	getCalls := 0
+	callGetCursorPos = func(args ...uintptr) (uintptr, uintptr, error) {
+		if getCalls == 0 {
+			position := (*point)(unsafe.Pointer(args[0]))
+			position.X, position.Y = 100, 200
+			getCalls++
+			return 1, 0, nil
+		}
+		return 0, 0, errors.New("position unavailable")
+	}
+	setCalls := 0
+	callSetCursorPos = func(...uintptr) (uintptr, uintptr, error) {
+		setCalls++
+		return 1, 0, nil
+	}
+	t.Cleanup(func() {
+		callGetCursorPos = originalGet
+		callSetCursorPos = originalSet
+	})
+	adapter := NewInputAdapter()
+	if err := adapter.PrepareEntry(context.Background(), control.ScreenEdgeRight); !errors.Is(err, ErrInputInjection) {
+		t.Fatalf("PrepareEntry() error = %v", err)
+	}
+	if err := adapter.RollbackEntry(context.Background()); !errors.Is(err, ErrCursorEntryState) {
+		t.Fatalf("RollbackEntry() error = %v", err)
+	}
+	if setCalls != 1 {
+		t.Fatalf("unknown entry rollback called SetCursorPos %d times", setCalls)
 	}
 }
 

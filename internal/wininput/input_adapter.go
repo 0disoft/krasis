@@ -22,6 +22,7 @@ const (
 var (
 	ErrUnsupportedInput = errors.New("unsupported Windows input")
 	ErrInputInjection   = errors.New("Windows input injection failed")
+	ErrCursorEntryState = errors.New("Windows cursor entry state is uncertain")
 )
 
 func EncodeScanCode(scanCode uint16, extended bool) (uint32, error) {

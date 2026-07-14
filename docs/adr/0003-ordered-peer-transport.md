@@ -30,3 +30,6 @@ control과 input 사이의 순서를 하나의 stream에서 설명할 수 있고
 `net.Pipe` loopback 검증은 framing과 순서를 증명하지만 TLS, Wi-Fi 장애, 방화벽, 지연 또는 packet loss를 증명하지 않는다.
 
 TLS loopback 검증은 양쪽 인증서 검증, TLS version과 ALPN을 증명한다. test 인증서는 메모리에서만 생성하며 제품 pairing과 certificate storage를 대신하지 않는다.
+
+grant 전 destination cursor 이동의 prepare·commit·rollback 순서와 network write 실패 보상은
+ADR 0009가 이 결정의 후속 효과 계약으로 보완한다.

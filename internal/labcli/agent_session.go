@@ -538,14 +538,17 @@ func (input *countingInput) Wheel(ctx context.Context, x, y int32) error {
 	input.mu.Unlock()
 	return nil
 }
-func (input *countingInput) Enter(ctx context.Context, edge control.ScreenEdge) error {
-	if err := input.delegate.Enter(ctx, edge); err != nil {
-		return err
-	}
+func (input *countingInput) PrepareEntry(ctx context.Context, edge control.ScreenEdge) error {
+	return input.delegate.PrepareEntry(ctx, edge)
+}
+func (input *countingInput) CommitEntry() {
+	input.delegate.CommitEntry()
 	input.mu.Lock()
 	input.value.Entries++
 	input.mu.Unlock()
-	return nil
+}
+func (input *countingInput) RollbackEntry(ctx context.Context) error {
+	return input.delegate.RollbackEntry(ctx)
 }
 func (input *countingInput) ArmReturn(intent control.ReturnIntent, edge control.ScreenEdge) error {
 	if err := input.delegate.ArmReturn(intent, edge); err != nil {

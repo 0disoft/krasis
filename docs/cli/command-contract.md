@@ -158,6 +158,7 @@ peer별 durable authorization record를 관리한다.
 - `--edge`는 이 장비에서 상대 장비로 넘어가는 화면 끝이다. 왼쪽 노트북은 일반적으로 `RIGHT`, 오른쪽 노트북은 `LEFT`다.
 - MVP대로 active monitor가 정확히 하나가 아니면 hook을 시작하지 않고 실패한다.
 - destination grant 전에는 source suppression을 활성화하지 않는다.
+- destination cursor entry는 inbound runtime grant와 grant frame write 전까지 pending 효과로 유지한다. 중간 실패에서는 현재 cursor가 확인된 entry 좌표와 같을 때만 이전 snapshot으로 복원하고, 성공 evidence의 entry count는 grant write 뒤 commit에서만 증가한다.
 - physical `Ctrl+Alt+Shift+F12`는 현재 active source session을 즉시 중단한다. F12 terminator는 원격 전송하거나 로컬에서 억제하지 않으며 supervisor는 긴급 해제 뒤 재연결하지 않는다.
 - 같은 executable의 별도 crash guard process가 destination down 전에 token을 ACK하고 성공한 up 뒤 제거한다. protocol v2는 새 prepare와 기존 반복 token을 구분하며, 새 press가 `NOT_APPLIED`로 확정된 경우에만 주입 없는 cancel로 기록을 제거한다. partial·unknown 결과와 실패한 release는 기록을 유지한다. guard가 먼저 종료되거나 정상 종료에서 남은 token을 해제하지 못하면 session은 실패한다.
 - 숨겨진 Windows lifecycle monitor는 suspend/resume, session lock·disconnect·logoff, shutdown과

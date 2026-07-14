@@ -4,6 +4,7 @@ package wininput
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/0disoft/krasis/internal/control"
@@ -18,12 +19,28 @@ func NewInputAdapter() *InputAdapter {
 	return newInputAdapter()
 }
 
-func (adapter *InputAdapter) Enter(ctx context.Context, sourceEdge control.ScreenEdge) error {
+func (adapter *InputAdapter) PrepareEntry(ctx context.Context, sourceEdge control.ScreenEdge) error {
 	if adapter == nil {
 		return fmt.Errorf("%w: input adapter is not initialized", ErrInputInjection)
 	}
+	if ctx == nil {
+		return fmt.Errorf("%w: context is required", ErrInputInjection)
+	}
 	if err := ctx.Err(); err != nil {
 		return err
+	}
+	state, err := adapter.cursorEntryState()
+	if err != nil {
+		return err
+	}
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	if state.pending {
+		return fmt.Errorf("%w: another cursor entry is pending", ErrCursorEntryState)
+	}
+	before, err := cursorPosition()
+	if err != nil {
+		return fmt.Errorf("%w: snapshot cursor before entry: %v", ErrInputInjection, err)
 	}
 	x, y, err := cursorEntryPoint(
 		sourceEdge,
@@ -39,12 +56,62 @@ func (adapter *InputAdapter) Enter(ctx context.Context, sourceEdge control.Scree
 	if result == 0 {
 		return fmt.Errorf("%w: SetCursorPos failed: %v", ErrInputInjection, callErr)
 	}
+	state.pending = true
+	state.previousX = before.X
+	state.previousY = before.Y
 	position, err := cursorPosition()
 	if err != nil {
 		return fmt.Errorf("%w: verify cursor entry: %v", ErrInputInjection, err)
 	}
+	state.enteredKnown = true
+	state.enteredX = position.X
+	state.enteredY = position.Y
 	if position.X != x || position.Y != y {
 		return fmt.Errorf("%w: cursor entry was clipped to (%d,%d)", ErrInputInjection, position.X, position.Y)
+	}
+	return nil
+}
+
+func (adapter *InputAdapter) RollbackEntry(ctx context.Context) error {
+	state, err := adapter.cursorEntryState()
+	if err != nil {
+		return err
+	}
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	if !state.pending {
+		return nil
+	}
+	defer state.clear()
+	if ctx == nil {
+		return fmt.Errorf("%w: rollback context is required", ErrCursorEntryState)
+	}
+	if err := ctx.Err(); err != nil {
+		return errors.Join(ErrCursorEntryState, err)
+	}
+	if !state.enteredKnown {
+		return fmt.Errorf("%w: entry position could not be verified", ErrCursorEntryState)
+	}
+	current, err := cursorPosition()
+	if err != nil {
+		return fmt.Errorf("%w: inspect cursor before rollback: %v", ErrCursorEntryState, err)
+	}
+	if current.X != state.enteredX || current.Y != state.enteredY {
+		return nil
+	}
+	result, _, callErr := callSetCursorPos(
+		uintptr(uint32(state.previousX)),
+		uintptr(uint32(state.previousY)),
+	)
+	if result == 0 {
+		return fmt.Errorf("%w: SetCursorPos rollback failed: %v", ErrCursorEntryState, callErr)
+	}
+	restored, err := cursorPosition()
+	if err != nil {
+		return fmt.Errorf("%w: verify cursor rollback: %v", ErrCursorEntryState, err)
+	}
+	if restored.X != state.previousX || restored.Y != state.previousY {
+		return fmt.Errorf("%w: cursor rollback was clipped to (%d,%d)", ErrCursorEntryState, restored.X, restored.Y)
 	}
 	return nil
 }

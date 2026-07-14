@@ -137,7 +137,7 @@ func TestLeaseResponderGrantsAuthorizedRequest(t *testing.T) {
 	if grant.Kind != transport.ControlLeaseGrant || grant.LeaseID != "lease-1" {
 		t.Fatalf("grant = %+v", grant)
 	}
-	if len(entry.edges) != 1 || entry.edges[0] != control.ScreenEdgeRight || len(entry.states) != 1 || entry.states[0] != control.StateLocal || len(entry.armed) != 1 {
+	if len(entry.edges) != 1 || entry.edges[0] != control.ScreenEdgeRight || len(entry.states) != 1 || entry.states[0] != control.StateLocal || len(entry.armed) != 1 || entry.commits != 1 || entry.rollbacks != 0 {
 		t.Fatalf("entry = %+v", entry)
 	}
 	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateInboundActive || !snapshot.HasStream {
@@ -198,6 +198,9 @@ func TestLeaseResponderEntryFailureDoesNotGrantInbound(t *testing.T) {
 	if len(entry.armed) != 1 || len(entry.disarmed) != 1 {
 		t.Fatalf("entry failure did not rollback return detector: armed=%+v disarmed=%+v", entry.armed, entry.disarmed)
 	}
+	if entry.commits != 0 || entry.rollbacks != 1 {
+		t.Fatalf("entry failure compensation = commits:%d rollbacks:%d", entry.commits, entry.rollbacks)
+	}
 }
 
 func TestLeaseResponderGrantWriteFailureCleansInboundRuntime(t *testing.T) {
@@ -221,6 +224,53 @@ func TestLeaseResponderGrantWriteFailureCleansInboundRuntime(t *testing.T) {
 	}
 	if len(entry.disarmed) != 1 {
 		t.Fatalf("grant write failure did not disarm return detector: %+v", entry.disarmed)
+	}
+	if entry.commits != 0 || entry.rollbacks != 1 {
+		t.Fatalf("grant write failure compensation = commits:%d rollbacks:%d", entry.commits, entry.rollbacks)
+	}
+}
+
+func TestLeaseResponderGrantRuntimeFailureRollsBackEntry(t *testing.T) {
+	runtime, err := application.NewSessionRuntime(failingInboundExecutor{}, &inputPort{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry := &recordingCursorEntry{}
+	writer := &recordingFrameWriter{}
+	responder := &LeaseResponder{
+		Coordinator: testWriteCoordinator(t, writer),
+		Runtime:     runtime,
+		Authorizer:  staticLeaseAuthorizer{leaseID: "lease-1", accepted: true},
+		Peer:        testAuthenticatedPeer(),
+		Entry:       entry,
+		Returns:     entry,
+	}
+	command := transport.ControlCommand{Kind: transport.ControlLeaseRequest, SessionID: "session-1", Epoch: "epoch-1", Edge: control.ScreenEdgeRight}
+	if err := responder.HandleLeaseRequest(context.Background(), command, time.Unix(100, 0)); err == nil {
+		t.Fatal("HandleLeaseRequest() error = nil")
+	}
+	if len(writer.frames) != 0 || entry.commits != 0 || entry.rollbacks != 1 || len(entry.disarmed) != 1 {
+		t.Fatalf("runtime failure compensation = frames:%d commits:%d rollbacks:%d disarmed:%d", len(writer.frames), entry.commits, entry.rollbacks, len(entry.disarmed))
+	}
+}
+
+func TestLeaseResponderJoinsCursorRollbackFailure(t *testing.T) {
+	runtime := newLocalRuntime(t)
+	writeErr := errors.New("write failed")
+	rollbackErr := errors.New("cursor rollback failed")
+	entry := &recordingCursorEntry{rollbackErr: rollbackErr}
+	responder := &LeaseResponder{
+		Coordinator: testWriteCoordinator(t, &recordingFrameWriter{err: writeErr}),
+		Runtime:     runtime,
+		Authorizer:  staticLeaseAuthorizer{leaseID: "lease-1", accepted: true},
+		Peer:        testAuthenticatedPeer(),
+		Entry:       entry,
+		Returns:     entry,
+	}
+	command := transport.ControlCommand{Kind: transport.ControlLeaseRequest, SessionID: "session-1", Epoch: "epoch-1", Edge: control.ScreenEdgeRight}
+	err := responder.HandleLeaseRequest(context.Background(), command, time.Unix(100, 0))
+	if !errors.Is(err, writeErr) || !errors.Is(err, rollbackErr) {
+		t.Fatalf("HandleLeaseRequest() error = %v", err)
 	}
 }
 
@@ -280,22 +330,43 @@ type staticLeaseAuthorizer struct {
 	err      error
 }
 
-type recordingCursorEntry struct {
-	runtime  *application.SessionRuntime
-	edges    []control.ScreenEdge
-	states   []control.State
-	armed    []control.ReturnIntent
-	rearmed  []control.ReturnIntent
-	disarmed []control.ReturnIntent
-	err      error
+type failingInboundExecutor struct{}
+
+func (failingInboundExecutor) Execute(_ context.Context, effect control.Effect) error {
+	if effect == control.EffectBeginInbound {
+		return errors.New("begin inbound failed")
+	}
+	return nil
 }
 
-func (entry *recordingCursorEntry) Enter(_ context.Context, edge control.ScreenEdge) error {
+type recordingCursorEntry struct {
+	runtime     *application.SessionRuntime
+	edges       []control.ScreenEdge
+	states      []control.State
+	armed       []control.ReturnIntent
+	rearmed     []control.ReturnIntent
+	disarmed    []control.ReturnIntent
+	err         error
+	rollbackErr error
+	commits     int
+	rollbacks   int
+}
+
+func (entry *recordingCursorEntry) PrepareEntry(_ context.Context, edge control.ScreenEdge) error {
 	entry.edges = append(entry.edges, edge)
 	if entry.runtime != nil {
 		entry.states = append(entry.states, entry.runtime.Snapshot().Control.State)
 	}
 	return entry.err
+}
+
+func (entry *recordingCursorEntry) CommitEntry() {
+	entry.commits++
+}
+
+func (entry *recordingCursorEntry) RollbackEntry(context.Context) error {
+	entry.rollbacks++
+	return entry.rollbackErr
 }
 
 func (entry *recordingCursorEntry) ArmReturn(intent control.ReturnIntent, _ control.ScreenEdge) error {

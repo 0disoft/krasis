@@ -16,6 +16,11 @@
 4. source가 `OUTBOUND_ACTIVE`, destination이 `INBOUND_ACTIVE`가 된 뒤 입력 전달을 시작한다.
 5. 반대 경계 전환은 같은 절차로 새 제어권을 만든다.
 
+destination의 cursor entry는 return detector arm 뒤 `PrepareEntry`로 이동 전 좌표와 실제 entry 좌표를
+기억한다. inbound runtime grant와 grant frame write가 모두 성공해야 `CommitEntry`한다. 그 전에 실패하면
+취소를 상속하지 않는 bounded cleanup에서 `RollbackEntry`를 호출하며, 현재 cursor가 확인된 entry 좌표에
+그대로 있을 때만 이전 좌표로 복원한다. 이미 움직인 cursor는 오래된 snapshot으로 덮어쓰지 않는다.
+
 상태 변경은 `internal/control` transition table에서만 결정한다. table이 반환한 effect는 Application이 순서대로 실행하고 성공 또는 실패 event를 다시 상태 머신에 넣는다. 현재 구현은 순수 transition core, authenticated peer transport와 `SendInput` 기반 Win32 destination adapter까지 포함한다. source-side 경계 감지와 물리 입력 억제는 후속 단계다.
 
 활성 inbound lease에서 받은 입력은 실행 전에 `InputStream` gate를 통과한다. session, epoch 또는 정확한 다음 sequence가 하나라도 맞지 않으면 해당 payload를 실행하지 않고 `FAULT_DETECTED` cleanup으로 넘긴다. stream과 lease의 session이 서로 다르거나 non-local 상태에서 lease 방향과 맞지 않는 입력을 받은 경우도 동일하게 fail-safe 처리한다. 재연결은 새 session과 epoch, sequence `1`에서 시작한다.

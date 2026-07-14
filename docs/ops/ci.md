@@ -70,6 +70,10 @@ guard child 테스트는 정상 disarm ACK 뒤 process가 종료되기 전에 st
 no-replace로 쓰는지 검증한다. guard report checker는 parent EOF에서 실제 release가 없거나,
 dirty/mismatched build, unknown field, invalid count와 정상 disarm recovery를 통과시키지 않는다.
 
+cursor entry 보상 테스트는 prepare 뒤 inbound grant 또는 grant frame write 실패에서 rollback이
+호출되는지, 성공한 grant만 commit되는지, 현재 cursor가 entry 좌표에서 이미 움직였으면 snapshot을
+덮어쓰지 않는지 검증한다. Windows API mock은 순서를 검증하지만 실제 물리 mouse와의 경쟁을 증명하지 않는다.
+
 agent report checker 테스트는 strict JSON decoding과 두 file cardinality, 장소별 alias pair,
 listener/connect 역할, 반대 edge, clean 동일 build, 동일 duration/heartbeat interval/peer timeout,
 최소 heartbeat 송수신·same-session gap evidence와 timeout보다 작은 최대 gap, 양쪽 pass, crash guard의

@@ -12,6 +12,17 @@ const ReturnIntentQueueCapacity = 1
 
 type InputAdapter struct {
 	returns *returnBoundaryState
+	entry   *cursorEntryState
+}
+
+type cursorEntryState struct {
+	mu           sync.Mutex
+	pending      bool
+	enteredKnown bool
+	previousX    int32
+	previousY    int32
+	enteredX     int32
+	enteredY     int32
 }
 
 type returnBoundaryState struct {
@@ -24,7 +35,36 @@ type returnBoundaryState struct {
 }
 
 func newInputAdapter() *InputAdapter {
-	return &InputAdapter{returns: &returnBoundaryState{intents: make(chan control.ReturnIntent, ReturnIntentQueueCapacity)}}
+	return &InputAdapter{
+		returns: &returnBoundaryState{intents: make(chan control.ReturnIntent, ReturnIntentQueueCapacity)},
+		entry:   &cursorEntryState{},
+	}
+}
+
+func (adapter *InputAdapter) CommitEntry() {
+	state, err := adapter.cursorEntryState()
+	if err != nil {
+		return
+	}
+	state.mu.Lock()
+	state.clear()
+	state.mu.Unlock()
+}
+
+func (adapter *InputAdapter) cursorEntryState() (*cursorEntryState, error) {
+	if adapter == nil || adapter.entry == nil {
+		return nil, errors.New("input adapter cursor entry is not initialized")
+	}
+	return adapter.entry, nil
+}
+
+func (state *cursorEntryState) clear() {
+	state.pending = false
+	state.enteredKnown = false
+	state.previousX = 0
+	state.previousY = 0
+	state.enteredX = 0
+	state.enteredY = 0
 }
 
 func (adapter *InputAdapter) ArmReturn(intent control.ReturnIntent, sourceEdge control.ScreenEdge) error {

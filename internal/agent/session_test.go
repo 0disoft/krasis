@@ -196,10 +196,12 @@ func newTestInput(returnNext bool) *testInput {
 	return &testInput{returnNext: returnNext, returns: make(chan control.ReturnIntent, 1), moves: make(chan [2]int32, 1)}
 }
 
-func (*testInput) Press(context.Context, control.PressedToken) error   { return nil }
-func (*testInput) Release(context.Context, control.PressedToken) error { return nil }
-func (*testInput) Wheel(context.Context, int32, int32) error           { return nil }
-func (*testInput) Enter(context.Context, control.ScreenEdge) error     { return nil }
+func (*testInput) Press(context.Context, control.PressedToken) error      { return nil }
+func (*testInput) Release(context.Context, control.PressedToken) error    { return nil }
+func (*testInput) Wheel(context.Context, int32, int32) error              { return nil }
+func (*testInput) PrepareEntry(context.Context, control.ScreenEdge) error { return nil }
+func (*testInput) CommitEntry()                                           {}
+func (*testInput) RollbackEntry(context.Context) error                    { return nil }
 func (input *testInput) Move(_ context.Context, x, y int32) error {
 	input.moves <- [2]int32{x, y}
 	input.mu.Lock()

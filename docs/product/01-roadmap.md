@@ -53,6 +53,7 @@
 - bounded live-input `krasis-lab agent-session`과 로컬 긴급 해제는 구현됨
 - 별도 Phase 0 crash guard, parent-kill subprocess 복구와 report gate는 구현됨
 - `SendInput` zero·partial·unknown 확실성, 반복 press 보존과 crash guard protocol v2 cancel은 구현됨
+- grant 전 cursor entry의 prepare·commit·conditional rollback과 write failure 보상은 구현됨
 - Windows suspend/resume, session lock·disconnect·logoff, shutdown과 display change를 terminal
   cancellation으로 만드는 lifecycle owner와 v6 evidence gate는 구현됨
 - 장소별 순차 수집을 합치는 `phase0-check` evidence gate는 구현됨
