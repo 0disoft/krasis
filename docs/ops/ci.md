@@ -51,7 +51,7 @@ connection 또는 source Close 실패는 원래 session·shutdown 오류와 함�
 network source 테스트는 listener의 첫 Close 오류 보존과 TLS 인증 실패 뒤 raw socket의 close
 오류 결합을 검증한다. 통합 테스트는 `peer-credentials`가 만든 역할 분리 identity로 실제 localhost listener/dial을 열고 양쪽 `PeerConnection`의 mTLS와 ALPN 인증을 통과시킨다. trust store 테스트는 import/list/revoke persistence, corrupt·unknown·trailing·oversized JSON 거부, duplicate와 repeated revoke, permissive directory, process lock contention, atomic replace revision과 temporary cleanup을 검증한다.
 
-emergency release 테스트는 modifier press/release, left/right modifier variant, F12 terminator 비전달, source suppression 해제와 worker fault cleanup을 검증한다. `agent-session` parser와 evidence gate 테스트는 explicit live-input acknowledgement, bounded duration, 인증 session 부재와 destination input 부재를 성공으로 가장하지 않는지 확인한다. CI에서는 실제 hook suppression과 `SendInput` 상호작용을 실행하지 않는다.
+emergency release 테스트는 modifier press/release, left/right modifier variant, F12 terminator 비전달, source suppression 해제와 worker fault cleanup을 검증한다. `agent-session` parser와 evidence gate 테스트는 explicit live-input acknowledgement, bounded duration, 인증 session 부재, destination input 부재, 주입 실패와 cursor rollback 실패를 성공으로 가장하지 않는지 확인한다. CI에서는 실제 hook suppression과 `SendInput` 상호작용을 실행하지 않는다.
 
 Windows lifecycle 테스트는 숨겨진 top-level window monitor의 start/close, power·WTS session·shutdown·
 display message 정규화, 첫 event cancellation, monitor 비정상 종료, guard 선행 종료와 source-before-guard
@@ -77,7 +77,7 @@ cursor entry 보상 테스트는 prepare 뒤 inbound grant 또는 grant frame wr
 agent report checker 테스트는 strict JSON decoding과 두 file cardinality, 장소별 alias pair,
 listener/connect 역할, 반대 edge, clean 동일 build, 동일 duration/heartbeat interval/peer timeout,
 최소 heartbeat 송수신·same-session gap evidence와 timeout보다 작은 최대 gap, 양쪽 pass, crash guard의
-시작·정상 종료, lifecycle monitor의 clean 종료와 event·rearm 부재, 같은 directory의 guard report device/build/zero-recovery 및 destination evidence를 검증한다. 전체 path, session identifier나 원시
+시작·정상 종료, lifecycle monitor의 clean 종료와 event·rearm 부재, 같은 directory의 guard report device/build/zero-recovery, destination evidence, 주입 실패 0건과 cursor rollback 분류 합계를 검증한다. 전체 path, session identifier나 원시
 입력은 checker output으로 복제하지 않는다.
 
 Phase 0 checker 테스트는 서로 다른 날짜의 home/study pair를 같은 build, duration과 liveness policy로

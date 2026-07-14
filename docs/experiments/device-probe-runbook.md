@@ -126,7 +126,7 @@ $PeerTimeout = Read-Host 'same peer timeout used by the listener'
 이 시간은 제품 기본값이 아니라 해당 실행에서 직접 입력한 interval의 배수다. 그래야 양쪽
 report에 송수신 각각 2회 이상과 같은 session 내부 receive gap sample이 남는다.
 
-양쪽 report가 모두 `schemaVersion=krasis.lab.agent-session/v6`, `completed=true`,
+양쪽 report가 모두 `schemaVersion=krasis.lab.agent-session/v7`, `completed=true`,
 `passed=true`, `crashGuard.started=true`, `crashGuard.cleanShutdown=true`,
 `lifecycle.monitorStarted=true`, `lifecycle.cleanShutdown=true`, lifecycle event 없음,
 `lifecycle.rearmRequired=false`,
@@ -134,7 +134,9 @@ report에 송수신 각각 2회 이상과 같은 session 내부 receive gap samp
 `liveness.heartbeatsSent>=2`, `liveness.heartbeatsReceived>=2`,
 `liveness.receiveGapSamples>=1`,
 `0<liveness.maxReceiveGapMillis<peerTimeoutMillis`,
-`destinationInput.entries>=1`이어야 해당 pair의 bounded 양방향
+`destinationInput.entries>=1`, 모든 `destinationInput.injectionFailures`가 `0`,
+`destinationInput.cursorRollbacks.failed=0`, 그리고 rollback의 복원·미복원·실패 합계가 시도 수와
+같아야 해당 pair의 bounded 양방향
 실험이 통과한 것이다. 집 pair와 스터디카페 pair는 서로 다른 날짜에 반복해도 된다.
 
 ## Windows lifecycle fault injection

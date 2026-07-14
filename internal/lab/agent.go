@@ -2,7 +2,7 @@ package lab
 
 import "time"
 
-const AgentSessionSchemaVersion = "krasis.lab.agent-session/v6"
+const AgentSessionSchemaVersion = "krasis.lab.agent-session/v7"
 
 type AgentSessionReport struct {
 	SchemaVersion     string             `json:"schemaVersion"`
@@ -55,12 +55,36 @@ type SupervisorEvidence struct {
 }
 
 type InputEvidence struct {
-	Entries      uint64 `json:"entries"`
-	KeyDowns     uint64 `json:"keyDowns"`
-	KeyUps       uint64 `json:"keyUps"`
-	ButtonDowns  uint64 `json:"buttonDowns"`
-	ButtonUps    uint64 `json:"buttonUps"`
-	PointerMoves uint64 `json:"pointerMoves"`
-	Wheels       uint64 `json:"wheels"`
-	ReturnArms   uint64 `json:"returnArms"`
+	Entries           uint64                   `json:"entries"`
+	KeyDowns          uint64                   `json:"keyDowns"`
+	KeyUps            uint64                   `json:"keyUps"`
+	ButtonDowns       uint64                   `json:"buttonDowns"`
+	ButtonUps         uint64                   `json:"buttonUps"`
+	PointerMoves      uint64                   `json:"pointerMoves"`
+	Wheels            uint64                   `json:"wheels"`
+	ReturnArms        uint64                   `json:"returnArms"`
+	InjectionFailures InjectionFailureEvidence `json:"injectionFailures"`
+	CursorRollbacks   CursorRollbackEvidence   `json:"cursorRollbacks"`
+}
+
+type InjectionFailureEvidence struct {
+	NotApplied       uint64 `json:"notApplied"`
+	PartiallyApplied uint64 `json:"partiallyApplied"`
+	OutcomeUnknown   uint64 `json:"outcomeUnknown"`
+	Unclassified     uint64 `json:"unclassified"`
+}
+
+func (evidence InjectionFailureEvidence) Total() uint64 {
+	return evidence.NotApplied + evidence.PartiallyApplied + evidence.OutcomeUnknown + evidence.Unclassified
+}
+
+type CursorRollbackEvidence struct {
+	Attempted   uint64 `json:"attempted"`
+	Restored    uint64 `json:"restored"`
+	NotRestored uint64 `json:"notRestored"`
+	Failed      uint64 `json:"failed"`
+}
+
+func (evidence CursorRollbackEvidence) Classified() uint64 {
+	return evidence.Restored + evidence.NotRestored + evidence.Failed
 }

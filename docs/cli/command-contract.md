@@ -165,14 +165,19 @@ peer별 durable authorization record를 관리한다.
   display change를 terminal event로 처리한다. 기존 connection은 resume하지 않으며 source cleanup과
   crash guard disarm 뒤 새 실행에서만 diagnostics와 rearm을 다시 수행한다.
 - 기본 rearm distance는 32px이고 activation gap은 0px다. 이는 Phase 0 안전 실험값이며 제품 UX 기본값이 아니다.
-- report에는 실행한 heartbeat interval과 peer timeout, 성공한 heartbeat 송수신 횟수, 같은 session 내부 receive gap sample 수와 최대 gap, aggregate input count와 supervisor state만 저장한다. 주소, certificate, session/epoch/lease, key code, pointer 좌표와 delta는 저장하지 않는다.
+- report에는 실행한 heartbeat interval과 peer timeout, 성공한 heartbeat 송수신 횟수, 같은 session 내부 receive gap sample 수와 최대 gap, 성공 input count, 입력 주입 실패 확실성 count, cursor rollback 결과 count와 supervisor state만 저장한다. 주소, certificate, session/epoch/lease, key code, pointer 좌표와 delta는 저장하지 않는다.
 - `--guard-output`은 agent report와 같은 directory의 다른 새 JSON 경로여야 한다. guard는 정상 `DISARM` 또는 parent pipe `PARENT_EOF`에서 aggregate release count만 이 파일에 기록한다.
 
-duration 또는 사용자의 취소로 안전 종료해도 인증된 active session, 성공한 heartbeat 송신·수신 각각 2회, 같은 session의 receive gap sample 하나, peer timeout보다 작은 최대 receive gap과 destination entry·input evidence가 모두 없으면 `passed=false`와 exit `1`이다. 긴급 해제는 의도된 안전 동작이라 exit `0`이지만 `passed=true`로 바꾸지 않는다.
+duration 또는 사용자의 취소로 안전 종료해도 인증된 active session, 성공한 heartbeat 송신·수신 각각
+2회, 같은 session의 receive gap sample 하나, peer timeout보다 작은 최대 receive gap과 destination
+entry·input evidence가 모두 없으면 `passed=false`와 exit `1`이다. 입력 주입 실패가 하나라도 있거나
+cursor rollback 결과 합계가 시도 수와 다르거나 rollback 실패가 있으면 역시 통과하지 않는다. 성공한
+복원과 사용자 cursor 이동을 보호한 미복원은 안전한 결과로 인정한다. 긴급 해제는 의도된 안전 동작이라
+exit `0`이지만 `passed=true`로 바꾸지 않는다.
 
 ### `agent-session-check`
 
-같은 장소의 두 장비에서 수집한 `krasis.lab.agent-session/v6` report가 bounded 양방향 실험을 증명하는지 strict하게 판정한다.
+같은 장소의 두 장비에서 수집한 `krasis.lab.agent-session/v7` report가 bounded 양방향 실험을 증명하는지 strict하게 판정한다.
 
 - 사용법: `krasis-lab agent-session-check [--json] REPORT-A.json REPORT-B.json`
 - 정확히 두 file만 받으며 unknown field, trailing JSON, 1MiB 초과 file과 schema 불일치를 거부한다.
@@ -181,7 +186,8 @@ duration 또는 사용자의 취소로 안전 종료해도 인증된 active sess
 - listener/connect 역할 하나씩, 반대 edge, 같은 clean build revision, requested duration, heartbeat interval과 peer timeout을 요구한다.
 - 두 report 모두 `completed=true`, `passed=true`, lifecycle monitor와 crash guard 시작·정상 종료,
   lifecycle event와 rearm 요구 없음, final supervisor `STOPPED`, authenticated active session, 최소
-  liveness aggregate와 destination entry·input·return arm evidence를 가져야 한다.
+  liveness aggregate와 destination entry·input·return arm evidence를 가져야 한다. 입력 주입 실패는
+  모두 0이어야 하고 cursor rollback은 모든 시도가 복원·미복원·실패 중 하나로 분류되며 실패가 없어야 한다.
 
 report가 JSON으로 유효해도 pair 조건을 만족하지 않으면 exit `1`이다. 긴급 해제 report는 안전 동작 증거로 보존하지만 pair pass로 승격하지 않는다.
 

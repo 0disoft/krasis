@@ -611,8 +611,10 @@ type integrationCursorEntry struct{}
 func (integrationCursorEntry) PrepareEntry(context.Context, control.ScreenEdge) error {
 	return nil
 }
-func (integrationCursorEntry) CommitEntry()                        {}
-func (integrationCursorEntry) RollbackEntry(context.Context) error { return nil }
+func (integrationCursorEntry) CommitEntry() {}
+func (integrationCursorEntry) RollbackEntry(context.Context) (application.CursorRollbackOutcome, error) {
+	return application.CursorRollbackNotRestored, nil
+}
 
 type integrationReturnBoundary struct {
 	mu     sync.Mutex

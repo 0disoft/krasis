@@ -135,7 +135,7 @@ type LeaseAuthorizer interface {
 type CursorEntryPort interface {
 	PrepareEntry(context.Context, control.ScreenEdge) error
 	CommitEntry()
-	RollbackEntry(context.Context) error
+	RollbackEntry(context.Context) (application.CursorRollbackOutcome, error)
 }
 
 type ReturnBoundaryPort interface {
@@ -193,7 +193,8 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 			responder.Returns.DisarmReturn(returnIntent)
 			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), CleanupTimeout)
 			defer cancel()
-			return errors.Join(cause, responder.Entry.RollbackEntry(cleanupCtx))
+			_, rollbackErr := responder.Entry.RollbackEntry(cleanupCtx)
+			return errors.Join(cause, rollbackErr)
 		}
 		if err := responder.Entry.PrepareEntry(ctx, command.Edge); err != nil {
 			return rollbackEntry(err)

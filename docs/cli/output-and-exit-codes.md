@@ -201,7 +201,7 @@ certificate body, private key, 주소와 operational session 식별자는 저장
 
 ## `agent-session`
 
-- schema: `krasis.lab.agent-session/v6`
+- schema: `krasis.lab.agent-session/v7`
 - 출력: `--output`으로 지정한 단일 JSON file
 
 필드:
@@ -214,6 +214,8 @@ certificate body, private key, 주소와 operational session 식별자는 저장
 - supervisor의 final state, active 횟수, acquire/session failure 횟수와 emergency stop 횟수
 - 성공한 heartbeat 송수신 횟수, 같은 session 내부 receive gap sample 수와 최대 gap millisecond
 - destination의 entry, key/button down/up, pointer move, wheel과 return arm 누적 개수
+- 입력 주입 실패의 `notApplied`, `partiallyApplied`, `outcomeUnknown`, `unclassified` 누적 개수
+- cursor rollback의 `attempted`, `restored`, `notRestored`, `failed` 누적 개수
 
 stable failure code:
 
@@ -247,6 +249,9 @@ stable failure code:
 - `no_destination_input_observed`
 - `insufficient_liveness_evidence`
 - `unsafe_liveness_gap`
+- `input_injection_failure_observed`
+- `invalid_cursor_rollback_evidence`
+- `cursor_rollback_failed`
 
 `stopReason`은 `duration_elapsed`, `canceled`, `emergency_release`, `lifecycle_transition`,
 `failure` 중 하나다. lifecycle transition은 cleanup 뒤에도 explicit rearm을 요구하므로 exit `1`이고
@@ -256,7 +261,7 @@ redacted report만 남긴다.
 
 ## `agent-session-check --json`
 
-- schema: `krasis.lab.agent-session-check/v3`
+- schema: `krasis.lab.agent-session-check/v4`
 - 출력: 두 file의 basename 기반 요약, 전체 `valid`, `pairPassed`와 stable issue code
 
 pair issue code:
@@ -273,7 +278,11 @@ pair issue code:
 - `mixed_heartbeat_interval`
 - `mixed_peer_timeout`
 
-file issue에는 schema, alias, role, edge, timestamp, build, duration, liveness policy, `invalid_liveness_evidence`, `insufficient_liveness_evidence`, `liveness_gap_reached_timeout`, pass consistency, crash guard와 destination evidence 오류가 포함된다. 두 file이 모두 strict valid하고 pair issue가 없을 때만 exit `0`이다.
+file issue에는 schema, alias, role, edge, timestamp, build, duration, liveness policy,
+`invalid_liveness_evidence`, `insufficient_liveness_evidence`, `liveness_gap_reached_timeout`, pass
+consistency, crash guard, `unsafe_destination_input_evidence`, `invalid_cursor_rollback_evidence`,
+`unsafe_cursor_rollback_evidence`가 포함된다. file 결과는 aggregate `destinationInput`을 포함하지만
+token code와 pointer 좌표는 포함하지 않는다. 두 file이 모두 strict valid하고 pair issue가 없을 때만 exit `0`이다.
 
 ## `crash-recovery-check --json`
 
@@ -287,7 +296,7 @@ checker output 모두에 없다.
 
 ## `phase0-check --json`
 
-- schema: `krasis.lab.phase0-check/v3`
+- schema: `krasis.lab.phase0-check/v4`
 - 출력: home/study pair checker 결과, 네 recovery checker 결과, 전체 `passed`와 issue
 
 stable issue에는 pair cardinality/pass/alias, cross-location build/duration/heartbeat interval/peer timeout, recovery cardinality,

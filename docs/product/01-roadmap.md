@@ -55,7 +55,8 @@
 - `SendInput` zero·partial·unknown 확실성, 반복 press 보존과 crash guard protocol v2 cancel은 구현됨
 - grant 전 cursor entry의 prepare·commit·conditional rollback과 write failure 보상은 구현됨
 - Windows suspend/resume, session lock·disconnect·logoff, shutdown과 display change를 terminal
-  cancellation으로 만드는 lifecycle owner와 v6 evidence gate는 구현됨
+  cancellation으로 만드는 lifecycle owner와 v7 evidence gate는 구현됨
+- 입력 주입 실패 확실성과 cursor rollback 결과를 aggregate-only로 검증하는 evidence gate는 구현됨
 - 장소별 순차 수집을 합치는 `phase0-check` evidence gate는 구현됨
 - heartbeat payload, liveness domain, optional timer worker, explicit live CLI policy와 privacy-bounded aggregate 계측은 구현됨
 - 정식 agent executable, 단일 instance와 tray UI lifecycle은 미구현

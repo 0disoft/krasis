@@ -14,5 +14,6 @@
 - `0007-windows-agent-lifecycle-owner.md`: Windows 절전·session·display event의 fail-closed agent owner
 - `0008-input-injection-certainty.md`: `SendInput` 실패 확실성과 journal·crash guard rollback 경계
 - `0009-cursor-entry-compensation.md`: grant 전 cursor entry의 prepare·commit·conditional rollback
+- `0010-input-failure-evidence.md`: 입력 주입 실패 확실성과 cursor rollback 결과의 aggregate evidence
 
 새 결정은 `0000-template.md`를 복사해 다음 번호로 추가한다. 이미 Accepted인 결정의 의미를 바꿀 때는 기존 문서를 조용히 덮어쓰지 말고 새 ADR에서 대체 관계와 migration 영향을 기록한다.

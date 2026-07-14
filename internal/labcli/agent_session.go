@@ -326,6 +326,18 @@ func agentSessionEvidenceExit(report *lab.AgentSessionReport) int {
 		return exitRuntime
 	}
 	input := report.DestinationInput
+	if input.InjectionFailures.Total() > 0 {
+		report.FailureCode = "input_injection_failure_observed"
+		return exitRuntime
+	}
+	if input.CursorRollbacks.Classified() != input.CursorRollbacks.Attempted {
+		report.FailureCode = "invalid_cursor_rollback_evidence"
+		return exitRuntime
+	}
+	if input.CursorRollbacks.Failed > 0 {
+		report.FailureCode = "cursor_rollback_failed"
+		return exitRuntime
+	}
 	if input.Entries == 0 || input.KeyDowns+input.KeyUps+input.ButtonDowns+input.ButtonUps+input.PointerMoves+input.Wheels == 0 {
 		report.FailureCode = "no_destination_input_observed"
 		return exitRuntime
@@ -485,6 +497,7 @@ func (input *countingInput) Press(ctx context.Context, token control.PressedToke
 		return fmt.Errorf("prepare crash recovery: %w", err)
 	}
 	if err := input.delegate.Press(ctx, token); err != nil {
+		input.recordInjectionFailure(err)
 		certainty, classified := application.InjectionCertaintyOf(err)
 		if prepared && classified && certainty == application.InjectionNotApplied {
 			if cancelErr := input.guard.CancelPreparedPress(token); cancelErr != nil {
@@ -506,6 +519,7 @@ func (input *countingInput) Release(ctx context.Context, token control.PressedTo
 	input.operationMu.Lock()
 	defer input.operationMu.Unlock()
 	if err := input.delegate.Release(ctx, token); err != nil {
+		input.recordInjectionFailure(err)
 		return err
 	}
 	if err := input.guard.Released(token); err != nil {
@@ -522,6 +536,7 @@ func (input *countingInput) Release(ctx context.Context, token control.PressedTo
 }
 func (input *countingInput) Move(ctx context.Context, x, y int32) error {
 	if err := input.delegate.Move(ctx, x, y); err != nil {
+		input.recordInjectionFailure(err)
 		return err
 	}
 	input.mu.Lock()
@@ -531,6 +546,7 @@ func (input *countingInput) Move(ctx context.Context, x, y int32) error {
 }
 func (input *countingInput) Wheel(ctx context.Context, x, y int32) error {
 	if err := input.delegate.Wheel(ctx, x, y); err != nil {
+		input.recordInjectionFailure(err)
 		return err
 	}
 	input.mu.Lock()
@@ -547,8 +563,48 @@ func (input *countingInput) CommitEntry() {
 	input.value.Entries++
 	input.mu.Unlock()
 }
-func (input *countingInput) RollbackEntry(ctx context.Context) error {
-	return input.delegate.RollbackEntry(ctx)
+func (input *countingInput) RollbackEntry(ctx context.Context) (application.CursorRollbackOutcome, error) {
+	input.mu.Lock()
+	input.value.CursorRollbacks.Attempted++
+	input.mu.Unlock()
+	outcome, err := input.delegate.RollbackEntry(ctx)
+	input.mu.Lock()
+	defer input.mu.Unlock()
+	if err != nil {
+		input.value.CursorRollbacks.Failed++
+		return "", err
+	}
+	if validationErr := outcome.Validate(); validationErr != nil {
+		input.value.CursorRollbacks.Failed++
+		return "", validationErr
+	}
+	switch outcome {
+	case application.CursorRollbackRestored:
+		input.value.CursorRollbacks.Restored++
+	case application.CursorRollbackNotRestored:
+		input.value.CursorRollbacks.NotRestored++
+	}
+	return outcome, nil
+}
+
+func (input *countingInput) recordInjectionFailure(err error) {
+	input.mu.Lock()
+	defer input.mu.Unlock()
+	certainty, classified := application.InjectionCertaintyOf(err)
+	if !classified {
+		input.value.InjectionFailures.Unclassified++
+		return
+	}
+	switch certainty {
+	case application.InjectionNotApplied:
+		input.value.InjectionFailures.NotApplied++
+	case application.InjectionPartiallyApplied:
+		input.value.InjectionFailures.PartiallyApplied++
+	case application.InjectionOutcomeUnknown:
+		input.value.InjectionFailures.OutcomeUnknown++
+	default:
+		input.value.InjectionFailures.Unclassified++
+	}
 }
 func (input *countingInput) ArmReturn(intent control.ReturnIntent, edge control.ScreenEdge) error {
 	if err := input.delegate.ArmReturn(intent, edge); err != nil {

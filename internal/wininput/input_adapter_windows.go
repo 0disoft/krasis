@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
 )
 
@@ -72,48 +73,48 @@ func (adapter *InputAdapter) PrepareEntry(ctx context.Context, sourceEdge contro
 	return nil
 }
 
-func (adapter *InputAdapter) RollbackEntry(ctx context.Context) error {
+func (adapter *InputAdapter) RollbackEntry(ctx context.Context) (application.CursorRollbackOutcome, error) {
 	state, err := adapter.cursorEntryState()
 	if err != nil {
-		return err
+		return "", err
 	}
 	state.mu.Lock()
 	defer state.mu.Unlock()
 	if !state.pending {
-		return nil
+		return application.CursorRollbackNotRestored, nil
 	}
 	defer state.clear()
 	if ctx == nil {
-		return fmt.Errorf("%w: rollback context is required", ErrCursorEntryState)
+		return "", fmt.Errorf("%w: rollback context is required", ErrCursorEntryState)
 	}
 	if err := ctx.Err(); err != nil {
-		return errors.Join(ErrCursorEntryState, err)
+		return "", errors.Join(ErrCursorEntryState, err)
 	}
 	if !state.enteredKnown {
-		return fmt.Errorf("%w: entry position could not be verified", ErrCursorEntryState)
+		return "", fmt.Errorf("%w: entry position could not be verified", ErrCursorEntryState)
 	}
 	current, err := cursorPosition()
 	if err != nil {
-		return fmt.Errorf("%w: inspect cursor before rollback: %v", ErrCursorEntryState, err)
+		return "", fmt.Errorf("%w: inspect cursor before rollback: %v", ErrCursorEntryState, err)
 	}
 	if current.X != state.enteredX || current.Y != state.enteredY {
-		return nil
+		return application.CursorRollbackNotRestored, nil
 	}
 	result, _, callErr := callSetCursorPos(
 		uintptr(uint32(state.previousX)),
 		uintptr(uint32(state.previousY)),
 	)
 	if result == 0 {
-		return fmt.Errorf("%w: SetCursorPos rollback failed: %v", ErrCursorEntryState, callErr)
+		return "", fmt.Errorf("%w: SetCursorPos rollback failed: %v", ErrCursorEntryState, callErr)
 	}
 	restored, err := cursorPosition()
 	if err != nil {
-		return fmt.Errorf("%w: verify cursor rollback: %v", ErrCursorEntryState, err)
+		return "", fmt.Errorf("%w: verify cursor rollback: %v", ErrCursorEntryState, err)
 	}
 	if restored.X != state.previousX || restored.Y != state.previousY {
-		return fmt.Errorf("%w: cursor rollback was clipped to (%d,%d)", ErrCursorEntryState, restored.X, restored.Y)
+		return "", fmt.Errorf("%w: cursor rollback was clipped to (%d,%d)", ErrCursorEntryState, restored.X, restored.Y)
 	}
-	return nil
+	return application.CursorRollbackRestored, nil
 }
 
 func (adapter *InputAdapter) Press(ctx context.Context, token control.PressedToken) error {

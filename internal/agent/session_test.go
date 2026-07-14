@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/transport"
 	"github.com/0disoft/krasis/internal/wininput"
@@ -201,7 +202,9 @@ func (*testInput) Release(context.Context, control.PressedToken) error    { retu
 func (*testInput) Wheel(context.Context, int32, int32) error              { return nil }
 func (*testInput) PrepareEntry(context.Context, control.ScreenEdge) error { return nil }
 func (*testInput) CommitEntry()                                           {}
-func (*testInput) RollbackEntry(context.Context) error                    { return nil }
+func (*testInput) RollbackEntry(context.Context) (application.CursorRollbackOutcome, error) {
+	return application.CursorRollbackNotRestored, nil
+}
 func (input *testInput) Move(_ context.Context, x, y int32) error {
 	input.moves <- [2]int32{x, y}
 	input.mu.Lock()

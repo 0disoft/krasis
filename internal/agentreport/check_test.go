@@ -23,6 +23,9 @@ func TestCheckAcceptsPassingHomePair(t *testing.T) {
 	if result.Files[0].File != "H-A.json" {
 		t.Fatalf("file = %q", result.Files[0].File)
 	}
+	if result.Files[0].DestinationInput != passingReport("H-A", "listen", "RIGHT").DestinationInput {
+		t.Fatalf("destination input evidence = %+v", result.Files[0].DestinationInput)
+	}
 }
 
 func TestCheckRejectsMixedLocationAndSameEdge(t *testing.T) {
@@ -72,7 +75,7 @@ func TestCheckRejectsLifecycleTransitionEvidence(t *testing.T) {
 
 func TestCheckRejectsUnknownFields(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "unknown.json")
-	if err := os.WriteFile(path, []byte(`{"schemaVersion":"krasis.lab.agent-session/v6","surprise":true}`), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(`{"schemaVersion":"krasis.lab.agent-session/v7","surprise":true}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	result := Check([]string{path})
@@ -126,6 +129,33 @@ func TestCheckRejectsInvalidOrMixedLivenessPolicy(t *testing.T) {
 	result = Check([]string{first, second})
 	if !result.Valid || result.PairPassed || !hasIssue(result.Issues, "mixed_heartbeat_interval") || !hasIssue(result.Issues, "mixed_peer_timeout") {
 		t.Fatalf("Check(mixed policy) = %+v", result)
+	}
+}
+
+func TestValidateRejectsUnsafeDestinationInputEvidence(t *testing.T) {
+	report := passingReport("H-A", "listen", "RIGHT")
+	report.DestinationInput.InjectionFailures.PartiallyApplied = 1
+	issues := validate(report)
+	if !hasIssue(issues, "unsafe_destination_input_evidence") {
+		t.Fatalf("validate() issues = %v", issues)
+	}
+
+	report = passingReport("H-A", "listen", "RIGHT")
+	report.DestinationInput.CursorRollbacks = lab.CursorRollbackEvidence{Attempted: 2, Restored: 1}
+	issues = validate(report)
+	if !hasIssue(issues, "invalid_cursor_rollback_evidence") {
+		t.Fatalf("validate() issues = %v", issues)
+	}
+
+	report.DestinationInput.CursorRollbacks = lab.CursorRollbackEvidence{Attempted: 1, Failed: 1}
+	issues = validate(report)
+	if !hasIssue(issues, "unsafe_cursor_rollback_evidence") {
+		t.Fatalf("validate() issues = %v", issues)
+	}
+
+	report.DestinationInput.CursorRollbacks = lab.CursorRollbackEvidence{Attempted: 1, NotRestored: 1}
+	if issues = validate(report); len(issues) != 0 {
+		t.Fatalf("validate(safe no-restore) issues = %v", issues)
 	}
 }
 

@@ -29,8 +29,8 @@
 | Medium | Wails v3 prerelease 변화로 UI 빌드가 깨짐 | 설치물 재현 불가 | exact toolchain 재현 | 호환 세트 고정, UI를 core에서 격리 |
 | Medium | 진단 로그가 사용자 입력을 노출 | 개인정보 유출 | 지원 번들 검토 | allowlist 로그와 민감값 redaction |
 | High | 제품 trust store 경로와 pairing UI가 없어 Phase 0 store를 수동 관리함 | 잘못된 store directory나 alias를 선택하고 key rotation을 놓침 | import/list/revoke, 손상·중복·lock·DACL과 향후 migration 테스트 | atomic `krasis.trust-store/v1`과 immutable runtime snapshot은 구현됨; 제품 default 경로·사용자 승인·rotation UX는 Phase 2 후속 |
-| High | press 주입 결과 확실성 분류가 실제 Windows 동작과 어긋남 | 유령 token 또는 실제 held input 누락 | zero·partial·불가능 count, 반복 press, guard cancel과 실제 장비 failure-injection 테스트 | `NOT_APPLIED`인 새 기록만 rollback하고 partial·unknown·기존 반복 token은 guard와 journal에 유지; protocol v2 구현됨 |
-| Medium | cursor entry rollback이 최신 물리 cursor 이동과 경합함 | 실패 복구가 사용자의 새 위치를 덮어쓰거나 cursor가 화면 끝에 남음 | entry 성공 뒤 runtime/write 실패, entry 이후 물리 이동과 실제 두 장비 경합 테스트 | prepare·commit·conditional rollback 구현됨; 현재 좌표가 확인된 entry 좌표와 같을 때만 snapshot 복원, 불확실하면 덮어쓰지 않음 |
+| High | press 주입 결과 확실성 분류가 실제 Windows 동작과 어긋남 | 유령 token 또는 실제 held input 누락 | zero·partial·불가능 count, 반복 press, guard cancel과 실제 장비 failure-injection 테스트 | `NOT_APPLIED`인 새 기록만 rollback하고 partial·unknown·기존 반복 token은 guard와 journal에 유지; protocol v2와 aggregate failure evidence 구현됨 |
+| Medium | cursor entry rollback이 최신 물리 cursor 이동과 경합함 | 실패 복구가 사용자의 새 위치를 덮어쓰거나 cursor가 화면 끝에 남음 | entry 성공 뒤 runtime/write 실패, entry 이후 물리 이동과 실제 두 장비 경합 테스트 | prepare·commit·conditional rollback과 restored/not-restored/failed aggregate evidence 구현됨; 현재 좌표가 확인된 entry 좌표와 같을 때만 snapshot 복원, 불확실하면 덮어쓰지 않음 |
 | Medium | 복사된 Windows private key가 넓은 ACL이나 reparse path에 놓임 | 다른 로컬 계정이 key를 읽거나 교체함 | inherited DACL·non-regular key·역할별 복사 후 재보호 테스트 | 생성·명시적 재보호 시 현재 사용자와 `SYSTEM` 전용 protected DACL 강제, load-time DACL·reparse 검증 구현됨; 이미 노출된 key는 폐기 |
 | High | Windows lifecycle message가 누락되거나 monitor cleanup이 멈춤 | stale lease나 geometry가 resume 뒤 남음 | OS message fault-injection, Modern Standby와 실제 장비 반복 | 숨겨진 window owner가 잠금·절전·복귀·로그오프·shutdown·display 변경을 terminal cancel하고 source·guard·monitor를 close-once 종료함; 다음 실행에서만 재진단·rearm |
 

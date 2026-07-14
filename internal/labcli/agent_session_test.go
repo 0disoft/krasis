@@ -16,9 +16,13 @@ import (
 )
 
 type certaintyInput struct {
-	pressErr   error
-	releaseErr error
-	returns    chan control.ReturnIntent
+	pressErr       error
+	releaseErr     error
+	moveErr        error
+	wheelErr       error
+	rollbackResult application.CursorRollbackOutcome
+	rollbackErr    error
+	returns        chan control.ReturnIntent
 }
 
 func (input *certaintyInput) Press(context.Context, control.PressedToken) error {
@@ -27,11 +31,16 @@ func (input *certaintyInput) Press(context.Context, control.PressedToken) error 
 func (input *certaintyInput) Release(context.Context, control.PressedToken) error {
 	return input.releaseErr
 }
-func (*certaintyInput) Move(context.Context, int32, int32) error               { return nil }
-func (*certaintyInput) Wheel(context.Context, int32, int32) error              { return nil }
+func (input *certaintyInput) Move(context.Context, int32, int32) error         { return input.moveErr }
+func (input *certaintyInput) Wheel(context.Context, int32, int32) error        { return input.wheelErr }
 func (*certaintyInput) PrepareEntry(context.Context, control.ScreenEdge) error { return nil }
 func (*certaintyInput) CommitEntry()                                           {}
-func (*certaintyInput) RollbackEntry(context.Context) error                    { return nil }
+func (input *certaintyInput) RollbackEntry(context.Context) (application.CursorRollbackOutcome, error) {
+	if input.rollbackResult == "" && input.rollbackErr == nil {
+		return application.CursorRollbackNotRestored, nil
+	}
+	return input.rollbackResult, input.rollbackErr
+}
 func (*certaintyInput) ArmReturn(control.ReturnIntent, control.ScreenEdge) error {
 	return nil
 }
@@ -97,6 +106,51 @@ func TestCountingInputKeepsGuardRecordWhenReleaseFails(t *testing.T) {
 	}
 }
 
+func TestCountingInputClassifiesInjectionFailures(t *testing.T) {
+	cause := errors.New("injection failed")
+	input := newCountingInput(&certaintyInput{
+		pressErr:   &application.InjectionError{Certainty: application.InjectionNotApplied, Requested: 1, Cause: cause},
+		releaseErr: &application.InjectionError{Certainty: application.InjectionPartiallyApplied, Requested: 1, Inserted: 1, Cause: cause},
+		moveErr:    &application.InjectionError{Certainty: application.InjectionOutcomeUnknown, Requested: 1, Cause: cause},
+		wheelErr:   cause,
+	}, &certaintyGuard{})
+	token := control.PressedToken{Kind: control.PressedKeyboardKey, Code: 30}
+	_ = input.Press(context.Background(), token)
+	_ = input.Release(context.Background(), token)
+	_ = input.Move(context.Background(), 1, 0)
+	_ = input.Wheel(context.Background(), 0, 1)
+	evidence := input.evidence().InjectionFailures
+	if evidence.NotApplied != 1 || evidence.PartiallyApplied != 1 || evidence.OutcomeUnknown != 1 || evidence.Unclassified != 1 || evidence.Total() != 4 {
+		t.Fatalf("injection failure evidence = %+v", evidence)
+	}
+}
+
+func TestCountingInputClassifiesCursorRollbackOutcomes(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		outcome  application.CursorRollbackOutcome
+		err      error
+		want     lab.CursorRollbackEvidence
+		wantFail bool
+	}{
+		{name: "restored", outcome: application.CursorRollbackRestored, want: lab.CursorRollbackEvidence{Attempted: 1, Restored: 1}},
+		{name: "not restored", outcome: application.CursorRollbackNotRestored, want: lab.CursorRollbackEvidence{Attempted: 1, NotRestored: 1}},
+		{name: "failed", err: errors.New("rollback failed"), want: lab.CursorRollbackEvidence{Attempted: 1, Failed: 1}, wantFail: true},
+		{name: "invalid outcome", outcome: "UNKNOWN", want: lab.CursorRollbackEvidence{Attempted: 1, Failed: 1}, wantFail: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			input := newCountingInput(&certaintyInput{rollbackResult: test.outcome, rollbackErr: test.err}, &certaintyGuard{})
+			_, err := input.RollbackEntry(context.Background())
+			if (err != nil) != test.wantFail {
+				t.Fatalf("RollbackEntry() error = %v", err)
+			}
+			if evidence := input.evidence().CursorRollbacks; evidence != test.want {
+				t.Fatalf("cursor rollback evidence = %+v, want %+v", evidence, test.want)
+			}
+		})
+	}
+}
+
 func TestCountingInputCountsOnlyCommittedCursorEntry(t *testing.T) {
 	input := newCountingInput(&certaintyInput{}, &certaintyGuard{})
 	if err := input.PrepareEntry(context.Background(), control.ScreenEdgeRight); err != nil {
@@ -109,7 +163,7 @@ func TestCountingInputCountsOnlyCommittedCursorEntry(t *testing.T) {
 	if evidence := input.evidence(); evidence.Entries != 1 {
 		t.Fatalf("committed entry evidence = %+v", evidence)
 	}
-	if err := input.RollbackEntry(context.Background()); err != nil {
+	if _, err := input.RollbackEntry(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	if evidence := input.evidence(); evidence.Entries != 1 {
@@ -274,6 +328,24 @@ func TestAgentSessionEvidenceRequiresConnectionAndDestinationInput(t *testing.T)
 	}
 	if code := agentSessionEvidenceExit(&report); code != exitSuccess || !report.Passed {
 		t.Fatalf("passing evidence = code %d report %+v", code, report)
+	}
+	report.Passed = false
+	report.DestinationInput.InjectionFailures.OutcomeUnknown = 1
+	if code := agentSessionEvidenceExit(&report); code != exitRuntime || report.FailureCode != "input_injection_failure_observed" {
+		t.Fatalf("injection failure evidence = code %d report %+v", code, report)
+	}
+	report.DestinationInput.InjectionFailures = lab.InjectionFailureEvidence{}
+	report.DestinationInput.CursorRollbacks = lab.CursorRollbackEvidence{Attempted: 1, Failed: 1}
+	if code := agentSessionEvidenceExit(&report); code != exitRuntime || report.FailureCode != "cursor_rollback_failed" {
+		t.Fatalf("rollback failure evidence = code %d report %+v", code, report)
+	}
+	report.DestinationInput.CursorRollbacks = lab.CursorRollbackEvidence{Attempted: 1}
+	if code := agentSessionEvidenceExit(&report); code != exitRuntime || report.FailureCode != "invalid_cursor_rollback_evidence" {
+		t.Fatalf("invalid rollback evidence = code %d report %+v", code, report)
+	}
+	report.DestinationInput.CursorRollbacks = lab.CursorRollbackEvidence{Attempted: 1, Restored: 1}
+	if code := agentSessionEvidenceExit(&report); code != exitSuccess || !report.Passed {
+		t.Fatalf("safe rollback evidence = code %d report %+v", code, report)
 	}
 	report.Passed = false
 	report.Liveness.MaxReceiveGapMillis = report.PeerTimeoutMillis

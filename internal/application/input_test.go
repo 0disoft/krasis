@@ -171,3 +171,14 @@ func TestInjectReleaseRejectsInvalidUntrackedToken(t *testing.T) {
 		t.Fatalf("invalid release was not rejected: released=%t calls=%v error=%v", released, port.releaseCalls, err)
 	}
 }
+
+func TestCursorRollbackOutcomeValidation(t *testing.T) {
+	for _, outcome := range []CursorRollbackOutcome{CursorRollbackRestored, CursorRollbackNotRestored} {
+		if err := outcome.Validate(); err != nil {
+			t.Fatalf("Validate(%q) error = %v", outcome, err)
+		}
+	}
+	if err := CursorRollbackOutcome("UNKNOWN").Validate(); err == nil {
+		t.Fatal("Validate(UNKNOWN) accepted unsupported outcome")
+	}
+}

@@ -6,7 +6,7 @@ import (
 	"github.com/0disoft/krasis/internal/guardreport"
 )
 
-const SchemaVersion = "krasis.lab.phase0-check/v3"
+const SchemaVersion = "krasis.lab.phase0-check/v4"
 
 type Report struct {
 	SchemaVersion string                    `json:"schemaVersion"`

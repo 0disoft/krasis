@@ -364,9 +364,12 @@ func (entry *recordingCursorEntry) CommitEntry() {
 	entry.commits++
 }
 
-func (entry *recordingCursorEntry) RollbackEntry(context.Context) error {
+func (entry *recordingCursorEntry) RollbackEntry(context.Context) (application.CursorRollbackOutcome, error) {
 	entry.rollbacks++
-	return entry.rollbackErr
+	if entry.rollbackErr != nil {
+		return "", entry.rollbackErr
+	}
+	return application.CursorRollbackRestored, nil
 }
 
 func (entry *recordingCursorEntry) ArmReturn(intent control.ReturnIntent, _ control.ScreenEdge) error {

@@ -16,6 +16,22 @@ const (
 	InjectionOutcomeUnknown   InjectionCertainty = "OUTCOME_UNKNOWN"
 )
 
+type CursorRollbackOutcome string
+
+const (
+	CursorRollbackRestored    CursorRollbackOutcome = "RESTORED"
+	CursorRollbackNotRestored CursorRollbackOutcome = "NOT_RESTORED"
+)
+
+func (outcome CursorRollbackOutcome) Validate() error {
+	switch outcome {
+	case CursorRollbackRestored, CursorRollbackNotRestored:
+		return nil
+	default:
+		return fmt.Errorf("unsupported cursor rollback outcome %q", outcome)
+	}
+}
+
 type InjectionError struct {
 	Certainty InjectionCertainty
 	Requested int

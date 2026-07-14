@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	SchemaVersion = "krasis.lab.agent-session-check/v3"
+	SchemaVersion = "krasis.lab.agent-session-check/v4"
 	maxReportSize = 1 << 20
 )
 
@@ -41,6 +41,7 @@ type FileResult struct {
 	Completed         bool                 `json:"completed"`
 	Passed            bool                 `json:"passed"`
 	Liveness          lab.LivenessEvidence `json:"liveness"`
+	DestinationInput  lab.InputEvidence    `json:"destinationInput"`
 	GuardReport       string               `json:"guardReport,omitempty"`
 	GuardValid        bool                 `json:"guardValid"`
 	GuardIssues       []string             `json:"guardIssues"`
@@ -116,6 +117,7 @@ func checkFile(path string) (FileResult, lab.AgentSessionReport) {
 	result.Completed = report.Completed
 	result.Passed = report.Passed
 	result.Liveness = report.Liveness
+	result.DestinationInput = report.DestinationInput
 	result.Issues = validate(report)
 	if report.CrashGuard.ReportFile == "" || filepath.Base(report.CrashGuard.ReportFile) != report.CrashGuard.ReportFile {
 		result.Issues = append(result.Issues, "invalid_guard_report_reference")
@@ -202,6 +204,15 @@ func validate(report lab.AgentSessionReport) []string {
 	input := report.DestinationInput
 	if input.Entries == 0 || input.ReturnArms == 0 || input.KeyDowns+input.KeyUps+input.ButtonDowns+input.ButtonUps+input.PointerMoves+input.Wheels == 0 {
 		issues = append(issues, "missing_destination_evidence")
+	}
+	if input.InjectionFailures.Total() > 0 {
+		issues = append(issues, "unsafe_destination_input_evidence")
+	}
+	if input.CursorRollbacks.Classified() != input.CursorRollbacks.Attempted {
+		issues = append(issues, "invalid_cursor_rollback_evidence")
+	}
+	if input.CursorRollbacks.Failed > 0 {
+		issues = append(issues, "unsafe_cursor_rollback_evidence")
 	}
 	return issues
 }

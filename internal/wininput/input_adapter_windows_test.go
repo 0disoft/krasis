@@ -225,9 +225,10 @@ func TestInputAdapterRollbackRestoresOnlyOwnedEntryPosition(t *testing.T) {
 		currentX     int32
 		currentY     int32
 		wantSetCalls int
+		wantOutcome  application.CursorRollbackOutcome
 	}{
-		{name: "unchanged entry", wantSetCalls: 2},
-		{name: "cursor moved after entry", currentX: 777, currentY: 888, wantSetCalls: 1},
+		{name: "unchanged entry", wantSetCalls: 2, wantOutcome: application.CursorRollbackRestored},
+		{name: "cursor moved after entry", currentX: 777, currentY: 888, wantSetCalls: 1, wantOutcome: application.CursorRollbackNotRestored},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			originalGet := callGetCursorPos
@@ -276,8 +277,12 @@ func TestInputAdapterRollbackRestoresOnlyOwnedEntryPosition(t *testing.T) {
 			if err := adapter.PrepareEntry(context.Background(), control.ScreenEdgeRight); err != nil {
 				t.Fatalf("PrepareEntry() error = %v", err)
 			}
-			if err := adapter.RollbackEntry(context.Background()); err != nil {
+			outcome, err := adapter.RollbackEntry(context.Background())
+			if err != nil {
 				t.Fatalf("RollbackEntry() error = %v", err)
+			}
+			if outcome != test.wantOutcome {
+				t.Fatalf("RollbackEntry() outcome = %q, want %q", outcome, test.wantOutcome)
 			}
 			if setCalls != test.wantSetCalls {
 				t.Fatalf("SetCursorPos calls = %d, want %d", setCalls, test.wantSetCalls)
@@ -320,7 +325,7 @@ func TestInputAdapterCommitPreventsRollback(t *testing.T) {
 		t.Fatal(err)
 	}
 	adapter.CommitEntry()
-	if err := adapter.RollbackEntry(context.Background()); err != nil {
+	if outcome, err := adapter.RollbackEntry(context.Background()); err != nil || outcome != application.CursorRollbackNotRestored {
 		t.Fatal(err)
 	}
 	if setCalls != 1 {
@@ -354,7 +359,7 @@ func TestInputAdapterRollbackRefusesUnknownEntryPosition(t *testing.T) {
 	if err := adapter.PrepareEntry(context.Background(), control.ScreenEdgeRight); !errors.Is(err, ErrInputInjection) {
 		t.Fatalf("PrepareEntry() error = %v", err)
 	}
-	if err := adapter.RollbackEntry(context.Background()); !errors.Is(err, ErrCursorEntryState) {
+	if _, err := adapter.RollbackEntry(context.Background()); !errors.Is(err, ErrCursorEntryState) {
 		t.Fatalf("RollbackEntry() error = %v", err)
 	}
 	if setCalls != 1 {
