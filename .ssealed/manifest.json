@@ -1,7 +1,7 @@
 {
   "tool": "ssealed",
   "version": "0.6.11",
-  "generatedAt": "2026-07-14T04:02:14.185Z",
+  "generatedAt": "2026-07-14T05:30:07.670Z",
   "scope": "general",
   "profile": "desktop-app",
   "addons": [
@@ -826,13 +826,13 @@
     },
     {
       "path": "docs/ops/ci.md",
-      "checksum": "sha256:da3049a57009e67e94a386c034b7f347b8fb1071f6b5f1e2dc47700f1f00e7f5",
+      "checksum": "sha256:bdedd6393c9b36cac432c43e8c060fde7bc72832ee70df75947533775c72a32d",
       "kind": "document",
       "ownership": "seeded",
       "presence": "optional",
       "status": "active",
       "initialChecksum": "sha256:22ccaa9f1a1371db7743291eebeef85d477ff5bc0838dde24a166722e8bdc525",
-      "acceptedChecksum": "sha256:da3049a57009e67e94a386c034b7f347b8fb1071f6b5f1e2dc47700f1f00e7f5",
+      "acceptedChecksum": "sha256:bdedd6393c9b36cac432c43e8c060fde7bc72832ee70df75947533775c72a32d",
       "generatedChecksum": "sha256:22ccaa9f1a1371db7743291eebeef85d477ff5bc0838dde24a166722e8bdc525"
     },
     {

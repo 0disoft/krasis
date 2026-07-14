@@ -80,6 +80,11 @@ listener/connect 역할, 반대 edge, clean 동일 build, 동일 duration/heartb
 시작·정상 종료, lifecycle monitor의 clean 종료와 event·rearm 부재, 같은 directory의 guard report device/build/zero-recovery, destination evidence, 주입 실패 0건과 cursor rollback 분류 합계를 검증한다. 전체 path, session identifier나 원시
 입력은 checker output으로 복제하지 않는다.
 
+Windows `cmd/krasis-lab` 통합 smoke는 현재 source에서 임시 `krasis-lab.exe`를 실제로 빌드해
+subprocess로 실행한다. 정상 `agent-session-check/v4`, 주입 실패, cursor rollback 합계 불일치와 실패,
+정상 `phase0-check/v4`를 검증하고 모든 JSON output을 재귀 검사해 token code, pointer 좌표·delta,
+session·epoch·lease, 주소와 certificate 식별 필드가 나타나지 않는지 확인한다.
+
 Phase 0 checker 테스트는 서로 다른 날짜의 home/study pair를 같은 build, duration과 liveness policy로
 합칠 수 있는지, 네 alias의 parent-EOF recovery가 각각 한 번씩 있는지 검증한다. 네 장비의
 동시 실행이나 같은 수집 timestamp를 요구하지 않으며 location 사이 policy가 다르면 거부한다.
