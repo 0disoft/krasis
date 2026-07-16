@@ -23,6 +23,9 @@ GitHub Actions의 `krasis-probe-kit-windows-amd64-<commit>.zip` artifact를 한 
 `Probe kit checksums verified.`가 나오지 않으면 실행하지 않는다. 이 검사는 다운로드 뒤
 부분 변조와 손상을 찾지만, artifact와 `SHA256SUMS.txt`가 함께 교체된 경우를 막는 서명은
 아니다. GitHub workflow run, commit과 artifact 출처도 함께 확인한다.
+`phase0-check`는 report의 clean build revision만 비교하고 이 kit checksum을 다시 계산하지 않는다.
+따라서 네 장비에서 사용한 workflow run과 kit SHA-256 기록을 잃으면 checker pass만으로 동일
+artifact 사용을 주장하지 않는다.
 
 ## 수집
 
@@ -50,6 +53,77 @@ $reports = @(Get-ChildItem -LiteralPath .\reports -Filter '*-basic-*.json' -File
 ```
 
 서로 다른 build revision, dirty build, duration 또는 중복 장비 별칭이 섞이면 비교 불가능으로 판정한다. `Guided` report는 현재 `probe-check` 입력이 아니며 stage별 `passed`와 `failureCodes`를 직접 확인한다.
+
+## pointer edge shadow
+
+Guided와 Basic probe를 통과한 장비에서 현재 legacy hook 좌표 경로가 화면 edge의 바깥 방향 movement를 잃는지 별도로 확인한다. 이 단계도 사용자 수동 실행 전용이다. Deskflow와 다른 입력 공유·자동화 프로그램을 완전히 종료하고, 한 장비씩 실행한다.
+
+왼쪽 장비의 오른쪽 edge 예시:
+
+```powershell
+.\krasis-lab.exe pointer-shadow --device S-A --edge RIGHT --duration 10s --output .\reports\S-A-pointer-shadow.json
+```
+
+오른쪽 장비에서는 alias를 `S-B`, edge를 `LEFT`로 바꾼다. capture 안내가 나오면 cursor를 지정 edge로 이동한 뒤 해당 edge 바깥 방향으로 mouse 또는 touchpad를 계속 움직인다. 이 명령은 로컬 입력을 억제하거나 다른 장비로 보내지 않는다.
+
+report의 `completed=true`, `passed=true`, 빈 `failureCodes`, 양수 `raw.outwardWhileHookAtEdge`와 `signature.observed=true`를 함께 확인한다. `injected_pointer_interference`가 있으면 자동화 프로그램이 완전히 종료되지 않은 것이므로 해당 report를 보존하고 새 output으로 다시 실행한다.
+
+이 report는 aggregate count만 가지며 pointer 좌표나 trajectory를 저장하지 않는다. `passed=true`는 legacy edge-clipping signature를 확인했다는 뜻이지 production Raw Input forwarding이나 pointer latency가 통과했다는 뜻이 아니다.
+
+## 단일 장비 wheel surface 진단
+
+두 손가락 scroll이 source 장비에만 남으면 두 장비 실험을 반복하지 말고 문제 장비 한 대에서 먼저 실행한다. gram13 예시는 다음과 같다.
+
+```powershell
+New-Item -ItemType Directory -Path .\reports -Force
+.\krasis-lab.exe wheel-surface --device S-B --duration 10s --output .\reports\S-B-wheel-surface.json
+```
+
+pointer 이동, left/right click, 두 손가락 vertical/horizontal scroll을 수행한다. network, credential, listener와 HP15는 필요 없다. Deskflow 같은 입력 공유·자동화 프로그램은 종료한다.
+
+시작과 종료에 각각 `MOUSEEVENTF_MOVE|MOUSEEVENTF_MOVE_NOCOALESCE` tagged 상대 pointer move `+1/-1` pair가 들어간다. 정상 hook은 네 `WM_MOUSEMOVE`를 모두 삼키며 wheel event를 만들지 않아 Raw Input wheel evidence를 오염시키지 않는다. hook이 없으면 cursor가 순간 이동할 수 있고 pair 순합이 0이어도 완전히 무해함을 보장할 수 없다. 중요한 작업을 저장하고 빈 테스트 화면에서 실행한다.
+
+output은 기존 file을 덮어쓰지 않으므로 재실행에는 timestamp를 붙인 새 이름을 쓴다. 먼저 `completed=true`, `passed=true`, 빈 `failureCodes`, `signature.hookHealthConfirmed=true`, `observation.sentinel.requested=inserted=observed=swallowed=4`를 확인한다. `observedPath`는 다음처럼 해석한다.
+
+- `HOOK_AND_RAW`: 두 표면의 관찰만 확인한다. aggregate count만으로 같은 OS event, production owner 또는 중복 방지를 결정하지 않는다.
+- `HOOK_ONLY`: hook-owned 후보를 유지하되 active session callback 소실을 계속 조사한다.
+- `RAW_ONLY`: active session에서 `rawObserved`와 hook health를 함께 계측한다. 이 결과만으로 Raw Input에 payload 소유권을 주지 않는다.
+- `NEITHER`: 실제 scroll을 수행했다면 Precision Touchpad pointer/gesture 표면을 별도 조사한다.
+
+`passed=true`는 wheel 관찰이 아니라 collection·sentinel health와 non-sentinel physical move 또는 button interaction의 통과다. 실제 interaction이 있으면 `NEITHER`도 유효하다. 과거 `agent-session` wheel 0도 Raw Input 부재를 증명하지 않는다. 당시 mapper가 `RI_MOUSE_WHEEL`과 `RI_MOUSE_HWHEEL`을 계측하지 않고 무시했다. standalone `77/77` `HOOK_AND_RAW`는 Raw 부재를 반박하지만 hook suppression과 Raw send 분리를 승인하지 않는다.
+
+## Windows 11 touchpad pointer 표면 진단
+
+active `agent-session/v12`에서 pointer move/button은 전달되지만 `hookObserved`,
+`synthesizedObserved`, `rawObserved`가 모두 `0`인 동안 두 손가락 scroll이 source local window에서
+동작하면 두 장비 세션을 다시 돌리지 말고 gram13 한 대에서 실행한다.
+
+```powershell
+New-Item -ItemType Directory -Path .\reports -Force
+.\krasis-lab.exe touchpad-surface --device S-B --duration 15s --output .\reports\S-B-touchpad-surface.json
+```
+
+visible test window가 열리면 그 창 안에 pointer를 두고 15초 동안 vertical/horizontal 두 손가락
+scroll을 각각 여러 번 수행한다. 창을 전환하거나 닫지 않는다. 이 명령은 foreground를 가져가므로
+중요한 작업을 저장하고 빈 테스트 환경에서 실행한다. network, credential, listener와 HP15는 필요 없다.
+
+다음을 함께 확인한다.
+
+- `completed=true`, `passed=true`, 빈 `failureCodes`
+- `api.registerAvailable=true`, `api.pointerTypeAvailable=true`, `api.registered=true`
+- `window.created=true`, `window.foregroundObserved=true`, `window.deactivations=0`
+- `pointer.touchpadConfirmed>0`
+- `signature.observedPath`가 `POINTER_ONLY` 또는 `POINTER_AND_LEGACY`
+
+`LEGACY_ONLY`는 legacy wheel의 device나 변환 원인을 증명하지 않으며 성공이 아니다. `NEITHER`면 실제
+gesture를 수행했는지 확인해 새 output으로 한 번만 재실행한다. 좌표, pointer ID와 delta는 report에
+없어야 한다. 이 결과는 production fix가 아니라 다음 owner 실험을 고르는 진단이다.
+
+Raw Input move/button과 foreground touchpad-capable window-owned wheel을 결합한 production source가 포함된 새 build에서는 같은 S-A/S-B pair로 아래 `agent-session`을 다시
+실행한다. shadow report 통과만으로 source 수정이 끝났다고 판정하지 않는다. pointer가 destination에서
+한 방향으로 부드럽게 움직이는지, move 뒤 click 위치가 맞는지, wheel과 primary button이 한 번씩만
+적용되는지, return 뒤 양쪽이 `LOCAL`인지 확인하고 양쪽 report의 queue/session/injection failure를
+함께 검사한다. 1000Hz mouse 검증은 polling rate를 기록하고 별도 실행한다.
 
 ## 두 장비 peer probe
 
@@ -120,24 +194,60 @@ $PeerTimeout = Read-Host 'same peer timeout used by the listener'
 같은 값을 다시 입력하고 report의 millisecond 필드로 일치 여부를 검증한다. 측정 전에 특정
 숫자를 제품 기본값으로 승인하지 않는다.
 
-실행 중 A의 오른쪽 끝에서 B로 넘어가 pointer, wheel, 기본 button과 안전한 test key를 확인한다. B의 왼쪽 끝에서 A로 돌아온 뒤 반대 방향도 반복한다. key나 button을 누른 상태로 경계를 넘지 않는다. 이상 동작, stuck input 또는 예상하지 않은 suppression이 보이면 즉시 긴급 해제를 누른다.
+실행 중 A의 물리 mouse로 A의 오른쪽 끝에서 B로 넘어가 pointer, wheel, 기본 button과 안전한 test key를 확인한다. 이 outbound lease의 source는 B 화면에서도 계속 A이므로 같은 A mouse로 B의 왼쪽 끝에 도달해 A로 return한다. 양쪽이 `LOCAL`로 돌아온 것을 확인한 뒤에만 B의 물리 mouse 또는 touchpad로 B의 왼쪽 끝에서 별도의 B→A lease를 시작한다. destination의 물리 입력을 기존 lease의 return 조작과 섞지 않는다. key나 button을 누른 상태로 경계를 넘지 않는다. 이상 동작, stuck input 또는 예상하지 않은 suppression이 보이면 즉시 긴급 해제를 누른다.
+
+Precision Touchpad 방향에서는 remote 화면에서 두 손가락 vertical scroll도 수행한다. source report의
+`sourceInput.wheels`와 destination report의 `destinationInput.wheels`가 모두 증가해야 하며 local source
+화면의 entry 경계에 남은 cursor 아래 창이 대신 scroll되면 실패다. 일반 mouse wheel도 별도로 한 번
+검증해 hook과 Raw Input 중복으로 한 notch가 두 번 적용되지 않는지 확인한다.
+
+v13에서는 outbound grant 직후 source edge cursor 아래에 작은 `24x24` capture surface가 잠깐 보일 수
+있다. 이 창이 foreground를 소유해야 touchpad wheel이 전달된다. active 동안 다른 창으로 전환하지 말고,
+return 뒤 surface가 사라지고 이전 source 창 focus가 복원됐는지 확인한다. foreground를 잃으면 안전하게
+session failure로 끝나야 하며 같은 실행을 성공 evidence로 쓰지 않는다.
+
+wheel 누락이나 session failure가 발생하면 source report의 `sourcePipeline.wheel`을 순서대로 본다.
+`rawObserved`는 active source session에서 유효한 tag 없는 non-zero Raw vertical/horizontal wheel axis,
+`activeHookMoves`와 `activeHookButtons`는 같은 구간의 tag 없는 physical hook move/button callback이다.
+`windowObserved`는 active capture window가 받은 legacy vertical/horizontal wheel이다. 이 값들과 기존
+hook wheel counter는 독립 aggregate라 같은 OS event를 correlate하거나 exact equality를
+요구하지 않는다. Raw counter가 증가해도 Raw Input이 suppression·mapping·send를 소유한다는 뜻은 아니다.
+touchpad에서 `hookObserved=0`, `rawObserved=0`, `windowObserved>0`은 예상 가능한 v13 경로다.
+일반 mouse에서는 hook과 window가 같은 wheel을 각각 관찰할 수 있지만 payload는 window만 만든다.
+관찰 수 합보다 작은 `mapped`는
+zero·Krasis-tagged·self-test-tagged mapping 제외,
+`rejectedInactive>0`은 제어권이 이미 local로 돌아온 구간, `rejectedInvalid>0`은 action 계약 오류,
+`rejectedOverflow>0`은 bounded queue 포화를 뜻한다. `queueAccepted>sent`는 sender 전에 멈춘 action이다.
+`rawObserved>0`인데 `sent==0`이면 report는 `raw_wheel_observed_without_forwarding`으로 실패해야 한다.
+`windowObserved>0`인데 `sent==0`이면 `window_wheel_observed_without_forwarding`으로 실패해야 한다.
+source action이 있으면 `captureActivations>=1`, activation과 deactivation이 같고 focus restore 세 분류 합이
+deactivation과 같으며 `focusRestoreFailed=0`이어야 한다.
+Raw Input은 비동기 queue이므로 경계를 넘은 직후 pointer를 움직이거나 한 번 클릭해 hook health를 남기고
+1초간 기다린 뒤 wheel을 조작한다. 그래도 같은 failure가 나와야 전환 직전 backlog 가능성을 배제할 수 있다.
+양쪽 `supervisor.lastFailureComponent`를 함께 비교하고 raw 오류나 입력값을 report에 덧붙이지 않는다.
 
 각 방향에서 제어권을 받은 뒤 최소 두 heartbeat interval이 지나도록 active 상태를 유지한다.
 이 시간은 제품 기본값이 아니라 해당 실행에서 직접 입력한 interval의 배수다. 그래야 양쪽
 report에 송수신 각각 2회 이상과 같은 session 내부 receive gap sample이 남는다.
 
-양쪽 report가 모두 `schemaVersion=krasis.lab.agent-session/v7`, `completed=true`,
+양쪽 report가 모두 `schemaVersion=krasis.lab.agent-session/v13`, `completed=true`,
 `passed=true`, `crashGuard.started=true`, `crashGuard.cleanShutdown=true`,
 `lifecycle.monitorStarted=true`, `lifecycle.cleanShutdown=true`, lifecycle event 없음,
 `lifecycle.rearmRequired=false`,
 양수 `heartbeatIntervalMillis`, 그보다 큰 `peerTimeoutMillis`, `supervisor.activeCount>=1`,
 `liveness.heartbeatsSent>=2`, `liveness.heartbeatsReceived>=2`,
 `liveness.receiveGapSamples>=1`,
-`0<liveness.maxReceiveGapMillis<peerTimeoutMillis`,
-`destinationInput.entries>=1`, 모든 `destinationInput.injectionFailures`가 `0`,
+`0<liveness.maxReceiveGapMillis<peerTimeoutMillis`이고, source report에는
+`sourceInput.boundaryIntents>=1`과 하나 이상의 source input action, destination report에는
+`destinationInput.entries>=1`, `destinationInput.returnArms>=1`과 하나 이상의 destination input action이
+있어야 한다. 모든 `destinationInput.injectionFailures`가 `0`,
 `destinationInput.cursorRollbacks.failed=0`, 그리고 rollback의 복원·미복원·실패 합계가 시도 수와
-같아야 해당 pair의 bounded 양방향
-실험이 통과한 것이다. 집 pair와 스터디카페 pair는 서로 다른 날짜에 반복해도 된다.
+같아야 한다. source action이 있는 report는 capture activation/deactivation 합계와 focus restore 분류도
+위 조건을 만족해야 해당 pair의 bounded peer input 실험이 통과한 것이다. touchpad acceptance 실행에서는
+추가로 source `windowObserved`, `mapped`, `queueAccepted`, `sent`와 destination `wheels`가 모두 양수여야 한다.
+한 방향만 실행해도 source와 destination
+보고서가 서로 보완되면 checker 증거로 충분하다. 반대 방향 사용성은 별도 수동 검증 항목이며 exact
+source/destination count 일치는 요구하지 않는다. 집 pair와 스터디카페 pair는 서로 다른 날짜에 반복해도 된다.
 
 ## Windows lifecycle fault injection
 
@@ -156,6 +266,10 @@ session이 자동으로 돌아오면 실패다. agent report는 `stopReason=life
 ```
 
 `valid=true`, `pairPassed=true`와 exit `0`을 함께 확인한다. report를 손으로 고쳐 통과시키지 않는다. 실패 report와 긴급 해제 report도 원인 분석용으로 별도 보존한다.
+
+aggregate-only redacted 결과 기록 형식은
+`docs/experiments/results/2026-07-16-study-pair-v13.md`를 따른다. 이 예시는 기본 touchpad wheel 전달만
+통과했으며 외장 mouse, lifecycle fault와 parent 강제 종료 gate를 대신하지 않는다.
 
 ## destination 강제 종료 복구
 

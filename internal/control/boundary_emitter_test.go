@@ -45,6 +45,27 @@ func TestBoundaryIntentEmitterPreservesQueuedIntentOnOverflow(t *testing.T) {
 	}
 }
 
+func TestBoundaryIntentEmitterObservesOnlyQueuedIntents(t *testing.T) {
+	detector := newRightBoundaryDetector(t)
+	observed := 0
+	emitter, err := NewBoundaryIntentEmitterObserved(detector, func(BoundaryIntent) { observed++ })
+	if err != nil {
+		t.Fatalf("NewBoundaryIntentEmitterObserved() error = %v", err)
+	}
+	if err := emitter.Observe(InputAction{Kind: InputPointerMove, DeltaX: 1}, 99); err != nil {
+		t.Fatalf("first Observe() error = %v", err)
+	}
+	if err := emitter.Observe(InputAction{Kind: InputPointerMove, DeltaX: -10}, 89); err != nil {
+		t.Fatalf("rearm Observe() error = %v", err)
+	}
+	if err := emitter.Observe(InputAction{Kind: InputPointerMove, DeltaX: 10}, 99); !errors.Is(err, ErrBoundaryIntentQueueFull) {
+		t.Fatalf("overflow error = %v", err)
+	}
+	if observed != 1 {
+		t.Fatalf("observed queued intents = %d, want 1", observed)
+	}
+}
+
 func TestBoundaryIntentEmitterValidatesConstruction(t *testing.T) {
 	if _, err := NewBoundaryIntentEmitter(nil); err == nil {
 		t.Fatal("NewBoundaryIntentEmitter(nil) error = nil")

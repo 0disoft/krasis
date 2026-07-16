@@ -9,6 +9,10 @@
 
 실행 명세: `docs/experiments/phase-0-windows-input-feasibility.md`
 
+현재 판정: `IN_PROGRESS`. S-B Precision Touchpad에서 S-A로 이어지는 v13 wheel 경로는
+`601 sent = 601 injected`, capture lifecycle `7/7`, injection/guard failure `0`으로 통과했다. 전체 Phase 0은
+장애·lifecycle, home pair, 역방향과 장시간 gate가 남아 완료하지 않는다.
+
 - 대상 노트북과 주변기기 목록 확정
 - 물리 입력 캡처와 선택적 억제 검증
 - `SendInput` 기반 주입과 합성 입력 재전달 방지 검증
@@ -40,7 +44,7 @@
 
 ### Phase 4: Windows 입력 통합
 
-- Phase 0에서 선택한 adapter 구현
+- S-A/S-B 기본 pointer, button과 Precision Touchpad wheel에는 순수 Go와 얇은 Win32 adapter를 선택했고 구현함
 - 경계 전환, 포인터 좌표, 키보드와 마우스 전달
 - 실제 장비 호환성 및 장시간 검증
 
@@ -59,6 +63,8 @@
 - 입력 주입 실패 확실성과 cursor rollback 결과를 aggregate-only로 검증하는 evidence gate는 구현됨
 - 장소별 순차 수집을 합치는 `phase0-check` evidence gate는 구현됨
 - heartbeat payload, liveness domain, optional timer worker, explicit live CLI policy와 privacy-bounded aggregate 계측은 구현됨
+- v13 입력 경로는 lab 전용 복제품이 아니라 `agent.RunSupervisor`, `agent.RunSession`과 `wininput.SourceHook`의
+  공용 core를 사용함; `krasis-lab`은 bounded 실행과 redacted report를 소유함
 - 정식 agent executable, 단일 instance와 tray UI lifecycle은 미구현
 
 ### Phase 6: Wails v3 + Svelte UI

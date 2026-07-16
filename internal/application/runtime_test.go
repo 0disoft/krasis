@@ -320,6 +320,61 @@ func TestSessionRuntimeRevokesExactLocalReturn(t *testing.T) {
 	}
 }
 
+func TestSessionRuntimeDrainsOrderedInputAfterLocalReturnWithoutInjection(t *testing.T) {
+	port := &recordingInputPort{}
+	runtime := newTestRuntime(t, port)
+	grantInbound(t, runtime, time.Unix(100, 0))
+	first := control.InputEnvelope{SessionID: "session-1", Epoch: "epoch-1", Sequence: 1}
+	if err := runtime.HandleInputAction(context.Background(), first, control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}); err != nil {
+		t.Fatalf("HandleInputAction(active) error = %v", err)
+	}
+	if _, _, err := runtime.RevokeLocalReturn(context.Background(), control.ReturnIntent{SessionID: "session-1", Epoch: "epoch-1"}); err != nil {
+		t.Fatalf("RevokeLocalReturn() error = %v", err)
+	}
+	late := control.InputEnvelope{SessionID: "session-1", Epoch: "epoch-1", Sequence: 2}
+	if err := runtime.HandleInputAction(context.Background(), late, control.InputAction{Kind: control.InputPointerMove, DeltaX: 99}); err != nil {
+		t.Fatalf("HandleInputAction(late retired) error = %v", err)
+	}
+	if len(port.moves) != 1 || port.moves[0] != [2]int32{1, 0} {
+		t.Fatalf("late retired input was injected: moves=%v", port.moves)
+	}
+	wrong := control.InputEnvelope{SessionID: "session-other", Epoch: "epoch-1", Sequence: 3}
+	if err := runtime.HandleInputAction(context.Background(), wrong, control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}); !errors.Is(err, control.ErrStaleSession) {
+		t.Fatalf("HandleInputAction(wrong retired session) error = %v", err)
+	}
+}
+
+func TestSessionRuntimeDrainsRetiredSessionHeartbeatAfterLocalReturn(t *testing.T) {
+	runtime := newTestRuntime(t, &recordingInputPort{})
+	grantInbound(t, runtime, time.Unix(100, 0))
+	if _, _, err := runtime.RevokeLocalReturn(context.Background(), control.ReturnIntent{SessionID: "session-1", Epoch: "epoch-1"}); err != nil {
+		t.Fatalf("RevokeLocalReturn() error = %v", err)
+	}
+
+	if err := runtime.ObserveHeartbeat(context.Background(), "session-1", time.Unix(101, 0)); err != nil {
+		t.Fatalf("ObserveHeartbeat(retired session) error = %v", err)
+	}
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal || snapshot.HasLiveness || snapshot.HasStream {
+		t.Fatalf("retired heartbeat changed local runtime = %s", snapshot)
+	}
+}
+
+func TestSessionRuntimeRejectsDifferentHeartbeatAfterLocalReturn(t *testing.T) {
+	runtime := newTestRuntime(t, &recordingInputPort{})
+	grantInbound(t, runtime, time.Unix(100, 0))
+	if _, _, err := runtime.RevokeLocalReturn(context.Background(), control.ReturnIntent{SessionID: "session-1", Epoch: "epoch-1"}); err != nil {
+		t.Fatalf("RevokeLocalReturn() error = %v", err)
+	}
+
+	err := runtime.ObserveHeartbeat(context.Background(), "session-2", time.Unix(101, 0))
+	if !errors.Is(err, ErrRuntimeNoLiveness) {
+		t.Fatalf("ObserveHeartbeat(different session) error = %v, want ErrRuntimeNoLiveness", err)
+	}
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal || snapshot.HasLiveness || snapshot.HasStream {
+		t.Fatalf("different heartbeat changed local runtime = %s", snapshot)
+	}
+}
+
 func TestSessionRuntimeIgnoresStaleLocalReturnWithoutDestroyingCurrentLease(t *testing.T) {
 	runtime := newTestRuntime(t, &recordingInputPort{})
 	grantInbound(t, runtime, time.Unix(100, 0))

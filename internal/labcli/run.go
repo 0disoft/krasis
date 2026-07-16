@@ -49,6 +49,12 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, platform 
 		return runProbeCheck(commandArgs, stdout, stderr)
 	case "guided-probe":
 		return runGuidedProbe(ctx, commandArgs, stdout, stderr, platform)
+	case "pointer-shadow":
+		return runPointerShadow(ctx, commandArgs, stdout, stderr, platform)
+	case "wheel-surface":
+		return runWheelSurface(ctx, commandArgs, stdout, stderr, platform)
+	case "touchpad-surface":
+		return runTouchpadSurface(ctx, commandArgs, stdout, stderr, platform)
 	case "peer-probe":
 		return runPeerProbe(ctx, commandArgs, stdout, stderr)
 	case "peer-credentials":
@@ -578,6 +584,9 @@ func writeUsage(output io.Writer) {
 	fmt.Fprintln(output, "  krasis-lab probe --device H-A|H-B|S-A|S-B --duration DURATION --output PATH.json")
 	fmt.Fprintln(output, "  krasis-lab probe-check [--json] REPORT.json [REPORT.json ...]")
 	fmt.Fprintln(output, "  krasis-lab guided-probe --device H-A|H-B|S-A|S-B --stage-duration DURATION --output PATH.json")
+	fmt.Fprintln(output, "  krasis-lab pointer-shadow --device H-A|H-B|S-A|S-B --edge LEFT|RIGHT --duration DURATION --output PATH.json")
+	fmt.Fprintln(output, "  krasis-lab wheel-surface --device H-A|H-B|S-A|S-B --duration DURATION --output PATH.json")
+	fmt.Fprintln(output, "  krasis-lab touchpad-surface --device H-A|H-B|S-A|S-B --duration DURATION --output PATH.json")
 	fmt.Fprintln(output, "  krasis-lab peer-probe listen|connect [options]")
 	fmt.Fprintln(output, "  krasis-lab peer-credentials --output DIRECTORY --server-name NAME")
 	fmt.Fprintln(output, "  krasis-lab peer-credentials-protect --directory ROLE_DIRECTORY")

@@ -1,0 +1,564 @@
+//go:build windows
+
+package wininput
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"runtime"
+	"sync"
+	"sync/atomic"
+	"syscall"
+	"time"
+	"unsafe"
+
+	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/lab"
+)
+
+const (
+	wmSourceWheelCaptureActivate   = 0x8025
+	wmSourceWheelCaptureDeactivate = 0x8026
+	wmSourceWheelCaptureStop       = 0x8027
+	wsPopup                        = 0x80000000
+	wsExTopmost                    = 0x00000008
+	wsExToolWindow                 = 0x00000080
+	swHide                         = 0
+	swpNoActivate                  = 0x0010
+	sourceWheelCaptureWidth        = 24
+	sourceWheelCaptureHeight       = 24
+	sourceWheelCaptureCallTimeout  = 2 * time.Second
+)
+
+var (
+	procSetWindowPosSourceCapture = user32.NewProc("SetWindowPos")
+	procIsWindowSourceCapture     = user32.NewProc("IsWindow")
+	sourceWheelCaptureShowWindow  = func(window uintptr, command uintptr) {
+		procShowWindowTouchpad.Call(window, command)
+	}
+	sourceWheelCaptureGetForeground = func() uintptr {
+		foreground, _, _ := procGetForegroundTouchpad.Call()
+		return foreground
+	}
+	sourceWheelCaptureSetForeground = func(window uintptr) error {
+		foreground, _, foregroundErr := procSetForegroundTouchpad.Call(window)
+		if foreground == 0 {
+			return touchpadWin32Error("SetForegroundWindow(source wheel capture)", foregroundErr)
+		}
+		return nil
+	}
+	sourceWheelCaptureIsWindow = func(window uintptr) bool {
+		valid, _, _ := procIsWindowSourceCapture.Call(window)
+		return valid != 0
+	}
+	sourceWheelCaptureRegisterWindow = func(proc, window uintptr, enabled bool) error {
+		value := uintptr(0)
+		if enabled {
+			value = 1
+		}
+		registered, _, registerErr := syscall.SyscallN(proc, window, value)
+		if registered == 0 {
+			return registerErr
+		}
+		return nil
+	}
+
+	sourceWheelCaptureClassSequence atomic.Uint64
+	sourceWheelCaptureTimeout       = sourceWheelCaptureCallTimeout
+)
+
+var errSourceWheelCaptureInactive = errors.New("source wheel capture received input outside an active source session")
+
+type sourceWheelCapture struct {
+	observer SourcePipelineObserver
+	opMu     sync.Mutex
+	runMu    sync.RWMutex
+	run      *sourceWheelCaptureRun
+}
+
+type sourceWheelCaptureRun struct {
+	window       uintptr
+	commands     chan sourceWheelCaptureCommand
+	done         chan struct{}
+	active       atomic.Bool
+	terminalMu   sync.Mutex
+	terminalErr  error
+	registerProc uintptr
+	savedFocus   uintptr
+	registered   bool
+	session      *SourceSession
+	observer     SourcePipelineObserver
+}
+
+type sourceWheelCaptureCommand struct {
+	message uint32
+	result  chan error
+}
+
+func newSourceWheelCapture(observer SourcePipelineObserver) *sourceWheelCapture {
+	return &sourceWheelCapture{observer: observer}
+}
+
+func (capture *sourceWheelCapture) Activate() error {
+	if capture == nil {
+		return errors.New("source wheel capture is not initialized")
+	}
+	return capture.execute(wmSourceWheelCaptureActivate, false)
+}
+
+func (capture *sourceWheelCapture) Deactivate() {
+	if capture == nil {
+		return
+	}
+	if err := capture.execute(wmSourceWheelCaptureDeactivate, true); err != nil {
+		capture.failCurrentRun(err)
+	}
+}
+
+func (capture *sourceWheelCapture) Active() bool {
+	if capture == nil {
+		return false
+	}
+	capture.runMu.RLock()
+	current := capture.run
+	capture.runMu.RUnlock()
+	return current != nil && current.active.Load()
+}
+
+func (capture *sourceWheelCapture) OwnsWheel() bool {
+	if capture == nil {
+		return false
+	}
+	capture.runMu.RLock()
+	current := capture.run
+	capture.runMu.RUnlock()
+	if current == nil || !current.active.Load() || current.window == 0 {
+		return false
+	}
+	return sourceWheelCaptureGetForeground() == current.window
+}
+
+func (capture *sourceWheelCapture) execute(message uint32, allowMissing bool) error {
+	capture.opMu.Lock()
+	defer capture.opMu.Unlock()
+	capture.runMu.RLock()
+	current := capture.run
+	capture.runMu.RUnlock()
+	if current == nil {
+		if allowMissing {
+			return nil
+		}
+		return errors.New("source wheel capture window is not ready")
+	}
+	if terminalErr := current.err(); terminalErr != nil {
+		return errors.Join(errors.New("source wheel capture window is terminal"), terminalErr)
+	}
+	timer := time.NewTimer(sourceWheelCaptureTimeout)
+	defer timer.Stop()
+	command := sourceWheelCaptureCommand{message: message, result: make(chan error, 1)}
+	select {
+	case current.commands <- command:
+	case <-current.done:
+		return errors.New("source wheel capture window stopped")
+	case <-timer.C:
+		err := errors.New("source wheel capture command admission timed out")
+		current.fail(err)
+		return err
+	}
+	if posted, _, postErr := procPostMessageWTouchpad.Call(current.window, uintptr(message), 0, 0); posted == 0 {
+		select {
+		case <-current.commands:
+		default:
+		}
+		err := touchpadWin32Error("PostMessageW(source wheel capture)", postErr)
+		current.fail(err)
+		return err
+	}
+	select {
+	case err := <-command.result:
+		return err
+	case <-current.done:
+		return errors.Join(errors.New("source wheel capture window stopped"), current.err())
+	case <-timer.C:
+		err := errors.New("source wheel capture command result timed out")
+		current.fail(err)
+		return err
+	}
+}
+
+func (capture *sourceWheelCapture) failCurrentRun(cause error) {
+	capture.runMu.RLock()
+	current := capture.run
+	capture.runMu.RUnlock()
+	if current == nil {
+		return
+	}
+	current.fail(cause)
+}
+
+func (capture *sourceWheelCapture) runWindow(
+	ctx context.Context,
+	session *SourceSession,
+	ready func(),
+) error {
+	if capture == nil || session == nil {
+		return errors.New("source wheel capture and session are required")
+	}
+	registerProc, available := resolveNamedRegisterTouchpadCapableWindow()
+	if !available {
+		return errors.Join(lab.ErrUnsupported, errors.New("RegisterTouchpadCapableWindow is unavailable"))
+	}
+	current := &sourceWheelCaptureRun{
+		commands:     make(chan sourceWheelCaptureCommand, 1),
+		done:         make(chan struct{}),
+		registerProc: registerProc,
+		session:      session,
+		observer:     capture.observer,
+	}
+	if err := capture.attach(current); err != nil {
+		return err
+	}
+	defer capture.detach(current)
+	defer close(current.done)
+	return current.run(ctx, ready)
+}
+
+func resolveNamedRegisterTouchpadCapableWindow() (uintptr, bool) {
+	named := user32.NewProc("RegisterTouchpadCapableWindow")
+	if named.Find() != nil {
+		return 0, false
+	}
+	return named.Addr(), true
+}
+
+func (capture *sourceWheelCapture) attach(current *sourceWheelCaptureRun) error {
+	capture.runMu.Lock()
+	defer capture.runMu.Unlock()
+	if capture.run != nil {
+		return errors.New("source wheel capture is already running")
+	}
+	capture.run = current
+	return nil
+}
+
+func (capture *sourceWheelCapture) detach(current *sourceWheelCaptureRun) {
+	capture.runMu.Lock()
+	if capture.run == current {
+		capture.run = nil
+	}
+	capture.runMu.Unlock()
+}
+
+func (current *sourceWheelCaptureRun) run(ctx context.Context, ready func()) (resultErr error) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	module, _, callErr := procGetModuleHandleW.Call(0)
+	if module == 0 {
+		return touchpadWin32Error("GetModuleHandleW", callErr)
+	}
+	className, err := syscall.UTF16PtrFromString(fmt.Sprintf("KrasisSourceWheelCapture-%d-%d", os.Getpid(), sourceWheelCaptureClassSequence.Add(1)))
+	if err != nil {
+		return fmt.Errorf("encode source wheel capture class name: %w", err)
+	}
+	windowTitle, err := syscall.UTF16PtrFromString("Krasis remote input capture")
+	if err != nil {
+		return fmt.Errorf("encode source wheel capture window title: %w", err)
+	}
+	windowDestroyed := false
+	wndProc := syscall.NewCallback(func(window uintptr, message uint32, wParam, lParam uintptr) uintptr {
+		switch message {
+		case wmSourceWheelCaptureActivate, wmSourceWheelCaptureDeactivate:
+			return current.handleCommand(message)
+		case wmSourceWheelCaptureStop:
+			procPostQuitMessageTouchpad.Call(0)
+			return 0
+		case wmMouseWheel, wmMouseHWheel:
+			if current.active.Load() {
+				current.routeWheel(message, wParam)
+				return 0
+			}
+		case wmActivate:
+			if current.active.Load() && uint16(wParam) == waInactive {
+				current.setError(errors.New("source wheel capture lost foreground"))
+				procPostQuitMessageTouchpad.Call(0)
+				return 0
+			}
+		case wmPointerDown, wmPointerUpdate, wmPointerUp, wmPointerEnter, wmPointerLeave,
+			wmPointerCaptureChanged, wmPointerWheel, wmPointerHorizontalWheel:
+			// DefWindowProc performs the system touchpad gesture conversion. The
+			// source owner consumes only the resulting legacy wheel messages.
+		case wmDestroy:
+			windowDestroyed = true
+			procPostQuitMessageTouchpad.Call(0)
+			return 0
+		}
+		result, _, _ := procDefWindowProcWTouchpad.Call(window, uintptr(message), wParam, lParam)
+		return result
+	})
+	cursor, _, _ := procLoadCursorWTouchpad.Call(0, idcArrow)
+	class := touchpadSurfaceWindowClass{
+		WindowProc: wndProc,
+		Instance:   module,
+		Cursor:     cursor,
+		Background: colorWindowBrush,
+		ClassName:  className,
+	}
+	atom, _, callErr := procRegisterClassWTouchpad.Call(uintptr(unsafe.Pointer(&class)))
+	if atom == 0 {
+		return touchpadWin32Error("RegisterClassW(source wheel capture)", callErr)
+	}
+	defer func() {
+		if unregistered, _, unregisterErr := procUnregisterClassWTouchpad.Call(uintptr(unsafe.Pointer(className)), module); unregistered == 0 {
+			resultErr = errors.Join(resultErr, touchpadWin32Error("UnregisterClassW(source wheel capture)", unregisterErr))
+		}
+		runtime.KeepAlive(wndProc)
+	}()
+	window, _, callErr := procCreateWindowExW.Call(
+		wsExTopmost|wsExToolWindow,
+		uintptr(unsafe.Pointer(className)),
+		uintptr(unsafe.Pointer(windowTitle)),
+		wsPopup,
+		0, 0, sourceWheelCaptureWidth, sourceWheelCaptureHeight,
+		0, 0, module, 0,
+	)
+	if window == 0 {
+		return touchpadWin32Error("CreateWindowExW(source wheel capture)", callErr)
+	}
+	current.window = window
+	defer func() {
+		resultErr = errors.Join(resultErr, current.deactivateWindow())
+		if !windowDestroyed {
+			if destroyed, _, destroyErr := procDestroyWindow.Call(window); destroyed == 0 {
+				resultErr = errors.Join(resultErr, touchpadWin32Error("DestroyWindow(source wheel capture)", destroyErr))
+			}
+		}
+	}()
+
+	stopWatcher := make(chan struct{})
+	stopWatcherDone := make(chan struct{})
+	go func() {
+		defer close(stopWatcherDone)
+		select {
+		case <-ctx.Done():
+			procPostMessageWTouchpad.Call(window, wmSourceWheelCaptureStop, 0, 0)
+		case <-stopWatcher:
+		}
+	}()
+	defer func() {
+		close(stopWatcher)
+		<-stopWatcherDone
+	}()
+	if ready != nil {
+		ready()
+	}
+	loopErr := touchpadSurfaceMessageLoop()
+	if loopErr != nil {
+		return errors.Join(loopErr, current.err())
+	}
+	if terminalErr := current.err(); terminalErr != nil {
+		return terminalErr
+	}
+	return ctx.Err()
+}
+
+func (current *sourceWheelCaptureRun) handleCommand(message uint32) uintptr {
+	var command sourceWheelCaptureCommand
+	select {
+	case command = <-current.commands:
+	default:
+		current.setError(errors.New("source wheel capture command message had no request"))
+		procPostQuitMessageTouchpad.Call(0)
+		return 0
+	}
+	if command.message != message {
+		err := errors.New("source wheel capture command order mismatch")
+		current.setError(err)
+		command.result <- err
+		procPostQuitMessageTouchpad.Call(0)
+		return 0
+	}
+	var err error
+	switch message {
+	case wmSourceWheelCaptureActivate:
+		err = current.activateWindow()
+	case wmSourceWheelCaptureDeactivate:
+		err = current.deactivateWindow()
+	}
+	command.result <- err
+	if err != nil {
+		current.setError(err)
+		procPostQuitMessageTouchpad.Call(0)
+	}
+	return 0
+}
+
+func (current *sourceWheelCaptureRun) activateWindow() error {
+	if current.active.Load() {
+		return errors.New("source wheel capture is already active")
+	}
+	position, err := cursorPosition()
+	if err != nil {
+		return fmt.Errorf("position source wheel capture: %w", err)
+	}
+	current.savedFocus = sourceWheelCaptureGetForeground()
+	x, y := sourceWheelCapturePosition(position)
+	topmost := ^uintptr(0)
+	if positioned, _, positionErr := procSetWindowPosSourceCapture.Call(
+		current.window, topmost, uintptr(x), uintptr(y), sourceWheelCaptureWidth, sourceWheelCaptureHeight, swpNoActivate,
+	); positioned == 0 {
+		return touchpadWin32Error("SetWindowPos(source wheel capture)", positionErr)
+	}
+	if registerErr := sourceWheelCaptureRegisterWindow(current.registerProc, current.window, true); registerErr != nil {
+		sourceWheelCaptureShowWindow(current.window, swHide)
+		return touchpadWin32Error("RegisterTouchpadCapableWindow(source TRUE)", registerErr)
+	}
+	current.registered = true
+	sourceWheelCaptureShowWindow(current.window, swShow)
+	procUpdateWindowTouchpad.Call(current.window)
+	if foregroundErr := sourceWheelCaptureSetForeground(current.window); foregroundErr != nil {
+		cleanupErr := current.deactivateWindow()
+		return errors.Join(foregroundErr, cleanupErr)
+	}
+	if sourceWheelCaptureGetForeground() != current.window {
+		cleanupErr := current.deactivateWindow()
+		return errors.Join(errors.New("source wheel capture did not become foreground"), cleanupErr)
+	}
+	current.active.Store(true)
+	if current.observer != nil {
+		current.observer.ObserveWheelCaptureActivated()
+	}
+	return nil
+}
+
+func (current *sourceWheelCaptureRun) deactivateWindow() error {
+	wasActive := current.active.Swap(false)
+	wasRegistered := current.registered
+	current.registered = false
+	if !wasActive && !wasRegistered {
+		return nil
+	}
+	if current.observer != nil && wasActive {
+		current.observer.ObserveWheelCaptureDeactivated()
+	}
+	var cleanupErr error
+	if wasRegistered {
+		if unregisterErr := sourceWheelCaptureRegisterWindow(current.registerProc, current.window, false); unregisterErr != nil {
+			cleanupErr = errors.Join(cleanupErr, touchpadWin32Error("RegisterTouchpadCapableWindow(source FALSE)", unregisterErr))
+		}
+	}
+	// Restore while the capture window is still foreground. Hiding it first lets
+	// Windows choose another foreground owner, which makes restoreFocus classify
+	// every ordinary return as skipped and loses the saved application focus.
+	restoreResult, restoreErr := current.restoreFocus()
+	sourceWheelCaptureShowWindow(current.window, swHide)
+	if current.observer != nil && wasActive {
+		current.observer.ObserveWheelFocusRestore(restoreResult)
+	}
+	current.savedFocus = 0
+	return errors.Join(cleanupErr, restoreErr)
+}
+
+func (current *sourceWheelCaptureRun) restoreFocus() (SourceFocusRestoreResult, error) {
+	if current.savedFocus == 0 {
+		return SourceFocusRestoreSkipped, nil
+	}
+	if sourceWheelCaptureGetForeground() != current.window {
+		return SourceFocusRestoreSkipped, nil
+	}
+	if !sourceWheelCaptureIsWindow(current.savedFocus) {
+		return SourceFocusRestoreSkipped, nil
+	}
+	if restoreErr := sourceWheelCaptureSetForeground(current.savedFocus); restoreErr != nil {
+		return SourceFocusRestoreFailed, fmt.Errorf("restore source focus: %w", restoreErr)
+	}
+	if sourceWheelCaptureGetForeground() != current.savedFocus {
+		return SourceFocusRestoreFailed, errors.New("source foreground window was not restored")
+	}
+	return SourceFocusRestoreSucceeded, nil
+}
+
+func (current *sourceWheelCaptureRun) routeWheel(message uint32, wParam uintptr) {
+	action, emitted, err := mapWindowMouseWheel(message, wParam)
+	if err != nil {
+		current.session.Abort(err)
+		return
+	}
+	if !emitted {
+		return
+	}
+	if current.observer != nil {
+		current.observer.ObserveWheelWindow()
+		current.observer.ObserveWheelMapped()
+	}
+	if !current.session.Active() {
+		current.session.Abort(errSourceWheelCaptureInactive)
+		return
+	}
+	current.session.Offer(action)
+}
+
+func mapWindowMouseWheel(message uint32, wParam uintptr) (control.InputAction, bool, error) {
+	delta := int32(int16(uint16(wParam >> 16)))
+	if delta == 0 {
+		return control.InputAction{}, false, nil
+	}
+	var action control.InputAction
+	switch message {
+	case wmMouseWheel:
+		action = control.InputAction{Kind: control.InputWheel, DeltaY: delta}
+	case wmMouseHWheel:
+		action = control.InputAction{Kind: control.InputWheel, DeltaX: delta}
+	default:
+		return control.InputAction{}, false, nil
+	}
+	if err := action.Validate(); err != nil {
+		return control.InputAction{}, false, fmt.Errorf("map source window wheel: %w", err)
+	}
+	return action, true, nil
+}
+
+func sourceWheelCapturePosition(position point) (int32, int32) {
+	left := systemMetric(smXVIRTUALSCREEN)
+	top := systemMetric(smYVIRTUALSCREEN)
+	right := left + systemMetric(smCXVIRTUALSCREEN)
+	bottom := top + systemMetric(smCYVIRTUALSCREEN)
+	x := position.X - sourceWheelCaptureWidth/2
+	y := position.Y - sourceWheelCaptureHeight/2
+	if x < left {
+		x = left
+	}
+	if x+sourceWheelCaptureWidth > right {
+		x = right - sourceWheelCaptureWidth
+	}
+	if y < top {
+		y = top
+	}
+	if y+sourceWheelCaptureHeight > bottom {
+		y = bottom - sourceWheelCaptureHeight
+	}
+	return x, y
+}
+
+func (current *sourceWheelCaptureRun) setError(err error) {
+	if err == nil {
+		return
+	}
+	current.terminalMu.Lock()
+	current.terminalErr = errors.Join(current.terminalErr, err)
+	current.terminalMu.Unlock()
+}
+
+func (current *sourceWheelCaptureRun) fail(err error) {
+	current.setError(err)
+	if current.window != 0 {
+		procPostMessageWTouchpad.Call(current.window, wmSourceWheelCaptureStop, 0, 0)
+	}
+}
+
+func (current *sourceWheelCaptureRun) err() error {
+	current.terminalMu.Lock()
+	defer current.terminalMu.Unlock()
+	return current.terminalErr
+}

@@ -100,6 +100,23 @@ func TestRunRequiresCommand(t *testing.T) {
 	}
 }
 
+func TestHelpListsWheelAndTouchpadSurfaceDiagnostics(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	exitCode := Run(context.Background(), []string{"help"}, &stdout, &stderr, fakePlatform{})
+
+	if exitCode != exitSuccess {
+		t.Fatalf("exit code = %d, stderr = %q", exitCode, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "krasis-lab wheel-surface") {
+		t.Fatalf("stdout does not contain wheel-surface usage: %q", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "krasis-lab touchpad-surface") {
+		t.Fatalf("stdout does not contain touchpad-surface usage: %q", stdout.String())
+	}
+}
+
 func TestDiagnoseJSON(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

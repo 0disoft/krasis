@@ -99,6 +99,45 @@ func TestRunSupervisorRetriesAcquireAndRecoveredSession(t *testing.T) {
 	}
 }
 
+func TestRunSupervisorReportsStableSessionFailureComponent(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	observer := &recordingSupervisorObserver{}
+	err := RunSupervisor(ctx, SupervisorConfig{
+		Session: Config{QueueCapacity: 1, Now: time.Now},
+		Backoff: BackoffPolicy{Initial: time.Millisecond, Maximum: time.Millisecond, StableAfter: time.Second},
+		Now:     time.Now,
+		Wait: func(context.Context, time.Duration) error {
+			cancel()
+			return context.Canceled
+		},
+		Observer: observer,
+	}, SupervisorDependencies{
+		Source: &scriptedSource{outcomes: []sourceOutcome{{connection: &stubConnection{}}}},
+		Hook:   &idleHook{}, Input: newTestInput(false), Effects: noopEffects{}, Authorizer: acceptingAuthorizer{},
+		RunSession: func(context.Context, Config, Dependencies) (Result, error) {
+			return Result{FinalState: control.StateLocal}, &sessionComponentError{
+				component: "peer-liveness", cause: errors.New("private timeout details"),
+			}
+		},
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("RunSupervisor() error = %v", err)
+	}
+	snapshots := observer.snapshotsCopy()
+	found := false
+	for _, snapshot := range snapshots {
+		if snapshot.FailureKind == "session" {
+			found = true
+			if snapshot.FailureComponent != "peer-liveness" {
+				t.Fatalf("failure snapshot = %+v", snapshot)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("session failure snapshot missing: %+v", snapshots)
+	}
+}
+
 func TestRunSupervisorDoesNotReconnectUnsafeSession(t *testing.T) {
 	source := &scriptedSource{outcomes: []sourceOutcome{{connection: &stubConnection{}}}}
 	observer := &recordingSupervisorObserver{}
@@ -212,6 +251,46 @@ func TestRunSupervisorPropagatesConnectionCloseFailureWithoutRetry(t *testing.T)
 		t.Fatalf("close calls = %d, Next calls = %d", connection.closeCalls, source.nextCalls)
 	}
 	if got := observer.states(); !equalStates(got, []SupervisorState{SupervisorAcquiring, SupervisorActive, SupervisorStopped}) {
+		t.Fatalf("states = %v", got)
+	}
+}
+
+func TestRunSupervisorRetriesWhenSessionAlreadyOwnsConnectionCloseFailure(t *testing.T) {
+	closeErr := errors.New("connection close failed")
+	sessionErr := errors.New("session failed")
+	first := &stubConnection{closeErr: closeErr}
+	second := &stubConnection{}
+	source := &scriptedSource{outcomes: []sourceOutcome{{connection: first}, {connection: second}}}
+	observer := &recordingSupervisorObserver{}
+	ctx, cancel := context.WithCancel(context.Background())
+	runs := 0
+	err := RunSupervisor(ctx, SupervisorConfig{
+		Session: Config{QueueCapacity: 1, Now: time.Now}, Backoff: DefaultBackoffPolicy(), Now: time.Now,
+		Wait: func(context.Context, time.Duration) error { return nil }, Observer: observer,
+	}, SupervisorDependencies{
+		Source: source, Hook: &idleHook{}, Input: newTestInput(false), Effects: noopEffects{}, Authorizer: acceptingAuthorizer{},
+		RunSession: func(ctx context.Context, _ Config, dependencies Dependencies) (Result, error) {
+			runs++
+			if runs == 1 {
+				ownedCloseErr := dependencies.Connection.Close()
+				return Result{FinalState: control.StateLocal}, &sessionComponentError{
+					component: "peer-session",
+					cause:     errors.Join(sessionErr, ownedCloseErr),
+				}
+			}
+			cancel()
+			return Result{FinalState: control.StateLocal}, ctx.Err()
+		},
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("RunSupervisor() error = %v, want cancellation after retry", err)
+	}
+	if source.nextCalls != 2 || first.closeCalls != 1 || second.closeCalls != 1 {
+		t.Fatalf("retry resources: Next=%d firstClose=%d secondClose=%d", source.nextCalls, first.closeCalls, second.closeCalls)
+	}
+	if got := observer.states(); !equalStates(got, []SupervisorState{
+		SupervisorAcquiring, SupervisorActive, SupervisorBackoff, SupervisorAcquiring, SupervisorActive, SupervisorStopped,
+	}) {
 		t.Fatalf("states = %v", got)
 	}
 }

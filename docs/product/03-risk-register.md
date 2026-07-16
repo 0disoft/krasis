@@ -24,6 +24,7 @@
 | Critical | network write가 source sender를 막아 fault cleanup도 멈춤 | suppression은 꺼졌지만 destination held input이 남음 | blocked send 중 queue overflow 테스트 | sender/lifecycle 분리, connection 선제 close, bounded cleanup |
 | High | 공용 Wi-Fi가 peer 통신을 차단 | 발견 또는 연결 실패 | 스터디카페 실망 테스트 | 직접 주소 입력, 대체망 운영 안내 검토 |
 | High | 높은 polling rate 또는 터치패드에서 hook 지연 | 커서 끊김, 입력 누락 | 실제 장비 부하 측정 | 최소 작업 hook, native fallback 판단 |
+| High | Precision Touchpad wheel이 low-level hook과 Raw Input payload 경로를 우회함 | pointer와 click은 원격에서 동작하지만 scroll은 source local window에 남음 | foreground touchpad-capable window의 source/destination aggregate와 실제 화면 동작 | ADR 0023 window owner 적용; S-B→S-A `601 sent = 601 injected` 통과, 가로 scroll·외장 mouse·다른 장비는 계속 검증 |
 | High | 절전과 잠금 뒤 낡은 세션이 살아남음 | 엉뚱한 기기로 입력 전달 | Modern Standby와 잠금 반복 | 세션 폐기 후 명시적 재연결 |
 | High | 관리자 앱 또는 보안 화면 기대가 어긋남 | 일부 창에서 입력 불가 | 권한 수준별 테스트 | MVP 제한을 UI와 문서에 명시 |
 | Medium | Wails v3 prerelease 변화로 UI 빌드가 깨짐 | 설치물 재현 불가 | exact toolchain 재현 | 호환 세트 고정, UI를 core에서 격리 |

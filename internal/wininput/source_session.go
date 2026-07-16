@@ -26,6 +26,48 @@ type SourceSink interface {
 	Fail(context.Context, error) error
 }
 
+type SourceActivation interface {
+	Activate() error
+	Deactivate()
+	Active() bool
+}
+
+type SourceWheelOwnership interface {
+	SourceActivation
+	OwnsWheel() bool
+}
+
+type SourcePipelineObserver interface {
+	ObserveWheelHook()
+	ObserveWheelSynthesized()
+	ObserveWheelRaw()
+	ObserveWheelWindow()
+	ObserveWheelCaptureActivated()
+	ObserveWheelCaptureDeactivated()
+	ObserveWheelFocusRestore(result SourceFocusRestoreResult)
+	ObserveActiveHookMouseMove()
+	ObserveActiveHookMouseButton()
+	ObserveWheelMapped()
+	ObserveWheelQueue(SourceQueueOfferResult)
+}
+
+type SourceFocusRestoreResult uint8
+
+const (
+	SourceFocusRestoreSkipped SourceFocusRestoreResult = iota + 1
+	SourceFocusRestoreSucceeded
+	SourceFocusRestoreFailed
+)
+
+type SourceQueueOfferResult uint8
+
+const (
+	SourceQueueAccepted SourceQueueOfferResult = iota + 1
+	SourceQueueRejectedInactive
+	SourceQueueRejectedInvalid
+	SourceQueueRejectedOverflow
+)
+
 type queuedAction struct {
 	generation uint64
 	action     control.InputAction
@@ -33,6 +75,8 @@ type queuedAction struct {
 
 type SourceSession struct {
 	sink       SourceSink
+	observer   SourcePipelineObserver
+	cleanup    time.Duration
 	queue      chan queuedAction
 	faults     chan error
 	started    atomic.Bool
@@ -44,6 +88,10 @@ type SourceSession struct {
 }
 
 func NewSourceSession(capacity int, sink SourceSink) (*SourceSession, error) {
+	return NewSourceSessionObserved(capacity, sink, nil)
+}
+
+func NewSourceSessionObserved(capacity int, sink SourceSink, observer SourcePipelineObserver) (*SourceSession, error) {
 	if capacity <= 0 || capacity > MaxSourceQueueCapacity {
 		return nil, fmt.Errorf("source queue capacity must be between 1 and %d", MaxSourceQueueCapacity)
 	}
@@ -51,9 +99,11 @@ func NewSourceSession(capacity int, sink SourceSink) (*SourceSession, error) {
 		return nil, errors.New("source sink is required")
 	}
 	return &SourceSession{
-		sink:   sink,
-		queue:  make(chan queuedAction, capacity),
-		faults: make(chan error, 1),
+		sink:     sink,
+		observer: observer,
+		cleanup:  SourceCleanupTimeout,
+		queue:    make(chan queuedAction, capacity),
+		faults:   make(chan error, 1),
 	}, nil
 }
 
@@ -100,22 +150,32 @@ func (session *SourceSession) Offer(action control.InputAction) bool {
 	session.stateMu.RLock()
 	if !session.active {
 		session.stateMu.RUnlock()
+		session.observeWheelQueue(action, SourceQueueRejectedInactive)
 		return false
 	}
 	if err := action.Validate(); err != nil {
 		session.stateMu.RUnlock()
 		session.abort(errors.Join(ErrSourceSession, err))
+		session.observeWheelQueue(action, SourceQueueRejectedInvalid)
 		return false
 	}
 	generation := session.generation
 	select {
 	case session.queue <- queuedAction{generation: generation, action: action}:
 		session.stateMu.RUnlock()
+		session.observeWheelQueue(action, SourceQueueAccepted)
 		return true
 	default:
 		session.stateMu.RUnlock()
 		session.abort(ErrSourceQueueOverflow)
+		session.observeWheelQueue(action, SourceQueueRejectedOverflow)
 		return false
+	}
+}
+
+func (session *SourceSession) observeWheelQueue(action control.InputAction, result SourceQueueOfferResult) {
+	if action.Kind == control.InputWheel && session.observer != nil {
+		session.observer.ObserveWheelQueue(result)
 	}
 }
 
@@ -166,8 +226,7 @@ func (session *SourceSession) RunWithReady(ctx context.Context, ready func()) er
 			if cause == nil {
 				cause = errors.New("source sender stopped unexpectedly")
 			}
-			session.Deactivate()
-			return errors.Join(cause, session.sink.Interrupt(cause), session.failSink(ctx, cause))
+			return session.cleanupSession(ctx, nil, nil, cause, true)
 		}
 	}
 }
@@ -182,6 +241,9 @@ func (session *SourceSession) runSender(ctx context.Context) error {
 				continue
 			}
 			if err := session.sink.SendAction(ctx, item.action); err != nil {
+				if !session.current(item.generation) {
+					continue
+				}
 				return err
 			}
 		}
@@ -195,24 +257,7 @@ func (session *SourceSession) stopSender(
 	cause error,
 	fail bool,
 ) error {
-	session.Deactivate()
-	interruptErr := session.sink.Interrupt(cause)
-	cancelSend()
-	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), SourceCleanupTimeout)
-	defer cancel()
-	var senderErr error
-	select {
-	case senderErr = <-senderDone:
-		if errors.Is(senderErr, context.Canceled) || errors.Is(senderErr, ctx.Err()) {
-			senderErr = nil
-		}
-	case <-cleanupCtx.Done():
-		senderErr = cleanupCtx.Err()
-	}
-	if !fail {
-		return errors.Join(cause, interruptErr, senderErr)
-	}
-	return errors.Join(cause, interruptErr, senderErr, session.failSink(ctx, cause))
+	return session.cleanupSession(ctx, cancelSend, senderDone, cause, fail)
 }
 
 func (session *SourceSession) abort(cause error) {
@@ -234,11 +279,50 @@ func (session *SourceSession) current(generation uint64) bool {
 	return session.active && session.generation == generation
 }
 
-func (session *SourceSession) failSink(ctx context.Context, cause error) error {
-	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), SourceCleanupTimeout)
-	defer cancel()
-	if err := session.sink.Fail(cleanupCtx, cause); err != nil {
-		return errors.Join(cause, err)
+func (session *SourceSession) cleanupSession(
+	ctx context.Context,
+	cancelSend context.CancelFunc,
+	senderDone <-chan error,
+	cause error,
+	fail bool,
+) error {
+	session.Deactivate()
+	timeout := session.cleanup
+	if timeout <= 0 {
+		timeout = SourceCleanupTimeout
 	}
-	return cause
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), timeout)
+	defer cancel()
+	interruptDone := make(chan error, 1)
+	go func() { interruptDone <- session.sink.Interrupt(cause) }()
+	if cancelSend != nil {
+		cancelSend()
+	}
+
+	var interruptErr error
+	var senderErr error
+	for interruptDone != nil || senderDone != nil {
+		select {
+		case interruptErr = <-interruptDone:
+			interruptDone = nil
+		case senderErr = <-senderDone:
+			senderDone = nil
+			if errors.Is(senderErr, context.Canceled) || (ctx.Err() != nil && errors.Is(senderErr, ctx.Err())) {
+				senderErr = nil
+			}
+		case <-cleanupCtx.Done():
+			return errors.Join(cause, interruptErr, senderErr, cleanupCtx.Err())
+		}
+	}
+	if !fail {
+		return errors.Join(cause, interruptErr, senderErr)
+	}
+	failDone := make(chan error, 1)
+	go func() { failDone <- session.sink.Fail(cleanupCtx, cause) }()
+	select {
+	case failErr := <-failDone:
+		return errors.Join(cause, interruptErr, senderErr, failErr)
+	case <-cleanupCtx.Done():
+		return errors.Join(cause, interruptErr, senderErr, cleanupCtx.Err())
+	}
 }

@@ -27,7 +27,7 @@ type evidenceFixture struct {
 }
 
 func TestAgentEvidenceCLIContractSmoke(t *testing.T) {
-	if lab.AgentSessionSchemaVersion != "krasis.lab.agent-session/v7" {
+	if lab.AgentSessionSchemaVersion != "krasis.lab.agent-session/v13" {
 		t.Fatalf("agent session schema = %q", lab.AgentSessionSchemaVersion)
 	}
 	executable := buildLabExecutable(t)
@@ -36,9 +36,10 @@ func TestAgentEvidenceCLIContractSmoke(t *testing.T) {
 	home := runLabJSON(t, executable, 0,
 		"agent-session-check", "--json", fixture.agentPaths["H-A"], fixture.agentPaths["H-B"],
 	)
-	requireJSONValue(t, home, "schemaVersion", "krasis.lab.agent-session-check/v4")
+	requireJSONValue(t, home, "schemaVersion", "krasis.lab.agent-session-check/v10")
 	requireJSONValue(t, home, "pairPassed", true)
 	requireDestinationInput(t, home)
+	requireSourcePipeline(t, home)
 	requireAggregatePrivacy(t, home)
 
 	partial := fixture.reports["H-A"]
@@ -68,6 +69,26 @@ func TestAgentEvidenceCLIContractSmoke(t *testing.T) {
 	requireFileIssue(t, failedResult, "unsafe_cursor_rollback_evidence")
 	requireAggregatePrivacy(t, failedResult)
 
+	invalidPipeline := fixture.reports["H-B"]
+	invalidPipeline.SourcePipeline.Wheel = lab.WheelPipelineEvidence{
+		HookObserved: 1, Mapped: 1, QueueAccepted: 1, Sent: 1,
+	}
+	invalidPipelinePath := writeJSONFile(t, filepath.Dir(fixture.agentPaths["H-B"]), "H-B-invalid-pipeline.json", invalidPipeline)
+	invalidPipelineResult := runLabJSON(t, executable, 1,
+		"agent-session-check", "--json", invalidPipelinePath, fixture.agentPaths["H-A"],
+	)
+	requireFileIssue(t, invalidPipelineResult, "invalid_source_pipeline_evidence")
+	requireAggregatePrivacy(t, invalidPipelineResult)
+
+	invalidComponent := fixture.reports["H-A"]
+	invalidComponent.Supervisor.LastFailureComponent = "private-component"
+	invalidComponentPath := writeJSONFile(t, filepath.Dir(fixture.agentPaths["H-A"]), "H-A-invalid-component.json", invalidComponent)
+	invalidComponentResult := runLabJSON(t, executable, 1,
+		"agent-session-check", "--json", invalidComponentPath, fixture.agentPaths["H-B"],
+	)
+	requireFileIssue(t, invalidComponentResult, "invalid_failure_component")
+	requireAggregatePrivacy(t, invalidComponentResult)
+
 	phase0 := runLabJSON(t, executable, 0,
 		"phase0-check", "--json",
 		"--home", fixture.agentPaths["H-A"], "--home", fixture.agentPaths["H-B"],
@@ -75,10 +96,10 @@ func TestAgentEvidenceCLIContractSmoke(t *testing.T) {
 		"--recovery", fixture.recoveryPaths["H-A"], "--recovery", fixture.recoveryPaths["H-B"],
 		"--recovery", fixture.recoveryPaths["S-A"], "--recovery", fixture.recoveryPaths["S-B"],
 	)
-	requireJSONValue(t, phase0, "schemaVersion", "krasis.lab.phase0-check/v4")
+	requireJSONValue(t, phase0, "schemaVersion", "krasis.lab.phase0-check/v10")
 	requireJSONValue(t, phase0, "passed", true)
 	homeResult := requireJSONObject(t, phase0, "home")
-	requireJSONValue(t, homeResult, "schemaVersion", "krasis.lab.agent-session-check/v4")
+	requireJSONValue(t, homeResult, "schemaVersion", "krasis.lab.agent-session-check/v10")
 	requireDestinationInput(t, homeResult)
 	requireAggregatePrivacy(t, phase0)
 }
@@ -144,7 +165,14 @@ func writeEvidenceFixture(t *testing.T) evidenceFixture {
 			CrashGuard:        lab.CrashGuardEvidence{Started: true, CleanShutdown: true, ReportFile: guardName},
 			Supervisor:        lab.SupervisorEvidence{FinalState: "STOPPED", ActiveCount: 1},
 			Liveness:          lab.LivenessEvidence{HeartbeatsSent: 4, HeartbeatsReceived: 4, ReceiveGapSamples: 3, MaxReceiveGapMillis: 600},
-			DestinationInput:  lab.InputEvidence{Entries: 1, PointerMoves: 1, ReturnArms: 1},
+		}
+		if device.role == "listen" {
+			report.DestinationInput = lab.InputEvidence{Entries: 1, PointerMoves: 1, ReturnArms: 1}
+		} else {
+			report.SourceInput = lab.SourceInputEvidence{BoundaryIntents: 1, PointerMoves: 1}
+			report.SourcePipeline.Wheel = lab.WheelPipelineEvidence{
+				CaptureActivations: 1, CaptureDeactivations: 1, FocusRestoreSkipped: 1,
+			}
 		}
 		if device.alias == "H-A" {
 			report.DestinationInput.CursorRollbacks = lab.CursorRollbackEvidence{Attempted: 1, NotRestored: 1}
@@ -239,6 +267,35 @@ func requireDestinationInput(t *testing.T, report map[string]any) {
 	rollbacks := requireJSONObject(t, input, "cursorRollbacks")
 	requireJSONValue(t, rollbacks, "attempted", float64(1))
 	requireJSONValue(t, rollbacks, "notRestored", float64(1))
+}
+
+func requireSourcePipeline(t *testing.T, report map[string]any) {
+	t.Helper()
+	files, ok := report["files"].([]any)
+	if !ok || len(files) == 0 {
+		t.Fatalf("checker files missing: %T", report["files"])
+	}
+	file, ok := files[0].(map[string]any)
+	if !ok {
+		t.Fatalf("checker file is not an object: %T", files[0])
+	}
+	pipeline := requireJSONObject(t, file, "sourcePipeline")
+	wheel := requireJSONObject(t, pipeline, "wheel")
+	requireJSONValue(t, wheel, "hookObserved", float64(0))
+	requireJSONValue(t, wheel, "synthesizedObserved", float64(0))
+	requireJSONValue(t, wheel, "rawObserved", float64(0))
+	requireJSONValue(t, wheel, "windowObserved", float64(0))
+	requireJSONValue(t, wheel, "activeHookMoves", float64(0))
+	requireJSONValue(t, wheel, "activeHookButtons", float64(0))
+	requireJSONValue(t, wheel, "captureActivations", float64(0))
+	requireJSONValue(t, wheel, "captureDeactivations", float64(0))
+	requireJSONValue(t, wheel, "focusRestoreSkipped", float64(0))
+	requireJSONValue(t, wheel, "focusRestored", float64(0))
+	requireJSONValue(t, wheel, "focusRestoreFailed", float64(0))
+	requireJSONValue(t, wheel, "rejectedInactive", float64(0))
+	requireJSONValue(t, wheel, "rejectedInvalid", float64(0))
+	requireJSONValue(t, wheel, "rejectedOverflow", float64(0))
+	requireJSONValue(t, wheel, "sent", float64(0))
 }
 
 func requireFileIssue(t *testing.T, report map[string]any, want string) {

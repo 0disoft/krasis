@@ -83,6 +83,68 @@ func TestRunSessionRejectsIncompleteDependencies(t *testing.T) {
 	}
 }
 
+func TestSessionFailureComponentReturnsOnlyStableComponent(t *testing.T) {
+	privateCause := errors.New("private wheel delta")
+	err := &sessionComponentError{component: "source-session", cause: privateCause}
+	if got := SessionFailureComponent(err); got != "source-session" {
+		t.Fatalf("component = %q", got)
+	}
+	if !errors.Is(err, privateCause) {
+		t.Fatal("component error did not preserve internal cause")
+	}
+	if got := SessionFailureComponent(privateCause); got != "unknown" {
+		t.Fatalf("generic component = %q", got)
+	}
+}
+
+func TestObservedSourceSinkCountsOnlySuccessfulSends(t *testing.T) {
+	observer := &recordingSourceObserver{}
+	delegate := &recordingSourceSink{}
+	sink := &observedSourceSink{delegate: delegate, observer: observer}
+	action := control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}
+	if err := sink.SendAction(context.Background(), action); err != nil {
+		t.Fatalf("SendAction() error = %v", err)
+	}
+	if observer.actions != 1 {
+		t.Fatalf("observed actions = %d, want 1", observer.actions)
+	}
+	delegate.sendErr = errors.New("send failed")
+	if err := sink.SendAction(context.Background(), action); !errors.Is(err, delegate.sendErr) {
+		t.Fatalf("failed SendAction() error = %v", err)
+	}
+	if observer.actions != 1 {
+		t.Fatalf("failed send changed observed actions to %d", observer.actions)
+	}
+}
+
+func TestCombinedSourceActivationOrdersCaptureLifecycleAndRollsBackFailure(t *testing.T) {
+	var order []string
+	source := &recordingActivation{name: "source", order: &order}
+	capture := &recordingActivation{name: "capture", order: &order}
+	activation := &combinedSourceActivation{source: source, capture: capture}
+	if err := activation.Activate(); err != nil {
+		t.Fatalf("Activate() error = %v", err)
+	}
+	activation.Deactivate()
+	if got := strings.Join(order, ","); got != "source.activate,capture.activate,capture.deactivate,source.deactivate" {
+		t.Fatalf("activation order = %q", got)
+	}
+
+	order = nil
+	source = &recordingActivation{name: "source", order: &order}
+	capture = &recordingActivation{name: "capture", order: &order, activateErr: errors.New("foreground denied")}
+	activation = &combinedSourceActivation{source: source, capture: capture}
+	if err := activation.Activate(); !errors.Is(err, capture.activateErr) {
+		t.Fatalf("Activate() error = %v", err)
+	}
+	if got := strings.Join(order, ","); got != "source.activate,capture.activate,source.deactivate,capture.deactivate" {
+		t.Fatalf("rollback order = %q", got)
+	}
+	if activation.Active() {
+		t.Fatal("activation remained active after capture failure")
+	}
+}
+
 func TestRunSessionTreatsIndependentComponentContextErrorAsFailure(t *testing.T) {
 	for _, test := range []struct {
 		name string
@@ -181,6 +243,29 @@ type contextErrorHook struct {
 	err error
 }
 
+type recordingActivation struct {
+	name        string
+	order       *[]string
+	active      bool
+	activateErr error
+}
+
+func (activation *recordingActivation) Activate() error {
+	*activation.order = append(*activation.order, activation.name+".activate")
+	if activation.activateErr != nil {
+		return activation.activateErr
+	}
+	activation.active = true
+	return nil
+}
+
+func (activation *recordingActivation) Deactivate() {
+	*activation.order = append(*activation.order, activation.name+".deactivate")
+	activation.active = false
+}
+
+func (activation *recordingActivation) Active() bool { return activation.active }
+
 func (hook contextErrorHook) RunWithBoundary(context.Context, *wininput.SourceSession, wininput.BoundaryObserver, func()) error {
 	return hook.err
 }
@@ -234,6 +319,27 @@ func (input *testInput) ReturnIntents() <-chan control.ReturnIntent { return inp
 type noopEffects struct{}
 
 func (noopEffects) Execute(context.Context, control.Effect) error { return nil }
+
+type recordingSourceObserver struct {
+	actions int
+}
+
+func (observer *recordingSourceObserver) ObserveSourceAction(control.InputAction) {
+	observer.actions++
+}
+
+func (*recordingSourceObserver) ObserveBoundaryIntent(control.BoundaryIntent) {}
+
+type recordingSourceSink struct {
+	sendErr error
+}
+
+func (sink *recordingSourceSink) SendAction(context.Context, control.InputAction) error {
+	return sink.sendErr
+}
+
+func (*recordingSourceSink) Interrupt(error) error             { return nil }
+func (*recordingSourceSink) Fail(context.Context, error) error { return nil }
 
 type acceptingAuthorizer struct{}
 

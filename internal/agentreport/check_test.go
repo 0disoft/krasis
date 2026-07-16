@@ -75,7 +75,7 @@ func TestCheckRejectsLifecycleTransitionEvidence(t *testing.T) {
 
 func TestCheckRejectsUnknownFields(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "unknown.json")
-	if err := os.WriteFile(path, []byte(`{"schemaVersion":"krasis.lab.agent-session/v7","surprise":true}`), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(`{"schemaVersion":"krasis.lab.agent-session/v13","surprise":true}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	result := Check([]string{path})
@@ -159,18 +159,140 @@ func TestValidateRejectsUnsafeDestinationInputEvidence(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsOverflowingAggregateCounters(t *testing.T) {
+	report := passingReport("H-A", "listen", "RIGHT")
+	report.SourceInput = lab.SourceInputEvidence{BoundaryIntents: 1, KeyDowns: ^uint64(0), KeyUps: 1}
+	report.DestinationInput.InjectionFailures = lab.InjectionFailureEvidence{NotApplied: ^uint64(0), PartiallyApplied: 1}
+	report.DestinationInput.CursorRollbacks = lab.CursorRollbackEvidence{Attempted: ^uint64(0), Restored: ^uint64(0), Failed: 1}
+	issues := validate(report)
+	for _, want := range []string{
+		"invalid_source_input_evidence",
+		"invalid_source_pipeline_evidence",
+		"invalid_injection_failure_evidence",
+		"invalid_cursor_rollback_evidence",
+	} {
+		if !hasIssue(issues, want) {
+			t.Fatalf("validate() issues = %v, want %q", issues, want)
+		}
+	}
+}
+
+func TestCheckRequiresComplementaryOneWayPairEvidence(t *testing.T) {
+	directory := t.TempDir()
+	firstReport := passingReport("H-A", "listen", "RIGHT")
+	firstReport.SourceInput = lab.SourceInputEvidence{}
+	secondReport := passingReport("H-B", "connect", "LEFT")
+	secondReport.SourceInput = lab.SourceInputEvidence{}
+	secondReport.DestinationInput = lab.InputEvidence{Entries: 1, PointerMoves: 1, ReturnArms: 1}
+	first := writeReport(t, directory, "H-A-destination.json", firstReport)
+	second := writeReport(t, directory, "H-B-destination.json", secondReport)
+	result := Check([]string{first, second})
+	if !result.Valid || result.PairPassed || !hasIssue(result.Issues, "missing_pair_source_evidence") {
+		t.Fatalf("destination-only pair = %+v", result)
+	}
+
+	firstReport = passingReport("H-A", "listen", "RIGHT")
+	firstReport.DestinationInput = lab.InputEvidence{}
+	firstReport.SourceInput = lab.SourceInputEvidence{BoundaryIntents: 1, PointerMoves: 1}
+	firstReport.SourcePipeline.Wheel = lab.WheelPipelineEvidence{
+		CaptureActivations: 1, CaptureDeactivations: 1, FocusRestoreSkipped: 1,
+	}
+	secondReport = passingReport("H-B", "connect", "LEFT")
+	secondReport.DestinationInput = lab.InputEvidence{}
+	first = writeReport(t, directory, "H-A-source.json", firstReport)
+	second = writeReport(t, directory, "H-B-source.json", secondReport)
+	result = Check([]string{first, second})
+	if !result.Valid || result.PairPassed || !hasIssue(result.Issues, "missing_pair_destination_evidence") {
+		t.Fatalf("source-only pair = %+v", result)
+	}
+}
+
+func TestValidateAllowsIncompleteOppositeDirectionWhenLocalEvidenceIsComplete(t *testing.T) {
+	destination := passingReport("H-A", "listen", "RIGHT")
+	destination.SourceInput.BoundaryIntents = 1
+	if issues := validate(destination); len(issues) != 0 {
+		t.Fatalf("complete destination with partial source issues = %v", issues)
+	}
+
+	source := passingReport("H-B", "connect", "LEFT")
+	source.DestinationInput.Entries = 1
+	if issues := validate(source); len(issues) != 0 {
+		t.Fatalf("complete source with partial destination issues = %v", issues)
+	}
+}
+
+func TestValidateRejectsInvalidSourcePipelineEvidenceAndFailureComponent(t *testing.T) {
+	report := passingReport("H-B", "connect", "LEFT")
+	report.SourcePipeline.Wheel = lab.WheelPipelineEvidence{
+		HookObserved: 1, Mapped: 1, QueueAccepted: 1, Sent: 1,
+	}
+	issues := validate(report)
+	if !hasIssue(issues, "invalid_source_pipeline_evidence") {
+		t.Fatalf("pipeline issues = %v", issues)
+	}
+
+	report.SourceInput.Wheels = 1
+	report.SourcePipeline.Wheel.CaptureActivations = 1
+	report.SourcePipeline.Wheel.CaptureDeactivations = 1
+	report.SourcePipeline.Wheel.FocusRestoreSkipped = 1
+	report.Supervisor.LastFailureComponent = "private-error"
+	issues = validate(report)
+	if hasIssue(issues, "invalid_source_pipeline_evidence") || !hasIssue(issues, "invalid_failure_component") {
+		t.Fatalf("component issues = %v", issues)
+	}
+
+	report.Supervisor.LastFailureComponent = "peer-liveness"
+	if issues = validate(report); len(issues) != 0 {
+		t.Fatalf("valid pipeline issues = %v", issues)
+	}
+}
+
+func TestValidateRejectsRawWheelObservedWithoutForwarding(t *testing.T) {
+	report := passingReport("H-B", "connect", "LEFT")
+	report.SourcePipeline.Wheel.RawObserved = 12
+	issues := validate(report)
+	if !hasIssue(issues, "raw_wheel_observed_without_forwarding") {
+		t.Fatalf("raw wheel issues = %v", issues)
+	}
+}
+
+func TestValidateRejectsWindowWheelWithoutForwardingAndUnsafeCaptureLifecycle(t *testing.T) {
+	report := passingReport("H-B", "connect", "LEFT")
+	report.SourcePipeline.Wheel.WindowObserved = 12
+	issues := validate(report)
+	if !hasIssue(issues, "window_wheel_observed_without_forwarding") {
+		t.Fatalf("window wheel issues = %v", issues)
+	}
+
+	report.SourcePipeline.Wheel = lab.WheelPipelineEvidence{
+		CaptureActivations: 1,
+	}
+	issues = validate(report)
+	if !hasIssue(issues, "invalid_source_pipeline_evidence") {
+		t.Fatalf("capture lifecycle issues = %v", issues)
+	}
+}
+
 func passingReport(alias, role, edge string) lab.AgentSessionReport {
-	return lab.AgentSessionReport{
+	report := lab.AgentSessionReport{
 		SchemaVersion: lab.AgentSessionSchemaVersion, DeviceAlias: alias, Role: role, Edge: edge,
 		CollectedAt:   time.Date(2026, time.July, 11, 0, 0, 0, 0, time.UTC),
 		BuildRevision: "abc123", RequestedMillis: 120_000, HeartbeatMillis: 500, PeerTimeoutMillis: 3_000,
 		Completed: true, Passed: true, StopReason: "duration_elapsed",
-		Lifecycle:        lab.LifecycleEvidence{MonitorStarted: true, CleanShutdown: true},
-		Liveness:         lab.LivenessEvidence{HeartbeatsSent: 4, HeartbeatsReceived: 4, ReceiveGapSamples: 3, MaxReceiveGapMillis: 600},
-		CrashGuard:       lab.CrashGuardEvidence{Started: true, CleanShutdown: true, ReportFile: alias + "-guard.json"},
-		Supervisor:       lab.SupervisorEvidence{FinalState: "STOPPED", ActiveCount: 1},
-		DestinationInput: lab.InputEvidence{Entries: 1, PointerMoves: 1, ReturnArms: 1},
+		Lifecycle:  lab.LifecycleEvidence{MonitorStarted: true, CleanShutdown: true},
+		Liveness:   lab.LivenessEvidence{HeartbeatsSent: 4, HeartbeatsReceived: 4, ReceiveGapSamples: 3, MaxReceiveGapMillis: 600},
+		CrashGuard: lab.CrashGuardEvidence{Started: true, CleanShutdown: true, ReportFile: alias + "-guard.json"},
+		Supervisor: lab.SupervisorEvidence{FinalState: "STOPPED", ActiveCount: 1},
 	}
+	if role == "listen" {
+		report.DestinationInput = lab.InputEvidence{Entries: 1, PointerMoves: 1, ReturnArms: 1}
+	} else {
+		report.SourceInput = lab.SourceInputEvidence{BoundaryIntents: 1, PointerMoves: 1}
+		report.SourcePipeline.Wheel = lab.WheelPipelineEvidence{
+			CaptureActivations: 1, CaptureDeactivations: 1, FocusRestoreSkipped: 1,
+		}
+	}
+	return report
 }
 
 func writeReport(t *testing.T, directory, name string, report lab.AgentSessionReport) string {

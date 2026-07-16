@@ -1,10 +1,10 @@
 # Phase 0: Windows 입력 안전성 검증
 
-- 상태: Planned
+- 상태: In Progress
 - 책임자: cherr
 - 제품 범위 기준: `docs/product/02-spec.md`
 - 아키텍처 기준: `ARCHITECTURE.md`
-- 결과 기록: 이 문서의 결과 표와 후속 ADR
+- 결과 기록: 이 문서, `docs/experiments/results/`의 redacted 실행 기록과 후속 ADR
 
 ## 목적
 
@@ -105,6 +105,9 @@ watchdog과 독립 복구 수단이 없는 구현은 기능이 동작하더라�
 | `stress-selftest` | 같은 process에서 hook session과 tagged 주입 왕복을 bounded window 동안 반복 |
 | `guided-probe` | keyboard, pointer, wheel/buttons를 단계별 aggregate evidence로 확인 |
 | `probe-check` | 장비별 basic probe JSON의 schema와 비교 가능성 검증 |
+| `pointer-shadow` | Raw Input relative packet과 legacy hook edge delta 소실을 aggregate evidence로 비교 |
+| `wheel-surface` | 한 장비에서 hook·Raw Input wheel 표면과 tagged pointer-move hook sentinel을 분리 계측 |
+| `touchpad-surface` | Windows 11 touchpad-capable foreground window에서 `PT_TOUCHPAD` pointer·legacy wheel 표면을 aggregate 계측 |
 
 각 경계는 사람에게 읽히는 결과와 redacted machine-readable 결과를 같은 내부 결과 model에서 만들어야 한다. 구체적인 flag와 exit code는 구현 직전에 CLI 계약으로 확정한다.
 
@@ -117,9 +120,50 @@ watchdog과 독립 복구 수단이 없는 구현은 기능이 동작하더라�
 - `probe`: 장비 별칭, build 식별자, 진단, aggregate capture와 selftest를 교체 불가 JSON file로 저장하도록 구현
 - `guided-probe`: keyboard, pointer, wheel/buttons 단계별 누락 code와 aggregate snapshot 저장 구현
 - `probe-check`: unknown field, trailing JSON, size, schema, build와 duration 비교 검증 구현
+- `pointer-shadow`: Raw Input과 low-level hook을 동시에 관찰하되 suppression·주입·network 전달 없이 edge-clipping signature만 aggregate JSON으로 저장하는 lab-only characterization 구현
+- `wheel-surface`: hook physical/synthesized wheel과 Raw Input wheel flag·signed delta를 집계하고 시작·종료의 tagged 상대 pointer move `+1/-1` pair로 hook health를 확인하는 단일 장비 진단 구현
+- `touchpad-surface`: visible foreground window에 Windows 11 touchpad capability를 등록하고 `PT_TOUCHPAD` pointer와 legacy wheel을 내용 없이 aggregate로 구분하는 단일 장비 진단 구현
 - 장비 실행 kit: Windows binary, 수집 script, runbook, build identity와 SHA-256 package 구현
 - 일반 `inject`, `suppress`, `edge`, `recover`: 미구현
-- Raw Input 비교 adapter: 미구현
+- production-shaped hybrid mouse source: Raw Input relative move·button, zero-device 허용,
+  current packet 표준 read와 64KiB buffered drain, active touchpad-capable window wheel owner와 focus 복원까지 구현;
+  실제 S-A/S-B `agent-session/v13` touchpad wheel 재검증 통과
+
+기존 `agent-session` wheel 0은 Raw Input wheel 부재 증거가 아니다. 당시 Raw mapper가
+`RI_MOUSE_WHEEL`과 `RI_MOUSE_HWHEEL`을 의도적으로 무시했으므로 ADR 0013, 0017과 0018의 해당
+증거 결론은 ADR 0019가 대체한다. 이후 standalone `wheel-surface`에서 hook과 Raw Input wheel이
+`77/77`인 `HOOK_AND_RAW`가 관찰돼 Raw 부재 가설은 반박됐다. 그래도 두 값은 같은 OS event를
+correlate하지 않는 aggregate라 split suppression·send ownership의 근거가 아니다. ADR 0021은 v12까지
+hook-owned payload를 유지했고 ADR 0023은 gram13 touchpad surface 결과를 근거로 v13 active outbound
+payload owner를 touchpad-capable window로 대체한다. Raw wheel은 계속 진단 evidence로만 센다.
+
+현재 진단 계약은 `krasis.lab.agent-session/v13`, strict checker
+`krasis.lab.agent-session-check/v10`, Phase 0 aggregate `krasis.lab.phase0-check/v10`이다.
+`sourcePipeline.wheel`은 기존 hook/mapping/queue/send counter에 `rawObserved`,
+`activeHookMoves`, `activeHookButtons`, `windowObserved`와 capture/focus lifecycle을 추가한다. 이 값들은 active source session의 독립 aggregate이며
+같은 event나 exact equality를 증명하지 않는다. `rawObserved>0 && sent==0`은
+`raw_wheel_observed_without_forwarding`으로 report를 실패시키는 다음 안전 gate다.
+
+2026-07-16 gram13 `agent-session/v12` 수동 재현에서는 active source pointer move `290`건과 button
+`4`건이 관찰되고 HP15에서 move/click/drag가 동작했지만 hook·합성·Raw wheel과 destination wheel은
+모두 `0`이었다. 두 손가락 vertical/horizontal scroll은 gram13 local window에서 동작했다. 따라서
+network나 전체 hook thread 실패로 보지 않고 ADR 0022의 `touchpad-surface`로 Windows 11
+Precision Touchpad pointer 표면을 확인했다. 해당 실행은 `PT_TOUCHPAD` `1850`건, legacy vertical
+`396`건과 horizontal `297`건의 `POINTER_AND_LEGACY`를 남겼고 type query 실패와 foreground 이탈은
+`0`이었다. ADR 0023의 v13은 active outbound에서 이 system legacy 변환을 window-owned queue ingress로
+사용한다.
+
+2026-07-16 S-B source와 S-A destination의 `agent-session/v13` 재검증에서 사용자가 destination
+scroll 동작을 확인했다. source window observation, queue accepted와 sent는 각각 `601`이었고 destination
+wheel도 `601`이었다. capture activation/deactivation은 `7/7`, focus restore failure와 destination
+injection failure, 양쪽 crash guard remaining은 모두 `0`이었다. 세부 redacted 결과와 남은 gate는
+`docs/experiments/results/2026-07-16-study-pair-v13.md`가 소유한다. 외장 mouse 중복, 세로/가로 분리,
+강제 foreground 이탈과 crash/disconnect/lifecycle 장애는 아직 장비 검증 대기다.
+
+sentinel은 wheel이 아니라 `MOUSEEVENTF_MOVE|MOUSEEVENTF_MOVE_NOCOALESCE` tagged 상대 이동이라
+Raw wheel evidence를 만들지 않는다. 정상 hook은 네 `WM_MOUSEMOVE`를 삼키지만 hook 누락 시 cursor가
+순간 이동할 수 있고 pair 순합 0도 완전 무해를 보장하지 않는다. pass에는 sentinel health와 실제
+non-sentinel move 또는 button interaction이 필요하며, 이 조건을 만족한 `NEITHER`는 유효한 진단 결과다.
 
 현재 개발 호스트에서 확인한 값은 Windows `10.0` build `26200`, `amd64`, 일반 권한 process, 단일 monitor다. 이는 H-A/H-B/S-A/S-B 중 어느 장비인지 확인되지 않았으므로 장비 원장에는 반영하지 않았다. 같은 smoke에서 low-level keyboard/mouse hook, Raw Input과 `SendInput` API 존재를 확인했다.
 

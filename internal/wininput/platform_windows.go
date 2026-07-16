@@ -80,8 +80,10 @@ func (p *Platform) Diagnose(ctx context.Context) (lab.Diagnostics, error) {
 		Capabilities: lab.Capabilities{
 			LowLevelKeyboardHook: user32.NewProc("SetWindowsHookExW").Find() == nil,
 			LowLevelMouseHook:    user32.NewProc("SetWindowsHookExW").Find() == nil,
-			RawInput:             user32.NewProc("RegisterRawInputDevices").Find() == nil && user32.NewProc("GetRawInputData").Find() == nil,
-			SendInput:            user32.NewProc("SendInput").Find() == nil,
+			RawInput: user32.NewProc("RegisterRawInputDevices").Find() == nil &&
+				user32.NewProc("GetRawInputData").Find() == nil &&
+				user32.NewProc("GetRawInputBuffer").Find() == nil,
+			SendInput: user32.NewProc("SendInput").Find() == nil,
 		},
 	}, nil
 }

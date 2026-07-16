@@ -18,6 +18,10 @@ type SourceHook interface {
 	RunWithBoundary(context.Context, *wininput.SourceSession, wininput.BoundaryObserver, func()) error
 }
 
+type sourceCaptureProvider interface {
+	SourceCapture() wininput.SourceActivation
+}
+
 type InputBoundaryPort interface {
 	application.InputPort
 	peer.CursorEntryPort
@@ -37,6 +41,13 @@ type Config struct {
 	Now              peer.ObservationClock
 	Liveness         *LivenessPolicy
 	LivenessObserver peer.LivenessObserver
+	SourceObserver   SourceActivityObserver
+	PipelineObserver wininput.SourcePipelineObserver
+}
+
+type SourceActivityObserver interface {
+	ObserveSourceAction(control.InputAction)
+	ObserveBoundaryIntent(control.BoundaryIntent)
 }
 
 type Dependencies struct {
@@ -67,7 +78,11 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	if err != nil {
 		return Result{}, err
 	}
-	emitter, err := control.NewBoundaryIntentEmitter(detector)
+	var observeBoundary func(control.BoundaryIntent)
+	if config.SourceObserver != nil {
+		observeBoundary = config.SourceObserver.ObserveBoundaryIntent
+	}
+	emitter, err := control.NewBoundaryIntentEmitterObserved(detector, observeBoundary)
 	if err != nil {
 		return Result{}, err
 	}
@@ -83,7 +98,11 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	if err != nil {
 		return Result{}, err
 	}
-	source, err := wininput.NewSourceSession(config.QueueCapacity, actionSink)
+	var sourceSink wininput.SourceSink = actionSink
+	if config.SourceObserver != nil {
+		sourceSink = &observedSourceSink{delegate: actionSink, observer: config.SourceObserver}
+	}
+	source, err := wininput.NewSourceSessionObserved(config.QueueCapacity, sourceSink, config.PipelineObserver)
 	if err != nil {
 		return Result{}, err
 	}
@@ -91,7 +110,15 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	if err != nil {
 		return Result{}, err
 	}
-	outbound, err := peer.NewOutboundController(coordinator, runtime, source)
+	var outboundSource peer.SourceActivation = source
+	if provider, ok := dependencies.Hook.(sourceCaptureProvider); ok {
+		capture := provider.SourceCapture()
+		if capture == nil {
+			return Result{}, errors.New("source capture provider returned no activation owner")
+		}
+		outboundSource = &combinedSourceActivation{source: source, capture: capture}
+	}
+	outbound, err := peer.NewOutboundController(coordinator, runtime, outboundSource)
 	if err != nil {
 		return Result{}, err
 	}
@@ -115,14 +142,15 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 		peerTimeout = config.Liveness.PeerTimeout
 	}
 	sourceReady := make(chan struct{})
+	hookReady := make(chan struct{})
 	components := []component{
 		{name: "source-session", run: func() error {
 			return source.RunWithReady(runContext, func() { close(sourceReady) })
 		}},
 		{name: "source-hook", wait: sourceReady, run: func() error {
-			return dependencies.Hook.RunWithBoundary(runContext, source, emergency, nil)
+			return dependencies.Hook.RunWithBoundary(runContext, source, emergency, func() { close(hookReady) })
 		}},
-		{name: "boundary-orchestrator", wait: sourceReady, run: func() error {
+		{name: "boundary-orchestrator", wait: hookReady, run: func() error {
 			return orchestrator.Run(runContext, emitter.Intents())
 		}},
 		{name: "return-controller", run: func() error {
@@ -157,7 +185,7 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 				runErr = fmt.Errorf("%s stopped unexpectedly", current.name)
 			}
 			if runContext.Err() == nil {
-				cancel(fmt.Errorf("%s: %w", current.name, runErr))
+				cancel(&sessionComponentError{component: current.name, cause: runErr})
 			}
 		}()
 	}
@@ -173,6 +201,88 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 		return result, ctx.Err()
 	}
 	return result, cause
+}
+
+type combinedSourceActivation struct {
+	source  wininput.SourceActivation
+	capture wininput.SourceActivation
+}
+
+func (activation *combinedSourceActivation) Activate() error {
+	if activation == nil || activation.source == nil || activation.capture == nil {
+		return errors.New("combined source activation is not initialized")
+	}
+	if err := activation.source.Activate(); err != nil {
+		return err
+	}
+	if err := activation.capture.Activate(); err != nil {
+		activation.source.Deactivate()
+		activation.capture.Deactivate()
+		return err
+	}
+	return nil
+}
+
+func (activation *combinedSourceActivation) Deactivate() {
+	if activation == nil {
+		return
+	}
+	if activation.capture != nil {
+		activation.capture.Deactivate()
+	}
+	if activation.source != nil {
+		activation.source.Deactivate()
+	}
+}
+
+func (activation *combinedSourceActivation) Active() bool {
+	if activation == nil {
+		return false
+	}
+	return activation.source != nil && activation.source.Active() ||
+		activation.capture != nil && activation.capture.Active()
+}
+
+type sessionComponentError struct {
+	component string
+	cause     error
+}
+
+func (err *sessionComponentError) Error() string {
+	return fmt.Sprintf("%s: %v", err.component, err.cause)
+}
+
+func (err *sessionComponentError) Unwrap() error {
+	return err.cause
+}
+
+func SessionFailureComponent(err error) string {
+	var componentErr *sessionComponentError
+	if errors.As(err, &componentErr) {
+		return componentErr.component
+	}
+	return "unknown"
+}
+
+type observedSourceSink struct {
+	delegate wininput.SourceSink
+	observer SourceActivityObserver
+}
+
+func (sink *observedSourceSink) SendAction(ctx context.Context, action control.InputAction) error {
+	if err := sink.delegate.SendAction(ctx, action); err != nil {
+		return err
+	}
+	sink.observer.ObserveSourceAction(action)
+	return nil
+}
+
+func (sink *observedSourceSink) Interrupt(cause error) error {
+	return sink.delegate.Interrupt(cause)
+}
+
+func (sink *observedSourceSink) Fail(ctx context.Context, cause error) error {
+	return sink.delegate.Fail(ctx, cause)
 }
 
 type component struct {

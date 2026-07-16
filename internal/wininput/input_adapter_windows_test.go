@@ -372,9 +372,12 @@ func TestInputAdapterMoveEmitsArmedReturnIntent(t *testing.T) {
 	originalSend := callSendInput
 	callSendInput = func(uintptr, uintptr, uintptr) (uintptr, uintptr, error) { return 1, 0, nil }
 	left := systemMetric(smXVIRTUALSCREEN)
+	positions := []int32{left + defaultReturnRearmDistance, left}
+	positionIndex := 0
 	callGetCursorPos = func(args ...uintptr) (uintptr, uintptr, error) {
 		position := (*point)(unsafe.Pointer(args[0]))
-		position.X = left
+		position.X = positions[positionIndex]
+		positionIndex++
 		return 1, 0, nil
 	}
 	t.Cleanup(func() {
@@ -386,8 +389,11 @@ func TestInputAdapterMoveEmitsArmedReturnIntent(t *testing.T) {
 	if err := adapter.ArmReturn(intent, control.ScreenEdgeRight); err != nil {
 		t.Fatalf("ArmReturn() error = %v", err)
 	}
+	if err := adapter.Move(context.Background(), 1, 0); err != nil {
+		t.Fatalf("Move(inward) error = %v", err)
+	}
 	if err := adapter.Move(context.Background(), -1, 0); err != nil {
-		t.Fatalf("Move() error = %v", err)
+		t.Fatalf("Move(return) error = %v", err)
 	}
 	select {
 	case got := <-adapter.ReturnIntents():

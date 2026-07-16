@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/0disoft/krasis/internal/agent"
@@ -225,7 +226,13 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 		return finish(exitRuntime)
 	}
 	fmt.Fprintf(stdout, "Crash guard armed: agent_pid=%d report=%s\n", os.Getpid(), options.guardOutput)
-	input := newCountingInput(wininput.NewInputAdapter(), guard)
+	inputAdapter, err := wininput.NewInputAdapterWithReturnRearmDistance(options.rearmDistance, diagnostics.Display.Width)
+	if err != nil {
+		report.FailureCode = "return_boundary_config_failed"
+		report.StopReason = "failure"
+		return finish(exitRuntime)
+	}
+	input := newCountingInput(inputAdapter, guard)
 	observer := &agentSessionObserver{}
 	runContext, cancel := context.WithTimeout(processOwner.Context(), options.duration)
 	defer cancel()
@@ -234,11 +241,13 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 		Session: sessionConfig,
 		Backoff: agent.DefaultBackoffPolicy(), Now: time.Now, Wait: agent.Wait, Observer: observer,
 	}, agent.SupervisorDependencies{
-		Source: source, Hook: wininput.NewSourceHook(), Input: input,
+		Source: source, Hook: wininput.NewSourceHookObserved(observer), Input: input,
 		Effects: agent.RuntimeEffects{}, Authorizer: authorizer, RunSession: agent.RunSession,
 	})
 	report.Supervisor = observer.evidence()
 	report.Liveness = observer.livenessEvidence()
+	report.SourceInput = observer.sourceInputEvidence()
+	report.SourcePipeline = observer.sourcePipelineEvidence()
 	report.DestinationInput = input.evidence()
 	if errors.Is(context.Cause(processOwner.Context()), errCrashGuardStopped) {
 		report.FailureCode = "crash_guard_stopped"
@@ -325,21 +334,46 @@ func agentSessionEvidenceExit(report *lab.AgentSessionReport) int {
 		report.FailureCode = "unsafe_liveness_gap"
 		return exitRuntime
 	}
-	input := report.DestinationInput
-	if input.InjectionFailures.Total() > 0 {
+	destination := report.DestinationInput
+	if destination.InjectionFailures.Total() > 0 {
 		report.FailureCode = "input_injection_failure_observed"
 		return exitRuntime
 	}
-	if input.CursorRollbacks.Classified() != input.CursorRollbacks.Attempted {
+	classifiedRollbacks, classifiedRollbacksValid := destination.CursorRollbacks.CheckedClassified()
+	if !classifiedRollbacksValid || classifiedRollbacks != destination.CursorRollbacks.Attempted {
 		report.FailureCode = "invalid_cursor_rollback_evidence"
 		return exitRuntime
 	}
-	if input.CursorRollbacks.Failed > 0 {
+	if destination.CursorRollbacks.Failed > 0 {
 		report.FailureCode = "cursor_rollback_failed"
 		return exitRuntime
 	}
-	if input.Entries == 0 || input.KeyDowns+input.KeyUps+input.ButtonDowns+input.ButtonUps+input.PointerMoves+input.Wheels == 0 {
-		report.FailureCode = "no_destination_input_observed"
+	if !report.SourcePipeline.ValidAgainst(report.SourceInput) {
+		report.FailureCode = "invalid_source_pipeline_evidence"
+		return exitRuntime
+	}
+	if report.SourcePipeline.Wheel.RawWheelUnforwarded() {
+		report.FailureCode = "raw_wheel_observed_without_forwarding"
+		return exitRuntime
+	}
+	if report.SourcePipeline.Wheel.WindowWheelUnforwarded() {
+		report.FailureCode = "window_wheel_observed_without_forwarding"
+		return exitRuntime
+	}
+	sourceActions, sourceActionsValid := report.SourceInput.CheckedTotalActions()
+	if !sourceActionsValid {
+		report.FailureCode = "invalid_source_pipeline_evidence"
+		return exitRuntime
+	}
+	destinationActions, destinationActionsValid := destination.CheckedTotalActions()
+	if !destinationActionsValid {
+		report.FailureCode = "invalid_destination_input_evidence"
+		return exitRuntime
+	}
+	sourceObserved := report.SourceInput.BoundaryIntents > 0 && sourceActions > 0
+	destinationObserved := destination.Entries > 0 && destination.ReturnArms > 0 && destinationActions > 0
+	if !sourceObserved && !destinationObserved {
+		report.FailureCode = "no_input_activity_observed"
 		return exitRuntime
 	}
 	report.Passed = true
@@ -465,6 +499,12 @@ func newAgentSessionConfig(options agentSessionArgs, screenLeft, screenWidth int
 		PeerTimeout:       options.peerTimeout,
 	}
 	config.LivenessObserver = observer
+	if sourceObserver, ok := observer.(agent.SourceActivityObserver); ok {
+		config.SourceObserver = sourceObserver
+	}
+	if pipelineObserver, ok := observer.(wininput.SourcePipelineObserver); ok {
+		config.PipelineObserver = pipelineObserver
+	}
 	return config
 }
 
@@ -632,10 +672,120 @@ func (input *countingInput) evidence() lab.InputEvidence {
 
 type agentSessionObserver struct {
 	mu                  sync.Mutex
+	rawWheelObserved    atomic.Uint64
+	activeHookMoves     atomic.Uint64
+	activeHookButtons   atomic.Uint64
 	value               lab.SupervisorEvidence
 	liveness            lab.LivenessEvidence
+	sourceInput         lab.SourceInputEvidence
+	sourcePipeline      lab.SourcePipelineEvidence
 	receiveSession      string
 	lastReceiveObserved time.Time
+}
+
+func (observer *agentSessionObserver) ObserveSourceAction(action control.InputAction) {
+	observer.mu.Lock()
+	defer observer.mu.Unlock()
+	switch action.Kind {
+	case control.InputKeyDown:
+		observer.sourceInput.KeyDowns++
+	case control.InputKeyUp:
+		observer.sourceInput.KeyUps++
+	case control.InputButtonDown:
+		observer.sourceInput.ButtonDowns++
+	case control.InputButtonUp:
+		observer.sourceInput.ButtonUps++
+	case control.InputPointerMove:
+		observer.sourceInput.PointerMoves++
+	case control.InputWheel:
+		observer.sourceInput.Wheels++
+		observer.sourcePipeline.Wheel.Sent++
+	}
+}
+
+func (observer *agentSessionObserver) ObserveWheelHook() {
+	observer.mu.Lock()
+	observer.sourcePipeline.Wheel.HookObserved++
+	observer.mu.Unlock()
+}
+
+func (observer *agentSessionObserver) ObserveWheelSynthesized() {
+	observer.mu.Lock()
+	observer.sourcePipeline.Wheel.SynthesizedObserved++
+	observer.mu.Unlock()
+}
+
+func (observer *agentSessionObserver) ObserveWheelRaw() {
+	observer.rawWheelObserved.Add(1)
+}
+
+func (observer *agentSessionObserver) ObserveWheelWindow() {
+	observer.mu.Lock()
+	observer.sourcePipeline.Wheel.WindowObserved++
+	observer.mu.Unlock()
+}
+
+func (observer *agentSessionObserver) ObserveWheelCaptureActivated() {
+	observer.mu.Lock()
+	observer.sourcePipeline.Wheel.CaptureActivations++
+	observer.mu.Unlock()
+}
+
+func (observer *agentSessionObserver) ObserveWheelCaptureDeactivated() {
+	observer.mu.Lock()
+	observer.sourcePipeline.Wheel.CaptureDeactivations++
+	observer.mu.Unlock()
+}
+
+func (observer *agentSessionObserver) ObserveWheelFocusRestore(result wininput.SourceFocusRestoreResult) {
+	observer.mu.Lock()
+	switch result {
+	case wininput.SourceFocusRestoreSkipped:
+		observer.sourcePipeline.Wheel.FocusRestoreSkipped++
+	case wininput.SourceFocusRestoreSucceeded:
+		observer.sourcePipeline.Wheel.FocusRestored++
+	case wininput.SourceFocusRestoreFailed:
+		observer.sourcePipeline.Wheel.FocusRestoreFailed++
+	}
+	observer.mu.Unlock()
+}
+
+func (observer *agentSessionObserver) ObserveActiveHookMouseMove() {
+	observer.activeHookMoves.Add(1)
+}
+
+func (observer *agentSessionObserver) ObserveActiveHookMouseButton() {
+	observer.activeHookButtons.Add(1)
+}
+
+func (observer *agentSessionObserver) ObserveWheelMapped() {
+	observer.mu.Lock()
+	observer.sourcePipeline.Wheel.Mapped++
+	observer.mu.Unlock()
+}
+
+func (observer *agentSessionObserver) ObserveWheelQueue(result wininput.SourceQueueOfferResult) {
+	observer.mu.Lock()
+	switch result {
+	case wininput.SourceQueueAccepted:
+		observer.sourcePipeline.Wheel.QueueAccepted++
+	case wininput.SourceQueueRejectedInactive:
+		observer.sourcePipeline.Wheel.QueueRejected++
+		observer.sourcePipeline.Wheel.RejectedInactive++
+	case wininput.SourceQueueRejectedInvalid:
+		observer.sourcePipeline.Wheel.QueueRejected++
+		observer.sourcePipeline.Wheel.RejectedInvalid++
+	case wininput.SourceQueueRejectedOverflow:
+		observer.sourcePipeline.Wheel.QueueRejected++
+		observer.sourcePipeline.Wheel.RejectedOverflow++
+	}
+	observer.mu.Unlock()
+}
+
+func (observer *agentSessionObserver) ObserveBoundaryIntent(control.BoundaryIntent) {
+	observer.mu.Lock()
+	observer.sourceInput.BoundaryIntents++
+	observer.mu.Unlock()
 }
 
 func (observer *agentSessionObserver) ObserveHeartbeatSent(_ string, _ time.Time) {
@@ -680,6 +830,9 @@ func (observer *agentSessionObserver) ObserveSupervisor(snapshot agent.Superviso
 	case "emergency_release":
 		observer.value.EmergencyStops++
 	}
+	if snapshot.FailureComponent != "" && observer.value.LastFailureComponent == "" {
+		observer.value.LastFailureComponent = snapshot.FailureComponent
+	}
 }
 func (observer *agentSessionObserver) evidence() lab.SupervisorEvidence {
 	observer.mu.Lock()
@@ -691,4 +844,20 @@ func (observer *agentSessionObserver) livenessEvidence() lab.LivenessEvidence {
 	observer.mu.Lock()
 	defer observer.mu.Unlock()
 	return observer.liveness
+}
+
+func (observer *agentSessionObserver) sourceInputEvidence() lab.SourceInputEvidence {
+	observer.mu.Lock()
+	defer observer.mu.Unlock()
+	return observer.sourceInput
+}
+
+func (observer *agentSessionObserver) sourcePipelineEvidence() lab.SourcePipelineEvidence {
+	observer.mu.Lock()
+	evidence := observer.sourcePipeline
+	observer.mu.Unlock()
+	evidence.Wheel.RawObserved = observer.rawWheelObserved.Load()
+	evidence.Wheel.ActiveHookMoves = observer.activeHookMoves.Load()
+	evidence.Wheel.ActiveHookButtons = observer.activeHookButtons.Load()
+	return evidence
 }

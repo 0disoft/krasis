@@ -31,7 +31,7 @@
 ## 결과
 
 단일 report와 pair checker만으로 input failure가 없었고 cursor 보상이 분류됐는지 확인할 수 있다.
-대신 schema를 읽는 도구는 v7/v4 shape로 함께 갱신해야 한다. 집계가 0이라는 사실은 실제 Windows가
+이 결정이 도입한 shape는 이후 ADR 0012의 v8/v5 source/destination 분리로 확장됐다. 집계가 0이라는 사실은 실제 Windows가
 실패를 정확히 보고했다는 증명은 아니므로 zero·partial·unknown 주입과 물리 cursor 경합은 실제 두
 장비 failure-injection으로 별도 검증한다.
 

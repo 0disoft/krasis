@@ -142,6 +142,82 @@ guided stage failure code:
 
 상위 `guided_input_incomplete`는 하나 이상의 stage가 요구 event 종류를 관찰하지 못했다는 뜻이다.
 
+## `pointer-shadow`
+
+- schema: `krasis.lab.pointer-shadow/v1`
+- 출력: `--output`으로 지정한 단일 JSON file
+
+허용 정보는 장비 별칭, edge, build와 duration, 일반 diagnostics, Raw Input과 hook의 aggregate count뿐이다. 좌표, 개별 delta, 시간순 trajectory, device name, key와 window 정보는 포함하지 않는다.
+
+stable failure code:
+
+- `raw_relative_not_observed`
+- `hook_physical_move_not_observed`
+- `injected_pointer_interference`
+- `edge_not_observed`
+- `raw_outward_at_edge_not_observed`
+- `legacy_edge_loss_not_observed`
+- `pointer_shadow_canceled`
+- `pointer_shadow_capture_failed`
+
+`signature`는 `rawOutwardAtEdge`, `legacyXUnchangedAtEdge`, `legacyOutwardDeficit`과 최종 `observed`를 가진다. capture runtime이 정상 종료되면 `completed=true`다. 모든 characterization evidence가 있으면 `passed=true`와 exit `0`, evidence가 부족하면 부분 report를 보존하고 exit `1`이다.
+
+## `wheel-surface`
+
+- schema: `krasis.lab.wheel-surface/v1`
+- 출력: `--output`으로 지정한 교체 불가 단일 JSON file
+
+허용 정보는 장비·build·duration·diagnostics, hook의 physical move/button과 physical/synthesized vertical/horizontal wheel count, Raw Input의 전체·zero-device·tagged-injected·vertical/horizontal wheel packet count와 signed delta total·magnitude, sentinel의 `requested`/`inserted`/`observed`/`swallowed`뿐이다. 좌표, 개별 delta·trajectory, 장치·창·process identity, network·session·certificate 정보는 금지한다.
+
+정상 bounded 실행은 시작·종료의 tagged relative pointer move `+1/-1` sentinel 두 쌍, 즉 `requested=inserted=observed=swallowed=4`를 요구한다. `MOUSEEVENTF_MOVE|MOUSEEVENTF_MOVE_NOCOALESCE`를 사용하고 hook은 tagged `WM_MOUSEMOVE`만 삼키므로 Raw Input wheel count를 만들지 않는다. hook이 없으면 cursor가 순간 이동할 수 있고 pair 순합이 0이어도 완전히 무해함을 보장하지 않는다.
+
+`signature`는 hook health, physical interaction, physical/synthesized hook wheel의 개별 관찰 여부와 합산 `hookWheelObserved`, Raw wheel 관찰 여부를 보존한다. `observedPath`는 이 합산 hook 여부와 Raw 여부로 `HOOK_AND_RAW`, `HOOK_ONLY`, `RAW_ONLY`, `NEITHER`를 정한다. physical wheel 관찰은 pass gate가 아니다. sentinel health와 non-sentinel physical move 또는 physical button down/up 중 하나 이상이 있으면 `NEITHER`도 `passed=true`인 유효 진단 결과다.
+
+stable failure code:
+
+- `diagnose_failed`
+- `wheel_surface_canceled`
+- `wheel_surface_capture_failed`
+- `sentinel_not_requested`
+- `sentinel_insertion_incomplete`
+- `sentinel_not_observed`
+- `sentinel_not_swallowed`
+- `physical_interaction_not_observed`
+
+실패해도 가능한 aggregate observation을 새 output에 보존하고 exit `1`로 종료한다. 잘못된 별칭·duration·output은 report 없이 exit `2`, 비 Windows platform은 exit `3`이다.
+
+## `touchpad-surface`
+
+- schema: `krasis.lab.touchpad-surface/v1`
+- 출력: `--output`으로 지정한 교체 불가 단일 JSON file
+
+허용 정보는 장비·build·duration·diagnostics, API availability/registration, window 생성·foreground
+관찰·activation/deactivation count, pointer message 종류별 count, pointer type query 성공/실패와
+`PT_TOUCHPAD`/other aggregate count, legacy vertical/horizontal wheel count뿐이다. pointer ID, 좌표,
+delta, timestamp, device path, window handle·title와 원시 message는 금지한다.
+
+`signature.observedPath`는 `POINTER_AND_LEGACY`, `POINTER_ONLY`, `LEGACY_ONLY`, `NEITHER` 중 하나다.
+legacy wheel은 device나 `DefWindowProc` 변환 원인을 증명하지 않는다. `passed=true`는 API와 window 등록,
+foreground 유지, `PT_TOUCHPAD` pointer 관찰과 duration 완료를 모두 요구한다.
+
+stable failure code:
+
+- `diagnose_failed`
+- `touchpad_api_unsupported`
+- `touchpad_surface_canceled`
+- `touchpad_surface_capture_failed`
+- `touchpad_api_unavailable`
+- `touchpad_window_not_registered`
+- `touchpad_window_not_created`
+- `touchpad_window_not_activated`
+- `touchpad_window_foreground_lost`
+- `touchpad_pointer_not_observed`
+- `touchpad_pointer_type_unresolved`
+- `touchpad_surface_closed_early`
+
+실패나 unsupported여도 가능한 aggregate observation을 새 output에 보존한다. runtime/evidence 실패는
+exit `1`, 잘못된 별칭·duration·output은 report 없이 exit `2`, API 미지원은 exit `3`이다.
+
 ## `peer-probe`
 
 - schema: `krasis.lab.peer-probe/v1`
@@ -201,7 +277,7 @@ certificate body, private key, 주소와 operational session 식별자는 저장
 
 ## `agent-session`
 
-- schema: `krasis.lab.agent-session/v7`
+- schema: `krasis.lab.agent-session/v13`
 - 출력: `--output`으로 지정한 단일 JSON file
 
 필드:
@@ -212,7 +288,16 @@ certificate body, private key, 주소와 operational session 식별자는 저장
 - crash guard의 시작 여부와 남은 token을 해제한 정상 종료 여부
 - 같은 directory에서 strict 검증할 guard report basename
 - supervisor의 final state, active 횟수, acquire/session failure 횟수와 emergency stop 횟수
+- 마지막 session failure component의 stable 이름
 - 성공한 heartbeat 송수신 횟수, 같은 session 내부 receive gap sample 수와 최대 gap millisecond
+- source의 queued boundary intent와 성공적으로 전송한 key/button down/up, pointer move, wheel 누적 개수
+- `sourcePipeline.wheel`의 기존 `hookObserved`, `synthesizedObserved`, `mapped`, `queueAccepted`,
+  `queueRejected`, `rejectedInactive`, `rejectedInvalid`, `rejectedOverflow`, `sent`
+- 같은 active source session에서 유효한 tag 없는 non-zero Raw vertical/horizontal wheel axis를 세는
+  `rawObserved`, tag 없는 physical hook move/button callback을 세는 `activeHookMoves`와
+  `activeHookButtons`
+- active touchpad-capable capture window의 legacy wheel을 세는 `windowObserved`, capture
+  activation/deactivation과 `focusRestoreSkipped`, `focusRestored`, `focusRestoreFailed`
 - destination의 entry, key/button down/up, pointer move, wheel과 return arm 누적 개수
 - 입력 주입 실패의 `notApplied`, `partiallyApplied`, `outcomeUnknown`, `unclassified` 누적 개수
 - cursor rollback의 `attempted`, `restored`, `notRestored`, `failed` 누적 개수
@@ -230,6 +315,7 @@ stable failure code:
 - `crash_guard_executable_failed`
 - `crash_guard_start_failed`
 - `crash_guard_stopped`
+- `return_boundary_config_failed`
 - `crash_guard_shutdown_failed`
 - `connection_source_shutdown_failed`
 - `lifecycle_monitor_start_failed`
@@ -246,22 +332,32 @@ stable failure code:
 - `lifecycle_display_change`
 - `agent_session_failed`
 - `no_authenticated_session`
-- `no_destination_input_observed`
+- `no_input_activity_observed`
 - `insufficient_liveness_evidence`
 - `unsafe_liveness_gap`
 - `input_injection_failure_observed`
 - `invalid_cursor_rollback_evidence`
 - `cursor_rollback_failed`
+- `invalid_destination_input_evidence`
+- `invalid_source_pipeline_evidence`
+- `raw_wheel_observed_without_forwarding`
+- `window_wheel_observed_without_forwarding`
 
 `stopReason`은 `duration_elapsed`, `canceled`, `emergency_release`, `lifecycle_transition`,
 `failure` 중 하나다. lifecycle transition은 cleanup 뒤에도 explicit rearm을 요구하므로 exit `1`이고
 pair evidence가 아니다. 긴급 해제는 exit `0`이지만 증거가 통과했다는 뜻은 아니다. raw runtime
 error는 주소나 입력 정보가 섞일 수 있으므로 terminal에 복제하지 않고 stable failure code와
-redacted report만 남긴다.
+redacted report만 남긴다. `lastFailureComponent`는 `source-session`, `source-hook`,
+`boundary-orchestrator`, `return-controller`, `peer-session`, `peer-liveness`, `unknown`만 허용한다.
+wheel evidence counter는 독립 aggregate라 같은 OS event의 Raw/hook/window 상관관계나 counter 간 exact equality를
+표현하지 않는다. `rawObserved`는 진단 evidence일 뿐 Raw Input의 suppression·mapping·send ownership이 아니다.
+active outbound payload owner는 capture window의 legacy wheel이다. capture lifecycle과 focus 분류가 불완전하거나
+focus 복원이 실패하면 `invalid_source_pipeline_evidence`다. `rawObserved>0` 또는 `windowObserved>0`인데
+`sent==0`이면 report는 `passed=false`와 해당 unforwarded failure code를 남긴다.
 
 ## `agent-session-check --json`
 
-- schema: `krasis.lab.agent-session-check/v4`
+- schema: `krasis.lab.agent-session-check/v10`
 - 출력: 두 file의 basename 기반 요약, 전체 `valid`, `pairPassed`와 stable issue code
 
 pair issue code:
@@ -277,12 +373,21 @@ pair issue code:
 - `mixed_duration`
 - `mixed_heartbeat_interval`
 - `mixed_peer_timeout`
+- `missing_pair_source_evidence`
+- `missing_pair_destination_evidence`
 
 file issue에는 schema, alias, role, edge, timestamp, build, duration, liveness policy,
 `invalid_liveness_evidence`, `insufficient_liveness_evidence`, `liveness_gap_reached_timeout`, pass
 consistency, crash guard, `unsafe_destination_input_evidence`, `invalid_cursor_rollback_evidence`,
-`unsafe_cursor_rollback_evidence`가 포함된다. file 결과는 aggregate `destinationInput`을 포함하지만
-token code와 pointer 좌표는 포함하지 않는다. 두 file이 모두 strict valid하고 pair issue가 없을 때만 exit `0`이다.
+`unsafe_cursor_rollback_evidence`, `incomplete_source_evidence`, `incomplete_destination_evidence`,
+`missing_input_activity_evidence`, `invalid_source_input_evidence`,
+`invalid_destination_input_evidence`, `invalid_injection_failure_evidence`,
+`invalid_source_pipeline_evidence`,
+`raw_wheel_observed_without_forwarding`, `window_wheel_observed_without_forwarding`, `invalid_failure_component`가
+포함된다. file 결과는 aggregate `sourceInput`, `sourcePipeline`과 `destinationInput`을
+포함하지만 token code와 pointer 좌표는 포함하지 않는다. 각 file은 source 또는 destination 증거 하나로
+valid할 수 있고, pair 전체에는 최소 한 file의 source 증거와 최소 한 file의 destination 증거가 있어야 한다.
+두 file이 모두 strict valid하고 pair issue가 없을 때만 exit `0`이다.
 
 ## `crash-recovery-check --json`
 
@@ -296,11 +401,13 @@ checker output 모두에 없다.
 
 ## `phase0-check --json`
 
-- schema: `krasis.lab.phase0-check/v4`
+- schema: `krasis.lab.phase0-check/v10`
 - 출력: home/study pair checker 결과, 네 recovery checker 결과, 전체 `passed`와 issue
 
 stable issue에는 pair cardinality/pass/alias, cross-location build/duration/heartbeat interval/peer timeout, recovery cardinality,
 invalid/duplicate/missing device와 agent-recovery build mismatch가 포함된다.
+`passed`는 report 내부의 clean build revision 일치만 판정하며 executable이나 kit의 SHA-256 동일성을
+증명하지 않는다. artifact identity는 수동 runbook의 별도 checksum·workflow 기록이 소유한다.
 
 ## 호환성
 

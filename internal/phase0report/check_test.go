@@ -106,11 +106,18 @@ func writeAgent(t *testing.T, directory, alias, role, edge, build string, durati
 		CollectedAt: collectedAt, BuildRevision: build, RequestedMillis: duration,
 		HeartbeatMillis: 500, PeerTimeoutMillis: 3_000,
 		Completed: true, Passed: true, StopReason: "duration_elapsed",
-		Lifecycle:        lab.LifecycleEvidence{MonitorStarted: true, CleanShutdown: true},
-		Liveness:         lab.LivenessEvidence{HeartbeatsSent: 4, HeartbeatsReceived: 4, ReceiveGapSamples: 3, MaxReceiveGapMillis: 600},
-		CrashGuard:       lab.CrashGuardEvidence{Started: true, CleanShutdown: true, ReportFile: guardName},
-		Supervisor:       lab.SupervisorEvidence{FinalState: "STOPPED", ActiveCount: 1},
-		DestinationInput: lab.InputEvidence{Entries: 1, PointerMoves: 1, ReturnArms: 1},
+		Lifecycle:  lab.LifecycleEvidence{MonitorStarted: true, CleanShutdown: true},
+		Liveness:   lab.LivenessEvidence{HeartbeatsSent: 4, HeartbeatsReceived: 4, ReceiveGapSamples: 3, MaxReceiveGapMillis: 600},
+		CrashGuard: lab.CrashGuardEvidence{Started: true, CleanShutdown: true, ReportFile: guardName},
+		Supervisor: lab.SupervisorEvidence{FinalState: "STOPPED", ActiveCount: 1},
+	}
+	if role == "listen" {
+		report.DestinationInput = lab.InputEvidence{Entries: 1, PointerMoves: 1, ReturnArms: 1}
+	} else {
+		report.SourceInput = lab.SourceInputEvidence{BoundaryIntents: 1, PointerMoves: 1}
+		report.SourcePipeline.Wheel = lab.WheelPipelineEvidence{
+			CaptureActivations: 1, CaptureDeactivations: 1, FocusRestoreSkipped: 1,
+		}
 	}
 	path := filepath.Join(directory, alias+"-agent.json")
 	writeJSON(t, path, report)

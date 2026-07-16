@@ -75,10 +75,11 @@ type SupervisorObserver interface {
 }
 
 type SupervisorSnapshot struct {
-	State       SupervisorState
-	Attempt     uint32
-	RetryAfter  time.Duration
-	FailureKind string
+	State            SupervisorState
+	Attempt          uint32
+	RetryAfter       time.Duration
+	FailureKind      string
+	FailureComponent string
 }
 
 type BackoffPolicy struct {
@@ -207,10 +208,9 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 			Effects: dependencies.Effects, Authorizer: dependencies.Authorizer,
 		})
 		if closeErr := ownedConnection.Close(); closeErr != nil {
-			if errors.Is(sessionErr, closeErr) {
-				return errors.Join(sessionErr, ctx.Err())
+			if !errors.Is(sessionErr, closeErr) {
+				return errors.Join(sessionErr, ctx.Err(), closeErr)
 			}
-			return errors.Join(sessionErr, ctx.Err(), closeErr)
 		}
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -233,7 +233,10 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 		if err != nil {
 			return err
 		}
-		if err := transition(SupervisorSessionFailed, SupervisorSnapshot{Attempt: attempt, RetryAfter: delay, FailureKind: "session"}); err != nil {
+		if err := transition(SupervisorSessionFailed, SupervisorSnapshot{
+			Attempt: attempt, RetryAfter: delay, FailureKind: "session",
+			FailureComponent: SessionFailureComponent(sessionErr),
+		}); err != nil {
 			return err
 		}
 		if err := waitForRetry(ctx, config, attempt, delay, transition); err != nil {

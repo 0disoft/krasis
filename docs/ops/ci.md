@@ -37,6 +37,9 @@ cleanup recovery 테스트는 첫 `ReleaseAll`에서 실패한 token만 한 번 
 `FAULT`와 pressed token을 유지해야 한다.
 
 agent assembly 통합 테스트는 두 agent session을 실제 framed pipe로 연결하고 source worker ready, boundary intent, lease grant 이후 suppression, normalized input 전달, destination return intent, source deactivation과 양쪽 `LOCAL` cleanup을 한 경로에서 검증한다. 테스트는 OS hook과 `SendInput` 대신 같은 interface의 deterministic port를 사용하므로 실제 Windows callback과 주입 검증을 대체하지 않는다.
+runtime 테스트는 local return 직후 exact retired session·epoch의 연속 input을 주입 없이 drain하고 다른
+session을 거부하는지 검증한다. supervisor 테스트는 session error가 이미 소유한 connection Close 오류만
+retry하며 독립적인 Close 실패는 terminal로 유지하는지 검증한다.
 별도 component lifecycle 테스트는 session context가 살아 있는 동안 worker가 독립적인
 `context.Canceled` 또는 `context.DeadlineExceeded`를 반환하면 전체 session이 즉시 취소되고
 `LOCAL`로 끝나는지 검증한다.
@@ -52,6 +55,34 @@ network source 테스트는 listener의 첫 Close 오류 보존과 TLS 인증 �
 오류 결합을 검증한다. 통합 테스트는 `peer-credentials`가 만든 역할 분리 identity로 실제 localhost listener/dial을 열고 양쪽 `PeerConnection`의 mTLS와 ALPN 인증을 통과시킨다. trust store 테스트는 import/list/revoke persistence, corrupt·unknown·trailing·oversized JSON 거부, duplicate와 repeated revoke, permissive directory, process lock contention, atomic replace revision과 temporary cleanup을 검증한다.
 
 emergency release 테스트는 modifier press/release, left/right modifier variant, F12 terminator 비전달, source suppression 해제와 worker fault cleanup을 검증한다. `agent-session` parser와 evidence gate 테스트는 explicit live-input acknowledgement, bounded duration, 인증 session 부재, destination input 부재, 주입 실패와 cursor rollback 실패를 성공으로 가장하지 않는지 확인한다. CI에서는 실제 hook suppression과 `SendInput` 상호작용을 실행하지 않는다.
+
+`pointer-shadow` unit test는 legacy hook 좌표가 edge에 고정되면 outward X delta가 사라지는 characterization, Raw Input relative/absolute packet 분류, Precision Touchpad의 zero device handle aggregate와 JSON privacy shape를 검증한다. hosted CI는 실제 mouse를 edge에서 계속 움직이거나 Raw Input과 hook의 runtime ordering을 재현하지 않으므로 장비별 shadow report가 별도 필요하다.
+
+`wheel-surface` unit test는 physical·합성 wheel 분류, Raw Input vertical/horizontal signed delta,
+zero-device·tagged-injected 집계, 네 observed path와 privacy shape를 검증한다. hook health sentinel은
+wheel이 아니라 tagged `MOUSEEVENTF_MOVE|MOUSEEVENTF_MOVE_NOCOALESCE` 상대 `+1/-1` pair이며 tagged
+`WM_MOUSEMOVE`만 삼켜 Raw wheel evidence를 오염시키지 않아야 한다. CLI test는 sentinel health와
+non-sentinel physical move/button interaction을 pass gate로 검증한다. hosted CI는 gram13 Precision
+Touchpad의 실제 입력 표면이나 hook 누락 시 cursor 순간 이동 위험을 증명하지 못하므로 단일 장비
+report가 필요하다.
+
+`touchpad-surface` unit test는 pointer message 종류별 aggregate, `PT_TOUCHPAD`/other/query failure
+분류, legacy-only 실패, foreground loss, API unsupported, no-overwrite와 privacy shape를 검증한다.
+hosted CI는 visible window의 실제 foreground 획득, Windows 11 touchpad capability 등록 결과나 gram13
+Precision Touchpad의 두 손가락 gesture를 재현하지 않는다. 따라서 실제 장비 report가 별도 필요하다.
+
+v13 source capture unit test는 window legacy wheel의 signed axis mapping, 한 message당 한 queue action,
+inactive source fault, low-level hook의 physical·untagged pass-through와 tagged suppression, combined source/capture
+activation·rollback·deactivation 순서, bounded command admission/result timeout, capture/focus evidence 합계와
+startup readiness gate를 검증한다. hosted CI는 `SetForegroundWindow`, 작은 edge window의 실제 touchpad
+delivery, `WM_ACTIVATE` ordering과 이전 foreground application 복원을 사용자 desktop에서 재현하지 않으므로
+두 장비 수동 gate가 필요하다.
+
+production mouse source unit test는 8-byte buffer alignment, variable-size Raw Input block traversal과
+truncation 거부, zero-device relative move, absolute·known tagged move 배제, 한 packet의
+move·button·signed wheel 순서, active/inactive/injected hook suppression과 pointer action 중복 부재를
+검증한다. hosted CI는 `GetRawInputData`와 `GetRawInputBuffer`의 실제 queue ordering, hook suppression
+뒤 Raw Input 도착, 1000Hz queue 여유와 두 장비의 체감 pointer 품질을 증명하지 않는다.
 
 Windows lifecycle 테스트는 숨겨진 top-level window monitor의 start/close, power·WTS session·shutdown·
 display message 정규화, 첫 event cancellation, monitor 비정상 종료, guard 선행 종료와 source-before-guard
@@ -77,13 +108,19 @@ cursor entry 보상 테스트는 prepare 뒤 inbound grant 또는 grant frame wr
 agent report checker 테스트는 strict JSON decoding과 두 file cardinality, 장소별 alias pair,
 listener/connect 역할, 반대 edge, clean 동일 build, 동일 duration/heartbeat interval/peer timeout,
 최소 heartbeat 송수신·same-session gap evidence와 timeout보다 작은 최대 gap, 양쪽 pass, crash guard의
-시작·정상 종료, lifecycle monitor의 clean 종료와 event·rearm 부재, 같은 directory의 guard report device/build/zero-recovery, destination evidence, 주입 실패 0건과 cursor rollback 분류 합계를 검증한다. 전체 path, session identifier나 원시
+시작·정상 종료, lifecycle monitor의 clean 종료와 event·rearm 부재, 같은 directory의 guard report device/build/zero-recovery, 서로 보완되는 source/destination evidence, 주입 실패 0건과 cursor rollback 분류 합계를 검증한다. source/destination action, 주입 실패와 cursor rollback 분류 counter 합의 `uint64` overflow는 별도 실패 증거로 검증한다. 전체 path, session identifier나 원시
 입력은 checker output으로 복제하지 않는다.
 
 Windows `cmd/krasis-lab` 통합 smoke는 현재 source에서 임시 `krasis-lab.exe`를 실제로 빌드해
-subprocess로 실행한다. 정상 `agent-session-check/v4`, 주입 실패, cursor rollback 합계 불일치와 실패,
-정상 `phase0-check/v4`를 검증하고 모든 JSON output을 재귀 검사해 token code, pointer 좌표·delta,
+subprocess로 실행한다. 정상 `agent-session-check/v10`, physical·합성·active Raw·window wheel source pipeline과 capture/focus lifecycle·거절 사유 합계·failure component,
+주입 실패, cursor rollback 합계 불일치와 실패, 정상 `phase0-check/v10`을 검증하고 모든 JSON output을 재귀 검사해 token code, pointer 좌표·delta,
 session·epoch·lease, 주소와 certificate 식별 필드가 나타나지 않는지 확인한다.
+
+source session 단위 테스트는 blocking `Interrupt`가 cleanup deadline을 넘겨 parent를 멈추지 않는지,
+source input thread join은 hung child를 bounded `thread-join` failure로 분류하는지 검증한다. return boundary
+테스트는 rearm distance가 cursor entry inset 이하이거나 현재 화면 폭 이상이면 거부하는지 검증한다.
+capture window lifecycle 테스트는 foreground 획득 전에 실패한 activation cleanup의 focus 결과가 성공한
+activation/deactivation evidence에 섞이지 않는지 검증한다.
 
 Phase 0 checker 테스트는 서로 다른 날짜의 home/study pair를 같은 build, duration과 liveness policy로
 합칠 수 있는지, 네 alias의 parent-EOF recovery가 각각 한 번씩 있는지 검증한다. 네 장비의

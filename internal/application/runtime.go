@@ -37,14 +37,15 @@ type RuntimeSnapshot struct {
 // SessionRuntime is the single serialized owner of one peer session's mutable
 // control, ordering, liveness, and pressed-input state.
 type SessionRuntime struct {
-	mu       sync.Mutex
-	control  control.Snapshot
-	stream   control.InputStream
-	outbound control.OutboundStream
-	liveness control.PeerLiveness
-	pressed  control.PressedState
-	executor *SafetyEffectExecutor
-	input    InputPort
+	mu             sync.Mutex
+	control        control.Snapshot
+	stream         control.InputStream
+	retiredInbound control.InputStream
+	outbound       control.OutboundStream
+	liveness       control.PeerLiveness
+	pressed        control.PressedState
+	executor       *SafetyEffectExecutor
+	input          InputPort
 }
 
 func NewSessionRuntime(delegate EffectExecutor, input InputPort) (*SessionRuntime, error) {
@@ -245,8 +246,12 @@ func (runtime *SessionRuntime) RevokeLocalReturn(
 		LeaseID:   runtime.control.LeaseID,
 		Epoch:     runtime.stream.Epoch,
 	}
+	retired := runtime.stream
 	outcome, err := HandleControlEvent(ctx, runtime.control, control.Event{Kind: control.EventRevokeRequested}, runtime.executor)
 	runtime.applyOutcomeLocked(outcome)
+	if err == nil && outcome.Snapshot.State == control.StateLocal {
+		runtime.retiredInbound = retired
+	}
 	return identity, outcome, err
 }
 
@@ -279,6 +284,7 @@ func (runtime *SessionRuntime) GrantInbound(
 		return runtime.faultLocked(ctx, errors.New("inbound grant did not produce inbound-active state"))
 	}
 	runtime.stream = stream
+	runtime.retiredInbound = control.InputStream{}
 	runtime.liveness = liveness
 	return outcome, nil
 }
@@ -322,6 +328,17 @@ func (runtime *SessionRuntime) HandleInputAction(
 	defer runtime.mu.Unlock()
 
 	if runtime.control.State != control.StateInboundActive || runtime.stream.SessionID == "" {
+		if runtime.control.State == control.StateLocal && runtime.retiredInbound.SessionID != "" {
+			if err := action.Validate(); err != nil {
+				return err
+			}
+			next, err := runtime.retiredInbound.Accept(envelope)
+			if err != nil {
+				return err
+			}
+			runtime.retiredInbound = next
+			return nil
+		}
 		if runtime.control.State != control.StateLocal {
 			_, faultErr := runtime.faultLocked(ctx, ErrRuntimeNotInbound)
 			return faultErr
@@ -375,6 +392,9 @@ func (runtime *SessionRuntime) ObserveHeartbeat(
 	defer runtime.mu.Unlock()
 
 	if runtime.control.State != control.StateInboundActive && runtime.control.State != control.StateOutboundActive {
+		if runtime.control.State == control.StateLocal && runtime.retiredInbound.SessionID == sessionID && sessionID != "" {
+			return nil
+		}
 		return ErrRuntimeNoLiveness
 	}
 	next, err := runtime.liveness.Observe(sessionID, observedAt)

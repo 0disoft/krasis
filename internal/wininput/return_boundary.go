@@ -10,6 +10,8 @@ import (
 
 const ReturnIntentQueueCapacity = 1
 
+const defaultReturnRearmDistance int32 = 32
+
 type InputAdapter struct {
 	returns *returnBoundaryState
 	entry   *cursorEntryState
@@ -26,19 +28,45 @@ type cursorEntryState struct {
 }
 
 type returnBoundaryState struct {
-	mu         sync.Mutex
-	intent     control.ReturnIntent
-	sourceEdge control.ScreenEdge
-	armed      bool
-	pressed    control.PressedState
-	intents    chan control.ReturnIntent
+	mu            sync.Mutex
+	intent        control.ReturnIntent
+	sourceEdge    control.ScreenEdge
+	armed         bool
+	returnReady   bool
+	rearmDistance int32
+	pressed       control.PressedState
+	intents       chan control.ReturnIntent
 }
 
 func newInputAdapter() *InputAdapter {
-	return &InputAdapter{
-		returns: &returnBoundaryState{intents: make(chan control.ReturnIntent, ReturnIntentQueueCapacity)},
-		entry:   &cursorEntryState{},
+	adapter, err := newInputAdapterWithReturnRearmDistance(defaultReturnRearmDistance)
+	if err != nil {
+		panic(err)
 	}
+	return adapter
+}
+
+func NewInputAdapterWithReturnRearmDistance(distance, screenWidth int32) (*InputAdapter, error) {
+	if screenWidth <= 1 {
+		return nil, fmt.Errorf("%w: return screen width is invalid", ErrUnsupportedInput)
+	}
+	if distance >= screenWidth {
+		return nil, fmt.Errorf("%w: return rearm distance must be smaller than the screen width", ErrUnsupportedInput)
+	}
+	return newInputAdapterWithReturnRearmDistance(distance)
+}
+
+func newInputAdapterWithReturnRearmDistance(distance int32) (*InputAdapter, error) {
+	if distance <= cursorEntryInset {
+		return nil, fmt.Errorf("%w: return rearm distance must be greater than cursor entry inset", ErrUnsupportedInput)
+	}
+	return &InputAdapter{
+		returns: &returnBoundaryState{
+			rearmDistance: distance,
+			intents:       make(chan control.ReturnIntent, ReturnIntentQueueCapacity),
+		},
+		entry: &cursorEntryState{},
+	}, nil
 }
 
 func (adapter *InputAdapter) CommitEntry() {
@@ -88,6 +116,7 @@ func (adapter *InputAdapter) ArmReturn(intent control.ReturnIntent, sourceEdge c
 			state.sourceEdge = sourceEdge
 			state.pressed = control.PressedState{}
 			state.armed = true
+			state.returnReady = false
 			return nil
 		}
 	}
@@ -113,6 +142,7 @@ func (adapter *InputAdapter) DisarmReturn(intent control.ReturnIntent) {
 	state.mu.Lock()
 	if state.intent == intent {
 		state.armed = false
+		state.returnReady = false
 		state.intent = control.ReturnIntent{}
 		state.sourceEdge = ""
 		state.pressed = control.PressedState{}
@@ -162,6 +192,16 @@ func (adapter *InputAdapter) observeReturnPosition(pointerX, screenLeft, screenW
 	if !state.armed || state.pressed.Count() != 0 {
 		return nil
 	}
+	if !state.returnReady {
+		state.returnReady = returnBoundaryDepartedEntryEdge(
+			state.sourceEdge,
+			pointerX,
+			screenLeft,
+			int32(right),
+			state.rearmDistance,
+		)
+		return nil
+	}
 	reached := state.sourceEdge == control.ScreenEdgeRight && pointerX <= screenLeft
 	if state.sourceEdge == control.ScreenEdgeLeft {
 		reached = pointerX >= int32(right)
@@ -175,6 +215,23 @@ func (adapter *InputAdapter) observeReturnPosition(pointerX, screenLeft, screenW
 	default:
 	}
 	return nil
+}
+
+func returnBoundaryDepartedEntryEdge(
+	sourceEdge control.ScreenEdge,
+	pointerX int32,
+	left int32,
+	right int32,
+	distance int32,
+) bool {
+	switch sourceEdge {
+	case control.ScreenEdgeRight:
+		return int64(pointerX) >= int64(left)+int64(distance)
+	case control.ScreenEdgeLeft:
+		return int64(pointerX) <= int64(right)-int64(distance)
+	default:
+		return false
+	}
 }
 
 func (adapter *InputAdapter) returnState() (*returnBoundaryState, error) {

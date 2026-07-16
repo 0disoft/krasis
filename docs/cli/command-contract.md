@@ -92,6 +92,58 @@
 - 누락된 event 종류는 stage별 stable failure code로 기록하고 나머지 stage도 계속 실행한다.
 - stage 누락이 있으면 `guided_input_incomplete`와 exit `1`이지만 수집된 부분 증거는 보존한다.
 
+### `pointer-shadow`
+
+실제 입력을 억제하거나 전달하지 않고 Windows Raw Input mouse packet과 `WH_MOUSE_LL` 화면 좌표 delta의 aggregate 관계를 같은 bounded 구간에서 관찰한다.
+
+- 사용법: `krasis-lab pointer-shadow --device H-A|H-B|S-A|S-B --edge LEFT|RIGHT --duration DURATION --output PATH.json`
+- `--edge`는 해당 장비에서 검증할 물리 화면 경계다.
+- 사용자는 cursor를 지정 edge까지 옮긴 뒤 capture가 끝날 때까지 바깥 방향으로 계속 움직인다.
+- Raw Input 등록과 low-level mouse hook은 관찰에만 사용하며 입력을 억제, 주입 또는 network로 전달하지 않는다.
+- report에는 raw packet, hook event와 edge signature의 aggregate count만 저장한다. pointer 좌표, delta 값의 시계열, device name, key와 window 정보는 저장하지 않는다.
+- injected pointer move가 하나라도 섞이면 `injected_pointer_interference`로 실패한다.
+- raw relative outward packet이 hook 기준 edge에서 계속 관찰되고, legacy hook X가 같은 edge 좌표에 머물거나 raw outward packet보다 hook outward move가 적은 edge-loss evidence가 함께 있어야 exit `0`이다.
+- 이 명령은 production Raw Input source, 1000Hz buffering, suppression 또는 cross-device pointer 품질을 구현하거나 증명하지 않는다.
+
+### `wheel-surface`
+
+한 Windows 장비에서 `WH_MOUSE_LL`과 Raw Input이 같은 wheel 동작을 어느 입력 표면으로 노출하는지 aggregate로 구분한다. network, peer credential 또는 두 번째 노트북은 필요하지 않는다.
+
+- 사용법: `krasis-lab wheel-surface --device H-A|H-B|S-A|S-B --duration DURATION --output PATH.json`
+- `--duration`은 Go duration 형식의 양수이고, `--output` 부모 directory는 미리 존재해야 하며 확장자는 `.json`이어야 한다.
+- 기존 output은 덮어쓰지 않는다. 같은 directory의 임시 file을 flush한 뒤 교체 없는 승격을 시도한다.
+- capture 동안 pointer 이동, left/right click, 두 손가락 vertical/horizontal scroll을 수행한다. 물리 입력은 관찰만 하며 억제하거나 network로 전달하지 않는다.
+- 시작과 종료에 각각 `MOUSEEVENTF_MOVE|MOUSEEVENTF_MOVE_NOCOALESCE` 상대 이동 `+1/-1` sentinel pair를 `SendInput`으로 넣는다. 총 네 event에는 Krasis 전용 tag가 있고 hook callback은 tagged `WM_MOUSEMOVE`만 관찰해 삼킨다. wheel sentinel을 쓰지 않아 Raw Input wheel evidence를 오염시키지 않는다.
+- hook이 설치되지 않았거나 실행 중 제거되면 cursor가 순간 이동할 수 있다. pair 순합은 0이지만 완전히 무해하거나 보이지 않는다고 보장하지 않는다. 중요한 작업을 저장하고 테스트용 빈 화면에서 실행한다.
+- report는 hook의 physical move/button과 physical/synthesized vertical/horizontal wheel count, Raw Input packet·zero-device·tagged-injected·vertical/horizontal wheel count와 signed delta 합계·절댓값 누적, sentinel requested/inserted/observed/swallowed count만 저장한다. 좌표, 개별 delta, 장치·창 이름은 저장하지 않는다.
+- `passed=true`는 collection·sentinel health와 non-sentinel physical move 또는 physical button down/up 중 하나 이상이 정상이라는 뜻이다. 실제 interaction이 있으면 physical wheel count가 0인 `NEITHER`도 유효한 진단 결과로 통과할 수 있다.
+- `signature.observedPath`는 `HOOK_AND_RAW`, `HOOK_ONLY`, `RAW_ONLY`, `NEITHER` 중 하나다. standalone `HOOK_AND_RAW`는 두 입력 표면의 관찰만 증명하며 production suppression·mapping·send 소유권을 정하지 않는다.
+
+과거 `agent-session`의 wheel 0은 Raw Input wheel 부재를 증명하지 않는다. 당시 Raw mapper가 `RI_MOUSE_WHEEL`과 `RI_MOUSE_HWHEEL`을 의도적으로 무시했기 때문이다. standalone `77/77` `HOOK_AND_RAW`는 그 부재 가설을 반박하지만 aggregate count만으로 같은 OS event나 owner 분리를 증명하지 않는다.
+
+### `touchpad-surface`
+
+Windows 11 Precision Touchpad의 두 손가락 gesture가 touchpad-capable foreground window의
+`WM_POINTER` 표면에 나타나는지 한 장비에서 aggregate로 확인한다. network, peer credential와 두 번째
+노트북은 필요하지 않는다.
+
+- 사용법: `krasis-lab touchpad-surface --device H-A|H-B|S-A|S-B --duration DURATION --output PATH.json`
+- visible top-level test window가 열리고 foreground를 요구한다. 저장된 빈 테스트 환경에서 실행하고
+  capture 동안 창을 전환하거나 닫지 않는다.
+- Windows 11 `RegisterTouchpadCapableWindow`와 `GetPointerType`을 동적으로 확인한다. API가 없으면
+  partial report와 exit `3`을 반환한다.
+- capture 동안 test window 안에서 두 손가락 vertical/horizontal scroll을 각각 수행한다.
+- pointer message는 aggregate count와 `PT_TOUCHPAD` 분류만 기록하고 모두 `DefWindowProc`에 넘긴다.
+  legacy vertical/horizontal wheel도 별도 집계하지만 어떤 device나 변환 경로에서 왔는지는 단정하지 않는다.
+- pointer ID, 좌표, delta, timestamp, device path, window handle·title과 원시 message를 report에 넣지 않는다.
+- foreground loss, API/registration 실패, `PT_TOUCHPAD` pointer 미관찰, 조기 종료는 stable failure로
+  보존한다. legacy wheel만 관찰된 `LEGACY_ONLY`는 유효한 부분 진단이지만 통과가 아니다.
+- 이 명령은 production suppression, mapping, queue, send 또는 injection owner를 변경하거나 검증하지 않는다.
+
+gram13 `agent-session/v12`에서 active pointer move/button은 관찰됐지만 hook·합성·Raw wheel이 모두
+`0`이고 두 손가락 scroll은 local window에서 동작했다. 이 명령은 그 미관찰 표면을 좁히기 위한 다음
+진단이며, 결과만으로 production owner를 바꾸지 않는다.
+
 ### `peer-probe`
 
 같은 장소에 있는 노트북 두 대 사이에서 실제 TCP, TLS 1.3 mTLS, `krasis/1` ALPN과 ordered peer frame 계약을 검증한다.
@@ -156,40 +208,70 @@ peer별 durable authorization record를 관리한다.
 - listener와 connector는 `peer-credentials`가 만든 역할별 identity만 사용한다.
 - `--trust-store`는 먼저 `trust import`로 만든 전용 directory다. 시작 시 strict snapshot을 읽으며 TLS peer fingerprint·역할이 record와 다르거나 record가 revoked/권한 없음이면 lease를 거부한다. 실행 중 file 변경은 다음 실행 전까지 적용하지 않는다.
 - `--edge`는 이 장비에서 상대 장비로 넘어가는 화면 끝이다. 왼쪽 노트북은 일반적으로 `RIGHT`, 오른쪽 노트북은 `LEFT`다.
+- `--rearm-distance`는 cursor entry inset보다 크고 현재 단일 화면 폭보다 작아야 한다. 범위를 벗어나면
+  `return_boundary_config_failed`로 live hook 시작 전에 종료한다.
 - MVP대로 active monitor가 정확히 하나가 아니면 hook을 시작하지 않고 실패한다.
 - destination grant 전에는 source suppression을 활성화하지 않는다.
+- outbound grant 뒤 source queue를 활성화한 다음 Windows 11 touchpad-capable capture window를 현재 edge
+  cursor 아래 foreground로 활성화한다. active 구간의 touchpad와 일반 mouse wheel은 이 window의
+  `WM_MOUSEWHEEL/HWHEEL`만 payload로 만들고 low-level hook wheel은 관찰 뒤 window로 통과시킨다.
+- capture window가 foreground가 되지 않거나 active 중 foreground를 잃으면 session을 실패시킨다.
+  local return과 failure에서는 capture registration·window를 먼저 해제한 뒤 source queue를 끄고 이전
+  foreground window를 조건부 복원한다.
+- active source는 named `RegisterTouchpadCapableWindow` export가 없는 Windows build에서 시작하지 않는다.
 - destination cursor entry는 inbound runtime grant와 grant frame write 전까지 pending 효과로 유지한다. 중간 실패에서는 현재 cursor가 확인된 entry 좌표와 같을 때만 이전 snapshot으로 복원하고, 성공 evidence의 entry count는 grant write 뒤 commit에서만 증가한다.
 - physical `Ctrl+Alt+Shift+F12`는 현재 active source session을 즉시 중단한다. F12 terminator는 원격 전송하거나 로컬에서 억제하지 않으며 supervisor는 긴급 해제 뒤 재연결하지 않는다.
 - 같은 executable의 별도 crash guard process가 destination down 전에 token을 ACK하고 성공한 up 뒤 제거한다. protocol v2는 새 prepare와 기존 반복 token을 구분하며, 새 press가 `NOT_APPLIED`로 확정된 경우에만 주입 없는 cancel로 기록을 제거한다. partial·unknown 결과와 실패한 release는 기록을 유지한다. guard가 먼저 종료되거나 정상 종료에서 남은 token을 해제하지 못하면 session은 실패한다.
 - 숨겨진 Windows lifecycle monitor는 suspend/resume, session lock·disconnect·logoff, shutdown과
   display change를 terminal event로 처리한다. 기존 connection은 resume하지 않으며 source cleanup과
   crash guard disarm 뒤 새 실행에서만 diagnostics와 rearm을 다시 수행한다.
-- 기본 rearm distance는 32px이고 activation gap은 0px다. 이는 Phase 0 안전 실험값이며 제품 UX 기본값이 아니다.
+- 기본 rearm distance는 32px이고 activation gap은 0px다. 같은 distance를 destination entry 직후
+  return detector의 히스테리시스에도 적용해, 안쪽 이동을 확인하기 전에는 entry edge의 잔여 delta로
+  즉시 복귀하지 않는다. 이는 Phase 0 안전 실험값이며 제품 UX 기본값이 아니다.
 - report에는 실행한 heartbeat interval과 peer timeout, 성공한 heartbeat 송수신 횟수, 같은 session 내부 receive gap sample 수와 최대 gap, 성공 input count, 입력 주입 실패 확실성 count, cursor rollback 결과 count와 supervisor state만 저장한다. 주소, certificate, session/epoch/lease, key code, pointer 좌표와 delta는 저장하지 않는다.
 - `--guard-output`은 agent report와 같은 directory의 다른 새 JSON 경로여야 한다. guard는 정상 `DISARM` 또는 parent pipe `PARENT_EOF`에서 aggregate release count만 이 파일에 기록한다.
 
 duration 또는 사용자의 취소로 안전 종료해도 인증된 active session, 성공한 heartbeat 송신·수신 각각
-2회, 같은 session의 receive gap sample 하나, peer timeout보다 작은 최대 receive gap과 destination
-entry·input evidence가 모두 없으면 `passed=false`와 exit `1`이다. 입력 주입 실패가 하나라도 있거나
+2회, 같은 session의 receive gap sample 하나, peer timeout보다 작은 최대 receive gap과 local input
+activity evidence가 없으면 `passed=false`와 exit `1`이다. local evidence는 queued boundary intent와
+성공적으로 전송한 source input의 조합 또는 destination entry와 적용된 input의 조합이다. 입력 주입 실패가 하나라도 있거나
 cursor rollback 결과 합계가 시도 수와 다르거나 rollback 실패가 있으면 역시 통과하지 않는다. 성공한
 복원과 사용자 cursor 이동을 보호한 미복원은 안전한 결과로 인정한다. 긴급 해제는 의도된 안전 동작이라
 exit `0`이지만 `passed=true`로 바꾸지 않는다.
 
 ### `agent-session-check`
 
-같은 장소의 두 장비에서 수집한 `krasis.lab.agent-session/v7` report가 bounded 양방향 실험을 증명하는지 strict하게 판정한다.
+같은 장소의 두 장비에서 수집한 `krasis.lab.agent-session/v13` report가 bounded peer input 실험을 증명하는지 strict하게 판정한다. checker schema는 `krasis.lab.agent-session-check/v10`이다.
 
 - 사용법: `krasis-lab agent-session-check [--json] REPORT-A.json REPORT-B.json`
 - 정확히 두 file만 받으며 unknown field, trailing JSON, 1MiB 초과 file과 schema 불일치를 거부한다.
+- source/destination action, 주입 실패와 cursor rollback 분류 counter 합이 `uint64` 범위를 넘으면
+  wrap한 값으로 pass를 계산하지 않고 해당 evidence를 거부한다.
 - file path는 결과에 basename만 남긴다.
 - `H-A/H-B` 또는 `S-A/S-B` 조합만 같은 pair로 인정한다.
 - listener/connect 역할 하나씩, 반대 edge, 같은 clean build revision, requested duration, heartbeat interval과 peer timeout을 요구한다.
 - 두 report 모두 `completed=true`, `passed=true`, lifecycle monitor와 crash guard 시작·정상 종료,
   lifecycle event와 rearm 요구 없음, final supervisor `STOPPED`, authenticated active session, 최소
-  liveness aggregate와 destination entry·input·return arm evidence를 가져야 한다. 입력 주입 실패는
-  모두 0이어야 하고 cursor rollback은 모든 시도가 복원·미복원·실패 중 하나로 분류되며 실패가 없어야 한다.
+  liveness aggregate와 source 또는 destination input evidence를 가져야 한다. pair 전체에는 queued boundary
+  intent와 성공적으로 전송한 source input, destination entry·input·return arm이 각각 최소 한 report에
+  있어야 한다. 두 방향의 exact count 일치는 요구하지 않는다. 입력 주입 실패는 모두 0이어야 하고 cursor
+  rollback은 모든 시도가 복원·미복원·실패 중 하나로 분류되며 실패가 없어야 한다.
+- wheel pipeline은 기존 `hookObserved`, `synthesizedObserved`, `mapped`, `queueAccepted`,
+  `queueRejected`, `rejectedInactive`, `rejectedInvalid`, `rejectedOverflow`, `sent`와
+  `sourceInput.wheels`의 기존 단조·합계 관계를 유지한다. 여기에 active source session에서 유효한
+  tag 없는 non-zero Raw wheel axis를 세는 `rawObserved`, tag 없는 physical hook move/button callback을
+  세는 `activeHookMoves`와 `activeHookButtons`, capture window legacy wheel의 `windowObserved`,
+  capture activation/deactivation과 focus restore 분류를 포함한다. 이 값들은 aggregate라 같은 OS event를
+  correlate하거나 서로 exact equality를 요구하지 않으며 Raw Input의 suppression·payload ownership을
+  뜻하지 않는다. source action이 있으면 capture activation이 있어야 하고 activation/deactivation과 focus
+  결과 합계가 맞으며 focus restore 실패가 없어야 한다. `rawObserved>0` 또는 `windowObserved>0`인데
+  `sent==0`인 report는 각각 stable unforwarded code로 실패해야 하며 failure component는 stable allowlist 값만 허용한다.
 
 report가 JSON으로 유효해도 pair 조건을 만족하지 않으면 exit `1`이다. 긴급 해제 report는 안전 동작 증거로 보존하지만 pair pass로 승격하지 않는다.
+
+`agent-session` 자체의 runtime evidence gate도 destination을 단독 input activity로 인정할 때 entry,
+return arm과 action을 모두 요구한다. destination action 또는 cursor rollback 분류 counter 합이
+`uint64` 범위를 넘으면 report를 pass로 만들지 않는다.
 
 ### `crash-recovery-check`
 
@@ -207,6 +289,9 @@ parent agent 강제 종료 뒤 별도 guard가 남긴 report 하나를 strict하
 - home은 `H-A/H-B`, study는 `S-A/S-B`여야 하며 네 agent report의 clean build revision과 duration이 같아야 한다.
 - recovery는 네 alias가 정확히 한 번씩 있어야 하고 해당 agent report와 build revision이 같아야 한다.
 - 수집 시각과 장소는 달라도 된다. 네 장비를 동시에 실행할 필요는 없다.
+- checker의 동일 revision 비교는 executable byte identity를 증명하지 않는다. 같은 artifact 사용 여부는
+  runbook의 workflow run·commit·kit checksum 기록으로 별도 확인하며, 그 기록이 없으면 checker가
+  `passed=true`여도 Phase 0 전체 완료 근거가 아니다.
 
 ## 출력 방식
 

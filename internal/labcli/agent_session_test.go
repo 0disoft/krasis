@@ -8,11 +8,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0disoft/krasis/internal/agent"
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/lab"
 	"github.com/0disoft/krasis/internal/transport"
 	"github.com/0disoft/krasis/internal/truststore"
+	"github.com/0disoft/krasis/internal/wininput"
 )
 
 type certaintyInput struct {
@@ -285,6 +287,12 @@ func TestNewAgentSessionConfigWiresExplicitLivenessPolicy(t *testing.T) {
 	if config.LivenessObserver != observer {
 		t.Fatal("liveness observer was not wired")
 	}
+	if config.SourceObserver != observer {
+		t.Fatal("source observer was not wired")
+	}
+	if config.PipelineObserver != observer {
+		t.Fatal("pipeline observer was not wired")
+	}
 	if config.Boundary.Edge != options.edge || config.Boundary.ScreenLeft != -100 || config.Boundary.ScreenWidth != 200 || config.Boundary.RearmDistance != 48 {
 		t.Fatalf("boundary config = %+v", config.Boundary)
 	}
@@ -303,7 +311,7 @@ func TestParseAgentSessionRequiresLiveInputAcknowledgement(t *testing.T) {
 	}
 }
 
-func TestAgentSessionEvidenceRequiresConnectionAndDestinationInput(t *testing.T) {
+func TestAgentSessionEvidenceRequiresConnectionAndLocalInputActivity(t *testing.T) {
 	report := lab.AgentSessionReport{}
 	if code := agentSessionEvidenceExit(&report); code != exitRuntime || report.FailureCode != "no_authenticated_session" {
 		t.Fatalf("no-session evidence = code %d report %+v", code, report)
@@ -317,8 +325,26 @@ func TestAgentSessionEvidenceRequiresConnectionAndDestinationInput(t *testing.T)
 		Supervisor:        lab.SupervisorEvidence{ActiveCount: 1},
 		Liveness:          lab.LivenessEvidence{HeartbeatsSent: 2, HeartbeatsReceived: 2, ReceiveGapSamples: 1, MaxReceiveGapMillis: 500},
 	}
-	if code := agentSessionEvidenceExit(&report); code != exitRuntime || report.FailureCode != "no_destination_input_observed" {
+	if code := agentSessionEvidenceExit(&report); code != exitRuntime || report.FailureCode != "no_input_activity_observed" {
 		t.Fatalf("no-input evidence = code %d report %+v", code, report)
+	}
+	report.SourceInput = lab.SourceInputEvidence{BoundaryIntents: 1, PointerMoves: 8}
+	report.SourcePipeline.Wheel = lab.WheelPipelineEvidence{
+		CaptureActivations: 1, CaptureDeactivations: 1, FocusRestoreSkipped: 1,
+	}
+	if code := agentSessionEvidenceExit(&report); code != exitSuccess || !report.Passed {
+		t.Fatalf("source-only evidence = code %d report %+v", code, report)
+	}
+	report.Passed = false
+	report.SourcePipeline.Wheel.RawObserved = 1
+	if code := agentSessionEvidenceExit(&report); code != exitRuntime || report.FailureCode != "raw_wheel_observed_without_forwarding" {
+		t.Fatalf("unforwarded raw wheel evidence = code %d report %+v", code, report)
+	}
+	report.SourcePipeline.Wheel.RawObserved = 0
+	report.Passed = false
+	report.SourcePipeline.Wheel.Sent = 1
+	if code := agentSessionEvidenceExit(&report); code != exitRuntime || report.FailureCode != "invalid_source_pipeline_evidence" {
+		t.Fatalf("invalid pipeline evidence = code %d report %+v", code, report)
 	}
 	report = lab.AgentSessionReport{
 		PeerTimeoutMillis: 3_000,
@@ -326,8 +352,13 @@ func TestAgentSessionEvidenceRequiresConnectionAndDestinationInput(t *testing.T)
 		Liveness:          lab.LivenessEvidence{HeartbeatsSent: 2, HeartbeatsReceived: 2, ReceiveGapSamples: 1, MaxReceiveGapMillis: 500},
 		DestinationInput:  lab.InputEvidence{Entries: 1, PointerMoves: 1},
 	}
+	if code := agentSessionEvidenceExit(&report); code != exitRuntime || report.FailureCode != "no_input_activity_observed" {
+		t.Fatalf("unarmed destination evidence = code %d report %+v", code, report)
+	}
+	report.FailureCode = ""
+	report.DestinationInput.ReturnArms = 1
 	if code := agentSessionEvidenceExit(&report); code != exitSuccess || !report.Passed {
-		t.Fatalf("passing evidence = code %d report %+v", code, report)
+		t.Fatalf("passing destination evidence = code %d report %+v", code, report)
 	}
 	report.Passed = false
 	report.DestinationInput.InjectionFailures.OutcomeUnknown = 1
@@ -348,6 +379,22 @@ func TestAgentSessionEvidenceRequiresConnectionAndDestinationInput(t *testing.T)
 		t.Fatalf("safe rollback evidence = code %d report %+v", code, report)
 	}
 	report.Passed = false
+	report.DestinationInput.CursorRollbacks = lab.CursorRollbackEvidence{
+		Attempted: ^uint64(0), Restored: ^uint64(0), NotRestored: 1,
+	}
+	if code := agentSessionEvidenceExit(&report); code != exitRuntime || report.FailureCode != "invalid_cursor_rollback_evidence" {
+		t.Fatalf("overflowing rollback evidence = code %d report %+v", code, report)
+	}
+	report.FailureCode = ""
+	report.DestinationInput.CursorRollbacks = lab.CursorRollbackEvidence{}
+	report.DestinationInput.PointerMoves = ^uint64(0)
+	report.DestinationInput.Wheels = 1
+	if code := agentSessionEvidenceExit(&report); code != exitRuntime || report.FailureCode != "invalid_destination_input_evidence" {
+		t.Fatalf("overflowing destination evidence = code %d report %+v", code, report)
+	}
+	report.DestinationInput.PointerMoves = 1
+	report.DestinationInput.Wheels = 0
+	report.Passed = false
 	report.Liveness.MaxReceiveGapMillis = report.PeerTimeoutMillis
 	if code := agentSessionEvidenceExit(&report); code != exitRuntime || report.FailureCode != "unsafe_liveness_gap" {
 		t.Fatalf("unsafe-gap evidence = code %d report %+v", code, report)
@@ -366,5 +413,55 @@ func TestAgentSessionObserverAggregatesReceiveGapsWithoutCrossingSessions(t *tes
 	evidence := observer.livenessEvidence()
 	if evidence.HeartbeatsSent != 2 || evidence.HeartbeatsReceived != 5 || evidence.ReceiveGapSamples != 3 || evidence.MaxReceiveGapMillis != 750 {
 		t.Fatalf("liveness evidence = %+v", evidence)
+	}
+}
+
+func TestAgentSessionObserverAggregatesSourceInputWithoutPayloads(t *testing.T) {
+	observer := &agentSessionObserver{}
+	observer.ObserveBoundaryIntent(control.BoundaryIntent{})
+	observer.ObserveSourceAction(control.InputAction{Kind: control.InputPointerMove, DeltaX: 7})
+	observer.ObserveSourceAction(control.InputAction{Kind: control.InputWheel, DeltaY: -1})
+	observer.ObserveSourceAction(control.InputAction{Kind: control.InputKeyDown, Code: 65})
+	evidence := observer.sourceInputEvidence()
+	if evidence.BoundaryIntents != 1 || evidence.PointerMoves != 1 || evidence.Wheels != 1 || evidence.KeyDowns != 1 || evidence.TotalActions() != 3 {
+		t.Fatalf("source input evidence = %+v", evidence)
+	}
+	pipeline := observer.sourcePipelineEvidence().Wheel
+	if pipeline.Sent != 1 {
+		t.Fatalf("source pipeline = %+v", pipeline)
+	}
+}
+
+func TestAgentSessionObserverAggregatesWheelPipelineAndFailureComponent(t *testing.T) {
+	observer := &agentSessionObserver{}
+	observer.ObserveWheelHook()
+	observer.ObserveWheelSynthesized()
+	observer.ObserveWheelRaw()
+	observer.ObserveWheelWindow()
+	observer.ObserveWheelCaptureActivated()
+	observer.ObserveWheelCaptureDeactivated()
+	observer.ObserveWheelFocusRestore(wininput.SourceFocusRestoreSucceeded)
+	observer.ObserveActiveHookMouseMove()
+	observer.ObserveActiveHookMouseButton()
+	observer.ObserveWheelMapped()
+	observer.ObserveWheelQueue(wininput.SourceQueueAccepted)
+	observer.ObserveWheelQueue(wininput.SourceQueueRejectedInactive)
+	observer.ObserveWheelQueue(wininput.SourceQueueRejectedInvalid)
+	observer.ObserveWheelQueue(wininput.SourceQueueRejectedOverflow)
+	observer.ObserveSupervisor(agent.SupervisorSnapshot{
+		State: agent.SupervisorBackoff, FailureKind: "session", FailureComponent: "source-session",
+	})
+	observer.ObserveSupervisor(agent.SupervisorSnapshot{
+		State: agent.SupervisorBackoff, FailureKind: "session", FailureComponent: "peer-session",
+	})
+	wheel := observer.sourcePipelineEvidence().Wheel
+	if wheel.HookObserved != 1 || wheel.SynthesizedObserved != 1 || wheel.RawObserved != 1 || wheel.WindowObserved != 1 ||
+		wheel.CaptureActivations != 1 || wheel.CaptureDeactivations != 1 || wheel.FocusRestored != 1 ||
+		wheel.ActiveHookMoves != 1 || wheel.ActiveHookButtons != 1 || wheel.Mapped != 1 || wheel.QueueAccepted != 1 || wheel.QueueRejected != 3 ||
+		wheel.RejectedInactive != 1 || wheel.RejectedInvalid != 1 || wheel.RejectedOverflow != 1 {
+		t.Fatalf("wheel pipeline = %+v", wheel)
+	}
+	if evidence := observer.evidence(); evidence.LastFailureComponent != "source-session" || evidence.SessionFailures != 2 {
+		t.Fatalf("supervisor evidence = %+v", evidence)
 	}
 }

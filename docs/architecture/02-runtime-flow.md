@@ -21,7 +21,7 @@ destination의 cursor entry는 return detector arm 뒤 `PrepareEntry`로 이동 
 취소를 상속하지 않는 bounded cleanup에서 `RollbackEntry`를 호출하며, 현재 cursor가 확인된 entry 좌표에
 그대로 있을 때만 이전 좌표로 복원한다. 이미 움직인 cursor는 오래된 snapshot으로 덮어쓰지 않는다.
 
-상태 변경은 `internal/control` transition table에서만 결정한다. table이 반환한 effect는 Application이 순서대로 실행하고 성공 또는 실패 event를 다시 상태 머신에 넣는다. 현재 구현은 순수 transition core, authenticated peer transport와 `SendInput` 기반 Win32 destination adapter까지 포함한다. source-side 경계 감지와 물리 입력 억제는 후속 단계다.
+상태 변경은 `internal/control` transition table에서만 결정한다. table이 반환한 effect는 Application이 순서대로 실행하고 성공 또는 실패 event를 다시 상태 머신에 넣는다. 현재 구현은 순수 transition core, authenticated peer transport, Raw Input과 low-level hook을 결합한 Win32 source, `SendInput` 기반 Win32 destination adapter를 포함한다.
 
 활성 inbound lease에서 받은 입력은 실행 전에 `InputStream` gate를 통과한다. session, epoch 또는 정확한 다음 sequence가 하나라도 맞지 않으면 해당 payload를 실행하지 않고 `FAULT_DETECTED` cleanup으로 넘긴다. stream과 lease의 session이 서로 다르거나 non-local 상태에서 lease 방향과 맞지 않는 입력을 받은 경우도 동일하게 fail-safe 처리한다. 재연결은 새 session과 epoch, sequence `1`에서 시작한다.
 
@@ -29,6 +29,11 @@ Application coordinator는 transition이 반환한 effect를 순서대로 실행
 
 heartbeat deadline은 caller가 제공한다. 만료된 현재-session liveness는 위 coordinator에 `FAULT_DETECTED`를 전달하며, 아직 살아 있는 session에는 state나 effect를 만들지 않는다. session 불일치, 시간이 뒤로 이동함, 잘못된 timeout처럼 liveness 판정을 신뢰할 수 없는 경우도 active lease를 유지하지 않고 같은 cleanup 경로로 보낸다.
 수신 heartbeat는 coordinator를 획득한 뒤 읽은 local observation으로 기존 deadline을 먼저 검사한다. 이미 timeout에 도달한 session은 늦은 frame으로 갱신하거나 수신 evidence에 넣지 않고 held input을 해제한 뒤 `LOCAL`로 수렴한다.
+
+destination의 local return tombstone과 exact하게 일치하는 retired inbound session의 늦은 heartbeat는
+`LOCAL`에서 오류로 승격하지 않고 drain한다. 이 drain은 liveness를 다시 활성화하거나 observation을
+갱신하지 않으며 runtime은 `LOCAL`로 남는다. 다른 session의 heartbeat와 tombstone identity 불일치는
+계속 오류로 처리해 stale session이 local runtime을 되살리지 못하게 한다.
 
 ## 장애와 종료
 
@@ -54,13 +59,21 @@ Win32 destination adapter는 keyboard scan-code down/up, left/right/middle/X1/X2
 
 lab self-test의 tagged `+1/-1` 상대 이동은 두 injection이 hook으로 돌아오는지 검증하는 probe이며, Windows pointer acceleration과 pixel rounding 때문에 두 delta가 좌표상 정확히 상쇄된다고 가정하지 않는다. 두 event 뒤 좌표가 남으면 `SetCursorPos`로 시작 좌표를 복구하고 그 결과까지 확인한다. 이 복구는 명시적인 bounded self-test에만 사용하며 제품의 일반 pointer 전달 경로에는 사용하지 않는다.
 
-source mapper는 physical keyboard hook의 scan code와 extended flag를 canonical key code로 바꾸고, mouse hook의 좌표 변화·button·signed wheel 값을 normalized action으로 바꾼다. injected flag 또는 Krasis tag가 있는 keyboard/mouse event는 다시 전송하지 않는다. injected mouse move도 다음 physical delta가 튀지 않도록 좌표 baseline만 갱신한다.
+lab `touchpad-surface`는 production input owner 밖의 별도 진단이다. Windows 11 visible foreground
+window를 touchpad-capable로 등록하고 `WM_POINTER`의 `PT_TOUCHPAD` 분류와 legacy wheel을 aggregate로
+관찰하지만 suppression, source queue, transport와 destination injection에 연결하지 않는다. pointer
+message를 `DefWindowProc`에 전달해 기본 변환 경로를 깨지 않으며, 그 과정에서 관찰된 legacy wheel의
+device나 변환 원인은 단정하지 않는다. 이 진단 결과와 실제 gram13 관찰을 근거로 ADR 0023이 active
+source의 wheel owner를 foreground touchpad-capable window로 변경하며, 진단 명령 자체는 production
+source queue나 transport에 연결하지 않는다.
 
-source session은 hook callback과 단일 network sender 사이에 고정 용량 queue를 둔다. callback은 현재 outbound generation에 action을 non-blocking enqueue한 경우에만 해당 물리 event를 억제할 수 있다. sender는 별도 goroutine에서 action 순서를 보존하고, lifecycle owner는 fault channel과 context를 독립적으로 소비한다. queue overflow, invalid mapping, sender 실패 또는 취소가 발생하면 suppression과 generation을 먼저 폐기하고 connection을 닫아 막힌 write를 interrupt한 뒤 bounded runtime fault cleanup을 수행한다. 폐기된 generation의 queued action은 원격으로 보내지 않는다. queue 용량은 설정 가능한 `1..65536` 범위이며 실제 기본값과 성능 예산은 source hook 통합 측정 뒤 확정한다.
+source keyboard mapper는 physical keyboard hook의 scan code와 extended flag를 canonical key code로 바꾼다. mouse의 relative move와 button은 `RAWMOUSE` packet 하나에서 move, button 순서로 normalized action을 만들고 Precision Touchpad의 zero device handle도 정상 packet으로 허용한다. vertical/horizontal wheel은 Raw Input에서 만들지 않는다. active outbound에서는 touchpad-capable foreground capture window가 `DefWindowProc` 변환 뒤 받은 `WM_MOUSEWHEEL`과 `WM_MOUSEHWHEEL`만 signed delta payload로 정규화한다. low-level hook의 physical·untagged synthesized wheel은 aggregate 관찰 뒤 window로 통과하고 Krasis/self-test tag wheel만 삼킨다. capture가 foreground ownership을 잃은 짧은 구간에는 low-level hook mapper로 fail-safe하고 곧 source-hook failure로 session을 종료한다. Raw Input wheel flag는 active-session 진단 aggregate만 갱신하며 suppression, mapping 또는 send ownership을 갖지 않는다. mouse hook의 화면 좌표는 경계 위치 관찰과 작은 capture window 배치에만 사용하고 좌표 차이를 원격 delta로 만들지 않는다. Krasis 또는 self-test tag가 있는 hook event와 known tagged Raw Input은 다시 전송하지 않는다.
+
+source session은 input owner thread와 단일 network sender 사이에 고정 용량 queue를 둔다. keyboard와 Raw Input action은 현재 outbound generation에 non-blocking enqueue하며 sender는 action 순서를 보존한다. discrete keyboard suppression은 해당 action offer가 성공한 경우에만 적용한다. mouse는 Raw Input 수신과 hook callback을 원자적으로 묶을 수 없으므로 active generation에서 physical hook event를 먼저 억제하고 Raw Input action을 별도로 offer한다. Raw read, parse 또는 queue가 실패하면 전달을 추측하거나 재생하지 않고 suppression과 generation을 폐기한다. sender 실패 또는 취소는 connection close interrupt, sender join과 runtime fault cleanup 전체를 하나의 bounded cleanup deadline 안에서 수행한다. `Close`나 cleanup 구현이 context를 무시해도 parent는 deadline 뒤 terminal error로 빠져나오며 늦은 completion은 buffered channel 밖으로 투영되지 않는다. 폐기된 generation의 queued action은 원격으로 보내지 않는다. queue 용량은 설정 가능한 `1..65536` 범위이며 현재 Phase 0 기본값은 4096이다.
 
 normalized discrete input의 code domain은 `PressedToken.Validate`가 단일 source of truth로 소유한다. `InputAction.Validate`는 key와 button action을 token으로 변환해 같은 검증을 수행하므로 source queue, wire encoder, wire decoder와 destination runtime이 zero scan code, 지원하지 않는 keyboard bit와 `1..5` 밖의 mouse button을 동일하게 거부한다.
 
-`SourceHook`은 별도 고정 OS thread에 `WH_KEYBOARD_LL`과 `WH_MOUSE_LL`을 설치한다. callback은 mapper, `BoundaryIntentEmitter.Observe`, `SourceSession.Offer`만 호출하고, offer가 성공한 physical event만 non-zero hook result로 억제한다. Win32 hook data 역참조와 mapper는 원격 enqueue 전에 별도 panic 경계에서 실행한다. mapper 또는 boundary observer가 panic하면 payload를 노출하지 않는 고정 오류로 변환하고 source generation을 폐기하며, 해당 physical event는 억제하지 않고 `CallNextHookEx`로 넘긴다. boundary intent handoff는 용량 1 queue에 non-blocking으로 수행하며 이미 intent가 대기 중이면 새 intent를 버리고 해당 physical event를 로컬 처리한다. inactive, injected, mapping error 또는 source queue overflow event도 로컬 처리에 넘긴다. 제품 source hook와 lab capture는 process-global hook gate를 공유하므로 같은 process에서 동시에 설치되지 않는다.
+`SourceHook`은 세 고정 OS thread를 소유한다. 첫 thread는 `WH_KEYBOARD_LL`과 `WH_MOUSE_LL` 전용 message loop, 둘째는 message-only Raw Input window와 `WM_INPUT` read, 셋째는 숨은 touchpad-capable wheel capture window를 소유한다. 세 surface가 모두 ready인 뒤에만 boundary orchestrator를 시작한다. Raw Input queue에 쌓인 packet은 8-byte aligned 64KiB 재사용 buffer로 batch drain하지만 hook dispatch를 막지 않는다. mouse hook callback이 갱신하고 Raw Input·capture thread가 읽는 최신 screen X는 atomic state이며, hook/Raw의 stateful boundary observation은 짧은 mutex로 직렬화한다. active capture activation과 deactivation은 message command와 bounded ACK로 직렬화하며, focus loss·등록 해제·복원 실패는 source-hook component failure다. keyboard callback, window wheel mapper, Raw Input mapper, `BoundaryIntentEmitter.Observe`, `SourceSession.Offer`는 network I/O를 수행하지 않는다. Win32 hook data 역참조와 hook mapper는 원격 enqueue 전에 별도 panic 경계를 유지한다. mapper 또는 boundary observer가 panic하면 payload를 노출하지 않는 고정 오류로 변환하고 source generation을 폐기한다. boundary intent handoff는 용량 1 queue에 non-blocking으로 수행하며 이미 intent가 대기 중이면 새 intent를 버린다. Raw Input registration은 process당 mouse device class 하나만 허용되므로 제품 source, pointer shadow와 lab capture는 process-global hook gate를 공유한다.
 
 `OutboundController`는 boundary orchestrator와 control dispatcher가 공유하는 source-side lifecycle owner다. boundary intent에서는 `LeaseRequest`만 보내고 source suppression을 켜지 않는다. 정확한 session·epoch의 `LeaseGrant`가 runtime을 `OUTBOUND_ACTIVE`로 만든 뒤에만 `SourceSession.Activate`를 호출한다. activation 실패, reject, revoke와 session failure에서는 suppression을 먼저 끄고 runtime cleanup으로 수렴한다.
 
@@ -68,7 +81,15 @@ normalized discrete input의 code domain은 `PressedToken.Validate`가 단일 so
 
 `LeaseRequest`는 source가 넘은 `LEFT` 또는 `RIGHT` edge를 포함한다. destination `CursorEntryPort`는 승인된 `RIGHT` request를 virtual desktop 왼쪽에서 1px 안쪽, `LEFT` request를 오른쪽에서 1px 안쪽, 세로 중앙에 배치한다. cursor 배치가 성공한 뒤에만 inbound runtime을 활성화하고 grant를 쓴다. authorization reject는 cursor를 움직이지 않으며 cursor 배치 실패는 inbound lease나 grant를 만들지 않고 session failure로 처리한다.
 
-destination input adapter는 현재 inbound session·epoch로 return detector를 arm한다. source `RIGHT` 진입은 destination 왼쪽 끝, source `LEFT` 진입은 destination 오른쪽 끝에서 return intent를 non-blocking으로 한 번만 발행한다. 오래된 queued intent는 새 session arm에서 폐기하고 runtime은 현재 inbound session·epoch가 정확히 일치하며 pressed input이 없을 때만 local revoke를 승인한다. 승인된 revoke는 destination을 먼저 `LOCAL`로 cleanup한 뒤 exact session·lease·epoch의 `LeaseRevoke`를 쓰며 source는 이를 받은 뒤 suppression을 해제한다. intent와 button-down의 경합은 session failure가 아니라 detector rearm으로 처리한다.
+destination input adapter는 현재 inbound session·epoch로 return detector를 arm하되 entry 직후에는
+return-ready로 보지 않는다. source `RIGHT` 진입은 destination 왼쪽에서 오른쪽으로, source `LEFT`
+진입은 destination 오른쪽에서 왼쪽으로 configured rearm distance 이상 이동한 뒤 entry edge로 돌아와야
+return intent를 non-blocking으로 한 번만 발행한다. 오래된 queued intent는 새 session arm에서 폐기하고 runtime은 현재 inbound session·epoch가 정확히 일치하며 pressed input이 없을 때만 local revoke를 승인한다. 승인된 revoke는 destination을 먼저 `LOCAL`로 cleanup한 뒤 exact session·lease·epoch의 `LeaseRevoke`를 쓰며 source는 이를 받은 뒤 suppression을 해제한다. intent와 button-down의 경합은 session failure가 아니라 detector rearm으로 처리한다.
+
+성공한 local return은 폐기한 inbound stream의 exact session·epoch와 다음 sequence를 tombstone으로 남긴다.
+revoke가 반대 방향으로 전달되기 전에 이미 source writer에 들어간 연속 input은 `LOCAL`에서 주입하지 않고
+tombstone sequence만 전진시킨다. 새 inbound grant는 tombstone을 폐기하며 다른 session·epoch, duplicate와
+sequence gap은 계속 protocol failure다.
 
 source `RunSession`의 EOF, cancellation, malformed frame과 dispatcher failure는 outbound lifecycle의 `Fail`을 통과해야 한다. 이 경로는 source suppression을 먼저 해제한 뒤 bounded runtime cleanup을 수행한다. runtime만 `LOCAL`로 돌리고 hook suppression을 남기는 종료 경로는 허용하지 않는다.
 
@@ -112,6 +133,19 @@ server와 client TLS config는 TLS 1.3만 허용하고 `krasis/1` ALPN을 사용
 supervisor가 시작된 뒤 어떤 terminal return을 만나도 connection source를 닫고 마지막 observer
 snapshot을 `STOPPED`로 수렴시킨다. connection source가 acquisition error와 함께 부분 connection을
 반환하면 retry 전에 그 connection도 닫아 owner 없는 transport를 남기지 않는다.
+session owner가 이미 관찰해 session error에 포함한 동일 connection Close 오류는 `LOCAL` cleanup 뒤
+retry를 막지 않는다. session error와 독립적인 Close 오류와 partial acquire Close 실패는 terminal이다.
+session component의 최초 failure는 stable component 이름으로만 observer에 투영하고 lab observer도 첫
+non-empty component를 고정해 이후 retry failure로 덮어쓰지 않는다. 내부 error cause는
+cleanup과 `errors.Is` 판단에 보존하지만 report에는 원문을 복제하지 않는다. source wheel은 physical hook,
+Raw와 active capture window 관찰, mapping, queue accepted/rejected 사유와 successful send를 aggregate
+pipeline으로 남긴다. v13은 `rawObserved`, `activeHookMoves`, `activeHookButtons`, `windowObserved`, capture
+activation/deactivation과 focus restore 분류를 집계한다. source action이 있으면 capture activation이
+필수이고 clean report는 activation/deactivation과 focus 결과 합계가 맞으며 restore failure가 없어야 한다.
+이 counter들은 같은 OS event를 correlate하지 않아 exact equality나 Raw payload ownership을 뜻하지 않는다.
+`rawObserved>0` 또는 `windowObserved>0`인데 `sent==0`이면 해당 stable unforwarded code로 실패한다. 폐기된
+generation의 이미 시작된 send가 늦게 실패하면 현재 generation을 종료하지 않고 버리며, current
+generation send 실패만 source session failure다.
 active connection은 supervisor가 씌운 close-once owner를 session과 공유한다. 두 경계가 동시에
 종료를 시도해도 실제 transport Close는 한 번만 실행되고 첫 Close 결과가 보존된다. connection,
 listener 또는 TLS 인증 실패 뒤 raw socket Close가 실패하면 기존 종료 원인과 close 오류를 함께

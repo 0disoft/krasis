@@ -35,19 +35,44 @@ func TestSourceSessionDoesNotSuppressWhileInactive(t *testing.T) {
 	}
 }
 
+func TestSourceSessionReportsAcceptedAndRejectedWheelOffers(t *testing.T) {
+	observer := &recordingSourcePipelineObserver{}
+	sink := &recordingSourceSink{sent: make(chan control.InputAction, 1)}
+	session := startObservedSourceSession(t, 1, sink, observer)
+	wheel := control.InputAction{Kind: control.InputWheel, DeltaY: 120}
+	if !session.Offer(wheel) {
+		t.Fatal("active wheel was not accepted")
+	}
+	if got := receiveAction(t, sink.sent); got != wheel {
+		t.Fatalf("sent wheel = %+v", got)
+	}
+	session.Deactivate()
+	if session.Offer(wheel) {
+		t.Fatal("inactive wheel was accepted")
+	}
+	if observer.queueAccepted != 1 || observer.queueRejected != 1 || observer.rejectedInactive != 1 {
+		t.Fatalf("pipeline observer = %+v", observer)
+	}
+}
+
 func TestSourceSessionOverflowDisablesSuppressionAndFaults(t *testing.T) {
 	blockSend := make(chan struct{})
 	sink := &recordingSourceSink{blockSend: blockSend, sent: make(chan control.InputAction, 1), failed: make(chan error, 1)}
-	session := startSourceSession(t, 1, sink)
-	if !session.Offer(control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}) {
+	observer := &recordingSourcePipelineObserver{}
+	session := startObservedSourceSession(t, 1, sink, observer)
+	wheel := control.InputAction{Kind: control.InputWheel, DeltaY: 120}
+	if !session.Offer(wheel) {
 		t.Fatal("first action was not accepted")
 	}
 	receiveAction(t, sink.sent)
-	if !session.Offer(control.InputAction{Kind: control.InputPointerMove, DeltaX: 2}) {
+	if !session.Offer(wheel) {
 		t.Fatal("queued action was not accepted")
 	}
-	if session.Offer(control.InputAction{Kind: control.InputPointerMove, DeltaX: 3}) {
+	if session.Offer(wheel) {
 		t.Fatal("overflowing action was incorrectly suppressed")
+	}
+	if observer.queueAccepted != 2 || observer.queueRejected != 1 || observer.rejectedOverflow != 1 {
+		t.Fatalf("overflow pipeline observer = %+v", observer)
 	}
 	if session.Active() {
 		t.Fatal("overflow did not disable suppression immediately")
@@ -70,9 +95,13 @@ func TestSourceSessionOverflowDisablesSuppressionAndFaults(t *testing.T) {
 
 func TestSourceSessionInvalidActionFailsOpen(t *testing.T) {
 	sink := &recordingSourceSink{failed: make(chan error, 1)}
-	session := startSourceSession(t, 1, sink)
-	if session.Offer(control.InputAction{Kind: control.InputPointerMove}) {
+	observer := &recordingSourcePipelineObserver{}
+	session := startObservedSourceSession(t, 1, sink, observer)
+	if session.Offer(control.InputAction{Kind: control.InputWheel}) {
 		t.Fatal("invalid action was suppressed")
+	}
+	if observer.queueRejected != 1 || observer.rejectedInvalid != 1 {
+		t.Fatalf("invalid pipeline observer = %+v", observer)
 	}
 	if session.Active() {
 		t.Fatal("invalid action left suppression active")
@@ -104,6 +133,42 @@ func TestSourceSessionSendFailureDisablesSuppression(t *testing.T) {
 	}
 	if session.Active() {
 		t.Fatal("send failure left suppression active")
+	}
+}
+
+func TestSourceSessionIgnoresSendFailureFromRevokedGeneration(t *testing.T) {
+	sink := &revokedGenerationSourceSink{
+		firstStarted: make(chan struct{}),
+		releaseFirst: make(chan struct{}),
+		sent:         make(chan control.InputAction, 1),
+		failed:       make(chan error, 1),
+	}
+	session := startSourceSession(t, 2, sink)
+	first := control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}
+	if !session.Offer(first) {
+		t.Fatal("first generation action was not accepted")
+	}
+	select {
+	case <-sink.firstStarted:
+	case <-time.After(time.Second):
+		t.Fatal("first generation send did not start")
+	}
+	session.Deactivate()
+	if err := session.Activate(); err != nil {
+		t.Fatalf("reactivate source session: %v", err)
+	}
+	second := control.InputAction{Kind: control.InputWheel, DeltaY: 120}
+	if !session.Offer(second) {
+		t.Fatal("second generation action was not accepted")
+	}
+	close(sink.releaseFirst)
+	if got := receiveAction(t, sink.sent); got != second {
+		t.Fatalf("sent action = %+v, want %+v", got, second)
+	}
+	select {
+	case err := <-sink.failed:
+		t.Fatalf("revoked generation failed the source session: %v", err)
+	case <-time.After(20 * time.Millisecond):
 	}
 }
 
@@ -139,9 +204,50 @@ func TestSourceSessionInterruptsBlockedSendBeforeFaultCleanup(t *testing.T) {
 	}
 }
 
+func TestSourceSessionBoundsBlockingInterrupt(t *testing.T) {
+	sink := &blockingInterruptSourceSink{
+		started: make(chan struct{}),
+		release: make(chan struct{}),
+	}
+	session, err := NewSourceSession(1, sink)
+	if err != nil {
+		t.Fatalf("NewSourceSession() error = %v", err)
+	}
+	session.cleanup = 25 * time.Millisecond
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- session.Run(ctx) }()
+	deadline := time.Now().Add(time.Second)
+	for !session.started.Load() && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if err := session.Activate(); err != nil {
+		t.Fatalf("Activate() error = %v", err)
+	}
+	cancel()
+	select {
+	case <-sink.started:
+	case <-time.After(time.Second):
+		t.Fatal("Interrupt did not start")
+	}
+	select {
+	case runErr := <-done:
+		if !errors.Is(runErr, context.DeadlineExceeded) {
+			t.Fatalf("Run() error = %v", runErr)
+		}
+	case <-time.After(250 * time.Millisecond):
+		t.Fatal("blocking Interrupt escaped the cleanup deadline")
+	}
+	close(sink.release)
+}
+
 func startSourceSession(t *testing.T, capacity int, sink SourceSink) *SourceSession {
+	return startObservedSourceSession(t, capacity, sink, nil)
+}
+
+func startObservedSourceSession(t *testing.T, capacity int, sink SourceSink, observer SourcePipelineObserver) *SourceSession {
 	t.Helper()
-	session, err := NewSourceSession(capacity, sink)
+	session, err := NewSourceSessionObserved(capacity, sink, observer)
 	if err != nil {
 		t.Fatalf("NewSourceSession() error = %v", err)
 	}
@@ -166,6 +272,80 @@ func startSourceSession(t *testing.T, capacity int, sink SourceSink) *SourceSess
 	return session
 }
 
+type recordingSourcePipelineObserver struct {
+	hookObserved         uint64
+	synthesizedObserved  uint64
+	rawObserved          uint64
+	windowObserved       uint64
+	captureActivations   uint64
+	captureDeactivations uint64
+	focusRestoreResults  []SourceFocusRestoreResult
+	activeHookMoves      uint64
+	activeHookButtons    uint64
+	mapped               uint64
+	queueAccepted        uint64
+	queueRejected        uint64
+	rejectedInactive     uint64
+	rejectedInvalid      uint64
+	rejectedOverflow     uint64
+}
+
+func (observer *recordingSourcePipelineObserver) ObserveWheelHook() {
+	observer.hookObserved++
+}
+
+func (observer *recordingSourcePipelineObserver) ObserveWheelSynthesized() {
+	observer.synthesizedObserved++
+}
+
+func (observer *recordingSourcePipelineObserver) ObserveWheelRaw() {
+	observer.rawObserved++
+}
+
+func (observer *recordingSourcePipelineObserver) ObserveWheelWindow() {
+	observer.windowObserved++
+}
+
+func (observer *recordingSourcePipelineObserver) ObserveWheelCaptureActivated() {
+	observer.captureActivations++
+}
+
+func (observer *recordingSourcePipelineObserver) ObserveWheelCaptureDeactivated() {
+	observer.captureDeactivations++
+}
+
+func (observer *recordingSourcePipelineObserver) ObserveWheelFocusRestore(result SourceFocusRestoreResult) {
+	observer.focusRestoreResults = append(observer.focusRestoreResults, result)
+}
+
+func (observer *recordingSourcePipelineObserver) ObserveActiveHookMouseMove() {
+	observer.activeHookMoves++
+}
+
+func (observer *recordingSourcePipelineObserver) ObserveActiveHookMouseButton() {
+	observer.activeHookButtons++
+}
+
+func (observer *recordingSourcePipelineObserver) ObserveWheelMapped() {
+	observer.mapped++
+}
+
+func (observer *recordingSourcePipelineObserver) ObserveWheelQueue(result SourceQueueOfferResult) {
+	switch result {
+	case SourceQueueAccepted:
+		observer.queueAccepted++
+	case SourceQueueRejectedInactive:
+		observer.queueRejected++
+		observer.rejectedInactive++
+	case SourceQueueRejectedInvalid:
+		observer.queueRejected++
+		observer.rejectedInvalid++
+	case SourceQueueRejectedOverflow:
+		observer.queueRejected++
+		observer.rejectedOverflow++
+	}
+}
+
 func receiveAction(t *testing.T, actions <-chan control.InputAction) control.InputAction {
 	t.Helper()
 	select {
@@ -183,6 +363,25 @@ type recordingSourceSink struct {
 	blockSend <-chan struct{}
 	sendErr   error
 }
+
+type blockingInterruptSourceSink struct {
+	started chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+func (*blockingInterruptSourceSink) SendAction(ctx context.Context, _ control.InputAction) error {
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func (sink *blockingInterruptSourceSink) Interrupt(error) error {
+	sink.once.Do(func() { close(sink.started) })
+	<-sink.release
+	return nil
+}
+
+func (*blockingInterruptSourceSink) Fail(context.Context, error) error { return nil }
 
 func (sink *recordingSourceSink) SendAction(_ context.Context, action control.InputAction) error {
 	if sink.sent != nil {
@@ -209,6 +408,36 @@ type interruptibleSourceSink struct {
 	started       chan struct{}
 	interrupted   chan struct{}
 	failed        chan error
+}
+
+type revokedGenerationSourceSink struct {
+	mu           sync.Mutex
+	calls        int
+	firstStarted chan struct{}
+	releaseFirst chan struct{}
+	sent         chan control.InputAction
+	failed       chan error
+}
+
+func (sink *revokedGenerationSourceSink) SendAction(_ context.Context, action control.InputAction) error {
+	sink.mu.Lock()
+	sink.calls++
+	call := sink.calls
+	sink.mu.Unlock()
+	if call == 1 {
+		close(sink.firstStarted)
+		<-sink.releaseFirst
+		return errors.New("revoked generation send failed")
+	}
+	sink.sent <- action
+	return nil
+}
+
+func (*revokedGenerationSourceSink) Interrupt(error) error { return nil }
+
+func (sink *revokedGenerationSourceSink) Fail(_ context.Context, cause error) error {
+	sink.failed <- cause
+	return nil
 }
 
 func (sink *interruptibleSourceSink) SendAction(context.Context, control.InputAction) error {
