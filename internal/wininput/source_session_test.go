@@ -53,6 +53,9 @@ func TestSourceSessionReportsAcceptedAndRejectedWheelOffers(t *testing.T) {
 	if observer.queueAccepted != 1 || observer.queueRejected != 1 || observer.rejectedInactive != 1 {
 		t.Fatalf("pipeline observer = %+v", observer)
 	}
+	if observer.queueEnqueued != 1 || observer.queueDequeued != 1 || observer.residenceSamples != 1 || observer.maxQueueDepth != 1 {
+		t.Fatalf("source queue observer = %+v", observer)
+	}
 }
 
 func TestSourceSessionOverflowDisablesSuppressionAndFaults(t *testing.T) {
@@ -90,6 +93,9 @@ func TestSourceSessionOverflowDisablesSuppressionAndFaults(t *testing.T) {
 	case action := <-sink.sent:
 		t.Fatalf("stale queued action was sent: %+v", action)
 	case <-time.After(20 * time.Millisecond):
+	}
+	if observer.queueDiscardedStale != 1 {
+		t.Fatalf("stale queue evidence = %+v", observer)
 	}
 }
 
@@ -279,7 +285,10 @@ type recordingSourcePipelineObserver struct {
 	windowObserved       uint64
 	captureActivations   uint64
 	captureDeactivations uint64
+	foregroundFallbacks  []SourceForegroundFallbackResult
+	focusFallbacks       []SourceFocusRestoreFallbackResult
 	focusRestoreResults  []SourceFocusRestoreResult
+	postHideFocusResults []SourcePostHideFocusResult
 	activeHookMoves      uint64
 	activeHookButtons    uint64
 	mapped               uint64
@@ -288,6 +297,12 @@ type recordingSourcePipelineObserver struct {
 	rejectedInactive     uint64
 	rejectedInvalid      uint64
 	rejectedOverflow     uint64
+	queueEnqueued        uint64
+	queueDequeued        uint64
+	queueDiscardedStale  uint64
+	maxQueueDepth        uint64
+	residenceSamples     uint64
+	maxResidence         time.Duration
 }
 
 func (observer *recordingSourcePipelineObserver) ObserveWheelHook() {
@@ -314,8 +329,20 @@ func (observer *recordingSourcePipelineObserver) ObserveWheelCaptureDeactivated(
 	observer.captureDeactivations++
 }
 
+func (observer *recordingSourcePipelineObserver) ObserveWheelForegroundFallback(result SourceForegroundFallbackResult) {
+	observer.foregroundFallbacks = append(observer.foregroundFallbacks, result)
+}
+
+func (observer *recordingSourcePipelineObserver) ObserveWheelFocusRestoreFallback(result SourceFocusRestoreFallbackResult) {
+	observer.focusFallbacks = append(observer.focusFallbacks, result)
+}
+
 func (observer *recordingSourcePipelineObserver) ObserveWheelFocusRestore(result SourceFocusRestoreResult) {
 	observer.focusRestoreResults = append(observer.focusRestoreResults, result)
+}
+
+func (observer *recordingSourcePipelineObserver) ObserveWheelPostHideFocus(result SourcePostHideFocusResult) {
+	observer.postHideFocusResults = append(observer.postHideFocusResults, result)
 }
 
 func (observer *recordingSourcePipelineObserver) ObserveActiveHookMouseMove() {
@@ -344,6 +371,25 @@ func (observer *recordingSourcePipelineObserver) ObserveWheelQueue(result Source
 		observer.queueRejected++
 		observer.rejectedOverflow++
 	}
+}
+
+func (observer *recordingSourcePipelineObserver) ObserveSourceQueueEnqueued(depth uint64) {
+	observer.queueEnqueued++
+	if depth > observer.maxQueueDepth {
+		observer.maxQueueDepth = depth
+	}
+}
+
+func (observer *recordingSourcePipelineObserver) ObserveSourceQueueDequeued(residence time.Duration) {
+	observer.queueDequeued++
+	observer.residenceSamples++
+	if residence > observer.maxResidence {
+		observer.maxResidence = residence
+	}
+}
+
+func (observer *recordingSourcePipelineObserver) ObserveSourceQueueDiscardedStale() {
+	observer.queueDiscardedStale++
 }
 
 func receiveAction(t *testing.T, actions <-chan control.InputAction) control.InputAction {

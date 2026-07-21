@@ -1,0 +1,55 @@
+package peer
+
+type ControlFlowEvent uint8
+
+const (
+	ControlFlowBoundaryAdmitted ControlFlowEvent = iota + 1
+	ControlFlowBoundaryDroppedNotReady
+	ControlFlowBoundaryBlockedLocalMenu
+	ControlFlowBoundaryBlockedMouseCapture
+	ControlFlowBoundaryBlockedPressedInput
+	ControlFlowBoundaryBlockedMoveSize
+	ControlFlowBoundaryAdmissionFailed
+	ControlFlowRequestWriteCompleted
+	ControlFlowRequestWriteOutcomeUnknown
+	ControlFlowRequestReceived
+	ControlFlowReturnArmSucceeded
+	ControlFlowEntryPrepareAttempted
+	ControlFlowEntryPrepared
+	ControlFlowGrantWriteCompleted
+	ControlFlowGrantWriteOutcomeUnknown
+	ControlFlowEntryCommitted
+	ControlFlowEntryRollbackAttempted
+	ControlFlowGrantReceived
+	ControlFlowGrantApplySucceeded
+	ControlFlowGrantApplyFailed
+	ControlFlowSourceSessionActivationSucceeded
+	ControlFlowSourceSessionActivationFailed
+	ControlFlowCaptureActivationAttempted
+	ControlFlowCaptureActivationSucceeded
+	ControlFlowCaptureActivationFailed
+	ControlFlowCaptureActivationSetupFailed
+	ControlFlowCaptureActivationAPIRejected
+	ControlFlowCaptureActivationVerificationLost
+	ControlFlowCommitWriteCompleted
+	ControlFlowCommitWriteOutcomeUnknown
+	ControlFlowAbortWriteCompleted
+	ControlFlowAbortWriteOutcomeUnknown
+	ControlFlowCommitReceived
+	ControlFlowAbortReceived
+	ControlFlowRevokeWriteCompleted
+	ControlFlowRevokeWriteOutcomeUnknown
+	ControlFlowRevokeReceived
+	ControlFlowLocalConnectionInterrupt
+	ControlFlowReadAfterLocalInterrupt
+)
+
+type ControlFlowObserver interface {
+	ObserveControlFlow(ControlFlowEvent)
+}
+
+func observeControlFlow(observer ControlFlowObserver, event ControlFlowEvent) {
+	if observer != nil {
+		observer.ObserveControlFlow(event)
+	}
+}

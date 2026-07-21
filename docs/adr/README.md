@@ -28,5 +28,14 @@
 - `0021-active-session-wheel-surface-evidence.md`: hook-owned wheel을 유지한 active-session Raw/hook 진단 evidence
 - `0022-touchpad-capable-window-surface-diagnostic.md`: Windows 11 Precision Touchpad pointer 표면의 foreground 진단
 - `0023-active-touchpad-window-wheel-owner.md`: active outbound touchpad-capable window wheel owner와 focus 복원
+- `0024-control-flow-failure-attribution.md`: boundary handoff 단계와 실제 session failure origin의 aggregate evidence
+- `0025-local-menu-boundary-admission.md`: local Windows menu loop의 source-side 전환 차단과 failure 우선순위
+- `0026-phase-0-native-launcher.md`: 실시간 입력 경로 밖 native launcher와 안전 종료·정확한 report 복사
+- `0027-local-interaction-admission-and-two-phase-entry.md`: drag·pressed input 차단과 commit/abort 기반 destination entry 확정
+- `0028-bounded-foreground-thread-attach-fallback.md`: foreground 거절 때만 단일 retry와 즉시 detach를 수행하는 capture fallback
+- `0029-bounded-focus-restore-thread-attach-fallback.md`: source focus 복원 거절 때만 단일 retry와 즉시 detach를 수행하는 대칭 fallback
+- `0030-degraded-focus-restore-does-not-terminate-session.md`: capture foreground를 놓았다면 정확한 focus 복원 실패를 degraded로 유지
+- `0031-peer-dispatch-and-input-queue-evidence.md`: peer dispatch, source queue 체류와 destination input disposition evidence
+- `0032-live-trust-authorization-and-certificate-validity.md`: lease별 trust reload와 credential 유효기간 조기 검증
 
 새 결정은 `0000-template.md`를 복사해 다음 번호로 추가한다. 이미 Accepted인 결정의 의미를 바꿀 때는 기존 문서를 조용히 덮어쓰지 말고 새 ADR에서 대체 관계와 migration 영향을 기록한다.

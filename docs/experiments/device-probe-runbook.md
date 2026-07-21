@@ -6,7 +6,11 @@
 
 ## 전제
 
-GitHub Actions의 `krasis-probe-kit-windows-amd64-<commit>.zip` artifact를 한 번 내려받아 두 장소에서 같은 zip을 사용한다. 이 artifact는 서명된 release나 설치 프로그램이 아니다. Windows가 출처 경고를 표시할 수 있으며, commit과 checksum을 확인할 수 없는 복사본은 실행하지 않는다.
+GitHub Actions의 `krasis-probe-kit-windows-amd64-<commit>.zip` artifact 또는 로컬에서 검증한
+`krasis-probe-kit-v21-queue-disposition-r2-windows-amd64.zip`을 한 번 준비해 두 장소에서 같은 ZIP을 사용한다.
+v21 r2 로컬 package는 configured intent `krasis_probe_kit_package_v21_queue_disposition_r2`만 생성한다. 이 artifact는
+서명된 release나 설치 프로그램이 아니다. Windows가 출처 경고를 표시할 수 있으며, commit과 checksum을
+확인할 수 없는 복사본은 실행하지 않는다. 서로 다른 버전이나 revision의 파일을 한 pair에서 섞지 않는다.
 
 네 대를 동시에 켤 필요가 없다. 집에서 `H-A`, `H-B`를 각각 실행하고 다른 날 스터디카페에서 `S-A`, `S-B`를 실행해도 된다. 각 장비에서는 다른 프로그램의 중요한 작업을 저장하고 마우스나 키보드를 자동 조작하는 프로그램을 잠시 끈다.
 
@@ -26,6 +30,32 @@ GitHub Actions의 `krasis-probe-kit-windows-amd64-<commit>.zip` artifact를 한 
 `phase0-check`는 report의 clean build revision만 비교하고 이 kit checksum을 다시 계산하지 않는다.
 따라서 네 장비에서 사용한 workflow run과 kit SHA-256 기록을 잃으면 checker pass만으로 동일
 artifact 사용을 주장하지 않는다.
+
+## 버튼 UI로 실행
+
+검증된 kit에는 수동 CLI와 함께 `krasis-launcher.exe`가 들어 있다. 압축을 푼 같은 directory에서 launcher를
+실행하면 긴 `agent-session` 명령 대신 버튼을 사용할 수 있다. Windows가 실행을 차단하면 checksum과 artifact
+출처를 다시 확인하며 경고를 무시하도록 자동 우회하지 않는다.
+launcher도 시작 시 배포 file 전체의 SHA-256을 확인하고 불일치하면 Pair와 연결을 차단한다. 따라서 버튼
+경로에서는 별도 PowerShell checksum 명령이 필요 없다. 코드 서명과 GitHub artifact origin 확인을 대체하지는
+않는다.
+
+1. HP15에서 역할을 `HP15 · Listener`, 별칭을 `S-A`, edge에 대응하는 기본 역할을 유지하고 현재 HP15 LAN
+   IP, port와 실행 시간을 확인한다.
+2. `새 Pair 생성`을 누르면 새 listener credential이 자동으로 설정되고 복사할 `connector` directory가
+   열린다. `secrets` parent가 없어도 launcher가 보호된 directory로 먼저 만든다. 열린 `connector`
+   directory만 gram13의 kit 아래 `secrets\connector`로 복사한다. pair 전체나 listener private key를
+   복사하지 않는다.
+3. gram13에서 역할을 `gram13 · Connector`, 별칭을 `S-B`, 같은 HP15 IP와 port로 설정하고
+   `Connector 준비`를 누른다.
+4. HP15의 `연결 시작`을 먼저 누른 뒤 gram13에서 누른다. `안전 중지` 또는 launcher 창 닫기는 process kill이
+   아니라 agent cleanup을 요청한다.
+5. 실행이 끝나면 각 노트북에서 `보고서 복사`를 한 번 눌러 이번 run의 agent+guard JSON만 전달한다.
+   launcher를 재시작하면 이전 run을 자동 선택하지 않으므로 `폴더 열기`로 직접 확인한다.
+
+이 UI는 방화벽, LAN 연결, credential 복사와 두 노트북에서의 시작 순서를 자동화하지 않는다. Pair credential은
+단기 실험용이며 만료됐거나 요청한 실행 종료까지 남은 수명이 부족하거나 다른 계정을 거쳤으면 새 Pair를
+만든다. launcher에 문제가 있으면 아래 수동 CLI 절차가 source of truth다.
 
 ## 수집
 
@@ -162,7 +192,10 @@ listener에서 먼저 실행한다.
 .\krasis-lab.exe peer-probe listen --device H-A --address 0.0.0.0:24876 --ca .\secrets\listener\ca.pem --cert .\secrets\listener\identity.pem --key .\secrets\listener\identity-key.pem --output .\reports\H-A-peer.json
 ```
 
-Windows 방화벽과 같은 LAN에서 listener의 실제 IP와 port 접근을 허용한 뒤 connector에서 실행한다. 아래 주소와 server name은 문서용 예시이므로 실제 listener 주소와 certificate name으로 바꾼다.
+신뢰하는 사설 LAN 또는 개인 hotspot에서 Windows 방화벽이 connector 주소에만 listener의 실제 IP와 port
+접근을 허용하도록 확인한 뒤 connector에서 실행한다. 공용 LAN에서 주소별 방화벽 제한을 확인할 수 없으면
+Phase 0 listener를 열지 않는다. 아래 주소와 server name은 문서용 예시이므로 실제 listener 주소와
+certificate name으로 바꾼다.
 
 ```powershell
 .\krasis-lab.exe peer-probe connect --device H-B --address 192.0.2.10:24876 --server-name 192.0.2.10 --ca .\secrets\connector\ca.pem --cert .\secrets\connector\identity.pem --key .\secrets\connector\identity-key.pem --output .\reports\H-B-peer.json
@@ -220,17 +253,38 @@ zero·Krasis-tagged·self-test-tagged mapping 제외,
 `rejectedOverflow>0`은 bounded queue 포화를 뜻한다. `queueAccepted>sent`는 sender 전에 멈춘 action이다.
 `rawObserved>0`인데 `sent==0`이면 report는 `raw_wheel_observed_without_forwarding`으로 실패해야 한다.
 `windowObserved>0`인데 `sent==0`이면 `window_wheel_observed_without_forwarding`으로 실패해야 한다.
-source action이 있으면 `captureActivations>=1`, activation과 deactivation이 같고 focus restore 세 분류 합이
-deactivation과 같으며 `focusRestoreFailed=0`이어야 한다.
+source action이 있으면 `captureActivations>=1`, activation과 deactivation이 같고 focus restore 결과 합이
+deactivation과 같아야 한다. 실패가 있으면
+`focusRestoreApiRejected+focusRestoreVerificationLost=focusRestoreFailed`여야 하며, 전자는 Windows API
+거절, 후자는 API 성공 직후 foreground verification 경합을 뜻한다. v20은 실패 수만큼 post-hide focus release를
+시도하고 recovered, unavailable 또는 capture-retained 중 정확히 하나를 남긴다. capture-retained 또는
+focus fallback detach failure는 unsafe다.
 Raw Input은 비동기 queue이므로 경계를 넘은 직후 pointer를 움직이거나 한 번 클릭해 hook health를 남기고
 1초간 기다린 뒤 wheel을 조작한다. 그래도 같은 failure가 나와야 전환 직전 backlog 가능성을 배제할 수 있다.
-양쪽 `supervisor.lastFailureComponent`를 함께 비교하고 raw 오류나 입력값을 report에 덧붙이지 않는다.
+양쪽 `supervisor.firstFailure`와 `failureCounts`를 함께 비교한다. count 합은 `sessionFailures`와 같고
+`firstFailure`는 그 분포에 포함돼야 한다. source 원인으로 연결을 닫은 뒤 peer reader가 깨어난 경우는
+`controlFlow.transport.localConnectionInterrupts`와 `readAfterLocalInterrupt`가 함께 증가할 수 있으므로
+뒤따른 read 오류를 원인으로 뒤집지 않는다. raw 오류나 입력값을 report에 덧붙이지 않는다.
+
+간헐적 경계 전환은 양쪽 `controlFlow`를 비교한다. source에서는
+`boundary.queued=sourceInput.boundaryIntents`, `boundary.admitted=outbound.requestWriteCompleted`여야 하고
+admitted, dropped-not-ready, blocked-local-menu, blocked-local-interaction과 admission-failed 합은 queued와
+정확히 같아야 한다. blocked-local-interaction은 mouse-capture, pressed-input, move-size subtype 합과 같아야 한다.
+`blockedLocalMenu`와 `blockedLocalInteraction`은 source foreground menu, mouse capture, pressed input 또는
+move/size loop 동안 request를 보내지 않은 안전 차단이다. grant receive는 apply 성공·실패로,
+apply 성공은 source session activation 성공·실패로, source session activation 성공은 capture activation
+성공·실패로 분류된다. capture 성공은 `sourcePipeline.wheel.captureActivations`와 commit write 결과 합계가
+같고 capture 실패는 abort write 결과 합계와 같아야 한다. destination은 모든 `entryPrepareAttempted`가 commit 또는
+rollback 시도로 보존되고 `entryPrepared<=entryPrepareAttempted`,
+`inbound.commitReceived=inbound.entryCommitted=destinationInput.entries`,
+`inbound.returnArmSucceeded=destinationInput.returnArms`여야 한다. aggregate는 세대별 trace가 아니므로 서로
+다른 세대의 counter를 억지로 한 사건으로 짝짓지 않는다.
 
 각 방향에서 제어권을 받은 뒤 최소 두 heartbeat interval이 지나도록 active 상태를 유지한다.
 이 시간은 제품 기본값이 아니라 해당 실행에서 직접 입력한 interval의 배수다. 그래야 양쪽
 report에 송수신 각각 2회 이상과 같은 session 내부 receive gap sample이 남는다.
 
-양쪽 report가 모두 `schemaVersion=krasis.lab.agent-session/v13`, `completed=true`,
+양쪽 report가 모두 `schemaVersion=krasis.lab.agent-session/v21`, `completed=true`,
 `passed=true`, `crashGuard.started=true`, `crashGuard.cleanShutdown=true`,
 `lifecycle.monitorStarted=true`, `lifecycle.cleanShutdown=true`, lifecycle event 없음,
 `lifecycle.rearmRequired=false`,
@@ -242,12 +296,29 @@ report에 송수신 각각 2회 이상과 같은 session 내부 receive gap samp
 `destinationInput.entries>=1`, `destinationInput.returnArms>=1`과 하나 이상의 destination input action이
 있어야 한다. 모든 `destinationInput.injectionFailures`가 `0`,
 `destinationInput.cursorRollbacks.failed=0`, 그리고 rollback의 복원·미복원·실패 합계가 시도 수와
-같아야 한다. source action이 있는 report는 capture activation/deactivation 합계와 focus restore 분류도
-위 조건을 만족해야 해당 pair의 bounded peer input 실험이 통과한 것이다. touchpad acceptance 실행에서는
+같아야 한다. `destinationPipeline.applied+retiredDrained+rejected=received`,
+`destinationPipeline.applied=destinationInput` action 합이어야 하고 `rejected=0`이어야 한다.
+`controlFlow` 합계가 유효하고 stage failure와 not-ready boundary drop이 모두 `0`이어야 한다.
+source action이 있는 report는 capture activation/deactivation 합계, foreground fallback outcome과 focus restore 분류도
+위 조건을 만족해야 한다. 또한 `sourcePipeline.queue.dequeued<=enqueued`,
+`discardedStale<=dequeued`, `residenceSamples=dequeued`, source action 합이
+`dequeued-discardedStale` 이하여야 해당 pair의 bounded peer input 실험이 통과한 것이다. touchpad acceptance 실행에서는
 추가로 source `windowObserved`, `mapped`, `queueAccepted`, `sent`와 destination `wheels`가 모두 양수여야 한다.
 한 방향만 실행해도 source와 destination
 보고서가 서로 보완되면 checker 증거로 충분하다. 반대 방향 사용성은 별도 수동 검증 항목이며 exact
 source/destination count 일치는 요구하지 않는다. 집 pair와 스터디카페 pair는 서로 다른 날짜에 반복해도 된다.
+
+v21 queue/disposition acceptance에서는 먼저 menu, drag, pressed input과 move/size를 모두 닫은 상태로 최소 20회 왕복한다.
+정상 foreground 획득은 `foregroundFallbackAttempted=0`일 수 있다. fallback이 필요했다면 attempted는 다섯
+outcome의 합과 같고, 성공 outcome만 capture activation과 commit으로 이어져야 한다. attach, detach 또는
+재시도 실패는 abort와 destination rollback으로 끝나야 하며 같은 실행에서 자동 retry loop가 생기면 실패다.
+return 뒤 일반 focus 복원이 거절됐다면 `focusRestoreFallbackAttempted`가 증가하고 다섯 outcome 중 하나로
+분류돼야 한다. fallback success는 최종 `focusRestored`로 끝난다. fallback까지 실패하면 post-hide outcome이
+recovered 또는 unavailable이어야 하며 source hook 종료, remote EOF, 재연결과 not-ready boundary drop을 만들지
+않아야 한다. capture-retained와 detach failure만 terminal이다. slow motion이 느껴지면 종료하지 말고 몇 차례 더
+왕복해 `sourcePipeline.queue.maxDepth`, `maxResidenceMicros`, `discardedStale`,
+`destinationPipeline.retiredDrained`와 supervisor failure distribution을 같은 report에 남긴다. 입력 좌표나 키값은
+보고서에 기록되지 않는다.
 
 ## Windows lifecycle fault injection
 

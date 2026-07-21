@@ -9,6 +9,10 @@
 
 `krasis-lab`은 제품 CLI가 아니라 Windows 입력 adapter를 선택하기 위한 폐기 가능한 실험 도구다. 명령과 JSON schema는 Phase 0 동안에만 호환성을 유지하며 정식 `krasis` CLI로 자동 승격되지 않는다.
 
+`--output PATH.json`으로 report를 쓰는 모든 명령은 부모 directory가 미리 존재해야 하고 기존 output을
+덮어쓰지 않는다. Windows에서는 volume root부터 부모 directory까지 reparse point가 없어야 하며,
+검증 실패는 report를 다른 위치로 따라가 쓰지 않고 거부한다.
+
 ## 명령
 
 ### `diagnose`
@@ -152,7 +156,7 @@ gram13 `agent-session/v12`에서 active pointer move/button은 관찰됐지만 h
 - connector 사용법: `krasis-lab peer-probe connect --device ALIAS --address ADDRESS --server-name NAME --ca CA.pem --cert CERT.pem --key KEY.pem --output REPORT.json [--timeout DURATION]`
 - listener와 connector는 같은 test CA가 서명한 서로 다른 identity를 사용해야 한다. connector의 `--server-name`은 listener certificate의 이름과 일치해야 한다.
 - 한 번의 실행에서 새 random session ID와 epoch를 사용하는 두 개의 독립 connection을 연속으로 만든다.
-- 각 connection은 lease request/grant, 상대 pointer move envelope 검증, lease revoke를 수행한다. 실제 pointer를 움직이거나 입력을 주입하지 않는다.
+- 각 connection은 lease request/grant/commit, 상대 pointer move envelope 검증, lease revoke를 수행한다. 실제 pointer를 움직이거나 입력을 주입하지 않는다.
 - report는 주소, certificate 내용, fingerprint, session ID, epoch, 원시 입력을 저장하지 않는다.
 - `--output`은 기존 file을 덮어쓰지 않는다. 실패 시에도 가능한 부분 report를 저장한다.
 - 기본 timeout은 2분이며 양쪽에서 별도로 지정할 수 있다.
@@ -169,6 +173,7 @@ gram13 `agent-session/v12`에서 active pointer move/button은 관찰됐지만 h
 - `listener/`와 `connector/`에는 각 역할의 `ca.pem`, `identity.pem`, `identity-key.pem`과 상대 역할의 공개 인증서 `peer.pem`을 생성한다. `peer.pem`에는 private key가 없다.
 - Windows에서는 각 역할 directory와 `identity-key.pem`의 상속 DACL을 제거하고 현재 사용자와 `SYSTEM`에만 full control을 허용한다. private key load는 같은 DACL과 path 전체의 reparse point 부재를 다시 검증하며 불일치하면 fail-closed한다.
 - identity 유효 기간은 생성 시점부터 24시간이다. 이는 제품 certificate 수명 정책이 아니다.
+- identity load와 `trust import`는 현재 시각이 certificate 유효기간 밖이면 handshake나 store mutation 전에 거부한다.
 - `--server-name`은 listener가 connector에서 실제로 접근할 DNS name 또는 IP 주소다.
 - bundle 전체를 두 장비에 복제하지 않는다. listener에는 `listener/`만, connector에는 `connector/`만 복사한다.
 
@@ -196,30 +201,47 @@ peer별 durable authorization record를 관리한다.
 - fingerprint 중복, 폐기 record 재등록, 존재하지 않는 fingerprint 폐기와 repeated revoke는 거부한다.
 - list는 명시적인 관리 명령이므로 fingerprint를 출력한다. report와 일반 진단 log에는 복제하지 않는다.
 - mutation은 non-blocking process lock과 revision increment, flush 뒤 atomic replace를 사용한다. lock contention, 손상, unknown field, trailing JSON, schema·DACL 불일치는 fail-closed한다.
+- 실행 중 `agent-session`은 각 inbound lease authorization에서 protected store를 다시 읽는다. reload 오류나 폐기 record는 기존 allowlist로 되돌아가지 않고 해당 lease를 거부한다. 이미 active인 lease를 `trust revoke`가 비동기로 종료하지는 않는다.
 
 ### `agent-session`
 
 두 Windows 장비에서 실제 low-level hook, 경계 억제, mTLS peer session과 `SendInput` destination adapter를 bounded하게 실행하는 Phase 0 실험 명령이다.
 
-- 사용법: `krasis-lab agent-session listen|connect --device ALIAS --address ADDRESS [--server-name NAME] --ca CA.pem --cert CERT.pem --key KEY.pem --trust-store DIRECTORY --edge LEFT|RIGHT --duration DURATION --heartbeat-interval DURATION --peer-timeout DURATION --output REPORT.json --guard-output GUARD.json [--rearm-distance PIXELS] --allow-live-input`
+- 사용법: `krasis-lab agent-session listen|connect --device ALIAS --address ADDRESS [--server-name NAME] --ca CA.pem --cert CERT.pem --key KEY.pem --trust-store DIRECTORY --edge LEFT|RIGHT --duration DURATION --heartbeat-interval DURATION --peer-timeout DURATION --output REPORT.json --guard-output GUARD.json [--stop-file PATH] [--rearm-distance PIXELS] --allow-live-input`
 - `--allow-live-input`이 없으면 실행하지 않는다. 이 flag는 실제 keyboard/mouse event를 억제·전달·주입한다는 명시적 확인이다.
 - `--duration`은 필수이며 1ms 이상의 정수 millisecond로 왕복 가능해야 한다. 무기한 실행을 허용하지 않는다.
+- identity certificate의 남은 유효기간은 요청한 `--duration` 전체를 덮어야 한다. 준비 직전과 실제 run
+  deadline 확정 때 이를 검사하며 부족하면 live listener·hook 실행 전에 또는 준비 cleanup을 거쳐
+  `credential_lifetime_insufficient`로 실패한다. 자동 갱신하지 않으므로 새 Pair를 생성해야 한다.
 - `--heartbeat-interval`과 `--peer-timeout`도 1ms 이상의 정수 millisecond이고 timeout이 interval보다 길어야 한다. 제품 기본값은 없으며 같은 Phase 0 evidence set의 네 report에 동일한 실험값을 명시한다.
 - listener와 connector는 `peer-credentials`가 만든 역할별 identity만 사용한다.
-- `--trust-store`는 먼저 `trust import`로 만든 전용 directory다. 시작 시 strict snapshot을 읽으며 TLS peer fingerprint·역할이 record와 다르거나 record가 revoked/권한 없음이면 lease를 거부한다. 실행 중 file 변경은 다음 실행 전까지 적용하지 않는다.
+- `--trust-store`는 먼저 `trust import`로 만든 전용 directory다. 시작 시 strict하게 검증하고 각 inbound lease authorization에서 다시 읽는다. TLS peer fingerprint·역할이 record와 다르거나 record가 revoked/권한 없음이면 lease를 거부하며 reload 실패도 fail-closed한다. 실행 중 폐기는 다음 lease부터 적용되지만 이미 active인 lease를 강제로 종료하지는 않는다.
 - `--edge`는 이 장비에서 상대 장비로 넘어가는 화면 끝이다. 왼쪽 노트북은 일반적으로 `RIGHT`, 오른쪽 노트북은 `LEFT`다.
 - `--rearm-distance`는 cursor entry inset보다 크고 현재 단일 화면 폭보다 작아야 한다. 범위를 벗어나면
   `return_boundary_config_failed`로 live hook 시작 전에 종료한다.
+- `--stop-file`은 선택 사항인 로컬 안전 종료 신호다. 지정할 때는 report와 guard report가 있는 같은
+  directory의 아직 존재하지 않는 세 번째 경로여야 한다. 실행 중 그 경로에 regular file이 생기면 agent는
+  process kill 대신 기존 context cancellation과 `ReleaseAll` 정리 경로로 종료하고 신호 file을 소비한다.
+  directory 감시 오류나 regular file이 아닌 경로는 fail-closed `stop_file_monitor_failed`로 남긴다. 이
+  flag는 peer protocol이나 원격 종료 권한을 만들지 않으며 GUI launcher 전용 비밀 채널도 아니다.
 - MVP대로 active monitor가 정확히 하나가 아니면 hook을 시작하지 않고 실패한다.
+- source foreground GUI thread가 menu, system menu, popup menu, mouse capture 또는 move/size loop에 있거나
+  key·mouse button이 눌려 있으면 boundary intent를 local에서 차단하고 request를 보내지 않는다. local
+  interaction을 끝낸 뒤 cursor를 안쪽으로 rearm하고 다시 경계에 닿아야 한다. 상태 조회에 실패하면 원격
+  entry를 허용하지 않고 session을 fail-closed로 종료한다.
 - destination grant 전에는 source suppression을 활성화하지 않는다.
 - outbound grant 뒤 source queue를 활성화한 다음 Windows 11 touchpad-capable capture window를 현재 edge
   cursor 아래 foreground로 활성화한다. active 구간의 touchpad와 일반 mouse wheel은 이 window의
   `WM_MOUSEWHEEL/HWHEEL`만 payload로 만들고 low-level hook wheel은 관찰 뒤 window로 통과시킨다.
-- capture window가 foreground가 되지 않거나 active 중 foreground를 잃으면 session을 실패시킨다.
+- capture window가 foreground가 되지 않으면 `LeaseAbort`로 destination prepared entry를 rollback한다. active
+  중 foreground를 잃으면 session을 실패시킨다.
   local return과 failure에서는 capture registration·window를 먼저 해제한 뒤 source queue를 끄고 이전
   foreground window를 조건부 복원한다.
 - active source는 named `RegisterTouchpadCapableWindow` export가 없는 Windows build에서 시작하지 않는다.
-- destination cursor entry는 inbound runtime grant와 grant frame write 전까지 pending 효과로 유지한다. 중간 실패에서는 현재 cursor가 확인된 entry 좌표와 같을 때만 이전 snapshot으로 복원하고, 성공 evidence의 entry count는 grant write 뒤 commit에서만 증가한다.
+- destination cursor entry는 `LeaseRequest`에서 prepare하지만 `LeaseGrant` 뒤에도 runtime
+  `INBOUND_PENDING` 효과로 유지한다. source session과 capture가 준비된 뒤 exact `LeaseCommit`을 받아야
+  `INBOUND_ACTIVE`와 cursor entry를 확정한다. `LeaseAbort`, EOF와 중간 실패에서는 현재 cursor가 확인된
+  entry 좌표와 같을 때만 이전 snapshot으로 복원한다.
 - physical `Ctrl+Alt+Shift+F12`는 현재 active source session을 즉시 중단한다. F12 terminator는 원격 전송하거나 로컬에서 억제하지 않으며 supervisor는 긴급 해제 뒤 재연결하지 않는다.
 - 같은 executable의 별도 crash guard process가 destination down 전에 token을 ACK하고 성공한 up 뒤 제거한다. protocol v2는 새 prepare와 기존 반복 token을 구분하며, 새 press가 `NOT_APPLIED`로 확정된 경우에만 주입 없는 cancel로 기록을 제거한다. partial·unknown 결과와 실패한 release는 기록을 유지한다. guard가 먼저 종료되거나 정상 종료에서 남은 token을 해제하지 못하면 session은 실패한다.
 - 숨겨진 Windows lifecycle monitor는 suspend/resume, session lock·disconnect·logoff, shutdown과
@@ -241,12 +263,16 @@ exit `0`이지만 `passed=true`로 바꾸지 않는다.
 
 ### `agent-session-check`
 
-같은 장소의 두 장비에서 수집한 `krasis.lab.agent-session/v13` report가 bounded peer input 실험을 증명하는지 strict하게 판정한다. checker schema는 `krasis.lab.agent-session-check/v10`이다.
+같은 장소의 두 장비에서 수집한 `krasis.lab.agent-session/v21` report가 bounded peer input 실험을 증명하는지 strict하게 판정한다. checker schema는 `krasis.lab.agent-session-check/v18`이다. v21은 source queue 체류와 destination input disposition conservation까지 검증한다.
 
 - 사용법: `krasis-lab agent-session-check [--json] REPORT-A.json REPORT-B.json`
 - 정확히 두 file만 받으며 unknown field, trailing JSON, 1MiB 초과 file과 schema 불일치를 거부한다.
 - source/destination action, 주입 실패와 cursor rollback 분류 counter 합이 `uint64` 범위를 넘으면
   wrap한 값으로 pass를 계산하지 않고 해당 evidence를 거부한다.
+- control-flow 단계 합계와 supervisor failure count도 overflow 없이 기존 source/destination/capture
+  aggregate와 일치해야 한다. not-ready boundary drop 또는 명시적인 단계 실패가 한 건이라도 있으면
+  report 내부 `passed=true`와 무관하게 거부한다. `blockedLocalMenu`와 `blockedLocalInteraction`은 request 전에 끝나는 의도된 local
+  차단이라 단계 실패로 세지 않는다.
 - file path는 결과에 basename만 남긴다.
 - `H-A/H-B` 또는 `S-A/S-B` 조합만 같은 pair로 인정한다.
 - listener/connect 역할 하나씩, 반대 edge, 같은 clean build revision, requested duration, heartbeat interval과 peer timeout을 요구한다.
@@ -263,9 +289,15 @@ exit `0`이지만 `passed=true`로 바꾸지 않는다.
   세는 `activeHookMoves`와 `activeHookButtons`, capture window legacy wheel의 `windowObserved`,
   capture activation/deactivation과 focus restore 분류를 포함한다. 이 값들은 aggregate라 같은 OS event를
   correlate하거나 서로 exact equality를 요구하지 않으며 Raw Input의 suppression·payload ownership을
-  뜻하지 않는다. source action이 있으면 capture activation이 있어야 하고 activation/deactivation과 focus
+  뜻하지 않는다. 정상 foreground 경로가 실패한 경우에만 bounded thread-input fallback을 한 번 허용하며,
+  fallback attempted는 success·attach failure·detach failure·retry API rejection·verification loss 중 정확히
+  하나로 보존돼야 한다. saved-focus 복원도 정상 경로가 실패한 경우에만 대칭 fallback을 한 번 허용하며 같은
+  다섯 outcome과 최종 focus 결과의 합계 관계를 보존해야 한다. source action이 있으면 capture activation이 있어야 하고 activation/deactivation과 focus
   결과 합계가 맞으며 focus restore 실패가 없어야 한다. `rawObserved>0` 또는 `windowObserved>0`인데
-  `sent==0`인 report는 각각 stable unforwarded code로 실패해야 하며 failure component는 stable allowlist 값만 허용한다.
+  `sent==0`인 report는 각각 stable unforwarded code로 실패해야 한다.
+- supervisor의 session failure는 stable `component`, `phase`, `code` triple별 count로 분류한다. triple은
+  중복될 수 없고 count 합은 `sessionFailures`와 같으며 `firstFailure`는 그 분포에 포함돼야 한다. raw
+  error 문자열은 report나 checker output에 넣지 않는다.
 
 report가 JSON으로 유효해도 pair 조건을 만족하지 않으면 exit `1`이다. 긴급 해제 report는 안전 동작 증거로 보존하지만 pair pass로 승격하지 않는다.
 

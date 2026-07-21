@@ -3,6 +3,7 @@ package peer
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/0disoft/krasis/internal/application"
@@ -20,6 +21,10 @@ type OutboundActionSink struct {
 	Connection  interface{ Close() error }
 }
 
+type localConnectionInterrupter interface {
+	InterruptLocal(error) error
+}
+
 func NewOutboundActionSink(
 	coordinator *SessionWriteCoordinator,
 	runtime *application.SessionRuntime,
@@ -31,9 +36,12 @@ func NewOutboundActionSink(
 	return &OutboundActionSink{Coordinator: coordinator, Runtime: runtime, Connection: connection}, nil
 }
 
-func (sink *OutboundActionSink) Interrupt(error) error {
+func (sink *OutboundActionSink) Interrupt(cause error) error {
 	if sink == nil || sink.Connection == nil {
 		return errors.New("outbound action sink is not initialized")
+	}
+	if interrupter, ok := sink.Connection.(localConnectionInterrupter); ok {
+		return interrupter.InterruptLocal(errors.Join(ErrSourceSessionInterrupted, cause))
 	}
 	return sink.Connection.Close()
 }
@@ -60,19 +68,37 @@ func BeginOutboundSession(
 	epoch string,
 	edge control.ScreenEdge,
 ) error {
+	return BeginOutboundSessionObserved(ctx, coordinator, runtime, sessionID, epoch, edge, nil)
+}
+
+func BeginOutboundSessionObserved(
+	ctx context.Context,
+	coordinator *SessionWriteCoordinator,
+	runtime *application.SessionRuntime,
+	sessionID string,
+	epoch string,
+	edge control.ScreenEdge,
+	observer ControlFlowObserver,
+) error {
 	if coordinator == nil || runtime == nil {
 		return errors.New("write coordinator and runtime are required")
 	}
 	return coordinator.Execute(ctx, func(writer FrameWriter) error {
 		if _, err := runtime.BeginOutbound(ctx, sessionID, epoch); err != nil {
-			return err
+			return fmt.Errorf("%w: %w", ErrOutboundBegin, err)
 		}
-		return writeControlOrFail(ctx, writer, runtime, transport.ControlCommand{
+		err := writeControlOrFail(ctx, writer, runtime, transport.ControlCommand{
 			Kind:      transport.ControlLeaseRequest,
 			SessionID: sessionID,
 			Epoch:     epoch,
 			Edge:      edge,
 		})
+		if err != nil {
+			observeControlFlow(observer, ControlFlowRequestWriteOutcomeUnknown)
+			return fmt.Errorf("%w: %w", ErrOutboundRequestWrite, err)
+		}
+		observeControlFlow(observer, ControlFlowRequestWriteCompleted)
+		return nil
 	})
 }
 
@@ -151,6 +177,13 @@ type LeaseResponder struct {
 	Peer        transport.AuthenticatedPeerContext
 	Entry       CursorEntryPort
 	Returns     ReturnBoundaryPort
+	Observer    ControlFlowObserver
+	pending     *pendingInboundLease
+}
+
+type pendingInboundLease struct {
+	command      transport.ControlCommand
+	returnIntent control.ReturnIntent
 }
 
 func (responder *LeaseResponder) HandleLeaseRequest(
@@ -167,6 +200,7 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 	if command.Kind != transport.ControlLeaseRequest {
 		return errors.New("lease responder requires a lease request")
 	}
+	observeControlFlow(responder.Observer, ControlFlowRequestReceived)
 	return responder.Coordinator.Execute(ctx, func(writer FrameWriter) error {
 		if responder.Runtime.Snapshot().Control.State != control.StateLocal {
 			return errors.New("lease responder requires a local runtime")
@@ -189,35 +223,126 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 		if err := responder.Returns.ArmReturn(returnIntent, command.Edge); err != nil {
 			return err
 		}
+		observeControlFlow(responder.Observer, ControlFlowReturnArmSucceeded)
 		rollbackEntry := func(cause error) error {
 			responder.Returns.DisarmReturn(returnIntent)
 			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), CleanupTimeout)
 			defer cancel()
+			observeControlFlow(responder.Observer, ControlFlowEntryRollbackAttempted)
 			_, rollbackErr := responder.Entry.RollbackEntry(cleanupCtx)
 			return errors.Join(cause, rollbackErr)
 		}
+		observeControlFlow(responder.Observer, ControlFlowEntryPrepareAttempted)
 		if err := responder.Entry.PrepareEntry(ctx, command.Edge); err != nil {
 			return rollbackEntry(err)
 		}
-		if _, err := responder.Runtime.GrantInbound(ctx, control.Event{
-			Kind:      control.EventInboundLeaseGranted,
-			SessionID: command.SessionID,
-			LeaseID:   leaseID,
-		}, command.Epoch, observedAt); err != nil {
+		observeControlFlow(responder.Observer, ControlFlowEntryPrepared)
+		if _, err := responder.Runtime.PrepareInbound(ctx, command.SessionID, leaseID, command.Epoch); err != nil {
 			return rollbackEntry(err)
 		}
-		err = writeControlOrFail(ctx, writer, responder.Runtime, transport.ControlCommand{
+		responder.pending = &pendingInboundLease{
+			command: transport.ControlCommand{
+				Kind: transport.ControlLeaseGrant, SessionID: command.SessionID, LeaseID: leaseID, Epoch: command.Epoch,
+			},
+			returnIntent: returnIntent,
+		}
+		payload, err := transport.EncodeControlPayload(transport.ControlCommand{
 			Kind:      transport.ControlLeaseGrant,
 			SessionID: command.SessionID,
 			LeaseID:   leaseID,
 			Epoch:     command.Epoch,
 		})
-		if err != nil {
-			return rollbackEntry(err)
+		if err == nil {
+			err = writer.WriteFrameContext(ctx, transport.Frame{Kind: transport.MessageControl, Payload: payload})
 		}
-		responder.Entry.CommitEntry()
+		if err != nil {
+			observeControlFlow(responder.Observer, ControlFlowGrantWriteOutcomeUnknown)
+			return responder.abortPendingLocked(ctx, fmt.Errorf("%w: %w", ErrInboundGrantWrite, err))
+		}
+		observeControlFlow(responder.Observer, ControlFlowGrantWriteCompleted)
 		return nil
 	})
+}
+
+func (responder *LeaseResponder) HandleLeaseCommit(
+	ctx context.Context,
+	command transport.ControlCommand,
+	observedAt time.Time,
+) error {
+	if responder == nil || responder.Coordinator == nil || responder.Runtime == nil || responder.Entry == nil || responder.Returns == nil {
+		return errors.New("lease responder is not initialized")
+	}
+	if command.Kind != transport.ControlLeaseCommit {
+		return errors.New("lease responder requires a lease commit")
+	}
+	return responder.Coordinator.Execute(ctx, func(FrameWriter) error {
+		observeControlFlow(responder.Observer, ControlFlowCommitReceived)
+		if !responder.matchesPending(command) {
+			return errors.New("lease commit does not match the prepared inbound lease")
+		}
+		if _, err := responder.Runtime.CommitInbound(ctx, command.SessionID, command.LeaseID, command.Epoch, observedAt); err != nil {
+			return responder.abortPendingLocked(ctx, err)
+		}
+		responder.Entry.CommitEntry()
+		responder.pending = nil
+		observeControlFlow(responder.Observer, ControlFlowEntryCommitted)
+		return nil
+	})
+}
+
+func (responder *LeaseResponder) HandleLeaseAbort(
+	ctx context.Context,
+	command transport.ControlCommand,
+) error {
+	if responder == nil || responder.Coordinator == nil || responder.Runtime == nil || responder.Entry == nil || responder.Returns == nil {
+		return errors.New("lease responder is not initialized")
+	}
+	if command.Kind != transport.ControlLeaseAbort {
+		return errors.New("lease responder requires a lease abort")
+	}
+	return responder.Coordinator.Execute(ctx, func(FrameWriter) error {
+		observeControlFlow(responder.Observer, ControlFlowAbortReceived)
+		if !responder.matchesPending(command) {
+			return errors.New("lease abort does not match the prepared inbound lease")
+		}
+		return responder.abortPendingLocked(ctx, nil)
+	})
+}
+
+func (responder *LeaseResponder) AbortPending(ctx context.Context) error {
+	if responder == nil || responder.Coordinator == nil {
+		return errors.New("lease responder is not initialized")
+	}
+	return responder.Coordinator.Execute(ctx, func(FrameWriter) error {
+		return responder.abortPendingLocked(ctx, nil)
+	})
+}
+
+func (responder *LeaseResponder) matchesPending(command transport.ControlCommand) bool {
+	return responder.pending != nil &&
+		responder.pending.command.SessionID == command.SessionID &&
+		responder.pending.command.LeaseID == command.LeaseID &&
+		responder.pending.command.Epoch == command.Epoch
+}
+
+func (responder *LeaseResponder) abortPendingLocked(ctx context.Context, cause error) error {
+	if responder.pending == nil {
+		return cause
+	}
+	pending := responder.pending
+	responder.pending = nil
+	responder.Returns.DisarmReturn(pending.returnIntent)
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), CleanupTimeout)
+	defer cancel()
+	_, runtimeErr := responder.Runtime.AbortInbound(
+		cleanupCtx,
+		pending.command.SessionID,
+		pending.command.LeaseID,
+		pending.command.Epoch,
+	)
+	observeControlFlow(responder.Observer, ControlFlowEntryRollbackAttempted)
+	_, rollbackErr := responder.Entry.RollbackEntry(cleanupCtx)
+	return errors.Join(cause, runtimeErr, rollbackErr)
 }
 
 func writeControlOrFail(

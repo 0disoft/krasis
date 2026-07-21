@@ -25,8 +25,10 @@ func TestPeerConnectionExchangesFramesAfterAuthentication(t *testing.T) {
 	}
 
 	want := Frame{Kind: MessageInput, Payload: []byte("input")}
+	writeContext, cancelWrite := context.WithTimeout(context.Background(), time.Second)
+	defer cancelWrite()
 	writeDone := make(chan error, 1)
-	go func() { writeDone <- client.WriteFrame(want) }()
+	go func() { writeDone <- client.WriteFrameContext(writeContext, want) }()
 	got, err := server.ReadFrame()
 	if err != nil {
 		t.Fatalf("ReadFrame() error = %v", err)
@@ -101,6 +103,8 @@ func TestPeerConnectionSerializesConcurrentWrites(t *testing.T) {
 	}
 
 	const frameCount = 32
+	writeContext, cancelWrite := context.WithTimeout(context.Background(), time.Second)
+	defer cancelWrite()
 	readDone := make(chan error, 1)
 	go func() {
 		seen := make(map[byte]bool, frameCount)
@@ -124,7 +128,7 @@ func TestPeerConnectionSerializesConcurrentWrites(t *testing.T) {
 		writers.Add(1)
 		go func(value byte) {
 			defer writers.Done()
-			if err := client.WriteFrame(Frame{Kind: MessageInput, Payload: []byte{value}}); err != nil {
+			if err := client.WriteFrameContext(writeContext, Frame{Kind: MessageInput, Payload: []byte{value}}); err != nil {
 				writeErrors <- err
 			}
 		}(byte(index))

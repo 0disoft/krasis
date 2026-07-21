@@ -44,13 +44,85 @@ func TestGenerateCreatesSeparatedUsableIdentitiesWithoutCAKey(t *testing.T) {
 	if _, err := transport.NewClientTLSConfig(connector, roots, "peer.test"); err != nil {
 		t.Fatalf("NewClientTLSConfig() error = %v", err)
 	}
-	listenerPeer, err := LoadTrustedPeer(filepath.Join(output, "listener", "peer.pem"))
+	listenerPeer, err := loadTrustedPeerAt(filepath.Join(output, "listener", "peer.pem"), now)
 	if err != nil || listenerPeer.Role != transport.AuthenticatedPeerConnector {
 		t.Fatalf("listener trusted peer = %+v, %v", listenerPeer, err)
 	}
-	connectorPeer, err := LoadTrustedPeer(filepath.Join(output, "connector", "peer.pem"))
+	connectorPeer, err := loadTrustedPeerAt(filepath.Join(output, "connector", "peer.pem"), now)
 	if err != nil || connectorPeer.Role != transport.AuthenticatedPeerListener {
 		t.Fatalf("connector trusted peer = %+v, %v", connectorPeer, err)
+	}
+}
+
+func TestLoadRejectsIdentityOutsideCertificateValidity(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "bundle")
+	now := time.Date(2026, time.July, 20, 12, 0, 0, 0, time.UTC)
+	if _, err := Generate(output, "peer.test", now); err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+	directory := filepath.Join(output, "listener")
+	caPath := filepath.Join(directory, "ca.pem")
+	certificatePath := filepath.Join(directory, "identity.pem")
+	keyPath := filepath.Join(directory, "identity-key.pem")
+
+	if _, _, err := loadAt(caPath, certificatePath, keyPath, now.Add(-2*time.Minute)); !errors.Is(err, ErrCertificateNotYetValid) {
+		t.Fatalf("loadAt() before validity error = %v, want ErrCertificateNotYetValid", err)
+	}
+	if _, _, err := loadAt(caPath, certificatePath, keyPath, now.Add(Validity+time.Second)); !errors.Is(err, ErrCertificateExpired) {
+		t.Fatalf("loadAt() after validity error = %v, want ErrCertificateExpired", err)
+	}
+	if _, _, err := loadAt(caPath, certificatePath, keyPath, now); err != nil {
+		t.Fatalf("loadAt() during validity error = %v", err)
+	}
+}
+
+func TestValidateIdentityValidThroughRejectsInsufficientLifetime(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "bundle")
+	now := time.Date(2026, time.July, 21, 12, 0, 0, 0, time.UTC)
+	if _, err := Generate(output, "peer.test", now); err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+	directory := filepath.Join(output, "listener")
+	identity, roots, err := loadAt(
+		filepath.Join(directory, "ca.pem"),
+		filepath.Join(directory, "identity.pem"),
+		filepath.Join(directory, "identity-key.pem"),
+		now,
+	)
+	if err != nil {
+		t.Fatalf("loadAt() error = %v", err)
+	}
+	deadline := identity.Leaf.NotAfter
+	if err := ValidateIdentityValidThrough(identity, roots, deadline); err != nil {
+		t.Fatalf("ValidateIdentityValidThrough() at NotAfter error = %v", err)
+	}
+	if err := ValidateIdentityValidThrough(identity, roots, deadline.Add(time.Nanosecond)); !errors.Is(err, ErrCertificateLifetimeInsufficient) {
+		t.Fatalf("ValidateIdentityValidThrough() error = %v, want ErrCertificateLifetimeInsufficient", err)
+	}
+	if err := ValidateIdentityValidThrough(tls.Certificate{}, roots, deadline); err == nil {
+		t.Fatal("ValidateIdentityValidThrough() accepted identity without parsed leaf")
+	}
+	if err := ValidateIdentityValidThrough(identity, nil, deadline); err == nil {
+		t.Fatal("ValidateIdentityValidThrough() accepted identity without roots")
+	}
+	if err := ValidateIdentityValidThrough(identity, roots, time.Time{}); err == nil {
+		t.Fatal("ValidateIdentityValidThrough() accepted zero required time")
+	}
+}
+
+func TestLoadTrustedPeerRejectsCertificateOutsideValidity(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "bundle")
+	now := time.Date(2026, time.July, 20, 12, 0, 0, 0, time.UTC)
+	if _, err := Generate(output, "peer.test", now); err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+	peerPath := filepath.Join(output, "listener", "peer.pem")
+
+	if _, err := loadTrustedPeerAt(peerPath, now.Add(-2*time.Minute)); !errors.Is(err, ErrCertificateNotYetValid) {
+		t.Fatalf("loadTrustedPeerAt() before validity error = %v, want ErrCertificateNotYetValid", err)
+	}
+	if _, err := loadTrustedPeerAt(peerPath, now.Add(Validity+time.Second)); !errors.Is(err, ErrCertificateExpired) {
+		t.Fatalf("loadTrustedPeerAt() after validity error = %v, want ErrCertificateExpired", err)
 	}
 }
 

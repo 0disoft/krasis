@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	ControlPayloadVersion uint8 = 2
+	ControlPayloadVersion uint8 = 3
 	controlHeaderSize           = 8
 	controlEdgeNone       uint8 = 0
 	controlEdgeLeft       uint8 = 1
@@ -27,6 +27,8 @@ const (
 	ControlLeaseGrant   ControlCommandKind = 2
 	ControlLeaseReject  ControlCommandKind = 3
 	ControlLeaseRevoke  ControlCommandKind = 4
+	ControlLeaseCommit  ControlCommandKind = 5
+	ControlLeaseAbort   ControlCommandKind = 6
 )
 
 type ControlCommand struct {
@@ -115,9 +117,9 @@ func (command ControlCommand) Validate() error {
 		if command.LeaseID != "" {
 			return errors.New("lease rejection must not include a lease")
 		}
-	case ControlLeaseGrant, ControlLeaseRevoke:
+	case ControlLeaseGrant, ControlLeaseRevoke, ControlLeaseCommit, ControlLeaseAbort:
 		if command.LeaseID == "" {
-			return errors.New("lease grant or revocation requires a lease")
+			return errors.New("lease grant, commit, abort, or revocation requires a lease")
 		}
 	}
 	if command.Kind != ControlLeaseRequest && command.Edge != "" {
@@ -152,7 +154,7 @@ func decodeControlEdge(value uint8) (control.ScreenEdge, error) {
 
 func (kind ControlCommandKind) Valid() bool {
 	switch kind {
-	case ControlLeaseRequest, ControlLeaseGrant, ControlLeaseReject, ControlLeaseRevoke:
+	case ControlLeaseRequest, ControlLeaseGrant, ControlLeaseReject, ControlLeaseRevoke, ControlLeaseCommit, ControlLeaseAbort:
 		return true
 	default:
 		return false

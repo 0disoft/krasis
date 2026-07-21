@@ -137,12 +137,29 @@ correlate하지 않는 aggregate라 split suppression·send ownership의 근거�
 hook-owned payload를 유지했고 ADR 0023은 gram13 touchpad surface 결과를 근거로 v13 active outbound
 payload owner를 touchpad-capable window로 대체한다. Raw wheel은 계속 진단 evidence로만 센다.
 
-현재 진단 계약은 `krasis.lab.agent-session/v13`, strict checker
-`krasis.lab.agent-session-check/v10`, Phase 0 aggregate `krasis.lab.phase0-check/v10`이다.
+현재 진단 계약은 `krasis.lab.agent-session/v21`, strict checker
+`krasis.lab.agent-session-check/v18`, Phase 0 aggregate `krasis.lab.phase0-check/v17`이다.
 `sourcePipeline.wheel`은 기존 hook/mapping/queue/send counter에 `rawObserved`,
-`activeHookMoves`, `activeHookButtons`, `windowObserved`와 capture/focus lifecycle을 추가한다. 이 값들은 active source session의 독립 aggregate이며
+`activeHookMoves`, `activeHookButtons`, `windowObserved`와 capture/focus lifecycle을 추가한다. focus 복원 실패는
+`focusRestoreApiRejected`와 `focusRestoreVerificationLost`로 나누고 두 원인 합계가
+`focusRestoreFailed`와 일치해야 한다. v21은 v20의 post-hide foreground release outcome을 유지하고
+source queue의 depth·residence·stale discard, destination input의 applied·retired-drained·rejected 합계와
+peer frame-kind dispatch failure를 추가한다. restore failure마다 post-hide foreground release outcome도
+하나 남기며 capture-retained와 thread detach failure만 terminal로 유지한다. 이 값들은 active source session의 독립 aggregate이며
 같은 event나 exact equality를 증명하지 않는다. `rawObserved>0 && sent==0`은
 `raw_wheel_observed_without_forwarding`으로 report를 실패시키는 다음 안전 gate다.
+v15는 v14의 동작을 바꾸지 않고 boundary admission, request/grant/entry, source/capture activation과 local
+connection interrupt 뒤 peer read를 `controlFlow` aggregate로 분리한다. supervisor도 먼저 종료된 goroutine
+component 하나 대신 stable failure triple의 최초값과 전체 분포를 기록한다. stage failure 또는 not-ready
+boundary drop은 strict evidence 실패다.
+v16은 통제된 menu A/B에서 확인한 source capture activation 실패를 request 전 local admission에서 막는다.
+foreground GUI thread가 menu mode이면 `blockedLocalMenu`, mouse capture·pressed input·move/size loop이면 해당
+`blockedLocalInteraction` subtype만 증가하고 remote request와 entry는 만들지 않는다. request가 승인된 뒤에도
+destination은 `LeaseCommit` 전 `INBOUND_PENDING`에 머물며 source 준비 실패의 `LeaseAbort` 또는 EOF에서 cursor를 rollback한다.
+menu query 실패는 fail-closed이며 capture stage failure는 liveness 부족보다 대표 failure code 우선순위가 높다.
+v18은 정상 foreground 전환이 거절되거나 직후 검증을 잃은 경우에만 capture thread와 현재 foreground thread의
+input queue를 잠시 연결하고 `SetForegroundWindow`를 한 번 재시도한다. 성공·실패와 무관하게 즉시 detach하며
+어느 단계든 실패하면 기존 `LeaseAbort`와 destination rollback을 사용한다. 이 fallback은 아직 실제 장비 검증 전이다.
 
 2026-07-16 gram13 `agent-session/v12` 수동 재현에서는 active source pointer move `290`건과 button
 `4`건이 관찰되고 HP15에서 move/click/drag가 동작했지만 hook·합성·Raw wheel과 destination wheel은
@@ -159,6 +176,42 @@ wheel도 `601`이었다. capture activation/deactivation은 `7/7`, focus restore
 injection failure, 양쪽 crash guard remaining은 모두 `0`이었다. 세부 redacted 결과와 남은 gate는
 `docs/experiments/results/2026-07-16-study-pair-v13.md`가 소유한다. 외장 mouse 중복, 세로/가로 분리,
 강제 foreground 이탈과 crash/disconnect/lifecycle 장애는 아직 장비 검증 대기다.
+
+2026-07-17 clean commit `1a25f16b75ff3d6b5c76ca905e36810bdf7ebe24`의 CI artifact로 12회 왕복한
+S-B/S-A 실행은 pointer, button, keyboard와 wheel 전달 및 return을 실제로 확인했다. source/destination
+wheel은 `57/57`, destination entry/return arm은 `12/12`, injection failure와 guard remaining은 `0`이었다.
+다만 source focus 복원 `12`회 중 `11`회만 성공하고 한 번이 기존 `focusRestoreFailed`로 뭉쳐져 report가
+실패했다. 입력 전달 결함과 focus 복원 실패 원인을 섞지 않기 위해 v14에서 API 거절과 verification 경합을
+분리했다. 세부 redacted 결과는 `docs/experiments/results/2026-07-17-study-pair-v13-clean.md`가 소유한다.
+
+같은 날 v14 modified build로 `90s` 동안 반복한 실행은 wheel `155/155`, focus restore `11/11`, destination
+entry/return arm `18/18`을 남겼지만 사용자는 일부 경계 전환이 즉시 되지 않다가 다시 되는 현상을
+관찰했다. source boundary intent `22`, destination entry `18`, capture activation `11`의 차이와 양쪽
+session failure `7`건은 handoff 구간을 의심하게 하지만 v14 aggregate와 `peer-session` component만으로
+인과를 확정할 수 없다. 세부 기록은
+`docs/experiments/results/2026-07-17-study-pair-v14-intermittent.md`, 후속 진단 계약은 ADR 0024가 소유한다.
+
+이후 v15 통제 실행은 gram13 menu 없음에서 capture activation `14/14`, menu 열림에서 `0/8`을 남겼다.
+menu-open 실행은 HP15 entry `8`, input·revoke `0`이었고 source failure 8건이 모두
+`source-capture/capture-activate/activation_failed`였다. 세부 A/B는
+`docs/experiments/results/2026-07-17-study-pair-v15-menu-ab.md`, v16 차단 결정은 ADR 0025가 소유한다.
+
+2026-07-18 v17 two-phase entry 실행은 request, grant apply와 source session activation `8/8` 뒤 capture
+activation `2/8`을 남겼다. 실패 `6`건은 모두 foreground API rejection이었고 source commit/abort `2/6`,
+HP15 commit `2`, abort rollback restored `6/6`으로 half-entry는 발생하지 않았다. v18은 정상
+foreground 경로를 먼저 유지하고 거절 또는 즉시 검증 상실에만 bounded thread-input attach, 단일 retry와
+즉시 detach를 수행한다. 새 동작과 열린 실기 gate는 ADR 0028이 소유한다.
+
+같은 v18 r3 실행에서 foreground activation fallback은 `9/9` 성공했지만 return 뒤 saved-focus 복원은
+`1/10`만 성공했다. 나머지 `9`건은 모두 API rejection으로 source hook과 connection을 종료했고 재연결 중
+boundary intent `2`건이 not-ready로 버려졌다. v19는 정상 focus 복원을 먼저 유지하고 이 거절·검증 상실에만
+saved-focus window thread와 bounded attach, 단일 retry와 즉시 detach를 수행한다. 새 동작과 gate는 ADR 0029가 소유한다.
+
+2026-07-18 v19 실행은 승인된 boundary `19/19`와 foreground fallback `8/8`을 완료했지만 정확한 focus 복원은
+`14/19`, focus fallback은 `3/8`만 성공했다. restore failure `5`건과 연결 재생성 공백의 not-ready boundary
+drop `4`건이 남았다. v20은 정확한 restore 실패와 capture foreground release를 분리해 recovered·unavailable은
+degraded로 유지하고 hidden capture retention과 thread detach failure만 terminal로 처리한다. 세부 결과는
+`docs/experiments/results/2026-07-18-study-pair-v19.md`, 결정과 새 gate는 ADR 0030이 소유한다.
 
 sentinel은 wheel이 아니라 `MOUSEEVENTF_MOVE|MOUSEEVENTF_MOVE_NOCOALESCE` tagged 상대 이동이라
 Raw wheel evidence를 만들지 않는다. 정상 hook은 네 `WM_MOUSEMOVE`를 삼키지만 hook 누락 시 cursor가

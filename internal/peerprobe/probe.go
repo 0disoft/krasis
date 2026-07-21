@@ -240,6 +240,18 @@ func serveSession(ctx context.Context, connection *transport.PeerConnection, res
 		return peer.OutboundIdentity{}, err
 	}
 	result.LeaseRoundTrips++
+	commitFrame, err := connection.ReadFrame()
+	if err != nil {
+		return peer.OutboundIdentity{}, err
+	}
+	if _, err := decodeExactControl(
+		commitFrame,
+		transport.ControlLeaseCommit,
+		peer.OutboundIdentity{SessionID: request.SessionID, Epoch: request.Epoch},
+		probeLeaseID,
+	); err != nil {
+		return peer.OutboundIdentity{}, err
+	}
 
 	inputFrame, err := connection.ReadFrame()
 	if err != nil {
@@ -287,6 +299,15 @@ func requestSession(ctx context.Context, connection *transport.PeerConnection, i
 		return err
 	}
 	result.LeaseRoundTrips++
+	commitPayload, err := transport.EncodeControlPayload(transport.ControlCommand{
+		Kind: transport.ControlLeaseCommit, SessionID: identity.SessionID, LeaseID: grant.LeaseID, Epoch: identity.Epoch,
+	})
+	if err != nil {
+		return err
+	}
+	if err := connection.WriteFrameContext(ctx, transport.Frame{Kind: transport.MessageControl, Payload: commitPayload}); err != nil {
+		return err
+	}
 	envelope := control.InputEnvelope{SessionID: identity.SessionID, Epoch: identity.Epoch, Sequence: 1}
 	inputPayload, err := transport.EncodeInputPayload(envelope, control.InputAction{Kind: control.InputPointerMove, DeltaX: 7, DeltaY: -3})
 	if err != nil {

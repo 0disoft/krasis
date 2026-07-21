@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -47,6 +48,7 @@ type agentSessionArgs struct {
 	rearmDistance int32
 	output        string
 	guardOutput   string
+	stopFile      string
 	liveInput     bool
 }
 
@@ -69,11 +71,17 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 		fmt.Fprintf(stderr, "invalid agent-session guard output: %v\n", err)
 		return exitUsage
 	}
-	_, guardPath, err := resolveAgentSessionOutputPaths(options.output, options.guardOutput)
+	_, guardPath, stopPath, err := resolveAgentSessionPaths(options.output, options.guardOutput, options.stopFile)
 	if err != nil {
-		fmt.Fprintln(stderr, "invalid agent-session guard output path")
+		fmt.Fprintln(stderr, "invalid agent-session output or stop-file path")
 		return exitUsage
 	}
+	sessionContext, closeStopMonitor, err := monitorAgentStopFile(ctx, stopPath)
+	if err != nil {
+		fmt.Fprintln(stderr, "invalid agent-session stop-file path")
+		return exitUsage
+	}
+	defer closeStopMonitor()
 	build := buildinfo.Read()
 	report := lab.AgentSessionReport{
 		SchemaVersion: lab.AgentSessionSchemaVersion, DeviceAlias: options.device,
@@ -125,7 +133,7 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 		fmt.Fprintf(stdout, "Agent session report: %s\n", options.output)
 		return code
 	}
-	processOwner, err = startAgentSessionProcessOwner(ctx)
+	processOwner, err = startAgentSessionProcessOwner(sessionContext)
 	if err != nil {
 		report.FailureCode = "lifecycle_monitor_start_failed"
 		report.StopReason = "failure"
@@ -149,6 +157,11 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 		report.StopReason = "failure"
 		return finish(exitRuntime)
 	}
+	if err := peercredentials.ValidateIdentityValidThrough(identity, roots, time.Now().Add(options.duration)); err != nil {
+		report.FailureCode = "credential_lifetime_insufficient"
+		report.StopReason = "failure"
+		return finish(exitRuntime)
+	}
 	store, err := truststore.New(options.trustStore)
 	if err != nil {
 		report.FailureCode = "trust_store_load_failed"
@@ -161,7 +174,7 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 		report.StopReason = "failure"
 		return finish(exitRuntime)
 	}
-	authorizer, err := newTrustStoreAuthorizer(document)
+	authorizer, err := newReloadingTrustStoreAuthorizerFromDocument(store, document)
 	if err != nil {
 		report.FailureCode = "trust_policy_failed"
 		report.StopReason = "failure"
@@ -234,7 +247,13 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 	}
 	input := newCountingInput(inputAdapter, guard)
 	observer := &agentSessionObserver{}
-	runContext, cancel := context.WithTimeout(processOwner.Context(), options.duration)
+	runDeadline := time.Now().Add(options.duration)
+	if err := peercredentials.ValidateIdentityValidThrough(identity, roots, runDeadline); err != nil {
+		report.FailureCode = "credential_lifetime_insufficient"
+		report.StopReason = "failure"
+		return finish(exitRuntime)
+	}
+	runContext, cancel := context.WithDeadline(processOwner.Context(), runDeadline)
 	defer cancel()
 	sessionConfig := newAgentSessionConfig(options, diagnostics.Display.Left, diagnostics.Display.Width, observer)
 	err = agent.RunSupervisor(runContext, agent.SupervisorConfig{
@@ -248,6 +267,8 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 	report.Liveness = observer.livenessEvidence()
 	report.SourceInput = observer.sourceInputEvidence()
 	report.SourcePipeline = observer.sourcePipelineEvidence()
+	report.ControlFlow = observer.controlFlowEvidence()
+	report.DestinationPipeline = observer.destinationPipelineEvidence()
 	report.DestinationInput = input.evidence()
 	if errors.Is(context.Cause(processOwner.Context()), errCrashGuardStopped) {
 		report.FailureCode = "crash_guard_stopped"
@@ -265,6 +286,14 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 		report.StopReason = "failure"
 		return finish(exitRuntime)
 	}
+	if cause := context.Cause(sessionContext); cause != nil &&
+		!errors.Is(cause, errAgentStopRequested) &&
+		!errors.Is(cause, context.Canceled) &&
+		!errors.Is(cause, context.DeadlineExceeded) {
+		report.FailureCode = "stop_file_monitor_failed"
+		report.StopReason = "failure"
+		return finish(exitRuntime)
+	}
 	switch {
 	case errors.Is(err, wininput.ErrEmergencyRelease):
 		report.Completed = true
@@ -274,7 +303,11 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 		report.Completed = true
 		report.StopReason = "duration_elapsed"
 		return finish(agentSessionEvidenceExit(&report))
-	case errors.Is(err, context.Canceled) && ctx.Err() != nil:
+	case errors.Is(context.Cause(sessionContext), errAgentStopRequested):
+		report.Completed = true
+		report.StopReason = "canceled"
+		return finish(agentSessionEvidenceExit(&report))
+	case errors.Is(err, context.Canceled) && sessionContext.Err() != nil:
 		report.Completed = true
 		report.StopReason = "canceled"
 		return finish(agentSessionEvidenceExit(&report))
@@ -288,6 +321,59 @@ func runAgentSession(ctx context.Context, args []string, stdout, stderr io.Write
 
 func lifecycleFailureCode(event agentlifecycle.Event) string {
 	return "lifecycle_" + string(event)
+}
+
+type trustDocumentSource interface {
+	List() (truststore.Document, error)
+}
+
+type reloadingTrustStoreAuthorizer struct {
+	source trustDocumentSource
+}
+
+func newReloadingTrustStoreAuthorizer(source trustDocumentSource) (*reloadingTrustStoreAuthorizer, error) {
+	if source == nil {
+		return nil, errors.New("trust document source is required")
+	}
+	document, err := source.List()
+	if err != nil {
+		return nil, fmt.Errorf("load trust policy: %w", err)
+	}
+	return newReloadingTrustStoreAuthorizerFromDocument(source, document)
+}
+
+func newReloadingTrustStoreAuthorizerFromDocument(source trustDocumentSource, document truststore.Document) (*reloadingTrustStoreAuthorizer, error) {
+	if source == nil {
+		return nil, errors.New("trust document source is required")
+	}
+	if _, err := newTrustStoreAuthorizer(document); err != nil {
+		return nil, fmt.Errorf("build trust policy: %w", err)
+	}
+	return &reloadingTrustStoreAuthorizer{source: source}, nil
+}
+
+func (authorizer *reloadingTrustStoreAuthorizer) AuthorizeLease(
+	ctx context.Context,
+	peerContext transport.AuthenticatedPeerContext,
+	sessionID,
+	epoch string,
+	observedAt time.Time,
+) (string, bool, error) {
+	if err := ctx.Err(); err != nil {
+		return "", false, err
+	}
+	if authorizer == nil || authorizer.source == nil {
+		return "", false, errors.New("reloading trust store authorizer is not initialized")
+	}
+	document, err := authorizer.source.List()
+	if err != nil {
+		return "", false, fmt.Errorf("reload trust policy: %w", err)
+	}
+	current, err := newTrustStoreAuthorizer(document)
+	if err != nil {
+		return "", false, fmt.Errorf("build reloaded trust policy: %w", err)
+	}
+	return current.AuthorizeLease(ctx, peerContext, sessionID, epoch, observedAt)
 }
 
 func newTrustStoreAuthorizer(document truststore.Document) (*agent.TrustedPeerAuthorizer, error) {
@@ -306,32 +392,46 @@ func newTrustStoreAuthorizer(document truststore.Document) (*agent.TrustedPeerAu
 }
 
 func resolveAgentSessionOutputPaths(report, guard string) (string, string, error) {
+	reportPath, guardPath, _, err := resolveAgentSessionPaths(report, guard, "")
+	return reportPath, guardPath, err
+}
+
+func resolveAgentSessionPaths(report, guard, stop string) (string, string, string, error) {
 	reportPath, err := filepath.Abs(report)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	guardPath, err := filepath.Abs(guard)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	if strings.EqualFold(filepath.Clean(reportPath), filepath.Clean(guardPath)) ||
 		!strings.EqualFold(filepath.Clean(filepath.Dir(reportPath)), filepath.Clean(filepath.Dir(guardPath))) {
-		return "", "", errors.New("agent and guard outputs must be different files in the same directory")
+		return "", "", "", errors.New("agent and guard outputs must be different files in the same directory")
 	}
-	return reportPath, guardPath, nil
+	if stop == "" {
+		return reportPath, guardPath, "", nil
+	}
+	stopPath, err := filepath.Abs(stop)
+	if err != nil {
+		return "", "", "", err
+	}
+	if !strings.EqualFold(filepath.Clean(filepath.Dir(reportPath)), filepath.Clean(filepath.Dir(stopPath))) ||
+		strings.EqualFold(filepath.Clean(reportPath), filepath.Clean(stopPath)) ||
+		strings.EqualFold(filepath.Clean(guardPath), filepath.Clean(stopPath)) {
+		return "", "", "", errors.New("stop file must be a third path in the report directory")
+	}
+	if _, err := os.Lstat(stopPath); err == nil {
+		return "", "", "", errors.New("stop file already exists")
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return "", "", "", err
+	}
+	return reportPath, guardPath, stopPath, nil
 }
 
 func agentSessionEvidenceExit(report *lab.AgentSessionReport) int {
 	if report.Supervisor.ActiveCount == 0 {
 		report.FailureCode = "no_authenticated_session"
-		return exitRuntime
-	}
-	if report.Liveness.HeartbeatsSent < 2 || report.Liveness.HeartbeatsReceived < 2 || report.Liveness.ReceiveGapSamples == 0 {
-		report.FailureCode = "insufficient_liveness_evidence"
-		return exitRuntime
-	}
-	if report.Liveness.MaxReceiveGapMillis <= 0 || report.Liveness.MaxReceiveGapMillis >= report.PeerTimeoutMillis {
-		report.FailureCode = "unsafe_liveness_gap"
 		return exitRuntime
 	}
 	destination := report.DestinationInput
@@ -348,8 +448,50 @@ func agentSessionEvidenceExit(report *lab.AgentSessionReport) int {
 		report.FailureCode = "cursor_rollback_failed"
 		return exitRuntime
 	}
+	destinationActions, destinationActionsValid := destination.CheckedTotalActions()
+	if !destinationActionsValid {
+		report.FailureCode = "invalid_destination_input_evidence"
+		return exitRuntime
+	}
+	sourceActions, sourceActionsValid := report.SourceInput.CheckedTotalActions()
+	if !sourceActionsValid {
+		report.FailureCode = "invalid_source_pipeline_evidence"
+		return exitRuntime
+	}
+	if !report.DestinationPipeline.ValidAgainst(report.DestinationInput) {
+		report.FailureCode = "invalid_destination_pipeline_evidence"
+		return exitRuntime
+	}
+	if report.DestinationPipeline.Rejected > 0 {
+		report.FailureCode = "destination_input_rejected"
+		return exitRuntime
+	}
 	if !report.SourcePipeline.ValidAgainst(report.SourceInput) {
 		report.FailureCode = "invalid_source_pipeline_evidence"
+		return exitRuntime
+	}
+	if !report.ControlFlow.ValidAgainst(report.SourceInput, report.SourcePipeline.Wheel, report.DestinationInput) {
+		report.FailureCode = "invalid_control_flow_evidence"
+		return exitRuntime
+	}
+	if !report.Supervisor.FailureEvidenceValid() {
+		report.FailureCode = "invalid_failure_evidence"
+		return exitRuntime
+	}
+	if report.ControlFlow.StageFailureObserved() {
+		report.FailureCode = "control_flow_failure_observed"
+		return exitRuntime
+	}
+	if report.ControlFlow.BoundaryDropObserved() {
+		report.FailureCode = "boundary_not_ready_drop_observed"
+		return exitRuntime
+	}
+	if report.Liveness.HeartbeatsSent < 2 || report.Liveness.HeartbeatsReceived < 2 || report.Liveness.ReceiveGapSamples == 0 {
+		report.FailureCode = "insufficient_liveness_evidence"
+		return exitRuntime
+	}
+	if report.Liveness.MaxReceiveGapMillis <= 0 || report.Liveness.MaxReceiveGapMillis >= report.PeerTimeoutMillis {
+		report.FailureCode = "unsafe_liveness_gap"
 		return exitRuntime
 	}
 	if report.SourcePipeline.Wheel.RawWheelUnforwarded() {
@@ -358,16 +500,6 @@ func agentSessionEvidenceExit(report *lab.AgentSessionReport) int {
 	}
 	if report.SourcePipeline.Wheel.WindowWheelUnforwarded() {
 		report.FailureCode = "window_wheel_observed_without_forwarding"
-		return exitRuntime
-	}
-	sourceActions, sourceActionsValid := report.SourceInput.CheckedTotalActions()
-	if !sourceActionsValid {
-		report.FailureCode = "invalid_source_pipeline_evidence"
-		return exitRuntime
-	}
-	destinationActions, destinationActionsValid := destination.CheckedTotalActions()
-	if !destinationActionsValid {
-		report.FailureCode = "invalid_destination_input_evidence"
 		return exitRuntime
 	}
 	sourceObserved := report.SourceInput.BoundaryIntents > 0 && sourceActions > 0
@@ -392,6 +524,7 @@ func parseAgentSessionArgs(args []string) (agentSessionArgs, error) {
 		"--ca": &parsed.ca, "--cert": &parsed.cert, "--key": &parsed.key, "--output": &parsed.output,
 		"--trust-store":  &parsed.trustStore,
 		"--guard-output": &parsed.guardOutput,
+		"--stop-file":    &parsed.stopFile,
 	}
 	var edgeValue, durationValue, heartbeatValue, peerTimeoutValue, rearmValue string
 	values["--edge"] = &edgeValue
@@ -505,11 +638,17 @@ func newAgentSessionConfig(options agentSessionArgs, screenLeft, screenWidth int
 	if pipelineObserver, ok := observer.(wininput.SourcePipelineObserver); ok {
 		config.PipelineObserver = pipelineObserver
 	}
+	if controlObserver, ok := observer.(peer.ControlFlowObserver); ok {
+		config.ControlObserver = controlObserver
+	}
+	if destinationObserver, ok := observer.(application.InputDispositionObserver); ok {
+		config.DestinationObserver = destinationObserver
+	}
 	return config
 }
 
 func writeAgentSessionUsage(output io.Writer) {
-	fmt.Fprintln(output, "usage: krasis-lab agent-session listen|connect --device ALIAS --address ADDRESS [--server-name NAME] --ca CA.pem --cert CERT.pem --key KEY.pem --trust-store DIRECTORY --edge LEFT|RIGHT --duration DURATION --heartbeat-interval DURATION --peer-timeout DURATION --output REPORT.json --guard-output GUARD.json [--rearm-distance PIXELS] --allow-live-input")
+	fmt.Fprintln(output, "usage: krasis-lab agent-session listen|connect --device ALIAS --address ADDRESS [--server-name NAME] --ca CA.pem --cert CERT.pem --key KEY.pem --trust-store DIRECTORY --edge LEFT|RIGHT --duration DURATION --heartbeat-interval DURATION --peer-timeout DURATION --output REPORT.json --guard-output GUARD.json [--stop-file PATH] [--rearm-distance PIXELS] --allow-live-input")
 }
 
 type countingInput struct {
@@ -671,16 +810,28 @@ func (input *countingInput) evidence() lab.InputEvidence {
 }
 
 type agentSessionObserver struct {
-	mu                  sync.Mutex
-	rawWheelObserved    atomic.Uint64
-	activeHookMoves     atomic.Uint64
-	activeHookButtons   atomic.Uint64
-	value               lab.SupervisorEvidence
-	liveness            lab.LivenessEvidence
-	sourceInput         lab.SourceInputEvidence
-	sourcePipeline      lab.SourcePipelineEvidence
-	receiveSession      string
-	lastReceiveObserved time.Time
+	mu                            sync.Mutex
+	rawWheelObserved              atomic.Uint64
+	activeHookMoves               atomic.Uint64
+	activeHookButtons             atomic.Uint64
+	sourceQueueEnqueued           atomic.Uint64
+	sourceQueueDequeued           atomic.Uint64
+	sourceQueueDiscardedStale     atomic.Uint64
+	sourceQueueMaxDepth           atomic.Uint64
+	sourceQueueResidenceSamples   atomic.Uint64
+	sourceQueueMaxResidenceMicros atomic.Int64
+	destinationReceived           atomic.Uint64
+	destinationApplied            atomic.Uint64
+	destinationRetiredDrained     atomic.Uint64
+	destinationRejected           atomic.Uint64
+	value                         lab.SupervisorEvidence
+	liveness                      lab.LivenessEvidence
+	sourceInput                   lab.SourceInputEvidence
+	sourcePipeline                lab.SourcePipelineEvidence
+	controlFlow                   lab.ControlFlowEvidence
+	failureCounts                 map[lab.FailureDescriptorEvidence]uint64
+	receiveSession                string
+	lastReceiveObserved           time.Time
 }
 
 func (observer *agentSessionObserver) ObserveSourceAction(action control.InputAction) {
@@ -737,6 +888,42 @@ func (observer *agentSessionObserver) ObserveWheelCaptureDeactivated() {
 	observer.mu.Unlock()
 }
 
+func (observer *agentSessionObserver) ObserveWheelForegroundFallback(result wininput.SourceForegroundFallbackResult) {
+	observer.mu.Lock()
+	observer.sourcePipeline.Wheel.ForegroundFallbackAttempted++
+	switch result {
+	case wininput.SourceForegroundFallbackSucceeded:
+		observer.sourcePipeline.Wheel.ForegroundFallbackSucceeded++
+	case wininput.SourceForegroundFallbackAttachFailed:
+		observer.sourcePipeline.Wheel.ForegroundFallbackAttachFailed++
+	case wininput.SourceForegroundFallbackDetachFailed:
+		observer.sourcePipeline.Wheel.ForegroundFallbackDetachFailed++
+	case wininput.SourceForegroundFallbackAPIRejected:
+		observer.sourcePipeline.Wheel.ForegroundFallbackAPIRejected++
+	case wininput.SourceForegroundFallbackVerificationLost:
+		observer.sourcePipeline.Wheel.ForegroundFallbackVerificationLost++
+	}
+	observer.mu.Unlock()
+}
+
+func (observer *agentSessionObserver) ObserveWheelFocusRestoreFallback(result wininput.SourceFocusRestoreFallbackResult) {
+	observer.mu.Lock()
+	observer.sourcePipeline.Wheel.FocusRestoreFallbackAttempted++
+	switch result {
+	case wininput.SourceFocusRestoreFallbackSucceeded:
+		observer.sourcePipeline.Wheel.FocusRestoreFallbackSucceeded++
+	case wininput.SourceFocusRestoreFallbackAttachFailed:
+		observer.sourcePipeline.Wheel.FocusRestoreFallbackAttachFailed++
+	case wininput.SourceFocusRestoreFallbackDetachFailed:
+		observer.sourcePipeline.Wheel.FocusRestoreFallbackDetachFailed++
+	case wininput.SourceFocusRestoreFallbackAPIRejected:
+		observer.sourcePipeline.Wheel.FocusRestoreFallbackAPIRejected++
+	case wininput.SourceFocusRestoreFallbackVerificationLost:
+		observer.sourcePipeline.Wheel.FocusRestoreFallbackVerificationLost++
+	}
+	observer.mu.Unlock()
+}
+
 func (observer *agentSessionObserver) ObserveWheelFocusRestore(result wininput.SourceFocusRestoreResult) {
 	observer.mu.Lock()
 	switch result {
@@ -744,8 +931,26 @@ func (observer *agentSessionObserver) ObserveWheelFocusRestore(result wininput.S
 		observer.sourcePipeline.Wheel.FocusRestoreSkipped++
 	case wininput.SourceFocusRestoreSucceeded:
 		observer.sourcePipeline.Wheel.FocusRestored++
-	case wininput.SourceFocusRestoreFailed:
+	case wininput.SourceFocusRestoreAPIRejected:
 		observer.sourcePipeline.Wheel.FocusRestoreFailed++
+		observer.sourcePipeline.Wheel.FocusRestoreAPIRejected++
+	case wininput.SourceFocusRestoreVerificationLost:
+		observer.sourcePipeline.Wheel.FocusRestoreFailed++
+		observer.sourcePipeline.Wheel.FocusRestoreVerificationLost++
+	}
+	observer.mu.Unlock()
+}
+
+func (observer *agentSessionObserver) ObserveWheelPostHideFocus(result wininput.SourcePostHideFocusResult) {
+	observer.mu.Lock()
+	observer.sourcePipeline.Wheel.PostHideFocusAttempted++
+	switch result {
+	case wininput.SourcePostHideFocusRecovered:
+		observer.sourcePipeline.Wheel.PostHideFocusRecovered++
+	case wininput.SourcePostHideFocusUnavailable:
+		observer.sourcePipeline.Wheel.PostHideFocusUnavailable++
+	case wininput.SourcePostHideFocusCaptureRetained:
+		observer.sourcePipeline.Wheel.PostHideFocusCaptureRetained++
 	}
 	observer.mu.Unlock()
 }
@@ -782,10 +987,146 @@ func (observer *agentSessionObserver) ObserveWheelQueue(result wininput.SourceQu
 	observer.mu.Unlock()
 }
 
+func (observer *agentSessionObserver) ObserveSourceQueueEnqueued(depth uint64) {
+	observer.sourceQueueEnqueued.Add(1)
+	updateAtomicUint64Max(&observer.sourceQueueMaxDepth, depth)
+}
+
+func (observer *agentSessionObserver) ObserveSourceQueueDequeued(residence time.Duration) {
+	observer.sourceQueueDequeued.Add(1)
+	observer.sourceQueueResidenceSamples.Add(1)
+	micros := residence.Microseconds()
+	updateAtomicInt64Max(&observer.sourceQueueMaxResidenceMicros, micros)
+}
+
+func (observer *agentSessionObserver) ObserveSourceQueueDiscardedStale() {
+	observer.sourceQueueDiscardedStale.Add(1)
+}
+
+func (observer *agentSessionObserver) ObserveDestinationInputReceived() {
+	observer.destinationReceived.Add(1)
+}
+
+func (observer *agentSessionObserver) ObserveDestinationInputDisposition(disposition application.InputDisposition) {
+	switch disposition {
+	case application.InputDispositionApplied:
+		observer.destinationApplied.Add(1)
+	case application.InputDispositionRetiredDrained:
+		observer.destinationRetiredDrained.Add(1)
+	case application.InputDispositionRejected:
+		observer.destinationRejected.Add(1)
+	}
+}
+
+func updateAtomicUint64Max(value *atomic.Uint64, candidate uint64) {
+	for current := value.Load(); candidate > current; current = value.Load() {
+		if value.CompareAndSwap(current, candidate) {
+			return
+		}
+	}
+}
+
+func updateAtomicInt64Max(value *atomic.Int64, candidate int64) {
+	for current := value.Load(); candidate > current; current = value.Load() {
+		if value.CompareAndSwap(current, candidate) {
+			return
+		}
+	}
+}
+
 func (observer *agentSessionObserver) ObserveBoundaryIntent(control.BoundaryIntent) {
 	observer.mu.Lock()
 	observer.sourceInput.BoundaryIntents++
+	observer.controlFlow.Boundary.Queued++
 	observer.mu.Unlock()
+}
+
+func (observer *agentSessionObserver) ObserveControlFlow(event peer.ControlFlowEvent) {
+	observer.mu.Lock()
+	defer observer.mu.Unlock()
+	switch event {
+	case peer.ControlFlowBoundaryAdmitted:
+		observer.controlFlow.Boundary.Admitted++
+	case peer.ControlFlowBoundaryDroppedNotReady:
+		observer.controlFlow.Boundary.DroppedNotReady++
+	case peer.ControlFlowBoundaryBlockedLocalMenu:
+		observer.controlFlow.Boundary.BlockedLocalMenu++
+	case peer.ControlFlowBoundaryBlockedMouseCapture:
+		observer.controlFlow.Boundary.BlockedLocalInteraction++
+		observer.controlFlow.Boundary.BlockedMouseCapture++
+	case peer.ControlFlowBoundaryBlockedPressedInput:
+		observer.controlFlow.Boundary.BlockedLocalInteraction++
+		observer.controlFlow.Boundary.BlockedPressedInput++
+	case peer.ControlFlowBoundaryBlockedMoveSize:
+		observer.controlFlow.Boundary.BlockedLocalInteraction++
+		observer.controlFlow.Boundary.BlockedMoveSize++
+	case peer.ControlFlowBoundaryAdmissionFailed:
+		observer.controlFlow.Boundary.AdmissionFailed++
+	case peer.ControlFlowRequestWriteCompleted:
+		observer.controlFlow.Outbound.RequestWriteCompleted++
+	case peer.ControlFlowRequestWriteOutcomeUnknown:
+		observer.controlFlow.Outbound.RequestWriteOutcomeUnknown++
+	case peer.ControlFlowRequestReceived:
+		observer.controlFlow.Inbound.RequestReceived++
+	case peer.ControlFlowReturnArmSucceeded:
+		observer.controlFlow.Inbound.ReturnArmSucceeded++
+	case peer.ControlFlowEntryPrepareAttempted:
+		observer.controlFlow.Inbound.EntryPrepareAttempted++
+	case peer.ControlFlowEntryPrepared:
+		observer.controlFlow.Inbound.EntryPrepared++
+	case peer.ControlFlowGrantWriteCompleted:
+		observer.controlFlow.Inbound.GrantWriteCompleted++
+	case peer.ControlFlowGrantWriteOutcomeUnknown:
+		observer.controlFlow.Inbound.GrantWriteOutcomeUnknown++
+	case peer.ControlFlowEntryCommitted:
+		observer.controlFlow.Inbound.EntryCommitted++
+	case peer.ControlFlowEntryRollbackAttempted:
+		observer.controlFlow.Inbound.EntryRollbackAttempted++
+	case peer.ControlFlowGrantReceived:
+		observer.controlFlow.Outbound.GrantReceived++
+	case peer.ControlFlowGrantApplySucceeded:
+		observer.controlFlow.Outbound.GrantApplySucceeded++
+	case peer.ControlFlowGrantApplyFailed:
+		observer.controlFlow.Outbound.GrantApplyFailed++
+	case peer.ControlFlowSourceSessionActivationSucceeded:
+		observer.controlFlow.Outbound.SourceSessionActivationSucceeded++
+	case peer.ControlFlowSourceSessionActivationFailed:
+		observer.controlFlow.Outbound.SourceSessionActivationFailed++
+	case peer.ControlFlowCaptureActivationAttempted:
+		observer.controlFlow.Outbound.CaptureActivationAttempted++
+	case peer.ControlFlowCaptureActivationSucceeded:
+		observer.controlFlow.Outbound.CaptureActivationSucceeded++
+	case peer.ControlFlowCaptureActivationFailed:
+		observer.controlFlow.Outbound.CaptureActivationFailed++
+	case peer.ControlFlowCaptureActivationSetupFailed:
+		observer.controlFlow.Outbound.CaptureActivationSetupFailed++
+	case peer.ControlFlowCaptureActivationAPIRejected:
+		observer.controlFlow.Outbound.CaptureActivationAPIRejected++
+	case peer.ControlFlowCaptureActivationVerificationLost:
+		observer.controlFlow.Outbound.CaptureActivationVerificationLost++
+	case peer.ControlFlowCommitWriteCompleted:
+		observer.controlFlow.Outbound.CommitWriteCompleted++
+	case peer.ControlFlowCommitWriteOutcomeUnknown:
+		observer.controlFlow.Outbound.CommitWriteOutcomeUnknown++
+	case peer.ControlFlowAbortWriteCompleted:
+		observer.controlFlow.Outbound.AbortWriteCompleted++
+	case peer.ControlFlowAbortWriteOutcomeUnknown:
+		observer.controlFlow.Outbound.AbortWriteOutcomeUnknown++
+	case peer.ControlFlowCommitReceived:
+		observer.controlFlow.Inbound.CommitReceived++
+	case peer.ControlFlowAbortReceived:
+		observer.controlFlow.Inbound.AbortReceived++
+	case peer.ControlFlowRevokeWriteCompleted:
+		observer.controlFlow.Inbound.RevokeWriteCompleted++
+	case peer.ControlFlowRevokeWriteOutcomeUnknown:
+		observer.controlFlow.Inbound.RevokeWriteOutcomeUnknown++
+	case peer.ControlFlowRevokeReceived:
+		observer.controlFlow.Outbound.RevokeReceived++
+	case peer.ControlFlowLocalConnectionInterrupt:
+		observer.controlFlow.Transport.LocalConnectionInterrupts++
+	case peer.ControlFlowReadAfterLocalInterrupt:
+		observer.controlFlow.Transport.ReadAfterLocalInterrupt++
+	}
 }
 
 func (observer *agentSessionObserver) ObserveHeartbeatSent(_ string, _ time.Time) {
@@ -827,17 +1168,45 @@ func (observer *agentSessionObserver) ObserveSupervisor(snapshot agent.Superviso
 		observer.value.AcquireFailures++
 	case "session":
 		observer.value.SessionFailures++
+		descriptor := lab.FailureDescriptorEvidence{
+			Component: snapshot.FailureComponent,
+			Phase:     snapshot.FailurePhase,
+			Code:      snapshot.FailureCode,
+		}
+		if observer.value.FirstFailure.Component == "" {
+			observer.value.FirstFailure = descriptor
+		}
+		if observer.failureCounts == nil {
+			observer.failureCounts = make(map[lab.FailureDescriptorEvidence]uint64)
+		}
+		observer.failureCounts[descriptor]++
 	case "emergency_release":
 		observer.value.EmergencyStops++
-	}
-	if snapshot.FailureComponent != "" && observer.value.LastFailureComponent == "" {
-		observer.value.LastFailureComponent = snapshot.FailureComponent
 	}
 }
 func (observer *agentSessionObserver) evidence() lab.SupervisorEvidence {
 	observer.mu.Lock()
 	defer observer.mu.Unlock()
-	return observer.value
+	evidence := observer.value
+	evidence.FailureCounts = make([]lab.FailureCountEvidence, 0, len(observer.failureCounts))
+	for descriptor, count := range observer.failureCounts {
+		evidence.FailureCounts = append(evidence.FailureCounts, lab.FailureCountEvidence{
+			FailureDescriptorEvidence: descriptor,
+			Count:                     count,
+		})
+	}
+	sort.Slice(evidence.FailureCounts, func(left, right int) bool {
+		first := evidence.FailureCounts[left]
+		second := evidence.FailureCounts[right]
+		if first.Component != second.Component {
+			return first.Component < second.Component
+		}
+		if first.Phase != second.Phase {
+			return first.Phase < second.Phase
+		}
+		return first.Code < second.Code
+	})
+	return evidence
 }
 
 func (observer *agentSessionObserver) livenessEvidence() lab.LivenessEvidence {
@@ -859,5 +1228,28 @@ func (observer *agentSessionObserver) sourcePipelineEvidence() lab.SourcePipelin
 	evidence.Wheel.RawObserved = observer.rawWheelObserved.Load()
 	evidence.Wheel.ActiveHookMoves = observer.activeHookMoves.Load()
 	evidence.Wheel.ActiveHookButtons = observer.activeHookButtons.Load()
+	evidence.Queue = lab.SourceQueueEvidence{
+		Enqueued:           observer.sourceQueueEnqueued.Load(),
+		Dequeued:           observer.sourceQueueDequeued.Load(),
+		DiscardedStale:     observer.sourceQueueDiscardedStale.Load(),
+		MaxDepth:           observer.sourceQueueMaxDepth.Load(),
+		ResidenceSamples:   observer.sourceQueueResidenceSamples.Load(),
+		MaxResidenceMicros: observer.sourceQueueMaxResidenceMicros.Load(),
+	}
 	return evidence
+}
+
+func (observer *agentSessionObserver) controlFlowEvidence() lab.ControlFlowEvidence {
+	observer.mu.Lock()
+	defer observer.mu.Unlock()
+	return observer.controlFlow
+}
+
+func (observer *agentSessionObserver) destinationPipelineEvidence() lab.DestinationPipelineEvidence {
+	return lab.DestinationPipelineEvidence{
+		Received:       observer.destinationReceived.Load(),
+		Applied:        observer.destinationApplied.Load(),
+		RetiredDrained: observer.destinationRetiredDrained.Load(),
+		Rejected:       observer.destinationRejected.Load(),
+	}
 }

@@ -25,7 +25,7 @@ agent 비정상 종료 뒤 destination의 pressed input을 해제하지만 살�
 - Phase 0 process owner는 lifecycle context, connection source와 crash guard를 한 번만 등록한다.
   종료 시 새 session을 막고 source를 닫은 뒤, supervisor의 bounded cleanup이 끝난 상태에서 crash
   guard를 disarm하고 마지막으로 OS monitor를 닫는다. 중복 Close는 실제 child owner에 한 번만 전달한다.
-- 현재 `krasis.lab.agent-session/v13` report는 monitor 시작·정상 종료, 정규화된 event와 explicit rearm
+- 현재 `krasis.lab.agent-session/v21` report는 monitor 시작·정상 종료, 정규화된 event와 explicit rearm
   필요 여부만 기록한다. session id, window handle, 사용자 이름과 원시 Windows message는 기록하지 않는다.
 - lifecycle event는 안전 종료에는 성공했더라도 Phase 0 pair evidence 성공이 아니다. stable failure
   code와 `stopReason=lifecycle_transition`, exit `1`을 남기며 checker는 해당 report를 거부한다.

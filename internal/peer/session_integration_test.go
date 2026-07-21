@@ -71,6 +71,7 @@ func TestPeerSessionsCompleteOutboundInputAndReturnRevokeRoundTrip(t *testing.T)
 		t.Fatalf("BeginBoundary() error = %v", err)
 	}
 	waitSignal(t, sourceActivation.activated, "source activation after grant")
+	waitRuntimeState(t, destinationRuntime, control.StateInboundActive, "destination commit")
 	if sourceRuntime.Snapshot().Control.State != control.StateOutboundActive {
 		t.Fatalf("source runtime = %s", sourceRuntime.Snapshot())
 	}
@@ -101,6 +102,62 @@ func TestPeerSessionsCompleteOutboundInputAndReturnRevokeRoundTrip(t *testing.T)
 	if destinationRuntime.Snapshot().Control.State != control.StateLocal {
 		t.Fatalf("destination did not converge local: %s", destinationRuntime.Snapshot())
 	}
+}
+
+func TestPeerSessionsAbortPreparedDestinationWhenSourceActivationFails(t *testing.T) {
+	sourceSide, destinationSide := openFramedPipe(t)
+	sourceRuntime := newIntegrationRuntime(t, &integrationInputPort{})
+	destinationRuntime := newIntegrationRuntime(t, &integrationInputPort{})
+	sourceCoordinator := testWriteCoordinator(t, sourceSide)
+	destinationCoordinator := testWriteCoordinator(t, destinationSide)
+	sourceActivation := newIntegrationSourceActivation()
+	sourceActivation.activateErr = errors.New("foreground activation denied")
+	outbound, err := NewOutboundController(sourceCoordinator, sourceRuntime, sourceActivation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rolledBack := make(chan struct{}, 1)
+	entry := integrationCursorEntry{rolledBack: rolledBack}
+	returns := &integrationReturnBoundary{}
+	responder := &LeaseResponder{
+		Coordinator: destinationCoordinator, Runtime: destinationRuntime,
+		Authorizer: staticLeaseAuthorizer{leaseID: "lease-1", accepted: true},
+		Peer:       testAuthenticatedPeer(), Entry: entry, Returns: returns,
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 2)
+	now := func() time.Time { return time.Unix(100, 0) }
+	go func() {
+		done <- RunSessionWithLifecycle(ctx, sourceSide, sourceCoordinator, sourceRuntime, nil, outbound, now)
+	}()
+	go func() {
+		done <- RunSessionWithLifecycle(ctx, destinationSide, destinationCoordinator, destinationRuntime, responder, nil, now)
+	}()
+	t.Cleanup(func() {
+		cancel()
+		_ = sourceSide.Close()
+		_ = destinationSide.Close()
+		for range 2 {
+			select {
+			case <-done:
+			case <-time.After(2 * time.Second):
+				t.Fatal("peer session did not stop")
+			}
+		}
+	})
+
+	if err := outbound.BeginBoundary(
+		ctx,
+		control.BoundaryIntent{Edge: control.ScreenEdgeRight, X: 1919},
+		OutboundIdentity{SessionID: "session-1", Epoch: "epoch-1"},
+	); err != nil {
+		t.Fatal(err)
+	}
+	waitSignal(t, sourceActivation.attempted, "source activation attempt")
+	waitSignal(t, rolledBack, "destination prepared-entry rollback")
+	waitRuntimeState(t, sourceRuntime, control.StateLocal, "source abort convergence")
+	waitRuntimeState(t, destinationRuntime, control.StateLocal, "destination abort convergence")
 }
 
 func TestPeerSessionsReuseOneConnectionForBothDirections(t *testing.T) {
@@ -514,6 +571,18 @@ func waitSignal(t *testing.T, signal <-chan struct{}, name string) {
 	}
 }
 
+func waitRuntimeState(t *testing.T, runtime *application.SessionRuntime, want control.State, name string) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if runtime.Snapshot().Control.State == want {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for %s: %s", name, runtime.Snapshot())
+}
+
 func waitMove(t *testing.T, moves <-chan [2]int32, want [2]int32, destination string) {
 	t.Helper()
 	select {
@@ -565,12 +634,15 @@ func (*integrationInputPort) Wheel(context.Context, int32, int32) error { return
 type integrationSourceActivation struct {
 	mu          sync.Mutex
 	active      bool
+	activateErr error
+	attempted   chan struct{}
 	activated   chan struct{}
 	deactivated chan struct{}
 }
 
 func newIntegrationSourceActivation() *integrationSourceActivation {
 	return &integrationSourceActivation{
+		attempted:   make(chan struct{}, 1),
 		activated:   make(chan struct{}, 1),
 		deactivated: make(chan struct{}, 1),
 	}
@@ -581,6 +653,13 @@ func (source *integrationSourceActivation) Activate() error {
 	defer source.mu.Unlock()
 	if source.active {
 		return errors.New("source already active")
+	}
+	select {
+	case source.attempted <- struct{}{}:
+	default:
+	}
+	if source.activateErr != nil {
+		return source.activateErr
 	}
 	source.active = true
 	source.activated <- struct{}{}
@@ -606,13 +685,29 @@ func (source *integrationSourceActivation) Active() bool {
 	return source.active
 }
 
-type integrationCursorEntry struct{}
+type integrationCursorEntry struct {
+	committed  chan struct{}
+	rolledBack chan struct{}
+}
 
 func (integrationCursorEntry) PrepareEntry(context.Context, control.ScreenEdge) error {
 	return nil
 }
-func (integrationCursorEntry) CommitEntry() {}
-func (integrationCursorEntry) RollbackEntry(context.Context) (application.CursorRollbackOutcome, error) {
+func (entry integrationCursorEntry) CommitEntry() {
+	if entry.committed != nil {
+		select {
+		case entry.committed <- struct{}{}:
+		default:
+		}
+	}
+}
+func (entry integrationCursorEntry) RollbackEntry(context.Context) (application.CursorRollbackOutcome, error) {
+	if entry.rolledBack != nil {
+		select {
+		case entry.rolledBack <- struct{}{}:
+		default:
+		}
+	}
 	return application.CursorRollbackNotRestored, nil
 }
 

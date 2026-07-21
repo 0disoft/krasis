@@ -27,8 +27,8 @@ authority로 남아야 한다.
 - `trust import`는 `peer.pem`을 fingerprint·역할 입력으로 사용하지만 certificate 원문을 store에
   복제하지 않는다. 같은 fingerprint 재등록과 폐기된 fingerprint의 부활은 거부한다.
 - `trust revoke`는 record를 삭제하지 않고 폐기 시각을 기록한다.
-- `agent-session`은 시작 시 document를 strict하게 읽어 immutable grant snapshot을 만들며, 실행 중
-  file 변경을 hot-reload하지 않는다. 다음 process/session 시작에서 새 revision이 적용된다.
+- `agent-session`의 시작 시점 immutable grant snapshot 결정은 ADR 0032가 대체한다. store 형식과
+  mutation 원자성, fingerprint·역할·capability·폐기 record 결정은 이 ADR에 그대로 남는다.
 
 ## 결과
 

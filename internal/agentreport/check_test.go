@@ -75,7 +75,7 @@ func TestCheckRejectsLifecycleTransitionEvidence(t *testing.T) {
 
 func TestCheckRejectsUnknownFields(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "unknown.json")
-	if err := os.WriteFile(path, []byte(`{"schemaVersion":"krasis.lab.agent-session/v13","surprise":true}`), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(`{"schemaVersion":"krasis.lab.agent-session/v21","surprise":true}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	result := Check([]string{path})
@@ -183,7 +183,14 @@ func TestCheckRequiresComplementaryOneWayPairEvidence(t *testing.T) {
 	firstReport.SourceInput = lab.SourceInputEvidence{}
 	secondReport := passingReport("H-B", "connect", "LEFT")
 	secondReport.SourceInput = lab.SourceInputEvidence{}
+	secondReport.SourcePipeline = lab.SourcePipelineEvidence{}
+	secondReport.ControlFlow = lab.ControlFlowEvidence{}
 	secondReport.DestinationInput = lab.InputEvidence{Entries: 1, PointerMoves: 1, ReturnArms: 1}
+	secondReport.DestinationPipeline = lab.DestinationPipelineEvidence{Received: 1, Applied: 1}
+	secondReport.ControlFlow.Inbound = lab.InboundFlowEvidence{
+		RequestReceived: 1, ReturnArmSucceeded: 1, EntryPrepareAttempted: 1, EntryPrepared: 1,
+		GrantWriteCompleted: 1, CommitReceived: 1, EntryCommitted: 1,
+	}
 	first := writeReport(t, directory, "H-A-destination.json", firstReport)
 	second := writeReport(t, directory, "H-B-destination.json", secondReport)
 	result := Check([]string{first, second})
@@ -193,12 +200,24 @@ func TestCheckRequiresComplementaryOneWayPairEvidence(t *testing.T) {
 
 	firstReport = passingReport("H-A", "listen", "RIGHT")
 	firstReport.DestinationInput = lab.InputEvidence{}
+	firstReport.ControlFlow.Inbound = lab.InboundFlowEvidence{}
 	firstReport.SourceInput = lab.SourceInputEvidence{BoundaryIntents: 1, PointerMoves: 1}
 	firstReport.SourcePipeline.Wheel = lab.WheelPipelineEvidence{
 		CaptureActivations: 1, CaptureDeactivations: 1, FocusRestoreSkipped: 1,
 	}
+	firstReport.SourcePipeline.Queue = lab.SourceQueueEvidence{
+		Enqueued: 1, Dequeued: 1, MaxDepth: 1, ResidenceSamples: 1, MaxResidenceMicros: 1,
+	}
+	firstReport.DestinationPipeline = lab.DestinationPipelineEvidence{}
+	firstReport.ControlFlow.Boundary = lab.BoundaryFlowEvidence{Queued: 1, Admitted: 1}
+	firstReport.ControlFlow.Outbound = lab.OutboundFlowEvidence{
+		RequestWriteCompleted: 1, GrantReceived: 1, GrantApplySucceeded: 1,
+		SourceSessionActivationSucceeded: 1, CaptureActivationAttempted: 1, CaptureActivationSucceeded: 1,
+		CommitWriteCompleted: 1,
+	}
 	secondReport = passingReport("H-B", "connect", "LEFT")
 	secondReport.DestinationInput = lab.InputEvidence{}
+	secondReport.DestinationPipeline = lab.DestinationPipelineEvidence{}
 	first = writeReport(t, directory, "H-A-source.json", firstReport)
 	second = writeReport(t, directory, "H-B-source.json", secondReport)
 	result = Check([]string{first, second})
@@ -210,14 +229,31 @@ func TestCheckRequiresComplementaryOneWayPairEvidence(t *testing.T) {
 func TestValidateAllowsIncompleteOppositeDirectionWhenLocalEvidenceIsComplete(t *testing.T) {
 	destination := passingReport("H-A", "listen", "RIGHT")
 	destination.SourceInput.BoundaryIntents = 1
+	destination.ControlFlow.Boundary.Queued = 1
 	if issues := validate(destination); len(issues) != 0 {
 		t.Fatalf("complete destination with partial source issues = %v", issues)
 	}
 
 	source := passingReport("H-B", "connect", "LEFT")
 	source.DestinationInput.Entries = 1
+	source.ControlFlow.Inbound.EntryPrepareAttempted = 1
+	source.ControlFlow.Inbound.EntryPrepared = 1
+	source.ControlFlow.Inbound.GrantWriteCompleted = 1
+	source.ControlFlow.Inbound.CommitReceived = 1
+	source.ControlFlow.Inbound.EntryCommitted = 1
 	if issues := validate(source); len(issues) != 0 {
 		t.Fatalf("complete source with partial destination issues = %v", issues)
+	}
+}
+
+func TestValidateAllowsSafeLocalMenuBlockAfterCompletedSourceInput(t *testing.T) {
+	report := passingReport("H-B", "connect", "LEFT")
+	report.SourceInput.BoundaryIntents = 2
+	report.ControlFlow.Boundary = lab.BoundaryFlowEvidence{
+		Queued: 2, Admitted: 1, BlockedLocalMenu: 1,
+	}
+	if issues := validate(report); len(issues) != 0 {
+		t.Fatalf("local menu block issues = %v", issues)
 	}
 }
 
@@ -232,16 +268,24 @@ func TestValidateRejectsInvalidSourcePipelineEvidenceAndFailureComponent(t *test
 	}
 
 	report.SourceInput.Wheels = 1
+	report.SourcePipeline.Queue = lab.SourceQueueEvidence{
+		Enqueued: 2, Dequeued: 2, MaxDepth: 1, ResidenceSamples: 2, MaxResidenceMicros: 1,
+	}
 	report.SourcePipeline.Wheel.CaptureActivations = 1
 	report.SourcePipeline.Wheel.CaptureDeactivations = 1
 	report.SourcePipeline.Wheel.FocusRestoreSkipped = 1
-	report.Supervisor.LastFailureComponent = "private-error"
+	report.Supervisor.SessionFailures = 1
+	report.Supervisor.FirstFailure = lab.FailureDescriptorEvidence{Component: "private-error", Phase: "runtime", Code: "component_failed"}
+	report.Supervisor.FailureCounts = []lab.FailureCountEvidence{{
+		FailureDescriptorEvidence: report.Supervisor.FirstFailure, Count: 1,
+	}}
 	issues = validate(report)
-	if hasIssue(issues, "invalid_source_pipeline_evidence") || !hasIssue(issues, "invalid_failure_component") {
+	if hasIssue(issues, "invalid_source_pipeline_evidence") || !hasIssue(issues, "invalid_failure_evidence") {
 		t.Fatalf("component issues = %v", issues)
 	}
 
-	report.Supervisor.LastFailureComponent = "peer-liveness"
+	report.Supervisor.FirstFailure = lab.FailureDescriptorEvidence{Component: "liveness", Phase: "heartbeat", Code: "peer_timeout"}
+	report.Supervisor.FailureCounts[0].FailureDescriptorEvidence = report.Supervisor.FirstFailure
 	if issues = validate(report); len(issues) != 0 {
 		t.Fatalf("valid pipeline issues = %v", issues)
 	}
@@ -273,6 +317,43 @@ func TestValidateRejectsWindowWheelWithoutForwardingAndUnsafeCaptureLifecycle(t 
 	}
 }
 
+func TestValidateRejectsUnclassifiedFocusRestoreFailure(t *testing.T) {
+	report := passingReport("H-B", "connect", "LEFT")
+	report.SourcePipeline.Wheel = lab.WheelPipelineEvidence{
+		CaptureActivations: 1, CaptureDeactivations: 1, FocusRestoreFailed: 1,
+	}
+	issues := validate(report)
+	if !hasIssue(issues, "invalid_source_pipeline_evidence") {
+		t.Fatalf("focus restore issues = %v", issues)
+	}
+}
+
+func TestValidateAcceptsDegradedFocusRestoreAfterCaptureRelease(t *testing.T) {
+	report := passingReport("H-B", "connect", "LEFT")
+	report.SourcePipeline.Wheel = lab.WheelPipelineEvidence{
+		CaptureActivations: 1, CaptureDeactivations: 1,
+		FocusRestoreFallbackAttempted: 1, FocusRestoreFallbackAPIRejected: 1,
+		FocusRestoreFailed: 1, FocusRestoreAPIRejected: 1,
+		PostHideFocusAttempted: 1, PostHideFocusRecovered: 1,
+	}
+	if issues := validate(report); len(issues) != 0 {
+		t.Fatalf("degraded focus restore issues = %v", issues)
+	}
+}
+
+func TestValidateRejectsRetainedCaptureAfterFocusRestoreFailure(t *testing.T) {
+	report := passingReport("H-B", "connect", "LEFT")
+	report.SourcePipeline.Wheel = lab.WheelPipelineEvidence{
+		CaptureActivations: 1, CaptureDeactivations: 1,
+		FocusRestoreFallbackAttempted: 1, FocusRestoreFallbackAPIRejected: 1,
+		FocusRestoreFailed: 1, FocusRestoreAPIRejected: 1,
+		PostHideFocusAttempted: 1, PostHideFocusCaptureRetained: 1,
+	}
+	if issues := validate(report); !hasIssue(issues, "invalid_source_pipeline_evidence") {
+		t.Fatalf("retained capture issues = %v", issues)
+	}
+}
+
 func passingReport(alias, role, edge string) lab.AgentSessionReport {
 	report := lab.AgentSessionReport{
 		SchemaVersion: lab.AgentSessionSchemaVersion, DeviceAlias: alias, Role: role, Edge: edge,
@@ -286,10 +367,24 @@ func passingReport(alias, role, edge string) lab.AgentSessionReport {
 	}
 	if role == "listen" {
 		report.DestinationInput = lab.InputEvidence{Entries: 1, PointerMoves: 1, ReturnArms: 1}
+		report.DestinationPipeline = lab.DestinationPipelineEvidence{Received: 1, Applied: 1}
+		report.ControlFlow.Inbound = lab.InboundFlowEvidence{
+			RequestReceived: 1, ReturnArmSucceeded: 1, EntryPrepareAttempted: 1, EntryPrepared: 1,
+			GrantWriteCompleted: 1, CommitReceived: 1, EntryCommitted: 1,
+		}
 	} else {
 		report.SourceInput = lab.SourceInputEvidence{BoundaryIntents: 1, PointerMoves: 1}
 		report.SourcePipeline.Wheel = lab.WheelPipelineEvidence{
 			CaptureActivations: 1, CaptureDeactivations: 1, FocusRestoreSkipped: 1,
+		}
+		report.SourcePipeline.Queue = lab.SourceQueueEvidence{
+			Enqueued: 1, Dequeued: 1, MaxDepth: 1, ResidenceSamples: 1, MaxResidenceMicros: 1,
+		}
+		report.ControlFlow.Boundary = lab.BoundaryFlowEvidence{Queued: 1, Admitted: 1}
+		report.ControlFlow.Outbound = lab.OutboundFlowEvidence{
+			RequestWriteCompleted: 1, GrantReceived: 1, GrantApplySucceeded: 1,
+			SourceSessionActivationSucceeded: 1, CaptureActivationAttempted: 1, CaptureActivationSucceeded: 1,
+			CommitWriteCompleted: 1,
 		}
 	}
 	return report

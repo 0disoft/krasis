@@ -36,13 +36,15 @@ type Connection interface {
 }
 
 type Config struct {
-	Boundary         control.BoundaryConfig
-	QueueCapacity    int
-	Now              peer.ObservationClock
-	Liveness         *LivenessPolicy
-	LivenessObserver peer.LivenessObserver
-	SourceObserver   SourceActivityObserver
-	PipelineObserver wininput.SourcePipelineObserver
+	Boundary            control.BoundaryConfig
+	QueueCapacity       int
+	Now                 peer.ObservationClock
+	Liveness            *LivenessPolicy
+	LivenessObserver    peer.LivenessObserver
+	SourceObserver      SourceActivityObserver
+	PipelineObserver    wininput.SourcePipelineObserver
+	ControlObserver     peer.ControlFlowObserver
+	DestinationObserver application.InputDispositionObserver
 }
 
 type SourceActivityObserver interface {
@@ -70,7 +72,8 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	if err := validate(config, dependencies); err != nil {
 		return Result{}, err
 	}
-	authenticatedPeer, err := dependencies.Connection.AuthenticatedPeer()
+	connection := newSessionConnectionEvidence(dependencies.Connection, config.ControlObserver)
+	authenticatedPeer, err := connection.AuthenticatedPeer()
 	if err != nil {
 		return Result{}, err
 	}
@@ -86,15 +89,19 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	if err != nil {
 		return Result{}, err
 	}
-	runtime, err := application.NewSessionRuntime(dependencies.Effects, dependencies.Input)
+	runtime, err := application.NewSessionRuntimeObserved(
+		dependencies.Effects,
+		dependencies.Input,
+		config.DestinationObserver,
+	)
 	if err != nil {
 		return Result{}, err
 	}
-	coordinator, err := peer.NewSessionWriteCoordinator(dependencies.Connection)
+	coordinator, err := peer.NewSessionWriteCoordinator(connection)
 	if err != nil {
 		return Result{}, err
 	}
-	actionSink, err := peer.NewOutboundActionSink(coordinator, runtime, dependencies.Connection)
+	actionSink, err := peer.NewOutboundActionSink(coordinator, runtime, connection)
 	if err != nil {
 		return Result{}, err
 	}
@@ -116,21 +123,30 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 		if capture == nil {
 			return Result{}, errors.New("source capture provider returned no activation owner")
 		}
-		outboundSource = &combinedSourceActivation{source: source, capture: capture}
+		outboundSource = &combinedSourceActivation{source: source, capture: capture, observer: config.ControlObserver}
 	}
-	outbound, err := peer.NewOutboundController(coordinator, runtime, outboundSource)
+	outbound, err := peer.NewOutboundControllerObserved(coordinator, runtime, outboundSource, config.ControlObserver)
 	if err != nil {
 		return Result{}, err
 	}
-	orchestrator, err := peer.NewBoundaryOrchestrator(outbound, peer.NewRandomOutboundIdentity)
+	var admissionGate peer.BoundaryAdmissionGate
+	if gate, ok := dependencies.Hook.(peer.BoundaryAdmissionGate); ok {
+		admissionGate = gate
+	}
+	orchestrator, err := peer.NewBoundaryOrchestratorObservedWithGate(
+		outbound,
+		peer.NewRandomOutboundIdentity,
+		config.ControlObserver,
+		admissionGate,
+	)
 	if err != nil {
 		return Result{}, err
 	}
 	responder := &peer.LeaseResponder{
 		Coordinator: coordinator, Runtime: runtime, Authorizer: dependencies.Authorizer,
-		Peer: authenticatedPeer, Entry: dependencies.Input, Returns: dependencies.Input,
+		Peer: authenticatedPeer, Entry: dependencies.Input, Returns: dependencies.Input, Observer: config.ControlObserver,
 	}
-	returns, err := peer.NewReturnController(coordinator, runtime, dependencies.Input)
+	returns, err := peer.NewReturnControllerObserved(coordinator, runtime, dependencies.Input, config.ControlObserver)
 	if err != nil {
 		return Result{}, err
 	}
@@ -157,7 +173,7 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 			return returns.Run(runContext, dependencies.Input.ReturnIntents())
 		}},
 		{name: "peer-session", run: func() error {
-			return peer.RunSessionWithLifecycleObserved(runContext, dependencies.Connection, coordinator, runtime, responder, outbound, config.Now, peerTimeout, config.LivenessObserver)
+			return peer.RunSessionWithLifecycleObserved(runContext, connection, coordinator, runtime, responder, outbound, config.Now, peerTimeout, config.LivenessObserver)
 		}},
 	}
 	if config.Liveness != nil {
@@ -204,8 +220,9 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 }
 
 type combinedSourceActivation struct {
-	source  wininput.SourceActivation
-	capture wininput.SourceActivation
+	source   wininput.SourceActivation
+	capture  wininput.SourceActivation
+	observer peer.ControlFlowObserver
 }
 
 func (activation *combinedSourceActivation) Activate() error {
@@ -213,14 +230,33 @@ func (activation *combinedSourceActivation) Activate() error {
 		return errors.New("combined source activation is not initialized")
 	}
 	if err := activation.source.Activate(); err != nil {
-		return err
+		activation.observe(peer.ControlFlowSourceSessionActivationFailed)
+		return fmt.Errorf("%w: %w", ErrSourceSessionActivation, err)
 	}
+	activation.observe(peer.ControlFlowSourceSessionActivationSucceeded)
+	activation.observe(peer.ControlFlowCaptureActivationAttempted)
 	if err := activation.capture.Activate(); err != nil {
 		activation.source.Deactivate()
 		activation.capture.Deactivate()
-		return err
+		activation.observe(peer.ControlFlowCaptureActivationFailed)
+		switch {
+		case errors.Is(err, wininput.ErrSourceCaptureActivationAPIRejected):
+			activation.observe(peer.ControlFlowCaptureActivationAPIRejected)
+		case errors.Is(err, wininput.ErrSourceCaptureActivationVerificationLost):
+			activation.observe(peer.ControlFlowCaptureActivationVerificationLost)
+		default:
+			activation.observe(peer.ControlFlowCaptureActivationSetupFailed)
+		}
+		return fmt.Errorf("%w: %w", ErrSourceCaptureActivation, err)
 	}
+	activation.observe(peer.ControlFlowCaptureActivationSucceeded)
 	return nil
+}
+
+func (activation *combinedSourceActivation) observe(event peer.ControlFlowEvent) {
+	if activation != nil && activation.observer != nil {
+		activation.observer.ObserveControlFlow(event)
+	}
 }
 
 func (activation *combinedSourceActivation) Deactivate() {

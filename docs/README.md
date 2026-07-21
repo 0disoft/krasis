@@ -13,6 +13,7 @@
 - Desktop installer source: docs/desktop/installers.md
 - Desktop auto-update source: docs/desktop/auto-update.md
 - Desktop local data source: docs/desktop/local-data.md
+- Phase 0 desktop launcher source: docs/desktop/phase-0-launcher.md
 - Desktop OS support source: docs/desktop/os-support.md
 - CLI command contract source: docs/cli/command-contract.md
 - CLI config source: docs/cli/configuration.md
@@ -20,3 +21,7 @@
 - Phase 0 Windows input feasibility plan: docs/experiments/phase-0-windows-input-feasibility.md
 - Phase 0 device probe runbook: docs/experiments/device-probe-runbook.md
 - Phase 0 redacted hardware result: docs/experiments/results/2026-07-16-study-pair-v13.md
+- Phase 0 foreground fallback decision: docs/adr/0028-bounded-foreground-thread-attach-fallback.md
+- Phase 0 focus restore fallback decision: docs/adr/0029-bounded-focus-restore-thread-attach-fallback.md
+- Phase 0 degraded focus release decision: docs/adr/0030-degraded-focus-restore-does-not-terminate-session.md
+- Phase 0 v19 focus restore hardware result: docs/experiments/results/2026-07-18-study-pair-v19.md

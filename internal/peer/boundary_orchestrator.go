@@ -24,19 +24,65 @@ type BoundaryBeginner interface {
 	BeginBoundary(context.Context, control.BoundaryIntent, OutboundIdentity) error
 }
 
+type BoundaryAdmissionDecision uint8
+
+const (
+	BoundaryAdmissionAllowed BoundaryAdmissionDecision = iota + 1
+	BoundaryAdmissionBlockedLocalMenu
+	BoundaryAdmissionBlockedMouseCapture
+	BoundaryAdmissionBlockedPressedInput
+	BoundaryAdmissionBlockedMoveSize
+)
+
+func (decision BoundaryAdmissionDecision) Valid() bool {
+	switch decision {
+	case BoundaryAdmissionAllowed,
+		BoundaryAdmissionBlockedLocalMenu,
+		BoundaryAdmissionBlockedMouseCapture,
+		BoundaryAdmissionBlockedPressedInput,
+		BoundaryAdmissionBlockedMoveSize:
+		return true
+	default:
+		return false
+	}
+}
+
+type BoundaryAdmissionGate interface {
+	AdmitBoundary(context.Context, control.BoundaryIntent) (BoundaryAdmissionDecision, error)
+}
+
 type BoundaryOrchestrator struct {
 	beginner BoundaryBeginner
 	identity OutboundIdentityFactory
+	observer ControlFlowObserver
+	gate     BoundaryAdmissionGate
 }
 
 func NewBoundaryOrchestrator(
 	beginner BoundaryBeginner,
 	identity OutboundIdentityFactory,
 ) (*BoundaryOrchestrator, error) {
+	return NewBoundaryOrchestratorObserved(beginner, identity, nil)
+}
+
+func NewBoundaryOrchestratorObserved(
+	beginner BoundaryBeginner,
+	identity OutboundIdentityFactory,
+	observer ControlFlowObserver,
+) (*BoundaryOrchestrator, error) {
+	return NewBoundaryOrchestratorObservedWithGate(beginner, identity, observer, nil)
+}
+
+func NewBoundaryOrchestratorObservedWithGate(
+	beginner BoundaryBeginner,
+	identity OutboundIdentityFactory,
+	observer ControlFlowObserver,
+	gate BoundaryAdmissionGate,
+) (*BoundaryOrchestrator, error) {
 	if beginner == nil || identity == nil {
 		return nil, errors.New("boundary beginner and identity factory are required")
 	}
-	return &BoundaryOrchestrator{beginner: beginner, identity: identity}, nil
+	return &BoundaryOrchestrator{beginner: beginner, identity: identity, observer: observer, gate: gate}, nil
 }
 
 func (orchestrator *BoundaryOrchestrator) Run(
@@ -58,18 +104,51 @@ func (orchestrator *BoundaryOrchestrator) Run(
 				return nil
 			}
 			if !orchestrator.beginner.Ready() {
+				observeControlFlow(orchestrator.observer, ControlFlowBoundaryDroppedNotReady)
 				continue
+			}
+			if orchestrator.gate != nil {
+				decision, err := orchestrator.gate.AdmitBoundary(ctx, intent)
+				if err != nil {
+					if ctx.Err() != nil && (errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
+						return ctx.Err()
+					}
+					observeControlFlow(orchestrator.observer, ControlFlowBoundaryAdmissionFailed)
+					return err
+				}
+				if !decision.Valid() {
+					observeControlFlow(orchestrator.observer, ControlFlowBoundaryAdmissionFailed)
+					return errors.New("boundary admission gate returned an invalid decision")
+				}
+				switch decision {
+				case BoundaryAdmissionBlockedLocalMenu:
+					observeControlFlow(orchestrator.observer, ControlFlowBoundaryBlockedLocalMenu)
+					continue
+				case BoundaryAdmissionBlockedMouseCapture:
+					observeControlFlow(orchestrator.observer, ControlFlowBoundaryBlockedMouseCapture)
+					continue
+				case BoundaryAdmissionBlockedPressedInput:
+					observeControlFlow(orchestrator.observer, ControlFlowBoundaryBlockedPressedInput)
+					continue
+				case BoundaryAdmissionBlockedMoveSize:
+					observeControlFlow(orchestrator.observer, ControlFlowBoundaryBlockedMoveSize)
+					continue
+				}
 			}
 			identity, err := orchestrator.identity()
 			if err != nil {
+				observeControlFlow(orchestrator.observer, ControlFlowBoundaryAdmissionFailed)
 				return err
 			}
 			if err := orchestrator.beginner.BeginBoundary(ctx, intent, identity); err != nil {
 				if errors.Is(err, ErrOutboundNotReady) {
+					observeControlFlow(orchestrator.observer, ControlFlowBoundaryDroppedNotReady)
 					continue
 				}
+				observeControlFlow(orchestrator.observer, ControlFlowBoundaryAdmissionFailed)
 				return err
 			}
+			observeControlFlow(orchestrator.observer, ControlFlowBoundaryAdmitted)
 		}
 	}
 }

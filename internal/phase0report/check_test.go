@@ -113,10 +113,24 @@ func writeAgent(t *testing.T, directory, alias, role, edge, build string, durati
 	}
 	if role == "listen" {
 		report.DestinationInput = lab.InputEvidence{Entries: 1, PointerMoves: 1, ReturnArms: 1}
+		report.DestinationPipeline = lab.DestinationPipelineEvidence{Received: 1, Applied: 1}
+		report.ControlFlow.Inbound = lab.InboundFlowEvidence{
+			RequestReceived: 1, ReturnArmSucceeded: 1, EntryPrepareAttempted: 1, EntryPrepared: 1,
+			GrantWriteCompleted: 1, CommitReceived: 1, EntryCommitted: 1,
+		}
 	} else {
 		report.SourceInput = lab.SourceInputEvidence{BoundaryIntents: 1, PointerMoves: 1}
 		report.SourcePipeline.Wheel = lab.WheelPipelineEvidence{
 			CaptureActivations: 1, CaptureDeactivations: 1, FocusRestoreSkipped: 1,
+		}
+		report.SourcePipeline.Queue = lab.SourceQueueEvidence{
+			Enqueued: 1, Dequeued: 1, MaxDepth: 1, ResidenceSamples: 1, MaxResidenceMicros: 1,
+		}
+		report.ControlFlow.Boundary = lab.BoundaryFlowEvidence{Queued: 1, Admitted: 1}
+		report.ControlFlow.Outbound = lab.OutboundFlowEvidence{
+			RequestWriteCompleted: 1, GrantReceived: 1, GrantApplySucceeded: 1,
+			SourceSessionActivationSucceeded: 1, CaptureActivationAttempted: 1, CaptureActivationSucceeded: 1,
+			CommitWriteCompleted: 1,
 		}
 	}
 	path := filepath.Join(directory, alias+"-agent.json")

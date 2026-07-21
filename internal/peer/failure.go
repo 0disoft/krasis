@@ -11,6 +11,25 @@ import (
 
 const CleanupTimeout = 2 * time.Second
 
+var (
+	ErrOutboundBegin               = errors.New("outbound boundary admission failed")
+	ErrOutboundRequestWrite        = errors.New("outbound lease request write outcome is unknown")
+	ErrOutboundGrantApply          = errors.New("outbound lease grant apply failed")
+	ErrInboundGrantWrite           = errors.New("inbound lease grant write outcome is unknown")
+	ErrInboundRevokeWrite          = errors.New("inbound lease revoke write outcome is unknown")
+	ErrPeerReadAfterLocalInterrupt = errors.New("peer read failed after local connection interrupt")
+	ErrPeerRemoteEOF               = errors.New("peer closed the connection")
+	ErrPeerFrameTruncated          = errors.New("peer frame was truncated")
+	ErrPeerReadFailure             = errors.New("peer read failed")
+	ErrSourceSessionInterrupted    = errors.New("source session interrupted the connection")
+)
+
+type localInterruptState interface {
+	LocalInterruptObserved() bool
+	LocalInterruptCause() error
+	ObserveReadAfterLocalInterrupt()
+}
+
 func failRuntime(ctx context.Context, runtime *application.SessionRuntime, cause error) error {
 	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), CleanupTimeout)
 	defer cancel()

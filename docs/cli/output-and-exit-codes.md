@@ -238,7 +238,9 @@ exit `1`, 잘못된 별칭·duration·output은 report 없이 exit `2`, API 미�
 - session ID, epoch와 lease ID
 - pointer 좌표, key 또는 button 값
 
-정상 완료는 TLS 1.3 mTLS와 `krasis/1` ALPN으로 인증된 새 connection 두 개가 각각 lease, input envelope, revoke round trip을 완료했다는 뜻이다. 인증서 load, listen/connect, 인증 또는 session 단계가 실패하면 부분 report를 저장하고 exit `1`로 종료한다.
+정상 완료는 TLS 1.3 mTLS와 `krasis/1` ALPN으로 인증된 새 connection 두 개가 각각 lease grant/commit,
+input envelope, revoke round trip을 완료했다는 뜻이다. 인증서 load, listen/connect, 인증 또는 session 단계가
+실패하면 부분 report를 저장하고 exit `1`로 종료한다.
 
 ## `peer-credentials`
 
@@ -277,7 +279,7 @@ certificate body, private key, 주소와 operational session 식별자는 저장
 
 ## `agent-session`
 
-- schema: `krasis.lab.agent-session/v13`
+- schema: `krasis.lab.agent-session/v21`
 - 출력: `--output`으로 지정한 단일 JSON file
 
 필드:
@@ -288,7 +290,8 @@ certificate body, private key, 주소와 operational session 식별자는 저장
 - crash guard의 시작 여부와 남은 token을 해제한 정상 종료 여부
 - 같은 directory에서 strict 검증할 guard report basename
 - supervisor의 final state, active 횟수, acquire/session failure 횟수와 emergency stop 횟수
-- 마지막 session failure component의 stable 이름
+- supervisor의 최초 session failure를 나타내는 stable `firstFailure` triple과 같은 triple별
+  `failureCounts`. triple은 중복될 수 없고 count 합은 `sessionFailures`와 같아야 한다.
 - 성공한 heartbeat 송수신 횟수, 같은 session 내부 receive gap sample 수와 최대 gap millisecond
 - source의 queued boundary intent와 성공적으로 전송한 key/button down/up, pointer move, wheel 누적 개수
 - `sourcePipeline.wheel`의 기존 `hookObserved`, `synthesizedObserved`, `mapped`, `queueAccepted`,
@@ -298,6 +301,25 @@ certificate body, private key, 주소와 operational session 식별자는 저장
   `activeHookButtons`
 - active touchpad-capable capture window의 legacy wheel을 세는 `windowObserved`, capture
   activation/deactivation과 `focusRestoreSkipped`, `focusRestored`, `focusRestoreFailed`
+- 첫 foreground 전환 실패 뒤 bounded fallback의 `foregroundFallbackAttempted`와 정확히 하나의 outcome인
+  `foregroundFallbackSucceeded`, `foregroundFallbackAttachFailed`, `foregroundFallbackDetachFailed`,
+  `foregroundFallbackApiRejected`, `foregroundFallbackVerificationLost`
+- 첫 saved-focus 복원 실패 뒤 bounded fallback의 `focusRestoreFallbackAttempted`와 정확히 하나의 outcome인
+  `focusRestoreFallbackSucceeded`, `focusRestoreFallbackAttachFailed`, `focusRestoreFallbackDetachFailed`,
+  `focusRestoreFallbackApiRejected`, `focusRestoreFallbackVerificationLost`
+- capture activation 실패 합계를 원인별로 나눈 `captureActivationSetupFailed`,
+  `captureActivationApiRejected`, `captureActivationVerificationLost`
+- focus 복원 실패 합계를 원인별로 나눈 `focusRestoreApiRejected`,
+  `focusRestoreVerificationLost`. 두 값의 합은 반드시 `focusRestoreFailed`와 같아야 한다.
+- 정확한 focus 복원 실패 뒤 capture window를 숨긴 결과를 세는 `postHideFocusAttempted`와 정확히 하나의
+  outcome인 `postHideFocusRecovered`, `postHideFocusUnavailable`, `postHideFocusCaptureRetained`
+- `controlFlow.boundary`의 queued, admitted, not-ready drop, `blockedLocalMenu`, `blockedLocalInteraction`,
+  `blockedMouseCapture`, `blockedPressedInput`, `blockedMoveSize`와 admission failure
+- `controlFlow.outbound`의 request write, grant receive/apply, source session/capture activation,
+  commit/abort write와 revoke receive 단계별 성공·실패·outcome-unknown aggregate
+- `controlFlow.inbound`의 request receive, return arm, `entryPrepareAttempted`, 성공한 `entryPrepared`,
+  grant write, commit/abort receive, entry commit/rollback 시도와 revoke write aggregate
+- `controlFlow.transport`의 local connection interrupt와 그 뒤 peer read wake-up aggregate
 - destination의 entry, key/button down/up, pointer move, wheel과 return arm 누적 개수
 - 입력 주입 실패의 `notApplied`, `partiallyApplied`, `outcomeUnknown`, `unclassified` 누적 개수
 - cursor rollback의 `attempted`, `restored`, `notRestored`, `failed` 누적 개수
@@ -307,6 +329,7 @@ stable failure code:
 - `diagnose_failed`
 - `multiple_monitors_unsupported`
 - `credential_load_failed`
+- `credential_lifetime_insufficient`
 - `trust_store_load_failed`
 - `trust_policy_failed`
 - `tls_config_failed`
@@ -331,6 +354,7 @@ stable failure code:
 - `lifecycle_shutdown`
 - `lifecycle_display_change`
 - `agent_session_failed`
+- `stop_file_monitor_failed`
 - `no_authenticated_session`
 - `no_input_activity_observed`
 - `insufficient_liveness_evidence`
@@ -340,6 +364,10 @@ stable failure code:
 - `cursor_rollback_failed`
 - `invalid_destination_input_evidence`
 - `invalid_source_pipeline_evidence`
+- `invalid_control_flow_evidence`
+- `invalid_failure_evidence`
+- `control_flow_failure_observed`
+- `boundary_not_ready_drop_observed`
 - `raw_wheel_observed_without_forwarding`
 - `window_wheel_observed_without_forwarding`
 
@@ -347,17 +375,42 @@ stable failure code:
 `failure` 중 하나다. lifecycle transition은 cleanup 뒤에도 explicit rearm을 요구하므로 exit `1`이고
 pair evidence가 아니다. 긴급 해제는 exit `0`이지만 증거가 통과했다는 뜻은 아니다. raw runtime
 error는 주소나 입력 정보가 섞일 수 있으므로 terminal에 복제하지 않고 stable failure code와
-redacted report만 남긴다. `lastFailureComponent`는 `source-session`, `source-hook`,
-`boundary-orchestrator`, `return-controller`, `peer-session`, `peer-liveness`, `unknown`만 허용한다.
+redacted report만 남긴다. failure triple은 source/capture activation, outbound state transition,
+semantic request/grant/commit/abort/revoke write, local interrupt 뒤 read, remote EOF·truncated frame·일반 I/O,
+heartbeat timeout과 기존 runtime component fallback만 허용한다. raw error 문자열이나 연결·session
+식별자는 기록하지 않는다.
+`controlFlow`는 단계별 aggregate이며 per-generation trace가 아니다. queued boundary는 admitted,
+not-ready drop, local menu block, local interaction block 또는 admission failure로 분류되고, admitted request와
+grant apply·source/capture activation·commit/abort write, inbound entry prepare 시도·commit/rollback의 합계 관계가
+기존 source/destination evidence와 맞아야 한다. stage failure나
+not-ready drop은 valid counter여도 clean pair evidence가 아니므로 별도 stable failure code를 남긴다.
+`blockedLocalMenu`와 `blockedLocalInteraction`은 request 전 안전 차단이라 자체로 report failure가 아니다.
+`blockedLocalInteraction`은 mouse capture, pressed input과 move/size subtype의 합과 같아야 한다. 구조적으로 유효한 stage
+failure는 liveness 부족보다 대표 `failureCode` 우선순위가 높다.
 wheel evidence counter는 독립 aggregate라 같은 OS event의 Raw/hook/window 상관관계나 counter 간 exact equality를
 표현하지 않는다. `rawObserved`는 진단 evidence일 뿐 Raw Input의 suppression·mapping·send ownership이 아니다.
 active outbound payload owner는 capture window의 legacy wheel이다. capture lifecycle과 focus 분류가 불완전하거나
-focus 복원이 실패하면 `invalid_source_pipeline_evidence`다. `rawObserved>0` 또는 `windowObserved>0`인데
+focus 실패 합계·원인·post-hide 결과가 일치하지 않으면 `invalid_source_pipeline_evidence`다.
+`focusRestoreApiRejected`는 `SetForegroundWindow`가 거절한 경우이고,
+`focusRestoreVerificationLost`는 호출 성공 직후 저장한 foreground owner가 확인되지 않은 경합이다.
+capture activation의 같은 두 field는 source capture window를 처음 foreground로 만드는 단계의 API 거부와
+검증 상실이고, 나머지 position·registration 실패는 `captureActivationSetupFailed`다. foreground fallback은
+정상 경로가 실패한 경우에만 정확히 한 번 시도하며 다섯 outcome의 합은 attempted와 같아야 한다. fallback
+success는 capture activation success보다 클 수 없고 attach/detach/retry failure는 capture activation failure를
+초과할 수 없다. attach와 detach 오류는 supervisor에서 각각
+`source-capture/capture-activate/thread_attach_failed`,
+`source-capture/capture-activate/thread_detach_failed`로 분류한다.
+focus restore fallback도 다섯 outcome의 합이 attempted와 같아야 한다. 성공은 최종 `focusRestored`를
+초과할 수 없고 네 failure outcome 합은 최종 `focusRestoreFailed`와 같아야 한다. 정확한 restore failure는 post-hide outcome으로
+모두 보존돼야 하며 recovered와 unavailable은 non-terminal degraded return이다. capture-retained는
+`source-capture/focus-release/capture_retained`, thread detach 실패는 기존
+`source-capture/focus-restore/thread_detach_failed` terminal 오류다.
+`rawObserved>0` 또는 `windowObserved>0`인데
 `sent==0`이면 report는 `passed=false`와 해당 unforwarded failure code를 남긴다.
 
 ## `agent-session-check --json`
 
-- schema: `krasis.lab.agent-session-check/v10`
+- schema: `krasis.lab.agent-session-check/v18`
 - 출력: 두 file의 basename 기반 요약, 전체 `valid`, `pairPassed`와 stable issue code
 
 pair issue code:
@@ -382,9 +435,10 @@ consistency, crash guard, `unsafe_destination_input_evidence`, `invalid_cursor_r
 `unsafe_cursor_rollback_evidence`, `incomplete_source_evidence`, `incomplete_destination_evidence`,
 `missing_input_activity_evidence`, `invalid_source_input_evidence`,
 `invalid_destination_input_evidence`, `invalid_injection_failure_evidence`,
-`invalid_source_pipeline_evidence`,
-`raw_wheel_observed_without_forwarding`, `window_wheel_observed_without_forwarding`, `invalid_failure_component`가
-포함된다. file 결과는 aggregate `sourceInput`, `sourcePipeline`과 `destinationInput`을
+`invalid_source_pipeline_evidence`, `invalid_control_flow_evidence`, `invalid_failure_evidence`,
+`control_flow_failure_observed`, `boundary_not_ready_drop_observed`,
+`raw_wheel_observed_without_forwarding`, `window_wheel_observed_without_forwarding`이 포함된다. file 결과는
+aggregate `sourceInput`, `sourcePipeline`, `controlFlow`와 `destinationInput`을
 포함하지만 token code와 pointer 좌표는 포함하지 않는다. 각 file은 source 또는 destination 증거 하나로
 valid할 수 있고, pair 전체에는 최소 한 file의 source 증거와 최소 한 file의 destination 증거가 있어야 한다.
 두 file이 모두 strict valid하고 pair issue가 없을 때만 exit `0`이다.
@@ -401,7 +455,7 @@ checker output 모두에 없다.
 
 ## `phase0-check --json`
 
-- schema: `krasis.lab.phase0-check/v10`
+- schema: `krasis.lab.phase0-check/v17`
 - 출력: home/study pair checker 결과, 네 recovery checker 결과, 전체 `passed`와 issue
 
 stable issue에는 pair cardinality/pass/alias, cross-location build/duration/heartbeat interval/peer timeout, recovery cardinality,

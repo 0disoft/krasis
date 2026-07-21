@@ -18,6 +18,10 @@ param(
 
     [Parameter()]
     [ValidateNotNullOrEmpty()]
+    [string]$LauncherPath = (Join-Path (Split-Path -Parent $PSScriptRoot) 'build/krasis-launcher.exe'),
+
+    [Parameter()]
+    [ValidateNotNullOrEmpty()]
     [string]$OutputPath = (Join-Path (Split-Path -Parent $PSScriptRoot) 'dist/krasis-probe-kit-windows-amd64.zip')
 )
 
@@ -27,6 +31,9 @@ $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 if (-not (Test-Path -LiteralPath $BinaryPath -PathType Leaf)) {
     throw "Probe binary not found: $BinaryPath"
+}
+if (-not (Test-Path -LiteralPath $LauncherPath -PathType Leaf)) {
+    throw "Launcher binary not found: $LauncherPath"
 }
 if (Test-Path -LiteralPath $OutputPath) {
     throw "Package output already exists: $OutputPath"
@@ -40,6 +47,7 @@ $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
 try {
     $null = New-Item -ItemType Directory -Path $stagingRoot
     Copy-Item -LiteralPath $BinaryPath -Destination (Join-Path $stagingRoot 'krasis-lab.exe')
+    Copy-Item -LiteralPath $LauncherPath -Destination (Join-Path $stagingRoot 'krasis-launcher.exe')
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'collect-probe.ps1') -Destination $stagingRoot
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'check-phase0.ps1') -Destination $stagingRoot
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'verify-kit.ps1') -Destination $stagingRoot
@@ -59,6 +67,7 @@ try {
 
     $checksumFiles = @(
         'krasis-lab.exe'
+        'krasis-launcher.exe'
         'collect-probe.ps1'
         'check-phase0.ps1'
         'verify-kit.ps1'

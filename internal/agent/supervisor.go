@@ -80,6 +80,8 @@ type SupervisorSnapshot struct {
 	RetryAfter       time.Duration
 	FailureKind      string
 	FailureComponent string
+	FailurePhase     string
+	FailureCode      string
 }
 
 type BackoffPolicy struct {
@@ -233,9 +235,12 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 		if err != nil {
 			return err
 		}
+		failure := DescribeSessionFailure(sessionErr)
 		if err := transition(SupervisorSessionFailed, SupervisorSnapshot{
 			Attempt: attempt, RetryAfter: delay, FailureKind: "session",
-			FailureComponent: SessionFailureComponent(sessionErr),
+			FailureComponent: failure.Component,
+			FailurePhase:     failure.Phase,
+			FailureCode:      failure.Code,
 		}); err != nil {
 			return err
 		}

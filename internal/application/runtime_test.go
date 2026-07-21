@@ -322,7 +322,11 @@ func TestSessionRuntimeRevokesExactLocalReturn(t *testing.T) {
 
 func TestSessionRuntimeDrainsOrderedInputAfterLocalReturnWithoutInjection(t *testing.T) {
 	port := &recordingInputPort{}
-	runtime := newTestRuntime(t, port)
+	observer := &recordingInputDispositionObserver{}
+	runtime, err := NewSessionRuntimeObserved(noopEffectExecutor{}, port, observer)
+	if err != nil {
+		t.Fatalf("NewSessionRuntimeObserved() error = %v", err)
+	}
 	grantInbound(t, runtime, time.Unix(100, 0))
 	first := control.InputEnvelope{SessionID: "session-1", Epoch: "epoch-1", Sequence: 1}
 	if err := runtime.HandleInputAction(context.Background(), first, control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}); err != nil {
@@ -341,6 +345,9 @@ func TestSessionRuntimeDrainsOrderedInputAfterLocalReturnWithoutInjection(t *tes
 	wrong := control.InputEnvelope{SessionID: "session-other", Epoch: "epoch-1", Sequence: 3}
 	if err := runtime.HandleInputAction(context.Background(), wrong, control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}); !errors.Is(err, control.ErrStaleSession) {
 		t.Fatalf("HandleInputAction(wrong retired session) error = %v", err)
+	}
+	if observer.received != 3 || observer.applied != 1 || observer.retiredDrained != 1 || observer.rejected != 1 {
+		t.Fatalf("input dispositions = %+v", observer)
 	}
 }
 
@@ -437,6 +444,28 @@ func newTestRuntime(t *testing.T, port InputPort) *SessionRuntime {
 		t.Fatalf("NewSessionRuntime() error = %v", err)
 	}
 	return runtime
+}
+
+type recordingInputDispositionObserver struct {
+	received       uint64
+	applied        uint64
+	retiredDrained uint64
+	rejected       uint64
+}
+
+func (observer *recordingInputDispositionObserver) ObserveDestinationInputReceived() {
+	observer.received++
+}
+
+func (observer *recordingInputDispositionObserver) ObserveDestinationInputDisposition(disposition InputDisposition) {
+	switch disposition {
+	case InputDispositionApplied:
+		observer.applied++
+	case InputDispositionRetiredDrained:
+		observer.retiredDrained++
+	case InputDispositionRejected:
+		observer.rejected++
+	}
 }
 
 func grantInbound(t *testing.T, runtime *SessionRuntime, observedAt time.Time) {

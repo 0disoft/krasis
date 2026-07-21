@@ -33,9 +33,11 @@ const (
 )
 
 var (
-	procSetWindowPosSourceCapture = user32.NewProc("SetWindowPos")
-	procIsWindowSourceCapture     = user32.NewProc("IsWindow")
-	sourceWheelCaptureShowWindow  = func(window uintptr, command uintptr) {
+	procSetWindowPosSourceCapture      = user32.NewProc("SetWindowPos")
+	procIsWindowSourceCapture          = user32.NewProc("IsWindow")
+	procAttachThreadInputSourceCapture = user32.NewProc("AttachThreadInput")
+	procGetWindowThreadIDSourceCapture = user32.NewProc("GetWindowThreadProcessId")
+	sourceWheelCaptureShowWindow       = func(window uintptr, command uintptr) {
 		procShowWindowTouchpad.Call(window, command)
 	}
 	sourceWheelCaptureGetForeground = func() uintptr {
@@ -48,6 +50,36 @@ var (
 			return touchpadWin32Error("SetForegroundWindow(source wheel capture)", foregroundErr)
 		}
 		return nil
+	}
+	sourceWheelCaptureCurrentThread = func() uint32 {
+		thread, _, _ := procGetCurrentThreadID.Call()
+		return uint32(thread)
+	}
+	sourceWheelCaptureWindowThread = func(window uintptr) (uint32, error) {
+		thread, _, callErr := procGetWindowThreadIDSourceCapture.Call(window, 0)
+		if thread != 0 {
+			return uint32(thread), nil
+		}
+		if callErr == syscall.Errno(0) {
+			return 0, errors.New("GetWindowThreadProcessId returned no extended error")
+		}
+		return 0, callErr
+	}
+	sourceWheelCaptureAttachThreads = func(sourceThread, targetThread uint32, attach bool) error {
+		value := uintptr(0)
+		if attach {
+			value = 1
+		}
+		attached, _, callErr := procAttachThreadInputSourceCapture.Call(
+			uintptr(sourceThread), uintptr(targetThread), value,
+		)
+		if attached != 0 {
+			return nil
+		}
+		if callErr == syscall.Errno(0) {
+			return errors.New("AttachThreadInput returned no extended error")
+		}
+		return callErr
 	}
 	sourceWheelCaptureIsWindow = func(window uintptr) bool {
 		valid, _, _ := procIsWindowSourceCapture.Call(window)
@@ -64,12 +96,44 @@ var (
 		}
 		return nil
 	}
+	sourceWheelCaptureSetPosition = func(window uintptr, x, y int32) error {
+		topmost := ^uintptr(0)
+		positioned, _, positionErr := procSetWindowPosSourceCapture.Call(
+			window, topmost, uintptr(x), uintptr(y), sourceWheelCaptureWidth, sourceWheelCaptureHeight, swpNoActivate,
+		)
+		if positioned == 0 {
+			return touchpadWin32Error("SetWindowPos(source wheel capture)", positionErr)
+		}
+		return nil
+	}
 
 	sourceWheelCaptureClassSequence atomic.Uint64
 	sourceWheelCaptureTimeout       = sourceWheelCaptureCallTimeout
 )
 
-var errSourceWheelCaptureInactive = errors.New("source wheel capture received input outside an active source session")
+var (
+	errSourceWheelCaptureInactive              = errors.New("source wheel capture received input outside an active source session")
+	ErrSourceCaptureActivationSetup            = errors.New("source capture activation setup failed")
+	ErrSourceCaptureActivationAPIRejected      = errors.New("source capture foreground activation was rejected")
+	ErrSourceCaptureActivationVerificationLost = errors.New("source capture foreground activation lost verification")
+	ErrSourceCaptureThreadAttachFailed         = errors.New("source capture foreground thread attach failed")
+	ErrSourceCaptureThreadDetachFailed         = errors.New("source capture foreground thread detach failed")
+	ErrSourceFocusRestoreAPIRejected           = errors.New("source focus restore was rejected")
+	ErrSourceFocusRestoreVerificationLost      = errors.New("source focus restore lost verification")
+	ErrSourceFocusRestoreThreadAttachFailed    = errors.New("source focus restore thread attach failed")
+	ErrSourceFocusRestoreThreadDetachFailed    = errors.New("source focus restore thread detach failed")
+	ErrSourceFocusReleaseCaptureRetained       = errors.New("source capture window retained foreground after hide")
+)
+
+type foregroundThreadFallbackResult uint8
+
+const (
+	foregroundThreadFallbackSucceeded foregroundThreadFallbackResult = iota + 1
+	foregroundThreadFallbackAttachFailed
+	foregroundThreadFallbackDetachFailed
+	foregroundThreadFallbackAPIRejected
+	foregroundThreadFallbackVerificationLost
+)
 
 type sourceWheelCapture struct {
 	observer SourcePipelineObserver
@@ -400,36 +464,113 @@ func (current *sourceWheelCaptureRun) activateWindow() error {
 	}
 	position, err := cursorPosition()
 	if err != nil {
-		return fmt.Errorf("position source wheel capture: %w", err)
+		return fmt.Errorf("%w: position source wheel capture: %v", ErrSourceCaptureActivationSetup, err)
 	}
 	current.savedFocus = sourceWheelCaptureGetForeground()
 	x, y := sourceWheelCapturePosition(position)
-	topmost := ^uintptr(0)
-	if positioned, _, positionErr := procSetWindowPosSourceCapture.Call(
-		current.window, topmost, uintptr(x), uintptr(y), sourceWheelCaptureWidth, sourceWheelCaptureHeight, swpNoActivate,
-	); positioned == 0 {
-		return touchpadWin32Error("SetWindowPos(source wheel capture)", positionErr)
+	if positionErr := sourceWheelCaptureSetPosition(current.window, x, y); positionErr != nil {
+		return fmt.Errorf("%w: %v", ErrSourceCaptureActivationSetup, positionErr)
 	}
 	if registerErr := sourceWheelCaptureRegisterWindow(current.registerProc, current.window, true); registerErr != nil {
 		sourceWheelCaptureShowWindow(current.window, swHide)
-		return touchpadWin32Error("RegisterTouchpadCapableWindow(source TRUE)", registerErr)
+		return fmt.Errorf("%w: %v", ErrSourceCaptureActivationSetup, touchpadWin32Error("RegisterTouchpadCapableWindow(source TRUE)", registerErr))
 	}
 	current.registered = true
 	sourceWheelCaptureShowWindow(current.window, swShow)
 	procUpdateWindowTouchpad.Call(current.window)
-	if foregroundErr := sourceWheelCaptureSetForeground(current.window); foregroundErr != nil {
-		cleanupErr := current.deactivateWindow()
-		return errors.Join(foregroundErr, cleanupErr)
+	foregroundErr := sourceWheelCaptureSetForeground(current.window)
+	verificationLost := foregroundErr == nil && sourceWheelCaptureGetForeground() != current.window
+	if foregroundErr != nil || verificationLost {
+		fallbackResult, fallbackErr := current.activateForegroundFallback()
+		if current.observer != nil {
+			current.observer.ObserveWheelForegroundFallback(fallbackResult)
+		}
+		if fallbackErr == nil {
+			foregroundErr = nil
+			verificationLost = false
+		} else {
+			cleanupErr := current.deactivateWindow()
+			if foregroundErr != nil {
+				return errors.Join(
+					fmt.Errorf("%w: %v", ErrSourceCaptureActivationAPIRejected, foregroundErr),
+					fallbackErr,
+					cleanupErr,
+				)
+			}
+			return errors.Join(ErrSourceCaptureActivationVerificationLost, fallbackErr, cleanupErr)
+		}
 	}
-	if sourceWheelCaptureGetForeground() != current.window {
+	if foregroundErr != nil {
 		cleanupErr := current.deactivateWindow()
-		return errors.Join(errors.New("source wheel capture did not become foreground"), cleanupErr)
+		return errors.Join(fmt.Errorf("%w: %v", ErrSourceCaptureActivationAPIRejected, foregroundErr), cleanupErr)
+	}
+	if verificationLost || sourceWheelCaptureGetForeground() != current.window {
+		cleanupErr := current.deactivateWindow()
+		return errors.Join(ErrSourceCaptureActivationVerificationLost, cleanupErr)
 	}
 	current.active.Store(true)
 	if current.observer != nil {
 		current.observer.ObserveWheelCaptureActivated()
 	}
 	return nil
+}
+
+func (current *sourceWheelCaptureRun) activateForegroundFallback() (SourceForegroundFallbackResult, error) {
+	foreground := sourceWheelCaptureGetForeground()
+	if foreground == 0 || foreground == current.window {
+		return SourceForegroundFallbackAttachFailed, errors.Join(
+			ErrSourceCaptureThreadAttachFailed,
+			errors.New("foreground thread is unavailable for capture fallback"),
+		)
+	}
+	result, err := current.setForegroundWithThreadAttach(current.window, foreground)
+	switch result {
+	case foregroundThreadFallbackSucceeded:
+		return SourceForegroundFallbackSucceeded, nil
+	case foregroundThreadFallbackAttachFailed:
+		return SourceForegroundFallbackAttachFailed, errors.Join(ErrSourceCaptureThreadAttachFailed, err)
+	case foregroundThreadFallbackDetachFailed:
+		return SourceForegroundFallbackDetachFailed, errors.Join(ErrSourceCaptureThreadDetachFailed, err)
+	case foregroundThreadFallbackAPIRejected:
+		return SourceForegroundFallbackAPIRejected, errors.Join(ErrSourceCaptureActivationAPIRejected, err)
+	case foregroundThreadFallbackVerificationLost:
+		return SourceForegroundFallbackVerificationLost, errors.Join(ErrSourceCaptureActivationVerificationLost, err)
+	default:
+		return SourceForegroundFallbackAttachFailed, errors.Join(
+			ErrSourceCaptureThreadAttachFailed,
+			errors.New("source capture foreground fallback returned an invalid result"),
+		)
+	}
+}
+
+func (current *sourceWheelCaptureRun) setForegroundWithThreadAttach(targetWindow, peerWindow uintptr) (foregroundThreadFallbackResult, error) {
+	if targetWindow == 0 || peerWindow == 0 {
+		return foregroundThreadFallbackAttachFailed, errors.New("foreground fallback window is unavailable")
+	}
+	sourceThread := sourceWheelCaptureCurrentThread()
+	peerThread, err := sourceWheelCaptureWindowThread(peerWindow)
+	if err != nil || sourceThread == 0 || peerThread == 0 || sourceThread == peerThread {
+		return foregroundThreadFallbackAttachFailed, errors.Join(
+			err,
+			errors.New("source and peer thread identities cannot be attached"),
+		)
+	}
+	if err := sourceWheelCaptureAttachThreads(sourceThread, peerThread, true); err != nil {
+		return foregroundThreadFallbackAttachFailed, err
+	}
+	foregroundErr := sourceWheelCaptureSetForeground(targetWindow)
+	verified := foregroundErr == nil && sourceWheelCaptureGetForeground() == targetWindow
+	detachErr := sourceWheelCaptureAttachThreads(sourceThread, peerThread, false)
+	if detachErr != nil {
+		return foregroundThreadFallbackDetachFailed, errors.Join(detachErr, foregroundErr)
+	}
+	if foregroundErr != nil {
+		return foregroundThreadFallbackAPIRejected, foregroundErr
+	}
+	if !verified {
+		return foregroundThreadFallbackVerificationLost, errors.New("foreground fallback target was not verified")
+	}
+	return foregroundThreadFallbackSucceeded, nil
 }
 
 func (current *sourceWheelCaptureRun) deactivateWindow() error {
@@ -457,7 +598,29 @@ func (current *sourceWheelCaptureRun) deactivateWindow() error {
 		current.observer.ObserveWheelFocusRestore(restoreResult)
 	}
 	current.savedFocus = 0
-	return errors.Join(cleanupErr, restoreErr)
+	if restoreErr == nil || !wasActive {
+		return errors.Join(cleanupErr, restoreErr)
+	}
+	postHideResult, postHideErr := current.verifyPostHideFocusRelease()
+	if current.observer != nil {
+		current.observer.ObserveWheelPostHideFocus(postHideResult)
+	}
+	if errors.Is(restoreErr, ErrSourceFocusRestoreThreadDetachFailed) || postHideErr != nil {
+		return errors.Join(cleanupErr, restoreErr, postHideErr)
+	}
+	return cleanupErr
+}
+
+func (current *sourceWheelCaptureRun) verifyPostHideFocusRelease() (SourcePostHideFocusResult, error) {
+	foreground := sourceWheelCaptureGetForeground()
+	switch foreground {
+	case current.window:
+		return SourcePostHideFocusCaptureRetained, ErrSourceFocusReleaseCaptureRetained
+	case 0:
+		return SourcePostHideFocusUnavailable, nil
+	default:
+		return SourcePostHideFocusRecovered, nil
+	}
 }
 
 func (current *sourceWheelCaptureRun) restoreFocus() (SourceFocusRestoreResult, error) {
@@ -470,13 +633,46 @@ func (current *sourceWheelCaptureRun) restoreFocus() (SourceFocusRestoreResult, 
 	if !sourceWheelCaptureIsWindow(current.savedFocus) {
 		return SourceFocusRestoreSkipped, nil
 	}
-	if restoreErr := sourceWheelCaptureSetForeground(current.savedFocus); restoreErr != nil {
-		return SourceFocusRestoreFailed, fmt.Errorf("restore source focus: %w", restoreErr)
-	}
-	if sourceWheelCaptureGetForeground() != current.savedFocus {
-		return SourceFocusRestoreFailed, errors.New("source foreground window was not restored")
+	restoreErr := sourceWheelCaptureSetForeground(current.savedFocus)
+	verificationLost := restoreErr == nil && sourceWheelCaptureGetForeground() != current.savedFocus
+	if restoreErr != nil || verificationLost {
+		fallbackResult, fallbackErr := current.restoreFocusFallback()
+		if current.observer != nil {
+			current.observer.ObserveWheelFocusRestoreFallback(fallbackResult)
+		}
+		if fallbackErr == nil {
+			return SourceFocusRestoreSucceeded, nil
+		}
+		if restoreErr != nil {
+			return SourceFocusRestoreAPIRejected, errors.Join(
+				fmt.Errorf("%w: %v", ErrSourceFocusRestoreAPIRejected, restoreErr),
+				fallbackErr,
+			)
+		}
+		return SourceFocusRestoreVerificationLost, errors.Join(ErrSourceFocusRestoreVerificationLost, fallbackErr)
 	}
 	return SourceFocusRestoreSucceeded, nil
+}
+
+func (current *sourceWheelCaptureRun) restoreFocusFallback() (SourceFocusRestoreFallbackResult, error) {
+	result, err := current.setForegroundWithThreadAttach(current.savedFocus, current.savedFocus)
+	switch result {
+	case foregroundThreadFallbackSucceeded:
+		return SourceFocusRestoreFallbackSucceeded, nil
+	case foregroundThreadFallbackAttachFailed:
+		return SourceFocusRestoreFallbackAttachFailed, errors.Join(ErrSourceFocusRestoreThreadAttachFailed, err)
+	case foregroundThreadFallbackDetachFailed:
+		return SourceFocusRestoreFallbackDetachFailed, errors.Join(ErrSourceFocusRestoreThreadDetachFailed, err)
+	case foregroundThreadFallbackAPIRejected:
+		return SourceFocusRestoreFallbackAPIRejected, errors.Join(ErrSourceFocusRestoreAPIRejected, err)
+	case foregroundThreadFallbackVerificationLost:
+		return SourceFocusRestoreFallbackVerificationLost, errors.Join(ErrSourceFocusRestoreVerificationLost, err)
+	default:
+		return SourceFocusRestoreFallbackAttachFailed, errors.Join(
+			ErrSourceFocusRestoreThreadAttachFailed,
+			errors.New("source focus restore fallback returned an invalid result"),
+		)
+	}
 }
 
 func (current *sourceWheelCaptureRun) routeWheel(message uint32, wParam uintptr) {

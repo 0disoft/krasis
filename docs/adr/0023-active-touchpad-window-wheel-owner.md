@@ -3,7 +3,7 @@
 - 상태: Accepted
 - 책임자: cherr
 - 범위: Phase 0 Windows source wheel 전달과 foreground lifecycle
-- 관계: ADR 0013의 상시 hook-owned wheel을 active outbound 구간에 한해 대체하고, ADR 0022의 진단 결과를 production-shaped lab 경로로 승격한다
+- 관계: ADR 0013의 상시 hook-owned wheel을 active outbound 구간에 한해 대체하고, ADR 0022의 진단 결과를 production-shaped lab 경로로 승격한다. foreground 거절 fallback은 ADR 0028이 소유한다.
 
 ## 맥락
 
@@ -54,20 +54,32 @@ Windows 11은 touchpad-capable window가 두 손가락 gesture의 `WM_POINTER`�
 
 ## evidence 계약
 
-`krasis.lab.agent-session/v13`의 `sourcePipeline.wheel`은 기존 counter에 다음을 추가한다.
+현재 `krasis.lab.agent-session/v21`의 `sourcePipeline.wheel`은 v14에서 확정한 다음 counter를 유지하고,
+ADR 0028의 bounded foreground activation fallback, ADR 0029의 focus restore fallback과 ADR 0030의
+post-hide focus release outcome을 추가한다.
 
 - `windowObserved`: active capture window에서 받은 vertical/horizontal legacy wheel 수
 - `captureActivations`, `captureDeactivations`: 성공한 capture lifecycle 수
 - `focusRestoreSkipped`, `focusRestored`, `focusRestoreFailed`: 성공한 activation의 deactivation별 focus 결과.
+- `focusRestoreApiRejected`, `focusRestoreVerificationLost`: 실패 합계를 각각 `SetForegroundWindow` 거절과
+  호출 성공 직후 저장한 foreground owner가 확인되지 않은 경합으로 나눈 원인별 counter.
   foreground 획득 전에 실패한 activation의 cleanup은 이 lifecycle counter에 섞지 않는다.
+- `foregroundFallbackAttempted`와 성공·attach 실패·detach 실패·재시도 API 거절·재검증 상실 counter:
+  정상 foreground 경로가 실패했을 때만 수행한 ADR 0028 fallback의 단일 outcome.
+- `focusRestoreFallbackAttempted`와 같은 다섯 outcome: 정상 saved-focus 복원이 실패했을 때만 수행한
+  ADR 0029 fallback의 단일 outcome.
+- `postHideFocusAttempted`와 recovered·unavailable·capture-retained outcome: 정확한 restore failure 뒤
+  capture window를 숨긴 결과. ADR 0030에 따라 앞의 두 결과는 degraded, capture-retained는 unsafe다.
 
 `mapped`는 hook physical/synthesized와 window observation 합계보다 클 수 없다. clean report는 capture
-activation/deactivation 수가 같고, 모든 deactivation의 focus 결과가 정확히 하나로 분류되며
-`focusRestoreFailed=0`이어야 한다. `windowObserved>0 && sent=0`은
+activation/deactivation 수가 같고, 모든 deactivation의 focus 결과가 정확히 하나로 분류돼야 한다.
+`focusRestoreApiRejected+focusRestoreVerificationLost=focusRestoreFailed`이고 restore failure는 post-hide outcome으로
+모두 보존돼야 한다. capture-retained 또는 thread detach failure가 없어야 한다. `windowObserved>0 && sent=0`은
 `window_wheel_observed_without_forwarding`으로 실패한다.
 
-strict pair checker는 `krasis.lab.agent-session-check/v10`, Phase 0 aggregate는
-`krasis.lab.phase0-check/v10`이다.
+strict pair checker는 `krasis.lab.agent-session-check/v18`, Phase 0 aggregate는
+`krasis.lab.phase0-check/v17`이다. v15가 추가한 boundary handoff와 failure origin evidence는 ADR 0024,
+v16 local menu admission은 ADR 0025가 소유하며 wheel owner와 focus 복원 정책은 바꾸지 않는다.
 
 ## 결과
 
@@ -79,6 +91,11 @@ source의 `windowObserved`, `queueAccepted`, `sent`와 destination `wheels`가 �
 activation/deactivation은 `7/7`, focus restore failure와 injection failure는 `0`이었다. 양쪽 crash
 guard도 clean disarm과 remaining `0`을 남겼다. redacted 실행 기록은
 `docs/experiments/results/2026-07-16-study-pair-v13.md`에 있다.
+
+2026-07-17 같은 pair의 clean commit artifact로 12회 왕복한 실행은 destination entry/return arm `12/12`,
+source/destination wheel `57/57`과 안전한 guard 종료를 남겼지만 focus 복원 한 번이 실패했다. v13은 이
+한 건을 원인 없는 `focusRestoreFailed`로만 남겼다. v14는 안전 정책을 완화하지 않고 API 거절과 호출 후
+verification 경합을 분리해 다음 실제 장비 실행이 정책 판단에 필요한 원인을 남기게 한다.
 
 capture window는 foreground를 가져가므로 Phase 0에서 눈에 보이는 작은 edge surface가 생길 수 있다.
 원격 제어 중 source의 일반 application focus를 유지하는 제품 UX는 아직 확정하지 않는다. Wails 설정 UI,
@@ -94,17 +111,20 @@ tray, installer와 자동 시작은 이 ADR 범위 밖이다.
 - foreground 전환 실패를 무시하고 session 유지: touchpad scroll이 local application에 남는 기존 결함을
   성공으로 가장하므로 기각한다.
 - `AttachThreadInput`으로 강제 foreground 탈취: thread input queue 결합과 복원 실패 위험이 커 Phase 0에
-  도입하지 않는다.
+  일반 경로와 session 전체 결합에는 도입하지 않는다. 2026-07-18 v17에서 정상 interaction 중에도
+  foreground API 거절이 `6/8` 발생한 뒤 ADR 0028이 단일 retry와 즉시 detach로 범위를 제한한 fallback만
+  실험적으로 허용했다.
 
 ## 검증 gate
 
 - gram13 touchpad vertical/horizontal scroll이 HP15에서 각각 동작하고 gram13 local window에는 남지 않는다.
 - gram13에 연결한 일반 mouse wheel 한 notch가 HP15에서 한 번만 적용된다.
 - source report에서 `captureActivations>=1`, `captureActivations=captureDeactivations`, focus 결과 합계가
-  deactivation과 같고 `focusRestoreFailed=0`이어야 한다.
+  deactivation과 같아야 한다. restore failure가 있으면 post-hide outcome으로 모두 분류되고
+  capture-retained와 thread detach failure가 없어야 한다.
 - touchpad 또는 mouse wheel 구간에서 `windowObserved`, `mapped`, `queueAccepted`, `sent`가 모두 양수이고
   destination `wheels`도 양수여야 한다.
-- return 뒤 이전 source focus가 복원되거나 안전하게 skipped로 분류되고 capture surface가 사라져야 한다.
+- return 뒤 이전 source focus가 복원·skipped되거나 post-hide release로 degraded 분류되고 capture surface가 사라져야 한다.
 - active 중 다른 창으로 전환하면 session이 source-hook failure로 종료되고 양쪽이 `LOCAL`로 수렴해야 한다.
 - 강제 종료와 peer disconnect 뒤 capture window, touchpad registration과 suppression이 남지 않아야 한다.
 

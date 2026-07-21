@@ -4,7 +4,8 @@
 - 책임자: cherr
 - 범위: Phase 0 `agent-session` report, supervisor와 strict checker
 
-후속 결정: queue 거절 사유 분류와 return 경합 수정은 ADR 0015가 소유한다.
+후속 결정: queue 거절 사유 분류와 return 경합 수정은 ADR 0015가 소유한다. v15의 구조화된
+failure origin과 control-flow 단계 evidence는 ADR 0024가 `lastFailureComponent` 계약을 대체한다.
 
 ## 맥락
 

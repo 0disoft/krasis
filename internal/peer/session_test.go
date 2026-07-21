@@ -279,8 +279,20 @@ func TestRunSessionFailsSafeOnMalformedFramePayload(t *testing.T) {
 	if !errors.Is(err, transport.ErrInvalidInputPayload) {
 		t.Fatalf("RunSession() error = %v, want ErrInvalidInputPayload", err)
 	}
+	if !errors.Is(err, ErrPeerInputDispatch) {
+		t.Fatalf("RunSession() error = %v, want input dispatch classification", err)
+	}
 	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal {
 		t.Fatalf("runtime did not fail safe: %s", snapshot)
+	}
+}
+
+func TestRunSessionClassifiesControlDispatchFailure(t *testing.T) {
+	runtime, _ := newInboundRuntime(t)
+	connection := &scriptedConnection{frames: []transport.Frame{{Kind: transport.MessageControl, Payload: []byte{1}}}}
+	err := RunSession(context.Background(), connection, runtime, nil, fixedClock(time.Unix(101, 0)))
+	if !errors.Is(err, transport.ErrInvalidControlPayload) || !errors.Is(err, ErrPeerControlDispatch) {
+		t.Fatalf("RunSession() error = %v, want control dispatch classification", err)
 	}
 }
 

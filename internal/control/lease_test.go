@@ -17,11 +17,17 @@ func TestTransitionTable(t *testing.T) {
 		{name: "outbound intent", current: InitialSnapshot(), event: Event{Kind: EventOutboundIntentDetected, SessionID: "session-1"}, state: StatePending},
 		{name: "outbound grant", current: Snapshot{State: StatePending, SessionID: "session-1", Version: 1}, event: Event{Kind: EventOutboundLeaseGranted, SessionID: "session-1", LeaseID: "lease-1"}, state: StateOutboundActive, effects: []Effect{EffectBeginOutbound}},
 		{name: "outbound reject", current: Snapshot{State: StatePending, SessionID: "session-1", Version: 1}, event: Event{Kind: EventOutboundLeaseRejected, SessionID: "session-1"}, state: StateRevoking, effects: []Effect{EffectStopRemoteControl, EffectReleaseAll}},
-		{name: "inbound grant", current: InitialSnapshot(), event: Event{Kind: EventInboundLeaseGranted, SessionID: "session-1", LeaseID: "lease-1"}, state: StateInboundActive, effects: []Effect{EffectBeginInbound}},
+		{name: "pending outbound abort", current: Snapshot{State: StatePending, SessionID: "session-1", Version: 1}, event: Event{Kind: EventOutboundLeaseAborted, SessionID: "session-1", LeaseID: "lease-1"}, state: StateRevoking, effects: []Effect{EffectStopRemoteControl, EffectReleaseAll}},
+		{name: "active outbound abort", current: activeSnapshot(StateOutboundActive), event: Event{Kind: EventOutboundLeaseAborted, SessionID: "session-1", LeaseID: "lease-1"}, state: StateRevoking, effects: []Effect{EffectStopRemoteControl, EffectReleaseAll}},
+		{name: "inbound prepare", current: InitialSnapshot(), event: Event{Kind: EventInboundLeasePrepared, SessionID: "session-1", LeaseID: "lease-1"}, state: StateInboundPending},
+		{name: "inbound commit", current: activeSnapshot(StateInboundPending), event: Event{Kind: EventInboundLeaseCommitted, SessionID: "session-1", LeaseID: "lease-1"}, state: StateInboundActive, effects: []Effect{EffectBeginInbound}},
+		{name: "inbound abort", current: activeSnapshot(StateInboundPending), event: Event{Kind: EventInboundLeaseAborted, SessionID: "session-1", LeaseID: "lease-1"}, state: StateRevoking, effects: []Effect{EffectStopRemoteControl, EffectReleaseAll}},
 		{name: "pending revoke", current: Snapshot{State: StatePending, SessionID: "session-1"}, event: Event{Kind: EventRevokeRequested}, state: StateRevoking, effects: []Effect{EffectStopRemoteControl, EffectRevokeLease, EffectReleaseAll}},
+		{name: "inbound pending revoke", current: activeSnapshot(StateInboundPending), event: Event{Kind: EventRevokeRequested}, state: StateRevoking, effects: []Effect{EffectStopRemoteControl, EffectReleaseAll}},
 		{name: "outbound revoke", current: activeSnapshot(StateOutboundActive), event: Event{Kind: EventRevokeRequested}, state: StateRevoking, effects: []Effect{EffectStopRemoteControl, EffectRevokeLease, EffectReleaseAll}},
 		{name: "inbound revoke", current: activeSnapshot(StateInboundActive), event: Event{Kind: EventRevokeRequested}, state: StateRevoking, effects: []Effect{EffectStopRemoteControl, EffectRevokeLease, EffectReleaseAll}},
 		{name: "pending fault", current: Snapshot{State: StatePending, SessionID: "session-1"}, event: Event{Kind: EventFaultDetected}, state: StateFault, effects: []Effect{EffectStopRemoteControl, EffectRevokeLease, EffectReleaseAll}},
+		{name: "inbound pending fault", current: activeSnapshot(StateInboundPending), event: Event{Kind: EventFaultDetected}, state: StateFault, effects: []Effect{EffectStopRemoteControl, EffectReleaseAll}},
 		{name: "outbound fault", current: activeSnapshot(StateOutboundActive), event: Event{Kind: EventFaultDetected}, state: StateFault, effects: []Effect{EffectStopRemoteControl, EffectRevokeLease, EffectReleaseAll}},
 		{name: "inbound fault", current: activeSnapshot(StateInboundActive), event: Event{Kind: EventFaultDetected}, state: StateFault, effects: []Effect{EffectStopRemoteControl, EffectRevokeLease, EffectReleaseAll}},
 		{name: "revoking fault", current: activeSnapshot(StateRevoking), event: Event{Kind: EventFaultDetected}, state: StateFault, effects: []Effect{EffectStopRemoteControl, EffectRevokeLease, EffectReleaseAll}},
@@ -59,6 +65,28 @@ func TestOutboundGrantRejectsStaleSession(t *testing.T) {
 	_, err := Apply(current, Event{Kind: EventOutboundLeaseGranted, SessionID: "session-old", LeaseID: "lease-old"})
 	if !errors.Is(err, ErrInvalidEvent) {
 		t.Fatalf("error = %v, want ErrInvalidEvent", err)
+	}
+}
+
+func TestActiveLeaseEventsRejectStaleLease(t *testing.T) {
+	tests := []struct {
+		name  string
+		state State
+		event EventKind
+	}{
+		{name: "inbound commit", state: StateInboundPending, event: EventInboundLeaseCommitted},
+		{name: "inbound abort", state: StateInboundPending, event: EventInboundLeaseAborted},
+		{name: "outbound abort", state: StateOutboundActive, event: EventOutboundLeaseAborted},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := Apply(activeSnapshot(test.state), Event{
+				Kind: test.event, SessionID: "session-1", LeaseID: "lease-stale",
+			})
+			if !errors.Is(err, ErrInvalidEvent) {
+				t.Fatalf("error = %v, want ErrInvalidEvent", err)
+			}
+		})
 	}
 }
 

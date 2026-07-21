@@ -137,11 +137,21 @@ func TestLeaseResponderGrantsAuthorizedRequest(t *testing.T) {
 	if grant.Kind != transport.ControlLeaseGrant || grant.LeaseID != "lease-1" {
 		t.Fatalf("grant = %+v", grant)
 	}
-	if len(entry.edges) != 1 || entry.edges[0] != control.ScreenEdgeRight || len(entry.states) != 1 || entry.states[0] != control.StateLocal || len(entry.armed) != 1 || entry.commits != 1 || entry.rollbacks != 0 {
+	if len(entry.edges) != 1 || entry.edges[0] != control.ScreenEdgeRight || len(entry.states) != 1 || entry.states[0] != control.StateLocal || len(entry.armed) != 1 || entry.commits != 0 || entry.rollbacks != 0 {
 		t.Fatalf("entry = %+v", entry)
 	}
-	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateInboundActive || !snapshot.HasStream {
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateInboundPending || !snapshot.HasStream {
 		t.Fatalf("snapshot = %s", snapshot)
+	}
+	commit := transport.ControlCommand{Kind: transport.ControlLeaseCommit, SessionID: "session-1", LeaseID: "lease-1", Epoch: "epoch-1"}
+	if err := responder.HandleLeaseCommit(context.Background(), commit, time.Unix(101, 0)); err != nil {
+		t.Fatalf("HandleLeaseCommit() error = %v", err)
+	}
+	if entry.commits != 1 || entry.rollbacks != 0 {
+		t.Fatalf("committed entry = %+v", entry)
+	}
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateInboundActive || !snapshot.HasStream {
+		t.Fatalf("committed snapshot = %s", snapshot)
 	}
 }
 
@@ -177,6 +187,7 @@ func TestLeaseResponderEntryFailureDoesNotGrantInbound(t *testing.T) {
 	writer := &recordingFrameWriter{}
 	cause := errors.New("cursor placement failed")
 	entry := &recordingCursorEntry{err: cause}
+	recorder := &controlFlowRecorder{}
 	responder := &LeaseResponder{
 		Coordinator: testWriteCoordinator(t, writer),
 		Runtime:     runtime,
@@ -184,6 +195,7 @@ func TestLeaseResponderEntryFailureDoesNotGrantInbound(t *testing.T) {
 		Peer:        testAuthenticatedPeer(),
 		Entry:       entry,
 		Returns:     entry,
+		Observer:    recorder,
 	}
 	command := transport.ControlCommand{Kind: transport.ControlLeaseRequest, SessionID: "session-1", Epoch: "epoch-1", Edge: control.ScreenEdgeLeft}
 	if err := responder.HandleLeaseRequest(context.Background(), command, time.Unix(100, 0)); !errors.Is(err, cause) {
@@ -200,6 +212,11 @@ func TestLeaseResponderEntryFailureDoesNotGrantInbound(t *testing.T) {
 	}
 	if entry.commits != 0 || entry.rollbacks != 1 {
 		t.Fatalf("entry failure compensation = commits:%d rollbacks:%d", entry.commits, entry.rollbacks)
+	}
+	if recorder.count(ControlFlowEntryPrepareAttempted) != 1 ||
+		recorder.count(ControlFlowEntryPrepared) != 0 ||
+		recorder.count(ControlFlowEntryRollbackAttempted) != 1 {
+		t.Fatalf("entry failure evidence = %v", recorder.events)
 	}
 }
 
@@ -246,10 +263,14 @@ func TestLeaseResponderGrantRuntimeFailureRollsBackEntry(t *testing.T) {
 		Returns:     entry,
 	}
 	command := transport.ControlCommand{Kind: transport.ControlLeaseRequest, SessionID: "session-1", Epoch: "epoch-1", Edge: control.ScreenEdgeRight}
-	if err := responder.HandleLeaseRequest(context.Background(), command, time.Unix(100, 0)); err == nil {
-		t.Fatal("HandleLeaseRequest() error = nil")
+	if err := responder.HandleLeaseRequest(context.Background(), command, time.Unix(100, 0)); err != nil {
+		t.Fatalf("HandleLeaseRequest() error = %v", err)
 	}
-	if len(writer.frames) != 0 || entry.commits != 0 || entry.rollbacks != 1 || len(entry.disarmed) != 1 {
+	commit := transport.ControlCommand{Kind: transport.ControlLeaseCommit, SessionID: "session-1", LeaseID: "lease-1", Epoch: "epoch-1"}
+	if err := responder.HandleLeaseCommit(context.Background(), commit, time.Unix(101, 0)); err == nil {
+		t.Fatal("HandleLeaseCommit() error = nil")
+	}
+	if len(writer.frames) != 1 || entry.commits != 0 || entry.rollbacks != 1 || len(entry.disarmed) != 1 {
 		t.Fatalf("runtime failure compensation = frames:%d commits:%d rollbacks:%d disarmed:%d", len(writer.frames), entry.commits, entry.rollbacks, len(entry.disarmed))
 	}
 }
@@ -271,6 +292,37 @@ func TestLeaseResponderJoinsCursorRollbackFailure(t *testing.T) {
 	err := responder.HandleLeaseRequest(context.Background(), command, time.Unix(100, 0))
 	if !errors.Is(err, writeErr) || !errors.Is(err, rollbackErr) {
 		t.Fatalf("HandleLeaseRequest() error = %v", err)
+	}
+}
+
+func TestLeaseResponderAbortRollsBackPreparedEntry(t *testing.T) {
+	runtime := newLocalRuntime(t)
+	entry := &recordingCursorEntry{}
+	responder := &LeaseResponder{
+		Coordinator: testWriteCoordinator(t, &recordingFrameWriter{}),
+		Runtime:     runtime, Authorizer: staticLeaseAuthorizer{leaseID: "lease-1", accepted: true},
+		Peer: testAuthenticatedPeer(), Entry: entry, Returns: entry,
+	}
+	request := transport.ControlCommand{
+		Kind: transport.ControlLeaseRequest, SessionID: "session-1", Epoch: "epoch-1", Edge: control.ScreenEdgeRight,
+	}
+	if err := responder.HandleLeaseRequest(context.Background(), request, time.Unix(100, 0)); err != nil {
+		t.Fatal(err)
+	}
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateInboundPending {
+		t.Fatalf("prepared runtime = %s", snapshot)
+	}
+	abort := transport.ControlCommand{
+		Kind: transport.ControlLeaseAbort, SessionID: "session-1", LeaseID: "lease-1", Epoch: "epoch-1",
+	}
+	if err := responder.HandleLeaseAbort(context.Background(), abort); err != nil {
+		t.Fatal(err)
+	}
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal || snapshot.HasStream {
+		t.Fatalf("aborted runtime = %s", snapshot)
+	}
+	if entry.commits != 0 || entry.rollbacks != 1 || len(entry.disarmed) != 1 {
+		t.Fatalf("aborted entry = %+v", entry)
 	}
 }
 

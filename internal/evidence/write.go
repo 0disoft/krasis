@@ -9,7 +9,10 @@ import (
 	"strings"
 )
 
-var ErrOutputExists = errors.New("evidence output already exists")
+var (
+	ErrOutputExists     = errors.New("evidence output already exists")
+	ErrUnsafeOutputPath = errors.New("evidence output path is unsafe")
+)
 
 func ValidateJSONOutputPath(path string) error {
 	_, _, err := resolveJSONOutputPath(path)
@@ -55,6 +58,9 @@ func WriteJSONExclusive(path string, value any) error {
 	if err := temporary.Close(); err != nil {
 		return fmt.Errorf("close temporary evidence file: %w", err)
 	}
+	if err := validateOutputDirectory(directory); err != nil {
+		return err
+	}
 	if err := promoteNoReplace(temporaryPath, absolute); err != nil {
 		if errors.Is(err, ErrOutputExists) {
 			return err
@@ -84,6 +90,9 @@ func resolveJSONOutputPath(path string) (string, string, error) {
 	}
 	if !info.IsDir() {
 		return "", "", fmt.Errorf("output parent is not a directory")
+	}
+	if err := validateOutputDirectory(directory); err != nil {
+		return "", "", err
 	}
 	if _, err := os.Lstat(absolute); err == nil {
 		return "", "", fmt.Errorf("%w: %s", ErrOutputExists, absolute)

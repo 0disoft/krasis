@@ -3,6 +3,7 @@ package peer
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/0disoft/krasis/internal/application"
@@ -22,6 +23,7 @@ type OutboundController struct {
 	Coordinator *SessionWriteCoordinator
 	Runtime     *application.SessionRuntime
 	Source      SourceActivation
+	Observer    ControlFlowObserver
 }
 
 func NewOutboundController(
@@ -29,10 +31,19 @@ func NewOutboundController(
 	runtime *application.SessionRuntime,
 	source SourceActivation,
 ) (*OutboundController, error) {
+	return NewOutboundControllerObserved(coordinator, runtime, source, nil)
+}
+
+func NewOutboundControllerObserved(
+	coordinator *SessionWriteCoordinator,
+	runtime *application.SessionRuntime,
+	source SourceActivation,
+	observer ControlFlowObserver,
+) (*OutboundController, error) {
 	if coordinator == nil || runtime == nil || source == nil {
 		return nil, errors.New("write coordinator, runtime, and source activation are required")
 	}
-	return &OutboundController{Coordinator: coordinator, Runtime: runtime, Source: source}, nil
+	return &OutboundController{Coordinator: coordinator, Runtime: runtime, Source: source, Observer: observer}, nil
 }
 
 func (controller *OutboundController) Begin(
@@ -47,7 +58,7 @@ func (controller *OutboundController) Begin(
 	if !controller.Ready() {
 		return ErrOutboundNotReady
 	}
-	return BeginOutboundSession(ctx, controller.Coordinator, controller.Runtime, sessionID, epoch, edge)
+	return BeginOutboundSessionObserved(ctx, controller.Coordinator, controller.Runtime, sessionID, epoch, edge, controller.Observer)
 }
 
 func (controller *OutboundController) Ready() bool {
@@ -77,7 +88,8 @@ func (controller *OutboundController) GrantPeer(
 	if command.Kind != transport.ControlLeaseGrant {
 		return errors.New("outbound controller requires a lease grant")
 	}
-	return controller.Coordinator.Execute(ctx, func(FrameWriter) error {
+	observeControlFlow(controller.Observer, ControlFlowGrantReceived)
+	return controller.Coordinator.Execute(ctx, func(writer FrameWriter) error {
 		if _, err := controller.Runtime.GrantOutbound(
 			ctx,
 			command.SessionID,
@@ -85,12 +97,38 @@ func (controller *OutboundController) GrantPeer(
 			command.Epoch,
 			observedAt,
 		); err != nil {
-			return err
+			observeControlFlow(controller.Observer, ControlFlowGrantApplyFailed)
+			return fmt.Errorf("%w: %w", ErrOutboundGrantApply, err)
 		}
+		observeControlFlow(controller.Observer, ControlFlowGrantApplySucceeded)
 		if err := controller.Source.Activate(); err != nil {
 			controller.Source.Deactivate()
-			return failRuntime(ctx, controller.Runtime, err)
+			abort := transport.ControlCommand{
+				Kind: transport.ControlLeaseAbort, SessionID: command.SessionID,
+				LeaseID: command.LeaseID, Epoch: command.Epoch,
+			}
+			if writeErr := writeControlOrFail(ctx, writer, controller.Runtime, abort); writeErr != nil {
+				observeControlFlow(controller.Observer, ControlFlowAbortWriteOutcomeUnknown)
+				return errors.Join(err, writeErr)
+			}
+			observeControlFlow(controller.Observer, ControlFlowAbortWriteCompleted)
+			if _, abortErr := controller.Runtime.AbortOutbound(
+				ctx, command.SessionID, command.LeaseID, command.Epoch,
+			); abortErr != nil {
+				return errors.Join(err, abortErr)
+			}
+			return nil
 		}
+		commit := transport.ControlCommand{
+			Kind: transport.ControlLeaseCommit, SessionID: command.SessionID,
+			LeaseID: command.LeaseID, Epoch: command.Epoch,
+		}
+		if err := writeControlOrFail(ctx, writer, controller.Runtime, commit); err != nil {
+			observeControlFlow(controller.Observer, ControlFlowCommitWriteOutcomeUnknown)
+			controller.Source.Deactivate()
+			return err
+		}
+		observeControlFlow(controller.Observer, ControlFlowCommitWriteCompleted)
 		return nil
 	})
 }
@@ -116,6 +154,7 @@ func (controller *OutboundController) RevokePeer(ctx context.Context, command tr
 	if command.Kind != transport.ControlLeaseRevoke {
 		return errors.New("outbound controller requires a lease revocation")
 	}
+	observeControlFlow(controller.Observer, ControlFlowRevokeReceived)
 	return controller.Coordinator.Execute(ctx, func(FrameWriter) error {
 		controller.Source.Deactivate()
 		_, err := controller.Runtime.RevokePeer(ctx, command.SessionID, command.LeaseID, command.Epoch)

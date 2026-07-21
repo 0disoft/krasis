@@ -44,19 +44,54 @@ type SourcePipelineObserver interface {
 	ObserveWheelWindow()
 	ObserveWheelCaptureActivated()
 	ObserveWheelCaptureDeactivated()
+	ObserveWheelForegroundFallback(result SourceForegroundFallbackResult)
+	ObserveWheelFocusRestoreFallback(result SourceFocusRestoreFallbackResult)
 	ObserveWheelFocusRestore(result SourceFocusRestoreResult)
+	ObserveWheelPostHideFocus(result SourcePostHideFocusResult)
 	ObserveActiveHookMouseMove()
 	ObserveActiveHookMouseButton()
 	ObserveWheelMapped()
 	ObserveWheelQueue(SourceQueueOfferResult)
+	ObserveSourceQueueEnqueued(depth uint64)
+	ObserveSourceQueueDequeued(residence time.Duration)
+	ObserveSourceQueueDiscardedStale()
 }
+
+type SourceForegroundFallbackResult uint8
+
+const (
+	SourceForegroundFallbackSucceeded SourceForegroundFallbackResult = iota + 1
+	SourceForegroundFallbackAttachFailed
+	SourceForegroundFallbackDetachFailed
+	SourceForegroundFallbackAPIRejected
+	SourceForegroundFallbackVerificationLost
+)
+
+type SourceFocusRestoreFallbackResult uint8
+
+const (
+	SourceFocusRestoreFallbackSucceeded SourceFocusRestoreFallbackResult = iota + 1
+	SourceFocusRestoreFallbackAttachFailed
+	SourceFocusRestoreFallbackDetachFailed
+	SourceFocusRestoreFallbackAPIRejected
+	SourceFocusRestoreFallbackVerificationLost
+)
 
 type SourceFocusRestoreResult uint8
 
 const (
 	SourceFocusRestoreSkipped SourceFocusRestoreResult = iota + 1
 	SourceFocusRestoreSucceeded
-	SourceFocusRestoreFailed
+	SourceFocusRestoreAPIRejected
+	SourceFocusRestoreVerificationLost
+)
+
+type SourcePostHideFocusResult uint8
+
+const (
+	SourcePostHideFocusRecovered SourcePostHideFocusResult = iota + 1
+	SourcePostHideFocusUnavailable
+	SourcePostHideFocusCaptureRetained
 )
 
 type SourceQueueOfferResult uint8
@@ -71,6 +106,7 @@ const (
 type queuedAction struct {
 	generation uint64
 	action     control.InputAction
+	queuedAt   time.Time
 }
 
 type SourceSession struct {
@@ -78,7 +114,9 @@ type SourceSession struct {
 	observer   SourcePipelineObserver
 	cleanup    time.Duration
 	queue      chan queuedAction
+	queueDepth atomic.Int64
 	faults     chan error
+	now        func() time.Time
 	started    atomic.Bool
 	terminal   atomic.Bool
 	stateMu    sync.RWMutex
@@ -104,6 +142,7 @@ func NewSourceSessionObserved(capacity int, sink SourceSink, observer SourcePipe
 		cleanup:  SourceCleanupTimeout,
 		queue:    make(chan queuedAction, capacity),
 		faults:   make(chan error, 1),
+		now:      time.Now,
 	}, nil
 }
 
@@ -160,12 +199,18 @@ func (session *SourceSession) Offer(action control.InputAction) bool {
 		return false
 	}
 	generation := session.generation
+	queuedAt := session.now()
+	depth := session.queueDepth.Add(1)
 	select {
-	case session.queue <- queuedAction{generation: generation, action: action}:
+	case session.queue <- queuedAction{generation: generation, action: action, queuedAt: queuedAt}:
 		session.stateMu.RUnlock()
+		if session.observer != nil {
+			session.observer.ObserveSourceQueueEnqueued(uint64(depth))
+		}
 		session.observeWheelQueue(action, SourceQueueAccepted)
 		return true
 	default:
+		session.queueDepth.Add(-1)
 		session.stateMu.RUnlock()
 		session.abort(ErrSourceQueueOverflow)
 		session.observeWheelQueue(action, SourceQueueRejectedOverflow)
@@ -237,7 +282,18 @@ func (session *SourceSession) runSender(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case item := <-session.queue:
+			session.queueDepth.Add(-1)
+			residence := session.now().Sub(item.queuedAt)
+			if residence < 0 {
+				residence = 0
+			}
+			if session.observer != nil {
+				session.observer.ObserveSourceQueueDequeued(residence)
+			}
 			if !session.current(item.generation) {
+				if session.observer != nil {
+					session.observer.ObserveSourceQueueDiscardedStale()
+				}
 				continue
 			}
 			if err := session.sink.SendAction(ctx, item.action); err != nil {

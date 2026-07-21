@@ -11,7 +11,7 @@
 | Critical | source boundary observer panic이 hook callback을 이탈함 | 현재 입력이 사라지거나 agent process가 종료됨 | observer panic과 민감한 panic payload 테스트 | 고정 오류로 변환, 현재 event 로컬 통과, source generation 폐기 |
 | Critical | source mapper panic이 hook callback을 이탈함 | 현재 입력이 사라지거나 agent process가 종료됨 | mapper panic과 민감한 panic payload 테스트 | remote enqueue 전 고정 오류로 변환, 현재 event 로컬 통과, source generation 폐기 |
 | High | wire codec와 runtime의 discrete code domain이 다름 | 인증된 peer의 잘못된 frame이 destination session fault를 유발함 | encoder와 decoder의 invalid key/button code 계약 테스트 | `PressedToken.Validate`를 단일 code-domain source로 사용 |
-| High | unauthenticated TLS client가 listener를 독점함 | 정상 peer 연결과 재연결이 무기한 대기함 | partial TLS record와 정상 mTLS 연결의 경합 테스트 | accept/handshake 분리, 5초 timeout, pre-auth 동시성 4개 제한 |
+| High | unauthenticated TLS client가 listener를 독점함 | 정상 peer 연결과 재연결이 지연됨 | partial TLS record와 정상 mTLS 연결의 경합 테스트 | accept/handshake 분리, 5초 timeout, pre-auth 동시성 4개 제한, 신뢰 사설망·connector 주소 방화벽 운영; IP별 limiter는 미구현 |
 | High | 두 기기가 동시에 제어권을 가짐 | 충돌, 순서 역전 | 동시 경계 진입 | 단일 lease와 epoch |
 | High | revoke 뒤 낡은 heartbeat가 기록됨 | 정상 복귀 직후 connection fault와 불필요한 재연결 | heartbeat/revoke 순서 강제 테스트 | ADR 0005 semantic write coordinator 선행 |
 | High | timeout 뒤 늦은 heartbeat가 만료 세션을 되살림 | 끊긴 peer가 살아 있다고 판단해 원격 입력 상태가 남음 | deadline 경계의 heartbeat 수신 경합 테스트 | 수신 coordinator 안에서 갱신 전 deadline 판정 |

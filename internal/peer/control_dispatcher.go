@@ -15,6 +15,14 @@ type LeaseRequestHandler interface {
 	HandleLeaseRequest(context.Context, transport.ControlCommand, time.Time) error
 }
 
+type LeaseCommitHandler interface {
+	HandleLeaseCommit(context.Context, transport.ControlCommand, time.Time) error
+}
+
+type LeaseAbortHandler interface {
+	HandleLeaseAbort(context.Context, transport.ControlCommand) error
+}
+
 func DispatchControlFrame(
 	ctx context.Context,
 	frame transport.Frame,
@@ -85,6 +93,18 @@ func dispatchControlFrame(
 		} else {
 			_, err = runtime.RevokePeer(ctx, command.SessionID, command.LeaseID, command.Epoch)
 		}
+	case transport.ControlLeaseCommit:
+		handler, ok := requests.(LeaseCommitHandler)
+		if !ok {
+			return failControlDispatch(ctx, runtime, errors.New("lease commit handler is required"), deferFailure)
+		}
+		err = handler.HandleLeaseCommit(ctx, command, observedAt)
+	case transport.ControlLeaseAbort:
+		handler, ok := requests.(LeaseAbortHandler)
+		if !ok {
+			return failControlDispatch(ctx, runtime, errors.New("lease abort handler is required"), deferFailure)
+		}
+		err = handler.HandleLeaseAbort(ctx, command)
 	default:
 		err = errors.New("decoded unsupported control command")
 	}

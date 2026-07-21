@@ -10,6 +10,7 @@ type State string
 const (
 	StateLocal          State = "LOCAL"
 	StatePending        State = "PENDING"
+	StateInboundPending State = "INBOUND_PENDING"
 	StateOutboundActive State = "OUTBOUND_ACTIVE"
 	StateInboundActive  State = "INBOUND_ACTIVE"
 	StateRevoking       State = "REVOKING"
@@ -22,7 +23,11 @@ const (
 	EventOutboundIntentDetected EventKind = "OUTBOUND_INTENT_DETECTED"
 	EventOutboundLeaseGranted   EventKind = "OUTBOUND_LEASE_GRANTED"
 	EventOutboundLeaseRejected  EventKind = "OUTBOUND_LEASE_REJECTED"
+	EventOutboundLeaseAborted   EventKind = "OUTBOUND_LEASE_ABORTED"
 	EventInboundLeaseGranted    EventKind = "INBOUND_LEASE_GRANTED"
+	EventInboundLeasePrepared   EventKind = "INBOUND_LEASE_PREPARED"
+	EventInboundLeaseCommitted  EventKind = "INBOUND_LEASE_COMMITTED"
+	EventInboundLeaseAborted    EventKind = "INBOUND_LEASE_ABORTED"
 	EventRevokeRequested        EventKind = "REVOKE_REQUESTED"
 	EventFaultDetected          EventKind = "FAULT_DETECTED"
 	EventReleaseAllSucceeded    EventKind = "RELEASE_ALL_SUCCEEDED"
@@ -82,13 +87,19 @@ var transitionRules = []rule{
 	{from: StateLocal, event: EventOutboundIntentDetected, to: StatePending, guard: requireSessionWithoutLease, update: setSession},
 	{from: StatePending, event: EventOutboundLeaseGranted, to: StateOutboundActive, effects: []Effect{EffectBeginOutbound}, guard: requireMatchingSessionAndLease, update: setLease},
 	{from: StatePending, event: EventOutboundLeaseRejected, to: StateRevoking, effects: []Effect{EffectStopRemoteControl, EffectReleaseAll}, guard: requireMatchingSessionWithoutLease},
-	{from: StateLocal, event: EventInboundLeaseGranted, to: StateInboundActive, effects: []Effect{EffectBeginInbound}, guard: requireSessionAndLease, update: setSessionAndLease},
+	{from: StatePending, event: EventOutboundLeaseAborted, to: StateRevoking, effects: []Effect{EffectStopRemoteControl, EffectReleaseAll}, guard: requireMatchingSessionAndLease},
+	{from: StateOutboundActive, event: EventOutboundLeaseAborted, to: StateRevoking, effects: []Effect{EffectStopRemoteControl, EffectReleaseAll}, guard: requireExactSessionAndLease},
+	{from: StateLocal, event: EventInboundLeasePrepared, to: StateInboundPending, guard: requireSessionAndLease, update: setSessionAndLease},
+	{from: StateInboundPending, event: EventInboundLeaseCommitted, to: StateInboundActive, effects: []Effect{EffectBeginInbound}, guard: requireExactSessionAndLease},
+	{from: StateInboundPending, event: EventInboundLeaseAborted, to: StateRevoking, effects: []Effect{EffectStopRemoteControl, EffectReleaseAll}, guard: requireExactSessionAndLease},
 
 	{from: StatePending, event: EventRevokeRequested, to: StateRevoking, effects: []Effect{EffectStopRemoteControl, EffectRevokeLease, EffectReleaseAll}},
+	{from: StateInboundPending, event: EventRevokeRequested, to: StateRevoking, effects: []Effect{EffectStopRemoteControl, EffectReleaseAll}},
 	{from: StateOutboundActive, event: EventRevokeRequested, to: StateRevoking, effects: []Effect{EffectStopRemoteControl, EffectRevokeLease, EffectReleaseAll}},
 	{from: StateInboundActive, event: EventRevokeRequested, to: StateRevoking, effects: []Effect{EffectStopRemoteControl, EffectRevokeLease, EffectReleaseAll}},
 
 	{from: StatePending, event: EventFaultDetected, to: StateFault, effects: []Effect{EffectStopRemoteControl, EffectRevokeLease, EffectReleaseAll}},
+	{from: StateInboundPending, event: EventFaultDetected, to: StateFault, effects: []Effect{EffectStopRemoteControl, EffectReleaseAll}},
 	{from: StateOutboundActive, event: EventFaultDetected, to: StateFault, effects: []Effect{EffectStopRemoteControl, EffectRevokeLease, EffectReleaseAll}},
 	{from: StateInboundActive, event: EventFaultDetected, to: StateFault, effects: []Effect{EffectStopRemoteControl, EffectRevokeLease, EffectReleaseAll}},
 	{from: StateRevoking, event: EventFaultDetected, to: StateFault, effects: []Effect{EffectStopRemoteControl, EffectRevokeLease, EffectReleaseAll}},
@@ -139,7 +150,7 @@ func validateSnapshot(snapshot Snapshot) error {
 		if snapshot.SessionID == "" || snapshot.LeaseID != "" {
 			return fmt.Errorf("pending state requires only a session")
 		}
-	case StateOutboundActive, StateInboundActive:
+	case StateInboundPending, StateOutboundActive, StateInboundActive:
 		if snapshot.SessionID == "" || snapshot.LeaseID == "" {
 			return fmt.Errorf("active state requires a session and lease")
 		}
@@ -170,6 +181,14 @@ func requireSessionAndLease(_ Snapshot, event Event) error {
 func requireMatchingSessionAndLease(current Snapshot, event Event) error {
 	if event.SessionID == "" || event.SessionID != current.SessionID || event.LeaseID == "" {
 		return errors.New("outbound lease grant must match the pending session and include a lease")
+	}
+	return nil
+}
+
+func requireExactSessionAndLease(current Snapshot, event Event) error {
+	if event.SessionID == "" || event.SessionID != current.SessionID ||
+		event.LeaseID == "" || event.LeaseID != current.LeaseID {
+		return errors.New("lease event must match the current session and lease")
 	}
 	return nil
 }

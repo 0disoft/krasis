@@ -18,6 +18,12 @@ type SessionConnection interface {
 
 type ObservationClock func() time.Time
 
+var (
+	ErrPeerControlDispatch   = errors.New("peer control frame dispatch failed")
+	ErrPeerInputDispatch     = errors.New("peer input frame dispatch failed")
+	ErrPeerHeartbeatDispatch = errors.New("peer heartbeat frame dispatch failed")
+)
+
 func RunSession(
 	ctx context.Context,
 	connection SessionConnection,
@@ -91,11 +97,11 @@ func runSession(
 		if err != nil {
 			_ = ownedConnection.Close()
 			if ctxErr := ctx.Err(); ctxErr != nil {
+				ctxErr = errors.Join(ctxErr, abortPendingLease(ctx, requests))
 				return failSessionWithLifecycle(ctx, coordinator, runtime, outbound, ctxErr)
 			}
-			if errors.Is(err, io.EOF) {
-				err = io.ErrUnexpectedEOF
-			}
+			err = classifyPeerReadFailure(connection, err)
+			err = errors.Join(err, abortPendingLease(ctx, requests))
 			return failSessionWithLifecycle(ctx, coordinator, runtime, outbound, err)
 		}
 		var observedAt time.Time
@@ -104,10 +110,16 @@ func runSession(
 		case transport.MessageControl:
 			observedAt = now()
 			err = DispatchControlFrameWithLifecycle(ctx, frame, observedAt, runtime, requests, outbound)
+			if err != nil {
+				err = errors.Join(ErrPeerControlDispatch, err)
+			}
 		case transport.MessageInput:
 			err = coordinateDispatch(ctx, coordinator, func() error {
 				return DispatchInputFrame(ctx, frame, runtime)
 			})
+			if err != nil {
+				err = errors.Join(ErrPeerInputDispatch, err)
+			}
 		case transport.MessageHeartbeat:
 			err = coordinateDispatch(ctx, coordinator, func() error {
 				observedAt = now()
@@ -126,17 +138,49 @@ func runSession(
 				heartbeat, dispatchErr = DispatchHeartbeatFrame(ctx, frame, observedAt, runtime)
 				return dispatchErr
 			})
+			if err != nil {
+				err = errors.Join(ErrPeerHeartbeatDispatch, err)
+			}
 		default:
 			err = transport.ErrUnsupportedFrame
 		}
 		if err != nil {
 			_ = ownedConnection.Close()
+			err = errors.Join(err, abortPendingLease(ctx, requests))
 			return failSessionWithLifecycle(ctx, coordinator, runtime, outbound, err)
 		}
 		if frame.Kind == transport.MessageHeartbeat && observer != nil {
 			observer.ObserveHeartbeatReceived(heartbeat.SessionID, heartbeat.ObservedAt)
 		}
 	}
+}
+
+type pendingLeaseAborter interface {
+	AbortPending(context.Context) error
+}
+
+func abortPendingLease(ctx context.Context, requests LeaseRequestHandler) error {
+	aborter, ok := requests.(pendingLeaseAborter)
+	if !ok {
+		return nil
+	}
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), CleanupTimeout)
+	defer cancel()
+	return aborter.AbortPending(cleanupCtx)
+}
+
+func classifyPeerReadFailure(connection SessionConnection, readErr error) error {
+	if state, ok := connection.(localInterruptState); ok && state.LocalInterruptObserved() {
+		state.ObserveReadAfterLocalInterrupt()
+		return errors.Join(ErrPeerReadAfterLocalInterrupt, state.LocalInterruptCause(), readErr)
+	}
+	if errors.Is(readErr, io.EOF) {
+		return errors.Join(ErrPeerRemoteEOF, io.ErrUnexpectedEOF)
+	}
+	if errors.Is(readErr, io.ErrUnexpectedEOF) {
+		return errors.Join(ErrPeerFrameTruncated, readErr)
+	}
+	return errors.Join(ErrPeerReadFailure, readErr)
 }
 
 type sessionConnectionOwner struct {

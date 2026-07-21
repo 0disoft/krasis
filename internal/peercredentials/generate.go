@@ -54,7 +54,14 @@ func Generate(outputDirectory, serverName string, now time.Time) (manifest Manif
 	completed := false
 	defer func() {
 		if !completed {
-			_ = os.RemoveAll(absolute)
+			if cleanupErr := os.RemoveAll(absolute); cleanupErr != nil {
+				cleanupErr = fmt.Errorf("remove incomplete credential bundle: %w", cleanupErr)
+				if err == nil {
+					err = cleanupErr
+				} else {
+					err = errors.Join(err, cleanupErr)
+				}
+			}
 		}
 	}()
 

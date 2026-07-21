@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	SchemaVersion = "krasis.lab.agent-session-check/v10"
+	SchemaVersion = "krasis.lab.agent-session-check/v18"
 	maxReportSize = 1 << 20
 )
 
@@ -27,26 +27,28 @@ type Report struct {
 }
 
 type FileResult struct {
-	File              string                     `json:"file"`
-	Valid             bool                       `json:"valid"`
-	Issues            []string                   `json:"issues"`
-	DeviceAlias       string                     `json:"deviceAlias,omitempty"`
-	Role              string                     `json:"role,omitempty"`
-	Edge              string                     `json:"edge,omitempty"`
-	BuildRevision     string                     `json:"buildRevision,omitempty"`
-	BuildModified     bool                       `json:"buildModified"`
-	RequestedMillis   int64                      `json:"requestedDurationMillis"`
-	HeartbeatMillis   int64                      `json:"heartbeatIntervalMillis"`
-	PeerTimeoutMillis int64                      `json:"peerTimeoutMillis"`
-	Completed         bool                       `json:"completed"`
-	Passed            bool                       `json:"passed"`
-	Liveness          lab.LivenessEvidence       `json:"liveness"`
-	SourceInput       lab.SourceInputEvidence    `json:"sourceInput"`
-	SourcePipeline    lab.SourcePipelineEvidence `json:"sourcePipeline"`
-	DestinationInput  lab.InputEvidence          `json:"destinationInput"`
-	GuardReport       string                     `json:"guardReport,omitempty"`
-	GuardValid        bool                       `json:"guardValid"`
-	GuardIssues       []string                   `json:"guardIssues"`
+	File                string                          `json:"file"`
+	Valid               bool                            `json:"valid"`
+	Issues              []string                        `json:"issues"`
+	DeviceAlias         string                          `json:"deviceAlias,omitempty"`
+	Role                string                          `json:"role,omitempty"`
+	Edge                string                          `json:"edge,omitempty"`
+	BuildRevision       string                          `json:"buildRevision,omitempty"`
+	BuildModified       bool                            `json:"buildModified"`
+	RequestedMillis     int64                           `json:"requestedDurationMillis"`
+	HeartbeatMillis     int64                           `json:"heartbeatIntervalMillis"`
+	PeerTimeoutMillis   int64                           `json:"peerTimeoutMillis"`
+	Completed           bool                            `json:"completed"`
+	Passed              bool                            `json:"passed"`
+	Liveness            lab.LivenessEvidence            `json:"liveness"`
+	SourceInput         lab.SourceInputEvidence         `json:"sourceInput"`
+	SourcePipeline      lab.SourcePipelineEvidence      `json:"sourcePipeline"`
+	ControlFlow         lab.ControlFlowEvidence         `json:"controlFlow"`
+	DestinationPipeline lab.DestinationPipelineEvidence `json:"destinationPipeline"`
+	DestinationInput    lab.InputEvidence               `json:"destinationInput"`
+	GuardReport         string                          `json:"guardReport,omitempty"`
+	GuardValid          bool                            `json:"guardValid"`
+	GuardIssues         []string                        `json:"guardIssues"`
 }
 
 func Check(paths []string) Report {
@@ -121,6 +123,8 @@ func checkFile(path string) (FileResult, lab.AgentSessionReport) {
 	result.Liveness = report.Liveness
 	result.SourceInput = report.SourceInput
 	result.SourcePipeline = report.SourcePipeline
+	result.ControlFlow = report.ControlFlow
+	result.DestinationPipeline = report.DestinationPipeline
 	result.DestinationInput = report.DestinationInput
 	result.Issues = validate(report)
 	if report.CrashGuard.ReportFile == "" || filepath.Base(report.CrashGuard.ReportFile) != report.CrashGuard.ReportFile {
@@ -202,8 +206,8 @@ func validate(report lab.AgentSessionReport) []string {
 	if report.Supervisor.FinalState != "STOPPED" || report.Supervisor.ActiveCount == 0 {
 		issues = append(issues, "missing_authenticated_session")
 	}
-	if !validFailureComponent(report.Supervisor.LastFailureComponent) {
-		issues = append(issues, "invalid_failure_component")
+	if !report.Supervisor.FailureEvidenceValid() {
+		issues = append(issues, "invalid_failure_evidence")
 	}
 	if !report.CrashGuard.Started || !report.CrashGuard.CleanShutdown {
 		issues = append(issues, "missing_crash_guard_evidence")
@@ -215,6 +219,21 @@ func validate(report lab.AgentSessionReport) []string {
 	}
 	if !report.SourcePipeline.ValidAgainst(source) {
 		issues = append(issues, "invalid_source_pipeline_evidence")
+	}
+	if !report.ControlFlow.ValidAgainst(source, report.SourcePipeline.Wheel, report.DestinationInput) {
+		issues = append(issues, "invalid_control_flow_evidence")
+	}
+	if !report.DestinationPipeline.ValidAgainst(report.DestinationInput) {
+		issues = append(issues, "invalid_destination_pipeline_evidence")
+	}
+	if report.DestinationPipeline.Rejected > 0 {
+		issues = append(issues, "destination_input_rejected")
+	}
+	if report.ControlFlow.StageFailureObserved() {
+		issues = append(issues, "control_flow_failure_observed")
+	}
+	if report.ControlFlow.BoundaryDropObserved() {
+		issues = append(issues, "boundary_not_ready_drop_observed")
 	}
 	if report.SourcePipeline.Wheel.RawWheelUnforwarded() {
 		issues = append(issues, "raw_wheel_observed_without_forwarding")
@@ -257,15 +276,6 @@ func validate(report lab.AgentSessionReport) []string {
 		issues = append(issues, "unsafe_cursor_rollback_evidence")
 	}
 	return issues
-}
-
-func validFailureComponent(component string) bool {
-	switch component {
-	case "", "unknown", "source-session", "source-hook", "boundary-orchestrator", "return-controller", "peer-session", "peer-liveness":
-		return true
-	default:
-		return false
-	}
 }
 
 func comparePair(first, second lab.AgentSessionReport) []string {

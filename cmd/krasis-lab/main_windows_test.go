@@ -27,7 +27,7 @@ type evidenceFixture struct {
 }
 
 func TestAgentEvidenceCLIContractSmoke(t *testing.T) {
-	if lab.AgentSessionSchemaVersion != "krasis.lab.agent-session/v13" {
+	if lab.AgentSessionSchemaVersion != "krasis.lab.agent-session/v21" {
 		t.Fatalf("agent session schema = %q", lab.AgentSessionSchemaVersion)
 	}
 	executable := buildLabExecutable(t)
@@ -36,10 +36,11 @@ func TestAgentEvidenceCLIContractSmoke(t *testing.T) {
 	home := runLabJSON(t, executable, 0,
 		"agent-session-check", "--json", fixture.agentPaths["H-A"], fixture.agentPaths["H-B"],
 	)
-	requireJSONValue(t, home, "schemaVersion", "krasis.lab.agent-session-check/v10")
+	requireJSONValue(t, home, "schemaVersion", "krasis.lab.agent-session-check/v18")
 	requireJSONValue(t, home, "pairPassed", true)
 	requireDestinationInput(t, home)
 	requireSourcePipeline(t, home)
+	requireControlFlow(t, home)
 	requireAggregatePrivacy(t, home)
 
 	partial := fixture.reports["H-A"]
@@ -81,12 +82,16 @@ func TestAgentEvidenceCLIContractSmoke(t *testing.T) {
 	requireAggregatePrivacy(t, invalidPipelineResult)
 
 	invalidComponent := fixture.reports["H-A"]
-	invalidComponent.Supervisor.LastFailureComponent = "private-component"
+	invalidComponent.Supervisor.SessionFailures = 1
+	invalidComponent.Supervisor.FirstFailure = lab.FailureDescriptorEvidence{Component: "private-component", Phase: "runtime", Code: "component_failed"}
+	invalidComponent.Supervisor.FailureCounts = []lab.FailureCountEvidence{{
+		FailureDescriptorEvidence: invalidComponent.Supervisor.FirstFailure, Count: 1,
+	}}
 	invalidComponentPath := writeJSONFile(t, filepath.Dir(fixture.agentPaths["H-A"]), "H-A-invalid-component.json", invalidComponent)
 	invalidComponentResult := runLabJSON(t, executable, 1,
 		"agent-session-check", "--json", invalidComponentPath, fixture.agentPaths["H-B"],
 	)
-	requireFileIssue(t, invalidComponentResult, "invalid_failure_component")
+	requireFileIssue(t, invalidComponentResult, "invalid_failure_evidence")
 	requireAggregatePrivacy(t, invalidComponentResult)
 
 	phase0 := runLabJSON(t, executable, 0,
@@ -96,10 +101,10 @@ func TestAgentEvidenceCLIContractSmoke(t *testing.T) {
 		"--recovery", fixture.recoveryPaths["H-A"], "--recovery", fixture.recoveryPaths["H-B"],
 		"--recovery", fixture.recoveryPaths["S-A"], "--recovery", fixture.recoveryPaths["S-B"],
 	)
-	requireJSONValue(t, phase0, "schemaVersion", "krasis.lab.phase0-check/v10")
+	requireJSONValue(t, phase0, "schemaVersion", "krasis.lab.phase0-check/v17")
 	requireJSONValue(t, phase0, "passed", true)
 	homeResult := requireJSONObject(t, phase0, "home")
-	requireJSONValue(t, homeResult, "schemaVersion", "krasis.lab.agent-session-check/v10")
+	requireJSONValue(t, homeResult, "schemaVersion", "krasis.lab.agent-session-check/v18")
 	requireDestinationInput(t, homeResult)
 	requireAggregatePrivacy(t, phase0)
 }
@@ -168,10 +173,24 @@ func writeEvidenceFixture(t *testing.T) evidenceFixture {
 		}
 		if device.role == "listen" {
 			report.DestinationInput = lab.InputEvidence{Entries: 1, PointerMoves: 1, ReturnArms: 1}
+			report.DestinationPipeline = lab.DestinationPipelineEvidence{Received: 1, Applied: 1}
+			report.ControlFlow.Inbound = lab.InboundFlowEvidence{
+				RequestReceived: 1, ReturnArmSucceeded: 1, EntryPrepareAttempted: 1, EntryPrepared: 1,
+				GrantWriteCompleted: 1, CommitReceived: 1, EntryCommitted: 1,
+			}
 		} else {
 			report.SourceInput = lab.SourceInputEvidence{BoundaryIntents: 1, PointerMoves: 1}
 			report.SourcePipeline.Wheel = lab.WheelPipelineEvidence{
 				CaptureActivations: 1, CaptureDeactivations: 1, FocusRestoreSkipped: 1,
+			}
+			report.SourcePipeline.Queue = lab.SourceQueueEvidence{
+				Enqueued: 1, Dequeued: 1, MaxDepth: 1, ResidenceSamples: 1, MaxResidenceMicros: 1,
+			}
+			report.ControlFlow.Boundary = lab.BoundaryFlowEvidence{Queued: 1, Admitted: 1}
+			report.ControlFlow.Outbound = lab.OutboundFlowEvidence{
+				RequestWriteCompleted: 1, GrantReceived: 1, GrantApplySucceeded: 1,
+				SourceSessionActivationSucceeded: 1, CaptureActivationAttempted: 1, CaptureActivationSucceeded: 1,
+				CommitWriteCompleted: 1,
 			}
 		}
 		if device.alias == "H-A" {
@@ -292,10 +311,34 @@ func requireSourcePipeline(t *testing.T, report map[string]any) {
 	requireJSONValue(t, wheel, "focusRestoreSkipped", float64(0))
 	requireJSONValue(t, wheel, "focusRestored", float64(0))
 	requireJSONValue(t, wheel, "focusRestoreFailed", float64(0))
+	requireJSONValue(t, wheel, "focusRestoreApiRejected", float64(0))
+	requireJSONValue(t, wheel, "focusRestoreVerificationLost", float64(0))
 	requireJSONValue(t, wheel, "rejectedInactive", float64(0))
 	requireJSONValue(t, wheel, "rejectedInvalid", float64(0))
 	requireJSONValue(t, wheel, "rejectedOverflow", float64(0))
 	requireJSONValue(t, wheel, "sent", float64(0))
+}
+
+func requireControlFlow(t *testing.T, report map[string]any) {
+	t.Helper()
+	files, ok := report["files"].([]any)
+	if !ok || len(files) == 0 {
+		t.Fatalf("checker files missing: %T", report["files"])
+	}
+	file, ok := files[0].(map[string]any)
+	if !ok {
+		t.Fatalf("checker file is not an object: %T", files[0])
+	}
+	flow := requireJSONObject(t, file, "controlFlow")
+	boundary := requireJSONObject(t, flow, "boundary")
+	requireJSONValue(t, boundary, "blockedLocalMenu", float64(0))
+	inbound := requireJSONObject(t, flow, "inbound")
+	requireJSONValue(t, inbound, "requestReceived", float64(1))
+	requireJSONValue(t, inbound, "grantWriteCompleted", float64(1))
+	requireJSONValue(t, inbound, "entryCommitted", float64(1))
+	transport := requireJSONObject(t, flow, "transport")
+	requireJSONValue(t, transport, "localConnectionInterrupts", float64(0))
+	requireJSONValue(t, transport, "readAfterLocalInterrupt", float64(0))
 }
 
 func requireFileIssue(t *testing.T, report map[string]any, want string) {

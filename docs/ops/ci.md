@@ -8,7 +8,7 @@
 
 `main` push와 모든 pull request에서 Windows job 하나를 실행한다. job은 repository contents read 권한만 가지며 network service, secret, release와 deployment를 사용하지 않는다.
 
-순서는 format 검사, `go test ./...`, `go vet`, Windows CLI build와 장비 실행 kit 생성이다. Win32 callback의 `LPARAM` 변환 package만 `unsafeptr` 검사를 제외하고 나머지 vet analyzer는 유지한다. 성공한 build는 실행 파일, 수집·순차 Phase 0·무결성 helper, 장비 runbook과 build identity를 zip 하나로 묶고 각 파일의 SHA-256 manifest와 commit SHA가 포함된 artifact 이름으로 올린다.
+순서는 format 검사, `go test ./...`, `go vet`, Windows CLI build와 장비 실행 kit 생성이다. `internal/wininput`은 Win32 callback `LPARAM`, message structure와 syscall buffer를 Go pointer로 연결하므로 이 package에 한해 `unsafeptr` analyzer를 제외한다. 해당 package의 나머지 vet analyzer와 다른 모든 package의 기본 vet analyzer는 유지한다. 이 예외는 memory safety 증명이 아니며 새 `unsafe` 경계는 Win32 ABI lifetime, struct layout과 callback 범위를 별도로 검토해야 한다. 성공한 build는 실행 파일, 수집·순차 Phase 0·무결성 helper, 장비 runbook과 build identity를 zip 하나로 묶고 각 파일의 SHA-256 manifest와 commit SHA가 포함된 artifact 이름으로 올린다.
 
 peer 통합 테스트는 먼저 한 process 안의 두 `RunSession`을 실제 framed stream으로 연결해 request, grant, input, return revoke와 양쪽 `LOCAL` 수렴을 검증한다. 별도 subprocess 테스트는 임시 test CA와 identity를 test temp directory에만 생성하고 source와 destination test process를 localhost TCP로 연결한다. 양쪽은 제품 `PeerConnection`을 사용해 TLS 1.3 mutual authentication과 `krasis/1` ALPN을 통과한 뒤 동일한 왕복을 수행해야 하며 두 process가 모두 success exit code를 반환해야 한다. test certificate와 private key는 artifact에 포함하지 않는다.
 
@@ -71,10 +71,16 @@ report가 필요하다.
 hosted CI는 visible window의 실제 foreground 획득, Windows 11 touchpad capability 등록 결과나 gram13
 Precision Touchpad의 두 손가락 gesture를 재현하지 않는다. 따라서 실제 장비 report가 별도 필요하다.
 
-v13 source capture unit test는 window legacy wheel의 signed axis mapping, 한 message당 한 queue action,
+source capture unit test는 window legacy wheel의 signed axis mapping, 한 message당 한 queue action,
 inactive source fault, low-level hook의 physical·untagged pass-through와 tagged suppression, combined source/capture
 activation·rollback·deactivation 순서, bounded command admission/result timeout, capture/focus evidence 합계와
-startup readiness gate를 검증한다. hosted CI는 `SetForegroundWindow`, 작은 edge window의 실제 touchpad
+startup readiness gate를 검증한다. v18은 정상 foreground 경로 우선, 첫 실패에만 thread-input attach,
+단일 retry, 성공·실패 뒤 detach, detach 실패의 terminal rollback과 fallback outcome 합계를 추가로 검증한다.
+	v19는 saved-focus 복원에도 정상 경로 우선, 단일 attach/retry/detach와 최종 restored/failed 합계 보존을
+	대칭 검증한다.
+	v20은 정확한 restore 실패 뒤 capture window를 숨기고 post-hide foreground release를 분류하며,
+	recovered·unavailable은 non-terminal, capture-retained와 thread detach 실패는 terminal인지 검증한다.
+hosted CI는 `SetForegroundWindow`, `AttachThreadInput`, 작은 edge window의 실제 touchpad
 delivery, `WM_ACTIVATE` ordering과 이전 foreground application 복원을 사용자 desktop에서 재현하지 않으므로
 두 장비 수동 gate가 필요하다.
 
@@ -108,19 +114,25 @@ cursor entry 보상 테스트는 prepare 뒤 inbound grant 또는 grant frame wr
 agent report checker 테스트는 strict JSON decoding과 두 file cardinality, 장소별 alias pair,
 listener/connect 역할, 반대 edge, clean 동일 build, 동일 duration/heartbeat interval/peer timeout,
 최소 heartbeat 송수신·same-session gap evidence와 timeout보다 작은 최대 gap, 양쪽 pass, crash guard의
-시작·정상 종료, lifecycle monitor의 clean 종료와 event·rearm 부재, 같은 directory의 guard report device/build/zero-recovery, 서로 보완되는 source/destination evidence, 주입 실패 0건과 cursor rollback 분류 합계를 검증한다. source/destination action, 주입 실패와 cursor rollback 분류 counter 합의 `uint64` overflow는 별도 실패 증거로 검증한다. 전체 path, session identifier나 원시
+시작·정상 종료, lifecycle monitor의 clean 종료와 event·rearm 부재, 같은 directory의 guard report device/build/zero-recovery, 서로 보완되는 source/destination evidence, 주입 실패 0건과 cursor rollback 분류 합계를 검증한다. control-flow 단계 보존, stage failure·not-ready drop 거부, structured failure count 합과 stable triple도 검증한다. source/destination action, 주입 실패, cursor rollback, control-flow와 failure count의 `uint64` overflow는 별도 실패 증거로 검증한다. 전체 path, session identifier나 원시
 입력은 checker output으로 복제하지 않는다.
 
 Windows `cmd/krasis-lab` 통합 smoke는 현재 source에서 임시 `krasis-lab.exe`를 실제로 빌드해
-subprocess로 실행한다. 정상 `agent-session-check/v10`, physical·합성·active Raw·window wheel source pipeline과 capture/focus lifecycle·거절 사유 합계·failure component,
-주입 실패, cursor rollback 합계 불일치와 실패, 정상 `phase0-check/v10`을 검증하고 모든 JSON output을 재귀 검사해 token code, pointer 좌표·delta,
+subprocess로 실행한다. 정상 `agent-session-check/v18`, physical·합성·active Raw·window wheel source pipeline과 capture/focus lifecycle·foreground/focus-restore fallback outcome·post-hide focus release·source queue 체류·destination disposition·거절 사유 합계·focus 복원 실패 원인 합계, local interaction admission, commit/abort control-flow와 structured failure evidence,
+주입 실패, cursor rollback 합계 불일치와 실패, 정상 `phase0-check/v17`를 검증하고 모든 JSON output을 재귀 검사해 token code, pointer 좌표·delta,
 session·epoch·lease, 주소와 certificate 식별 필드가 나타나지 않는지 확인한다.
+
+control-flow unit test는 boundary admission 네 분류, local menu가 identity 생성과 request 전에 차단되는지,
+semantic request/grant/entry write 순서, source와
+capture activation 단계, local connection interrupt cause가 뒤따른 peer read 오류에 가려지지 않는지
+검증한다. 이 aggregate test는 세대별 trace나 실제 Wi-Fi ordering을 증명하지 않는다.
 
 source session 단위 테스트는 blocking `Interrupt`가 cleanup deadline을 넘겨 parent를 멈추지 않는지,
 source input thread join은 hung child를 bounded `thread-join` failure로 분류하는지 검증한다. return boundary
 테스트는 rearm distance가 cursor entry inset 이하이거나 현재 화면 폭 이상이면 거부하는지 검증한다.
 capture window lifecycle 테스트는 foreground 획득 전에 실패한 activation cleanup의 focus 결과가 성공한
-activation/deactivation evidence에 섞이지 않는지 검증한다.
+activation/deactivation evidence에 섞이지 않는지 검증한다. fallback 테스트는 attach/detach 대상 ID 자체를
+report에 저장하지 않고 aggregate outcome만 증가시키는지도 구조 검증한다.
 
 Phase 0 checker 테스트는 서로 다른 날짜의 home/study pair를 같은 build, duration과 liveness policy로
 합칠 수 있는지, 네 alias의 parent-EOF recovery가 각각 한 번씩 있는지 검증한다. 네 장비의

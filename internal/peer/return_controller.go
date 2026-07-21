@@ -3,6 +3,7 @@ package peer
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
@@ -13,6 +14,7 @@ type ReturnController struct {
 	Coordinator *SessionWriteCoordinator
 	Runtime     *application.SessionRuntime
 	Returns     ReturnBoundaryPort
+	Observer    ControlFlowObserver
 }
 
 func NewReturnController(
@@ -20,10 +22,19 @@ func NewReturnController(
 	runtime *application.SessionRuntime,
 	returns ReturnBoundaryPort,
 ) (*ReturnController, error) {
+	return NewReturnControllerObserved(coordinator, runtime, returns, nil)
+}
+
+func NewReturnControllerObserved(
+	coordinator *SessionWriteCoordinator,
+	runtime *application.SessionRuntime,
+	returns ReturnBoundaryPort,
+	observer ControlFlowObserver,
+) (*ReturnController, error) {
 	if coordinator == nil || runtime == nil || returns == nil {
 		return nil, errors.New("return write coordinator, runtime, and boundary lifecycle are required")
 	}
-	return &ReturnController{Coordinator: coordinator, Runtime: runtime, Returns: returns}, nil
+	return &ReturnController{Coordinator: coordinator, Runtime: runtime, Returns: returns, Observer: observer}, nil
 }
 
 func (controller *ReturnController) Revoke(ctx context.Context, intent control.ReturnIntent) error {
@@ -45,7 +56,12 @@ func (controller *ReturnController) Revoke(ctx context.Context, intent control.R
 		if encodeErr != nil {
 			return encodeErr
 		}
-		return writer.WriteFrameContext(ctx, transport.Frame{Kind: transport.MessageControl, Payload: payload})
+		if err := writer.WriteFrameContext(ctx, transport.Frame{Kind: transport.MessageControl, Payload: payload}); err != nil {
+			observeControlFlow(controller.Observer, ControlFlowRevokeWriteOutcomeUnknown)
+			return fmt.Errorf("%w: %w", ErrInboundRevokeWrite, err)
+		}
+		observeControlFlow(controller.Observer, ControlFlowRevokeWriteCompleted)
+		return nil
 	})
 	if errors.Is(err, application.ErrRuntimeInputHeld) {
 		controller.Returns.RearmReturn(intent)

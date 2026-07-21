@@ -11,6 +11,7 @@ if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
 
 $requiredFiles = @(
     'krasis-lab.exe'
+    'krasis-launcher.exe'
     'collect-probe.ps1'
     'check-phase0.ps1'
     'verify-kit.ps1'

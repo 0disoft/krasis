@@ -15,6 +15,8 @@ func TestControlPayloadRoundTrip(t *testing.T) {
 		{Kind: ControlLeaseGrant, SessionID: "session-1", LeaseID: "lease-1", Epoch: "epoch-1"},
 		{Kind: ControlLeaseReject, SessionID: "session-1", Epoch: "epoch-1"},
 		{Kind: ControlLeaseRevoke, SessionID: "session-1", LeaseID: "lease-1", Epoch: "epoch-1"},
+		{Kind: ControlLeaseCommit, SessionID: "session-1", LeaseID: "lease-1", Epoch: "epoch-1"},
+		{Kind: ControlLeaseAbort, SessionID: "session-1", LeaseID: "lease-1", Epoch: "epoch-1"},
 	}
 	for _, command := range commands {
 		payload, err := EncodeControlPayload(command)
@@ -40,6 +42,8 @@ func TestControlPayloadRejectsInvalidCommands(t *testing.T) {
 		{Kind: ControlLeaseGrant, SessionID: "session-1", Epoch: "epoch-1"},
 		{Kind: ControlLeaseReject, SessionID: "session-1", LeaseID: "lease-1", Epoch: "epoch-1"},
 		{Kind: ControlLeaseRevoke, SessionID: "session-1", Epoch: "epoch-1"},
+		{Kind: ControlLeaseCommit, SessionID: "session-1", Epoch: "epoch-1"},
+		{Kind: ControlLeaseAbort, SessionID: "session-1", Epoch: "epoch-1"},
 		{Kind: ControlLeaseRequest, SessionID: strings.Repeat("s", maxIdentifierSize+1), Epoch: "epoch-1", Edge: control.ScreenEdgeRight},
 		{Kind: ControlLeaseGrant, SessionID: "session-1", LeaseID: "lease-1", Epoch: "epoch-1", Edge: control.ScreenEdgeLeft},
 	}

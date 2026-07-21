@@ -44,7 +44,8 @@ func TestOutboundControllerActivatesSourceOnlyAfterGrant(t *testing.T) {
 func TestOutboundControllerActivationFailureCleansGrantedLease(t *testing.T) {
 	runtime := newLocalRuntime(t)
 	source := &recordingSourceActivation{activateErr: errors.New("hook worker unavailable")}
-	controller, err := NewOutboundController(testWriteCoordinator(t, &recordingFrameWriter{}), runtime, source)
+	writer := &recordingFrameWriter{}
+	controller, err := NewOutboundController(testWriteCoordinator(t, writer), runtime, source)
 	if err != nil {
 		t.Fatalf("NewOutboundController() error = %v", err)
 	}
@@ -52,14 +53,21 @@ func TestOutboundControllerActivationFailureCleansGrantedLease(t *testing.T) {
 		t.Fatalf("Begin() error = %v", err)
 	}
 	grant := transport.ControlCommand{Kind: transport.ControlLeaseGrant, SessionID: "session-1", LeaseID: "lease-1", Epoch: "epoch-1"}
-	if err := controller.GrantPeer(context.Background(), grant, time.Unix(100, 0)); err == nil {
-		t.Fatal("GrantPeer() error = nil")
+	if err := controller.GrantPeer(context.Background(), grant, time.Unix(100, 0)); err != nil {
+		t.Fatalf("GrantPeer() error = %v", err)
 	}
 	if source.active {
 		t.Fatal("source remained active after activation failure")
 	}
 	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal {
 		t.Fatalf("runtime did not fail safe: %s", snapshot)
+	}
+	if len(writer.frames) != 2 {
+		t.Fatalf("written frames = %d, want request and abort", len(writer.frames))
+	}
+	abort, err := transport.DecodeControlPayload(writer.frames[1].Payload)
+	if err != nil || abort.Kind != transport.ControlLeaseAbort || abort.LeaseID != "lease-1" {
+		t.Fatalf("abort = %+v, %v", abort, err)
 	}
 }
 

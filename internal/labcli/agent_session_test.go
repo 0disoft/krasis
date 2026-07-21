@@ -3,6 +3,7 @@ package labcli
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/lab"
+	"github.com/0disoft/krasis/internal/peer"
 	"github.com/0disoft/krasis/internal/transport"
 	"github.com/0disoft/krasis/internal/truststore"
 	"github.com/0disoft/krasis/internal/wininput"
@@ -202,6 +204,69 @@ func TestTrustStoreAuthorizerMapsActiveAndRevokedRecords(t *testing.T) {
 	}
 }
 
+type mutableTrustDocumentSource struct {
+	document truststore.Document
+	err      error
+}
+
+func (source *mutableTrustDocumentSource) List() (truststore.Document, error) {
+	if source.err != nil {
+		return truststore.Document{}, source.err
+	}
+	return source.document, nil
+}
+
+func TestReloadingTrustStoreAuthorizerAppliesRevocationToNextLease(t *testing.T) {
+	now := time.Now().UTC()
+	peerContext := transport.AuthenticatedPeerContext{
+		CertificateSHA256: strings.Repeat("b", 64), Role: transport.AuthenticatedPeerConnector,
+	}
+	source := &mutableTrustDocumentSource{document: truststore.Document{
+		SchemaVersion: truststore.SchemaVersion, Revision: 1, UpdatedAt: now,
+		Peers: []truststore.PeerRecord{{
+			Fingerprint: peerContext.CertificateSHA256, Role: peerContext.Role, Alias: "peer",
+			AllowInboundControl: true, CreatedAt: now,
+		}},
+	}}
+	authorizer, err := newReloadingTrustStoreAuthorizer(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, accepted, err := authorizer.AuthorizeLease(context.Background(), peerContext, "session-1", "epoch-1", now); err != nil || !accepted {
+		t.Fatalf("active authorization accepted=%t error=%v", accepted, err)
+	}
+
+	revokedAt := now.Add(time.Second)
+	source.document.Revision++
+	source.document.UpdatedAt = revokedAt
+	source.document.Peers[0].RevokedAt = &revokedAt
+	if _, accepted, err := authorizer.AuthorizeLease(context.Background(), peerContext, "session-2", "epoch-2", revokedAt); err != nil || accepted {
+		t.Fatalf("revoked authorization accepted=%t error=%v", accepted, err)
+	}
+}
+
+func TestReloadingTrustStoreAuthorizerFailsClosedWhenReloadFails(t *testing.T) {
+	now := time.Now().UTC()
+	peerContext := transport.AuthenticatedPeerContext{
+		CertificateSHA256: strings.Repeat("c", 64), Role: transport.AuthenticatedPeerConnector,
+	}
+	source := &mutableTrustDocumentSource{document: truststore.Document{
+		SchemaVersion: truststore.SchemaVersion, Revision: 1, UpdatedAt: now,
+		Peers: []truststore.PeerRecord{{
+			Fingerprint: peerContext.CertificateSHA256, Role: peerContext.Role, Alias: "peer",
+			AllowInboundControl: true, CreatedAt: now,
+		}},
+	}}
+	authorizer, err := newReloadingTrustStoreAuthorizer(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source.err = errors.New("test reload failure")
+	if _, accepted, err := authorizer.AuthorizeLease(context.Background(), peerContext, "session", "epoch", now); err == nil || accepted {
+		t.Fatalf("reload failure accepted=%t error=%v", accepted, err)
+	}
+}
+
 func TestLifecycleFailureCodeIsStable(t *testing.T) {
 	if code := lifecycleFailureCode("session_lock"); code != "lifecycle_session_lock" {
 		t.Fatalf("lifecycleFailureCode() = %q", code)
@@ -220,18 +285,38 @@ func TestResolveAgentSessionOutputPathsRequiresSameDirectory(t *testing.T) {
 	}
 }
 
+func TestResolveAgentSessionPathsRequiresFreshStopFileInReportDirectory(t *testing.T) {
+	directory := t.TempDir()
+	report := filepath.Join(directory, "agent.json")
+	guard := filepath.Join(directory, "guard.json")
+	stop := filepath.Join(directory, ".stop")
+	_, _, resolvedStop, err := resolveAgentSessionPaths(report, guard, stop)
+	if err != nil || resolvedStop != stop {
+		t.Fatalf("resolveAgentSessionPaths() stop=%q error=%v", resolvedStop, err)
+	}
+	if _, _, _, err := resolveAgentSessionPaths(report, guard, filepath.Join(t.TempDir(), ".stop")); err == nil {
+		t.Fatal("resolveAgentSessionPaths accepted stop file in another directory")
+	}
+	if err := os.WriteFile(stop, []byte("stop\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err := resolveAgentSessionPaths(report, guard, stop); err == nil {
+		t.Fatal("resolveAgentSessionPaths accepted an existing stop file")
+	}
+}
+
 func TestParseAgentSessionConnectArgs(t *testing.T) {
 	options, err := parseAgentSessionArgs([]string{
 		"connect", "--device", "H-B", "--address", "192.0.2.10:24876", "--server-name", "192.0.2.10",
 		"--ca", "ca.pem", "--cert", "identity.pem", "--key", "identity-key.pem",
 		"--trust-store", "trust",
 		"--edge", "left", "--duration", "2m", "--heartbeat-interval", "500ms", "--peer-timeout", "3s",
-		"--output", "report.json", "--guard-output", "guard.json", "--allow-live-input",
+		"--output", "report.json", "--guard-output", "guard.json", "--stop-file", ".stop", "--allow-live-input",
 	})
 	if err != nil {
 		t.Fatalf("parseAgentSessionArgs() error = %v", err)
 	}
-	if options.edge != control.ScreenEdgeLeft || options.duration != 2*time.Minute || options.heartbeat != 500*time.Millisecond || options.peerTimeout != 3*time.Second || options.rearmDistance != defaultAgentRearmDistance {
+	if options.edge != control.ScreenEdgeLeft || options.duration != 2*time.Minute || options.heartbeat != 500*time.Millisecond || options.peerTimeout != 3*time.Second || options.rearmDistance != defaultAgentRearmDistance || options.stopFile != ".stop" {
 		t.Fatalf("options = %+v", options)
 	}
 }
@@ -332,6 +417,15 @@ func TestAgentSessionEvidenceRequiresConnectionAndLocalInputActivity(t *testing.
 	report.SourcePipeline.Wheel = lab.WheelPipelineEvidence{
 		CaptureActivations: 1, CaptureDeactivations: 1, FocusRestoreSkipped: 1,
 	}
+	report.SourcePipeline.Queue = lab.SourceQueueEvidence{
+		Enqueued: 8, Dequeued: 8, MaxDepth: 1, ResidenceSamples: 8, MaxResidenceMicros: 1,
+	}
+	report.ControlFlow.Boundary = lab.BoundaryFlowEvidence{Queued: 1, Admitted: 1}
+	report.ControlFlow.Outbound = lab.OutboundFlowEvidence{
+		RequestWriteCompleted: 1, GrantReceived: 1, GrantApplySucceeded: 1,
+		SourceSessionActivationSucceeded: 1, CaptureActivationAttempted: 1, CaptureActivationSucceeded: 1,
+		CommitWriteCompleted: 1,
+	}
 	if code := agentSessionEvidenceExit(&report); code != exitSuccess || !report.Passed {
 		t.Fatalf("source-only evidence = code %d report %+v", code, report)
 	}
@@ -347,16 +441,22 @@ func TestAgentSessionEvidenceRequiresConnectionAndLocalInputActivity(t *testing.
 		t.Fatalf("invalid pipeline evidence = code %d report %+v", code, report)
 	}
 	report = lab.AgentSessionReport{
-		PeerTimeoutMillis: 3_000,
-		Supervisor:        lab.SupervisorEvidence{ActiveCount: 1},
-		Liveness:          lab.LivenessEvidence{HeartbeatsSent: 2, HeartbeatsReceived: 2, ReceiveGapSamples: 1, MaxReceiveGapMillis: 500},
-		DestinationInput:  lab.InputEvidence{Entries: 1, PointerMoves: 1},
+		PeerTimeoutMillis:   3_000,
+		Supervisor:          lab.SupervisorEvidence{ActiveCount: 1},
+		Liveness:            lab.LivenessEvidence{HeartbeatsSent: 2, HeartbeatsReceived: 2, ReceiveGapSamples: 1, MaxReceiveGapMillis: 500},
+		DestinationInput:    lab.InputEvidence{Entries: 1, PointerMoves: 1},
+		DestinationPipeline: lab.DestinationPipelineEvidence{Received: 1, Applied: 1},
+		ControlFlow: lab.ControlFlowEvidence{Inbound: lab.InboundFlowEvidence{
+			RequestReceived: 1, ReturnArmSucceeded: 0, EntryPrepareAttempted: 1, EntryPrepared: 1,
+			GrantWriteCompleted: 1, CommitReceived: 1, EntryCommitted: 1,
+		}},
 	}
 	if code := agentSessionEvidenceExit(&report); code != exitRuntime || report.FailureCode != "no_input_activity_observed" {
 		t.Fatalf("unarmed destination evidence = code %d report %+v", code, report)
 	}
 	report.FailureCode = ""
 	report.DestinationInput.ReturnArms = 1
+	report.ControlFlow.Inbound.ReturnArmSucceeded = 1
 	if code := agentSessionEvidenceExit(&report); code != exitSuccess || !report.Passed {
 		t.Fatalf("passing destination evidence = code %d report %+v", code, report)
 	}
@@ -401,6 +501,88 @@ func TestAgentSessionEvidenceRequiresConnectionAndLocalInputActivity(t *testing.
 	}
 }
 
+func TestAgentSessionEvidenceClassifiesControlFlowFailures(t *testing.T) {
+	base := lab.AgentSessionReport{
+		PeerTimeoutMillis: 3_000,
+		Supervisor:        lab.SupervisorEvidence{ActiveCount: 1},
+		Liveness:          lab.LivenessEvidence{HeartbeatsSent: 2, HeartbeatsReceived: 2, ReceiveGapSamples: 1, MaxReceiveGapMillis: 500},
+	}
+
+	report := base
+	report.SourceInput = lab.SourceInputEvidence{BoundaryIntents: 2, PointerMoves: 1}
+	report.SourcePipeline.Wheel = lab.WheelPipelineEvidence{
+		CaptureActivations: 1, CaptureDeactivations: 1, FocusRestoreSkipped: 1,
+	}
+	report.SourcePipeline.Queue = lab.SourceQueueEvidence{
+		Enqueued: 1, Dequeued: 1, MaxDepth: 1, ResidenceSamples: 1, MaxResidenceMicros: 1,
+	}
+	report.ControlFlow.Boundary = lab.BoundaryFlowEvidence{Queued: 2, Admitted: 1, DroppedNotReady: 1}
+	report.ControlFlow.Outbound = lab.OutboundFlowEvidence{
+		RequestWriteCompleted: 1, GrantReceived: 1, GrantApplySucceeded: 1,
+		SourceSessionActivationSucceeded: 1, CaptureActivationAttempted: 1, CaptureActivationSucceeded: 1,
+		CommitWriteCompleted: 1,
+	}
+	if code := agentSessionEvidenceExit(&report); code != exitRuntime || report.FailureCode != "boundary_not_ready_drop_observed" {
+		t.Fatalf("boundary drop evidence = code %d report %+v", code, report)
+	}
+
+	report = base
+	report.SourceInput.BoundaryIntents = 1
+	report.ControlFlow.Boundary = lab.BoundaryFlowEvidence{Queued: 1, AdmissionFailed: 1}
+	report.ControlFlow.Outbound.RequestWriteOutcomeUnknown = 1
+	if code := agentSessionEvidenceExit(&report); code != exitRuntime || report.FailureCode != "control_flow_failure_observed" {
+		t.Fatalf("stage failure evidence = code %d report %+v", code, report)
+	}
+
+	report = lab.AgentSessionReport{
+		PeerTimeoutMillis: 3_000,
+		Supervisor: lab.SupervisorEvidence{
+			ActiveCount:     1,
+			SessionFailures: 1,
+			FirstFailure: lab.FailureDescriptorEvidence{
+				Component: "source-capture", Phase: "capture-activate", Code: "activation_failed",
+			},
+			FailureCounts: []lab.FailureCountEvidence{{
+				FailureDescriptorEvidence: lab.FailureDescriptorEvidence{
+					Component: "source-capture", Phase: "capture-activate", Code: "activation_failed",
+				},
+				Count: 1,
+			}},
+		},
+		SourceInput: lab.SourceInputEvidence{BoundaryIntents: 1},
+		ControlFlow: lab.ControlFlowEvidence{
+			Boundary: lab.BoundaryFlowEvidence{Queued: 1, Admitted: 1},
+			Outbound: lab.OutboundFlowEvidence{
+				RequestWriteCompleted: 1, GrantReceived: 1, GrantApplySucceeded: 1,
+				SourceSessionActivationSucceeded: 1, CaptureActivationAttempted: 1,
+				CaptureActivationFailed: 1, CaptureActivationSetupFailed: 1, AbortWriteCompleted: 1,
+			},
+		},
+	}
+	if code := agentSessionEvidenceExit(&report); code != exitRuntime || report.FailureCode != "control_flow_failure_observed" {
+		t.Fatalf("stage failure masked by liveness = code %d report %+v", code, report)
+	}
+
+	report = base
+	report.SourceInput = lab.SourceInputEvidence{BoundaryIntents: 1, PointerMoves: 1}
+	report.SourcePipeline.Wheel = lab.WheelPipelineEvidence{
+		CaptureActivations: 1, CaptureDeactivations: 1, FocusRestoreSkipped: 1,
+	}
+	report.SourcePipeline.Queue = lab.SourceQueueEvidence{
+		Enqueued: 1, Dequeued: 1, MaxDepth: 1, ResidenceSamples: 1, MaxResidenceMicros: 1,
+	}
+	report.ControlFlow.Boundary.Queued = 1
+	if code := agentSessionEvidenceExit(&report); code != exitRuntime || report.FailureCode != "invalid_control_flow_evidence" {
+		t.Fatalf("invalid control flow evidence = code %d report %+v", code, report)
+	}
+
+	report = base
+	report.Supervisor.SessionFailures = 1
+	if code := agentSessionEvidenceExit(&report); code != exitRuntime || report.FailureCode != "invalid_failure_evidence" {
+		t.Fatalf("invalid failure evidence = code %d report %+v", code, report)
+	}
+}
+
 func TestAgentSessionObserverAggregatesReceiveGapsWithoutCrossingSessions(t *testing.T) {
 	observer := &agentSessionObserver{}
 	observer.ObserveHeartbeatSent("session-1", time.Unix(100, 0))
@@ -434,13 +616,29 @@ func TestAgentSessionObserverAggregatesSourceInputWithoutPayloads(t *testing.T) 
 
 func TestAgentSessionObserverAggregatesWheelPipelineAndFailureComponent(t *testing.T) {
 	observer := &agentSessionObserver{}
+	observer.ObserveControlFlow(peer.ControlFlowBoundaryBlockedLocalMenu)
 	observer.ObserveWheelHook()
 	observer.ObserveWheelSynthesized()
 	observer.ObserveWheelRaw()
 	observer.ObserveWheelWindow()
 	observer.ObserveWheelCaptureActivated()
 	observer.ObserveWheelCaptureDeactivated()
+	observer.ObserveWheelForegroundFallback(wininput.SourceForegroundFallbackSucceeded)
+	observer.ObserveWheelForegroundFallback(wininput.SourceForegroundFallbackAttachFailed)
+	observer.ObserveWheelForegroundFallback(wininput.SourceForegroundFallbackDetachFailed)
+	observer.ObserveWheelForegroundFallback(wininput.SourceForegroundFallbackAPIRejected)
+	observer.ObserveWheelForegroundFallback(wininput.SourceForegroundFallbackVerificationLost)
+	observer.ObserveWheelFocusRestoreFallback(wininput.SourceFocusRestoreFallbackSucceeded)
+	observer.ObserveWheelFocusRestoreFallback(wininput.SourceFocusRestoreFallbackAttachFailed)
+	observer.ObserveWheelFocusRestoreFallback(wininput.SourceFocusRestoreFallbackDetachFailed)
+	observer.ObserveWheelFocusRestoreFallback(wininput.SourceFocusRestoreFallbackAPIRejected)
+	observer.ObserveWheelFocusRestoreFallback(wininput.SourceFocusRestoreFallbackVerificationLost)
 	observer.ObserveWheelFocusRestore(wininput.SourceFocusRestoreSucceeded)
+	observer.ObserveWheelFocusRestore(wininput.SourceFocusRestoreAPIRejected)
+	observer.ObserveWheelFocusRestore(wininput.SourceFocusRestoreVerificationLost)
+	observer.ObserveWheelPostHideFocus(wininput.SourcePostHideFocusRecovered)
+	observer.ObserveWheelPostHideFocus(wininput.SourcePostHideFocusUnavailable)
+	observer.ObserveWheelPostHideFocus(wininput.SourcePostHideFocusCaptureRetained)
 	observer.ObserveActiveHookMouseMove()
 	observer.ObserveActiveHookMouseButton()
 	observer.ObserveWheelMapped()
@@ -450,18 +648,32 @@ func TestAgentSessionObserverAggregatesWheelPipelineAndFailureComponent(t *testi
 	observer.ObserveWheelQueue(wininput.SourceQueueRejectedOverflow)
 	observer.ObserveSupervisor(agent.SupervisorSnapshot{
 		State: agent.SupervisorBackoff, FailureKind: "session", FailureComponent: "source-session",
+		FailurePhase: "runtime", FailureCode: "component_failed",
 	})
 	observer.ObserveSupervisor(agent.SupervisorSnapshot{
 		State: agent.SupervisorBackoff, FailureKind: "session", FailureComponent: "peer-session",
+		FailurePhase: "runtime", FailureCode: "component_failed",
 	})
 	wheel := observer.sourcePipelineEvidence().Wheel
 	if wheel.HookObserved != 1 || wheel.SynthesizedObserved != 1 || wheel.RawObserved != 1 || wheel.WindowObserved != 1 ||
 		wheel.CaptureActivations != 1 || wheel.CaptureDeactivations != 1 || wheel.FocusRestored != 1 ||
+		wheel.ForegroundFallbackAttempted != 5 || wheel.ForegroundFallbackSucceeded != 1 ||
+		wheel.ForegroundFallbackAttachFailed != 1 || wheel.ForegroundFallbackDetachFailed != 1 ||
+		wheel.ForegroundFallbackAPIRejected != 1 || wheel.ForegroundFallbackVerificationLost != 1 ||
+		wheel.FocusRestoreFallbackAttempted != 5 || wheel.FocusRestoreFallbackSucceeded != 1 ||
+		wheel.FocusRestoreFallbackAttachFailed != 1 || wheel.FocusRestoreFallbackDetachFailed != 1 ||
+		wheel.FocusRestoreFallbackAPIRejected != 1 || wheel.FocusRestoreFallbackVerificationLost != 1 ||
+		wheel.FocusRestoreFailed != 2 || wheel.FocusRestoreAPIRejected != 1 || wheel.FocusRestoreVerificationLost != 1 ||
+		wheel.PostHideFocusAttempted != 3 || wheel.PostHideFocusRecovered != 1 || wheel.PostHideFocusUnavailable != 1 ||
+		wheel.PostHideFocusCaptureRetained != 1 ||
 		wheel.ActiveHookMoves != 1 || wheel.ActiveHookButtons != 1 || wheel.Mapped != 1 || wheel.QueueAccepted != 1 || wheel.QueueRejected != 3 ||
 		wheel.RejectedInactive != 1 || wheel.RejectedInvalid != 1 || wheel.RejectedOverflow != 1 {
 		t.Fatalf("wheel pipeline = %+v", wheel)
 	}
-	if evidence := observer.evidence(); evidence.LastFailureComponent != "source-session" || evidence.SessionFailures != 2 {
+	if evidence := observer.evidence(); evidence.FirstFailure.Component != "source-session" || evidence.SessionFailures != 2 || len(evidence.FailureCounts) != 2 {
 		t.Fatalf("supervisor evidence = %+v", evidence)
+	}
+	if evidence := observer.controlFlowEvidence(); evidence.Boundary.BlockedLocalMenu != 1 {
+		t.Fatalf("control flow evidence = %+v", evidence)
 	}
 }

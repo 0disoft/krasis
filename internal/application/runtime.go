@@ -34,6 +34,19 @@ type RuntimeSnapshot struct {
 	PressedCount      int
 }
 
+type InputDisposition uint8
+
+const (
+	InputDispositionApplied InputDisposition = iota + 1
+	InputDispositionRetiredDrained
+	InputDispositionRejected
+)
+
+type InputDispositionObserver interface {
+	ObserveDestinationInputReceived()
+	ObserveDestinationInputDisposition(InputDisposition)
+}
+
 // SessionRuntime is the single serialized owner of one peer session's mutable
 // control, ordering, liveness, and pressed-input state.
 type SessionRuntime struct {
@@ -46,15 +59,25 @@ type SessionRuntime struct {
 	pressed        control.PressedState
 	executor       *SafetyEffectExecutor
 	input          InputPort
+	inputObserver  InputDispositionObserver
 }
 
 func NewSessionRuntime(delegate EffectExecutor, input InputPort) (*SessionRuntime, error) {
+	return NewSessionRuntimeObserved(delegate, input, nil)
+}
+
+func NewSessionRuntimeObserved(
+	delegate EffectExecutor,
+	input InputPort,
+	observer InputDispositionObserver,
+) (*SessionRuntime, error) {
 	if delegate == nil || input == nil {
 		return nil, errors.New("effect delegate and input port are required")
 	}
 	runtime := &SessionRuntime{
-		control: control.InitialSnapshot(),
-		input:   input,
+		control:       control.InitialSnapshot(),
+		input:         input,
+		inputObserver: observer,
 	}
 	executor, err := NewSafetyEffectExecutor(delegate, &runtime.pressed, input)
 	if err != nil {
@@ -78,8 +101,9 @@ func (runtime *SessionRuntime) Dispatch(
 	runtime.mu.Lock()
 	defer runtime.mu.Unlock()
 
-	if event.Kind == control.EventInboundLeaseGranted {
-		return ControlOutcome{}, errors.New("inbound lease grants require GrantInbound")
+	if event.Kind == control.EventInboundLeaseGranted || event.Kind == control.EventInboundLeasePrepared ||
+		event.Kind == control.EventInboundLeaseCommitted || event.Kind == control.EventInboundLeaseAborted {
+		return ControlOutcome{}, errors.New("inbound lease transitions require dedicated runtime methods")
 	}
 	if event.Kind == control.EventOutboundIntentDetected {
 		return ControlOutcome{}, errors.New("outbound intents require BeginOutbound")
@@ -89,6 +113,9 @@ func (runtime *SessionRuntime) Dispatch(
 	}
 	if event.Kind == control.EventOutboundLeaseRejected {
 		return ControlOutcome{}, errors.New("outbound lease rejections require RejectOutbound")
+	}
+	if event.Kind == control.EventOutboundLeaseAborted {
+		return ControlOutcome{}, errors.New("outbound lease aborts require AbortOutbound")
 	}
 	if event.Kind == control.EventReleaseAllSucceeded || event.Kind == control.EventReleaseAllFailed {
 		return ControlOutcome{}, errors.New("ReleaseAll completion events are runtime-internal")
@@ -200,6 +227,32 @@ func (runtime *SessionRuntime) RejectOutbound(
 	return outcome, err
 }
 
+func (runtime *SessionRuntime) AbortOutbound(
+	ctx context.Context,
+	sessionID string,
+	leaseID string,
+	epoch string,
+) (ControlOutcome, error) {
+	runtime.mu.Lock()
+	defer runtime.mu.Unlock()
+	if runtime.control.State != control.StatePending && runtime.control.State != control.StateOutboundActive {
+		return ControlOutcome{}, errors.New("outbound abort requires a pending or active outbound stream")
+	}
+	if runtime.outbound.SessionID != sessionID || runtime.outbound.Epoch != epoch || leaseID == "" {
+		return runtime.faultLocked(ctx, errors.New("outbound abort does not match session, lease, and epoch"))
+	}
+	if runtime.control.State == control.StateOutboundActive && runtime.control.LeaseID != leaseID {
+		return runtime.faultLocked(ctx, errors.New("outbound abort does not match the active lease"))
+	}
+	outcome, err := HandleControlEvent(ctx, runtime.control, control.Event{
+		Kind:      control.EventOutboundLeaseAborted,
+		SessionID: sessionID,
+		LeaseID:   leaseID,
+	}, runtime.executor)
+	runtime.applyOutcomeLocked(outcome)
+	return outcome, err
+}
+
 func (runtime *SessionRuntime) RevokePeer(
 	ctx context.Context,
 	sessionID string,
@@ -261,32 +314,103 @@ func (runtime *SessionRuntime) GrantInbound(
 	epoch string,
 	observedAt time.Time,
 ) (ControlOutcome, error) {
-	runtime.mu.Lock()
-	defer runtime.mu.Unlock()
-
 	if event.Kind != control.EventInboundLeaseGranted {
 		return ControlOutcome{}, errors.New("GrantInbound requires an inbound lease grant event")
 	}
-	stream, err := control.NewInputStream(event.SessionID, epoch)
+	if _, err := runtime.PrepareInbound(ctx, event.SessionID, event.LeaseID, epoch); err != nil {
+		return ControlOutcome{}, err
+	}
+	return runtime.CommitInbound(ctx, event.SessionID, event.LeaseID, epoch, observedAt)
+}
+
+func (runtime *SessionRuntime) PrepareInbound(
+	ctx context.Context,
+	sessionID string,
+	leaseID string,
+	epoch string,
+) (ControlOutcome, error) {
+	runtime.mu.Lock()
+	defer runtime.mu.Unlock()
+
+	stream, err := control.NewInputStream(sessionID, epoch)
 	if err != nil {
 		return ControlOutcome{}, err
 	}
-	liveness, err := control.NewPeerLiveness(event.SessionID, observedAt)
+	outcome, err := HandleControlEvent(ctx, runtime.control, control.Event{
+		Kind:      control.EventInboundLeasePrepared,
+		SessionID: sessionID,
+		LeaseID:   leaseID,
+	}, runtime.executor)
+	runtime.applyOutcomeLocked(outcome)
 	if err != nil {
-		return ControlOutcome{}, err
+		return outcome, err
 	}
-	outcome, err := HandleControlEvent(ctx, runtime.control, event, runtime.executor)
+	if outcome.Snapshot.State != control.StateInboundPending {
+		return runtime.faultLocked(ctx, errors.New("inbound preparation did not produce inbound-pending state"))
+	}
+	runtime.stream = stream
+	runtime.retiredInbound = control.InputStream{}
+	return outcome, nil
+}
+
+func (runtime *SessionRuntime) CommitInbound(
+	ctx context.Context,
+	sessionID string,
+	leaseID string,
+	epoch string,
+	observedAt time.Time,
+) (ControlOutcome, error) {
+	runtime.mu.Lock()
+	defer runtime.mu.Unlock()
+
+	if runtime.control.State != control.StateInboundPending || runtime.stream.SessionID == "" {
+		return ControlOutcome{}, errors.New("inbound commit requires a prepared inbound stream")
+	}
+	if runtime.control.SessionID != sessionID || runtime.control.LeaseID != leaseID || runtime.stream.Epoch != epoch {
+		return runtime.faultLocked(ctx, errors.New("inbound commit does not match prepared session, lease, and epoch"))
+	}
+	liveness, err := control.NewPeerLiveness(sessionID, observedAt)
+	if err != nil {
+		return runtime.faultLocked(ctx, err)
+	}
+	outcome, err := HandleControlEvent(ctx, runtime.control, control.Event{
+		Kind:      control.EventInboundLeaseCommitted,
+		SessionID: sessionID,
+		LeaseID:   leaseID,
+	}, runtime.executor)
 	runtime.applyOutcomeLocked(outcome)
 	if err != nil {
 		return outcome, err
 	}
 	if outcome.Snapshot.State != control.StateInboundActive {
-		return runtime.faultLocked(ctx, errors.New("inbound grant did not produce inbound-active state"))
+		return runtime.faultLocked(ctx, errors.New("inbound commit did not produce inbound-active state"))
 	}
-	runtime.stream = stream
-	runtime.retiredInbound = control.InputStream{}
 	runtime.liveness = liveness
 	return outcome, nil
+}
+
+func (runtime *SessionRuntime) AbortInbound(
+	ctx context.Context,
+	sessionID string,
+	leaseID string,
+	epoch string,
+) (ControlOutcome, error) {
+	runtime.mu.Lock()
+	defer runtime.mu.Unlock()
+
+	if runtime.control.State != control.StateInboundPending || runtime.stream.SessionID == "" {
+		return ControlOutcome{}, errors.New("inbound abort requires a prepared inbound stream")
+	}
+	if runtime.control.SessionID != sessionID || runtime.control.LeaseID != leaseID || runtime.stream.Epoch != epoch {
+		return runtime.faultLocked(ctx, errors.New("inbound abort does not match prepared session, lease, and epoch"))
+	}
+	outcome, err := HandleControlEvent(ctx, runtime.control, control.Event{
+		Kind:      control.EventInboundLeaseAborted,
+		SessionID: sessionID,
+		LeaseID:   leaseID,
+	}, runtime.executor)
+	runtime.applyOutcomeLocked(outcome)
+	return outcome, err
 }
 
 func (runtime *SessionRuntime) HandlePressedInput(
@@ -323,9 +447,16 @@ func (runtime *SessionRuntime) HandleInputAction(
 	ctx context.Context,
 	envelope control.InputEnvelope,
 	action control.InputAction,
-) error {
+) (returnErr error) {
 	runtime.mu.Lock()
 	defer runtime.mu.Unlock()
+	disposition := InputDispositionRejected
+	if runtime.inputObserver != nil {
+		runtime.inputObserver.ObserveDestinationInputReceived()
+		defer func() {
+			runtime.inputObserver.ObserveDestinationInputDisposition(disposition)
+		}()
+	}
 
 	if runtime.control.State != control.StateInboundActive || runtime.stream.SessionID == "" {
 		if runtime.control.State == control.StateLocal && runtime.retiredInbound.SessionID != "" {
@@ -337,6 +468,7 @@ func (runtime *SessionRuntime) HandleInputAction(
 				return err
 			}
 			runtime.retiredInbound = next
+			disposition = InputDispositionRetiredDrained
 			return nil
 		}
 		if runtime.control.State != control.StateLocal {
@@ -377,6 +509,7 @@ func (runtime *SessionRuntime) HandleInputAction(
 		err = runtime.input.Wheel(ctx, action.DeltaX, action.DeltaY)
 	}
 	if err == nil {
+		disposition = InputDispositionApplied
 		return nil
 	}
 	_, faultErr := runtime.faultLocked(ctx, err)
@@ -463,7 +596,7 @@ func (runtime *SessionRuntime) applyOutcomeLocked(outcome ControlOutcome) {
 		return
 	}
 	runtime.control = outcome.Snapshot
-	if runtime.control.State != control.StateInboundActive {
+	if runtime.control.State != control.StateInboundPending && runtime.control.State != control.StateInboundActive {
 		runtime.stream = control.InputStream{}
 	}
 	if runtime.control.State != control.StatePending && runtime.control.State != control.StateOutboundActive {

@@ -53,10 +53,6 @@ func (connection *PeerConnection) ReadFrame() (Frame, error) {
 	return connection.reader.ReadFrame()
 }
 
-func (connection *PeerConnection) WriteFrame(frame Frame) error {
-	return connection.WriteFrameContext(context.Background(), frame)
-}
-
 func (connection *PeerConnection) WriteFrameContext(ctx context.Context, frame Frame) error {
 	if connection == nil || connection.writer == nil || connection.connection == nil || connection.writeGate == nil {
 		return errors.New("peer connection is not initialized")
