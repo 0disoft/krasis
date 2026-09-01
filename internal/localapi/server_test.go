@@ -76,6 +76,7 @@ func TestServerRejectsUnknownTrailingAndOversizedRequestsBeforeDispatch(t *testi
 	for _, body := range []string{
 		`{"schemaVersion":"krasis.agent.operation/v1","unknown":true}`,
 		`{"schemaVersion":"krasis.agent.operation/v1"} {}`,
+		`{"schemaVersion":"krasis.agent.operation/v1","peerAlias":"peer\nforged"}`,
 		`{"schemaVersion":"krasis.agent.operation/v1","peerAlias":"` + strings.Repeat("x", maxRequestBytes) + `"}`,
 	} {
 		response := request(t, client, credentials, http.MethodPost, "/v1/connect", body)

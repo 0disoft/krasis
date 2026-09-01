@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
+	"unicode/utf8"
 )
 
 const (
@@ -24,10 +26,12 @@ const (
 )
 
 type Status struct {
-	SchemaVersion string   `json:"schemaVersion"`
-	State         string   `json:"state"`
-	PeerAlias     string   `json:"peerAlias,omitempty"`
-	Actions       []string `json:"actions"`
+	SchemaVersion      string   `json:"schemaVersion"`
+	State              string   `json:"state"`
+	PeerAlias          string   `json:"peerAlias,omitempty"`
+	Actions            []string `json:"actions"`
+	DeviceFingerprint  string   `json:"deviceFingerprint"`
+	IdentityGeneration uint64   `json:"identityGeneration"`
 }
 
 type OperationRequest struct {
@@ -162,11 +166,11 @@ func (handler *handler) ServeHTTP(response http.ResponseWriter, request *http.Re
 		}
 		writeJSON(response, http.StatusOK, value)
 	case "/v1/connect":
-		handler.operation(response, request, handler.operations.Connect)
+		handler.operation(response, request, "connect", handler.operations.Connect)
 	case "/v1/disconnect":
-		handler.operation(response, request, handler.operations.Disconnect)
+		handler.operation(response, request, "disconnect", handler.operations.Disconnect)
 	case "/v1/pair":
-		handler.operation(response, request, handler.operations.Pair)
+		handler.operation(response, request, "pair", handler.operations.Pair)
 	case "/v1/diagnostics":
 		if request.Method != http.MethodGet {
 			writeMethodNotAllowed(response)
@@ -194,13 +198,13 @@ func (handler *handler) ServeHTTP(response http.ResponseWriter, request *http.Re
 	}
 }
 
-func (handler *handler) operation(response http.ResponseWriter, request *http.Request, operation func(context.Context, OperationRequest) (OperationResult, error)) {
+func (handler *handler) operation(response http.ResponseWriter, request *http.Request, kind string, operation func(context.Context, OperationRequest) (OperationResult, error)) {
 	if request.Method != http.MethodPost || !strings.HasPrefix(request.Header.Get("Content-Type"), "application/json") {
 		writeMethodNotAllowed(response)
 		return
 	}
 	var value OperationRequest
-	if err := decodeStrict(request.Body, &value); err != nil || value.SchemaVersion != OperationSchemaVersion {
+	if err := decodeStrict(request.Body, &value); err != nil || value.SchemaVersion != OperationSchemaVersion || validateOperationRequest(kind, value) != nil {
 		writeResult(response, http.StatusBadRequest, OperationResult{SchemaVersion: ResultSchemaVersion, Status: "REJECTED", Code: "invalid_request"})
 		return
 	}
@@ -210,6 +214,75 @@ func (handler *handler) operation(response http.ResponseWriter, request *http.Re
 		return
 	}
 	writeJSON(response, http.StatusOK, result)
+}
+
+func validateOperationRequest(kind string, value OperationRequest) error {
+	switch kind {
+	case "connect":
+		if !validAlias(value.PeerAlias) || value.PairingAction != "" || value.PairingID != "" || value.ConfirmationCode != "" || value.AllowInboundControl != nil {
+			return errors.New("connect request is invalid")
+		}
+	case "disconnect":
+		if value.PeerAlias != "" || value.PairingAction != "" || value.PairingID != "" || value.ConfirmationCode != "" || value.AllowInboundControl != nil {
+			return errors.New("disconnect request is invalid")
+		}
+	case "pair":
+		switch value.PairingAction {
+		case "BEGIN":
+			if !validAlias(value.PeerAlias) || value.AllowInboundControl == nil || value.PairingID != "" || value.ConfirmationCode != "" {
+				return errors.New("pair begin request is invalid")
+			}
+		case "CONFIRM":
+			if value.PeerAlias != "" || value.AllowInboundControl != nil || !validPairingID(value.PairingID) || !validConfirmationCode(value.ConfirmationCode) {
+				return errors.New("pair confirm request is invalid")
+			}
+		case "CANCEL":
+			if value.PeerAlias != "" || value.AllowInboundControl != nil || !validPairingID(value.PairingID) || value.ConfirmationCode != "" {
+				return errors.New("pair cancel request is invalid")
+			}
+		default:
+			return errors.New("pairing action is invalid")
+		}
+	default:
+		return errors.New("operation kind is invalid")
+	}
+	return nil
+}
+
+func validAlias(value string) bool {
+	if value == "" || strings.TrimSpace(value) != value || !utf8.ValidString(value) || utf8.RuneCountInString(value) > 64 {
+		return false
+	}
+	for _, character := range value {
+		if unicode.IsControl(character) {
+			return false
+		}
+	}
+	return true
+}
+
+func validPairingID(value string) bool {
+	if len(value) != 32 {
+		return false
+	}
+	for _, character := range value {
+		if (character < '0' || character > '9') && (character < 'a' || character > 'f') {
+			return false
+		}
+	}
+	return true
+}
+
+func validConfirmationCode(value string) bool {
+	if len(value) != 6 {
+		return false
+	}
+	for _, character := range value {
+		if character < '0' || character > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func (handler *handler) authenticated(header string) bool {
