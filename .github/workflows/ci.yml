@@ -55,10 +55,11 @@ jobs:
           }
           go vet -unsafeptr=false ./internal/wininput
 
-      - name: Build probe binaries
+      - name: Build Windows binaries
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force build | Out-Null
+          go build -trimpath -o build/krasis-agent.exe ./cmd/krasis-agent
           go build -trimpath -o build/krasis-lab.exe ./cmd/krasis-lab
           go build -trimpath -o build/krasis-launcher.exe ./cmd/krasis-launcher
 

@@ -91,6 +91,7 @@ func TestListenAndDialSourcesAuthenticatePeerConnection(t *testing.T) {
 	}
 	accepted := make(chan result, 1)
 	go func() { connection, nextErr := listener.Next(ctx); accepted <- result{connection, nextErr} }()
+	waitForListenRound(t, listener)
 	clientConnection, err := dialer.Next(ctx)
 	if err != nil {
 		t.Fatalf("DialSource.Next() error = %v", err)

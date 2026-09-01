@@ -1,6 +1,6 @@
 # Agent management revocation contract
 
-- Status: Active application contract; local transport is owned by issue #13
+- Status: Active application and local transport contract
 - Version: `krasis.agent.control-revoke/v1`
 - Decision: `docs/adr/0034-exact-active-lease-management-revocation.md`
 - CLI adapter: issue #14
@@ -13,7 +13,7 @@ The agent session registers its authenticated peer, runtime, write coordinator, 
 
 ## Local authorization
 
-The local transport authenticates the current user and maps the client to a `ManagementPrincipal`. Immediate lease operations require `LEASE_REVOKE`.
+The local transport uses the current process bearer credential stored under the protected product control directory and maps the authenticated current-user client to a `ManagementPrincipal`. Immediate lease operations require `LEASE_REVOKE`.
 
 Authentication and authorization happen before request parsing reaches `SessionRegistry.Revoke`. An empty principal is unauthenticated. A principal without the capability is forbidden. The principal subject is never included in the operation result or aggregate metrics.
 
@@ -21,7 +21,7 @@ The Phase 0 `krasis-lab` executable does not expose this service and does not cr
 
 ## Active target projection
 
-The future local API exposes a redacted active-control projection with:
+The local API exposes a redacted active-control projection with:
 
 ```json
 {

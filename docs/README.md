@@ -27,6 +27,9 @@
 - Exact active-lease management revocation decision: docs/adr/0034-exact-active-lease-management-revocation.md
 - Product identity and mutual pairing decision: docs/adr/0035-product-identity-and-mutual-pairing.md
 - Product pairing user flow: docs/product/04-pairing-user-flow.md
+- Resident agent ownership decision: docs/adr/0036-resident-agent-and-local-api-ownership.md
+- Resident agent local API: docs/agent/local-api.md
+- Resident agent operations: docs/ops/resident-agent.md
 - Local secure-write inventory: docs/security/local-write-inventory.md
 - Phase 0 foreground fallback decision: docs/adr/0028-bounded-foreground-thread-attach-fallback.md
 - Phase 0 focus restore fallback decision: docs/adr/0029-bounded-focus-restore-thread-attach-fallback.md

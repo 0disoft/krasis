@@ -20,7 +20,7 @@ func TestResolveWindowsPathsSeparatesDataClasses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if paths.Root != `C:\Users\zero\AppData\Local\Krasis` || paths.Identity == paths.Trust || paths.Trust == paths.Diagnostics {
+	if paths.Root != `C:\Users\zero\AppData\Local\Krasis` || paths.Identity == paths.Trust || paths.Trust == paths.Control || paths.Control == paths.Diagnostics {
 		t.Fatalf("paths = %+v", paths)
 	}
 }
