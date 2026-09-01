@@ -16,6 +16,7 @@ type Paths struct {
 	Root        string
 	Identity    string
 	Trust       string
+	Control     string
 	Diagnostics string
 }
 
@@ -82,6 +83,7 @@ func ResolveWindowsPaths(localAppData string) (Paths, error) {
 		Root:        root,
 		Identity:    filepath.Join(root, "identity"),
 		Trust:       filepath.Join(root, "trust"),
+		Control:     filepath.Join(root, "control"),
 		Diagnostics: filepath.Join(root, "diagnostics"),
 	}, nil
 }
