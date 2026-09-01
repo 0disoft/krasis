@@ -3,7 +3,7 @@
   "schemaVersion": 1,
   "generatorVersion": "0.6.12",
   "version": "0.6.12",
-  "generatedAt": "2026-09-01T10:45:23.814Z",
+  "generatedAt": "2026-09-01T10:51:52.996Z",
   "scope": "general",
   "profile": "desktop-app",
   "addons": [
@@ -784,13 +784,13 @@
     },
     {
       "path": "docs/engineering/08-threat-model.md",
-      "checksum": "sha256:ca6efc8544b3742885430b1ec574ea2d607d1933c6045c453f2cc52d1d390821",
+      "checksum": "sha256:a88d9097db198e382f644806e40ca61a5b605d3c216bd789e7fc92602f67b701",
       "kind": "document",
       "ownership": "seeded",
       "presence": "optional",
       "status": "active",
       "initialChecksum": "sha256:f5aa4545fbc2371dd1e03fb6124fc1e73899ad48fe99952a4cea0316d30926d9",
-      "acceptedChecksum": "sha256:ca6efc8544b3742885430b1ec574ea2d607d1933c6045c453f2cc52d1d390821",
+      "acceptedChecksum": "sha256:a88d9097db198e382f644806e40ca61a5b605d3c216bd789e7fc92602f67b701",
       "generatedChecksum": "sha256:f5aa4545fbc2371dd1e03fb6124fc1e73899ad48fe99952a4cea0316d30926d9"
     },
     {
@@ -960,24 +960,24 @@
     },
     {
       "path": "docs/product/03-risk-register.md",
-      "checksum": "sha256:82fdb3dbc26eb95ef36daa275b90e8c4d1de571abb9c88e8377bb4b4f0c12565",
+      "checksum": "sha256:5bf7e899511fa5cabbc04a1e88c77717023e15ba2123d2edd040df5fa16288ac",
       "kind": "document",
       "ownership": "seeded",
       "presence": "optional",
       "status": "active",
       "initialChecksum": "sha256:207579a3a910f2ffc320ef9c548882d729d7ba49b17e3cc3c5d6e045d8510b9b",
-      "acceptedChecksum": "sha256:82fdb3dbc26eb95ef36daa275b90e8c4d1de571abb9c88e8377bb4b4f0c12565",
+      "acceptedChecksum": "sha256:5bf7e899511fa5cabbc04a1e88c77717023e15ba2123d2edd040df5fa16288ac",
       "generatedChecksum": "sha256:207579a3a910f2ffc320ef9c548882d729d7ba49b17e3cc3c5d6e045d8510b9b"
     },
     {
       "path": "docs/README.md",
-      "checksum": "sha256:7c094c92f56f66eab71d97846135fc4833aa295e1156007aaaa8cb3b36cde373",
+      "checksum": "sha256:45b0a69e98ce5198f8cc2e17989427d1657c4be2a422ada1c4f4a332058b44d1",
       "kind": "document",
       "ownership": "seeded",
       "presence": "optional",
       "status": "active",
       "initialChecksum": "sha256:65ec92cbbe418c169cf2771bb78693f03abe978d5962d7b167df4ed8c2c255e2",
-      "acceptedChecksum": "sha256:7c094c92f56f66eab71d97846135fc4833aa295e1156007aaaa8cb3b36cde373",
+      "acceptedChecksum": "sha256:45b0a69e98ce5198f8cc2e17989427d1657c4be2a422ada1c4f4a332058b44d1",
       "generatedChecksum": "sha256:65ec92cbbe418c169cf2771bb78693f03abe978d5962d7b167df4ed8c2c255e2"
     },
     {

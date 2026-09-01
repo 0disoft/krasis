@@ -11,7 +11,7 @@
 | Critical | source boundary observer panic이 hook callback을 이탈함 | 현재 입력이 사라지거나 agent process가 종료됨 | observer panic과 민감한 panic payload 테스트 | 고정 오류로 변환, 현재 event 로컬 통과, source generation 폐기 |
 | Critical | source mapper panic이 hook callback을 이탈함 | 현재 입력이 사라지거나 agent process가 종료됨 | mapper panic과 민감한 panic payload 테스트 | remote enqueue 전 고정 오류로 변환, 현재 event 로컬 통과, source generation 폐기 |
 | High | wire codec와 runtime의 discrete code domain이 다름 | 인증된 peer의 잘못된 frame이 destination session fault를 유발함 | encoder와 decoder의 invalid key/button code 계약 테스트 | `PressedToken.Validate`를 단일 code-domain source로 사용 |
-| High | unauthenticated TLS client가 listener를 독점함 | 정상 peer 연결과 재연결이 지연됨 | partial TLS record와 정상 mTLS 연결의 경합 테스트 | accept/handshake 분리, 5초 timeout, pre-auth 동시성 4개 제한, 신뢰 사설망·connector 주소 방화벽 운영; IP별 limiter는 미구현 |
+| High | unauthenticated TLS client가 listener를 독점함 | 정상 peer 연결과 재연결이 지연됨 | partial TLS record, source burst, rotating address와 정상 mTLS 연결의 경합 테스트 | 5초 timeout, pre-auth 동시성 4개, 전역 16/s burst 32, source별 4/s burst 8, 최대 256개 idle-expiring source; trusted-private policy만 허용 |
 | High | 두 기기가 동시에 제어권을 가짐 | 충돌, 순서 역전 | 동시 경계 진입 | 단일 lease와 epoch |
 | High | revoke 뒤 낡은 heartbeat가 기록됨 | 정상 복귀 직후 connection fault와 불필요한 재연결 | heartbeat/revoke 순서 강제 테스트 | ADR 0005 semantic write coordinator 선행 |
 | High | timeout 뒤 늦은 heartbeat가 만료 세션을 되살림 | 끊긴 peer가 살아 있다고 판단해 원격 입력 상태가 남음 | deadline 경계의 heartbeat 수신 경합 테스트 | 수신 coordinator 안에서 갱신 전 deadline 판정 |
@@ -22,7 +22,7 @@
 | High | cleanup coordinator timeout이 원래 fault를 가림 | active runtime이 남았는데 timeout만 보여 최초 장애를 진단하지 못함 | coordinator 점유 중 bounded cleanup timeout 테스트 | runtime 무변경, 원래 cause와 deadline 오류 결합, reconnect 중단 |
 | Critical | 부분 `ReleaseAll` 실패 뒤 재시도 가능한 token 상태를 버림 | 원격 기기에 일부 키나 버튼이 계속 눌린 채 남음 | transient/지속 release 실패 recovery 테스트 | 같은 coordinator에서 fault recovery 한 번, 성공 token 제외, 지속 실패는 `FAULT` 유지 |
 | Critical | network write가 source sender를 막아 fault cleanup도 멈춤 | suppression은 꺼졌지만 destination held input이 남음 | blocked send 중 queue overflow 테스트 | sender/lifecycle 분리, connection 선제 close, bounded cleanup |
-| High | 공용 Wi-Fi가 peer 통신을 차단 | 발견 또는 연결 실패 | 스터디카페 실망 테스트 | 직접 주소 입력, 대체망 운영 안내 검토 |
+| High | 공용 Wi-Fi가 peer 통신을 차단 | 발견 또는 연결 실패 | 스터디카페 실망 테스트 | public listener를 열지 않고 개인 hotspot 또는 사용자 통제 사설망으로 전환 |
 | High | 높은 polling rate 또는 터치패드에서 hook 지연 | 커서 끊김, 입력 누락 | 실제 장비 부하 측정 | 최소 작업 hook, native fallback 판단 |
 | High | Precision Touchpad wheel이 low-level hook과 Raw Input payload 경로를 우회함 | pointer와 click은 원격에서 동작하지만 scroll은 source local window에 남음 | foreground touchpad-capable window의 source/destination aggregate와 실제 화면 동작 | ADR 0023 window owner 적용; S-B→S-A `601 sent = 601 injected` 통과, 가로 scroll·외장 mouse·다른 장비는 계속 검증 |
 | High | 절전과 잠금 뒤 낡은 세션이 살아남음 | 엉뚱한 기기로 입력 전달 | Modern Standby와 잠금 반복 | 세션 폐기 후 명시적 재연결 |

@@ -25,7 +25,7 @@ Synthesized input must not loop back to a peer. Tagging is diagnostic metadata; 
 
 Credentials and trust records use restrictive permissions, bounded parsing, locking, atomic replacement, and explicit revocation. Reports use allow-listed schemas, aggregate counters, exclusive creation, path validation, and redaction.
 
-The listener uses TLS 1.3 mutual authentication, ALPN, a bounded pre-auth concurrency gate, and handshake deadlines. Per-source admission, public-LAN firewall automation, and load-tested recovery limits remain unresolved under issue #11; until then the listener is limited to a trusted private LAN or personal hotspot.
+The listener uses TLS 1.3 mutual authentication, ALPN, a four-handshake pre-auth concurrency gate, five-second deadlines, a global token bucket, a per-source token bucket, and a fixed-size idle-expiring source table. Source addresses stay ephemeral and diagnostics expose only aggregate rejection causes. The accepted listener policy is `trusted-private`; unspecified or public policies fail before binding. Public-profile support requires a separate reversible Windows firewall implementation.
 
 The Phase 0 crash guard runs with the same user and privilege, inherits only its anonymous pipe, accepts a bounded versioned protocol, stores no input content, and releases known tokens on parent failure.
 

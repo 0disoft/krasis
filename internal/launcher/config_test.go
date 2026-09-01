@@ -78,6 +78,25 @@ func TestBuildSessionPlanUsesExactRunPathsAndConnectorAddress(t *testing.T) {
 	}
 }
 
+func TestBuildSessionPlanBindsListenerToSelectedInterface(t *testing.T) {
+	base := t.TempDir()
+	config := DefaultConfig("hp15")
+	config.PeerHost = testPeerHost
+	createLauncherFixture(t, base, config.CredentialDirectory)
+
+	plan, err := config.BuildSessionPlan(base, time.Date(2026, 7, 17, 2, 3, 4, 5, time.UTC))
+	if err != nil {
+		t.Fatal(err)
+	}
+	args := plan.Commands[0].Args
+	if !contains(args, testPeerHost+":24876") {
+		t.Fatalf("listener args do not contain selected interface: %v", args)
+	}
+	if contains(args, "0.0.0.0:24876") || contains(args, "[::]:24876") {
+		t.Fatalf("listener args contain a wildcard address: %v", args)
+	}
+}
+
 func TestBuildCredentialPlanUsesConfiguredConnectorDirectory(t *testing.T) {
 	base := t.TempDir()
 	config := DefaultConfig("gram13")

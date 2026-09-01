@@ -235,7 +235,7 @@ func (config Config) BuildSessionPlan(base string, now time.Time) (SessionPlan, 
 	agentReport := filepath.Join(reports, prefix+"-agent.json")
 	guardReport := filepath.Join(reports, prefix+"-guard.json")
 	stopFile := filepath.Join(reports, "."+prefix+".stop")
-	address := "0.0.0.0:" + strconv.Itoa(config.Port)
+	address := net.JoinHostPort(config.PeerHost, strconv.Itoa(config.Port))
 	args := []string{
 		"agent-session", config.Role,
 		"--device", config.DeviceAlias,
@@ -254,8 +254,6 @@ func (config Config) BuildSessionPlan(base string, now time.Time) (SessionPlan, 
 		"--allow-live-input",
 	}
 	if config.Role == RoleConnect {
-		address = net.JoinHostPort(config.PeerHost, strconv.Itoa(config.Port))
-		args[5] = address
 		args = append(args, "--server-name", config.PeerHost)
 	}
 	return SessionPlan{
