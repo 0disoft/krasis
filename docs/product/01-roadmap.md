@@ -37,10 +37,12 @@ Phase 1 완료는 Phase 0 완료를 대신하지 않는다. Phase 0이 `IN_PROGR
 
 ### Phase 2: 기기 신원과 페어링
 
-- fingerprint·역할·capability·revocation의 atomic local trust store와 CLI는 구현됨
-- 정식 local device identity와 제품 default trust store 경로
-- 사용자 확인이 포함된 페어링
-- key rotation과 alias·권한 변경 경로
+- 상태: core 구현 완료. 제품 activation은 issue #13과 #14가 소유한다.
+- `%LOCALAPPDATA%\Krasis` protected root와 설치별 durable device identity 구현
+- 양쪽 동일 code 확인과 signed receipt가 모두 필요한 5분 pairing ceremony 구현
+- fingerprint·역할·capability·revocation의 atomic local trust store 구현
+- identity rotation, alias·권한 변경과 old revoke+replacement atomic mutation 구현
+- Phase 0 credential 자동 migration은 지원하지 않고 폐기 후 새 pairing으로 고정
 
 ### Phase 3: 전송과 제어권
 

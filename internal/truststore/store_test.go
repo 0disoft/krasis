@@ -85,6 +85,86 @@ func TestStoreRejectsDuplicateAndRepeatedRevocation(t *testing.T) {
 	}
 }
 
+func TestStoreUpdatesAliasAndCapabilityAtomically(t *testing.T) {
+	store := mustStore(t)
+	peer := testPeer()
+	createdAt := time.Date(2026, time.July, 13, 1, 2, 3, 0, time.UTC)
+	if _, err := store.Import(peer, "old alias", false, createdAt); err != nil {
+		t.Fatal(err)
+	}
+	updatedAt := createdAt.Add(time.Minute)
+	updated, err := store.Update(peer.CertificateSHA256, "new alias", true, updatedAt)
+	if err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+	if updated.Alias != "new alias" || !updated.AllowInboundControl || !updated.CreatedAt.Equal(createdAt) {
+		t.Fatalf("updated = %+v", updated)
+	}
+	document, err := store.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if document.Revision != 2 || len(document.Peers) != 1 || document.Peers[0] != updated {
+		t.Fatalf("document = %+v", document)
+	}
+}
+
+func TestStoreReplacesPeerInOneRevision(t *testing.T) {
+	store := mustStore(t)
+	oldPeer := testPeer()
+	createdAt := time.Date(2026, time.July, 13, 1, 2, 3, 0, time.UTC)
+	if _, err := store.Import(oldPeer, "old device", true, createdAt); err != nil {
+		t.Fatal(err)
+	}
+	replacement := transport.AuthenticatedPeerContext{
+		CertificateSHA256: strings.Repeat("b", 64),
+		Role:              transport.AuthenticatedPeerConnector,
+	}
+	replacedAt := createdAt.Add(time.Hour)
+	revoked, added, err := store.Replace(oldPeer.CertificateSHA256, replacement, "replacement device", false, replacedAt)
+	if err != nil {
+		t.Fatalf("Replace() error = %v", err)
+	}
+	if revoked.RevokedAt == nil || !revoked.RevokedAt.Equal(replacedAt) {
+		t.Fatalf("revoked = %+v", revoked)
+	}
+	if added.Fingerprint != replacement.CertificateSHA256 || added.AllowInboundControl {
+		t.Fatalf("added = %+v", added)
+	}
+	document, err := store.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if document.Revision != 2 || len(document.Peers) != 2 {
+		t.Fatalf("document = %+v", document)
+	}
+}
+
+func TestStoreRejectsChangesToRevokedOrDuplicateReplacement(t *testing.T) {
+	store := mustStore(t)
+	now := time.Date(2026, time.July, 13, 1, 2, 3, 0, time.UTC)
+	first := testPeer()
+	second := transport.AuthenticatedPeerContext{
+		CertificateSHA256: strings.Repeat("b", 64),
+		Role:              transport.AuthenticatedPeerConnector,
+	}
+	if _, err := store.Import(first, "first", true, now); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Import(second, "second", true, now.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Revoke(first.CertificateSHA256, now.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Update(first.CertificateSHA256, "revived", true, now.Add(2*time.Minute)); !errors.Is(err, ErrPeerRevoked) {
+		t.Fatalf("Update() error = %v", err)
+	}
+	if _, _, err := store.Replace(first.CertificateSHA256, second, "duplicate", true, now.Add(3*time.Minute)); !errors.Is(err, ErrPeerExists) {
+		t.Fatalf("Replace() error = %v", err)
+	}
+}
+
 func TestStoreRejectsCorruptOrUnknownJSONWithoutFallback(t *testing.T) {
 	store := mustStore(t)
 	if _, err := store.Import(testPeer(), "peer", true, time.Now().UTC()); err != nil {

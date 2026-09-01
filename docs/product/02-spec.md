@@ -48,7 +48,7 @@
 - 지원 Windows 버전과 CPU 아키텍처
 - 입력 캡처 방식: 저수준 hook 단독, Raw Input 결합, 또는 작은 native 모듈
 - control payload 직렬화 형식
-- 페어링 확인 방식과 인증서 수명
+- transport 인증서의 제품 갱신 주기와 갱신 UX
 - 화면 경계 감도, dwell, 압력과 지연 예산
 - 긴급 해제 키 조합
 - CLI 명령 이름, JSON 출력, exit code

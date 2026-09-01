@@ -105,6 +105,91 @@ func (store *Store) Revoke(fingerprint string, now time.Time) (PeerRecord, error
 	return revoked, err
 }
 
+func (store *Store) Update(fingerprint, alias string, allowInboundControl bool, now time.Time) (PeerRecord, error) {
+	if store == nil {
+		return PeerRecord{}, errors.New("trust store is not initialized")
+	}
+	if err := validateFingerprint(fingerprint); err != nil {
+		return PeerRecord{}, err
+	}
+	if err := validateAlias(alias); err != nil {
+		return PeerRecord{}, err
+	}
+	if now.IsZero() {
+		return PeerRecord{}, errors.New("update time is required")
+	}
+	var updated PeerRecord
+	err := store.mutate(false, now.UTC(), func(document *Document) error {
+		for index := range document.Peers {
+			if document.Peers[index].Fingerprint != fingerprint {
+				continue
+			}
+			if document.Peers[index].RevokedAt != nil {
+				return ErrPeerRevoked
+			}
+			document.Peers[index].Alias = alias
+			document.Peers[index].AllowInboundControl = allowInboundControl
+			updated = document.Peers[index]
+			return nil
+		}
+		return ErrPeerNotFound
+	})
+	return updated, err
+}
+
+func (store *Store) Replace(fingerprint string, replacement transport.AuthenticatedPeerContext, alias string, allowInboundControl bool, now time.Time) (PeerRecord, PeerRecord, error) {
+	if store == nil {
+		return PeerRecord{}, PeerRecord{}, errors.New("trust store is not initialized")
+	}
+	if err := validateFingerprint(fingerprint); err != nil {
+		return PeerRecord{}, PeerRecord{}, err
+	}
+	if err := replacement.Validate(); err != nil {
+		return PeerRecord{}, PeerRecord{}, err
+	}
+	if replacement.CertificateSHA256 == fingerprint {
+		return PeerRecord{}, PeerRecord{}, errors.New("replacement fingerprint must differ from the existing peer")
+	}
+	if err := validateAlias(alias); err != nil {
+		return PeerRecord{}, PeerRecord{}, err
+	}
+	if now.IsZero() {
+		return PeerRecord{}, PeerRecord{}, errors.New("replacement time is required")
+	}
+	var revoked, added PeerRecord
+	err := store.mutate(false, now.UTC(), func(document *Document) error {
+		oldIndex := -1
+		for index := range document.Peers {
+			record := document.Peers[index]
+			if record.Fingerprint == replacement.CertificateSHA256 {
+				return ErrPeerExists
+			}
+			if record.Fingerprint == fingerprint {
+				oldIndex = index
+			}
+		}
+		if oldIndex < 0 {
+			return ErrPeerNotFound
+		}
+		if document.Peers[oldIndex].RevokedAt != nil {
+			return ErrPeerRevoked
+		}
+		revokedAt := now.UTC()
+		document.Peers[oldIndex].RevokedAt = &revokedAt
+		revoked = document.Peers[oldIndex]
+		added = PeerRecord{
+			Fingerprint:         replacement.CertificateSHA256,
+			Role:                replacement.Role,
+			Alias:               alias,
+			AllowInboundControl: allowInboundControl,
+			CreatedAt:           now.UTC(),
+		}
+		document.Peers = append(document.Peers, added)
+		return nil
+	})
+	return revoked, added, err
+}
+
 func (store *Store) List() (Document, error) {
 	if store == nil {
 		return Document{}, errors.New("trust store is not initialized")

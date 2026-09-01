@@ -25,6 +25,8 @@
 - Phase 0 redacted hardware result: docs/experiments/results/2026-07-16-study-pair-v13.md
 - Pre-auth admission and trusted-private listener decision: docs/adr/0033-hybrid-pre-auth-admission.md
 - Exact active-lease management revocation decision: docs/adr/0034-exact-active-lease-management-revocation.md
+- Product identity and mutual pairing decision: docs/adr/0035-product-identity-and-mutual-pairing.md
+- Product pairing user flow: docs/product/04-pairing-user-flow.md
 - Local secure-write inventory: docs/security/local-write-inventory.md
 - Phase 0 foreground fallback decision: docs/adr/0028-bounded-foreground-thread-attach-fallback.md
 - Phase 0 focus restore fallback decision: docs/adr/0029-bounded-focus-restore-thread-attach-fallback.md

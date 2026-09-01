@@ -1,6 +1,6 @@
 # Local data and diagnostic retention
 
-- Status: Active policy; product paths remain blocked by issues #10 and #16
+- Status: Active policy; identity and trust paths are accepted, remaining install paths are blocked by issue #16
 - Owner: release owner named in the release manifest
 - Trust decision: `docs/adr/0006-persistent-trust-store.md`
 - Secret policy: `docs/ops/secrets.md`
@@ -9,7 +9,15 @@
 
 Krasis keeps product configuration, device identity, peer trust, diagnostics, logs, caches, and release metadata as separate classes. A UI, CLI, installer, repair, rollback, or uninstall operation must not collapse them into one opaque data directory or one all-or-nothing deletion choice.
 
-The exact product-owned Windows paths are not yet approved. Issue #10 owns identity and trust paths; issue #16 owns install scope, config and log paths, firewall ownership, uninstall, and cleanup. Limited beta remains blocked until those paths and ACLs are implemented and tested.
+The current-user product data root is `%LOCALAPPDATA%\Krasis`. Device identity is stored under
+`identity`, peer trust under `trust`, and diagnostics under `diagnostics`; these classes are not
+interchangeable. Issue #16 still owns install scope, config and log paths, firewall ownership,
+uninstall, and cleanup. Limited beta remains blocked until those remaining paths are implemented and tested.
+
+The product root and identity data allow only the current user and `SYSTEM`. Existing permissive or
+reparse-backed roots fail closed instead of being silently repaired. Device identity uses
+`identity\identity.json` plus `.identity.lock`; peer trust keeps its existing `trust.json` and
+`.trust.lock` contract below the product trust directory.
 
 ## Product retention policy
 
