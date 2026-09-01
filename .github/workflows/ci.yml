@@ -62,7 +62,7 @@ jobs:
           go build -trimpath -o build/krasis-lab.exe ./cmd/krasis-lab
           go build -trimpath -o build/krasis-launcher.exe ./cmd/krasis-launcher
 
-      - name: Package device probe kit
+      - name: Package and verify device probe kit
         shell: pwsh
         run: |
           $packageArguments = @{
@@ -70,11 +70,31 @@ jobs:
             Repository = '${{ github.repository }}'
             WorkflowRun = '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
           }
-          ./scripts/package-probe-kit.ps1 @packageArguments
+          $packagePath = ./scripts/package-probe-kit.ps1 @packageArguments
+          $firstHash = (Get-FileHash -LiteralPath $packagePath -Algorithm SHA256).Hash
 
-      - name: Upload lab CLI
+          $reusedPath = ./scripts/package-probe-kit.ps1 @packageArguments
+          $secondHash = (Get-FileHash -LiteralPath $reusedPath -Algorithm SHA256).Hash
+          if ($reusedPath -ne $packagePath -or $secondHash -ne $firstHash) {
+            throw 'A same-revision rerun did not reuse the byte-identical package.'
+          }
+
+          $mismatchedArguments = $packageArguments.Clone()
+          $mismatchedArguments.WorkflowRun = $packageArguments.WorkflowRun + '/mismatched-build'
+          $mismatchRejected = $false
+          try {
+            ./scripts/package-probe-kit.ps1 @mismatchedArguments -OutputPath $packagePath | Out-Null
+          }
+          catch {
+            $mismatchRejected = $true
+          }
+          if (-not $mismatchRejected) {
+            throw 'Packaging accepted a mismatched existing artifact.'
+          }
+
+      - name: Upload probe kit
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: krasis-probe-kit-windows-amd64-${{ github.sha }}
-          path: dist/krasis-probe-kit-windows-amd64.zip
+          path: dist/krasis-probe-kit-windows-amd64-${{ github.sha }}.zip
           if-no-files-found: error
