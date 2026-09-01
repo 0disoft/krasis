@@ -9,6 +9,7 @@
 - Operational standard source: docs/ops/00-operational-contract.md
 - Validation source: VALIDATION.md
 - Agent routing source: .agents/context-map.md
+- Agent management revocation contract: docs/agent/management-contract.md
 - Repository hygiene source: .editorconfig, .gitattributes, .gitignore
 - Desktop installer source: docs/desktop/installers.md
 - Desktop auto-update source: docs/desktop/auto-update.md
@@ -21,6 +22,7 @@
 - Phase 0 Windows input feasibility plan: docs/experiments/phase-0-windows-input-feasibility.md
 - Phase 0 device probe runbook: docs/experiments/device-probe-runbook.md
 - Phase 0 redacted hardware result: docs/experiments/results/2026-07-16-study-pair-v13.md
+- Exact active-lease management revocation decision: docs/adr/0034-exact-active-lease-management-revocation.md
 - Phase 0 foreground fallback decision: docs/adr/0028-bounded-foreground-thread-attach-fallback.md
 - Phase 0 focus restore fallback decision: docs/adr/0029-bounded-focus-restore-thread-attach-fallback.md
 - Phase 0 degraded focus release decision: docs/adr/0030-degraded-focus-restore-does-not-terminate-session.md
