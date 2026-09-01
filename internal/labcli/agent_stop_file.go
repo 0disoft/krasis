@@ -5,7 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
+
+	"github.com/0disoft/krasis/internal/securefs"
 )
 
 var errAgentStopRequested = errors.New("agent stop requested")
@@ -19,9 +22,17 @@ func monitorAgentStopFile(parent context.Context, path string) (context.Context,
 	if path == "" {
 		return parent, func() {}, nil
 	}
-	if _, err := os.Lstat(path); err == nil {
+	directory, err := securefs.OpenDirectory(filepath.Dir(path))
+	if err != nil {
+		return nil, nil, fmt.Errorf("open agent stop directory: %w", err)
+	}
+	name := filepath.Base(path)
+	if file, err := directory.Open(name); err == nil {
+		_ = file.Close()
+		_ = directory.Close()
 		return nil, nil, errors.New("agent stop file already exists")
 	} else if !errors.Is(err, os.ErrNotExist) {
+		_ = directory.Close()
 		return nil, nil, err
 	}
 
@@ -40,15 +51,12 @@ func monitorAgentStopFile(parent context.Context, path string) (context.Context,
 			case <-stop:
 				return
 			case <-ticker.C:
-				info, err := os.Lstat(path)
+				file, err := directory.Open(name)
 				switch {
 				case err == nil:
-					if info.Mode().IsRegular() {
-						_ = os.Remove(path)
-						cancel(errAgentStopRequested)
-						return
-					}
-					cancel(errors.New("agent stop path is not a regular file"))
+					_ = file.Close()
+					_ = directory.Remove(name)
+					cancel(errAgentStopRequested)
 					return
 				case errors.Is(err, os.ErrNotExist):
 					continue
@@ -63,7 +71,8 @@ func monitorAgentStopFile(parent context.Context, path string) (context.Context,
 	closeMonitor := func() {
 		close(stop)
 		<-done
-		_ = os.Remove(path)
+		_ = directory.Remove(name)
+		_ = directory.Close()
 		cancel(context.Canceled)
 	}
 	return ctx, closeMonitor, nil

@@ -6,7 +6,10 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sync"
+
+	"github.com/0disoft/krasis/internal/securefs"
 )
 
 type OperationResult struct {
@@ -94,7 +97,12 @@ func (manager *Manager) RequestStop() error {
 	if path == "" {
 		return errors.New("the current operation cannot be stopped safely")
 	}
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	directory, err := securefs.OpenDirectory(filepath.Dir(path))
+	if err != nil {
+		return fmt.Errorf("open stop signal directory: %w", err)
+	}
+	defer directory.Close()
+	file, err := directory.CreateExclusive(filepath.Base(path), 0o600)
 	if errors.Is(err, os.ErrExist) {
 		return nil
 	}
