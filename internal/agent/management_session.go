@@ -70,15 +70,6 @@ func (session *managedPeerSession) Revoke(ctx context.Context, request LeaseRevo
 			return ErrManagementLeaseMismatch
 		}
 
-		var trustErr error
-		if request.Action == LeaseRevocationTrust {
-			if session.trust == nil {
-				trustErr = errors.Join(ErrManagementTrustRevocation, errors.New("trust revoker is unavailable"))
-			} else if err := session.trust.RevokeTrust(request.Peer.CertificateSHA256, session.now()); err != nil {
-				trustErr = errors.Join(ErrManagementTrustRevocation, err)
-			}
-		}
-
 		session.source.Deactivate()
 		if _, err := session.runtime.RevokePeer(
 			ctx,
@@ -87,7 +78,16 @@ func (session *managedPeerSession) Revoke(ctx context.Context, request LeaseRevo
 			request.Lease.Epoch,
 		); err != nil {
 			interruptErr := session.connection.InterruptLocal(ErrManagementLocalCleanup)
-			return errors.Join(trustErr, ErrManagementLocalCleanup, err, interruptErr)
+			return errors.Join(ErrManagementLocalCleanup, err, interruptErr)
+		}
+
+		var trustErr error
+		if request.Action == LeaseRevocationTrust {
+			if session.trust == nil {
+				trustErr = errors.Join(ErrManagementTrustRevocation, errors.New("trust revoker is unavailable"))
+			} else if err := session.trust.RevokeTrust(request.Peer.CertificateSHA256, session.now()); err != nil {
+				trustErr = errors.Join(ErrManagementTrustRevocation, err)
+			}
 		}
 
 		payload, err := transport.EncodeControlPayload(transport.ControlCommand{
