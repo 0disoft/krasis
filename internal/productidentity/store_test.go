@@ -25,6 +25,39 @@ func TestResolveWindowsPathsSeparatesDataClasses(t *testing.T) {
 	}
 }
 
+func TestBootstrapWindowsCreatesProtectedRootAndIdentity(t *testing.T) {
+	localAppData := t.TempDir()
+	now := time.Date(2026, time.September, 1, 1, 2, 3, 0, time.UTC)
+	paths, identity, created, err := BootstrapWindows(localAppData, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !created || identity.Public().Generation != 1 {
+		t.Fatalf("identity = %+v, created = %t", identity.Public(), created)
+	}
+	if _, err := peercredentials.ValidateSecurityDirectory(paths.Root); err != nil {
+		t.Fatalf("root security: %v", err)
+	}
+	_, reopened, created, err := BootstrapWindows(localAppData, now.Add(time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created || reopened.Public() != identity.Public() {
+		t.Fatalf("reopened = %+v, created = %t", reopened.Public(), created)
+	}
+}
+
+func TestBootstrapWindowsRejectsExistingInsecureRoot(t *testing.T) {
+	localAppData := t.TempDir()
+	root := filepath.Join(localAppData, "Krasis")
+	if err := os.Mkdir(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err := BootstrapWindows(localAppData, time.Now().UTC()); err == nil {
+		t.Fatal("BootstrapWindows() accepted an insecure existing root")
+	}
+}
+
 func TestStoreCreatesLoadsAndRotatesIdentity(t *testing.T) {
 	store := testStore(t)
 	createdAt := time.Date(2026, time.September, 1, 1, 2, 3, 0, time.UTC)
