@@ -16,6 +16,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/0disoft/krasis/internal/securefs"
 )
 
 const (
@@ -51,10 +53,45 @@ func Generate(outputDirectory, serverName string, now time.Time) (manifest Manif
 	if err := os.Mkdir(absolute, 0o700); err != nil {
 		return Manifest{}, fmt.Errorf("create exclusive output directory: %w", err)
 	}
+	rootDirectory, err := securefs.OpenDirectory(absolute)
+	if err != nil {
+		return Manifest{}, fmt.Errorf("open credential output directory: %w", err)
+	}
+	if err := ProtectSecurityDirectoryHandle(rootDirectory.Handle()); err != nil {
+		_ = rootDirectory.RemoveSelf()
+		_ = rootDirectory.Close()
+		return Manifest{}, err
+	}
+	listenerDirectory, err := rootDirectory.CreateDirectory("listener", 0o700)
+	if err != nil {
+		_ = rootDirectory.RemoveSelf()
+		_ = rootDirectory.Close()
+		return Manifest{}, err
+	}
+	if err := ProtectSecurityDirectoryHandle(listenerDirectory.Handle()); err != nil {
+		_ = cleanupCredentialBundle(rootDirectory, listenerDirectory, nil)
+		_ = listenerDirectory.Close()
+		_ = rootDirectory.Close()
+		return Manifest{}, err
+	}
+	connectorDirectory, err := rootDirectory.CreateDirectory("connector", 0o700)
+	if err != nil {
+		_ = cleanupCredentialBundle(rootDirectory, listenerDirectory, nil)
+		_ = listenerDirectory.Close()
+		_ = rootDirectory.Close()
+		return Manifest{}, err
+	}
+	if err := ProtectSecurityDirectoryHandle(connectorDirectory.Handle()); err != nil {
+		_ = cleanupCredentialBundle(rootDirectory, listenerDirectory, connectorDirectory)
+		_ = connectorDirectory.Close()
+		_ = listenerDirectory.Close()
+		_ = rootDirectory.Close()
+		return Manifest{}, err
+	}
 	completed := false
 	defer func() {
 		if !completed {
-			if cleanupErr := os.RemoveAll(absolute); cleanupErr != nil {
+			if cleanupErr := cleanupCredentialBundle(rootDirectory, listenerDirectory, connectorDirectory); cleanupErr != nil {
 				cleanupErr = fmt.Errorf("remove incomplete credential bundle: %w", cleanupErr)
 				if err == nil {
 					err = cleanupErr
@@ -63,16 +100,10 @@ func Generate(outputDirectory, serverName string, now time.Time) (manifest Manif
 				}
 			}
 		}
+		_ = connectorDirectory.Close()
+		_ = listenerDirectory.Close()
+		_ = rootDirectory.Close()
 	}()
-
-	listenerDirectory := filepath.Join(absolute, "listener")
-	connectorDirectory := filepath.Join(absolute, "connector")
-	if err := os.Mkdir(listenerDirectory, 0o700); err != nil {
-		return Manifest{}, err
-	}
-	if err := os.Mkdir(connectorDirectory, 0o700); err != nil {
-		return Manifest{}, err
-	}
 
 	notBefore := now.UTC().Add(-time.Minute)
 	expiresAt := now.UTC().Add(Validity)
@@ -88,8 +119,8 @@ func Generate(outputDirectory, serverName string, now time.Time) (manifest Manif
 	if err != nil {
 		return Manifest{}, err
 	}
-	for _, directory := range []string{listenerDirectory, connectorDirectory} {
-		if err := writePEMExclusive(filepath.Join(directory, "ca.pem"), "CERTIFICATE", caDER); err != nil {
+	for _, directory := range []*securefs.Directory{listenerDirectory, connectorDirectory} {
+		if err := writePEMExclusive(directory, "ca.pem", "CERTIFICATE", caDER); err != nil {
 			return Manifest{}, err
 		}
 	}
@@ -99,26 +130,19 @@ func Generate(outputDirectory, serverName string, now time.Time) (manifest Manif
 	if err := writeIdentity(connectorDirectory, connectorDER, connectorKey); err != nil {
 		return Manifest{}, err
 	}
-	if err := writePEMExclusive(filepath.Join(listenerDirectory, "peer.pem"), "CERTIFICATE", connectorDER); err != nil {
+	if err := writePEMExclusive(listenerDirectory, "peer.pem", "CERTIFICATE", connectorDER); err != nil {
 		return Manifest{}, err
 	}
-	if err := writePEMExclusive(filepath.Join(connectorDirectory, "peer.pem"), "CERTIFICATE", listenerDER); err != nil {
+	if err := writePEMExclusive(connectorDirectory, "peer.pem", "CERTIFICATE", listenerDER); err != nil {
 		return Manifest{}, err
 	}
-	if err := ProtectPrivateKeyDirectory(listenerDirectory); err != nil {
-		return Manifest{}, err
-	}
-	if err := ProtectPrivateKeyDirectory(connectorDirectory); err != nil {
-		return Manifest{}, err
-	}
-
 	manifest = Manifest{
 		SchemaVersion: SchemaVersion,
 		CreatedAt:     now.UTC(), ExpiresAt: expiresAt, ServerName: serverName,
 		ListenerDir: "listener", ConnectorDir: "connector",
 		ListenerPeerCertificate: "peer.pem", ConnectorPeerCertificate: "peer.pem",
 	}
-	if err := writeJSONExclusive(filepath.Join(absolute, "manifest.json"), manifest); err != nil {
+	if err := writeJSONExclusive(rootDirectory, "manifest.json", manifest); err != nil {
 		return Manifest{}, err
 	}
 	completed = true
@@ -202,32 +226,44 @@ func randomSerial() (*big.Int, error) {
 	return serial, nil
 }
 
-func writeIdentity(directory string, certificateDER []byte, key *ecdsa.PrivateKey) error {
-	if err := writePEMExclusive(filepath.Join(directory, "identity.pem"), "CERTIFICATE", certificateDER); err != nil {
+func writeIdentity(directory *securefs.Directory, certificateDER []byte, key *ecdsa.PrivateKey) error {
+	if err := writePEMExclusive(directory, "identity.pem", "CERTIFICATE", certificateDER); err != nil {
 		return err
 	}
 	keyDER, err := x509.MarshalPKCS8PrivateKey(key)
 	if err != nil {
 		return err
 	}
-	return writePEMExclusive(filepath.Join(directory, "identity-key.pem"), "PRIVATE KEY", keyDER)
+	return writePEMExclusive(directory, "identity-key.pem", "PRIVATE KEY", keyDER)
 }
 
-func writePEMExclusive(path, blockType string, data []byte) error {
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+func writePEMExclusive(directory *securefs.Directory, name, blockType string, data []byte) error {
+	file, err := directory.CreateExclusive(name, 0o600)
 	if err != nil {
+		return err
+	}
+	if err := ProtectSecurityFileHandle(file); err != nil {
+		_ = file.Close()
 		return err
 	}
 	if err := pem.Encode(file, &pem.Block{Type: blockType, Bytes: data}); err != nil {
 		_ = file.Close()
 		return err
 	}
+	if err := file.Sync(); err != nil {
+		_ = file.Close()
+		return err
+	}
 	return file.Close()
 }
 
-func writeJSONExclusive(path string, value any) error {
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+func writeJSONExclusive(directory *securefs.Directory, name string, value any) error {
+	file, err := directory.CreateExclusive(name, 0o600)
 	if err != nil {
+		return err
+	}
+	if err := ProtectSecurityFileHandle(file); err != nil {
+		_ = file.Close()
 		return err
 	}
 	encoder := json.NewEncoder(file)
@@ -236,5 +272,35 @@ func writeJSONExclusive(path string, value any) error {
 		_ = file.Close()
 		return err
 	}
+	if err := file.Sync(); err != nil {
+		_ = file.Close()
+		return err
+	}
 	return file.Close()
+}
+
+func cleanupCredentialBundle(root, listener, connector *securefs.Directory) error {
+	var cleanupErr error
+	for _, directory := range []*securefs.Directory{listener, connector} {
+		if directory == nil {
+			continue
+		}
+		for _, name := range []string{"ca.pem", "identity.pem", "identity-key.pem", "peer.pem"} {
+			if err := directory.Remove(name); err != nil && !errors.Is(err, os.ErrNotExist) {
+				cleanupErr = errors.Join(cleanupErr, err)
+			}
+		}
+		if err := directory.RemoveSelf(); err != nil && !errors.Is(err, os.ErrNotExist) {
+			cleanupErr = errors.Join(cleanupErr, err)
+		}
+	}
+	if root != nil {
+		if err := root.Remove("manifest.json"); err != nil && !errors.Is(err, os.ErrNotExist) {
+			cleanupErr = errors.Join(cleanupErr, err)
+		}
+		if err := root.RemoveSelf(); err != nil && !errors.Is(err, os.ErrNotExist) {
+			cleanupErr = errors.Join(cleanupErr, err)
+		}
+	}
+	return cleanupErr
 }

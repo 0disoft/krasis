@@ -121,7 +121,7 @@ func OpenDirectory(path string) (*Directory, error) {
 	handle, err := ntCreate(
 		syscall.InvalidHandle,
 		`\??\`+absolute,
-		fileListDirectory|fileReadAttributes|synchronizeAccess,
+		standardRightsRead|fileListDirectory|fileReadAttributes|synchronizeAccess|deleteAccess|writeDAC,
 		fileOpen,
 		fileDirectoryFile|fileOpenForBackupIntent|fileOpenReparsePoint|fileSynchronousNonAlert,
 	)
@@ -198,6 +198,23 @@ func (directory *Directory) CreateTemporary(prefix string, mode os.FileMode) (*o
 	return nil, "", errors.New("secure temporary name collision limit reached")
 }
 
+func (directory *Directory) CreateDirectory(name string, _ os.FileMode) (*Directory, error) {
+	if err := directory.ready(name); err != nil {
+		return nil, err
+	}
+	handle, err := ntCreate(
+		directory.handle,
+		name,
+		standardRightsRead|fileListDirectory|fileReadAttributes|synchronizeAccess|deleteAccess|writeDAC,
+		fileCreate,
+		fileDirectoryFile|fileOpenForBackupIntent|fileOpenReparsePoint|fileSynchronousNonAlert,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &Directory{path: filepath.Join(directory.path, name), handle: handle}, nil
+}
+
 func (directory *Directory) openExisting(name string, access uint32) (*os.File, error) {
 	if err := directory.ready(name); err != nil {
 		return nil, err
@@ -262,6 +279,19 @@ func (directory *Directory) Remove(name string) error {
 	}
 	fallback := dispositionInformation{DeleteFile: true}
 	status := ntSetInformation(handle, unsafe.Pointer(&fallback), uint32(unsafe.Sizeof(fallback)), fileDispositionInfo)
+	return ntStatusError(status)
+}
+
+func (directory *Directory) RemoveSelf() error {
+	if directory == nil || directory.handle == syscall.InvalidHandle || directory.handle == 0 {
+		return errors.New("secure directory is closed")
+	}
+	info := dispositionInformationEx{Flags: fileDispositionDelete | fileDispositionPOSIX | fileDispositionIgnoreRO}
+	if status := ntSetInformation(directory.handle, unsafe.Pointer(&info), uint32(unsafe.Sizeof(info)), fileDispositionInfoEx); status == 0 {
+		return nil
+	}
+	fallback := dispositionInformation{DeleteFile: true}
+	status := ntSetInformation(directory.handle, unsafe.Pointer(&fallback), uint32(unsafe.Sizeof(fallback)), fileDispositionInfo)
 	return ntStatusError(status)
 }
 

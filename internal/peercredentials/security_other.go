@@ -96,6 +96,20 @@ func ProtectSecurityFileHandle(file *os.File) error {
 	return ValidateSecurityFileHandle(file)
 }
 
+func ProtectSecurityDirectoryHandle(handle uintptr) error {
+	if handle == 0 {
+		return nil
+	}
+	return nil
+}
+
+func ValidateSecurityDirectoryHandle(handle uintptr) error {
+	if handle == 0 {
+		return nil
+	}
+	return nil
+}
+
 func ValidateSecurityFileHandle(file *os.File) error {
 	if file == nil {
 		return errors.New("security file handle is required")

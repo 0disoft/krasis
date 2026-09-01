@@ -57,6 +57,7 @@ var (
 	procGetNamedSecurityInfoW                                = advapi32.NewProc("GetNamedSecurityInfoW")
 	procSetSecurityInfo                                      = advapi32.NewProc("SetSecurityInfo")
 	procGetSecurityInfo                                      = advapi32.NewProc("GetSecurityInfo")
+	procSetKernelObjectSecurity                              = advapi32.NewProc("SetKernelObjectSecurity")
 	procGetACE                                               = advapi32.NewProc("GetAce")
 	procGetFileAttributesW                                   = kernel32.NewProc("GetFileAttributesW")
 )
@@ -134,6 +135,30 @@ func ProtectSecurityFileHandle(file *os.File) error {
 	return ValidateSecurityFileHandle(file)
 }
 
+func ProtectSecurityDirectoryHandle(handle uintptr) error {
+	if handle == 0 {
+		return errors.New("security directory handle is required")
+	}
+	if err := protectSecurityHandle(handle, true); err != nil {
+		return fmt.Errorf("protect security directory handle: %w", err)
+	}
+	return ValidateSecurityDirectoryHandle(handle)
+}
+
+func ValidateSecurityDirectoryHandle(handle uintptr) error {
+	if handle == 0 {
+		return errors.New("security directory handle is required")
+	}
+	var info syscall.ByHandleFileInformation
+	if err := syscall.GetFileInformationByHandle(syscall.Handle(handle), &info); err != nil {
+		return err
+	}
+	if info.FileAttributes&fileAttributeReparsePoint != 0 || info.FileAttributes&syscall.FILE_ATTRIBUTE_DIRECTORY == 0 {
+		return fmt.Errorf("%w: security handle is not a real directory", ErrInsecurePrivateKey)
+	}
+	return validateExactCurrentUserDACLHandle(handle, objectInheritACE|containerInheritACE)
+}
+
 func ValidateSecurityFileHandle(file *os.File) error {
 	if file == nil {
 		return errors.New("security file handle is required")
@@ -157,18 +182,15 @@ func protectSecurityHandle(handle uintptr, directory bool) error {
 		return err
 	}
 	defer syscall.LocalFree(syscall.Handle(descriptor))
-	status, _, _ := procSetSecurityInfo.Call(
+	result, _, callErr := procSetKernelObjectSecurity.Call(
 		handle,
-		seFileObject,
 		daclSecurityInformation|protectedDACLsecurityInformation,
-		0,
-		0,
-		uintptr(unsafe.Pointer(dacl)),
-		0,
+		uintptr(descriptor),
 	)
 	runtime.KeepAlive(descriptor)
-	if status != 0 {
-		return syscall.Errno(status)
+	runtime.KeepAlive(dacl)
+	if result == 0 {
+		return callErr
 	}
 	return nil
 }

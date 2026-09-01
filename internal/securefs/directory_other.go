@@ -66,6 +66,20 @@ func (directory *Directory) CreateTemporary(prefix string, mode os.FileMode) (*o
 	return nil, "", errors.New("secure temporary name collision limit reached")
 }
 
+func (directory *Directory) CreateDirectory(name string, mode os.FileMode) (*Directory, error) {
+	if directory == nil {
+		return nil, errors.New("secure directory is closed")
+	}
+	if err := validateLeaf(name); err != nil {
+		return nil, err
+	}
+	path := filepath.Join(directory.path, name)
+	if err := os.Mkdir(path, mode); err != nil {
+		return nil, err
+	}
+	return OpenDirectory(path)
+}
+
 func (directory *Directory) openExisting(name string, flag int) (*os.File, error) {
 	if directory == nil {
 		return nil, errors.New("secure directory is closed")
@@ -105,6 +119,13 @@ func (directory *Directory) Remove(name string) error {
 		return err
 	}
 	return os.Remove(filepath.Join(directory.path, name))
+}
+
+func (directory *Directory) RemoveSelf() error {
+	if directory == nil {
+		return errors.New("secure directory is closed")
+	}
+	return os.Remove(directory.path)
 }
 
 func (directory *Directory) rename(source, destination string, _ bool) error {
