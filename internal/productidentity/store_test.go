@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/ed25519"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/0disoft/krasis/internal/peercredentials"
+	"github.com/0disoft/krasis/internal/securefs"
 )
 
 func TestResolveWindowsPathsSeparatesDataClasses(t *testing.T) {
@@ -121,6 +123,31 @@ func TestStoreRejectsInsecureAndReparseBackedDirectory(t *testing.T) {
 	}
 	if _, _, err := linked.OpenOrCreate(time.Now().UTC()); err == nil {
 		t.Fatal("OpenOrCreate() accepted a reparse-backed directory")
+	}
+}
+
+func TestStoreRejectsConcurrentOperation(t *testing.T) {
+	store := testStore(t)
+	if _, _, err := store.OpenOrCreate(time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	directory, err := securefs.OpenDirectory(store.directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer directory.Close()
+	lock, _, err := openLockFile(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lock.Close()
+	unlock, err := acquireFileLock(lock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unlock()
+	if _, err := store.Load(); !errors.Is(err, ErrStoreBusy) {
+		t.Fatalf("Load() error = %v, want ErrStoreBusy", err)
 	}
 }
 

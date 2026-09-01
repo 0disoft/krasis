@@ -21,10 +21,14 @@ import (
 const (
 	SchemaVersion = "krasis.product-identity/v1"
 	identityFile  = "identity.json"
+	lockFile      = ".identity.lock"
 	maxStoreBytes = 64 << 10
 )
 
-var ErrIdentityNotFound = errors.New("product identity does not exist")
+var (
+	ErrIdentityNotFound = errors.New("product identity does not exist")
+	ErrStoreBusy        = errors.New("product identity store is busy")
+)
 
 type PublicIdentity struct {
 	SchemaVersion string    `json:"schemaVersion"`
@@ -86,21 +90,23 @@ func (store *Store) OpenOrCreate(now time.Time) (*Identity, bool, error) {
 	if now.IsZero() {
 		return nil, false, errors.New("identity creation time is required")
 	}
-	identity, err := store.Load()
+	directory, release, err := store.openLocked(true)
+	if err != nil {
+		return nil, false, err
+	}
+	defer release()
+	identity, err := loadFromDirectory(directory)
 	if err == nil {
 		return identity, false, nil
 	}
 	if !errors.Is(err, ErrIdentityNotFound) {
 		return nil, false, err
 	}
-	if err := store.prepareDirectory(true); err != nil {
-		return nil, false, err
-	}
 	document, err := generateDocument(1, now.UTC())
 	if err != nil {
 		return nil, false, err
 	}
-	if err := store.write(document, false); err != nil {
+	if err := writeDocument(directory, document, false); err != nil {
 		return nil, false, err
 	}
 	identity, err = identityFromDocument(document)
@@ -111,14 +117,15 @@ func (store *Store) Load() (*Identity, error) {
 	if store == nil {
 		return nil, errors.New("product identity store is not initialized")
 	}
-	if err := store.prepareDirectory(false); err != nil {
+	directory, release, err := store.openLocked(false)
+	if err != nil {
 		return nil, err
 	}
-	directory, err := securefs.OpenDirectory(store.directory)
-	if err != nil {
-		return nil, fmt.Errorf("open product identity directory: %w", err)
-	}
-	defer directory.Close()
+	defer release()
+	return loadFromDirectory(directory)
+}
+
+func loadFromDirectory(directory *securefs.Directory) (*Identity, error) {
 	file, err := directory.Open(identityFile)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -154,7 +161,12 @@ func (store *Store) Rotate(now time.Time) (*Identity, error) {
 	if now.IsZero() {
 		return nil, errors.New("identity rotation time is required")
 	}
-	current, err := store.Load()
+	directory, release, err := store.openLocked(false)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	current, err := loadFromDirectory(directory)
 	if err != nil {
 		return nil, err
 	}
@@ -165,10 +177,62 @@ func (store *Store) Rotate(now time.Time) (*Identity, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := store.write(document, true); err != nil {
+	if err := writeDocument(directory, document, true); err != nil {
 		return nil, err
 	}
 	return identityFromDocument(document)
+}
+
+func (store *Store) openLocked(create bool) (*securefs.Directory, func(), error) {
+	if err := store.prepareDirectory(create); err != nil {
+		return nil, nil, err
+	}
+	directory, err := securefs.OpenDirectory(store.directory)
+	if err != nil {
+		return nil, nil, fmt.Errorf("open product identity directory: %w", err)
+	}
+	lock, created, err := openLockFile(directory)
+	if err != nil {
+		_ = directory.Close()
+		return nil, nil, err
+	}
+	closeHandles := func() {
+		_ = lock.Close()
+		_ = directory.Close()
+	}
+	if created {
+		if err := peercredentials.ProtectSecurityFileHandle(lock); err != nil {
+			closeHandles()
+			return nil, nil, err
+		}
+	} else if err := peercredentials.ValidateSecurityFileHandle(lock); err != nil {
+		closeHandles()
+		return nil, nil, err
+	}
+	unlock, err := acquireFileLock(lock)
+	if err != nil {
+		closeHandles()
+		return nil, nil, err
+	}
+	return directory, func() {
+		_ = unlock()
+		closeHandles()
+	}, nil
+}
+
+func openLockFile(directory *securefs.Directory) (*os.File, bool, error) {
+	file, err := directory.CreateExclusive(lockFile, 0o600)
+	if err == nil {
+		return file, true, nil
+	}
+	if !errors.Is(err, os.ErrExist) {
+		return nil, false, fmt.Errorf("create product identity lock: %w", err)
+	}
+	file, err = directory.OpenReadWrite(lockFile)
+	if err != nil {
+		return nil, false, fmt.Errorf("open product identity lock: %w", err)
+	}
+	return file, false, nil
 }
 
 func (store *Store) prepareDirectory(create bool) error {
@@ -203,15 +267,10 @@ func (store *Store) prepareDirectory(create bool) error {
 	return err
 }
 
-func (store *Store) write(document identityDocument, replace bool) error {
+func writeDocument(directory *securefs.Directory, document identityDocument, replace bool) error {
 	if err := document.validate(); err != nil {
 		return err
 	}
-	directory, err := securefs.OpenDirectory(store.directory)
-	if err != nil {
-		return err
-	}
-	defer directory.Close()
 	data, err := json.MarshalIndent(document, "", "  ")
 	if err != nil {
 		return err
