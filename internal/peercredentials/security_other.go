@@ -85,3 +85,41 @@ func ValidateSecurityFile(path string) error {
 	}
 	return nil
 }
+
+func ProtectSecurityFileHandle(file *os.File) error {
+	if file == nil {
+		return errors.New("security file handle is required")
+	}
+	if err := file.Chmod(0o600); err != nil {
+		return err
+	}
+	return ValidateSecurityFileHandle(file)
+}
+
+func ProtectSecurityDirectoryHandle(handle uintptr) error {
+	if handle == 0 {
+		return nil
+	}
+	return nil
+}
+
+func ValidateSecurityDirectoryHandle(handle uintptr) error {
+	if handle == 0 {
+		return nil
+	}
+	return nil
+}
+
+func ValidateSecurityFileHandle(file *os.File) error {
+	if file == nil {
+		return errors.New("security file handle is required")
+	}
+	info, err := file.Stat()
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() || info.Mode().Perm() != 0o600 {
+		return ErrInsecurePrivateKey
+	}
+	return nil
+}

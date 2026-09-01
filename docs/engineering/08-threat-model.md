@@ -23,7 +23,7 @@ Malformed, duplicated, stale, out-of-order, or outcome-unknown input is dropped 
 
 Synthesized input must not loop back to a peer. Tagging is diagnostic metadata; classification also uses Windows injected flags and current session direction.
 
-Credentials and trust records use restrictive permissions, bounded parsing, locking, atomic replacement, and explicit revocation. Reports use allow-listed schemas, aggregate counters, exclusive creation, path validation, and redaction.
+Credentials, trust records, reports, launcher configuration, and stop markers use the handle-relative mutation boundary in `docs/security/local-write-inventory.md`. Reparse traversal, hard-linked rename sources, destination precreation, ACL drift, and parent path replacement fail closed. Credentials and trust records additionally use restrictive handle-validated DACLs, bounded parsing, locking, atomic replacement, and explicit revocation.
 
 The listener uses TLS 1.3 mutual authentication, ALPN, a four-handshake pre-auth concurrency gate, five-second deadlines, a global token bucket, a per-source token bucket, and a fixed-size idle-expiring source table. Source addresses stay ephemeral and diagnostics expose only aggregate rejection causes. The accepted listener policy is `trusted-private`; unspecified or public policies fail before binding. Public-profile support requires a separate reversible Windows firewall implementation.
 
@@ -31,7 +31,7 @@ The Phase 0 crash guard runs with the same user and privilege, inherits only its
 
 ## Residual risks
 
-A malicious process running as the same user can race path components or replace executables unless a handle-relative writer and signed installation boundary prevent it. Path-race hardening is tracked by issue #17 and signing by issue #16.
+Runtime local-data mutation no longer follows a pathname after acquiring its target directory. A malicious process already running as the same user may still read that user's files, inject into the process, abuse a debugger, or replace unsigned executables; the secure-write boundary is not a same-account sandbox. Signed installation and executable integrity remain owned by issue #16.
 
 Power loss can prevent cleanup from running. Windows secure desktops and higher-integrity targets are outside the MVP guarantee. Laptop-specific drivers and touchpad conversion require physical evidence. Local resource exhaustion, firewall misconfiguration, certificate lifecycle mistakes, and compromised trusted peers remain release blockers until their owning issues are accepted.
 

@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0disoft/krasis/internal/securefs"
+
 	"github.com/0disoft/krasis/internal/peercredentials"
 	"github.com/0disoft/krasis/internal/transport"
 )
@@ -123,7 +125,12 @@ func TestStoreRejectsConcurrentMutationLock(t *testing.T) {
 	if _, err := store.Import(testPeer(), "peer", true, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
-	lock, _, err := openLockFile(filepath.Join(store.directory, lockFilename))
+	directory, err := securefs.OpenDirectory(store.directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer directory.Close()
+	lock, _, err := openLockFile(directory)
 	if err != nil {
 		t.Fatal(err)
 	}

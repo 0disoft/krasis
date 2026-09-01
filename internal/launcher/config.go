@@ -14,6 +14,7 @@ import (
 
 	"github.com/0disoft/krasis/internal/lab"
 	"github.com/0disoft/krasis/internal/peercredentials"
+	"github.com/0disoft/krasis/internal/securefs"
 )
 
 const (
@@ -125,16 +126,16 @@ func SaveConfig(path string, config Config) error {
 	if err := os.MkdirAll(directory, 0o700); err != nil {
 		return err
 	}
-	temporary, err := os.CreateTemp(directory, ".launcher-config-*.tmp")
+	secureDirectory, err := securefs.OpenDirectory(directory)
 	if err != nil {
 		return err
 	}
-	temporaryPath := temporary.Name()
-	defer os.Remove(temporaryPath)
-	if err := temporary.Chmod(0o600); err != nil {
-		temporary.Close()
+	defer secureDirectory.Close()
+	temporary, temporaryName, err := secureDirectory.CreateTemporary(".launcher-config-", 0o600)
+	if err != nil {
 		return err
 	}
+	defer secureDirectory.Remove(temporaryName)
 	if _, err := temporary.Write(payload); err != nil {
 		temporary.Close()
 		return err
@@ -146,7 +147,7 @@ func SaveConfig(path string, config Config) error {
 	if err := temporary.Close(); err != nil {
 		return err
 	}
-	return replaceFile(temporaryPath, path)
+	return secureDirectory.Replace(temporaryName, filepath.Base(path))
 }
 
 func (config Config) Validate() error {
