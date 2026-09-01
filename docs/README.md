@@ -7,6 +7,7 @@
 - Product scope source: docs/product/02-spec.md
 - Architecture decisions source: docs/adr/*.md
 - Operational standard source: docs/ops/00-operational-contract.md
+- Network exposure and listener recovery: docs/ops/network-exposure.md
 - Validation source: VALIDATION.md
 - Agent routing source: .agents/context-map.md
 - Repository hygiene source: .editorconfig, .gitattributes, .gitignore
@@ -21,6 +22,7 @@
 - Phase 0 Windows input feasibility plan: docs/experiments/phase-0-windows-input-feasibility.md
 - Phase 0 device probe runbook: docs/experiments/device-probe-runbook.md
 - Phase 0 redacted hardware result: docs/experiments/results/2026-07-16-study-pair-v13.md
+- Pre-auth admission and trusted-private listener decision: docs/adr/0033-hybrid-pre-auth-admission.md
 - Phase 0 foreground fallback decision: docs/adr/0028-bounded-foreground-thread-attach-fallback.md
 - Phase 0 focus restore fallback decision: docs/adr/0029-bounded-focus-restore-thread-attach-fallback.md
 - Phase 0 degraded focus release decision: docs/adr/0030-degraded-focus-restore-does-not-terminate-session.md

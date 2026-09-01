@@ -43,6 +43,18 @@ func TestCloseConnectionOnErrorPreservesCauseAndCloseFailure(t *testing.T) {
 	}
 }
 
+func TestListenSourceRejectsUnspecifiedNetworkPolicyBeforeBinding(t *testing.T) {
+	_, err := NewListenSourceWithPolicy(
+		"127.0.0.1:0",
+		&tls.Config{},
+		"",
+		DefaultPreAuthAdmissionConfig(),
+	)
+	if err == nil {
+		t.Fatal("expected explicit network policy error")
+	}
+}
+
 func TestListenAndDialSourcesAuthenticatePeerConnection(t *testing.T) {
 	directory := filepath.Join(t.TempDir(), "credentials")
 	if _, err := peercredentials.Generate(directory, "127.0.0.1", time.Now()); err != nil {
@@ -64,6 +76,9 @@ func TestListenAndDialSourcesAuthenticatePeerConnection(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer listener.Close()
+	if listener.NetworkPolicy() != ListenNetworkTrustedPrivate {
+		t.Fatalf("network policy = %q", listener.NetworkPolicy())
+	}
 	dialer, err := NewDialSource(listener.Address(), clientTLS, time.Second)
 	if err != nil {
 		t.Fatal(err)
@@ -86,6 +101,10 @@ func TestListenAndDialSourcesAuthenticatePeerConnection(t *testing.T) {
 	}
 	_ = clientConnection.Close()
 	_ = serverResult.connection.Close()
+	metrics := listener.PreAuthMetrics()
+	if metrics.Admitted != 1 || metrics.Authenticated != 1 {
+		t.Fatalf("pre-auth metrics = %+v", metrics)
+	}
 }
 
 func TestListenSourceDoesNotLetStalledHandshakeBlockAuthenticatedPeer(t *testing.T) {
@@ -146,6 +165,10 @@ func TestListenSourceDoesNotLetStalledHandshakeBlockAuthenticatedPeer(t *testing
 		t.Fatalf("ListenSource.Next() error = %v", serverResult.err)
 	}
 	defer serverResult.connection.Close()
+	metrics := listener.PreAuthMetrics()
+	if metrics.Admitted != 2 || metrics.Authenticated != 1 {
+		t.Fatalf("pre-auth metrics = %+v", metrics)
+	}
 }
 
 func waitForListenRound(t *testing.T, source *ListenSource) {
