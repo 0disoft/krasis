@@ -55,6 +55,8 @@ var (
 	procGetSecurityDescriptorControl                         = advapi32.NewProc("GetSecurityDescriptorControl")
 	procSetNamedSecurityInfoW                                = advapi32.NewProc("SetNamedSecurityInfoW")
 	procGetNamedSecurityInfoW                                = advapi32.NewProc("GetNamedSecurityInfoW")
+	procSetSecurityInfo                                      = advapi32.NewProc("SetSecurityInfo")
+	procGetSecurityInfo                                      = advapi32.NewProc("GetSecurityInfo")
 	procGetACE                                               = advapi32.NewProc("GetAce")
 	procGetFileAttributesW                                   = kernel32.NewProc("GetFileAttributesW")
 )
@@ -120,6 +122,114 @@ func ValidateSecurityFile(path string) error {
 		return fmt.Errorf("%w: private key: %v", ErrInsecurePrivateKey, err)
 	}
 	return nil
+}
+
+func ProtectSecurityFileHandle(file *os.File) error {
+	if file == nil {
+		return errors.New("security file handle is required")
+	}
+	if err := protectSecurityHandle(file.Fd(), false); err != nil {
+		return fmt.Errorf("protect security file handle: %w", err)
+	}
+	return ValidateSecurityFileHandle(file)
+}
+
+func ValidateSecurityFileHandle(file *os.File) error {
+	if file == nil {
+		return errors.New("security file handle is required")
+	}
+	var info syscall.ByHandleFileInformation
+	if err := syscall.GetFileInformationByHandle(syscall.Handle(file.Fd()), &info); err != nil {
+		return err
+	}
+	if info.FileAttributes&fileAttributeReparsePoint != 0 || info.FileAttributes&syscall.FILE_ATTRIBUTE_DIRECTORY != 0 {
+		return fmt.Errorf("%w: security handle is not a regular file", ErrInsecurePrivateKey)
+	}
+	if info.NumberOfLinks != 1 {
+		return fmt.Errorf("%w: security file has multiple hard links", ErrInsecurePrivateKey)
+	}
+	return validateExactCurrentUserDACLHandle(file.Fd(), 0)
+}
+
+func protectSecurityHandle(handle uintptr, directory bool) error {
+	dacl, descriptor, err := currentUserDACL(directory)
+	if err != nil {
+		return err
+	}
+	defer syscall.LocalFree(syscall.Handle(descriptor))
+	status, _, _ := procSetSecurityInfo.Call(
+		handle,
+		seFileObject,
+		daclSecurityInformation|protectedDACLsecurityInformation,
+		0,
+		0,
+		uintptr(unsafe.Pointer(dacl)),
+		0,
+	)
+	runtime.KeepAlive(descriptor)
+	if status != 0 {
+		return syscall.Errno(status)
+	}
+	return nil
+}
+
+func currentUserDACL(directory bool) (*windowsACL, unsafe.Pointer, error) {
+	userSID, err := currentUserSIDString()
+	if err != nil {
+		return nil, nil, err
+	}
+	flags := ""
+	if directory {
+		flags = "OICI"
+	}
+	aces := "(A;" + flags + ";FA;;;" + userSID + ")"
+	if userSID != "S-1-5-18" {
+		aces += "(A;" + flags + ";FA;;;SY)"
+	}
+	sddl, err := syscall.UTF16PtrFromString("D:P" + aces)
+	if err != nil {
+		return nil, nil, err
+	}
+	var descriptor unsafe.Pointer
+	result, _, callErr := procConvertStringSecurityDescriptorToSecurityDescriptorW.Call(
+		uintptr(unsafe.Pointer(sddl)), sddlRevision1, uintptr(unsafe.Pointer(&descriptor)), 0,
+	)
+	if result == 0 {
+		return nil, nil, callErr
+	}
+	var dacl *windowsACL
+	var present, defaulted int32
+	result, _, callErr = procGetSecurityDescriptorDACL.Call(
+		uintptr(descriptor), uintptr(unsafe.Pointer(&present)), uintptr(unsafe.Pointer(&dacl)), uintptr(unsafe.Pointer(&defaulted)),
+	)
+	if result == 0 || present == 0 || dacl == nil {
+		_, _ = syscall.LocalFree(syscall.Handle(descriptor))
+		if result == 0 {
+			return nil, nil, callErr
+		}
+		return nil, nil, errors.New("generated security descriptor has no DACL")
+	}
+	return dacl, descriptor, nil
+}
+
+func validateExactCurrentUserDACLHandle(handle uintptr, expectedFlags byte) error {
+	var dacl *windowsACL
+	var descriptor unsafe.Pointer
+	status, _, _ := procGetSecurityInfo.Call(
+		handle,
+		seFileObject,
+		daclSecurityInformation,
+		0,
+		0,
+		uintptr(unsafe.Pointer(&dacl)),
+		0,
+		uintptr(unsafe.Pointer(&descriptor)),
+	)
+	if status != 0 {
+		return syscall.Errno(status)
+	}
+	defer syscall.LocalFree(syscall.Handle(descriptor))
+	return validateCurrentUserDACL(dacl, descriptor, expectedFlags)
 }
 
 func validatePrivateKeyDirectory(directory string) (string, error) {
@@ -268,6 +378,10 @@ func validateExactCurrentUserDACL(path string, expectedFlags byte) error {
 		return syscall.Errno(status)
 	}
 	defer syscall.LocalFree(syscall.Handle(descriptor))
+	return validateCurrentUserDACL(dacl, descriptor, expectedFlags)
+}
+
+func validateCurrentUserDACL(dacl *windowsACL, descriptor unsafe.Pointer, expectedFlags byte) error {
 	if dacl == nil {
 		return errors.New("DACL is missing")
 	}

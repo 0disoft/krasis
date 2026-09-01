@@ -17,6 +17,7 @@ import (
 const (
 	deleteAccess             = 0x00010000
 	standardRightsRead       = 0x00020000
+	writeDAC                 = 0x00040000
 	synchronizeAccess        = 0x00100000
 	fileListDirectory        = 0x00000001
 	fileReadData             = 0x00000001
@@ -139,6 +140,21 @@ func (directory *Directory) Close() error {
 	return err
 }
 
+func (directory *Directory) Handle() uintptr {
+	if directory == nil {
+		return 0
+	}
+	return uintptr(directory.handle)
+}
+
+func (directory *Directory) Open(name string) (*os.File, error) {
+	return directory.openExisting(name, fileGenericRead)
+}
+
+func (directory *Directory) OpenReadWrite(name string) (*os.File, error) {
+	return directory.openExisting(name, fileGenericRead|fileGenericWrite|deleteAccess)
+}
+
 func (directory *Directory) CreateExclusive(name string, mode os.FileMode) (*os.File, error) {
 	if err := directory.ready(name); err != nil {
 		return nil, err
@@ -146,7 +162,7 @@ func (directory *Directory) CreateExclusive(name string, mode os.FileMode) (*os.
 	handle, err := ntCreate(
 		directory.handle,
 		name,
-		fileGenericRead|fileGenericWrite|deleteAccess,
+		fileGenericRead|fileGenericWrite|deleteAccess|writeDAC,
 		fileCreate,
 		fileNonDirectoryFile|fileOpenReparsePoint|fileSynchronousNonAlert|fileWriteThrough,
 	)
@@ -180,6 +196,41 @@ func (directory *Directory) CreateTemporary(prefix string, mode os.FileMode) (*o
 		}
 	}
 	return nil, "", errors.New("secure temporary name collision limit reached")
+}
+
+func (directory *Directory) openExisting(name string, access uint32) (*os.File, error) {
+	if err := directory.ready(name); err != nil {
+		return nil, err
+	}
+	handle, err := ntCreate(
+		directory.handle,
+		name,
+		access|fileReadAttributes|synchronizeAccess,
+		fileOpen,
+		fileNonDirectoryFile|fileOpenReparsePoint|fileSynchronousNonAlert,
+	)
+	if err != nil {
+		return nil, err
+	}
+	var info syscall.ByHandleFileInformation
+	if err := syscall.GetFileInformationByHandle(handle, &info); err != nil {
+		_ = syscall.CloseHandle(handle)
+		return nil, err
+	}
+	if info.FileAttributes&syscall.FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+		_ = syscall.CloseHandle(handle)
+		return nil, ErrUnsafePath
+	}
+	if info.NumberOfLinks != 1 {
+		_ = syscall.CloseHandle(handle)
+		return nil, ErrHardLink
+	}
+	file := os.NewFile(uintptr(handle), filepath.Join(directory.path, name))
+	if file == nil {
+		_ = syscall.CloseHandle(handle)
+		return nil, errors.New("wrap secure file handle")
+	}
+	return file, nil
 }
 
 func (directory *Directory) Replace(source, destination string) error {

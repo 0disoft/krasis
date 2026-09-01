@@ -29,6 +29,16 @@ func OpenDirectory(path string) (*Directory, error) {
 
 func (directory *Directory) Close() error { return nil }
 
+func (directory *Directory) Handle() uintptr { return 0 }
+
+func (directory *Directory) Open(name string) (*os.File, error) {
+	return directory.openExisting(name, os.O_RDONLY)
+}
+
+func (directory *Directory) OpenReadWrite(name string) (*os.File, error) {
+	return directory.openExisting(name, os.O_RDWR)
+}
+
 func (directory *Directory) CreateExclusive(name string, mode os.FileMode) (*os.File, error) {
 	if directory == nil {
 		return nil, errors.New("secure directory is closed")
@@ -54,6 +64,24 @@ func (directory *Directory) CreateTemporary(prefix string, mode os.FileMode) (*o
 		}
 	}
 	return nil, "", errors.New("secure temporary name collision limit reached")
+}
+
+func (directory *Directory) openExisting(name string, flag int) (*os.File, error) {
+	if directory == nil {
+		return nil, errors.New("secure directory is closed")
+	}
+	if err := validateLeaf(name); err != nil {
+		return nil, err
+	}
+	path := filepath.Join(directory.path, name)
+	info, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+		return nil, ErrUnsafePath
+	}
+	return os.OpenFile(path, flag, 0)
 }
 
 func (directory *Directory) Replace(source, destination string) error {

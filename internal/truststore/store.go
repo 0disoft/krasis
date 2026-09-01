@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/0disoft/krasis/internal/peercredentials"
+	"github.com/0disoft/krasis/internal/securefs"
 	"github.com/0disoft/krasis/internal/transport"
 )
 
@@ -112,7 +113,7 @@ func (store *Store) List() (Document, error) {
 }
 
 func (store *Store) mutate(create bool, now time.Time, change func(*Document) error) error {
-	document, release, err := store.openLocked(create)
+	document, directory, release, err := store.openLocked(create)
 	if err != nil {
 		return err
 	}
@@ -130,11 +131,11 @@ func (store *Store) mutate(create bool, now time.Time, change func(*Document) er
 	if err := document.Validate(); err != nil {
 		return err
 	}
-	return store.write(document)
+	return store.write(directory, document)
 }
 
 func (store *Store) readLocked(create bool) (Document, error) {
-	document, release, err := store.openLocked(create)
+	document, _, release, err := store.openLocked(create)
 	if err != nil {
 		return Document{}, err
 	}
@@ -142,43 +143,51 @@ func (store *Store) readLocked(create bool) (Document, error) {
 	return document, nil
 }
 
-func (store *Store) openLocked(create bool) (Document, func(), error) {
+func (store *Store) openLocked(create bool) (Document, *securefs.Directory, func(), error) {
 	if err := store.prepareDirectory(create); err != nil {
-		return Document{}, nil, err
+		return Document{}, nil, nil, err
 	}
-	lockPath := filepath.Join(store.directory, lockFilename)
-	lockFile, created, err := openLockFile(lockPath)
+	directory, err := securefs.OpenDirectory(store.directory)
 	if err != nil {
-		return Document{}, nil, err
+		return Document{}, nil, nil, fmt.Errorf("open trust store directory handle: %w", err)
 	}
-	closeLock := func() { _ = lockFile.Close() }
+	lockFile, created, err := openLockFile(directory)
+	if err != nil {
+		_ = directory.Close()
+		return Document{}, nil, nil, err
+	}
+	closeLock := func() {
+		_ = lockFile.Close()
+		_ = directory.Close()
+	}
 	if created {
-		if err := peercredentials.ProtectSecurityFile(lockPath); err != nil {
+		if err := peercredentials.ProtectSecurityFileHandle(lockFile); err != nil {
 			closeLock()
-			return Document{}, nil, err
+			return Document{}, nil, nil, err
 		}
-	} else if err := peercredentials.ValidateSecurityFile(lockPath); err != nil {
+	} else if err := peercredentials.ValidateSecurityFileHandle(lockFile); err != nil {
 		closeLock()
-		return Document{}, nil, err
+		return Document{}, nil, nil, err
 	}
 	unlock, err := acquireFileLock(lockFile)
 	if err != nil {
 		closeLock()
-		return Document{}, nil, err
+		return Document{}, nil, nil, err
 	}
 	release := func() {
 		_ = unlock()
 		_ = lockFile.Close()
+		_ = directory.Close()
 	}
-	document, err := store.read()
+	document, err := store.read(directory)
 	if err != nil {
 		if create && errors.Is(err, ErrStoreNotFound) {
-			return Document{SchemaVersion: SchemaVersion, Peers: []PeerRecord{}}, release, nil
+			return Document{SchemaVersion: SchemaVersion, Peers: []PeerRecord{}}, directory, release, nil
 		}
 		release()
-		return Document{}, nil, err
+		return Document{}, nil, nil, err
 	}
-	return document, release, nil
+	return document, directory, release, nil
 }
 
 func (store *Store) prepareDirectory(create bool) error {
@@ -209,19 +218,18 @@ func (store *Store) prepareDirectory(create bool) error {
 	return err
 }
 
-func (store *Store) read() (Document, error) {
-	path := filepath.Join(store.directory, storeFilename)
-	if err := peercredentials.ValidateSecurityFile(path); err != nil {
+func (store *Store) read(directory *securefs.Directory) (Document, error) {
+	file, err := directory.Open(storeFilename)
+	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return Document{}, ErrStoreNotFound
 		}
-		return Document{}, fmt.Errorf("validate trust store security: %w", err)
-	}
-	file, err := os.Open(path)
-	if err != nil {
 		return Document{}, fmt.Errorf("open trust store: %w", err)
 	}
 	defer file.Close()
+	if err := peercredentials.ValidateSecurityFileHandle(file); err != nil {
+		return Document{}, fmt.Errorf("validate trust store security: %w", err)
+	}
 	data, err := io.ReadAll(io.LimitReader(file, maxStoreBytes+1))
 	if err != nil {
 		return Document{}, fmt.Errorf("read trust store: %w", err)
@@ -244,26 +252,19 @@ func (store *Store) read() (Document, error) {
 	return document, nil
 }
 
-func (store *Store) write(document Document) error {
+func (store *Store) write(directory *securefs.Directory, document Document) error {
 	data, err := json.MarshalIndent(document, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode trust store: %w", err)
 	}
 	data = append(data, '\n')
-	temporary, err := os.CreateTemp(store.directory, ".trust-*.tmp")
+	temporary, temporaryName, err := directory.CreateTemporary(".trust-", 0o600)
 	if err != nil {
 		return fmt.Errorf("create trust store temporary file: %w", err)
 	}
-	temporaryPath := temporary.Name()
-	defer os.Remove(temporaryPath)
-	if err := temporary.Close(); err != nil {
-		return err
-	}
-	if err := peercredentials.ProtectSecurityFile(temporaryPath); err != nil {
-		return err
-	}
-	temporary, err = os.OpenFile(temporaryPath, os.O_WRONLY|os.O_TRUNC, 0o600)
-	if err != nil {
+	defer directory.Remove(temporaryName)
+	if err := peercredentials.ProtectSecurityFileHandle(temporary); err != nil {
+		_ = temporary.Close()
 		return err
 	}
 	if _, err := temporary.Write(data); err != nil {
@@ -277,10 +278,15 @@ func (store *Store) write(document Document) error {
 	if err := temporary.Close(); err != nil {
 		return err
 	}
-	if err := replaceFile(temporaryPath, filepath.Join(store.directory, storeFilename)); err != nil {
+	if err := directory.Replace(temporaryName, storeFilename); err != nil {
 		return fmt.Errorf("replace trust store: %w", err)
 	}
-	return peercredentials.ValidateSecurityFile(filepath.Join(store.directory, storeFilename))
+	file, err := directory.Open(storeFilename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	return peercredentials.ValidateSecurityFileHandle(file)
 }
 
 func ensureJSONEOF(decoder *json.Decoder) error {
@@ -294,15 +300,15 @@ func ensureJSONEOF(decoder *json.Decoder) error {
 	return nil
 }
 
-func openLockFile(path string) (*os.File, bool, error) {
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0o600)
+func openLockFile(directory *securefs.Directory) (*os.File, bool, error) {
+	file, err := directory.CreateExclusive(lockFilename, 0o600)
 	if err == nil {
 		return file, true, nil
 	}
 	if !errors.Is(err, os.ErrExist) {
 		return nil, false, fmt.Errorf("create trust store lock: %w", err)
 	}
-	file, err = os.OpenFile(path, os.O_RDWR, 0o600)
+	file, err = directory.OpenReadWrite(lockFilename)
 	if err != nil {
 		return nil, false, fmt.Errorf("open trust store lock: %w", err)
 	}
