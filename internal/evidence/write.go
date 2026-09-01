@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/0disoft/krasis/internal/securefs"
 )
 
 var (
@@ -31,17 +33,16 @@ func WriteJSONExclusive(path string, value any) error {
 	}
 	data = append(data, '\n')
 
-	temporary, err := os.CreateTemp(directory, ".krasis-probe-*.tmp")
+	secureDirectory, err := securefs.OpenDirectory(directory)
+	if err != nil {
+		return fmt.Errorf("open secure evidence directory: %w", err)
+	}
+	defer secureDirectory.Close()
+	temporary, temporaryName, err := secureDirectory.CreateTemporary(".krasis-probe-", 0o600)
 	if err != nil {
 		return fmt.Errorf("create temporary evidence file: %w", err)
 	}
-	temporaryPath := temporary.Name()
-	keepTemporary := false
-	defer func() {
-		if !keepTemporary {
-			_ = os.Remove(temporaryPath)
-		}
-	}()
+	defer secureDirectory.Remove(temporaryName)
 
 	if err := temporary.Chmod(0o600); err != nil {
 		_ = temporary.Close()
@@ -61,13 +62,12 @@ func WriteJSONExclusive(path string, value any) error {
 	if err := validateOutputDirectory(directory); err != nil {
 		return err
 	}
-	if err := promoteNoReplace(temporaryPath, absolute); err != nil {
-		if errors.Is(err, ErrOutputExists) {
-			return err
+	if err := secureDirectory.PromoteNoReplace(temporaryName, filepath.Base(absolute)); err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return fmt.Errorf("%w: output already exists", ErrOutputExists)
 		}
 		return fmt.Errorf("promote evidence file: %w", err)
 	}
-	keepTemporary = true
 	return nil
 }
 
