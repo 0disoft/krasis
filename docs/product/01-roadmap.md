@@ -23,9 +23,17 @@
 
 ### Phase 1: 순수 상태 모델
 
-- 세션, 제어권, epoch, 눌림 상태와 전환 상태 머신
-- 중복, 역순, 유실, 재연결에 대한 모델 테스트
-- OS와 네트워크 없이 `ReleaseAll` 및 `LOCAL` 수렴 검증
+현재 판정: `COMPLETE`. 실행 가능한 transition table, session·lease·epoch·sequence gate,
+`PressedState`, `ReleaseAll`과 `LOCAL` 수렴의 구현 및 결정적 테스트를
+`docs/architecture/01-domain-model.md`에서 1:1로 연결했다.
+
+- 세션, 제어권, epoch, 눌림 상태와 7개 상태의 전환 table 완료
+- duplicate, 역순, 유실·gap, stale identity와 재연결 모델 테스트 완료
+- OS와 네트워크 없이 `ReleaseAll` 성공·부분 실패·재시도와 `LOCAL` 수렴 검증 완료
+- framed stream 재연결과 stale-input 통합 테스트는 순수 모델의 보조 근거로 유지
+
+Phase 1 완료는 Phase 0 완료를 대신하지 않는다. Phase 0이 `IN_PROGRESS`인 동안 GUI와 설치 단계로
+진행하지 않는다.
 
 ### Phase 2: 기기 신원과 페어링
 
