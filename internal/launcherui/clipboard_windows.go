@@ -5,6 +5,7 @@ package launcherui
 import (
 	"errors"
 	"fmt"
+	"runtime"
 	"syscall"
 	"unsafe"
 )
@@ -23,6 +24,7 @@ var (
 	procGlobalFree       = kernel32.NewProc("GlobalFree")
 	procGlobalLock       = kernel32.NewProc("GlobalLock")
 	procGlobalUnlock     = kernel32.NewProc("GlobalUnlock")
+	procRtlMoveMemory    = syscall.NewLazyDLL("ntdll.dll").NewProc("RtlMoveMemory")
 )
 
 func writeClipboardText(owner uintptr, value string) error {
@@ -45,8 +47,8 @@ func writeClipboardText(owner uintptr, value string) error {
 	if pointer == 0 {
 		return fmt.Errorf("lock clipboard memory: %w", callErr)
 	}
-	destination := unsafe.Slice((*uint16)(unsafe.Pointer(pointer)), len(encoded))
-	copy(destination, encoded)
+	procRtlMoveMemory.Call(pointer, uintptr(unsafe.Pointer(&encoded[0])), size)
+	runtime.KeepAlive(encoded)
 	procGlobalUnlock.Call(handle)
 	if result, _, callErr := procOpenClipboard.Call(owner); result == 0 {
 		return fmt.Errorf("open clipboard: %w", callErr)
