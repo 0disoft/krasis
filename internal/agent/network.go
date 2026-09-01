@@ -16,6 +16,8 @@ type ListenSource struct {
 	tlsConfig        *tls.Config
 	handshakeTimeout time.Duration
 	preAuthSlots     chan struct{}
+	addressLimiter   *addressRateLimiter
+	metrics          preAuthCounters
 	shutdown         context.Context
 	cancel           context.CancelFunc
 	roundMu          sync.Mutex
@@ -43,26 +45,48 @@ type listenResult struct {
 }
 
 func NewListenSource(address string, tlsConfig *tls.Config) (*ListenSource, error) {
+	return NewListenSourceWithPolicy(address, tlsConfig, DefaultPreAuthPolicy())
+}
+
+func NewListenSourceWithPolicy(address string, tlsConfig *tls.Config, policy PreAuthPolicy) (*ListenSource, error) {
 	if address == "" || tlsConfig == nil {
 		return nil, errors.New("listen address and TLS config are required")
+	}
+	if err := policy.validate(); err != nil {
+		return nil, err
 	}
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		return nil, err
 	}
-	return newListenSource(listener, tlsConfig, DefaultPreAuthHandshakeTimeout, MaxConcurrentPreAuthHandshakes)
+	source, err := newListenSourceWithPolicy(listener, tlsConfig, policy)
+	if err != nil {
+		return nil, errors.Join(err, listener.Close())
+	}
+	return source, nil
 }
 
 func newListenSource(listener net.Listener, tlsConfig *tls.Config, handshakeTimeout time.Duration, maxPreAuth int) (*ListenSource, error) {
-	if listener == nil || tlsConfig == nil || handshakeTimeout <= 0 || maxPreAuth <= 0 {
-		return nil, errors.New("listener, TLS config, positive handshake timeout, and pre-auth limit are required")
+	policy := DefaultPreAuthPolicy()
+	policy.HandshakeTimeout = handshakeTimeout
+	policy.MaxConcurrent = maxPreAuth
+	return newListenSourceWithPolicy(listener, tlsConfig, policy)
+}
+
+func newListenSourceWithPolicy(listener net.Listener, tlsConfig *tls.Config, policy PreAuthPolicy) (*ListenSource, error) {
+	if listener == nil || tlsConfig == nil {
+		return nil, errors.New("listener and TLS config are required")
+	}
+	if err := policy.validate(); err != nil {
+		return nil, err
 	}
 	shutdown, cancel := context.WithCancel(context.Background())
 	source := &ListenSource{
 		listener:         listener,
 		tlsConfig:        tlsConfig.Clone(),
-		handshakeTimeout: handshakeTimeout,
-		preAuthSlots:     make(chan struct{}, maxPreAuth),
+		handshakeTimeout: policy.HandshakeTimeout,
+		preAuthSlots:     make(chan struct{}, policy.MaxConcurrent),
+		addressLimiter:   newAddressRateLimiter(policy),
 		shutdown:         shutdown,
 		cancel:           cancel,
 	}
@@ -76,6 +100,13 @@ func (source *ListenSource) Address() string {
 		return ""
 	}
 	return source.listener.Addr().String()
+}
+
+func (source *ListenSource) PreAuthMetrics() PreAuthMetrics {
+	if source == nil {
+		return PreAuthMetrics{}
+	}
+	return source.metrics.snapshot()
 }
 
 func (source *ListenSource) Next(ctx context.Context) (Connection, error) {
@@ -152,6 +183,12 @@ func (source *ListenSource) acceptLoop() {
 		round := source.round
 		source.roundMu.Unlock()
 		if round == nil {
+			source.metrics.rejectedNoPendingRound.Add(1)
+			_ = connection.Close()
+			continue
+		}
+		if !source.addressLimiter.allow(connection.RemoteAddr(), time.Now()) {
+			source.metrics.rejectedRateLimited.Add(1)
 			_ = connection.Close()
 			continue
 		}
@@ -160,6 +197,7 @@ func (source *ListenSource) acceptLoop() {
 			source.workers.Add(1)
 			go source.authenticate(round, connection)
 		default:
+			source.metrics.rejectedCapacity.Add(1)
 			_ = connection.Close()
 		}
 	}
@@ -172,11 +210,26 @@ func (source *ListenSource) authenticate(round *listenRound, connection net.Conn
 	defer cancel()
 	peerConnection, err := transport.NewPeerConnection(handshakeCtx, tls.Server(connection, source.tlsConfig.Clone()))
 	if err != nil {
+		source.recordHandshakeFailure(round, handshakeCtx, err)
 		_ = connection.Close()
 		return
 	}
 	if !source.deliver(round, listenResult{connection: peerConnection}) {
+		source.metrics.canceled.Add(1)
 		_ = peerConnection.Close()
+		return
+	}
+	source.metrics.accepted.Add(1)
+}
+
+func (source *ListenSource) recordHandshakeFailure(round *listenRound, handshakeCtx context.Context, err error) {
+	switch {
+	case errors.Is(err, context.DeadlineExceeded), errors.Is(handshakeCtx.Err(), context.DeadlineExceeded):
+		source.metrics.handshakeTimeout.Add(1)
+	case round.ctx.Err() != nil, source.shutdown.Err() != nil, errors.Is(handshakeCtx.Err(), context.Canceled):
+		source.metrics.canceled.Add(1)
+	default:
+		source.metrics.authenticationFailure.Add(1)
 	}
 }
 
