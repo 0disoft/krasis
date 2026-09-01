@@ -9,9 +9,9 @@ This repository type owns command behavior, arguments, flags, config loading, ex
 
 ## Source of Truth
 
-- Product decision: UNDECIDED
+- Product decision: product pairing is resident-agent mediated; command surface remains issue #14
 - Technical owner: UNASSIGNED
-- Related ADR: UNDECIDED
+- Related ADR: `docs/adr/0035-product-identity-and-mutual-pairing.md`
 
 ## Required Decisions
 
@@ -20,6 +20,11 @@ This repository type owns command behavior, arguments, flags, config loading, ex
 - Machine-readable output contract: UNDECIDED
 - Config precedence and default behavior: UNDECIDED
 - Runtime compatibility floor: UNDECIDED
+
+Issue #14 will expose product pairing through the resident agent API. That CLI may show device
+fingerprints, aliases, capabilities, pairing expiry and the human confirmation code, but must never
+print private keys or certificate bodies. The existing `krasis-lab peer-credentials` and `trust`
+commands remain Phase 0 tools and are not the product migration path.
 
 ## Review Blockers
 

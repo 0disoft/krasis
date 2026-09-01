@@ -19,9 +19,15 @@ A GUI close is not evidence that input cleanup completed. Product shutdown, roll
 
 ## Credential and trust boundary
 
-Phase 0 credentials and trust records use protected Windows directories, restrictive DACLs, bounded parsing, locking, certificate-validity checks, explicit capability and revocation records, and reparse-path rejection. They are experiment assets, not the product identity or pairing UX.
+Phase 0 credentials remain short-lived experiment assets. Product identity and pairing follow ADR 0035:
+an ACL-protected installation identity, 5-minute transcript, the same human-verified code on both peers,
+and signed confirmation receipts from both devices. Trust is created only after both receipts verify.
+Private keys and certificate bodies never enter UI-facing output.
 
-A limited beta requires issue #10 to define product-owned paths, identity lifetime, confirmation on both peers, rotation, replacement, migration, and recovery. Issue #12 must provide authenticated immediate revocation of the exact active lease. Expired, revoked, not-yet-valid, corrupt, overly permissive, or reparse-backed material fails closed.
+Identity rotation creates a new generation; peer replacement atomically revokes the old transport
+fingerprint and adds the new one. Expired transport credentials, revoked records, not-yet-valid
+certificates, corrupt identity, overly permissive ACL, reparse paths and lock contention fail closed.
+Authenticated exact-active-lease revocation is implemented separately by ADR 0034.
 
 A lost or suspected-compromised device is removed from trust on every remaining peer before another session is allowed. An already active lease must be terminated, held input released, local suppression disabled, and the affected identity replaced rather than merely renamed.
 

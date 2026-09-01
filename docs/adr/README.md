@@ -37,5 +37,8 @@
 - `0030-degraded-focus-restore-does-not-terminate-session.md`: capture foreground를 놓았다면 정확한 focus 복원 실패를 degraded로 유지
 - `0031-peer-dispatch-and-input-queue-evidence.md`: peer dispatch, source queue 체류와 destination input disposition evidence
 - `0032-live-trust-authorization-and-certificate-validity.md`: lease별 trust reload와 credential 유효기간 조기 검증
+- `0033-hybrid-pre-auth-admission.md`: trusted-private listener와 pre-auth admission budget
+- `0034-exact-active-lease-management-revocation.md`: exact active lease의 인증된 관리 종료
+- `0035-product-identity-and-mutual-pairing.md`: protected product identity와 양쪽 confirmation receipt pairing
 
 새 결정은 `0000-template.md`를 복사해 다음 번호로 추가한다. 이미 Accepted인 결정의 의미를 바꿀 때는 기존 문서를 조용히 덮어쓰지 말고 새 ADR에서 대체 관계와 migration 영향을 기록한다.

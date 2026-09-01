@@ -1,6 +1,6 @@
 # Secret and credential policy
 
-- Status: Active policy; product identity implementation remains blocked by issue #10
+- Status: Active policy; product identity core is implemented
 - Primary owner: release owner named in the release manifest
 - Security boundary: `docs/security/desktop-security.md`
 
@@ -22,7 +22,9 @@ CI credentials are repository or environment scoped, unavailable to untrusted pu
 
 ## Lifetime and rotation
 
-Issue #10 owns the exact product identity and certificate lifetime. Until that decision and its migration tests are accepted, external limited beta is blocked.
+ADR 0035 defines a non-expiring installation Ed25519 identity that rotates by explicit generation.
+Transport certificate validity remains independently enforced, and its product renewal cadence is a
+later agent/CLI UX decision. Phase 0 credentials are never migrated into product identity.
 
 Rotation is mandatory when a private key may have been read, a device is lost or transferred, an ACL or reparse check fails, certificate validity is exhausted, a signing certificate changes, a CI credential is exposed, or cryptographic policy changes.
 
