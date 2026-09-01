@@ -55,11 +55,12 @@ jobs:
           }
           go vet -unsafeptr=false ./internal/wininput
 
-      - name: Build lab CLI
+      - name: Build probe binaries
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force build | Out-Null
           go build -trimpath -o build/krasis-lab.exe ./cmd/krasis-lab
+          go build -trimpath -o build/krasis-launcher.exe ./cmd/krasis-launcher
 
       - name: Package device probe kit
         shell: pwsh
