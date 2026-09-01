@@ -128,6 +128,15 @@ func OpenDirectory(path string) (*Directory, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open secure directory: %w", err)
 	}
+	var info syscall.ByHandleFileInformation
+	if err := syscall.GetFileInformationByHandle(handle, &info); err != nil {
+		_ = syscall.CloseHandle(handle)
+		return nil, fmt.Errorf("inspect secure directory handle: %w", err)
+	}
+	if info.FileAttributes&syscall.FILE_ATTRIBUTE_REPARSE_POINT != 0 || info.FileAttributes&syscall.FILE_ATTRIBUTE_DIRECTORY == 0 {
+		_ = syscall.CloseHandle(handle)
+		return nil, ErrUnsafePath
+	}
 	return &Directory{path: absolute, handle: handle}, nil
 }
 

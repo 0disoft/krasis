@@ -98,3 +98,22 @@ func TestDirectoryRejectsHardLinkedRenameSource(t *testing.T) {
 		t.Fatalf("Replace error = %v, want ErrHardLink", err)
 	}
 }
+
+func TestOpenDirectoryRejectsReparseTraversal(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows reparse behavior")
+	}
+	root := t.TempDir()
+	target := filepath.Join(root, "target")
+	link := filepath.Join(root, "link")
+	if err := os.Mkdir(target, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+	if directory, err := OpenDirectory(link); err == nil {
+		_ = directory.Close()
+		t.Fatal("OpenDirectory accepted reparse traversal")
+	}
+}

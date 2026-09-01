@@ -29,7 +29,7 @@ A lost or suspected-compromised device is removed from trust on every remaining 
 
 The probe kit is not a product release artifact. A limited beta requires signed binaries and installer, checksum and SBOM publication, exact commit provenance, minimal reversible firewall changes, safe repair and uninstall, and no bundled credentials, reports, LAN addresses, or user data. Issue #16 owns the implementation and evidence.
 
-Executable replacement, same-user path swaps, hard links, reparse insertion, and ACL drift must fail closed for sensitive writes and launch decisions. The remaining path-replacement race tracked by issue #17 is a limited-beta blocker.
+Sensitive runtime writes follow `docs/security/local-write-inventory.md`: opened directory handles bind mutation identity, reparse traversal and hard-linked sources fail closed, and credential/trust DACLs are validated through the same handles. Executable replacement remains a signed-installer and launch-integrity concern owned by issue #16.
 
 ## Local data and diagnostics
 
