@@ -53,6 +53,13 @@ func (identity *Identity) Public() PublicIdentity {
 	return identity.public
 }
 
+func (identity *Identity) PublicKey() []byte {
+	if identity == nil || len(identity.private) != ed25519.PrivateKeySize {
+		return nil
+	}
+	return append([]byte(nil), identity.private.Public().(ed25519.PublicKey)...)
+}
+
 func (identity *Identity) Sign(message []byte) ([]byte, error) {
 	if identity == nil || len(identity.private) != ed25519.PrivateKeySize {
 		return nil, errors.New("product identity is not initialized")
