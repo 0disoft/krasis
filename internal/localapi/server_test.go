@@ -120,6 +120,15 @@ func (*stubOperations) Pair(context.Context, OperationRequest) (OperationResult,
 func (*stubOperations) Diagnostics(context.Context) (Diagnostics, error) {
 	return Diagnostics{SchemaVersion: DiagnosticsSchemaVersion, State: "LOCAL", Counters: map[string]uint64{}}, nil
 }
+func (*stubOperations) Trust(context.Context) (Trust, error) {
+	return Trust{SchemaVersion: TrustSchemaVersion, Peers: []TrustedPeer{}}, nil
+}
+func (*stubOperations) RevokeTrust(context.Context, OperationRequest) (OperationResult, error) {
+	return completedResult(), nil
+}
+func (*stubOperations) Topology(context.Context) (Topology, error) {
+	return Topology{SchemaVersion: TopologySchemaVersion, State: "LOCAL", Layout: "UNCONFIGURED", Peers: []TopologyPeer{}}, nil
+}
 func (*stubOperations) SafeStop(context.Context) (OperationResult, error) {
 	return completedResult(), nil
 }

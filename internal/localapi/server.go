@@ -21,6 +21,8 @@ const (
 	OperationSchemaVersion   = "krasis.agent.operation/v1"
 	ResultSchemaVersion      = "krasis.agent.operation-result/v1"
 	DiagnosticsSchemaVersion = "krasis.agent.diagnostics/v1"
+	TrustSchemaVersion       = "krasis.agent.trust/v1"
+	TopologySchemaVersion    = "krasis.agent.topology/v1"
 	DefaultShutdownTimeout   = 5 * time.Second
 	maxRequestBytes          = 64 << 10
 )
@@ -41,6 +43,7 @@ type OperationRequest struct {
 	PairingID           string `json:"pairingId,omitempty"`
 	ConfirmationCode    string `json:"confirmationCode,omitempty"`
 	AllowInboundControl *bool  `json:"allowInboundControl,omitempty"`
+	Fingerprint         string `json:"fingerprint,omitempty"`
 }
 
 type OperationResult struct {
@@ -57,12 +60,42 @@ type Diagnostics struct {
 	Counters      map[string]uint64 `json:"counters"`
 }
 
+type TrustedPeer struct {
+	Fingerprint         string `json:"fingerprint"`
+	Alias               string `json:"alias"`
+	Role                string `json:"role"`
+	AllowInboundControl bool   `json:"allowInboundControl"`
+	Revoked             bool   `json:"revoked"`
+}
+
+type Trust struct {
+	SchemaVersion string        `json:"schemaVersion"`
+	Revision      uint64        `json:"revision"`
+	Peers         []TrustedPeer `json:"peers"`
+}
+
+type TopologyPeer struct {
+	Alias               string `json:"alias"`
+	AllowInboundControl bool   `json:"allowInboundControl"`
+	Connected           bool   `json:"connected"`
+}
+
+type Topology struct {
+	SchemaVersion string         `json:"schemaVersion"`
+	State         string         `json:"state"`
+	Layout        string         `json:"layout"`
+	Peers         []TopologyPeer `json:"peers"`
+}
+
 type Operations interface {
 	Status(context.Context) (Status, error)
 	Connect(context.Context, OperationRequest) (OperationResult, error)
 	Disconnect(context.Context, OperationRequest) (OperationResult, error)
 	Pair(context.Context, OperationRequest) (OperationResult, error)
 	Diagnostics(context.Context) (Diagnostics, error)
+	Trust(context.Context) (Trust, error)
+	RevokeTrust(context.Context, OperationRequest) (OperationResult, error)
+	Topology(context.Context) (Topology, error)
 	SafeStop(context.Context) (OperationResult, error)
 }
 
@@ -184,6 +217,30 @@ func (handler *handler) ServeHTTP(response http.ResponseWriter, request *http.Re
 			return
 		}
 		writeJSON(response, http.StatusOK, value)
+	case "/v1/trust":
+		if request.Method != http.MethodGet {
+			writeMethodNotAllowed(response)
+			return
+		}
+		value, err := handler.operations.Trust(request.Context())
+		if err != nil {
+			writeInternalFailure(response)
+			return
+		}
+		writeJSON(response, http.StatusOK, value)
+	case "/v1/trust/revoke":
+		handler.operation(response, request, "trust-revoke", handler.operations.RevokeTrust)
+	case "/v1/topology":
+		if request.Method != http.MethodGet {
+			writeMethodNotAllowed(response)
+			return
+		}
+		value, err := handler.operations.Topology(request.Context())
+		if err != nil {
+			writeInternalFailure(response)
+			return
+		}
+		writeJSON(response, http.StatusOK, value)
 	case "/v1/safe-stop":
 		if request.Method != http.MethodPost || !emptyBody(request.Body) {
 			writeMethodNotAllowed(response)
@@ -230,34 +287,50 @@ func (handler *handler) operation(response http.ResponseWriter, request *http.Re
 func validateOperationRequest(kind string, value OperationRequest) error {
 	switch kind {
 	case "connect":
-		if !validAlias(value.PeerAlias) || value.PairingAction != "" || value.PairingID != "" || value.ConfirmationCode != "" || value.AllowInboundControl != nil {
+		if !validAlias(value.PeerAlias) || value.PairingAction != "" || value.PairingID != "" || value.ConfirmationCode != "" || value.AllowInboundControl != nil || value.Fingerprint != "" {
 			return errors.New("connect request is invalid")
 		}
 	case "disconnect":
-		if value.PeerAlias != "" || value.PairingAction != "" || value.PairingID != "" || value.ConfirmationCode != "" || value.AllowInboundControl != nil {
+		if value.PeerAlias != "" || value.PairingAction != "" || value.PairingID != "" || value.ConfirmationCode != "" || value.AllowInboundControl != nil || value.Fingerprint != "" {
 			return errors.New("disconnect request is invalid")
 		}
 	case "pair":
 		switch value.PairingAction {
 		case "BEGIN":
-			if !validAlias(value.PeerAlias) || value.AllowInboundControl == nil || value.PairingID != "" || value.ConfirmationCode != "" {
+			if !validAlias(value.PeerAlias) || value.AllowInboundControl == nil || value.PairingID != "" || value.ConfirmationCode != "" || value.Fingerprint != "" {
 				return errors.New("pair begin request is invalid")
 			}
 		case "CONFIRM":
-			if value.PeerAlias != "" || value.AllowInboundControl != nil || !validPairingID(value.PairingID) || !validConfirmationCode(value.ConfirmationCode) {
+			if value.PeerAlias != "" || value.AllowInboundControl != nil || !validPairingID(value.PairingID) || !validConfirmationCode(value.ConfirmationCode) || value.Fingerprint != "" {
 				return errors.New("pair confirm request is invalid")
 			}
 		case "CANCEL":
-			if value.PeerAlias != "" || value.AllowInboundControl != nil || !validPairingID(value.PairingID) || value.ConfirmationCode != "" {
+			if value.PeerAlias != "" || value.AllowInboundControl != nil || !validPairingID(value.PairingID) || value.ConfirmationCode != "" || value.Fingerprint != "" {
 				return errors.New("pair cancel request is invalid")
 			}
 		default:
 			return errors.New("pairing action is invalid")
 		}
+	case "trust-revoke":
+		if !validFingerprint(value.Fingerprint) || value.PeerAlias != "" || value.PairingAction != "" || value.PairingID != "" || value.ConfirmationCode != "" || value.AllowInboundControl != nil {
+			return errors.New("trust revoke request is invalid")
+		}
 	default:
 		return errors.New("operation kind is invalid")
 	}
 	return nil
+}
+
+func validFingerprint(value string) bool {
+	if len(value) != 64 || strings.ToLower(value) != value {
+		return false
+	}
+	for _, character := range value {
+		if (character < '0' || character > '9') && (character < 'a' || character > 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 func validAlias(value string) bool {
