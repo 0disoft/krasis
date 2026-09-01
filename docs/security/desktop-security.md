@@ -1,46 +1,48 @@
-# Desktop Security
+# Desktop security boundary
 
-- Status: Draft
-- Repository Type: desktop-app
+- Status: Active policy; product release remains blocked
+- Owner: repository maintainers
+- Product contract: `docs/product/02-spec.md`
+- Threat model: `docs/engineering/08-threat-model.md`
 
-## Repository Type Contract
+## Supported security boundary
 
-This repository type owns installed app behavior, OS support, local data, installer, auto-update, crash reporting, permissions, and desktop-specific security contracts.
+Krasis is a same-user, direct peer-input product for explicitly paired Windows devices. It is not a remote administration tool, privileged helper, cloud relay, login-screen controller, or security-desktop input provider.
 
-## Source of Truth
+The resident agent, UI, CLI, launcher, and crash guard run without elevation in the current interactive session. They must never request elevation merely to broaden input reach. Control of a higher-integrity application is not a supported guarantee, and Windows sign-in, UAC secure desktop, lock screen, Session 0, and another user's desktop are excluded.
 
-- Product decision: UNDECIDED
-- Technical owner: UNASSIGNED
-- Related ADR: `docs/adr/0004-phase-0-crash-guard.md`,
-  `docs/adr/0006-persistent-trust-store.md`,
-  `docs/adr/0007-windows-agent-lifecycle-owner.md`,
-  `docs/adr/0032-live-trust-authorization-and-certificate-validity.md` (Phase 0 범위)
+## Input safety
 
-## Required Decisions
+The destination must prepare before source suppression starts. Exact session, lease, epoch, and sequence identity govern every active-control transition. Disconnect, timeout, lifecycle termination, injection uncertainty, stale traffic, local emergency release, or component failure revokes control, disables suppression, attempts `ReleaseAll`, and converges to `LOCAL` or an explicit fault state.
 
-- Supported operating systems and architectures: UNDECIDED
-- Installer and update channel ownership: UNDECIDED
-- Local data and cache ownership: 정식 제품 default directory는 `UNDECIDED`다. Phase 0 launcher,
-  report, credential과 repository cache의 보존·삭제 경계는 `docs/desktop/local-data.md`를 따른다.
-- Crash report and diagnostic data policy: 정식 제품 정책은 `UNDECIDED`다. Phase 0은 local
-  aggregate-only report, no automatic upload와 수동 evidence retention만 허용한다.
-- Desktop permission and security boundaries: Phase 0 crash guard는 agent와 같은 로그인
-  사용자 권한, 상속된 익명 pipe와 동일 executable만 사용한다. Phase 0 역할별 credential
-  directory와 private key는 Windows에서 현재 사용자와 `SYSTEM` 전용 protected DACL을
-  사용하고 load 전에 DACL과 reparse path를 검증한다. 역할 directory 아래 trust store의 부모,
-  directory, lock과 document에도 같은 protected DACL과 reparse path 검증을 적용한다. report output도
-  부모 path의 reparse point를 거부한다. trust 폐기는 다음 inbound lease authorization부터 적용하고
-  credential은 유효기간 밖에서 load하지 않는다. 정식 설치
-  ACL, code signing, single-instance와 elevation 경계는 UNDECIDED다. Phase 0 lifecycle monitor는
-  별도 권한 상승 없이 현재 interactive session의 숨겨진 window로 power, WTS session, shutdown과
-  display message를 받고 첫 안전 관련 event에서 현재 session을 폐기한다.
-- Phase 0 network exposure: listener의 unauthenticated handshake는 동시 4개와 연결당 5초로 제한하지만
-  IP별 rate limit은 구현하지 않는다. 신뢰하는 사설 LAN 또는 개인 hotspot에서만 실행하고, 공용 LAN은
-  Windows 방화벽으로 connector 주소만 허용할 수 있을 때만 사용한다. launcher는 방화벽을 변경하지 않으며
-  자동 규칙 생성, 공용 Wi-Fi DoS 방어와 주소별 limiter는 정식 제품 운영 결정으로 남긴다.
+A GUI close is not evidence that input cleanup completed. Product shutdown, rollback, uninstall, repair, and upgrade must use the resident agent's authenticated cleanup path and verify the final local state.
 
-## Review Blockers
+## Credential and trust boundary
 
-- Installer, update, or OS support behavior changes without platform-specific validation.
-- Local data behavior changes without migration, privacy, and recovery notes.
-- Crash diagnostics or logs can expose private data.
+Phase 0 credentials and trust records use protected Windows directories, restrictive DACLs, bounded parsing, locking, certificate-validity checks, explicit capability and revocation records, and reparse-path rejection. They are experiment assets, not the product identity or pairing UX.
+
+A limited beta requires issue #10 to define product-owned paths, identity lifetime, confirmation on both peers, rotation, replacement, migration, and recovery. Issue #12 must provide authenticated immediate revocation of the exact active lease. Expired, revoked, not-yet-valid, corrupt, overly permissive, or reparse-backed material fails closed.
+
+A lost or suspected-compromised device is removed from trust on every remaining peer before another session is allowed. An already active lease must be terminated, held input released, local suppression disabled, and the affected identity replaced rather than merely renamed.
+
+## Installation and executable integrity
+
+The probe kit is not a product release artifact. A limited beta requires signed binaries and installer, checksum and SBOM publication, exact commit provenance, minimal reversible firewall changes, safe repair and uninstall, and no bundled credentials, reports, LAN addresses, or user data. Issue #16 owns the implementation and evidence.
+
+Executable replacement, same-user path swaps, hard links, reparse insertion, and ACL drift must fail closed for sensitive writes and launch decisions. The remaining path-replacement race tracked by issue #17 is a limited-beta blocker.
+
+## Local data and diagnostics
+
+Credentials, trust records, configuration, logs, caches, and diagnostic bundles are separate data classes with separate deletion choices. Diagnostics remain local and aggregate-only by default. There is no automatic upload, telemetry backend, input-content logging, or silent support-bundle collection.
+
+Raw key values, typed text, pointer trajectories, clipboard or screen content, private keys, certificate bodies, usernames, absolute paths, IP addresses, hostnames, device serials, window handles, thread identifiers, and unrestricted command lines are forbidden in product diagnostics and incident reports.
+
+## Network exposure
+
+TLS 1.3 mutual authentication, ALPN, certificate role, validity, and live trust authorization remain independent gates. Pre-auth resource controls do not turn a public or shared network into a supported environment.
+
+Until listener admission and reversible firewall policy are accepted, run only on a user-controlled private LAN or personal hotspot. Do not disable Windows Firewall or add a broad inbound rule to make a peer reachable.
+
+## Release blockers
+
+A release is blocked by any authentication bypass, stale or duplicated control owner, unbounded pre-auth resource path, failure to release local or remote input, secret exposure, sensitive diagnostic field, unsigned executable, unsafe local write, unsupported elevation promise, or missing four-device physical evidence.
