@@ -37,5 +37,6 @@
 - `0030-degraded-focus-restore-does-not-terminate-session.md`: capture foreground를 놓았다면 정확한 focus 복원 실패를 degraded로 유지
 - `0031-peer-dispatch-and-input-queue-evidence.md`: peer dispatch, source queue 체류와 destination input disposition evidence
 - `0032-live-trust-authorization-and-certificate-validity.md`: lease별 trust reload와 credential 유효기간 조기 검증
+- `0033-pre-auth-listener-admission.md`: 주소별 burst, 전역 handshake cap과 interface 한정 bind를 결합한 listener 방어
 
 새 결정은 `0000-template.md`를 복사해 다음 번호로 추가한다. 이미 Accepted인 결정의 의미를 바꿀 때는 기존 문서를 조용히 덮어쓰지 말고 새 ADR에서 대체 관계와 migration 영향을 기록한다.
