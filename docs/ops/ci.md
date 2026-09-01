@@ -8,7 +8,7 @@
 
 `main` push와 모든 pull request에서 Windows job 하나를 실행한다. job은 repository contents read 권한만 가지며 network service, secret, release와 deployment를 사용하지 않는다.
 
-순서는 format 검사, `go test ./...`, `go vet`, `krasis-agent.exe`를 포함한 Windows executable build와 장비 실행 kit 생성이다. `internal/wininput`은 Win32 callback `LPARAM`, message structure와 syscall buffer를 Go pointer로 연결하므로 이 package에 한해 `unsafeptr` analyzer를 제외한다. 해당 package의 나머지 vet analyzer와 다른 모든 package의 기본 vet analyzer는 유지한다. 이 예외는 memory safety 증명이 아니며 새 `unsafe` 경계는 Win32 ABI lifetime, struct layout과 callback 범위를 별도로 검토해야 한다. probe kit에는 실험용 `krasis-lab.exe`와 `krasis-launcher.exe`만 포함하며 unsigned `krasis-agent.exe`를 배포 artifact로 올리지 않는다. 성공한 probe build는 실행 파일, 수집·순차 Phase 0·무결성 helper, 장비 runbook과 build identity를 zip 하나로 묶고 각 파일의 SHA-256 manifest와 commit SHA가 포함된 artifact 이름으로 올린다.
+순서는 format 검사, `go test ./...`, `go vet`, `krasis.exe`와 `krasis-agent.exe`를 포함한 Windows executable build와 장비 실행 kit 생성이다. `internal/wininput`은 Win32 callback `LPARAM`, message structure와 syscall buffer를 Go pointer로 연결하므로 이 package에 한해 `unsafeptr` analyzer를 제외한다. 해당 package의 나머지 vet analyzer와 다른 모든 package의 기본 vet analyzer는 유지한다. 이 예외는 memory safety 증명이 아니며 새 `unsafe` 경계는 Win32 ABI lifetime, struct layout과 callback 범위를 별도로 검토해야 한다. probe kit에는 실험용 `krasis-lab.exe`와 `krasis-launcher.exe`만 포함하며 unsigned 제품 `krasis.exe`와 `krasis-agent.exe`를 배포 artifact로 올리지 않는다. 성공한 probe build는 실행 파일, 수집·순차 Phase 0·무결성 helper, 장비 runbook과 build identity를 zip 하나로 묶고 각 파일의 SHA-256 manifest와 commit SHA가 포함된 artifact 이름으로 올린다.
 
 peer 통합 테스트는 먼저 한 process 안의 두 `RunSession`을 실제 framed stream으로 연결해 request, grant, input, return revoke와 양쪽 `LOCAL` 수렴을 검증한다. 별도 subprocess 테스트는 임시 test CA와 identity를 test temp directory에만 생성하고 source와 destination test process를 localhost TCP로 연결한다. 양쪽은 제품 `PeerConnection`을 사용해 TLS 1.3 mutual authentication과 `krasis/1` ALPN을 통과한 뒤 동일한 왕복을 수행해야 하며 두 process가 모두 success exit code를 반환해야 한다. test certificate와 private key는 artifact에 포함하지 않는다.
 
@@ -151,6 +151,7 @@ hosted runner는 실제 사용자의 interactive desktop 입력 장치와 네 �
 ## 실패 정책
 
 - format, test, vet 또는 build 중 하나라도 실패하면 artifact를 만들지 않는다.
+- 전체 Go test는 3분 안에 끝나야 하며, timeout은 package와 goroutine stack을 남기는 test 실패로 처리한다.
 - artifact는 배포물이나 서명된 release가 아니라 동일 commit을 수동 장비 실험에 전달하기 위한 experimental probe kit다.
 - branch protection의 required check 지정 여부는 repository 설정에서 아직 `UNDECIDED`다.
 

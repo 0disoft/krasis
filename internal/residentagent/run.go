@@ -10,6 +10,7 @@ import (
 	"github.com/0disoft/krasis/internal/agentlifecycle"
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/productidentity"
+	"github.com/0disoft/krasis/internal/truststore"
 	"github.com/0disoft/krasis/internal/winlifecycle"
 )
 
@@ -64,7 +65,11 @@ func run(ctx context.Context, localAppData string, dependencies runDependencies)
 	}
 	defer func() { err = errors.Join(err, lifecycle.Close()) }()
 
-	operations, err := New(lifecycle.Context(), identity.Public(), dependencies.runner, dependencies.pairing)
+	trust, err := truststore.New(paths.Trust)
+	if err != nil {
+		return err
+	}
+	operations, err := New(lifecycle.Context(), identity.Public(), dependencies.runner, dependencies.pairing, trust)
 	if err != nil {
 		return err
 	}

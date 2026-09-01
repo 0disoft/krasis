@@ -8,6 +8,8 @@ import (
 
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/productidentity"
+	"github.com/0disoft/krasis/internal/transport"
+	"github.com/0disoft/krasis/internal/truststore"
 )
 
 func TestConnectSessionOutlivesRequestAndDisconnectStopsIt(t *testing.T) {
@@ -81,6 +83,50 @@ func TestStatusAndDiagnosticsAreRedactedAggregates(t *testing.T) {
 	}
 }
 
+func TestTrustTopologyAndRevocationStayAgentOwned(t *testing.T) {
+	store := &stubTrustStore{document: truststore.Document{
+		SchemaVersion: truststore.SchemaVersion,
+		Revision:      4,
+		UpdatedAt:     time.Now().UTC(),
+		Peers: []truststore.PeerRecord{{
+			Fingerprint: strings.Repeat("b", 64), Role: transport.AuthenticatedPeerConnector,
+			Alias: "peer", AllowInboundControl: true, CreatedAt: time.Now().UTC(),
+		}},
+	}}
+	operations := testOperationsWithTrust(t, store)
+	trust, err := operations.Trust(context.Background())
+	if err != nil || trust.Revision != 4 || len(trust.Peers) != 1 || trust.Peers[0].Fingerprint == "" {
+		t.Fatalf("Trust() = %+v, %v", trust, err)
+	}
+	topology, err := operations.Topology(context.Background())
+	if err != nil || topology.Layout != "UNCONFIGURED" || len(topology.Peers) != 1 {
+		t.Fatalf("Topology() = %+v, %v", topology, err)
+	}
+	result, err := operations.RevokeTrust(context.Background(), localapi.OperationRequest{Fingerprint: strings.Repeat("b", 64)})
+	if err != nil || result.Code != "trust_revoked" || store.revoked != strings.Repeat("b", 64) {
+		t.Fatalf("RevokeTrust() = %+v, %v", result, err)
+	}
+}
+
+func TestTrustRevocationRejectsActivePeer(t *testing.T) {
+	store := &stubTrustStore{document: truststore.Document{
+		SchemaVersion: truststore.SchemaVersion, Revision: 1, UpdatedAt: time.Now().UTC(),
+		Peers: []truststore.PeerRecord{{
+			Fingerprint: strings.Repeat("b", 64), Role: transport.AuthenticatedPeerConnector,
+			Alias: "peer", CreatedAt: time.Now().UTC(),
+		}},
+	}}
+	operations := testOperationsWithTrust(t, store)
+	operations.mu.Lock()
+	operations.peerAlias = "peer"
+	operations.sessionDone = make(chan error, 1)
+	operations.mu.Unlock()
+	result, err := operations.RevokeTrust(context.Background(), localapi.OperationRequest{Fingerprint: strings.Repeat("b", 64)})
+	if err != nil || result.Code != "active_session_requires_disconnect" || store.revoked != "" {
+		t.Fatalf("RevokeTrust() = %+v, %v", result, err)
+	}
+}
+
 func testOperations(t *testing.T, runner SessionRunner) *Operations {
 	t.Helper()
 	operations, err := New(context.Background(), productidentity.PublicIdentity{
@@ -88,9 +134,34 @@ func testOperations(t *testing.T, runner SessionRunner) *Operations {
 		Fingerprint:   strings.Repeat("a", 64),
 		Generation:    3,
 		CreatedAt:     time.Now().UTC(),
-	}, runner, nil)
+	}, runner, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return operations
+}
+
+func testOperationsWithTrust(t *testing.T, trust trustStore) *Operations {
+	t.Helper()
+	operations, err := New(context.Background(), productidentity.PublicIdentity{
+		SchemaVersion: productidentity.SchemaVersion,
+		Fingerprint:   strings.Repeat("a", 64),
+		Generation:    3,
+		CreatedAt:     time.Now().UTC(),
+	}, nil, nil, trust)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return operations
+}
+
+type stubTrustStore struct {
+	document truststore.Document
+	revoked  string
+}
+
+func (store *stubTrustStore) List() (truststore.Document, error) { return store.document, nil }
+func (store *stubTrustStore) Revoke(fingerprint string, _ time.Time) (truststore.PeerRecord, error) {
+	store.revoked = fingerprint
+	return store.document.Peers[0], nil
 }

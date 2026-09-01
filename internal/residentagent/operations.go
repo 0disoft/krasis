@@ -3,11 +3,13 @@ package residentagent
 import (
 	"context"
 	"errors"
+	"sort"
 	"sync"
 	"time"
 
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/productidentity"
+	"github.com/0disoft/krasis/internal/truststore"
 )
 
 const DefaultSessionStopTimeout = 5 * time.Second
@@ -23,12 +25,19 @@ type PairWorkflow interface {
 	Handle(context.Context, localapi.OperationRequest) (localapi.OperationResult, error)
 }
 
+type trustStore interface {
+	List() (truststore.Document, error)
+	Revoke(string, time.Time) (truststore.PeerRecord, error)
+}
+
 type Operations struct {
 	root      context.Context
 	stopAgent context.CancelCauseFunc
 	identity  productidentity.PublicIdentity
 	runner    SessionRunner
 	pairing   PairWorkflow
+	trust     trustStore
+	now       func() time.Time
 
 	mu          sync.Mutex
 	sessionStop context.CancelCauseFunc
@@ -38,7 +47,7 @@ type Operations struct {
 	counters    map[string]uint64
 }
 
-func New(parent context.Context, identity productidentity.PublicIdentity, runner SessionRunner, pairing PairWorkflow) (*Operations, error) {
+func New(parent context.Context, identity productidentity.PublicIdentity, runner SessionRunner, pairing PairWorkflow, trust trustStore) (*Operations, error) {
 	if parent == nil || identity.Fingerprint == "" || identity.Generation == 0 {
 		return nil, errors.New("resident agent parent context and device identity are required")
 	}
@@ -49,9 +58,99 @@ func New(parent context.Context, identity productidentity.PublicIdentity, runner
 		identity:  identity,
 		runner:    runner,
 		pairing:   pairing,
+		trust:     trust,
+		now:       time.Now,
 		lastCode:  "ready",
 		counters:  map[string]uint64{},
 	}, nil
+}
+
+func (operations *Operations) Trust(context.Context) (localapi.Trust, error) {
+	result := localapi.Trust{SchemaVersion: localapi.TrustSchemaVersion, Peers: []localapi.TrustedPeer{}}
+	if operations.trust == nil {
+		return result, nil
+	}
+	document, err := operations.trust.List()
+	if errors.Is(err, truststore.ErrStoreNotFound) {
+		return result, nil
+	}
+	if err != nil {
+		return localapi.Trust{}, err
+	}
+	result.Revision = document.Revision
+	for _, peer := range document.Peers {
+		result.Peers = append(result.Peers, localapi.TrustedPeer{
+			Fingerprint: peer.Fingerprint, Alias: peer.Alias, Role: string(peer.Role),
+			AllowInboundControl: peer.AllowInboundControl, Revoked: peer.RevokedAt != nil,
+		})
+	}
+	return result, nil
+}
+
+func (operations *Operations) RevokeTrust(_ context.Context, request localapi.OperationRequest) (localapi.OperationResult, error) {
+	if operations.trust == nil {
+		return rejected("not_configured"), nil
+	}
+	document, err := operations.trust.List()
+	if err != nil {
+		if errors.Is(err, truststore.ErrStoreNotFound) {
+			return rejected("peer_not_found"), nil
+		}
+		return localapi.OperationResult{}, err
+	}
+	alias := ""
+	for _, peer := range document.Peers {
+		if peer.Fingerprint == request.Fingerprint {
+			alias = peer.Alias
+			break
+		}
+	}
+	operations.mu.Lock()
+	active := operations.sessionDone != nil && operations.peerAlias == alias
+	operations.mu.Unlock()
+	if active {
+		return rejected("active_session_requires_disconnect"), nil
+	}
+	if _, err := operations.trust.Revoke(request.Fingerprint, operations.now().UTC()); err != nil {
+		switch {
+		case errors.Is(err, truststore.ErrPeerNotFound):
+			return rejected("peer_not_found"), nil
+		case errors.Is(err, truststore.ErrPeerRevoked):
+			return rejected("peer_already_revoked"), nil
+		case errors.Is(err, truststore.ErrStoreBusy):
+			return failed("trust_store_busy"), nil
+		default:
+			return localapi.OperationResult{}, err
+		}
+	}
+	operations.mu.Lock()
+	operations.recordLocked("trust_revoked")
+	operations.mu.Unlock()
+	return completed("trust_revoked"), nil
+}
+
+func (operations *Operations) Topology(ctx context.Context) (localapi.Topology, error) {
+	trust, err := operations.Trust(ctx)
+	if err != nil {
+		return localapi.Topology{}, err
+	}
+	operations.mu.Lock()
+	state, active := "LOCAL", operations.peerAlias
+	if operations.sessionDone != nil {
+		state = "CONNECTED"
+	}
+	operations.mu.Unlock()
+	result := localapi.Topology{SchemaVersion: localapi.TopologySchemaVersion, State: state, Layout: "UNCONFIGURED", Peers: []localapi.TopologyPeer{}}
+	for _, peer := range trust.Peers {
+		if peer.Revoked {
+			continue
+		}
+		result.Peers = append(result.Peers, localapi.TopologyPeer{
+			Alias: peer.Alias, AllowInboundControl: peer.AllowInboundControl, Connected: peer.Alias == active && state == "CONNECTED",
+		})
+	}
+	sort.Slice(result.Peers, func(left, right int) bool { return result.Peers[left].Alias < result.Peers[right].Alias })
+	return result, nil
 }
 
 func (operations *Operations) Context() context.Context {

@@ -38,7 +38,7 @@ jobs:
 
       - name: Test
         shell: pwsh
-        run: go test ./...
+        run: go test -timeout 3m ./...
 
       - name: Vet
         shell: pwsh
@@ -59,6 +59,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force build | Out-Null
+          go build -trimpath -o build/krasis.exe ./cmd/krasis
           go build -trimpath -o build/krasis-agent.exe ./cmd/krasis-agent
           go build -trimpath -o build/krasis-lab.exe ./cmd/krasis-lab
           go build -trimpath -o build/krasis-launcher.exe ./cmd/krasis-launcher

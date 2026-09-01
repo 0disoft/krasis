@@ -32,7 +32,10 @@ func TestRunOwnsLifecycleAndClosesResourcesInBoundedOrder(t *testing.T) {
 	dependencies := runDependencies{
 		acquire: func() (instanceLease, error) { return instance, nil },
 		bootstrap: func(string, time.Time) (productidentity.Paths, *productidentity.Identity, bool, error) {
-			return productidentity.Paths{Control: filepath.Join(root, "control")}, identity, false, nil
+			return productidentity.Paths{
+				Control: filepath.Join(root, "control"),
+				Trust:   filepath.Join(root, "trust"),
+			}, identity, false, nil
 		},
 		startMonitor: func() (agentlifecycle.Monitor, error) { return monitor, nil },
 		listen:       func(string, localapi.Operations) (apiServer, error) { return server, nil },
@@ -40,7 +43,13 @@ func TestRunOwnsLifecycleAndClosesResourcesInBoundedOrder(t *testing.T) {
 	}
 	done := make(chan error, 1)
 	go func() { done <- run(context.Background(), root, dependencies) }()
-	<-server.started
+	select {
+	case <-server.started:
+	case err := <-done:
+		t.Fatalf("resident agent stopped before the API server started: %v", err)
+	case <-time.After(time.Second):
+		t.Fatal("resident agent did not start the API server")
+	}
 	monitor.events <- agentlifecycle.EventSessionLock
 	select {
 	case err := <-done:

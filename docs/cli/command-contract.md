@@ -1,5 +1,33 @@
 # CLI 명령 계약
 
+## 제품 CLI `krasis`
+
+정식 제품 CLI는 resident agent의 authenticated local API client다. 명령은 다음과 같다.
+
+```text
+krasis [--json] [--control-dir DIR] status
+krasis [--json] [--control-dir DIR] diagnostics
+krasis [--json] [--control-dir DIR] topology
+krasis [--json] [--control-dir DIR] connect ALIAS
+krasis [--json] [--control-dir DIR] disconnect
+krasis [--json] [--control-dir DIR] pair begin ALIAS --allow-inbound-control
+krasis [--json] [--control-dir DIR] pair confirm PAIRING_ID CODE
+krasis [--json] [--control-dir DIR] pair cancel PAIRING_ID
+krasis [--json] [--control-dir DIR] trust list
+krasis [--json] [--control-dir DIR] trust revoke SHA256_FINGERPRINT
+krasis [--json] [--control-dir DIR] safe-stop
+```
+
+global option은 command 앞이나 뒤에 한 번만 사용할 수 있다. alias는 공백으로 감싸지 않은 유효한
+UTF-8 1~64자이고 control character를 허용하지 않는다. pairing ID는 lowercase 32자리 hex, code는
+6자리 숫자, fingerprint는 lowercase 64자리 SHA-256 hex다. 잘못된 값은 local API 호출 전에 거부한다.
+
+`pair begin`의 inbound-control 승인은 생략할 수 없는 명시적 동의다. `safe-stop`은 agent와 소유한
+session 전체를 안전 종료하므로 일반 연결 해제에는 `disconnect`를 사용한다. `topology`의
+`UNCONFIGURED`는 배치가 저장됐다는 뜻이 아니며, CLI가 기본 edge를 추측하지 않는다.
+
+아래 `krasis-lab` 계약은 Phase 0 실험 표면이며 제품 CLI와 호환성 관계가 없다.
+
 - 상태: Experimental
 - 저장소 유형: cli-tool
 - 실행 파일: `krasis-lab`

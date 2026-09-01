@@ -22,12 +22,15 @@ clipboard, environment 또는 UI projection에 복제하지 않는다.
 | `POST` | `/v1/disconnect` | active runner cancel과 최대 5초 wait |
 | `POST` | `/v1/pair` | `BEGIN`, `CONFIRM`, `CANCEL` product pairing workflow |
 | `GET` | `/v1/diagnostics` | stable code별 aggregate counter와 마지막 state |
+| `GET` | `/v1/trust` | fingerprint, alias, role, inbound capability와 revoked 상태의 redacted projection |
+| `POST` | `/v1/trust/revoke` | inactive trusted fingerprint의 atomic local revocation |
+| `GET` | `/v1/topology` | 연결 상태와 non-revoked peer 목록; 저장된 배치가 없으면 `UNCONFIGURED` |
 | `POST` | `/v1/safe-stop` | agent root cancellation 요청 |
 
 mutation body schema는 `krasis.agent.operation/v1`, 결과는
 `krasis.agent.operation-result/v1`이다. 모든 body는 64KiB 이하 strict JSON이다. `connect`는 alias만,
 `disconnect`는 추가 field 없이, pair action은 해당 action에 필요한 alias/capability 또는
-pairing ID/code만 허용한다.
+pairing ID/code만 허용한다. trust revoke는 lowercase SHA-256 fingerprint 하나만 허용한다.
 
 `status`와 diagnostics는 private key, certificate body, transport address, target token, session·lease·epoch,
 raw input, path와 internal error를 반환하지 않는다. active-lease exact revoke operation은
@@ -36,6 +39,9 @@ raw input, path와 internal error를 반환하지 않는다. active-lease exact 
 ## 안정 코드
 
 현재 process owner의 lifecycle code는 `ready`, `connect_started`, `already_active`, `not_configured`,
-`no_active_session`, `disconnected`, `shutdown_timeout`, `session_stopped`, `safe_stop_requested`다.
+`no_active_session`, `disconnected`, `shutdown_timeout`, `session_stopped`, `trust_revoked`,
+`active_session_requires_disconnect`, `peer_not_found`, `peer_already_revoked`, `trust_store_busy`,
+`safe_stop_requested`다.
 HTTP adapter 자체는 `unauthenticated`, `invalid_request`, `method_not_allowed`, `not_found`,
-`internal_failure`를 반환한다. #14는 이를 CLI exit taxonomy에 매핑한다.
+`internal_failure`를 반환한다. 제품 CLI는 이를 `docs/cli/output-and-exit-codes.md`의 exit taxonomy에
+매핑한다.
