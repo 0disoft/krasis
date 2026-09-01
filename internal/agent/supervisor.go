@@ -131,12 +131,14 @@ type SupervisorConfig struct {
 }
 
 type SupervisorDependencies struct {
-	Source     ConnectionSource
-	Hook       SourceHook
-	Input      InputBoundaryPort
-	Effects    application.EffectExecutor
-	Authorizer peer.LeaseAuthorizer
-	RunSession SessionRunner
+	Source       ConnectionSource
+	Hook         SourceHook
+	Input        InputBoundaryPort
+	Effects      application.EffectExecutor
+	Authorizer   peer.LeaseAuthorizer
+	Management   *SessionRegistry
+	TrustRevoker TrustRevoker
+	RunSession   SessionRunner
 }
 
 func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies SupervisorDependencies) (returnErr error) {
@@ -208,6 +210,7 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 		result, sessionErr := dependencies.RunSession(ctx, config.Session, Dependencies{
 			Connection: ownedConnection, Hook: dependencies.Hook, Input: dependencies.Input,
 			Effects: dependencies.Effects, Authorizer: dependencies.Authorizer,
+			Management: dependencies.Management, TrustRevoker: dependencies.TrustRevoker,
 		})
 		if closeErr := ownedConnection.Close(); closeErr != nil {
 			if !errors.Is(sessionErr, closeErr) {

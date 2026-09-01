@@ -3,7 +3,7 @@
   "schemaVersion": 1,
   "generatorVersion": "0.6.12",
   "version": "0.6.12",
-  "generatedAt": "2026-09-01T10:56:43.411Z",
+  "generatedAt": "2026-09-01T11:02:50.260Z",
   "scope": "general",
   "profile": "desktop-app",
   "addons": [
@@ -971,13 +971,13 @@
     },
     {
       "path": "docs/README.md",
-      "checksum": "sha256:45b0a69e98ce5198f8cc2e17989427d1657c4be2a422ada1c4f4a332058b44d1",
+      "checksum": "sha256:228487d994c89e9b4cdb323f70277ae8a288712a0d2bfb68fd03ffe382e73bce",
       "kind": "document",
       "ownership": "seeded",
       "presence": "optional",
       "status": "active",
       "initialChecksum": "sha256:65ec92cbbe418c169cf2771bb78693f03abe978d5962d7b167df4ed8c2c255e2",
-      "acceptedChecksum": "sha256:45b0a69e98ce5198f8cc2e17989427d1657c4be2a422ada1c4f4a332058b44d1",
+      "acceptedChecksum": "sha256:228487d994c89e9b4cdb323f70277ae8a288712a0d2bfb68fd03ffe382e73bce",
       "generatedChecksum": "sha256:65ec92cbbe418c169cf2771bb78693f03abe978d5962d7b167df4ed8c2c255e2"
     },
     {
