@@ -53,11 +53,13 @@ type SourceActivityObserver interface {
 }
 
 type Dependencies struct {
-	Connection Connection
-	Hook       SourceHook
-	Input      InputBoundaryPort
-	Effects    application.EffectExecutor
-	Authorizer peer.LeaseAuthorizer
+	Connection   Connection
+	Hook         SourceHook
+	Input        InputBoundaryPort
+	Effects      application.EffectExecutor
+	Authorizer   peer.LeaseAuthorizer
+	Management   *SessionRegistry
+	TrustRevoker TrustRevoker
 }
 
 type Result struct {
@@ -149,6 +151,25 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	returns, err := peer.NewReturnControllerObserved(coordinator, runtime, dependencies.Input, config.ControlObserver)
 	if err != nil {
 		return Result{}, err
+	}
+	if dependencies.Management != nil {
+		managed, managedErr := newManagedPeerSession(
+			authenticatedPeer,
+			runtime,
+			coordinator,
+			outboundSource,
+			connection,
+			dependencies.TrustRevoker,
+			config.Now,
+		)
+		if managedErr != nil {
+			return Result{}, managedErr
+		}
+		registration, registerErr := dependencies.Management.register(managed)
+		if registerErr != nil {
+			return Result{}, registerErr
+		}
+		defer registration.Close()
 	}
 
 	runContext, cancel := context.WithCancelCause(ctx)
