@@ -100,6 +100,53 @@ func TestPairingRejectsExpiredTamperedAndWrongSessionReceipts(t *testing.T) {
 	}
 }
 
+func TestPairingReplacementRevokesOldPeerAndAddsConfirmedPeerAtomically(t *testing.T) {
+	now := time.Date(2026, time.September, 1, 1, 2, 3, 0, time.UTC)
+	initiator := testIdentity(t, "initiator", now)
+	responder := testIdentity(t, "responder", now)
+	oldPeer := testPeer("c", transport.AuthenticatedPeerListener)
+	newPeer := testPeer("d", transport.AuthenticatedPeerListener)
+	store := testTrustStore(t)
+	if _, err := store.Import(oldPeer, "old device", true, now.Add(-time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	offer, err := createOffer(initiator, newPeer, now, bytes.NewReader(bytes.Repeat([]byte{2}, 16)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	responderSession, response, err := Accept(offer, responder, testPeer("b", transport.AuthenticatedPeerConnector), now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	initiatorSession, err := Complete(offer, response, initiator, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	initiatorReceipt, err := initiatorSession.Confirm(initiatorSession.ConfirmationCode(), now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := responderSession.Confirm(responderSession.ConfirmationCode(), now); err != nil {
+		t.Fatal(err)
+	}
+	revoked, added, err := responderSession.FinalizeReplacement(
+		initiatorReceipt, store, oldPeer.CertificateSHA256, "new device", true, now,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if revoked.RevokedAt == nil || added.Fingerprint != newPeer.CertificateSHA256 {
+		t.Fatalf("revoked = %+v, added = %+v", revoked, added)
+	}
+	document, err := store.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if document.Revision != 2 || len(document.Peers) != 2 {
+		t.Fatalf("document = %+v", document)
+	}
+}
+
 func testIdentity(t *testing.T, name string, now time.Time) *productidentity.Identity {
 	t.Helper()
 	parent := filepath.Join(t.TempDir(), name)

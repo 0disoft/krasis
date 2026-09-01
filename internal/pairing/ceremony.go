@@ -163,19 +163,33 @@ func (session *Session) Confirm(code string, now time.Time) (Receipt, error) {
 }
 
 func (session *Session) Finalize(remote Receipt, store *truststore.Store, alias string, allowInboundControl bool, now time.Time) (truststore.PeerRecord, error) {
-	if session == nil || store == nil {
-		return truststore.PeerRecord{}, errors.New("pairing session and trust store are required")
-	}
-	if now.IsZero() || now.After(session.expiresAt) {
-		return truststore.PeerRecord{}, ErrExpired
-	}
-	if !session.localConfirmed {
-		return truststore.PeerRecord{}, ErrLocalConfirmation
-	}
-	if err := remote.validate(session.pairingID, session.transcript, session.remote); err != nil {
+	if err := session.authorizeFinalize(remote, store, now); err != nil {
 		return truststore.PeerRecord{}, err
 	}
 	return store.Import(session.remote.TransportPeer, alias, allowInboundControl, now.UTC())
+}
+
+func (session *Session) FinalizeReplacement(remote Receipt, store *truststore.Store, replacedFingerprint, alias string, allowInboundControl bool, now time.Time) (truststore.PeerRecord, truststore.PeerRecord, error) {
+	if err := session.authorizeFinalize(remote, store, now); err != nil {
+		return truststore.PeerRecord{}, truststore.PeerRecord{}, err
+	}
+	return store.Replace(replacedFingerprint, session.remote.TransportPeer, alias, allowInboundControl, now.UTC())
+}
+
+func (session *Session) authorizeFinalize(remote Receipt, store *truststore.Store, now time.Time) error {
+	if session == nil || store == nil {
+		return errors.New("pairing session and trust store are required")
+	}
+	if now.IsZero() || now.After(session.expiresAt) {
+		return ErrExpired
+	}
+	if !session.localConfirmed {
+		return ErrLocalConfirmation
+	}
+	if err := remote.validate(session.pairingID, session.transcript, session.remote); err != nil {
+		return err
+	}
+	return nil
 }
 
 func participant(identity *productidentity.Identity, transportPeer transport.AuthenticatedPeerContext) (Participant, error) {
