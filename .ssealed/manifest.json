@@ -3,7 +3,7 @@
   "schemaVersion": 1,
   "generatorVersion": "0.6.12",
   "version": "0.6.12",
-  "generatedAt": "2026-09-01T10:39:54.089Z",
+  "generatedAt": "2026-09-01T10:45:23.814Z",
   "scope": "general",
   "profile": "desktop-app",
   "addons": [
@@ -542,13 +542,13 @@
     },
     {
       "path": "docs/architecture/01-domain-model.md",
-      "checksum": "sha256:d405386f4eb22e40d8c088fd901ad0feab952d355260702442467c6049f9f475",
+      "checksum": "sha256:d09e65473835fcdbf4ded664ae83dfa312ef6c060f277dd7cab17132de08953a",
       "kind": "document",
       "ownership": "seeded",
       "presence": "optional",
       "status": "active",
       "initialChecksum": "sha256:3a6ade5fdc3cb4fd6036e0c72d83d26fedeefd3aff76c11f748d0d81e26b66fb",
-      "acceptedChecksum": "sha256:d405386f4eb22e40d8c088fd901ad0feab952d355260702442467c6049f9f475",
+      "acceptedChecksum": "sha256:d09e65473835fcdbf4ded664ae83dfa312ef6c060f277dd7cab17132de08953a",
       "generatedChecksum": "sha256:3a6ade5fdc3cb4fd6036e0c72d83d26fedeefd3aff76c11f748d0d81e26b66fb"
     },
     {
@@ -938,13 +938,13 @@
     },
     {
       "path": "docs/product/01-roadmap.md",
-      "checksum": "sha256:9b980eae64e96e3635284a5d85d1a31adf7f78764b1abf1de1561c719b7fb6b6",
+      "checksum": "sha256:3c032a2db6179e5ca968868b159fcbf87a50001eff9dfbcc79a3717cc4e5611b",
       "kind": "document",
       "ownership": "seeded",
       "presence": "optional",
       "status": "active",
       "initialChecksum": "sha256:950d7a44619b2ff2626421126a59af4ac1b98f258f252a78d9ead96b568640e4",
-      "acceptedChecksum": "sha256:9b980eae64e96e3635284a5d85d1a31adf7f78764b1abf1de1561c719b7fb6b6",
+      "acceptedChecksum": "sha256:3c032a2db6179e5ca968868b159fcbf87a50001eff9dfbcc79a3717cc4e5611b",
       "generatedChecksum": "sha256:950d7a44619b2ff2626421126a59af4ac1b98f258f252a78d9ead96b568640e4"
     },
     {
