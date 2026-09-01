@@ -14,8 +14,8 @@ It is not the production tray application, installer, updater, or persistent age
 
 The production desktop surface will project state from the resident agent through an authenticated local API. It may configure pairing, peer layout, connection state, safety state, diagnostics, and explicit disconnect or revoke actions. It must never own the live input queue, lease state machine, heartbeat deadline, pressed-input journal, or `ReleaseAll` cleanup.
 
-The resident agent and authenticated local API are implemented by ADR 0036. Product configuration and
-CLI wiring are tracked by issue #14, the Wails v3 and Svelte tray UI by issue #15, and installer and
+The resident agent and authenticated local API are implemented by ADR 0036. Product CLI projection is
+implemented by ADR 0037, the Wails v3 and Svelte tray UI is tracked by issue #15, and installer and
 lifecycle packaging by issue #16.
 
 ## Platform status

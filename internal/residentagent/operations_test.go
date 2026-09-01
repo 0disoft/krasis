@@ -108,6 +108,25 @@ func TestTrustTopologyAndRevocationStayAgentOwned(t *testing.T) {
 	}
 }
 
+func TestTrustRevocationRejectsActivePeer(t *testing.T) {
+	store := &stubTrustStore{document: truststore.Document{
+		SchemaVersion: truststore.SchemaVersion, Revision: 1, UpdatedAt: time.Now().UTC(),
+		Peers: []truststore.PeerRecord{{
+			Fingerprint: strings.Repeat("b", 64), Role: transport.AuthenticatedPeerConnector,
+			Alias: "peer", CreatedAt: time.Now().UTC(),
+		}},
+	}}
+	operations := testOperationsWithTrust(t, store)
+	operations.mu.Lock()
+	operations.peerAlias = "peer"
+	operations.sessionDone = make(chan error, 1)
+	operations.mu.Unlock()
+	result, err := operations.RevokeTrust(context.Background(), localapi.OperationRequest{Fingerprint: strings.Repeat("b", 64)})
+	if err != nil || result.Code != "active_session_requires_disconnect" || store.revoked != "" {
+		t.Fatalf("RevokeTrust() = %+v, %v", result, err)
+	}
+}
+
 func testOperations(t *testing.T, runner SessionRunner) *Operations {
 	t.Helper()
 	operations, err := New(context.Background(), productidentity.PublicIdentity{

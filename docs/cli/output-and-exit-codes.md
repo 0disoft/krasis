@@ -1,5 +1,36 @@
 # 출력과 exit code
 
+## 제품 CLI
+
+human output은 상태와 안전한 복구 행동을 위한 짧은 text다. `--json`은 local API가 반환한 다음
+versioned object 하나를 stdout에 출력한다.
+
+- `krasis.agent.status/v1`
+- `krasis.agent.diagnostics/v1`
+- `krasis.agent.trust/v1`
+- `krasis.agent.topology/v1`
+- mutation은 `krasis.agent.operation-result/v1`
+
+JSON decoder는 1 MiB를 초과한 response, unknown field, trailing value와 예상하지 않은 schema version을
+거부한다. stderr에는 token, endpoint, control directory, HTTP body, username이나 원시 input을 출력하지
+않는다.
+
+| Code | 의미 |
+| --- | --- |
+| `0` | 성공적으로 완료됨 |
+| `1` | 분류되지 않은 내부 실패 |
+| `2` | command/option/config 사용 오류 |
+| `3` | 현재 제품 정책이나 미구성 기능으로 거부됨 |
+| `4` | resident agent가 실행 중이 아니거나 endpoint에 연결할 수 없음 |
+| `5` | local credential 손상 또는 인증 실패 |
+| `6` | transport, HTTP 또는 schema 호환 실패 |
+| `7` | 이미 연결됨, active session 없음, unknown/revoked peer, timeout 등 안전 상태 충돌 |
+
+operation JSON의 `REJECTED`나 `FAILED`도 파싱 가능한 결과로 stdout에 남으며 exit code로 성공과
+구분한다. agent unavailable은 자동으로 agent를 시작하거나 stale endpoint를 추측하지 않는다.
+
+## Phase 0 `krasis-lab`
+
 - 상태: Experimental
 - 저장소 유형: cli-tool
 - 구현 기준: `internal/labcli/run.go`, `internal/lab/model.go`

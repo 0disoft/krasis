@@ -25,14 +25,15 @@ process만 소유한다. 제품 UI나 CLI가 hook, peer session, trust mutation 
   directory와 file은 현재 사용자와 `SYSTEM`만 허용한다.
 - request는 bearer token을 constant-time 비교한 뒤에만 처리한다. body는 64KiB 이하 strict JSON이며
   unknown field, trailing JSON, 잘못된 operation별 field 조합을 application 호출 전에 거부한다.
-- API operation은 status, connect, disconnect, pair begin/confirm/cancel, aggregate diagnostics와 safe stop이다.
+- API operation은 status, connect, disconnect, pair begin/confirm/cancel, trust list/revoke, topology,
+  aggregate diagnostics와 safe stop이다.
   response는 stable status/code와 redacted projection만 반환하고 private key, certificate body, session·lease,
   주소, path와 내부 error string을 포함하지 않는다.
 - connect로 시작한 shared session runner는 HTTP request context가 아니라 agent root context의 child다.
   UI/CLI 종료는 session을 중단하지 않는다. disconnect, lifecycle event와 safe stop만 session cancel을
   수행하며 5초 안에 종료되지 않으면 `shutdown_timeout`을 남긴다.
 - runner port는 기존 `internal/agent` supervisor/session core를 호출하는 adapter 자리다. resident agent는
-  별도 input/session 구현을 만들지 않는다. #14의 product configuration adapter가 없으면 connect와 pair는
+  별도 input/session 구현을 만들지 않는다. product network/pairing adapter가 없으면 connect와 pair는
   `not_configured`를 반환한다.
 - lock, suspend, resume, logoff, shutdown과 display change는 기존 Windows lifecycle owner가 agent root를
   취소한다. local API를 먼저 닫고 shared session을 cancel/wait한 뒤 monitor와 instance handle을 닫는다.
@@ -51,4 +52,4 @@ Windows 사용자나 원격 peer는 token file을 읽을 수 없어야 한다.
 - unauthenticated request 거부와 operation dispatch
 - request cancellation 뒤 shared session 생존, disconnect와 safe stop cancellation
 - Windows lifecycle event 뒤 API, session, monitor와 instance의 bounded cleanup
-- Windows CI에서 `krasis-agent.exe` build
+- Windows CI에서 `krasis.exe`와 `krasis-agent.exe` build

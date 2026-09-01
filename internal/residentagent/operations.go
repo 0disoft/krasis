@@ -91,6 +91,26 @@ func (operations *Operations) RevokeTrust(_ context.Context, request localapi.Op
 	if operations.trust == nil {
 		return rejected("not_configured"), nil
 	}
+	document, err := operations.trust.List()
+	if err != nil {
+		if errors.Is(err, truststore.ErrStoreNotFound) {
+			return rejected("peer_not_found"), nil
+		}
+		return localapi.OperationResult{}, err
+	}
+	alias := ""
+	for _, peer := range document.Peers {
+		if peer.Fingerprint == request.Fingerprint {
+			alias = peer.Alias
+			break
+		}
+	}
+	operations.mu.Lock()
+	active := operations.sessionDone != nil && operations.peerAlias == alias
+	operations.mu.Unlock()
+	if active {
+		return rejected("active_session_requires_disconnect"), nil
+	}
 	if _, err := operations.trust.Revoke(request.Fingerprint, operations.now().UTC()); err != nil {
 		switch {
 		case errors.Is(err, truststore.ErrPeerNotFound):

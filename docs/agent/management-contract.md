@@ -3,7 +3,7 @@
 - Status: Active application and local transport contract
 - Version: `krasis.agent.control-revoke/v1`
 - Decision: `docs/adr/0034-exact-active-lease-management-revocation.md`
-- CLI adapter: issue #14
+- CLI adapter: exact-active control commands remain a follow-up to the product CLI projection
 
 ## Ownership
 
@@ -98,7 +98,9 @@ Management executes through the peer session write coordinator. Input, heartbeat
 
 ## CLI mapping
 
-The product CLI implemented by issue #14 uses the local API only.
+The product CLI uses the local API only. Its `trust list` and `trust revoke FINGERPRINT` commands are
+offline trust-store maintenance and must reject an active peer; they are not substitutes for this exact-active
+target-token contract. The commands below remain the planned active-control mapping.
 
 ```text
 krasis control revoke --active

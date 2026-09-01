@@ -3,8 +3,10 @@ package localapi
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -33,6 +35,28 @@ func TestClientAuthenticatesAndValidatesSchemas(t *testing.T) {
 	if err := <-done; err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestClientRejectsIncompatibleResponseSchema(t *testing.T) {
+	client := &Client{
+		credentials: ClientCredentials{Endpoint: Endpoint{Address: "127.0.0.1:1234"}, Token: strings.Repeat("a", 64)},
+		http: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+				Body:       io.NopCloser(strings.NewReader(`{"schemaVersion":"krasis.agent.status/v2","state":"LOCAL","actions":[],"deviceFingerprint":"","identityGeneration":0}`)),
+			}, nil
+		})},
+	}
+	if _, err := client.Status(context.Background()); !errors.Is(err, ErrProtocol) {
+		t.Fatalf("Status() error = %v", err)
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (function roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return function(request)
 }
 
 func TestClientClassifiesUnavailableAndAuthenticationFailures(t *testing.T) {

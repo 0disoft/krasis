@@ -10,7 +10,7 @@
 Krasis keeps product configuration, device identity, peer trust, diagnostics, logs, caches, and release metadata as separate classes. A UI, CLI, installer, repair, rollback, or uninstall operation must not collapse them into one opaque data directory or one all-or-nothing deletion choice.
 
 The current-user product data root is `%LOCALAPPDATA%\Krasis`. Device identity is stored under
-`identity`, peer trust under `trust`, local API discovery credentials under `control`, and diagnostics
+`identity`, peer trust under `trust`, CLI config in `config.json`, local API discovery credentials under `control`, and diagnostics
 under `diagnostics`; these classes are not
 interchangeable. Issue #16 still owns install scope, config and log paths, firewall ownership,
 uninstall, and cleanup. Limited beta remains blocked until those remaining paths are implemented and tested.
