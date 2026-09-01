@@ -3,7 +3,7 @@
   "schemaVersion": 1,
   "generatorVersion": "0.6.12",
   "version": "0.6.12",
-  "generatedAt": "2026-09-01T12:51:15.714Z",
+  "generatedAt": "2026-09-01T13:06:55.318Z",
   "scope": "general",
   "profile": "desktop-app",
   "addons": [
@@ -828,13 +828,13 @@
     },
     {
       "path": "docs/ops/ci.md",
-      "checksum": "sha256:b7ad26b47c50086e98238f7ffb8c30b158138518ee872f5522dd7760a244abc8",
+      "checksum": "sha256:7dc13afbbfddbad3941e78c6e2e35618221687abe6f172306da5dca036d1b214",
       "kind": "document",
       "ownership": "seeded",
       "presence": "optional",
       "status": "active",
       "initialChecksum": "sha256:22ccaa9f1a1371db7743291eebeef85d477ff5bc0838dde24a166722e8bdc525",
-      "acceptedChecksum": "sha256:b7ad26b47c50086e98238f7ffb8c30b158138518ee872f5522dd7760a244abc8",
+      "acceptedChecksum": "sha256:7dc13afbbfddbad3941e78c6e2e35618221687abe6f172306da5dca036d1b214",
       "generatedChecksum": "sha256:22ccaa9f1a1371db7743291eebeef85d477ff5bc0838dde24a166722e8bdc525"
     },
     {

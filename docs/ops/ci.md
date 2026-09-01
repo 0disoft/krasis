@@ -151,6 +151,7 @@ hosted runner는 실제 사용자의 interactive desktop 입력 장치와 네 �
 ## 실패 정책
 
 - format, test, vet 또는 build 중 하나라도 실패하면 artifact를 만들지 않는다.
+- 전체 Go test는 3분 안에 끝나야 하며, timeout은 package와 goroutine stack을 남기는 test 실패로 처리한다.
 - artifact는 배포물이나 서명된 release가 아니라 동일 commit을 수동 장비 실험에 전달하기 위한 experimental probe kit다.
 - branch protection의 required check 지정 여부는 repository 설정에서 아직 `UNDECIDED`다.
 
