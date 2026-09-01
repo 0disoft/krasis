@@ -115,7 +115,9 @@ func (server *Server) Run(ctx context.Context) error {
 	}()
 	select {
 	case err := <-result:
-		closeErr := server.Close(context.Background())
+		shutdown, cancel := context.WithTimeout(context.Background(), DefaultShutdownTimeout)
+		defer cancel()
+		closeErr := server.Close(shutdown)
 		return errors.Join(err, closeErr)
 	case <-ctx.Done():
 		shutdown, cancel := context.WithTimeout(context.Background(), DefaultShutdownTimeout)
@@ -183,7 +185,7 @@ func (handler *handler) ServeHTTP(response http.ResponseWriter, request *http.Re
 		}
 		writeJSON(response, http.StatusOK, value)
 	case "/v1/safe-stop":
-		if request.Method != http.MethodPost || request.ContentLength > 0 {
+		if request.Method != http.MethodPost || !emptyBody(request.Body) {
 			writeMethodNotAllowed(response)
 			return
 		}
@@ -196,6 +198,15 @@ func (handler *handler) ServeHTTP(response http.ResponseWriter, request *http.Re
 	default:
 		writeResult(response, http.StatusNotFound, OperationResult{SchemaVersion: ResultSchemaVersion, Status: "REJECTED", Code: "not_found"})
 	}
+}
+
+func emptyBody(reader io.Reader) bool {
+	if reader == nil {
+		return true
+	}
+	var value [1]byte
+	count, err := reader.Read(value[:])
+	return count == 0 && errors.Is(err, io.EOF)
 }
 
 func (handler *handler) operation(response http.ResponseWriter, request *http.Request, kind string, operation func(context.Context, OperationRequest) (OperationResult, error)) {
