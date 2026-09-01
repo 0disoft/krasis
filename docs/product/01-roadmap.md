@@ -37,7 +37,7 @@ Phase 1 완료는 Phase 0 완료를 대신하지 않는다. Phase 0이 `IN_PROGR
 
 ### Phase 2: 기기 신원과 페어링
 
-- 상태: core 구현 완료. 제품 activation은 issue #13과 #14가 소유한다.
+- 상태: core와 resident API 구현 완료. 제품 CLI/config activation은 issue #14가 소유한다.
 - `%LOCALAPPDATA%\Krasis` protected root와 설치별 durable device identity 구현
 - 양쪽 동일 code 확인과 signed receipt가 모두 필요한 5분 pairing ceremony 구현
 - fingerprint·역할·capability·revocation의 atomic local trust store 구현
@@ -60,6 +60,9 @@ Phase 1 완료는 Phase 0 완료를 대신하지 않는다. Phase 0이 `IN_PROGR
 
 ### Phase 5: 상주 agent와 CLI
 
+- `krasis-agent.exe`, session-local single instance, stale-owner recovery와 bounded lifecycle shutdown 구현됨
+- protected bearer credential 기반 loopback local API와 status/connect/disconnect/pair/diagnostics/safe-stop contract 구현됨
+- HTTP request 수명과 shared supervisor/session runner 수명 분리 구현됨
 - 단일 인스턴스, tray lifecycle, 로컬 제어 API
 - 상태, 진단, 페어링, 연결 해제 명령 계약
 - 단일 authenticated connection의 bidirectional session 조립 경계는 구현됨
@@ -75,7 +78,7 @@ Phase 1 완료는 Phase 0 완료를 대신하지 않는다. Phase 0이 `IN_PROGR
 - heartbeat payload, liveness domain, optional timer worker, explicit live CLI policy와 privacy-bounded aggregate 계측은 구현됨
 - v13 입력 경로는 lab 전용 복제품이 아니라 `agent.RunSupervisor`, `agent.RunSession`과 `wininput.SourceHook`의
   공용 core를 사용함; `krasis-lab`은 bounded 실행과 redacted report를 소유함
-- 정식 agent executable, 단일 instance와 tray UI lifecycle은 미구현
+- product configuration/CLI adapter와 tray UI lifecycle은 issue #14와 #15에 남음
 
 ### Phase 6: Wails v3 + Svelte UI
 

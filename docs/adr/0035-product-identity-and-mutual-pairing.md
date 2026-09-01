@@ -49,7 +49,7 @@ Phase 0의 역할별 인증서는 24시간 실험 자산이고, 한 장비가 bu
 
 장기 device identity와 짧은 transport credential의 수명을 분리하면서도 pairing 승인 대상을 exact
 transport fingerprint로 고정한다. 대가로 rotation과 transport renewal은 상대 장비 확인이 필요한
-명시적인 작업이며, UI와 제품 CLI는 issue #13과 #14의 local agent API를 통해 이 core를 호출해야 한다.
+명시적인 작업이며, UI와 제품 CLI는 ADR 0036의 local agent API를 통해 이 core를 호출해야 한다.
 
 ## 검증
 

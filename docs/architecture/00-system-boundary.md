@@ -8,7 +8,10 @@
 
 This repository owns the peer-input safety model, Windows input adapters, authenticated ordered peer transport, local trust and credential primitives, agent supervision, Phase 0 diagnostics, native probe launcher, evidence validators, and the product contracts that constrain them.
 
-The current executable surface is the bounded `krasis-lab` workflow and its launcher. A production resident agent, authenticated local management API, Wails/Svelte tray UI, signed installer, update channel, and release-grade pairing UX remain later-phase work tracked by issues and `docs/product/01-roadmap.md`.
+The executable surface includes the bounded `krasis-lab` workflow and launcher plus `krasis-agent.exe`,
+which owns one user-session lifecycle and an authenticated loopback management API. Product CLI
+configuration, Wails/Svelte tray UI, signed installer and update channel remain later-phase work
+tracked by issues and `docs/product/01-roadmap.md`.
 
 ## External boundary
 
