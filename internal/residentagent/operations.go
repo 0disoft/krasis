@@ -41,7 +41,7 @@ type Operations struct {
 
 	mu          sync.Mutex
 	sessionStop context.CancelCauseFunc
-	sessionDone chan error
+	sessionDone chan struct{}
 	peerAlias   string
 	lastCode    string
 	counters    map[string]uint64
@@ -196,13 +196,14 @@ func (operations *Operations) Connect(_ context.Context, request localapi.Operat
 		return rejected("already_active"), nil
 	}
 	ctx, cancel := context.WithCancelCause(operations.root)
-	done := make(chan error, 1)
+	done := make(chan struct{})
 	operations.sessionStop = cancel
 	operations.sessionDone = done
 	operations.peerAlias = request.PeerAlias
 	operations.recordLocked("connect_started")
 	go func(alias string) {
-		done <- operations.runner(ctx, alias)
+		defer cancel(nil)
+		_ = operations.runner(ctx, alias)
 		operations.finishSession(done)
 	}(request.PeerAlias)
 	return completed("connect_started"), nil
@@ -284,7 +285,7 @@ func (operations *Operations) Close(ctx context.Context) error {
 	return errors.New(result.Code)
 }
 
-func (operations *Operations) finishSession(done chan error) {
+func (operations *Operations) finishSession(done chan struct{}) {
 	operations.mu.Lock()
 	defer operations.mu.Unlock()
 	if operations.sessionDone == done {
@@ -293,6 +294,8 @@ func (operations *Operations) finishSession(done chan error) {
 		operations.peerAlias = ""
 		operations.recordLocked("session_stopped")
 	}
+	// Publish completion only after clearing the session, and wake every waiter.
+	close(done)
 }
 
 func (operations *Operations) recordLocked(code string) {

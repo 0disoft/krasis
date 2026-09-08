@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/0disoft/krasis/internal/localapi"
@@ -11,6 +12,41 @@ import (
 	"github.com/0disoft/krasis/internal/transport"
 	"github.com/0disoft/krasis/internal/truststore"
 )
+
+func TestConcurrentDisconnectWaitersAllObserveSessionCompletion(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		release := make(chan struct{})
+		operations := testOperations(t, func(ctx context.Context, _ string) error {
+			<-ctx.Done()
+			<-release
+			return context.Cause(ctx)
+		})
+		if result, err := operations.Connect(context.Background(), localapi.OperationRequest{PeerAlias: "peer"}); err != nil || result.Status != "COMPLETED" {
+			t.Fatalf("connect = %+v, %v", result, err)
+		}
+		results := make(chan localapi.OperationResult, 2)
+		for range 2 {
+			go func() {
+				result, err := operations.Disconnect(context.Background(), localapi.OperationRequest{})
+				if err != nil {
+					t.Errorf("disconnect: %v", err)
+				}
+				results <- result
+			}()
+		}
+		synctest.Wait()
+		close(release)
+		for range 2 {
+			if result := <-results; result.Status != "COMPLETED" || result.Code != "disconnected" {
+				t.Errorf("disconnect result = %+v", result)
+			}
+		}
+		status, err := operations.Status(context.Background())
+		if err != nil || status.State != "LOCAL" || status.PeerAlias != "" {
+			t.Fatalf("status after completed disconnect = %+v, %v", status, err)
+		}
+	})
+}
 
 func TestConnectSessionOutlivesRequestAndDisconnectStopsIt(t *testing.T) {
 	started := make(chan struct{})
@@ -119,7 +155,7 @@ func TestTrustRevocationRejectsActivePeer(t *testing.T) {
 	operations := testOperationsWithTrust(t, store)
 	operations.mu.Lock()
 	operations.peerAlias = "peer"
-	operations.sessionDone = make(chan error, 1)
+	operations.sessionDone = make(chan struct{})
 	operations.mu.Unlock()
 	result, err := operations.RevokeTrust(context.Background(), localapi.OperationRequest{Fingerprint: strings.Repeat("b", 64)})
 	if err != nil || result.Code != "active_session_requires_disconnect" || store.revoked != "" {
