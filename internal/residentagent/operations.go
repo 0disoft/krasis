@@ -12,7 +12,7 @@ import (
 	"github.com/0disoft/krasis/internal/truststore"
 )
 
-const DefaultSessionStopTimeout = 5 * time.Second
+const DefaultSessionStopTimeout = localapi.DefaultSessionStopTimeout
 
 var (
 	ErrNotConfigured = errors.New("resident agent operation is not configured")

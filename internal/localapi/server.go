@@ -17,14 +17,19 @@ import (
 )
 
 const (
-	StatusSchemaVersion      = "krasis.agent.status/v1"
-	OperationSchemaVersion   = "krasis.agent.operation/v1"
-	ResultSchemaVersion      = "krasis.agent.operation-result/v1"
-	DiagnosticsSchemaVersion = "krasis.agent.diagnostics/v1"
-	TrustSchemaVersion       = "krasis.agent.trust/v1"
-	TopologySchemaVersion    = "krasis.agent.topology/v1"
-	DefaultShutdownTimeout   = 5 * time.Second
-	maxRequestBytes          = 64 << 10
+	StatusSchemaVersion       = "krasis.agent.status/v1"
+	OperationSchemaVersion    = "krasis.agent.operation/v1"
+	ResultSchemaVersion       = "krasis.agent.operation-result/v1"
+	DiagnosticsSchemaVersion  = "krasis.agent.diagnostics/v1"
+	TrustSchemaVersion        = "krasis.agent.trust/v1"
+	TopologySchemaVersion     = "krasis.agent.topology/v1"
+	DefaultShutdownTimeout    = 5 * time.Second
+	DefaultSessionStopTimeout = 5 * time.Second
+	requestReadTimeout        = 5 * time.Second
+	// The write deadline includes body reading and the bounded operation itself.
+	responseWriteTimeout = requestReadTimeout + DefaultSessionStopTimeout + time.Second
+	clientRequestTimeout = responseWriteTimeout + time.Second
+	maxRequestBytes      = 64 << 10
 )
 
 type Status struct {
@@ -127,8 +132,8 @@ func Listen(controlDirectory string, operations Operations) (*Server, error) {
 		http: &http.Server{
 			Handler:           handler,
 			ReadHeaderTimeout: 2 * time.Second,
-			ReadTimeout:       5 * time.Second,
-			WriteTimeout:      5 * time.Second,
+			ReadTimeout:       requestReadTimeout,
+			WriteTimeout:      responseWriteTimeout,
 			IdleTimeout:       30 * time.Second,
 		},
 	}, nil

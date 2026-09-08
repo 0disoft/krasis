@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
 )
 
 const maxResponseBytes = 1 << 20
@@ -35,7 +34,7 @@ func OpenClient(controlDirectory string) (*Client, error) {
 		}
 		return nil, fmt.Errorf("%w: endpoint credentials are invalid", ErrAuthentication)
 	}
-	return &Client{credentials: credentials, http: &http.Client{Timeout: 5 * time.Second}}, nil
+	return &Client{credentials: credentials, http: &http.Client{Timeout: clientRequestTimeout}}, nil
 }
 
 func (client *Client) Status(ctx context.Context) (Status, error) {
