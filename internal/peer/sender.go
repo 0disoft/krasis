@@ -46,11 +46,14 @@ func (sink *OutboundActionSink) Interrupt(cause error) error {
 	return sink.Connection.Close()
 }
 
-func (sink *OutboundActionSink) SendAction(ctx context.Context, action control.InputAction) error {
+func (sink *OutboundActionSink) SendAction(ctx context.Context, action control.InputAction, isCurrent func() bool) error {
 	if sink == nil || sink.Coordinator == nil || sink.Runtime == nil {
 		return errors.New("outbound action sink is not initialized")
 	}
-	return SendInputAction(ctx, sink.Coordinator, sink.Runtime, action)
+	if isCurrent == nil {
+		return errors.New("source generation check is required")
+	}
+	return sendInputAction(ctx, sink.Coordinator, sink.Runtime, action, isCurrent)
 }
 
 func (sink *OutboundActionSink) Fail(ctx context.Context, cause error) error {
@@ -108,6 +111,18 @@ func SendInputAction(
 	runtime *application.SessionRuntime,
 	action control.InputAction,
 ) error {
+	return sendInputAction(ctx, coordinator, runtime, action, nil)
+}
+
+var ErrStaleSourceAction = errors.New("source action belongs to a retired generation")
+
+func sendInputAction(
+	ctx context.Context,
+	coordinator *SessionWriteCoordinator,
+	runtime *application.SessionRuntime,
+	action control.InputAction,
+	isCurrent func() bool,
+) error {
 	if coordinator == nil || runtime == nil {
 		return errors.New("write coordinator and runtime are required")
 	}
@@ -115,6 +130,9 @@ func SendInputAction(
 		return err
 	}
 	return coordinator.Execute(ctx, func(writer FrameWriter) error {
+		if isCurrent != nil && !isCurrent() {
+			return ErrStaleSourceAction
+		}
 		envelope, err := runtime.NextOutboundEnvelope(ctx)
 		if err != nil {
 			return err

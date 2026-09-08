@@ -21,7 +21,9 @@ var (
 )
 
 type SourceSink interface {
-	SendAction(context.Context, control.InputAction) error
+	// SendAction must check isCurrent after acquiring its semantic write lock,
+	// before assigning the action to an outbound session.
+	SendAction(context.Context, control.InputAction, func() bool) error
 	Interrupt(error) error
 	Fail(context.Context, error) error
 }
@@ -296,8 +298,11 @@ func (session *SourceSession) runSender(ctx context.Context) error {
 				}
 				continue
 			}
-			if err := session.sink.SendAction(ctx, item.action); err != nil {
+			if err := session.sink.SendAction(ctx, item.action, func() bool { return session.current(item.generation) }); err != nil {
 				if !session.current(item.generation) {
+					if session.observer != nil {
+						session.observer.ObserveSourceQueueDiscardedStale()
+					}
 					continue
 				}
 				return err

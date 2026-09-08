@@ -5,12 +5,60 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/transport"
 )
+
+func TestSourceGenerationIsCheckedAfterWaitingForSessionWriter(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx := context.Background()
+		runtime := newOutboundRuntime(t)
+		if _, err := runtime.GrantOutbound(ctx, "session-1", "lease-1", "epoch-1", time.Now()); err != nil {
+			t.Fatal(err)
+		}
+		writer := &recordingFrameWriter{}
+		coordinator := testWriteCoordinator(t, writer)
+		sink, err := NewOutboundActionSink(coordinator, runtime, &recordingCloser{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		<-coordinator.permit
+		current := true
+		result := make(chan error, 1)
+		action := control.InputAction{Kind: control.InputPointerMove, DeltaX: 2}
+		go func() { result <- sink.SendAction(ctx, action, func() bool { return current }) }()
+		synctest.Wait()
+		// Return and re-enter while the old action is waiting for the writer.
+		if _, err := runtime.RevokePeer(ctx, "session-1", "lease-1", "epoch-1"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := runtime.BeginOutbound(ctx, "session-2", "epoch-2"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := runtime.GrantOutbound(ctx, "session-2", "lease-2", "epoch-2", time.Now()); err != nil {
+			t.Fatal(err)
+		}
+		current = false
+		coordinator.permit <- struct{}{}
+		if err := <-result; !errors.Is(err, ErrStaleSourceAction) {
+			t.Fatalf("retired action error = %v", err)
+		}
+		if len(writer.frames) != 0 {
+			t.Fatal("retired action was written to the new session")
+		}
+		if err := sink.SendAction(ctx, action, func() bool { return true }); err != nil {
+			t.Fatal(err)
+		}
+		envelope, _, err := transport.DecodeInputPayload(writer.frames[0].Payload)
+		if err != nil || envelope.SessionID != "session-2" || envelope.Epoch != "epoch-2" || envelope.Sequence != 1 {
+			t.Fatalf("new session envelope = %+v, error = %v", envelope, err)
+		}
+	})
+}
 
 func TestBeginOutboundSessionWritesLeaseRequest(t *testing.T) {
 	runtime := newLocalRuntime(t)
@@ -37,7 +85,7 @@ func TestOutboundActionSinkWritesThroughRuntimeSequence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewOutboundActionSink() error = %v", err)
 	}
-	if err := sink.SendAction(context.Background(), control.InputAction{Kind: control.InputPointerMove, DeltaX: 2}); err != nil {
+	if err := sink.SendAction(context.Background(), control.InputAction{Kind: control.InputPointerMove, DeltaX: 2}, func() bool { return true }); err != nil {
 		t.Fatalf("SendAction() error = %v", err)
 	}
 	envelope, action, err := transport.DecodeInputPayload(writer.frames[0].Payload)

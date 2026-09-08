@@ -416,7 +416,7 @@ type blockingInterruptSourceSink struct {
 	once    sync.Once
 }
 
-func (*blockingInterruptSourceSink) SendAction(ctx context.Context, _ control.InputAction) error {
+func (*blockingInterruptSourceSink) SendAction(ctx context.Context, _ control.InputAction, _ func() bool) error {
 	<-ctx.Done()
 	return ctx.Err()
 }
@@ -429,7 +429,7 @@ func (sink *blockingInterruptSourceSink) Interrupt(error) error {
 
 func (*blockingInterruptSourceSink) Fail(context.Context, error) error { return nil }
 
-func (sink *recordingSourceSink) SendAction(_ context.Context, action control.InputAction) error {
+func (sink *recordingSourceSink) SendAction(_ context.Context, action control.InputAction, _ func() bool) error {
 	if sink.sent != nil {
 		sink.sent <- action
 	}
@@ -465,7 +465,7 @@ type revokedGenerationSourceSink struct {
 	failed       chan error
 }
 
-func (sink *revokedGenerationSourceSink) SendAction(_ context.Context, action control.InputAction) error {
+func (sink *revokedGenerationSourceSink) SendAction(_ context.Context, action control.InputAction, isCurrent func() bool) error {
 	sink.mu.Lock()
 	sink.calls++
 	call := sink.calls
@@ -473,6 +473,9 @@ func (sink *revokedGenerationSourceSink) SendAction(_ context.Context, action co
 	if call == 1 {
 		close(sink.firstStarted)
 		<-sink.releaseFirst
+		if isCurrent() {
+			panic("retired generation was still current at send time")
+		}
 		return errors.New("revoked generation send failed")
 	}
 	sink.sent <- action
@@ -486,7 +489,7 @@ func (sink *revokedGenerationSourceSink) Fail(_ context.Context, cause error) er
 	return nil
 }
 
-func (sink *interruptibleSourceSink) SendAction(context.Context, control.InputAction) error {
+func (sink *interruptibleSourceSink) SendAction(context.Context, control.InputAction, func() bool) error {
 	sink.startedOnce.Do(func() { close(sink.started) })
 	<-sink.interrupted
 	return errors.New("send interrupted")

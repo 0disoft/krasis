@@ -102,14 +102,14 @@ func TestObservedSourceSinkCountsOnlySuccessfulSends(t *testing.T) {
 	delegate := &recordingSourceSink{}
 	sink := &observedSourceSink{delegate: delegate, observer: observer}
 	action := control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}
-	if err := sink.SendAction(context.Background(), action); err != nil {
+	if err := sink.SendAction(context.Background(), action, func() bool { return true }); err != nil {
 		t.Fatalf("SendAction() error = %v", err)
 	}
 	if observer.actions != 1 {
 		t.Fatalf("observed actions = %d, want 1", observer.actions)
 	}
 	delegate.sendErr = errors.New("send failed")
-	if err := sink.SendAction(context.Background(), action); !errors.Is(err, delegate.sendErr) {
+	if err := sink.SendAction(context.Background(), action, func() bool { return true }); !errors.Is(err, delegate.sendErr) {
 		t.Fatalf("failed SendAction() error = %v", err)
 	}
 	if observer.actions != 1 {
@@ -334,7 +334,7 @@ type recordingSourceSink struct {
 	sendErr error
 }
 
-func (sink *recordingSourceSink) SendAction(context.Context, control.InputAction) error {
+func (sink *recordingSourceSink) SendAction(context.Context, control.InputAction, func() bool) error {
 	return sink.sendErr
 }
 

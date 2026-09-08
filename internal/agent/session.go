@@ -326,8 +326,8 @@ type observedSourceSink struct {
 	observer SourceActivityObserver
 }
 
-func (sink *observedSourceSink) SendAction(ctx context.Context, action control.InputAction) error {
-	if err := sink.delegate.SendAction(ctx, action); err != nil {
+func (sink *observedSourceSink) SendAction(ctx context.Context, action control.InputAction, isCurrent func() bool) error {
+	if err := sink.delegate.SendAction(ctx, action, isCurrent); err != nil {
 		return err
 	}
 	sink.observer.ObserveSourceAction(action)

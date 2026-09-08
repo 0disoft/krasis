@@ -109,8 +109,10 @@ func (observer *emergencyRecordingObserver) Observe(action control.InputAction, 
 
 type emergencyRecordingSink struct{ failed chan error }
 
-func (*emergencyRecordingSink) SendAction(context.Context, control.InputAction) error { return nil }
-func (*emergencyRecordingSink) Interrupt(error) error                                 { return nil }
+func (*emergencyRecordingSink) SendAction(context.Context, control.InputAction, func() bool) error {
+	return nil
+}
+func (*emergencyRecordingSink) Interrupt(error) error { return nil }
 func (sink *emergencyRecordingSink) Fail(_ context.Context, err error) error {
 	sink.failed <- err
 	return err
