@@ -76,9 +76,11 @@ func (reader *Reader) ReadFrame() (Frame, error) {
 	return Frame{Kind: kind, Payload: payload}, nil
 }
 
+// Writer requires serialized calls, as provided by PeerConnection's write gate.
 type Writer struct {
 	destination io.Writer
 	maxPayload  uint32
+	buffer      []byte
 }
 
 func NewWriter(destination io.Writer) (*Writer, error) {
@@ -95,16 +97,20 @@ func (writer *Writer) WriteFrame(frame Frame) error {
 	if uint64(len(frame.Payload)) > uint64(writer.maxPayload) {
 		return fmt.Errorf("%w: actual=%d maximum=%d", ErrPayloadTooLarge, len(frame.Payload), writer.maxPayload)
 	}
-	var header [headerSize]byte
+	size := headerSize + len(frame.Payload)
+	if cap(writer.buffer) < size {
+		writer.buffer = make([]byte, size)
+	}
+	packet := writer.buffer[:size]
+	header := packet[:headerSize]
+	clear(header)
 	copy(header[0:4], frameMagic[:])
 	header[4] = ProtocolVersion
 	header[5] = byte(frame.Kind)
 	binary.BigEndian.PutUint32(header[8:12], uint32(len(frame.Payload)))
-	if err := writeFull(writer.destination, header[:]); err != nil {
-		return fmt.Errorf("write frame header: %w", err)
-	}
-	if err := writeFull(writer.destination, frame.Payload); err != nil {
-		return fmt.Errorf("write frame payload: %w", err)
+	copy(packet[headerSize:], frame.Payload)
+	if err := writeFull(writer.destination, packet); err != nil {
+		return fmt.Errorf("write frame: %w", err)
 	}
 	return nil
 }

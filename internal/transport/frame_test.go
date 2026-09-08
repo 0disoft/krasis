@@ -9,6 +9,80 @@ import (
 	"testing"
 )
 
+func TestFrameWriterUsesOneWritePerFrameAndPreservesWireBytes(t *testing.T) {
+	var wire bytes.Buffer
+	calls := 0
+	writer, err := NewWriter(frameWriteFunc(func(data []byte) (int, error) {
+		calls++
+		return wire.Write(data)
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	frames := []Frame{
+		{Kind: MessageInput, Payload: bytes.Repeat([]byte{0xff}, 2048)},
+		{Kind: MessageControl, Payload: []byte("grant")},
+		{Kind: MessageHeartbeat},
+		{Kind: MessageInput, Payload: bytes.Repeat([]byte{0x42}, int(MaxPayloadSize))},
+	}
+	for _, frame := range frames {
+		wire.Reset()
+		calls = 0
+		if err := writer.WriteFrame(frame); err != nil {
+			t.Fatal(err)
+		}
+		want := append(headerWith('K', ProtocolVersion, byte(frame.Kind), 0, uint32(len(frame.Payload))), frame.Payload...)
+		if calls != 1 || !bytes.Equal(wire.Bytes(), want) {
+			t.Fatalf("frame kind %d: writes = %d, wire matches = %t", frame.Kind, calls, bytes.Equal(wire.Bytes(), want))
+		}
+	}
+}
+
+func TestFrameWriterCompletesPartialWritesWithoutDuplicatingBytes(t *testing.T) {
+	var wire bytes.Buffer
+	writer, _ := NewWriter(frameWriteFunc(func(data []byte) (int, error) {
+		return wire.Write(data[:min(3, len(data))])
+	}))
+	want := Frame{Kind: MessageInput, Payload: []byte("partial")}
+	if err := writer.WriteFrame(want); err != nil {
+		t.Fatal(err)
+	}
+	reader, _ := NewReader(&wire)
+	got, err := reader.ReadFrame()
+	if err != nil || got.Kind != want.Kind || !bytes.Equal(got.Payload, want.Payload) || wire.Len() != 0 {
+		t.Fatalf("partial writes changed frame: %+v, %v, remaining = %d", got, err, wire.Len())
+	}
+}
+
+func TestFrameWriterStopsOnFailedOrZeroProgressWrite(t *testing.T) {
+	cause := errors.New("transport write failed")
+	for _, test := range []struct {
+		name string
+		n    int
+		err  error
+		want error
+	}{
+		{name: "partial failure", n: 3, err: cause, want: cause},
+		{name: "zero progress", want: io.ErrShortWrite},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			calls := 0
+			writer, _ := NewWriter(frameWriteFunc(func([]byte) (int, error) {
+				calls++
+				return test.n, test.err
+			}))
+			err := writer.WriteFrame(Frame{Kind: MessageInput, Payload: []byte("input")})
+			if !errors.Is(err, test.want) || calls != 1 {
+				t.Fatalf("error = %v, calls = %d", err, calls)
+			}
+		})
+	}
+}
+
+type frameWriteFunc func([]byte) (int, error)
+
+func (write frameWriteFunc) Write(data []byte) (int, error) { return write(data) }
+
 func TestFrameRoundTrip(t *testing.T) {
 	frames := []Frame{
 		{Kind: MessageControl, Payload: []byte("lease")},
