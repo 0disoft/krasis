@@ -93,6 +93,8 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, deps depe
 
 func dispatch(ctx context.Context, client apiClient, args []string) (any, int, error) {
 	switch args[0] {
+	case "connection":
+		return dispatchConnection(ctx, client, args[1:])
 	case "status":
 		if len(args) != 1 {
 			return nil, ExitUsage, usageError("status accepts no arguments")
@@ -206,6 +208,9 @@ func parseGlobalOptions(args []string) (options, error) {
 
 func validateCommandArgs(args []string) error {
 	switch args[0] {
+	case "connection":
+		_, err := parseConnection(args[1:])
+		return err
 	case "status", "diagnostics", "topology", "disconnect", "safe-stop":
 		if len(args) != 1 {
 			return usageError(args[0] + " accepts no arguments")
@@ -299,11 +304,16 @@ func writeUsageError(stderr io.Writer, err error) {
 	if err != nil {
 		fmt.Fprintln(stderr, "usage_error:", err)
 	}
-	fmt.Fprintln(stderr, "usage: krasis [--json] [--control-dir DIR] status|diagnostics|topology|connect|disconnect|pair|trust|safe-stop")
+	fmt.Fprintln(stderr, "usage: krasis [--json] [--control-dir DIR] status|diagnostics|topology|connection|connect|disconnect|pair|trust|safe-stop")
 }
 
 func writeHuman(output io.Writer, value any) {
 	switch item := value.(type) {
+	case localapi.ConnectionResult:
+		fmt.Fprintf(output, "%s: %s\n", item.Status, item.Code)
+		if item.Profile != nil {
+			fmt.Fprintf(output, "Address: %s\nLocal exit edge: %s\nFingerprint: %s\n", item.Profile.Address, item.Profile.Edge, item.Profile.Fingerprint)
+		}
 	case localapi.Status:
 		fmt.Fprintf(output, "State: %s\n", item.State)
 		if item.PeerAlias != "" {
