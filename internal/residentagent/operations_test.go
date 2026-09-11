@@ -7,6 +7,7 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/0disoft/krasis/internal/agent"
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/productidentity"
 	"github.com/0disoft/krasis/internal/transport"
@@ -16,7 +17,7 @@ import (
 func TestConcurrentDisconnectWaitersAllObserveSessionCompletion(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		release := make(chan struct{})
-		operations := testOperations(t, func(ctx context.Context, _ string) error {
+		operations := testOperations(t, func(ctx context.Context, _ string, _ agent.SupervisorObserver) error {
 			<-ctx.Done()
 			<-release
 			return context.Cause(ctx)
@@ -51,7 +52,7 @@ func TestConcurrentDisconnectWaitersAllObserveSessionCompletion(t *testing.T) {
 func TestConnectSessionOutlivesRequestAndDisconnectStopsIt(t *testing.T) {
 	started := make(chan struct{})
 	stopped := make(chan struct{})
-	runner := func(ctx context.Context, alias string) error {
+	runner := func(ctx context.Context, alias string, _ agent.SupervisorObserver) error {
 		if alias != "peer" {
 			t.Errorf("alias = %q", alias)
 		}

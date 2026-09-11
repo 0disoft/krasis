@@ -17,7 +17,7 @@ clipboard, environment 또는 UI projection에 복제하지 않는다.
 
 | Method | Path | Operation |
 | --- | --- | --- |
-| `GET` | `/v1/status` | identity fingerprint/generation, `LOCAL|CONNECTED`, redacted alias, allowed actions |
+| `GET` | `/v1/status` | identity fingerprint/generation, 연결 lifecycle state, redacted alias, allowed actions |
 | `POST` | `/v1/connect` | configured shared-core session runner 시작 |
 | `POST` | `/v1/connection` | 신뢰된 peer의 연결 설정 저장 또는 조회; 세션 시작과 분리 |
 | `POST` | `/v1/disconnect` | active runner cancel과 최대 5초 wait |
@@ -38,6 +38,13 @@ raw input, path와 internal error를 반환하지 않는다. active-lease exact 
 `docs/agent/management-contract.md` 계약을 이 transport 위에서 사용한다.
 
 ## 안정 코드
+
+연결 상태는 `LOCAL`, `CONNECTING`, `CONNECTED`, `RECONNECTING`, `DISCONNECTING`이다.
+runner 시작만으로 CONNECTED가 되지 않는다. shared supervisor의 인증된 연결 획득 알림이 있어야
+CONNECTED로 표시하며, 입력 제어권 획득을 뜻하지는 않는다. 재시도 대기와 재접속은 RECONNECTING,
+취소부터 runner cleanup 완료까지는 DISCONNECTING이다. status와 topology가 같은 상태를 사용한다.
+이전 runner가 늦게 보낸 상태는 새 runner에 적용하지 않는다. 취소되지 않은 runner의 오류는
+원문 대신 `session_failed`로 기록한다. 종료된 agent에 새 connect를 요청하면 `operation_cancelled`다.
 
 현재 process owner의 lifecycle code는 `ready`, `connect_started`, `already_active`, `not_configured`,
 `no_active_session`, `disconnected`, `shutdown_timeout`, `session_stopped`, `trust_revoked`,

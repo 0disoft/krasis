@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/0disoft/krasis/internal/agent"
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/productidentity"
 	"github.com/0disoft/krasis/internal/truststore"
@@ -19,7 +20,9 @@ var (
 	ErrAlreadyActive = errors.New("resident agent session is already active")
 )
 
-type SessionRunner func(context.Context, string) error
+// SessionRunner must report the shared supervisor's actual state. Starting the
+// runner alone is not evidence of a peer connection.
+type SessionRunner func(context.Context, string, agent.SupervisorObserver) error
 
 type PairWorkflow interface {
 	Handle(context.Context, localapi.OperationRequest) (localapi.OperationResult, error)
@@ -39,12 +42,13 @@ type Operations struct {
 	trust     trustStore
 	now       func() time.Time
 
-	mu          sync.Mutex
-	sessionStop context.CancelCauseFunc
-	sessionDone chan struct{}
-	peerAlias   string
-	lastCode    string
-	counters    map[string]uint64
+	mu           sync.Mutex
+	sessionStop  context.CancelCauseFunc
+	sessionDone  chan struct{}
+	sessionState string
+	peerAlias    string
+	lastCode     string
+	counters     map[string]uint64
 }
 
 func New(parent context.Context, identity productidentity.PublicIdentity, runner SessionRunner, pairing PairWorkflow, trust trustStore) (*Operations, error) {
@@ -135,10 +139,7 @@ func (operations *Operations) Topology(ctx context.Context) (localapi.Topology, 
 		return localapi.Topology{}, err
 	}
 	operations.mu.Lock()
-	state, active := "LOCAL", operations.peerAlias
-	if operations.sessionDone != nil {
-		state = "CONNECTED"
-	}
+	state, active := operations.stateLocked(), operations.peerAlias
 	operations.mu.Unlock()
 	result := localapi.Topology{SchemaVersion: localapi.TopologySchemaVersion, State: state, Layout: "UNCONFIGURED", Peers: []localapi.TopologyPeer{}}
 	for _, peer := range trust.Peers {
@@ -163,10 +164,9 @@ func (operations *Operations) Context() context.Context {
 func (operations *Operations) Status(context.Context) (localapi.Status, error) {
 	operations.mu.Lock()
 	defer operations.mu.Unlock()
-	state := "LOCAL"
+	state := operations.stateLocked()
 	actions := []string{"PAIR", "SAFE_STOP"}
 	if operations.sessionDone != nil {
-		state = "CONNECTED"
 		actions = []string{"DISCONNECT", "SAFE_STOP"}
 	} else {
 		actions = append(actions, "CONNECT")
@@ -181,12 +181,15 @@ func (operations *Operations) Status(context.Context) (localapi.Status, error) {
 	}, nil
 }
 
-func (operations *Operations) Connect(_ context.Context, request localapi.OperationRequest) (localapi.OperationResult, error) {
-	if request.PeerAlias == "" {
+func (operations *Operations) Connect(requestContext context.Context, request localapi.OperationRequest) (localapi.OperationResult, error) {
+	if requestContext == nil || request.PeerAlias == "" {
 		return rejected("invalid_request"), nil
 	}
 	operations.mu.Lock()
 	defer operations.mu.Unlock()
+	if requestContext.Err() != nil || operations.root.Err() != nil {
+		return rejected("operation_cancelled"), nil
+	}
 	if operations.runner == nil {
 		operations.recordLocked("not_configured")
 		return rejected("not_configured"), nil
@@ -199,12 +202,13 @@ func (operations *Operations) Connect(_ context.Context, request localapi.Operat
 	done := make(chan struct{})
 	operations.sessionStop = cancel
 	operations.sessionDone = done
+	operations.sessionState = "CONNECTING"
 	operations.peerAlias = request.PeerAlias
 	operations.recordLocked("connect_started")
 	go func(alias string) {
 		defer cancel(nil)
-		_ = operations.runner(ctx, alias)
-		operations.finishSession(done)
+		err := operations.runner(ctx, alias, &sessionObserver{operations: operations, done: done})
+		operations.finishSession(done, err, ctx.Err() != nil)
 	}(request.PeerAlias)
 	return completed("connect_started"), nil
 }
@@ -220,6 +224,7 @@ func (operations *Operations) Disconnect(ctx context.Context, _ localapi.Operati
 		operations.mu.Unlock()
 		return rejected("no_active_session"), nil
 	}
+	operations.sessionState = "DISCONNECTING"
 	stop(errors.New("local disconnect requested"))
 	operations.mu.Unlock()
 	shutdown, cancel := context.WithTimeout(ctx, DefaultSessionStopTimeout)
@@ -265,6 +270,9 @@ func (operations *Operations) Diagnostics(context.Context) (localapi.Diagnostics
 func (operations *Operations) SafeStop(context.Context) (localapi.OperationResult, error) {
 	operations.mu.Lock()
 	operations.recordLocked("safe_stop_requested")
+	if operations.sessionDone != nil {
+		operations.sessionState = "DISCONNECTING"
+	}
 	operations.mu.Unlock()
 	operations.stopAgent(errors.New("local safe stop requested"))
 	return completed("safe_stop_requested"), nil
@@ -285,14 +293,19 @@ func (operations *Operations) Close(ctx context.Context) error {
 	return errors.New(result.Code)
 }
 
-func (operations *Operations) finishSession(done chan struct{}) {
+func (operations *Operations) finishSession(done chan struct{}, err error, cancelled bool) {
 	operations.mu.Lock()
 	defer operations.mu.Unlock()
 	if operations.sessionDone == done {
 		operations.sessionStop = nil
 		operations.sessionDone = nil
+		operations.sessionState = ""
 		operations.peerAlias = ""
-		operations.recordLocked("session_stopped")
+		if err != nil && !cancelled {
+			operations.recordLocked("session_failed")
+		} else {
+			operations.recordLocked("session_stopped")
+		}
 	}
 	// Publish completion only after clearing the session, and wake every waiter.
 	close(done)

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0disoft/krasis/internal/agent"
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/productcli"
 	"github.com/0disoft/krasis/internal/productidentity"
@@ -29,7 +30,10 @@ func TestConnectionCLIThroughAuthenticatedResidentAPI(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	operations, err := New(ctx, identity.Public(), func(ctx context.Context, _ string) error { <-ctx.Done(); return context.Cause(ctx) }, nil, trust)
+	operations, err := New(ctx, identity.Public(), func(ctx context.Context, _ string, _ agent.SupervisorObserver) error {
+		<-ctx.Done()
+		return context.Cause(ctx)
+	}, nil, trust)
 	if err != nil {
 		t.Fatal(err)
 	}
