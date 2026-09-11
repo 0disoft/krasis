@@ -45,6 +45,10 @@ func New(directory string) (*Store, error) {
 }
 
 func (store *Store) Import(peer transport.AuthenticatedPeerContext, alias string, allowInboundControl bool, now time.Time) (PeerRecord, error) {
+	return store.importPeer(peer, alias, allowInboundControl, now, nil)
+}
+
+func (store *Store) importPeer(peer transport.AuthenticatedPeerContext, alias string, allowInboundControl bool, now time.Time, prepare func(*securefs.Directory) error) (PeerRecord, error) {
 	if store == nil {
 		return PeerRecord{}, errors.New("trust store is not initialized")
 	}
@@ -61,7 +65,7 @@ func (store *Store) Import(peer transport.AuthenticatedPeerContext, alias string
 		Fingerprint: peer.CertificateSHA256, Role: peer.Role, Alias: alias,
 		AllowInboundControl: allowInboundControl, CreatedAt: now.UTC(),
 	}
-	err := store.mutate(true, now.UTC(), func(document *Document) error {
+	err := store.mutatePrepared(true, now.UTC(), func(document *Document) error {
 		for _, existing := range document.Peers {
 			if existing.Fingerprint == record.Fingerprint {
 				return ErrPeerExists
@@ -69,7 +73,7 @@ func (store *Store) Import(peer transport.AuthenticatedPeerContext, alias string
 		}
 		document.Peers = append(document.Peers, record)
 		return nil
-	})
+	}, prepare)
 	if err != nil {
 		return PeerRecord{}, err
 	}
@@ -198,6 +202,10 @@ func (store *Store) List() (Document, error) {
 }
 
 func (store *Store) mutate(create bool, now time.Time, change func(*Document) error) error {
+	return store.mutatePrepared(create, now, change, nil)
+}
+
+func (store *Store) mutatePrepared(create bool, now time.Time, change func(*Document) error, prepare func(*securefs.Directory) error) error {
 	document, directory, release, err := store.openLocked(create)
 	if err != nil {
 		return err
@@ -215,6 +223,11 @@ func (store *Store) mutate(create bool, now time.Time, change func(*Document) er
 	sortPeers(document.Peers)
 	if err := document.Validate(); err != nil {
 		return err
+	}
+	if prepare != nil {
+		if err := prepare(directory); err != nil {
+			return err
+		}
 	}
 	return store.write(directory, document)
 }

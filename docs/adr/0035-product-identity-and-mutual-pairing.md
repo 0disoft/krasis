@@ -53,6 +53,26 @@ transport fingerprint로 고정한다. 대가로 rotation과 transport renewal�
 
 ## 검증
 
+### 제품 공개 인증서 저장 구현
+
+`Session.FinalizeWithCertificate`는 기존 양쪽 확인 검증 후, transport adapter가 받은 공개 leaf DER의
+지문·역할이 transcript와 정확히 일치하는지 확인한다. DER는 offer/response/receipt에 추가하지 않는다.
+제품 인증서는 self-signed end-entity signing certificate로 제한하고 CA 인증서는 거부한다.
+
+공개 DER는 protected trust directory의 `certificate-FINGERPRINT.der`에 저장한다. trust-store lock을
+잡은 채 인증서 저장을 먼저 완료하고 마지막에 trust.json을 원자 교체한다. 인증서 저장 실패는 trust를
+등록하지 않는다. 반대로 마지막 trust write가 실패하면 권한이 없는 공개 DER만 남을 수 있으며,
+재시도는 동일한 protected bytes만 재사용한다. 손상된 파일을 자동 덮어쓰지는 않는다.
+
+`Store.PeerCertificate`는 매 호출 시 현재 trust의 fingerprint·role·revocation과 인증서 만료를
+재검증한다. 인증서 파일이 존재한다는 사실만으로 trust를 부여하지 않는다. 반환한 인증서는 해당 peer의
+명시적 TLS trust anchor로 사용할 수 있다. 전역 CA 설치나 TLS 검증 생략은 하지 않는다.
+
+기존 fingerprint-only Finalize와 trust.json 형식은 유지한다. 제품 network pairing adapter는 새
+FinalizeWithCertificate 경로를 사용해야 하며, 그 adapter와 제품 session runner 연결은 아직 미완료다.
+기존 fingerprint-only peer의 인증서를 자동 가져오거나 갱신하지 않는다. 인증서 포함 replacement
+페어링 연동도 별도 작업으로 남는다.
+
 - protected default root 생성, existing insecure root와 reparse-backed directory 거부
 - identity create/load/atomic rotation, corruption·unknown·trailing·oversized·key mismatch 거부
 - identity lock contention 거부
