@@ -29,6 +29,79 @@ const TransportServerName = "krasis.invalid"
 
 var ErrTransportRenewalRequired = errors.New("transport credential requires explicit renewal and pairing")
 
+var ErrTransportFingerprintChanged = errors.New("transport fingerprint changed")
+
+// TransportInfo contains only public metadata, never certificate or key bytes.
+type TransportInfo struct {
+	Fingerprint string                          `json:"fingerprint"`
+	Role        transport.AuthenticatedPeerRole `json:"role"`
+	NotBefore   time.Time                       `json:"notBefore"`
+	NotAfter    time.Time                       `json:"notAfter"`
+	Expired     bool                            `json:"expired"`
+}
+
+func (store *Store) InspectTransport(role transport.AuthenticatedPeerRole, now time.Time) (TransportInfo, error) {
+	return store.maintainTransport(role, "", now)
+}
+
+// RenewTransport replaces exactly the expected certificate under the identity
+// lock. It neither changes device identity nor grants trust on another device.
+func (store *Store) RenewTransport(role transport.AuthenticatedPeerRole, expectedFingerprint string, now time.Time) (TransportInfo, error) {
+	if expectedFingerprint == "" {
+		return TransportInfo{}, ErrTransportFingerprintChanged
+	}
+	return store.maintainTransport(role, expectedFingerprint, now)
+}
+
+func (store *Store) maintainTransport(role transport.AuthenticatedPeerRole, expected string, now time.Time) (TransportInfo, error) {
+	if store == nil || now.IsZero() || (role != transport.AuthenticatedPeerListener && role != transport.AuthenticatedPeerConnector) {
+		return TransportInfo{}, errors.New("transport store, role and time are required")
+	}
+	directory, release, err := store.openLocked(false)
+	if err != nil {
+		return TransportInfo{}, err
+	}
+	defer release()
+	identity, err := loadFromDirectory(directory)
+	if err != nil {
+		return TransportInfo{}, err
+	}
+	name := "transport-" + string(role) + ".json"
+	document, err := readTransport(directory, name)
+	if err != nil {
+		return TransportInfo{}, err
+	}
+	certificate, err := validateTransportMaterial(document, identity.Public(), role)
+	if err != nil {
+		return TransportInfo{}, err
+	}
+	peer, err := transport.AuthenticatedPeerFromCertificate(certificate.Leaf)
+	if err != nil {
+		return TransportInfo{}, err
+	}
+	if expected != "" {
+		if peer.CertificateSHA256 != expected {
+			return TransportInfo{}, ErrTransportFingerprintChanged
+		}
+		next, err := createTransport(identity.Public(), role, now)
+		if err != nil {
+			return TransportInfo{}, err
+		}
+		certificate, err = validateTransport(next, identity.Public(), role, now)
+		if err != nil {
+			return TransportInfo{}, err
+		}
+		peer, err = transport.AuthenticatedPeerFromCertificate(certificate.Leaf)
+		if err != nil {
+			return TransportInfo{}, err
+		}
+		if err := writeTransport(directory, name, next, true); err != nil {
+			return TransportInfo{}, err
+		}
+	}
+	return TransportInfo{Fingerprint: peer.CertificateSHA256, Role: role, NotBefore: certificate.Leaf.NotBefore, NotAfter: certificate.Leaf.NotAfter, Expired: !now.Before(certificate.Leaf.NotAfter)}, nil
+}
+
 type transportDocument struct {
 	SchemaVersion       string `json:"schemaVersion"`
 	IdentityFingerprint string `json:"identityFingerprint"`
@@ -53,24 +126,33 @@ func (store *Store) OpenTransport(role transport.AuthenticatedPeerRole, now time
 		return tls.Certificate{}, err
 	}
 	name := "transport-" + string(role) + ".json"
-	file, err := directory.Open(name)
-	var document transportDocument
+	document, err := readTransport(directory, name)
 	if errors.Is(err, os.ErrNotExist) {
 		document, err = createTransport(identity.Public(), role, now)
 		if err == nil {
 			err = saveTransport(directory, name, document)
 		}
-	} else if err == nil {
+	}
+	if err != nil {
+		return tls.Certificate{}, err
+	}
+	return validateTransport(document, identity.Public(), role, now)
+}
+
+func readTransport(directory *securefs.Directory, name string) (transportDocument, error) {
+	var document transportDocument
+	file, err := directory.Open(name)
+	if err == nil {
 		defer file.Close()
 		if err = peercredentials.ValidateSecurityFileHandle(file); err != nil {
-			return tls.Certificate{}, err
+			return document, err
 		}
 		data, readErr := io.ReadAll(io.LimitReader(file, maxStoreBytes+1))
 		if readErr != nil {
-			return tls.Certificate{}, readErr
+			return document, readErr
 		}
 		if len(data) > maxStoreBytes {
-			return tls.Certificate{}, errors.New("transport document exceeds size limit")
+			return document, errors.New("transport document exceeds size limit")
 		}
 		decoder := json.NewDecoder(bytes.NewReader(data))
 		decoder.DisallowUnknownFields()
@@ -82,10 +164,7 @@ func (store *Store) OpenTransport(role transport.AuthenticatedPeerRole, now time
 			}
 		}
 	}
-	if err != nil {
-		return tls.Certificate{}, err
-	}
-	return validateTransport(document, identity.Public(), role, now)
+	return document, err
 }
 
 func createTransport(identity PublicIdentity, role transport.AuthenticatedPeerRole, now time.Time) (transportDocument, error) {
@@ -122,15 +201,23 @@ func createTransport(identity PublicIdentity, role transport.AuthenticatedPeerRo
 }
 
 func validateTransport(document transportDocument, identity PublicIdentity, role transport.AuthenticatedPeerRole, now time.Time) (tls.Certificate, error) {
+	certificate, err := validateTransportMaterial(document, identity, role)
+	if err != nil {
+		return tls.Certificate{}, err
+	}
+	if now.Before(certificate.Leaf.NotBefore) || !now.Before(certificate.Leaf.NotAfter) {
+		return tls.Certificate{}, ErrTransportRenewalRequired
+	}
+	return certificate, nil
+}
+
+func validateTransportMaterial(document transportDocument, identity PublicIdentity, role transport.AuthenticatedPeerRole) (tls.Certificate, error) {
 	if document.SchemaVersion != "krasis.product-transport/v1" || document.IdentityFingerprint != identity.Fingerprint || document.Generation != identity.Generation {
 		return tls.Certificate{}, ErrTransportRenewalRequired
 	}
 	leaf, err := x509.ParseCertificate(document.Certificate)
 	if err != nil {
 		return tls.Certificate{}, err
-	}
-	if now.Before(leaf.NotBefore) || !now.Before(leaf.NotAfter) {
-		return tls.Certificate{}, ErrTransportRenewalRequired
 	}
 	if leaf.IsCA || leaf.KeyUsage != x509.KeyUsageDigitalSignature ||
 		leaf.NotAfter.Sub(leaf.NotBefore) > TransportLifetime+time.Minute ||
@@ -157,6 +244,10 @@ func validateTransport(document transportDocument, identity PublicIdentity, role
 }
 
 func saveTransport(directory *securefs.Directory, name string, document transportDocument) error {
+	return writeTransport(directory, name, document, false)
+}
+
+func writeTransport(directory *securefs.Directory, name string, document transportDocument, replace bool) error {
 	data, err := json.Marshal(document)
 	if err != nil {
 		return err
@@ -178,6 +269,9 @@ func saveTransport(directory *securefs.Directory, name string, document transpor
 	}
 	if err := file.Close(); err != nil {
 		return err
+	}
+	if replace {
+		return directory.Replace(temporary, name)
 	}
 	return directory.PromoteNoReplace(temporary, name)
 }

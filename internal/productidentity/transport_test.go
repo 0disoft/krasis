@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -40,10 +41,64 @@ func TestTransportRejectsCorruptStoreWithoutReplacingIt(t *testing.T) {
 		if _, err := store.OpenTransport(role, now); err == nil {
 			t.Fatal("corrupt document accepted")
 		}
+		if _, err := store.RenewTransport(role, strings.Repeat("a", 64), now); err == nil {
+			t.Fatal("renewal overwrote corruption")
+		}
 		after, err := os.ReadFile(path)
 		if err != nil || !bytes.Equal(payload, after) {
 			t.Fatal("corrupt document was replaced")
 		}
+	}
+}
+
+func TestExplicitTransportRenewalUsesExpectedFingerprint(t *testing.T) {
+	store := testStore(t)
+	now := time.Now().UTC().Truncate(time.Second)
+	identity, _, err := store.OpenOrCreate(now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	role := transport.AuthenticatedPeerListener
+	if _, err := store.InspectTransport(role, now); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("inspect created credential: %v", err)
+	}
+	old, err := store.OpenTransport(role, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := store.OpenTransport(transport.AuthenticatedPeerConnector, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := store.InspectTransport(role, old.Leaf.NotAfter)
+	if err != nil || !info.Expired {
+		t.Fatalf("expired inspection: %+v %v", info, err)
+	}
+	if _, err := store.RenewTransport(role, strings.Repeat("0", 64), now); !errors.Is(err, ErrTransportFingerprintChanged) {
+		t.Fatalf("wrong fingerprint: %v", err)
+	}
+	stillOld, err := store.OpenTransport(role, now)
+	if err != nil || !bytes.Equal(stillOld.Certificate[0], old.Certificate[0]) {
+		t.Fatal("failed renewal changed certificate")
+	}
+	next, err := store.RenewTransport(role, info.Fingerprint, old.Leaf.NotAfter)
+	if err != nil || next.Fingerprint == info.Fingerprint || next.Expired {
+		t.Fatalf("renewal: %+v %v", next, err)
+	}
+	if _, err := store.RenewTransport(role, info.Fingerprint, old.Leaf.NotAfter); !errors.Is(err, ErrTransportFingerprintChanged) {
+		t.Fatalf("stale retry: %v", err)
+	}
+	loaded, err := store.OpenTransport(role, old.Leaf.NotAfter)
+	if err != nil || bytes.Equal(loaded.Leaf.RawSubjectPublicKeyInfo, old.Leaf.RawSubjectPublicKeyInfo) {
+		t.Fatal("renewal did not persist a new key")
+	}
+	unchanged, err := store.OpenTransport(transport.AuthenticatedPeerConnector, now)
+	if err != nil || !bytes.Equal(other.Certificate[0], unchanged.Certificate[0]) {
+		t.Fatal("renewal changed the other role")
+	}
+	current, _, err := store.OpenOrCreate(now)
+	if err != nil || current.Public() != identity.Public() {
+		t.Fatal("renewal changed device identity")
 	}
 }
 
