@@ -1,6 +1,7 @@
 package pairing
 
 import (
+	"errors"
 	"time"
 
 	"github.com/0disoft/krasis/internal/truststore"
@@ -13,7 +14,13 @@ func (session *Session) FinalizeWithCertificate(remote Receipt, certificateDER [
 	if err := session.authorizeFinalize(remote, store, now); err != nil {
 		return truststore.PeerRecord{}, err
 	}
-	return store.ImportWithCertificate(session.remote.TransportPeer, certificateDER, alias, allowInboundControl, now.UTC())
+	record, err := store.ImportWithCertificate(session.remote.TransportPeer, certificateDER, alias, allowInboundControl, now.UTC())
+	if errors.Is(err, truststore.ErrPeerExists) {
+		// A peer whose certificate did not rotate can retain its exact existing
+		// grant. Recheck under the store lock; never infer consent from existence.
+		return store.ReconfirmWithCertificate(session.remote.TransportPeer, certificateDER, alias, allowInboundControl, now.UTC())
+	}
+	return record, err
 }
 
 // FinalizeReplacementWithCertificate verifies the new peer before replacing the

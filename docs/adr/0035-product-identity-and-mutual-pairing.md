@@ -104,9 +104,24 @@ generation 불일치는 자동 복구하지 않는다. 기기 신원, 다른 역
 동일한 이전 지문을 사용한 중복 갱신은 거부한다.
 
 CLI credential show/renew와 인증된 local API는 이 경로를 사용한다. RENEW는 활성 세션·페어링 중
-거부하며 종료된 agent에서도 수행하지 않는다. 현재 재페어링은 양쪽 역할 인증서를 각각 갱신한 뒤
-양쪽 기존 지문을 명시적으로 교체하는 흐름이다. 같은 상대 인증서를 재등록하는 단일 장비 복구는
-지원하지 않는다. 갱신 응답 유실은 SHOW로 재조회하며 신뢰 자동 이전이나 재승인으로 처리하지 않는다.
+거부하며 종료된 agent에서도 수행하지 않는다. 한쪽 또는 양쪽 인증서를 갱신할 수 있다.
+갱신 응답 유실은 SHOW로 재조회하며 신뢰 자동 이전이나 재승인으로 처리하지 않는다.
+
+### 변경되지 않은 peer 재확인
+
+일반 `FinalizeWithCertificate`에서 신규 import가 `ErrPeerExists`로 끝난 경우에만
+`ReconfirmWithCertificate`를 호출한다. 양쪽 receipt 검증은 이 분기 전에 반드시 수행하며,
+과거 다른 ceremony의 receipt는 사용할 수 없다. 기존 fingerprint-only import와 replacement의
+중복 거부 계약은 유지한다.
+
+재확인은 trust lock 안에서 현재 활성 지문·역할·별칭·inbound 권한과 보호 저장된 DER bytes가
+모두 같은지 확인한다. 유효 기간도 검사하며 철회된 신뢰, 손상되거나 없는 인증서를 복구하지 않는다.
+성공 시 기존 record를 반환할 뿐 revision·생성 시각·권한·연결 profile을 변경하지 않는다.
+최초 import 충돌과 재확인 사이에 철회가 발생해도 현재 lock 안의 상태로 거부한다.
+
+A만 갱신하면 A는 변경되지 않은 B를 일반 pairing으로 재확인하고, B는 기존 A 지문을 명시해
+새 A 지문으로 교체한다. 양쪽 모두 새 확인이 필요하다. 이 경로는 분산 transaction이나 자동 재시도,
+정책 변경 또는 철회된 인증서 재승인을 제공하지 않는다.
 
 - protected default root 생성, existing insecure root와 reparse-backed directory 거부
 - identity create/load/atomic rotation, corruption·unknown·trailing·oversized·key mismatch 거부

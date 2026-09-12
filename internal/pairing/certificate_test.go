@@ -62,6 +62,35 @@ func TestConfirmedCertificatesSupportMutualTLSAndRevocation(t *testing.T) {
 	if _, err := firstSession.FinalizeWithCertificate(secondReceipt, clientCertificate.Certificate[0], firstStore, "second", true, now); err != nil {
 		t.Fatal(err)
 	}
+	// Existing trust does not bypass either confirmation in a new ceremony.
+	offer, err = CreateOffer(first, serverPeer, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondSession, response, err = Accept(offer, second, clientPeer, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstSession, err = Complete(offer, response, first, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	freshReceipt, err := firstSession.Confirm(firstSession.ConfirmationCode(), now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := secondSession.FinalizeWithCertificate(freshReceipt, serverCertificate.Certificate[0], secondStore, "first", true, now); !errors.Is(err, ErrLocalConfirmation) {
+		t.Fatalf("existing trust bypassed local confirmation: %v", err)
+	}
+	if _, err := secondSession.Confirm(secondSession.ConfirmationCode(), now); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := secondSession.FinalizeWithCertificate(firstReceipt, serverCertificate.Certificate[0], secondStore, "first", true, now); !errors.Is(err, ErrRemoteConfirmation) {
+		t.Fatalf("stale receipt accepted: %v", err)
+	}
+	if _, err := secondSession.FinalizeWithCertificate(freshReceipt, serverCertificate.Certificate[0], secondStore, "first", true, now); err != nil {
+		t.Fatalf("fresh reconfirmation: %v", err)
+	}
 	serverLeaf, err := secondStore.PeerCertificate(serverPeer, now)
 	if err != nil {
 		t.Fatal(err)
@@ -107,6 +136,9 @@ func TestConfirmedCertificatesSupportMutualTLSAndRevocation(t *testing.T) {
 	}
 	if _, err := secondStore.PeerCertificate(serverPeer, now.Add(time.Second)); !errors.Is(err, truststore.ErrPeerRevoked) {
 		t.Fatalf("revoked certificate read: %v", err)
+	}
+	if _, err := secondSession.FinalizeWithCertificate(freshReceipt, serverCertificate.Certificate[0], secondStore, "first", true, now.Add(time.Second)); !errors.Is(err, truststore.ErrPeerRevoked) {
+		t.Fatalf("reconfirmation restored revoked trust: %v", err)
 	}
 }
 

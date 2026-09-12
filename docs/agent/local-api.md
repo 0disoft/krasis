@@ -80,8 +80,11 @@ RENEW는 현재 지문 불일치 시 `credential_changed`, 활성 세션은 `act
 성공 코드는 `credential_loaded` 또는 `credential_renewed_repair_required`다. 갱신은 해당 역할의
 로컬 TLS 키/인증서만 원자 교체하며 기기 신원·다른 역할·상대 신뢰를 변경하지 않는다.
 응답 유실 후 이전 지문으로 재시도하면 거부될 수 있으므로 SHOW로 현재 상태를 확인한다.
-연결·페어링과 갱신은 같은 agent lock으로 직렬화한다. 실기기 검증 및 단일 장비 갱신 후 동일
-상대 인증서를 재승인하는 복구 흐름은 별도다.
+연결·페어링과 갱신은 같은 agent lock으로 직렬화한다. 한쪽만 갱신한 경우 변경되지 않은 상대는
+일반 LISTEN/DIAL로 양방향 재확인하며, 바뀐 상대 지문을 보유한 쪽만 fingerprint 교체를 지정한다.
+재확인은 저장된 지문·역할·별칭·inbound 권한·인증서 bytes가 모두 같고 현재 유효할 때만 성공한다.
+성공 코드는 기존 `pairing_completed`이며 revision과 연결 설정은 유지한다. 불일치·철회·누락·손상은
+`pairing_failed`로 종료한다. 자동 재승인, 정책 변경, 부분 실패 자동 복구는 수행하지 않는다.
 
 ## 연결 설정
 

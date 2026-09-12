@@ -35,6 +35,81 @@ func replacementCertificate(t *testing.T, now time.Time) (transport.Authenticate
 	return peer, certificate
 }
 
+func TestReconfirmationPreservesExactExistingGrant(t *testing.T) {
+	now := time.Now().UTC()
+	peer, certificate := replacementCertificate(t, now)
+	for _, scenario := range []string{"same", "alias", "capability", "role", "expired", "revoked", "missing_certificate", "damaged_certificate"} {
+		t.Run(scenario, func(t *testing.T) {
+			store := mustStore(t)
+			original, err := store.ImportWithCertificate(peer, certificate.Certificate[0], "peer", false, now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			profile, err := store.SetConnection("peer", ConnectionSettings{Address: "127.0.0.1:12345", Edge: "LEFT"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if scenario == "revoked" {
+				if _, err := store.Revoke(peer.CertificateSHA256, now); err != nil {
+					t.Fatal(err)
+				}
+			}
+			path := filepath.Join(store.directory, peerCertificateFilename(peer.CertificateSHA256))
+			if scenario == "missing_certificate" {
+				if err := os.Remove(path); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if scenario == "damaged_certificate" {
+				if err := os.WriteFile(path, []byte("damaged"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			before, err := store.List()
+			if err != nil {
+				t.Fatal(err)
+			}
+			alias, allow, at, expected := "peer", false, now, peer
+			switch scenario {
+			case "alias":
+				alias = "different"
+			case "capability":
+				allow = true
+			case "role":
+				expected.Role = transport.AuthenticatedPeerConnector
+			case "expired":
+				at = certificate.Leaf.NotAfter
+			}
+			record, err := store.ReconfirmWithCertificate(expected, certificate.Certificate[0], alias, allow, at)
+			if scenario == "same" {
+				if err != nil || !reflect.DeepEqual(record, original) {
+					t.Fatalf("same grant: %+v %v", record, err)
+				}
+			} else if err == nil {
+				t.Fatal("changed or unavailable grant was accepted")
+			}
+			after, err := store.List()
+			if err != nil || !reflect.DeepEqual(before, after) {
+				t.Fatalf("reconfirmation mutated trust: %v", err)
+			}
+			if scenario != "revoked" {
+				loaded, err := store.Connection("peer")
+				if err != nil || loaded != profile {
+					t.Fatalf("reconfirmation changed profile: %v", err)
+				}
+			}
+			if scenario == "missing_certificate" {
+				if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+					t.Fatal("missing certificate was recreated")
+				}
+			}
+			if _, err := store.ImportWithCertificate(peer, certificate.Certificate[0], "peer", false, now); !errors.Is(err, ErrPeerExists) {
+				t.Fatalf("raw import semantics changed: %v", err)
+			}
+		})
+	}
+}
+
 func TestCertificateReplacementPreservesOldTrustUntilCommit(t *testing.T) {
 	now := time.Now().UTC()
 	old, oldCertificate := replacementCertificate(t, now)

@@ -3,9 +3,11 @@ package residentagent
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"net"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -300,6 +302,12 @@ func waitPairReady(t *testing.T, service *networkPairing) *pairJob {
 }
 
 func TestProductCLIPairsNewDevicesAndPreparedTransportConnects(t *testing.T) {
+	for _, both := range []bool{false, true} {
+		t.Run(map[bool]string{false: "one_sided_renewal", true: "both_sides_renewal"}[both], func(t *testing.T) { productRenewalFlow(t, both) })
+	}
+}
+
+func productRenewalFlow(t *testing.T, both bool) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	first, second := newFlowNode(t, ctx), newFlowNode(t, ctx)
@@ -379,15 +387,25 @@ func TestProductCLIPairsNewDevicesAndPreparedTransportConnects(t *testing.T) {
 		t.Fatal(err)
 	}
 	oldFirst, oldSecond := clientConfig.peer, serverConfig.peer
+	beforeReconfirm, err := first.pairing.trust.List()
+	if err != nil {
+		t.Fatal(err)
+	}
 	flowCLI(t, first, "credential", "renew", "LISTENER", oldFirst.CertificateSHA256)
-	flowCLI(t, second, "credential", "renew", "CONNECTOR", oldSecond.CertificateSHA256)
+	if both {
+		flowCLI(t, second, "credential", "renew", "CONNECTOR", oldSecond.CertificateSHA256)
+	}
 	newListener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer newListener.Close()
 	first.pairing.listen = func(string, string) (net.Listener, error) { return newListener, nil }
-	firstStart = flowCLI(t, first, "pair", "listen", "second", newListener.Addr().String(), "--allow-inbound-control", "--replace", oldSecond.CertificateSHA256)
+	args := []string{"pair", "listen", "second", newListener.Addr().String(), "--allow-inbound-control"}
+	if both {
+		args = append(args, "--replace", oldSecond.CertificateSHA256)
+	}
+	firstStart = flowCLI(t, first, args...)
 	secondStart = flowCLI(t, second, "pair", "dial", "first", newListener.Addr().String(), "--allow-inbound-control", "--replace", oldFirst.CertificateSHA256)
 	firstJob, secondJob = waitPairReady(t, first.pairing), waitPairReady(t, second.pairing)
 	firstStatus = flowCLI(t, first, "pair", "status", firstStart.PairingID)
@@ -407,6 +425,16 @@ func TestProductCLIPairsNewDevicesAndPreparedTransportConnects(t *testing.T) {
 	if flowCLI(t, first, "pair", "status", firstStart.PairingID).Code != "pairing_completed" || flowCLI(t, second, "pair", "status", secondStart.PairingID).Code != "pairing_completed" {
 		t.Fatal("renewal replacement failed")
 	}
+	if !both {
+		after, err := first.pairing.trust.List()
+		if err != nil || !reflect.DeepEqual(beforeReconfirm, after) {
+			t.Fatalf("reconfirmation changed trust: %v", err)
+		}
+		profile, err := first.pairing.trust.Connection("second")
+		if err != nil || profile != serverConfig.profile {
+			t.Fatalf("reconfirmation changed connection: %v", err)
+		}
+	}
 	if _, err := first.pairing.trust.SetConnection("second", serverConfig.profile.ConnectionSettings); err != nil {
 		t.Fatal(err)
 	}
@@ -421,8 +449,26 @@ func TestProductCLIPairsNewDevicesAndPreparedTransportConnects(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if serverConfig.peer == oldSecond || clientConfig.peer == oldFirst {
+	if (both && serverConfig.peer == oldSecond) || (!both && serverConfig.peer != oldSecond) || clientConfig.peer == oldFirst {
 		t.Fatal("renewal reused old peer")
+	}
+	left, right := net.Pipe()
+	defer left.Close()
+	defer right.Close()
+	renewalContext, stopRenewal := context.WithTimeout(ctx, 3*time.Second)
+	defer stopRenewal()
+	renewalServer := make(chan error, 1)
+	go func() {
+		actual, err := transport.AuthenticatePeerContext(renewalContext, tls.Server(left, serverConfig.tls))
+		if err == nil && actual != serverConfig.peer {
+			err = errors.New("wrong renewed connector")
+		}
+		renewalServer <- err
+	}()
+	actual, renewedErr := transport.AuthenticatePeerContext(renewalContext, tls.Client(right, clientConfig.tls))
+	serverErr := <-renewalServer
+	if renewedErr != nil || serverErr != nil || actual != clientConfig.peer {
+		t.Fatalf("renewed TLS: client=%v server=%v", renewedErr, serverErr)
 	}
 	if _, err := second.pairing.trust.PeerCertificate(oldFirst, time.Now()); !errors.Is(err, truststore.ErrPeerRevoked) {
 		t.Fatal("old renewed peer remained trusted")
