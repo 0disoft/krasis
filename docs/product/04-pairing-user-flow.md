@@ -33,6 +33,12 @@
 6. A에서 `krasis connect B`, B에서 `krasis connect A`를 실행한 뒤 `krasis status`로
    확인한다. 종료는 양쪽에서 `krasis disconnect`를 실행한다.
 
+listen/dial에는 `--allow-inbound-control` 또는 `--deny-inbound-control` 중 하나를 반드시 지정한다.
+거부 옵션은 이 장비가 상대에게서 입력을 받는 권한을 false로 저장한다. 상대 장비의 권한을 바꾸거나
+송신 권한을 자동 부여하지 않는다. 양쪽에서 거부하면 TLS 연결은 가능하지만 양쪽 모두 원격 입력을
+받지 않는다. 두 옵션의 동시 사용, 중복 지정과 생략은 usage 오류다. `--replace`는 그 뒤에 붙인다.
+거부 예: `krasis pair listen B A_PRIVATE_IP:PAIR_PORT --deny-inbound-control`.
+
 페어링 전용 TLS 채널은 입력을 전달하지 않는다. 초기 인증서의 신뢰는 양쪽 사용자 코드 확인과
 서명된 receipt로 확정한다. 이후 입력 연결은 인증서 체인·이름·지문을 검사하는 별도 mutual TLS다.
 작업은 5분 뒤 만료하며 실패하면 자동으로 신뢰를 승인하거나 재시도하지 않는다.
@@ -75,8 +81,9 @@ LISTENER 또는 CONNECTOR이며, 지문은 **로컬 show 결과**다. 만료된 
    양쪽을 모두 갱신했다면 양쪽 모두 `--replace 상대_기존_지문`과 connection set이 필요하다.
 
 변경되지 않은 peer에는 `--replace`를 지정하지 않는다. 새 양방향 확인을 생략할 수 없으며, 일반
-페어링의 재확인은 현재 신뢰를 그대로 보존할 뿐 철회된 권한을 복구하지 않는다. 현재 CLI는 inbound
-허용 옵션만 제공하므로 기존 권한이 false라면 이 명령으로 재확인할 수 없다. 다른 peer도 같은 역할 인증서를 신뢰했다면
+페어링의 재확인은 현재 신뢰를 그대로 보존할 뿐 철회된 권한을 복구하지 않는다. 기존 권한이 false면
+`--deny-inbound-control`, true면 `--allow-inbound-control`로 재확인한다. 반대 옵션으로 재확인하여
+기존 권한을 변경할 수는 없다. 다른 peer도 같은 역할 인증서를 신뢰했다면
 그 peer와의 연결도 끊기므로 각 peer의 신뢰를 별도로 교체해야 한다. 응답 유실 시 show로 지문을 다시
 확인한다. 이전 지문으로 재시도해 인증서가 연속 회전하는 것은 차단한다.
 

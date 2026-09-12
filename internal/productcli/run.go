@@ -152,11 +152,11 @@ func dispatchTrust(ctx context.Context, client apiClient, args []string) (any, i
 
 func dispatchPair(ctx context.Context, client apiClient, args []string) (any, int, error) {
 	switch {
-	case len(args) == 6 && (args[0] == "listen" || args[0] == "dial") && args[3] == "--allow-inbound-control" && args[4] == "--replace":
-		allow := true
+	case len(args) == 6 && (args[0] == "listen" || args[0] == "dial") && validInboundOption(args[3]) && args[4] == "--replace":
+		allow := args[3] == "--allow-inbound-control"
 		return operation(client.Pair(ctx, localapi.OperationRequest{PairingAction: strings.ToUpper(args[0]), PeerAlias: args[1], Address: args[2], AllowInboundControl: &allow, Fingerprint: args[5]}))
-	case len(args) == 4 && (args[0] == "listen" || args[0] == "dial") && args[3] == "--allow-inbound-control":
-		allow := true
+	case len(args) == 4 && (args[0] == "listen" || args[0] == "dial") && validInboundOption(args[3]):
+		allow := args[3] == "--allow-inbound-control"
 		return operation(client.Pair(ctx, localapi.OperationRequest{PairingAction: strings.ToUpper(args[0]), PeerAlias: args[1], Address: args[2], AllowInboundControl: &allow}))
 	case len(args) == 2 && args[0] == "status":
 		return operation(client.Pair(ctx, localapi.OperationRequest{PairingAction: "STATUS", PairingID: args[1]}))
@@ -206,7 +206,7 @@ func parseGlobalOptions(args []string) (options, error) {
 			}
 			index++
 			result.controlDir = args[index]
-		case "--allow-inbound-control", "--replace":
+		case "--allow-inbound-control", "--deny-inbound-control", "--replace":
 			result.args = append(result.args, args[index])
 		default:
 			if strings.HasPrefix(args[index], "--") {
@@ -243,11 +243,11 @@ func validateCommandArgs(args []string) error {
 		}
 	case "pair":
 		switch {
-		case len(args) == 7 && (args[1] == "listen" || args[1] == "dial") && validAlias(args[2]) && args[4] == "--allow-inbound-control" && args[5] == "--replace" && validHex(args[6], 64):
+		case len(args) == 7 && (args[1] == "listen" || args[1] == "dial") && validAlias(args[2]) && validInboundOption(args[4]) && args[5] == "--replace" && validHex(args[6], 64):
 			if _, err := parseConnection([]string{"set", args[2], args[3], "LEFT"}); err != nil {
 				return err
 			}
-		case len(args) == 5 && (args[1] == "listen" || args[1] == "dial") && validAlias(args[2]) && args[4] == "--allow-inbound-control":
+		case len(args) == 5 && (args[1] == "listen" || args[1] == "dial") && validAlias(args[2]) && validInboundOption(args[4]):
 			if _, err := parseConnection([]string{"set", args[2], args[3], "LEFT"}); err != nil {
 				return err
 			}
@@ -274,6 +274,10 @@ func validAlias(value string) bool {
 		}
 	}
 	return true
+}
+
+func validInboundOption(value string) bool {
+	return value == "--allow-inbound-control" || value == "--deny-inbound-control"
 }
 
 func validHex(value string, length int) bool {

@@ -79,8 +79,9 @@ func testDependencies(client apiClient) dependencies {
 }
 
 type stubClient struct {
-	status    localapi.Status
-	operation localapi.OperationResult
+	pairRequest localapi.OperationRequest
+	status      localapi.Status
+	operation   localapi.OperationResult
 }
 
 func (client *stubClient) Status(context.Context) (localapi.Status, error) { return client.status, nil }
@@ -99,8 +100,40 @@ func (client *stubClient) Connect(context.Context, string) (localapi.OperationRe
 func (client *stubClient) Disconnect(context.Context) (localapi.OperationResult, error) {
 	return client.operation, nil
 }
-func (client *stubClient) Pair(context.Context, localapi.OperationRequest) (localapi.OperationResult, error) {
+func (client *stubClient) Pair(_ context.Context, request localapi.OperationRequest) (localapi.OperationResult, error) {
+	client.pairRequest = request
 	return client.operation, nil
+}
+
+func TestPairInboundOptionsAreExplicitAndExclusive(t *testing.T) {
+	for _, action := range []string{"listen", "dial"} {
+		for _, option := range []string{"--allow-inbound-control", "--deny-inbound-control"} {
+			for _, replace := range []bool{false, true} {
+				client := &stubClient{operation: localapi.OperationResult{SchemaVersion: localapi.ResultSchemaVersion, Status: "COMPLETED", Code: "pairing_waiting"}}
+				args := []string{"pair", action, "peer", "127.0.0.1:12345", option}
+				if replace {
+					args = append(args, "--replace", strings.Repeat("a", 64))
+				}
+				var out bytes.Buffer
+				if code := run(context.Background(), args, &out, &out, testDependencies(client)); code != ExitOK {
+					t.Fatalf("%v: exit %d", args, code)
+				}
+				request := client.pairRequest
+				if request.PairingAction != strings.ToUpper(action) || request.AllowInboundControl == nil || *request.AllowInboundControl != (option == "--allow-inbound-control") || (request.Fingerprint != "") != replace {
+					t.Fatalf("wrong request: %+v", request)
+				}
+			}
+		}
+	}
+	for _, tail := range [][]string{nil, {"--deny-inbound-control", "--allow-inbound-control"}, {"--allow-inbound-control", "--deny-inbound-control"}, {"--deny-inbound-control", "--deny-inbound-control"}, {"--allow-inbound-control", "--allow-inbound-control"}, {"--deny-inbound-control", "--replace", strings.Repeat("a", 64), "--allow-inbound-control"}} {
+		opened := false
+		deps := dependencies{localAppData: `C:\Users\test\AppData\Local`, openClient: func(string) (apiClient, error) { opened = true; return nil, errors.New("unexpected") }}
+		var out bytes.Buffer
+		args := append([]string{"pair", "listen", "peer", "127.0.0.1:12345"}, tail...)
+		if code := run(context.Background(), args, &out, &out, deps); code != ExitUsage || opened {
+			t.Fatalf("ambiguous options %v: exit=%d opened=%t", args, code, opened)
+		}
+	}
 }
 func (client *stubClient) RevokeTrust(context.Context, string) (localapi.OperationResult, error) {
 	return client.operation, nil

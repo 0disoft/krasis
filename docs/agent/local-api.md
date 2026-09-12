@@ -34,6 +34,10 @@ connection을 제외한 mutation body schema는 `krasis.agent.operation/v1`, 결
 `disconnect`는 추가 field 없이, pair action은 해당 action에 필요한 alias/capability 또는
 pairing ID/code만 허용한다. trust revoke는 lowercase SHA-256 fingerprint 하나만 허용한다.
 pair LISTEN/DIAL은 alias, 명시적 inbound capability와 private/loopback `address`가 필요하다.
+CLI의 `--allow-inbound-control`과 `--deny-inbound-control`은 각각 `allowInboundControl: true`,
+`false`를 전달한다. 둘 중 하나만 지정해야 하며 false는 필드 생략과 다르다. 서버는 기존과 같이
+명시적인 boolean을 요구하고, 재확인 시 저장된 권한과의 정확한 일치를 검사한다. 새 endpoint나
+schema 변경은 없다. 레거시 BEGIN의 지원 범위는 변경하지 않는다.
 STATUS/CANCEL은 pairing ID만, CONFIRM은 pairing ID와 6자리 code만 받는다.
 LISTEN/DIAL의 선택적 `fingerprint`는 사용자가 교체를 승인한 기존 peer의 lowercase SHA-256 지문이다.
 지문을 생략하면 신규 등록이며, 지정하면 작업 생성 시 존재·철회·역할을 확인하고 작업에 고정한다.

@@ -303,11 +303,16 @@ func waitPairReady(t *testing.T, service *networkPairing) *pairJob {
 
 func TestProductCLIPairsNewDevicesAndPreparedTransportConnects(t *testing.T) {
 	for _, both := range []bool{false, true} {
-		t.Run(map[bool]string{false: "one_sided_renewal", true: "both_sides_renewal"}[both], func(t *testing.T) { productRenewalFlow(t, both) })
+		t.Run(map[bool]string{false: "one_sided_renewal", true: "both_sides_renewal"}[both], func(t *testing.T) { productRenewalFlow(t, both, true) })
 	}
+	t.Run("deny_inbound_reconfirmation", func(t *testing.T) { productRenewalFlow(t, false, false) })
 }
 
-func productRenewalFlow(t *testing.T, both bool) {
+func productRenewalFlow(t *testing.T, both, allowInbound bool) {
+	option := "--allow-inbound-control"
+	if !allowInbound {
+		option = "--deny-inbound-control"
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	first, second := newFlowNode(t, ctx), newFlowNode(t, ctx)
@@ -317,8 +322,8 @@ func productRenewalFlow(t *testing.T, both bool) {
 	}
 	defer listener.Close()
 	first.pairing.listen = func(string, string) (net.Listener, error) { return listener, nil }
-	firstStart := flowCLI(t, first, "pair", "listen", "second", listener.Addr().String(), "--allow-inbound-control")
-	secondStart := flowCLI(t, second, "pair", "dial", "first", listener.Addr().String(), "--allow-inbound-control")
+	firstStart := flowCLI(t, first, "pair", "listen", "second", listener.Addr().String(), option)
+	secondStart := flowCLI(t, second, "pair", "dial", "first", listener.Addr().String(), option)
 	firstJob, secondJob := waitPairReady(t, first.pairing), waitPairReady(t, second.pairing)
 	firstStatus := flowCLI(t, first, "pair", "status", firstStart.PairingID)
 	secondStatus := flowCLI(t, second, "pair", "status", secondStart.PairingID)
@@ -391,6 +396,9 @@ func productRenewalFlow(t *testing.T, both bool) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if len(beforeReconfirm.Peers) != 1 || beforeReconfirm.Peers[0].AllowInboundControl != allowInbound {
+		t.Fatal("pairing stored wrong inbound permission")
+	}
 	flowCLI(t, first, "credential", "renew", "LISTENER", oldFirst.CertificateSHA256)
 	if both {
 		flowCLI(t, second, "credential", "renew", "CONNECTOR", oldSecond.CertificateSHA256)
@@ -401,12 +409,12 @@ func productRenewalFlow(t *testing.T, both bool) {
 	}
 	defer newListener.Close()
 	first.pairing.listen = func(string, string) (net.Listener, error) { return newListener, nil }
-	args := []string{"pair", "listen", "second", newListener.Addr().String(), "--allow-inbound-control"}
+	args := []string{"pair", "listen", "second", newListener.Addr().String(), option}
 	if both {
 		args = append(args, "--replace", oldSecond.CertificateSHA256)
 	}
 	firstStart = flowCLI(t, first, args...)
-	secondStart = flowCLI(t, second, "pair", "dial", "first", newListener.Addr().String(), "--allow-inbound-control", "--replace", oldFirst.CertificateSHA256)
+	secondStart = flowCLI(t, second, "pair", "dial", "first", newListener.Addr().String(), option, "--replace", oldFirst.CertificateSHA256)
 	firstJob, secondJob = waitPairReady(t, first.pairing), waitPairReady(t, second.pairing)
 	firstStatus = flowCLI(t, first, "pair", "status", firstStart.PairingID)
 	secondStatus = flowCLI(t, second, "pair", "status", secondStart.PairingID)
@@ -469,6 +477,17 @@ func productRenewalFlow(t *testing.T, both bool) {
 	serverErr := <-renewalServer
 	if renewedErr != nil || serverErr != nil || actual != clientConfig.peer {
 		t.Fatalf("renewed TLS: client=%v server=%v", renewedErr, serverErr)
+	}
+	if !allowInbound {
+		for _, check := range []struct {
+			store *truststore.Store
+			peer  transport.AuthenticatedPeerContext
+		}{{first.pairing.trust, serverConfig.peer}, {second.pairing.trust, clientConfig.peer}} {
+			lease, allowed, err := (productAuthorizer{check.store}).AuthorizeLease(ctx, check.peer, "session", "epoch", time.Now())
+			if err != nil || allowed || lease != "" {
+				t.Fatalf("deny option granted input: allowed=%t err=%v", allowed, err)
+			}
+		}
 	}
 	if _, err := second.pairing.trust.PeerCertificate(oldFirst, time.Now()); !errors.Is(err, truststore.ErrPeerRevoked) {
 		t.Fatal("old renewed peer remained trusted")
