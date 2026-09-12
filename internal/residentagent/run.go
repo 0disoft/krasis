@@ -89,6 +89,7 @@ func run(ctx context.Context, localAppData string, dependencies runDependencies)
 			return err
 		}
 		operations.preflight = func(alias string) error { _, err := prepareProductConnection(identities, trust, alias); return err }
+		operations.credentials = identities
 	}
 	server, err := dependencies.listen(paths.Control, operations)
 	if err != nil {

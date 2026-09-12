@@ -196,6 +196,8 @@ func (handler *handler) ServeHTTP(response http.ResponseWriter, request *http.Re
 		return
 	}
 	switch request.URL.Path {
+	case "/v1/credential":
+		handler.credential(response, request)
 	case "/v1/connection":
 		handler.connection(response, request)
 	case "/v1/status":

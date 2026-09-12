@@ -93,6 +93,8 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, deps depe
 
 func dispatch(ctx context.Context, client apiClient, args []string) (any, int, error) {
 	switch args[0] {
+	case "credential":
+		return dispatchCredential(ctx, client, args[1:])
 	case "connection":
 		return dispatchConnection(ctx, client, args[1:])
 	case "status":
@@ -218,6 +220,9 @@ func parseGlobalOptions(args []string) (options, error) {
 
 func validateCommandArgs(args []string) error {
 	switch args[0] {
+	case "credential":
+		_, err := parseCredential(args[1:])
+		return err
 	case "connection":
 		_, err := parseConnection(args[1:])
 		return err
@@ -323,11 +328,19 @@ func writeUsageError(stderr io.Writer, err error) {
 	if err != nil {
 		fmt.Fprintln(stderr, "usage_error:", err)
 	}
-	fmt.Fprintln(stderr, "usage: krasis [--json] [--control-dir DIR] status|diagnostics|topology|connection|connect|disconnect|pair|trust|safe-stop")
+	fmt.Fprintln(stderr, "usage: krasis [--json] [--control-dir DIR] status|diagnostics|topology|credential|connection|connect|disconnect|pair|trust|safe-stop")
 }
 
 func writeHuman(output io.Writer, value any) {
 	switch item := value.(type) {
+	case localapi.CredentialResult:
+		fmt.Fprintf(output, "%s: %s\n", item.Status, item.Code)
+		if item.Info != nil {
+			fmt.Fprintf(output, "Role: %s\nFingerprint: %s\nExpires: %v\nExpired: %t\n", item.Info.Role, item.Info.Fingerprint, item.Info.NotAfter, item.Info.Expired)
+		}
+		if item.Code == "credential_renewed_repair_required" {
+			fmt.Fprintln(output, "Re-pair with each peer before connecting; remote trust was not changed.")
+		}
 	case localapi.ConnectionResult:
 		fmt.Fprintf(output, "%s: %s\n", item.Status, item.Code)
 		if item.Profile != nil {

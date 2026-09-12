@@ -55,7 +55,28 @@
 지문이 철회되어도 최종 저장은 실패한다. 이 절차는 다른 인증서를 가진 새 peer로 교체하는 기능이며,
 같은 인증서 재승인이나 로컬 인증서 갱신 기능은 아니다. 부분 성공 시 양쪽 trust를 다시 확인한다.
 
-현재 transport 인증서는 30일이며 자동 갱신·교체는 후속 작업이다. heartbeat 250ms,
+### 로컬 인증서 갱신
+
+transport 인증서는 30일이며 자동 갱신하지 않는다. `krasis credential show LISTENER` 또는
+`krasis credential show CONNECTOR`로 현재 지문·역할·만료를 조회한다. 조회는 새 인증서를 만들지 않는다.
+갱신은 `krasis credential renew ROLE EXPECTED_LOCAL_FINGERPRINT`로 실행한다. 여기서 ROLE은
+LISTENER 또는 CONNECTOR이며, 지문은 **로컬 show 결과**다. 만료된 인증서도 갱신할 수 있지만,
+손상되었거나 기기 신원이 바뀐 인증서는 덮어쓰지 않는다. 갱신 뒤 상대 신뢰는 자동 변경되지 않는다.
+
+현재 지원 절차는 양쪽 갱신이다. A가 LISTENER, B가 CONNECTOR라면:
+
+1. 양쪽 연결·페어링을 중지하고 현재 설정과 양쪽 역할의 기존 지문을 기록한다.
+2. A는 LISTENER, B는 CONNECTOR를 각각 위 명령으로 갱신한다.
+3. A는 `pair listen ... --replace B_OLD_FINGERPRINT`, B는
+   `pair dial ... --replace A_OLD_FINGERPRINT`로 재페어링한다. 앞 절의 전체 인자와 양쪽 확인 절차를 따른다.
+4. 양쪽 완료를 확인하고 새 신뢰에 connection set을 다시 실행한 뒤 연결한다.
+
+한쪽만 갱신한 경우 동일 상대 인증서 재등록이 막힐 수 있다. 자동 재승인이나 파일 삭제로 우회하지
+않고 반대쪽도 해당 역할을 갱신한 뒤 위 교체 절차를 따른다. 다른 peer도 같은 역할 인증서를 신뢰했다면
+그 peer와의 연결도 끊기므로 각 peer의 신뢰를 별도로 교체해야 한다. 응답 유실 시 show로 지문을 다시
+확인한다. 이전 지문으로 재시도해 인증서가 연속 회전하는 것은 차단한다.
+
+heartbeat 250ms,
 peer timeout 2초, 화면 복귀 재무장 거리 32px는 초기 설정이며 실기기 지연 보장값이 아니다.
 로컬 테스트는 CLI 페어링과 TLS 연결을 검증하지만 실제 두 PC 입력, secure desktop,
 관리자 권한 앱 동작을 검증한 것은 아니다.

@@ -34,14 +34,15 @@ type trustStore interface {
 }
 
 type Operations struct {
-	root      context.Context
-	stopAgent context.CancelCauseFunc
-	identity  productidentity.PublicIdentity
-	runner    SessionRunner
-	preflight func(string) error
-	pairing   PairWorkflow
-	trust     trustStore
-	now       func() time.Time
+	root        context.Context
+	stopAgent   context.CancelCauseFunc
+	identity    productidentity.PublicIdentity
+	runner      SessionRunner
+	preflight   func(string) error
+	credentials *productidentity.Store
+	pairing     PairWorkflow
+	trust       trustStore
+	now         func() time.Time
 
 	mu             sync.Mutex
 	sessionStop    context.CancelCauseFunc

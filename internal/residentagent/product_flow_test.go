@@ -163,6 +163,7 @@ func newFlowNode(t *testing.T, ctx context.Context) flowNode {
 	if err != nil {
 		t.Fatal(err)
 	}
+	operations.credentials = identities
 	server, err := localapi.Listen(paths.Control, operations)
 	if err != nil {
 		t.Fatal(err)
@@ -183,6 +184,90 @@ func newFlowNode(t *testing.T, ctx context.Context) flowNode {
 		}
 	})
 	return flowNode{pair, operations, paths.Control}
+}
+
+func TestCredentialCLIInspectionRenewalAndGuards(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	node := newFlowNode(t, ctx)
+	client, err := localapi.OpenClient(node.control)
+	if err != nil {
+		t.Fatal(err)
+	}
+	role := transport.AuthenticatedPeerListener
+	request := localapi.CredentialRequest{Action: "SHOW", Role: role}
+	result, err := client.Credential(ctx, request)
+	if err != nil || result.Code != "credential_not_found" {
+		t.Fatalf("empty inspection: %+v %v", result, err)
+	}
+	old, err := node.pairing.identities.OpenTransport(role, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	peer, err := transport.AuthenticatedPeerFromCertificate(old.Leaf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	run := func(wantExit int, args ...string) localapi.CredentialResult {
+		t.Helper()
+		var stdout, stderr bytes.Buffer
+		exit := productcli.Run(ctx, append([]string{"--json", "--control-dir", node.control}, args...), &stdout, &stderr, "unused")
+		if exit != wantExit {
+			t.Fatalf("credential CLI exit=%d stderr=%s stdout=%s", exit, stderr.String(), stdout.String())
+		}
+		if strings.Contains(stdout.String(), "privateKey") || strings.Contains(stdout.String(), "certificate\"") {
+			t.Fatal("credential material in output")
+		}
+		var value localapi.CredentialResult
+		if err := json.Unmarshal(stdout.Bytes(), &value); err != nil {
+			t.Fatal(err)
+		}
+		return value
+	}
+	shown := run(productcli.ExitOK, "credential", "show", "LISTENER")
+	if shown.Info == nil || shown.Info.Fingerprint != peer.CertificateSHA256 {
+		t.Fatal("wrong public metadata")
+	}
+	node.operations.runner = func(ctx context.Context, _ string, _ agent.SupervisorObserver) error { <-ctx.Done(); return ctx.Err() }
+	flowCLI(t, node, "connect", "peer")
+	if result := run(productcli.ExitUnsafeState, "credential", "renew", "LISTENER", peer.CertificateSHA256); result.Code != "active_session_requires_disconnect" {
+		t.Fatalf("active renewal: %+v", result)
+	}
+	flowCLI(t, node, "disconnect")
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	node.pairing.listen = func(string, string) (net.Listener, error) { return listener, nil }
+	started := flowCLI(t, node, "pair", "listen", "peer", listener.Addr().String(), "--allow-inbound-control")
+	if result := run(productcli.ExitUnsafeState, "credential", "renew", "LISTENER", peer.CertificateSHA256); result.Code != "pairing_already_active" {
+		t.Fatalf("pairing renewal: %+v", result)
+	}
+	flowCLI(t, node, "pair", "cancel", started.PairingID)
+	node.pairing.mu.Lock()
+	job := node.pairing.job
+	node.pairing.mu.Unlock()
+	select {
+	case <-job.done:
+	case <-time.After(time.Second):
+		t.Fatal("pair did not stop")
+	}
+	// Expiry is simulated at the agent clock; no wall-clock waiting is required.
+	node.operations.now = func() time.Time { return old.Leaf.NotAfter }
+	if expired := run(productcli.ExitOK, "credential", "show", "LISTENER"); expired.Info == nil || !expired.Info.Expired {
+		t.Fatal("expiry not visible")
+	}
+	renewed := run(productcli.ExitOK, "credential", "renew", "LISTENER", peer.CertificateSHA256)
+	if renewed.Code != "credential_renewed_repair_required" || renewed.Info == nil || renewed.Info.Fingerprint == peer.CertificateSHA256 {
+		t.Fatalf("renewal: %+v", renewed)
+	}
+	if stale := run(productcli.ExitUnsafeState, "credential", "renew", "LISTENER", peer.CertificateSHA256); stale.Code != "credential_changed" {
+		t.Fatalf("stale retry: %+v", stale)
+	}
+	if _, err := node.pairing.trust.List(); !errors.Is(err, truststore.ErrStoreNotFound) {
+		t.Fatalf("renewal granted trust: %v", err)
+	}
 }
 
 func flowCLI(t *testing.T, node flowNode, args ...string) localapi.OperationResult {
@@ -292,6 +377,55 @@ func TestProductCLIPairsNewDevicesAndPreparedTransportConnects(t *testing.T) {
 	conn.Close()
 	if err := <-accepted; err != nil {
 		t.Fatal(err)
+	}
+	oldFirst, oldSecond := clientConfig.peer, serverConfig.peer
+	flowCLI(t, first, "credential", "renew", "LISTENER", oldFirst.CertificateSHA256)
+	flowCLI(t, second, "credential", "renew", "CONNECTOR", oldSecond.CertificateSHA256)
+	newListener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer newListener.Close()
+	first.pairing.listen = func(string, string) (net.Listener, error) { return newListener, nil }
+	firstStart = flowCLI(t, first, "pair", "listen", "second", newListener.Addr().String(), "--allow-inbound-control", "--replace", oldSecond.CertificateSHA256)
+	secondStart = flowCLI(t, second, "pair", "dial", "first", newListener.Addr().String(), "--allow-inbound-control", "--replace", oldFirst.CertificateSHA256)
+	firstJob, secondJob = waitPairReady(t, first.pairing), waitPairReady(t, second.pairing)
+	firstStatus = flowCLI(t, first, "pair", "status", firstStart.PairingID)
+	secondStatus = flowCLI(t, second, "pair", "status", secondStart.PairingID)
+	if firstStatus.Confirmation != secondStatus.Confirmation {
+		t.Fatal("renewal confirmation differs")
+	}
+	flowCLI(t, first, "pair", "confirm", firstStart.PairingID, firstStatus.Confirmation)
+	flowCLI(t, second, "pair", "confirm", secondStart.PairingID, secondStatus.Confirmation)
+	for _, job := range []*pairJob{firstJob, secondJob} {
+		select {
+		case <-job.done:
+		case <-time.After(5 * time.Second):
+			t.Fatal("renewal re-pair did not finish")
+		}
+	}
+	if flowCLI(t, first, "pair", "status", firstStart.PairingID).Code != "pairing_completed" || flowCLI(t, second, "pair", "status", secondStart.PairingID).Code != "pairing_completed" {
+		t.Fatal("renewal replacement failed")
+	}
+	if _, err := first.pairing.trust.SetConnection("second", serverConfig.profile.ConnectionSettings); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := second.pairing.trust.SetConnection("first", clientConfig.profile.ConnectionSettings); err != nil {
+		t.Fatal(err)
+	}
+	serverConfig, err = prepareProductConnection(first.pairing.identities, first.pairing.trust, "second")
+	if err != nil {
+		t.Fatal(err)
+	}
+	clientConfig, err = prepareProductConnection(second.pairing.identities, second.pairing.trust, "first")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if serverConfig.peer == oldSecond || clientConfig.peer == oldFirst {
+		t.Fatal("renewal reused old peer")
+	}
+	if _, err := second.pairing.trust.PeerCertificate(oldFirst, time.Now()); !errors.Is(err, truststore.ErrPeerRevoked) {
+		t.Fatal("old renewed peer remained trusted")
 	}
 	if _, err := second.pairing.trust.Revoke(clientConfig.peer.CertificateSHA256, time.Now()); err != nil {
 		t.Fatal(err)

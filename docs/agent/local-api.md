@@ -20,6 +20,7 @@ clipboard, environment 또는 UI projection에 복제하지 않는다.
 | `GET` | `/v1/status` | identity fingerprint/generation, 연결 lifecycle state, redacted alias, allowed actions |
 | `POST` | `/v1/connect` | configured shared-core session runner 시작 |
 | `POST` | `/v1/connection` | 신뢰된 peer의 연결 설정 저장 또는 조회; 세션 시작과 분리 |
+| `POST` | `/v1/credential` | 역할별 로컬 인증서 공개 정보 조회 또는 예상 지문을 지정한 명시적 갱신 |
 | `POST` | `/v1/disconnect` | active runner cancel과 최대 5초 wait |
 | `POST` | `/v1/pair` | `LISTEN`, `DIAL`, `STATUS`, `CONFIRM`, `CANCEL` product pairing workflow |
 | `GET` | `/v1/diagnostics` | stable code별 aggregate counter와 마지막 state |
@@ -62,6 +63,25 @@ CONNECTED로 표시하며, 입력 제어권 획득을 뜻하지는 않는다. �
 HTTP adapter 자체는 `unauthenticated`, `invalid_request`, `method_not_allowed`, `not_found`,
 `internal_failure`를 반환한다. 제품 CLI는 이를 `docs/cli/output-and-exit-codes.md`의 exit taxonomy에
 매핑한다.
+
+## 로컬 인증서 관리
+
+인증된 `POST /v1/credential`은 `schemaVersion: krasis.agent.credential/v1`, `action: SHOW|RENEW`,
+`role: LISTENER|CONNECTOR`를 받는다. RENEW에는 `expectedFingerprint`가 필수이며 SHOW에는
+허용하지 않는다. 64KiB strict JSON과 기존 bearer 인증을 적용한다.
+
+결과는 같은 schemaVersion, status, code와 성공 시 `info`를 포함한다. info는 fingerprint, role,
+notBefore, notAfter, expired만 포함하며 private key와 certificate bytes는 노출하지 않는다.
+SHOW는 인증서를 생성하지 않고 만료된 인증서도 조회한다. 없으면 `credential_not_found`다.
+RENEW는 현재 지문 불일치 시 `credential_changed`, 활성 세션은 `active_session_requires_disconnect`,
+페어링 중에는 `pairing_already_active`로 거부한다. lock 충돌은 `FAILED/credential_store_busy`,
+손상·신원 불일치 등은 `FAILED/credential_unavailable`이다.
+
+성공 코드는 `credential_loaded` 또는 `credential_renewed_repair_required`다. 갱신은 해당 역할의
+로컬 TLS 키/인증서만 원자 교체하며 기기 신원·다른 역할·상대 신뢰를 변경하지 않는다.
+응답 유실 후 이전 지문으로 재시도하면 거부될 수 있으므로 SHOW로 현재 상태를 확인한다.
+연결·페어링과 갱신은 같은 agent lock으로 직렬화한다. 실기기 검증 및 단일 장비 갱신 후 동일
+상대 인증서를 재승인하는 복구 흐름은 별도다.
 
 ## 연결 설정
 
