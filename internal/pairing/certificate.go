@@ -15,3 +15,13 @@ func (session *Session) FinalizeWithCertificate(remote Receipt, certificateDER [
 	}
 	return store.ImportWithCertificate(session.remote.TransportPeer, certificateDER, alias, allowInboundControl, now.UTC())
 }
+
+// FinalizeReplacementWithCertificate verifies the new peer before replacing the
+// caller-selected old fingerprint. The caller owns selection/approval of the old
+// peer and must stop its active session before invoking this persistence path.
+func (session *Session) FinalizeReplacementWithCertificate(remote Receipt, certificateDER []byte, store *truststore.Store, replacedFingerprint, alias string, allowInboundControl bool, now time.Time) (truststore.PeerRecord, truststore.PeerRecord, error) {
+	if err := session.authorizeFinalize(remote, store, now); err != nil {
+		return truststore.PeerRecord{}, truststore.PeerRecord{}, err
+	}
+	return store.ReplaceWithCertificate(replacedFingerprint, session.remote.TransportPeer, certificateDER, alias, allowInboundControl, now.UTC())
+}

@@ -142,6 +142,10 @@ func (store *Store) Update(fingerprint, alias string, allowInboundControl bool, 
 }
 
 func (store *Store) Replace(fingerprint string, replacement transport.AuthenticatedPeerContext, alias string, allowInboundControl bool, now time.Time) (PeerRecord, PeerRecord, error) {
+	return store.replacePeer(fingerprint, replacement, alias, allowInboundControl, now, nil)
+}
+
+func (store *Store) replacePeer(fingerprint string, replacement transport.AuthenticatedPeerContext, alias string, allowInboundControl bool, now time.Time, prepare func(*securefs.Directory) error) (PeerRecord, PeerRecord, error) {
 	if store == nil {
 		return PeerRecord{}, PeerRecord{}, errors.New("trust store is not initialized")
 	}
@@ -161,7 +165,7 @@ func (store *Store) Replace(fingerprint string, replacement transport.Authentica
 		return PeerRecord{}, PeerRecord{}, errors.New("replacement time is required")
 	}
 	var revoked, added PeerRecord
-	err := store.mutate(false, now.UTC(), func(document *Document) error {
+	err := store.mutatePrepared(false, now.UTC(), func(document *Document) error {
 		oldIndex := -1
 		for index := range document.Peers {
 			record := document.Peers[index]
@@ -190,7 +194,10 @@ func (store *Store) Replace(fingerprint string, replacement transport.Authentica
 		}
 		document.Peers = append(document.Peers, added)
 		return nil
-	})
+	}, prepare)
+	if err != nil {
+		return PeerRecord{}, PeerRecord{}, err
+	}
 	return revoked, added, err
 }
 

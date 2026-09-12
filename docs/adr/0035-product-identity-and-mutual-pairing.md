@@ -68,10 +68,26 @@ transport fingerprint로 고정한다. 대가로 rotation과 transport renewal�
 재검증한다. 인증서 파일이 존재한다는 사실만으로 trust를 부여하지 않는다. 반환한 인증서는 해당 peer의
 명시적 TLS trust anchor로 사용할 수 있다. 전역 CA 설치나 TLS 검증 생략은 하지 않는다.
 
-기존 fingerprint-only Finalize와 trust.json 형식은 유지한다. 제품 network pairing adapter는 새
-FinalizeWithCertificate 경로를 사용해야 하며, 그 adapter와 제품 session runner 연결은 아직 미완료다.
-기존 fingerprint-only peer의 인증서를 자동 가져오거나 갱신하지 않는다. 인증서 포함 replacement
-페어링 연동도 별도 작업으로 남는다.
+기존 fingerprint-only Finalize와 trust.json 형식은 유지한다. 제품 network pairing adapter는
+FinalizeWithCertificate 경로를 사용하며 제품 session runner와 연결되어 있다.
+기존 fingerprint-only peer의 인증서를 자동 가져오거나 갱신하지 않는다.
+
+### 인증서를 포함한 교체 코어
+
+`Session.FinalizeReplacementWithCertificate`는 새 peer의 양쪽 확인과 공개 DER를 검증하고,
+`Store.ReplaceWithCertificate`는 같은 lock 안에서 인증서를 준비한 뒤 기존 지문 철회와 새 지문
+등록을 단일 trust revision으로 기록한다. 기존 peer가 없거나 철회되었거나 새 지문이 이미 등록되어
+있으면 거부한다. 재시도로 철회된 신뢰를 부활시키지 않는다.
+
+인증서 검증·준비 실패 및 최종 trust 교체 전 중단은 이전 trust와 연결 설정을 변경하지 않는다.
+인증서 저장 직후 중단으로 남은 DER는 권한이 없으며 동일한 protected bytes로만 재시도할 수 있다.
+최종 원자 교체 이후의 검증 오류는 이미 commit되었을 수 있으므로, 호출자는 실패를 무조건 rollback으로
+해석하지 않고 현재 trust를 다시 조회해야 한다. 두 장비의 저장을 하나의 transaction으로 보장하지 않는다.
+
+이 코어는 호출자가 선택한 기존 지문을 교체한다. 기존 peer 선택의 사용자 승인과 active session 종료는
+호출자의 책임이며, 새 peer 확인 receipt 자체가 기존 지문 선택을 승인하는 것은 아니다.
+기존 연결 profile은 삭제하거나 새 지문으로 자동 이전하지 않는다. 교체 성공 뒤 새 peer는 별도의 연결
+설정이 필요하다. 인증서 갱신, 교체용 CLI/API와 부분 실패 복구 흐름은 후속 작업이다.
 
 - protected default root 생성, existing insecure root와 reparse-backed directory 거부
 - identity create/load/atomic rotation, corruption·unknown·trailing·oversized·key mismatch 거부

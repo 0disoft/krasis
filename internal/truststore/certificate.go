@@ -29,6 +29,19 @@ func (store *Store) ImportWithCertificate(peer transport.AuthenticatedPeerContex
 	})
 }
 
+// ReplaceWithCertificate requires a mutually confirmed replacement peer and an
+// explicitly selected old fingerprint. It does not transfer connection settings.
+// The certificate is prepared under the store lock before the single trust commit.
+func (store *Store) ReplaceWithCertificate(fingerprint string, replacement transport.AuthenticatedPeerContext, der []byte, alias string, allowInboundControl bool, now time.Time) (PeerRecord, PeerRecord, error) {
+	der = bytes.Clone(der)
+	if _, err := validatePeerCertificate(replacement, der, now); err != nil {
+		return PeerRecord{}, PeerRecord{}, err
+	}
+	return store.replacePeer(fingerprint, replacement, alias, allowInboundControl, now, func(directory *securefs.Directory) error {
+		return persistPeerCertificate(directory, replacement.CertificateSHA256, der)
+	})
+}
+
 // PeerCertificate checks current trust and certificate validity under the same
 // store lock. A cached certificate must not replace this check on reconnect.
 func (store *Store) PeerCertificate(peer transport.AuthenticatedPeerContext, now time.Time) (*x509.Certificate, error) {

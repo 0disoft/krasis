@@ -126,3 +126,67 @@ func certifiedIdentity(t *testing.T, role transport.AuthenticatedPeerRole, now t
 	}
 	return identity, certificate
 }
+
+func TestCertificateReplacementRequiresMutualConfirmation(t *testing.T) {
+	now := time.Now().UTC()
+	_, oldCertificate := certifiedIdentity(t, transport.AuthenticatedPeerListener, now)
+	first, replacement := certifiedIdentity(t, transport.AuthenticatedPeerListener, now)
+	second, local := certifiedIdentity(t, transport.AuthenticatedPeerConnector, now)
+	oldPeer, _ := transport.AuthenticatedPeerFromCertificate(oldCertificate.Leaf)
+	newPeer, _ := transport.AuthenticatedPeerFromCertificate(replacement.Leaf)
+	localPeer, _ := transport.AuthenticatedPeerFromCertificate(local.Leaf)
+	store := testTrustStore(t)
+	if _, err := store.ImportWithCertificate(oldPeer, oldCertificate.Certificate[0], "peer", true, now); err != nil {
+		t.Fatal(err)
+	}
+	offer, err := CreateOffer(first, newPeer, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, response, err := Accept(offer, second, localPeer, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	remote, err := Complete(offer, response, first, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	receipt, err := remote.Confirm(remote.ConfirmationCode(), now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	finalize := func(r Receipt, der []byte, at time.Time) error {
+		_, _, err := session.FinalizeReplacementWithCertificate(r, der, store, oldPeer.CertificateSHA256, "peer", false, at)
+		return err
+	}
+	if err := finalize(receipt, replacement.Certificate[0], now); !errors.Is(err, ErrLocalConfirmation) {
+		t.Fatalf("missing local confirmation: %v", err)
+	}
+	if _, err := session.Confirm(session.ConfirmationCode(), now); err != nil {
+		t.Fatal(err)
+	}
+	if err := finalize(Receipt{}, replacement.Certificate[0], now); !errors.Is(err, ErrRemoteConfirmation) {
+		t.Fatalf("missing receipt: %v", err)
+	}
+	if err := finalize(receipt, replacement.Certificate[0], now.Add(DefaultLifetime+time.Second)); !errors.Is(err, ErrExpired) {
+		t.Fatalf("expired replacement: %v", err)
+	}
+	if err := finalize(receipt, oldCertificate.Certificate[0], now); err == nil {
+		t.Fatal("certificate substitution accepted")
+	}
+	if _, err := store.PeerCertificate(oldPeer, now); err != nil {
+		t.Fatalf("failed confirmation revoked old peer: %v", err)
+	}
+	if err := finalize(receipt, replacement.Certificate[0], now); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.PeerCertificate(oldPeer, now); !errors.Is(err, truststore.ErrPeerRevoked) {
+		t.Fatalf("old peer not revoked: %v", err)
+	}
+	if _, err := store.PeerCertificate(newPeer, now); err != nil {
+		t.Fatalf("new certificate unavailable: %v", err)
+	}
+	if err := finalize(receipt, replacement.Certificate[0], now); !errors.Is(err, truststore.ErrPeerExists) {
+		t.Fatalf("replacement replay: %v", err)
+	}
+}
