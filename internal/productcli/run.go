@@ -150,6 +150,9 @@ func dispatchTrust(ctx context.Context, client apiClient, args []string) (any, i
 
 func dispatchPair(ctx context.Context, client apiClient, args []string) (any, int, error) {
 	switch {
+	case len(args) == 6 && (args[0] == "listen" || args[0] == "dial") && args[3] == "--allow-inbound-control" && args[4] == "--replace":
+		allow := true
+		return operation(client.Pair(ctx, localapi.OperationRequest{PairingAction: strings.ToUpper(args[0]), PeerAlias: args[1], Address: args[2], AllowInboundControl: &allow, Fingerprint: args[5]}))
 	case len(args) == 4 && (args[0] == "listen" || args[0] == "dial") && args[3] == "--allow-inbound-control":
 		allow := true
 		return operation(client.Pair(ctx, localapi.OperationRequest{PairingAction: strings.ToUpper(args[0]), PeerAlias: args[1], Address: args[2], AllowInboundControl: &allow}))
@@ -201,7 +204,7 @@ func parseGlobalOptions(args []string) (options, error) {
 			}
 			index++
 			result.controlDir = args[index]
-		case "--allow-inbound-control":
+		case "--allow-inbound-control", "--replace":
 			result.args = append(result.args, args[index])
 		default:
 			if strings.HasPrefix(args[index], "--") {
@@ -235,6 +238,10 @@ func validateCommandArgs(args []string) error {
 		}
 	case "pair":
 		switch {
+		case len(args) == 7 && (args[1] == "listen" || args[1] == "dial") && validAlias(args[2]) && args[4] == "--allow-inbound-control" && args[5] == "--replace" && validHex(args[6], 64):
+			if _, err := parseConnection([]string{"set", args[2], args[3], "LEFT"}); err != nil {
+				return err
+			}
 		case len(args) == 5 && (args[1] == "listen" || args[1] == "dial") && validAlias(args[2]) && args[4] == "--allow-inbound-control":
 			if _, err := parseConnection([]string{"set", args[2], args[3], "LEFT"}); err != nil {
 				return err

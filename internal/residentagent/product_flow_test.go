@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/productcli"
 	"github.com/0disoft/krasis/internal/productidentity"
+	"github.com/0disoft/krasis/internal/transport"
 	"github.com/0disoft/krasis/internal/truststore"
 )
 
@@ -20,6 +22,126 @@ type flowNode struct {
 	pairing    *networkPairing
 	operations *Operations
 	control    string
+}
+
+func TestReplacementCLIAndFinalRevocationGate(t *testing.T) {
+	for _, revokeDuring := range []bool{false, true} {
+		t.Run(map[bool]string{false: "replace", true: "revoked_during_confirmation"}[revokeDuring], func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			first, second, old := newFlowNode(t, ctx), newFlowNode(t, ctx), newFlowNode(t, ctx)
+			certificate, err := old.pairing.identities.OpenTransport(transport.AuthenticatedPeerConnector, time.Now())
+			if err != nil {
+				t.Fatal(err)
+			}
+			oldPeer, err := transport.AuthenticatedPeerFromCertificate(certificate.Leaf)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := first.pairing.trust.ImportWithCertificate(oldPeer, certificate.Certificate[0], "old", true, time.Now()); err != nil {
+				t.Fatal(err)
+			}
+			client, err := localapi.OpenClient(first.control)
+			if err != nil {
+				t.Fatal(err)
+			}
+			allow := true
+			request := localapi.OperationRequest{PairingAction: "LISTEN", PeerAlias: "new", Address: "127.0.0.1:12345", Fingerprint: oldPeer.CertificateSHA256, AllowInboundControl: &allow}
+			first.operations.runner = func(ctx context.Context, _ string, _ agent.SupervisorObserver) error { <-ctx.Done(); return ctx.Err() }
+			flowCLI(t, first, "connect", "old")
+			if result, err := client.Pair(ctx, request); err != nil || result.Code != "active_session_requires_disconnect" {
+				t.Fatalf("active replacement: %+v %v", result, err)
+			}
+			flowCLI(t, first, "disconnect")
+			invalid := request
+			invalid.Fingerprint = "bad"
+			if _, err := client.Pair(ctx, invalid); err == nil {
+				t.Fatal("API accepted malformed fingerprint")
+			}
+			invalid.Fingerprint = strings.Repeat("0", 64)
+			if result, err := client.Pair(ctx, invalid); err != nil || result.Code != "peer_not_found" {
+				t.Fatalf("unknown target: %+v %v", result, err)
+			}
+			invalid = request
+			invalid.PairingAction = "DIAL"
+			if result, err := client.Pair(ctx, invalid); err != nil || result.Code != "replacement_role_mismatch" {
+				t.Fatalf("wrong role: %+v %v", result, err)
+			}
+			var output bytes.Buffer
+			if exit := productcli.Run(ctx, []string{"--control-dir", first.control, "pair", "listen", "new", "127.0.0.1:12345", "--allow-inbound-control", "--replace", "bad"}, &output, &output, "unused"); exit != productcli.ExitUsage {
+				t.Fatalf("invalid CLI fingerprint exit=%d", exit)
+			}
+			listener, err := net.Listen("tcp", "127.0.0.1:0")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer listener.Close()
+			first.pairing.listen = func(string, string) (net.Listener, error) { return listener, nil }
+			started := flowCLI(t, first, "pair", "listen", "new", listener.Addr().String(), "--allow-inbound-control", "--replace", oldPeer.CertificateSHA256)
+			remote := flowCLI(t, second, "pair", "dial", "first", listener.Addr().String(), "--allow-inbound-control")
+			job, remoteJob := waitPairReady(t, first.pairing), waitPairReady(t, second.pairing)
+			status := flowCLI(t, first, "pair", "status", started.PairingID)
+			if _, err := client.Pair(ctx, localapi.OperationRequest{PairingAction: "CONFIRM", PairingID: started.PairingID, ConfirmationCode: status.Confirmation, Fingerprint: oldPeer.CertificateSHA256}); err == nil {
+				t.Fatal("confirm accepted a replacement target override")
+			}
+			if revokeDuring {
+				if _, err := first.pairing.trust.Revoke(oldPeer.CertificateSHA256, time.Now()); err != nil {
+					t.Fatal(err)
+				}
+			}
+			flowCLI(t, first, "pair", "confirm", started.PairingID, status.Confirmation)
+			if !revokeDuring {
+				if _, err := first.pairing.trust.PeerCertificate(oldPeer, time.Now()); err != nil {
+					t.Fatalf("one-sided confirmation replaced trust: %v", err)
+				}
+			}
+			flowCLI(t, second, "pair", "confirm", remote.PairingID, status.Confirmation)
+			for _, finished := range []*pairJob{job, remoteJob} {
+				select {
+				case <-finished.done:
+				case <-time.After(5 * time.Second):
+					t.Fatal("replacement did not finish")
+				}
+			}
+			result, err := client.Pair(ctx, localapi.OperationRequest{PairingAction: "STATUS", PairingID: started.PairingID})
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := "pairing_completed"
+			if revokeDuring {
+				want = "pairing_failed"
+			}
+			if result.Code != want {
+				t.Fatalf("replacement status=%+v", result)
+			}
+			document, err := first.pairing.trust.List()
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantCount := 2
+			if revokeDuring {
+				wantCount = 1
+			}
+			if len(document.Peers) != wantCount {
+				t.Fatalf("unexpected peers: %d", len(document.Peers))
+			}
+			if _, err := first.pairing.trust.PeerCertificate(oldPeer, time.Now()); !errors.Is(err, truststore.ErrPeerRevoked) {
+				t.Fatalf("old peer not revoked: %v", err)
+			}
+			if result, err := client.Pair(ctx, request); err != nil || result.Code != "peer_already_revoked" {
+				t.Fatalf("revoked target accepted: %+v %v", result, err)
+			}
+			if !revokeDuring {
+				for _, peer := range document.Peers {
+					if peer.RevokedAt == nil {
+						if _, err := first.pairing.trust.PeerCertificate(transport.AuthenticatedPeerContext{CertificateSHA256: peer.Fingerprint, Role: peer.Role}, time.Now()); err != nil {
+							t.Fatal(err)
+						}
+					}
+				}
+			}
+		})
+	}
 }
 
 func newFlowNode(t *testing.T, ctx context.Context) flowNode {

@@ -31,6 +31,7 @@ type networkPairing struct {
 }
 
 type pairJob struct {
+	replacedFingerprint           string
 	id, alias, code, confirmation string
 	allow                         bool
 	cancel                        context.CancelFunc
@@ -94,6 +95,31 @@ func (service *networkPairing) Handle(ctx context.Context, request localapi.Oper
 		if request.PairingAction == "LISTEN" {
 			role = transport.AuthenticatedPeerListener
 		}
+		if request.Fingerprint != "" {
+			document, err := service.trust.List()
+			if err != nil {
+				if errors.Is(err, truststore.ErrStoreNotFound) {
+					return rejected("peer_not_found"), nil
+				}
+				return failed("trust_store_unavailable"), nil
+			}
+			found := false
+			for _, peer := range document.Peers {
+				if peer.Fingerprint != request.Fingerprint {
+					continue
+				}
+				if peer.RevokedAt != nil {
+					return rejected("peer_already_revoked"), nil
+				}
+				if peer.Role == role {
+					return rejected("replacement_role_mismatch"), nil
+				}
+				found = true
+			}
+			if !found {
+				return rejected("peer_not_found"), nil
+			}
+		}
 		identity, err := service.identities.OpenTransport(role, time.Now())
 		if err != nil {
 			return failed("credential_unavailable"), nil
@@ -119,6 +145,7 @@ func (service *networkPairing) Handle(ctx context.Context, request localapi.Oper
 		jobContext, cancel := context.WithTimeout(service.root, pairing.DefaultLifetime)
 		job := &pairJob{id: hex.EncodeToString(id[:]), alias: request.PeerAlias, allow: *request.AllowInboundControl, code: "pairing_waiting", cancel: cancel, done: make(chan struct{}), ready: make(chan struct{}), receipt: make(chan pairing.Receipt, 1)}
 		service.job = job
+		job.replacedFingerprint = request.Fingerprint
 		go service.run(jobContext, job, listener, request.Address, identity, role)
 		return pairResult(job), nil
 	}
@@ -321,7 +348,11 @@ func (service *networkPairing) exchange(ctx context.Context, job *pairJob, liste
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	_, err = session.FinalizeWithCertificate(remote, leaf.Raw, service.trust, job.alias, job.allow, time.Now())
+	if job.replacedFingerprint != "" {
+		_, _, err = session.FinalizeReplacementWithCertificate(remote, leaf.Raw, service.trust, job.replacedFingerprint, job.alias, job.allow, time.Now())
+	} else {
+		_, err = session.FinalizeWithCertificate(remote, leaf.Raw, service.trust, job.alias, job.allow, time.Now())
+	}
 	if err == nil {
 		job.code = "pairing_completed"
 	}

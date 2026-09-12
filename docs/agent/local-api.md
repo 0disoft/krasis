@@ -34,6 +34,12 @@ connection을 제외한 mutation body schema는 `krasis.agent.operation/v1`, 결
 pairing ID/code만 허용한다. trust revoke는 lowercase SHA-256 fingerprint 하나만 허용한다.
 pair LISTEN/DIAL은 alias, 명시적 inbound capability와 private/loopback `address`가 필요하다.
 STATUS/CANCEL은 pairing ID만, CONFIRM은 pairing ID와 6자리 code만 받는다.
+LISTEN/DIAL의 선택적 `fingerprint`는 사용자가 교체를 승인한 기존 peer의 lowercase SHA-256 지문이다.
+지문을 생략하면 신규 등록이며, 지정하면 작업 생성 시 존재·철회·역할을 확인하고 작업에 고정한다.
+CONFIRM에서 교체 대상을 바꿀 수 없다. 활성 입력 세션 중에는 작업 생성과 확인을 거부하며,
+최종 저장 시 기존 지문의 철회 상태를 다시 확인한다. 잘못된 역할은 `replacement_role_mismatch`,
+없는 대상은 `peer_not_found`, 철회된 대상은 `peer_already_revoked`로 거부한다.
+store 조회 실패는 `FAILED/trust_store_unavailable`이며 자동 승인하지 않는다.
 기존 BEGIN 요청은 기본 네트워크 adapter에서 지원하지 않는다.
 
 `status`와 diagnostics는 private key, certificate body, transport address, target token, session·lease·epoch,

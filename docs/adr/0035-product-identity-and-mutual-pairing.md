@@ -87,7 +87,13 @@ FinalizeWithCertificate 경로를 사용하며 제품 session runner와 연결�
 이 코어는 호출자가 선택한 기존 지문을 교체한다. 기존 peer 선택의 사용자 승인과 active session 종료는
 호출자의 책임이며, 새 peer 확인 receipt 자체가 기존 지문 선택을 승인하는 것은 아니다.
 기존 연결 profile은 삭제하거나 새 지문으로 자동 이전하지 않는다. 교체 성공 뒤 새 peer는 별도의 연결
-설정이 필요하다. 인증서 갱신, 교체용 CLI/API와 부분 실패 복구 흐름은 후속 작업이다.
+설정이 필요하다. 인증서 갱신과 부분 실패 복구 흐름은 후속 작업이다.
+
+제품 CLI의 listen/dial `--replace OLD_FINGERPRINT`는 인증된 local API의 `fingerprint`로 전달한다.
+network adapter는 기존 지문이 현재 활성 trust이며 예상 peer 역할인지 확인하고, 5분 작업에 대상을
+고정한다. 입력 세션과 교체 작업은 상호 배제하며, 양쪽 확인 후 위 replacement 코어로 저장한다.
+기존 지문은 새 peer에게 전달하지 않는다. 생성 시 확인은 UX 사전 검사이고, 최종 철회/중복 판정은
+store lock 안에서 다시 수행한다. 생성 후 다른 confirm 요청으로 대상을 변경할 수 없다.
 
 - protected default root 생성, existing insecure root와 reparse-backed directory 거부
 - identity create/load/atomic rotation, corruption·unknown·trailing·oversized·key mismatch 거부

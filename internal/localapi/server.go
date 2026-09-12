@@ -309,7 +309,7 @@ func validateOperationRequest(kind string, value OperationRequest) error {
 	case "pair":
 		switch value.PairingAction {
 		case "LISTEN", "DIAL":
-			if !validAlias(value.PeerAlias) || value.AllowInboundControl == nil || value.PairingID != "" || value.ConfirmationCode != "" || value.Fingerprint != "" || (truststore.ConnectionSettings{Address: value.Address, Edge: "LEFT"}).Validate() != nil {
+			if !validAlias(value.PeerAlias) || value.AllowInboundControl == nil || value.PairingID != "" || value.ConfirmationCode != "" || (value.Fingerprint != "" && !validFingerprint(value.Fingerprint)) || (truststore.ConnectionSettings{Address: value.Address, Edge: "LEFT"}).Validate() != nil {
 				return errors.New("pair network request is invalid")
 			}
 		case "STATUS":
