@@ -6,14 +6,27 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/0disoft/krasis/internal/crashguard"
 	"github.com/0disoft/krasis/internal/residentagent"
+	"github.com/0disoft/krasis/internal/wininput"
 )
 
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "product-crash-guard-internal" {
+		_, err := crashguard.ServeWithResult(os.Stdin, os.Stdout, wininput.NewInputAdapter())
+		if err != nil {
+			os.Exit(1)
+		}
+		return
+	}
+	if len(os.Args) != 1 {
+		fmt.Fprintln(os.Stderr, "invalid agent arguments")
+		os.Exit(2)
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	if err := residentagent.Run(ctx, os.Getenv("LOCALAPPDATA")); err != nil {
-		fmt.Fprintln(os.Stderr, "agent_error:", err)
+		fmt.Fprintln(os.Stderr, "agent_error: resident agent stopped")
 		os.Exit(1)
 	}
 }

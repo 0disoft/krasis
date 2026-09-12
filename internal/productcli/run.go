@@ -150,6 +150,11 @@ func dispatchTrust(ctx context.Context, client apiClient, args []string) (any, i
 
 func dispatchPair(ctx context.Context, client apiClient, args []string) (any, int, error) {
 	switch {
+	case len(args) == 4 && (args[0] == "listen" || args[0] == "dial") && args[3] == "--allow-inbound-control":
+		allow := true
+		return operation(client.Pair(ctx, localapi.OperationRequest{PairingAction: strings.ToUpper(args[0]), PeerAlias: args[1], Address: args[2], AllowInboundControl: &allow}))
+	case len(args) == 2 && args[0] == "status":
+		return operation(client.Pair(ctx, localapi.OperationRequest{PairingAction: "STATUS", PairingID: args[1]}))
 	case len(args) == 3 && args[0] == "begin" && args[2] == "--allow-inbound-control":
 		allow := true
 		return operation(client.Pair(ctx, localapi.OperationRequest{PairingAction: "BEGIN", PeerAlias: args[1], AllowInboundControl: &allow}))
@@ -158,7 +163,7 @@ func dispatchPair(ctx context.Context, client apiClient, args []string) (any, in
 	case len(args) == 2 && args[0] == "cancel":
 		return operation(client.Pair(ctx, localapi.OperationRequest{PairingAction: "CANCEL", PairingID: args[1]}))
 	default:
-		return nil, ExitUsage, usageError("pair requires begin, confirm, or cancel arguments")
+		return nil, ExitUsage, usageError("pair requires listen, dial, status, confirm, or cancel arguments")
 	}
 }
 
@@ -196,6 +201,8 @@ func parseGlobalOptions(args []string) (options, error) {
 			}
 			index++
 			result.controlDir = args[index]
+		case "--allow-inbound-control":
+			result.args = append(result.args, args[index])
 		default:
 			if strings.HasPrefix(args[index], "--") {
 				return options{}, usageError("unknown option")
@@ -228,11 +235,16 @@ func validateCommandArgs(args []string) error {
 		}
 	case "pair":
 		switch {
+		case len(args) == 5 && (args[1] == "listen" || args[1] == "dial") && validAlias(args[2]) && args[4] == "--allow-inbound-control":
+			if _, err := parseConnection([]string{"set", args[2], args[3], "LEFT"}); err != nil {
+				return err
+			}
+		case len(args) == 3 && args[1] == "status" && validHex(args[2], 32):
 		case len(args) == 4 && args[1] == "begin" && validAlias(args[2]) && args[3] == "--allow-inbound-control":
 		case len(args) == 4 && args[1] == "confirm" && validHex(args[2], 32) && validDigits(args[3], 6):
 		case len(args) == 3 && args[1] == "cancel" && validHex(args[2], 32):
 		default:
-			return usageError("pair requires valid begin, confirm, or cancel arguments")
+			return usageError("pair requires valid listen, dial, status, confirm, or cancel arguments")
 		}
 	default:
 		return usageError("unknown command")

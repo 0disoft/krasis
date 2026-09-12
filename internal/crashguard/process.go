@@ -16,6 +16,16 @@ import (
 
 const maxStderrBytes = 4096
 
+// StartProduct uses only the recovery pipe protocol; it writes no probe report.
+func StartProduct(executable string) (*Process, error) {
+	if !filepath.IsAbs(executable) {
+		return nil, errors.New("absolute guard executable required")
+	}
+	command := exec.Command(executable, "product-crash-guard-internal")
+	command.Dir = filepath.Dir(executable)
+	return startCommand(command)
+}
+
 var processIPCTimeout = 2 * time.Second
 
 type Process struct {

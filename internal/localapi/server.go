@@ -6,6 +6,7 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
+	"github.com/0disoft/krasis/internal/truststore"
 	"io"
 	"net"
 	"net/http"
@@ -49,6 +50,7 @@ type OperationRequest struct {
 	ConfirmationCode    string `json:"confirmationCode,omitempty"`
 	AllowInboundControl *bool  `json:"allowInboundControl,omitempty"`
 	Fingerprint         string `json:"fingerprint,omitempty"`
+	Address             string `json:"address,omitempty"`
 }
 
 type OperationResult struct {
@@ -292,6 +294,9 @@ func (handler *handler) operation(response http.ResponseWriter, request *http.Re
 }
 
 func validateOperationRequest(kind string, value OperationRequest) error {
+	if value.Address != "" && (kind != "pair" || (value.PairingAction != "LISTEN" && value.PairingAction != "DIAL")) {
+		return errors.New("unexpected address")
+	}
 	switch kind {
 	case "connect":
 		if !validAlias(value.PeerAlias) || value.PairingAction != "" || value.PairingID != "" || value.ConfirmationCode != "" || value.AllowInboundControl != nil || value.Fingerprint != "" {
@@ -303,6 +308,14 @@ func validateOperationRequest(kind string, value OperationRequest) error {
 		}
 	case "pair":
 		switch value.PairingAction {
+		case "LISTEN", "DIAL":
+			if !validAlias(value.PeerAlias) || value.AllowInboundControl == nil || value.PairingID != "" || value.ConfirmationCode != "" || value.Fingerprint != "" || (truststore.ConnectionSettings{Address: value.Address, Edge: "LEFT"}).Validate() != nil {
+				return errors.New("pair network request is invalid")
+			}
+		case "STATUS":
+			if value.PeerAlias != "" || value.AllowInboundControl != nil || !validPairingID(value.PairingID) || value.ConfirmationCode != "" || value.Fingerprint != "" {
+				return errors.New("pair status request is invalid")
+			}
 		case "BEGIN":
 			if !validAlias(value.PeerAlias) || value.AllowInboundControl == nil || value.PairingID != "" || value.ConfirmationCode != "" || value.Fingerprint != "" {
 				return errors.New("pair begin request is invalid")

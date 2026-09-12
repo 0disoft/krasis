@@ -22,13 +22,14 @@ type apiServer interface {
 }
 
 type runDependencies struct {
-	acquire      func() (instanceLease, error)
-	bootstrap    func(string, time.Time) (productidentity.Paths, *productidentity.Identity, bool, error)
-	startMonitor agentlifecycle.StartMonitor
-	listen       func(string, localapi.Operations) (apiServer, error)
-	runner       SessionRunner
-	pairing      PairWorkflow
-	now          func() time.Time
+	acquire         func() (instanceLease, error)
+	bootstrap       func(string, time.Time) (productidentity.Paths, *productidentity.Identity, bool, error)
+	startMonitor    agentlifecycle.StartMonitor
+	listen          func(string, localapi.Operations) (apiServer, error)
+	runner          SessionRunner
+	pairing         PairWorkflow
+	now             func() time.Time
+	productAdapters bool
 }
 
 func Run(ctx context.Context, localAppData string) error {
@@ -39,7 +40,8 @@ func Run(ctx context.Context, localAppData string) error {
 		listen: func(directory string, operations localapi.Operations) (apiServer, error) {
 			return localapi.Listen(directory, operations)
 		},
-		now: time.Now,
+		now:             time.Now,
+		productAdapters: true,
 	}
 	return run(ctx, localAppData, dependencies)
 }
@@ -69,9 +71,24 @@ func run(ctx context.Context, localAppData string, dependencies runDependencies)
 	if err != nil {
 		return err
 	}
+	if dependencies.productAdapters {
+		identities, err := productidentity.New(paths.Identity)
+		if err != nil {
+			return err
+		}
+		dependencies.pairing = &networkPairing{root: lifecycle.Context(), identity: identity, identities: identities, trust: trust}
+		dependencies.runner = productRunner(identities, trust)
+	}
 	operations, err := New(lifecycle.Context(), identity.Public(), dependencies.runner, dependencies.pairing, trust)
 	if err != nil {
 		return err
+	}
+	if dependencies.productAdapters {
+		identities, err := productidentity.New(paths.Identity)
+		if err != nil {
+			return err
+		}
+		operations.preflight = func(alias string) error { _, err := prepareProductConnection(identities, trust, alias); return err }
 	}
 	server, err := dependencies.listen(paths.Control, operations)
 	if err != nil {

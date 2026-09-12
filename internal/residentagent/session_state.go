@@ -1,6 +1,31 @@
 package residentagent
 
-import "github.com/0disoft/krasis/internal/agent"
+import (
+	"context"
+	"github.com/0disoft/krasis/internal/agent"
+)
+
+type sessionOutcome struct{ failed bool }
+
+func cancellationOnly(err, cause error) bool {
+	if err == nil {
+		return true
+	}
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		for _, child := range joined.Unwrap() {
+			if !cancellationOnly(child, cause) {
+				return false
+			}
+		}
+		return true
+	}
+	if wrapped, ok := err.(interface{ Unwrap() error }); ok {
+		if child := wrapped.Unwrap(); child != nil {
+			return cancellationOnly(child, cause)
+		}
+	}
+	return err == cause || err == context.Canceled || err == context.DeadlineExceeded
+}
 
 // Each observer belongs to exactly one runner generation, identified by its
 // completion channel. Retained callbacks cannot update a later session.

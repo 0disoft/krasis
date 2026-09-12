@@ -14,6 +14,36 @@
 5. 양쪽 signed receipt가 검증된 뒤 각 장비가 상대 transport fingerprint를 자기 trust store에 저장한다.
 6. 연결은 trust 저장 성공 뒤 별도 동작으로 시작한다. pairing 성공이 active control을 자동 시작하지 않는다.
 
+## 현재 CLI 사용 순서
+
+두 Windows 장비에서 resident agent를 실행한 뒤 다음 순서로 진행한다. 아래 `A_PRIVATE_IP`,
+`PAIR_PORT`, `CONTROL_PORT`, `OWN_JOB_ID`, `CODE`는 실제 값으로 바꾼다. 포트는 명시적으로
+선택하며 방화벽 규칙을 자동으로 변경하지 않는다. 현재 한 장비당 활성 화면 하나를 지원한다.
+
+1. A에서 `krasis pair listen B A_PRIVATE_IP:PAIR_PORT --allow-inbound-control`을 실행한다.
+2. B에서 `krasis pair dial A A_PRIVATE_IP:PAIR_PORT --allow-inbound-control`을 실행한다.
+3. 각 장비에서 반환된 **자기 장비의** 작업 ID로 `krasis pair status OWN_JOB_ID`를 조회한다.
+   `confirmation_required`가 되면 양쪽 화면의 6자리 코드를 직접 비교한다.
+4. 코드가 같을 때만 각각 `krasis pair confirm OWN_JOB_ID CODE`를 실행한다.
+   다르면 `krasis pair cancel OWN_JOB_ID`로 중단한다. 코드·작업 ID를 다른 사람에게 전달해
+   대신 승인하게 하지 않는다. 양쪽 status가 `pairing_completed`인지 확인한다.
+5. A에서 `krasis connection set B A_PRIVATE_IP:CONTROL_PORT RIGHT`,
+   B에서 `krasis connection set A A_PRIVATE_IP:CONTROL_PORT LEFT`를 실행한다.
+   예시는 B가 A의 오른쪽에 있는 배치다. A는 수신하고 B는 A에 접속한다.
+6. A에서 `krasis connect B`, B에서 `krasis connect A`를 실행한 뒤 `krasis status`로
+   확인한다. 종료는 양쪽에서 `krasis disconnect`를 실행한다.
+
+페어링 전용 TLS 채널은 입력을 전달하지 않는다. 초기 인증서의 신뢰는 양쪽 사용자 코드 확인과
+서명된 receipt로 확정한다. 이후 입력 연결은 인증서 체인·이름·지문을 검사하는 별도 mutual TLS다.
+작업은 5분 뒤 만료하며 실패하면 자동으로 신뢰를 승인하거나 재시도하지 않는다.
+한쪽 저장만 성공할 수 있으므로 양쪽 결과가 다르면 연결하지 말고 성공한 쪽의 신뢰부터 철회한다.
+같은 인증서의 재등록 및 인증서 포함 교체 복구 CLI는 아직 지원하지 않는다.
+
+현재 transport 인증서는 30일이며 자동 갱신·교체는 후속 작업이다. heartbeat 250ms,
+peer timeout 2초, 화면 복귀 재무장 거리 32px는 초기 설정이며 실기기 지연 보장값이 아니다.
+로컬 테스트는 CLI 페어링과 TLS 연결을 검증하지만 실제 두 PC 입력, secure desktop,
+관리자 권한 앱 동작을 검증한 것은 아니다.
+
 ## 이름과 권한 변경
 
 alias와 inbound-control capability는 active fingerprint를 대상으로 같은 trust revision에서 변경한다.

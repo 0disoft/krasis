@@ -38,17 +38,19 @@ type Operations struct {
 	stopAgent context.CancelCauseFunc
 	identity  productidentity.PublicIdentity
 	runner    SessionRunner
+	preflight func(string) error
 	pairing   PairWorkflow
 	trust     trustStore
 	now       func() time.Time
 
-	mu           sync.Mutex
-	sessionStop  context.CancelCauseFunc
-	sessionDone  chan struct{}
-	sessionState string
-	peerAlias    string
-	lastCode     string
-	counters     map[string]uint64
+	mu             sync.Mutex
+	sessionStop    context.CancelCauseFunc
+	sessionDone    chan struct{}
+	sessionState   string
+	sessionOutcome *sessionOutcome
+	peerAlias      string
+	lastCode       string
+	counters       map[string]uint64
 }
 
 func New(parent context.Context, identity productidentity.PublicIdentity, runner SessionRunner, pairing PairWorkflow, trust trustStore) (*Operations, error) {
@@ -190,6 +192,9 @@ func (operations *Operations) Connect(requestContext context.Context, request lo
 	if requestContext.Err() != nil || operations.root.Err() != nil {
 		return rejected("operation_cancelled"), nil
 	}
+	if workflow, ok := operations.pairing.(interface{ Active() bool }); ok && workflow.Active() {
+		return rejected("pairing_already_active"), nil
+	}
 	if operations.runner == nil {
 		operations.recordLocked("not_configured")
 		return rejected("not_configured"), nil
@@ -198,8 +203,26 @@ func (operations *Operations) Connect(requestContext context.Context, request lo
 		operations.recordLocked("already_active")
 		return rejected("already_active"), nil
 	}
+	if operations.preflight != nil {
+		if err := operations.preflight(request.PeerAlias); err != nil {
+			code := "credential_unavailable"
+			if errors.Is(err, truststore.ErrConnectionNotConfigured) {
+				code = "connection_not_configured"
+			}
+			if errors.Is(err, truststore.ErrPeerNotFound) || errors.Is(err, truststore.ErrStoreNotFound) {
+				code = "peer_not_found"
+			}
+			if errors.Is(err, truststore.ErrAliasAmbiguous) {
+				code = "peer_alias_ambiguous"
+			}
+			operations.recordLocked(code)
+			return rejected(code), nil
+		}
+	}
 	ctx, cancel := context.WithCancelCause(operations.root)
 	done := make(chan struct{})
+	outcome := &sessionOutcome{}
+	operations.sessionOutcome = outcome
 	operations.sessionStop = cancel
 	operations.sessionDone = done
 	operations.sessionState = "CONNECTING"
@@ -208,7 +231,7 @@ func (operations *Operations) Connect(requestContext context.Context, request lo
 	go func(alias string) {
 		defer cancel(nil)
 		err := operations.runner(ctx, alias, &sessionObserver{operations: operations, done: done})
-		operations.finishSession(done, err, ctx.Err() != nil)
+		operations.finishSession(done, outcome, err, ctx.Err() != nil && cancellationOnly(err, context.Cause(ctx)))
 	}(request.PeerAlias)
 	return completed("connect_started"), nil
 }
@@ -219,6 +242,7 @@ func (operations *Operations) Disconnect(ctx context.Context, _ localapi.Operati
 	}
 	operations.mu.Lock()
 	stop, done := operations.sessionStop, operations.sessionDone
+	outcome := operations.sessionOutcome
 	if stop == nil || done == nil {
 		operations.recordLocked("no_active_session")
 		operations.mu.Unlock()
@@ -231,6 +255,9 @@ func (operations *Operations) Disconnect(ctx context.Context, _ localapi.Operati
 	defer cancel()
 	select {
 	case <-done:
+		if outcome != nil && outcome.failed {
+			return failed("session_failed"), nil
+		}
 		operations.mu.Lock()
 		operations.recordLocked("disconnected")
 		operations.mu.Unlock()
@@ -244,10 +271,13 @@ func (operations *Operations) Disconnect(ctx context.Context, _ localapi.Operati
 }
 
 func (operations *Operations) Pair(ctx context.Context, request localapi.OperationRequest) (localapi.OperationResult, error) {
+	operations.mu.Lock()
+	defer operations.mu.Unlock()
+	if operations.sessionDone != nil {
+		return rejected("active_session_requires_disconnect"), nil
+	}
 	if operations.pairing == nil {
-		operations.mu.Lock()
 		operations.recordLocked("not_configured")
-		operations.mu.Unlock()
 		return rejected("not_configured"), nil
 	}
 	return operations.pairing.Handle(ctx, request)
@@ -283,6 +313,11 @@ func (operations *Operations) Close(ctx context.Context) error {
 		return nil
 	}
 	operations.stopAgent(context.Canceled)
+	if workflow, ok := operations.pairing.(interface{ Close(context.Context) error }); ok {
+		if err := workflow.Close(ctx); err != nil {
+			return err
+		}
+	}
 	result, err := operations.Disconnect(ctx, localapi.OperationRequest{})
 	if err != nil {
 		return err
@@ -293,12 +328,14 @@ func (operations *Operations) Close(ctx context.Context) error {
 	return errors.New(result.Code)
 }
 
-func (operations *Operations) finishSession(done chan struct{}, err error, cancelled bool) {
+func (operations *Operations) finishSession(done chan struct{}, outcome *sessionOutcome, err error, cancelled bool) {
 	operations.mu.Lock()
 	defer operations.mu.Unlock()
+	outcome.failed = err != nil && !cancelled
 	if operations.sessionDone == done {
 		operations.sessionStop = nil
 		operations.sessionDone = nil
+		operations.sessionOutcome = nil
 		operations.sessionState = ""
 		operations.peerAlias = ""
 		if err != nil && !cancelled {

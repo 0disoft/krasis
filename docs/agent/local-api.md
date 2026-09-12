@@ -21,7 +21,7 @@ clipboard, environment 또는 UI projection에 복제하지 않는다.
 | `POST` | `/v1/connect` | configured shared-core session runner 시작 |
 | `POST` | `/v1/connection` | 신뢰된 peer의 연결 설정 저장 또는 조회; 세션 시작과 분리 |
 | `POST` | `/v1/disconnect` | active runner cancel과 최대 5초 wait |
-| `POST` | `/v1/pair` | `BEGIN`, `CONFIRM`, `CANCEL` product pairing workflow |
+| `POST` | `/v1/pair` | `LISTEN`, `DIAL`, `STATUS`, `CONFIRM`, `CANCEL` product pairing workflow |
 | `GET` | `/v1/diagnostics` | stable code별 aggregate counter와 마지막 state |
 | `GET` | `/v1/trust` | fingerprint, alias, role, inbound capability와 revoked 상태의 redacted projection |
 | `POST` | `/v1/trust/revoke` | inactive trusted fingerprint의 atomic local revocation |
@@ -32,6 +32,9 @@ connection을 제외한 mutation body schema는 `krasis.agent.operation/v1`, 결
 `krasis.agent.operation-result/v1`이다. 모든 body는 64KiB 이하 strict JSON이다. `connect`는 alias만,
 `disconnect`는 추가 field 없이, pair action은 해당 action에 필요한 alias/capability 또는
 pairing ID/code만 허용한다. trust revoke는 lowercase SHA-256 fingerprint 하나만 허용한다.
+pair LISTEN/DIAL은 alias, 명시적 inbound capability와 private/loopback `address`가 필요하다.
+STATUS/CANCEL은 pairing ID만, CONFIRM은 pairing ID와 6자리 code만 받는다.
+기존 BEGIN 요청은 기본 네트워크 adapter에서 지원하지 않는다.
 
 `status`와 diagnostics는 private key, certificate body, transport address, target token, session·lease·epoch,
 raw input, path와 internal error를 반환하지 않는다. active-lease exact revoke operation은
@@ -77,7 +80,16 @@ profile은 `krasis.connection-profile/v1`이며 `fingerprint`, `address`, `edge`
   `peer_not_found`, `peer_alias_ambiguous`, `active_session_requires_disconnect`다.
   잠금 충돌은 `FAILED/trust_store_busy`다.
 
-설정 저장은 페어링이나 연결 시작을 뜻하지 않는다. 현재 기본 제품 runner와 pairing adapter 연결은
-아직 미완료이며, 설정만 저장해도 connect가 활성화되지는 않는다. topology의 배치 projection 역시
-실행기 연결 전까지 `UNCONFIGURED`를 유지한다. LAN 주소는 이 명시적 설정 조회에만 노출하고
-status와 diagnostics에는 추가하지 않는다.
+설정 저장은 페어링이나 연결 시작을 뜻하지 않는다. 기본 agent는 네트워크 pairing adapter와
+Windows shared-core runner를 사용한다. connect는 설정과 인증서를 먼저 검사하며 누락·만료 시
+`connection_not_configured` 또는 `credential_unavailable`을 반환한다. 입력 세션과 페어링은
+동시에 시작할 수 없다. 종료 중 입력 정리 오류는 `FAILED/session_failed`이며 성공으로 숨기지 않는다.
+topology의 화면 배치 projection은 아직 `UNCONFIGURED`다. LAN 주소는 명시적 설정 조회에만
+노출하고 status와 diagnostics에는 추가하지 않는다.
+
+페어링은 최대 5분, TLS handshake는 최대 5초이며 한 번에 한 작업만 유지한다.
+작업 결과의 `COMPLETED`는 해당 API 요청의 처리를 뜻한다. 페어링 완료 여부는 반드시
+`code: pairing_completed`로 판단한다. 진행 코드는 `pairing_waiting`, `confirmation_required`,
+`confirmation_submitted`이며 종료 코드는 `pairing_completed`, `pairing_cancelled`,
+`pairing_failed`, `pairing_expired`다. 확인 코드 오류는 `confirmation_rejected`와 함께 작업을
+취소한다. 원격 저장까지 원자적으로 보장하지 않으므로 양쪽 STATUS를 확인해야 한다.
