@@ -30,6 +30,26 @@ func TestRunProducesStableJSONAndHumanOutput(t *testing.T) {
 	}
 }
 
+func TestPairRecoveryOutput(t *testing.T) {
+	for _, test := range []struct{ code, hint string }{
+		{"pairing_completed", "Local trust commit succeeded; remote outcome is unknown"},
+		{"pairing_commit_uncertain", "Do not connect or repeat pairing yet"},
+		{"pairing_failed", "existing trust may still exist"},
+		{"pairing_expired", "did not attempt a local trust commit"},
+		{"pairing_cancelled", "remote outcome is unknown"},
+		{"confirmation_submitted", "same local job ID"},
+		{"confirmation_already_submitted", "same local job ID"},
+	} {
+		t.Run(test.code, func(t *testing.T) {
+			var output bytes.Buffer
+			writeHuman(&output, localapi.OperationResult{Status: "FAILED", Code: test.code})
+			if !strings.Contains(output.String(), test.hint) {
+				t.Fatalf("missing recovery hint: %q", output.String())
+			}
+		})
+	}
+}
+
 func TestRunMapsUnavailableAndOperationOutcomes(t *testing.T) {
 	tests := []struct {
 		name string

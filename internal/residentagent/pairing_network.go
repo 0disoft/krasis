@@ -39,6 +39,7 @@ type pairJob struct {
 	ready                         chan struct{}
 	session                       *pairing.Session
 	confirmed                     bool
+	commitAttempted               bool
 	receipt                       chan pairing.Receipt
 }
 
@@ -196,7 +197,7 @@ func (service *networkPairing) Handle(ctx context.Context, request localapi.Oper
 
 func pairResult(job *pairJob) localapi.OperationResult {
 	result := completed(job.code)
-	if job.code == "pairing_failed" || job.code == "pairing_expired" {
+	if job.code == "pairing_failed" || job.code == "pairing_expired" || job.code == "pairing_commit_uncertain" {
 		result.Status = "FAILED"
 	}
 	result.PairingID, result.Confirmation = job.id, job.confirmation
@@ -212,6 +213,11 @@ func (service *networkPairing) run(ctx context.Context, job *pairJob, listener n
 		job.code = "pairing_failed"
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			job.code = "pairing_expired"
+		}
+		// A failed finalizer may have persisted state before returning an error.
+		// Do not report that no trust exists or infer the remote commit outcome.
+		if job.commitAttempted {
+			job.code = "pairing_commit_uncertain"
 		}
 	}
 	job.confirmation = ""
@@ -348,6 +354,7 @@ func (service *networkPairing) exchange(ctx context.Context, job *pairJob, liste
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
+	job.commitAttempted = true
 	if job.replacedFingerprint != "" {
 		_, _, err = session.FinalizeReplacementWithCertificate(remote, leaf.Raw, service.trust, job.replacedFingerprint, job.alias, job.allow, time.Now())
 	} else {

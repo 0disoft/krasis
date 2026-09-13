@@ -53,6 +53,14 @@ raw input, path와 internal error를 반환하지 않는다. active-lease exact 
 
 ## 안정 코드
 
+페어링 결과의 기존 `code` 필드에 `pairing_commit_uncertain`을 추가한다(`status: FAILED`).
+이는 로컬 최종 저장을 호출했지만 오류가 반환되어 영속 결과를 확정할 수 없다는 뜻이다.
+`pairing_failed`, `pairing_expired`, `pairing_cancelled`는 해당 작업의 로컬 최종 저장 미시도이며
+기존 trust 부재를 보장하지 않는다. `pairing_completed`는 로컬 성공만 보장한다. 모든 경우 상대
+저장 결과는 별도로 상대 status를 조회해야 한다. 새 JSON 필드·endpoint·wire 메시지는 추가하지 않는다.
+STATUS는 기존 작업의 결과를 변경하지 않는다. 작업 교체·process 재시작 뒤 `pairing_not_found`는
+저장 실패의 증거가 아니다. 복구 절차는 `docs/product/04-pairing-user-flow.md`를 따른다.
+
 연결 상태는 `LOCAL`, `CONNECTING`, `CONNECTED`, `RECONNECTING`, `DISCONNECTING`이다.
 runner 시작만으로 CONNECTED가 되지 않는다. shared supervisor의 인증된 연결 획득 알림이 있어야
 CONNECTED로 표시하며, 입력 제어권 획득을 뜻하지는 않는다. 재시도 대기와 재접속은 RECONNECTING,

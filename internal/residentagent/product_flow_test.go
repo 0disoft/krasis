@@ -111,10 +111,20 @@ func TestReplacementCLIAndFinalRevocationGate(t *testing.T) {
 			}
 			want := "pairing_completed"
 			if revokeDuring {
-				want = "pairing_failed"
+				want = "pairing_commit_uncertain"
 			}
 			if result.Code != want {
 				t.Fatalf("replacement status=%+v", result)
+			}
+			// Re-read after ignoring the confirm response: status is observational
+			// and must retain the local outcome, including one-sided failure.
+			again, err := client.Pair(ctx, localapi.OperationRequest{PairingAction: "STATUS", PairingID: started.PairingID})
+			if err != nil || again != result {
+				t.Fatalf("repeat status=%+v %v; initial=%+v", again, err, result)
+			}
+			remoteStatus := flowCLI(t, second, "pair", "status", remote.PairingID)
+			if remoteStatus.Code != "pairing_completed" {
+				t.Fatalf("remote local commit=%+v", remoteStatus)
 			}
 			document, err := first.pairing.trust.List()
 			if err != nil {

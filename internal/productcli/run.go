@@ -384,5 +384,15 @@ func writeHuman(output io.Writer, value any) {
 		if item.Confirmation != "" {
 			fmt.Fprintf(output, "Confirmation code: %s\n", item.Confirmation)
 		}
+		switch item.Code {
+		case "pairing_completed":
+			fmt.Fprintln(output, "Local trust commit succeeded; remote outcome is unknown. Check pair status on both devices before connecting.")
+		case "pairing_commit_uncertain":
+			fmt.Fprintln(output, "Local trust commit outcome is uncertain; remote outcome is unknown. Do not connect or repeat pairing yet. Check pair status and trust list on both devices.")
+		case "pairing_failed", "pairing_expired", "pairing_cancelled":
+			fmt.Fprintln(output, "This job did not attempt a local trust commit; existing trust may still exist and the remote outcome is unknown. Check pair status and trust list on both devices before retrying.")
+		case "confirmation_submitted", "confirmation_already_submitted":
+			fmt.Fprintln(output, "Confirmation was submitted, not completed. Query pair status with the same local job ID; do not start a new pairing job.")
+		}
 	}
 }
