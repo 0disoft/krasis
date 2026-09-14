@@ -60,10 +60,23 @@ func (settings ConnectionSettings) Validate() error {
 // SetConnection uses the trust-store lock so alias resolution and persistence
 // cannot race with a trust change. It never grants trust or inbound permission.
 func (store *Store) SetConnection(alias string, settings ConnectionSettings) (ConnectionProfile, error) {
+	return store.setConnection(alias, "", settings, false)
+}
+
+// SetConnectionEdge binds the edit to a device and preserves its address under
+// the same store lock as alias resolution and publication.
+func (store *Store) SetConnectionEdge(alias, fingerprint, edge string) (ConnectionProfile, error) {
+	if validateFingerprint(fingerprint) != nil || (edge != "LEFT" && edge != "RIGHT") {
+		return ConnectionProfile{}, errors.New("invalid edge selection")
+	}
+	return store.setConnection(alias, fingerprint, ConnectionSettings{Edge: edge}, true)
+}
+
+func (store *Store) setConnection(alias, fingerprint string, settings ConnectionSettings, edgeOnly bool) (ConnectionProfile, error) {
 	if store == nil {
 		return ConnectionProfile{}, errors.New("trust store is not initialized")
 	}
-	if err := settings.Validate(); err != nil {
+	if err := settings.Validate(); err != nil && !edgeOnly {
 		return ConnectionProfile{}, err
 	}
 	document, directory, release, err := store.openLocked(false)
@@ -76,8 +89,15 @@ func (store *Store) SetConnection(alias string, settings ConnectionSettings) (Co
 		return ConnectionProfile{}, err
 	}
 	// Refuse to overwrite corrupt existing data as though it were absent.
-	if _, err := readConnection(directory, peer.Fingerprint); err != nil && !errors.Is(err, ErrConnectionNotConfigured) {
+	if edgeOnly && peer.Fingerprint != fingerprint {
+		return ConnectionProfile{}, ErrPeerNotFound
+	}
+	previous, err := readConnection(directory, peer.Fingerprint)
+	if err != nil && (edgeOnly || !errors.Is(err, ErrConnectionNotConfigured)) {
 		return ConnectionProfile{}, err
+	}
+	if edgeOnly {
+		settings.Address = previous.Address
 	}
 	profile := ConnectionProfile{SchemaVersion: ConnectionSchemaVersion, Fingerprint: peer.Fingerprint, ConnectionSettings: settings}
 	data, err := json.Marshal(profile)

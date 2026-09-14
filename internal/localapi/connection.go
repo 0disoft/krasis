@@ -15,6 +15,7 @@ type ConnectionRequest struct {
 	PeerAlias     string `json:"peerAlias"`
 	Address       string `json:"address,omitempty"`
 	Edge          string `json:"edge,omitempty"`
+	Fingerprint   string `json:"fingerprint,omitempty"`
 }
 
 type ConnectionResult struct {
@@ -34,9 +35,11 @@ func (request ConnectionRequest) Valid() bool {
 	}
 	switch request.Action {
 	case "SHOW":
-		return request.Address == "" && request.Edge == ""
+		return request.Address == "" && request.Edge == "" && request.Fingerprint == ""
 	case "SET":
-		return (truststore.ConnectionSettings{Address: request.Address, Edge: request.Edge}).Validate() == nil
+		return request.Fingerprint == "" && (truststore.ConnectionSettings{Address: request.Address, Edge: request.Edge}).Validate() == nil
+	case "SET_EDGE":
+		return request.Address == "" && validFingerprint(request.Fingerprint) && (request.Edge == "LEFT" || request.Edge == "RIGHT")
 	default:
 		return false
 	}

@@ -52,6 +52,31 @@ func TestConnectionPersistsWithoutChangingTrust(t *testing.T) {
 	}
 }
 
+func TestEdgeEditPreservesAddressAndRejectsChangedIdentity(t *testing.T) {
+	store := mustStore(t)
+	peer := testPeer()
+	if _, err := store.Import(peer, "peer", false, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.SetConnectionEdge("peer", peer.CertificateSHA256, "LEFT"); !errors.Is(err, ErrConnectionNotConfigured) {
+		t.Fatal("missing profile created")
+	}
+	settings := ConnectionSettings{Address: "127.0.0.1:4567", Edge: "RIGHT"}
+	if _, err := store.SetConnection("peer", settings); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.SetConnectionEdge("peer", strings.Repeat("b", 64), "LEFT"); err == nil {
+		t.Fatal("changed identity accepted")
+	}
+	profile, err := store.SetConnectionEdge("peer", peer.CertificateSHA256, "LEFT")
+	if err != nil || profile.Address != settings.Address || profile.Edge != "LEFT" {
+		t.Fatalf("edge edit: %+v %v", profile, err)
+	}
+	if _, err := store.SetConnectionEdge("peer", peer.CertificateSHA256, "UP"); err == nil {
+		t.Fatal("invalid edge accepted")
+	}
+}
+
 func TestConnectionRejectsAmbiguityMissingAndCorruption(t *testing.T) {
 	store := mustStore(t)
 	peer, now := testPeer(), time.Now().UTC()

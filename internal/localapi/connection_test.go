@@ -31,6 +31,9 @@ func TestConnectionRouteRejectsUnauthenticatedAndInvalidRequests(t *testing.T) {
 		authenticated bool
 		status        int
 	}{
+		{`{"schemaVersion":"krasis.agent.connection/v1","action":"SET_EDGE","peerAlias":"peer","edge":"LEFT"}`, false, http.StatusUnauthorized},
+		{`{"schemaVersion":"krasis.agent.connection/v1","action":"SET_EDGE","peerAlias":"peer","edge":"LEFT"}`, true, http.StatusBadRequest},
+		{`{"schemaVersion":"krasis.agent.connection/v1","action":"SET_EDGE","peerAlias":"peer","fingerprint":"` + strings.Repeat("a", 64) + `","edge":"LEFT","address":"127.0.0.1:4567"}`, true, http.StatusBadRequest},
 		{`{"schemaVersion":"krasis.agent.connection/v1","action":"SHOW","peerAlias":"peer"}`, false, http.StatusUnauthorized},
 		{`{"schemaVersion":"krasis.agent.connection/v1","action":"SET","peerAlias":"peer","address":"8.8.8.8:1234","edge":"RIGHT"}`, true, http.StatusBadRequest},
 		{`{"schemaVersion":"krasis.agent.connection/v1","action":"SHOW","peerAlias":"peer","allowInboundControl":true}`, true, http.StatusBadRequest},

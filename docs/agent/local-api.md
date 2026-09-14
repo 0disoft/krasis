@@ -117,6 +117,10 @@ RENEW는 현재 지문 불일치 시 `credential_changed`, 활성 세션은 `act
 
 `/v1/connection` 요청은 `schemaVersion: krasis.agent.connection/v1`, `action: SET|SHOW`,
 `peerAlias`를 받는다. SET에는 `address`와 `edge`가 필요하고 SHOW에는 둘 다 허용하지 않는다.
+Generation 5부터 `action: SET_EDGE`도 지원한다. `fingerprint`와 LEFT/RIGHT `edge`를 받고
+`address`는 허용하지 않는다. trust-store 잠금 안에서 fingerprint를 비교하고 기존 주소를
+보존하여 경계만 저장한다. SET_EDGE는 기존 정상 연결 profile이 필요하며, SET과 마찬가지로
+활성 세션 중에는 거부한다. SET/SHOW에는 fingerprint를 허용하지 않는다.
 결과는 같은 schemaVersion과 `status`, `code`, 성공 시 `profile`을 포함한다.
 profile은 `krasis.connection-profile/v1`이며 `fingerprint`, `address`, `edge`를 포함한다.
 

@@ -74,6 +74,15 @@ func TestConnectionCLIThroughAuthenticatedResidentAPI(t *testing.T) {
 			t.Fatalf("CLI %v: %d %s %s", test.args, code, stdout.String(), stderr.String())
 		}
 	}
+	client, err := localapi.OpenClient(paths.Control)
+	if err != nil {
+		t.Fatal(err)
+	}
+	edgeRequest := localapi.ConnectionRequest{Action: "SET_EDGE", PeerAlias: "peer", Fingerprint: strings.Repeat("a", 64), Edge: "LEFT"}
+	edited, err := client.Connection(ctx, edgeRequest)
+	if err != nil || edited.Code != "connection_saved" || edited.Profile == nil || edited.Profile.Edge != "LEFT" || edited.Profile.Address != "192.168.1.2:4567" {
+		t.Fatalf("edge API: %+v %v", edited, err)
+	}
 	if _, err := operations.Connect(ctx, localapi.OperationRequest{PeerAlias: "peer"}); err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +92,12 @@ func TestConnectionCLIThroughAuthenticatedResidentAPI(t *testing.T) {
 		t.Fatalf("active update: %+v %v", result, err)
 	}
 	profile, err := trust.Connection("peer")
-	if err != nil || profile.Edge != "RIGHT" {
+	if err != nil || profile.Edge != "LEFT" {
 		t.Fatalf("active profile changed: %+v %v", profile, err)
+	}
+	edgeRequest.Edge = "RIGHT"
+	blocked, err := client.Connection(ctx, edgeRequest)
+	if err != nil || blocked.Code != "active_session_requires_disconnect" {
+		t.Fatalf("active edge write: %+v %v", blocked, err)
 	}
 }

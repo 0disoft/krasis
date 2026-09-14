@@ -30,13 +30,22 @@ func (operations *Operations) Connection(ctx context.Context, request localapi.C
 	if err := ctx.Err(); err != nil {
 		return result, err
 	}
-	if request.Action == "SET" && operations.sessionDone != nil {
+	if request.Action != "SHOW" && operations.sessionDone != nil {
 		result.Code = "active_session_requires_disconnect"
 		return result, nil
 	}
 	var profile truststore.ConnectionProfile
 	var err error
-	if request.Action == "SET" {
+	if request.Action == "SET_EDGE" {
+		editor, ok := operations.trust.(interface {
+			SetConnectionEdge(string, string, string) (truststore.ConnectionProfile, error)
+		})
+		if !ok {
+			result.Code = "not_configured"
+			return result, nil
+		}
+		profile, err = editor.SetConnectionEdge(request.PeerAlias, request.Fingerprint, request.Edge)
+	} else if request.Action == "SET" {
 		profile, err = store.SetConnection(request.PeerAlias, truststore.ConnectionSettings{Address: request.Address, Edge: request.Edge})
 	} else {
 		profile, err = store.Connection(request.PeerAlias)
@@ -58,7 +67,7 @@ func (operations *Operations) Connection(ctx context.Context, request localapi.C
 		return result, nil
 	}
 	result.Status, result.Code, result.Profile = "COMPLETED", "connection_loaded", &profile
-	if request.Action == "SET" {
+	if request.Action != "SHOW" {
 		result.Code = "connection_saved"
 		operations.recordLocked(result.Code)
 	}
