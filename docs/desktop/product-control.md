@@ -119,6 +119,18 @@ AgentGeneration 8부터 입력 에이전트와 crash guard는 시작 직후 모�
 기대값이다. 양쪽 연결을 해제한 뒤 새 관리 앱을 실행하면 이전 세대의 에이전트를 교체한다.
 실제 두 PC에서 화면 끝 전환과 복귀는 별도로 확인해야 한다.
 
+AgentGeneration 9는 재시도 대기 진입마다 고정된 `reconnect_*` 원인 이벤트를 남긴다.
+`reconnect_acquire_failed`는 연결 획득 실패이며 활성 제어 중 단절과 구분한다.
+`reconnect_remote_eof`는 상대가 스트림을 닫았다는 뜻이지 상대가 정상 종료했다는 증거는 아니다.
+`reconnect_read_io_failure`, `reconnect_*_write_failed`, `reconnect_*_dispatch_failed`는
+읽기, 쓰기, 메시지 처리 실패를 구분한다. capture/focus 관련 코드는 입력 캡처·포커스 단계의 실패다.
+`heartbeat_timeout_observed`는 반환 오류에 하트비트 만료가 포함됐음을 독립적으로 표시한다.
+다른 정리 오류가 주된 원인 코드로 선택돼도 이 표시는 남으며, 원인이 네트워크인지 스케줄링인지까지
+확정하지는 않는다. 알 수 없는 사유는 `reconnect_session_unknown`으로 기록한다.
+로컬 연결 해제 요청은 `disconnect_requested`로 남긴다. 두 PC의 시계가 다를 수 있으므로
+각 장치 내 이벤트 순서를 우선 비교한다. 원문 오류·주소·키 입력은 수집하지 않는다.
+이번 진단 추가는 하트비트 주기, 만료 제한, 재시도 정책을 변경하지 않는다.
+
 에이전트를 켜거나 연결을 바꾸지 않고 저장하므로 오프라인에서도 사용할 수 있다. 없는 로그,
 손상되거나 너무 큰 기록, 쓰기 도중의 마지막 줄은 `incomplete: true`로 표시한다. 이 자료는
 이벤트 이력이며 현재 연결 상태나 완전한 크래시 보고서가 아니다. 기록 시각은 사용 패턴을

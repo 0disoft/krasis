@@ -103,3 +103,23 @@ func TestUnexpectedRunnerErrorIsReportedWithoutRawDetails(t *testing.T) {
 		}
 	})
 }
+
+func TestReconnectReasonCountersIgnoreStaleAndStoppingObservers(t *testing.T) {
+	done := make(chan struct{})
+	o := &Operations{root: context.Background(), sessionDone: done, sessionState: "CONNECTED", counters: map[string]uint64{}}
+	observer := &sessionObserver{operations: o, done: done}
+	snapshot := agent.SupervisorSnapshot{State: agent.SupervisorBackoff, FailureKind: "session", FailureComponent: "peer-reader", FailurePhase: "read", FailureCode: "after_local_interrupt", PeerTimeoutObserved: true}
+	observer.ObserveSupervisor(snapshot)
+	observer.ObserveSupervisor(agent.SupervisorSnapshot{State: agent.SupervisorAcquiring})
+	if o.counters["reconnect_after_local_interrupt"] != 1 || o.counters["heartbeat_timeout_observed"] != 1 {
+		t.Fatal("reason or independent timeout lost")
+	}
+	o.sessionDone = make(chan struct{})
+	observer.ObserveSupervisor(snapshot)
+	o.sessionDone = done
+	o.sessionState = "DISCONNECTING"
+	observer.ObserveSupervisor(snapshot)
+	if o.counters["reconnect_after_local_interrupt"] != 1 || o.counters["heartbeat_timeout_observed"] != 1 {
+		t.Fatal("stale or stopping observer recorded a retry")
+	}
+}

@@ -250,6 +250,7 @@ func (operations *Operations) Disconnect(ctx context.Context, _ localapi.Operati
 		return rejected("no_active_session"), nil
 	}
 	operations.sessionState = "DISCONNECTING"
+	operations.log.Event("disconnect_requested")
 	stop(errors.New("local disconnect requested"))
 	operations.mu.Unlock()
 	shutdown, cancel := context.WithTimeout(ctx, DefaultSessionStopTimeout)

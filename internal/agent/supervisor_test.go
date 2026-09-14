@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/peer"
 	"github.com/0disoft/krasis/internal/transport"
 	"github.com/0disoft/krasis/internal/wininput"
 )
@@ -129,6 +130,43 @@ func TestRunSupervisorReportsStableSessionFailureComponent(t *testing.T) {
 		if snapshot.FailureKind == "session" {
 			found = true
 			if snapshot.FailureComponent != "peer-liveness" {
+				t.Fatalf("failure snapshot = %+v", snapshot)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("session failure snapshot missing: %+v", snapshots)
+	}
+}
+
+func TestRunSupervisorPreservesTimeoutAlongsideReadCleanup(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	observer := &recordingSupervisorObserver{}
+	err := RunSupervisor(ctx, SupervisorConfig{
+		Session: Config{QueueCapacity: 1, Now: time.Now},
+		Backoff: BackoffPolicy{Initial: time.Millisecond, Maximum: time.Millisecond, StableAfter: time.Second},
+		Now:     time.Now,
+		Wait: func(context.Context, time.Duration) error {
+			cancel()
+			return context.Canceled
+		},
+		Observer: observer,
+	}, SupervisorDependencies{
+		Source: &scriptedSource{outcomes: []sourceOutcome{{connection: &stubConnection{}}}},
+		Hook:   &idleHook{}, Input: newTestInput(false), Effects: noopEffects{}, Authorizer: acceptingAuthorizer{},
+		RunSession: func(context.Context, Config, Dependencies) (Result, error) {
+			return Result{FinalState: control.StateLocal}, errors.Join(peer.ErrPeerLivenessExpired, peer.ErrPeerReadAfterLocalInterrupt, errors.New("private details"))
+		},
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("RunSupervisor() error = %v", err)
+	}
+	snapshots := observer.snapshotsCopy()
+	found := false
+	for _, snapshot := range snapshots {
+		if snapshot.FailureKind == "session" {
+			found = true
+			if snapshot.FailureCode != "after_local_interrupt" || !snapshot.PeerTimeoutObserved {
 				t.Fatalf("failure snapshot = %+v", snapshot)
 			}
 		}

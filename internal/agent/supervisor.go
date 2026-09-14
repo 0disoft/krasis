@@ -82,6 +82,8 @@ type SupervisorSnapshot struct {
 	FailureComponent string
 	FailurePhase     string
 	FailureCode      string
+	// Independent of the primary descriptor: cleanup/read errors may coexist.
+	PeerTimeoutObserved bool
 }
 
 type BackoffPolicy struct {
@@ -241,9 +243,10 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 		failure := DescribeSessionFailure(sessionErr)
 		if err := transition(SupervisorSessionFailed, SupervisorSnapshot{
 			Attempt: attempt, RetryAfter: delay, FailureKind: "session",
-			FailureComponent: failure.Component,
-			FailurePhase:     failure.Phase,
-			FailureCode:      failure.Code,
+			FailureComponent:    failure.Component,
+			FailurePhase:        failure.Phase,
+			FailureCode:         failure.Code,
+			PeerTimeoutObserved: errors.Is(sessionErr, peer.ErrPeerLivenessExpired),
 		}); err != nil {
 			return err
 		}

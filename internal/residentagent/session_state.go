@@ -3,6 +3,7 @@ package residentagent
 import (
 	"context"
 	"github.com/0disoft/krasis/internal/agent"
+	"github.com/0disoft/krasis/internal/productlog"
 )
 
 type sessionOutcome struct{ failed bool }
@@ -52,6 +53,13 @@ func (observer *sessionObserver) ObserveSupervisor(snapshot agent.SupervisorSnap
 	case agent.SupervisorActive:
 		state = "CONNECTED"
 	case agent.SupervisorBackoff:
+		reason := productlog.ReconnectCode(snapshot.FailureKind, snapshot.FailureComponent, snapshot.FailurePhase, snapshot.FailureCode)
+		operations.log.Event(reason)
+		operations.counters[reason]++
+		if snapshot.PeerTimeoutObserved {
+			operations.log.Event("heartbeat_timeout_observed")
+			operations.counters["heartbeat_timeout_observed"]++
+		}
 		observer.retrying = true
 		state = "RECONNECTING"
 	case agent.SupervisorStopped:
