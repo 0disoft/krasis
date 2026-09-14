@@ -27,6 +27,8 @@ const exportEvent = wmUIEvent + 2
 const wmTimer = 0x0113
 
 type productWindow struct {
+	trayReady, trayMenuOpen, quitRequested                    bool
+	taskbarCreated                                            uint32
 	exportButton, exportPath                                  uintptr
 	exportResults                                             chan string
 	revoke                                                    uintptr
@@ -84,6 +86,10 @@ func RunProductControl() (resultErr error) {
 	}
 	procShowWindow.Call(hwnd, swShow)
 	procUpdateWindow.Call(hwnd)
+	messageID, _, _ := user32.NewProc("RegisterWindowMessageW").Call(uintptr(unsafe.Pointer(utf16("TaskbarCreated"))))
+	app.taskbarCreated = uint32(messageID)
+	app.installTray()
+	defer app.removeTray()
 	app.perform("prepare")
 	user32.NewProc("SetTimer").Call(hwnd, 1, 2000, 0)
 	var msg message
@@ -109,7 +115,23 @@ func productWindowProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr
 		value, _, _ := procDefWindowProc.Call(hwnd, uintptr(msg), wParam, lParam)
 		return value
 	}
+	if a.taskbarCreated != 0 && msg == a.taskbarCreated && !a.closing {
+		a.removeTray()
+		a.installTray()
+		return 0
+	}
 	switch msg {
+	case trayEvent:
+		if a.closing {
+			return 0
+		}
+		switch uint32(lParam & 0xffff) {
+		case 0x400, 0x401:
+			a.showControl() // NIN_SELECT / NIN_KEYSELECT
+		case 0x007B:
+			a.trayMenu() // WM_CONTEXTMENU
+		}
+		return 0
 	case wmCreate:
 		a.hwnd = hwnd
 		if !a.create() {
@@ -141,7 +163,7 @@ func productWindowProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr
 		}
 		return 0
 	case wmTimer:
-		if !a.busy && !a.closing {
+		if !a.busy && !a.closing && !a.trayMenuOpen {
 			if a.pin.job != "" {
 				a.performPIN("status")
 			} else {
@@ -189,6 +211,17 @@ func productWindowProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr
 		}
 		return 0
 	case wmClose:
+		if a.trayMenuOpen {
+			return 0
+		}
+		if !a.quitRequested && a.trayReady {
+			if a.busy || a.pin.job != "" {
+				setText(a.notice, "진행 중인 작업이나 기기 등록을 완료 또는 취소한 뒤 창을 닫으세요.")
+			} else {
+				procShowWindow.Call(hwnd, 0)
+			}
+			return 0
+		}
 		if a.pin.job != "" && !a.busy {
 			a.performPIN("cancel")
 			a.closing = true
@@ -201,6 +234,7 @@ func productWindowProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr
 		}
 		return 0
 	case wmDestroy:
+		a.removeTray()
 		procPostQuitMessage.Call(0)
 		return 0
 	}
@@ -222,7 +256,7 @@ func (a *productWindow) create() bool {
 	a.refresh = control("BUTTON", "새로고침", wsTabStop, 390, 100, 175, 35, productRefresh)
 	a.status = control("STATIC", "상태 확인 중…", 0, 20, 150, 545, 22, 0)
 	a.notice = control("STATIC", "", 0, 20, 177, 545, 38, 0)
-	control("STATIC", "창을 닫아도 연결은 유지됩니다.\n중지하려면 연결 해제를 누르세요.", 0, 20, 222, 355, 46, 0)
+	control("STATIC", "창을 닫으면 트레이에 남습니다.\n중지하려면 연결 해제를 누르세요.", 0, 20, 222, 355, 46, 0)
 	a.revoke = control("BUTTON", "기기 등록 해제", wsTabStop, 390, 226, 175, 30, productRevoke)
 	a.createPIN(control)
 	a.exportResults = make(chan string, 1)
@@ -330,6 +364,7 @@ func (a *productWindow) performTarget(action, alias string) {
 func (a *productWindow) apply(view productpanel.View) {
 	selected := a.selected()
 	a.view = view
+	a.updateTray()
 	send(a.peers, 0x014B, 0, 0) // CB_RESETCONTENT
 	index := 0
 	for i, alias := range view.Peers {
