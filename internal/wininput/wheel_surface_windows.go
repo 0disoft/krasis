@@ -361,7 +361,7 @@ func sendWheelSurfaceSentinelPulse() (uint64, uint64, error) {
 	requested := uint64(len(events))
 	sent, _, callErr := callSendInput(
 		uintptr(len(events)),
-		uintptr(unsafe.Pointer(&events[0])),
+		&events[0],
 		unsafe.Sizeof(input{}),
 	)
 	inserted := uint64(sent)

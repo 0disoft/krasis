@@ -79,14 +79,14 @@ func TestWheelSurfaceRawWheelParsingPreservesSignedTotalsAndZeroDevicePackets(t 
 func TestSendWheelSurfaceSentinelUsesTinyBalancedTaggedMoveEvents(t *testing.T) {
 	previous := callSendInput
 	t.Cleanup(func() { callSendInput = previous })
-	callSendInput = func(count, inputs, size uintptr) (uintptr, uintptr, error) {
+	callSendInput = func(count uintptr, inputs *input, size uintptr) (uintptr, uintptr, error) {
 		if count != wheelSurfaceSentinelEventsPerPulse {
 			t.Fatalf("SendInput count=%d", count)
 		}
 		if size != unsafe.Sizeof(input{}) {
 			t.Fatalf("SendInput size=%d want=%d", size, unsafe.Sizeof(input{}))
 		}
-		events := unsafe.Slice((*input)(unsafe.Pointer(inputs)), int(count))
+		events := unsafe.Slice(inputs, int(count))
 		if events[0].Type != inputMouse || events[1].Type != inputMouse {
 			t.Fatalf("event types = %d,%d", events[0].Type, events[1].Type)
 		}
@@ -113,7 +113,7 @@ func TestSendWheelSurfaceSentinelRejectsPartialAndImpossibleInsertion(t *testing
 	t.Cleanup(func() { callSendInput = previous })
 
 	for _, inserted := range []uintptr{0, 1, 3} {
-		callSendInput = func(uintptr, uintptr, uintptr) (uintptr, uintptr, error) {
+		callSendInput = func(uintptr, *input, uintptr) (uintptr, uintptr, error) {
 			return inserted, 0, errors.New("sentinel insertion failed")
 		}
 		requested, got, err := sendWheelSurfaceSentinelPulse()

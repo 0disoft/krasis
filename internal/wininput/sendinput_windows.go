@@ -39,8 +39,8 @@ const (
 
 var procSendInput = user32.NewProc("SendInput")
 
-var callSendInput = func(count, inputs, size uintptr) (uintptr, uintptr, error) {
-	return procSendInput.Call(count, inputs, size)
+var callSendInput = func(count uintptr, inputs *input, size uintptr) (uintptr, uintptr, error) {
+	return procSendInput.Call(count, uintptr(unsafe.Pointer(inputs)), size)
 }
 
 type mouseInput struct {
@@ -107,7 +107,7 @@ func sendInputs(ctx context.Context, events []input) error {
 	}
 	sent, _, callErr := callSendInput(
 		uintptr(len(events)),
-		uintptr(unsafe.Pointer(&events[0])),
+		&events[0],
 		unsafe.Sizeof(input{}),
 	)
 	inserted := int(sent)

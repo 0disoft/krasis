@@ -6,13 +6,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"unsafe"
 
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
 )
 
 var (
-	callGetCursorPos = procGetCursorPos.Call
+	// Keep the Go/test boundary typed. Convert only at the real syscall call,
+	// where the compiler can preserve the pointer for the duration of the call.
+	callGetCursorPos = func(position *point) (uintptr, uintptr, error) {
+		return procGetCursorPos.Call(uintptr(unsafe.Pointer(position)))
+	}
 	callSetCursorPos = procSetCursorPos.Call
 )
 

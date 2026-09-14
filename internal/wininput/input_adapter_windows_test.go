@@ -67,7 +67,7 @@ func TestWheelEventsKeepVerticalThenHorizontalOrder(t *testing.T) {
 func TestSendInputsRejectsCanceledContextWithoutCallingWindows(t *testing.T) {
 	original := callSendInput
 	called := false
-	callSendInput = func(uintptr, uintptr, uintptr) (uintptr, uintptr, error) {
+	callSendInput = func(uintptr, *input, uintptr) (uintptr, uintptr, error) {
 		called = true
 		return 1, 0, nil
 	}
@@ -83,7 +83,7 @@ func TestSendInputsRejectsCanceledContextWithoutCallingWindows(t *testing.T) {
 
 func TestSendInputsRejectsPartialInjection(t *testing.T) {
 	original := callSendInput
-	callSendInput = func(uintptr, uintptr, uintptr) (uintptr, uintptr, error) {
+	callSendInput = func(uintptr, *input, uintptr) (uintptr, uintptr, error) {
 		return 1, 0, errors.New("partial")
 	}
 	t.Cleanup(func() { callSendInput = original })
@@ -102,7 +102,7 @@ func TestSendInputsClassifiesZeroAndImpossibleCounts(t *testing.T) {
 	t.Cleanup(func() { callSendInput = original })
 	events := []input{mouseEvent(mouseEventMove, 0, 1, 0)}
 
-	callSendInput = func(uintptr, uintptr, uintptr) (uintptr, uintptr, error) {
+	callSendInput = func(uintptr, *input, uintptr) (uintptr, uintptr, error) {
 		return 0, 0, errors.New("blocked")
 	}
 	err := sendInputs(context.Background(), events)
@@ -111,7 +111,7 @@ func TestSendInputsClassifiesZeroAndImpossibleCounts(t *testing.T) {
 		t.Fatalf("zero insertion certainty = %q, classified=%t, error=%v", certainty, classified, err)
 	}
 
-	callSendInput = func(uintptr, uintptr, uintptr) (uintptr, uintptr, error) {
+	callSendInput = func(uintptr, *input, uintptr) (uintptr, uintptr, error) {
 		return 2, 0, errors.New("invalid count")
 	}
 	err = sendInputs(context.Background(), events)
@@ -124,7 +124,7 @@ func TestSendInputsClassifiesZeroAndImpossibleCounts(t *testing.T) {
 func TestInputAdapterRejectsInvalidTokensBeforeCallingWindows(t *testing.T) {
 	original := callSendInput
 	called := false
-	callSendInput = func(uintptr, uintptr, uintptr) (uintptr, uintptr, error) {
+	callSendInput = func(uintptr, *input, uintptr) (uintptr, uintptr, error) {
 		called = true
 		return 1, 0, nil
 	}
@@ -155,8 +155,7 @@ func TestInputAdapterEntryCallsSetCursorPosInsideOppositeEdge(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cursorEntryPoint() error = %v", err)
 	}
-	callGetCursorPos = func(args ...uintptr) (uintptr, uintptr, error) {
-		position := (*point)(unsafe.Pointer(args[0]))
+	callGetCursorPos = func(position *point) (uintptr, uintptr, error) {
 		if getCalls == 0 {
 			position.X, position.Y = 100, 200
 		} else {
@@ -199,8 +198,7 @@ func TestInputAdapterEntryRejectsClippedCursor(t *testing.T) {
 	originalSet := callSetCursorPos
 	callSetCursorPos = func(...uintptr) (uintptr, uintptr, error) { return 1, 0, nil }
 	getCalls := 0
-	callGetCursorPos = func(args ...uintptr) (uintptr, uintptr, error) {
-		position := (*point)(unsafe.Pointer(args[0]))
+	callGetCursorPos = func(position *point) (uintptr, uintptr, error) {
 		if getCalls == 0 {
 			position.X, position.Y = 100, 200
 		} else {
@@ -249,8 +247,7 @@ func TestInputAdapterRollbackRestoresOnlyOwnedEntryPosition(t *testing.T) {
 				current = point{X: entryX, Y: entryY}
 			}
 			getCalls := 0
-			callGetCursorPos = func(args ...uintptr) (uintptr, uintptr, error) {
-				position := (*point)(unsafe.Pointer(args[0]))
+			callGetCursorPos = func(position *point) (uintptr, uintptr, error) {
 				switch getCalls {
 				case 0:
 					*position = before
@@ -295,8 +292,7 @@ func TestInputAdapterCommitPreventsRollback(t *testing.T) {
 	originalGet := callGetCursorPos
 	originalSet := callSetCursorPos
 	getCalls := 0
-	callGetCursorPos = func(args ...uintptr) (uintptr, uintptr, error) {
-		position := (*point)(unsafe.Pointer(args[0]))
+	callGetCursorPos = func(position *point) (uintptr, uintptr, error) {
 		if getCalls == 0 {
 			position.X, position.Y = 100, 200
 		} else {
@@ -337,9 +333,8 @@ func TestInputAdapterRollbackRefusesUnknownEntryPosition(t *testing.T) {
 	originalGet := callGetCursorPos
 	originalSet := callSetCursorPos
 	getCalls := 0
-	callGetCursorPos = func(args ...uintptr) (uintptr, uintptr, error) {
+	callGetCursorPos = func(position *point) (uintptr, uintptr, error) {
 		if getCalls == 0 {
-			position := (*point)(unsafe.Pointer(args[0]))
 			position.X, position.Y = 100, 200
 			getCalls++
 			return 1, 0, nil
@@ -370,12 +365,11 @@ func TestInputAdapterRollbackRefusesUnknownEntryPosition(t *testing.T) {
 func TestInputAdapterMoveEmitsArmedReturnIntent(t *testing.T) {
 	originalGet := callGetCursorPos
 	originalSend := callSendInput
-	callSendInput = func(uintptr, uintptr, uintptr) (uintptr, uintptr, error) { return 1, 0, nil }
+	callSendInput = func(uintptr, *input, uintptr) (uintptr, uintptr, error) { return 1, 0, nil }
 	left := systemMetric(smXVIRTUALSCREEN)
 	positions := []int32{left + defaultReturnRearmDistance, left}
 	positionIndex := 0
-	callGetCursorPos = func(args ...uintptr) (uintptr, uintptr, error) {
-		position := (*point)(unsafe.Pointer(args[0]))
+	callGetCursorPos = func(position *point) (uintptr, uintptr, error) {
 		position.X = positions[positionIndex]
 		positionIndex++
 		return 1, 0, nil

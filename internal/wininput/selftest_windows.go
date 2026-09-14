@@ -160,7 +160,7 @@ func sendTaggedRelativeMoves() (uint32, bool, error) {
 
 func cursorPosition() (point, error) {
 	var position point
-	result, _, callErr := callGetCursorPos(uintptr(unsafe.Pointer(&position)))
+	result, _, callErr := callGetCursorPos(&position)
 	if result == 0 {
 		return point{}, fmt.Errorf("GetCursorPos failed: %w", callErr)
 	}
