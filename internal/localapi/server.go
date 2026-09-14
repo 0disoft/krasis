@@ -309,6 +309,21 @@ func (handler *handler) operation(response http.ResponseWriter, request *http.Re
 }
 
 func validateOperationRequest(kind string, value OperationRequest) error {
+	if kind == "pair" && (value.PairingAction == "PIN_LISTEN" || value.PairingAction == "PIN_DIAL") {
+		if !validAlias(value.PeerAlias+"-00000000") || value.AllowInboundControl == nil || value.Fingerprint != "" {
+			return errors.New("invalid PIN request")
+		}
+		if value.PairingAction == "PIN_LISTEN" {
+			if value.Address != "" || value.PairingID != "" || value.ConfirmationCode != "" {
+				return errors.New("invalid invitation")
+			}
+			return nil
+		}
+		if !validConfirmationCode(value.ConfirmationCode) || !validPairingID(value.PairingID) || (truststore.ConnectionSettings{Address: value.Address, Edge: "LEFT"}).Validate() != nil {
+			return errors.New("invalid PIN join")
+		}
+		return nil
+	}
 	if value.Address != "" && (kind != "pair" || (value.PairingAction != "LISTEN" && value.PairingAction != "DIAL")) {
 		return errors.New("unexpected address")
 	}

@@ -151,6 +151,11 @@ STATUS 조회나 확인 요청으로 유효 시간이 연장되지 않는다. �
 차단하지 않는다. 제한은 메모리 기반으로, agent 재시작을 견디는 PIN 인증 방어책은 아니다.
 원격 저장까지 원자적으로 보장하지 않으므로 양쪽 STATUS를 확인해야 한다.
 
-한쪽에서 표시한 PIN을 다른 쪽에 입력하는 기능은 아직 구현되지 않았다. 현재 코드는 공개된
-교환 transcript에서 도출되는 SAS이며 양쪽 사용자의 확인이 필수다. PIN 기반 PAKE와 이를
-기기 키·TLS transcript에 연결하는 인증 절차가 구현되기 전에는 한쪽 확인을 자동 승인하지 않는다.
+`PIN_LISTEN`은 별칭과 명시적 inbound capability만 받으며 agent가 임의 PIN을 생성한다.
+`PIN_DIAL`은 검색 결과의 private IPv4 address, 초대 ID(`pairingId`), 6자리 `confirmationCode`,
+별칭과 capability를 받는다. caller가 LISTEN PIN을 지정하거나 PIN을 legacy DIAL에 싣는 것은 거부한다.
+PIN은 기존 인증된 loopback API로만 UI에 전달하고 LAN에는 PAKE 메시지와 키 확인 증명만 보낸다.
+PIN 작업은 `pin_waiting`, `pairing_registering`, 기존 종료 코드를 사용하며 수동 CONFIRM을 거부한다.
+STATUS에서 `pairing_completed`를 확인하면 기존 기기 키 인증을 사용한다. PIN 모드가 아닌 기존
+SAS 작업에는 양쪽 사용자 확인이 여전히 필요하다. 새 기기 등록은 trust 저장 후 연결 설정까지
+저장하며 중간 실패는 `pairing_commit_uncertain`으로 보고한다. 양쪽 저장은 원자적이지 않다.

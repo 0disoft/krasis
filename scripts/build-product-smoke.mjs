@@ -11,7 +11,7 @@ const revision = git(['rev-parse', 'HEAD']);
 const destination = path.join(root, 'dist', 'product-smoke', revision);
 if (fs.existsSync(destination)) throw new Error('Artifact already exists; do not overwrite it.');
 fs.mkdirSync(destination, { recursive: true });
-const environment = { ...process.env, GOOS: 'windows', GOARCH: 'amd64', CGO_ENABLED: '0', GOPROXY: 'off', GOSUMDB: 'off', GOCACHE: path.join(root, '.cache', 'go-build') };
+const environment = { ...process.env, GOOS: 'windows', GOARCH: 'amd64', CGO_ENABLED: '0', GOPROXY: 'off', GOSUMDB: 'off', GOCACHE: path.join(root, '.cache', 'go-build'), GOMODCACHE: path.join(root, '.cache', 'go-mod') };
 for (const name of ['krasis', 'krasis-agent', 'krasis-control']) {
   const executable = path.join(destination, `${name}.exe`);
   const flags = name === 'krasis-control' ? ['-ldflags=-H=windowsgui'] : [];
@@ -26,7 +26,10 @@ const probe = spawnSync(path.join(destination, 'krasis.exe'), [], { encoding: 'u
 if (probe.error || probe.status !== 2) throw new Error('CLI usage smoke check failed.');
 fs.copyFileSync('docs/experiments/product-two-pc-smoke.md', path.join(destination, 'START-HERE.md'));
 fs.writeFileSync(path.join(destination, 'BUILD.json'), JSON.stringify({ revision, platform: 'windows/amd64', cgo: false, purpose: 'manual-two-pc-smoke', signed: false }, null, 2) + '\n');
-const entries = ['krasis.exe', 'krasis-agent.exe', 'krasis-control.exe', 'START-HERE.md', 'BUILD.json'];
+const modules = execFileSync('go', ['list', '-m', '-f', '{{.Path}}|{{.Dir}}', 'all'], { env: environment, encoding: 'utf8' }).trim().split(/\r?\n/u).slice(1);
+const notices = modules.map(line => { const [name, directory] = line.split('|'); return `${name}\n\n${fs.readFileSync(path.join(directory, 'LICENSE'), 'utf8')}`; }).join('\n\n');
+fs.writeFileSync(path.join(destination, 'THIRD-PARTY-NOTICES.txt'), notices);
+const entries = ['krasis.exe', 'krasis-agent.exe', 'krasis-control.exe', 'START-HERE.md', 'BUILD.json', 'THIRD-PARTY-NOTICES.txt'];
 const hash = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 fs.writeFileSync(path.join(destination, 'SHA256SUMS.txt'), entries.map(name => `${hash(path.join(destination, name))}  ${name}`).join('\n') + '\n');
 entries.push('SHA256SUMS.txt');

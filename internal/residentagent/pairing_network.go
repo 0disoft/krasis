@@ -7,12 +7,16 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"errors"
+	"io"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/pairing"
+	"github.com/0disoft/krasis/internal/pinauth"
+	"github.com/0disoft/krasis/internal/pindiscovery"
 	"github.com/0disoft/krasis/internal/productidentity"
 	"github.com/0disoft/krasis/internal/transport"
 	"github.com/0disoft/krasis/internal/truststore"
@@ -29,12 +33,15 @@ type networkPairing struct {
 	identities *productidentity.Store
 	trust      *truststore.Store
 	listen     func(string, string) (net.Listener, error)
+	advertise  func(context.Context, string, int) (io.Closer, error)
 	mu         sync.Mutex
 	job        *pairJob
 	nextStart  time.Time
 }
 
 type pairJob struct {
+	pinMode                       bool
+	pin, invitation               string
 	expiresAt                     time.Time
 	replacedFingerprint           string
 	id, alias, code, confirmation string
@@ -86,11 +93,15 @@ func (service *networkPairing) Handle(ctx context.Context, request localapi.Oper
 	if ctx.Err() != nil || service.root.Err() != nil {
 		return rejected("operation_cancelled"), nil
 	}
-	if request.PairingAction == "LISTEN" || request.PairingAction == "DIAL" {
+	pinMode := request.PairingAction == "PIN_LISTEN" || request.PairingAction == "PIN_DIAL"
+	if pinMode && request.PairingAction == "PIN_DIAL" && (!pinauth.Valid(request.ConfirmationCode) || len(request.PairingID) != 32) {
+		return rejected("invalid_request"), nil
+	}
+	if request.PairingAction == "LISTEN" || request.PairingAction == "DIAL" || pinMode {
 		if time.Now().Before(service.nextStart) {
 			return rejected("pairing_retry_later"), nil
 		}
-		if request.AllowInboundControl == nil || (truststore.ConnectionSettings{Address: request.Address, Edge: "LEFT"}).Validate() != nil {
+		if request.AllowInboundControl == nil || (request.PairingAction != "PIN_LISTEN" && (truststore.ConnectionSettings{Address: request.Address, Edge: "LEFT"}).Validate() != nil) {
 			return rejected("invalid_request"), nil
 		}
 		if service.job != nil {
@@ -101,7 +112,7 @@ func (service *networkPairing) Handle(ctx context.Context, request localapi.Oper
 			}
 		}
 		role := transport.AuthenticatedPeerConnector
-		if request.PairingAction == "LISTEN" {
+		if request.PairingAction == "LISTEN" || request.PairingAction == "PIN_LISTEN" {
 			role = transport.AuthenticatedPeerListener
 		}
 		if request.Fingerprint != "" {
@@ -139,7 +150,11 @@ func (service *networkPairing) Handle(ctx context.Context, request localapi.Oper
 			if listen == nil {
 				listen = net.Listen
 			}
-			listener, err = listen("tcp", request.Address)
+			listenAddress := request.Address
+			if request.PairingAction == "PIN_LISTEN" {
+				listenAddress = "0.0.0.0:45871"
+			}
+			listener, err = listen("tcp4", listenAddress)
 			if err != nil {
 				return failed("pairing_listen_failed"), nil
 			}
@@ -155,6 +170,36 @@ func (service *networkPairing) Handle(ctx context.Context, request localapi.Oper
 		jobContext, cancel := context.WithDeadline(service.root, expiresAt)
 		job := &pairJob{id: hex.EncodeToString(id[:]), alias: request.PeerAlias, allow: *request.AllowInboundControl, code: "pairing_waiting", cancel: cancel, done: make(chan struct{}), ready: make(chan struct{}), receipt: make(chan pairing.Receipt, 1)}
 		job.expiresAt = expiresAt
+		job.pinMode = pinMode
+		if pinMode {
+			job.alias = request.PeerAlias + "-" + job.id[:8]
+			job.pin = request.ConfirmationCode
+			job.invitation = request.PairingID
+			if role == transport.AuthenticatedPeerListener {
+				job.pin, err = pinauth.Generate()
+				if err != nil {
+					cancel()
+					listener.Close()
+					return failed("pin_unavailable"), nil
+				}
+				job.invitation = job.id
+				job.confirmation = job.pin
+				_, portText, _ := net.SplitHostPort(listener.Addr().String())
+				port, _ := strconv.Atoi(portText)
+				advertise := service.advertise
+				if advertise == nil {
+					advertise = pindiscovery.Advertise
+				}
+				advertisement, err := advertise(jobContext, job.id, port)
+				if err != nil {
+					cancel()
+					listener.Close()
+					return failed("discovery_unavailable"), nil
+				}
+				context.AfterFunc(jobContext, func() { advertisement.Close() })
+			}
+			job.code = "pin_waiting"
+		}
 		service.job = job
 		job.replacedFingerprint = request.Fingerprint
 		go service.run(jobContext, job, listener, request.Address, identity, role)
@@ -193,6 +238,9 @@ func (service *networkPairing) Handle(ctx context.Context, request localapi.Oper
 		job.confirmation = ""
 		return pairResult(job), nil
 	case "CONFIRM":
+		if job.pinMode {
+			return rejected("invalid_request"), nil
+		}
 		if job.session == nil {
 			return rejected("pairing_not_ready"), nil
 		}
@@ -243,6 +291,10 @@ func (service *networkPairing) run(ctx context.Context, job *pairJob, listener n
 		}
 	}
 	job.confirmation = ""
+	job.pin = ""
+	if job.pinMode && err != nil {
+		service.nextStart = time.Now().Add(pairingRetryDelay)
+	}
 	job.session = nil
 	job.cancel()
 	close(job.done)
@@ -270,7 +322,11 @@ func (service *networkPairing) exchange(ctx context.Context, job *pairJob, liste
 	if err := raw.SetDeadline(deadline); err != nil {
 		return err
 	}
-	config := &tls.Config{Certificates: []tls.Certificate{identity}, MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, NextProtos: []string{pairingALPN}, SessionTicketsDisabled: true}
+	alpn := pairingALPN
+	if job.pinMode {
+		alpn = "krasis-pin/1"
+	}
+	config := &tls.Config{Certificates: []tls.Certificate{identity}, MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, NextProtos: []string{alpn}, SessionTicketsDisabled: true}
 	var connection *tls.Conn
 	if role == transport.AuthenticatedPeerListener {
 		config.ClientAuth = tls.RequireAnyClientCert
@@ -288,7 +344,7 @@ func (service *networkPairing) exchange(ctx context.Context, job *pairJob, liste
 		return err
 	}
 	state := connection.ConnectionState()
-	if state.NegotiatedProtocol != pairingALPN || len(state.PeerCertificates) != 1 {
+	if state.NegotiatedProtocol != alpn || len(state.PeerCertificates) != 1 {
 		return errors.New("invalid pairing TLS peer")
 	}
 	leaf := state.PeerCertificates[0]
@@ -298,6 +354,20 @@ func (service *networkPairing) exchange(ctx context.Context, job *pairJob, liste
 	}
 	if err := leaf.CheckSignature(leaf.SignatureAlgorithm, leaf.RawTBSCertificate, leaf.Signature); err != nil {
 		return err
+	}
+	if job.pinMode {
+		remoteHost, _, _ := net.SplitHostPort(raw.RemoteAddr().String())
+		ip := net.ParseIP(remoteHost)
+		if ip == nil || (!ip.IsPrivate() && !ip.IsLoopback()) {
+			return errors.New("PIN peer is not local")
+		}
+		binding, err := state.ExportKeyingMaterial("EXPORTER-Krasis-PIN-v1", []byte(job.invitation), 32)
+		if err != nil {
+			return err
+		}
+		if err = pinauth.Exchange(connection, job.pin, binding, listener != nil); err != nil {
+			return err
+		}
 	}
 	local, err := transport.AuthenticatedPeerFromCertificate(identity.Leaf)
 	if err != nil {
@@ -350,6 +420,17 @@ func (service *networkPairing) exchange(ctx context.Context, job *pairJob, liste
 		return context.DeadlineExceeded
 	}
 	job.session, job.confirmation, job.code = session, session.ConfirmationCode(), "confirmation_required"
+	if job.pinMode {
+		receipt, err := session.Confirm(session.ConfirmationCode(), time.Now())
+		if err != nil {
+			service.mu.Unlock()
+			return err
+		}
+		job.confirmation = ""
+		job.code = "pairing_registering"
+		job.confirmed = true
+		job.receipt <- receipt
+	}
 	close(job.ready)
 	service.mu.Unlock()
 	var receipt pairing.Receipt
@@ -390,7 +471,22 @@ func (service *networkPairing) exchange(ctx context.Context, job *pairJob, liste
 		_, err = session.FinalizeWithCertificate(remote, leaf.Raw, service.trust, job.alias, job.allow, time.Now())
 	}
 	if err == nil {
-		job.code = "pairing_completed"
+		if job.pinMode {
+			address := raw.RemoteAddr()
+			edge := "LEFT"
+			if listener != nil {
+				address = raw.LocalAddr()
+				edge = "RIGHT"
+			}
+			host, _, _ := net.SplitHostPort(address.String())
+			_, err = service.trust.SetConnection(job.alias, truststore.ConnectionSettings{Address: net.JoinHostPort(host, "45872"), Edge: edge})
+			if err != nil {
+				return err
+			}
+		}
+		if !job.pinMode {
+			job.code = "pairing_completed"
+		}
 	}
 	return err
 }

@@ -24,6 +24,7 @@ const productPeers = 2004
 const wmTimer = 0x0113
 
 type productWindow struct {
+	pin                                                       pinWindow
 	log                                                       *productlog.Logger
 	hwnd, peers, status, notice, connect, disconnect, refresh uintptr
 	control                                                   string
@@ -71,7 +72,7 @@ func RunProductControl() (resultErr error) {
 	if value, _, _ := procRegisterClassEx.Call(uintptr(unsafe.Pointer(&class))); value == 0 {
 		return errors.New("register control window")
 	}
-	hwnd, _, _ := procCreateWindowEx.Call(0, uintptr(unsafe.Pointer(name)), uintptr(unsafe.Pointer(utf16("Krasis · 연결 관리"))), (wsOverlappedWindow&^(0x00040000|0x00010000))|wsVisible, 0x80000000, 0x80000000, 600, 310, 0, 0, instance, 0)
+	hwnd, _, _ := procCreateWindowEx.Call(0, uintptr(unsafe.Pointer(name)), uintptr(unsafe.Pointer(utf16("Krasis · 연결 관리"))), (wsOverlappedWindow&^(0x00040000|0x00010000))|wsVisible, 0x80000000, 0x80000000, 600, 550, 0, 0, instance, 0)
 	if hwnd == 0 {
 		return errors.New("create control window")
 	}
@@ -112,6 +113,14 @@ func productWindowProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr
 	case wmCommand:
 		if int((wParam>>16)&0xffff) == bnClicked {
 			switch int(wParam & 0xffff) {
+			case pinInvite:
+				a.performPIN("invite")
+			case pinSearch:
+				a.performPIN("search")
+			case pinJoin:
+				a.performPIN("join")
+			case pinCancel:
+				a.performPIN("cancel")
 			case productRefresh:
 				a.perform("prepare")
 			case productConnect:
@@ -123,7 +132,25 @@ func productWindowProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr
 		return 0
 	case wmTimer:
 		if !a.busy && !a.closing {
-			a.perform("refresh")
+			if a.pin.job != "" {
+				a.performPIN("status")
+			} else {
+				a.perform("refresh")
+			}
+		}
+		return 0
+	case pinEvent:
+		select {
+		case result := <-a.pin.results:
+			a.busy = false
+			if a.closing {
+				a.cancel()
+				procDestroyWindow.Call(hwnd)
+			} else {
+				a.applyPIN(result)
+				a.perform("refresh")
+			}
+		default:
 		}
 		return 0
 	case wmUIEvent:
@@ -139,6 +166,11 @@ func productWindowProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr
 		}
 		return 0
 	case wmClose:
+		if a.pin.job != "" && !a.busy {
+			a.performPIN("cancel")
+			a.closing = true
+			return 0
+		}
 		a.closing = true
 		a.cancel()
 		if !a.busy {
@@ -168,6 +200,7 @@ func (a *productWindow) create() bool {
 	a.status = control("STATIC", "상태 확인 중…", 0, 20, 150, 545, 22, 0)
 	a.notice = control("STATIC", "", 0, 20, 177, 545, 38, 0)
 	control("STATIC", "창을 닫아도 연결은 유지됩니다. 중지하려면 연결 해제를 누르세요.", 0, 20, 226, 550, 30, 0)
+	a.createPIN(control)
 	a.apply(productpanel.View{})
 	return a.peers != 0 && a.connect != 0 && a.disconnect != 0 && a.refresh != 0 && a.status != 0 && a.notice != 0
 }
@@ -186,6 +219,7 @@ func (a *productWindow) perform(action string) {
 	}
 	alias := a.selected()
 	a.busy = true
+	a.enablePIN()
 	for _, hwnd := range []uintptr{a.peers, a.connect, a.disconnect, a.refresh} {
 		enable(hwnd, false)
 	}
@@ -234,7 +268,7 @@ func (a *productWindow) apply(view productpanel.View) {
 	}
 	setText(a.status, "상태: "+state)
 	if view.Notice == "" && len(view.Peers) == 0 {
-		view.Notice = "페어링된 기기가 없습니다. 최초 페어링은 현재 CLI에서 진행합니다."
+		view.Notice = "페어링된 기기가 없습니다. 아래에서 PIN으로 새 기기를 등록하세요."
 	}
 	if a.log == nil || a.log.Failed() {
 		view.Notice = "로그 저장 불가 또는 기록 누락이 발생했습니다. " + view.Notice
@@ -244,4 +278,5 @@ func (a *productWindow) apply(view productpanel.View) {
 	enable(a.connect, view.State == "LOCAL" && len(view.Peers) > 0)
 	enable(a.disconnect, view.State != "" && view.State != "LOCAL")
 	enable(a.refresh, true)
+	a.enablePIN()
 }
