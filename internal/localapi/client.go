@@ -19,6 +19,7 @@ var (
 	ErrAuthentication = errors.New("local API authentication failed")
 	ErrTransport      = errors.New("local API transport failed")
 	ErrProtocol       = errors.New("local API protocol failed")
+	ErrNotFound       = fmt.Errorf("%w: endpoint not found", ErrProtocol)
 )
 
 type Client struct {
@@ -113,6 +114,10 @@ func (client *Client) get(ctx context.Context, path string, target any) error {
 }
 
 func (client *Client) request(ctx context.Context, method, path string, body, target any) error {
+	return client.requestHeaders(ctx, method, path, body, target, nil)
+}
+
+func (client *Client) requestHeaders(ctx context.Context, method, path string, body, target any, headers map[string]string) error {
 	if client == nil || client.http == nil || client.credentials.Token == "" {
 		return ErrUnavailable
 	}
@@ -129,6 +134,9 @@ func (client *Client) request(ctx context.Context, method, path string, body, ta
 		return fmt.Errorf("%w: create request", ErrProtocol)
 	}
 	request.Header.Set("Authorization", "Bearer "+client.credentials.Token)
+	for key, value := range headers {
+		request.Header.Set(key, value)
+	}
 	if body != nil {
 		request.Header.Set("Content-Type", "application/json")
 	}
@@ -142,6 +150,9 @@ func (client *Client) request(ctx context.Context, method, path string, body, ta
 	}
 	if response.StatusCode == http.StatusUnauthorized {
 		return ErrAuthentication
+	}
+	if response.StatusCode == http.StatusNotFound {
+		return ErrNotFound
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return fmt.Errorf("%w: HTTP status %d", ErrProtocol, response.StatusCode)

@@ -18,6 +18,8 @@ clipboard, environment 또는 UI projection에 복제하지 않는다.
 | Method | Path | Operation |
 | --- | --- | --- |
 | `GET` | `/v1/status` | identity fingerprint/generation, 연결 lifecycle state, redacted alias, allowed actions |
+| `GET` | `/v1/runtime` | schema, protocol, agent generation, build revision, process instance nonce |
+| `POST` | `/v1/upgrade-stop` | empty body와 `If-Match` instance nonce를 사용하는 idle-only 종료 |
 | `POST` | `/v1/connect` | configured shared-core session runner 시작 |
 | `POST` | `/v1/connection` | 신뢰된 peer의 연결 설정 저장 또는 조회; 세션 시작과 분리 |
 | `POST` | `/v1/credential` | 역할별 로컬 인증서 공개 정보 조회 또는 예상 지문을 지정한 명시적 갱신 |
@@ -29,7 +31,11 @@ clipboard, environment 또는 UI projection에 복제하지 않는다.
 | `GET` | `/v1/topology` | 연결 상태와 non-revoked peer 목록; 저장된 배치가 없으면 `UNCONFIGURED` |
 | `POST` | `/v1/safe-stop` | agent root cancellation 요청 |
 
-connection을 제외한 mutation body schema는 `krasis.agent.operation/v1`, 결과는
+upgrade-stop은 인증 후 빈 body와 현재 instance nonce를 검사한다. nonce 불일치는 409로 거부한다.
+연결·페어링 중에는 agent 잠금 안에서 종료를 거부한다. 일반 safe-stop과 별개인 자동 교체 전용 경로다.
+runtime schema는 `krasis.agent.runtime/v1`이며 기존 status/result schema는 변경하지 않는다.
+
+connection과 upgrade-stop을 제외한 mutation body schema는 `krasis.agent.operation/v1`, 결과는
 `krasis.agent.operation-result/v1`이다. 모든 body는 64KiB 이하 strict JSON이다. `connect`는 alias만,
 `disconnect`는 추가 field 없이, pair action은 해당 action에 필요한 alias/capability 또는
 pairing ID/code만 허용한다. trust revoke는 lowercase SHA-256 fingerprint 하나만 허용한다.

@@ -118,6 +118,10 @@ func Listen(controlDirectory string, operations Operations) (*Server, error) {
 	if operations == nil {
 		return nil, errors.New("local API operations are required")
 	}
+	runtimeInfo, err := newRuntimeInfo()
+	if err != nil {
+		return nil, err
+	}
 	listener, err := net.Listen("tcp4", "127.0.0.1:0")
 	if err != nil {
 		return nil, err
@@ -127,7 +131,7 @@ func Listen(controlDirectory string, operations Operations) (*Server, error) {
 		_ = listener.Close()
 		return nil, err
 	}
-	handler := &handler{token: credentials.Token(), operations: operations}
+	handler := &handler{token: credentials.Token(), operations: operations, runtime: runtimeInfo}
 	return &Server{
 		listener:    listener,
 		credentials: credentials,
@@ -185,6 +189,7 @@ func (server *Server) Close(ctx context.Context) error {
 }
 
 type handler struct {
+	runtime    RuntimeInfo
 	token      string
 	operations Operations
 }
@@ -196,6 +201,14 @@ func (handler *handler) ServeHTTP(response http.ResponseWriter, request *http.Re
 		return
 	}
 	switch request.URL.Path {
+	case "/v1/runtime":
+		if request.Method != http.MethodGet {
+			writeMethodNotAllowed(response)
+			return
+		}
+		writeJSON(response, http.StatusOK, handler.runtime)
+	case "/v1/upgrade-stop":
+		handler.upgradeStop(response, request)
 	case "/v1/credential":
 		handler.credential(response, request)
 	case "/v1/connection":

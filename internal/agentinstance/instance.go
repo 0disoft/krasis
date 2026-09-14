@@ -15,6 +15,9 @@ type Lease struct {
 
 func Acquire() (*Lease, error) { return acquire(productionName) }
 
+// Separate short-lived ownership for GUI startup/upgrade coordination.
+func AcquireControlStartup() (*Lease, error) { return acquire(`Local\Krasis-Control-Startup-v1`) }
+
 func (lease *Lease) Close() error {
 	if lease == nil || lease.close == nil {
 		return nil

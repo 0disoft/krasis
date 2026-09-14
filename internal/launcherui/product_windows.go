@@ -30,6 +30,7 @@ type productWindow struct {
 	ctx                                                       context.Context
 	cancel                                                    context.CancelFunc
 	result                                                    chan productpanel.View
+	startup                                                   productpanel.Startup
 }
 
 var productApp *productWindow
@@ -44,6 +45,10 @@ func RunProductControl() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	app := &productWindow{control: paths.Control, ctx: ctx, cancel: cancel, result: make(chan productpanel.View, 1)}
+	app.startup, err = productpanel.NewStartup(paths.Control)
+	if err != nil {
+		return err
+	}
 	productApp = app
 	defer func() { productApp = nil }()
 	instance, _, _ := procGetModuleHandle.Call(0)
@@ -59,7 +64,7 @@ func RunProductControl() error {
 	}
 	procShowWindow.Call(hwnd, swShow)
 	procUpdateWindow.Call(hwnd)
-	app.perform("refresh")
+	app.perform("prepare")
 	user32.NewProc("SetTimer").Call(hwnd, 1, 2000, 0)
 	var msg message
 	for {
@@ -95,7 +100,7 @@ func productWindowProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr
 		if int((wParam>>16)&0xffff) == bnClicked {
 			switch int(wParam & 0xffff) {
 			case productRefresh:
-				a.perform("refresh")
+				a.perform("prepare")
 			case productConnect:
 				a.perform("connect")
 			case productDisconnect:
@@ -173,8 +178,20 @@ func (a *productWindow) perform(action string) {
 	}
 	hwnd := a.hwnd
 	go func() {
-		ctx, cancel := context.WithTimeout(a.ctx, 12*time.Second)
+		ctx, cancel := context.WithTimeout(a.ctx, 20*time.Second)
 		defer cancel()
+		if action == "prepare" || action == "connect" {
+			if err := a.startup.Ensure(ctx); err != nil {
+				view := productpanel.Execute(ctx, func() (productpanel.Client, error) { return localapi.OpenClient(a.control) }, "refresh", "")
+				view.Notice = productpanel.StartupNotice(err)
+				a.result <- view
+				procPostMessage.Call(hwnd, wmUIEvent, 0, 0)
+				return
+			}
+			if action == "prepare" {
+				action = "refresh"
+			}
+		}
 		view := productpanel.Execute(ctx, func() (productpanel.Client, error) { return localapi.OpenClient(a.control) }, action, alias)
 		a.result <- view
 		procPostMessage.Call(hwnd, wmUIEvent, 0, 0)

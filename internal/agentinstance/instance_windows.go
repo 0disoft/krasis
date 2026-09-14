@@ -34,5 +34,5 @@ func acquire(name string) (*Lease, error) {
 }
 
 func validName(name string) bool {
-	return strings.HasPrefix(name, `Local\Krasis-Agent-Test-`) || name == productionName
+	return strings.HasPrefix(name, `Local\Krasis-Agent-Test-`) || name == productionName || name == `Local\Krasis-Control-Startup-v1`
 }

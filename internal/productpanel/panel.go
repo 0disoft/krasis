@@ -27,7 +27,7 @@ type View struct {
 func Execute(ctx context.Context, open func() (Client, error), action, alias string) View {
 	client, err := open()
 	if err != nil {
-		return View{Notice: "에이전트에 접근할 수 없습니다. 에이전트를 실행한 뒤 새로고침하세요."}
+		return View{Notice: "에이전트에 접근할 수 없습니다. 새로고침을 눌러 에이전트를 준비하세요."}
 	}
 	status, err := client.Status(ctx)
 	if err != nil {
