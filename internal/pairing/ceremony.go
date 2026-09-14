@@ -142,7 +142,7 @@ func (session *Session) Confirm(code string, now time.Time) (Receipt, error) {
 	if session == nil || session.local == nil {
 		return Receipt{}, errors.New("pairing session is not initialized")
 	}
-	if now.IsZero() || now.After(session.expiresAt) {
+	if now.IsZero() || !now.Before(session.expiresAt) {
 		return Receipt{}, ErrExpired
 	}
 	if code != session.confirmation {
@@ -180,7 +180,7 @@ func (session *Session) authorizeFinalize(remote Receipt, store *truststore.Stor
 	if session == nil || store == nil {
 		return errors.New("pairing session and trust store are required")
 	}
-	if now.IsZero() || now.After(session.expiresAt) {
+	if now.IsZero() || !now.Before(session.expiresAt) {
 		return ErrExpired
 	}
 	if !session.localConfirmed {
@@ -264,7 +264,7 @@ func (offer Offer) validate(now time.Time) error {
 		offer.ExpiresAt.Sub(offer.CreatedAt) != DefaultLifetime {
 		return errors.New("pairing offer lifetime is invalid")
 	}
-	if now.Before(offer.CreatedAt) || now.After(offer.ExpiresAt) {
+	if now.Before(offer.CreatedAt) || !now.Before(offer.ExpiresAt) {
 		return ErrExpired
 	}
 	return offer.Initiator.validate()

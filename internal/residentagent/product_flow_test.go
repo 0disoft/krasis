@@ -558,6 +558,12 @@ func TestPairWrongConfirmationNeverImportsTrust(t *testing.T) {
 	if err != nil || result.Code != "confirmation_rejected" {
 		t.Fatalf("wrong confirmation: %+v %v", result, err)
 	}
+	for _, action := range []string{"LISTEN", "DIAL"} {
+		result, err := first.pairing.Handle(ctx, localapi.OperationRequest{PairingAction: action, PeerAlias: "different-peer"})
+		if err != nil || result.Code != "pairing_retry_later" {
+			t.Fatalf("retry bypass: %+v %v", result, err)
+		}
+	}
 	select {
 	case <-job.done:
 	case <-time.After(time.Second):
@@ -567,5 +573,24 @@ func TestPairWrongConfirmationNeverImportsTrust(t *testing.T) {
 		if _, err := node.pairing.trust.List(); !errors.Is(err, truststore.ErrStoreNotFound) {
 			t.Fatalf("wrong confirmation imported trust: %v", err)
 		}
+	}
+}
+
+func TestPairingDeadlineCannotBeExtendedByStatusOrConfirmation(t *testing.T) {
+	cancelled := false
+	job := &pairJob{id: "job", code: "confirmation_required", confirmation: "123456", expiresAt: time.Now().Add(-time.Second), done: make(chan struct{}), cancel: func() { cancelled = true }}
+	service := &networkPairing{root: context.Background(), job: job}
+	result, err := service.Handle(context.Background(), localapi.OperationRequest{PairingAction: "STATUS", PairingID: job.id})
+	if err != nil || result.Code != "pairing_expired" || result.Confirmation != "" || !cancelled {
+		t.Fatalf("expiry: %+v %v", result, err)
+	}
+	result, err = service.Handle(context.Background(), localapi.OperationRequest{PairingAction: "CONFIRM", PairingID: job.id, ConfirmationCode: "123456"})
+	if err != nil || result.Code != "pairing_finished" {
+		t.Fatalf("expired confirm: %+v %v", result, err)
+	}
+	service.nextStart = time.Now().Add(-time.Second)
+	result, err = service.Handle(context.Background(), localapi.OperationRequest{PairingAction: "DIAL"})
+	if err != nil || result.Code != "invalid_request" {
+		t.Fatalf("elapsed cooldown: %+v %v", result, err)
 	}
 }

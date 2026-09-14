@@ -20,6 +20,9 @@ import (
 
 const pairingALPN = "krasis-pairing/1"
 
+const pairingJobLifetime = 2 * time.Minute
+const pairingRetryDelay = 30 * time.Second
+
 type networkPairing struct {
 	root       context.Context
 	identity   *productidentity.Identity
@@ -28,9 +31,11 @@ type networkPairing struct {
 	listen     func(string, string) (net.Listener, error)
 	mu         sync.Mutex
 	job        *pairJob
+	nextStart  time.Time
 }
 
 type pairJob struct {
+	expiresAt                     time.Time
 	replacedFingerprint           string
 	id, alias, code, confirmation string
 	allow                         bool
@@ -82,6 +87,9 @@ func (service *networkPairing) Handle(ctx context.Context, request localapi.Oper
 		return rejected("operation_cancelled"), nil
 	}
 	if request.PairingAction == "LISTEN" || request.PairingAction == "DIAL" {
+		if time.Now().Before(service.nextStart) {
+			return rejected("pairing_retry_later"), nil
+		}
 		if request.AllowInboundControl == nil || (truststore.ConnectionSettings{Address: request.Address, Edge: "LEFT"}).Validate() != nil {
 			return rejected("invalid_request"), nil
 		}
@@ -143,8 +151,10 @@ func (service *networkPairing) Handle(ctx context.Context, request localapi.Oper
 			}
 			return localapi.OperationResult{}, err
 		}
-		jobContext, cancel := context.WithTimeout(service.root, pairing.DefaultLifetime)
+		expiresAt := time.Now().Add(pairingJobLifetime)
+		jobContext, cancel := context.WithDeadline(service.root, expiresAt)
 		job := &pairJob{id: hex.EncodeToString(id[:]), alias: request.PeerAlias, allow: *request.AllowInboundControl, code: "pairing_waiting", cancel: cancel, done: make(chan struct{}), ready: make(chan struct{}), receipt: make(chan pairing.Receipt, 1)}
+		job.expiresAt = expiresAt
 		service.job = job
 		job.replacedFingerprint = request.Fingerprint
 		go service.run(jobContext, job, listener, request.Address, identity, role)
@@ -154,10 +164,21 @@ func (service *networkPairing) Handle(ctx context.Context, request localapi.Oper
 	if job == nil || job.id != request.PairingID {
 		return rejected("pairing_not_found"), nil
 	}
+	if !job.expiresAt.IsZero() && !time.Now().Before(job.expiresAt) {
+		select {
+		case <-job.done:
+		default:
+			if job.code != "pairing_completed" && job.code != "pairing_cancelled" {
+				job.cancel()
+				job.code = "pairing_expired"
+				job.confirmation = ""
+			}
+		}
+	}
 	if request.PairingAction == "STATUS" {
 		return pairResult(job), nil
 	}
-	if job.code == "pairing_completed" || job.code == "pairing_cancelled" {
+	if job.code == "pairing_completed" || job.code == "pairing_cancelled" || job.code == "pairing_expired" {
 		return rejected("pairing_finished"), nil
 	}
 	select {
@@ -180,6 +201,7 @@ func (service *networkPairing) Handle(ctx context.Context, request localapi.Oper
 		}
 		receipt, err := job.session.Confirm(request.ConfirmationCode, time.Now())
 		if err != nil {
+			service.nextStart = time.Now().Add(pairingRetryDelay)
 			job.cancel()
 			job.code = "pairing_failed"
 			job.confirmation = ""
@@ -209,9 +231,9 @@ func (service *networkPairing) run(ctx context.Context, job *pairJob, listener n
 	service.mu.Lock()
 	if err == nil {
 		job.code = "pairing_completed"
-	} else if job.code != "pairing_cancelled" {
+	} else if job.code != "pairing_cancelled" && job.code != "pairing_expired" {
 		job.code = "pairing_failed"
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) || errors.Is(err, context.DeadlineExceeded) {
 			job.code = "pairing_expired"
 		}
 		// A failed finalizer may have persisted state before returning an error.
@@ -323,6 +345,10 @@ func (service *networkPairing) exchange(ctx context.Context, job *pairJob, liste
 		service.mu.Unlock()
 		return ctx.Err()
 	}
+	if !time.Now().Before(job.expiresAt) {
+		service.mu.Unlock()
+		return context.DeadlineExceeded
+	}
 	job.session, job.confirmation, job.code = session, session.ConfirmationCode(), "confirmation_required"
 	close(job.ready)
 	service.mu.Unlock()
@@ -353,6 +379,9 @@ func (service *networkPairing) exchange(ctx context.Context, job *pairJob, liste
 	defer service.mu.Unlock()
 	if ctx.Err() != nil {
 		return ctx.Err()
+	}
+	if !time.Now().Before(job.expiresAt) {
+		return context.DeadlineExceeded
 	}
 	job.commitAttempted = true
 	if job.replacedFingerprint != "" {

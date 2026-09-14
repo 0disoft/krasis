@@ -91,8 +91,14 @@ func TestPairingRejectsExpiredTamperedAndWrongSessionReceipts(t *testing.T) {
 	if _, err := responderSession.Finalize(tampered, testTrustStore(t), "initiator", true, now); !errors.Is(err, ErrRemoteConfirmation) {
 		t.Fatalf("tampered Finalize() error = %v", err)
 	}
-	if _, err := responderSession.Finalize(initiatorReceipt, testTrustStore(t), "initiator", true, offer.ExpiresAt.Add(time.Nanosecond)); !errors.Is(err, ErrExpired) {
+	if _, err := responderSession.Finalize(initiatorReceipt, testTrustStore(t), "initiator", true, offer.ExpiresAt); !errors.Is(err, ErrExpired) {
 		t.Fatalf("expired Finalize() error = %v", err)
+	}
+	if _, err := initiatorSession.Confirm(initiatorSession.ConfirmationCode(), offer.ExpiresAt); !errors.Is(err, ErrExpired) {
+		t.Fatal("confirmation accepted at expiry")
+	}
+	if _, _, err := Accept(offer, responder, testPeer("b", transport.AuthenticatedPeerConnector), offer.ExpiresAt); !errors.Is(err, ErrExpired) {
+		t.Fatal("offer accepted at expiry")
 	}
 	response.Responder.IdentityPublicKey[0] ^= 0xff
 	if _, err := Complete(offer, response, initiator, now); err == nil {

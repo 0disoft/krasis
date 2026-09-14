@@ -139,9 +139,18 @@ Windows shared-core runner를 사용한다. connect는 설정과 인증서를 �
 topology의 화면 배치 projection은 아직 `UNCONFIGURED`다. LAN 주소는 명시적 설정 조회에만
 노출하고 status와 diagnostics에는 추가하지 않는다.
 
-페어링은 최대 5분, TLS handshake는 최대 5초이며 한 번에 한 작업만 유지한다.
+페어링 작업은 시작부터 최대 2분, TLS handshake는 최대 5초이며 한 번에 한 작업만 유지한다.
+STATUS 조회나 확인 요청으로 유효 시간이 연장되지 않는다. 기존 wire v1 offer의 5분 형식은
+호환성을 위해 유지하지만 실제 작업 deadline과 최종 저장 검사는 더 짧은 2분을 적용한다.
 작업 결과의 `COMPLETED`는 해당 API 요청의 처리를 뜻한다. 페어링 완료 여부는 반드시
 `code: pairing_completed`로 판단한다. 진행 코드는 `pairing_waiting`, `confirmation_required`,
 `confirmation_submitted`이며 종료 코드는 `pairing_completed`, `pairing_cancelled`,
 `pairing_failed`, `pairing_expired`다. 확인 코드 오류는 `confirmation_rejected`와 함께 작업을
-취소한다. 원격 저장까지 원자적으로 보장하지 않으므로 양쪽 STATUS를 확인해야 한다.
+취소한다. 틀린 확인 코드를 제출하면 같은 agent의 신규 LISTEN/DIAL은 30초간
+`pairing_retry_later`로 거부한다. 별칭이나 주소를 바꿔도 제한은 유지되며 STATUS/CANCEL은
+차단하지 않는다. 제한은 메모리 기반으로, agent 재시작을 견디는 PIN 인증 방어책은 아니다.
+원격 저장까지 원자적으로 보장하지 않으므로 양쪽 STATUS를 확인해야 한다.
+
+한쪽에서 표시한 PIN을 다른 쪽에 입력하는 기능은 아직 구현되지 않았다. 현재 코드는 공개된
+교환 transcript에서 도출되는 SAS이며 양쪽 사용자의 확인이 필수다. PIN 기반 PAKE와 이를
+기기 키·TLS transcript에 연결하는 인증 절차가 구현되기 전에는 한쪽 확인을 자동 승인하지 않는다.
