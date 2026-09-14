@@ -6,6 +6,9 @@
 
 ## 발견과 인증
 
+diagnostics counter의 `log_incomplete = 1`은 파일 기록 실패 또는 로그 큐 초과를 뜻한다.
+진단 로그는 로컬 파일이며 API 응답 schema와 기기 신뢰 저장 형식은 변경하지 않는다.
+
 agent는 `%LOCALAPPDATA%\Krasis\control\endpoint.json`에 `krasis.local-api-endpoint/v1` 주소를,
 `auth-token`에 64자리 lowercase hex token을 기록한다. 두 file은 current user와 `SYSTEM` 전용이며
 agent 종료 때 삭제된다. client는 두 file을 strict하게 읽고 `Authorization: Bearer TOKEN`을 보낸다.

@@ -13,6 +13,7 @@ import (
 
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/productidentity"
+	"github.com/0disoft/krasis/internal/productlog"
 	"github.com/0disoft/krasis/internal/productpanel"
 )
 
@@ -23,6 +24,7 @@ const productPeers = 2004
 const wmTimer = 0x0113
 
 type productWindow struct {
+	log                                                       *productlog.Logger
 	hwnd, peers, status, notice, connect, disconnect, refresh uintptr
 	control                                                   string
 	view                                                      productpanel.View
@@ -35,9 +37,19 @@ type productWindow struct {
 
 var productApp *productWindow
 
-func RunProductControl() error {
+func RunProductControl() (resultErr error) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
+	log, _ := productlog.Open(os.Getenv("LOCALAPPDATA"), "control")
+	log.Event("process_started")
+	defer func() {
+		if resultErr != nil {
+			log.Event("process_failed")
+		} else {
+			log.Event("process_stopped")
+		}
+		log.Close()
+	}()
 	paths, err := productidentity.ResolveWindowsPaths(os.Getenv("LOCALAPPDATA"))
 	if err != nil {
 		return err
@@ -45,6 +57,7 @@ func RunProductControl() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	app := &productWindow{control: paths.Control, ctx: ctx, cancel: cancel, result: make(chan productpanel.View, 1)}
+	app.log = log
 	app.startup, err = productpanel.NewStartup(paths.Control)
 	if err != nil {
 		return err
@@ -181,13 +194,16 @@ func (a *productWindow) perform(action string) {
 		ctx, cancel := context.WithTimeout(a.ctx, 20*time.Second)
 		defer cancel()
 		if action == "prepare" || action == "connect" {
+			a.log.Event("prepare_started")
 			if err := a.startup.Ensure(ctx); err != nil {
+				a.log.Event("prepare_failed")
 				view := productpanel.Execute(ctx, func() (productpanel.Client, error) { return localapi.OpenClient(a.control) }, "refresh", "")
 				view.Notice = productpanel.StartupNotice(err)
 				a.result <- view
 				procPostMessage.Call(hwnd, wmUIEvent, 0, 0)
 				return
 			}
+			a.log.Event("prepare_completed")
 			if action == "prepare" {
 				action = "refresh"
 			}
@@ -219,6 +235,9 @@ func (a *productWindow) apply(view productpanel.View) {
 	setText(a.status, "상태: "+state)
 	if view.Notice == "" && len(view.Peers) == 0 {
 		view.Notice = "페어링된 기기가 없습니다. 최초 페어링은 현재 CLI에서 진행합니다."
+	}
+	if a.log == nil || a.log.Failed() {
+		view.Notice = "로그 저장 불가 또는 기록 누락이 발생했습니다. " + view.Notice
 	}
 	setText(a.notice, view.Notice)
 	enable(a.peers, len(view.Peers) > 0)

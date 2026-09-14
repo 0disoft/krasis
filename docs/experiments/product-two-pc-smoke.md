@@ -62,6 +62,11 @@ Wi-Fi IPv4 주소, B가 A의 왼쪽/오른쪽 중 어디에 놓였는지를 확�
 
 ## 검증 범위
 
+자동 로그는 `%LOCALAPPDATA%\Krasis\diagnostics`에 저장한다. 문제가 나면 `agent.jsonl`,
+`control.jsonl` 및 각 `*.previous.jsonl`을 확인한다. 키 입력·토큰은 기록하지 않는다.
+각 파일 최대 256KiB, 역할별 이전 파일 하나만 유지한다. GUI가 로그 저장 불가를 표시하면
+기록이 완전하지 않을 수 있다. generation 1 agent는 연결 해제 후 새 GUI에서 새로고침하면 교체된다.
+
 빌드 단계는 Windows x64 PE 형식과 CLI의 인자 없는 usage 종료를 확인한다.
 에이전트·네이티브 입력·페어링을 자동 실행하지 않는다. 실기기에서의 입력 전송, 입력 해제,
 관리자 앱, secure desktop, 절전 복귀는 별도 수동 검증 대상이다.

@@ -10,6 +10,7 @@ import (
 	"github.com/0disoft/krasis/internal/agentlifecycle"
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/productidentity"
+	"github.com/0disoft/krasis/internal/productlog"
 	"github.com/0disoft/krasis/internal/truststore"
 	"github.com/0disoft/krasis/internal/winlifecycle"
 )
@@ -30,10 +31,25 @@ type runDependencies struct {
 	pairing         PairWorkflow
 	now             func() time.Time
 	productAdapters bool
+	log             *productlog.Logger
 }
 
-func Run(ctx context.Context, localAppData string) error {
+func Run(ctx context.Context, localAppData string) (err error) {
+	log, err := productlog.Open(localAppData, "agent")
+	if err != nil {
+		return fmt.Errorf("initialize diagnostics: %w", err)
+	}
+	log.Event("process_started")
+	defer func() {
+		if err != nil {
+			log.Event("process_failed")
+		} else {
+			log.Event("process_stopped")
+		}
+		log.Close()
+	}()
 	dependencies := runDependencies{
+		log:          log,
 		acquire:      func() (instanceLease, error) { return agentinstance.Acquire() },
 		bootstrap:    productidentity.BootstrapWindows,
 		startMonitor: winlifecycle.StartMonitor,
@@ -55,7 +71,17 @@ func run(ctx context.Context, localAppData string, dependencies runDependencies)
 	if err != nil {
 		return err
 	}
-	defer func() { err = errors.Join(err, instance.Close()) }()
+	defer func() {
+		// Drain logs before releasing agent ownership so an upgrade cannot race
+		// the previous process's log writer.
+		if err != nil {
+			dependencies.log.Event("process_failed")
+		} else {
+			dependencies.log.Event("process_stopped")
+		}
+		dependencies.log.Close()
+		err = errors.Join(err, instance.Close())
+	}()
 
 	paths, identity, _, err := dependencies.bootstrap(localAppData, dependencies.now().UTC())
 	if err != nil {
@@ -83,6 +109,7 @@ func run(ctx context.Context, localAppData string, dependencies runDependencies)
 	if err != nil {
 		return err
 	}
+	operations.log = dependencies.log
 	if dependencies.productAdapters {
 		identities, err := productidentity.New(paths.Identity)
 		if err != nil {
@@ -100,6 +127,7 @@ func run(ctx context.Context, localAppData string, dependencies runDependencies)
 		defer cancel()
 		err = errors.Join(err, server.Close(shutdown), operations.Close(shutdown))
 	}()
+	dependencies.log.Event("agent_ready")
 	if err := server.Run(operations.Context()); err != nil && !errors.Is(err, context.Canceled) {
 		return fmt.Errorf("run resident agent local API: %w", err)
 	}

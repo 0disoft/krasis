@@ -10,6 +10,7 @@ import (
 	"github.com/0disoft/krasis/internal/agent"
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/productidentity"
+	"github.com/0disoft/krasis/internal/productlog"
 	"github.com/0disoft/krasis/internal/truststore"
 )
 
@@ -34,6 +35,7 @@ type trustStore interface {
 }
 
 type Operations struct {
+	log         *productlog.Logger
 	root        context.Context
 	stopAgent   context.CancelCauseFunc
 	identity    productidentity.PublicIdentity
@@ -291,6 +293,9 @@ func (operations *Operations) Diagnostics(context.Context) (localapi.Diagnostics
 	for key, value := range operations.counters {
 		counters[key] = value
 	}
+	if operations.log.Failed() {
+		counters["log_incomplete"] = 1
+	}
 	return localapi.Diagnostics{
 		SchemaVersion: localapi.DiagnosticsSchemaVersion,
 		State:         operations.lastCode,
@@ -350,6 +355,7 @@ func (operations *Operations) finishSession(done chan struct{}, outcome *session
 }
 
 func (operations *Operations) recordLocked(code string) {
+	operations.log.Event(code)
 	operations.lastCode = code
 	operations.counters[code]++
 }

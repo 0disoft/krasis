@@ -29,6 +29,21 @@ GUI는 기존 agent 소유권 잠금이 해제된 뒤 새 agent를 실행한다.
 시작 프로그램·서비스 등록, 방화벽 변경은 수행하지 않는다. AgentGeneration은 호환 제품 변경 시
 의도적으로 올리는 로컬 배포 세대이며 Git build revision과 구분한다.
 
+## 자동 로그
+
+`%LOCALAPPDATA%\Krasis\diagnostics`의 `agent.jsonl`, `control.jsonl`에 시작·종료,
+준비 실패, 연결 시작·실패·상태 전이를 기록한다. 각 파일은 256KiB까지 쓰고 이전 파일 하나
+(`*.previous.jsonl`)만 남기므로 정상 운용 시 총 1MiB 이하이다. 인터넷 전송은 없다.
+고정 이벤트 코드, UTC 시각, PID, build revision만 허용하며 오류 원문, 키 입력, 마우스 좌표,
+별칭, IP, 토큰, 기기 키는 기록하지 않는다. raw stderr나 메모리 덤프도 수집하지 않는다.
+기록은 제한된 큐에서 처리하여 입력 경로에서 디스크를 기다리지 않는다. 큐 초과·쓰기 실패는
+GUI 경고 또는 agent diagnostics의 `log_incomplete` counter로 알린다. 정상 종료는 최대 2초
+drain하며 강제 종료·전원 차단 직전의 큐 항목은 유실될 수 있다. 저장 권한 오류나 디스크 고장은
+파일 기록을 보장할 수 없다. 두 번째 동시 GUI는 로그 소유권 경고를 표시할 수 있다.
+
+AgentGeneration 2부터 agent 로그를 지원한다. generation 1은 idle 시 자동 교체한다.
+runtime API가 없는 더 오래된 agent를 재사용하는 경우 control 로그만 새로 기록된다.
+
 ## 검증 경계
 
 projection과 요청 테스트, Windows GUI 컴파일 및 ZIP 구성 확인은 자동 검증한다.

@@ -61,6 +61,9 @@ func (observer *sessionObserver) ObserveSupervisor(snapshot agent.SupervisorSnap
 	default:
 		return
 	}
+	if operations.sessionState != state {
+		operations.log.Event(state)
+	}
 	operations.sessionState = state
 }
 
