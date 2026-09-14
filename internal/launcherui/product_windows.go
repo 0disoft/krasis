@@ -21,9 +21,11 @@ const productRefresh = 2001
 const productConnect = 2002
 const productDisconnect = 2003
 const productPeers = 2004
+const productRevoke = 2005
 const wmTimer = 0x0113
 
 type productWindow struct {
+	revoke                                                    uintptr
 	pin                                                       pinWindow
 	log                                                       *productlog.Logger
 	hwnd, peers, status, notice, connect, disconnect, refresh uintptr
@@ -113,6 +115,8 @@ func productWindowProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr
 	case wmCommand:
 		if int((wParam>>16)&0xffff) == bnClicked {
 			switch int(wParam & 0xffff) {
+			case productRevoke:
+				a.revokePeer()
 			case pinInvite:
 				a.performPIN("invite")
 			case pinSearch:
@@ -199,7 +203,8 @@ func (a *productWindow) create() bool {
 	a.refresh = control("BUTTON", "새로고침", wsTabStop, 390, 100, 175, 35, productRefresh)
 	a.status = control("STATIC", "상태 확인 중…", 0, 20, 150, 545, 22, 0)
 	a.notice = control("STATIC", "", 0, 20, 177, 545, 38, 0)
-	control("STATIC", "창을 닫아도 연결은 유지됩니다. 중지하려면 연결 해제를 누르세요.", 0, 20, 226, 550, 30, 0)
+	control("STATIC", "창을 닫아도 연결은 유지됩니다.\n중지하려면 연결 해제를 누르세요.", 0, 20, 222, 355, 46, 0)
+	a.revoke = control("BUTTON", "기기 등록 해제", wsTabStop, 390, 226, 175, 30, productRevoke)
 	a.createPIN(control)
 	a.apply(productpanel.View{})
 	return a.peers != 0 && a.connect != 0 && a.disconnect != 0 && a.refresh != 0 && a.status != 0 && a.notice != 0
@@ -214,13 +219,37 @@ func (a *productWindow) selected() string {
 }
 
 func (a *productWindow) perform(action string) {
+	a.performTarget(action, a.selected())
+}
+
+func (a *productWindow) revokePeer() {
+	if a.busy || a.closing || a.view.State != "LOCAL" || a.pin.job != "" {
+		return
+	}
+	fingerprint := a.view.Fingerprints[a.selected()]
+	if len(fingerprint) != 64 {
+		return
+	}
+	a.busy = true
+	answer, _, _ := user32.NewProc("MessageBoxW").Call(a.hwnd, uintptr(unsafe.Pointer(utf16("선택한 기기의 등록을 이 PC에서 해제할까요?\n다시 사용하려면 재등록해야 합니다. 상대 PC의 기록은 삭제하지 않습니다."))), uintptr(unsafe.Pointer(utf16("Krasis · 기기 등록 해제"))), 0x134)
+	a.busy = false
+	if a.closing {
+		a.cancel()
+		procDestroyWindow.Call(a.hwnd)
+		return
+	}
+	if answer == 6 {
+		a.performTarget("revoke", fingerprint)
+	}
+}
+
+func (a *productWindow) performTarget(action, alias string) {
 	if a.busy || a.closing {
 		return
 	}
-	alias := a.selected()
 	a.busy = true
 	a.enablePIN()
-	for _, hwnd := range []uintptr{a.peers, a.connect, a.disconnect, a.refresh} {
+	for _, hwnd := range []uintptr{a.peers, a.connect, a.disconnect, a.refresh, a.revoke} {
 		enable(hwnd, false)
 	}
 	hwnd := a.hwnd
@@ -242,7 +271,13 @@ func (a *productWindow) perform(action string) {
 				action = "refresh"
 			}
 		}
-		view := productpanel.Execute(ctx, func() (productpanel.Client, error) { return localapi.OpenClient(a.control) }, action, alias)
+		open := func() (productpanel.Client, error) { return localapi.OpenClient(a.control) }
+		var view productpanel.View
+		if action == "revoke" {
+			view = productpanel.Revoke(ctx, open, alias)
+		} else {
+			view = productpanel.Execute(ctx, open, action, alias)
+		}
 		a.result <- view
 		procPostMessage.Call(hwnd, wmUIEvent, 0, 0)
 	}()
@@ -278,5 +313,6 @@ func (a *productWindow) apply(view productpanel.View) {
 	enable(a.connect, view.State == "LOCAL" && len(view.Peers) > 0)
 	enable(a.disconnect, view.State != "" && view.State != "LOCAL")
 	enable(a.refresh, true)
+	enable(a.revoke, view.State == "LOCAL" && len(view.Peers) > 0 && a.pin.job == "")
 	a.enablePIN()
 }

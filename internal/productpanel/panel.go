@@ -17,9 +17,10 @@ type Client interface {
 }
 
 type View struct {
-	State  string
-	Peers  []string
-	Notice string
+	Fingerprints map[string]string
+	State        string
+	Peers        []string
+	Notice       string
 }
 
 // Execute opens fresh endpoint credentials on each action, including after an agent restart.
@@ -49,7 +50,7 @@ func Execute(ctx context.Context, open func() (Client, error), action, alias str
 	if err != nil {
 		return View{State: status.State, Notice: "기기 목록을 읽지 못했습니다. 연결을 시작하지 않습니다."}
 	}
-	view := View{State: status.State}
+	view := View{State: status.State, Fingerprints: map[string]string{}}
 	counts := map[string]int{}
 	for _, peer := range trust.Peers {
 		if !peer.Revoked && peer.Alias != "" && !strings.ContainsRune(peer.Alias, 0) {
@@ -62,6 +63,11 @@ func Execute(ctx context.Context, open func() (Client, error), action, alias str
 		}
 	}
 	sort.Strings(view.Peers)
+	for _, peer := range trust.Peers {
+		if !peer.Revoked && counts[peer.Alias] == 1 {
+			view.Fingerprints[peer.Alias] = peer.Fingerprint
+		}
+	}
 	var result localapi.OperationResult
 	switch action {
 	case "refresh":

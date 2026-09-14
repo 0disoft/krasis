@@ -32,14 +32,15 @@
 - OS와 네트워크 없이 `ReleaseAll` 성공·부분 실패·재시도와 `LOCAL` 수렴 검증 완료
 - framed stream 재연결과 stale-input 통합 테스트는 순수 모델의 보조 근거로 유지
 
-Phase 1 완료는 Phase 0 완료를 대신하지 않는다. Phase 0이 `IN_PROGRESS`인 동안 GUI와 설치 단계로
-진행하지 않는다.
+Phase 1 완료는 Phase 0 완료를 대신하지 않는다. 사용자 요청에 따라 개발용 GUI 구현과 실기기
+검증을 병행하지만, 서명된 제한 베타 승인은 실기기·설치·복구 증거가 확보될 때까지 보류한다.
 
 ### Phase 2: 기기 신원과 페어링
 
 - 상태: core, resident API와 제품 CLI/config activation 구현 완료.
 - `%LOCALAPPDATA%\Krasis` protected root와 설치별 durable device identity 구현
-- 양쪽 동일 code 확인과 signed receipt가 모두 필요한 5분 pairing ceremony 구현
+- 기존 SAS와 signed receipt, 2분 작업 deadline 구현
+- 일회용 6자리 PIN PAKE, TLS channel binding, 임시 LAN 검색과 GUI 등록 구현
 - fingerprint·역할·capability·revocation의 atomic local trust store 구현
 - identity rotation, alias·권한 변경과 old revoke+replacement atomic mutation 구현
 - Phase 0 credential 자동 migration은 지원하지 않고 폐기 후 새 pairing으로 고정
@@ -83,16 +84,21 @@ Phase 1 완료는 Phase 0 완료를 대신하지 않는다. Phase 0이 `IN_PROGR
   공용 core를 사용함; `krasis-lab`은 bounded 실행과 redacted report를 소유함
 - tray UI lifecycle은 issue #15에 남음
 
-### Phase 6: Wails v3 + Svelte UI
+### Phase 6: 제품 Win32 GUI
 
-- 설정과 상태 투영
-- 입력 처리 경로와 독립적인 시작, 종료 및 장애 처리
+- agent 자동 준비, 상태·연결 관리, PIN 등록과 기기 등록 해제 구현
+- 입력 처리 경로와 독립적인 시작·종료 구현
+- 남음: 자유로운 화면 배치·경계 설정, 트레이, 진단 내보내기, 접근성·고배율 실기기 확인 (#15)
+- Wails/Svelte 재작성은 완료 조건이 아니다. ADR 0001의 agent/projection 경계를 유지한다.
 
 ### Phase 7: 설치와 제한된 베타
 
 - 서명된 설치물, 방화벽 안내, 제거와 데이터 삭제
 - 네 대의 실제 노트북으로 반복 가능한 회귀 표준 확정
 
-## 순서 변경 금지 조건
+## 개발과 출시 승인 경계
 
-Phase 0과 Phase 1을 통과하기 전에 GUI, 설치 프로그램 또는 세부 프로토콜 최적화로 넘어가지 않는다.
+개발용 편의기능 구현을 Phase 0 완료로 간주하지 않는다. #4–#7의 실제 장비 검증과 #16의 설치·서명
+조건은 계속 열어 두며, 중복된 #8의 E0–E8 분류·기본값 결정·증거 일치 검사는 #20에 통합한다.
+네 대의 기존 검증 계획은 통과한 것으로 바꾸지 않는다. 이슈가 정리됐다는 이유로 안전성 gate를
+완료 처리하지 않는다. 로컬 커밋, 원격 반영, CI, 실제 장비 검증은 서로 다른 증거다.

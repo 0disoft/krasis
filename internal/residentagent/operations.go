@@ -97,6 +97,8 @@ func (operations *Operations) Trust(context.Context) (localapi.Trust, error) {
 }
 
 func (operations *Operations) RevokeTrust(_ context.Context, request localapi.OperationRequest) (localapi.OperationResult, error) {
+	operations.mu.Lock()
+	defer operations.mu.Unlock()
 	if operations.trust == nil {
 		return rejected("not_configured"), nil
 	}
@@ -114,9 +116,7 @@ func (operations *Operations) RevokeTrust(_ context.Context, request localapi.Op
 			break
 		}
 	}
-	operations.mu.Lock()
 	active := operations.sessionDone != nil && operations.peerAlias == alias
-	operations.mu.Unlock()
 	if active {
 		return rejected("active_session_requires_disconnect"), nil
 	}
@@ -132,9 +132,7 @@ func (operations *Operations) RevokeTrust(_ context.Context, request localapi.Op
 			return localapi.OperationResult{}, err
 		}
 	}
-	operations.mu.Lock()
 	operations.recordLocked("trust_revoked")
-	operations.mu.Unlock()
 	return completed("trust_revoked"), nil
 }
 

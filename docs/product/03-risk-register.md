@@ -27,9 +27,9 @@
 | High | Precision Touchpad wheel이 low-level hook과 Raw Input payload 경로를 우회함 | pointer와 click은 원격에서 동작하지만 scroll은 source local window에 남음 | foreground touchpad-capable window의 source/destination aggregate와 실제 화면 동작 | ADR 0023 window owner 적용; S-B→S-A `601 sent = 601 injected` 통과, 가로 scroll·외장 mouse·다른 장비는 계속 검증 |
 | High | 절전과 잠금 뒤 낡은 세션이 살아남음 | 엉뚱한 기기로 입력 전달 | Modern Standby와 잠금 반복 | 세션 폐기 후 명시적 재연결 |
 | High | 관리자 앱 또는 보안 화면 기대가 어긋남 | 일부 창에서 입력 불가 | 권한 수준별 테스트 | MVP 제한을 UI와 문서에 명시 |
-| Medium | Wails v3 prerelease 변화로 UI 빌드가 깨짐 | 설치물 재현 불가 | exact toolchain 재현 | 호환 세트 고정, UI를 core에서 격리 |
+| Medium | Win32 제품 GUI의 고배율·접근성 또는 수명 처리 불일치 | 조작 불가 또는 오래된 상태 표시 | 실제 GUI와 DPI·키보드 탐색 확인 | UI를 core에서 격리하고 #15에서 남은 검증 추적 |
 | Medium | 진단 로그가 사용자 입력을 노출 | 개인정보 유출 | 지원 번들 검토 | allowlist 로그와 민감값 redaction |
-| High | 제품 trust store 경로와 pairing UI가 없어 Phase 0 store를 수동 관리함 | 잘못된 store directory나 alias를 선택하고 key rotation을 놓침 | import/list/revoke, 손상·중복·lock·DACL과 향후 migration 테스트 | atomic `krasis.trust-store/v1`과 immutable runtime snapshot은 구현됨; 제품 default 경로·사용자 승인·rotation UX는 Phase 2 후속 |
+| High | 제품 trust·PIN 등록·철회 UX의 실제 장비 검증 부족 | 잘못된 상대 등록 또는 갱신·철회 혼동 | import/list/revoke, PIN 실패·취소, 손상·lock·DACL과 실제 GUI 확인 | protected 제품 경로·PIN GUI·등록 해제는 구현됨; 실기기 UX와 key rotation UX 검증은 계속 필요 |
 | High | press 주입 결과 확실성 분류가 실제 Windows 동작과 어긋남 | 유령 token 또는 실제 held input 누락 | zero·partial·불가능 count, 반복 press, guard cancel과 실제 장비 failure-injection 테스트 | `NOT_APPLIED`인 새 기록만 rollback하고 partial·unknown·기존 반복 token은 guard와 journal에 유지; protocol v2와 aggregate failure evidence 구현됨 |
 | Medium | cursor entry rollback이 최신 물리 cursor 이동과 경합함 | 실패 복구가 사용자의 새 위치를 덮어쓰거나 cursor가 화면 끝에 남음 | entry 성공 뒤 runtime/write 실패, entry 이후 물리 이동과 실제 두 장비 경합 테스트 | prepare·commit·conditional rollback과 restored/not-restored/failed aggregate evidence 구현됨; 현재 좌표가 확인된 entry 좌표와 같을 때만 snapshot 복원, 불확실하면 덮어쓰지 않음 |
 | Medium | 복사된 Windows private key가 넓은 ACL이나 reparse path에 놓임 | 다른 로컬 계정이 key를 읽거나 교체함 | inherited DACL·non-regular key·역할별 복사 후 재보호 테스트 | 생성·명시적 재보호 시 현재 사용자와 `SYSTEM` 전용 protected DACL 강제, load-time DACL·reparse 검증 구현됨; 이미 노출된 key는 폐기 |

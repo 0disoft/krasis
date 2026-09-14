@@ -80,7 +80,7 @@ func (a *productWindow) performPIN(action string) {
 	}
 	a.busy = true
 	a.enablePIN()
-	for _, h := range []uintptr{a.peers, a.connect, a.disconnect, a.refresh} {
+	for _, h := range []uintptr{a.peers, a.connect, a.disconnect, a.refresh, a.revoke} {
 		enable(h, false)
 	}
 	hwnd := a.hwnd

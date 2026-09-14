@@ -10,12 +10,16 @@ Krasis의 입력 처리는 GUI 수명, 렌더러 정지 또는 프론트엔드 �
 ## 결정
 
 - 사용자 세션에서 동작하는 상주 Go agent가 입력, 연결, 신원, 제어권과 복구를 소유한다.
-- CLI, tray와 Wails v3/Svelte UI는 agent의 로컬 API를 사용하는 projection이다.
+- CLI와 GUI는 agent의 로컬 API를 사용하는 projection이다. 현재 제품 GUI는 Go/Win32다.
 - Domain과 Application은 Win32와 UI framework에 의존하지 않는다.
 - 초기 저장소는 비공개 monorepo와 단일 Go module로 유지한다.
 - Windows service는 MVP에 두지 않는다.
 
 ## 결과
+
+2026-09-14 정리: 사용자 요청으로 이미 구현한 native 제품 GUI를 계속 사용한다. Wails/Svelte로
+재작성하는 것 자체를 완료 조건으로 삼지 않는다. 원래의 agent/projection 소유권 경계는 유지하며,
+트레이·설정·접근성 등 남은 사용자 기능은 issue #15에서 추적한다.
 
 UI를 교체하거나 닫아도 입력 안전 계약은 유지된다. 대신 agent, local API와 projection 사이의 버전 계약과 단일 인스턴스 lifecycle을 명시적으로 관리해야 한다.
 
