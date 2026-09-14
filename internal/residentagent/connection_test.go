@@ -100,4 +100,16 @@ func TestConnectionCLIThroughAuthenticatedResidentAPI(t *testing.T) {
 	if err != nil || blocked.Code != "active_session_requires_disconnect" {
 		t.Fatalf("active edge write: %+v %v", blocked, err)
 	}
+	rearmRequest := localapi.ConnectionRequest{Action: "SET_REARM", PeerAlias: "peer", Fingerprint: strings.Repeat("a", 64), RearmDistance: 64}
+	blocked, err = client.Connection(ctx, rearmRequest)
+	if err != nil || blocked.Code != "active_session_requires_disconnect" {
+		t.Fatal("active rearm accepted")
+	}
+	if _, err = client.Disconnect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	rearmed, err := client.Connection(ctx, rearmRequest)
+	if err != nil || rearmed.Profile == nil || rearmed.Profile.Rearm() != 64 || rearmed.Profile.Edge != "LEFT" || rearmed.Profile.Address != "192.168.1.2:4567" {
+		t.Fatalf("rearm API: %+v %v", rearmed, err)
+	}
 }

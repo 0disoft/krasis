@@ -22,9 +22,20 @@ var (
 // Address is the remote dial address when the peer is LISTENER, and the local
 // bind address when the peer is CONNECTOR. Edge is the local exit edge.
 type ConnectionSettings struct {
-	Address string `json:"address"`
-	Edge    string `json:"edge"`
+	Address       string `json:"address"`
+	Edge          string `json:"edge"`
+	RearmDistance int32  `json:"rearmDistance,omitempty"`
 }
+
+// Zero preserves the pre-setting product default for existing profiles.
+func (settings ConnectionSettings) Rearm() int32 {
+	if settings.RearmDistance == 0 {
+		return 32
+	}
+	return settings.RearmDistance
+}
+
+func ValidRearm(distance int32) bool { return distance == 32 || distance == 64 || distance == 128 }
 
 type ConnectionProfile struct {
 	SchemaVersion string `json:"schemaVersion"`
@@ -43,6 +54,9 @@ func (profile ConnectionProfile) Validate() error {
 }
 
 func (settings ConnectionSettings) Validate() error {
+	if !ValidRearm(settings.Rearm()) {
+		return errors.New("invalid rearm distance")
+	}
 	address, err := netip.ParseAddrPort(settings.Address)
 	if err != nil || address.Port() == 0 || address.Addr().Zone() != "" {
 		return errors.New("connection requires an IP address and nonzero port")
@@ -72,6 +86,13 @@ func (store *Store) SetConnectionEdge(alias, fingerprint, edge string) (Connecti
 	return store.setConnection(alias, fingerprint, ConnectionSettings{Edge: edge}, true)
 }
 
+func (store *Store) SetConnectionRearm(alias, fingerprint string, distance int32) (ConnectionProfile, error) {
+	if validateFingerprint(fingerprint) != nil || !ValidRearm(distance) {
+		return ConnectionProfile{}, errors.New("invalid rearm selection")
+	}
+	return store.setConnection(alias, fingerprint, ConnectionSettings{RearmDistance: distance}, true)
+}
+
 func (store *Store) setConnection(alias, fingerprint string, settings ConnectionSettings, edgeOnly bool) (ConnectionProfile, error) {
 	if store == nil {
 		return ConnectionProfile{}, errors.New("trust store is not initialized")
@@ -98,6 +119,11 @@ func (store *Store) setConnection(alias, fingerprint string, settings Connection
 	}
 	if edgeOnly {
 		settings.Address = previous.Address
+		if settings.Edge == "" {
+			settings.Edge = previous.Edge
+		} else {
+			settings.RearmDistance = previous.RearmDistance
+		}
 	}
 	profile := ConnectionProfile{SchemaVersion: ConnectionSchemaVersion, Fingerprint: peer.Fingerprint, ConnectionSettings: settings}
 	data, err := json.Marshal(profile)

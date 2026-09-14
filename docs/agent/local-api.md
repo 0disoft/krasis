@@ -121,6 +121,12 @@ Generation 5부터 `action: SET_EDGE`도 지원한다. `fingerprint`와 LEFT/RIG
 `address`는 허용하지 않는다. trust-store 잠금 안에서 fingerprint를 비교하고 기존 주소를
 보존하여 경계만 저장한다. SET_EDGE는 기존 정상 연결 profile이 필요하며, SET과 마찬가지로
 활성 세션 중에는 거부한다. SET/SHOW에는 fingerprint를 허용하지 않는다.
+Generation 6부터 `SET_REARM`은 `fingerprint`와 `rearmDistance`(32, 64, 128)를 받으며
+address/edge를 금지한다. 기존 profile의 주소·edge를 같은 저장소 잠금 안에서 보존하고,
+활성 세션 중에는 거부한다. 다른 action에는 0이 아닌 rearmDistance를 허용하지 않는다.
+profile의 선택적 rearmDistance가 없거나 0이면 기존 기본값 32를 적용한다. 명시적인 값이
+저장된 profile/응답은 이전 strict-decoding agent/CLI와 호환되지 않을 수 있으므로 실행 파일을
+함께 업데이트한다. 기존 profile은 별도 마이그레이션 없이 읽으며 신뢰 문서는 변경하지 않는다.
 결과는 같은 schemaVersion과 `status`, `code`, 성공 시 `profile`을 포함한다.
 profile은 `krasis.connection-profile/v1`이며 `fingerprint`, `address`, `edge`를 포함한다.
 

@@ -36,7 +36,16 @@ func (operations *Operations) Connection(ctx context.Context, request localapi.C
 	}
 	var profile truststore.ConnectionProfile
 	var err error
-	if request.Action == "SET_EDGE" {
+	if request.Action == "SET_REARM" {
+		editor, ok := operations.trust.(interface {
+			SetConnectionRearm(string, string, int32) (truststore.ConnectionProfile, error)
+		})
+		if !ok {
+			result.Code = "not_configured"
+			return result, nil
+		}
+		profile, err = editor.SetConnectionRearm(request.PeerAlias, request.Fingerprint, request.RearmDistance)
+	} else if request.Action == "SET_EDGE" {
 		editor, ok := operations.trust.(interface {
 			SetConnectionEdge(string, string, string) (truststore.ConnectionProfile, error)
 		})

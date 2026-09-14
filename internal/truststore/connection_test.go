@@ -77,6 +77,40 @@ func TestEdgeEditPreservesAddressAndRejectsChangedIdentity(t *testing.T) {
 	}
 }
 
+func TestRearmPersistsWithoutChangingEdgeOrAddress(t *testing.T) {
+	store := mustStore(t)
+	peer := testPeer()
+	if _, err := store.Import(peer, "peer", false, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	settings := ConnectionSettings{Address: "127.0.0.1:4567", Edge: "RIGHT"}
+	if settings.Rearm() != 32 {
+		t.Fatal("legacy default changed")
+	}
+	if _, err := store.SetConnection("peer", settings); err != nil {
+		t.Fatal(err)
+	}
+	for _, distance := range []int32{32, 64, 128} {
+		p, err := store.SetConnectionRearm("peer", peer.CertificateSHA256, distance)
+		if err != nil || p.Rearm() != distance || p.Edge != settings.Edge || p.Address != settings.Address {
+			t.Fatalf("rearm: %+v %v", p, err)
+		}
+	}
+	for _, distance := range []int32{-1, 0, 1, 33, 256} {
+		if _, err := store.SetConnectionRearm("peer", peer.CertificateSHA256, distance); err == nil {
+			t.Fatal("invalid distance saved")
+		}
+	}
+	p, err := store.SetConnectionEdge("peer", peer.CertificateSHA256, "LEFT")
+	if err != nil || p.Rearm() != 128 {
+		t.Fatal("edge edit reset rearm")
+	}
+	loaded, err := store.Connection("peer")
+	if err != nil || loaded != p {
+		t.Fatal("rearm not persisted")
+	}
+}
+
 func TestConnectionRejectsAmbiguityMissingAndCorruption(t *testing.T) {
 	store := mustStore(t)
 	peer, now := testPeer(), time.Now().UTC()

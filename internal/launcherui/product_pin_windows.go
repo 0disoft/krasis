@@ -50,6 +50,9 @@ func (a *productWindow) createPIN(control func(string, string, uintptr, int32, i
 }
 
 func (a *productWindow) enablePIN() {
+	for _, h := range a.rearmButtons {
+		enable(h, !a.busy && !a.closing && a.view.State == "LOCAL" && a.pin.job == "" && len(a.view.Peers) > 0)
+	}
 	for _, h := range []uintptr{a.layoutLeft, a.layoutRight} {
 		enable(h, !a.busy && !a.closing && a.view.State == "LOCAL" && a.pin.job == "" && len(a.view.Peers) > 0)
 	}

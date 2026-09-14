@@ -7,6 +7,14 @@ import (
 
 // SetLayout changes only this PC's exit edge, without re-pairing or replacing an address.
 func SetLayout(ctx context.Context, open func() (Client, error), fingerprint, edge string) View {
+	return setBoundary(ctx, open, fingerprint, edge, 0)
+}
+
+func SetRearm(ctx context.Context, open func() (Client, error), fingerprint string, distance int32) View {
+	return setBoundary(ctx, open, fingerprint, "", distance)
+}
+
+func setBoundary(ctx context.Context, open func() (Client, error), fingerprint, edge string, distance int32) View {
 	c, err := open()
 	if err != nil {
 		return View{Notice: "에이전트에 접근할 수 없습니다."}
@@ -19,7 +27,8 @@ func SetLayout(ctx context.Context, open func() (Client, error), fingerprint, ed
 			alias = name
 		}
 	}
-	if view.State != "LOCAL" || alias == "" || (edge != "LEFT" && edge != "RIGHT") {
+	valid := (distance == 0 && (edge == "LEFT" || edge == "RIGHT")) || (edge == "" && (distance == 32 || distance == 64 || distance == 128))
+	if view.State != "LOCAL" || alias == "" || !valid {
 		view.Notice = "연결 해제 후 기기를 다시 선택하세요."
 		return view
 	}
@@ -30,11 +39,19 @@ func SetLayout(ctx context.Context, open func() (Client, error), fingerprint, ed
 		view.Notice = "새로고침으로 에이전트를 업데이트하세요."
 		return view
 	}
-	result, err := editor.Connection(ctx, localapi.ConnectionRequest{Action: "SET_EDGE", PeerAlias: alias, Fingerprint: fingerprint, Edge: edge})
+	request := localapi.ConnectionRequest{Action: "SET_EDGE", PeerAlias: alias, Fingerprint: fingerprint, Edge: edge}
+	if distance != 0 {
+		request.Action = "SET_REARM"
+		request.RearmDistance = distance
+	}
+	result, err := editor.Connection(ctx, request)
 	if err != nil || result.Status != "COMPLETED" || result.Code != "connection_saved" {
 		view.Notice = "배치 저장을 확인하지 못했습니다. 새로고침하거나 기존 연결 설정을 확인하세요."
 		return view
 	}
 	view.Notice = "이 PC의 배치를 저장했습니다. 상대 PC에서도 반대 방향을 선택한 뒤 연결하세요."
+	if distance != 0 {
+		view.Notice = "이 PC의 경계 재진입 여유를 저장했습니다. 다음 연결부터 적용됩니다."
+	}
 	return view
 }

@@ -25,10 +25,14 @@ const productRevoke = 2005
 const productExport = 2006
 const layoutLeft = 2301
 const layoutRight = 2302
+const rearm32 = 2310
+const rearm64 = 2311
+const rearm128 = 2312
 const exportEvent = wmUIEvent + 2
 const wmTimer = 0x0113
 
 type productWindow struct {
+	rearmButtons                                              [3]uintptr
 	layoutLeft, layoutRight                                   uintptr
 	trayReady, trayMenuOpen, quitRequested                    bool
 	taskbarCreated                                            uint32
@@ -83,7 +87,7 @@ func RunProductControl() (resultErr error) {
 	if value, _, _ := procRegisterClassEx.Call(uintptr(unsafe.Pointer(&class))); value == 0 {
 		return errors.New("register control window")
 	}
-	hwnd, _, _ := procCreateWindowEx.Call(0, uintptr(unsafe.Pointer(name)), uintptr(unsafe.Pointer(utf16("Krasis · 연결 관리"))), (wsOverlappedWindow&^(0x00040000|0x00010000))|wsVisible, 0x80000000, 0x80000000, 600, 715, 0, 0, instance, 0)
+	hwnd, _, _ := procCreateWindowEx.Call(0, uintptr(unsafe.Pointer(name)), uintptr(unsafe.Pointer(utf16("Krasis · 연결 관리"))), (wsOverlappedWindow&^(0x00040000|0x00010000))|wsVisible, 0x80000000, 0x80000000, 600, 750, 0, 0, instance, 0)
 	if hwnd == 0 {
 		return errors.New("create control window")
 	}
@@ -144,6 +148,12 @@ func productWindowProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr
 	case wmCommand:
 		if int((wParam>>16)&0xffff) == bnClicked {
 			switch int(wParam & 0xffff) {
+			case rearm32:
+				a.performTarget("rearm_32", a.view.Fingerprints[a.selected()])
+			case rearm64:
+				a.performTarget("rearm_64", a.view.Fingerprints[a.selected()])
+			case rearm128:
+				a.performTarget("rearm_128", a.view.Fingerprints[a.selected()])
 			case layoutLeft:
 				a.performTarget("layout_LEFT", a.view.Fingerprints[a.selected()])
 			case layoutRight:
@@ -273,6 +283,9 @@ func (a *productWindow) create() bool {
 	control("STATIC", "선택한 기기의 위치 · 연결 해제 후 양쪽 PC에서 각각 설정", 0, 20, 580, 545, 25, 0)
 	a.layoutLeft = control("BUTTON", "상대가 왼쪽", wsTabStop, 20, 616, 260, 32, layoutLeft)
 	a.layoutRight = control("BUTTON", "상대가 오른쪽", wsTabStop, 305, 616, 260, 32, layoutRight)
+	a.rearmButtons[0] = control("BUTTON", "재진입 32px (기본)", wsTabStop, 20, 660, 175, 32, rearm32)
+	a.rearmButtons[1] = control("BUTTON", "재진입 64px", wsTabStop, 205, 660, 170, 32, rearm64)
+	a.rearmButtons[2] = control("BUTTON", "재진입 128px", wsTabStop, 390, 660, 175, 32, rearm128)
 	a.apply(productpanel.View{})
 	return a.peers != 0 && a.connect != 0 && a.disconnect != 0 && a.refresh != 0 && a.status != 0 && a.notice != 0 && a.exportButton != 0 && a.exportPath != 0
 }
@@ -361,7 +374,9 @@ func (a *productWindow) performTarget(action, alias string) {
 		}
 		open := func() (productpanel.Client, error) { return localapi.OpenClient(a.control) }
 		var view productpanel.View
-		if action == "layout_LEFT" || action == "layout_RIGHT" {
+		if distance := map[string]int32{"rearm_32": 32, "rearm_64": 64, "rearm_128": 128}[action]; distance != 0 {
+			view = productpanel.SetRearm(ctx, open, alias, distance)
+		} else if action == "layout_LEFT" || action == "layout_RIGHT" {
 			view = productpanel.SetLayout(ctx, open, alias, action[len("layout_"):])
 		} else if action == "revoke" {
 			view = productpanel.Revoke(ctx, open, alias)

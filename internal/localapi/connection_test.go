@@ -31,6 +31,9 @@ func TestConnectionRouteRejectsUnauthenticatedAndInvalidRequests(t *testing.T) {
 		authenticated bool
 		status        int
 	}{
+		{`{"schemaVersion":"krasis.agent.connection/v1","action":"SET_REARM","peerAlias":"peer","fingerprint":"` + strings.Repeat("a", 64) + `","rearmDistance":64}`, false, http.StatusUnauthorized},
+		{`{"schemaVersion":"krasis.agent.connection/v1","action":"SET_REARM","peerAlias":"peer","fingerprint":"` + strings.Repeat("a", 64) + `","rearmDistance":1}`, true, http.StatusBadRequest},
+		{`{"schemaVersion":"krasis.agent.connection/v1","action":"SET_REARM","peerAlias":"peer","fingerprint":"` + strings.Repeat("a", 64) + `","rearmDistance":64,"edge":"LEFT"}`, true, http.StatusBadRequest},
 		{`{"schemaVersion":"krasis.agent.connection/v1","action":"SET_EDGE","peerAlias":"peer","edge":"LEFT"}`, false, http.StatusUnauthorized},
 		{`{"schemaVersion":"krasis.agent.connection/v1","action":"SET_EDGE","peerAlias":"peer","edge":"LEFT"}`, true, http.StatusBadRequest},
 		{`{"schemaVersion":"krasis.agent.connection/v1","action":"SET_EDGE","peerAlias":"peer","fingerprint":"` + strings.Repeat("a", 64) + `","edge":"LEFT","address":"127.0.0.1:4567"}`, true, http.StatusBadRequest},

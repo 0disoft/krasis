@@ -94,7 +94,7 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store) S
 		if diagnostics.Display.MonitorCount != 1 {
 			return errors.New("one active display is required")
 		}
-		input, err := wininput.NewInputAdapterWithReturnRearmDistance(32, diagnostics.Display.Width)
+		input, err := wininput.NewInputAdapterWithReturnRearmDistance(prepared.profile.Rearm(), diagnostics.Display.Width)
 		if err != nil {
 			return err
 		}
@@ -142,7 +142,7 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store) S
 			}
 		}()
 		defer func() { cancel(); <-monitorDone }()
-		config := agent.DefaultConfig(control.BoundaryConfig{Edge: control.ScreenEdge(prepared.profile.Edge), ScreenLeft: diagnostics.Display.Left, ScreenWidth: diagnostics.Display.Width, RearmDistance: 32})
+		config := agent.DefaultConfig(control.BoundaryConfig{Edge: control.ScreenEdge(prepared.profile.Edge), ScreenLeft: diagnostics.Display.Left, ScreenWidth: diagnostics.Display.Width, RearmDistance: prepared.profile.Rearm()})
 		// Initial conservative defaults, not a measured latency guarantee.
 		config.Liveness = &agent.LivenessPolicy{HeartbeatInterval: 250 * time.Millisecond, PeerTimeout: 2 * time.Second}
 		return agent.RunSupervisor(ctx, agent.SupervisorConfig{Session: config, Backoff: agent.DefaultBackoffPolicy(), Now: time.Now, Wait: agent.Wait, Observer: observer}, agent.SupervisorDependencies{

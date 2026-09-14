@@ -16,6 +16,7 @@ type ConnectionRequest struct {
 	Address       string `json:"address,omitempty"`
 	Edge          string `json:"edge,omitempty"`
 	Fingerprint   string `json:"fingerprint,omitempty"`
+	RearmDistance int32  `json:"rearmDistance,omitempty"`
 }
 
 type ConnectionResult struct {
@@ -33,7 +34,12 @@ func (request ConnectionRequest) Valid() bool {
 	if request.SchemaVersion != ConnectionSchemaVersion || !validAlias(request.PeerAlias) {
 		return false
 	}
+	if request.Action != "SET_REARM" && request.RearmDistance != 0 {
+		return false
+	}
 	switch request.Action {
+	case "SET_REARM":
+		return request.Address == "" && request.Edge == "" && validFingerprint(request.Fingerprint) && truststore.ValidRearm(request.RearmDistance)
 	case "SHOW":
 		return request.Address == "" && request.Edge == "" && request.Fingerprint == ""
 	case "SET":
