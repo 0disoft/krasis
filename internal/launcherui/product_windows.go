@@ -22,9 +22,13 @@ const productConnect = 2002
 const productDisconnect = 2003
 const productPeers = 2004
 const productRevoke = 2005
+const productExport = 2006
+const exportEvent = wmUIEvent + 2
 const wmTimer = 0x0113
 
 type productWindow struct {
+	exportButton, exportPath                                  uintptr
+	exportResults                                             chan string
 	revoke                                                    uintptr
 	pin                                                       pinWindow
 	log                                                       *productlog.Logger
@@ -74,7 +78,7 @@ func RunProductControl() (resultErr error) {
 	if value, _, _ := procRegisterClassEx.Call(uintptr(unsafe.Pointer(&class))); value == 0 {
 		return errors.New("register control window")
 	}
-	hwnd, _, _ := procCreateWindowEx.Call(0, uintptr(unsafe.Pointer(name)), uintptr(unsafe.Pointer(utf16("Krasis · 연결 관리"))), (wsOverlappedWindow&^(0x00040000|0x00010000))|wsVisible, 0x80000000, 0x80000000, 600, 550, 0, 0, instance, 0)
+	hwnd, _, _ := procCreateWindowEx.Call(0, uintptr(unsafe.Pointer(name)), uintptr(unsafe.Pointer(utf16("Krasis · 연결 관리"))), (wsOverlappedWindow&^(0x00040000|0x00010000))|wsVisible, 0x80000000, 0x80000000, 600, 620, 0, 0, instance, 0)
 	if hwnd == 0 {
 		return errors.New("create control window")
 	}
@@ -115,6 +119,8 @@ func productWindowProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr
 	case wmCommand:
 		if int((wParam>>16)&0xffff) == bnClicked {
 			switch int(wParam & 0xffff) {
+			case productExport:
+				a.exportDiagnostics()
 			case productRevoke:
 				a.revokePeer()
 			case pinInvite:
@@ -141,6 +147,19 @@ func productWindowProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr
 			} else {
 				a.perform("refresh")
 			}
+		}
+		return 0
+	case exportEvent:
+		select {
+		case result := <-a.exportResults:
+			a.busy = false
+			if a.closing {
+				procDestroyWindow.Call(hwnd)
+			} else {
+				a.apply(a.view)
+				setText(a.exportPath, result)
+			}
+		default:
 		}
 		return 0
 	case pinEvent:
@@ -206,8 +225,33 @@ func (a *productWindow) create() bool {
 	control("STATIC", "창을 닫아도 연결은 유지됩니다.\n중지하려면 연결 해제를 누르세요.", 0, 20, 222, 355, 46, 0)
 	a.revoke = control("BUTTON", "기기 등록 해제", wsTabStop, 390, 226, 175, 30, productRevoke)
 	a.createPIN(control)
+	a.exportResults = make(chan string, 1)
+	a.exportButton = control("BUTTON", "진단 내보내기", wsTabStop, 20, 490, 170, 30, productExport)
+	control("STATIC", "최근 이벤트만 저장 · 이전 내보내기 파일 교체", 0, 205, 494, 360, 25, 0)
+	a.exportPath = control("EDIT", "저장 후 이 칸의 파일 경로를 복사할 수 있습니다.", wsTabStop|0x0800|0x0080, 20, 532, 545, 26, 0)
 	a.apply(productpanel.View{})
-	return a.peers != 0 && a.connect != 0 && a.disconnect != 0 && a.refresh != 0 && a.status != 0 && a.notice != 0
+	return a.peers != 0 && a.connect != 0 && a.disconnect != 0 && a.refresh != 0 && a.status != 0 && a.notice != 0 && a.exportButton != 0 && a.exportPath != 0
+}
+
+func (a *productWindow) exportDiagnostics() {
+	if a.busy || a.closing || a.pin.job != "" {
+		return
+	}
+	a.busy = true
+	a.enablePIN()
+	for _, h := range []uintptr{a.peers, a.connect, a.disconnect, a.refresh, a.revoke} {
+		enable(h, false)
+	}
+	hwnd, base := a.hwnd, os.Getenv("LOCALAPPDATA")
+	setText(a.exportPath, "진단 파일 저장 중…")
+	go func() {
+		path, err := productlog.Export(base)
+		if err != nil {
+			path = "저장 실패. 저장 공간과 Krasis 폴더 접근 권한을 확인하세요."
+		}
+		a.exportResults <- path
+		procPostMessage.Call(hwnd, exportEvent, 0, 0)
+	}()
 }
 
 func (a *productWindow) selected() string {
