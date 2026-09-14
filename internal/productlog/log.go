@@ -20,16 +20,18 @@ const maxBytes = 256 << 10
 var allowed = map[string]bool{}
 
 func init() {
+	allowed["boundary_summary"] = true
 	for _, code := range []string{"process_started", "process_stopped", "process_failed", "agent_ready", "prepare_started", "prepare_failed", "prepare_completed", "connect_started", "already_active", "not_configured", "credential_unavailable", "connection_not_configured", "peer_not_found", "peer_alias_ambiguous", "no_active_session", "disconnected", "shutdown_timeout", "safe_stop_requested", "session_failed", "session_stopped", "CONNECTED", "CONNECTING", "RECONNECTING", "DISCONNECTING", "upgrade_stop_requested"} {
 		allowed[code] = true
 	}
 }
 
 type record struct {
-	Time  string `json:"time"`
-	Code  string `json:"code"`
-	Build string `json:"build"`
-	PID   int    `json:"pid"`
+	Time     string           `json:"time"`
+	Code     string           `json:"code"`
+	Build    string           `json:"build"`
+	PID      int              `json:"pid"`
+	Boundary *BoundarySummary `json:"boundary,omitempty"`
 }
 type Logger struct {
 	mu          sync.Mutex
@@ -80,6 +82,10 @@ func newLogger(dir *securefs.Directory, lease io.Closer, role string) *Logger {
 }
 
 func (l *Logger) Event(code string) {
+	l.enqueue(code, nil)
+}
+
+func (l *Logger) enqueue(code string, boundary *BoundarySummary) {
 	if l == nil || !allowed[code] {
 		return
 	}
@@ -88,7 +94,7 @@ func (l *Logger) Event(code string) {
 	if l.closed {
 		return
 	}
-	r := record{time.Now().UTC().Format(time.RFC3339Nano), code, l.build, os.Getpid()}
+	r := record{Time: time.Now().UTC().Format(time.RFC3339Nano), Code: code, Build: l.build, PID: os.Getpid(), Boundary: boundary}
 	select {
 	case l.queue <- r:
 	default:

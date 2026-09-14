@@ -16,8 +16,9 @@ import (
 const ExportName = "support-latest.json"
 
 type exportEvent struct {
-	Time string `json:"time"`
-	Code string `json:"code"`
+	Time     string           `json:"time"`
+	Code     string           `json:"code"`
+	Boundary *BoundarySummary `json:"boundary,omitempty"`
 }
 
 type exportLog struct {
@@ -113,7 +114,15 @@ func sanitizeLog(name string, r io.Reader) exportLog {
 			continue
 		}
 		// Reproject: no arbitrary fields, build strings, process IDs or raw lines.
-		result.Events = append(result.Events, exportEvent{timestamp.UTC().Format(time.RFC3339Nano), input.Code})
+		event := exportEvent{Time: timestamp.UTC().Format(time.RFC3339Nano), Code: input.Code}
+		if input.Code == "boundary_summary" {
+			if input.Boundary == nil || !input.Boundary.valid() {
+				result.Incomplete = true
+				continue
+			}
+			event.Boundary = input.Boundary
+		}
+		result.Events = append(result.Events, event)
 	}
 	if scanner.Err() != nil {
 		result.Incomplete = true

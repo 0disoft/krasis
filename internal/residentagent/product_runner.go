@@ -12,6 +12,7 @@ import (
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/crashguard"
 	"github.com/0disoft/krasis/internal/productidentity"
+	"github.com/0disoft/krasis/internal/productlog"
 	"github.com/0disoft/krasis/internal/transport"
 	"github.com/0disoft/krasis/internal/truststore"
 	"github.com/0disoft/krasis/internal/wininput"
@@ -81,7 +82,7 @@ func prepareProductConnection(identities *productidentity.Store, trust *truststo
 	return productConnection{profile: profile, peer: peer, tls: config, deadline: deadline}, nil
 }
 
-func productRunner(identities *productidentity.Store, trust *truststore.Store) SessionRunner {
+func productRunner(identities *productidentity.Store, trust *truststore.Store, log *productlog.Logger) SessionRunner {
 	return func(parent context.Context, alias string, observer agent.SupervisorObserver) (err error) {
 		prepared, err := prepareProductConnection(identities, trust, alias)
 		if err != nil {
@@ -143,6 +144,15 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store) S
 		}()
 		defer func() { cancel(); <-monitorDone }()
 		config := agent.DefaultConfig(control.BoundaryConfig{Edge: control.ScreenEdge(prepared.profile.Edge), ScreenLeft: diagnostics.Display.Left, ScreenWidth: diagnostics.Display.Width, RearmDistance: prepared.profile.Rearm()})
+		physicalWidth, physicalHeight, awareness := wininput.DisplayCoordinates()
+		boundary := &boundaryDiagnostics{summary: productlog.BoundarySummary{
+			Left: diagnostics.Display.Left, Top: diagnostics.Display.Top, Width: diagnostics.Display.Width, Height: diagnostics.Display.Height,
+			PhysicalWidth: physicalWidth, PhysicalHeight: physicalHeight, DPIAwareness: awareness,
+			Edge: string(config.Boundary.Edge), Gap: config.Boundary.ActivationGap, Rearm: config.Boundary.RearmDistance,
+		}}
+		log.Boundary(boundary.snapshot(false))
+		defer func() { log.Boundary(boundary.snapshot(true)) }()
+		config.SourceObserver = boundary
 		// Initial conservative defaults, not a measured latency guarantee.
 		config.Liveness = &agent.LivenessPolicy{HeartbeatInterval: 250 * time.Millisecond, PeerTimeout: 2 * time.Second}
 		return agent.RunSupervisor(ctx, agent.SupervisorConfig{Session: config, Backoff: agent.DefaultBackoffPolicy(), Now: time.Now, Wait: agent.Wait, Observer: observer}, agent.SupervisorDependencies{

@@ -103,7 +103,7 @@ func run(ctx context.Context, localAppData string, dependencies runDependencies)
 			return err
 		}
 		dependencies.pairing = &networkPairing{root: lifecycle.Context(), identity: identity, identities: identities, trust: trust}
-		dependencies.runner = productRunner(identities, trust)
+		dependencies.runner = productRunner(identities, trust, dependencies.log)
 	}
 	operations, err := New(lifecycle.Context(), identity.Public(), dependencies.runner, dependencies.pairing, trust)
 	if err != nil {
