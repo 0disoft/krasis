@@ -10,7 +10,7 @@ import (
 
 const RuntimeSchemaVersion = "krasis.agent.runtime/v1"
 const AgentProtocol = 1
-const AgentGeneration = 7
+const AgentGeneration = 8
 
 type RuntimeInfo struct {
 	SchemaVersion string `json:"schemaVersion"`

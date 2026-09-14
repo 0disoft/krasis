@@ -12,6 +12,10 @@ import (
 )
 
 func main() {
+	if err := wininput.InitializePhysicalCoordinates(); err != nil {
+		fmt.Fprintln(os.Stderr, "agent_error: physical screen coordinates unavailable")
+		os.Exit(1)
+	}
 	if len(os.Args) == 2 && os.Args[1] == "product-crash-guard-internal" {
 		_, err := crashguard.ServeWithResult(os.Stdin, os.Stdout, wininput.NewInputAdapter())
 		if err != nil {
