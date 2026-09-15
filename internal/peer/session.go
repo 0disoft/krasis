@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/0disoft/krasis/internal/application"
+	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/transport"
 )
 
@@ -123,7 +124,11 @@ func runSession(
 		case transport.MessageHeartbeat:
 			err = coordinateDispatch(ctx, coordinator, func() error {
 				observedAt = now()
-				if peerTimeout > 0 {
+				// After normal return, the dispatcher must still validate and
+				// drain the exact retired heartbeat (ADR 0020). Only active
+				// leases have a deadline; other identities remain rejected.
+				state := runtime.Snapshot().Control.State
+				if peerTimeout > 0 && (state == control.StateInboundActive || state == control.StateOutboundActive) {
 					cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), CleanupTimeout)
 					defer cancel()
 					faulted, livenessErr := runtime.CheckLiveness(cleanupCtx, observedAt, peerTimeout)
