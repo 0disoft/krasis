@@ -25,6 +25,9 @@ const (
 	wsPopup                        = 0x80000000
 	wsExTopmost                    = 0x00000008
 	wsExToolWindow                 = 0x00000080
+	wsExLayeredSourceCapture       = 0x00080000
+	sourceWheelCaptureAlpha        = 1
+	sourceWheelCaptureAlphaFlag    = 0x00000002
 	swHide                         = 0
 	swpNoActivate                  = 0x0010
 	sourceWheelCaptureWidth        = 24
@@ -33,6 +36,7 @@ const (
 )
 
 var (
+	callSetLayeredSourceCapture        = user32.NewProc("SetLayeredWindowAttributes").Call
 	procSetWindowPosSourceCapture      = user32.NewProc("SetWindowPos")
 	procIsWindowSourceCapture          = user32.NewProc("IsWindow")
 	procAttachThreadInputSourceCapture = user32.NewProc("AttachThreadInput")
@@ -380,7 +384,7 @@ func (current *sourceWheelCaptureRun) run(ctx context.Context, ready func()) (re
 		runtime.KeepAlive(wndProc)
 	}()
 	window, _, callErr := procCreateWindowExW.Call(
-		wsExTopmost|wsExToolWindow,
+		wsExTopmost|wsExToolWindow|wsExLayeredSourceCapture,
 		uintptr(unsafe.Pointer(className)),
 		uintptr(unsafe.Pointer(windowTitle)),
 		wsPopup,
@@ -399,6 +403,11 @@ func (current *sourceWheelCaptureRun) run(ctx context.Context, ready func()) (re
 			}
 		}
 	}()
+
+	// Configure before the first ShowWindow: an opaque frame must never flash.
+	if err := configureSourceWheelCaptureAppearance(window); err != nil {
+		return err
+	}
 
 	stopWatcher := make(chan struct{})
 	stopWatcherDone := make(chan struct{})
@@ -425,6 +434,16 @@ func (current *sourceWheelCaptureRun) run(ctx context.Context, ready func()) (re
 		return terminalErr
 	}
 	return ctx.Err()
+}
+
+func configureSourceWheelCaptureAppearance(window uintptr) error {
+	// Alpha zero or WS_EX_TRANSPARENT would pass hit testing through to other
+	// applications. Keep a nonzero alpha so touchpad wheel ownership is retained.
+	configured, _, callErr := callSetLayeredSourceCapture(window, 0, sourceWheelCaptureAlpha, sourceWheelCaptureAlphaFlag)
+	if configured == 0 {
+		return fmt.Errorf("%w: %v", ErrSourceCaptureActivationSetup, touchpadWin32Error("SetLayeredWindowAttributes(source wheel capture)", callErr))
+	}
+	return nil
 }
 
 func (current *sourceWheelCaptureRun) handleCommand(message uint32) uintptr {
