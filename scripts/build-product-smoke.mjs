@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { verifyExecutableIcon } from './check-windows-icon.mjs';
 
 // Local manual-test artifact only: never starts an agent or sends input.
 const root = process.cwd();
@@ -21,6 +22,7 @@ for (const name of ['krasis', 'krasis-agent', 'krasis-control']) {
   if (bytes.toString('ascii', 0, 2) !== 'MZ' || bytes.readUInt32LE(pe) !== 0x4550 || bytes.readUInt16LE(pe + 4) !== 0x8664) {
     throw new Error('Artifact is not a Windows x64 executable.');
   }
+  verifyExecutableIcon(bytes);
 }
 const probe = spawnSync(path.join(destination, 'krasis.exe'), [], { encoding: 'utf8', timeout: 5000 });
 if (probe.error || probe.status !== 2) throw new Error('CLI usage smoke check failed.');

@@ -32,6 +32,7 @@ const exportEvent = wmUIEvent + 2
 const wmTimer = 0x0113
 
 type productWindow struct {
+	trayIcon                                                  uintptr
 	version                                                   uintptr
 	appBuild                                                  string
 	rearmButtons                                              [3]uintptr
@@ -91,16 +92,21 @@ func RunProductControl() (resultErr error) {
 	productApp = app
 	defer func() { productApp = nil }()
 	instance, _, _ := procGetModuleHandle.Call(0)
+	icons := loadWindowIcons(instance)
+	defer icons.close()
+	app.trayIcon = icons.small.handle
 	cursor, _, _ := procLoadCursor.Call(0, 32512)
 	name := utf16(productWindowClass)
-	class := windowClassEx{size: uint32(unsafe.Sizeof(windowClassEx{})), wndProc: syscall.NewCallback(productWindowProc), instance: instance, cursor: cursor, background: 6, className: name}
+	class := windowClassEx{size: uint32(unsafe.Sizeof(windowClassEx{})), wndProc: syscall.NewCallback(productWindowProc), instance: instance, icon: icons.large.handle, iconSmall: icons.small.handle, cursor: cursor, background: 6, className: name}
 	if value, _, _ := procRegisterClassEx.Call(uintptr(unsafe.Pointer(&class))); value == 0 {
 		return errors.New("register control window")
 	}
+	defer user32.NewProc("UnregisterClassW").Call(uintptr(unsafe.Pointer(name)), instance)
 	hwnd, _, _ := procCreateWindowEx.Call(0, uintptr(unsafe.Pointer(name)), uintptr(unsafe.Pointer(utf16("Krasis · 연결 관리"))), (wsOverlappedWindow&^(0x00040000|0x00010000))|wsVisible, 0x80000000, 0x80000000, 600, 750, 0, 0, instance, 0)
 	if hwnd == 0 {
 		return errors.New("create control window")
 	}
+	defer user32.NewProc("DestroyWindow").Call(hwnd)
 	procShowWindow.Call(hwnd, swShow)
 	procUpdateWindow.Call(hwnd)
 	messageID, _, _ := user32.NewProc("RegisterWindowMessageW").Call(uintptr(unsafe.Pointer(utf16("TaskbarCreated"))))

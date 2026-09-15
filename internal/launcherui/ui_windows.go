@@ -181,12 +181,16 @@ func Run() error {
 	defer func() { globalApp = nil }()
 
 	instance, _, _ := procGetModuleHandle.Call(0)
+	icons := loadWindowIcons(instance)
+	defer icons.close()
 	className := utf16(windowClassName)
 	cursor, _, _ := procLoadCursor.Call(0, 32512)
 	class := windowClassEx{
 		size:       uint32(unsafe.Sizeof(windowClassEx{})),
 		wndProc:    syscall.NewCallback(windowProc),
 		instance:   instance,
+		icon:       icons.large.handle,
+		iconSmall:  icons.small.handle,
 		cursor:     cursor,
 		background: 6,
 		className:  className,
@@ -194,6 +198,7 @@ func Run() error {
 	if result, _, callErr := procRegisterClassEx.Call(uintptr(unsafe.Pointer(&class))); result == 0 {
 		return fmt.Errorf("register launcher window: %w", callErr)
 	}
+	defer user32.NewProc("UnregisterClassW").Call(uintptr(unsafe.Pointer(className)), instance)
 	hwnd, _, callErr := procCreateWindowEx.Call(
 		0,
 		uintptr(unsafe.Pointer(className)),
@@ -205,6 +210,7 @@ func Run() error {
 	if hwnd == 0 {
 		return fmt.Errorf("create launcher window: %w", callErr)
 	}
+	defer user32.NewProc("DestroyWindow").Call(hwnd)
 	app.hwnd = hwnd
 	procShowWindow.Call(hwnd, swShow)
 	procUpdateWindow.Call(hwnd)

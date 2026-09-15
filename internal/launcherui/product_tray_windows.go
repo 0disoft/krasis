@@ -54,7 +54,7 @@ func trayLabel(state string) string {
 func (a *productWindow) trayData() notifyIconData {
 	d := notifyIconData{Window: a.hwnd, ID: 1, Flags: 1 | 2 | 4 | 0x80, Callback: trayEvent}
 	d.Size = uint32(unsafe.Sizeof(d))
-	d.Icon, _, _ = user32.NewProc("LoadIconW").Call(0, 32512)
+	d.Icon = a.trayIcon
 	text, _ := syscall.UTF16FromString(trayLabel(a.view.State))
 	copy(d.Tip[:], text)
 	return d
