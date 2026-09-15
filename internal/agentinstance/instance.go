@@ -8,12 +8,17 @@ var (
 )
 
 const productionName = `Local\Krasis-Agent-v1`
+const controlName = `Local\Krasis-Control-v1`
 
 type Lease struct {
 	close func() error
 }
 
 func Acquire() (*Lease, error) { return acquire(productionName) }
+
+// AcquireControl owns the management GUI lifetime, separately from startup
+// coordination and log-file ownership. The agent keeps running when it closes.
+func AcquireControl() (*Lease, error) { return acquire(controlName) }
 
 // Separate short-lived ownership for GUI startup/upgrade coordination.
 func AcquireControlStartup() (*Lease, error) { return acquire(`Local\Krasis-Control-Startup-v1`) }

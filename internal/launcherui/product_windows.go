@@ -41,6 +41,7 @@ type productWindow struct {
 	revoke                                                    uintptr
 	pin                                                       pinWindow
 	log                                                       *productlog.Logger
+	logOpenErr                                                error
 	hwnd, peers, status, notice, connect, disconnect, refresh uintptr
 	control                                                   string
 	view                                                      productpanel.View
@@ -56,7 +57,12 @@ var productApp *productWindow
 func RunProductControl() (resultErr error) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
-	log, _ := productlog.Open(os.Getenv("LOCALAPPDATA"), "control")
+	ownership, err := acquireProductWindow()
+	if err != nil || ownership == nil {
+		return err
+	}
+	defer ownership.Close()
+	log, logErr := productlog.Open(os.Getenv("LOCALAPPDATA"), "control")
 	log.Event("process_started")
 	defer func() {
 		if resultErr != nil {
@@ -74,6 +80,7 @@ func RunProductControl() (resultErr error) {
 	defer cancel()
 	app := &productWindow{control: paths.Control, ctx: ctx, cancel: cancel, result: make(chan productpanel.View, 1)}
 	app.log = log
+	app.logOpenErr = logErr
 	app.startup, err = productpanel.NewStartup(paths.Control)
 	if err != nil {
 		return err
@@ -82,7 +89,7 @@ func RunProductControl() (resultErr error) {
 	defer func() { productApp = nil }()
 	instance, _, _ := procGetModuleHandle.Call(0)
 	cursor, _, _ := procLoadCursor.Call(0, 32512)
-	name := utf16("KrasisProductControlWindow")
+	name := utf16(productWindowClass)
 	class := windowClassEx{size: uint32(unsafe.Sizeof(windowClassEx{})), wndProc: syscall.NewCallback(productWindowProc), instance: instance, cursor: cursor, background: 6, className: name}
 	if value, _, _ := procRegisterClassEx.Call(uintptr(unsafe.Pointer(&class))); value == 0 {
 		return errors.New("register control window")
@@ -128,6 +135,11 @@ func productWindowProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr
 		return 0
 	}
 	switch msg {
+	case productShowExisting:
+		if !a.closing {
+			a.showControl()
+		}
+		return 0
 	case trayEvent:
 		if a.closing {
 			return 0
@@ -411,8 +423,8 @@ func (a *productWindow) apply(view productpanel.View) {
 	if view.Notice == "" && len(view.Peers) == 0 {
 		view.Notice = "페어링된 기기가 없습니다. 아래에서 PIN으로 새 기기를 등록하세요."
 	}
-	if a.log == nil || a.log.Failed() {
-		view.Notice = "로그 저장 불가 또는 기록 누락이 발생했습니다. " + view.Notice
+	if warning := controlLogWarning(a.log != nil, a.log.Failed(), a.logOpenErr); warning != "" {
+		view.Notice = warning + " " + view.Notice
 	}
 	setText(a.notice, view.Notice)
 	enable(a.peers, len(view.Peers) > 0)

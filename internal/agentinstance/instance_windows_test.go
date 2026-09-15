@@ -24,6 +24,12 @@ func TestAcquireRejectsSecondOwner(t *testing.T) {
 	}
 }
 
+func TestControlLifetimeNameIsDistinctAndAllowed(t *testing.T) {
+	if !validName(controlName) || controlName == productionName || controlName == `Local\Krasis-Control-Startup-v1` || controlName == `Local\Krasis-Log-control-v1` {
+		t.Fatal("GUI lifetime ownership overlaps another resource")
+	}
+}
+
 func TestProcessExitReleasesOwnershipForStaleRecovery(t *testing.T) {
 	name := testName(t)
 	command := exec.Command(os.Args[0], "-test.run=TestAgentInstanceHelperProcess")

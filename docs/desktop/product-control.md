@@ -1,5 +1,31 @@
 # 제품 연결 관리 GUI 1단계
 
+## 관리 앱 중복 실행과 로그 안내
+
+관리 앱은 로그를 열거나 agent를 준비하기 전에 Windows 세션 내 GUI 수명 mutex를
+확보한다. 다시 실행하면 숨겨진 창을 포함해 기존 `KrasisProductControlWindow`를
+복원하고 새 process는 종료한다. 첫 process의 창 생성 대기는 최대 3초이며,
+그 안에 창을 찾지 못하면 중복 창을 만들지 않는다. 기존 process가 먼저 종료하면
+남은 시간 안에 소유권을 다시 얻어 정상 시작할 수 있다.
+
+창 복원은 `ShowWindowAsync`로 요청하고 전면 전환은 Windows 정책에 따라 최선을
+다해 시도한다. 새로 실행된 process가 agent 연결, pairing, PIN 또는 배치를 변경하지 않는다.
+새 GUI에는 payload 없는 창 열기 메시지도 보내 UI thread에서 복원·활성화를 수행한다.
+전면 전환 권한은 해당 창의 process ID에만 넘기며 모든 process에 부여하지 않는다.
+GUI 수명, 시작 준비와 로그 기록의 mutex는 서로 별개다.
+
+구버전 창도 감지하지만 강제로 종료하거나 새 바이너리로 교체하지 않는다. 업데이트할 때는
+트레이의 `연결 유지하고 관리 앱 종료`로 기존 관리 앱을 종료한 뒤 새 ZIP을 실행한다.
+이미 구버전 관리 앱이 여러 개 떠 있다면 처음 한 번은 각각 종료해야 한다. 창의 X는
+트레이로 숨길 뿐이다. GUI만 수정했으므로 agent generation과 peer protocol은 바뀌지 않는다.
+
+로그 경고는 관리 앱의 상태를 나타내며 agent 로그 실패로 단정하지 않는다.
+로그 소유권 충돌, 파일 열기 실패, 실행 중 저장 실패/큐 누락을 구분해 표시하며,
+정상 상태에서는 경고를 표시하지 않는다. 원시 오류 문자열이나 개인 경로는 표시하지 않는다.
+
+Windows API 근거: [창 비동기 복원](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-showwindowasync),
+[전면 전환 제한](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setforegroundwindow).
+
 ## 한쪽에서 연결 해제
 
 agent generation 11부터 인증된 연결에서 한쪽의 `연결 해제`를 누르면 상대도
