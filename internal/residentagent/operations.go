@@ -232,7 +232,7 @@ func (operations *Operations) Connect(requestContext context.Context, request lo
 	go func(alias string) {
 		defer cancel(nil)
 		err := operations.runner(ctx, alias, &sessionObserver{operations: operations, done: done})
-		operations.finishSession(done, outcome, err, ctx.Err() != nil && cancellationOnly(err, context.Cause(ctx)))
+		operations.finishSession(done, outcome, err, (ctx.Err() != nil && cancellationOnly(err, context.Cause(ctx))) || peerDisconnectOnly(err))
 	}(request.PeerAlias)
 	return completed("connect_started"), nil
 }
@@ -251,7 +251,7 @@ func (operations *Operations) Disconnect(ctx context.Context, _ localapi.Operati
 	}
 	operations.sessionState = "DISCONNECTING"
 	operations.log.Event("disconnect_requested")
-	stop(errors.New("local disconnect requested"))
+	stop(errLocalDisconnect)
 	operations.mu.Unlock()
 	shutdown, cancel := context.WithTimeout(ctx, DefaultSessionStopTimeout)
 	defer cancel()

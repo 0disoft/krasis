@@ -3,10 +3,34 @@ package residentagent
 import (
 	"context"
 	"github.com/0disoft/krasis/internal/agent"
+	"github.com/0disoft/krasis/internal/peer"
 	"github.com/0disoft/krasis/internal/productlog"
 )
 
 type sessionOutcome struct{ failed bool }
+
+// A requested stop must not hide joined cleanup or deadline failures.
+func peerDisconnectOnly(err error) bool {
+	if err == nil {
+		return false
+	}
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		children := joined.Unwrap()
+		if len(children) == 0 {
+			return false
+		}
+		for _, child := range children {
+			if !peerDisconnectOnly(child) {
+				return false
+			}
+		}
+		return true
+	}
+	if wrapped, ok := err.(interface{ Unwrap() error }); ok {
+		return peerDisconnectOnly(wrapped.Unwrap())
+	}
+	return err == peer.ErrPeerDisconnectRequested
+}
 
 func cancellationOnly(err, cause error) bool {
 	if err == nil {
@@ -63,6 +87,9 @@ func (observer *sessionObserver) ObserveSupervisor(snapshot agent.SupervisorSnap
 		observer.retrying = true
 		state = "RECONNECTING"
 	case agent.SupervisorStopped:
+		if snapshot.FailureKind == "peer_disconnect" {
+			operations.recordLocked("peer_disconnect_requested")
+		}
 		// Completion is published by the runner return, after cleanup, not by
 		// this earlier supervisor event.
 		state = "DISCONNECTING"

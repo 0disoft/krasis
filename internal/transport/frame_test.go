@@ -23,6 +23,7 @@ func TestFrameWriterUsesOneWritePerFrameAndPreservesWireBytes(t *testing.T) {
 		{Kind: MessageInput, Payload: bytes.Repeat([]byte{0xff}, 2048)},
 		{Kind: MessageControl, Payload: []byte("grant")},
 		{Kind: MessageHeartbeat},
+		{Kind: MessageDisconnect},
 		{Kind: MessageInput, Payload: bytes.Repeat([]byte{0x42}, int(MaxPayloadSize))},
 	}
 	for _, frame := range frames {

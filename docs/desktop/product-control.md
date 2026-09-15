@@ -1,5 +1,15 @@
 # 제품 연결 관리 GUI 1단계
 
+## 한쪽에서 연결 해제
+
+agent generation 11부터 인증된 연결에서 한쪽의 `연결 해제`를 누르면 상대도
+재연결을 멈추고 입력 정리 후 `LOCAL`로 돌아간다. 양쪽 PC를 함께 업데이트해야 한다.
+페어링은 유지된다. 네트워크 장애나 프로세스 비정상 종료 때의 자동 재연결은 유지한다.
+이미 연결이 끊겨 해제 신호를 전달할 수 없으면 상대에서도 해제해야 할 수 있다.
+진단의 `peer_disconnect_requested`는 상대의 명시적 해제 수신을 나타내며,
+`disconnect_notification_failed`는 해제 알림 전송 실패다. 입력 정리 실패는 별도로 남는다.
+상세 계약은 [ADR 0038](../adr/0038-explicit-product-disconnect.md)을 따른다.
+
 `krasis-control.exe`는 제품 resident agent를 준비하고 인증된 loopback API를 사용한다.
 기존 Phase 0 launcher와 별개이며 저장된 제품 신뢰·연결 설정을 재사용한다.
 

@@ -20,9 +20,10 @@ type SessionConnection interface {
 type ObservationClock func() time.Time
 
 var (
-	ErrPeerControlDispatch   = errors.New("peer control frame dispatch failed")
-	ErrPeerInputDispatch     = errors.New("peer input frame dispatch failed")
-	ErrPeerHeartbeatDispatch = errors.New("peer heartbeat frame dispatch failed")
+	ErrPeerControlDispatch     = errors.New("peer control frame dispatch failed")
+	ErrPeerInputDispatch       = errors.New("peer input frame dispatch failed")
+	ErrPeerHeartbeatDispatch   = errors.New("peer heartbeat frame dispatch failed")
+	ErrPeerDisconnectRequested = errors.New("peer requested disconnect")
 )
 
 func RunSession(
@@ -108,6 +109,12 @@ func runSession(
 		var observedAt time.Time
 		var heartbeat HeartbeatObservation
 		switch frame.Kind {
+		case transport.MessageDisconnect:
+			if len(frame.Payload) != 0 {
+				err = transport.ErrInvalidFrame
+			} else {
+				err = ErrPeerDisconnectRequested
+			}
 		case transport.MessageControl:
 			observedAt = now()
 			err = DispatchControlFrameWithLifecycle(ctx, frame, observedAt, runtime, requests, outbound)

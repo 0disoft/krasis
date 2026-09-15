@@ -5,11 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/peer"
+	"github.com/0disoft/krasis/internal/transport"
 	"github.com/0disoft/krasis/internal/wininput"
 )
 
@@ -232,6 +234,10 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 		if result.FinalState != control.StateLocal {
 			return fmt.Errorf("agent session cannot reconnect outside LOCAL: %w", sessionErr)
 		}
+		if ownedConnection.disconnectReceived.Load() || errors.Is(sessionErr, peer.ErrPeerDisconnectRequested) {
+			terminalSnapshot.FailureKind = "peer_disconnect"
+			return sessionErr
+		}
 		if config.Now().Sub(started) >= config.Backoff.StableAfter {
 			attempt = 0
 		}
@@ -265,8 +271,17 @@ func waitForRetry(ctx context.Context, config SupervisorConfig, attempt uint32, 
 
 type supervisedConnection struct {
 	Connection
-	closeOnce sync.Once
-	closeErr  error
+	closeOnce          sync.Once
+	closeErr           error
+	disconnectReceived atomic.Bool
+}
+
+func (connection *supervisedConnection) ReadFrame() (transport.Frame, error) {
+	frame, err := connection.Connection.ReadFrame()
+	if err == nil && frame.Kind == transport.MessageDisconnect && len(frame.Payload) == 0 {
+		connection.disconnectReceived.Store(true)
+	}
+	return frame, err
 }
 
 func (connection *supervisedConnection) Close() error {

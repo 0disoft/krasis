@@ -113,6 +113,7 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 			return err
 		}
 		defer source.Close()
+		source = &disconnectSource{ConnectionSource: source, intent: parent, log: log}
 		executable, err := os.Executable()
 		if err != nil {
 			return err

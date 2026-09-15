@@ -23,9 +23,10 @@ var (
 type MessageKind uint8
 
 const (
-	MessageControl   MessageKind = 1
-	MessageInput     MessageKind = 2
-	MessageHeartbeat MessageKind = 3
+	MessageControl    MessageKind = 1
+	MessageInput      MessageKind = 2
+	MessageHeartbeat  MessageKind = 3
+	MessageDisconnect MessageKind = 4
 )
 
 type Frame struct {
@@ -117,7 +118,7 @@ func (writer *Writer) WriteFrame(frame Frame) error {
 
 func (kind MessageKind) Valid() bool {
 	switch kind {
-	case MessageControl, MessageInput, MessageHeartbeat:
+	case MessageControl, MessageInput, MessageHeartbeat, MessageDisconnect:
 		return true
 	default:
 		return false
