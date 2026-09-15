@@ -32,6 +32,8 @@ const exportEvent = wmUIEvent + 2
 const wmTimer = 0x0113
 
 type productWindow struct {
+	version                                                   uintptr
+	appBuild                                                  string
 	rearmButtons                                              [3]uintptr
 	layoutLeft, layoutRight                                   uintptr
 	trayReady, trayMenuOpen, quitRequested                    bool
@@ -80,6 +82,7 @@ func RunProductControl() (resultErr error) {
 	defer cancel()
 	app := &productWindow{control: paths.Control, ctx: ctx, cancel: cancel, result: make(chan productpanel.View, 1)}
 	app.log = log
+	app.appBuild = productpanel.CurrentBuildLabel()
 	app.logOpenErr = logErr
 	app.startup, err = productpanel.NewStartup(paths.Control)
 	if err != nil {
@@ -278,7 +281,7 @@ func (a *productWindow) create() bool {
 		setFont(hwnd, font)
 		return hwnd
 	}
-	control("STATIC", "이미 페어링한 기기를 선택해 연결하세요.", 0, 20, 18, 550, 25, 0)
+	a.version = control("STATIC", productpanel.VersionCaption(a.appBuild, ""), 0, 20, 18, 550, 25, 0)
 	a.peers = control("COMBOBOX", "", wsTabStop|cbsDropDownList|wsVScroll, 20, 55, 545, 160, productPeers)
 	a.connect = control("BUTTON", "연결", wsTabStop, 20, 100, 170, 35, productConnect)
 	a.disconnect = control("BUTTON", "연결 해제", wsTabStop, 205, 100, 170, 35, productDisconnect)
@@ -299,7 +302,7 @@ func (a *productWindow) create() bool {
 	a.rearmButtons[1] = control("BUTTON", "재진입 64px", wsTabStop, 205, 660, 170, 32, rearm64)
 	a.rearmButtons[2] = control("BUTTON", "재진입 128px", wsTabStop, 390, 660, 175, 32, rearm128)
 	a.apply(productpanel.View{})
-	return a.peers != 0 && a.connect != 0 && a.disconnect != 0 && a.refresh != 0 && a.status != 0 && a.notice != 0 && a.exportButton != 0 && a.exportPath != 0
+	return a.version != 0 && a.peers != 0 && a.connect != 0 && a.disconnect != 0 && a.refresh != 0 && a.status != 0 && a.notice != 0 && a.exportButton != 0 && a.exportPath != 0
 }
 
 func (a *productWindow) exportDiagnostics() {
@@ -369,14 +372,18 @@ func (a *productWindow) performTarget(action, alias string) {
 	go func() {
 		ctx, cancel := context.WithTimeout(a.ctx, 20*time.Second)
 		defer cancel()
+		var view productpanel.View
+		defer func() {
+			view.AgentVersion = productpanel.AgentVersionLabel(ctx, a.startup.Open)
+			a.result <- view
+			procPostMessage.Call(hwnd, wmUIEvent, 0, 0)
+		}()
 		if action == "prepare" || action == "connect" {
 			a.log.Event("prepare_started")
 			if err := a.startup.Ensure(ctx); err != nil {
 				a.log.Event("prepare_failed")
-				view := productpanel.Execute(ctx, func() (productpanel.Client, error) { return localapi.OpenClient(a.control) }, "refresh", "")
+				view = productpanel.Execute(ctx, func() (productpanel.Client, error) { return localapi.OpenClient(a.control) }, "refresh", "")
 				view.Notice = productpanel.StartupNotice(err)
-				a.result <- view
-				procPostMessage.Call(hwnd, wmUIEvent, 0, 0)
 				return
 			}
 			a.log.Event("prepare_completed")
@@ -385,7 +392,6 @@ func (a *productWindow) performTarget(action, alias string) {
 			}
 		}
 		open := func() (productpanel.Client, error) { return localapi.OpenClient(a.control) }
-		var view productpanel.View
 		if distance := map[string]int32{"rearm_32": 32, "rearm_64": 64, "rearm_128": 128}[action]; distance != 0 {
 			view = productpanel.SetRearm(ctx, open, alias, distance)
 		} else if action == "layout_LEFT" || action == "layout_RIGHT" {
@@ -395,12 +401,13 @@ func (a *productWindow) performTarget(action, alias string) {
 		} else {
 			view = productpanel.Execute(ctx, open, action, alias)
 		}
-		a.result <- view
-		procPostMessage.Call(hwnd, wmUIEvent, 0, 0)
 	}()
 }
 
 func (a *productWindow) apply(view productpanel.View) {
+	if view.AgentVersion != "" {
+		setText(a.version, productpanel.VersionCaption(a.appBuild, view.AgentVersion))
+	}
 	selected := a.selected()
 	a.view = view
 	a.updateTray()

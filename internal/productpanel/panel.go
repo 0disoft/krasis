@@ -17,6 +17,7 @@ type Client interface {
 }
 
 type View struct {
+	AgentVersion string
 	Fingerprints map[string]string
 	State        string
 	Peers        []string
