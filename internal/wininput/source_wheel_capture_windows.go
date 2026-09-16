@@ -36,6 +36,7 @@ const (
 )
 
 var (
+	callSetSourceCaptureCursor         = user32.NewProc("SetCursor").Call
 	callSetLayeredSourceCapture        = user32.NewProc("SetLayeredWindowAttributes").Call
 	procSetWindowPosSourceCapture      = user32.NewProc("SetWindowPos")
 	procIsWindowSourceCapture          = user32.NewProc("IsWindow")
@@ -337,6 +338,10 @@ func (current *sourceWheelCaptureRun) run(ctx context.Context, ready func()) (re
 	windowDestroyed := false
 	wndProc := syscall.NewCallback(func(window uintptr, message uint32, wParam, lParam uintptr) uintptr {
 		switch message {
+		case 0x20: // WM_SETCURSOR
+			if current.hideActiveCursor() {
+				return 1
+			}
 		case wmSourceWheelCaptureActivate, wmSourceWheelCaptureDeactivate:
 			return current.handleCommand(message)
 		case wmSourceWheelCaptureStop:
@@ -528,10 +533,21 @@ func (current *sourceWheelCaptureRun) activateWindow() error {
 		return errors.Join(ErrSourceCaptureActivationVerificationLost, cleanupErr)
 	}
 	current.active.Store(true)
+	current.hideActiveCursor()
 	if current.observer != nil {
 		current.observer.ObserveWheelCaptureActivated()
 	}
 	return nil
+}
+
+// Run only on the capture window's owner thread. Inactive windows retain the
+// normal class cursor; no global cursor resource or ShowCursor count is changed.
+func (current *sourceWheelCaptureRun) hideActiveCursor() bool {
+	if !current.active.Load() {
+		return false
+	}
+	callSetSourceCaptureCursor(0)
+	return true
 }
 
 func (current *sourceWheelCaptureRun) activateForegroundFallback() (SourceForegroundFallbackResult, error) {

@@ -599,3 +599,29 @@ func TestSourceWheelCaptureRejectsWheelWhenSourceIsInactive(t *testing.T) {
 func packedWindowWheel(delta int16) uintptr {
 	return uintptr(uint32(uint16(delta)) << 16)
 }
+func TestSourceCaptureHidesCursorOnlyWhileActive(t *testing.T) {
+	original := callSetSourceCaptureCursor
+	t.Cleanup(func() { callSetSourceCaptureCursor = original })
+	calls := 0
+	callSetSourceCaptureCursor = func(args ...uintptr) (uintptr, uintptr, error) {
+		calls++
+		if len(args) != 1 || args[0] != 0 {
+			t.Fatal("expected null cursor")
+		}
+		return 0, 0, nil
+	}
+	current := &sourceWheelCaptureRun{}
+	if current.hideActiveCursor() || calls != 0 {
+		t.Fatal("inactive capture hid cursor")
+	}
+	current.active.Store(true)
+	for range 3 {
+		if !current.hideActiveCursor() {
+			t.Fatal("active cursor request was not handled")
+		}
+	}
+	current.active.Store(false)
+	if current.hideActiveCursor() || calls != 3 {
+		t.Fatal("cursor hiding survived deactivation")
+	}
+}
