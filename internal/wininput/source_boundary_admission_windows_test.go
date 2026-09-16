@@ -80,3 +80,49 @@ func TestSourceBoundaryAdmissionFailsClosed(t *testing.T) {
 		t.Fatalf("AdmitBoundary() = %v, %v", decision, err)
 	}
 }
+func TestBoundaryDismissesMenuAndRechecksInteraction(t *testing.T) {
+	oldInfo, oldPressed, oldCancel := sourceForegroundGUIThreadInfo, sourceAnyInputPressed, sourceCancelMenu
+	t.Cleanup(func() {
+		sourceForegroundGUIThreadInfo, sourceAnyInputPressed, sourceCancelMenu = oldInfo, oldPressed, oldCancel
+	})
+	for _, test := range []struct {
+		name            string
+		delivered, held bool
+		after           sourceGUIThreadInfo
+		want            peer.BoundaryAdmissionDecision
+	}{
+		{"closed", true, false, sourceGUIThreadInfo{Active: 7}, peer.BoundaryAdmissionAllowed},
+		{"hung menu", false, false, sourceGUIThreadInfo{}, peer.BoundaryAdmissionBlockedLocalMenu},
+		{"held button", true, true, sourceGUIThreadInfo{}, peer.BoundaryAdmissionBlockedLocalMenu},
+		{"foreground changed", true, false, sourceGUIThreadInfo{Active: 8}, peer.BoundaryAdmissionBlockedLocalMenu},
+		{"capture remains", true, false, sourceGUIThreadInfo{Active: 7, Capture: 9}, peer.BoundaryAdmissionBlockedMouseCapture},
+		{"move size remains", true, false, sourceGUIThreadInfo{Active: 7, Flags: guiInMoveSize}, peer.BoundaryAdmissionBlockedMoveSize},
+		{"different menu", true, false, sourceGUIThreadInfo{Active: 7, MenuOwner: 8, Flags: guiInMenuMode}, peer.BoundaryAdmissionBlockedLocalMenu},
+		{"menu remains open", true, false, sourceGUIThreadInfo{Active: 7, MenuOwner: 42, Flags: guiInMenuMode}, peer.BoundaryAdmissionBlockedLocalMenu},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			queries, sends := 0, 0
+			sourceForegroundGUIThreadInfo = func(info *sourceGUIThreadInfo) error {
+				queries++
+				if queries == 1 {
+					*info = sourceGUIThreadInfo{Active: 7, MenuOwner: 42, Flags: guiSystemMenuMode}
+				} else {
+					*info = test.after
+				}
+				return nil
+			}
+			sourceAnyInputPressed = func() bool { return test.held }
+			sourceCancelMenu = func(_ context.Context, owner uintptr) bool {
+				sends++
+				if owner != 42 {
+					t.Fatal("wrong menu owner")
+				}
+				return test.delivered
+			}
+			decision, err := (&SourceHook{}).AdmitBoundary(context.Background(), control.BoundaryIntent{Edge: control.ScreenEdgeRight})
+			if err != nil || decision != test.want || (test.held && sends != 0) {
+				t.Fatalf("decision=%v err=%v sends=%d", decision, err, sends)
+			}
+		})
+	}
+}

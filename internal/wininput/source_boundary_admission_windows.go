@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"github.com/0disoft/krasis/internal/control"
@@ -24,7 +25,59 @@ const (
 var (
 	procGetGUIThreadInfoSource = user32.NewProc("GetGUIThreadInfo")
 	procGetAsyncKeyStateSource = user32.NewProc("GetAsyncKeyState")
+	procCancelMenuSource       = user32.NewProc("SendMessageTimeoutW")
 )
+
+var sourceCancelMenu = func(ctx context.Context, owner uintptr) bool {
+	if owner == 0 || ctx.Err() != nil {
+		return false
+	}
+	timeout := 150 * time.Millisecond
+	if deadline, ok := ctx.Deadline(); ok && time.Until(deadline) < timeout {
+		timeout = time.Until(deadline)
+	}
+	if timeout < time.Millisecond {
+		return false
+	}
+	var result uintptr
+	sent, _, _ := procCancelMenuSource.Call(owner, 0x001f, 0, 0, 0x23, uintptr(timeout/time.Millisecond), uintptr(unsafe.Pointer(&result)))
+	return sent != 0
+}
+
+// Menu dismissal is bounded and best effort. Never proceed solely because the
+// message was delivered: the menu loop may exit after the window procedure.
+func dismissBoundaryMenu(ctx context.Context, info sourceGUIThreadInfo) (sourceGUIThreadInfo, bool, error) {
+	if info.MenuOwner == 0 || info.Flags&guiInMoveSize != 0 || info.MoveSize != 0 || sourceAnyInputPressed() {
+		return info, false, nil
+	}
+	if !sourceCancelMenu(ctx, info.MenuOwner) {
+		return info, false, nil
+	}
+	wait, cancel := context.WithTimeout(ctx, 150*time.Millisecond)
+	defer cancel()
+	for {
+		next := sourceGUIThreadInfo{Size: uint32(unsafe.Sizeof(sourceGUIThreadInfo{}))}
+		if err := sourceForegroundGUIThreadInfo(&next); err != nil {
+			return info, false, err
+		}
+		if next.Active != info.Active {
+			return next, false, nil
+		}
+		if next.Flags&guiMenuModeMask == 0 {
+			return next, true, nil
+		}
+		if next.MenuOwner != info.MenuOwner {
+			return next, false, nil
+		}
+		timer := time.NewTimer(10 * time.Millisecond)
+		select {
+		case <-wait.Done():
+			timer.Stop()
+			return next, false, nil
+		case <-timer.C:
+		}
+	}
+}
 
 type sourceGUIThreadInfo struct {
 	Size      uint32
@@ -81,7 +134,17 @@ func (hook *SourceHook) AdmitBoundary(ctx context.Context, _ control.BoundaryInt
 		return 0, fmt.Errorf("inspect foreground GUI thread: %w", err)
 	}
 	if info.Flags&guiMenuModeMask != 0 {
-		return peer.BoundaryAdmissionBlockedLocalMenu, nil
+		updated, closed, err := dismissBoundaryMenu(ctx, info)
+		if err != nil {
+			return 0, fmt.Errorf("verify menu dismissal: %w", err)
+		}
+		if err := ctx.Err(); err != nil {
+			return 0, err
+		}
+		if !closed {
+			return peer.BoundaryAdmissionBlockedLocalMenu, nil
+		}
+		info = updated
 	}
 	if info.Capture != 0 {
 		return peer.BoundaryAdmissionBlockedMouseCapture, nil
