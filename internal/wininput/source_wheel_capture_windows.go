@@ -702,7 +702,9 @@ func (current *sourceWheelCaptureRun) deactivateWindow() error {
 		current.observer.ObserveWheelFocusRestore(restoreResult)
 	}
 	current.savedFocus = 0
-	if restoreErr == nil || !wasActive {
+	// Partial activation can own registration and foreground before active=true.
+	// It needs the same post-hide release proof as a fully active capture.
+	if restoreErr == nil {
 		return errors.Join(cleanupErr, restoreErr)
 	}
 	postHideResult, postHideErr := current.verifyPostHideFocusRelease()

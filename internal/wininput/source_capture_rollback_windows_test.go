@@ -85,3 +85,33 @@ func TestCaptureAlreadyForegroundDoesNotAttachToItself(t *testing.T) {
 		t.Fatalf("result=%v err=%v", result, err)
 	}
 }
+
+func TestCapturePartialActivationRollbackAcceptsVerifiedFocusRelease(t *testing.T) {
+	for _, retained := range []bool{false, true} {
+		t.Run(map[bool]string{false: "released", true: "retained"}[retained], func(t *testing.T) {
+			restore := stubSourceWheelCaptureActivation(t)
+			defer restore()
+			foreground := uintptr(10)
+			sourceWheelCaptureGetForeground = func() uintptr { return foreground }
+			sourceWheelCaptureSetForeground = func(uintptr) error { return errors.New("focus denied") }
+			sourceWheelCaptureCurrentThread = func() uint32 { return 11 }
+			sourceWheelCaptureWindowThread = func(uintptr) (uint32, error) { return 22, nil }
+			sourceWheelCaptureAttachThreads = func(uint32, uint32, bool) error { return errors.New("attach denied") }
+			sourceWheelCaptureShowWindow = func(_ uintptr, command uintptr) {
+				if command == swHide && !retained {
+					foreground = 20
+				}
+			}
+			// Activation registered the window but failed before publishing active.
+			current := &sourceWheelCaptureRun{window: 10, savedFocus: 20, registered: true}
+			err := current.rollbackActivation(ErrSourceCaptureActivationVerificationLost)
+			_, rejected := err.(*sourceCaptureActivationRejected)
+			if rejected == retained {
+				t.Fatalf("retained=%v rollback=%v", retained, err)
+			}
+			if current.active.Load() || current.registered || current.savedFocus != 0 {
+				t.Fatal("rollback retained ownership")
+			}
+		})
+	}
+}
