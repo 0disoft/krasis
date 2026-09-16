@@ -3,6 +3,7 @@
 package wininput
 
 import (
+	"context"
 	"errors"
 	"slices"
 	"strings"
@@ -11,6 +12,17 @@ import (
 
 	"github.com/0disoft/krasis/internal/control"
 )
+
+func TestSourceWheelCaptureShutdownDoesNotPromoteCancellationToFailure(t *testing.T) {
+	for _, cause := range []error{context.Canceled, errors.Join(context.Canceled, errors.New("native cleanup failed"))} {
+		current := &sourceWheelCaptureRun{terminalErr: cause}
+		capture := &sourceWheelCapture{run: current}
+		err := capture.execute(wmSourceWheelCaptureDeactivate, true)
+		if cancellationOnly(err) != cancellationOnly(cause) {
+			t.Fatalf("shutdown changed failure classification: cause=%v result=%v", cause, err)
+		}
+	}
+}
 
 func TestSourceWheelCaptureRestoresFocusBeforeHiding(t *testing.T) {
 	previousShow := sourceWheelCaptureShowWindow

@@ -237,13 +237,16 @@ func (capture *sourceWheelCapture) execute(message uint32, allowMissing bool) er
 		return errors.New("source wheel capture window is not ready")
 	}
 	if terminalErr := current.err(); terminalErr != nil {
-		return errors.Join(errors.New("source wheel capture window is terminal"), terminalErr)
+		// Context cancellation is an expected worker result during shutdown.
+		// Adding an independent error would make cancellationOnly classify it
+		// as a native cleanup failure and latch an otherwise clean stop FAULTED.
+		return fmt.Errorf("source wheel capture window is terminal: %w", terminalErr)
 	}
 	command := sourceWheelCaptureCommand{message: message, result: make(chan error, 1)}
 	select {
 	case current.commands <- command:
 	case <-current.done:
-		return errors.New("source wheel capture window stopped")
+		return current.stoppedError()
 	case <-timer.C:
 		err := errors.New("source wheel capture command admission timed out")
 		current.fail(err)
@@ -262,12 +265,19 @@ func (capture *sourceWheelCapture) execute(message uint32, allowMissing bool) er
 	case err := <-command.result:
 		return err
 	case <-current.done:
-		return errors.Join(errors.New("source wheel capture window stopped"), current.err())
+		return current.stoppedError()
 	case <-timer.C:
 		err := errors.New("source wheel capture command result timed out")
 		current.fail(err)
 		return err
 	}
+}
+
+func (current *sourceWheelCaptureRun) stoppedError() error {
+	if err := current.err(); err != nil {
+		return fmt.Errorf("source wheel capture window stopped: %w", err)
+	}
+	return errors.New("source wheel capture window stopped unexpectedly")
 }
 
 func (capture *sourceWheelCapture) failCurrentRun(cause error) {
