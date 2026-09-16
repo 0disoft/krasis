@@ -87,6 +87,9 @@ func (hook *SourceHook) RunWithBoundary(
 		return fmt.Errorf("snapshot source pointer: %w", err)
 	}
 	pointerState := newSourcePointerState(initialPosition)
+	session.physicalMu.Lock()
+	session.physicalCheck = sourceAnyInputPressed
+	session.physicalMu.Unlock()
 	if boundary != nil {
 		boundary = &serializedBoundaryObserver{next: boundary}
 	}
@@ -258,6 +261,12 @@ func runSourceLowLevelHookThread(
 			shield.beforeInput()
 			data := *(*mouseHookData)(unsafe.Pointer(lParam))
 			message := uint32(wParam)
+			if action, button := mapSourceHookButton(message, data); button {
+				if routePhysicalAction(session, boundary, action, data.Point.X) {
+					return 1
+				}
+				return callNextHook(code, wParam, lParam)
+			}
 			if message == wmMouseMove {
 				pointerState.observe(data.Point)
 			}

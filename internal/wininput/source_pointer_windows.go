@@ -229,6 +229,11 @@ func routeRawMouse(
 	pointerX, known := state.pointerX()
 	for index := 0; index < actions.count; index++ {
 		action := actions.values[index]
+		// Button ownership is decided synchronously by the low-level hook.
+		// Delayed Raw Input must not republish a pre-grant button into a new lease.
+		if action.Kind == control.InputButtonDown || action.Kind == control.InputButtonUp {
+			continue
+		}
 		if !known {
 			if session.Active() {
 				session.Offer(action)

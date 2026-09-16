@@ -21,6 +21,11 @@ func routePhysicalAction(
 	if session == nil {
 		return false
 	}
+	// The physical down/up decision and grant activation share one gate. In
+	// particular a local down observed during REQUEST cannot acquire a remote up.
+	session.physicalMu.Lock()
+	defer session.physicalMu.Unlock()
+	session.observePhysicalPress(action)
 	if boundary != nil {
 		if err := observeBoundary(boundary, action, pointerX); err != nil {
 			if errors.Is(err, ErrBoundaryObserverPanic) {

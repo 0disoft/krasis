@@ -112,19 +112,22 @@ type queuedAction struct {
 }
 
 type SourceSession struct {
-	sink       SourceSink
-	observer   SourcePipelineObserver
-	cleanup    time.Duration
-	queue      chan queuedAction
-	queueDepth atomic.Int64
-	faults     chan error
-	now        func() time.Time
-	started    atomic.Bool
-	terminal   atomic.Bool
-	stateMu    sync.RWMutex
-	active     bool
-	generation uint64
-	faultOnce  sync.Once
+	sink          SourceSink
+	observer      SourcePipelineObserver
+	cleanup       time.Duration
+	queue         chan queuedAction
+	queueDepth    atomic.Int64
+	faults        chan error
+	now           func() time.Time
+	started       atomic.Bool
+	terminal      atomic.Bool
+	stateMu       sync.RWMutex
+	physicalMu    sync.Mutex
+	physicalHeld  map[physicalPress]struct{}
+	physicalCheck func() bool
+	active        bool
+	generation    uint64
+	faultOnce     sync.Once
 }
 
 func NewSourceSession(capacity int, sink SourceSink) (*SourceSession, error) {
@@ -151,6 +154,11 @@ func NewSourceSessionObserved(capacity int, sink SourceSink, observer SourcePipe
 func (session *SourceSession) Activate() error {
 	if session == nil || !session.started.Load() || session.terminal.Load() {
 		return errors.New("source session worker is not running")
+	}
+	session.physicalMu.Lock()
+	defer session.physicalMu.Unlock()
+	if len(session.physicalHeld) != 0 || session.physicalCheck != nil && session.physicalCheck() {
+		return errors.New("physical input is held during source activation")
 	}
 	session.stateMu.Lock()
 	defer session.stateMu.Unlock()
