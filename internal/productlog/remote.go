@@ -1,0 +1,92 @@
+package productlog
+
+import (
+	"bytes"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"github.com/0disoft/krasis/internal/productidentity"
+	"path/filepath"
+	"time"
+)
+
+const MaxSupportBytes = 1 << 20
+
+// SanitizeSupport reprojects an untrusted support document, never raw logs.
+func SanitizeSupport(data []byte) ([]byte, error) {
+	if len(data) > MaxSupportBytes {
+		return nil, errors.New("support size exceeded")
+	}
+	var doc struct {
+		Schema  string      `json:"schema"`
+		Created string      `json:"created"`
+		Scope   string      `json:"scope"`
+		Logs    []exportLog `json:"logs"`
+	}
+	if json.Unmarshal(data, &doc) != nil || doc.Schema != "krasis.support/v1" || len(doc.Logs) > 4 {
+		return nil, errors.New("invalid support document")
+	}
+	created, err := time.Parse(time.RFC3339, doc.Created)
+	if err != nil {
+		return nil, err
+	}
+	doc.Created = created.UTC().Format(time.RFC3339)
+	doc.Scope = "Event history only; received from a paired device; not a live status."
+	seen := map[string]bool{}
+	for i, l := range doc.Logs {
+		if seen[l.Source] || (l.Source != "agent.jsonl" && l.Source != "agent.previous.jsonl" && l.Source != "control.jsonl" && l.Source != "control.previous.jsonl") {
+			return nil, errors.New("invalid support source")
+		}
+		seen[l.Source] = true
+		var lines bytes.Buffer
+		for _, event := range l.Events {
+			if err := json.NewEncoder(&lines).Encode(event); err != nil {
+				return nil, err
+			}
+		}
+		clean := sanitizeLog(l.Source, &lines)
+		clean.Incomplete = clean.Incomplete || l.Incomplete
+		doc.Logs[i] = clean
+	}
+	return json.Marshal(doc)
+}
+
+func SaveRemoteSupport(base, peer string, data []byte) (string, error) {
+	decoded, err := hex.DecodeString(peer)
+	if err != nil || len(decoded) != 32 {
+		return "", errors.New("invalid peer")
+	}
+	clean, err := SanitizeSupport(data)
+	if err != nil {
+		return "", err
+	}
+	dir, err := productidentity.PrepareDiagnostics(base)
+	if err != nil {
+		return "", err
+	}
+	defer dir.Close()
+	f, temp, err := dir.CreateTemporary(".peer-support-", 0600)
+	if err != nil {
+		return "", err
+	}
+	defer dir.Remove(temp)
+	defer f.Close()
+	if _, err = f.Write(clean); err != nil {
+		return "", err
+	}
+	if err = f.Sync(); err != nil {
+		return "", err
+	}
+	if err = f.Close(); err != nil {
+		return "", err
+	}
+	name := "support-peer-" + peer + ".json"
+	if err = dir.Replace(temp, name); err != nil {
+		return "", err
+	}
+	paths, err := productidentity.ResolveWindowsPaths(base)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(paths.Diagnostics, name), nil
+}

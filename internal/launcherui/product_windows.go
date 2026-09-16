@@ -35,6 +35,8 @@ const exportEvent = wmUIEvent + 2
 const wmTimer = 0x0113
 
 type productWindow struct {
+	diagnosticNotice                                          uintptr
+	receivedDiagnostic                                        string
 	updateSend, updateAllow                                   uintptr
 	updateResume, initialPeer, expectedBuild                  string
 	updateAttempt                                             string
@@ -325,6 +327,7 @@ func (a *productWindow) create() bool {
 	a.updateSend = control("BUTTON", "상대 기기 업데이트", wsTabStop, 205, 490, 175, 30, productSendUpdate)
 	a.updateAllow = control("BUTTON", "업데이트 허용 설정", wsTabStop, 390, 490, 175, 30, productAllowUpdate)
 	a.exportPath = control("EDIT", "저장 후 이 칸의 파일 경로를 복사할 수 있습니다.", wsTabStop|0x0800|0x0080, 20, 532, 545, 26, 0)
+	a.diagnosticNotice = control("STATIC", "진단 내보내기 시 선택한 페어링 기기로도 전송합니다.", 0, 20, 560, 545, 18, 0)
 	control("STATIC", "선택한 기기의 위치 · 연결 해제 후 양쪽 PC에서 각각 설정", 0, 20, 580, 545, 25, 0)
 	a.layoutLeft = control("BUTTON", "상대가 왼쪽", wsTabStop, 20, 616, 260, 32, layoutLeft)
 	a.layoutRight = control("BUTTON", "상대가 오른쪽", wsTabStop, 305, 616, 260, 32, layoutRight)
@@ -345,8 +348,23 @@ func (a *productWindow) exportDiagnostics() {
 		enable(h, false)
 	}
 	hwnd, base := a.hwnd, os.Getenv("LOCALAPPDATA")
+	peer, control := a.view.Fingerprints[a.selected()], a.control
 	setText(a.exportPath, "진단 파일 저장 중…")
 	go func() {
+		if peer != "" {
+			ctx, cancel := context.WithTimeout(a.ctx, 10*time.Second)
+			client, err := localapi.OpenClient(control)
+			if err == nil {
+				result, sendErr := client.SendDiagnostic(ctx, peer)
+				if sendErr == nil && result.Path != "" {
+					cancel()
+					a.exportResults <- result.Path
+					procPostMessage.Call(hwnd, exportEvent, 0, 0)
+					return
+				}
+			}
+			cancel()
+		}
 		path, err := productlog.Export(base)
 		if err != nil {
 			path = "저장 실패. 저장 공간과 Krasis 폴더 접근 권한을 확인하세요."
@@ -467,6 +485,27 @@ func (a *productWindow) performTarget(action, alias string) {
 }
 
 func (a *productWindow) apply(view productpanel.View) {
+	if path := view.Update.Status.ReceivedDiagnostic; path != "" && path != a.receivedDiagnostic {
+		a.receivedDiagnostic = path
+		setText(a.exportPath, path)
+	}
+	notice := "진단 내보내기 시 선택한 페어링 기기로도 전송합니다."
+	switch view.Update.Status.Diagnostic {
+	case "QUEUED":
+		notice = "진단 전송 대기 중…"
+	case "SENT":
+		notice = "상대 기기에 진단 저장 완료"
+	case "EXPIRED":
+		notice = "진단 전송 만료 · 상대 앱·네트워크 확인 후 다시 내보내세요."
+	case "UNSUPPORTED":
+		notice = "상대가 진단 수신을 지원하지 않습니다. 업데이트가 필요합니다."
+	case "REJECTED":
+		notice = "상대가 진단 저장을 거부했습니다."
+	}
+	if a.receivedDiagnostic != "" {
+		notice += " · 상대 진단 수신됨"
+	}
+	setText(a.diagnosticNotice, notice)
 	if view.UpdateResume != "" {
 		a.updateResume = view.UpdateResume
 	}

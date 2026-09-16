@@ -111,6 +111,7 @@ func run(ctx context.Context, localAppData string, dependencies runDependencies)
 		return err
 	}
 	operations.log = dependencies.log
+	operations.localAppData = localAppData
 	if dependencies.productAdapters {
 		identities, err := productidentity.New(paths.Identity)
 		if err != nil {
@@ -122,6 +123,9 @@ func run(ctx context.Context, localAppData string, dependencies runDependencies)
 		if updateErr == nil {
 			updates.Observe = dependencies.log.Event
 			operations.updates = updates
+			updates.ReceiveDiagnostic = func(peer string, data []byte) (string, error) {
+				return productlog.SaveRemoteSupport(localAppData, peer, data)
+			}
 			defer updates.Close()
 			managementCtx, stopManagement := context.WithCancel(operations.Context())
 			managementDone := make(chan struct{})

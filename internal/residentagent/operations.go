@@ -36,6 +36,7 @@ type trustStore interface {
 }
 
 type Operations struct {
+	localAppData   string
 	updates        *peerupdate.Manager
 	updateApplying bool
 	log            *productlog.Logger

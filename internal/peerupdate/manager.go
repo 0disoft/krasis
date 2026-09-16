@@ -25,16 +25,18 @@ var ErrDenied = errors.New("peer update not authorized")
 var ErrBusy = errors.New("peer update busy")
 
 type Status struct {
-	PeerGeneration int      `json:"peerGeneration,omitempty"`
-	PeerRevision   string   `json:"peerRevision,omitempty"`
-	Bytes          int64    `json:"bytes,omitempty"`
-	Total          int64    `json:"total,omitempty"`
-	State          string   `json:"state"`
-	Allowed        []string `json:"allowed"`
-	ID             string   `json:"id,omitempty"`
-	Revision       string   `json:"revision,omitempty"`
-	Generation     int      `json:"generation,omitempty"`
-	Peer           string   `json:"peer,omitempty"`
+	Diagnostic         string   `json:"diagnostic,omitempty"`
+	ReceivedDiagnostic string   `json:"receivedDiagnostic,omitempty"`
+	PeerGeneration     int      `json:"peerGeneration,omitempty"`
+	PeerRevision       string   `json:"peerRevision,omitempty"`
+	Bytes              int64    `json:"bytes,omitempty"`
+	Total              int64    `json:"total,omitempty"`
+	State              string   `json:"state"`
+	Allowed            []string `json:"allowed"`
+	ID                 string   `json:"id,omitempty"`
+	Revision           string   `json:"revision,omitempty"`
+	Generation         int      `json:"generation,omitempty"`
+	Peer               string   `json:"peer,omitempty"`
 }
 
 type offer struct {
@@ -48,25 +50,27 @@ type stagedBundle interface {
 	Stage(*os.Root, string) error
 }
 type Manager struct {
-	peers          map[string]peerObservation
-	deliveredUntil time.Time
-	workers        sync.WaitGroup
-	closed         bool
-	cancels        map[uint64]context.CancelFunc
-	nextWorker     uint64
-	Observe        func(string)
-	mu             sync.Mutex
-	root           *os.Root
-	path           string
-	generation     int
-	revision       string
-	allowed        map[string]bool
-	status         Status
-	stagedUntil    time.Time
-	out            *offer
-	receiving      bool
-	packing        bool
-	validate       func([]byte) (stagedBundle, error)
+	diagnostic        diagnosticTransfer
+	ReceiveDiagnostic func(string, []byte) (string, error)
+	peers             map[string]peerObservation
+	deliveredUntil    time.Time
+	workers           sync.WaitGroup
+	closed            bool
+	cancels           map[uint64]context.CancelFunc
+	nextWorker        uint64
+	Observe           func(string)
+	mu                sync.Mutex
+	root              *os.Root
+	path              string
+	generation        int
+	revision          string
+	allowed           map[string]bool
+	status            Status
+	stagedUntil       time.Time
+	out               *offer
+	receiving         bool
+	packing           bool
+	validate          func([]byte) (stagedBundle, error)
 }
 
 func Open(productRoot string, generation int) (*Manager, error) {
@@ -180,6 +184,14 @@ func (m *Manager) Status() Status {
 		m.status.State = "EXPIRED"
 	}
 	s := m.status
+	m.diagnostic.mu.Lock()
+	if m.diagnostic.out != nil && time.Now().After(m.diagnostic.out.expires) {
+		m.diagnostic.out = nil
+		m.diagnostic.state = "EXPIRED"
+	}
+	s.Diagnostic = m.diagnostic.state
+	s.ReceivedDiagnostic = m.diagnostic.received
+	m.diagnostic.mu.Unlock()
 	s.Allowed = []string{}
 	for fp, allow := range m.allowed {
 		if allow {
