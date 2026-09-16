@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
-	"syscall"
 	"time"
 	"unsafe"
 
@@ -241,7 +240,7 @@ func runSourceLowLevelHookThread(
 	var bootstrapMessage message
 	procPeekMessageW.Call(uintptr(unsafe.Pointer(&bootstrapMessage)), 0, 0, 0, pmNoRemove)
 	mapper := &sourceKeyboardMapper{}
-	keyboardCallback := syscall.NewCallback(func(code int, wParam uintptr, lParam uintptr) uintptr {
+	keyboardCallback := func(code int, wParam uintptr, lParam uintptr) uintptr {
 		if code == hcAction && lParam != 0 {
 			shield.beforeInput()
 			if routeMappedPhysicalAction(session, boundary, func() (control.InputAction, bool, int32, error) {
@@ -253,8 +252,8 @@ func runSourceLowLevelHookThread(
 			}
 		}
 		return callNextHook(code, wParam, lParam)
-	})
-	mouseCallback := syscall.NewCallback(func(code int, wParam uintptr, lParam uintptr) uintptr {
+	}
+	mouseCallback := func(code int, wParam uintptr, lParam uintptr) uintptr {
 		if code == hcAction && lParam != 0 {
 			shield.beforeInput()
 			data := *(*mouseHookData)(unsafe.Pointer(lParam))
@@ -284,17 +283,22 @@ func runSourceLowLevelHookThread(
 			}
 		}
 		return callNextHook(code, wParam, lParam)
-	})
+	}
+	owner := &sourceHookCallbacks{keyboard: keyboardCallback, mouse: mouseCallback}
+	if _, loaded := sourceHookOwners.LoadOrStore(threadID, owner); loaded {
+		return errors.New("source hook thread already has an owner")
+	}
+	defer sourceHookOwners.CompareAndDelete(threadID, owner)
 
 	module, _, callErr := procGetModuleHandleW.Call(0)
 	if module == 0 {
 		return fmt.Errorf("GetModuleHandleW failed: %w", callErr)
 	}
-	keyboardHook, _, callErr := procSetWindowsHookExW.Call(whKeyboardLL, keyboardCallback, module, 0)
+	keyboardHook, _, callErr := procSetWindowsHookExW.Call(whKeyboardLL, sourceKeyboardCallback, module, 0)
 	if keyboardHook == 0 {
 		return fmt.Errorf("SetWindowsHookExW(WH_KEYBOARD_LL) failed: %w", callErr)
 	}
-	mouseHook, _, callErr := procSetWindowsHookExW.Call(whMouseLL, mouseCallback, module, 0)
+	mouseHook, _, callErr := procSetWindowsHookExW.Call(whMouseLL, sourceMouseCallback, module, 0)
 	if mouseHook == 0 {
 		procUnhookWindowsHookEx.Call(keyboardHook)
 		return fmt.Errorf("SetWindowsHookExW(WH_MOUSE_LL) failed: %w", callErr)

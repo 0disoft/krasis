@@ -336,7 +336,7 @@ func (current *sourceWheelCaptureRun) run(ctx context.Context, ready func()) (re
 		return fmt.Errorf("encode source wheel capture window title: %w", err)
 	}
 	windowDestroyed := false
-	wndProc := syscall.NewCallback(func(window uintptr, message uint32, wParam, lParam uintptr) uintptr {
+	wndProc := sourceWindowCallback(func(window uintptr, message uint32, wParam, lParam uintptr) uintptr {
 		switch message {
 		case 0x20: // WM_SETCURSOR
 			if current.hideActiveCursor() {
@@ -372,7 +372,7 @@ func (current *sourceWheelCaptureRun) run(ctx context.Context, ready func()) (re
 	})
 	cursor, _, _ := procLoadCursorWTouchpad.Call(0, idcArrow)
 	class := touchpadSurfaceWindowClass{
-		WindowProc: wndProc,
+		WindowProc: sourceCaptureCallback,
 		Instance:   module,
 		Cursor:     cursor,
 		Background: colorWindowBrush,
@@ -400,6 +400,8 @@ func (current *sourceWheelCaptureRun) run(ctx context.Context, ready func()) (re
 		return touchpadWin32Error("CreateWindowExW(source wheel capture)", callErr)
 	}
 	current.window = window
+	sourceWindowOwners.Store(window, wndProc)
+	defer sourceWindowOwners.Delete(window)
 	defer func() {
 		resultErr = errors.Join(resultErr, current.deactivateWindow())
 		if !windowDestroyed {
