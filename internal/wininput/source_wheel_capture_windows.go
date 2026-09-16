@@ -36,6 +36,16 @@ const (
 )
 
 var (
+	callSourceAttachThreadInput       = user32.NewProc("AttachThreadInput").Call
+	callSourceForegroundProbe         = user32.NewProc("SendMessageTimeoutW").Call
+	sourceWheelCaptureProbeForeground = func(window uintptr) error {
+		var result uintptr
+		sent, _, callErr := callSourceForegroundProbe(window, 0, 0, 0, 0x23, 100, uintptr(unsafe.Pointer(&result)))
+		if sent == 0 {
+			return touchpadWin32Error("SendMessageTimeoutW(source foreground probe)", callErr)
+		}
+		return nil
+	}
 	callSetSourceCaptureCursor         = user32.NewProc("SetCursor").Call
 	callSetLayeredSourceCapture        = user32.NewProc("SetLayeredWindowAttributes").Call
 	procSetWindowPosSourceCapture      = user32.NewProc("SetWindowPos")
@@ -70,9 +80,15 @@ var (
 		return 0, callErr
 	}
 	sourceWheelCaptureAttachThreads = func(sourceThread, targetThread uint32, attach bool) error {
-		// Joining another application's input queue can make foreground calls
-		// wait on that application's hung UI thread. Product mode fails closed.
-		return errors.New("cross-thread foreground attachment is disabled")
+		value := uintptr(0)
+		if attach {
+			value = 1
+		}
+		attached, _, callErr := callSourceAttachThreadInput(uintptr(sourceThread), uintptr(targetThread), value)
+		if attached == 0 {
+			return touchpadWin32Error("AttachThreadInput(source foreground)", callErr)
+		}
+		return nil
 	}
 	sourceWheelCaptureIsWindow = func(window uintptr) bool {
 		valid, _, _ := procIsWindowSourceCapture.Call(window)
@@ -609,6 +625,9 @@ func (current *sourceWheelCaptureRun) activateForegroundFallback() (SourceForegr
 }
 
 func (current *sourceWheelCaptureRun) setForegroundWithThreadAttach(targetWindow, peerWindow uintptr) (foregroundThreadFallbackResult, error) {
+	if err := current.err(); err != nil {
+		return foregroundThreadFallbackAttachFailed, err
+	}
 	if targetWindow == 0 || peerWindow == 0 {
 		return foregroundThreadFallbackAttachFailed, errors.New("foreground fallback window is unavailable")
 	}
@@ -620,10 +639,21 @@ func (current *sourceWheelCaptureRun) setForegroundWithThreadAttach(targetWindow
 			errors.New("source and peer thread identities cannot be attached"),
 		)
 	}
+	// This rejects an already-unresponsive window. It is not a cancellation
+	// guarantee: the peer can still stall after this bounded probe.
+	if err := sourceWheelCaptureProbeForeground(peerWindow); err != nil {
+		return foregroundThreadFallbackAttachFailed, err
+	}
+	if err := current.err(); err != nil {
+		return foregroundThreadFallbackAttachFailed, err
+	}
 	if err := sourceWheelCaptureAttachThreads(sourceThread, peerThread, true); err != nil {
 		return foregroundThreadFallbackAttachFailed, err
 	}
-	foregroundErr := sourceWheelCaptureSetForeground(targetWindow)
+	foregroundErr := current.err()
+	if foregroundErr == nil {
+		foregroundErr = sourceWheelCaptureSetForeground(targetWindow)
+	}
 	verified := foregroundErr == nil && sourceWheelCaptureGetForeground() == targetWindow
 	detachErr := sourceWheelCaptureAttachThreads(sourceThread, peerThread, false)
 	if detachErr != nil {

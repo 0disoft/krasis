@@ -1,5 +1,7 @@
 package productlog
 
+import "strings"
+
 // Reconnect reasons are a closed vocabulary. Never log arbitrary descriptor
 // strings: observers and wrapped errors can contain private peer details.
 var reconnectReasons = map[[3]string]string{
@@ -37,6 +39,19 @@ func init() {
 	for _, code := range []string{"reconnect_acquire_failed", "reconnect_session_unknown", "heartbeat_timeout_observed", "disconnect_requested", "reconnect_source_hook_failed", "reconnect_return_controller_failed", "reconnect_boundary_orchestrator_failed", "reconnect_peer_session_failed", "reconnect_peer_liveness_failed"} {
 		allowed[code] = true
 	}
+	var faults []string
+	for code := range allowed {
+		if strings.HasPrefix(code, "reconnect_") {
+			faults = append(faults, "fault_"+strings.TrimPrefix(code, "reconnect_"))
+		}
+	}
+	for _, code := range faults {
+		allowed[code] = true
+	}
+}
+
+func FaultCode(component, phase, code string) string {
+	return "fault_" + strings.TrimPrefix(ReconnectCode("session", component, phase, code), "reconnect_")
 }
 
 func ReconnectCode(kind, component, phase, code string) string {

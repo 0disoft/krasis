@@ -226,6 +226,10 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 			Effects: dependencies.Effects, Authorizer: dependencies.Authorizer,
 			Management: dependencies.Management, TrustRevoker: dependencies.TrustRevoker,
 		})
+		if errors.Is(sessionErr, ErrRecoveryUnverified) {
+			failure := DescribeSessionFailure(sessionErr)
+			terminalSnapshot = SupervisorSnapshot{FailureKind: "session", FailureComponent: failure.Component, FailurePhase: failure.Phase, FailureCode: failure.Code}
+		}
 		if closeErr := ownedConnection.Close(); closeErr != nil {
 			if !errors.Is(sessionErr, closeErr) {
 				return errors.Join(sessionErr, ctx.Err(), closeErr)

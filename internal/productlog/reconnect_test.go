@@ -31,3 +31,17 @@ func TestReconnectReasonsDoNotCopyPrivateDescriptors(t *testing.T) {
 		}
 	}
 }
+
+func TestTerminalFaultReasonsAreSanitizedAndExportable(t *testing.T) {
+	for descriptor := range reconnectReasons {
+		code := FaultCode(descriptor[0], descriptor[1], descriptor[2])
+		data, _ := json.Marshal(record{Time: "2026-09-16T00:00:00Z", Code: code})
+		exported := sanitizeLog("agent.jsonl", strings.NewReader(string(data)+"\n"))
+		if exported.Incomplete || len(exported.Events) != 1 || exported.Events[0].Code != code {
+			t.Fatalf("fault reason dropped: %s", code)
+		}
+	}
+	if got := FaultCode("private peer", "private path", "private error"); got != "fault_session_unknown" || !allowed[got] {
+		t.Fatalf("unsafe fault code: %s", got)
+	}
+}

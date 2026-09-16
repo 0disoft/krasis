@@ -69,7 +69,15 @@ func (observer *sessionObserver) ObserveSupervisor(snapshot agent.SupervisorSnap
 		operations.recordLocked("session_failed")
 		return
 	}
-	if operations.sessionDone != observer.done || operations.root.Err() != nil || operations.sessionState == "DISCONNECTING" {
+	if operations.sessionDone != observer.done || operations.root.Err() != nil {
+		return
+	}
+	if snapshot.State == agent.SupervisorStopped && snapshot.FailureKind == "session" {
+		reason := productlog.FaultCode(snapshot.FailureComponent, snapshot.FailurePhase, snapshot.FailureCode)
+		operations.log.Event(reason)
+		operations.counters[reason]++
+	}
+	if operations.sessionState == "DISCONNECTING" {
 		return
 	}
 	var state string
