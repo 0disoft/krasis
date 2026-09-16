@@ -39,6 +39,52 @@ func TestPeerPreflightOutcomes(t *testing.T) {
 	}
 }
 
+func TestApplyFailureIsBoundToPeerAndTransfer(t *testing.T) {
+	m := testManager(t)
+	peer, other := strings.Repeat("a", 64), strings.Repeat("b", 64)
+	id := strings.Repeat("c", 32)
+	m.status = Status{State: "APPLY_FAILED", Peer: peer, ID: id}
+	info := m.info(peer)
+	if info.UpdateID != id || info.UpdateState != "APPLY_FAILED" || m.info(other).UpdateID != "" {
+		t.Fatal("apply result leaked or omitted")
+	}
+	data, _ := json.Marshal(info)
+	if _, err := readPeerInfo(strings.NewReader(string(data))); err != nil {
+		t.Fatal(err)
+	}
+	for _, state := range []string{"DELIVERED", "TRANSFER_UNKNOWN", "RESTART_UNCONFIRMED"} {
+		m.status = Status{State: state, Peer: peer, ID: id}
+		m.observePeer(other, info)
+		stale := info
+		stale.UpdateID = strings.Repeat("d", 32)
+		m.observePeer(peer, stale)
+		if m.status.State != state {
+			t.Fatal("unrelated failure accepted")
+		}
+		m.observePeer(peer, info)
+		if m.status.State != "PEER_APPLY_FAILED" {
+			t.Fatal("matching failure lost")
+		}
+	}
+}
+
+func TestApplyResultValidationAndLateConfirmation(t *testing.T) {
+	for _, suffix := range []string{`,"updateState":"private error"`, `,"updateState":"APPLY_FAILED","updateID":"bad"`, `,"updateID":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"`} {
+		if _, err := readPeerInfo(strings.NewReader(`{"protocol":2,"generation":27` + suffix + `}`)); err == nil {
+			t.Fatal("invalid result accepted")
+		}
+	}
+	for _, state := range []string{"TRANSFER_UNKNOWN", "RESTART_UNCONFIRMED"} {
+		m := testManager(t)
+		peer, rev := strings.Repeat("a", 64), strings.Repeat("b", 40)
+		m.status = Status{State: state, Peer: peer, Generation: 28, Revision: rev}
+		m.observePeer(peer, PeerInfo{Generation: 28, Revision: rev})
+		if m.status.State != "UPDATED" {
+			t.Fatal("late runtime confirmation lost")
+		}
+	}
+}
+
 func TestInstalledConfirmationRequiresExactPeerAndBuild(t *testing.T) {
 	m := testManager(t)
 	peer := strings.Repeat("a", 64)

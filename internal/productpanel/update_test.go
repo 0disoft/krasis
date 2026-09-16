@@ -7,8 +7,20 @@ import (
 	"testing"
 
 	"github.com/0disoft/krasis/internal/localapi"
+	"github.com/0disoft/krasis/internal/peerupdate"
 	"github.com/0disoft/krasis/internal/updatebundle"
 )
+
+func TestUpdateResumeRequiresConfirmedRuntimeAndLocalState(t *testing.T) {
+	for _, local := range []string{"LOCAL", "CONNECTED", "CONNECTING", "FAULTED"} {
+		for _, update := range []string{"DELIVERED", "TRANSFER_UNKNOWN", "RESTART_UNCONFIRMED", "PEER_APPLY_FAILED", "UPDATED"} {
+			want := local == "LOCAL" && update == "UPDATED"
+			if CanResumeAfterUpdate(local, peerupdate.Status{State: update}) != want {
+				t.Fatalf("resume for local=%s update=%s", local, update)
+			}
+		}
+	}
+}
 
 func TestUpdateDeliveryIsNotReportedAsInstalled(t *testing.T) {
 	if UpdateNotice("DELIVERED") == "" || UpdateNotice("TRANSFER_UNKNOWN") == "" || UpdateNotice("PEER_NOT_ALLOWED") == "" {

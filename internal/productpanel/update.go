@@ -5,6 +5,11 @@ import (
 	"github.com/0disoft/krasis/internal/peerupdate"
 )
 
+// Delivery acknowledges stored bytes, not a running replacement agent.
+func CanResumeAfterUpdate(localState string, status peerupdate.Status) bool {
+	return localState == "LOCAL" && status.State == "UPDATED"
+}
+
 func UpdateStatusNotice(status peerupdate.Status) string {
 	text := UpdateNotice(status.State)
 	if text == "" {
@@ -62,7 +67,9 @@ func UpdateNotice(state string) string {
 	case "APPLYING":
 		return "업데이트 적용 중…"
 	case "DELIVERED":
-		return "상대에게 업데이트 전달 완료 · 적용 후 연결을 다시 준비합니다."
+		return "상대에게 파일 전달 완료 · 새 버전 실행 확인 중입니다. 확인 후 다시 연결합니다."
+	case "PEER_APPLY_FAILED":
+		return "상대가 업데이트 적용 실패를 보고했습니다. 자동 재연결을 중단했습니다. 상대 진단을 확인하세요."
 	case "EXPIRED":
 		return "전송 대기 만료 · 상대의 업데이트 허용·버전·방화벽을 확인하세요."
 	case "PEER_NOT_ALLOWED":

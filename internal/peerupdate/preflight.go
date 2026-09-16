@@ -9,6 +9,8 @@ import (
 
 // PeerInfo is exchanged only inside the pinned mutually authenticated channel.
 type PeerInfo struct {
+	UpdateID      string `json:"updateID,omitempty"`
+	UpdateState   string `json:"updateState,omitempty"`
 	Clipboard     bool   `json:"clipboard,omitempty"`
 	ClipboardID   string `json:"clipboardID,omitempty"`
 	ClipboardSize int    `json:"clipboardSize,omitempty"`
@@ -24,7 +26,13 @@ type peerObservation struct {
 
 func (m *Manager) info(peer string) PeerInfo {
 	allowed, id, size := m.ClipboardInfo(peer)
-	return PeerInfo{Protocol: 2, Generation: m.generation, Revision: m.revision, Allowed: m.permitted(peer), Clipboard: allowed, ClipboardID: id, ClipboardSize: size}
+	info := PeerInfo{Protocol: 2, Generation: m.generation, Revision: m.revision, Allowed: m.permitted(peer), Clipboard: allowed, ClipboardID: id, ClipboardSize: size}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.status.Peer == peer && m.status.State == "APPLY_FAILED" {
+		info.UpdateID, info.UpdateState = m.status.ID, m.status.State
+	}
+	return info
 }
 func readPeerInfo(reader io.Reader) (PeerInfo, error) {
 	var info PeerInfo
@@ -36,6 +44,10 @@ func readPeerInfo(reader io.Reader) (PeerInfo, error) {
 		return PeerInfo{}, ErrDenied
 	}
 	if info.ClipboardSize < 0 || info.ClipboardSize > MaxClipboardBytes || (info.ClipboardID != "" && !validID(info.ClipboardID, 32)) {
+		return PeerInfo{}, ErrDenied
+	}
+	if (info.UpdateState != "" && info.UpdateState != "APPLY_FAILED") ||
+		(info.UpdateState != "" && !validID(info.UpdateID, 32)) || (info.UpdateState == "" && info.UpdateID != "") {
 		return PeerInfo{}, ErrDenied
 	}
 	return info, nil
@@ -52,8 +64,12 @@ func (m *Manager) observePeer(peer string, info PeerInfo) {
 	}
 	m.status.PeerGeneration = info.Generation
 	m.status.PeerRevision = info.Revision
-	if m.status.State == "DELIVERED" && m.status.Revision != "" && info.Revision == m.status.Revision && info.Generation == m.status.Generation {
-		m.status.State = "UPDATED"
+	if m.status.State == "DELIVERED" || m.status.State == "TRANSFER_UNKNOWN" || m.status.State == "RESTART_UNCONFIRMED" {
+		if info.UpdateState == "APPLY_FAILED" && info.UpdateID == m.status.ID && info.UpdateID != "" {
+			m.status.State = "PEER_APPLY_FAILED"
+		} else if m.status.Revision != "" && info.Revision == m.status.Revision && info.Generation == m.status.Generation {
+			m.status.State = "UPDATED"
+		}
 	}
 	if m.out == nil || m.out.peer != peer {
 		return

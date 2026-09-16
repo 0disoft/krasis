@@ -592,7 +592,7 @@ func (a *productWindow) apply(view productpanel.View) {
 		a.performTarget("update_apply", view.Update.Status.Peer)
 		return
 	}
-	if a.updateResume != "" && view.State == "LOCAL" && (view.Update.Status.State == "DELIVERED" || view.Update.Status.State == "TRANSFER_UNKNOWN") {
+	if a.updateResume != "" && !a.busy && productpanel.CanResumeAfterUpdate(view.State, view.Update.Status) {
 		alias := a.updateResume
 		a.updateResume = ""
 		a.performTarget("connect", alias)
