@@ -18,8 +18,9 @@ import (
 const wmSourceReady = 0x8002
 
 type SourceHook struct {
-	observer SourcePipelineObserver
-	capture  *sourceWheelCapture
+	observer     SourcePipelineObserver
+	capture      *sourceWheelCapture
+	returnCursor returnCursorShield
 }
 
 type sourceInputThreadResult struct {
@@ -97,7 +98,7 @@ func (hook *SourceHook) RunWithBoundary(
 	startSourceInputThread(results, "low-level-hook", func() error {
 		return runSourceLowLevelHookThread(runCtx, session, boundary, hook.observer, hook.capture, pointerState, func() {
 			readySignals <- struct{}{}
-		})
+		}, &hook.returnCursor)
 	})
 	startSourceInputThread(results, "raw-mouse", func() error {
 		return runSourceRawMouseThread(runCtx, session, boundary, pointerState, func() {
@@ -228,13 +229,21 @@ func runSourceLowLevelHookThread(
 	wheelCapture SourceActivation,
 	pointerState *sourcePointerState,
 	ready func(),
+	shields ...*returnCursorShield,
 ) error {
+	var shield *returnCursorShield
+	if len(shields) != 0 {
+		shield = shields[0]
+		shield.open()
+		defer shield.close()
+	}
 	threadID, _, _ := procGetCurrentThreadID.Call()
 	var bootstrapMessage message
 	procPeekMessageW.Call(uintptr(unsafe.Pointer(&bootstrapMessage)), 0, 0, 0, pmNoRemove)
 	mapper := &sourceKeyboardMapper{}
 	keyboardCallback := syscall.NewCallback(func(code int, wParam uintptr, lParam uintptr) uintptr {
 		if code == hcAction && lParam != 0 {
+			shield.beforeInput()
 			if routeMappedPhysicalAction(session, boundary, func() (control.InputAction, bool, int32, error) {
 				data := *(*keyboardHookData)(unsafe.Pointer(lParam))
 				action, emitted, err := mapper.keyboard(uint32(wParam), data)
@@ -247,6 +256,7 @@ func runSourceLowLevelHookThread(
 	})
 	mouseCallback := syscall.NewCallback(func(code int, wParam uintptr, lParam uintptr) uintptr {
 		if code == hcAction && lParam != 0 {
+			shield.beforeInput()
 			data := *(*mouseHookData)(unsafe.Pointer(lParam))
 			message := uint32(wParam)
 			if message == wmMouseMove {

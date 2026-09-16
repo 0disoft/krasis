@@ -18,6 +18,12 @@ func TestReturnControllerCleansInboundBeforeWritingExactRevoke(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewReturnController() error = %v", err)
 	}
+	cursor := &recordingReturnCursor{present: func() {
+		if len(writer.frames) != 1 {
+			t.Fatal("presented before revoke write")
+		}
+	}}
+	controller.Cursor = cursor
 	if err := controller.Revoke(context.Background(), control.ReturnIntent{SessionID: "session-1", Epoch: "epoch-1"}); err != nil {
 		t.Fatalf("Revoke() error = %v", err)
 	}
@@ -30,6 +36,41 @@ func TestReturnControllerCleansInboundBeforeWritingExactRevoke(t *testing.T) {
 	}
 	if len(returns.disarmed) != 1 {
 		t.Fatalf("disarmed = %+v", returns.disarmed)
+	}
+	if cursor.prepared != 1 || cursor.presented != 1 {
+		t.Fatal("missing return presentation")
+	}
+}
+
+type recordingReturnCursor struct {
+	prepared, presented int
+	present             func()
+}
+
+func (cursor *recordingReturnCursor) PrepareReturnCursor() func() {
+	cursor.prepared++
+	return func() {
+		cursor.presented++
+		if cursor.present != nil {
+			cursor.present()
+		}
+	}
+}
+func (*recordingReturnCursor) RestoreReturnCursor() {}
+
+type failedReturnWriter struct{}
+
+func (failedReturnWriter) WriteFrameContext(context.Context, transport.Frame) error {
+	return errors.New("write failed")
+}
+
+func TestReturnCursorNotPresentedWhenRevokeWriteFails(t *testing.T) {
+	runtime, _ := newInboundRuntime(t)
+	controller, _ := NewReturnController(testWriteCoordinator(t, failedReturnWriter{}), runtime, &recordingReturnBoundary{})
+	cursor := &recordingReturnCursor{}
+	controller.Cursor = cursor
+	if err := controller.Revoke(context.Background(), control.ReturnIntent{SessionID: "session-1", Epoch: "epoch-1"}); err == nil || cursor.presented != 0 {
+		t.Fatalf("failed revoke presented cursor: %v %+v", err, cursor)
 	}
 }
 
@@ -60,12 +101,17 @@ func TestReturnControllerDoesNotWriteWhenInputIsHeld(t *testing.T) {
 	writer := &recordingFrameWriter{}
 	returns := &recordingReturnBoundary{}
 	controller, _ := NewReturnController(testWriteCoordinator(t, writer), runtime, returns)
+	cursor := &recordingReturnCursor{}
+	controller.Cursor = cursor
 	err := controller.Revoke(context.Background(), control.ReturnIntent{SessionID: "session-1", Epoch: "epoch-1"})
 	if !errors.Is(err, application.ErrRuntimeInputHeld) || len(writer.frames) != 0 {
 		t.Fatalf("Revoke(held) error=%v frames=%d", err, len(writer.frames))
 	}
 	if len(returns.rearmed) != 1 {
 		t.Fatalf("rearmed = %+v", returns.rearmed)
+	}
+	if cursor.presented != 0 {
+		t.Fatal("held input hid cursor")
 	}
 }
 

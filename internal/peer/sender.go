@@ -189,6 +189,7 @@ type ReturnBoundaryPort interface {
 }
 
 type LeaseResponder struct {
+	Cursor      ReturnCursorPresentation
 	Coordinator *SessionWriteCoordinator
 	Runtime     *application.SessionRuntime
 	Authorizer  LeaseAuthorizer
@@ -251,6 +252,9 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 			return errors.Join(cause, rollbackErr)
 		}
 		observeControlFlow(responder.Observer, ControlFlowEntryPrepareAttempted)
+		if responder.Cursor != nil {
+			responder.Cursor.RestoreReturnCursor()
+		}
 		if err := responder.Entry.PrepareEntry(ctx, command.Edge); err != nil {
 			return rollbackEntry(err)
 		}

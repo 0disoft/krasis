@@ -152,6 +152,11 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	if err != nil {
 		return Result{}, err
 	}
+	if cursor, ok := dependencies.Hook.(peer.ReturnCursorPresentation); ok {
+		returns.Cursor = cursor
+		responder.Cursor = cursor
+		defer cursor.RestoreReturnCursor()
+	}
 	if dependencies.Management != nil {
 		managed, managedErr := newManagedPeerSession(
 			authenticatedPeer,

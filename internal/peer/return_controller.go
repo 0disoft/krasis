@@ -15,6 +15,14 @@ type ReturnController struct {
 	Runtime     *application.SessionRuntime
 	Returns     ReturnBoundaryPort
 	Observer    ControlFlowObserver
+	Cursor      ReturnCursorPresentation
+}
+
+// ReturnCursorPresentation affects only the idle pointer, not control ownership.
+// The prepared action must be invalidated by local input or a new entry.
+type ReturnCursorPresentation interface {
+	PrepareReturnCursor() func()
+	RestoreReturnCursor()
 }
 
 func NewReturnController(
@@ -42,6 +50,10 @@ func (controller *ReturnController) Revoke(ctx context.Context, intent control.R
 		return errors.New("return controller is not initialized")
 	}
 	err := controller.Coordinator.Execute(ctx, func(writer FrameWriter) error {
+		var present func()
+		if controller.Cursor != nil {
+			present = controller.Cursor.PrepareReturnCursor()
+		}
 		identity, _, revokeErr := controller.Runtime.RevokeLocalReturn(ctx, intent)
 		if revokeErr != nil {
 			return revokeErr
@@ -61,6 +73,9 @@ func (controller *ReturnController) Revoke(ctx context.Context, intent control.R
 			return fmt.Errorf("%w: %w", ErrInboundRevokeWrite, err)
 		}
 		observeControlFlow(controller.Observer, ControlFlowRevokeWriteCompleted)
+		if present != nil {
+			present()
+		}
 		return nil
 	})
 	if errors.Is(err, application.ErrRuntimeInputHeld) {
