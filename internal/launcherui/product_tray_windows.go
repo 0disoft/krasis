@@ -3,6 +3,7 @@
 package launcherui
 
 import (
+	"github.com/0disoft/krasis/internal/productpanel"
 	"syscall"
 	"unsafe"
 )
@@ -119,7 +120,7 @@ func (a *productWindow) trayMenu() {
 		user32.NewProc("AppendMenuW").Call(menu, flags, id, uintptr(unsafe.Pointer(utf16(label))))
 	}
 	add(trayOpen, "연결 관리 열기", false)
-	add(trayDisconnect, "연결 해제", a.busy || a.view.State == "LOCAL")
+	add(trayDisconnect, productpanel.DisconnectLabel(a.view.State), a.busy || a.view.State == "LOCAL")
 	add(trayQuit, "연결 유지하고 관리 앱 종료", a.busy)
 	var point struct{ X, Y int32 }
 	user32.NewProc("GetCursorPos").Call(uintptr(unsafe.Pointer(&point)))

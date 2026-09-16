@@ -9,13 +9,84 @@ import (
 )
 
 type runtimeStub struct {
+	state        string
 	generation   int
 	legacy, busy bool
 	stops        int
 }
 
 func (r *runtimeStub) Status(context.Context) (localapi.Status, error) {
+	if r.state != "" {
+		return localapi.Status{State: r.state}, nil
+	}
 	return localapi.Status{State: "LOCAL"}, nil
+}
+
+func TestStartupRecoversFaultedProcessWithoutDowngradeOrRestartLoop(t *testing.T) {
+	for _, test := range []struct {
+		name                         string
+		generation                   int
+		occupied, badBundle, refault bool
+		wantStarts, wantStops        int
+		wantErr                      bool
+	}{
+		{"same generation", 2, false, false, false, 1, 1, false},
+		{"older generation", 1, false, false, false, 1, 1, false},
+		{"newer generation", 3, false, false, false, 0, 0, true},
+		{"owner still alive", 2, true, false, false, 0, 1, true},
+		{"bad bundle", 2, false, true, false, 0, 0, true},
+		{"replacement faults", 2, false, false, true, 1, 1, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			r := &runtimeStub{generation: test.generation, state: "FAULTED"}
+			starts, pauses, probes := 0, 0, 0
+			s := Startup{Generation: 2, Lock: func() (io.Closer, error) { return closerStub{}, nil }, Open: func() (RuntimeClient, error) { return r, nil },
+				Verify: func() error {
+					if test.badBundle {
+						return errors.New("bad bundle")
+					}
+					return nil
+				},
+				Available: func() (bool, error) { probes++; return !test.occupied, nil },
+				Start: func() error {
+					if probes == 0 || r.stops != 1 {
+						t.Fatal("start before stop and ownership verification")
+					}
+					starts++
+					r.generation = 2
+					if !test.refault {
+						r.state = "LOCAL"
+					}
+					return nil
+				},
+				Pause: func(context.Context) error {
+					pauses++
+					if pauses > 4 {
+						return context.DeadlineExceeded
+					}
+					return nil
+				},
+			}
+			err := s.Ensure(context.Background())
+			if (err != nil) != test.wantErr || starts != test.wantStarts || r.stops != test.wantStops {
+				t.Fatalf("err=%v starts=%d stops=%d", err, starts, r.stops)
+			}
+		})
+	}
+}
+
+func TestFaultRecoveryActionIsExplicit(t *testing.T) {
+	if RecoveryAction("FAULTED", "disconnect") != "prepare" || DisconnectLabel("FAULTED") != "에이전트 재시작" {
+		t.Fatal("fault recovery unavailable")
+	}
+	for _, state := range []string{"LOCAL", "CONNECTED", "RECONNECTING", "FAULTED"} {
+		if RecoveryAction(state, "refresh") != "refresh" {
+			t.Fatal("poll restarted agent")
+		}
+		if state != "FAULTED" && RecoveryAction(state, "disconnect") != "disconnect" {
+			t.Fatal("normal disconnect changed")
+		}
+	}
 }
 func (r *runtimeStub) Runtime(context.Context) (localapi.RuntimeInfo, error) {
 	if r.legacy {

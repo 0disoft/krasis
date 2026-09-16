@@ -368,7 +368,7 @@ func (a *productWindow) perform(action string) {
 	if action == "disconnect" {
 		a.updateResume = ""
 	}
-	a.performTarget(action, a.selected())
+	a.performTarget(productpanel.RecoveryAction(a.view.State, action), a.selected())
 }
 
 func (a *productWindow) revokePeer() {
@@ -504,10 +504,11 @@ func (a *productWindow) apply(view productpanel.View) {
 	if warning := controlLogWarning(a.log != nil, a.log.Failed(), a.logOpenErr); warning != "" {
 		view.Notice = warning + " " + view.Notice
 	}
-	if updateNotice := productpanel.UpdateNotice(view.Update.Status.State); updateNotice != "" {
+	if updateNotice := productpanel.UpdateNotice(view.Update.Status.State); updateNotice != "" && view.State != "FAULTED" && view.State != "RECONNECTING" {
 		view.Notice = updateNotice
 	}
 	setText(a.notice, view.Notice)
+	setText(a.disconnect, productpanel.DisconnectLabel(view.State))
 	enable(a.updateSend, !a.busy && view.State == "CONNECTED" && view.Update.Code == "ok" && a.pin.job == "")
 	enable(a.updateAllow, !a.busy && len(view.Peers) > 0 && view.Update.Code == "ok" && a.pin.job == "")
 	enable(a.peers, len(view.Peers) > 0)

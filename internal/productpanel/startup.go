@@ -9,10 +9,11 @@ import (
 )
 
 var (
-	ErrStartupBusy       = errors.New("agent startup is busy")
-	ErrAgentBusy         = errors.New("agent is active; disconnect or finish pairing before upgrade")
-	ErrAgentIncompatible = errors.New("agent protocol is incompatible")
-	ErrAgentNotReady     = errors.New("agent did not become ready")
+	ErrStartupBusy         = errors.New("agent startup is busy")
+	ErrAgentBusy           = errors.New("agent is active; disconnect or finish pairing before upgrade")
+	ErrAgentIncompatible   = errors.New("agent protocol is incompatible")
+	ErrAgentNotReady       = errors.New("agent did not become ready")
+	ErrAgentRecoveryFailed = errors.New("replacement agent is faulted")
 )
 
 type RuntimeClient interface {
@@ -56,8 +57,9 @@ func (s Startup) Ensure(ctx context.Context) error {
 			}
 		} else {
 			client, err := s.Open()
+			var status localapi.Status
 			if err == nil {
-				_, err = client.Status(ctx)
+				status, err = client.Status(ctx)
 			}
 			if err == nil {
 				info, err := client.Runtime(ctx)
@@ -72,8 +74,17 @@ func (s Startup) Ensure(ctx context.Context) error {
 				if info.Protocol != localapi.AgentProtocol {
 					return ErrAgentIncompatible
 				}
-				if info.Generation >= s.Generation {
+				faulted := status.State == "FAULTED"
+				if info.Generation >= s.Generation && !faulted {
 					return nil
+				}
+				// A fault latch belongs to this process. Never clear it in place or
+				// restart repeatedly; replace only after verified process ownership ends.
+				if faulted && started {
+					return ErrAgentRecoveryFailed
+				}
+				if faulted && info.Generation > s.Generation {
+					return ErrAgentIncompatible
 				}
 				if started {
 					return ErrAgentIncompatible
@@ -126,6 +137,9 @@ func startupPause(ctx context.Context) error {
 }
 
 func StartupNotice(err error) string {
+	if errors.Is(err, ErrAgentRecoveryFailed) {
+		return "새 에이전트에서도 오류가 발생했습니다. 반복 재시작하지 않습니다. 진단을 내보내주세요."
+	}
 	if errors.Is(err, ErrAgentBusy) {
 		return "연결 또는 페어링 중인 에이전트는 교체하지 않습니다. 작업 종료 후 새로고침하세요."
 	}

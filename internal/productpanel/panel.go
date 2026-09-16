@@ -40,7 +40,7 @@ func Execute(ctx context.Context, open func() (Client, error), action, alias str
 	}
 	// Stopping a session must not depend on reading a possibly damaged trust store.
 	if status.State == "FAULTED" {
-		return View{State: status.State, Notice: "입력 제어 정리 결과를 확인하지 못해 연결을 차단했습니다. 에이전트를 완전히 종료한 뒤 다시 실행하세요."}
+		return View{State: status.State, Notice: "입력 제어 오류로 연결을 차단했습니다. ‘에이전트 재시작’을 누르면 기존 에이전트 종료 확인 후 복구합니다. 이후 기기를 선택해 연결하세요."}
 	}
 	if action == "disconnect" {
 		result, err := client.Disconnect(ctx)
@@ -106,4 +106,20 @@ func Execute(ctx context.Context, open func() (Client, error), action, alias str
 		view.State = current.State
 	}
 	return view
+}
+
+// The explicit disconnect action becomes process recovery only for a faulted
+// view. Periodic refresh must never trigger a restart loop.
+func RecoveryAction(state, action string) string {
+	if state == "FAULTED" && action == "disconnect" {
+		return "prepare"
+	}
+	return action
+}
+
+func DisconnectLabel(state string) string {
+	if state == "FAULTED" {
+		return "에이전트 재시작"
+	}
+	return "연결 해제"
 }
