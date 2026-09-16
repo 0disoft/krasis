@@ -2,6 +2,22 @@ package productpanel
 
 func UpdateNotice(state string) string {
 	switch state {
+	case "SAME_VERSION":
+		return "상대 기기는 보내려는 묶음과 같은 버전입니다. 업데이트가 필요하지 않습니다."
+	case "PEER_NEWER":
+		return "상대 기기가 보내려는 묶음보다 최신 세대입니다. 다운그레이드하지 않습니다."
+	case "GENERATION_CONFLICT":
+		return "같은 세대의 서로 다른 빌드입니다. 더 높은 세대로 만든 묶음이 필요합니다."
+	case "PEER_BUSY":
+		return "상대 기기가 다른 업데이트를 처리 중입니다. 완료 후 다시 시도하세요."
+	case "BUNDLE_MISSING":
+		return "업데이트 파일이 없습니다. ZIP 전체를 새 폴더에 풀어 실행하세요."
+	case "HASH_MISMATCH":
+		return "전송된 파일의 체크섬이 일치하지 않습니다. 적용하지 않았습니다."
+	case "STORAGE_FAILED":
+		return "상대 기기에 업데이트를 저장하지 못했습니다. 저장 공간과 폴더 권한을 확인하세요."
+	case "TRANSFER_INTERRUPTED":
+		return "파일 전송이 중단되었습니다. 네트워크를 확인한 뒤 다시 시도하세요."
 	case "PREPARING":
 		return "업데이트 묶음 검사 중…"
 	case "QUEUED":
@@ -23,7 +39,7 @@ func UpdateNotice(state string) string {
 	case "INVALID_BUNDLE":
 		return "업데이트 검사 실패 · ZIP 전체를 풀어 실행했는지 확인하세요."
 	case "PEER_REJECTED":
-		return "상대가 업데이트를 거부했습니다. 더 높은 세대의 완전한 묶음이 필요합니다."
+		return "상대가 업데이트를 거부했지만 세부 이유를 제공하지 않았습니다. 구버전일 수 있으니 상대 진단을 확인하세요."
 	case "TRANSFER_UNKNOWN":
 		return "전송 결과 미확인 · 상대 기기의 버전을 확인하세요."
 	case "RECEIVE_FAILED":

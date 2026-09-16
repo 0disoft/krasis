@@ -69,7 +69,7 @@ func (m *Manager) Run(ctx context.Context, address, peer string, listener bool, 
 					} else if resp.StatusCode == http.StatusForbidden {
 						state = "PEER_NOT_ALLOWED"
 					} else {
-						state = "PEER_REJECTED"
+						state = wireResult(resp.Header.Get("X-Krasis-Result"))
 					}
 					resp.Body.Close()
 				}
@@ -111,7 +111,7 @@ func (m *Manager) Run(ctx context.Context, address, peer string, listener bool, 
 			if err == nil {
 				ack.Header.Set("X-Krasis-Result", "DELIVERED")
 			} else {
-				ack.Header.Set("X-Krasis-Result", "PEER_REJECTED")
+				ack.Header.Set("X-Krasis-Result", FailureCode(err))
 			}
 			if r, e := client.Do(ack); e == nil {
 				if r.StatusCode == http.StatusOK && err == nil && authorized() {
@@ -166,6 +166,9 @@ func (m *Manager) handler(peer string, authorized func() bool) http.Handler {
 				return
 			}
 			err := m.receive(peer, r.Header.Get("X-Krasis-ID"), r.Header.Get("X-Krasis-SHA256"), r.Body, authorized)
+			if err != nil {
+				w.Header().Set("X-Krasis-Result", FailureCode(err))
+			}
 			if errors.Is(err, ErrDenied) {
 				w.WriteHeader(http.StatusForbidden)
 			} else if errors.Is(err, ErrBusy) {
@@ -184,7 +187,7 @@ func (m *Manager) handler(peer string, authorized func() bool) http.Handler {
 				return
 			}
 			result := r.Header.Get("X-Krasis-Result")
-			if result != "DELIVERED" && result != "PEER_REJECTED" {
+			if result != wireResult(result) {
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}

@@ -52,6 +52,7 @@ type Manager struct {
 	root        *os.Root
 	path        string
 	generation  int
+	revision    string
 	allowed     map[string]bool
 	status      Status
 	stagedUntil time.Time
@@ -84,6 +85,7 @@ func Open(productRoot string, generation int) (*Manager, error) {
 	m := &Manager{root: root, path: path, generation: generation, allowed: map[string]bool{}, status: Status{State: "IDLE"}, validate: func(data []byte) (stagedBundle, error) {
 		return updatebundle.Read(bytes.NewReader(data), int64(len(data)))
 	}}
+	m.revision = buildRevision()
 	f, err := root.Open("permissions.json")
 	if err == nil {
 		defer f.Close()
@@ -235,7 +237,7 @@ func (m *Manager) Prepare(peer, directory string) error {
 	defer m.mu.Unlock()
 	m.packing = false
 	if err != nil {
-		m.status.State = "INVALID_BUNDLE"
+		m.status.State = FailureCode(err)
 		return err
 	}
 	id := randomID()
@@ -295,18 +297,22 @@ func (m *Manager) receive(peer, id, expected string, reader io.Reader, authorize
 		defer m.mu.Unlock()
 		m.receiving = false
 		if failure != nil {
-			m.status.State = "RECEIVE_FAILED"
+			m.status.State = FailureCode(failure)
 			m.event("peer_update_receive_failed")
 		}
 	}()
 	data, err := io.ReadAll(io.LimitReader(reader, updatebundle.MaxArchiveBytes+1))
-	if err != nil || int64(len(data)) > updatebundle.MaxArchiveBytes {
+	if err != nil {
+		failure = ErrTransfer
+		return failure
+	}
+	if int64(len(data)) > updatebundle.MaxArchiveBytes {
 		failure = updatebundle.ErrInvalid
 		return failure
 	}
 	hash := sha256.Sum256(data)
 	if hex.EncodeToString(hash[:]) != expected {
-		failure = updatebundle.ErrInvalid
+		failure = ErrHashMismatch
 		return failure
 	}
 	received, err = m.validate(data)
@@ -314,7 +320,11 @@ func (m *Manager) receive(peer, id, expected string, reader io.Reader, authorize
 		failure = err
 		return err
 	}
-	if received.Metadata().Generation <= m.generation || !authorized() {
+	if err := compareVersion(m.generation, m.revision, received.Metadata().Generation, received.Metadata().Revision); err != nil {
+		failure = err
+		return failure
+	}
+	if !authorized() {
 		failure = ErrDenied
 		return failure
 	}
@@ -325,8 +335,8 @@ func (m *Manager) receive(peer, id, expected string, reader io.Reader, authorize
 		return failure
 	}
 	if err = received.Stage(m.root, id); err != nil {
-		failure = err
-		return err
+		failure = errors.Join(ErrStorage, err)
+		return failure
 	}
 	m.status = Status{State: "STAGED", ID: id, Peer: peer, Revision: received.Metadata().Revision, Generation: received.Metadata().Generation}
 	m.stagedUntil = time.Now().Add(3 * time.Minute)

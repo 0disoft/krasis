@@ -64,6 +64,12 @@ solely by the network handler. Fixed stage codes omit paths, contents and aliase
 
 ## Verification boundary
 
+Update rejection receipts use a closed `X-Krasis-Result` vocabulary. Same build,
+newer receiver, equal-generation different build, denied permission, busy peer,
+archive hash mismatch, interrupted transfer, invalid bundle and staging failure
+are distinct outcomes. Unknown/legacy results remain unspecified rejections;
+they are not inferred to mean an already-current peer. Raw error text is not sent.
+
 Unit tests cover denied and revoked permissions, single-use apply, malformed ZIPs,
 generation checks and integrity checks. Packaged two-PC upgrade, firewall behavior,
 native GUI relaunch and post-upgrade input require manual verification. No official
