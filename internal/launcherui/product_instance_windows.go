@@ -14,6 +14,15 @@ import (
 const productShowExisting = wmUIEvent + 4
 
 func acquireProductWindow() (io.Closer, error) {
+	return acquireProductWindowForUpdate(false)
+}
+
+func acquireProductWindowForUpdate(wait bool) (io.Closer, error) {
+	if wait {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		return claimProductWindow(ctx, func() (io.Closer, error) { return agentinstance.AcquireControl() }, func() bool { return false })
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	return claimProductWindow(ctx, func() (io.Closer, error) {

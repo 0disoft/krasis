@@ -27,7 +27,9 @@ for (const name of ['krasis', 'krasis-agent', 'krasis-control']) {
 const probe = spawnSync(path.join(destination, 'krasis.exe'), [], { encoding: 'utf8', timeout: 5000 });
 if (probe.error || probe.status !== 2) throw new Error('CLI usage smoke check failed.');
 fs.copyFileSync('docs/experiments/product-two-pc-smoke.md', path.join(destination, 'START-HERE.md'));
-fs.writeFileSync(path.join(destination, 'BUILD.json'), JSON.stringify({ revision, platform: 'windows/amd64', cgo: false, purpose: 'manual-two-pc-smoke', signed: false }, null, 2) + '\n');
+const generation = Number(fs.readFileSync('internal/localapi/runtime.go', 'utf8').match(/const AgentGeneration = (\d+)/u)?.[1]);
+if (!Number.isSafeInteger(generation) || generation < 1) throw new Error('Missing agent generation.');
+fs.writeFileSync(path.join(destination, 'BUILD.json'), JSON.stringify({ revision, generation, platform: 'windows/amd64', cgo: false, purpose: 'manual-two-pc-smoke', signed: false }, null, 2) + '\n');
 const modules = execFileSync('go', ['list', '-m', '-f', '{{.Path}}|{{.Dir}}', 'all'], { env: environment, encoding: 'utf8' }).trim().split(/\r?\n/u).slice(1);
 const notices = modules.map(line => { const [name, directory] = line.split('|'); return `${name}\n\n${fs.readFileSync(path.join(directory, 'LICENSE'), 'utf8')}`; }).join('\n\n');
 fs.writeFileSync(path.join(destination, 'THIRD-PARTY-NOTICES.txt'), notices);
@@ -38,4 +40,5 @@ entries.push('SHA256SUMS.txt');
 const archive = path.join(destination, 'krasis-windows-x64-smoke.zip');
 const quote = value => "'" + value.replaceAll("'", "''") + "'";
 execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `$ErrorActionPreference='Stop'; Compress-Archive -LiteralPath @(${entries.map(name => quote(path.join(destination, name))).join(',')}) -DestinationPath ${quote(archive)}`], { stdio: 'inherit' });
+execFileSync('go', ['test', '-count=1', '-timeout', '60s', '-run', '^TestPackagedUpdateBundle$', './internal/productpanel'], { env: { ...environment, KRASIS_UPDATE_SMOKE: destination, KRASIS_UPDATE_REVISION: revision }, stdio: 'inherit' });
 process.stdout.write(JSON.stringify({ archive, sha256: hash(archive), revision, entries }, null, 2) + '\n');

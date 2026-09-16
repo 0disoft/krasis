@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path/filepath"
 	"runtime"
 	"syscall"
 	"time"
@@ -23,6 +24,8 @@ const productDisconnect = 2003
 const productPeers = 2004
 const productRevoke = 2005
 const productExport = 2006
+const productSendUpdate = 2007
+const productAllowUpdate = 2008
 const layoutLeft = 2301
 const layoutRight = 2302
 const rearm32 = 2310
@@ -32,6 +35,9 @@ const exportEvent = wmUIEvent + 2
 const wmTimer = 0x0113
 
 type productWindow struct {
+	updateSend, updateAllow                                   uintptr
+	updateResume, initialPeer, expectedBuild                  string
+	updateAttempt                                             string
 	trayIcon                                                  uintptr
 	version                                                   uintptr
 	appBuild                                                  string
@@ -58,9 +64,17 @@ type productWindow struct {
 var productApp *productWindow
 
 func RunProductControl() (resultErr error) {
+	return runProductControl("", "")
+}
+
+func RunUpdatedProductControl(alias, revision string) error {
+	return runProductControl(alias, revision)
+}
+
+func runProductControl(alias, revision string) (resultErr error) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
-	ownership, err := acquireProductWindow()
+	ownership, err := acquireProductWindowForUpdate(alias != "")
 	if err != nil || ownership == nil {
 		return err
 	}
@@ -82,6 +96,7 @@ func RunProductControl() (resultErr error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	app := &productWindow{control: paths.Control, ctx: ctx, cancel: cancel, result: make(chan productpanel.View, 1)}
+	app.initialPeer, app.expectedBuild = alias, revision
 	app.log = log
 	app.appBuild = productpanel.CurrentBuildLabel()
 	app.logOpenErr = logErr
@@ -169,6 +184,13 @@ func productWindowProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr
 	case wmCommand:
 		if int((wParam>>16)&0xffff) == bnClicked {
 			switch int(wParam & 0xffff) {
+			case productSendUpdate:
+				if !a.busy {
+					a.updateResume = ""
+					a.performTarget("update_send", a.view.Fingerprints[a.selected()])
+				}
+			case productAllowUpdate:
+				a.toggleUpdatePermission()
 			case rearm32:
 				a.performTarget("rearm_32", a.view.Fingerprints[a.selected()])
 			case rearm64:
@@ -196,6 +218,7 @@ func productWindowProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr
 			case productConnect:
 				a.perform("connect")
 			case productDisconnect:
+				a.updateResume = ""
 				a.perform("disconnect")
 			}
 		}
@@ -299,7 +322,8 @@ func (a *productWindow) create() bool {
 	a.createPIN(control)
 	a.exportResults = make(chan string, 1)
 	a.exportButton = control("BUTTON", "진단 내보내기", wsTabStop, 20, 490, 170, 30, productExport)
-	control("STATIC", "최근 이벤트만 저장 · 이전 내보내기 파일 교체", 0, 205, 494, 360, 25, 0)
+	a.updateSend = control("BUTTON", "상대 기기 업데이트", wsTabStop, 205, 490, 175, 30, productSendUpdate)
+	a.updateAllow = control("BUTTON", "업데이트 허용 설정", wsTabStop, 390, 490, 175, 30, productAllowUpdate)
 	a.exportPath = control("EDIT", "저장 후 이 칸의 파일 경로를 복사할 수 있습니다.", wsTabStop|0x0800|0x0080, 20, 532, 545, 26, 0)
 	control("STATIC", "선택한 기기의 위치 · 연결 해제 후 양쪽 PC에서 각각 설정", 0, 20, 580, 545, 25, 0)
 	a.layoutLeft = control("BUTTON", "상대가 왼쪽", wsTabStop, 20, 616, 260, 32, layoutLeft)
@@ -341,6 +365,9 @@ func (a *productWindow) selected() string {
 }
 
 func (a *productWindow) perform(action string) {
+	if action == "disconnect" {
+		a.updateResume = ""
+	}
 	a.performTarget(action, a.selected())
 }
 
@@ -380,6 +407,9 @@ func (a *productWindow) performTarget(action, alias string) {
 		defer cancel()
 		var view productpanel.View
 		defer func() {
+			if client, err := localapi.OpenClient(a.control); err == nil {
+				view.Update, _ = client.Update(ctx, localapi.UpdateRequest{Schema: localapi.UpdateSchema, Action: "STATUS"})
+			}
 			view.AgentVersion = productpanel.AgentVersionLabel(ctx, a.startup.Open)
 			a.result <- view
 			procPostMessage.Call(hwnd, wmUIEvent, 0, 0)
@@ -398,6 +428,32 @@ func (a *productWindow) performTarget(action, alias string) {
 			}
 		}
 		open := func() (productpanel.Client, error) { return localapi.OpenClient(a.control) }
+		if a.initialPeer != "" && action == "refresh" {
+			client, err := localapi.OpenClient(a.control)
+			if err == nil {
+				info, runtimeErr := client.Runtime(ctx)
+				if runtimeErr == nil && info.Build == a.expectedBuild {
+					a.log.Event("peer_update_agent_verified")
+					result, connectErr := client.Connect(ctx, a.initialPeer)
+					err = connectErr
+					if err == nil && result.Status != "COMPLETED" {
+						err = errors.New("updated connection rejected")
+					}
+				} else {
+					err = errors.New("updated agent build mismatch")
+				}
+			}
+			a.initialPeer = ""
+			if err != nil {
+				view = productpanel.Execute(ctx, open, "refresh", "")
+				view.Notice = "새 에이전트 실행을 확인하지 못했습니다. 이전 버전 폴더는 보존되어 있습니다."
+				return
+			}
+		}
+		if action == "update_send" || action == "update_allow" || action == "update_deny" || action == "update_apply" {
+			view = a.executeUpdate(ctx, action, alias)
+			return
+		}
 		if distance := map[string]int32{"rearm_32": 32, "rearm_64": 64, "rearm_128": 128}[action]; distance != 0 {
 			view = productpanel.SetRearm(ctx, open, alias, distance)
 		} else if action == "layout_LEFT" || action == "layout_RIGHT" {
@@ -411,6 +467,15 @@ func (a *productWindow) performTarget(action, alias string) {
 }
 
 func (a *productWindow) apply(view productpanel.View) {
+	if view.UpdateResume != "" {
+		a.updateResume = view.UpdateResume
+	}
+	if view.ExitForUpdate {
+		a.closing = true
+		a.cancel()
+		procDestroyWindow.Call(a.hwnd)
+		return
+	}
 	if view.AgentVersion != "" {
 		setText(a.version, productpanel.VersionCaption(a.appBuild, view.AgentVersion))
 	}
@@ -439,11 +504,81 @@ func (a *productWindow) apply(view productpanel.View) {
 	if warning := controlLogWarning(a.log != nil, a.log.Failed(), a.logOpenErr); warning != "" {
 		view.Notice = warning + " " + view.Notice
 	}
+	if updateNotice := productpanel.UpdateNotice(view.Update.Status.State); updateNotice != "" {
+		view.Notice = updateNotice
+	}
 	setText(a.notice, view.Notice)
+	enable(a.updateSend, !a.busy && view.State == "CONNECTED" && view.Update.Code == "ok" && a.pin.job == "")
+	enable(a.updateAllow, !a.busy && len(view.Peers) > 0 && view.Update.Code == "ok" && a.pin.job == "")
 	enable(a.peers, len(view.Peers) > 0)
 	enable(a.connect, view.State == "LOCAL" && len(view.Peers) > 0)
 	enable(a.disconnect, view.State != "" && view.State != "LOCAL")
 	enable(a.refresh, true)
 	enable(a.revoke, view.State == "LOCAL" && len(view.Peers) > 0 && a.pin.job == "")
 	a.enablePIN()
+	if view.Update.Status.State == "READY" && !a.busy && view.State == "CONNECTED" && a.updateAttempt != view.Update.Status.ID {
+		a.updateAttempt = view.Update.Status.ID
+		a.performTarget("update_apply", view.Update.Status.Peer)
+		return
+	}
+	if a.updateResume != "" && view.State == "LOCAL" && (view.Update.Status.State == "DELIVERED" || view.Update.Status.State == "TRANSFER_UNKNOWN") {
+		alias := a.updateResume
+		a.updateResume = ""
+		a.performTarget("connect", alias)
+	}
+}
+
+func (a *productWindow) executeUpdate(ctx context.Context, action, peer string) productpanel.View {
+	open := func() (productpanel.Client, error) { return localapi.OpenClient(a.control) }
+	view := productpanel.Execute(ctx, open, "refresh", "")
+	client, err := localapi.OpenClient(a.control)
+	if err != nil {
+		return view
+	}
+	request := localapi.UpdateRequest{Schema: localapi.UpdateSchema, Peer: peer}
+	switch action {
+	case "update_send":
+		request.Action = "SEND"
+		self, e := os.Executable()
+		if e != nil {
+			return view
+		}
+		request.Directory = filepath.Dir(self)
+	case "update_allow":
+		request.Action = "ALLOW"
+	case "update_deny":
+		request.Action = "DENY"
+	case "update_apply":
+		request.Action = "APPLY"
+		request.ID = a.view.Update.Status.ID
+	}
+	result, err := client.Update(ctx, request)
+	if err != nil {
+		if action == "update_apply" {
+			cleanup, cancel := context.WithTimeout(a.ctx, 5*time.Second)
+			defer cancel()
+			request.Action = "APPLY_FAILED"
+			_, _ = client.Update(cleanup, request)
+		}
+		view.Notice = "업데이트 요청 결과를 확인하지 못했습니다."
+		return view
+	}
+	if result.Code == "apply_ready" {
+		if err := productpanel.LaunchReceivedUpdate(result.Directory, result.Status.Revision, result.Alias); err != nil {
+			request.Action = "APPLY_FAILED"
+			_, _ = client.Update(ctx, request)
+			view.Notice = "새 버전을 실행하지 못했습니다. 기존 파일은 보존했습니다."
+			return view
+		}
+		view.ExitForUpdate = true
+	} else if result.Code == "queued" {
+		for alias, fp := range view.Fingerprints {
+			if fp == peer {
+				view.UpdateResume = alias
+			}
+		}
+	} else if result.Code == "rejected" {
+		view.Notice = "업데이트 요청을 거부했습니다. 연결·권한 상태를 확인하세요."
+	}
+	return view
 }

@@ -82,7 +82,7 @@ func prepareProductConnection(identities *productidentity.Store, trust *truststo
 	return productConnection{profile: profile, peer: peer, tls: config, deadline: deadline}, nil
 }
 
-func productRunner(identities *productidentity.Store, trust *truststore.Store, log *productlog.Logger) SessionRunner {
+func productRunner(identities *productidentity.Store, trust *truststore.Store, log *productlog.Logger, auxiliary ...func(context.Context, string, productConnection)) SessionRunner {
 	return func(parent context.Context, alias string, observer agent.SupervisorObserver) (err error) {
 		prepared, err := prepareProductConnection(identities, trust, alias)
 		if err != nil {
@@ -101,6 +101,9 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 		}
 		ctx, cancel := context.WithDeadline(parent, prepared.deadline)
 		defer cancel()
+		for _, start := range auxiliary {
+			start(ctx, alias, prepared)
+		}
 		var source agent.ConnectionSource
 		if prepared.peer.Role == transport.AuthenticatedPeerConnector {
 			source, err = agent.NewListenSource(prepared.profile.Address, prepared.tls)

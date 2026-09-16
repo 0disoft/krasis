@@ -9,6 +9,7 @@ import (
 	"github.com/0disoft/krasis/internal/agentinstance"
 	"github.com/0disoft/krasis/internal/agentlifecycle"
 	"github.com/0disoft/krasis/internal/localapi"
+	"github.com/0disoft/krasis/internal/peerupdate"
 	"github.com/0disoft/krasis/internal/productidentity"
 	"github.com/0disoft/krasis/internal/productlog"
 	"github.com/0disoft/krasis/internal/truststore"
@@ -117,6 +118,15 @@ func run(ctx context.Context, localAppData string, dependencies runDependencies)
 		}
 		operations.preflight = func(alias string) error { _, err := prepareProductConnection(identities, trust, alias); return err }
 		operations.credentials = identities
+		updates, updateErr := peerupdate.Open(paths.Root, localapi.AgentGeneration)
+		if updateErr == nil {
+			updates.Observe = dependencies.log.Event
+			operations.updates = updates
+			defer updates.Close()
+			operations.runner = productRunner(identities, trust, dependencies.log, func(ctx context.Context, alias string, prepared productConnection) {
+				operations.runUpdates(ctx, alias, prepared, trust)
+			})
+		}
 	}
 	server, err := dependencies.listen(paths.Control, operations)
 	if err != nil {

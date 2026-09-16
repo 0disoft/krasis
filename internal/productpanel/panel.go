@@ -17,11 +17,14 @@ type Client interface {
 }
 
 type View struct {
-	AgentVersion string
-	Fingerprints map[string]string
-	State        string
-	Peers        []string
-	Notice       string
+	Update        localapi.UpdateResult
+	ExitForUpdate bool
+	UpdateResume  string
+	AgentVersion  string
+	Fingerprints  map[string]string
+	State         string
+	Peers         []string
+	Notice        string
 }
 
 // Execute opens fresh endpoint credentials on each action, including after an agent restart.

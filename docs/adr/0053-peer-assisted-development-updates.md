@@ -1,6 +1,6 @@
 # Peer-assisted development updates
 
-Status: in progress
+Status: accepted
 
 ## Scope and authorization
 
@@ -31,7 +31,40 @@ provide a manual recovery path; automatic downgrade is not authorized.
 ## Increment 1
 
 `internal/updatebundle` implements bounded ZIP validation, distribution packing,
-and fresh-directory staging. It never executes received code. Transfer,
-permissions, GUI application, and installed two-PC verification remain separate
-increments. No production signed feed, global rollout, or release publication is
-implied by this development workflow.
+and fresh-directory staging. It never executes received code.
+
+## Transfer and local API contract
+
+Generation 21 uses HTTP/1.1 over the existing pinned mutual TLS roles on the input
+listener's port plus one. The listener serves an explicitly queued bundle; the
+connector polls every two seconds only while authorized, or uploads its queued
+bundle. TLS 1.3, certificate expiry/revocation, current CONNECTED peer identity,
+and per-device opt-in are checked separately. Input protocol v1 is unchanged.
+Transfers have a 90-second limit, offers expire after three minutes, and only one
+bundle is admitted at a time. There is no blind retry of an ambiguous upload.
+
+The authenticated loopback API adds POST `/v1/update` with schema
+`krasis.peer-update/v1`: STATUS (no fields), ALLOW/DENY (exact fingerprint), SEND
+(fingerprint plus local distribution directory), APPLY/APPLY_FAILED (fingerprint
+plus exact ready job ID). Unknown actions and cross-action fields are rejected.
+The LAN API cannot select local paths or grant itself update permission. Permission
+is saved under the private product root; changed/revoked certificates do not
+inherit it. Before APPLY, trust is rechecked and the job is consumed once under
+the permission lock. New pairing/connections are fenced until handoff finishes.
+
+The GUI retains the old distribution, launches the freshly revalidated bundle,
+and exits normally. The new GUI waits for old GUI ownership, uses the existing
+agent-upgrade handshake, checks the exact expected runtime build, and reconnects.
+The sender GUI also prepares its agent and reconnects after the receiver's stop.
+Local launch failure clears the apply fence. A new-process crash/startup failure
+requires reopening the preserved old distribution; automatic rollback is not
+claimed. Permissions survive restart; pending transfers deliberately do not.
+The receiver GUI must be open or in the tray. Received files are never executed
+solely by the network handler. Fixed stage codes omit paths, contents and aliases.
+
+## Verification boundary
+
+Unit tests cover denied and revoked permissions, single-use apply, malformed ZIPs,
+generation checks and integrity checks. Packaged two-PC upgrade, firewall behavior,
+native GUI relaunch and post-upgrade input require manual verification. No official
+publisher signature, production feed, global rollout or release is claimed.

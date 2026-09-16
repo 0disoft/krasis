@@ -9,6 +9,7 @@ import (
 
 	"github.com/0disoft/krasis/internal/agent"
 	"github.com/0disoft/krasis/internal/localapi"
+	"github.com/0disoft/krasis/internal/peerupdate"
 	"github.com/0disoft/krasis/internal/productidentity"
 	"github.com/0disoft/krasis/internal/productlog"
 	"github.com/0disoft/krasis/internal/truststore"
@@ -35,16 +36,18 @@ type trustStore interface {
 }
 
 type Operations struct {
-	log         *productlog.Logger
-	root        context.Context
-	stopAgent   context.CancelCauseFunc
-	identity    productidentity.PublicIdentity
-	runner      SessionRunner
-	preflight   func(string) error
-	credentials *productidentity.Store
-	pairing     PairWorkflow
-	trust       trustStore
-	now         func() time.Time
+	updates        *peerupdate.Manager
+	updateApplying bool
+	log            *productlog.Logger
+	root           context.Context
+	stopAgent      context.CancelCauseFunc
+	identity       productidentity.PublicIdentity
+	runner         SessionRunner
+	preflight      func(string) error
+	credentials    *productidentity.Store
+	pairing        PairWorkflow
+	trust          trustStore
+	now            func() time.Time
 
 	mu             sync.Mutex
 	sessionStop    context.CancelCauseFunc
@@ -100,6 +103,9 @@ func (operations *Operations) Trust(context.Context) (localapi.Trust, error) {
 func (operations *Operations) RevokeTrust(_ context.Context, request localapi.OperationRequest) (localapi.OperationResult, error) {
 	operations.mu.Lock()
 	defer operations.mu.Unlock()
+	if operations.updateApplying {
+		return rejected("update_in_progress"), nil
+	}
 	if operations.trust == nil {
 		return rejected("not_configured"), nil
 	}
@@ -196,6 +202,9 @@ func (operations *Operations) Connect(requestContext context.Context, request lo
 	if requestContext.Err() != nil || operations.root.Err() != nil {
 		return rejected("operation_cancelled"), nil
 	}
+	if operations.updateApplying {
+		return rejected("update_in_progress"), nil
+	}
 	if operations.sessionFaulted {
 		return rejected("session_failed"), nil
 	}
@@ -284,6 +293,9 @@ func (operations *Operations) Disconnect(ctx context.Context, _ localapi.Operati
 func (operations *Operations) Pair(ctx context.Context, request localapi.OperationRequest) (localapi.OperationResult, error) {
 	operations.mu.Lock()
 	defer operations.mu.Unlock()
+	if operations.updateApplying {
+		return rejected("update_in_progress"), nil
+	}
 	if operations.sessionFaulted {
 		return rejected("session_failed"), nil
 	}
