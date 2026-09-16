@@ -204,6 +204,13 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	}
 	if config.Liveness != nil {
 		policy := *config.Liveness
+		components = append(components, component{name: "lease-watchdog", run: func() error {
+			return runLeaseWatchdog(runContext, runtime.LeaseWatch, policy, func(cause error) {
+				source.Deactivate()
+				cancel(cause)
+				_ = connection.Close()
+			})
+		}})
 		components = append(components, component{name: "peer-liveness", run: func() error {
 			return runLiveness(runContext, coordinator, runtime, policy, config.Now, config.LivenessObserver)
 		}})
@@ -241,6 +248,9 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	// Wait establishes that every slot is final. Cancellation selects the first
 	// cause; it must not discard errors produced later by native/input cleanup.
 	for index, outcome := range outcomes {
+		if components[index].name == "lease-watchdog" && errors.Is(outcome, cause) {
+			continue
+		}
 		if outcome != nil && !expectedWorkerCancellation(outcome, runContext.Err()) {
 			if !errors.Is(cause, outcome) {
 				cause = errors.Join(cause, outcome, ErrRecoveryUnverified)

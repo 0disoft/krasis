@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/0disoft/krasis/internal/control"
@@ -50,6 +51,7 @@ type InputDispositionObserver interface {
 // SessionRuntime is the single serialized owner of one peer session's mutable
 // control, ordering, liveness, and pressed-input state.
 type SessionRuntime struct {
+	watch          atomic.Pointer[LeaseWatch]
 	mu             sync.Mutex
 	control        control.Snapshot
 	stream         control.InputStream
@@ -536,6 +538,7 @@ func (runtime *SessionRuntime) ObserveHeartbeat(
 		return faultErr
 	}
 	runtime.liveness = next
+	runtime.publishLeaseWatchLocked(true)
 	return nil
 }
 
@@ -610,6 +613,7 @@ func (runtime *SessionRuntime) applyOutcomeLocked(outcome ControlOutcome) {
 		return
 	}
 	runtime.control = outcome.Snapshot
+	runtime.publishLeaseWatchLocked(false)
 	if runtime.control.State != control.StateInboundPending && runtime.control.State != control.StateInboundActive {
 		runtime.stream = control.InputStream{}
 	}

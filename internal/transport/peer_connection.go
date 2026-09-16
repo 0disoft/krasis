@@ -15,6 +15,8 @@ type PeerConnection struct {
 	peer       AuthenticatedPeerContext
 }
 
+const FrameWriteTimeout = 2 * time.Second
+
 func NewPeerConnection(ctx context.Context, connection *tls.Conn) (*PeerConnection, error) {
 	if connection == nil {
 		return nil, errors.New("TLS connection is required")
@@ -60,8 +62,14 @@ func (connection *PeerConnection) WriteFrameContext(ctx context.Context, frame F
 	if ctx == nil {
 		return errors.New("write context is required")
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(ctx, FrameWriteTimeout)
+	defer cancel()
 	select {
 	case <-ctx.Done():
+		_ = connection.Close()
 		return ctx.Err()
 	case <-connection.writeGate:
 	}
@@ -83,6 +91,7 @@ func (connection *PeerConnection) WriteFrameContext(ctx context.Context, frame F
 		_ = connection.connection.SetWriteDeadline(time.Time{})
 	}
 	if err != nil {
+		_ = connection.Close() // a partially written/timed-out stream cannot be reused
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return ctxErr
 		}
