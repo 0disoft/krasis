@@ -272,6 +272,9 @@ func (operations *Operations) Disconnect(ctx context.Context, _ localapi.Operati
 		return completed("disconnected"), nil
 	case <-shutdown.Done():
 		operations.mu.Lock()
+		if operations.sessionDone == done {
+			operations.sessionFaulted = true
+		}
 		operations.recordLocked("shutdown_timeout")
 		operations.mu.Unlock()
 		return failed("shutdown_timeout"), nil
@@ -345,13 +348,13 @@ func (operations *Operations) Close(ctx context.Context) error {
 func (operations *Operations) finishSession(done chan struct{}, outcome *sessionOutcome, err error, cancelled bool) {
 	operations.mu.Lock()
 	defer operations.mu.Unlock()
-	outcome.failed = !cancelled
+	outcome.failed = !cancelled || operations.sessionFaulted
 	if operations.sessionDone == done {
 		operations.sessionStop = nil
 		operations.sessionDone = nil
 		operations.sessionOutcome = nil
 		operations.sessionState = ""
-		operations.sessionFaulted = outcome.failed
+		operations.sessionFaulted = operations.sessionFaulted || outcome.failed
 		operations.peerAlias = ""
 		if outcome.failed {
 			operations.recordLocked("session_failed")

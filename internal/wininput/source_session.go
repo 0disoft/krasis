@@ -162,12 +162,24 @@ func (session *SourceSession) Activate() error {
 	}
 	session.stateMu.Lock()
 	defer session.stateMu.Unlock()
+	if session.terminal.Load() || !session.started.Load() {
+		return errors.New("source session worker has stopped")
+	}
 	if session.active {
 		return errors.New("source session is already active")
 	}
 	session.generation++
 	session.active = true
 	return nil
+}
+
+// Retire permanently rejects late activation from the old lease generation.
+func (session *SourceSession) Retire() {
+	if session == nil {
+		return
+	}
+	session.terminal.Store(true)
+	session.Deactivate()
 }
 
 func (session *SourceSession) Deactivate() {

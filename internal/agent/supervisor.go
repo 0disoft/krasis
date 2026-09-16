@@ -86,6 +86,7 @@ type SupervisorSnapshot struct {
 	FailureCode      string
 	// Independent of the primary descriptor: cleanup/read errors may coexist.
 	PeerTimeoutObserved bool
+	Recovery            *RecoveryReport
 }
 
 type BackoffPolicy struct {
@@ -153,6 +154,15 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 		return err
 	}
 	state := SupervisorStopped
+	previousRecoveryObserver := config.Session.RecoveryObserver
+	config.Session.RecoveryObserver = func(report RecoveryReport) {
+		if previousRecoveryObserver != nil {
+			previousRecoveryObserver(report)
+		}
+		if config.Observer != nil {
+			config.Observer.ObserveSupervisor(SupervisorSnapshot{Recovery: &report})
+		}
+	}
 	transition := func(event SupervisorEvent, snapshot SupervisorSnapshot) error {
 		next, err := TransitionSupervisor(state, event)
 		if err != nil {

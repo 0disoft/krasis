@@ -45,6 +45,7 @@ type Config struct {
 	PipelineObserver    wininput.SourcePipelineObserver
 	ControlObserver     peer.ControlFlowObserver
 	DestinationObserver application.InputDispositionObserver
+	RecoveryObserver    func(RecoveryReport)
 }
 
 type SourceActivityObserver interface {
@@ -65,6 +66,7 @@ type Dependencies struct {
 type Result struct {
 	FinalState control.State
 	Cause      error
+	Recovery   RecoveryReport
 }
 
 func RunSession(ctx context.Context, config Config, dependencies Dependencies) (Result, error) {
@@ -206,7 +208,7 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 		policy := *config.Liveness
 		components = append(components, component{name: "lease-watchdog", run: func() error {
 			return runLeaseWatchdog(runContext, runtime.LeaseWatch, policy, func(cause error) {
-				source.Deactivate()
+				source.Retire()
 				cancel(cause)
 				_ = connection.Close()
 			})
@@ -243,8 +245,14 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 		}()
 	}
 	<-runContext.Done()
-	workers.Wait()
+	source.Retire()
+	joined := make(chan struct{})
+	go func() { workers.Wait(); close(joined) }()
+	expired := awaitRecovery(joined, 2*wininput.SourceCleanupTimeout, config.RecoveryObserver)
 	cause := context.Cause(runContext)
+	if expired {
+		cause = errors.Join(cause, ErrRecoveryUnverified)
+	}
 	// Wait establishes that every slot is final. Cancellation selects the first
 	// cause; it must not discard errors produced later by native/input cleanup.
 	for index, outcome := range outcomes {
@@ -259,10 +267,27 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 			}
 		}
 	}
+	recovery := RecoveryReport{ForwardingStopped: RecoveryConfirmed, WorkersJoined: RecoveryConfirmed, DeadlineExceeded: expired}
+	// A timed-out cleanup helper may still own the runtime mutex. Do not try
+	// to turn an already-unverified recovery into another unbounded snapshot.
+	if errors.Is(cause, ErrRecoveryUnverified) {
+		return Result{FinalState: runtime.LeaseWatch().State, Cause: cause, Recovery: recovery}, cause
+	}
 	snapshot := runtime.Snapshot()
-	result := Result{FinalState: snapshot.Control.State, Cause: cause}
+	for index, current := range components {
+		if current.name == "source-hook" && expectedWorkerCancellation(outcomes[index], runContext.Err()) {
+			recovery.NativeOwnersReleased = RecoveryConfirmed
+		}
+	}
+	if snapshot.PressedCount == 0 {
+		recovery.PressedLedgerEmpty = RecoveryConfirmed
+	}
+	result := Result{FinalState: snapshot.Control.State, Cause: cause, Recovery: recovery}
 	if snapshot.Control.State != control.StateLocal {
-		return result, errors.Join(fmt.Errorf("agent session stopped outside LOCAL: %s", snapshot), cause)
+		return result, errors.Join(fmt.Errorf("agent session stopped outside LOCAL: %s", snapshot), cause, ErrRecoveryUnverified)
+	}
+	if snapshot.PressedCount != 0 {
+		return result, errors.Join(cause, ErrRecoveryUnverified)
 	}
 	return result, cause
 }

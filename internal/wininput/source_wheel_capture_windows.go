@@ -40,7 +40,6 @@ var (
 	callSetLayeredSourceCapture        = user32.NewProc("SetLayeredWindowAttributes").Call
 	procSetWindowPosSourceCapture      = user32.NewProc("SetWindowPos")
 	procIsWindowSourceCapture          = user32.NewProc("IsWindow")
-	procAttachThreadInputSourceCapture = user32.NewProc("AttachThreadInput")
 	procGetWindowThreadIDSourceCapture = user32.NewProc("GetWindowThreadProcessId")
 	sourceWheelCaptureShowWindow       = func(window uintptr, command uintptr) {
 		procShowWindowTouchpad.Call(window, command)
@@ -71,20 +70,9 @@ var (
 		return 0, callErr
 	}
 	sourceWheelCaptureAttachThreads = func(sourceThread, targetThread uint32, attach bool) error {
-		value := uintptr(0)
-		if attach {
-			value = 1
-		}
-		attached, _, callErr := procAttachThreadInputSourceCapture.Call(
-			uintptr(sourceThread), uintptr(targetThread), value,
-		)
-		if attached != 0 {
-			return nil
-		}
-		if callErr == syscall.Errno(0) {
-			return errors.New("AttachThreadInput returned no extended error")
-		}
-		return callErr
+		// Joining another application's input queue can make foreground calls
+		// wait on that application's hung UI thread. Product mode fails closed.
+		return errors.New("cross-thread foreground attachment is disabled")
 	}
 	sourceWheelCaptureIsWindow = func(window uintptr) bool {
 		valid, _, _ := procIsWindowSourceCapture.Call(window)
@@ -430,7 +418,7 @@ func (current *sourceWheelCaptureRun) run(ctx context.Context, ready func()) (re
 		defer close(stopWatcherDone)
 		select {
 		case <-ctx.Done():
-			procPostMessageWTouchpad.Call(window, wmSourceWheelCaptureStop, 0, 0)
+			current.fail(ctx.Err())
 		case <-stopWatcher:
 		}
 	}()

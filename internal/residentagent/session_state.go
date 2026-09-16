@@ -64,6 +64,11 @@ func (observer *sessionObserver) ObserveSupervisor(snapshot agent.SupervisorSnap
 	operations := observer.operations
 	operations.mu.Lock()
 	defer operations.mu.Unlock()
+	if operations.sessionDone == observer.done && snapshot.Recovery != nil && snapshot.Recovery.DeadlineExceeded {
+		operations.sessionFaulted = true
+		operations.recordLocked("session_failed")
+		return
+	}
 	if operations.sessionDone != observer.done || operations.root.Err() != nil || operations.sessionState == "DISCONNECTING" {
 		return
 	}
