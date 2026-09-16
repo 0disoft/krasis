@@ -62,6 +62,9 @@ func TestSourceInputThreadsErrorPreservesFailedComponent(t *testing.T) {
 	if !errors.Is(err, want) || !strings.Contains(err.Error(), "low-level-hook") {
 		t.Fatalf("sourceInputThreadsError() = %v", err)
 	}
+	if SourceFailureStage(err) != "low-level-hook" {
+		t.Fatalf("worker stage lost: %s", SourceFailureStage(err))
+	}
 }
 
 func TestCollectSourceInputThreadsBoundsHungChild(t *testing.T) {

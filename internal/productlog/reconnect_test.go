@@ -32,6 +32,18 @@ func TestReconnectReasonsDoNotCopyPrivateDescriptors(t *testing.T) {
 	}
 }
 
+func TestSourceOperationFaultCodes(t *testing.T) {
+	for _, stage := range []string{"low-level-hook", "raw-mouse", "wheel-capture", "thread-join", "hook-install", "hook-release", "raw-register", "raw-release", "raw-read", "raw-buffer", "raw-route", "message-loop", "pointer-snapshot"} {
+		want := "fault_source_" + strings.ReplaceAll(stage, "-", "_") + "_failed"
+		if got := FaultCode("source-hook", stage, "failed"); got != want || !allowed[got] {
+			t.Fatalf("stage %s: %s", stage, got)
+		}
+	}
+	if got := FaultCode("source-hook", "private window title", "failed"); got != "fault_session_unknown" {
+		t.Fatalf("private stage escaped: %s", got)
+	}
+}
+
 func TestTerminalFaultReasonsAreSanitizedAndExportable(t *testing.T) {
 	for descriptor := range reconnectReasons {
 		code := FaultCode(descriptor[0], descriptor[1], descriptor[2])

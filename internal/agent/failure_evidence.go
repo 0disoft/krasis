@@ -82,6 +82,9 @@ func DescribeSessionFailure(err error) FailureDescriptor {
 	case errors.Is(err, peer.ErrPeerHeartbeatDispatch):
 		return FailureDescriptor{Component: "peer-dispatch", Phase: "heartbeat", Code: "failed"}
 	}
+	if stage := wininput.SourceFailureStage(err); stage != "" {
+		return FailureDescriptor{Component: "source-hook", Phase: stage, Code: "failed"}
+	}
 	return FailureDescriptor{Component: SessionFailureComponent(err), Phase: "runtime", Code: "component_failed"}
 }
 

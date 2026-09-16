@@ -84,7 +84,7 @@ func (hook *SourceHook) RunWithBoundary(
 	}()
 	initialPosition, err := cursorPosition()
 	if err != nil {
-		return fmt.Errorf("snapshot source pointer: %w", err)
+		return sourceStage("pointer-snapshot", err)
 	}
 	pointerState := newSourcePointerState(initialPosition)
 	session.physicalMu.Lock()
@@ -186,10 +186,10 @@ func sourceInputThreadsError(parent context.Context, results ...sourceInputThrea
 			if parentErr != nil {
 				continue
 			}
-			joined = append(joined, fmt.Errorf("source %s stopped unexpectedly", result.component))
+			joined = append(joined, sourceWorkerStage(result.component, fmt.Errorf("source %s stopped unexpectedly", result.component)))
 			continue
 		}
-		joined = append(joined, fmt.Errorf("source %s: %w", result.component, result.err))
+		joined = append(joined, sourceWorkerStage(result.component, result.err))
 	}
 	if len(joined) > 0 {
 		joined = append([]error{parentErr}, joined...)
@@ -305,12 +305,12 @@ func runSourceLowLevelHookThread(
 	}
 	keyboardHook, _, callErr := procSetWindowsHookExW.Call(whKeyboardLL, sourceKeyboardCallback, module, 0)
 	if keyboardHook == 0 {
-		return fmt.Errorf("SetWindowsHookExW(WH_KEYBOARD_LL) failed: %w", callErr)
+		return sourceStage("hook-install", fmt.Errorf("SetWindowsHookExW(WH_KEYBOARD_LL) failed: %w", callErr))
 	}
 	mouseHook, _, callErr := procSetWindowsHookExW.Call(whMouseLL, sourceMouseCallback, module, 0)
 	if mouseHook == 0 {
 		procUnhookWindowsHookEx.Call(keyboardHook)
-		return fmt.Errorf("SetWindowsHookExW(WH_MOUSE_LL) failed: %w", callErr)
+		return sourceStage("hook-install", fmt.Errorf("SetWindowsHookExW(WH_MOUSE_LL) failed: %w", callErr))
 	}
 	cleanupHooks := func() error {
 		var cleanupErr error
@@ -328,7 +328,7 @@ func runSourceLowLevelHookThread(
 				cleanupErr = fmt.Errorf("UnhookWindowsHookEx(WH_KEYBOARD_LL) failed: %w", unhookErr)
 			}
 		}
-		return cleanupErr
+		return sourceStage("hook-release", cleanupErr)
 	}
 	defer cleanupHooks()
 	if err := postSourceReady(threadID); err != nil {
@@ -361,7 +361,7 @@ func runSourceRawMouseThread(
 	}
 	defer procDestroyWindow.Call(window)
 	if err := registerRawMouseInput(window); err != nil {
-		return err
+		return sourceStage("raw-register", err)
 	}
 	rawRegistered := true
 	cleanupRawInput := func() error {
@@ -369,7 +369,7 @@ func runSourceRawMouseThread(
 			return nil
 		}
 		rawRegistered = false
-		return unregisterRawMouseInput()
+		return sourceStage("raw-release", unregisterRawMouseInput())
 	}
 	defer cleanupRawInput()
 	rawReader, err := newRawMouseReader()
@@ -380,7 +380,7 @@ func runSourceRawMouseThread(
 		return err
 	}
 	visitRawMouse := func(header rawInputHeader, mouse rawMouse) error {
-		return routeRawMouse(session, boundary, pointerState, header, mouse)
+		return sourceStage("raw-route", routeRawMouse(session, boundary, pointerState, header, mouse))
 	}
 	loopErr := runSourceRawMessageLoop(ctx, threadID, ready, rawReader, visitRawMouse)
 	rawInputErr := cleanupRawInput()
@@ -417,9 +417,9 @@ func runSourceRawMessageLoop(
 			return nil
 		}
 		if err := rawReader.readCurrent(msg.LParam, visitRawMouse); err != nil {
-			return err
+			return sourceStage("raw-read", err)
 		}
-		return rawReader.drainBuffered(visitRawMouse)
+		return sourceStage("raw-buffer", rawReader.drainBuffered(visitRawMouse))
 	})
 }
 
@@ -449,7 +449,7 @@ func runSourceThreadMessageLoop(
 		result, _, callErr := procGetMessageW.Call(uintptr(unsafe.Pointer(&msg)), 0, 0, 0)
 		switch int32(result) {
 		case -1:
-			return fmt.Errorf("GetMessageW failed: %w", callErr)
+			return sourceStage("message-loop", fmt.Errorf("GetMessageW failed: %w", callErr))
 		case 0:
 			return nil
 		default:

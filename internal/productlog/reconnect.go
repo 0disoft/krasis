@@ -24,6 +24,9 @@ var reconnectReasons = map[[3]string]string{
 }
 
 func init() {
+	for _, stage := range []string{"low-level-hook", "raw-mouse", "wheel-capture", "thread-join", "hook-install", "hook-release", "raw-register", "raw-release", "raw-read", "raw-buffer", "raw-route", "message-loop", "pointer-snapshot"} {
+		reconnectReasons[[3]string{"source-hook", stage, "failed"}] = "reconnect_source_" + strings.ReplaceAll(stage, "-", "_") + "_failed"
+	}
 	for _, phase := range []string{"capture-activate", "focus-restore"} {
 		for _, code := range []string{"thread_detach_failed", "thread_attach_failed", "verification_lost", "api_rejected", "setup_failed", "activation_failed", "foreground_unavailable", "foreground_thread_unavailable", "foreground_probe_failed", "rollback_failed"} {
 			prefix := "reconnect_capture_"
