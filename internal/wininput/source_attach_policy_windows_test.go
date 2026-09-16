@@ -60,7 +60,7 @@ func TestForegroundProbeHasFixedDeadline(t *testing.T) {
 	previous := callSourceForegroundProbe
 	t.Cleanup(func() { callSourceForegroundProbe = previous })
 	callSourceForegroundProbe = func(args ...uintptr) (uintptr, uintptr, error) {
-		if len(args) != 7 || args[0] != 42 || args[1] != 0 || args[4] != 0x23 || args[5] != 100 {
+		if len(args) != 7 || args[0] != 42 || args[1] != 0 || args[4] != 0x23 || args[5] != 100 || args[6] != 0 {
 			t.Fatalf("unbounded probe: %v", args)
 		}
 		return 1, 0, nil

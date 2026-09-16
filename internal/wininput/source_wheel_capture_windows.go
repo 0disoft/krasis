@@ -39,8 +39,9 @@ var (
 	callSourceAttachThreadInput       = user32.NewProc("AttachThreadInput").Call
 	callSourceForegroundProbe         = user32.NewProc("SendMessageTimeoutW").Call
 	sourceWheelCaptureProbeForeground = func(window uintptr) error {
-		var result uintptr
-		sent, _, callErr := callSourceForegroundProbe(window, 0, 0, 0, 0x23, 100, uintptr(unsafe.Pointer(&result)))
+		// WM_NULL needs only the API success flag, not the optional result.
+		// Avoid passing a Go pointer through the injectable syscall adapter.
+		sent, _, callErr := callSourceForegroundProbe(window, 0, 0, 0, 0x23, 100, 0)
 		if sent == 0 {
 			return touchpadWin32Error("SendMessageTimeoutW(source foreground probe)", callErr)
 		}
