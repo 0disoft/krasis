@@ -142,7 +142,8 @@ const (
 
 type sourceWheelCapture struct {
 	observer SourcePipelineObserver
-	opMu     sync.Mutex
+	opOnce   sync.Once
+	opGate   chan struct{}
 	runMu    sync.RWMutex
 	run      *sourceWheelCaptureRun
 }
@@ -210,8 +211,17 @@ func (capture *sourceWheelCapture) OwnsWheel() bool {
 }
 
 func (capture *sourceWheelCapture) execute(message uint32, allowMissing bool) error {
-	capture.opMu.Lock()
-	defer capture.opMu.Unlock()
+	timer := time.NewTimer(sourceWheelCaptureTimeout)
+	defer timer.Stop()
+	capture.opOnce.Do(func() { capture.opGate = make(chan struct{}, 1) })
+	select {
+	case capture.opGate <- struct{}{}:
+		defer func() { <-capture.opGate }()
+	case <-timer.C:
+		err := errors.New("source wheel capture command serialization timed out")
+		capture.failCurrentRun(err)
+		return err
+	}
 	capture.runMu.RLock()
 	current := capture.run
 	capture.runMu.RUnlock()
@@ -224,8 +234,6 @@ func (capture *sourceWheelCapture) execute(message uint32, allowMissing bool) er
 	if terminalErr := current.err(); terminalErr != nil {
 		return errors.Join(errors.New("source wheel capture window is terminal"), terminalErr)
 	}
-	timer := time.NewTimer(sourceWheelCaptureTimeout)
-	defer timer.Stop()
 	command := sourceWheelCaptureCommand{message: message, result: make(chan error, 1)}
 	select {
 	case current.commands <- command:
@@ -470,6 +478,10 @@ func (current *sourceWheelCaptureRun) handleCommand(message uint32) uintptr {
 		return 0
 	}
 	var err error
+	if terminalErr := current.err(); terminalErr != nil {
+		command.result <- terminalErr
+		return 0
+	}
 	switch message {
 	case wmSourceWheelCaptureActivate:
 		err = current.activateWindow()
@@ -485,6 +497,9 @@ func (current *sourceWheelCaptureRun) handleCommand(message uint32) uintptr {
 }
 
 func (current *sourceWheelCaptureRun) activateWindow() error {
+	if err := current.err(); err != nil {
+		return err
+	}
 	if current.active.Load() {
 		return errors.New("source wheel capture is already active")
 	}
@@ -493,18 +508,36 @@ func (current *sourceWheelCaptureRun) activateWindow() error {
 		return fmt.Errorf("%w: position source wheel capture: %v", ErrSourceCaptureActivationSetup, err)
 	}
 	current.savedFocus = sourceWheelCaptureGetForeground()
+	if err := current.err(); err != nil {
+		return err
+	}
 	x, y := sourceWheelCapturePosition(position)
 	if positionErr := sourceWheelCaptureSetPosition(current.window, x, y); positionErr != nil {
 		return fmt.Errorf("%w: %v", ErrSourceCaptureActivationSetup, positionErr)
+	}
+	if err := current.err(); err != nil {
+		return err
 	}
 	if registerErr := sourceWheelCaptureRegisterWindow(current.registerProc, current.window, true); registerErr != nil {
 		sourceWheelCaptureShowWindow(current.window, swHide)
 		return fmt.Errorf("%w: %v", ErrSourceCaptureActivationSetup, touchpadWin32Error("RegisterTouchpadCapableWindow(source TRUE)", registerErr))
 	}
 	current.registered = true
+	if err := current.err(); err != nil {
+		return errors.Join(err, current.deactivateWindow())
+	}
 	sourceWheelCaptureShowWindow(current.window, swShow)
+	if err := current.err(); err != nil {
+		return errors.Join(err, current.deactivateWindow())
+	}
 	procUpdateWindowTouchpad.Call(current.window)
+	if err := current.err(); err != nil {
+		return errors.Join(err, current.deactivateWindow())
+	}
 	foregroundErr := sourceWheelCaptureSetForeground(current.window)
+	if err := current.err(); err != nil {
+		return errors.Join(err, current.deactivateWindow())
+	}
 	verificationLost := foregroundErr == nil && sourceWheelCaptureGetForeground() != current.window
 	if foregroundErr != nil || verificationLost {
 		fallbackResult, fallbackErr := current.activateForegroundFallback()
@@ -534,7 +567,14 @@ func (current *sourceWheelCaptureRun) activateWindow() error {
 		cleanupErr := current.deactivateWindow()
 		return errors.Join(ErrSourceCaptureActivationVerificationLost, cleanupErr)
 	}
+	current.terminalMu.Lock()
+	if current.terminalErr != nil {
+		err := current.terminalErr
+		current.terminalMu.Unlock()
+		return errors.Join(err, current.deactivateWindow())
+	}
 	current.active.Store(true)
+	current.terminalMu.Unlock()
 	current.hideActiveCursor()
 	if current.observer != nil {
 		current.observer.ObserveWheelCaptureActivated()
@@ -726,7 +766,8 @@ func (current *sourceWheelCaptureRun) routeWheel(message uint32, wParam uintptr)
 		current.observer.ObserveWheelMapped()
 	}
 	if !current.session.Active() {
-		current.session.Abort(errSourceWheelCaptureInactive)
+		// Source forwarding is stopped before native capture cleanup. A queued
+		// wheel message during that interval belongs to the retired owner.
 		return
 	}
 	current.session.Offer(action)
@@ -780,6 +821,7 @@ func (current *sourceWheelCaptureRun) setError(err error) {
 	}
 	current.terminalMu.Lock()
 	current.terminalErr = errors.Join(current.terminalErr, err)
+	current.active.Store(false)
 	current.terminalMu.Unlock()
 }
 

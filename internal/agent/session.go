@@ -335,11 +335,11 @@ func (activation *combinedSourceActivation) Deactivate() {
 	if activation == nil {
 		return
 	}
-	if activation.capture != nil {
-		activation.capture.Deactivate()
-	}
 	if activation.source != nil {
 		activation.source.Deactivate()
+	}
+	if activation.capture != nil {
+		activation.capture.Deactivate()
 	}
 }
 

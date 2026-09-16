@@ -588,11 +588,43 @@ func TestSourceWheelCaptureRejectsWheelWhenSourceIsInactive(t *testing.T) {
 	}
 	select {
 	case cause := <-session.faults:
-		if cause == nil {
-			t.Fatal("inactive capture fault was nil")
-		}
+		t.Fatalf("retired capture message faulted session: %v", cause)
 	default:
-		t.Fatal("inactive capture did not fault the source session")
+	}
+}
+
+func TestTerminalCaptureCommandCannotActivate(t *testing.T) {
+	cause := errors.New("expired capture generation")
+	current := &sourceWheelCaptureRun{commands: make(chan sourceWheelCaptureCommand, 1)}
+	current.active.Store(true)
+	current.setError(cause)
+	result := make(chan error, 1)
+	current.commands <- sourceWheelCaptureCommand{message: wmSourceWheelCaptureActivate, result: result}
+	current.handleCommand(wmSourceWheelCaptureActivate)
+	if err := <-result; !errors.Is(err, cause) {
+		t.Fatalf("late command result: %v", err)
+	}
+	if current.active.Load() {
+		t.Fatal("terminal capture reactivated")
+	}
+	if err := current.activateWindow(); !errors.Is(err, cause) {
+		t.Fatalf("late activation: %v", err)
+	}
+}
+
+func TestCaptureSerializationHasDeadline(t *testing.T) {
+	previous := sourceWheelCaptureTimeout
+	sourceWheelCaptureTimeout = 10 * time.Millisecond
+	t.Cleanup(func() { sourceWheelCaptureTimeout = previous })
+	capture := newSourceWheelCapture(nil)
+	capture.opOnce.Do(func() { capture.opGate = make(chan struct{}, 1) })
+	capture.opGate <- struct{}{}
+	start := time.Now()
+	if err := capture.Activate(); err == nil || !strings.Contains(err.Error(), "serialization timed out") {
+		t.Fatalf("Activate: %v", err)
+	}
+	if time.Since(start) > 200*time.Millisecond {
+		t.Fatal("serialization was not bounded")
 	}
 }
 

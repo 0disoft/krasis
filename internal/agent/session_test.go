@@ -126,7 +126,7 @@ func TestCombinedSourceActivationOrdersCaptureLifecycleAndRollsBackFailure(t *te
 		t.Fatalf("Activate() error = %v", err)
 	}
 	activation.Deactivate()
-	if got := strings.Join(order, ","); got != "source.activate,capture.activate,capture.deactivate,source.deactivate" {
+	if got := strings.Join(order, ","); got != "source.activate,capture.activate,source.deactivate,capture.deactivate" {
 		t.Fatalf("activation order = %q", got)
 	}
 
