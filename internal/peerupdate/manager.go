@@ -25,6 +25,7 @@ var ErrDenied = errors.New("peer update not authorized")
 var ErrBusy = errors.New("peer update busy")
 
 type Status struct {
+	ClipboardPeer      string   `json:"clipboardPeer,omitempty"`
 	Diagnostic         string   `json:"diagnostic,omitempty"`
 	ReceivedDiagnostic string   `json:"receivedDiagnostic,omitempty"`
 	PeerGeneration     int      `json:"peerGeneration,omitempty"`
@@ -50,6 +51,7 @@ type stagedBundle interface {
 	Stage(*os.Root, string) error
 }
 type Manager struct {
+	clipboard         clipboardState
 	diagnostic        diagnosticTransfer
 	ReceiveDiagnostic func(string, []byte) (string, error)
 	peers             map[string]peerObservation
@@ -97,6 +99,18 @@ func Open(productRoot string, generation int) (*Manager, error) {
 		return updatebundle.Read(bytes.NewReader(data), int64(len(data)))
 	}}
 	m.revision = buildRevision()
+	if f, e := root.Open("clipboard-peer.txt"); e == nil {
+		data, e := io.ReadAll(io.LimitReader(f, 65))
+		f.Close()
+		if e != nil || (len(data) > 0 && !validID(string(data), 64)) {
+			root.Close()
+			return nil, ErrDenied
+		}
+		m.clipboard.peer = string(data)
+	} else if !errors.Is(e, os.ErrNotExist) {
+		root.Close()
+		return nil, e
+	}
 	f, err := root.Open("permissions.json")
 	if err == nil {
 		defer f.Close()
@@ -184,6 +198,7 @@ func (m *Manager) Status() Status {
 		m.status.State = "EXPIRED"
 	}
 	s := m.status
+	s.ClipboardPeer = m.ClipboardPeer()
 	m.diagnostic.mu.Lock()
 	if m.diagnostic.out != nil && time.Now().After(m.diagnostic.out.expires) {
 		m.diagnostic.out = nil

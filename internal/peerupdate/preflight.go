@@ -9,10 +9,13 @@ import (
 
 // PeerInfo is exchanged only inside the pinned mutually authenticated channel.
 type PeerInfo struct {
-	Protocol   int    `json:"protocol"`
-	Generation int    `json:"generation"`
-	Revision   string `json:"revision"`
-	Allowed    bool   `json:"allowed"`
+	Clipboard     bool   `json:"clipboard,omitempty"`
+	ClipboardID   string `json:"clipboardID,omitempty"`
+	ClipboardSize int    `json:"clipboardSize,omitempty"`
+	Protocol      int    `json:"protocol"`
+	Generation    int    `json:"generation"`
+	Revision      string `json:"revision"`
+	Allowed       bool   `json:"allowed"`
 }
 type peerObservation struct {
 	info PeerInfo
@@ -20,7 +23,8 @@ type peerObservation struct {
 }
 
 func (m *Manager) info(peer string) PeerInfo {
-	return PeerInfo{Protocol: 2, Generation: m.generation, Revision: m.revision, Allowed: m.permitted(peer)}
+	allowed, id, size := m.ClipboardInfo(peer)
+	return PeerInfo{Protocol: 2, Generation: m.generation, Revision: m.revision, Allowed: m.permitted(peer), Clipboard: allowed, ClipboardID: id, ClipboardSize: size}
 }
 func readPeerInfo(reader io.Reader) (PeerInfo, error) {
 	var info PeerInfo
@@ -29,6 +33,9 @@ func readPeerInfo(reader io.Reader) (PeerInfo, error) {
 		return info, ErrDenied
 	}
 	if json.Unmarshal(data, &info) != nil || info.Protocol != 2 || info.Generation < 21 || info.Generation > 1000000 || (info.Revision != "" && !validID(info.Revision, 40)) {
+		return PeerInfo{}, ErrDenied
+	}
+	if info.ClipboardSize < 0 || info.ClipboardSize > MaxClipboardBytes || (info.ClipboardID != "" && !validID(info.ClipboardID, 32)) {
 		return PeerInfo{}, ErrDenied
 	}
 	return info, nil

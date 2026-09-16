@@ -3,12 +3,32 @@
 package launcherui
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"github.com/0disoft/krasis/internal/localapi"
+	"github.com/0disoft/krasis/internal/peerupdate"
 	"runtime"
 	"syscall"
+	unicode16 "unicode/utf16"
 	"unsafe"
 )
+
+var clipUser = syscall.NewLazyDLL("user32.dll")
+var clipKernel = syscall.NewLazyDLL("kernel32.dll")
+var clipSequence = clipUser.NewProc("GetClipboardSequenceNumber")
+var clipOpen = clipUser.NewProc("OpenClipboard")
+var clipClose = clipUser.NewProc("CloseClipboard")
+var clipGet = clipUser.NewProc("GetClipboardData")
+var clipSet = clipUser.NewProc("SetClipboardData")
+var clipEmpty = clipUser.NewProc("EmptyClipboard")
+var clipAlloc = clipKernel.NewProc("GlobalAlloc")
+var clipFree = clipKernel.NewProc("GlobalFree")
+var clipLock = clipKernel.NewProc("GlobalLock")
+var clipUnlock = clipKernel.NewProc("GlobalUnlock")
+var clipSize = clipKernel.NewProc("GlobalSize")
+var clipCopy = syscall.NewLazyDLL("ntdll.dll").NewProc("RtlMoveMemory")
+var errClipboardUnavailable = errors.New("clipboard unavailable")
 
 const (
 	cfUnicodeText = 13
@@ -65,4 +85,228 @@ func writeClipboardText(owner uintptr, value string) error {
 	}
 	transferred = true
 	return nil
+}
+
+func clipboardFormat(name string) uintptr {
+	v, _, _ := clipUser.NewProc("RegisterClipboardFormatW").Call(uintptr(unsafe.Pointer(utf16Ptr(name))))
+	return v
+}
+
+func clipboardSequence() uintptr { v, _, _ := clipSequence.Call(); return v }
+func clipboardDesktopAvailable() bool {
+	h, _, _ := clipUser.NewProc("OpenInputDesktop").Call(0, 0, 1)
+	if h == 0 {
+		return false
+	}
+	defer clipUser.NewProc("CloseDesktop").Call(h)
+	var name [128]uint16
+	var needed uint32
+	ok, _, _ := clipUser.NewProc("GetUserObjectInformationW").Call(h, 2, uintptr(unsafe.Pointer(&name[0])), uintptr(len(name)*2), uintptr(unsafe.Pointer(&needed)))
+	return ok != 0 && syscall.UTF16ToString(name[:]) == "Default"
+}
+func readClipboardText(hwnd uintptr) (string, uintptr, error) {
+	if !clipboardDesktopAvailable() {
+		return "", 0, errClipboardUnavailable
+	}
+	opened, _, _ := clipOpen.Call(hwnd)
+	if opened == 0 {
+		return "", 0, errClipboardUnavailable
+	}
+	defer clipClose.Call()
+	sequence := clipboardSequence()
+	for _, name := range []string{"ExcludeClipboardContentFromMonitorProcessing", "Krasis.RemoteClipboard.v1"} {
+		format := clipboardFormat(name)
+		if format == 0 {
+			return "", sequence, errClipboardUnavailable
+		}
+		has, _, _ := clipUser.NewProc("IsClipboardFormatAvailable").Call(format)
+		if has != 0 {
+			return "", sequence, errClipboardUnavailable
+		}
+	}
+	handle, _, _ := clipGet.Call(13)
+	if handle == 0 {
+		return "", sequence, errClipboardUnavailable
+	}
+	size, _, _ := clipSize.Call(handle)
+	if size < 2 || size > 2*(peerupdate.MaxClipboardBytes+1) || size%2 != 0 {
+		return "", sequence, errClipboardUnavailable
+	}
+	ptr, _, _ := clipLock.Call(handle)
+	if ptr == 0 {
+		return "", sequence, errClipboardUnavailable
+	}
+	defer clipUnlock.Call(handle)
+	data := make([]uint16, int(size/2))
+	clipCopy.Call(uintptr(unsafe.Pointer(&data[0])), ptr, size)
+	runtime.KeepAlive(data)
+	end := -1
+	for i, v := range data {
+		if v == 0 {
+			end = i
+			break
+		}
+	}
+	if end < 0 {
+		return "", sequence, errClipboardUnavailable
+	}
+	text := string(unicode16.Decode(data[:end]))
+	if len(text) > peerupdate.MaxClipboardBytes {
+		return "", sequence, errClipboardUnavailable
+	}
+	return text, sequence, nil
+}
+func utf16Ptr(s string) *uint16 { return utf16(s) }
+
+func writeRemoteClipboardText(hwnd, expected uintptr, text, id string) (uintptr, error) {
+	if !clipboardDesktopAvailable() {
+		return 0, errClipboardUnavailable
+	}
+	data, err := syscall.UTF16FromString(text)
+	if err != nil || len(text) > peerupdate.MaxClipboardBytes {
+		return 0, errClipboardUnavailable
+	}
+	handle, _, _ := clipAlloc.Call(2, uintptr(len(data)*2))
+	if handle == 0 {
+		return 0, errClipboardUnavailable
+	}
+	owned := true
+	defer func() {
+		if owned {
+			clipFree.Call(handle)
+		}
+	}()
+	marker, _, _ := clipAlloc.Call(2, uintptr(len(id)+1))
+	if marker == 0 {
+		return 0, errClipboardUnavailable
+	}
+	markerOwned := true
+	defer func() {
+		if markerOwned {
+			clipFree.Call(marker)
+		}
+	}()
+	markerPtr, _, _ := clipLock.Call(marker)
+	if markerPtr == 0 {
+		return 0, errClipboardUnavailable
+	}
+	markerData := append([]byte(id), 0)
+	clipCopy.Call(markerPtr, uintptr(unsafe.Pointer(&markerData[0])), uintptr(len(markerData)))
+	runtime.KeepAlive(markerData)
+	clipUnlock.Call(marker)
+	markerFormat := clipboardFormat("Krasis.RemoteClipboard.v1")
+	if markerFormat == 0 {
+		return 0, errClipboardUnavailable
+	}
+	ptr, _, _ := clipLock.Call(handle)
+	if ptr == 0 {
+		return 0, errClipboardUnavailable
+	}
+	clipCopy.Call(ptr, uintptr(unsafe.Pointer(&data[0])), uintptr(len(data)*2))
+	runtime.KeepAlive(data)
+	clipUnlock.Call(handle)
+	ok, _, _ := clipOpen.Call(hwnd)
+	if ok == 0 {
+		return 0, errClipboardUnavailable
+	}
+	defer clipClose.Call()
+	if clipboardSequence() != expected {
+		return 0, errClipboardUnavailable
+	}
+	if ok, _, _ := clipEmpty.Call(); ok == 0 {
+		return 0, errClipboardUnavailable
+	}
+	if ok, _, _ := clipSet.Call(13, handle); ok == 0 {
+		return 0, errClipboardUnavailable
+	}
+	owned = false
+	if ok, _, _ := clipSet.Call(markerFormat, marker); ok != 0 {
+		markerOwned = false
+	}
+	return clipboardSequence(), nil
+}
+
+// Only the serialized GUI operation worker touches this state. Remote writes
+// record their exact native sequence, so they never become a new outbound copy.
+type clipboardPump struct {
+	peer     string
+	sequence uintptr
+}
+
+func (a *productWindow) syncClipboard(ctx context.Context) {
+	peer := a.view.Update.Status.ClipboardPeer
+	if peer == "" {
+		a.clipPump = clipboardPump{}
+		return
+	}
+	paired := false
+	for _, fp := range a.view.Fingerprints {
+		if fp == peer {
+			paired = true
+		}
+	}
+	if !paired {
+		a.clipPump = clipboardPump{}
+		return
+	}
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	if !clipboardDesktopAvailable() {
+		a.clipPump = clipboardPump{}
+		return
+	}
+	current := clipboardSequence()
+	if peer != a.clipPump.peer {
+		a.clipPump = clipboardPump{peer: peer, sequence: current}
+	}
+	request := localapi.ClipboardRequest{Action: "SYNC", Peer: peer}
+	if current != a.clipPump.sequence {
+		text, sequence, err := readClipboardText(a.hwnd)
+		if sequence != 0 {
+			a.clipPump.sequence = sequence
+		}
+		if err == nil {
+			request.Text = &text
+			current = sequence
+		}
+	}
+	client, err := localapi.OpenClient(a.control)
+	if err != nil {
+		return
+	}
+	result, err := client.Clipboard(ctx, request)
+	if err != nil || result.Code != "ok" || result.Value.ID == "" {
+		return
+	}
+	sequence, err := writeRemoteClipboardText(a.hwnd, current, result.Value.Text, result.Value.ID)
+	if err != nil {
+		return
+	}
+	a.clipPump.sequence = sequence
+	_, _ = client.Clipboard(ctx, localapi.ClipboardRequest{Action: "SYNC", Peer: peer, Ack: result.Value.ID})
+}
+
+func (a *productWindow) toggleClipboard() {
+	if a.busy || a.closing || a.pin.job != "" {
+		return
+	}
+	peer := a.view.Fingerprints[a.selected()]
+	if active := a.view.Update.Status.ClipboardPeer; active != "" {
+		a.performTarget("clipboard_disable", active)
+		return
+	}
+	if len(peer) != 64 {
+		return
+	}
+	action := "clipboard_enable"
+	if a.view.Update.Status.ClipboardPeer == peer {
+		action = "clipboard_disable"
+	} else {
+		text := "선택한 기기와 복사한 텍스트를 자동 공유할까요?\n\n비밀번호 등 민감한 내용도 포함될 수 있습니다. 양쪽에서 켜야 동작하며, 버튼을 다시 누르면 끕니다. 기존 클립보드 내용은 보내지 않습니다."
+		result, _, _ := clipUser.NewProc("MessageBoxW").Call(a.hwnd, uintptr(unsafe.Pointer(utf16Ptr(text))), uintptr(unsafe.Pointer(utf16Ptr("클립보드 공유"))), 0x134)
+		if result != 6 {
+			return
+		}
+	}
+	a.performTarget(action, peer)
 }

@@ -26,6 +26,7 @@ const productRevoke = 2005
 const productExport = 2006
 const productSendUpdate = 2007
 const productAllowUpdate = 2008
+const productClipboard = 2009
 const layoutLeft = 2301
 const layoutRight = 2302
 const rearm32 = 2310
@@ -35,6 +36,8 @@ const exportEvent = wmUIEvent + 2
 const wmTimer = 0x0113
 
 type productWindow struct {
+	clipboardButton                                           uintptr
+	clipPump                                                  clipboardPump
 	diagnosticNotice                                          uintptr
 	receivedDiagnostic                                        string
 	updateSend, updateAllow                                   uintptr
@@ -186,6 +189,8 @@ func productWindowProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr
 	case wmCommand:
 		if int((wParam>>16)&0xffff) == bnClicked {
 			switch int(wParam & 0xffff) {
+			case productClipboard:
+				a.toggleClipboard()
 			case productSendUpdate:
 				if !a.busy {
 					a.updateResume = ""
@@ -319,7 +324,8 @@ func (a *productWindow) create() bool {
 	a.refresh = control("BUTTON", "새로고침", wsTabStop, 390, 100, 175, 35, productRefresh)
 	a.status = control("STATIC", "상태 확인 중…", 0, 20, 150, 545, 22, 0)
 	a.notice = control("STATIC", "", 0, 20, 177, 545, 38, 0)
-	control("STATIC", "창을 닫으면 트레이에 남습니다.\n중지하려면 연결 해제를 누르세요.", 0, 20, 222, 355, 46, 0)
+	control("STATIC", "창을 닫아도 트레이에\n남아 동작합니다.", 0, 20, 222, 170, 46, 0)
+	a.clipboardButton = control("BUTTON", "클립보드 공유 켜기", wsTabStop, 205, 226, 175, 30, productClipboard)
 	a.revoke = control("BUTTON", "기기 등록 해제", wsTabStop, 390, 226, 175, 30, productRevoke)
 	a.createPIN(control)
 	a.exportResults = make(chan string, 1)
@@ -446,6 +452,21 @@ func (a *productWindow) performTarget(action, alias string) {
 			}
 		}
 		open := func() (productpanel.Client, error) { return localapi.OpenClient(a.control) }
+		if action == "clipboard_enable" || action == "clipboard_disable" {
+			if client, err := localapi.OpenClient(a.control); err == nil {
+				command := "ENABLE"
+				if action == "clipboard_disable" {
+					command = "DISABLE"
+				}
+				_, _ = client.Clipboard(ctx, localapi.ClipboardRequest{Action: command, Peer: alias})
+			}
+			a.clipPump = clipboardPump{}
+			view = productpanel.Execute(ctx, open, "refresh", "")
+			return
+		}
+		if action == "refresh" {
+			a.syncClipboard(ctx)
+		}
 		if a.initialPeer != "" && action == "refresh" {
 			client, err := localapi.OpenClient(a.control)
 			if err == nil {
@@ -485,6 +506,12 @@ func (a *productWindow) performTarget(action, alias string) {
 }
 
 func (a *productWindow) apply(view productpanel.View) {
+	text := "클립보드 공유 켜기"
+	if view.Update.Status.ClipboardPeer != "" {
+		text = "클립보드 공유 끄기"
+	}
+	setText(a.clipboardButton, text)
+	enable(a.clipboardButton, !a.busy && (len(view.Peers) > 0 || view.Update.Status.ClipboardPeer != ""))
 	if path := view.Update.Status.ReceivedDiagnostic; path != "" && path != a.receivedDiagnostic {
 		a.receivedDiagnostic = path
 		setText(a.exportPath, path)
