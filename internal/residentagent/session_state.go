@@ -7,7 +7,25 @@ import (
 	"github.com/0disoft/krasis/internal/productlog"
 )
 
-type sessionOutcome struct{ failed bool }
+type sessionOutcome struct {
+	failed     bool
+	faultCodes map[string]bool
+}
+
+// Caller holds operations.mu; the ledger belongs to one runner generation.
+func (operations *Operations) recordSessionFaultLocked(outcome *sessionOutcome, code string) {
+	if outcome != nil {
+		if outcome.faultCodes[code] {
+			return
+		}
+		if outcome.faultCodes == nil {
+			outcome.faultCodes = make(map[string]bool)
+		}
+		outcome.faultCodes[code] = true
+	}
+	operations.log.Event(code)
+	operations.counters[code]++
+}
 
 // A requested stop must not hide joined cleanup or deadline failures.
 func peerDisconnectOnly(err error) bool {
@@ -66,6 +84,7 @@ func (observer *sessionObserver) ObserveSupervisor(snapshot agent.SupervisorSnap
 	defer operations.mu.Unlock()
 	if operations.sessionDone == observer.done && snapshot.Recovery != nil && snapshot.Recovery.DeadlineExceeded {
 		operations.sessionFaulted = true
+		operations.recordSessionFaultLocked(operations.sessionOutcome, productlog.FaultCode("recovery", "deadline", "exceeded"))
 		operations.recordLocked("session_failed")
 		return
 	}
@@ -74,8 +93,7 @@ func (observer *sessionObserver) ObserveSupervisor(snapshot agent.SupervisorSnap
 	}
 	if snapshot.State == agent.SupervisorStopped && snapshot.FailureKind == "session" {
 		reason := productlog.FaultCode(snapshot.FailureComponent, snapshot.FailurePhase, snapshot.FailureCode)
-		operations.log.Event(reason)
-		operations.counters[reason]++
+		operations.recordSessionFaultLocked(operations.sessionOutcome, reason)
 	}
 	if operations.sessionState == "DISCONNECTING" {
 		return

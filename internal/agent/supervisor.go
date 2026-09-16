@@ -180,7 +180,7 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 	}
 	terminalSnapshot := SupervisorSnapshot{}
 	defer func() {
-		sourceCloseErr := dependencies.Source.Close()
+		sourceCloseErr := supervisorExit("source-close", dependencies.Source.Close())
 		var transitionErr error
 		if state != SupervisorStopped {
 			transitionErr = transition(SupervisorStoppedEvent, terminalSnapshot)
@@ -194,7 +194,7 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 		if acquireErr != nil {
 			if connection != nil {
 				if closeErr := connection.Close(); closeErr != nil {
-					return errors.Join(acquireErr, ctx.Err(), closeErr)
+					return errors.Join(acquireErr, ctx.Err(), supervisorExit("connection-close", closeErr))
 				}
 			}
 			if ctx.Err() != nil {
@@ -214,7 +214,7 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 			continue
 		}
 		if connection == nil {
-			return errors.New("connection source returned a nil connection")
+			return supervisorExit("nil-connection", errors.New("connection source returned a nil connection"))
 		}
 		ownedConnection := &supervisedConnection{Connection: connection}
 		if err := transition(SupervisorConnectionAcquired, SupervisorSnapshot{Attempt: attempt}); err != nil {
@@ -232,14 +232,14 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 		}
 		if closeErr := ownedConnection.Close(); closeErr != nil {
 			if !errors.Is(sessionErr, closeErr) {
-				return errors.Join(sessionErr, ctx.Err(), closeErr)
+				return errors.Join(sessionErr, ctx.Err(), supervisorExit("connection-close", closeErr))
 			}
 		}
 		if ctx.Err() != nil {
 			return errors.Join(ctx.Err(), sessionErr)
 		}
 		if sessionErr == nil {
-			return errors.New("agent session ended without a failure or shutdown")
+			return supervisorExit("unexpected-stop", errors.New("agent session ended without a failure or shutdown"))
 		}
 		if errors.Is(sessionErr, ErrRecoveryUnverified) {
 			return sessionErr
@@ -249,7 +249,7 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 			return sessionErr
 		}
 		if result.FinalState != control.StateLocal {
-			return fmt.Errorf("agent session cannot reconnect outside LOCAL: %w", sessionErr)
+			return supervisorExit("nonlocal-state", fmt.Errorf("agent session cannot reconnect outside LOCAL: %w", sessionErr))
 		}
 		if ownedConnection.disconnectReceived.Load() || errors.Is(sessionErr, peer.ErrPeerDisconnectRequested) {
 			terminalSnapshot.FailureKind = "peer_disconnect"

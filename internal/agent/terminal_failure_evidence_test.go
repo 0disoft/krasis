@@ -29,3 +29,30 @@ func TestUnverifiedRecoveryPreservesTerminalCaptureDescriptor(t *testing.T) {
 		t.Fatalf("terminal reason lost: %+v", last)
 	}
 }
+
+func TestSupervisorExitReasonPreservesUnderlyingCause(t *testing.T) {
+	for _, phase := range []string{"source-close", "connection-close", "nonlocal-state", "unexpected-stop", "nil-connection"} {
+		err := supervisorExit(phase, context.Canceled)
+		if !errors.Is(err, context.Canceled) || errors.Unwrap(err) != context.Canceled || SupervisorExitPhase(err) != phase {
+			t.Fatalf("phase=%s error=%v", phase, err)
+		}
+	}
+	if SupervisorExitPhase(supervisorExit("private window title", errors.New("private path"))) != "" {
+		t.Fatal("private phase escaped")
+	}
+}
+
+func TestSupervisorNonLocalExitKeepsFailureAndStopReason(t *testing.T) {
+	err := RunSupervisor(context.Background(), SupervisorConfig{
+		Session: Config{QueueCapacity: 1, Now: time.Now}, Backoff: DefaultBackoffPolicy(), Now: time.Now,
+		Wait: func(context.Context, time.Duration) error { t.Fatal("retried nonlocal state"); return nil },
+	}, SupervisorDependencies{
+		Source: &scriptedSource{outcomes: []sourceOutcome{{connection: &stubConnection{}}}}, Hook: &idleHook{}, Input: newTestInput(false), Effects: noopEffects{}, Authorizer: acceptingAuthorizer{},
+		RunSession: func(context.Context, Config, Dependencies) (Result, error) {
+			return Result{}, wininput.ErrSourceCaptureLostForeground
+		},
+	})
+	if SupervisorExitPhase(err) != "nonlocal-state" || !errors.Is(err, wininput.ErrSourceCaptureLostForeground) {
+		t.Fatalf("cause lost: %v", err)
+	}
+}

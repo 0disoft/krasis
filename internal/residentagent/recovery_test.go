@@ -22,6 +22,9 @@ func TestRecoveryReportFaultsBeforeRunnerCompletes(t *testing.T) {
 		if status.State != "FAULTED" {
 			t.Fatalf("pending recovery status: %+v", status)
 		}
+		if operations.counters["fault_recovery_deadline_exceeded"] != 1 {
+			t.Fatal("recovery deadline reason missing")
+		}
 		result, _ := operations.Connect(context.Background(), localapi.OperationRequest{PeerAlias: "peer"})
 		if result.Code != "session_failed" {
 			t.Fatalf("admitted new owner: %+v", result)

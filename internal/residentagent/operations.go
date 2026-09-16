@@ -363,6 +363,13 @@ func (operations *Operations) finishSession(done chan struct{}, outcome *session
 	defer operations.mu.Unlock()
 	outcome.failed = !cancelled || operations.sessionFaulted
 	if operations.sessionDone == done {
+		if outcome.failed && !cancelled {
+			failure := agent.DescribeSessionFailure(err)
+			operations.recordSessionFaultLocked(outcome, productlog.FaultCode(failure.Component, failure.Phase, failure.Code))
+			if phase := agent.SupervisorExitPhase(err); phase != "" {
+				operations.recordSessionFaultLocked(outcome, productlog.FaultCode("supervisor", phase, "failed"))
+			}
+		}
 		operations.sessionStop = nil
 		operations.sessionDone = nil
 		operations.sessionOutcome = nil
