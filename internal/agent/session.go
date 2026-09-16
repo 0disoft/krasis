@@ -135,8 +135,12 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	if gate, ok := dependencies.Hook.(peer.BoundaryAdmissionGate); ok {
 		admissionGate = gate
 	}
+	returns, err := peer.NewReturnControllerObserved(coordinator, runtime, dependencies.Input, config.ControlObserver)
+	if err != nil {
+		return Result{}, err
+	}
 	orchestrator, err := peer.NewBoundaryOrchestratorObservedWithGate(
-		outbound,
+		&peer.BidirectionalBoundary{Outbound: outbound, Return: returns},
 		peer.NewRandomOutboundIdentity,
 		config.ControlObserver,
 		admissionGate,
@@ -147,10 +151,6 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	responder := &peer.LeaseResponder{
 		Coordinator: coordinator, Runtime: runtime, Authorizer: dependencies.Authorizer,
 		Peer: authenticatedPeer, Entry: dependencies.Input, Returns: dependencies.Input, Observer: config.ControlObserver,
-	}
-	returns, err := peer.NewReturnControllerObserved(coordinator, runtime, dependencies.Input, config.ControlObserver)
-	if err != nil {
-		return Result{}, err
 	}
 	if cursor, ok := dependencies.Hook.(peer.ReturnCursorPresentation); ok {
 		returns.Cursor = cursor

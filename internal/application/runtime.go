@@ -459,7 +459,7 @@ func (runtime *SessionRuntime) HandleInputAction(
 	}
 
 	if runtime.control.State != control.StateInboundActive || runtime.stream.SessionID == "" {
-		if runtime.control.State == control.StateLocal && runtime.retiredInbound.SessionID != "" {
+		if runtime.canDrainRetiredLocked() {
 			if err := action.Validate(); err != nil {
 				return err
 			}
@@ -523,11 +523,11 @@ func (runtime *SessionRuntime) ObserveHeartbeat(
 ) error {
 	runtime.mu.Lock()
 	defer runtime.mu.Unlock()
+	if runtime.canDrainRetiredLocked() && runtime.retiredInbound.SessionID == sessionID {
+		return nil
+	}
 
 	if runtime.control.State != control.StateInboundActive && runtime.control.State != control.StateOutboundActive {
-		if runtime.control.State == control.StateLocal && runtime.retiredInbound.SessionID == sessionID && sessionID != "" {
-			return nil
-		}
 		return ErrRuntimeNoLiveness
 	}
 	next, err := runtime.liveness.Observe(sessionID, observedAt)
@@ -537,6 +537,20 @@ func (runtime *SessionRuntime) ObserveHeartbeat(
 	}
 	runtime.liveness = next
 	return nil
+}
+
+func (runtime *SessionRuntime) canDrainRetiredLocked() bool {
+	if runtime.retiredInbound.SessionID == "" {
+		return false
+	}
+	switch runtime.control.State {
+	case control.StateLocal:
+		return true
+	case control.StatePending, control.StateOutboundActive:
+		return runtime.retiredInbound.SessionID != runtime.control.SessionID
+	default:
+		return false
+	}
 }
 
 func (runtime *SessionRuntime) CheckLiveness(
