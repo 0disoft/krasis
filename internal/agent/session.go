@@ -205,8 +205,9 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	}
 
 	var workers sync.WaitGroup
+	outcomes := make([]error, len(components))
 	workers.Add(len(components))
-	for _, current := range components {
+	for index, current := range components {
 		current := current
 		go func() {
 			defer workers.Done()
@@ -218,26 +219,57 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 				}
 			}
 			runErr := current.run()
-			if runErr == nil {
+			if runErr == nil && runContext.Err() == nil {
 				runErr = fmt.Errorf("%s stopped unexpectedly", current.name)
 			}
-			if runContext.Err() == nil {
-				cancel(&sessionComponentError{component: current.name, cause: runErr})
+			if runErr != nil {
+				outcomes[index] = &sessionComponentError{component: current.name, cause: runErr}
+				if runContext.Err() == nil {
+					cancel(outcomes[index])
+				}
 			}
 		}()
 	}
 	<-runContext.Done()
 	workers.Wait()
 	cause := context.Cause(runContext)
+	// Wait establishes that every slot is final. Cancellation selects the first
+	// cause; it must not discard errors produced later by native/input cleanup.
+	for _, outcome := range outcomes {
+		if outcome != nil && !expectedWorkerCancellation(outcome, runContext.Err()) && !errors.Is(cause, outcome) {
+			cause = errors.Join(cause, outcome)
+		}
+	}
 	snapshot := runtime.Snapshot()
 	result := Result{FinalState: snapshot.Control.State, Cause: cause}
 	if snapshot.Control.State != control.StateLocal {
-		return result, fmt.Errorf("agent session stopped outside LOCAL: %s", snapshot)
-	}
-	if ctx.Err() != nil && (errors.Is(cause, context.Canceled) || errors.Is(cause, context.DeadlineExceeded)) {
-		return result, ctx.Err()
+		return result, errors.Join(fmt.Errorf("agent session stopped outside LOCAL: %s", snapshot), cause)
 	}
 	return result, cause
+}
+
+func expectedWorkerCancellation(err, expected error) bool {
+	if err == nil {
+		return true
+	}
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		children := joined.Unwrap()
+		if len(children) == 0 {
+			return false
+		}
+		for _, child := range children {
+			if !expectedWorkerCancellation(child, expected) {
+				return false
+			}
+		}
+		return true
+	}
+	if wrapped, ok := err.(interface{ Unwrap() error }); ok {
+		if child := wrapped.Unwrap(); child != nil {
+			return expectedWorkerCancellation(child, expected)
+		}
+	}
+	return expected != nil && (err == expected || err == context.Canceled)
 }
 
 type combinedSourceActivation struct {

@@ -222,7 +222,7 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 			}
 		}
 		if ctx.Err() != nil {
-			return ctx.Err()
+			return errors.Join(ctx.Err(), sessionErr)
 		}
 		if sessionErr == nil {
 			return errors.New("agent session ended without a failure or shutdown")
