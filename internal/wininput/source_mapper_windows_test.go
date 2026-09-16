@@ -31,3 +31,22 @@ func TestSourceMapperRejectsInvalidPhysicalScanCode(t *testing.T) {
 		t.Fatalf("keyboard(zero) emitted=%t error=%v", emitted, err)
 	}
 }
+
+func TestRightShiftHasStableIdentityAcrossIMEExtendedFlags(t *testing.T) {
+	mapper := &sourceKeyboardMapper{}
+	for _, message := range []uint32{wmKeyDown, wmKeyUp, wmSysKeyDown, wmSysKeyUp} {
+		for _, flags := range []uint32{0, llkhfExtended} {
+			action, emitted, err := mapper.keyboard(message, keyboardHookData{VirtualKey: 0xA1, ScanCode: 0x36, Flags: flags})
+			if err != nil || !emitted || action.Code != 0x36 {
+				t.Fatalf("right shift message=%x flags=%x action=%+v emitted=%v error=%v", message, flags, action, emitted, err)
+			}
+			want := control.InputKeyDown
+			if message == wmKeyUp || message == wmSysKeyUp {
+				want = control.InputKeyUp
+			}
+			if action.Kind != want {
+				t.Fatalf("kind=%v want=%v", action.Kind, want)
+			}
+		}
+	}
+}

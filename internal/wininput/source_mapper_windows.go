@@ -12,7 +12,10 @@ func (mapper *sourceKeyboardMapper) keyboard(message uint32, data keyboardHookDa
 	if data.Flags&llkhfInjected != 0 || data.ExtraInfo == krasisInjectedExtraInfo || data.ExtraInfo == selfTestExtraInfo {
 		return control.InputAction{}, false, nil
 	}
-	code, err := EncodeScanCode(uint16(data.ScanCode), data.Flags&llkhfExtended != 0)
+	// Right Shift has its own non-E0 scan code. Some IME paths report an
+	// extended flag for it; keep down/up identity stable before held tracking.
+	extended := data.Flags&llkhfExtended != 0 && data.ScanCode != scanCodeRightShift
+	code, err := EncodeScanCode(uint16(data.ScanCode), extended)
 	if err != nil {
 		return control.InputAction{}, false, err
 	}

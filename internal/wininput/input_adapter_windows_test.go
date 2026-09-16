@@ -26,6 +26,29 @@ func TestKeyboardEventUsesScanCodeAndExtendedFlags(t *testing.T) {
 	}
 }
 
+func TestRightShiftInjectionNeverUsesE0Prefix(t *testing.T) {
+	for _, released := range []bool{false, true} {
+		for _, extended := range []bool{false, true} {
+			event := keyboardEvent(0x36, extended, released)
+			keyboard := *(*keyboardInput)(unsafe.Pointer(&event.Mouse))
+			want := uint32(keyEventScanCode)
+			if released {
+				want |= keyEventKeyUp
+			}
+			if keyboard.ScanCode != 0x36 || keyboard.Flags != want {
+				t.Fatalf("right shift = %+v", keyboard)
+			}
+		}
+	}
+	for _, scan := range []uint16{0x1D, 0x38, 0x37, 0x2A} {
+		event := keyboardEvent(scan, true, false)
+		keyboard := *(*keyboardInput)(unsafe.Pointer(&event.Mouse))
+		if keyboard.Flags&keyEventExtended == 0 {
+			t.Fatalf("unrelated E0 scan %x changed", scan)
+		}
+	}
+}
+
 func TestMouseButtonEventMapsClosedButtonSet(t *testing.T) {
 	tests := []struct {
 		code     uint32

@@ -67,7 +67,9 @@ type input struct {
 
 func keyboardEvent(scanCode uint16, extended, released bool) input {
 	flags := uint32(keyEventScanCode)
-	if extended {
+	// Also tolerate the old sender's E0-marked right Shift on injection.
+	// Do not clear E0 for Ctrl, Alt, or Print Screen's synthetic shift codes.
+	if extended && uint32(scanCode) != scanCodeRightShift {
 		flags |= keyEventExtended
 	}
 	if released {
