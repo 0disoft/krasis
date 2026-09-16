@@ -1,7 +1,38 @@
 package productpanel
 
+import (
+	"fmt"
+	"github.com/0disoft/krasis/internal/peerupdate"
+)
+
+func UpdateStatusNotice(status peerupdate.Status) string {
+	text := UpdateNotice(status.State)
+	if text == "" {
+		return ""
+	}
+	if status.State == "SENDING" && status.Total > 0 && status.Bytes >= 0 && status.Bytes <= status.Total {
+		text = fmt.Sprintf("업데이트 전송 중 · %d%% (상대 수신 확인 전)", status.Bytes*100/status.Total)
+	}
+	if status.Generation > 0 && status.PeerGeneration > 0 {
+		text += fmt.Sprintf(" · 보낼 버전 g%d / 상대 g%d", status.Generation, status.PeerGeneration)
+	}
+	return text
+}
+
 func UpdateNotice(state string) string {
 	switch state {
+	case "PEER_UNREACHABLE":
+		return "상대 관리 서비스가 응답하지 않습니다. 전원·네트워크·에이전트·방화벽 또는 구버전 여부를 확인하세요."
+	case "PEER_UNSUPPORTED":
+		return "상대 버전이 독립 업데이트 확인을 지원하지 않습니다. 처음 한 번 수동 교체가 필요합니다."
+	case "SENDING":
+		return "업데이트 전송 중…"
+	case "VERIFYING":
+		return "전송 완료 · 파일 무결성과 빌드 검사 중…"
+	case "UPDATED":
+		return "상대 기기에서 새 에이전트 버전 실행을 확인했습니다."
+	case "RESTART_UNCONFIRMED":
+		return "파일은 전달했지만 새 버전 실행을 확인하지 못했습니다. 상대의 관리 앱·에이전트를 확인하세요."
 	case "SAME_VERSION":
 		return "상대 기기는 보내려는 묶음과 같은 버전입니다. 업데이트가 필요하지 않습니다."
 	case "PEER_NEWER":
@@ -21,7 +52,7 @@ func UpdateNotice(state string) string {
 	case "PREPARING":
 		return "업데이트 묶음 검사 중…"
 	case "QUEUED":
-		return "업데이트 전송 대기 · 상대 기기의 업데이트 허용이 필요합니다."
+		return "상대 기기의 버전·업데이트 허용 확인 중…"
 	case "RECEIVING":
 		return "업데이트 수신·검증 중…"
 	case "STAGED":

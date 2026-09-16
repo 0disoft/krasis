@@ -57,7 +57,7 @@ func (o *Operations) Update(ctx context.Context, r localapi.UpdateRequest) (loca
 		result.Code = "permission_saved"
 	case "SEND":
 		o.mu.Lock()
-		connected := o.stateLocked() == "CONNECTED" && o.peerAlias == p.Alias && !o.updateApplying
+		connected := !o.updateApplying && o.root.Err() == nil
 		o.mu.Unlock()
 		if !connected {
 			return result, nil
@@ -69,7 +69,7 @@ func (o *Operations) Update(ctx context.Context, r localapi.UpdateRequest) (loca
 		}
 	case "APPLY":
 		o.mu.Lock()
-		if o.updateApplying || o.sessionFaulted || o.peerAlias != p.Alias || o.stateLocked() != "CONNECTED" {
+		if o.updateApplying || o.root.Err() != nil || (o.sessionDone != nil && o.peerAlias != p.Alias) {
 			o.mu.Unlock()
 			return result, nil
 		}
@@ -79,14 +79,22 @@ func (o *Operations) Update(ctx context.Context, r localapi.UpdateRequest) (loca
 			return result, nil
 		}
 		o.updateApplying = true
+		idle := o.sessionDone == nil
 		o.mu.Unlock()
-		stop, err := o.Disconnect(ctx, localapi.OperationRequest{})
+		stop := completed("no_active_session")
+		if !idle {
+			stop, err = o.Disconnect(ctx, localapi.OperationRequest{})
+		}
 		if err != nil || stop.Status != "COMPLETED" {
 			o.updates.ApplyFailed()
+			o.mu.Lock()
+			o.updateApplying = false
+			o.mu.Unlock()
 			result.Code = "cleanup_failed"
 			return result, nil
 		}
-		// No executable replacement happens before confirmed input cleanup.
+		// Idle FAULTED is not cleared here. The new GUI must terminate the old
+		// process through the verified lifecycle before starting a replacement.
 		result.Code = "apply_ready"
 		result.Directory = directory
 		result.Alias = p.Alias
@@ -104,7 +112,7 @@ func (o *Operations) updateAuthorized(ctx context.Context, alias, fp string) boo
 	}
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	return o.stateLocked() == "CONNECTED" && o.peerAlias == alias && !o.updateApplying
+	return o.root.Err() == nil && !o.updateApplying
 }
 
 // Keep a fresh certificate/trust check on every auxiliary request.
@@ -114,6 +122,7 @@ func (o *Operations) runUpdates(ctx context.Context, alias string, prepared prod
 	}
 	o.updates.Start(ctx, prepared.profile.Address, prepared.peer.CertificateSHA256, string(prepared.peer.Role) == "CONNECTOR", prepared.tls, func() bool {
 		_, err := trust.PeerCertificate(prepared.peer, time.Now())
-		return err == nil && o.updateAuthorized(ctx, alias, prepared.peer.CertificateSHA256)
+		profile, profileErr := trust.Connection(alias)
+		return err == nil && profileErr == nil && profile.Address == prepared.profile.Address && profile.Fingerprint == prepared.profile.Fingerprint && o.updateAuthorized(ctx, alias, prepared.peer.CertificateSHA256)
 	})
 }

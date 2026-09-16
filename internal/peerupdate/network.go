@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"io"
 	"net"
@@ -53,8 +54,18 @@ func (m *Manager) Run(ctx context.Context, address, peer string, listener bool, 
 			if !authorized() {
 				continue
 			}
+			statusData, _ := json.Marshal(m.info(peer))
+			statusCtx, cancelStatus := context.WithTimeout(ctx, 6*time.Second)
+			statusRequest, _ := http.NewRequestWithContext(statusCtx, http.MethodPost, "https://"+address+"/v2/status", bytes.NewReader(statusData))
+			statusRequest.Header.Set("Content-Type", "application/json")
+			statusOK := m.exchangeStatus(client, statusRequest, peer)
+			cancelStatus()
+			if !statusOK {
+				continue
+			}
 			if offer := m.offered(peer); offer != nil {
-				req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://"+address+"/v1/bundle", bytes.NewReader(offer.data))
+				progress := &progressReader{Reader: bytes.NewReader(offer.data), update: func(n int64) { m.progress(peer, offer.id, "SENDING", n, int64(len(offer.data))) }}
+				req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://"+address+"/v1/bundle", progress)
 				if err != nil {
 					continue
 				}
@@ -128,7 +139,7 @@ func (m *Manager) handler(peer string, authorized func() bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		// TLS config verifies the one pinned certificate. Recheck current trust
-		// and input connection state on every request, not just the handshake.
+		// on every request, not just the handshake. Input state is independent.
 		if !authorized() {
 			w.WriteHeader(http.StatusForbidden)
 			return
@@ -145,6 +156,19 @@ func (m *Manager) handler(peer string, authorized func() bool) http.Handler {
 			return
 		}
 		switch {
+		case r.URL.Path == "/v2/status" && r.Method == http.MethodPost:
+			if r.Header.Get("Content-Type") != "application/json" {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			info, err := readPeerInfo(r.Body)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			m.observePeer(peer, info)
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(m.info(peer))
 		case r.URL.Path == "/v1/bundle" && r.Method == http.MethodGet:
 			if r.ContentLength != 0 {
 				w.WriteHeader(http.StatusBadRequest)
@@ -159,7 +183,8 @@ func (m *Manager) handler(peer string, authorized func() bool) http.Handler {
 			w.Header().Set("X-Krasis-ID", offer.id)
 			w.Header().Set("X-Krasis-SHA256", offer.hash)
 			w.Header().Set("Content-Length", strconv.Itoa(len(offer.data)))
-			_, _ = io.Copy(w, bytes.NewReader(offer.data))
+			progress := &progressReader{Reader: bytes.NewReader(offer.data), update: func(n int64) { m.progress(peer, offer.id, "SENDING", n, int64(len(offer.data))) }}
+			_, _ = io.Copy(w, progress)
 		case r.URL.Path == "/v1/bundle" && r.Method == http.MethodPost:
 			if r.Header.Get("Content-Type") != "application/zip" {
 				w.WriteHeader(http.StatusBadRequest)

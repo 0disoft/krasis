@@ -123,9 +123,10 @@ func run(ctx context.Context, localAppData string, dependencies runDependencies)
 			updates.Observe = dependencies.log.Event
 			operations.updates = updates
 			defer updates.Close()
-			operations.runner = productRunner(identities, trust, dependencies.log, func(ctx context.Context, alias string, prepared productConnection) {
-				operations.runUpdates(ctx, alias, prepared, trust)
-			})
+			managementCtx, stopManagement := context.WithCancel(operations.Context())
+			managementDone := make(chan struct{})
+			go func() { defer close(managementDone); operations.maintainUpdates(managementCtx, identities, trust) }()
+			defer func() { stopManagement(); <-managementDone }()
 		}
 	}
 	server, err := dependencies.listen(paths.Control, operations)

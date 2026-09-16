@@ -62,13 +62,39 @@ claimed. Permissions survive restart; pending transfers deliberately do not.
 The receiver GUI must be open or in the tray. Received files are never executed
 solely by the network handler. Fixed stage codes omit paths, contents and aliases.
 
-## Verification boundary
+## Generation 24 management lifetime
+
+Management workers now belong to the resident agent, not an input session. Saved
+profiles are reconciled every five seconds (at most 16 workers); changed profiles
+and revoked trust cancel old workers. Each request still checks the pinned peer,
+current certificate validity, current saved address and revocation. Local update
+opt-in remains mandatory for receipt and apply. LOCAL and idle FAULTED can receive
+and apply; a session for another peer prevents apply. A fault latch is never reset
+in place: the replacement GUI must stop the old process and verify ownership is
+released before starting the new agent. The GUI must remain running or in tray.
+An agent process that has crashed or cannot answer its management API still needs
+local recovery; this is not an independent privileged OS service.
+
+POST `/v2/status` exchanges bounded protocol/generation/revision/permission JSON
+over pinned mutual TLS before transfer. Equal generation with a different build
+is not reported as the same version. Expired or unavailable metadata never proves
+that a peer is current. An unsupported endpoint and a missing response are distinct.
+Generation 21-23 needs one manual upgrade to bootstrap this path. Input v1 and the
+local update request schema are unchanged; response status fields are additive.
+Transfer percentages indicate sender bytes consumed, not installed bytes. A
+DELIVERED receipt is not installation: UPDATED requires a later authenticated
+status reporting the exact expected generation and revision. Confirmation expires
+after three minutes; pending job state is not persisted across sender restarts.
+Shared listener-port conflicts fail closed rather than broadening certificate
+trust; configure nonconflicting saved listeners for additional pairs.
 
 Update rejection receipts use a closed `X-Krasis-Result` vocabulary. Same build,
 newer receiver, equal-generation different build, denied permission, busy peer,
 archive hash mismatch, interrupted transfer, invalid bundle and staging failure
 are distinct outcomes. Unknown/legacy results remain unspecified rejections;
 they are not inferred to mean an already-current peer. Raw error text is not sent.
+
+## Verification boundary
 
 Unit tests cover denied and revoked permissions, single-use apply, malformed ZIPs,
 generation checks and integrity checks. Packaged two-PC upgrade, firewall behavior,

@@ -504,12 +504,16 @@ func (a *productWindow) apply(view productpanel.View) {
 	if warning := controlLogWarning(a.log != nil, a.log.Failed(), a.logOpenErr); warning != "" {
 		view.Notice = warning + " " + view.Notice
 	}
-	if updateNotice := productpanel.UpdateNotice(view.Update.Status.State); updateNotice != "" && view.State != "FAULTED" && view.State != "RECONNECTING" {
-		view.Notice = updateNotice
+	if updateNotice := productpanel.UpdateStatusNotice(view.Update.Status); updateNotice != "" {
+		if view.State == "FAULTED" {
+			view.Notice += " " + updateNotice
+		} else {
+			view.Notice = updateNotice
+		}
 	}
 	setText(a.notice, view.Notice)
 	setText(a.disconnect, productpanel.DisconnectLabel(view.State))
-	enable(a.updateSend, !a.busy && view.State == "CONNECTED" && view.Update.Code == "ok" && a.pin.job == "")
+	enable(a.updateSend, !a.busy && len(view.Peers) > 0 && view.Update.Code == "ok" && a.pin.job == "")
 	enable(a.updateAllow, !a.busy && len(view.Peers) > 0 && view.Update.Code == "ok" && a.pin.job == "")
 	enable(a.peers, len(view.Peers) > 0)
 	enable(a.connect, view.State == "LOCAL" && len(view.Peers) > 0)
@@ -517,7 +521,7 @@ func (a *productWindow) apply(view productpanel.View) {
 	enable(a.refresh, true)
 	enable(a.revoke, view.State == "LOCAL" && len(view.Peers) > 0 && a.pin.job == "")
 	a.enablePIN()
-	if view.Update.Status.State == "READY" && !a.busy && view.State == "CONNECTED" && a.updateAttempt != view.Update.Status.ID {
+	if view.Update.Status.State == "READY" && !a.busy && a.updateAttempt != view.Update.Status.ID {
 		a.updateAttempt = view.Update.Status.ID
 		a.performTarget("update_apply", view.Update.Status.Peer)
 		return

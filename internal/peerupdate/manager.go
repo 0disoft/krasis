@@ -25,41 +25,48 @@ var ErrDenied = errors.New("peer update not authorized")
 var ErrBusy = errors.New("peer update busy")
 
 type Status struct {
-	State      string   `json:"state"`
-	Allowed    []string `json:"allowed"`
-	ID         string   `json:"id,omitempty"`
-	Revision   string   `json:"revision,omitempty"`
-	Generation int      `json:"generation,omitempty"`
-	Peer       string   `json:"peer,omitempty"`
+	PeerGeneration int      `json:"peerGeneration,omitempty"`
+	PeerRevision   string   `json:"peerRevision,omitempty"`
+	Bytes          int64    `json:"bytes,omitempty"`
+	Total          int64    `json:"total,omitempty"`
+	State          string   `json:"state"`
+	Allowed        []string `json:"allowed"`
+	ID             string   `json:"id,omitempty"`
+	Revision       string   `json:"revision,omitempty"`
+	Generation     int      `json:"generation,omitempty"`
+	Peer           string   `json:"peer,omitempty"`
 }
 
 type offer struct {
 	id, hash, peer string
 	data           []byte
 	expires        time.Time
+	created        time.Time
 }
 type stagedBundle interface {
 	Metadata() updatebundle.Metadata
 	Stage(*os.Root, string) error
 }
 type Manager struct {
-	workers     sync.WaitGroup
-	closed      bool
-	cancels     map[uint64]context.CancelFunc
-	nextWorker  uint64
-	Observe     func(string)
-	mu          sync.Mutex
-	root        *os.Root
-	path        string
-	generation  int
-	revision    string
-	allowed     map[string]bool
-	status      Status
-	stagedUntil time.Time
-	out         *offer
-	receiving   bool
-	packing     bool
-	validate    func([]byte) (stagedBundle, error)
+	peers          map[string]peerObservation
+	deliveredUntil time.Time
+	workers        sync.WaitGroup
+	closed         bool
+	cancels        map[uint64]context.CancelFunc
+	nextWorker     uint64
+	Observe        func(string)
+	mu             sync.Mutex
+	root           *os.Root
+	path           string
+	generation     int
+	revision       string
+	allowed        map[string]bool
+	status         Status
+	stagedUntil    time.Time
+	out            *offer
+	receiving      bool
+	packing        bool
+	validate       func([]byte) (stagedBundle, error)
 }
 
 func Open(productRoot string, generation int) (*Manager, error) {
@@ -143,12 +150,28 @@ func (m *Manager) Start(ctx context.Context, address, peer string, listener bool
 		defer m.workers.Done()
 		defer cancel()
 		defer func() { m.mu.Lock(); delete(m.cancels, id); m.mu.Unlock() }()
-		m.Run(run, address, peer, listener, config, authorized)
+		for run.Err() == nil {
+			m.Run(run, address, peer, listener, config, authorized)
+			timer := time.NewTimer(5 * time.Second)
+			select {
+			case <-run.Done():
+				timer.Stop()
+				return
+			case <-timer.C:
+			}
+		}
 	}()
 }
 func (m *Manager) Status() Status {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.out != nil && m.status.State == "QUEUED" && !m.out.created.IsZero() && time.Since(m.out.created) > 15*time.Second && m.peers[m.out.peer].at.Before(m.out.created) {
+		m.out = nil
+		m.status.State = "PEER_UNREACHABLE"
+	}
+	if m.status.State == "DELIVERED" && !m.deliveredUntil.IsZero() && time.Now().After(m.deliveredUntil) {
+		m.status.State = "RESTART_UNCONFIRMED"
+	}
 	if m.status.State == "STAGED" && !m.stagedUntil.IsZero() && time.Now().After(m.stagedUntil) {
 		m.status.State = "RECEIVE_FAILED"
 	}
@@ -233,6 +256,14 @@ func (m *Manager) Prepare(peer, directory string) error {
 		data, err = updatebundle.Pack(root)
 		root.Close()
 	}
+	var metadata updatebundle.Metadata
+	if err == nil {
+		var bundle *updatebundle.Bundle
+		bundle, err = updatebundle.Read(bytes.NewReader(data), int64(len(data)))
+		if err == nil {
+			metadata = bundle.Metadata()
+		}
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.packing = false
@@ -242,8 +273,8 @@ func (m *Manager) Prepare(peer, directory string) error {
 	}
 	id := randomID()
 	hash := sha256.Sum256(data)
-	m.out = &offer{id: id, hash: hex.EncodeToString(hash[:]), peer: peer, data: data, expires: time.Now().Add(3 * time.Minute)}
-	m.status = Status{State: "QUEUED", Peer: peer, ID: id}
+	m.out = &offer{id: id, hash: hex.EncodeToString(hash[:]), peer: peer, data: data, created: time.Now(), expires: time.Now().Add(3 * time.Minute)}
+	m.status = Status{State: "QUEUED", Peer: peer, ID: id, Generation: metadata.Generation, Revision: metadata.Revision, Total: int64(len(data))}
 	m.event("peer_update_queued")
 	return nil
 }
@@ -267,6 +298,9 @@ func (m *Manager) sent(id, state string) {
 	if m.out != nil && m.out.id == id {
 		m.out = nil
 		m.status.State = state
+		if state == "DELIVERED" {
+			m.deliveredUntil = time.Now().Add(3 * time.Minute)
+		}
 	}
 }
 
@@ -301,7 +335,8 @@ func (m *Manager) receive(peer, id, expected string, reader io.Reader, authorize
 			m.event("peer_update_receive_failed")
 		}
 	}()
-	data, err := io.ReadAll(io.LimitReader(reader, updatebundle.MaxArchiveBytes+1))
+	progress := &progressReader{Reader: reader, update: func(n int64) { m.progress(peer, id, "RECEIVING", n, 0) }}
+	data, err := io.ReadAll(io.LimitReader(progress, updatebundle.MaxArchiveBytes+1))
 	if err != nil {
 		failure = ErrTransfer
 		return failure
@@ -315,6 +350,7 @@ func (m *Manager) receive(peer, id, expected string, reader io.Reader, authorize
 		failure = ErrHashMismatch
 		return failure
 	}
+	m.progress(peer, id, "VERIFYING", int64(len(data)), int64(len(data)))
 	received, err = m.validate(data)
 	if err != nil {
 		failure = err

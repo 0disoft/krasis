@@ -39,8 +39,9 @@ func Execute(ctx context.Context, open func() (Client, error), action, alias str
 		return View{Notice: "에이전트 상태를 확인하지 못했습니다. 새로고침으로 다시 확인하세요."}
 	}
 	// Stopping a session must not depend on reading a possibly damaged trust store.
-	if status.State == "FAULTED" {
-		return View{State: status.State, Notice: "입력 제어 오류로 연결을 차단했습니다. ‘에이전트 재시작’을 누르면 기존 에이전트 종료 확인 후 복구합니다. 이후 기기를 선택해 연결하세요."}
+	faultNotice := "입력 제어 오류로 연결을 차단했습니다. ‘에이전트 재시작’으로 복구하거나 허용한 기기에서 업데이트를 보내세요."
+	if status.State == "FAULTED" && action != "refresh" {
+		return View{State: status.State, Notice: faultNotice}
 	}
 	if action == "disconnect" {
 		result, err := client.Disconnect(ctx)
@@ -55,9 +56,15 @@ func Execute(ctx context.Context, open func() (Client, error), action, alias str
 	}
 	trust, err := client.Trust(ctx)
 	if err != nil {
+		if status.State == "FAULTED" {
+			return View{State: status.State, Notice: faultNotice}
+		}
 		return View{State: status.State, Notice: "기기 목록을 읽지 못했습니다. 연결을 시작하지 않습니다."}
 	}
 	view := View{State: status.State, Fingerprints: map[string]string{}}
+	if status.State == "FAULTED" {
+		view.Notice = faultNotice
+	}
 	counts := map[string]int{}
 	for _, peer := range trust.Peers {
 		if !peer.Revoked && peer.Alias != "" && !strings.ContainsRune(peer.Alias, 0) {
