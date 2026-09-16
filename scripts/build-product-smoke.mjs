@@ -40,5 +40,5 @@ entries.push('SHA256SUMS.txt');
 const archive = path.join(destination, 'krasis-windows-x64-smoke.zip');
 const quote = value => "'" + value.replaceAll("'", "''") + "'";
 execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `$ErrorActionPreference='Stop'; Compress-Archive -LiteralPath @(${entries.map(name => quote(path.join(destination, name))).join(',')}) -DestinationPath ${quote(archive)}`], { stdio: 'inherit' });
-execFileSync('go', ['test', '-count=1', '-timeout', '60s', '-run', '^TestPackagedUpdateBundle$', './internal/productpanel'], { env: { ...environment, KRASIS_UPDATE_SMOKE: destination, KRASIS_UPDATE_REVISION: revision }, stdio: 'inherit' });
+execFileSync('go', ['test', '-count=1', '-timeout', '60s', '-run', '^TestPackaged(UpdateBundle|ReceivedUpdateLaunchPreparation)$', './internal/productpanel'], { env: { ...environment, KRASIS_UPDATE_SMOKE: destination, KRASIS_UPDATE_REVISION: revision }, stdio: 'inherit' });
 process.stdout.write(JSON.stringify({ archive, sha256: hash(archive), revision, entries }, null, 2) + '\n');

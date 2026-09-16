@@ -17,6 +17,15 @@ import (
 )
 
 func LaunchReceivedUpdate(directory, revision, alias string) error {
+	return launchReceivedUpdate(directory, revision, alias, localapi.AgentGeneration, func(command *exec.Cmd) error {
+		if err := command.Start(); err != nil {
+			return err
+		}
+		return command.Process.Release()
+	})
+}
+
+func launchReceivedUpdate(directory, revision, alias string, generation int, start func(*exec.Cmd) error) error {
 	parent := filepath.Join(os.Getenv("LOCALAPPDATA"), "Krasis", "updates")
 	absolute, err := filepath.Abs(directory)
 	if err != nil {
@@ -33,12 +42,9 @@ func LaunchReceivedUpdate(directory, revision, alias string) error {
 		return err
 	}
 	defer guard.Close()
-	root, err := os.OpenRoot(absolute)
-	if err != nil {
-		return err
-	}
-	defer root.Close()
-	data, err := updatebundle.Pack(root)
+	// Reuse the no-reparse directory handle. Opening an os.Root alongside this
+	// DELETE-capable handle fails Windows sharing checks before validation.
+	data, err := updatebundle.Pack(guard)
 	if err != nil {
 		return err
 	}
@@ -46,7 +52,7 @@ func LaunchReceivedUpdate(directory, revision, alias string) error {
 	if err != nil {
 		return err
 	}
-	if bundle.Metadata().Revision != revision || bundle.Metadata().Generation <= localapi.AgentGeneration {
+	if bundle.Metadata().Revision != revision || bundle.Metadata().Generation <= generation {
 		return errors.New("stale update")
 	}
 	command := exec.Command(filepath.Join(absolute, "krasis-control.exe"), "--updated-peer", alias, "--expected-build", revision)
@@ -57,8 +63,5 @@ func LaunchReceivedUpdate(directory, revision, alias string) error {
 			command.Env = append(command.Env, key+"="+value)
 		}
 	}
-	if err := command.Start(); err != nil {
-		return err
-	}
-	return command.Process.Release()
+	return start(command)
 }

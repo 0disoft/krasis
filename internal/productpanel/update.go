@@ -14,7 +14,7 @@ func UpdateStatusNotice(status peerupdate.Status) string {
 		text = fmt.Sprintf("업데이트 전송 중 · %d%% (상대 수신 확인 전)", status.Bytes*100/status.Total)
 	}
 	if status.Generation > 0 && status.PeerGeneration > 0 {
-		text += fmt.Sprintf(" · 보낼 버전 g%d / 상대 g%d", status.Generation, status.PeerGeneration)
+		text += fmt.Sprintf(" · 업데이트 묶음 g%d / 연결 상대 g%d", status.Generation, status.PeerGeneration)
 	}
 	return text
 }

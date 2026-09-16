@@ -196,7 +196,9 @@ func (b *Bundle) Stage(parent *os.Root, directory string) (err error) {
 
 // Pack snapshots the current distribution. The returned ZIP is checked by Read
 // before callers offer it; missing/mixed files do not become an update.
-func Pack(root *os.Root) ([]byte, error) {
+func Pack(root interface {
+	Open(string) (*os.File, error)
+}) ([]byte, error) {
 	var buffer bytes.Buffer
 	w := zip.NewWriter(&buffer)
 	for _, name := range names {
