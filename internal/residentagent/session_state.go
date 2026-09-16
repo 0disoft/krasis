@@ -49,7 +49,7 @@ func cancellationOnly(err, cause error) bool {
 			return cancellationOnly(child, cause)
 		}
 	}
-	return err == cause || err == context.Canceled || err == context.DeadlineExceeded
+	return err == cause || err == context.Canceled
 }
 
 // Each observer belongs to exactly one runner generation, identified by its
@@ -103,6 +103,9 @@ func (observer *sessionObserver) ObserveSupervisor(snapshot agent.SupervisorSnap
 }
 
 func (operations *Operations) stateLocked() string {
+	if operations.sessionFaulted {
+		return "FAULTED"
+	}
 	if operations.sessionDone == nil {
 		return "LOCAL"
 	}

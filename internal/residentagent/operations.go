@@ -50,6 +50,7 @@ type Operations struct {
 	sessionStop    context.CancelCauseFunc
 	sessionDone    chan struct{}
 	sessionState   string
+	sessionFaulted bool
 	sessionOutcome *sessionOutcome
 	peerAlias      string
 	lastCode       string
@@ -171,6 +172,8 @@ func (operations *Operations) Status(context.Context) (localapi.Status, error) {
 	actions := []string{"PAIR", "SAFE_STOP"}
 	if operations.sessionDone != nil {
 		actions = []string{"DISCONNECT", "SAFE_STOP"}
+	} else if operations.sessionFaulted {
+		actions = []string{"SAFE_STOP"}
 	} else {
 		actions = append(actions, "CONNECT")
 	}
@@ -192,6 +195,9 @@ func (operations *Operations) Connect(requestContext context.Context, request lo
 	defer operations.mu.Unlock()
 	if requestContext.Err() != nil || operations.root.Err() != nil {
 		return rejected("operation_cancelled"), nil
+	}
+	if operations.sessionFaulted {
+		return rejected("session_failed"), nil
 	}
 	if workflow, ok := operations.pairing.(interface{ Active() bool }); ok && workflow.Active() {
 		return rejected("pairing_already_active"), nil
@@ -275,6 +281,9 @@ func (operations *Operations) Disconnect(ctx context.Context, _ localapi.Operati
 func (operations *Operations) Pair(ctx context.Context, request localapi.OperationRequest) (localapi.OperationResult, error) {
 	operations.mu.Lock()
 	defer operations.mu.Unlock()
+	if operations.sessionFaulted {
+		return rejected("session_failed"), nil
+	}
 	if operations.sessionDone != nil {
 		return rejected("active_session_requires_disconnect"), nil
 	}
@@ -336,14 +345,15 @@ func (operations *Operations) Close(ctx context.Context) error {
 func (operations *Operations) finishSession(done chan struct{}, outcome *sessionOutcome, err error, cancelled bool) {
 	operations.mu.Lock()
 	defer operations.mu.Unlock()
-	outcome.failed = err != nil && !cancelled
+	outcome.failed = !cancelled
 	if operations.sessionDone == done {
 		operations.sessionStop = nil
 		operations.sessionDone = nil
 		operations.sessionOutcome = nil
 		operations.sessionState = ""
+		operations.sessionFaulted = outcome.failed
 		operations.peerAlias = ""
-		if err != nil && !cancelled {
+		if outcome.failed {
 			operations.recordLocked("session_failed")
 		} else {
 			operations.recordLocked("session_stopped")

@@ -36,6 +36,9 @@ func Execute(ctx context.Context, open func() (Client, error), action, alias str
 		return View{Notice: "에이전트 상태를 확인하지 못했습니다. 새로고침으로 다시 확인하세요."}
 	}
 	// Stopping a session must not depend on reading a possibly damaged trust store.
+	if status.State == "FAULTED" {
+		return View{State: status.State, Notice: "입력 제어 정리 결과를 확인하지 못해 연결을 차단했습니다. 에이전트를 완전히 종료한 뒤 다시 실행하세요."}
+	}
 	if action == "disconnect" {
 		result, err := client.Disconnect(ctx)
 		if err != nil || result.Status != "COMPLETED" {

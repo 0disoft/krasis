@@ -85,7 +85,11 @@ func TestRemoteDisconnectPublishesLocalAndPreservesCleanupErrors(t *testing.T) {
 			}
 			synctest.Wait()
 			status, _ := operations.Status(context.Background())
-			if status.State != "LOCAL" {
+			wantState := "LOCAL"
+			if cleanupErr != nil {
+				wantState = "FAULTED"
+			}
+			if status.State != wantState {
 				t.Fatalf("state=%s", status.State)
 			}
 			want := "session_stopped"

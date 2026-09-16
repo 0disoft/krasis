@@ -235,9 +235,13 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	cause := context.Cause(runContext)
 	// Wait establishes that every slot is final. Cancellation selects the first
 	// cause; it must not discard errors produced later by native/input cleanup.
-	for _, outcome := range outcomes {
-		if outcome != nil && !expectedWorkerCancellation(outcome, runContext.Err()) && !errors.Is(cause, outcome) {
-			cause = errors.Join(cause, outcome)
+	for index, outcome := range outcomes {
+		if outcome != nil && !expectedWorkerCancellation(outcome, runContext.Err()) {
+			if !errors.Is(cause, outcome) {
+				cause = errors.Join(cause, outcome, ErrRecoveryUnverified)
+			} else if components[index].name == "source-hook" {
+				cause = errors.Join(cause, ErrRecoveryUnverified)
+			}
 		}
 	}
 	snapshot := runtime.Snapshot()

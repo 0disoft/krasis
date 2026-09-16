@@ -78,3 +78,13 @@ func TestDisconnectDoesNotDependOnTrustRead(t *testing.T) {
 		t.Fatalf("blocked disconnect: %+v", view)
 	}
 }
+
+func TestFaultedPanelBlocksActionsAndExplainsRecovery(t *testing.T) {
+	c := &fakeClient{state: "FAULTED", trustErr: errors.New("private trust failure")}
+	for _, action := range []string{"refresh", "connect", "disconnect"} {
+		view := Execute(context.Background(), func() (Client, error) { return c, nil }, action, "B")
+		if view.State != "FAULTED" || !strings.Contains(view.Notice, "차단") || c.connects != 0 || c.disconnects != 0 {
+			t.Fatalf("unsafe fault view: %+v", view)
+		}
+	}
+}

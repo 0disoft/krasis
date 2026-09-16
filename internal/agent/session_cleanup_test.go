@@ -54,13 +54,25 @@ func TestSessionPreservesHookCleanupAfterStop(t *testing.T) {
 			}
 			select {
 			case err := <-done:
-				if !errors.Is(err, expected) || !errors.Is(err, failure) {
+				if !errors.Is(err, expected) || !errors.Is(err, failure) || !errors.Is(err, ErrRecoveryUnverified) {
 					t.Fatalf("lost stop or cleanup: %v", err)
 				}
 			case <-time.After(3 * time.Second):
 				t.Fatal("session did not stop")
 			}
 		})
+	}
+}
+
+func TestSupervisorDoesNotRetryUnverifiedRecovery(t *testing.T) {
+	err := RunSupervisor(context.Background(), SupervisorConfig{Session: Config{QueueCapacity: 1, Now: time.Now}, Backoff: DefaultBackoffPolicy(), Now: time.Now, Wait: func(context.Context, time.Duration) error { t.Fatal("retried unverified recovery"); return nil }}, SupervisorDependencies{
+		Source: &scriptedSource{outcomes: []sourceOutcome{{connection: &stubConnection{}}}}, Hook: &idleHook{}, Input: newTestInput(false), Effects: noopEffects{}, Authorizer: acceptingAuthorizer{},
+		RunSession: func(context.Context, Config, Dependencies) (Result, error) {
+			return Result{FinalState: control.StateLocal}, errors.Join(errors.New("transport failed"), ErrRecoveryUnverified)
+		},
+	})
+	if !errors.Is(err, ErrRecoveryUnverified) {
+		t.Fatalf("lost recovery failure: %v", err)
 	}
 }
 

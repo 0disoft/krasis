@@ -227,6 +227,9 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 		if sessionErr == nil {
 			return errors.New("agent session ended without a failure or shutdown")
 		}
+		if errors.Is(sessionErr, ErrRecoveryUnverified) {
+			return sessionErr
+		}
 		if errors.Is(sessionErr, wininput.ErrEmergencyRelease) {
 			terminalSnapshot.FailureKind = "emergency_release"
 			return sessionErr
