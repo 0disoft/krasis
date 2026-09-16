@@ -5,6 +5,9 @@ import "strings"
 // Reconnect reasons are a closed vocabulary. Never log arbitrary descriptor
 // strings: observers and wrapped errors can contain private peer details.
 var reconnectReasons = map[[3]string]string{
+	{"source-capture", "capture-runtime", "unregister_failed"}:         "reconnect_capture_unregister_failed",
+	{"source-capture", "capture-runtime", "command_timeout"}:           "reconnect_capture_command_timeout",
+	{"source-capture", "capture-runtime", "foreground_lost"}:           "reconnect_capture_foreground_lost",
 	{"liveness", "heartbeat", "peer_timeout"}:                          "reconnect_heartbeat_timeout",
 	{"peer-reader", "read", "remote_eof"}:                              "reconnect_remote_eof",
 	{"peer-reader", "read", "after_local_interrupt"}:                   "reconnect_after_local_interrupt",

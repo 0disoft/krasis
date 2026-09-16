@@ -21,6 +21,12 @@ type FailureDescriptor struct {
 
 func DescribeSessionFailure(err error) FailureDescriptor {
 	switch {
+	case errors.Is(err, wininput.ErrSourceCaptureUnregisterFailed):
+		return FailureDescriptor{Component: "source-capture", Phase: "capture-runtime", Code: "unregister_failed"}
+	case errors.Is(err, wininput.ErrSourceCaptureCommandTimeout):
+		return FailureDescriptor{Component: "source-capture", Phase: "capture-runtime", Code: "command_timeout"}
+	case errors.Is(err, wininput.ErrSourceCaptureLostForeground):
+		return FailureDescriptor{Component: "source-capture", Phase: "capture-runtime", Code: "foreground_lost"}
 	case errors.Is(err, wininput.ErrSourceCaptureRollbackFailed):
 		return FailureDescriptor{Component: "source-capture", Phase: "capture-activate", Code: "rollback_failed"}
 	case errors.Is(err, wininput.ErrSourceFocusReleaseCaptureRetained):

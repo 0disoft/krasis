@@ -125,6 +125,19 @@ func TestDescribeSessionFailureClassifiesCaptureActivationCause(t *testing.T) {
 	}
 }
 
+func TestDescribeCaptureRuntimeFailure(t *testing.T) {
+	for cause, code := range map[error]string{
+		wininput.ErrSourceCaptureUnregisterFailed: "unregister_failed",
+		wininput.ErrSourceCaptureCommandTimeout:   "command_timeout",
+		wininput.ErrSourceCaptureLostForeground:   "foreground_lost",
+	} {
+		d := DescribeSessionFailure(errors.Join(cause, errors.New("private native details")))
+		if d.Component != "source-capture" || d.Phase != "capture-runtime" || d.Code != code {
+			t.Fatalf("descriptor = %+v", d)
+		}
+	}
+}
+
 func TestDescribeSessionFailureClassifiesFocusRestoreCause(t *testing.T) {
 	tests := []struct {
 		name string

@@ -122,6 +122,9 @@ var (
 )
 
 var (
+	ErrSourceCaptureLostForeground             = errors.New("source wheel capture lost foreground")
+	ErrSourceCaptureUnregisterFailed           = errors.New("source wheel capture unregister failed")
+	ErrSourceCaptureCommandTimeout             = errors.New("source wheel capture command timed out")
 	errSourceWheelCaptureInactive              = errors.New("source wheel capture received input outside an active source session")
 	ErrSourceCaptureActivationSetup            = errors.New("source capture activation setup failed")
 	ErrSourceCaptureActivationAPIRejected      = errors.New("source capture foreground activation was rejected")
@@ -223,7 +226,7 @@ func (capture *sourceWheelCapture) execute(message uint32, allowMissing bool) er
 	case capture.opGate <- struct{}{}:
 		defer func() { <-capture.opGate }()
 	case <-timer.C:
-		err := errors.New("source wheel capture command serialization timed out")
+		err := fmt.Errorf("source wheel capture command serialization timed out: %w", ErrSourceCaptureCommandTimeout)
 		capture.failCurrentRun(err)
 		return err
 	}
@@ -248,7 +251,7 @@ func (capture *sourceWheelCapture) execute(message uint32, allowMissing bool) er
 	case <-current.done:
 		return current.stoppedError()
 	case <-timer.C:
-		err := errors.New("source wheel capture command admission timed out")
+		err := fmt.Errorf("source wheel capture command admission timed out: %w", ErrSourceCaptureCommandTimeout)
 		current.fail(err)
 		return err
 	}
@@ -267,7 +270,7 @@ func (capture *sourceWheelCapture) execute(message uint32, allowMissing bool) er
 	case <-current.done:
 		return current.stoppedError()
 	case <-timer.C:
-		err := errors.New("source wheel capture command result timed out")
+		err := fmt.Errorf("source wheel capture command result timed out: %w", ErrSourceCaptureCommandTimeout)
 		current.fail(err)
 		return err
 	}
@@ -377,7 +380,7 @@ func (current *sourceWheelCaptureRun) run(ctx context.Context, ready func()) (re
 			}
 		case wmActivate:
 			if current.active.Load() && uint16(wParam) == waInactive {
-				current.setError(errors.New("source wheel capture lost foreground"))
+				current.setError(ErrSourceCaptureLostForeground)
 				procPostQuitMessageTouchpad.Call(0)
 				return 0
 			}
@@ -700,7 +703,7 @@ func (current *sourceWheelCaptureRun) deactivateWindow() error {
 	var cleanupErr error
 	if wasRegistered {
 		if unregisterErr := sourceWheelCaptureRegisterWindow(current.registerProc, current.window, false); unregisterErr != nil {
-			cleanupErr = errors.Join(cleanupErr, touchpadWin32Error("RegisterTouchpadCapableWindow(source FALSE)", unregisterErr))
+			cleanupErr = errors.Join(cleanupErr, ErrSourceCaptureUnregisterFailed, touchpadWin32Error("RegisterTouchpadCapableWindow(source FALSE)", unregisterErr))
 		}
 	}
 	// Restore while the capture window is still foreground. Hiding it first lets
