@@ -1,8 +1,12 @@
 package localapi
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"github.com/0disoft/krasis/internal/peerupdate"
+	"io"
 	"net/http"
 )
 
@@ -37,7 +41,7 @@ func (h *handler) clipboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req ClipboardRequest
-	if decodeStrict(r.Body, &req) != nil || !req.Valid() {
+	if decodeClipboardRequest(r.Body, &req) != nil || !req.Valid() {
 		writeJSON(w, 400, ClipboardResult{Code: "invalid_request"})
 		return
 	}
@@ -54,4 +58,26 @@ func (h *handler) clipboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, result)
+}
+
+func decodeClipboardRequest(r io.Reader, value *ClipboardRequest) error {
+	// JSON may encode each text byte as six bytes (for example '<' as \u003c).
+	const limit = 6*peerupdate.MaxClipboardBytes + 1024
+	data, err := io.ReadAll(io.LimitReader(r, limit+1))
+	if err != nil {
+		return err
+	}
+	if len(data) > limit {
+		return errors.New("clipboard request too large")
+	}
+	d := json.NewDecoder(bytes.NewReader(data))
+	d.DisallowUnknownFields()
+	if err = d.Decode(value); err != nil {
+		return err
+	}
+	var extra any
+	if d.Decode(&extra) != io.EOF {
+		return errors.New("trailing clipboard request")
+	}
+	return nil
 }
