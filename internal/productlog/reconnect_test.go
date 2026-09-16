@@ -45,3 +45,17 @@ func TestTerminalFaultReasonsAreSanitizedAndExportable(t *testing.T) {
 		t.Fatalf("unsafe fault code: %s", got)
 	}
 }
+
+func TestActivationReasonsAreSanitizedAndExportable(t *testing.T) {
+	for descriptor := range reconnectReasons {
+		code := ActivationCode(descriptor[0], descriptor[1], descriptor[2])
+		data, _ := json.Marshal(record{Time: "2026-09-16T00:00:00Z", Code: code})
+		exported := sanitizeLog("agent.jsonl", strings.NewReader(string(data)+"\n"))
+		if exported.Incomplete || len(exported.Events) != 1 || exported.Events[0].Code != code {
+			t.Fatalf("activation dropped: %s", code)
+		}
+	}
+	if got := ActivationCode("private peer", "private path", "private error"); got != "activation_session_unknown" || !allowed[got] {
+		t.Fatalf("unsafe activation code: %s", got)
+	}
+}

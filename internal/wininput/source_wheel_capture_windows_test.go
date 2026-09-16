@@ -487,6 +487,8 @@ func TestSourceWheelCaptureClassifiesForegroundFallbackRetryFailure(t *testing.T
 
 func stubSourceWheelCaptureActivation(t *testing.T) func() {
 	t.Helper()
+	previousVisible := sourceWheelCaptureIsVisible
+	sourceWheelCaptureIsVisible = func(uintptr) bool { return false }
 	previousProbe := sourceWheelCaptureProbeForeground
 	sourceWheelCaptureProbeForeground = func(uintptr) error { return nil }
 	previousPosition := sourceWheelCaptureSetPosition
@@ -503,6 +505,7 @@ func stubSourceWheelCaptureActivation(t *testing.T) func() {
 	sourceWheelCaptureShowWindow = func(uintptr, uintptr) {}
 	sourceWheelCaptureIsWindow = func(uintptr) bool { return true }
 	return func() {
+		sourceWheelCaptureIsVisible = previousVisible
 		sourceWheelCaptureProbeForeground = previousProbe
 		sourceWheelCaptureSetPosition = previousPosition
 		sourceWheelCaptureRegisterWindow = previousRegister

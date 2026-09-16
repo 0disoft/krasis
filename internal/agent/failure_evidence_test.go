@@ -31,8 +31,12 @@ func TestCombinedSourceActivationClassifiesCaptureFailureStages(t *testing.T) {
 	order := make([]string, 0, 4)
 	source := &recordingActivation{name: "source", order: &order}
 	capture := &recordingActivation{name: "capture", order: &order, activateErr: errors.New("foreground denied")}
-	activation := &combinedSourceActivation{source: source, capture: capture, observer: recorder}
+	var observed error
+	activation := &combinedSourceActivation{source: source, capture: capture, observer: recorder, failureObserver: func(err error) { observed = err }}
 	err := activation.Activate()
+	if observed != err {
+		t.Fatalf("activation failure not reported: %v", observed)
+	}
 	if !errors.Is(err, ErrSourceCaptureActivation) || !errors.Is(err, capture.activateErr) {
 		t.Fatalf("Activate() error = %v", err)
 	}
@@ -102,6 +106,10 @@ func TestDescribeSessionFailureClassifiesCaptureActivationCause(t *testing.T) {
 		code string
 	}{
 		{name: "setup", err: wininput.ErrSourceCaptureActivationSetup, code: "setup_failed"},
+		{name: "rollback", err: wininput.ErrSourceCaptureRollbackFailed, code: "rollback_failed"},
+		{name: "no foreground", err: errors.Join(wininput.ErrSourceCaptureThreadAttachFailed, wininput.ErrSourceForegroundUnavailable), code: "foreground_unavailable"},
+		{name: "no thread", err: errors.Join(wininput.ErrSourceCaptureThreadAttachFailed, wininput.ErrSourceForegroundThreadUnavailable), code: "foreground_thread_unavailable"},
+		{name: "probe", err: errors.Join(wininput.ErrSourceCaptureThreadAttachFailed, wininput.ErrSourceForegroundProbeFailed), code: "foreground_probe_failed"},
 		{name: "API rejected", err: wininput.ErrSourceCaptureActivationAPIRejected, code: "api_rejected"},
 		{name: "verification lost", err: wininput.ErrSourceCaptureActivationVerificationLost, code: "verification_lost"},
 		{name: "thread attach", err: errors.Join(wininput.ErrSourceCaptureActivationAPIRejected, wininput.ErrSourceCaptureThreadAttachFailed), code: "thread_attach_failed"},

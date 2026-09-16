@@ -494,20 +494,26 @@ func (current *sourceWheelCaptureRun) handleCommand(message uint32) uintptr {
 		err = current.deactivateWindow()
 	}
 	command.result <- err
-	if err != nil {
+	_, rollbackConfirmed := err.(*sourceCaptureActivationRejected)
+	if err != nil && !rollbackConfirmed {
 		current.setError(err)
 		procPostQuitMessageTouchpad.Call(0)
 	}
 	return 0
 }
 
-func (current *sourceWheelCaptureRun) activateWindow() error {
+func (current *sourceWheelCaptureRun) activateWindow() (activationErr error) {
 	if err := current.err(); err != nil {
 		return err
 	}
 	if current.active.Load() {
 		return errors.New("source wheel capture is already active")
 	}
+	defer func() {
+		if activationErr != nil {
+			activationErr = current.rollbackActivation(activationErr)
+		}
+	}()
 	position, err := cursorPosition()
 	if err != nil {
 		return fmt.Errorf("%w: position source wheel capture: %v", ErrSourceCaptureActivationSetup, err)
@@ -523,25 +529,28 @@ func (current *sourceWheelCaptureRun) activateWindow() error {
 	if err := current.err(); err != nil {
 		return err
 	}
+	current.registered = true // Also attempt unregister if registration reports failure.
 	if registerErr := sourceWheelCaptureRegisterWindow(current.registerProc, current.window, true); registerErr != nil {
 		sourceWheelCaptureShowWindow(current.window, swHide)
 		return fmt.Errorf("%w: %v", ErrSourceCaptureActivationSetup, touchpadWin32Error("RegisterTouchpadCapableWindow(source TRUE)", registerErr))
 	}
-	current.registered = true
 	if err := current.err(); err != nil {
-		return errors.Join(err, current.deactivateWindow())
+		return err
 	}
 	sourceWheelCaptureShowWindow(current.window, swShow)
 	if err := current.err(); err != nil {
-		return errors.Join(err, current.deactivateWindow())
+		return err
 	}
 	procUpdateWindowTouchpad.Call(current.window)
 	if err := current.err(); err != nil {
-		return errors.Join(err, current.deactivateWindow())
+		return err
 	}
 	foregroundErr := sourceWheelCaptureSetForeground(current.window)
 	if err := current.err(); err != nil {
-		return errors.Join(err, current.deactivateWindow())
+		return err
+	}
+	if sourceWheelCaptureGetForeground() == current.window {
+		foregroundErr = nil
 	}
 	verificationLost := foregroundErr == nil && sourceWheelCaptureGetForeground() != current.window
 	if foregroundErr != nil || verificationLost {
@@ -553,30 +562,26 @@ func (current *sourceWheelCaptureRun) activateWindow() error {
 			foregroundErr = nil
 			verificationLost = false
 		} else {
-			cleanupErr := current.deactivateWindow()
 			if foregroundErr != nil {
 				return errors.Join(
 					fmt.Errorf("%w: %v", ErrSourceCaptureActivationAPIRejected, foregroundErr),
 					fallbackErr,
-					cleanupErr,
 				)
 			}
-			return errors.Join(ErrSourceCaptureActivationVerificationLost, fallbackErr, cleanupErr)
+			return errors.Join(ErrSourceCaptureActivationVerificationLost, fallbackErr)
 		}
 	}
 	if foregroundErr != nil {
-		cleanupErr := current.deactivateWindow()
-		return errors.Join(fmt.Errorf("%w: %v", ErrSourceCaptureActivationAPIRejected, foregroundErr), cleanupErr)
+		return fmt.Errorf("%w: %v", ErrSourceCaptureActivationAPIRejected, foregroundErr)
 	}
 	if verificationLost || sourceWheelCaptureGetForeground() != current.window {
-		cleanupErr := current.deactivateWindow()
-		return errors.Join(ErrSourceCaptureActivationVerificationLost, cleanupErr)
+		return ErrSourceCaptureActivationVerificationLost
 	}
 	current.terminalMu.Lock()
 	if current.terminalErr != nil {
 		err := current.terminalErr
 		current.terminalMu.Unlock()
-		return errors.Join(err, current.deactivateWindow())
+		return err
 	}
 	current.active.Store(true)
 	current.terminalMu.Unlock()
@@ -599,10 +604,13 @@ func (current *sourceWheelCaptureRun) hideActiveCursor() bool {
 
 func (current *sourceWheelCaptureRun) activateForegroundFallback() (SourceForegroundFallbackResult, error) {
 	foreground := sourceWheelCaptureGetForeground()
-	if foreground == 0 || foreground == current.window {
+	if foreground == current.window && foreground != 0 {
+		return SourceForegroundFallbackSucceeded, nil
+	}
+	if foreground == 0 {
 		return SourceForegroundFallbackAttachFailed, errors.Join(
 			ErrSourceCaptureThreadAttachFailed,
-			errors.New("foreground thread is unavailable for capture fallback"),
+			ErrSourceForegroundUnavailable,
 		)
 	}
 	result, err := current.setForegroundWithThreadAttach(current.window, foreground)
@@ -630,20 +638,20 @@ func (current *sourceWheelCaptureRun) setForegroundWithThreadAttach(targetWindow
 		return foregroundThreadFallbackAttachFailed, err
 	}
 	if targetWindow == 0 || peerWindow == 0 {
-		return foregroundThreadFallbackAttachFailed, errors.New("foreground fallback window is unavailable")
+		return foregroundThreadFallbackAttachFailed, ErrSourceForegroundUnavailable
 	}
 	sourceThread := sourceWheelCaptureCurrentThread()
 	peerThread, err := sourceWheelCaptureWindowThread(peerWindow)
 	if err != nil || sourceThread == 0 || peerThread == 0 || sourceThread == peerThread {
 		return foregroundThreadFallbackAttachFailed, errors.Join(
 			err,
-			errors.New("source and peer thread identities cannot be attached"),
+			ErrSourceForegroundThreadUnavailable,
 		)
 	}
 	// This rejects an already-unresponsive window. It is not a cancellation
 	// guarantee: the peer can still stall after this bounded probe.
 	if err := sourceWheelCaptureProbeForeground(peerWindow); err != nil {
-		return foregroundThreadFallbackAttachFailed, err
+		return foregroundThreadFallbackAttachFailed, errors.Join(ErrSourceForegroundProbeFailed, err)
 	}
 	if err := current.err(); err != nil {
 		return foregroundThreadFallbackAttachFailed, err

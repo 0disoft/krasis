@@ -36,16 +36,17 @@ type Connection interface {
 }
 
 type Config struct {
-	Boundary            control.BoundaryConfig
-	QueueCapacity       int
-	Now                 peer.ObservationClock
-	Liveness            *LivenessPolicy
-	LivenessObserver    peer.LivenessObserver
-	SourceObserver      SourceActivityObserver
-	PipelineObserver    wininput.SourcePipelineObserver
-	ControlObserver     peer.ControlFlowObserver
-	DestinationObserver application.InputDispositionObserver
-	RecoveryObserver    func(RecoveryReport)
+	Boundary                  control.BoundaryConfig
+	QueueCapacity             int
+	Now                       peer.ObservationClock
+	Liveness                  *LivenessPolicy
+	LivenessObserver          peer.LivenessObserver
+	SourceObserver            SourceActivityObserver
+	PipelineObserver          wininput.SourcePipelineObserver
+	ControlObserver           peer.ControlFlowObserver
+	DestinationObserver       application.InputDispositionObserver
+	RecoveryObserver          func(RecoveryReport)
+	ActivationFailureObserver func(error)
 }
 
 type SourceActivityObserver interface {
@@ -127,7 +128,7 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 		if capture == nil {
 			return Result{}, errors.New("source capture provider returned no activation owner")
 		}
-		outboundSource = &combinedSourceActivation{source: source, capture: capture, observer: config.ControlObserver}
+		outboundSource = &combinedSourceActivation{source: source, capture: capture, observer: config.ControlObserver, failureObserver: config.ActivationFailureObserver}
 	}
 	outbound, err := peer.NewOutboundControllerObserved(coordinator, runtime, outboundSource, config.ControlObserver)
 	if err != nil {
@@ -317,9 +318,10 @@ func expectedWorkerCancellation(err, expected error) bool {
 }
 
 type combinedSourceActivation struct {
-	source   wininput.SourceActivation
-	capture  wininput.SourceActivation
-	observer peer.ControlFlowObserver
+	source          wininput.SourceActivation
+	capture         wininput.SourceActivation
+	observer        peer.ControlFlowObserver
+	failureObserver func(error)
 }
 
 func (activation *combinedSourceActivation) Activate() error {
@@ -328,7 +330,11 @@ func (activation *combinedSourceActivation) Activate() error {
 	}
 	if err := activation.source.Activate(); err != nil {
 		activation.observe(peer.ControlFlowSourceSessionActivationFailed)
-		return fmt.Errorf("%w: %w", ErrSourceSessionActivation, err)
+		failure := fmt.Errorf("%w: %w", ErrSourceSessionActivation, err)
+		if activation.failureObserver != nil {
+			activation.failureObserver(failure)
+		}
+		return failure
 	}
 	activation.observe(peer.ControlFlowSourceSessionActivationSucceeded)
 	activation.observe(peer.ControlFlowCaptureActivationAttempted)
@@ -344,7 +350,11 @@ func (activation *combinedSourceActivation) Activate() error {
 		default:
 			activation.observe(peer.ControlFlowCaptureActivationSetupFailed)
 		}
-		return fmt.Errorf("%w: %w", ErrSourceCaptureActivation, err)
+		failure := fmt.Errorf("%w: %w", ErrSourceCaptureActivation, err)
+		if activation.failureObserver != nil {
+			activation.failureObserver(failure)
+		}
+		return failure
 	}
 	activation.observe(peer.ControlFlowCaptureActivationSucceeded)
 	return nil

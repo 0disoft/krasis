@@ -69,6 +69,14 @@ func TestOutboundControllerActivationFailureCleansGrantedLease(t *testing.T) {
 	if err != nil || abort.Kind != transport.ControlLeaseAbort || abort.LeaseID != "lease-1" {
 		t.Fatalf("abort = %+v, %v", abort, err)
 	}
+	source.activateErr = nil
+	if err := controller.Begin(context.Background(), "session-2", "epoch-2", control.ScreenEdgeRight); err != nil {
+		t.Fatalf("retry Begin: %v", err)
+	}
+	grant = transport.ControlCommand{Kind: transport.ControlLeaseGrant, SessionID: "session-2", LeaseID: "lease-2", Epoch: "epoch-2"}
+	if err := controller.GrantPeer(context.Background(), grant, time.Unix(101, 0)); err != nil || !source.active {
+		t.Fatalf("retry GrantPeer: %v active=%t", err, source.active)
+	}
 }
 
 func TestOutboundControllerRejectsSecondBoundaryWhilePending(t *testing.T) {

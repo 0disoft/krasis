@@ -25,7 +25,7 @@ var reconnectReasons = map[[3]string]string{
 
 func init() {
 	for _, phase := range []string{"capture-activate", "focus-restore"} {
-		for _, code := range []string{"thread_detach_failed", "thread_attach_failed", "verification_lost", "api_rejected", "setup_failed", "activation_failed"} {
+		for _, code := range []string{"thread_detach_failed", "thread_attach_failed", "verification_lost", "api_rejected", "setup_failed", "activation_failed", "foreground_unavailable", "foreground_thread_unavailable", "foreground_probe_failed", "rollback_failed"} {
 			prefix := "reconnect_capture_"
 			if phase == "focus-restore" {
 				prefix = "reconnect_focus_restore_"
@@ -43,6 +43,7 @@ func init() {
 	for code := range allowed {
 		if strings.HasPrefix(code, "reconnect_") {
 			faults = append(faults, "fault_"+strings.TrimPrefix(code, "reconnect_"))
+			faults = append(faults, "activation_"+strings.TrimPrefix(code, "reconnect_"))
 		}
 	}
 	for _, code := range faults {
@@ -52,6 +53,10 @@ func init() {
 
 func FaultCode(component, phase, code string) string {
 	return "fault_" + strings.TrimPrefix(ReconnectCode("session", component, phase, code), "reconnect_")
+}
+
+func ActivationCode(component, phase, code string) string {
+	return "activation_" + strings.TrimPrefix(ReconnectCode("session", component, phase, code), "reconnect_")
 }
 
 func ReconnectCode(kind, component, phase, code string) string {

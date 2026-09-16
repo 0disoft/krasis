@@ -154,6 +154,10 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 		log.Boundary(boundary.snapshot(false))
 		defer func() { log.Boundary(boundary.snapshot(true)) }()
 		config.SourceObserver = boundary
+		config.ActivationFailureObserver = func(err error) {
+			failure := agent.DescribeSessionFailure(err)
+			log.Event(productlog.ActivationCode(failure.Component, failure.Phase, failure.Code))
+		}
 		// Initial conservative defaults, not a measured latency guarantee.
 		config.Liveness = &agent.LivenessPolicy{HeartbeatInterval: 250 * time.Millisecond, PeerTimeout: 2 * time.Second}
 		return agent.RunSupervisor(ctx, agent.SupervisorConfig{Session: config, Backoff: agent.DefaultBackoffPolicy(), Now: time.Now, Wait: agent.Wait, Observer: observer}, agent.SupervisorDependencies{

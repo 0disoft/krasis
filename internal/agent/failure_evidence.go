@@ -21,6 +21,8 @@ type FailureDescriptor struct {
 
 func DescribeSessionFailure(err error) FailureDescriptor {
 	switch {
+	case errors.Is(err, wininput.ErrSourceCaptureRollbackFailed):
+		return FailureDescriptor{Component: "source-capture", Phase: "capture-activate", Code: "rollback_failed"}
 	case errors.Is(err, wininput.ErrSourceFocusReleaseCaptureRetained):
 		return FailureDescriptor{Component: "source-capture", Phase: "focus-release", Code: "capture_retained"}
 	case errors.Is(err, wininput.ErrSourceFocusRestoreThreadDetachFailed):
@@ -33,6 +35,12 @@ func DescribeSessionFailure(err error) FailureDescriptor {
 		return FailureDescriptor{Component: "source-capture", Phase: "focus-restore", Code: "api_rejected"}
 	case errors.Is(err, wininput.ErrSourceCaptureThreadDetachFailed):
 		return FailureDescriptor{Component: "source-capture", Phase: "capture-activate", Code: "thread_detach_failed"}
+	case errors.Is(err, wininput.ErrSourceForegroundProbeFailed):
+		return FailureDescriptor{Component: "source-capture", Phase: "capture-activate", Code: "foreground_probe_failed"}
+	case errors.Is(err, wininput.ErrSourceForegroundThreadUnavailable):
+		return FailureDescriptor{Component: "source-capture", Phase: "capture-activate", Code: "foreground_thread_unavailable"}
+	case errors.Is(err, wininput.ErrSourceForegroundUnavailable):
+		return FailureDescriptor{Component: "source-capture", Phase: "capture-activate", Code: "foreground_unavailable"}
 	case errors.Is(err, wininput.ErrSourceCaptureThreadAttachFailed):
 		return FailureDescriptor{Component: "source-capture", Phase: "capture-activate", Code: "thread_attach_failed"}
 	case errors.Is(err, wininput.ErrSourceCaptureActivationVerificationLost):
