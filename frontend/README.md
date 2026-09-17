@@ -10,9 +10,13 @@ Korean and English catalogs cover navigation, accessible labels, dialog copy,
 state messages and settings. Explicit locale wins over navigator.languages;
 unsupported languages fall back to English. No remote font requests are made.
 
-The next stage must supply a typed Go bridge and authoritative state, preserve
+The next stage must wire the tested Go bridge and authoritative state, preserve
 tray/single-instance/update behavior, and remove simulated connection controls.
 Do not package this preview as the working KVM management app.
+
+`src/bridge.js` now validates the native-owned `productpanel.DesktopBridge`
+snapshot contract. App.svelte does not consume it until the Windows host is wired.
+See ADR 0061 for its identity, concurrency and cancellation boundaries.
 
 Configured verification: `krasis_frontend_install`, `krasis_frontend_check`.
 Configured preview: `krasis_frontend_preview` serves only loopback port 4179 and
