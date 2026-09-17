@@ -17,14 +17,16 @@ type Client interface {
 }
 
 type View struct {
-	Update        localapi.UpdateResult
-	ExitForUpdate bool
-	UpdateResume  string
-	AgentVersion  string
-	Fingerprints  map[string]string
-	State         string
-	Peers         []string
-	Notice        string
+	PeerAlias      string
+	DiagnosticPath string
+	Update         localapi.UpdateResult
+	ExitForUpdate  bool
+	UpdateResume   string
+	AgentVersion   string
+	Fingerprints   map[string]string
+	State          string
+	Peers          []string
+	Notice         string
 }
 
 // Execute opens fresh endpoint credentials on each action, including after an agent restart.
@@ -61,7 +63,7 @@ func Execute(ctx context.Context, open func() (Client, error), action, alias str
 		}
 		return View{State: status.State, Notice: "기기 목록을 읽지 못했습니다. 연결을 시작하지 않습니다."}
 	}
-	view := View{State: status.State, Fingerprints: map[string]string{}}
+	view := View{State: status.State, PeerAlias: status.PeerAlias, Fingerprints: map[string]string{}}
 	if status.State == "FAULTED" {
 		view.Notice = faultNotice
 	}
@@ -111,6 +113,7 @@ func Execute(ctx context.Context, open func() (Client, error), action, alias str
 		view.Notice = "요청 후 상태를 확인하지 못했습니다. 새로고침하세요."
 	} else {
 		view.State = current.State
+		view.PeerAlias = current.PeerAlias
 	}
 	return view
 }

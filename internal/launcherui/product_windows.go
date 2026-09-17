@@ -36,6 +36,7 @@ const exportEvent = wmUIEvent + 2
 const wmTimer = 0x0113
 
 type productWindow struct {
+	automatic                                                 productpanel.AutomaticRecovery
 	clipboardButton                                           uintptr
 	clipPump                                                  clipboardPump
 	diagnosticNotice                                          uintptr
@@ -389,7 +390,11 @@ func (a *productWindow) selected() string {
 }
 
 func (a *productWindow) perform(action string) {
+	if action == "connect" && !a.busy {
+		a.automatic.Reset()
+	}
 	if action == "disconnect" {
+		a.automatic.Stop()
 		a.updateResume = ""
 	}
 	a.performTarget(productpanel.RecoveryAction(a.view.State, action), a.selected())
@@ -426,8 +431,13 @@ func (a *productWindow) performTarget(action, alias string) {
 		enable(hwnd, false)
 	}
 	hwnd := a.hwnd
+	fingerprint := a.automatic.Fingerprint
 	go func() {
-		ctx, cancel := context.WithTimeout(a.ctx, 20*time.Second)
+		budget := 20 * time.Second
+		if action == "auto_recover" {
+			budget = 40 * time.Second
+		}
+		ctx, cancel := context.WithTimeout(a.ctx, budget)
 		defer cancel()
 		var view productpanel.View
 		defer func() {
@@ -438,6 +448,10 @@ func (a *productWindow) performTarget(action, alias string) {
 			a.result <- view
 			procPostMessage.Call(hwnd, wmUIEvent, 0, 0)
 		}()
+		if action == "auto_recover" || action == "auto_diagnose" {
+			view = a.executeAutomaticRecovery(ctx, action, alias, fingerprint)
+			return
+		}
 		if action == "prepare" || action == "connect" {
 			a.log.Event("prepare_started")
 			if err := a.startup.Ensure(ctx); err != nil {
@@ -506,6 +520,9 @@ func (a *productWindow) performTarget(action, alias string) {
 }
 
 func (a *productWindow) apply(view productpanel.View) {
+	if view.DiagnosticPath != "" {
+		setText(a.exportPath, view.DiagnosticPath)
+	}
 	text := "클립보드 공유 켜기"
 	if view.Update.Status.ClipboardPeer != "" {
 		text = "클립보드 공유 끄기"
@@ -578,6 +595,9 @@ func (a *productWindow) apply(view productpanel.View) {
 		}
 	}
 	setText(a.notice, view.Notice)
+	if recoveryNotice := a.automatic.Notice(view.State); recoveryNotice != "" {
+		setText(a.notice, view.Notice+" "+recoveryNotice)
+	}
 	setText(a.disconnect, productpanel.DisconnectLabel(view.State))
 	enable(a.updateSend, !a.busy && len(view.Peers) > 0 && view.Update.Code == "ok" && a.pin.job == "")
 	enable(a.updateAllow, !a.busy && len(view.Peers) > 0 && view.Update.Code == "ok" && a.pin.job == "")
@@ -596,6 +616,12 @@ func (a *productWindow) apply(view productpanel.View) {
 		alias := a.updateResume
 		a.updateResume = ""
 		a.performTarget("connect", alias)
+		return
+	}
+	if !a.busy && !a.closing && a.pin.job == "" && a.updateResume == "" {
+		if action := a.automatic.Next(time.Now(), view); action != "" {
+			a.performTarget(action, a.automatic.Alias)
+		}
 	}
 }
 
