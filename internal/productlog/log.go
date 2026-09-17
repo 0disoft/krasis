@@ -20,6 +20,9 @@ const maxBytes = 256 << 10
 var allowed = map[string]bool{}
 
 func init() {
+	for _, code := range []string{"session_certificate_deadline", "session_guard_exited", "session_guard_close_failed", "session_trust_check_failed", "session_trust_busy_exhausted"} {
+		allowed[code] = true
+	}
 	allowed["boundary_summary"] = true
 	allowed["peer_disconnect_requested"] = true
 	allowed["disconnect_notification_failed"] = true

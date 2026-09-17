@@ -125,26 +125,22 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 		if err != nil {
 			return err
 		}
-		defer func() { err = errors.Join(err, guard.Close()) }()
+		defer func() {
+			closeErr := guard.Close()
+			if closeErr != nil {
+				log.Event("session_guard_close_failed")
+			}
+			err = errors.Join(err, closeErr)
+		}()
 		monitorDone := make(chan struct{})
 		go func() {
 			defer close(monitorDone)
 			ticker := time.NewTicker(time.Second)
 			defer ticker.Stop()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-guard.Done():
-					cancel()
-					return
-				case <-ticker.C:
-					if _, checkErr := trust.PeerCertificate(prepared.peer, time.Now()); checkErr != nil {
-						cancel()
-						return
-					}
-				}
-			}
+			monitorProductSession(ctx, ticker.C, guard.Done(), func() error {
+				_, checkErr := trust.PeerCertificate(prepared.peer, time.Now())
+				return checkErr
+			}, cancel, log.Event)
 		}()
 		defer func() { cancel(); <-monitorDone }()
 		config := agent.DefaultConfig(control.BoundaryConfig{Edge: control.ScreenEdge(prepared.profile.Edge), ScreenLeft: diagnostics.Display.Left, ScreenWidth: diagnostics.Display.Width, RearmDistance: prepared.profile.Rearm()})
