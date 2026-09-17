@@ -1,0 +1,33 @@
+export const nativeCatalogs = {
+  ko: {
+    workspace:'작업 공간', integration:'실제 연결 · 시험판', devices:'연결된 기기', help:'등록한 기기를 선택해 연결하세요.',
+    LOCAL:'연결 대기', CONNECTING:'연결 중', CONNECTED:'연결됨', RECONNECTING:'재연결 중', DISCONNECTING:'연결 해제 중', FAULTED:'복구 필요', UNKNOWN:'상태 확인 불가',
+    refresh:'새로고침', connect:'연결', disconnect:'연결 해제', peer:'상대 기기', choose:'기기를 선택하세요', local:'내 PC', thisPC:'현재 입력 기기', otherPC:'페어링 기기',
+    scope:'이 창은 실제 상태 조회·연결·해제를 수행합니다. 기존 관리 앱은 트레이에 유지하세요.',
+    placement:'좌우 위치와 화면 전환 설정은 기존 관리 앱의 설정을 그대로 사용합니다.',
+    clipboard:'클립보드', update:'기기 업데이트', pair:'새 기기 등록', legacy:'기존 관리 앱에서 사용',
+    closeHelp:'이 창을 닫아도 에이전트는 종료되지 않습니다. 종료 전 연결 해제를 누르세요.', language:'언어',
+    unavailable:'에이전트 상태를 확인할 수 없습니다. 기존 관리 앱을 실행한 뒤 새로고침하세요.',
+    busy:'다른 요청을 처리하고 있습니다.', cancelled:'요청이 취소되었거나 시간이 초과됐습니다. 상태를 다시 확인하세요.',
+    invalid_peer:'유효한 기기를 선택하세요.', stale_peer:'기기 등록 정보가 바뀌었습니다. 새로고침 후 다시 선택하세요.',
+    rejected:'요청이 거부되었습니다. 현재 상태와 기존 관리 앱의 안내를 확인하세요.',
+    outcome_unknown:'요청 결과가 불명확합니다. 다시 실행하기 전에 새로고침하세요.',
+    recovery_required:'기존 관리 앱에서 에이전트를 복구하세요. 이 시험판은 자동 복구를 대신하지 않습니다.',
+  },
+  en: {
+    workspace:'Workspace', integration:'Live connection · Preview', devices:'Paired devices', help:'Choose a paired device to connect.',
+    LOCAL:'Ready', CONNECTING:'Connecting', CONNECTED:'Connected', RECONNECTING:'Reconnecting', DISCONNECTING:'Disconnecting', FAULTED:'Recovery needed', UNKNOWN:'Status unavailable',
+    refresh:'Refresh', connect:'Connect', disconnect:'Disconnect', peer:'Other device', choose:'Choose a device', local:'My PC', thisPC:'Local device', otherPC:'Paired device',
+    scope:'This window performs real status, connect and disconnect operations. Keep the existing control app in the tray.',
+    placement:'Screen positions and transition settings continue to use the existing control app configuration.',
+    clipboard:'Clipboard', update:'Device update', pair:'Pair device', legacy:'Use the existing control app',
+    closeHelp:'Closing this window does not stop the agent. Disconnect first to end the session.', language:'Language',
+    unavailable:'Agent status is unavailable. Open the existing control app, then refresh.',
+    busy:'Another request is running.', cancelled:'The request was cancelled or timed out. Refresh the state.',
+    invalid_peer:'Choose a valid device.', stale_peer:'Device identity changed. Refresh and select it again.',
+    rejected:'The request was rejected. Check the current state and existing control app.',
+    outcome_unknown:'The outcome is unknown. Refresh before trying again.',
+    recovery_required:'Recover the agent in the existing control app. This preview does not replace automatic recovery.',
+  },
+};
+export function nativeText(locale, key) { return nativeCatalogs[locale]?.[key] ?? nativeCatalogs.en[key] ?? nativeCatalogs.en.unavailable; }
