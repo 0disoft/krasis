@@ -1,6 +1,7 @@
 <script>
   import Icon from './Icon.svelte';
   import logo from '../../assets/windows/krasis.ico';
+  import monitorArtwork from './assets/monitor.png';
   import { resolveLocale, translate } from './i18n.js';
   let saved;
   try { saved = localStorage.getItem('krasis.preview.locale'); } catch {}
@@ -40,8 +41,8 @@
     <section class="heading"><h1>{t('placement')}</h1><p>{t('placementHelp')}</p></section>
     <section class="canvas" aria-label={t('placement')}>
       <div class="screens" class:reversed={!peerRight}>
-        <div class="screen"><Icon name="monitor" size={400} /><div class="screen-content"><strong>A</strong><span>{t('thisPC')}</span><small>{t(peerRight ? 'left' : 'right')}</small></div></div>
-        <div class="screen peer"><Icon name="monitor" size={400} /><div class="screen-content"><strong>B</strong><span>{t('otherPC')}</span><small>{t(peerRight ? 'right' : 'left')}</small></div></div>
+        <div class="screen"><img class="monitor-art" src={monitorArtwork} alt="" /><div class="screen-content"><strong>A</strong><span>{t('thisPC')}</span><small>{t(peerRight ? 'left' : 'right')}</small></div></div>
+        <div class="screen peer"><img class="monitor-art" src={monitorArtwork} alt="" /><div class="screen-content"><strong>B</strong><span>{t('otherPC')}</span><small>{t(peerRight ? 'right' : 'left')}</small></div></div>
       </div>
       <div class="placement-hint"><Icon name="info" size={20} />{t(state === 'LOCAL' ? 'placementReady' : 'placementLocked')}</div>
       <div class="canvas-actions"><button disabled={state !== 'LOCAL'} onclick={() => peerRight = !peerRight}><Icon name="arrows-left-right" size={18} />{t('swap')}</button><button onclick={() => pairing.showModal()}><Icon name="plus" size={18} />{t('addDevice')}</button></div>
