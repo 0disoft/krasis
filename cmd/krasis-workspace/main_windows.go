@@ -10,11 +10,13 @@ import (
 	"path/filepath"
 	"time"
 
+	windowsassets "github.com/0disoft/krasis/assets/windows"
 	"github.com/0disoft/krasis/frontend"
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/productidentity"
 	"github.com/0disoft/krasis/internal/productpanel"
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
 )
 
 // WorkspaceSmoke exists only in the bounded hidden-window check. It accepts no
@@ -65,7 +67,15 @@ func main() {
 	if err != nil {
 		os.Exit(1)
 	}
-	services := []application.Service{application.NewService(bridge)}
+	service := &WorkspaceService{raw: bridge}
+	if !smoke {
+		startup, startupErr := productpanel.NewStartup(paths.Control)
+		if startupErr != nil {
+			os.Exit(1)
+		}
+		service.managed = productpanel.NewDesktopLifecycle(ctx, func() (productpanel.Client, error) { return localapi.OpenClient(paths.Control) }, startup.Ensure, diagnose(os.Getenv("LOCALAPPDATA"), paths.Control))
+	}
+	services := []application.Service{application.NewService(service)}
 	check := &WorkspaceSmoke{result: make(chan bool, 1)}
 	if smoke {
 		services = append(services, application.NewService(check))
@@ -93,6 +103,7 @@ func main() {
 	}
 	app := application.New(application.Options{
 		Name:           "Krasis Workspace",
+		Icon:           windowsassets.Icon,
 		OnShutdown:     cancel,
 		MarshalError:   func(error) []byte { return []byte(`"bridge_failed"`) },
 		Assets:         application.AssetOptions{Handler: application.AssetFileServerFS(assets)},
@@ -111,6 +122,21 @@ func main() {
 		URL:              url,
 		Hidden:           smoke,
 	})
+	if !smoke {
+		tray := app.SystemTray.New()
+		tray.SetIcon(windowsassets.Icon)
+		tray.SetTooltip("Krasis Workspace")
+		tray.SetLabel("Krasis Workspace")
+		menu := app.NewMenu()
+		menu.Add("열기 / Open").OnClick(func(*application.Context) { window.Show(); window.Restore(); window.Focus() })
+		menu.Add("연결 해제 / Disconnect").OnClick(func(*application.Context) {
+			service.disconnectAsync()
+		})
+		menu.AddSeparator()
+		menu.Add("관리 앱 종료 · 에이전트 유지 / Quit UI").OnClick(func(*application.Context) { app.Quit() })
+		tray.SetMenu(menu)
+		window.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) { window.Hide(); e.Cancel() })
+	}
 	done := make(chan bool, 1)
 	if smoke {
 		go func() {

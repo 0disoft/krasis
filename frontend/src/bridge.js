@@ -38,5 +38,6 @@ export function createBridge(binding) {
       return call('Connect', [peer.alias, peer.fingerprint]);
     },
     disconnect: () => call('Disconnect'),
+    restart: () => call('Restart'),
   });
 }

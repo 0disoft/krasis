@@ -26,24 +26,35 @@ It embeds the native Svelte assets and uses the Go module's own
 Wails v3 is an explicitly selected prerelease dependency. The Go language
 requirement and installed agent generation are unchanged.
 
-Double-click the executable while the existing Krasis controller remains in the
-tray. It reads existing paired devices and supports refresh, connect and
-disconnect. Closing this window does not stop or disconnect the agent.
-Pairing, clipboard settings, updates, diagnostics and automatic recovery remain
-owned by krasis-control.exe; this is not yet its replacement.
+Extract the complete Workspace ZIP and double-click krasis-workspace.exe.
+The sibling agent is started automatically after bundle checksum verification.
+The existing controller is not required for startup, connection or recovery.
+Closing the window keeps Workspace in the tray; its menu can reopen it,
+disconnect, or quit only the controller while leaving the agent running.
+Pairing, clipboard synchronization/settings, updates and manual diagnostics
+still require krasis-control.exe; full controller replacement is a later step.
 
-The host starts no input hook, agent or public HTTP listener. Local API
+The host owns no input hook or public HTTP listener. Local API
 credentials stay in Go. The renderer receives only the narrowed bridge snapshot.
-Repeated launches focus the existing Workspace window.
+Repeated launches focus the existing Workspace window. Startup and replacement
+reuse productpanel.Startup, its native startup lock and bundle verification.
+Automatic recovery runs in Go, independent of hidden WebView timers. It saves
+diagnostics before replacement, attempts bounded peer delivery, and retries at
+most three times using the original peer fingerprint. Failed local export blocks
+replacement. Disconnect cancels an in-flight recovery and stops further retries.
+RECONNECTING remains owned by the existing agent supervisor, not a restart loop.
 
 Configured `krasis_workspace_build` tests the frontend and compiles Windows
-without CGO. `krasis_workspace_smoke` starts a hidden, read-only WebView for at
+without CGO. `krasis_workspace_lifecycle_build` additionally builds the sibling
+agent and packages checksums and notices. `krasis_workspace_smoke` starts a hidden, read-only WebView for at
 most 25 seconds, verifies renderer-to-Go-to-agent roundtrip, and exits. It never
 connects, disconnects, restarts or updates the installed agent.
 
 Local validation on 2026-09-17: seven frontend tests, native asset/Windows
 compilation, productpanel race tests, and the hidden renderer/agent roundtrip
-passed. Connect/disconnect were not triggered during the smoke check to preserve
+passed. Lifecycle regressions cover the retry budget, failed exports, cancellation,
+changed peer identity and worker shutdown. The smoke mode intentionally bypasses
+automatic startup/recovery and tray installation. Connect/disconnect were not triggered during the smoke check to preserve
 the active user session. WebView2 emitted a window-class unregister warning
 (1412) on shutdown; the process exited successfully. Visible native layout and
 full legacy-controller parity are not covered by this smoke result.
@@ -60,5 +71,5 @@ Monitor artwork: `src/assets/monitor.png`, generated with the built-in image too
 from the selected Midnight Workspace image. Prompt: recreate one front-facing
 neutral charcoal monitor with a fine grey outline and stand, no text, cursor or
 background dots. Device labels remain live localized UI, not baked into the asset.
-Standard action icons remain Phosphor. The UI package is 0.2.0; this does not
+Standard action icons remain Phosphor. The UI package is 0.3.0; this does not
 change the installed Go agent generation or the Windows bundle.

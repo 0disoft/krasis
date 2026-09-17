@@ -22,7 +22,7 @@
     if (busy || !bridge || disposed) return;
     busy = true;
     try {
-      const value = await (action === 'connect' ? bridge.connect(selectedPeer) : action === 'disconnect' ? bridge.disconnect() : bridge.refresh());
+      const value = await (action === 'connect' ? bridge.connect(selectedPeer) : action === 'disconnect' ? bridge.disconnect() : action === 'restart' ? bridge.restart() : bridge.refresh());
       if (disposed) return;
       snapshot = value;
       if (!value.peers.some(p => p.fingerprint === selected)) {
@@ -48,11 +48,12 @@
       try {
         const { Call } = await import(/* @vite-ignore */ '/wails/runtime.js');
         if (disposed) return;
-        const name = 'github.com/0disoft/krasis/internal/productpanel.DesktopBridge.';
+        const name = 'main.WorkspaceService.';
         bridge = createBridge({
           Refresh: () => Call.ByName(name + 'Refresh'),
           Connect: (alias, fingerprint) => Call.ByName(name + 'Connect', alias, fingerprint),
           Disconnect: () => Call.ByName(name + 'Disconnect'),
+          Restart: () => Call.ByName(name + 'Restart'),
         });
         await poll();
       } catch { if (!disposed) error = 'unavailable'; }
@@ -72,6 +73,8 @@
     <button disabled={busy || !bridge} onclick={() => run('refresh')}>{t('refresh')}</button>
     {#if snapshot.state === 'LOCAL'}
       <button disabled={busy || !selectedPeer} onclick={() => run('connect')}>{t('connect')}</button>
+    {:else if snapshot.state === 'FAULTED' || snapshot.state === 'UNKNOWN'}
+      <button disabled={busy || !bridge} onclick={() => run('restart')}>{t('restart')}</button>
     {:else}
       <button disabled={busy || !canDisconnect} onclick={() => run('disconnect')}>{t('disconnect')}</button>
     {/if}
