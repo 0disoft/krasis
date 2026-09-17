@@ -234,43 +234,46 @@ type clipboardPump struct {
 }
 
 func (a *productWindow) syncClipboard(ctx context.Context) {
-	peer := a.view.Update.Status.ClipboardPeer
+	a.clipPump.sync(ctx, a.hwnd, a.control, a.view.Update.Status.ClipboardPeer, a.view.Fingerprints)
+}
+
+func (p *clipboardPump) sync(ctx context.Context, hwnd uintptr, control, peer string, fingerprints map[string]string) {
 	if peer == "" {
-		a.clipPump = clipboardPump{}
+		*p = clipboardPump{}
 		return
 	}
 	paired := false
-	for _, fp := range a.view.Fingerprints {
+	for _, fp := range fingerprints {
 		if fp == peer {
 			paired = true
 		}
 	}
 	if !paired {
-		a.clipPump = clipboardPump{}
+		*p = clipboardPump{}
 		return
 	}
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	if !clipboardDesktopAvailable() {
-		a.clipPump = clipboardPump{}
+		*p = clipboardPump{}
 		return
 	}
 	current := clipboardSequence()
-	if peer != a.clipPump.peer {
-		a.clipPump = clipboardPump{peer: peer, sequence: current}
+	if peer != p.peer {
+		*p = clipboardPump{peer: peer, sequence: current}
 	}
 	request := localapi.ClipboardRequest{Action: "SYNC", Peer: peer}
-	if current != a.clipPump.sequence {
-		text, sequence, err := readClipboardText(a.hwnd)
+	if current != p.sequence {
+		text, sequence, err := readClipboardText(hwnd)
 		if sequence != 0 {
-			a.clipPump.sequence = sequence
+			p.sequence = sequence
 		}
 		if err == nil {
 			request.Text = &text
 			current = sequence
 		}
 	}
-	client, err := localapi.OpenClient(a.control)
+	client, err := localapi.OpenClient(control)
 	if err != nil {
 		return
 	}
@@ -278,11 +281,11 @@ func (a *productWindow) syncClipboard(ctx context.Context) {
 	if err != nil || result.Code != "ok" || result.Value.ID == "" {
 		return
 	}
-	sequence, err := writeRemoteClipboardText(a.hwnd, current, result.Value.Text, result.Value.ID)
+	sequence, err := writeRemoteClipboardText(hwnd, current, result.Value.Text, result.Value.ID)
 	if err != nil {
 		return
 	}
-	a.clipPump.sequence = sequence
+	p.sequence = sequence
 	_, _ = client.Clipboard(ctx, localapi.ClipboardRequest{Action: "SYNC", Peer: peer, Ack: result.Value.ID})
 }
 

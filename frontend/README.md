@@ -31,8 +31,30 @@ The sibling agent is started automatically after bundle checksum verification.
 The existing controller is not required for startup, connection or recovery.
 Closing the window keeps Workspace in the tray; its menu can reopen it,
 disconnect, or quit only the controller while leaving the agent running.
-Pairing, clipboard synchronization/settings, updates and manual diagnostics
+Pairing, updates and manual diagnostics
 still require krasis-control.exe; full controller replacement is a later step.
+
+## Clipboard sharing
+
+Workspace supports the existing opt-in text sharing protocol. Enable it on both
+PCs using the clipboard card. Enabling requires a warning/confirmation; disabling
+does not. The switch reflects acknowledged agent settings, not optimistic UI.
+Only the peer fingerprint and a status code cross the WebView boundary. Copied
+text stays in the native Windows worker and the authenticated local agent.
+
+The worker reuses the legacy controller's Unicode size limits, excluded-content
+formats, remote-write marker, exact sequence comparison and acknowledgment logic.
+It checks active trust and sharing consent before clipboard access. A process-
+owned UI window receives Windows clipboard-owner notifications; the worker
+does not create an unpumped owner window. Closing to tray keeps the worker alive.
+
+If the legacy controller is also open, Workspace defers to its existing pump.
+On takeover, changing peer, revocation or disabling, the baseline resets so old
+clipboard contents are not republished. Files/images are not supported.
+Consent changes and native synchronization are serialized. An off/on cycle,
+including an ambiguous setting response, resets the native sequence baseline
+before synchronization resumes.
+The read-only smoke mode does not start a clipboard worker or change consent.
 
 The host owns no input hook or public HTTP listener. Local API
 credentials stay in Go. The renderer receives only the narrowed bridge snapshot.
@@ -50,7 +72,7 @@ agent and packages checksums and notices. `krasis_workspace_smoke` starts a hidd
 most 25 seconds, verifies renderer-to-Go-to-agent roundtrip, and exits. It never
 connects, disconnects, restarts or updates the installed agent.
 
-Local validation on 2026-09-17: seven frontend tests, native asset/Windows
+Local validation on 2026-09-17: frontend tests, native asset/Windows
 compilation, productpanel race tests, and the hidden renderer/agent roundtrip
 passed. Lifecycle regressions cover the retry budget, failed exports, cancellation,
 changed peer identity and worker shutdown. The smoke mode intentionally bypasses
@@ -71,5 +93,10 @@ Monitor artwork: `src/assets/monitor.png`, generated with the built-in image too
 from the selected Midnight Workspace image. Prompt: recreate one front-facing
 neutral charcoal monitor with a fine grey outline and stand, no text, cursor or
 background dots. Device labels remain live localized UI, not baked into the asset.
-Standard action icons remain Phosphor. The UI package is 0.3.0; this does not
+Clipboard integration adds focused `krasis_workspace_clipboard_check` coverage
+for the shared pump, controller-presence probe and native controller regressions.
+Automated checks do not read or replace the user's current clipboard; two-PC
+copy/paste and visible consent-dialog testing remain manual.
+
+Standard action icons remain Phosphor. The UI package is 0.4.0; this does not
 change the installed Go agent generation or the Windows bundle.

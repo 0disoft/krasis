@@ -4,25 +4,37 @@ package main
 
 import (
 	"context"
+	"github.com/0disoft/krasis/internal/launcherui"
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/productlog"
 	"github.com/0disoft/krasis/internal/productpanel"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
 type WorkspaceService struct {
-	raw     *productpanel.DesktopBridge
-	managed *productpanel.DesktopLifecycle
-	done    chan struct{}
-	jobs    sync.WaitGroup
+	ctx       context.Context
+	control   string
+	title     string
+	clipGate  sync.Mutex
+	clipEpoch atomic.Uint64
+	raw       *productpanel.DesktopBridge
+	managed   *productpanel.DesktopLifecycle
+	done      chan struct{}
+	jobs      sync.WaitGroup
 }
 
 func (s *WorkspaceService) ServiceStartup(context.Context, application.ServiceOptions) error {
 	if s.managed != nil {
 		s.done = make(chan struct{})
 		go func() { defer close(s.done); s.managed.Run() }()
+		s.jobs.Add(1)
+		go func() {
+			defer s.jobs.Done()
+			launcherui.RunClipboardWorker(s.ctx, s.control, s.title, &s.clipGate, &s.clipEpoch)
+		}()
 	}
 	return nil
 }

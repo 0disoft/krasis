@@ -67,7 +67,7 @@ func main() {
 	if err != nil {
 		os.Exit(1)
 	}
-	service := &WorkspaceService{raw: bridge}
+	service := &WorkspaceService{raw: bridge, ctx: ctx, control: paths.Control, title: "Krasis Workspace · 연결 테스트 · " + productpanel.CurrentBuildLabel()}
 	if !smoke {
 		startup, startupErr := productpanel.NewStartup(paths.Control)
 		if startupErr != nil {
@@ -116,7 +116,7 @@ func main() {
 		url = "/?smoke=1"
 	}
 	window = app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title: "Krasis Workspace · 연결 테스트 · " + productpanel.CurrentBuildLabel(),
+		Title: service.title,
 		Width: 1180, Height: 850, MinWidth: 720, MinHeight: 620,
 		BackgroundColour: application.NewRGB(24, 27, 33),
 		URL:              url,

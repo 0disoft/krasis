@@ -4,6 +4,7 @@
   import logo from '../../assets/windows/krasis.ico';
   import monitor from './assets/monitor.png';
   import { createBridge } from './bridge.js';
+  import { createClipboardBridge } from './clipboard-bridge.js';
   import { resolveLocale } from './i18n.js';
   import { nativeText } from './native-i18n.js';
   let saved;
@@ -14,10 +15,28 @@
   let busy = $state(false);
   let error = $state('');
   let bridge = $state.raw();
+  let clipboardBridge;
+  let clipboard = $state({peer:'',code:'unavailable'});
+  let clipBusy = $state(false);
+  let clipNotice = $state('');
+  let consent;
+  let consentPeer = '';
   let disposed = false;
   const t = key => nativeText(locale, key);
   const selectedPeer = $derived(snapshot.peers.find(p => p.fingerprint === selected));
   const canDisconnect = $derived(['CONNECTING','CONNECTED','RECONNECTING'].includes(snapshot.state));
+  async function setClipboard(peer,enable) {
+    if (!clipboardBridge || clipBusy || disposed) return;
+    clipBusy=true;
+    try { const value=await clipboardBridge.set(peer,enable); if(!disposed) {clipboard=value;clipNotice=value.code==='ok'?'':value.code;} }
+    finally {if(!disposed)clipBusy=false;}
+  }
+  function toggleClipboard() {
+    if(clipboard.peer) {void setClipboard(clipboard.peer,false);return;}
+    if(!selectedPeer)return;
+    consentPeer=selectedPeer.fingerprint;
+    consent.showModal();
+  }
   async function run(action) {
     if (busy || !bridge || disposed) return;
     busy = true;
@@ -42,6 +61,11 @@
         await Call.ByName('main.WorkspaceSmoke.Report', snapshot.schema ?? '', snapshot.state, snapshot.code);
         return;
       }
+      if (!clipBusy && !disposed) {
+        clipBusy=true;
+        const value=await clipboardBridge.status();
+        if(!disposed) {clipboard=value;clipBusy=false;}
+      }
       if (!disposed) timer = setTimeout(poll, 1500);
     }
     void (async () => {
@@ -54,6 +78,10 @@
           Connect: (alias, fingerprint) => Call.ByName(name + 'Connect', alias, fingerprint),
           Disconnect: () => Call.ByName(name + 'Disconnect'),
           Restart: () => Call.ByName(name + 'Restart'),
+        });
+        clipboardBridge=createClipboardBridge({
+          ClipboardStatus:()=>Call.ByName(name+'ClipboardStatus'),
+          ClipboardSet:(peer,enable)=>Call.ByName(name+'ClipboardSet',peer,enable),
         });
         await poll();
       } catch { if (!disposed) error = 'unavailable'; }
@@ -90,11 +118,18 @@
     <p class="placement-hint">{t('placement')}</p>
   </section>
   <section class="utilities">
-    <button class="utility utility-button" disabled><Icon name="clipboard" /><div><h2>{t('clipboard')}</h2><p>{t('legacy')}</p></div></button>
+    <button class="utility utility-button" disabled={clipBusy || (!clipboard.peer && !selectedPeer)} onclick={toggleClipboard}><Icon name="clipboard" /><div><h2>{t('clipboard')}</h2><p>{t(clipboard.peer ? 'clipboard_on' : 'clipboard_off')}</p></div></button>
     <button class="utility utility-button" disabled><Icon name="arrows-clockwise" /><div><h2>{t('update')}</h2><p>{t('legacy')}</p></div></button>
     <button class="utility utility-button" disabled><Icon name="plus" /><div><h2>{t('pair')}</h2><p>{t('legacy')}</p></div></button>
   </section>
+  <p role="status">{clipNotice ? t(clipNotice) : clipboard.code !== 'ok' ? t(clipboard.code) : t('clipboard_help')}</p>
 </main>
+<dialog bind:this={consent} aria-labelledby="clipboard-consent-title">
+  <h2 id="clipboard-consent-title">{t('clipboard')}</h2>
+  <p>{t('clipboard_consent')}</p>
+  <button onclick={()=>consent.close()}>{t('cancel')}</button>
+  <button onclick={()=>{consent.close();void setClipboard(consentPeer,true);}}>{t('clipboard_enable')}</button>
+</dialog>
 <footer><span>{t('closeHelp')}</span><select aria-label={t('language')} bind:value={locale}><option value="ko">한국어</option><option value="en">English</option></select></footer>
 <style>
   .peer-select { display:flex; align-items:center; gap:20px; margin:20px 0; }

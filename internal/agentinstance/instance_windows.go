@@ -36,3 +36,26 @@ func acquire(name string) (*Lease, error) {
 func validName(name string) bool {
 	return strings.HasPrefix(name, `Local\Krasis-Agent-Test-`) || name == productionName || name == controlName || name == `Local\Krasis-Control-Startup-v1` || name == `Local\Krasis-Log-agent-v1` || name == `Local\Krasis-Log-control-v1`
 }
+
+// ControlRunning observes the legacy controller without acquiring its lease.
+func ControlRunning() (bool, error) {
+	return instanceRunning(controlName)
+}
+
+func instanceRunning(value string) (bool, error) {
+	if !validName(value) {
+		return false, errors.New("invalid instance name")
+	}
+	name, err := syscall.UTF16PtrFromString(value)
+	if err != nil {
+		return false, err
+	}
+	h, _, callErr := instanceKernel32.NewProc("OpenMutexW").Call(0x00100000, 0, uintptr(unsafe.Pointer(name)))
+	if h == 0 {
+		if errors.Is(callErr, syscall.ERROR_FILE_NOT_FOUND) {
+			return false, nil
+		}
+		return false, callErr
+	}
+	return true, syscall.CloseHandle(syscall.Handle(h))
+}

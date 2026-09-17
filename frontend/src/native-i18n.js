@@ -1,5 +1,9 @@
 export const nativeCatalogs = {
   ko: {
+    clipboard_on:'공유 켜짐 · 눌러서 끄기', clipboard_off:'공유 꺼짐 · 눌러서 켜기', clipboard_enable:'공유 켜기',cancel:'취소',
+    clipboard_help:'양쪽 기기에서 켜야 텍스트가 공유됩니다. 파일·이미지는 지원하지 않습니다.',
+    clipboard_consent:'선택한 기기와 이후 복사하는 텍스트를 자동 공유할까요? 비밀번호 등 민감한 내용도 포함될 수 있습니다. 기존 클립보드 내용은 보내지 않습니다.',
+    clipboard_worker_failed:'클립보드 동기화 작업을 시작하지 못했습니다. 관리 앱을 다시 실행하세요.',
     workspace:'작업 공간', integration:'실제 연결 · 시험판', devices:'연결된 기기', help:'등록한 기기를 선택해 연결하세요.',
     LOCAL:'연결 대기', CONNECTING:'연결 중', CONNECTED:'연결됨', RECONNECTING:'재연결 중', DISCONNECTING:'연결 해제 중', FAULTED:'복구 필요', UNKNOWN:'상태 확인 불가',
     refresh:'새로고침', connect:'연결', disconnect:'연결 해제', peer:'상대 기기', choose:'기기를 선택하세요', local:'내 PC', thisPC:'현재 입력 기기', otherPC:'페어링 기기',
@@ -22,6 +26,10 @@ export const nativeCatalogs = {
     recovery_required:'입력 제어가 중단되었습니다. 진단을 자동 저장하고, 이전 연결은 최대 3회 복구합니다.',
   },
   en: {
+    clipboard_on:'Sharing on · Click to disable',clipboard_off:'Sharing off · Click to enable',clipboard_enable:'Enable sharing',cancel:'Cancel',
+    clipboard_help:'Enable on both PCs to share text. Files and images are not supported.',
+    clipboard_consent:'Automatically share text copied from now on with the selected device? This may include passwords and other sensitive content. Existing clipboard contents are not sent.',
+    clipboard_worker_failed:'Clipboard synchronization could not start. Restart the controller.',
     workspace:'Workspace', integration:'Live connection · Preview', devices:'Paired devices', help:'Choose a paired device to connect.',
     LOCAL:'Ready', CONNECTING:'Connecting', CONNECTED:'Connected', RECONNECTING:'Reconnecting', DISCONNECTING:'Disconnecting', FAULTED:'Recovery needed', UNKNOWN:'Status unavailable',
     refresh:'Refresh', connect:'Connect', disconnect:'Disconnect', peer:'Other device', choose:'Choose a device', local:'My PC', thisPC:'Local device', otherPC:'Paired device',
