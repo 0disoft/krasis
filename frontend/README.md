@@ -31,8 +31,23 @@ The sibling agent is started automatically after bundle checksum verification.
 The existing controller is not required for startup, connection or recovery.
 Closing the window keeps Workspace in the tray; its menu can reopen it,
 disconnect, or quit only the controller while leaving the agent running.
-PIN pairing and left/right placement are available in Workspace. Updates still
-require krasis-control.exe.
+PIN pairing and left/right placement are available in Workspace. Update delivery
+and application still require krasis-control.exe.
+
+## Update status and receive permission
+
+Workspace 0.7.0 covers update status and receive permission only, with no SEND
+or APPLY in this UI. Peer management-channel observations are online only on a
+response within 15 seconds, stale for older observations, and unknown when there
+are no observations. Version comparison uses generations and build identities,
+not semver; different commits in the same generation cannot be ordered.
+Older local agents without the per-peer INSPECT action report peer status as
+unavailable while existing permission settings remain usable. Automated tests
+do not mutate real permissions.
+
+The per-peer INSPECT local API was added in agent generation 33, included with
+the Workspace UI 0.7.0 bundle. Agents below generation 33 report peer-info lookup
+as unavailable while the existing permission API continues to work.
 
 ## Manual diagnostics
 
@@ -107,5 +122,5 @@ for the shared pump, controller-presence probe and native controller regressions
 Automated checks do not read or replace the user's current clipboard; two-PC
 copy/paste and visible consent-dialog testing remain manual.
 
-Standard action icons remain Phosphor. The UI package is 0.6.0; this does not
+Standard action icons remain Phosphor. The UI package is 0.7.0; this does not
 change the installed Go agent generation or the Windows bundle.

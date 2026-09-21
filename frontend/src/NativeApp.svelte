@@ -1,5 +1,7 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
+  import UpdateSettings from './UpdateSettings.svelte';
+  import { createUpdateSettingsBridge } from './update-settings-bridge.js';
   import Icon from './Icon.svelte';
   import logo from '../../assets/windows/krasis.ico';
   import monitor from './assets/monitor.png';
@@ -27,6 +29,10 @@
   let diagAction = $state(false);
   let diagNotice = $state('');
   let diagnosticsDlg;
+  let updateSettingsBridge = $state.raw();
+  let updatesDlg;
+  let updatesOpen = $state(false);
+  async function openUpdates() { updatesOpen = true; await tick(); updatesDlg.showModal(); }
   let clipboard = $state({peer:'',code:'unavailable'});
   let pairing = $state({schema:'krasis.pairing/v1',code:'ok',pin:'',job:'',alias:'',candidates:[]});
   let layout = $state({edge:'RIGHT',rearm:32,code:'unavailable'});
@@ -175,6 +181,10 @@
           DiagnosticsExport:peer=>Call.ByName(name+'DiagnosticsExport',peer),
           DiagnosticsOpen:()=>Call.ByName(name+'DiagnosticsOpen'),
         });
+        updateSettingsBridge=createUpdateSettingsBridge({
+          UpdateSettings:peer=>Call.ByName(name+'UpdateSettings',peer),
+          UpdatePermission:(peer,allow)=>Call.ByName(name+'UpdatePermission',peer,allow),
+        });
         await poll();
       } catch { if (!disposed) error = 'unavailable'; }
     })();
@@ -218,12 +228,16 @@
   </section>
   <section class="utilities">
     <button class="utility utility-button" disabled={clipBusy || (!clipboard.peer && !selectedPeer)} onclick={toggleClipboard}><Icon name="clipboard" /><div><h2>{t('clipboard')}</h2><p>{t(clipboard.peer ? 'clipboard_on' : 'clipboard_off')}</p></div></button>
-    <button class="utility utility-button" disabled><Icon name="arrows-clockwise" /><div><h2>{t('update')}</h2><p>{t('legacy')}</p></div></button>
+    <button class="utility utility-button" onclick={openUpdates}><Icon name="arrows-clockwise" /><div><h2>{t('update')}</h2><p>{t('upd_title')}</p></div></button>
     <button class="utility utility-button" onclick={() => pairingDlg.showModal()}><Icon name="plus" /><div><h2>{t('pair')}</h2><p>{t(pairing.job ? 'pin_waiting' : 'pairHelp')}</p></div></button>
     <button class="utility utility-button" onclick={() => diagnosticsDlg.showModal()}><Icon name="info" /><div><h2>{t('diag_title')}</h2><p>{t('diag_save')} · {t('diag_open')}</p></div></button>
   </section>
   <p role="status">{clipNotice ? t(clipNotice) : clipboard.code !== 'ok' ? t(clipboard.code) : layout.code !== 'ok' && layout.code !== 'unavailable' && layout.code !== 'unconfigured' ? t(layout.code) : t('clipboard_help')}</p>
 </main>
+<dialog bind:this={updatesDlg} aria-labelledby="update-settings-title" onclose={() => updatesOpen = false}>
+  {#if updatesOpen}<UpdateSettings bridge={updateSettingsBridge} peers={snapshot.peers} initialPeer={selected} {locale} />{/if}
+  <button class="primary" onclick={() => updatesDlg.close()}>{t('close')}</button>
+</dialog>
 <dialog bind:this={diagnosticsDlg} aria-labelledby="diagnostics-title">
   <h2 id="diagnostics-title">{t('diag_title')}</h2>
   <p>{t('diag_help')}</p>

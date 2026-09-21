@@ -9,6 +9,7 @@ import (
 )
 
 const UpdateSchema = "krasis.peer-update/v1"
+const UpdateInspectionGeneration = 33
 
 type UpdateRequest struct {
 	Schema    string `json:"schema"`
@@ -18,11 +19,12 @@ type UpdateRequest struct {
 	ID        string `json:"id,omitempty"`
 }
 type UpdateResult struct {
-	Schema    string            `json:"schema"`
-	Code      string            `json:"code"`
-	Status    peerupdate.Status `json:"status"`
-	Directory string            `json:"directory,omitempty"`
-	Alias     string            `json:"alias,omitempty"`
+	PeerInfo  *peerupdate.PeerInspection `json:"peerInfo,omitempty"`
+	Schema    string                     `json:"schema"`
+	Code      string                     `json:"code"`
+	Status    peerupdate.Status          `json:"status"`
+	Directory string                     `json:"directory,omitempty"`
+	Alias     string                     `json:"alias,omitempty"`
 }
 
 func (r UpdateRequest) Valid() bool {
@@ -32,7 +34,7 @@ func (r UpdateRequest) Valid() bool {
 	switch r.Action {
 	case "STATUS":
 		return r.Peer == "" && r.Directory == "" && r.ID == ""
-	case "ALLOW", "DENY":
+	case "ALLOW", "DENY", "INSPECT":
 		return validFingerprint(r.Peer) && r.Directory == "" && r.ID == ""
 	case "SEND":
 		return validFingerprint(r.Peer) && r.Directory != "" && len(r.Directory) < 32768 && !strings.ContainsRune(r.Directory, 0) && r.ID == ""

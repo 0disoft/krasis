@@ -37,6 +37,11 @@ func (o *Operations) Update(ctx context.Context, r localapi.UpdateRequest) (loca
 	if !ok {
 		return result, nil
 	}
+	if r.Action == "INSPECT" {
+		info := o.updates.InspectPeer(r.Peer, time.Now())
+		result.Code, result.PeerInfo = "peer_status", &info
+		return result, nil
+	}
 	if r.Action != "DENY" && r.Action != "APPLY_FAILED" && (o.preflight == nil || o.preflight(p.Alias) != nil) {
 		return result, nil
 	}

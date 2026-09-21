@@ -76,6 +76,7 @@ func main() {
 		}
 		service.managed = productpanel.NewDesktopLifecycle(ctx, func() (productpanel.Client, error) { return localapi.OpenClient(paths.Control) }, startup.Ensure, diagnose(os.Getenv("LOCALAPPDATA"), paths.Control))
 		base := os.Getenv("LOCALAPPDATA")
+		service.updates = productpanel.NewUpdateSettingsBridge(ctx, func() (productpanel.UpdateSettingsClient, error) { return localapi.OpenClient(paths.Control) })
 		service.diagnostics = productpanel.NewDiagnosticsBridge(ctx,
 			func() (productpanel.DiagnosticClient, error) { return localapi.OpenClient(paths.Control) },
 			func() error { _, err := productlog.Export(base); return err },

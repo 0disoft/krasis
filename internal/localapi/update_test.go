@@ -1,6 +1,7 @@
 package localapi
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,6 +15,22 @@ func TestUpdateRouteRequiresLocalAuthenticationBeforeDispatch(t *testing.T) {
 	h.ServeHTTP(w, r)
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status=%d", w.Code)
+	}
+}
+
+func TestUpdateInspectionIsBoundedAndLegacyResponsesStayCompatible(t *testing.T) {
+	peer := strings.Repeat("a", 64)
+	if !(UpdateRequest{Schema: UpdateSchema, Action: "INSPECT", Peer: peer}).Valid() {
+		t.Fatal("inspection rejected")
+	}
+	for _, r := range []UpdateRequest{{Schema: UpdateSchema, Action: "INSPECT"}, {Schema: UpdateSchema, Action: "INSPECT", Peer: peer, Directory: "private"}, {Schema: UpdateSchema, Action: "INSPECT", Peer: peer, ID: strings.Repeat("a", 32)}} {
+		if r.Valid() {
+			t.Fatal("cross-action fields accepted")
+		}
+	}
+	raw, _ := json.Marshal(UpdateResult{Schema: UpdateSchema, Code: "ok"})
+	if strings.Contains(string(raw), "peerInfo") {
+		t.Fatal("legacy strict decoders would reject response")
 	}
 }
 

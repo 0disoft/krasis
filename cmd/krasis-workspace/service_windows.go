@@ -24,6 +24,7 @@ type WorkspaceService struct {
 	managed     *productpanel.DesktopLifecycle
 	pairs       *productpanel.PairingBridge
 	diagnostics *productpanel.DiagnosticsBridge
+	updates     *productpanel.UpdateSettingsBridge
 	done        chan struct{}
 	jobs        sync.WaitGroup
 }
