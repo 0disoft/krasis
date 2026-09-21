@@ -14,6 +14,7 @@ import (
 	"github.com/0disoft/krasis/frontend"
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/productidentity"
+	"github.com/0disoft/krasis/internal/productlog"
 	"github.com/0disoft/krasis/internal/productpanel"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
@@ -74,6 +75,12 @@ func main() {
 			os.Exit(1)
 		}
 		service.managed = productpanel.NewDesktopLifecycle(ctx, func() (productpanel.Client, error) { return localapi.OpenClient(paths.Control) }, startup.Ensure, diagnose(os.Getenv("LOCALAPPDATA"), paths.Control))
+		base := os.Getenv("LOCALAPPDATA")
+		service.diagnostics = productpanel.NewDiagnosticsBridge(ctx,
+			func() (productpanel.DiagnosticClient, error) { return localapi.OpenClient(paths.Control) },
+			func() error { _, err := productlog.Export(base); return err },
+			func() (bool, bool, error) { return diagnosticFiles(base) },
+			func() error { return openDiagnosticsFolder(base) })
 	}
 	service.pairs = productpanel.NewPairingBridge(ctx, func() (productpanel.PairingClient, error) {
 		return localapi.OpenClient(paths.Control)

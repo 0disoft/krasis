@@ -7,6 +7,7 @@
   import { createClipboardBridge } from './clipboard-bridge.js';
   import { createPairingBridge } from './pairing-bridge.js';
   import { createLayoutBridge } from './layout-bridge.js';
+  import { createDiagnosticsBridge } from './diagnostics-bridge.js';
   import { resolveLocale } from './i18n.js';
   import { nativeText } from './native-i18n.js';
   let saved;
@@ -20,6 +21,12 @@
   let clipboardBridge;
   let pairingBridge;
   let layoutBridge;
+  let diagnosticsBridge = $state.raw();
+  let diagnostics = $state({code:'unavailable',saved:false,received:false,transfer:'UNKNOWN'});
+  let diagBusy = $state(false);
+  let diagAction = $state(false);
+  let diagNotice = $state('');
+  let diagnosticsDlg;
   let clipboard = $state({peer:'',code:'unavailable'});
   let pairing = $state({schema:'krasis.pairing/v1',code:'ok',pin:'',job:'',alias:'',candidates:[]});
   let layout = $state({edge:'RIGHT',rearm:32,code:'unavailable'});
@@ -38,6 +45,18 @@
   const canDisconnect = $derived(['CONNECTING','CONNECTED','RECONNECTING'].includes(snapshot.state));
   const canPlace = $derived(snapshot.state === 'LOCAL' && !!selectedPeer && !pairing.job && !busy);
   const canPair = $derived(snapshot.state === 'LOCAL' && !pairing.job && !busy && !pairBusy);
+  async function runDiagnostics(action, peer = '') {
+    if (!diagnosticsBridge || diagBusy || disposed) return;
+    diagBusy = true;
+    diagAction = action !== 'status';
+    try {
+      const value = await (action === 'status' ? diagnosticsBridge.status() :
+        action === 'open' ? diagnosticsBridge.open() : diagnosticsBridge.export(peer));
+      if (disposed) return;
+      diagnostics = value;
+      if (action !== 'status') diagNotice = action === 'export' && value.code === 'ok' ? 'diag_saved' : 'diag_' + value.code;
+    } finally { if (!disposed) { diagBusy = false; diagAction = false; } }
+  }
   async function setClipboard(peer,enable) {
     if (!clipboardBridge || clipBusy || disposed) return;
     clipBusy=true;
@@ -121,6 +140,7 @@
         const value = await layoutBridge.status(selected);
         if (!disposed) layout = value;
       }
+      if (!disposed && !diagBusy && diagnosticsBridge) await runDiagnostics('status');
       if (!disposed) timer = setTimeout(poll, 1500);
     }
     void (async () => {
@@ -149,6 +169,11 @@
           LayoutStatus:(fp)=>Call.ByName(name+'LayoutStatus',fp),
           LayoutSet:(fp,edge)=>Call.ByName(name+'LayoutSet',fp,edge),
           LayoutRearm:(fp,distance)=>Call.ByName(name+'LayoutRearm',fp,distance),
+        });
+        diagnosticsBridge=createDiagnosticsBridge({
+          DiagnosticsStatus:()=>Call.ByName(name+'DiagnosticsStatus'),
+          DiagnosticsExport:peer=>Call.ByName(name+'DiagnosticsExport',peer),
+          DiagnosticsOpen:()=>Call.ByName(name+'DiagnosticsOpen'),
         });
         await poll();
       } catch { if (!disposed) error = 'unavailable'; }
@@ -195,9 +220,25 @@
     <button class="utility utility-button" disabled={clipBusy || (!clipboard.peer && !selectedPeer)} onclick={toggleClipboard}><Icon name="clipboard" /><div><h2>{t('clipboard')}</h2><p>{t(clipboard.peer ? 'clipboard_on' : 'clipboard_off')}</p></div></button>
     <button class="utility utility-button" disabled><Icon name="arrows-clockwise" /><div><h2>{t('update')}</h2><p>{t('legacy')}</p></div></button>
     <button class="utility utility-button" onclick={() => pairingDlg.showModal()}><Icon name="plus" /><div><h2>{t('pair')}</h2><p>{t(pairing.job ? 'pin_waiting' : 'pairHelp')}</p></div></button>
+    <button class="utility utility-button" onclick={() => diagnosticsDlg.showModal()}><Icon name="info" /><div><h2>{t('diag_title')}</h2><p>{t('diag_save')} · {t('diag_open')}</p></div></button>
   </section>
   <p role="status">{clipNotice ? t(clipNotice) : clipboard.code !== 'ok' ? t(clipboard.code) : layout.code !== 'ok' && layout.code !== 'unavailable' && layout.code !== 'unconfigured' ? t(layout.code) : t('clipboard_help')}</p>
 </main>
+<dialog bind:this={diagnosticsDlg} aria-labelledby="diagnostics-title">
+  <h2 id="diagnostics-title">{t('diag_title')}</h2>
+  <p>{t('diag_help')}</p>
+  <p>{t('diag_local')}: {t(diagnostics.saved ? 'diag_available' : diagnostics.code === 'unavailable' ? 'diag_unavailable' : 'diag_none')}</p>
+  <p>{t('diag_received')}: {t(diagnostics.received ? 'diag_available' : diagnostics.code === 'unavailable' ? 'diag_unavailable' : 'diag_none')}</p>
+  <p>{t('diag_latest')}: {t('diag_transfer_' + diagnostics.transfer)}</p>
+  <p>{t('diag_global')}</p>
+  <div class="pair-actions">
+    <button disabled={diagBusy || !diagnosticsBridge} onclick={() => runDiagnostics('export')}>{t('diag_save')}</button>
+    <button disabled={diagBusy || !diagnosticsBridge || !selectedPeer} onclick={() => runDiagnostics('export', selectedPeer.fingerprint)}>{t('diag_send')}{selectedPeer ? ' · ' + selectedPeer.alias : ''}</button>
+    <button disabled={diagBusy || !diagnosticsBridge} onclick={() => runDiagnostics('open')}>{t('diag_open')}</button>
+  </div>
+  <p role="status">{diagAction ? t('diag_busy') : diagNotice ? t(diagNotice) : diagnostics.code !== 'ok' ? t('diag_' + diagnostics.code) : ''}</p>
+  <button class="primary" onclick={() => diagnosticsDlg.close()}>{t('close')}</button>
+</dialog>
 <dialog bind:this={consent} aria-labelledby="clipboard-consent-title">
   <h2 id="clipboard-consent-title">{t('clipboard')}</h2>
   <p>{t('clipboard_consent')}</p>

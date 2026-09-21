@@ -15,16 +15,17 @@ import (
 )
 
 type WorkspaceService struct {
-	ctx       context.Context
-	control   string
-	title     string
-	clipGate  sync.Mutex
-	clipEpoch atomic.Uint64
-	raw       *productpanel.DesktopBridge
-	managed   *productpanel.DesktopLifecycle
-	pairs     *productpanel.PairingBridge
-	done      chan struct{}
-	jobs      sync.WaitGroup
+	ctx         context.Context
+	control     string
+	title       string
+	clipGate    sync.Mutex
+	clipEpoch   atomic.Uint64
+	raw         *productpanel.DesktopBridge
+	managed     *productpanel.DesktopLifecycle
+	pairs       *productpanel.PairingBridge
+	diagnostics *productpanel.DiagnosticsBridge
+	done        chan struct{}
+	jobs        sync.WaitGroup
 }
 
 func (s *WorkspaceService) ServiceStartup(context.Context, application.ServiceOptions) error {
