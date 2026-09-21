@@ -75,6 +75,9 @@ func main() {
 		}
 		service.managed = productpanel.NewDesktopLifecycle(ctx, func() (productpanel.Client, error) { return localapi.OpenClient(paths.Control) }, startup.Ensure, diagnose(os.Getenv("LOCALAPPDATA"), paths.Control))
 	}
+	service.pairs = productpanel.NewPairingBridge(ctx, func() (productpanel.PairingClient, error) {
+		return localapi.OpenClient(paths.Control)
+	}, nil)
 	services := []application.Service{application.NewService(service)}
 	check := &WorkspaceSmoke{result: make(chan bool, 1)}
 	if smoke {

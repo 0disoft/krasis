@@ -31,8 +31,8 @@ The sibling agent is started automatically after bundle checksum verification.
 The existing controller is not required for startup, connection or recovery.
 Closing the window keeps Workspace in the tray; its menu can reopen it,
 disconnect, or quit only the controller while leaving the agent running.
-Pairing, updates and manual diagnostics
-still require krasis-control.exe; full controller replacement is a later step.
+PIN pairing and left/right placement are available in Workspace. Updates and
+manual diagnostics still require krasis-control.exe.
 
 ## Clipboard sharing
 
@@ -98,5 +98,5 @@ for the shared pump, controller-presence probe and native controller regressions
 Automated checks do not read or replace the user's current clipboard; two-PC
 copy/paste and visible consent-dialog testing remain manual.
 
-Standard action icons remain Phosphor. The UI package is 0.4.0; this does not
+Standard action icons remain Phosphor. The UI package is 0.5.0; this does not
 change the installed Go agent generation or the Windows bundle.

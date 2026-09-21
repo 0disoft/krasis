@@ -22,6 +22,7 @@ type WorkspaceService struct {
 	clipEpoch atomic.Uint64
 	raw       *productpanel.DesktopBridge
 	managed   *productpanel.DesktopLifecycle
+	pairs     *productpanel.PairingBridge
 	done      chan struct{}
 	jobs      sync.WaitGroup
 }

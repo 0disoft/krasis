@@ -5,6 +5,8 @@
   import monitor from './assets/monitor.png';
   import { createBridge } from './bridge.js';
   import { createClipboardBridge } from './clipboard-bridge.js';
+  import { createPairingBridge } from './pairing-bridge.js';
+  import { createLayoutBridge } from './layout-bridge.js';
   import { resolveLocale } from './i18n.js';
   import { nativeText } from './native-i18n.js';
   let saved;
@@ -16,15 +18,26 @@
   let error = $state('');
   let bridge = $state.raw();
   let clipboardBridge;
+  let pairingBridge;
+  let layoutBridge;
   let clipboard = $state({peer:'',code:'unavailable'});
+  let pairing = $state({schema:'krasis.pairing/v1',code:'ok',pin:'',job:'',alias:'',candidates:[]});
+  let layout = $state({edge:'RIGHT',rearm:32,code:'unavailable'});
+  let candidate = $state('');
+  let pinInput = $state('');
   let clipBusy = $state(false);
+  let pairBusy = $state(false);
+  let pairNotice = $state('');
   let clipNotice = $state('');
   let consent;
+  let pairingDlg;
   let consentPeer = '';
   let disposed = false;
   const t = key => nativeText(locale, key);
   const selectedPeer = $derived(snapshot.peers.find(p => p.fingerprint === selected));
   const canDisconnect = $derived(['CONNECTING','CONNECTED','RECONNECTING'].includes(snapshot.state));
+  const canPlace = $derived(snapshot.state === 'LOCAL' && !!selectedPeer && !pairing.job && !busy);
+  const canPair = $derived(snapshot.state === 'LOCAL' && !pairing.job && !busy && !pairBusy);
   async function setClipboard(peer,enable) {
     if (!clipboardBridge || clipBusy || disposed) return;
     clipBusy=true;
@@ -36,6 +49,41 @@
     if(!selectedPeer)return;
     consentPeer=selectedPeer.fingerprint;
     consent.showModal();
+  }
+  async function runPair(action) {
+    if (!pairingBridge || pairBusy || disposed) return;
+    pairBusy = true;
+    if (action !== 'status') pairNotice = '';
+    try {
+      const value = action === 'invite' ? await pairingBridge.invite()
+        : action === 'search' ? await pairingBridge.search()
+        : action === 'cancel' ? await pairingBridge.cancel()
+        : action === 'join' ? await pairingBridge.join(candidate, pinInput)
+        : await pairingBridge.status();
+      if (disposed) return;
+      applyPair(value);
+      if (value.candidates[0] && !value.candidates.some(c => c.id === candidate)) candidate = value.candidates[0].id;
+      if (action === 'join') pinInput = '';
+      if (value.code === 'pairing_completed' || value.code === 'paired_connect_failed') await run('refresh');
+    } finally { if (!disposed) pairBusy = false; }
+  }
+  function applyPair(value) {
+    if (value.code === 'busy') return;
+    if (value.code === 'unavailable' && pairing.job && !value.job) {
+      value = {...value, job: pairing.job};
+    }
+    pairing = value;
+    if (['pairing_completed', 'paired_connect_failed', 'pairing_ended'].includes(value.code)) {
+      pairNotice = value.code;
+    }
+  }
+  async function swap() {
+    if (!layoutBridge || !selectedPeer || !canPlace) return;
+    layout = await layoutBridge.set(selectedPeer.fingerprint, layout.edge === 'LEFT' ? 'RIGHT' : 'LEFT');
+  }
+  async function setRearm(distance) {
+    if (!layoutBridge || !selectedPeer || !canPlace) return;
+    layout = await layoutBridge.rearm(selectedPeer.fingerprint, distance);
   }
   async function run(action) {
     if (busy || !bridge || disposed) return;
@@ -61,10 +109,17 @@
         await Call.ByName('main.WorkspaceSmoke.Report', snapshot.schema ?? '', snapshot.state, snapshot.code);
         return;
       }
-      if (!clipBusy && !disposed) {
+      if (!clipBusy && !disposed && clipboardBridge) {
         clipBusy=true;
         const value=await clipboardBridge.status();
         if(!disposed) {clipboard=value;clipBusy=false;}
+      }
+      if (!pairBusy && !disposed && pairingBridge) {
+        await runPair('status');
+      }
+      if (!disposed && layoutBridge && selected) {
+        const value = await layoutBridge.status(selected);
+        if (!disposed) layout = value;
       }
       if (!disposed) timer = setTimeout(poll, 1500);
     }
@@ -83,6 +138,18 @@
           ClipboardStatus:()=>Call.ByName(name+'ClipboardStatus'),
           ClipboardSet:(peer,enable)=>Call.ByName(name+'ClipboardSet',peer,enable),
         });
+        pairingBridge=createPairingBridge({
+          PairStatus:()=>Call.ByName(name+'PairStatus'),
+          PairInvite:()=>Call.ByName(name+'PairInvite'),
+          PairSearch:()=>Call.ByName(name+'PairSearch'),
+          PairJoin:(id,pin)=>Call.ByName(name+'PairJoin',id,pin),
+          PairCancel:()=>Call.ByName(name+'PairCancel'),
+        });
+        layoutBridge=createLayoutBridge({
+          LayoutStatus:(fp)=>Call.ByName(name+'LayoutStatus',fp),
+          LayoutSet:(fp,edge)=>Call.ByName(name+'LayoutSet',fp,edge),
+          LayoutRearm:(fp,distance)=>Call.ByName(name+'LayoutRearm',fp,distance),
+        });
         await poll();
       } catch { if (!disposed) error = 'unavailable'; }
     })();
@@ -100,7 +167,7 @@
     <span class="connection" class:fault={snapshot.state !== 'CONNECTED'}><span class="status-dot"></span>{t(snapshot.state)}</span>
     <button disabled={busy || !bridge} onclick={() => run('refresh')}>{t('refresh')}</button>
     {#if snapshot.state === 'LOCAL'}
-      <button disabled={busy || !selectedPeer} onclick={() => run('connect')}>{t('connect')}</button>
+      <button disabled={busy || !selectedPeer || !!pairing.job} onclick={() => run('connect')}>{t('connect')}</button>
     {:else if snapshot.state === 'FAULTED' || snapshot.state === 'UNKNOWN'}
       <button disabled={busy || !bridge} onclick={() => run('restart')}>{t('restart')}</button>
     {:else}
@@ -111,18 +178,25 @@
   <p class="fault-banner" role="status">{error ? t(error) : t('scope')}</p>
   <label class="peer-select">{t('peer')}<select bind:value={selected} disabled={busy || snapshot.state !== 'LOCAL'}><option value="">{t('choose')}</option>{#each snapshot.peers as peer (peer.fingerprint)}<option value={peer.fingerprint}>{peer.alias}</option>{/each}</select></label>
   <section class="canvas" aria-label={t('devices')}>
-    <div class="screens">
-      <div class="screen"><img class="monitor-art" src={monitor} alt="" /><div class="screen-content"><strong>{t('local')}</strong><span>{t('thisPC')}</span></div></div>
-      <div class="screen peer"><img class="monitor-art" src={monitor} alt="" /><div class="screen-content"><strong class="peer-name" dir="auto">{snapshot.peerAlias || selectedPeer?.alias || '—'}</strong><span>{t('otherPC')}</span></div></div>
+    <div class="screens" class:reversed={layout.edge === 'LEFT'}>
+      <div class="screen"><img class="monitor-art" src={monitor} alt="" /><div class="screen-content"><strong>{t('local')}</strong><span>{t('thisPC')}</span><small>{t(layout.edge === 'LEFT' ? 'right' : 'left')}</small></div></div>
+      <div class="screen peer"><img class="monitor-art" src={monitor} alt="" /><div class="screen-content"><strong class="peer-name" dir="auto">{snapshot.peerAlias || selectedPeer?.alias || '—'}</strong><span>{t('otherPC')}</span><small>{t(layout.edge === 'LEFT' ? 'left' : 'right')}</small></div></div>
     </div>
-    <p class="placement-hint">{t('placement')}</p>
+    <p class="placement-hint"><Icon name="info" size={20} />{t(snapshot.state === 'LOCAL' ? 'placementReady' : 'placementLocked')}</p>
+    <div class="canvas-actions">
+      <button disabled={!canPlace} onclick={swap}><Icon name="arrows-left-right" size={18} />{t('swap')}</button>
+      <select disabled={!canPlace} value={String(layout.rearm || 32)} onchange={e => setRearm(Number(e.currentTarget.value))} aria-label={t('rearm')}>
+        {#each [32,64,128] as value}<option {value}>{t('rearm')} {value}px</option>{/each}
+      </select>
+      <button onclick={() => pairingDlg.showModal()}><Icon name="plus" size={18} />{t('addDevice')}</button>
+    </div>
   </section>
   <section class="utilities">
     <button class="utility utility-button" disabled={clipBusy || (!clipboard.peer && !selectedPeer)} onclick={toggleClipboard}><Icon name="clipboard" /><div><h2>{t('clipboard')}</h2><p>{t(clipboard.peer ? 'clipboard_on' : 'clipboard_off')}</p></div></button>
     <button class="utility utility-button" disabled><Icon name="arrows-clockwise" /><div><h2>{t('update')}</h2><p>{t('legacy')}</p></div></button>
-    <button class="utility utility-button" disabled><Icon name="plus" /><div><h2>{t('pair')}</h2><p>{t('legacy')}</p></div></button>
+    <button class="utility utility-button" onclick={() => pairingDlg.showModal()}><Icon name="plus" /><div><h2>{t('pair')}</h2><p>{t(pairing.job ? 'pin_waiting' : 'pairHelp')}</p></div></button>
   </section>
-  <p role="status">{clipNotice ? t(clipNotice) : clipboard.code !== 'ok' ? t(clipboard.code) : t('clipboard_help')}</p>
+  <p role="status">{clipNotice ? t(clipNotice) : clipboard.code !== 'ok' ? t(clipboard.code) : layout.code !== 'ok' && layout.code !== 'unavailable' && layout.code !== 'unconfigured' ? t(layout.code) : t('clipboard_help')}</p>
 </main>
 <dialog bind:this={consent} aria-labelledby="clipboard-consent-title">
   <h2 id="clipboard-consent-title">{t('clipboard')}</h2>
@@ -130,14 +204,32 @@
   <button onclick={()=>consent.close()}>{t('cancel')}</button>
   <button onclick={()=>{consent.close();void setClipboard(consentPeer,true);}}>{t('clipboard_enable')}</button>
 </dialog>
+<dialog bind:this={pairingDlg} aria-labelledby="pair-title">
+  <h2 id="pair-title">{t('pairingTitle')}</h2>
+  <p>{t('pairingHelp')}</p>
+  {#if pairing.pin}<p class="pin-display">{pairing.pin}</p>{/if}
+  <div class="pair-actions">
+    <button disabled={!canPair} onclick={() => runPair('invite')}>{t('createPIN')}</button>
+    <button disabled={!canPair} onclick={() => runPair('search')}>{t('findDevice')}</button>
+    <button disabled={pairBusy || !pairing.job} onclick={() => runPair('cancel')}>{t('cancelPair')}</button>
+  </div>
+  {#if pairing.candidates.length}
+    <label class="peer-select">{t('nearby')}<select bind:value={candidate} disabled={!canPair}>{#each pairing.candidates as item, index (item.id)}<option value={item.id}>{t('nearbyDevice')} {index + 1}</option>{/each}</select></label>
+    <label class="peer-select">{t('enterPIN')}<input bind:value={pinInput} maxlength="6" inputmode="numeric" autocomplete="one-time-code" disabled={!canPair} /></label>
+    <button disabled={!canPair || !candidate || !/^\d{6}$/.test(pinInput)} onclick={() => runPair('join')}>{t('joinPIN')}</button>
+  {/if}
+  <p role="status">{t(pairNotice || pairing.code)}</p>
+  <button class="primary" onclick={() => pairingDlg.close()}>{t('close')}</button>
+</dialog>
 <footer><span>{t('closeHelp')}</span><select aria-label={t('language')} bind:value={locale}><option value="ko">한국어</option><option value="en">English</option></select></footer>
 <style>
   .peer-select { display:flex; align-items:center; gap:20px; margin:20px 0; }
-  .peer-select select { min-width:220px; }
+  .peer-select select, .peer-select input { min-width:220px; }
   .canvas { min-height:280px; height:35vh; }
   .screen { max-width:340px; }
   .screen-content strong { font-size:30px; }
   .peer-name { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .fault-banner { font-size:14px; }
   .brand { white-space:nowrap; }
+  .pin-display { font: 600 42px/1 ui-monospace, Consolas, monospace; letter-spacing: 12px; text-align:center; margin: 12px 0 4px; }
 </style>

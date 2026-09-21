@@ -55,3 +55,103 @@ func setBoundary(ctx context.Context, open func() (Client, error), fingerprint, 
 	}
 	return view
 }
+
+type LayoutSnapshot struct {
+	Edge  string `json:"edge"`
+	Rearm int32  `json:"rearm"`
+	Code  string `json:"code"`
+}
+
+func layoutFailure(code string) LayoutSnapshot {
+	return LayoutSnapshot{Edge: "RIGHT", Rearm: 32, Code: code}
+}
+
+func LayoutStatus(ctx context.Context, open func() (Client, error), fingerprint string) LayoutSnapshot {
+	if len(fingerprint) != 64 {
+		return layoutFailure("invalid_peer")
+	}
+	c, err := open()
+	if err != nil {
+		return layoutFailure("unavailable")
+	}
+	view := Execute(ctx, func() (Client, error) { return c, nil }, "refresh", "")
+	alias := ""
+	for name, id := range view.Fingerprints {
+		if id == fingerprint {
+			alias = name
+		}
+	}
+	if alias == "" {
+		return layoutFailure("invalid_peer")
+	}
+	editor, ok := c.(interface {
+		Connection(context.Context, localapi.ConnectionRequest) (localapi.ConnectionResult, error)
+	})
+	if !ok {
+		return layoutFailure("unavailable")
+	}
+	got, err := editor.Connection(ctx, localapi.ConnectionRequest{Action: "SHOW", PeerAlias: alias})
+	if err != nil {
+		return layoutFailure("unavailable")
+	}
+	if got.Code == "connection_not_configured" {
+		return layoutFailure("unconfigured")
+	}
+	if got.Status != "COMPLETED" || got.Profile == nil || (got.Profile.Edge != "LEFT" && got.Profile.Edge != "RIGHT") {
+		return layoutFailure("rejected")
+	}
+	return LayoutSnapshot{Edge: got.Profile.Edge, Rearm: got.Profile.Rearm(), Code: "ok"}
+}
+
+func LayoutSet(ctx context.Context, open func() (Client, error), fingerprint, edge string) LayoutSnapshot {
+	return writeLayout(ctx, open, fingerprint, edge, 0)
+}
+
+func LayoutRearm(ctx context.Context, open func() (Client, error), fingerprint string, distance int32) LayoutSnapshot {
+	return writeLayout(ctx, open, fingerprint, "", distance)
+}
+
+func writeLayout(ctx context.Context, open func() (Client, error), fingerprint, edge string, distance int32) LayoutSnapshot {
+	c, err := open()
+	if err != nil {
+		return layoutFailure("unavailable")
+	}
+	view := Execute(ctx, func() (Client, error) { return c, nil }, "refresh", "")
+	alias := ""
+	for name, id := range view.Fingerprints {
+		if id == fingerprint && len(id) == 64 {
+			alias = name
+		}
+	}
+	valid := (distance == 0 && (edge == "LEFT" || edge == "RIGHT")) || (edge == "" && (distance == 32 || distance == 64 || distance == 128))
+	if alias == "" || !valid {
+		return layoutFailure("invalid_peer")
+	}
+	if view.State != "LOCAL" {
+		status := LayoutStatus(ctx, func() (Client, error) { return c, nil }, fingerprint)
+		status.Code = "not_local"
+		return status
+	}
+	editor, ok := c.(interface {
+		Connection(context.Context, localapi.ConnectionRequest) (localapi.ConnectionResult, error)
+	})
+	if !ok {
+		return layoutFailure("unavailable")
+	}
+	request := localapi.ConnectionRequest{Action: "SET_EDGE", PeerAlias: alias, Fingerprint: fingerprint, Edge: edge}
+	if distance != 0 {
+		request.Action = "SET_REARM"
+		request.RearmDistance = distance
+	}
+	got, err := editor.Connection(ctx, request)
+	if err != nil {
+		return layoutFailure("unavailable")
+	}
+	if got.Status != "COMPLETED" || got.Code != "connection_saved" || got.Profile == nil {
+		if got.Code == "connection_not_configured" {
+			return layoutFailure("unconfigured")
+		}
+		return layoutFailure("rejected")
+	}
+	return LayoutSnapshot{Edge: got.Profile.Edge, Rearm: got.Profile.Rearm(), Code: "ok"}
+}

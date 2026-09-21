@@ -7,13 +7,15 @@
 
 Krasis는 Windows 노트북 두 대 사이에서 키보드와 마우스 입력을 넘기는 개발 단계 제품이다.
 Go/Win32 입력 core, mTLS, crash guard, 상주 agent, 장기 기기 신뢰 저장소와 CLI를 구현했다.
-제품용 `krasis-control.exe`는 agent 자동 준비, PIN 등록·임시 LAN 검색, 연결 관리와 기기 등록
-해제를 제공한다. 서명된 설치 프로그램, 트레이와 전체 실기기 안전성 검증은 아직 완료하지 않았다.
+제품용 `krasis-workspace.exe`는 agent 자동 준비, PIN 등록, 좌우 배치, 연결 관리와 클립보드 공유를
+제공한다. `krasis-control.exe`는 기존 관리 GUI이며 상대 기기 업데이트 등 남은 작업에 사용한다.
+서명된 설치 프로그램과 전체 실기기 안전성 검증은 아직 완료하지 않았다.
 
 ## 주요 경로
 
 - `cmd/krasis-lab/`: bounded Phase 0 실험 CLI
 - `cmd/krasis-control/`: 제품 연결 관리 GUI
+- `cmd/krasis-workspace/`: Wails v3 Workspace 관리 UI
 - `cmd/krasis-agent/`, `cmd/krasis/`: 상주 agent와 제품 CLI
 - `docs/desktop/product-control.md`: 현재 GUI 기능과 검증 경계
 - `internal/`: 상태 모델, transport, peer session, Windows input과 crash guard 구현
