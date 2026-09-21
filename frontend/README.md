@@ -122,5 +122,6 @@ for the shared pump, controller-presence probe and native controller regressions
 Automated checks do not read or replace the user's current clipboard; two-PC
 copy/paste and visible consent-dialog testing remain manual.
 
-Standard action icons remain Phosphor. The UI package is 0.7.0; this does not
-change the installed Go agent generation or the Windows bundle.
+Standard action icons remain Phosphor. The UI package is 0.7.0 and the Workspace
+bundle includes agent generation 33. Building the bundle does not replace the
+running agent.
