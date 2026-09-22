@@ -382,8 +382,7 @@ func (current *sourceWheelCaptureRun) run(ctx context.Context, ready func()) (re
 				return 0
 			}
 		case wmActivate:
-			if current.active.Load() && uint16(wParam) == waInactive {
-				current.setError(ErrSourceCaptureLostForeground)
+			if uint16(wParam) == waInactive && current.loseForeground() {
 				procPostQuitMessageTouchpad.Call(0)
 				return 0
 			}
@@ -875,6 +874,17 @@ func (current *sourceWheelCaptureRun) setError(err error) {
 	current.terminalErr = errors.Join(current.terminalErr, err)
 	current.active.Store(false)
 	current.terminalMu.Unlock()
+	if current.session != nil {
+		current.session.Abort(err)
+	}
+}
+
+func (current *sourceWheelCaptureRun) loseForeground() bool {
+	if !current.active.Load() {
+		return false
+	}
+	current.setError(ErrSourceCaptureLostForeground)
+	return true
 }
 
 func (current *sourceWheelCaptureRun) fail(err error) {

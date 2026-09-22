@@ -347,6 +347,9 @@ func (session *SourceSession) stopSender(
 }
 
 func (session *SourceSession) abort(cause error) {
+	// Retire synchronously: a late activation must not race the worker's
+	// asynchronous fault handling and resume suppression for this owner.
+	session.terminal.Store(true)
 	session.stateMu.Lock()
 	session.active = false
 	session.generation++

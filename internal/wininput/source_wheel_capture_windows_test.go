@@ -630,6 +630,35 @@ func TestTerminalCaptureCommandCannotActivate(t *testing.T) {
 	}
 }
 
+func TestCaptureLossStopsSuppressionBeforeCleanupAndRejectsLateActivation(t *testing.T) {
+	session, err := NewSourceSession(1, &recordingSourceSink{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Leave the fault worker stopped to prove that retirement is synchronous.
+	session.started.Store(true)
+	if err = session.Activate(); err != nil {
+		t.Fatal(err)
+	}
+	current := &sourceWheelCaptureRun{session: session}
+	current.active.Store(true)
+	if !current.loseForeground() {
+		t.Fatal("active loss not reported")
+	}
+	if session.Active() || session.Offer(control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}) {
+		t.Fatal("lost capture retained suppression")
+	}
+	if err = session.Activate(); err == nil {
+		t.Fatal("late activation revived lost capture")
+	}
+	if cause := <-session.faults; !errors.Is(cause, ErrSourceCaptureLostForeground) {
+		t.Fatal(cause)
+	}
+	if current.loseForeground() {
+		t.Fatal("normal inactive notification escalated")
+	}
+}
+
 func TestCaptureSerializationHasDeadline(t *testing.T) {
 	previous := sourceWheelCaptureTimeout
 	sourceWheelCaptureTimeout = 10 * time.Millisecond
