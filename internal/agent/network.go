@@ -12,21 +12,23 @@ import (
 )
 
 type ListenSource struct {
-	listener         net.Listener
-	tlsConfig        *tls.Config
-	networkPolicy    ListenNetworkPolicy
-	handshakeTimeout time.Duration
-	preAuthSlots     chan struct{}
-	preAuthAdmission *preAuthAdmission
-	preAuthMetrics   preAuthMetricCounters
-	shutdown         context.Context
-	cancel           context.CancelFunc
-	roundMu          sync.Mutex
-	round            *listenRound
-	acceptErr        error
-	workers          sync.WaitGroup
-	closeOnce        sync.Once
-	closeErr         error
+	authenticationObserver func(string)
+	authenticationLast     map[string]time.Time
+	listener               net.Listener
+	tlsConfig              *tls.Config
+	networkPolicy          ListenNetworkPolicy
+	handshakeTimeout       time.Duration
+	preAuthSlots           chan struct{}
+	preAuthAdmission       *preAuthAdmission
+	preAuthMetrics         preAuthMetricCounters
+	shutdown               context.Context
+	cancel                 context.CancelFunc
+	roundMu                sync.Mutex
+	round                  *listenRound
+	acceptErr              error
+	workers                sync.WaitGroup
+	closeOnce              sync.Once
+	closeErr               error
 }
 
 const (
@@ -286,6 +288,7 @@ func (source *ListenSource) authenticate(round *listenRound, connection net.Conn
 	peerConnection, err := transport.NewPeerConnection(handshakeCtx, tls.Server(connection, source.tlsConfig.Clone()))
 	if err != nil {
 		source.preAuthMetrics.handshakeFailed.Add(1)
+		source.observeAuthenticationFailure(err)
 		_ = connection.Close()
 		return
 	}

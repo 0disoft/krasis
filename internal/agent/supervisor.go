@@ -226,7 +226,8 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 			if err != nil {
 				return err
 			}
-			if err := transition(SupervisorAcquireFailed, SupervisorSnapshot{Attempt: attempt, RetryAfter: delay, FailureKind: "acquire"}); err != nil {
+			failure := describeAcquisitionFailure(acquireErr)
+			if err := transition(SupervisorAcquireFailed, SupervisorSnapshot{Attempt: attempt, RetryAfter: delay, FailureKind: "acquire", FailureComponent: failure.Component, FailurePhase: failure.Phase, FailureCode: failure.Code}); err != nil {
 				return err
 			}
 			if err := waitForRetry(ctx, config, attempt, delay, transition); err != nil {

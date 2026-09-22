@@ -97,18 +97,18 @@ func AuthenticatePeerContext(ctx context.Context, connection *tls.Conn) (Authent
 	}
 	state := connection.ConnectionState()
 	if state.Version != tls.VersionTLS13 {
-		return AuthenticatedPeerContext{}, fmt.Errorf("%w: negotiated TLS version %x", ErrPeerAuthentication, state.Version)
+		return AuthenticatedPeerContext{}, errors.Join(ErrPeerAuthentication, ErrPeerTLSVersion)
 	}
 	if state.NegotiatedProtocol != ALPNProtocol {
-		return AuthenticatedPeerContext{}, fmt.Errorf("%w: negotiated protocol %q", ErrPeerAuthentication, state.NegotiatedProtocol)
+		return AuthenticatedPeerContext{}, errors.Join(ErrPeerAuthentication, ErrPeerALPN)
 	}
 	if len(state.PeerCertificates) == 0 || len(state.VerifiedChains) == 0 {
-		return AuthenticatedPeerContext{}, errors.Join(ErrPeerAuthentication, errors.New("verified peer certificate chain is required"))
+		return AuthenticatedPeerContext{}, errors.Join(ErrPeerAuthentication, ErrPeerCertificateChain)
 	}
 	certificate := state.PeerCertificates[0]
 	peer, err := AuthenticatedPeerFromCertificate(certificate)
 	if err != nil {
-		return AuthenticatedPeerContext{}, errors.Join(ErrPeerAuthentication, err)
+		return AuthenticatedPeerContext{}, errors.Join(ErrPeerAuthentication, ErrPeerRole, err)
 	}
 	return peer, nil
 }
