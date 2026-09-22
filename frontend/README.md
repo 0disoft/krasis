@@ -157,5 +157,4 @@ Standard action icons remain Phosphor. The UI package is 0.9.4 and the Workspace
 bundle includes agent generation 39. Building the bundle does not replace the
 running agent. UI 0.9.1 is a responsive/scrolling modal and numeric rearm-selection
 fix; existing g35 receivers can accept this revised UI (same-generation
-different-build stays intentionally blocked). Remote update opens a new visible window
-with generated title; main handles native Go.
+different-build stays intentionally blocked). After a remote update, Krasis shows the new window once it is ready. The title includes the bundled generation, such as `Krasis · g39`.
