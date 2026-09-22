@@ -10,12 +10,13 @@ import (
 )
 
 type PeerConnection struct {
-	connection   *tls.Conn
-	reader       *Reader
-	writer       *Writer
-	writeGate    chan struct{}
-	peer         AuthenticatedPeerContext
-	diagnosticID string
+	connection      *tls.Conn
+	reader          *Reader
+	writer          *Writer
+	writeGate       chan struct{}
+	peer            AuthenticatedPeerContext
+	diagnosticID    string
+	keepAlivePolicy string
 }
 
 const FrameWriteTimeout = 2 * time.Second
@@ -45,7 +46,7 @@ func NewPeerConnection(ctx context.Context, connection *tls.Conn) (*PeerConnecti
 		clear(material)
 		diagnosticID = hex.EncodeToString(digest[:])
 	}
-	return &PeerConnection{connection: connection, reader: reader, writer: writer, writeGate: writeGate, peer: peer, diagnosticID: diagnosticID}, nil
+	return &PeerConnection{connection: connection, reader: reader, writer: writer, writeGate: writeGate, peer: peer, diagnosticID: diagnosticID, keepAlivePolicy: configureConnectionKeepAlive(connection.NetConn())}, nil
 }
 
 // DiagnosticID is a label-specific digest shared only by this TLS connection.
