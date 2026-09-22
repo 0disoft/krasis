@@ -385,22 +385,33 @@ func productRenewalFlow(t *testing.T, both, allowInbound bool) {
 	}
 	handshake, stop := context.WithTimeout(ctx, 3*time.Second)
 	defer stop()
-	accepted := make(chan error, 1)
+	type acceptedPeer struct {
+		connection agent.Connection
+		err        error
+	}
+	accepted := make(chan acceptedPeer, 1)
 	go func() {
 		conn, err := source.Next(handshake)
-		if conn != nil {
-			conn.Close()
-		}
-		accepted <- err
+		accepted <- acceptedPeer{conn, err}
 	}()
 	conn, err := dial.Next(handshake)
+	// Server-side completion does not prove the client has consumed and
+	// verified the final TLS flight. Keep both endpoints until both finish.
+	serverPeer := <-accepted
+	if serverPeer.connection != nil {
+		defer serverPeer.connection.Close()
+	}
+	if conn != nil {
+		defer conn.Close()
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
-	conn.Close()
-	if err := <-accepted; err != nil {
-		t.Fatal(err)
+	if serverPeer.err != nil {
+		t.Fatal(serverPeer.err)
 	}
+	conn.Close()
+	serverPeer.connection.Close()
 	oldFirst, oldSecond := clientConfig.peer, serverConfig.peer
 	beforeReconfirm, err := first.pairing.trust.List()
 	if err != nil {
