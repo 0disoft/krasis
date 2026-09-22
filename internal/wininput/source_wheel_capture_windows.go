@@ -157,18 +157,19 @@ type sourceWheelCapture struct {
 }
 
 type sourceWheelCaptureRun struct {
-	shutdownEvidence *sourceShutdownEvidence
-	window           uintptr
-	commands         chan sourceWheelCaptureCommand
-	done             chan struct{}
-	active           atomic.Bool
-	terminalMu       sync.Mutex
-	terminalErr      error
-	registerProc     uintptr
-	savedFocus       uintptr
-	registered       bool
-	session          *SourceSession
-	observer         SourcePipelineObserver
+	attachedSource, attachedPeer uint32 // Native owner thread only; retained until detach succeeds.
+	shutdownEvidence             *sourceShutdownEvidence
+	window                       uintptr
+	commands                     chan sourceWheelCaptureCommand
+	done                         chan struct{}
+	active                       atomic.Bool
+	terminalMu                   sync.Mutex
+	terminalErr                  error
+	registerProc                 uintptr
+	savedFocus                   uintptr
+	registered                   bool
+	session                      *SourceSession
+	observer                     SourcePipelineObserver
 }
 
 type sourceWheelCaptureCommand struct {
@@ -649,6 +650,9 @@ func (current *sourceWheelCaptureRun) activateForegroundFallback() (SourceForegr
 }
 
 func (current *sourceWheelCaptureRun) setForegroundWithThreadAttach(targetWindow, peerWindow uintptr) (foregroundThreadFallbackResult, error) {
+	if current.attachedSource != 0 {
+		return foregroundThreadFallbackDetachFailed, ErrSourceCaptureThreadDetachFailed
+	}
 	if err := current.err(); err != nil {
 		return foregroundThreadFallbackAttachFailed, err
 	}
@@ -674,12 +678,13 @@ func (current *sourceWheelCaptureRun) setForegroundWithThreadAttach(targetWindow
 	if err := sourceWheelCaptureAttachThreads(sourceThread, peerThread, true); err != nil {
 		return foregroundThreadFallbackAttachFailed, err
 	}
+	current.attachedSource, current.attachedPeer = sourceThread, peerThread
 	foregroundErr := current.err()
 	if foregroundErr == nil {
 		foregroundErr = sourceWheelCaptureSetForeground(targetWindow)
 	}
 	verified := foregroundErr == nil && sourceWheelCaptureGetForeground() == targetWindow
-	detachErr := sourceWheelCaptureAttachThreads(sourceThread, peerThread, false)
+	detachErr := current.detachForegroundThreads()
 	if detachErr != nil {
 		return foregroundThreadFallbackDetachFailed, errors.Join(detachErr, foregroundErr)
 	}
@@ -695,17 +700,20 @@ func (current *sourceWheelCaptureRun) setForegroundWithThreadAttach(targetWindow
 func (current *sourceWheelCaptureRun) deactivateWindow() error {
 	wasActive := current.active.Swap(false)
 	wasRegistered := current.registered
-	current.registered = false
+	// Retry only the exact native pair we attached, never a newly discovered owner.
+	detachErr := current.detachForegroundThreads()
 	if !wasActive && !wasRegistered {
-		return nil
+		return detachErr
 	}
 	if current.observer != nil && wasActive {
 		current.observer.ObserveWheelCaptureDeactivated()
 	}
-	var cleanupErr error
+	cleanupErr := detachErr
 	if wasRegistered {
 		if unregisterErr := sourceWheelCaptureRegisterWindow(current.registerProc, current.window, false); unregisterErr != nil {
 			cleanupErr = errors.Join(cleanupErr, ErrSourceCaptureUnregisterFailed, touchpadWin32Error("RegisterTouchpadCapableWindow(source FALSE)", unregisterErr))
+		} else {
+			current.registered = false
 		}
 	}
 	// Restore while the capture window is still foreground. Hiding it first lets
