@@ -1,0 +1,86 @@
+package residentagent
+
+import (
+	"github.com/0disoft/krasis/internal/transport"
+	"math"
+	"runtime/metrics"
+	"sync"
+	"testing"
+	"time"
+)
+
+func TestRuntimeDiagnosticsSeparatesReadDispatchAndValidatedHeartbeat(t *testing.T) {
+	d := newRuntimeDiagnostics()
+	start := d.started.Add(time.Second)
+	d.ObserveReadStarted(start)
+	if s := d.snapshot(start.Add(3 * time.Second)); s.ReadAgeMicros != 3000000 || s.DispatchKind != "idle" || s.HeartbeatReceived {
+		t.Fatalf("idle read=%+v", s)
+	}
+	d.ObserveReadCompleted(start.Add(3 * time.Second))
+	d.ObserveDispatchStarted(transport.MessageInput, start.Add(3*time.Second))
+	if s := d.snapshot(start.Add(5 * time.Second)); s.ReadAgeMicros != 0 || s.DispatchAgeMicros != 2000000 || s.DispatchKind != "input" || s.FramesReceived != 1 || s.HeartbeatReceived {
+		t.Fatalf("stalled dispatch=%+v", s)
+	}
+	d.ObserveDispatchCompleted(start.Add(6 * time.Second))
+	d.ObserveHeartbeatReceived("not-exported", start.Add(6*time.Second))
+	d.ObserveTimerLateness(600 * time.Millisecond)
+	s := d.snapshot(start.Add(7 * time.Second))
+	if s.DispatchKind != "idle" || s.DispatchMaxMicros != 3000000 || s.Dispatches != 1 || s.HeartbeatReceiveAgeMicros != 1000000 || !s.HeartbeatReceived || s.TimerLateMicros != 600000 {
+		t.Fatalf("completed=%+v", s)
+	}
+	if next := d.snapshot(start.Add(8 * time.Second)); next.Dispatches != 0 || next.DispatchMaxMicros != 0 || next.TimerLateMicros != 0 {
+		t.Fatalf("interval counters repeated=%+v", next)
+	}
+}
+
+func TestRuntimeSamplingUsesHistogramDeltasAndKnownOSCounters(t *testing.T) {
+	h := &metrics.Float64Histogram{Buckets: []float64{0, .00005, .0005, .005, .05, .5, math.Inf(1)}, Counts: []uint64{1, 2, 3, 4, 5, 6}}
+	if got := aggregateHistogram(h); got != [6]uint64{1, 2, 3, 4, 5, 6} {
+		t.Fatal(got)
+	}
+	d := newRuntimeDiagnostics()
+	previous := runtimeSample{at: d.started, allocated: 100, cpu: 500, cpuKnown: true, gc: [6]uint64{4}}
+	current := runtimeSample{at: d.started.Add(5 * time.Second), allocated: 600, heap: 50, cpu: 800, cpuKnown: true, workingSetKnown: true, workingSet: 900, gc: [6]uint64{7}, scheduler: [6]uint64{0, 3}}
+	s := d.sample(current, previous)
+	if s.IntervalMicros != 5000000 || s.AllocatedBytes != 500 || s.CPUMicros != 300 || s.GCPauses[0] != 3 || s.RunnableDelays[1] != 3 || s.WorkingSetBytes != 900 || !s.WorkingSetKnown {
+		t.Fatalf("sample=%+v", s)
+	}
+	current.cpuKnown = false
+	current.cpu = 0
+	current.allocated = 50
+	s = d.sample(current, previous)
+	if s.CPUKnown || s.CPUMicros != 0 || s.AllocatedBytes != 0 {
+		t.Fatalf("unknown/reset counters fabricated=%+v", s)
+	}
+	read := newRuntimeSampler()
+	actual := read()
+	if actual.heap == 0 || actual.allocated == 0 || actual.at.IsZero() {
+		t.Fatalf("runtime metrics unavailable=%+v", actual)
+	}
+}
+
+func TestRuntimeObserverIsAllocationFreeAndRaceSafe(t *testing.T) {
+	d := newRuntimeDiagnostics()
+	now := time.Now()
+	if n := testing.AllocsPerRun(100, func() {
+		d.ObserveReadStarted(now)
+		d.ObserveReadCompleted(now)
+		d.ObserveDispatchStarted(transport.MessageInput, now)
+		d.ObserveDispatchCompleted(now)
+	}); n != 0 {
+		t.Fatalf("callback allocations=%v", n)
+	}
+	var wg sync.WaitGroup
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 1000; j++ {
+				d.ObserveHeartbeatSent("", time.Now())
+				d.ObserveTimerLateness(time.Millisecond)
+				d.snapshot(time.Now())
+			}
+		}()
+	}
+	wg.Wait()
+}

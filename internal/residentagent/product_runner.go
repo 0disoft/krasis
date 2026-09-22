@@ -168,6 +168,12 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 		log.Boundary(boundary.snapshot(false))
 		defer func() { log.Boundary(boundary.snapshot(true)) }()
 		config.SourceObserver = boundary
+		progress := newRuntimeDiagnostics()
+		config.LivenessObserver = progress
+		progressCtx, stopProgress := context.WithCancel(ctx)
+		progressDone := make(chan struct{})
+		go func() { defer close(progressDone); progress.run(progressCtx, log) }()
+		defer func() { stopProgress(); <-progressDone }()
 		config.ActivationFailureObserver = func(err error) {
 			failure := agent.DescribeSessionFailure(err)
 			log.Event(productlog.ActivationCode(failure.Component, failure.Phase, failure.Code))

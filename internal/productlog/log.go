@@ -55,6 +55,7 @@ type record struct {
 	Boundary      *BoundarySummary  `json:"boundary,omitempty"`
 	Injection     *InjectionFailure `json:"injection,omitempty"`
 	Retry         *RetrySummary     `json:"retry,omitempty"`
+	Runtime       *RuntimeSummary   `json:"runtime,omitempty"`
 }
 type Logger struct {
 	mu              sync.Mutex

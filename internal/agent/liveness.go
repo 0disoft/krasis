@@ -56,9 +56,12 @@ func runLivenessTicks(
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case _, ok := <-ticks:
+		case scheduled, ok := <-ticks:
 			if !ok {
 				return errors.New("liveness ticker stopped unexpectedly")
+			}
+			if timing, ok := observer.(peer.TimerObserver); ok {
+				timing.ObserveTimerLateness(max(0, time.Since(scheduled)))
 			}
 			pulse, err := peer.PulseLiveness(ctx, coordinator, runtime, now, policy.PeerTimeout)
 			if err != nil {

@@ -27,6 +27,7 @@ type exportEvent struct {
 	Boundary      *BoundarySummary  `json:"boundary,omitempty"`
 	Injection     *InjectionFailure `json:"injection,omitempty"`
 	Retry         *RetrySummary     `json:"retry,omitempty"`
+	Runtime       *RuntimeSummary   `json:"runtime,omitempty"`
 }
 
 type exportLog struct {
@@ -149,6 +150,13 @@ func sanitizeLog(name string, r io.Reader) exportLog {
 				continue
 			}
 			event.Retry = input.Retry
+		}
+		if input.Code == "runtime_summary" {
+			if input.Runtime == nil || !input.Runtime.valid() {
+				result.Incomplete = true
+				continue
+			}
+			event.Runtime = input.Runtime
 		}
 		if input.Code == "boundary_summary" {
 			if input.Boundary == nil || !input.Boundary.valid() {

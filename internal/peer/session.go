@@ -94,7 +94,11 @@ func runSession(
 		returnErr = errors.Join(returnErr, ownedConnection.Close())
 	}()
 
+	progress, _ := observer.(SessionProgressObserver)
 	for {
+		if progress != nil {
+			progress.ObserveReadStarted(time.Now())
+		}
 		frame, err := ownedConnection.ReadFrame()
 		if err != nil {
 			_ = ownedConnection.Close()
@@ -105,6 +109,10 @@ func runSession(
 			err = classifyPeerReadFailure(connection, err)
 			err = errors.Join(err, abortPendingLease(ctx, requests))
 			return failSessionWithLifecycle(ctx, coordinator, runtime, outbound, err)
+		}
+		if progress != nil {
+			progress.ObserveReadCompleted(time.Now())
+			progress.ObserveDispatchStarted(frame.Kind, time.Now())
 		}
 		var observedAt time.Time
 		var heartbeat HeartbeatObservation
@@ -155,6 +163,9 @@ func runSession(
 			}
 		default:
 			err = transport.ErrUnsupportedFrame
+		}
+		if progress != nil {
+			progress.ObserveDispatchCompleted(time.Now())
 		}
 		if err != nil {
 			_ = ownedConnection.Close()

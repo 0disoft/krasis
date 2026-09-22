@@ -1,0 +1,168 @@
+package residentagent
+
+import (
+	"context"
+	"github.com/0disoft/krasis/internal/productlog"
+	"github.com/0disoft/krasis/internal/transport"
+	"runtime/metrics"
+	"sync/atomic"
+	"time"
+)
+
+// Session callbacks only update atomics. Runtime/OS sampling and JSON/disk work
+// stay off input, reader and heartbeat paths. Counters are diagnostic hints, not
+// lease authority; snapshots across atomics are deliberately approximate.
+type runtimeDiagnostics struct {
+	started                                 time.Time
+	readStart, dispatchStart, send, receive atomic.Int64
+	kind                                    atomic.Uint32
+	frames, dispatches                      atomic.Uint64
+	dispatchMax, timerMax                   atomic.Int64
+}
+
+func newRuntimeDiagnostics() *runtimeDiagnostics             { return &runtimeDiagnostics{started: time.Now()} }
+func (d *runtimeDiagnostics) stamp(t time.Time) int64        { return max(1, t.Sub(d.started).Microseconds()) }
+func (d *runtimeDiagnostics) ObserveReadStarted(t time.Time) { d.readStart.Store(d.stamp(t)) }
+func (d *runtimeDiagnostics) ObserveReadCompleted(time.Time) { d.readStart.Store(0); d.frames.Add(1) }
+func (d *runtimeDiagnostics) ObserveDispatchStarted(k transport.MessageKind, t time.Time) {
+	d.kind.Store(uint32(k))
+	d.dispatchStart.Store(d.stamp(t))
+}
+func (d *runtimeDiagnostics) ObserveDispatchCompleted(t time.Time) {
+	start := d.dispatchStart.Swap(0)
+	if start > 0 {
+		observeMaximum(&d.dispatchMax, max(0, d.stamp(t)-start))
+	}
+	d.dispatches.Add(1)
+}
+func (d *runtimeDiagnostics) ObserveHeartbeatSent(_ string, t time.Time) { d.send.Store(d.stamp(t)) }
+func (d *runtimeDiagnostics) ObserveHeartbeatReceived(_ string, t time.Time) {
+	d.receive.Store(d.stamp(t))
+}
+func (d *runtimeDiagnostics) ObserveTimerLateness(delay time.Duration) {
+	observeMaximum(&d.timerMax, max(0, delay.Microseconds()))
+}
+func observeMaximum(target *atomic.Int64, value int64) {
+	for old := target.Load(); value > old; old = target.Load() {
+		if target.CompareAndSwap(old, value) {
+			return
+		}
+	}
+}
+func (d *runtimeDiagnostics) snapshot(now time.Time) productlog.RuntimeSummary {
+	stamp := d.stamp(now)
+	age := func(start int64) int64 {
+		if start == 0 {
+			return 0
+		}
+		return max(0, stamp-start)
+	}
+	s := productlog.RuntimeSummary{DispatchKind: "idle", ReadAgeMicros: age(d.readStart.Load()), FramesReceived: d.frames.Swap(0), Dispatches: d.dispatches.Swap(0), DispatchMaxMicros: d.dispatchMax.Swap(0), TimerLateMicros: d.timerMax.Swap(0)}
+	if start := d.dispatchStart.Load(); start != 0 {
+		s.DispatchAgeMicros = age(start)
+		switch transport.MessageKind(d.kind.Load()) {
+		case transport.MessageControl:
+			s.DispatchKind = "control"
+		case transport.MessageInput:
+			s.DispatchKind = "input"
+		case transport.MessageHeartbeat:
+			s.DispatchKind = "heartbeat"
+		case transport.MessageDisconnect:
+			s.DispatchKind = "disconnect"
+		default:
+			s.DispatchKind = "unknown"
+		}
+	}
+	send, receive := d.send.Load(), d.receive.Load()
+	s.HeartbeatSent = send > 0
+	s.HeartbeatReceived = receive > 0
+	s.HeartbeatSendAgeMicros = age(send)
+	s.HeartbeatReceiveAgeMicros = age(receive)
+	return s
+}
+
+type runtimeSample struct {
+	at                               time.Time
+	heap, allocated, cpu, workingSet uint64
+	cpuKnown, workingSetKnown        bool
+	gc, scheduler                    [6]uint64
+}
+
+// runtime/metrics avoids the stop-the-world ReadMemStats API. Histogram storage
+// is reused by this one sampler, and only fixed-size aggregate values escape it.
+func newRuntimeSampler() func() runtimeSample {
+	samples := []metrics.Sample{{Name: "/memory/classes/heap/objects:bytes"}, {Name: "/gc/heap/allocs:bytes"}, {Name: "/sched/pauses/total/gc:seconds"}, {Name: "/sched/latencies:seconds"}}
+	return func() runtimeSample {
+		metrics.Read(samples)
+		s := runtimeSample{at: time.Now()}
+		if samples[0].Value.Kind() == metrics.KindUint64 {
+			s.heap = samples[0].Value.Uint64()
+		}
+		if samples[1].Value.Kind() == metrics.KindUint64 {
+			s.allocated = samples[1].Value.Uint64()
+		}
+		if samples[2].Value.Kind() == metrics.KindFloat64Histogram {
+			s.gc = aggregateHistogram(samples[2].Value.Float64Histogram())
+		}
+		if samples[3].Value.Kind() == metrics.KindFloat64Histogram {
+			s.scheduler = aggregateHistogram(samples[3].Value.Float64Histogram())
+		}
+		s.workingSet, s.workingSetKnown, s.cpu, s.cpuKnown = processRuntimeCounters()
+		return s
+	}
+}
+func aggregateHistogram(h *metrics.Float64Histogram) (result [6]uint64) {
+	limits := [5]float64{.0001, .001, .01, .1, 1}
+	for i, count := range h.Counts {
+		bucket := 5
+		for j, limit := range limits {
+			if h.Buckets[i+1] <= limit {
+				bucket = j
+				break
+			}
+		}
+		result[bucket] += count
+	}
+	return
+}
+func counterDelta(current, previous uint64) uint64 {
+	if current < previous {
+		return 0
+	}
+	return current - previous
+}
+func (d *runtimeDiagnostics) sample(current, previous runtimeSample) productlog.RuntimeSummary {
+	s := d.snapshot(current.at)
+	s.IntervalMicros = max(1, current.at.Sub(previous.at).Microseconds())
+	s.HeapBytes = current.heap
+	s.AllocatedBytes = counterDelta(current.allocated, previous.allocated)
+	s.WorkingSetBytes = current.workingSet
+	s.WorkingSetKnown = current.workingSetKnown
+	s.CPUKnown = current.cpuKnown && previous.cpuKnown
+	if s.CPUKnown {
+		s.CPUMicros = counterDelta(current.cpu, previous.cpu)
+	}
+	for i := range s.GCPauses {
+		s.GCPauses[i] = counterDelta(current.gc[i], previous.gc[i])
+		s.RunnableDelays[i] = counterDelta(current.scheduler[i], previous.scheduler[i])
+	}
+	return s
+}
+func (d *runtimeDiagnostics) run(ctx context.Context, log *productlog.Logger) {
+	read := newRuntimeSampler()
+	previous := read()
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			log.Runtime(d.sample(read(), previous))
+			return
+		case scheduled := <-ticker.C:
+			d.ObserveTimerLateness(time.Since(scheduled))
+			current := read()
+			log.Runtime(d.sample(current, previous))
+			previous = current
+		}
+	}
+}
