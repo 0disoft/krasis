@@ -212,7 +212,10 @@
     {/if}
   </div>
   <section class="heading"><h1>{t('devices')}</h1><p>{t('help')}</p></section>
-  <p class="fault-banner" role="status">{error ? t(error) : t('scope')}</p>
+  {#if error}
+    <p class="fault-banner" role="alert">{t(error)}</p>
+  {/if}
+  <p class="info-line" role="status"><Icon name="info" size={16} />{t('scope')}</p>
   <label class="peer-select">{t('peer')}<select bind:value={selected} disabled={busy || snapshot.state !== 'LOCAL'}><option value="">{t('choose')}</option>{#each snapshot.peers as peer (peer.fingerprint)}<option value={peer.fingerprint}>{peer.alias}</option>{/each}</select></label>
   <section class="canvas" aria-label={t('devices')}>
     <div class="screens" class:reversed={layout.edge === 'LEFT'}>
@@ -222,9 +225,11 @@
     <p class="placement-hint"><Icon name="info" size={20} />{t(snapshot.state === 'LOCAL' ? 'placementReady' : 'placementLocked')}</p>
     <div class="canvas-actions">
       <button disabled={!canPlace} onclick={swap}><Icon name="arrows-left-right" size={18} />{t('swap')}</button>
-      <select disabled={!canPlace} value={String(layout.rearm || 32)} onchange={e => setRearm(Number(e.currentTarget.value))} aria-label={t('rearm')}>
-        {#each [32,64,128] as value}<option {value}>{t('rearm')} {value}px</option>{/each}
-      </select>
+      <label class="rearm-field">{t('rearm')}
+        <select disabled={!canPlace} value={layout.rearm || 32} onchange={e => setRearm(Number(e.currentTarget.value))}>
+          {#each [32,64,128] as value}<option {value}>{value}px</option>{/each}
+        </select>
+      </label>
       <button onclick={() => pairingDlg.showModal()}><Icon name="plus" size={18} />{t('addDevice')}</button>
     </div>
   </section>
@@ -238,32 +243,32 @@
 </main>
 <dialog bind:this={updatesDlg} aria-labelledby="update-settings-title" onclose={() => updatesOpen = false}>
   {#if updatesOpen}<UpdateSettings bridge={updateSettingsBridge} peers={snapshot.peers} initialPeer={selected} {locale} />{/if}
-  <button class="primary" onclick={() => updatesDlg.close()}>{t('close')}</button>
+  <div class="dlg-foot"><button class="primary" onclick={() => updatesDlg.close()}>{t('close')}</button></div>
 </dialog>
 <dialog bind:this={diagnosticsDlg} aria-labelledby="diagnostics-title">
-  <h2 id="diagnostics-title">{t('diag_title')}</h2>
-  <p>{t('diag_help')}</p>
-  <p>{t('diag_local')}: {t(diagnostics.saved ? 'diag_available' : diagnostics.code === 'unavailable' ? 'diag_unavailable' : 'diag_none')}</p>
-  <p>{t('diag_received')}: {t(diagnostics.received ? 'diag_available' : diagnostics.code === 'unavailable' ? 'diag_unavailable' : 'diag_none')}</p>
-  <p>{t('diag_latest')}: {t('diag_transfer_' + diagnostics.transfer)}</p>
-  <p>{t('diag_global')}</p>
-  <div class="pair-actions">
-    <button disabled={diagBusy || !diagnosticsBridge} onclick={() => runDiagnostics('export')}>{t('diag_save')}</button>
-    <button disabled={diagBusy || !diagnosticsBridge || !selectedPeer} onclick={() => runDiagnostics('export', selectedPeer.fingerprint)}>{t('diag_send')}{selectedPeer ? ' · ' + selectedPeer.alias : ''}</button>
-    <button disabled={diagBusy || !diagnosticsBridge} onclick={() => runDiagnostics('open')}>{t('diag_open')}</button>
+  <div class="dlg-head"><h2 id="diagnostics-title">{t('diag_title')}</h2><p>{t('diag_help')}</p></div>
+  <div class="dlg-body">
+    <p>{t('diag_local')}: {t(diagnostics.saved ? 'diag_available' : diagnostics.code === 'unavailable' ? 'diag_unavailable' : 'diag_none')}</p>
+    <p>{t('diag_received')}: {t(diagnostics.received ? 'diag_available' : diagnostics.code === 'unavailable' ? 'diag_unavailable' : 'diag_none')}</p>
+    <p>{t('diag_latest')}: {t('diag_transfer_' + diagnostics.transfer)}</p>
+    <p>{t('diag_global')}</p>
+    <div class="pair-actions">
+      <button disabled={diagBusy || !diagnosticsBridge} onclick={() => runDiagnostics('export')}>{t('diag_save')}</button>
+      <button disabled={diagBusy || !diagnosticsBridge || !selectedPeer} onclick={() => runDiagnostics('export', selectedPeer.fingerprint)}>{t('diag_send')}{selectedPeer ? ' · ' + selectedPeer.alias : ''}</button>
+      <button disabled={diagBusy || !diagnosticsBridge} onclick={() => runDiagnostics('open')}>{t('diag_open')}</button>
+    </div>
+    <p role="status">{diagAction ? t('diag_busy') : diagNotice ? t(diagNotice) : diagnostics.code !== 'ok' ? t('diag_' + diagnostics.code) : ''}</p>
   </div>
-  <p role="status">{diagAction ? t('diag_busy') : diagNotice ? t(diagNotice) : diagnostics.code !== 'ok' ? t('diag_' + diagnostics.code) : ''}</p>
-  <button class="primary" onclick={() => diagnosticsDlg.close()}>{t('close')}</button>
+  <div class="dlg-foot"><button class="primary" onclick={() => diagnosticsDlg.close()}>{t('close')}</button></div>
 </dialog>
 <dialog bind:this={consent} aria-labelledby="clipboard-consent-title">
-  <h2 id="clipboard-consent-title">{t('clipboard')}</h2>
-  <p>{t('clipboard_consent')}</p>
-  <button onclick={()=>consent.close()}>{t('cancel')}</button>
-  <button onclick={()=>{consent.close();void setClipboard(consentPeer,true);}}>{t('clipboard_enable')}</button>
+  <div class="dlg-head"><h2 id="clipboard-consent-title">{t('clipboard')}</h2></div>
+  <div class="dlg-body"><p>{t('clipboard_consent')}</p></div>
+  <div class="dlg-foot"><button onclick={()=>consent.close()}>{t('cancel')}</button><button onclick={()=>{consent.close();void setClipboard(consentPeer,true);}}>{t('clipboard_enable')}</button></div>
 </dialog>
 <dialog bind:this={pairingDlg} aria-labelledby="pair-title">
-  <h2 id="pair-title">{t('pairingTitle')}</h2>
-  <p>{t('pairingHelp')}</p>
+  <div class="dlg-head"><h2 id="pair-title">{t('pairingTitle')}</h2><p>{t('pairingHelp')}</p></div>
+  <div class="dlg-body">
   {#if pairing.pin}<p class="pin-display">{pairing.pin}</p>{/if}
   <div class="pair-actions">
     <button disabled={!canPair} onclick={() => runPair('invite')}>{t('createPIN')}</button>
@@ -276,13 +281,14 @@
     <button disabled={!canPair || !candidate || !/^\d{6}$/.test(pinInput)} onclick={() => runPair('join')}>{t('joinPIN')}</button>
   {/if}
   <p role="status">{t(pairNotice || pairing.code)}</p>
-  <button class="primary" onclick={() => pairingDlg.close()}>{t('close')}</button>
+  </div>
+  <div class="dlg-foot"><button class="primary" onclick={() => pairingDlg.close()}>{t('close')}</button></div>
 </dialog>
 <footer><span>{t('closeHelp')}</span><select aria-label={t('language')} bind:value={locale}><option value="ko">한국어</option><option value="en">English</option></select></footer>
 <style>
   .peer-select { display:flex; align-items:center; gap:20px; margin:20px 0; }
   .peer-select select, .peer-select input { min-width:220px; }
-  .canvas { min-height:280px; height:35vh; }
+  .canvas { min-height: 0; }
   .screen { max-width:340px; }
   .screen-content strong { font-size:30px; }
   .peer-name { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }

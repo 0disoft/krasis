@@ -24,7 +24,7 @@ The optional Wails v3 host builds to `dist/workspace/krasis-workspace.exe`.
 It embeds the native Svelte assets and uses the Go module's own
 `/wails/runtime.js`; there is no separate npm runtime version to synchronize.
 Wails v3 is an explicitly selected prerelease dependency. The Go language
-requirement is unchanged; the bundle includes agent generation 35, and building
+requirement is unchanged; the bundle includes agent generation 36, and building
 does not replace the running process.
 
 Extract the complete Workspace ZIP and double-click krasis-workspace.exe.
@@ -142,6 +142,8 @@ for the shared pump, controller-presence probe and native controller regressions
 Automated checks do not read or replace the user's current clipboard; two-PC
 copy/paste and visible consent-dialog testing remain manual.
 
-Standard action icons remain Phosphor. The UI package is 0.9.0 and the Workspace
-bundle includes agent generation 35. Building the bundle does not replace the
-running agent.
+Standard action icons remain Phosphor. The UI package is 0.9.1 and the Workspace
+bundle includes agent generation 36. Building the bundle does not replace the
+running agent. UI 0.9.1 is a responsive/scrolling modal and numeric rearm-selection
+fix; existing g35 receivers can accept this revised UI (same-generation
+different-build stays intentionally blocked).
