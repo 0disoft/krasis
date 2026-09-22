@@ -72,7 +72,7 @@ func Run() {
 	if err != nil {
 		os.Exit(1)
 	}
-	service := &WorkspaceService{raw: bridge, ctx: ctx, control: paths.Control, title: "Krasis Workspace · 연결 테스트 · " + productpanel.CurrentBuildLabel()}
+	service := &WorkspaceService{raw: bridge, ctx: ctx, control: paths.Control, title: "Krasis · " + productpanel.CurrentBuildLabel()}
 	if !smoke {
 		startup, startupErr := productpanel.NewStartup(paths.Control)
 		if startupErr != nil {
@@ -130,7 +130,7 @@ func Run() {
 		}
 	}
 	app := application.New(application.Options{
-		Name:           "Krasis Workspace",
+		Name:           "Krasis",
 		Icon:           windowsassets.Icon,
 		OnShutdown:     cancel,
 		MarshalError:   func(error) []byte { return []byte(`"bridge_failed"`) },
@@ -154,8 +154,8 @@ func Run() {
 	if !smoke {
 		tray := app.SystemTray.New()
 		tray.SetIcon(windowsassets.Icon)
-		tray.SetTooltip("Krasis Workspace")
-		tray.SetLabel("Krasis Workspace")
+		tray.SetTooltip("Krasis")
+		tray.SetLabel("Krasis")
 		menu := app.NewMenu()
 		menu.Add("열기 / Open").OnClick(func(*application.Context) { window.Show(); window.Restore(); window.Focus() })
 		menu.Add("연결 해제 / Disconnect").OnClick(func(*application.Context) {

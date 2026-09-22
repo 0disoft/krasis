@@ -22,21 +22,21 @@ See ADR 0061 for its identity, concurrency and cancellation boundaries.
 
 The optional Wails v3 host ships as an immutable clean distribution under
 `dist/workspace/<git revision>/`, with the ZIP kept outside at
-`dist/workspace/krasis-workspace-<revision>.zip`.
+`dist/workspace/krasis-<revision>.zip`.
 The actual Wails UI lives in `peer-update/krasis-control.exe` and the resident
 agent in `peer-update/krasis-agent.exe`, each as a single copy; it embeds the
 native Svelte assets and uses the Go module's own
 `/wails/runtime.js`; there is no separate npm runtime version to synchronize.
-The root `krasis-workspace.exe` is a small icon-bearing launcher: it verifies
+The root `krasis.exe` is a small icon-bearing launcher: it verifies
 the compiled-in SHA256 of `peer-update/krasis-control.exe` and then starts it.
 There is no duplicate root agent. Keep the entire distribution directory;
 do not copy the launcher alone. Wails v3 is an explicitly selected prerelease
 dependency. The Go language requirement is unchanged; the bundle includes agent
-generation 37, and building does not replace the running process. All Go
+generation 38, and building does not replace the running process. All Go
 release exes build with trimpath plus `-s -w` (Go build metadata is kept, so
 stack traces still resolve; native debugger symbols are removed).
 
-Extract the complete Workspace ZIP and double-click the root krasis-workspace.exe
+Extract the complete Workspace ZIP and double-click the root krasis.exe
 inside its directory.
 The launcher verifies and starts `peer-update/krasis-control.exe` automatically.
 The existing controller is not required for startup, connection or recovery.
@@ -59,7 +59,7 @@ Workspace 0.9.0 adds explicit SEND from Workspace to the selected trusted peer,
 plus exact status for that peer fingerprint, transfer ID, and local agent
 instance. Sending is manual
 only; there is no automatic resend. The bundled `peer-update` folder contains the
-g37 Workspace agent/control bundle under the g34-compatible seven-file filenames;
+g38 Workspace agent/control bundle under the g34-compatible seven-file filenames;
 no delta update yet. The first
 g34 to g35 update needs the existing control running on the receiver so it can
 automatically APPLY the received bundle; afterwards a running Workspace suffices.
@@ -153,8 +153,8 @@ for the shared pump, controller-presence probe and native controller regressions
 Automated checks do not read or replace the user's current clipboard; two-PC
 copy/paste and visible consent-dialog testing remain manual.
 
-Standard action icons remain Phosphor. The UI package is 0.9.2 and the Workspace
-bundle includes agent generation 37. Building the bundle does not replace the
+Standard action icons remain Phosphor. The UI package is 0.9.3 and the Workspace
+bundle includes agent generation 38. Building the bundle does not replace the
 running agent. UI 0.9.1 is a responsive/scrolling modal and numeric rearm-selection
 fix; existing g35 receivers can accept this revised UI (same-generation
 different-build stays intentionally blocked).

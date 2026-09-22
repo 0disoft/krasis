@@ -5,7 +5,7 @@ import { verifyExecutableIcon } from './check-windows-icon.mjs';
 
 const directory=process.argv[2];
 assert.ok(directory,'Expected distribution directory');
-const launcher=fs.readFileSync(path.join(directory,'krasis-workspace.exe'));
+const launcher=fs.readFileSync(path.join(directory,'krasis.exe'));
 verifyExecutableIcon(launcher);
 assert.ok(launcher.length < 5*1024*1024,'Launcher unexpectedly includes the full UI');
 assert.ok(!fs.existsSync(path.join(directory,'krasis-agent.exe')),'Duplicate agent in distribution');

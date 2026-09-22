@@ -64,7 +64,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		if len(os.Args) == 1 {
 			message, _ := syscall.UTF16PtrFromString("Cannot open Workspace. Extract the complete ZIP into a new folder.\n\n" + err.Error())
-			title, _ := syscall.UTF16PtrFromString("Krasis Workspace")
+			title, _ := syscall.UTF16PtrFromString("Krasis")
 			syscall.NewLazyDLL("user32.dll").NewProc("MessageBoxW").Call(0, uintptr(unsafe.Pointer(message)), uintptr(unsafe.Pointer(title)), 0x10)
 		}
 		os.Exit(1)

@@ -30,14 +30,14 @@ foreach ($line in Get-Content -LiteralPath 'go.mod') {
 node scripts/build-workspace-update.mjs $bundle
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $controlHash = (Get-FileHash -LiteralPath (Join-Path $bundle 'peer-update/krasis-control.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
-go build -trimpath -tags desktop,production -ldflags "-s -w -H windowsgui -X main.controlSHA256=$controlHash" -o (Join-Path $bundle 'krasis-workspace.exe') ./cmd/krasis-workspace
+go build -trimpath -tags desktop,production -ldflags "-s -w -H windowsgui -X main.controlSHA256=$controlHash" -o (Join-Path $bundle 'krasis.exe') ./cmd/krasis-workspace
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 node scripts/check-workspace-package.mjs $bundle
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-$files = @('krasis-workspace.exe','START-HERE.md','THIRD-PARTY-NOTICES.txt')
+$files = @('krasis.exe','START-HERE.md','THIRD-PARTY-NOTICES.txt')
 $sums = foreach ($file in $files) { (Get-FileHash -LiteralPath (Join-Path $bundle $file) -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $file }
 [IO.File]::WriteAllLines((Join-Path $bundle 'SHA256SUMS.txt'), $sums, [Text.UTF8Encoding]::new($false))
 $files += @('SHA256SUMS.txt','peer-update')
-$archive = "dist/workspace/krasis-workspace-$revision.zip"
+$archive = "dist/workspace/krasis-$revision.zip"
 Compress-Archive -LiteralPath ($files | ForEach-Object {Join-Path $bundle $_}) -DestinationPath $archive
 Write-Output "Workspace packaged: $archive (shared UI and agent; installed processes unchanged)."
