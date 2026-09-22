@@ -136,8 +136,7 @@ GUI는 기존 agent 소유권 잠금이 해제된 뒤 새 agent를 실행한다.
 `%LOCALAPPDATA%\Krasis\diagnostics`의 `agent.jsonl`, `control.jsonl`에 시작·종료,
 준비 실패, 연결 시작·실패·상태 전이를 기록한다. 각 파일은 256KiB까지 쓰고 이전 파일 하나
 (`*.previous.jsonl`)만 남기므로 정상 운용 시 총 1MiB 이하이다. 인터넷 전송은 없다.
-고정 이벤트 코드, UTC 시각, PID, build revision과 아래 경계 요약만 허용하며 오류 원문, 키 입력, 마우스 이동 경로,
-별칭, IP, 토큰, 기기 키는 기록하지 않는다. raw stderr나 메모리 덤프도 수집하지 않는다.
+고정 이벤트 코드, UTC 시각, PID, 검증된 build SHA/buildDirty, run/connection/sequence/elapsed와 검증된 boundary/injection/retry/runtime 요약만 허용한다. PID 및 자유 문자열(오류 원문, 키 입력, 마우스 이동 경로, 별칭, IP, 토큰, 기기 키, 원시 입력, 윈도우 제목, desktop 이름, 검증되지 않은 build 문자열)은 제외한다. raw stderr나 메모리 덤프도 수집하지 않는다.
 기록은 제한된 큐에서 처리하여 입력 경로에서 디스크를 기다리지 않는다. 큐 초과·쓰기 실패는
 GUI 경고 또는 agent diagnostics의 `log_incomplete` counter로 알린다. 정상 종료는 최대 2초
 drain하며 강제 종료·전원 차단 직전의 큐 항목은 유실될 수 있다. 저장 권한 오류나 디스크 고장은
@@ -151,9 +150,9 @@ runtime API가 없는 더 오래된 agent를 재사용하는 경우 control 로�
 `진단 내보내기`를 누르면 `%LOCALAPPDATA%\Krasis\diagnostics\support-latest.json`에
 최근 이벤트 기록을 저장한다. 하단 경로를 선택해 복사할 수 있다. 내보낼 때마다 이전 진단
 파일 하나만 교체하므로 과거 자료가 필요하면 먼저 별도 보관한다. 자동 업로드는 하지 않는다.
-네 개의 지정 로그만 파일당 256KiB까지 읽고, 허용된 이벤트 코드와 정규화한 UTC 시각만
-다시 구성한다. 경계 요약은 지정된 숫자 필드와 LEFT/RIGHT 값만 검증하여 추가한다.
-PIN, 별칭, IP, PID, build 문자열, 키, 토큰, 원문 오류는 내보내지 않는다.
+네 개의 지정 로그만 파일당 256KiB까지 읽고, 허용된 이벤트 코드와 정규화한 UTC 시각,
+검증된 build SHA/buildDirty, run/connection/sequence/elapsed, 검증된 boundary/injection/retry/runtime 요약만
+다시 구성한다. PID 및 자유 문자열(PIN, 별칭, IP, 검증되지 않은 build 문자열, 키, 토큰, 원문 오류, 원시 입력, 윈도우 제목, desktop 이름)은 내보내지 않는다.
 identity/trust/control 폴더 및 다른 파일은 수집하지 않는다.
 
 AgentGeneration 7은 `boundary_summary` 이벤트를 연결 실행 시작과 정상 반환 시 기록한다.
@@ -178,10 +177,10 @@ AgentGeneration 8부터 입력 에이전트와 crash guard는 시작 직후 모�
 실제 두 PC에서 화면 끝 전환과 복귀는 별도로 확인해야 한다.
 
 AgentGeneration 9는 재시도 대기 진입마다 고정된 `reconnect_*` 원인 이벤트를 남긴다.
-`reconnect_acquire_failed`는 연결 획득 실패이며 활성 제어 중 단절과 구분한다.
+`reconnect_acquire_failed`는 연결 획득 실패이며 활성 제어 중 단절과 구분한다. cursor-present/restore/release 단계 오류는 보존되어 작업자 종료 오류로 합쳐지고, `Destroy` 실패 시 window와 registry 등록을 유지하므로 recovery 확인으로 승격하지 않는다. `ShowCursor`/`ClipCursor`는 쓰지 않고 보조 window로만 커서를 표현한다.
 `reconnect_remote_eof`는 상대가 스트림을 닫았다는 뜻이지 상대가 정상 종료했다는 증거는 아니다.
 `reconnect_read_io_failure`, `reconnect_*_write_failed`, `reconnect_*_dispatch_failed`는
-읽기, 쓰기, 메시지 처리 실패를 구분한다. capture/focus 관련 코드는 입력 캡처·포커스 단계의 실패다.
+읽기, 쓰기, 메시지 처리 실패를 구분한다. capture/focus 관련 코드는 입력 캡처·포커스 단계의 실패다. capture `setError`는 `session.Abort`로 즉시 suppression을 영구 중단하며, normal inactive 입력은 승격하지 않는다. source cleanup 확인 전에는 재사용하지 않는다.
 `heartbeat_timeout_observed`는 반환 오류에 하트비트 만료가 포함됐음을 독립적으로 표시한다.
 다른 정리 오류가 주된 원인 코드로 선택돼도 이 표시는 남으며, 원인이 네트워크인지 스케줄링인지까지
 확정하지는 않는다. 알 수 없는 사유는 `reconnect_session_unknown`으로 기록한다.
@@ -201,6 +200,7 @@ liveness 갱신 횟수로 해석하지 않는다. 이 수정은 캡처 실패나
 이벤트 이력이며 현재 연결 상태나 완전한 크래시 보고서가 아니다. 기록 시각은 사용 패턴을
 드러낼 수 있으므로 공유 전에 내용을 확인한다. PIN 등록 중에는 내보내기를 비활성화한다.
 저장 실패 시 기존 진단 파일은 유지하고 저장 공간·폴더 권한 확인 안내를 표시한다.
+`runtime_summary`는 5초 주기와 종료 시 기록된다. 힙 크기, 집계 구간 할당량, GC 일시정지와 runnable 지연 상한 버킷, working set과 집계 구간 CPU 시간, 타이머 늦음, 훅 호출·원시 입력 진행, 수신 대기 및 프레임 처리 시작 후 경과 시간과 처리 종류·최대 시간을 담는다. AllocatedBytes와 CPUMicros는 누적 총량이 아니라 이전/현재 샘플 차이다. 콜백 전체 시간에는 외부 `CallNextHookEx` 체인이 포함되므로 관찰값만으로 특정 제품이 원인이라고 단정하지 않는다. 원시 입력과 윈도우 제목, desktop 이름은 수집하지 않는다. 카운터는 원자적 핫패스와 worker 집계이며, 근사 관측값은 lease 검증을 대신하지 않는다. 오래된 idle read는 단절이 아니다. `desktop_switch` 통지 시 기존 process owner를 취소하므로 새 lease가 필요하며, 실제 UAC 전환과 두 PC 검증은 하지 않았다. 화면 좌표가 바뀌면 기존 session은 영구 무효화되며, source boundary/activation과 inbound prepare/commit을 다시 검증하고 pending은 rollback한 뒤 새 runner에서만 재구성한다. 실제 DPI/모니터 전환 테스트는 하지 않았다.
 일반 support export는 best-effort다. 최대 6초만 관측하고, 동시 export worker는 1개이며, 늦은 결과가 lifecycle 상태를 변경하지 않는다. 저장 실패나 지연은 `diagnostic_failed` 안내로 남지만 Startup.Ensure나 정상 reacquire를 막지 않는다. 입력 안전에 필수인 상태 저장과 guard 실패는 여전히 차단한다.
 임시 파일을 동기화한 뒤 교체하지만 전원 차단 시 저장 완료까지 보장하지는 않는다.
 
