@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/0disoft/krasis/internal/application"
+	"github.com/0disoft/krasis/internal/crashguard"
 	"net"
 	"sync"
 
@@ -24,6 +25,27 @@ type FailureDescriptor struct {
 }
 
 func DescribeSessionFailure(err error) FailureDescriptor {
+	var guard *crashguard.Failure
+	if errors.As(err, &guard) || errors.Is(err, crashguard.ErrUnexpectedExit) {
+		phase, code := "lifecycle", "exited"
+		if guard != nil {
+			phase = "ipc"
+			switch guard.Operation {
+			case "prepare", "release", "cancel-prepare", "close":
+				phase = guard.Operation
+			}
+			code = "failed"
+		}
+		switch {
+		case errors.Is(err, crashguard.ErrRecoveryFailed):
+			code = "recovery_failed"
+		case errors.Is(err, crashguard.ErrIPCTimeout):
+			code = "timeout"
+		case errors.Is(err, crashguard.ErrExitTimeout):
+			code = "exit_timeout"
+		}
+		return FailureDescriptor{Component: "crash-guard", Phase: phase, Code: code}
+	}
 	switch {
 	case errors.Is(err, wininput.ErrSourceShutdownPost):
 		return FailureDescriptor{Component: "source-hook", Phase: "shutdown-post", Code: "failed"}

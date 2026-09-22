@@ -215,6 +215,9 @@ func readAck(reader io.Reader, expected operation) (status, error) {
 		return statusRejected, errors.New("crash guard acknowledgement is invalid")
 	}
 	result := status(payload[6])
+	if expected == operationDisarm && result == statusRejected {
+		return result, ErrRecoveryFailed
+	}
 	if result != statusOK && !(expected == operationPreparePress && result == statusAlreadyPrepared) {
 		return result, fmt.Errorf("crash guard rejected operation %d", expected)
 	}

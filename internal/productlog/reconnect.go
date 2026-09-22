@@ -27,6 +27,11 @@ var reconnectReasons = map[[3]string]string{
 }
 
 func init() {
+	for _, phase := range []string{"lifecycle", "ipc", "prepare", "release", "cancel-prepare", "close"} {
+		for _, code := range []string{"exited", "failed", "recovery_failed", "timeout", "exit_timeout"} {
+			reconnectReasons[[3]string{"crash-guard", phase, code}] = "reconnect_guard_" + strings.ReplaceAll(phase, "-", "_") + "_" + code
+		}
+	}
 	for _, stage := range []string{"shutdown-post", "owner-acquire"} {
 		reconnectReasons[[3]string{"source-hook", stage, "failed"}] = "reconnect_source_" + strings.ReplaceAll(stage, "-", "_") + "_failed"
 	}

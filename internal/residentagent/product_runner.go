@@ -99,8 +99,15 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 		if err != nil {
 			return err
 		}
-		ctx, cancel := context.WithDeadline(parent, prepared.deadline)
+		deadlineCtx, cancel := context.WithDeadline(parent, prepared.deadline)
 		defer cancel()
+		ctx, cancelCause := context.WithCancelCause(deadlineCtx)
+		defer cancelCause(context.Canceled)
+		defer func() {
+			if errors.Is(context.Cause(ctx), crashguard.ErrUnexpectedExit) {
+				err = errors.Join(err, crashguard.ErrUnexpectedExit)
+			}
+		}()
 		for _, start := range auxiliary {
 			start(ctx, alias, prepared)
 		}
@@ -140,7 +147,12 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 			monitorProductSession(ctx, ticker.C, guard.Done(), func() error {
 				_, checkErr := trust.PeerCertificate(prepared.peer, time.Now())
 				return checkErr
-			}, cancel, log.Event)
+			}, cancel, func(code string) {
+				log.Event(code)
+				if code == "session_guard_exited" {
+					cancelCause(crashguard.ErrUnexpectedExit)
+				}
+			})
 		}()
 		defer func() { cancel(); <-monitorDone }()
 		config := agent.DefaultConfig(control.BoundaryConfig{Edge: control.ScreenEdge(prepared.profile.Edge), ScreenLeft: diagnostics.Display.Left, ScreenWidth: diagnostics.Display.Width, RearmDistance: prepared.profile.Rearm()})

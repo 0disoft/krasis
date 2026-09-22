@@ -103,7 +103,7 @@ func (process *Process) PreparePress(token control.PressedToken) (bool, error) {
 		return err
 	})
 	if err != nil {
-		return false, err
+		return false, operationFailure("prepare", err)
 	}
 	return prepared, nil
 }
@@ -112,14 +112,14 @@ func (process *Process) Released(token control.PressedToken) error {
 	if process == nil || process.client == nil {
 		return errors.New("crash guard process is not initialized")
 	}
-	return process.invoke(func() error { return process.client.Released(token) })
+	return operationFailure("release", process.invoke(func() error { return process.client.Released(token) }))
 }
 
 func (process *Process) CancelPreparedPress(token control.PressedToken) error {
 	if process == nil || process.client == nil {
 		return errors.New("crash guard process is not initialized")
 	}
-	return process.invoke(func() error { return process.client.CancelPreparedPress(token) })
+	return operationFailure("cancel-prepare", process.invoke(func() error { return process.client.CancelPreparedPress(token) }))
 }
 
 func (process *Process) Done() <-chan struct{} {
@@ -143,7 +143,7 @@ func (process *Process) Close() error {
 	case <-time.After(processIPCTimeout):
 		process.abortProcess()
 		<-process.done
-		disarmErr = errors.Join(disarmErr, errors.New("crash guard exit timed out"))
+		disarmErr = errors.Join(disarmErr, ErrExitTimeout)
 	}
 	process.mu.Lock()
 	waitErr := process.waitErr
@@ -152,7 +152,7 @@ func (process *Process) Close() error {
 	if waitErr != nil && stderr != "" {
 		waitErr = fmt.Errorf("crash guard exited: %w: %s", waitErr, stderr)
 	}
-	return errors.Join(disarmErr, closeErr, waitErr)
+	return operationFailure("close", errors.Join(disarmErr, closeErr, waitErr))
 }
 
 func (process *Process) invoke(operation func() error) error {
@@ -165,7 +165,7 @@ func (process *Process) invoke(operation func() error) error {
 		return err
 	case <-timer.C:
 		process.abortProcess()
-		return errors.New("crash guard IPC timed out")
+		return ErrIPCTimeout
 	}
 }
 
