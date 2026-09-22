@@ -128,8 +128,10 @@ func (monitor *Monitor) Close() error {
 
 func (monitor *Monitor) run() {
 	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
 	defer close(monitor.done)
+	// Return the OS thread before announcing completion. A fast restart must
+	// not force a fresh locked thread while the previous one is still owned.
+	defer runtime.UnlockOSThread()
 	defer close(monitor.events)
 	thread, _, _ := procGetCurrentThreadID.Call()
 	monitor.thread.Store(uint32(thread))
