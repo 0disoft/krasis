@@ -89,18 +89,12 @@ func (controller *OutboundController) GrantPeer(
 		return errors.New("outbound controller requires a lease grant")
 	}
 	observeControlFlow(controller.Observer, ControlFlowGrantReceived)
+	preparationStarted := time.Now()
 	return controller.Coordinator.Execute(ctx, func(writer FrameWriter) error {
-		if _, err := controller.Runtime.GrantOutbound(
-			ctx,
-			command.SessionID,
-			command.LeaseID,
-			command.Epoch,
-			observedAt,
-		); err != nil {
+		if err := controller.Runtime.ValidateOutboundPreparation(ctx, command.SessionID, command.LeaseID, command.Epoch, observedAt); err != nil {
 			observeControlFlow(controller.Observer, ControlFlowGrantApplyFailed)
-			return fmt.Errorf("%w: %w", ErrOutboundGrantApply, err)
+			return failRuntime(ctx, controller.Runtime, fmt.Errorf("%w: %w", ErrOutboundGrantApply, err))
 		}
-		observeControlFlow(controller.Observer, ControlFlowGrantApplySucceeded)
 		if err := controller.Source.Activate(); err != nil {
 			controller.Source.Deactivate()
 			abort := transport.ControlCommand{
@@ -119,6 +113,18 @@ func (controller *OutboundController) GrantPeer(
 			}
 			return nil
 		}
+		if err := controller.Runtime.ValidateOutboundPreparation(ctx, command.SessionID, command.LeaseID, command.Epoch, observedAt); err != nil {
+			controller.Source.Deactivate()
+			return failRuntime(ctx, controller.Runtime, fmt.Errorf("%w: %w", ErrOutboundGrantApply, err))
+		}
+		// Preserve the observation clock's origin, but begin active liveness only
+		// after preparation. Input writes remain behind this semantic gate until commit.
+		if _, err := controller.Runtime.GrantOutbound(ctx, command.SessionID, command.LeaseID, command.Epoch, observedAt.Add(time.Since(preparationStarted))); err != nil {
+			controller.Source.Deactivate()
+			observeControlFlow(controller.Observer, ControlFlowGrantApplyFailed)
+			return fmt.Errorf("%w: %w", ErrOutboundGrantApply, err)
+		}
+		observeControlFlow(controller.Observer, ControlFlowGrantApplySucceeded)
 		commit := transport.ControlCommand{
 			Kind: transport.ControlLeaseCommit, SessionID: command.SessionID,
 			LeaseID: command.LeaseID, Epoch: command.Epoch,
