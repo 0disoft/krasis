@@ -245,12 +245,12 @@ func runSourceLowLevelHookThread(
 	timing HookTimingObserver,
 	ready func(),
 	shields ...*returnCursorShield,
-) error {
+) (resultErr error) {
 	var shield *returnCursorShield
 	if len(shields) != 0 {
 		shield = shields[0]
 		shield.open()
-		defer shield.close()
+		defer func() { resultErr = errors.Join(resultErr, shield.close()) }()
 	}
 	threadID, _, _ := procGetCurrentThreadID.Call()
 	var bootstrapMessage message
@@ -258,7 +258,10 @@ func runSourceLowLevelHookThread(
 	mapper := &sourceKeyboardMapper{}
 	keyboardCallback := func(code int, wParam uintptr, lParam uintptr) uintptr {
 		if code == hcAction && lParam != 0 {
-			shield.beforeInput()
+			if err := shield.beforeInput(); err != nil {
+				session.Abort(err)
+				return callNextHook(code, wParam, lParam)
+			}
 			if routeMappedPhysicalAction(session, boundary, func() (control.InputAction, bool, int32, error) {
 				data := *(*keyboardHookData)(unsafe.Pointer(lParam))
 				action, emitted, err := mapper.keyboard(uint32(wParam), data)
@@ -271,7 +274,10 @@ func runSourceLowLevelHookThread(
 	}
 	mouseCallback := func(code int, wParam uintptr, lParam uintptr) uintptr {
 		if code == hcAction && lParam != 0 {
-			shield.beforeInput()
+			if err := shield.beforeInput(); err != nil {
+				session.Abort(err)
+				return callNextHook(code, wParam, lParam)
+			}
 			data := *(*mouseHookData)(unsafe.Pointer(lParam))
 			message := uint32(wParam)
 			if action, button := mapSourceHookButton(message, data); button {

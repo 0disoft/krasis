@@ -3,6 +3,8 @@
 package wininput
 
 import (
+	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -22,6 +24,21 @@ type returnCursorShield struct {
 	mu         sync.Mutex
 	position   point
 	visible    bool // accessed only on the owning hook thread
+	failure    atomic.Pointer[returnCursorFailure]
+}
+
+type returnCursorFailure struct{ err error }
+
+func (shield *returnCursorShield) record(stage string, err error) {
+	if err != nil {
+		shield.failure.CompareAndSwap(nil, &returnCursorFailure{sourceStage(stage, err)})
+	}
+}
+func (shield *returnCursorShield) failureResult() error {
+	if value := shield.failure.Load(); value != nil {
+		return value.err
+	}
+	return nil
 }
 
 var (
@@ -30,14 +47,36 @@ var (
 	returnCursorClassOK      bool
 	returnCursorWindows      sync.Map
 	returnCursorSet          = user32.NewProc("SetCursor")
-	returnCursorHideWindow   = func(window uintptr) { procShowWindowTouchpad.Call(window, swHide) }
-	returnCursorPost         = func(window uintptr, message uint32, generation uint64) {
-		procPostMessageWTouchpad.Call(window, uintptr(message), uintptr(generation), 0)
+	returnCursorVisible      = user32.NewProc("IsWindowVisible")
+	returnCursorDestroy      = func(window uintptr) error {
+		if ok, _, err := procDestroyWindow.Call(window); ok == 0 {
+			return fmt.Errorf("DestroyWindow(return cursor): %w", err)
+		}
+		return nil
 	}
-	returnCursorShowWindow = func(window uintptr, p point) {
+	returnCursorHideWindow = func(window uintptr) error {
+		procShowWindowTouchpad.Call(window, swHide)
+		if visible, _, _ := returnCursorVisible.Call(window); visible != 0 {
+			return errors.New("return cursor window remained visible")
+		}
+		return nil
+	}
+	returnCursorPost = func(window uintptr, message uint32, generation uint64) error {
+		if ok, _, err := procPostMessageWTouchpad.Call(window, uintptr(message), uintptr(generation), 0); ok == 0 {
+			return fmt.Errorf("PostMessageW(return cursor): %w", err)
+		}
+		return nil
+	}
+	returnCursorShowWindow = func(window uintptr, p point) error {
 		// Nonzero alpha preserves hit testing; no activation, capture or focus.
-		procSetWindowPosSourceCapture.Call(window, ^uintptr(0), uintptr(uint32(p.X-12)), uintptr(uint32(p.Y-12)), 24, 24, 0x10|0x40)
+		if ok, _, err := procSetWindowPosSourceCapture.Call(window, ^uintptr(0), uintptr(uint32(p.X-12)), uintptr(uint32(p.Y-12)), 24, 24, 0x10|0x40); ok == 0 {
+			return fmt.Errorf("SetWindowPos(return cursor): %w", err)
+		}
 		returnCursorSet.Call(0)
+		if visible, _, _ := returnCursorVisible.Call(window); visible == 0 {
+			return errors.New("return cursor window was not visible")
+		}
+		return nil
 	}
 	returnCursorPosition = cursorPosition
 	returnCursorWndProc  = syscall.NewCallback(func(window uintptr, message uint32, wParam, lParam uintptr) uintptr {
@@ -81,7 +120,7 @@ func (shield *returnCursorShield) prepare() func() {
 		}
 		shield.position = position
 		if window := shield.window.Load(); window != 0 {
-			returnCursorPost(window, wmReturnCursorShow, generation)
+			shield.record("cursor-present", returnCursorPost(window, wmReturnCursorShow, generation))
 		}
 	}
 }
@@ -97,24 +136,28 @@ func (shield *returnCursorShield) show(generation uint64) {
 		return
 	}
 	if window := shield.window.Load(); window != 0 {
-		returnCursorShowWindow(window, position)
 		shield.visible = true
+		shield.record("cursor-present", returnCursorShowWindow(window, position))
 	}
 }
 
 func (shield *returnCursorShield) hide() {
 	if shield.visible {
-		returnCursorHideWindow(shield.window.Load())
-		shield.visible = false
+		if err := returnCursorHideWindow(shield.window.Load()); err != nil {
+			shield.record("cursor-restore", err)
+		} else {
+			shield.visible = false
+		}
 	}
 }
 
-func (shield *returnCursorShield) beforeInput() {
+func (shield *returnCursorShield) beforeInput() error {
 	if shield == nil {
-		return
+		return nil
 	}
 	shield.generation.Add(1)
 	shield.hide()
+	return shield.failureResult()
 }
 
 func (shield *returnCursorShield) restore() {
@@ -123,7 +166,7 @@ func (shield *returnCursorShield) restore() {
 	}
 	generation := shield.generation.Add(1)
 	if window := shield.window.Load(); window != 0 {
-		returnCursorPost(window, wmReturnCursorHide, generation)
+		shield.record("cursor-restore", returnCursorPost(window, wmReturnCursorHide, generation))
 	}
 }
 
@@ -144,20 +187,26 @@ func (shield *returnCursorShield) open() {
 	if window == 0 {
 		return
 	}
-	if err := configureSourceWheelCaptureAppearance(window); err != nil {
-		procDestroyWindow.Call(window)
-		return
-	}
 	returnCursorWindows.Store(window, shield)
 	shield.generation.Add(1)
 	shield.window.Store(window)
+	if err := configureSourceWheelCaptureAppearance(window); err != nil {
+		_ = shield.close() // Preserve any failed native cleanup for the worker result.
+		return
+	}
 }
 
-func (shield *returnCursorShield) close() {
+func (shield *returnCursorShield) close() error {
 	shield.beforeInput()
-	window := shield.window.Swap(0)
+	window := shield.window.Load()
 	if window != 0 {
-		returnCursorWindows.Delete(window)
-		procDestroyWindow.Call(window)
+		if err := returnCursorDestroy(window); err != nil {
+			shield.record("cursor-release", err)
+		} else {
+			returnCursorWindows.Delete(window)
+			shield.window.Store(0)
+			shield.visible = false
+		}
 	}
+	return shield.failureResult()
 }

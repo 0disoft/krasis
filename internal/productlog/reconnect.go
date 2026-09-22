@@ -54,7 +54,7 @@ func init() {
 		reconnectReasons[[3]string{"supervisor", phase, "failed"}] = "reconnect_supervisor_" + strings.ReplaceAll(phase, "-", "_") + "_failed"
 	}
 	reconnectReasons[[3]string{"recovery", "deadline", "exceeded"}] = "reconnect_recovery_deadline_exceeded"
-	for _, stage := range []string{"low-level-hook", "raw-mouse", "wheel-capture", "thread-join", "hook-install", "hook-release", "raw-register", "raw-release", "raw-read", "raw-buffer", "raw-route", "message-loop", "pointer-snapshot"} {
+	for _, stage := range []string{"low-level-hook", "raw-mouse", "wheel-capture", "thread-join", "hook-install", "hook-release", "raw-register", "raw-release", "raw-read", "raw-buffer", "raw-route", "message-loop", "pointer-snapshot", "cursor-present", "cursor-restore", "cursor-release"} {
 		reconnectReasons[[3]string{"source-hook", stage, "failed"}] = "reconnect_source_" + strings.ReplaceAll(stage, "-", "_") + "_failed"
 	}
 	for _, phase := range []string{"capture-activate", "focus-restore"} {
