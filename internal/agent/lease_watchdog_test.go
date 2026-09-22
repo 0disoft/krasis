@@ -63,3 +63,17 @@ func TestWatchdogBoundsPendingHandshake(t *testing.T) {
 		}
 	})
 }
+
+func TestWatchdogUsesExecutionTimeAfterDelayedTick(t *testing.T) {
+	start := time.Unix(100, 0)
+	ticks := make(chan time.Time, 1)
+	ticks <- start.Add(250 * time.Millisecond)
+	watch := application.LeaseWatch{State: control.StateInboundActive, Progress: start}
+	stopped := false
+	err := runLeaseWatchdogTicks(context.Background(), func() application.LeaseWatch { return watch },
+		LivenessPolicy{HeartbeatInterval: 250 * time.Millisecond, PeerTimeout: 2 * time.Second},
+		func(error) { stopped = true }, ticks, func() time.Time { return start.Add(3 * time.Second) })
+	if !stopped || !errors.Is(err, peer.ErrPeerLivenessExpired) {
+		t.Fatalf("delayed worker retained expired lease: %v", err)
+	}
+}
