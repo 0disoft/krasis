@@ -18,9 +18,10 @@ type productInputGuard interface {
 
 type guardedProductInput struct {
 	agent.InputBoundaryPort
-	guard productInputGuard
-	log   *productlog.Logger
-	mu    sync.Mutex
+	guard    productInputGuard
+	log      *productlog.Logger
+	mu       sync.Mutex
+	geometry func() error
 }
 
 func (input *guardedProductInput) Press(ctx context.Context, token control.PressedToken) error {
@@ -62,9 +63,28 @@ func (input *guardedProductInput) Wheel(ctx context.Context, x, y int32) error {
 	return err
 }
 func (input *guardedProductInput) PrepareEntry(ctx context.Context, edge control.ScreenEdge) error {
+	if err := input.ValidateEntry(ctx); err != nil {
+		return err
+	}
 	err := input.InputBoundaryPort.PrepareEntry(ctx, edge)
 	input.log.Injection("entry", err)
+	if err == nil {
+		return input.ValidateEntry(ctx)
+	}
 	return err
+}
+
+func (input *guardedProductInput) ValidateEntry(ctx context.Context) error {
+	if ctx == nil {
+		return errors.New("entry validation context is required")
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if input.geometry != nil {
+		return input.geometry()
+	}
+	return nil
 }
 func (input *guardedProductInput) RollbackEntry(ctx context.Context) (application.CursorRollbackOutcome, error) {
 	outcome, err := input.InputBoundaryPort.RollbackEntry(ctx)

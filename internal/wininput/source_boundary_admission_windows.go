@@ -129,6 +129,11 @@ func (hook *SourceHook) AdmitBoundary(ctx context.Context, _ control.BoundaryInt
 	if err := ctx.Err(); err != nil {
 		return 0, err
 	}
+	if hook.boundaryGuard != nil {
+		if err := hook.boundaryGuard(); err != nil {
+			return 0, err
+		}
+	}
 	info := sourceGUIThreadInfo{Size: uint32(unsafe.Sizeof(sourceGUIThreadInfo{}))}
 	if err := sourceForegroundGUIThreadInfo(&info); err != nil {
 		return 0, fmt.Errorf("inspect foreground GUI thread: %w", err)
@@ -154,6 +159,11 @@ func (hook *SourceHook) AdmitBoundary(ctx context.Context, _ control.BoundaryInt
 	}
 	if sourceAnyInputPressed() {
 		return peer.BoundaryAdmissionBlockedPressedInput, nil
+	}
+	if hook.boundaryGuard != nil {
+		if err := hook.boundaryGuard(); err != nil {
+			return 0, err
+		}
 	}
 	return peer.BoundaryAdmissionAllowed, nil
 }

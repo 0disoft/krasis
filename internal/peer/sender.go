@@ -182,6 +182,10 @@ type CursorEntryPort interface {
 	RollbackEntry(context.Context) (application.CursorRollbackOutcome, error)
 }
 
+// Optional prepared-state validation immediately before committing an entry.
+// A failure uses the same rollback path as any other pending lease failure.
+type CursorEntryValidator interface{ ValidateEntry(context.Context) error }
+
 type ReturnBoundaryPort interface {
 	ArmReturn(control.ReturnIntent, control.ScreenEdge) error
 	RearmReturn(control.ReturnIntent)
@@ -305,6 +309,11 @@ func (responder *LeaseResponder) HandleLeaseCommit(
 		observeControlFlow(responder.Observer, ControlFlowCommitReceived)
 		if !responder.matchesPending(command) {
 			return errors.New("lease commit does not match the prepared inbound lease")
+		}
+		if validator, ok := responder.Entry.(CursorEntryValidator); ok {
+			if err := validator.ValidateEntry(ctx); err != nil {
+				return responder.abortPendingLocked(ctx, err)
+			}
 		}
 		if _, err := responder.Runtime.CommitInbound(ctx, command.SessionID, command.LeaseID, command.Epoch, observedAt); err != nil {
 			return responder.abortPendingLocked(ctx, err)

@@ -17,10 +17,11 @@ import (
 const wmSourceReady = 0x8002
 
 type SourceHook struct {
-	timing       HookTimingObserver
-	observer     SourcePipelineObserver
-	capture      *sourceWheelCapture
-	returnCursor returnCursorShield
+	boundaryGuard func() error
+	timing        HookTimingObserver
+	observer      SourcePipelineObserver
+	capture       *sourceWheelCapture
+	returnCursor  returnCursorShield
 }
 
 type sourceInputThreadResult struct {
@@ -54,6 +55,9 @@ func NewSourceHookObserved(observer SourcePipelineObserver) *SourceHook {
 func (hook *SourceHook) SourceCapture() SourceActivation {
 	if hook == nil {
 		return nil
+	}
+	if hook.boundaryGuard != nil {
+		return &guardedSourceActivation{SourceActivation: hook.capture, check: hook.boundaryGuard}
 	}
 	return hook.capture
 }

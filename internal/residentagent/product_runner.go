@@ -182,8 +182,12 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 		config.Liveness = &agent.LivenessPolicy{HeartbeatInterval: 250 * time.Millisecond, PeerTimeout: 2 * time.Second}
 		backoff := agent.DefaultBackoffPolicy()
 		backoff.Jitter = true
+		geometry := wininput.DisplayGeometry{Count: diagnostics.Display.MonitorCount, Left: diagnostics.Display.Left, Top: diagnostics.Display.Top, Width: diagnostics.Display.Width, Height: diagnostics.Display.Height}
+		checkGeometry := displayGeometryGuard(ctx, geometry, wininput.CurrentDisplayGeometry, func() { log.Event("lifecycle_display_change"); cancelCause(wininput.ErrDisplayGeometryChanged) })
+		hook := wininput.NewSourceHook(progress)
+		hook.SetBoundaryGuard(checkGeometry)
 		return agent.RunSupervisor(ctx, agent.SupervisorConfig{Session: config, Backoff: backoff, Now: time.Now, Wait: agent.Wait, Observer: observer}, agent.SupervisorDependencies{
-			Source: source, Hook: wininput.NewSourceHook(progress), Input: &guardedProductInput{InputBoundaryPort: input, guard: guard, log: log}, Effects: agent.RuntimeEffects{}, Authorizer: productAuthorizer{trust}, RunSession: agent.RunSession,
+			Source: source, Hook: hook, Input: &guardedProductInput{InputBoundaryPort: input, guard: guard, log: log, geometry: checkGeometry}, Effects: agent.RuntimeEffects{}, Authorizer: productAuthorizer{trust}, RunSession: agent.RunSession,
 		})
 	}
 }

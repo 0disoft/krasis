@@ -7,7 +7,7 @@ import (
 	"fmt"
 )
 
-type SourceHook struct{}
+type SourceHook struct{ boundaryGuard func() error }
 
 func NewSourceHook(...HookTimingObserver) *SourceHook { return &SourceHook{} }
 
