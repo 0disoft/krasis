@@ -34,9 +34,12 @@ type UpdateSettingsClient interface {
 }
 
 type UpdateSettingsBridge struct {
-	ctx  context.Context
-	open func() (UpdateSettingsClient, error)
-	mu   sync.Mutex
+	ctx              context.Context
+	open             func() (UpdateSettingsClient, error)
+	mu               sync.Mutex
+	bundleDirectory  string
+	transfer         UpdateTransferSnapshot
+	transferInstance string
 }
 
 func NewUpdateSettingsBridge(ctx context.Context, open func() (UpdateSettingsClient, error)) *UpdateSettingsBridge {

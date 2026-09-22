@@ -31,5 +31,8 @@ foreach ($line in Get-Content -LiteralPath 'go.mod') {
 }
 [IO.File]::WriteAllLines((Join-Path (Get-Location) 'dist/workspace/THIRD-PARTY-NOTICES.txt'), $notice, [Text.UTF8Encoding]::new($false))
 $files += @('SHA256SUMS.txt','START-HERE.md','THIRD-PARTY-NOTICES.txt')
+node scripts/build-workspace-update.mjs
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$files += 'peer-update'
 Compress-Archive -LiteralPath ($files | ForEach-Object {Join-Path 'dist/workspace' $_}) -DestinationPath 'dist/workspace/krasis-workspace-test.zip' -Force
 Write-Output 'Workspace and verified sibling agent packaged; no installed process was started or changed.'
