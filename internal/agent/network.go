@@ -209,9 +209,27 @@ func (source *ListenSource) Close() error {
 
 func (source *ListenSource) acceptLoop() {
 	defer source.workers.Done()
+	var retryDelay time.Duration
 	for {
 		connection, err := source.listener.Accept()
 		if err != nil {
+			var temporary interface{ Temporary() bool }
+			if source.shutdown.Err() == nil && !errors.Is(err, net.ErrClosed) && errors.As(err, &temporary) && temporary.Temporary() {
+				if retryDelay == 0 {
+					retryDelay = 5 * time.Millisecond
+				} else {
+					retryDelay = min(retryDelay*2, time.Second)
+				}
+				// Keep the same listener and pending round; cancellation interrupts backoff.
+				timer := time.NewTimer(retryDelay)
+				select {
+				case <-source.shutdown.Done():
+					timer.Stop()
+					return
+				case <-timer.C:
+					continue
+				}
+			}
 			if source.shutdown.Err() == nil {
 				source.roundMu.Lock()
 				source.acceptErr = err
@@ -223,6 +241,7 @@ func (source *ListenSource) acceptLoop() {
 			}
 			return
 		}
+		retryDelay = 0
 		source.roundMu.Lock()
 		round := source.round
 		source.roundMu.Unlock()

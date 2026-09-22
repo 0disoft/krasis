@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/0disoft/krasis/internal/peercredentials"
@@ -56,6 +57,15 @@ func TestListenSourceRejectsUnspecifiedNetworkPolicyBeforeBinding(t *testing.T) 
 }
 
 func TestListenAndDialSourcesAuthenticatePeerConnection(t *testing.T) {
+	testListenAndDialSourcesAuthenticatePeerConnection(t, false)
+}
+
+func TestListenSourceRecoversTemporaryAcceptFailure(t *testing.T) {
+	testListenAndDialSourcesAuthenticatePeerConnection(t, true)
+}
+
+func testListenAndDialSourcesAuthenticatePeerConnection(t *testing.T, failOnce bool) {
+	t.Helper()
 	directory := filepath.Join(t.TempDir(), "credentials")
 	if _, err := peercredentials.Generate(directory, "127.0.0.1", time.Now()); err != nil {
 		t.Fatalf("Generate() error = %v", err)
@@ -71,7 +81,16 @@ func TestListenAndDialSourcesAuthenticatePeerConnection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	listener, err := NewListenSource("127.0.0.1:0", serverTLS)
+	socket, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = socket.Close() })
+	var underlying net.Listener = socket
+	if failOnce {
+		underlying = &temporaryAcceptListener{Listener: socket}
+	}
+	listener, err := newListenSource(underlying, serverTLS, time.Second, 4)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,6 +124,69 @@ func TestListenAndDialSourcesAuthenticatePeerConnection(t *testing.T) {
 	metrics := listener.PreAuthMetrics()
 	if metrics.Admitted != 1 || metrics.Authenticated != 1 {
 		t.Fatalf("pre-auth metrics = %+v", metrics)
+	}
+}
+
+type temporaryAcceptError struct{}
+
+func (temporaryAcceptError) Error() string   { return "temporary accept failure" }
+func (temporaryAcceptError) Temporary() bool { return true }
+
+type temporaryAcceptListener struct {
+	net.Listener
+	failed bool
+}
+
+type repeatedTemporaryListener struct {
+	closeErrorListener
+	attempts int
+}
+
+func (listener *repeatedTemporaryListener) Accept() (net.Conn, error) {
+	listener.attempts++
+	return nil, temporaryAcceptError{}
+}
+
+func TestListenSourceCloseInterruptsTemporaryErrorBackoff(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		listener := &repeatedTemporaryListener{}
+		source, err := newListenSource(listener, &tls.Config{}, time.Second, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(2 * time.Second)
+		before := time.Now()
+		if err := source.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if listener.attempts < 2 || listener.attempts > 12 {
+			t.Fatalf("unbounded retry loop: %d", listener.attempts)
+		}
+		if time.Since(before) != 0 || listener.closeCalls != 1 {
+			t.Fatal("shutdown did not interrupt backoff or closed listener twice")
+		}
+	})
+}
+func (listener *temporaryAcceptListener) Accept() (net.Conn, error) {
+	if !listener.failed {
+		listener.failed = true
+		return nil, temporaryAcceptError{}
+	}
+	return listener.Listener.Accept()
+}
+
+func TestListenSourceTerminalAcceptFailureRemainsExplicit(t *testing.T) {
+	source, err := newListenSource(&closeErrorListener{}, &tls.Config{}, time.Second, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer source.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	for range 2 {
+		if _, err := source.Next(ctx); err == nil || err.Error() != "unused" {
+			t.Fatalf("terminal error lost: %v", err)
+		}
 	}
 }
 
