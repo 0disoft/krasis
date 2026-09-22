@@ -34,6 +34,25 @@ func TestLifecycleNativeWindowsRetireOwnersAcrossRepeatedStarts(t *testing.T) {
 	currentProcess := kernel32.NewProc("GetCurrentProcess")
 	getHandles := kernel32.NewProc("GetProcessHandleCount")
 	process, _, _ := currentProcess.Call()
+	openThread := kernel32.NewProc("OpenThread")
+	waitThread := kernel32.NewProc("WaitForSingleObject")
+	closeHandle := kernel32.NewProc("CloseHandle")
+	joinNativeThread := func(monitor *Monitor) {
+		if monitor.thread.Load() == startupThreadID {
+			t.Fatal("lifecycle owner used the non-terminating Go startup thread")
+		}
+		handle, _, err := openThread.Call(0x00100000, 0, uintptr(monitor.thread.Load())) // SYNCHRONIZE only.
+		if handle == 0 {
+			t.Fatalf("OpenThread: %v", err)
+		}
+		defer closeHandle.Call(handle)
+		if err := monitor.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if result, _, err := waitThread.Call(handle, 2000); result != 0 {
+			t.Fatalf("native owner thread did not exit: result=%d error=%v", result, err)
+		}
+	}
 	resources := func() (uintptr, uint32) {
 		gui, _, _ := getGUI.Call(process, 1)
 		var handles uint32
@@ -48,9 +67,7 @@ func TestLifecycleNativeWindowsRetireOwnersAcrossRepeatedStarts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = warm.Close(); err != nil {
-		t.Fatal(err)
-	}
+	joinNativeThread(warm.(*Monitor))
 	beforeGUI, beforeHandles := resources()
 	for i := 0; i < 100; i++ {
 		monitorInterface, err := StartMonitor()
@@ -74,9 +91,7 @@ func TestLifecycleNativeWindowsRetireOwnersAcrossRepeatedStarts(t *testing.T) {
 			monitor.Close()
 			t.Fatal("window event not routed")
 		}
-		if err = monitor.Close(); err != nil {
-			t.Fatal(err)
-		}
+		joinNativeThread(monitor)
 		if exists, _, _ := isWindow.Call(window); exists != 0 {
 			t.Fatal("window survived Close")
 		}

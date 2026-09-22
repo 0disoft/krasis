@@ -38,6 +38,7 @@ var (
 	procGetCurrentThreadID               = kernel32.NewProc("GetCurrentThreadId")
 	procWTSRegisterSessionNotification   = wtsapi32.NewProc("WTSRegisterSessionNotification")
 	procWTSUnRegisterSessionNotification = wtsapi32.NewProc("WTSUnRegisterSessionNotification")
+	startupThreadID                      = lifecycleThreadID()
 )
 
 type Monitor struct {
@@ -128,13 +129,22 @@ func (monitor *Monitor) Close() error {
 
 func (monitor *Monitor) run() {
 	runtime.LockOSThread()
+	thread := lifecycleThreadID()
+	if thread == startupThreadID {
+		// Go parks m0 instead of terminating it when a locked goroutine exits.
+		// Keep m0 occupied until another thread owns the whole monitor lifetime.
+		defer runtime.UnlockOSThread()
+		finished := make(chan struct{})
+		go func() { monitor.run(); close(finished) }()
+		<-finished
+		return
+	}
 	defer close(monitor.done)
-	// Return the OS thread before announcing completion. A fast restart must
-	// not force a fresh locked thread while the previous one is still owned.
-	defer runtime.UnlockOSThread()
+	// Like the input owners, this goroutine deliberately exits while locked.
+	// Go then terminates the dedicated OS thread instead of caching its
+	// thread-local USER/WTS resources for an unrelated future goroutine.
 	defer close(monitor.events)
-	thread, _, _ := procGetCurrentThreadID.Call()
-	monitor.thread.Store(uint32(thread))
+	monitor.thread.Store(thread)
 	defer monitor.thread.Store(0)
 
 	className, err := syscall.UTF16PtrFromString(fmt.Sprintf("KrasisLifecycle-%d-%d", os.Getpid(), lifecycleClassSequence.Add(1)))
@@ -213,6 +223,8 @@ func (monitor *Monitor) run() {
 		}
 	}
 }
+
+func lifecycleThreadID() uint32 { thread, _, _ := procGetCurrentThreadID.Call(); return uint32(thread) }
 
 func (monitor *Monitor) publish(event agentlifecycle.Event) {
 	select {
