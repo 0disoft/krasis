@@ -83,13 +83,9 @@ func (connection *PeerConnection) WriteFrameContext(ctx context.Context, frame F
 			return err
 		}
 	}
-	stopCancel := context.AfterFunc(ctx, func() {
-		_ = connection.connection.SetWriteDeadline(time.Now())
-	})
+	finishWrite := interruptWriteOnCancel(ctx, connection.connection)
 	err := connection.writer.WriteFrame(frame)
-	if stopCancel() {
-		_ = connection.connection.SetWriteDeadline(time.Time{})
-	}
+	finishWrite()
 	if err != nil {
 		_ = connection.Close() // a partially written/timed-out stream cannot be reused
 		if ctxErr := ctx.Err(); ctxErr != nil {
@@ -97,6 +93,22 @@ func (connection *PeerConnection) WriteFrameContext(ctx context.Context, frame F
 		}
 	}
 	return err
+}
+
+// The caller holds writeGate until this cleanup returns. AfterFunc's stop alone
+// does not join a callback that has already started.
+func interruptWriteOnCancel(ctx context.Context, connection interface{ SetWriteDeadline(time.Time) error }) func() {
+	done := make(chan struct{})
+	stop := context.AfterFunc(ctx, func() {
+		defer close(done)
+		_ = connection.SetWriteDeadline(time.Now())
+	})
+	return func() {
+		if !stop() {
+			<-done
+		}
+		_ = connection.SetWriteDeadline(time.Time{})
+	}
 }
 
 func (connection *PeerConnection) Close() error {
