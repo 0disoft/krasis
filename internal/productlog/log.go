@@ -1,6 +1,8 @@
 package productlog
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"github.com/0disoft/krasis/internal/agentinstance"
@@ -35,22 +37,31 @@ func init() {
 }
 
 type record struct {
-	Time     string           `json:"time"`
-	Code     string           `json:"code"`
-	Build    string           `json:"build"`
-	PID      int              `json:"pid"`
-	Boundary *BoundarySummary `json:"boundary,omitempty"`
+	Time          string           `json:"time"`
+	Code          string           `json:"code"`
+	Build         string           `json:"build"`
+	BuildDirty    bool             `json:"buildDirty,omitempty"`
+	Run           string           `json:"run,omitempty"`
+	Connection    string           `json:"connection,omitempty"`
+	Sequence      uint64           `json:"sequence,omitempty"`
+	ElapsedMicros int64            `json:"elapsedMicros,omitempty"`
+	PID           int              `json:"pid"`
+	Boundary      *BoundarySummary `json:"boundary,omitempty"`
 }
 type Logger struct {
-	mu          sync.Mutex
-	closed      bool
-	queue       chan record
-	done        chan struct{}
-	failed      atomic.Bool
-	dropped     atomic.Uint64
-	dir         *securefs.Directory
-	lease       io.Closer
-	role, build string
+	mu              sync.Mutex
+	closed          bool
+	queue           chan record
+	done            chan struct{}
+	failed          atomic.Bool
+	dropped         atomic.Uint64
+	dir             *securefs.Directory
+	lease           io.Closer
+	role, build     string
+	buildDirty      bool
+	run, connection string
+	sequence        uint64
+	started         time.Time
 }
 
 func Open(localAppData, role string) (*Logger, error) {
@@ -69,10 +80,18 @@ func Open(localAppData, role string) (*Logger, error) {
 
 func newLogger(dir *securefs.Directory, lease io.Closer, role string) *Logger {
 	l := &Logger{dir: dir, lease: lease, role: role, build: "development", queue: make(chan record, 64), done: make(chan struct{})}
+	l.started = time.Now()
+	var nonce [16]byte
+	if _, err := rand.Read(nonce[:]); err == nil {
+		l.run = hex.EncodeToString(nonce[:])
+	}
 	if info, ok := debug.ReadBuildInfo(); ok {
 		for _, s := range info.Settings {
 			if s.Key == "vcs.revision" {
 				l.build = s.Value
+			}
+			if s.Key == "vcs.modified" {
+				l.buildDirty = s.Value == "true"
 			}
 		}
 	}
@@ -103,6 +122,14 @@ func (l *Logger) enqueue(code string, boundary *BoundarySummary) {
 		return
 	}
 	r := record{Time: time.Now().UTC().Format(time.RFC3339Nano), Code: code, Build: l.build, PID: os.Getpid(), Boundary: boundary}
+	l.sequence++
+	r.BuildDirty = l.buildDirty
+	r.Run = l.run
+	r.Connection = l.connection
+	r.Sequence = l.sequence
+	if !l.started.IsZero() {
+		r.ElapsedMicros = time.Since(l.started).Microseconds()
+	}
 	select {
 	case l.queue <- r:
 	default:

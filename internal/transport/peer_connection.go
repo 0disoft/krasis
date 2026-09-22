@@ -2,17 +2,20 @@ package transport
 
 import (
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
+	"encoding/hex"
 	"errors"
 	"time"
 )
 
 type PeerConnection struct {
-	connection *tls.Conn
-	reader     *Reader
-	writer     *Writer
-	writeGate  chan struct{}
-	peer       AuthenticatedPeerContext
+	connection   *tls.Conn
+	reader       *Reader
+	writer       *Writer
+	writeGate    chan struct{}
+	peer         AuthenticatedPeerContext
+	diagnosticID string
 }
 
 const FrameWriteTimeout = 2 * time.Second
@@ -35,7 +38,23 @@ func NewPeerConnection(ctx context.Context, connection *tls.Conn) (*PeerConnecti
 	}
 	writeGate := make(chan struct{}, 1)
 	writeGate <- struct{}{}
-	return &PeerConnection{connection: connection, reader: reader, writer: writer, writeGate: writeGate, peer: peer}, nil
+	state := connection.ConnectionState()
+	var diagnosticID string
+	if material, err := state.ExportKeyingMaterial("krasis/diagnostic-correlation/v1", nil, 32); err == nil {
+		digest := sha256.Sum256(material)
+		clear(material)
+		diagnosticID = hex.EncodeToString(digest[:])
+	}
+	return &PeerConnection{connection: connection, reader: reader, writer: writer, writeGate: writeGate, peer: peer, diagnosticID: diagnosticID}, nil
+}
+
+// DiagnosticID is a label-specific digest shared only by this TLS connection.
+// It is neither an identity credential nor exported TLS key material.
+func (connection *PeerConnection) DiagnosticID() string {
+	if connection == nil {
+		return ""
+	}
+	return connection.diagnosticID
 }
 
 func (connection *PeerConnection) AuthenticatedPeer() (AuthenticatedPeerContext, error) {

@@ -16,9 +16,15 @@ import (
 const ExportName = "support-latest.json"
 
 type exportEvent struct {
-	Time     string           `json:"time"`
-	Code     string           `json:"code"`
-	Boundary *BoundarySummary `json:"boundary,omitempty"`
+	Time          string           `json:"time"`
+	Code          string           `json:"code"`
+	Build         string           `json:"build,omitempty"`
+	BuildDirty    bool             `json:"buildDirty,omitempty"`
+	Run           string           `json:"run,omitempty"`
+	Connection    string           `json:"connection,omitempty"`
+	Sequence      uint64           `json:"sequence,omitempty"`
+	ElapsedMicros int64            `json:"elapsedMicros,omitempty"`
+	Boundary      *BoundarySummary `json:"boundary,omitempty"`
 }
 
 type exportLog struct {
@@ -113,8 +119,21 @@ func sanitizeLog(name string, r io.Reader) exportLog {
 			result.Incomplete = true
 			continue
 		}
-		// Reproject: no arbitrary fields, build strings, process IDs or raw lines.
+		// Reproject only validated diagnostic identity. Never export arbitrary
+		// build strings, process IDs, TLS material, endpoint addresses or raw lines.
 		event := exportEvent{Time: timestamp.UTC().Format(time.RFC3339Nano), Code: input.Code}
+		if validHex(input.Build, 40) || validHex(input.Build, 64) || input.Build == "development" {
+			event.Build = input.Build
+			event.BuildDirty = input.BuildDirty
+		}
+		if validHex(input.Run, 32) && input.Sequence > 0 && input.ElapsedMicros >= 0 {
+			event.Run = input.Run
+			event.Sequence = input.Sequence
+			event.ElapsedMicros = input.ElapsedMicros
+		}
+		if validHex(input.Connection, 64) {
+			event.Connection = input.Connection
+		}
 		if input.Code == "boundary_summary" {
 			if input.Boundary == nil || !input.Boundary.valid() {
 				result.Incomplete = true

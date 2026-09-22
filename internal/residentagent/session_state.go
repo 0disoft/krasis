@@ -91,6 +91,9 @@ func (observer *sessionObserver) ObserveSupervisor(snapshot agent.SupervisorSnap
 	if operations.sessionDone != observer.done || operations.root.Err() != nil {
 		return
 	}
+	if snapshot.State != "" {
+		operations.log.Connection(snapshot.ConnectionID)
+	}
 	if snapshot.State == agent.SupervisorStopped && snapshot.FailureKind == "session" {
 		reason := productlog.FaultCode(snapshot.FailureComponent, snapshot.FailurePhase, snapshot.FailureCode)
 		operations.recordSessionFaultLocked(operations.sessionOutcome, reason)

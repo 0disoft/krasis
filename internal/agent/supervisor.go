@@ -77,6 +77,7 @@ type SupervisorObserver interface {
 }
 
 type SupervisorSnapshot struct {
+	ConnectionID     string
 	State            SupervisorState
 	Attempt          uint32
 	RetryAfter       time.Duration
@@ -154,6 +155,7 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 		return err
 	}
 	state := SupervisorStopped
+	var connectionID string
 	previousRecoveryObserver := config.Session.RecoveryObserver
 	config.Session.RecoveryObserver = func(report RecoveryReport) {
 		if previousRecoveryObserver != nil {
@@ -169,6 +171,10 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 			return err
 		}
 		state = next.Next
+		if state == SupervisorAcquiring {
+			connectionID = ""
+		}
+		snapshot.ConnectionID = connectionID
 		snapshot.State = state
 		if config.Observer != nil {
 			config.Observer.ObserveSupervisor(snapshot)
@@ -217,6 +223,9 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 			return supervisorExit("nil-connection", errors.New("connection source returned a nil connection"))
 		}
 		ownedConnection := &supervisedConnection{Connection: connection}
+		if diagnostic, ok := connection.(interface{ DiagnosticID() string }); ok {
+			connectionID = diagnostic.DiagnosticID()
+		}
 		if err := transition(SupervisorConnectionAcquired, SupervisorSnapshot{Attempt: attempt}); err != nil {
 			return errors.Join(err, ownedConnection.Close())
 		}

@@ -37,6 +37,13 @@ type disconnectConnection struct {
 	err    error
 }
 
+func (connection *disconnectConnection) DiagnosticID() string {
+	if diagnostic, ok := connection.Connection.(interface{ DiagnosticID() string }); ok {
+		return diagnostic.DiagnosticID()
+	}
+	return ""
+}
+
 func (connection *disconnectConnection) Close() error {
 	connection.once.Do(func() {
 		if errors.Is(context.Cause(connection.intent), errLocalDisconnect) {
