@@ -22,7 +22,7 @@ const maxBytes = 256 << 10
 var allowed = map[string]bool{}
 
 func init() {
-	for _, code := range []string{"suspend", "resume", "session_lock", "session_disconnect", "logoff", "shutdown", "display_change", "monitor_failed"} {
+	for _, code := range []string{"suspend", "resume", "session_lock", "session_disconnect", "logoff", "shutdown", "display_change", "desktop_switch", "monitor_failed"} {
 		allowed["lifecycle_"+code] = true
 	}
 	for _, code := range []string{"tcp_keepalive_15_5_3", "tcp_keepalive_unavailable", "tcp_keepalive_not_tcp"} {

@@ -188,6 +188,12 @@ func (monitor *Monitor) run() {
 			monitor.setRunError(win32Error("WTSUnRegisterSessionNotification", unregisterErr))
 		}
 	}()
+	stopDesktopWatch, err := monitor.watchDesktopSwitch()
+	if err != nil {
+		monitor.ready <- err
+		return
+	}
+	defer stopDesktopWatch()
 	monitor.ready <- nil
 
 	var message windowMessage

@@ -7,7 +7,7 @@ import (
 )
 
 func TestLifecycleStopReasonsAreDistinctAndDoNotResumeOwner(t *testing.T) {
-	for _, event := range []agentlifecycle.Event{agentlifecycle.EventSuspend, agentlifecycle.EventResume, agentlifecycle.EventSessionLock, agentlifecycle.EventSessionDisconnect, agentlifecycle.EventDisplayChange, agentlifecycle.EventLogoff, agentlifecycle.EventShutdown} {
+	for _, event := range []agentlifecycle.Event{agentlifecycle.EventSuspend, agentlifecycle.EventResume, agentlifecycle.EventSessionLock, agentlifecycle.EventSessionDisconnect, agentlifecycle.EventDisplayChange, agentlifecycle.EventDesktopSwitch, agentlifecycle.EventLogoff, agentlifecycle.EventShutdown} {
 		t.Run(string(event), func(t *testing.T) {
 			monitor := newRunMonitor()
 			owner, err := agentlifecycle.Start(context.Background(), func() (agentlifecycle.Monitor, error) { return monitor, nil })

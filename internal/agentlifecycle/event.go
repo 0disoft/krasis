@@ -12,12 +12,13 @@ const (
 	EventLogoff            Event = "logoff"
 	EventShutdown          Event = "shutdown"
 	EventDisplayChange     Event = "display_change"
+	EventDesktopSwitch     Event = "desktop_switch"
 )
 
 func (event Event) Validate() error {
 	switch event {
 	case EventSuspend, EventResume, EventSessionLock, EventSessionDisconnect,
-		EventLogoff, EventShutdown, EventDisplayChange:
+		EventLogoff, EventShutdown, EventDisplayChange, EventDesktopSwitch:
 		return nil
 	default:
 		return fmt.Errorf("unsupported agent lifecycle event %q", event)
