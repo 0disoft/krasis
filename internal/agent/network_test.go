@@ -191,6 +191,15 @@ func TestListenSourceTerminalAcceptFailureRemainsExplicit(t *testing.T) {
 }
 
 func TestListenSourceDoesNotLetStalledHandshakeBlockAuthenticatedPeer(t *testing.T) {
+	testListenSourceAdmissionRecovery(t, false)
+}
+
+func TestCanceledListenRoundReleasesAllSlotsBeforeReconnect(t *testing.T) {
+	testListenSourceAdmissionRecovery(t, true)
+}
+
+func testListenSourceAdmissionRecovery(t *testing.T, reconnect bool) {
+	t.Helper()
 	directory := filepath.Join(t.TempDir(), "credentials")
 	if _, err := peercredentials.Generate(directory, "127.0.0.1", time.Now()); err != nil {
 		t.Fatalf("Generate() error = %v", err)
@@ -225,13 +234,48 @@ func TestListenSourceDoesNotLetStalledHandshakeBlockAuthenticatedPeer(t *testing
 	}()
 	waitForListenRound(t, listener)
 
-	stalled, err := net.DialTimeout("tcp", listener.Address(), time.Second)
-	if err != nil {
-		t.Fatal(err)
+	stalledCount := 1
+	if reconnect {
+		stalledCount = MaxConcurrentPreAuthHandshakes
 	}
-	defer stalled.Close()
-	if _, err := stalled.Write([]byte{0x16}); err != nil {
-		t.Fatal(err)
+	for range stalledCount {
+		stalled, err := net.DialTimeout("tcp", listener.Address(), time.Second)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = stalled.Close() })
+		if _, err := stalled.Write([]byte{0x16}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if reconnect {
+		for len(listener.preAuthSlots) != stalledCount {
+			select {
+			case <-ctx.Done():
+				t.Fatal("stalled workers were not admitted")
+			default:
+				time.Sleep(time.Millisecond)
+			}
+		}
+		cancel()
+		select {
+		case previous := <-accepted:
+			if !errors.Is(previous.err, context.Canceled) {
+				t.Fatalf("old round result: %v", previous.err)
+			}
+		case <-time.After(time.Second):
+			t.Fatal("canceled workers did not drain")
+		}
+		if len(listener.preAuthSlots) != 0 {
+			t.Fatal("old round retained handshake slots")
+		}
+		ctx, cancel = context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		go func() {
+			connection, nextErr := listener.Next(ctx)
+			accepted <- result{connection: connection, err: nextErr}
+		}()
+		waitForListenRound(t, listener)
 	}
 
 	dialer, err := NewDialSource(listener.Address(), clientTLS, time.Second)
@@ -249,7 +293,7 @@ func TestListenSourceDoesNotLetStalledHandshakeBlockAuthenticatedPeer(t *testing
 	}
 	defer serverResult.connection.Close()
 	metrics := listener.PreAuthMetrics()
-	if metrics.Admitted != 2 || metrics.Authenticated != 1 {
+	if metrics.Admitted != uint64(stalledCount+1) || metrics.Authenticated != 1 {
 		t.Fatalf("pre-auth metrics = %+v", metrics)
 	}
 }

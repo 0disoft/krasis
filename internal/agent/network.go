@@ -35,9 +35,10 @@ const (
 )
 
 type listenRound struct {
-	ctx    context.Context
-	cancel context.CancelFunc
-	ready  chan listenResult
+	ctx     context.Context
+	cancel  context.CancelFunc
+	ready   chan listenResult
+	workers sync.WaitGroup
 }
 
 type listenResult struct {
@@ -175,11 +176,16 @@ func (source *ListenSource) Next(ctx context.Context) (Connection, error) {
 	source.roundMu.Unlock()
 	defer func() {
 		source.roundMu.Lock()
+		cancel()
+		source.roundMu.Unlock()
+		// No new workers can join this canceled round. Drain its admission slots
+		// before another Next can install the replacement round.
+		round.workers.Wait()
+		source.roundMu.Lock()
 		if source.round == round {
 			source.round = nil
 		}
 		source.roundMu.Unlock()
-		cancel()
 	}()
 	stop := context.AfterFunc(ctx, cancel)
 	defer stop()
@@ -244,13 +250,14 @@ func (source *ListenSource) acceptLoop() {
 		retryDelay = 0
 		source.roundMu.Lock()
 		round := source.round
-		source.roundMu.Unlock()
-		if round == nil {
+		if round == nil || round.ctx.Err() != nil {
+			source.roundMu.Unlock()
 			_ = connection.Close()
 			continue
 		}
 		decision := source.preAuthAdmission.allow(connection.RemoteAddr(), time.Now())
 		if decision != preAuthAdmitted {
+			source.roundMu.Unlock()
 			source.preAuthMetrics.recordDecision(decision)
 			_ = connection.Close()
 			continue
@@ -259,8 +266,11 @@ func (source *ListenSource) acceptLoop() {
 		case source.preAuthSlots <- struct{}{}:
 			source.preAuthMetrics.recordDecision(preAuthAdmitted)
 			source.workers.Add(1)
+			round.workers.Add(1)
+			source.roundMu.Unlock()
 			go source.authenticate(round, connection)
 		default:
+			source.roundMu.Unlock()
 			source.preAuthMetrics.rejectedBusy.Add(1)
 			_ = connection.Close()
 		}
@@ -269,6 +279,7 @@ func (source *ListenSource) acceptLoop() {
 
 func (source *ListenSource) authenticate(round *listenRound, connection net.Conn) {
 	defer source.workers.Done()
+	defer round.workers.Done()
 	defer func() { <-source.preAuthSlots }()
 	handshakeCtx, cancel := context.WithTimeout(round.ctx, source.handshakeTimeout)
 	defer cancel()
@@ -280,7 +291,9 @@ func (source *ListenSource) authenticate(round *listenRound, connection net.Conn
 	}
 	source.preAuthMetrics.authenticated.Add(1)
 	if !source.deliver(round, listenResult{connection: peerConnection}) {
-		_ = peerConnection.Close()
+		// The peer was never handed to a session. Do not wait for a TLS
+		// close-notify on a canceled admission round.
+		_ = connection.Close()
 	}
 }
 
