@@ -310,13 +310,6 @@ func TestPeerSessionsRejectCollisionWithoutDisconnectAndAllowRetry(t *testing.T)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	done := make(chan error, 2)
-	go func() {
-		done <- RunSessionWithLifecycle(ctx, leftSide, leftCoordinator, leftRuntime, leftResponder, leftOutbound, time.Now)
-	}()
-	go func() {
-		done <- RunSessionWithLifecycle(ctx, rightSide, rightCoordinator, rightRuntime, rightResponder, rightOutbound, time.Now)
-	}()
 	t.Cleanup(func() {
 		_ = leftSide.Close()
 		_ = rightSide.Close()
@@ -355,11 +348,23 @@ func TestPeerSessionsRejectCollisionWithoutDisconnectAndAllowRetry(t *testing.T)
 	}
 	for range requests {
 		select {
-		case <-writes:
+		case err := <-writes:
+			if err != nil {
+				t.Fatal(err)
+			}
 		case <-ctx.Done():
 			t.Fatalf("simultaneous lease request write did not finish: %v", ctx.Err())
 		}
 	}
+	// Put both requests on the wire before reading either rejection. Otherwise
+	// one peer can return to LOCAL early and legitimately accept the other request.
+	done := make(chan error, 2)
+	go func() {
+		done <- RunSessionWithLifecycle(ctx, leftSide, leftCoordinator, leftRuntime, leftResponder, leftOutbound, time.Now)
+	}()
+	go func() {
+		done <- RunSessionWithLifecycle(ctx, rightSide, rightCoordinator, rightRuntime, rightResponder, rightOutbound, time.Now)
+	}()
 	waitRuntimeState(t, leftRuntime, control.StateLocal, "left collision rejection")
 	waitRuntimeState(t, rightRuntime, control.StateLocal, "right collision rejection")
 	select {
