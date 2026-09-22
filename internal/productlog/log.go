@@ -20,6 +20,9 @@ const maxBytes = 256 << 10
 var allowed = map[string]bool{}
 
 func init() {
+	for _, code := range []string{"session_trust_read_timeout", "session_trust_read_pending", "session_trust_revoked", "session_trust_peer_missing", "session_trust_store_missing"} {
+		allowed[code] = true
+	}
 	for _, code := range []string{"session_certificate_deadline", "session_guard_exited", "session_guard_close_failed", "session_trust_check_failed", "session_trust_busy_exhausted"} {
 		allowed[code] = true
 	}

@@ -2,11 +2,53 @@ package residentagent
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/0disoft/krasis/internal/agent"
 	"github.com/0disoft/krasis/internal/truststore"
 )
+
+const trustReadTimeout = time.Second
+
+var (
+	errTrustReadTimeout   = errors.New("trust read deadline expired")
+	errTrustReadPending   = errors.New("previous trust read has not completed")
+	errMonitorGuardExited = errors.New("guard exited during trust check")
+	trustReadSlot         = make(chan struct{}, 1)
+)
+
+// Only one file-reading worker may outlive a canceled check in this process.
+// It has no input authority; a late result is discarded and cannot resume a session.
+func boundedMonitoredTrust(ctx context.Context, guardDone <-chan struct{}, check func() error) error {
+	select {
+	case trustReadSlot <- struct{}{}:
+	default:
+		return errTrustReadPending
+	}
+	checkCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	result := make(chan error, 1)
+	go func() {
+		err := func() error {
+			defer func() { <-trustReadSlot }()
+			return checkMonitoredTrust(checkCtx, check, agent.Wait)
+		}()
+		result <- err
+	}()
+	timer := time.NewTimer(trustReadTimeout)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-guardDone:
+		return errMonitorGuardExited
+	case <-timer.C:
+		return errTrustReadTimeout
+	case err := <-result:
+		return err
+	}
+}
 
 // A failed nonblocking store lock is contention, not a trust verdict. Retry only
 // that exact sentinel; never retry a revoked, missing, corrupt or unreadable peer.
@@ -41,16 +83,32 @@ func monitorProductSession(ctx context.Context, ticks <-chan time.Time, guardDon
 			}
 			return
 		case <-ticks:
-			err := checkMonitoredTrust(ctx, check, agent.Wait)
+			err := boundedMonitoredTrust(ctx, guardDone, check)
 			if err == nil {
 				continue
 			}
 			if ctx.Err() != nil {
+				if ctx.Err() == context.DeadlineExceeded {
+					record("session_certificate_deadline")
+				}
 				return
 			}
 			code := "session_trust_check_failed"
-			if err == truststore.ErrStoreBusy {
+			switch {
+			case errors.Is(err, errMonitorGuardExited):
+				code = "session_guard_exited"
+			case errors.Is(err, errTrustReadTimeout):
+				code = "session_trust_read_timeout"
+			case errors.Is(err, errTrustReadPending):
+				code = "session_trust_read_pending"
+			case errors.Is(err, truststore.ErrStoreBusy):
 				code = "session_trust_busy_exhausted"
+			case errors.Is(err, truststore.ErrPeerRevoked):
+				code = "session_trust_revoked"
+			case errors.Is(err, truststore.ErrPeerNotFound):
+				code = "session_trust_peer_missing"
+			case errors.Is(err, truststore.ErrStoreNotFound):
+				code = "session_trust_store_missing"
 			}
 			record(code)
 			cancel()
