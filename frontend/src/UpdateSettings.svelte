@@ -39,7 +39,7 @@
     } finally { if (!disposed) busy = false; }
   }
   function choose() { value = emptyUpdateSettings(selected); transfer = emptyUpdateTransfer(selected); notice = ''; void run(); }
-  function requestSend() { sendPeer = selected; sendConsent.showModal(); }
+  function requestSend() { sendPeer = selected; if (!sendConsent.open) sendConsent.showModal(); sendConsent.querySelector('button:not([disabled])')?.focus(); }
   async function confirmSend() {
     sendConsent.close();
     const peer = sendPeer;
@@ -49,7 +49,7 @@
     try { const next = await bridge.send(peer); if (!disposed && selected === peer) transfer = next; }
     finally { if (!disposed) busy = false; }
   }
-  function requestAllow() { consentPeer = selected; consent.showModal(); }
+  function requestAllow() { consentPeer = selected; if (!consent.open) consent.showModal(); consent.querySelector('button:not([disabled])')?.focus(); }
   function confirmAllow() {
     consent.close();
     if (consentPeer === selected && peers.some(peer => peer.fingerprint === consentPeer)) void run('allow', consentPeer);
@@ -86,7 +86,7 @@
     </div>
     <p class="upd-job" role="status" aria-live="polite">{t('upd_state_' + job.state)}{#if job.state === 'SENDING' && job.total > 0} · {Math.floor(job.bytes*100/job.total)}%{/if}</p>
     {#if job.generation}<p class="upd-job">{t('upd_bundle_version')}: {version(job.generation,job.build)}</p>{/if}
-    {#if job.state === 'SENDING' && job.total > 0}<div class="upd-job"><progress value={job.bytes} max={job.total} aria-label={t('upd_send')}></progress></div>{/if}
+    {#if job.state === 'SENDING' && job.total > 0}<div class="upd-job"><progress value={job.bytes} max={job.total} aria-label={t('upd_send')}>{Math.floor(job.bytes*100/job.total)}%</progress></div>{/if}
   </section>
   <section class="upd-section" aria-label={t('upd_permission')}>
     <h3>{t('upd_permission')}</h3>
@@ -111,3 +111,8 @@
   <div class="dlg-body"><p>{selectedName}</p><p>{t('upd_consent')}</p></div>
   <div class="dlg-foot"><button onclick={() => consent.close()}>{t('cancel')}</button><button disabled={busy || consentPeer !== selected} onclick={confirmAllow}>{t('upd_confirm')}</button></div>
 </dialog>
+<style>
+  @media (max-width: 700px) {
+    .upd-cards { grid-template-columns: 1fr; }
+  }
+</style>

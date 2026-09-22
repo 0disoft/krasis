@@ -32,7 +32,10 @@
   let updateSettingsBridge = $state.raw();
   let updatesDlg;
   let updatesOpen = $state(false);
-  async function openUpdates() { updatesOpen = true; await tick(); updatesDlg.showModal(); }
+  let opener = null;
+  function focusFirstControl(dlg) { dlg?.querySelector('select:not([disabled]), input:not([disabled]), button:not([disabled])')?.focus(); }
+  function openDialog(dlg) { if (!dlg || dlg.open) return; dlg.showModal(); focusFirstControl(dlg); }
+  async function openUpdates() { if (!updatesDlg || updatesDlg.open) return; opener = document.activeElement; updatesOpen = true; await tick(); if (updatesDlg.open) { focusFirstControl(updatesDlg); return; } updatesDlg.showModal(); focusFirstControl(updatesDlg); }
   let clipboard = $state({peer:'',code:'unavailable'});
   let pairing = $state({schema:'krasis.pairing/v1',code:'ok',pin:'',job:'',alias:'',candidates:[]});
   let layout = $state({edge:'RIGHT',rearm:32,code:'unavailable'});
@@ -73,7 +76,7 @@
     if(clipboard.peer) {void setClipboard(clipboard.peer,false);return;}
     if(!selectedPeer)return;
     consentPeer=selectedPeer.fingerprint;
-    consent.showModal();
+    openDialog(consent);
   }
   async function runPair(action) {
     if (!pairingBridge || pairBusy || disposed) return;
@@ -230,18 +233,18 @@
           {#each [32,64,128] as value}<option {value}>{value}px</option>{/each}
         </select>
       </label>
-      <button onclick={() => pairingDlg.showModal()}><Icon name="plus" size={18} />{t('addDevice')}</button>
+      <button aria-haspopup="dialog" onclick={() => openDialog(pairingDlg)}><Icon name="plus" size={18} />{t('addDevice')}</button>
     </div>
   </section>
   <section class="utilities">
     <button class="utility utility-button" disabled={clipBusy || (!clipboard.peer && !selectedPeer)} onclick={toggleClipboard} aria-pressed={!!clipboard.peer}><Icon name="clipboard" /><div><h2>{t('clipboard')}</h2></div></button>
-    <button class="utility utility-button" onclick={openUpdates}><Icon name="arrows-clockwise" /><div><h2>{t('update')}</h2></div></button>
-    <button class="utility utility-button" onclick={() => pairingDlg.showModal()}><Icon name="plus" /><div><h2>{t('pair')}</h2></div></button>
-    <button class="utility utility-button" onclick={() => diagnosticsDlg.showModal()}><Icon name="info" /><div><h2>{t('diag_title')}</h2></div></button>
+    <button class="utility utility-button" aria-haspopup="dialog" onclick={openUpdates}><Icon name="arrows-clockwise" /><div><h2>{t('update')}</h2></div></button>
+    <button class="utility utility-button" aria-haspopup="dialog" onclick={() => openDialog(pairingDlg)}><Icon name="plus" /><div><h2>{t('pair')}</h2></div></button>
+    <button class="utility utility-button" aria-haspopup="dialog" onclick={() => openDialog(diagnosticsDlg)}><Icon name="info" /><div><h2>{t('diag_title')}</h2></div></button>
   </section>
   <p role="status">{clipNotice ? t(clipNotice) : clipboard.code !== 'ok' ? t(clipboard.code) : layout.code !== 'ok' && layout.code !== 'unavailable' && layout.code !== 'unconfigured' ? t(layout.code) : t('clipboard_help')}</p>
 </main>
-<dialog bind:this={updatesDlg} aria-labelledby="update-settings-title" onclose={() => updatesOpen = false}>
+<dialog bind:this={updatesDlg} aria-labelledby="update-settings-title" onclose={() => { updatesOpen = false; if (opener && opener.focus) opener.focus(); opener = null; }}>
   {#if updatesOpen}<UpdateSettings bridge={updateSettingsBridge} peers={snapshot.peers} initialPeer={selected} {locale} />{/if}
   <div class="dlg-foot"><button class="primary" onclick={() => updatesDlg.close()}>{t('close')}</button></div>
 </dialog>
@@ -269,7 +272,7 @@
 <dialog bind:this={pairingDlg} aria-labelledby="pair-title">
   <div class="dlg-head"><h2 id="pair-title">{t('pairingTitle')}</h2><p>{t('pairingHelp')}</p></div>
   <div class="dlg-body">
-  {#if pairing.pin}<p class="pin-display">{pairing.pin}</p>{/if}
+  {#if pairing.pin}<p class="pin-display" role="status">{pairing.pin}</p>{/if}
   <div class="pair-actions">
     <button disabled={!canPair} onclick={() => runPair('invite')}>{t('createPIN')}</button>
     <button disabled={!canPair} onclick={() => runPair('search')}>{t('findDevice')}</button>
@@ -286,13 +289,13 @@
 </dialog>
 <footer><span>{t('closeHelp')}</span><select aria-label={t('language')} bind:value={locale}><option value="ko">한국어</option><option value="en">English</option></select></footer>
 <style>
-  .peer-select { display:flex; align-items:center; gap:20px; margin:20px 0; }
-  .peer-select select, .peer-select input { min-width:220px; }
+  .peer-select { display:flex; align-items:center; gap:20px; margin:20px 0; flex-wrap:wrap; }
+  .peer-select select, .peer-select input { min-width:min(220px,100%); max-width:100%; }
   .canvas { min-height: 0; }
   .screen { max-width:340px; }
   .screen-content strong { font-size:30px; }
   .peer-name { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .fault-banner { font-size:14px; }
   .brand { white-space:nowrap; }
-  .pin-display { font: 600 42px/1 ui-monospace, Consolas, monospace; letter-spacing: 12px; text-align:center; margin: 12px 0 4px; }
+  .pin-display { font: 600 clamp(28px, 6vw, 42px)/1.2 ui-monospace, Consolas, monospace; letter-spacing: 0.3em; text-indent: 0.3em; text-align:center; margin: 12px 0 4px; max-width: 100%; overflow-wrap: anywhere; }
 </style>
