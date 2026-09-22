@@ -11,6 +11,7 @@ import (
 
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/peer"
 	"github.com/0disoft/krasis/internal/transport"
 	"github.com/0disoft/krasis/internal/wininput"
 )
@@ -64,8 +65,13 @@ func TestRunSessionWiresBoundaryInputReturnAndLocalCleanup(t *testing.T) {
 	for range 2 {
 		select {
 		case finished := <-done:
-			if !errors.Is(finished.err, context.Canceled) {
+			// Parent cancellation reaches the two sessions in either order. The
+			// first connection can close before the other child sees cancellation.
+			if !errors.Is(finished.err, context.Canceled) && !errors.Is(finished.err, peer.ErrPeerRemoteEOF) {
 				t.Fatalf("RunSession() error = %v", finished.err)
+			}
+			if errors.Is(finished.err, ErrRecoveryUnverified) || finished.result.Recovery.PressedLedgerEmpty != RecoveryConfirmed {
+				t.Fatalf("shutdown did not verify input cleanup: %+v, %v", finished.result.Recovery, finished.err)
 			}
 			if finished.result.FinalState != control.StateLocal {
 				t.Fatalf("final state = %s", finished.result.FinalState)
