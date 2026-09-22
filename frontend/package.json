@@ -1,7 +1,7 @@
 {
   "name": "krasis-control-ui",
   "private": true,
-  "version": "0.9.1",
+  "version": "0.9.2",
   "type": "module",
   "scripts": { "dev": "vite", "build": "vite build", "test": "node --test src/*.test.js" },
   "devDependencies": { "@sveltejs/vite-plugin-svelte": "7", "@phosphor-icons/core": "2", "svelte": "5", "vite": "8" }

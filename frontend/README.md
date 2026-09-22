@@ -20,24 +20,34 @@ See ADR 0061 for its identity, concurrency and cancellation boundaries.
 
 ## Native Windows Workspace
 
-The optional Wails v3 host builds to `dist/workspace/krasis-workspace.exe`.
-It embeds the native Svelte assets and uses the Go module's own
+The optional Wails v3 host ships as an immutable clean distribution under
+`dist/workspace/<git revision>/`, with the ZIP kept outside at
+`dist/workspace/krasis-workspace-<revision>.zip`.
+The actual Wails UI lives in `peer-update/krasis-control.exe` and the resident
+agent in `peer-update/krasis-agent.exe`, each as a single copy; it embeds the
+native Svelte assets and uses the Go module's own
 `/wails/runtime.js`; there is no separate npm runtime version to synchronize.
-Wails v3 is an explicitly selected prerelease dependency. The Go language
-requirement is unchanged; the bundle includes agent generation 36, and building
-does not replace the running process.
+The root `krasis-workspace.exe` is a small icon-bearing launcher: it verifies
+the compiled-in SHA256 of `peer-update/krasis-control.exe` and then starts it.
+There is no duplicate root agent. Keep the entire distribution directory;
+do not copy the launcher alone. Wails v3 is an explicitly selected prerelease
+dependency. The Go language requirement is unchanged; the bundle includes agent
+generation 37, and building does not replace the running process. All Go
+release exes build with trimpath plus `-s -w` (Go build metadata is kept, so
+stack traces still resolve; native debugger symbols are removed).
 
-Extract the complete Workspace ZIP and double-click krasis-workspace.exe.
-The sibling agent is started automatically after bundle checksum verification.
+Extract the complete Workspace ZIP and double-click the root krasis-workspace.exe
+inside its directory.
+The launcher verifies and starts `peer-update/krasis-control.exe` automatically.
 The existing controller is not required for startup, connection or recovery.
 Closing the window keeps Workspace in the tray; its menu can reopen it,
 disconnect, or quit only the controller while leaving the agent running.
 PIN pairing and left/right placement are available in Workspace. Update SEND is
 explicit from Workspace to the selected trusted peer; no legacy control is
-required on the sender. The g35 bundle keeps the g34-compatible
-krasis-control.exe filename while the receiving UI becomes Workspace after
-validation. The first g34 to g35 update needs the existing control running on
-the receiver; afterwards a running Workspace suffices. The Workspace receiver
+required on the sender. The g35 bundle keeps the old g34 seven-file layout
+under g34-compatible filenames while the receiving UI becomes
+Workspace after validation. The first g34 migration needs the existing control
+running on the receiver; afterwards a running Workspace suffices. The Workspace receiver
 auto-applies previously permitted updates through the native worker, keeping
 stored trust and permissions and existing directories. A received bundle sends
 from its own root when its binary is krasis-control.exe, otherwise from the
@@ -49,7 +59,8 @@ Workspace 0.9.0 adds explicit SEND from Workspace to the selected trusted peer,
 plus exact status for that peer fingerprint, transfer ID, and local agent
 instance. Sending is manual
 only; there is no automatic resend. The bundled `peer-update` folder contains the
-g35 Workspace agent/control bundle under the g34-compatible filenames. The first
+g37 Workspace agent/control bundle under the g34-compatible seven-file filenames;
+no delta update yet. The first
 g34 to g35 update needs the existing control running on the receiver so it can
 automatically APPLY the received bundle; afterwards a running Workspace suffices.
 The receiver switches to the Workspace UI automatically after validation, and
@@ -142,8 +153,8 @@ for the shared pump, controller-presence probe and native controller regressions
 Automated checks do not read or replace the user's current clipboard; two-PC
 copy/paste and visible consent-dialog testing remain manual.
 
-Standard action icons remain Phosphor. The UI package is 0.9.1 and the Workspace
-bundle includes agent generation 36. Building the bundle does not replace the
+Standard action icons remain Phosphor. The UI package is 0.9.2 and the Workspace
+bundle includes agent generation 37. Building the bundle does not replace the
 running agent. UI 0.9.1 is a responsive/scrolling modal and numeric rearm-selection
 fix; existing g35 receivers can accept this revised UI (same-generation
 different-build stays intentionally blocked).

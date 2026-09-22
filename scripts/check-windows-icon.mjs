@@ -75,7 +75,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const source = fs.readFileSync(path.join(root, 'assets/windows/krasis-source.png'));
   assert.equal(createHash('sha256').update(source).digest('hex'), '2d895aec4e61cfaa42d055f72e4666a88dbb5c0303d402798c562329956c4a8f');
   frames(icon());
-  const objects = ['krasis', 'krasis-agent', 'krasis-control'].map(name => fs.readFileSync(path.join(root, `cmd/${name}/icon_windows_amd64.syso`)));
+  const objects = ['krasis', 'krasis-agent', 'krasis-control', 'krasis-workspace'].map(name => fs.readFileSync(path.join(root, `cmd/${name}/icon_windows_amd64.syso`)));
   assert.equal(objects[0].readUInt16LE(0), 0x8664);
   assert.equal(objects[0].readUInt32LE(4), 0);
   objects.slice(1).forEach(object => assert.deepEqual(object, objects[0]));

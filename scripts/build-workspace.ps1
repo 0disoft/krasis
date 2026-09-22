@@ -4,20 +4,17 @@ $env:GOMODCACHE = Join-Path (Get-Location) '.cache/go-mod'
 $env:GOCACHE = Join-Path (Get-Location) '.cache/go-build'
 $env:GOPROXY = 'off'
 $env:CGO_ENABLED = '0'
-gofmt -w cmd/krasis-workspace/main_windows.go internal/workspacehost/main_windows.go internal/workspacehost/service_windows.go assets/windows/embed.go internal/productpanel/desktop_lifecycle.go internal/productpanel/desktop_lifecycle_test.go
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 npm.cmd --prefix frontend test
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 npm.cmd --prefix frontend run build -- --mode native
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-go build -tags desktop,production -ldflags '-H windowsgui' -o dist/workspace/krasis-workspace.exe ./cmd/krasis-workspace
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-go build -ldflags '-H windowsgui' -o dist/workspace/krasis-agent.exe ./cmd/krasis-agent
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-$files = @('krasis-workspace.exe', 'krasis-agent.exe')
-$sums = foreach ($file in $files) { (Get-FileHash -LiteralPath (Join-Path 'dist/workspace' $file) -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $file }
-[IO.File]::WriteAllLines((Join-Path (Get-Location) 'dist/workspace/SHA256SUMS.txt'), $sums, [Text.UTF8Encoding]::new($false))
-Copy-Item -LiteralPath 'frontend/README.md' -Destination 'dist/workspace/START-HERE.md'
+$revision = (git rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or $revision -notmatch '^[a-f0-9]{40}$') { throw 'Missing source revision' }
+if (git status --porcelain --untracked-files=no) { throw 'Commit source changes before packaging' }
+$bundle = Join-Path 'dist/workspace' $revision
+if (Test-Path -LiteralPath $bundle) { throw 'Revision artifact already exists; do not overwrite running programs' }
+New-Item -ItemType Directory -Path $bundle | Out-Null
+Copy-Item -LiteralPath 'frontend/README.md' -Destination (Join-Path $bundle 'START-HERE.md')
 $notice = [Collections.Generic.List[string]]::new()
 foreach ($line in Get-Content -LiteralPath 'go.mod') {
  if ($line -match '^\s*(\S+)\s+(v\S+)') {
@@ -29,10 +26,18 @@ foreach ($line in Get-Content -LiteralPath 'go.mod') {
   }
  }
 }
-[IO.File]::WriteAllLines((Join-Path (Get-Location) 'dist/workspace/THIRD-PARTY-NOTICES.txt'), $notice, [Text.UTF8Encoding]::new($false))
-$files += @('SHA256SUMS.txt','START-HERE.md','THIRD-PARTY-NOTICES.txt')
-node scripts/build-workspace-update.mjs
+[IO.File]::WriteAllLines((Join-Path $bundle 'THIRD-PARTY-NOTICES.txt'), $notice, [Text.UTF8Encoding]::new($false))
+node scripts/build-workspace-update.mjs $bundle
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-$files += 'peer-update'
-Compress-Archive -LiteralPath ($files | ForEach-Object {Join-Path 'dist/workspace' $_}) -DestinationPath 'dist/workspace/krasis-workspace-test.zip' -Force
-Write-Output 'Workspace and verified sibling agent packaged; no installed process was started or changed.'
+$controlHash = (Get-FileHash -LiteralPath (Join-Path $bundle 'peer-update/krasis-control.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
+go build -trimpath -tags desktop,production -ldflags "-s -w -H windowsgui -X main.controlSHA256=$controlHash" -o (Join-Path $bundle 'krasis-workspace.exe') ./cmd/krasis-workspace
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+node scripts/check-workspace-package.mjs $bundle
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$files = @('krasis-workspace.exe','START-HERE.md','THIRD-PARTY-NOTICES.txt')
+$sums = foreach ($file in $files) { (Get-FileHash -LiteralPath (Join-Path $bundle $file) -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $file }
+[IO.File]::WriteAllLines((Join-Path $bundle 'SHA256SUMS.txt'), $sums, [Text.UTF8Encoding]::new($false))
+$files += @('SHA256SUMS.txt','peer-update')
+$archive = "dist/workspace/krasis-workspace-$revision.zip"
+Compress-Archive -LiteralPath ($files | ForEach-Object {Join-Path $bundle $_}) -DestinationPath $archive
+Write-Output "Workspace packaged: $archive (shared UI and agent; installed processes unchanged)."

@@ -133,6 +133,7 @@ func TestWorkspaceUpdatePackage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Logf("wire update archive: %d bytes", len(data))
 	bundle, err := updatebundle.Read(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
 		t.Fatal(err)

@@ -54,7 +54,7 @@ try {
     & (Join-Path $bin 'llvm-cvtres.exe') /MACHINE:X64 /TIMESTAMP:0 "/OUT:$obj" $res
     if ($LASTEXITCODE -ne 0) { throw 'Icon COFF conversion failed.' }
 } finally { Pop-Location }
-foreach ($name in @('krasis', 'krasis-agent', 'krasis-control')) {
+foreach ($name in @('krasis', 'krasis-agent', 'krasis-control', 'krasis-workspace')) {
     Copy-Item -LiteralPath $obj -Destination (Join-Path $root "cmd/$name/icon_windows_amd64.syso")
 }
-Write-Output 'Generated 9 PNG-backed ICO sizes and Windows amd64 resources for all three executables.'
+Write-Output 'Generated 9 PNG-backed ICO sizes and Windows amd64 resources for all four executables.'
