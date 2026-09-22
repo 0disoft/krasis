@@ -159,8 +159,9 @@ func Run() {
 		var showOnce sync.Once
 		window.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) {
 			showOnce.Do(func() {
-				// Older senders set STARTUPINFO/SW_HIDE. Show again once the
-				// replacement renderer is ready, after the initial native show.
+				// The first ShowWindow can consume an older sender's SW_HIDE,
+				// even at runtime-ready. The next call uses our explicit SW_SHOW.
+				window.Show()
 				window.Show()
 				window.Restore()
 				window.Focus()
@@ -184,6 +185,7 @@ func Run() {
 		window.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) { window.Hide(); e.Cancel() })
 	}
 	done := make(chan bool, 1)
+	var rendererOK, windowVisible bool
 	if smoke {
 		go func() {
 			timer := time.NewTimer(25 * time.Second)
@@ -194,9 +196,11 @@ func Run() {
 			case <-timer.C:
 			case <-ctx.Done():
 			}
+			rendererOK = ok
 			if visibleSmoke && ok {
 				select {
 				case ok = <-shown:
+					windowVisible = ok
 				case <-timer.C:
 					ok = false
 				case <-ctx.Done():
@@ -214,7 +218,7 @@ func Run() {
 		_ = json.NewEncoder(os.Stdout).Encode(struct {
 			RendererAgentRoundtrip bool `json:"rendererAgentRoundtrip"`
 			UpdatedWindowVisible   bool `json:"updatedWindowVisible,omitempty"`
-		}{ok, visibleSmoke && ok})
+		}{rendererOK, visibleSmoke && windowVisible})
 		if !ok {
 			os.Exit(2)
 		}
