@@ -45,11 +45,13 @@ type Monitor struct {
 	done   chan struct{}
 	ready  chan error
 
-	window atomic.Uintptr
-	thread atomic.Uint32
-	close  sync.Once
-	mu     sync.Mutex
-	runErr error
+	window          atomic.Uintptr
+	thread          atomic.Uint32
+	close           sync.Once
+	mu              sync.Mutex
+	runErr          error
+	windowDestroyed bool // accessed only on the native owner thread
+	tearingDown     bool // suppress a new WM_QUIT after the message loop has exited
 }
 
 type windowClass struct {
@@ -143,27 +145,7 @@ func (monitor *Monitor) run() {
 		monitor.ready <- win32Error("GetModuleHandleW", callErr)
 		return
 	}
-	windowDestroyed := false
-	wndProc := syscall.NewCallback(func(window uintptr, message uint32, wParam, lParam uintptr) uintptr {
-		if event, ok := eventFromMessage(message, wParam); ok {
-			monitor.publish(event)
-		}
-		switch message {
-		case wmQueryEndSession:
-			return 1
-		case wmClose, wmLifecycleStop:
-			procPostQuitMessage.Call(0)
-			return 0
-		case wmDestroy:
-			windowDestroyed = true
-			procPostQuitMessage.Call(0)
-			return 0
-		default:
-			result, _, _ := procDefWindowProcW.Call(window, uintptr(message), wParam, lParam)
-			return result
-		}
-	})
-	class := windowClass{wndProc: wndProc, instance: module, className: className}
+	class := windowClass{wndProc: lifecycleWindowCallback, instance: module, className: className}
 	atom, _, callErr := procRegisterClassW.Call(uintptr(unsafe.Pointer(&class)))
 	if atom == 0 {
 		monitor.ready <- win32Error("RegisterClassW", callErr)
@@ -186,9 +168,12 @@ func (monitor *Monitor) run() {
 		return
 	}
 	monitor.window.Store(window)
+	lifecycleWindowOwners.Store(window, monitor)
+	defer lifecycleWindowOwners.CompareAndDelete(window, monitor)
 	defer monitor.window.Store(0)
 	defer func() {
-		if !windowDestroyed {
+		monitor.tearingDown = true
+		if !monitor.windowDestroyed {
 			if result, _, destroyErr := procDestroyWindow.Call(window); result == 0 {
 				monitor.setRunError(win32Error("DestroyWindow", destroyErr))
 			}
