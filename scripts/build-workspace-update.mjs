@@ -3,7 +3,8 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 
-// A g32 receiver accepts exactly this legacy bundle format. No executable is launched.
+// Preserve the seven-file format accepted by g34, but compile its control
+// entry point with the shared Workspace UI. No executable is launched.
 const git = args => execFileSync('git',args,{encoding:'utf8'}).trim();
 if (git(['status','--porcelain','--untracked-files=no'])) throw Error('Commit source changes before packaging updates.');
 const revision = git(['rev-parse','HEAD']);
@@ -12,9 +13,10 @@ if (!Number.isSafeInteger(generation)) throw Error('Missing generation');
 const directory = 'dist/workspace/peer-update';
 fs.mkdirSync(directory,{recursive:true});
 for (const name of ['krasis','krasis-agent','krasis-control']) {
-  execFileSync('go',['build','-trimpath','-ldflags=-H=windowsgui','-o',path.join(directory,`${name}.exe`),`./cmd/${name}`],{stdio:'inherit',env:{...process.env,GOOS:'windows',GOARCH:'amd64',CGO_ENABLED:'0',GOPROXY:'off',GOSUMDB:'off'}});
+  const tags = name === 'krasis-control' ? ['-tags','desktop,production'] : [];
+  execFileSync('go',['build','-trimpath',...tags,'-ldflags=-H=windowsgui','-o',path.join(directory,`${name}.exe`),`./cmd/${name}`],{stdio:'inherit',env:{...process.env,GOOS:'windows',GOARCH:'amd64',CGO_ENABLED:'0',GOPROXY:'off',GOSUMDB:'off'}});
 }
-fs.copyFileSync('docs/experiments/product-two-pc-smoke.md',path.join(directory,'START-HERE.md'));
+fs.copyFileSync('frontend/README.md',path.join(directory,'START-HERE.md'));
 fs.copyFileSync('dist/workspace/THIRD-PARTY-NOTICES.txt',path.join(directory,'THIRD-PARTY-NOTICES.txt'));
 fs.writeFileSync(path.join(directory,'BUILD.json'),JSON.stringify({revision,generation,platform:'windows/amd64',cgo:false,purpose:'manual-two-pc-smoke',signed:false},null,2)+'\n');
 const names=['krasis.exe','krasis-agent.exe','krasis-control.exe','START-HERE.md','BUILD.json','THIRD-PARTY-NOTICES.txt'];

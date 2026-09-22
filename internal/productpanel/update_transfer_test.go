@@ -5,6 +5,7 @@ package productpanel
 import (
 	"bytes"
 	"context"
+	"debug/buildinfo"
 	"errors"
 	"os"
 	"os/exec"
@@ -139,6 +140,19 @@ func TestWorkspaceUpdatePackage(t *testing.T) {
 	if bundle.Metadata().Revision != os.Getenv("KRASIS_UPDATE_REVISION") || bundle.Metadata().Generation != localapi.AgentGeneration {
 		t.Fatal("build provenance mismatch")
 	}
+	controlInfo, err := buildinfo.ReadFile(filepath.Join(directory, "krasis-control.exe"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	desktop := false
+	for _, setting := range controlInfo.Settings {
+		if setting.Key == "-tags" && strings.Contains(setting.Value, "desktop") && strings.Contains(setting.Value, "production") {
+			desktop = true
+		}
+	}
+	if !desktop {
+		t.Fatal("update still contains legacy UI instead of Workspace")
+	}
 	base := t.TempDir()
 	t.Setenv("LOCALAPPDATA", base)
 	parent := filepath.Join(base, "Krasis", "updates")
@@ -158,7 +172,7 @@ func TestWorkspaceUpdatePackage(t *testing.T) {
 		t.Fatal(err)
 	}
 	called := false
-	err = launchReceivedUpdate(filepath.Join(parent, id), bundle.Metadata().Revision, "A", 32, func(cmd *exec.Cmd) error {
+	err = launchReceivedUpdate(filepath.Join(parent, id), bundle.Metadata().Revision, "A", 34, func(cmd *exec.Cmd) error {
 		called = true
 		if filepath.Base(cmd.Path) != "krasis-control.exe" {
 			t.Fatal("wrong receiver")
@@ -166,6 +180,6 @@ func TestWorkspaceUpdatePackage(t *testing.T) {
 		return nil
 	})
 	if err != nil || !called {
-		t.Fatalf("g32 launch preparation: %v", err)
+		t.Fatalf("g34 launch preparation: %v", err)
 	}
 }
