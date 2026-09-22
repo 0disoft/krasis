@@ -16,6 +16,7 @@ const BridgeSchema = "krasis.desktop/v1"
 // Notice is legacy localized panel copy; native integration must map it to catalog
 // codes before advertising complete localization of agent failures.
 type BridgeSnapshot struct {
+	Revision  uint64       `json:"revision,omitempty"`
 	Schema    string       `json:"schema"`
 	State     string       `json:"state"`
 	PeerAlias string       `json:"peerAlias"`

@@ -40,6 +40,8 @@ func (b *DesktopLifecycle) Refresh() BridgeSnapshot {
 
 func (b *DesktopLifecycle) save(value BridgeSnapshot) BridgeSnapshot {
 	b.stateMu.Lock()
+	// Native projection revision, independent of HTTP response arrival order.
+	value.Revision = b.state.Revision + 1
 	b.state = value
 	b.stateMu.Unlock()
 	return value

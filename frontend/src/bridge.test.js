@@ -32,3 +32,22 @@ test('overlapping calls are rejected and failed calls release the gate', async (
   await assert.rejects(bridge.connect({ alias: 'B' }), /bridge_invalid_peer/);
   assert.equal((await bridge.disconnect()).state, 'LOCAL');
 });
+
+test('older native projections cannot replace newer state or mutate the accepted cache', async () => {
+  const values = [{ ...snapshot('CONNECTED'), revision: 8 }, { ...snapshot('RECONNECTING'), revision: 7 },
+    { ...snapshot('LOCAL'), revision: 9 }];
+  const bridge = createBridge({ Refresh: async () => values.shift(), Connect() {}, Disconnect() {} });
+  const accepted = await bridge.refresh();
+  accepted.state = 'FAULTED'; accepted.peers[0].alias = 'mutated';
+  const stale = await bridge.refresh();
+  assert.equal(stale.state, 'CONNECTED'); assert.equal(stale.revision, 8); assert.equal(stale.peers[0].alias, 'B');
+  assert.equal((await bridge.refresh()).revision, 9);
+});
+
+test('invalid revision is rejected and transport queries never invoke disconnect', async () => {
+  let disconnects = 0;
+  const bridge = createBridge({ Refresh: async () => ({ ...snapshot('CONNECTED'), revision: -1 }),
+    Connect() {}, Disconnect() { disconnects++; } });
+  await assert.rejects(bridge.refresh(), /bridge_protocol/);
+  assert.equal(disconnects, 0);
+});

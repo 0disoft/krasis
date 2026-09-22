@@ -7,6 +7,8 @@ export function createBridge(binding) {
     throw new Error('bridge_unavailable');
   }
   let busy = false;
+  let latest;
+  const copy = value => ({ ...value, peers: value.peers.map(peer => ({ ...peer })) });
   async function call(method, args = []) {
     if (busy) throw new Error('bridge_busy');
     busy = true;
@@ -15,13 +17,18 @@ export function createBridge(binding) {
       if (!value || value.schema !== 'krasis.desktop/v1' || !states.has(value.state) ||
           !Array.isArray(value.peers) || typeof value.code !== 'string' ||
           typeof value.peerAlias !== 'string' || typeof value.notice !== 'string' ||
+          (value.revision !== undefined && (!Number.isSafeInteger(value.revision) || value.revision < 0)) ||
           value.peers.some(p => !p || typeof p.alias !== 'string' || !p.alias ||
             typeof p.fingerprint !== 'string' || !/^[a-f0-9]{64}$/i.test(p.fingerprint))) {
         throw new Error('bridge_protocol');
       }
-      return { schema: value.schema, state: value.state, peerAlias: value.peerAlias,
+      if (latest && value.revision > 0 && value.revision < latest.revision) return copy(latest);
+      const result = { schema: value.schema, state: value.state, peerAlias: value.peerAlias,
         code: value.code, notice: value.notice,
+        ...(value.revision > 0 ? { revision: value.revision } : {}),
         peers: value.peers.map(p => ({ alias: p.alias, fingerprint: p.fingerprint })) };
+      if (result.revision > 0) latest = copy(result);
+      return result;
     } catch (error) {
       // Native errors can contain transport details. Keep those out of the UI.
       if (error?.message === 'bridge_protocol') throw error;
