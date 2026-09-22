@@ -94,7 +94,9 @@ func TestSourceSessionOverflowDisablesSuppressionAndFaults(t *testing.T) {
 		t.Fatalf("stale queued action was sent: %+v", action)
 	case <-time.After(20 * time.Millisecond):
 	}
-	if observer.queueDiscardedStale != 1 {
+	// Cancellation may stop the sender before it dequeues the retired item.
+	// Either disposal path must retain exactly one unsent action.
+	if observer.queueDiscardedStale+uint64(len(session.queue)) != 1 {
 		t.Fatalf("stale queue evidence = %+v", observer)
 	}
 }

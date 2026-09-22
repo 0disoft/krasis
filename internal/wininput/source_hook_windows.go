@@ -62,7 +62,7 @@ func (hook *SourceHook) RunWithBoundary(
 	session *SourceSession,
 	boundary BoundaryObserver,
 	ready func(),
-) error {
+) (resultErr error) {
 	if hook == nil || hook.capture == nil || session == nil {
 		return errors.New("source hook and session are required")
 	}
@@ -72,6 +72,9 @@ func (hook *SourceHook) RunWithBoundary(
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	evidence := &sourceShutdownEvidence{}
+	ctx = context.WithValue(ctx, sourceShutdownKey{}, evidence)
+	defer func() { resultErr = errors.Join(resultErr, evidence.snapshot()) }()
 	releaseHookSession, err := acquireHookSession(ctx)
 	if err != nil {
 		return err
@@ -435,7 +438,13 @@ func runSourceThreadMessageLoop(
 		defer close(stopMessageLoopDone)
 		select {
 		case <-ctx.Done():
-			procPostThreadMessageW.Call(threadID, wmQuit, 0, 0)
+			_ = postSourceShutdown(sourceShutdownFrom(ctx), func() error {
+				posted, _, err := procPostThreadMessageW.Call(threadID, wmQuit, 0, 0)
+				if posted == 0 {
+					return fmt.Errorf("PostThreadMessageW(quit): %w", err)
+				}
+				return nil
+			})
 		case <-stopMessageLoop:
 		}
 	}()

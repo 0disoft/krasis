@@ -27,6 +27,9 @@ var reconnectReasons = map[[3]string]string{
 }
 
 func init() {
+	for _, stage := range []string{"shutdown-post", "owner-acquire"} {
+		reconnectReasons[[3]string{"source-hook", stage, "failed"}] = "reconnect_source_" + strings.ReplaceAll(stage, "-", "_") + "_failed"
+	}
 	for _, code := range []string{"not_applied", "partially_applied", "outcome_unknown"} {
 		reconnectReasons[[3]string{"input-injection", "apply", code}] = "reconnect_injection_" + code
 	}

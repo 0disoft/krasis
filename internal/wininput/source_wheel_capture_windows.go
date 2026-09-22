@@ -157,17 +157,18 @@ type sourceWheelCapture struct {
 }
 
 type sourceWheelCaptureRun struct {
-	window       uintptr
-	commands     chan sourceWheelCaptureCommand
-	done         chan struct{}
-	active       atomic.Bool
-	terminalMu   sync.Mutex
-	terminalErr  error
-	registerProc uintptr
-	savedFocus   uintptr
-	registered   bool
-	session      *SourceSession
-	observer     SourcePipelineObserver
+	shutdownEvidence *sourceShutdownEvidence
+	window           uintptr
+	commands         chan sourceWheelCaptureCommand
+	done             chan struct{}
+	active           atomic.Bool
+	terminalMu       sync.Mutex
+	terminalErr      error
+	registerProc     uintptr
+	savedFocus       uintptr
+	registered       bool
+	session          *SourceSession
+	observer         SourcePipelineObserver
 }
 
 type sourceWheelCaptureCommand struct {
@@ -306,11 +307,12 @@ func (capture *sourceWheelCapture) runWindow(
 		return errors.Join(lab.ErrUnsupported, errors.New("RegisterTouchpadCapableWindow is unavailable"))
 	}
 	current := &sourceWheelCaptureRun{
-		commands:     make(chan sourceWheelCaptureCommand, 1),
-		done:         make(chan struct{}),
-		registerProc: registerProc,
-		session:      session,
-		observer:     capture.observer,
+		shutdownEvidence: sourceShutdownFrom(ctx),
+		commands:         make(chan sourceWheelCaptureCommand, 1),
+		done:             make(chan struct{}),
+		registerProc:     registerProc,
+		session:          session,
+		observer:         capture.observer,
 	}
 	if err := capture.attach(current); err != nil {
 		return err
@@ -870,7 +872,14 @@ func (current *sourceWheelCaptureRun) setError(err error) {
 func (current *sourceWheelCaptureRun) fail(err error) {
 	current.setError(err)
 	if current.window != 0 {
-		procPostMessageWTouchpad.Call(current.window, wmSourceWheelCaptureStop, 0, 0)
+		postErr := postSourceShutdown(current.shutdownEvidence, func() error {
+			posted, _, err := procPostMessageWTouchpad.Call(current.window, wmSourceWheelCaptureStop, 0, 0)
+			if posted == 0 {
+				return touchpadWin32Error("PostMessageW(source stop)", err)
+			}
+			return nil
+		})
+		current.setError(postErr)
 	}
 }
 
