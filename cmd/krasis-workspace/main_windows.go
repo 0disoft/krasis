@@ -48,7 +48,7 @@ func launch() error {
 		return err
 	}
 	cmd := exec.Command(control, os.Args[1:]...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: 0x08000000}
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 	if len(os.Args) > 1 {
 		return cmd.Run()

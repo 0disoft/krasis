@@ -5,9 +5,11 @@ package workspacehost
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	windowsassets "github.com/0disoft/krasis/assets/windows"
@@ -60,7 +62,8 @@ func Run() {
 		}
 		return
 	}
-	smoke := len(os.Args) == 2 && os.Args[1] == "--smoke"
+	visibleSmoke := len(os.Args) == 2 && os.Args[1] == "--smoke-update-window"
+	smoke := visibleSmoke || (len(os.Args) == 2 && os.Args[1] == "--smoke")
 	var updated productpanel.WorkspaceUpdateLaunch
 	if len(os.Args) != 1 && !smoke {
 		updated, err = productpanel.ParseWorkspaceUpdateLaunch(os.Args[1:])
@@ -72,7 +75,7 @@ func Run() {
 	if err != nil {
 		os.Exit(1)
 	}
-	service := &WorkspaceService{raw: bridge, ctx: ctx, control: paths.Control, title: "Krasis · " + productpanel.CurrentBuildLabel()}
+	service := &WorkspaceService{raw: bridge, ctx: ctx, control: paths.Control, title: fmt.Sprintf("Krasis · g%d", localapi.AgentGeneration)}
 	if !smoke {
 		startup, startupErr := productpanel.NewStartup(paths.Control)
 		if startupErr != nil {
@@ -149,8 +152,22 @@ func Run() {
 		Width: 1180, Height: 850, MinWidth: 720, MinHeight: 620,
 		BackgroundColour: application.NewRGB(24, 27, 33),
 		URL:              url,
-		Hidden:           smoke,
+		Hidden:           smoke && !visibleSmoke,
 	})
+	shown := make(chan bool, 1)
+	if visibleSmoke || (!smoke && updated.Revision != "") {
+		var showOnce sync.Once
+		window.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) {
+			showOnce.Do(func() {
+				// Older senders set STARTUPINFO/SW_HIDE. Show again once the
+				// replacement renderer is ready, after the initial native show.
+				window.Show()
+				window.Restore()
+				window.Focus()
+				shown <- window.IsVisible()
+			})
+		})
+	}
 	if !smoke {
 		tray := app.SystemTray.New()
 		tray.SetIcon(windowsassets.Icon)
@@ -177,6 +194,15 @@ func Run() {
 			case <-timer.C:
 			case <-ctx.Done():
 			}
+			if visibleSmoke && ok {
+				select {
+				case ok = <-shown:
+				case <-timer.C:
+					ok = false
+				case <-ctx.Done():
+					ok = false
+				}
+			}
 			done <- ok
 			app.Quit()
 		}()
@@ -187,7 +213,8 @@ func Run() {
 		ok := <-done
 		_ = json.NewEncoder(os.Stdout).Encode(struct {
 			RendererAgentRoundtrip bool `json:"rendererAgentRoundtrip"`
-		}{ok})
+			UpdatedWindowVisible   bool `json:"updatedWindowVisible,omitempty"`
+		}{ok, visibleSmoke && ok})
 		if !ok {
 			os.Exit(2)
 		}

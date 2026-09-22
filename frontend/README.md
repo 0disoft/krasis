@@ -32,7 +32,7 @@ the compiled-in SHA256 of `peer-update/krasis-control.exe` and then starts it.
 There is no duplicate root agent. Keep the entire distribution directory;
 do not copy the launcher alone. Wails v3 is an explicitly selected prerelease
 dependency. The Go language requirement is unchanged; the bundle includes agent
-generation 38, and building does not replace the running process. All Go
+generation 39, and building does not replace the running process. All Go
 release exes build with trimpath plus `-s -w` (Go build metadata is kept, so
 stack traces still resolve; native debugger symbols are removed).
 
@@ -153,8 +153,9 @@ for the shared pump, controller-presence probe and native controller regressions
 Automated checks do not read or replace the user's current clipboard; two-PC
 copy/paste and visible consent-dialog testing remain manual.
 
-Standard action icons remain Phosphor. The UI package is 0.9.3 and the Workspace
-bundle includes agent generation 38. Building the bundle does not replace the
+Standard action icons remain Phosphor. The UI package is 0.9.4 and the Workspace
+bundle includes agent generation 39. Building the bundle does not replace the
 running agent. UI 0.9.1 is a responsive/scrolling modal and numeric rearm-selection
 fix; existing g35 receivers can accept this revised UI (same-generation
-different-build stays intentionally blocked).
+different-build stays intentionally blocked). Remote update opens a new visible window
+with generated title; main handles native Go.

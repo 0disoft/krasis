@@ -234,10 +234,10 @@
     </div>
   </section>
   <section class="utilities">
-    <button class="utility utility-button" disabled={clipBusy || (!clipboard.peer && !selectedPeer)} onclick={toggleClipboard}><Icon name="clipboard" /><div><h2>{t('clipboard')}</h2><p>{t(clipboard.peer ? 'clipboard_on' : 'clipboard_off')}</p></div></button>
-    <button class="utility utility-button" onclick={openUpdates}><Icon name="arrows-clockwise" /><div><h2>{t('update')}</h2><p>{t('upd_title')}</p></div></button>
-    <button class="utility utility-button" onclick={() => pairingDlg.showModal()}><Icon name="plus" /><div><h2>{t('pair')}</h2><p>{t(pairing.job ? 'pin_waiting' : 'pairHelp')}</p></div></button>
-    <button class="utility utility-button" onclick={() => diagnosticsDlg.showModal()}><Icon name="info" /><div><h2>{t('diag_title')}</h2><p>{t('diag_save')} · {t('diag_open')}</p></div></button>
+    <button class="utility utility-button" disabled={clipBusy || (!clipboard.peer && !selectedPeer)} onclick={toggleClipboard} aria-pressed={!!clipboard.peer}><Icon name="clipboard" /><div><h2>{t('clipboard')}</h2></div></button>
+    <button class="utility utility-button" onclick={openUpdates}><Icon name="arrows-clockwise" /><div><h2>{t('update')}</h2></div></button>
+    <button class="utility utility-button" onclick={() => pairingDlg.showModal()}><Icon name="plus" /><div><h2>{t('pair')}</h2></div></button>
+    <button class="utility utility-button" onclick={() => diagnosticsDlg.showModal()}><Icon name="info" /><div><h2>{t('diag_title')}</h2></div></button>
   </section>
   <p role="status">{clipNotice ? t(clipNotice) : clipboard.code !== 'ok' ? t(clipboard.code) : layout.code !== 'ok' && layout.code !== 'unavailable' && layout.code !== 'unconfigured' ? t(layout.code) : t('clipboard_help')}</p>
 </main>

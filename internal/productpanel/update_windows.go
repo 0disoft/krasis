@@ -68,7 +68,7 @@ func launchReceivedUpdate(directory, revision, alias string, generation int, sta
 	}
 	command := exec.Command(filepath.Join(absolute, "krasis-control.exe"), "--updated-peer", alias, "--expected-build", revision)
 	command.Dir = absolute
-	command.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
+	command.SysProcAttr = &syscall.SysProcAttr{CreationFlags: 0x08000000}
 	for _, key := range []string{"SystemRoot", "WINDIR", "LOCALAPPDATA", "TEMP", "TMP", "USERPROFILE"} {
 		if value, ok := os.LookupEnv(key); ok {
 			command.Env = append(command.Env, key+"="+value)

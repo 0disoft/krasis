@@ -178,6 +178,9 @@ func TestWorkspaceUpdatePackage(t *testing.T) {
 		if filepath.Base(cmd.Path) != "krasis-control.exe" {
 			t.Fatal("wrong receiver")
 		}
+		if cmd.SysProcAttr == nil || cmd.SysProcAttr.HideWindow || cmd.SysProcAttr.CreationFlags != 0x08000000 {
+			t.Fatal("updated GUI must remain visible without creating a console")
+		}
 		return nil
 	})
 	if err != nil || !called {
