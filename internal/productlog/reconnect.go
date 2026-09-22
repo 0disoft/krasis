@@ -27,6 +27,11 @@ var reconnectReasons = map[[3]string]string{
 }
 
 func init() {
+	for _, phase := range []string{"admission", "io", "deadline"} {
+		for _, code := range []string{"failed", "timeout", "canceled"} {
+			reconnectReasons[[3]string{"peer-writer", "write-" + phase, code}] = "reconnect_write_" + phase + "_" + code
+		}
+	}
 	for _, phase := range []string{"source-close", "connection-close", "nonlocal-state", "unexpected-stop", "nil-connection"} {
 		reconnectReasons[[3]string{"supervisor", phase, "failed"}] = "reconnect_supervisor_" + strings.ReplaceAll(phase, "-", "_") + "_failed"
 	}

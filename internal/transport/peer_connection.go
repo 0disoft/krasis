@@ -56,6 +56,16 @@ func (connection *PeerConnection) ReadFrame() (Frame, error) {
 }
 
 func (connection *PeerConnection) WriteFrameContext(ctx context.Context, frame Frame) error {
+	started := time.Now()
+	var admitted time.Time
+	failure := func(phase string, cause error) error {
+		value := &FrameWriteFailure{Phase: phase, Kind: frame.Kind, Cause: cause, Wait: time.Since(started)}
+		if !admitted.IsZero() {
+			value.Wait = admitted.Sub(started)
+			value.IO = time.Since(admitted)
+		}
+		return value
+	}
 	if connection == nil || connection.writer == nil || connection.connection == nil || connection.writeGate == nil {
 		return errors.New("peer connection is not initialized")
 	}
@@ -63,34 +73,38 @@ func (connection *PeerConnection) WriteFrameContext(ctx context.Context, frame F
 		return errors.New("write context is required")
 	}
 	if err := ctx.Err(); err != nil {
-		return err
+		return failure("admission", err)
 	}
 	ctx, cancel := context.WithTimeout(ctx, FrameWriteTimeout)
 	defer cancel()
 	select {
 	case <-ctx.Done():
-		_ = connection.Close()
-		return ctx.Err()
+		return failure("admission", ctx.Err())
 	case <-connection.writeGate:
 	}
 	defer func() { connection.writeGate <- struct{}{} }()
 	if err := ctx.Err(); err != nil {
-		return err
+		return failure("admission", err)
 	}
+	admitted = time.Now()
 	deadline, hasDeadline := ctx.Deadline()
 	if hasDeadline {
 		if err := connection.connection.SetWriteDeadline(deadline); err != nil {
-			return err
+			_ = connection.connection.NetConn().Close()
+			return failure("deadline", err)
 		}
 	}
 	finishWrite := interruptWriteOnCancel(ctx, connection.connection)
 	err := connection.writer.WriteFrame(frame)
 	finishWrite()
 	if err != nil {
-		_ = connection.Close() // a partially written/timed-out stream cannot be reused
+		// Failed TLS writes cannot be reused. Close the socket directly rather
+		// than spending another TLS close-notify timeout on an unusable stream.
+		_ = connection.connection.NetConn().Close()
 		if ctxErr := ctx.Err(); ctxErr != nil {
-			return ctxErr
+			return failure("io", errors.Join(ctxErr, err))
 		}
+		return failure("io", err)
 	}
 	return err
 }

@@ -1,10 +1,13 @@
 package agent
 
 import (
+	"context"
 	"errors"
+	"net"
 	"sync"
 
 	"github.com/0disoft/krasis/internal/peer"
+	"github.com/0disoft/krasis/internal/transport"
 	"github.com/0disoft/krasis/internal/wininput"
 )
 
@@ -59,6 +62,22 @@ func DescribeSessionFailure(err error) FailureDescriptor {
 		return FailureDescriptor{Component: "source-capture", Phase: "capture-activate", Code: "activation_failed"}
 	case errors.Is(err, ErrSourceSessionActivation):
 		return FailureDescriptor{Component: "source-session", Phase: "source-activate", Code: "activation_failed"}
+	}
+	var write *transport.FrameWriteFailure
+	if errors.As(err, &write) {
+		code := "failed"
+		var networkError net.Error
+		if errors.Is(err, context.DeadlineExceeded) || errors.As(write.Cause, &networkError) && networkError.Timeout() {
+			code = "timeout"
+		} else if errors.Is(err, context.Canceled) {
+			code = "canceled"
+		}
+		switch write.Phase {
+		case "admission", "io", "deadline":
+			return FailureDescriptor{Component: "peer-writer", Phase: "write-" + write.Phase, Code: code}
+		}
+	}
+	switch {
 	case errors.Is(err, peer.ErrSourceSessionInterrupted):
 		return FailureDescriptor{Component: "source-session", Phase: "runtime", Code: "connection_interrupted"}
 	case errors.Is(err, peer.ErrOutboundGrantApply):
