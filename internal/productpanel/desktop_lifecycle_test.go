@@ -32,14 +32,15 @@ func TestDesktopLifecycleRecoveryBudgetAndIdentity(t *testing.T) {
 	}
 }
 
-func TestDesktopLifecycleEvidenceFailureDoesNotRestart(t *testing.T) {
-	client := &fakeClient{state: "FAULTED"}
+func TestDesktopLifecycleDiagnosticFailureDoesNotBlockVerifiedRecovery(t *testing.T) {
+	fp := strings.Repeat("a", 64)
+	client := &fakeClient{state: "FAULTED", peers: []localapi.TrustedPeer{{Alias: "B", Fingerprint: fp}}}
 	starts := 0
-	b := NewDesktopLifecycle(context.Background(), func() (Client, error) { return client, nil }, func(context.Context) error { starts++; return nil }, func(context.Context, string) error { return errors.New("private path") })
+	b := NewDesktopLifecycle(context.Background(), func() (Client, error) { return client, nil }, func(context.Context) error { starts++; client.state = "LOCAL"; return nil }, func(context.Context, string) error { return errors.New("private path") })
 	b.recovery.Alias, b.recovery.Fingerprint = "B", strings.Repeat("a", 64)
 	b.tick(time.Now())
 	b.tick(time.Now().Add(time.Minute))
-	if starts != 0 || b.Refresh().Code != "diagnostic_failed" {
+	if starts != 1 || client.connects != 1 || b.Refresh().Code != "diagnostic_failed" {
 		t.Fatal(starts, b.Refresh())
 	}
 }

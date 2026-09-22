@@ -11,17 +11,18 @@ import (
 // DesktopLifecycle owns recovery independently of renderer timers. All process
 // operations are serialized; Disconnect cancels an in-flight recovery first.
 type DesktopLifecycle struct {
-	ctx      context.Context
-	open     func() (Client, error)
-	ensure   func(context.Context) error
-	diagnose func(context.Context, string) error
-	gate     sync.Mutex
-	cancelMu sync.Mutex
-	cancel   context.CancelFunc
-	stopped  atomic.Bool
-	recovery AutomaticRecovery
-	stateMu  sync.RWMutex
-	state    BridgeSnapshot
+	ctx              context.Context
+	open             func() (Client, error)
+	ensure           func(context.Context) error
+	diagnose         func(context.Context, string) error
+	diagnosticActive atomic.Bool
+	gate             sync.Mutex
+	cancelMu         sync.Mutex
+	cancel           context.CancelFunc
+	stopped          atomic.Bool
+	recovery         AutomaticRecovery
+	stateMu          sync.RWMutex
+	state            BridgeSnapshot
 }
 
 func NewDesktopLifecycle(ctx context.Context, open func() (Client, error), ensure func(context.Context) error, diagnose func(context.Context, string) error) *DesktopLifecycle {
@@ -126,16 +127,16 @@ func (b *DesktopLifecycle) Restart() BridgeSnapshot {
 		view.Code = "agent_busy"
 		return b.save(view)
 	}
-	if view.State == "FAULTED" && (b.diagnose == nil || b.diagnose(ctx, b.recovery.Fingerprint) != nil) {
-		view.Code = "diagnostic_failed"
-		return b.save(view)
+	var diagnosticErr error
+	if view.State == "FAULTED" {
+		diagnosticErr = b.diagnoseBounded(ctx, b.recovery.Fingerprint)
 	}
 	b.recovery.Reset()
 	b.stopped.Store(false)
 	if err := b.startup(ctx); err != nil {
 		return b.failedStartup(ctx, err)
 	}
-	return b.save(NewDesktopBridge(ctx, b.open).Refresh())
+	return b.save(withDiagnosticNotice(NewDesktopBridge(ctx, b.open).Refresh(), diagnosticErr))
 }
 
 // Run belongs to the native service lifetime; callers cancel ctx and join it.
@@ -144,13 +145,14 @@ func (b *DesktopLifecycle) Run() {
 	b.gate.Lock()
 	ctx, done := b.operation()
 	initial := NewDesktopBridge(ctx, b.open).Refresh()
-	if initial.State == "FAULTED" && (b.diagnose == nil || b.diagnose(ctx, "") != nil) {
-		initial.Code = "diagnostic_failed"
-		b.save(initial)
-	} else if err := b.startup(ctx); err != nil {
+	var diagnosticErr error
+	if initial.State == "FAULTED" {
+		diagnosticErr = b.diagnoseBounded(ctx, "")
+	}
+	if err := b.startup(ctx); err != nil {
 		b.failedStartup(ctx, err)
 	} else {
-		b.save(NewDesktopBridge(ctx, b.open).Refresh())
+		b.save(withDiagnosticNotice(NewDesktopBridge(ctx, b.open).Refresh(), diagnosticErr))
 	}
 	done()
 	b.gate.Unlock()
@@ -198,10 +200,10 @@ func (b *DesktopLifecycle) tick(now time.Time) {
 		}
 		return
 	}
-	if b.diagnose == nil || b.diagnose(ctx, b.recovery.Fingerprint) != nil {
+	diagnosticErr := b.diagnoseBounded(ctx, b.recovery.Fingerprint)
+	if diagnosticErr != nil {
 		value.Code = "diagnostic_failed"
 		b.save(value)
-		return
 	}
 	if action != "auto_recover" {
 		return
@@ -216,5 +218,5 @@ func (b *DesktopLifecycle) tick(now time.Time) {
 		return
 	}
 	// DesktopBridge rechecks active trust and the exact saved fingerprint.
-	b.save(bridge.Connect(b.recovery.Alias, b.recovery.Fingerprint))
+	b.save(withDiagnosticNotice(bridge.Connect(b.recovery.Alias, b.recovery.Fingerprint), diagnosticErr))
 }

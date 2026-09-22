@@ -83,11 +83,14 @@ func (s *WorkspaceService) Restart() productpanel.BridgeSnapshot {
 	return s.raw.Refresh()
 }
 
-// Export locally before replacement. Delivery is best-effort and bounded, but
-// failure to preserve the local evidence blocks automatic process replacement.
+// Export locally before replacement when available. The lifecycle bounds this
+// best-effort task independently of mandatory input/process ownership recovery.
 func diagnose(local, control string) func(context.Context, string) error {
 	return func(parent context.Context, fingerprint string) error {
 		if _, err := productlog.Export(local); err != nil {
+			return err
+		}
+		if err := parent.Err(); err != nil {
 			return err
 		}
 		if len(fingerprint) != 64 {
