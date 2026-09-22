@@ -93,6 +93,8 @@ func run(ctx context.Context, localAppData string, dependencies runDependencies)
 		return err
 	}
 	defer func() { err = errors.Join(err, lifecycle.Close()) }()
+	lifecycleObserved := observeLifecycleStop(lifecycle.Context(), dependencies.log.Event)
+	defer func() { lifecycle.Stop(); <-lifecycleObserved }()
 
 	trust, err := truststore.New(paths.Trust)
 	if err != nil {
