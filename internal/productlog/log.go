@@ -37,16 +37,17 @@ func init() {
 }
 
 type record struct {
-	Time          string           `json:"time"`
-	Code          string           `json:"code"`
-	Build         string           `json:"build"`
-	BuildDirty    bool             `json:"buildDirty,omitempty"`
-	Run           string           `json:"run,omitempty"`
-	Connection    string           `json:"connection,omitempty"`
-	Sequence      uint64           `json:"sequence,omitempty"`
-	ElapsedMicros int64            `json:"elapsedMicros,omitempty"`
-	PID           int              `json:"pid"`
-	Boundary      *BoundarySummary `json:"boundary,omitempty"`
+	Time          string            `json:"time"`
+	Code          string            `json:"code"`
+	Build         string            `json:"build"`
+	BuildDirty    bool              `json:"buildDirty,omitempty"`
+	Run           string            `json:"run,omitempty"`
+	Connection    string            `json:"connection,omitempty"`
+	Sequence      uint64            `json:"sequence,omitempty"`
+	ElapsedMicros int64             `json:"elapsedMicros,omitempty"`
+	PID           int               `json:"pid"`
+	Boundary      *BoundarySummary  `json:"boundary,omitempty"`
+	Injection     *InjectionFailure `json:"injection,omitempty"`
 }
 type Logger struct {
 	mu              sync.Mutex
@@ -113,6 +114,11 @@ func (l *Logger) Event(code string) {
 }
 
 func (l *Logger) enqueue(code string, boundary *BoundarySummary) {
+	l.enqueueRecord(record{Code: code, Boundary: boundary})
+}
+
+func (l *Logger) enqueueRecord(r record) {
+	code := r.Code
 	if l == nil || !allowed[code] {
 		return
 	}
@@ -121,7 +127,9 @@ func (l *Logger) enqueue(code string, boundary *BoundarySummary) {
 	if l.closed {
 		return
 	}
-	r := record{Time: time.Now().UTC().Format(time.RFC3339Nano), Code: code, Build: l.build, PID: os.Getpid(), Boundary: boundary}
+	r.Time = time.Now().UTC().Format(time.RFC3339Nano)
+	r.Build = l.build
+	r.PID = os.Getpid()
 	l.sequence++
 	r.BuildDirty = l.buildDirty
 	r.Run = l.run

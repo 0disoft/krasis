@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"errors"
+	"github.com/0disoft/krasis/internal/application"
 	"net"
 	"sync"
 
@@ -62,6 +63,16 @@ func DescribeSessionFailure(err error) FailureDescriptor {
 		return FailureDescriptor{Component: "source-capture", Phase: "capture-activate", Code: "activation_failed"}
 	case errors.Is(err, ErrSourceSessionActivation):
 		return FailureDescriptor{Component: "source-session", Phase: "source-activate", Code: "activation_failed"}
+	}
+	if certainty, ok := application.InjectionCertaintyOf(err); ok {
+		code := "outcome_unknown"
+		switch certainty {
+		case application.InjectionNotApplied:
+			code = "not_applied"
+		case application.InjectionPartiallyApplied:
+			code = "partially_applied"
+		}
+		return FailureDescriptor{Component: "input-injection", Phase: "apply", Code: code}
 	}
 	var write *transport.FrameWriteFailure
 	if code := transport.FrameFailureCode(err); code != "" {

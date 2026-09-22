@@ -16,15 +16,16 @@ import (
 const ExportName = "support-latest.json"
 
 type exportEvent struct {
-	Time          string           `json:"time"`
-	Code          string           `json:"code"`
-	Build         string           `json:"build,omitempty"`
-	BuildDirty    bool             `json:"buildDirty,omitempty"`
-	Run           string           `json:"run,omitempty"`
-	Connection    string           `json:"connection,omitempty"`
-	Sequence      uint64           `json:"sequence,omitempty"`
-	ElapsedMicros int64            `json:"elapsedMicros,omitempty"`
-	Boundary      *BoundarySummary `json:"boundary,omitempty"`
+	Time          string            `json:"time"`
+	Code          string            `json:"code"`
+	Build         string            `json:"build,omitempty"`
+	BuildDirty    bool              `json:"buildDirty,omitempty"`
+	Run           string            `json:"run,omitempty"`
+	Connection    string            `json:"connection,omitempty"`
+	Sequence      uint64            `json:"sequence,omitempty"`
+	ElapsedMicros int64             `json:"elapsedMicros,omitempty"`
+	Boundary      *BoundarySummary  `json:"boundary,omitempty"`
+	Injection     *InjectionFailure `json:"injection,omitempty"`
 }
 
 type exportLog struct {
@@ -133,6 +134,13 @@ func sanitizeLog(name string, r io.Reader) exportLog {
 		}
 		if validHex(input.Connection, 64) {
 			event.Connection = input.Connection
+		}
+		if input.Code == "injection_failure" {
+			if input.Injection == nil || !input.Injection.valid() {
+				result.Incomplete = true
+				continue
+			}
+			event.Injection = input.Injection
 		}
 		if input.Code == "boundary_summary" {
 			if input.Boundary == nil || !input.Boundary.valid() {

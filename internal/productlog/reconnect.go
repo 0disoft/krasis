@@ -27,6 +27,9 @@ var reconnectReasons = map[[3]string]string{
 }
 
 func init() {
+	for _, code := range []string{"not_applied", "partially_applied", "outcome_unknown"} {
+		reconnectReasons[[3]string{"input-injection", "apply", code}] = "reconnect_injection_" + code
+	}
 	for _, code := range []string{"header_truncated", "payload_truncated", "magic_invalid", "version_unsupported", "kind_unsupported", "flags_unsupported", "payload_oversized", "control_invalid", "control_unsupported", "input_invalid", "input_unsupported", "heartbeat_invalid", "heartbeat_unsupported"} {
 		reconnectReasons[[3]string{"peer-reader", "framing", code}] = "reconnect_frame_" + code
 	}
