@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -77,6 +78,8 @@ type SupervisorObserver interface {
 }
 
 type SupervisorSnapshot struct {
+	BackoffPolicy    BackoffPolicy
+	StableReset      bool
 	ConnectionID     string
 	State            SupervisorState
 	Attempt          uint32
@@ -91,6 +94,7 @@ type SupervisorSnapshot struct {
 }
 
 type BackoffPolicy struct {
+	Jitter      bool
 	Initial     time.Duration
 	Maximum     time.Duration
 	StableAfter time.Duration
@@ -117,6 +121,16 @@ func (policy BackoffPolicy) Delay(attempt uint32) (time.Duration, error) {
 	}
 	if delay > policy.Maximum {
 		delay = policy.Maximum
+	}
+	if policy.Jitter {
+		// Bounded independent jitter prevents symmetric peers retrying in lockstep.
+		delay = time.Duration(float64(delay) * (0.8 + rand.Float64()*0.4))
+		if delay > policy.Maximum {
+			delay = policy.Maximum
+		}
+		if delay < time.Nanosecond {
+			delay = time.Nanosecond
+		}
 	}
 	return delay, nil
 }
@@ -175,6 +189,7 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 			connectionID = ""
 		}
 		snapshot.ConnectionID = connectionID
+		snapshot.BackoffPolicy = config.Backoff
 		snapshot.State = state
 		if config.Observer != nil {
 			config.Observer.ObserveSupervisor(snapshot)
@@ -264,7 +279,8 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 			terminalSnapshot.FailureKind = "peer_disconnect"
 			return sessionErr
 		}
-		if config.Now().Sub(started) >= config.Backoff.StableAfter {
+		stableReset := config.Now().Sub(started) >= config.Backoff.StableAfter
+		if stableReset {
 			attempt = 0
 		}
 		attempt++
@@ -274,7 +290,8 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 		}
 		failure := DescribeSessionFailure(sessionErr)
 		if err := transition(SupervisorSessionFailed, SupervisorSnapshot{
-			Attempt: attempt, RetryAfter: delay, FailureKind: "session",
+			StableReset: stableReset,
+			Attempt:     attempt, RetryAfter: delay, FailureKind: "session",
 			FailureComponent:    failure.Component,
 			FailurePhase:        failure.Phase,
 			FailureCode:         failure.Code,

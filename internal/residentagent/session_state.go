@@ -93,6 +93,11 @@ func (observer *sessionObserver) ObserveSupervisor(snapshot agent.SupervisorSnap
 	}
 	if snapshot.State != "" {
 		operations.log.Connection(snapshot.ConnectionID)
+		jitter := 0
+		if snapshot.BackoffPolicy.Jitter {
+			jitter = 20
+		}
+		operations.log.Retry(productlog.RetrySummary{Policy: "agent-exponential-v1", Unlimited: true, Attempt: snapshot.Attempt, NextMillis: snapshot.RetryAfter.Milliseconds(), InitialMillis: snapshot.BackoffPolicy.Initial.Milliseconds(), MaximumMillis: snapshot.BackoffPolicy.Maximum.Milliseconds(), StableMillis: snapshot.BackoffPolicy.StableAfter.Milliseconds(), StableReset: snapshot.StableReset, JitterPercent: jitter})
 	}
 	if snapshot.State == agent.SupervisorStopped && snapshot.FailureKind == "session" {
 		reason := productlog.FaultCode(snapshot.FailureComponent, snapshot.FailurePhase, snapshot.FailureCode)

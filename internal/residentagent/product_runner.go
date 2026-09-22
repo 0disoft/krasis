@@ -171,7 +171,9 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 		}
 		// Initial conservative defaults, not a measured latency guarantee.
 		config.Liveness = &agent.LivenessPolicy{HeartbeatInterval: 250 * time.Millisecond, PeerTimeout: 2 * time.Second}
-		return agent.RunSupervisor(ctx, agent.SupervisorConfig{Session: config, Backoff: agent.DefaultBackoffPolicy(), Now: time.Now, Wait: agent.Wait, Observer: observer}, agent.SupervisorDependencies{
+		backoff := agent.DefaultBackoffPolicy()
+		backoff.Jitter = true
+		return agent.RunSupervisor(ctx, agent.SupervisorConfig{Session: config, Backoff: backoff, Now: time.Now, Wait: agent.Wait, Observer: observer}, agent.SupervisorDependencies{
 			Source: source, Hook: wininput.NewSourceHook(), Input: &guardedProductInput{InputBoundaryPort: input, guard: guard, log: log}, Effects: agent.RuntimeEffects{}, Authorizer: productAuthorizer{trust}, RunSession: agent.RunSession,
 		})
 	}
