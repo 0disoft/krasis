@@ -222,7 +222,11 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 	observeControlFlow(responder.Observer, ControlFlowRequestReceived)
 	return responder.Coordinator.Execute(ctx, func(writer FrameWriter) error {
 		if responder.Runtime.Snapshot().Control.State != control.StateLocal {
-			return errors.New("lease responder requires a local runtime")
+			// A concurrent outbound request or an existing lease is ordinary
+			// contention, not a malformed frame or a broken connection.
+			return writeControlOrFail(ctx, writer, responder.Runtime, transport.ControlCommand{
+				Kind: transport.ControlLeaseReject, SessionID: command.SessionID, Epoch: command.Epoch,
+			})
 		}
 		leaseID, accepted, err := responder.Authorizer.AuthorizeLease(ctx, responder.Peer, command.SessionID, command.Epoch, observedAt)
 		if err != nil {

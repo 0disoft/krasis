@@ -230,6 +230,32 @@ func TestLeaseResponderRejectsWithoutActivatingRuntime(t *testing.T) {
 	}
 }
 
+func TestLeaseResponderRejectsBusyWithoutChangingExistingLease(t *testing.T) {
+	runtime := newLocalRuntime(t)
+	if _, err := runtime.BeginOutbound(context.Background(), "existing", "existing-epoch"); err != nil {
+		t.Fatal(err)
+	}
+	before := runtime.Snapshot()
+	writer := &recordingFrameWriter{}
+	entry := &recordingCursorEntry{}
+	responder := &LeaseResponder{Coordinator: testWriteCoordinator(t, writer), Runtime: runtime,
+		Authorizer: staticLeaseAuthorizer{err: errors.New("busy request must not authorize")}, Peer: testAuthenticatedPeer(), Entry: entry, Returns: entry}
+	command := transport.ControlCommand{Kind: transport.ControlLeaseRequest, SessionID: "other", Epoch: "other-epoch", Edge: control.ScreenEdgeRight}
+	if err := responder.HandleLeaseRequest(context.Background(), command, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	reject := decodeWrittenControl(t, writer)
+	if reject.Kind != transport.ControlLeaseReject || reject.SessionID != command.SessionID || reject.Epoch != command.Epoch {
+		t.Fatalf("wrong rejection: %+v", reject)
+	}
+	if after := runtime.Snapshot(); after.Control != before.Control {
+		t.Fatalf("busy rejection changed owner: %+v", after)
+	}
+	if len(entry.edges) != 0 || entry.rollbacks != 0 {
+		t.Fatal("busy rejection touched cursor")
+	}
+}
+
 func TestLeaseResponderEntryFailureDoesNotGrantInbound(t *testing.T) {
 	runtime := newLocalRuntime(t)
 	writer := &recordingFrameWriter{}

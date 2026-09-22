@@ -265,8 +265,10 @@ func TestPeerSessionsReuseOneConnectionForBothDirections(t *testing.T) {
 	assertIntegrationRuntimesLocal(t, leftRuntime, rightRuntime, "right-to-left transfer")
 }
 
-func TestPeerSessionsFailSafeWhenBothPeersRequestControl(t *testing.T) {
-	leftSide, rightSide := openFramedPipe(t)
+func TestPeerSessionsRejectCollisionWithoutDisconnectAndAllowRetry(t *testing.T) {
+	// TCP buffers simultaneous rejections; net.Pipe has no write buffer and
+	// would impose a full-duplex deadlock that the product TCP path does not.
+	leftSide, rightSide := openFramedTCP(t)
 	leftRuntime := newIntegrationRuntime(t, &integrationInputPort{moves: make(chan [2]int32, 1)})
 	rightRuntime := newIntegrationRuntime(t, &integrationInputPort{moves: make(chan [2]int32, 1)})
 	leftCoordinator := testWriteCoordinator(t, leftSide)
@@ -358,21 +360,64 @@ func TestPeerSessionsFailSafeWhenBothPeersRequestControl(t *testing.T) {
 			t.Fatalf("simultaneous lease request write did not finish: %v", ctx.Err())
 		}
 	}
-	for range 2 {
-		select {
-		case sessionErr := <-done:
-			if sessionErr == nil {
-				t.Fatal("colliding peer session exited without an error")
-			}
-		case <-ctx.Done():
-			t.Fatalf("colliding peer session did not stop: %v", ctx.Err())
-		}
+	waitRuntimeState(t, leftRuntime, control.StateLocal, "left collision rejection")
+	waitRuntimeState(t, rightRuntime, control.StateLocal, "right collision rejection")
+	select {
+	case err := <-done:
+		t.Fatalf("ordinary collision closed transport: %v", err)
+	default:
 	}
 
 	assertIntegrationRuntimesLocal(t, leftRuntime, rightRuntime, "simultaneous control requests")
 	if leftActivation.Active() || rightActivation.Active() {
 		t.Fatalf("source activation survived collision: left=%t right=%t", leftActivation.Active(), rightActivation.Active())
 	}
+	if err := leftOutbound.Begin(ctx, "retry-session", "retry-epoch", control.ScreenEdgeRight); err != nil {
+		t.Fatal(err)
+	}
+	waitSignal(t, leftActivation.activated, "retry activation on same transport")
+	waitRuntimeState(t, rightRuntime, control.StateInboundActive, "retry inbound commit")
+	cancel()
+	_ = leftSide.Close()
+	_ = rightSide.Close()
+	for range 2 {
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Fatal("collision session cleanup blocked")
+		}
+	}
+}
+
+func openFramedTCP(t *testing.T) (*framedPipeConnection, *framedPipeConnection) {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	left, err := net.DialTimeout("tcp", listener.Addr().String(), time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = left.Close() })
+	right, err := listener.Accept()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = right.Close() })
+	wrap := func(c net.Conn) *framedPipeConnection {
+		r, err := transport.NewReader(c)
+		if err != nil {
+			t.Fatal(err)
+		}
+		w, err := transport.NewWriter(c)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return &framedPipeConnection{connection: c, reader: r, writer: w}
+	}
+	return wrap(left), wrap(right)
 }
 
 func TestPeerSessionsReconnectWithNewSessionAndEpoch(t *testing.T) {
