@@ -1,6 +1,6 @@
 //go:build windows && desktop
 
-package main
+package workspacehost
 
 import (
 	"encoding/hex"

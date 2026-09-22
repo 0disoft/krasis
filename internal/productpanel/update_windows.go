@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"syscall"
 
 	"github.com/0disoft/krasis/internal/localapi"
@@ -15,6 +16,16 @@ import (
 	"github.com/0disoft/krasis/internal/securefs"
 	"github.com/0disoft/krasis/internal/updatebundle"
 )
+
+func LaunchReceivedWorkspaceUpdate(directory, revision, alias string) error {
+	return launchReceivedUpdate(directory, revision, alias, localapi.AgentGeneration, func(command *exec.Cmd) error {
+		command.Args = append(command.Args, "--wait-pid", strconv.Itoa(os.Getpid()))
+		if err := command.Start(); err != nil {
+			return err
+		}
+		return command.Process.Release()
+	})
+}
 
 func LaunchReceivedUpdate(directory, revision, alias string) error {
 	return launchReceivedUpdate(directory, revision, alias, localapi.AgentGeneration, func(command *exec.Cmd) error {

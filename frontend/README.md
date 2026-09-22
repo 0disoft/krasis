@@ -24,7 +24,7 @@ The optional Wails v3 host builds to `dist/workspace/krasis-workspace.exe`.
 It embeds the native Svelte assets and uses the Go module's own
 `/wails/runtime.js`; there is no separate npm runtime version to synchronize.
 Wails v3 is an explicitly selected prerelease dependency. The Go language
-requirement is unchanged; the bundle includes agent generation 34, and building
+requirement is unchanged; the bundle includes agent generation 35, and building
 does not replace the running process.
 
 Extract the complete Workspace ZIP and double-click krasis-workspace.exe.
@@ -34,19 +34,26 @@ Closing the window keeps Workspace in the tray; its menu can reopen it,
 disconnect, or quit only the controller while leaving the agent running.
 PIN pairing and left/right placement are available in Workspace. Update SEND is
 explicit from Workspace to the selected trusted peer; no legacy control is
-required on the sender. Applying the received bundle on the receiver still
-requires the running g32 krasis-control.exe.
+required on the sender. The g35 bundle keeps the g34-compatible
+krasis-control.exe filename while the receiving UI becomes Workspace after
+validation. The first g34 to g35 update needs the existing control running on
+the receiver; afterwards a running Workspace suffices. The Workspace receiver
+auto-applies previously permitted updates through the native worker, keeping
+stored trust and permissions and existing directories. A received bundle sends
+from its own root when its binary is krasis-control.exe, otherwise from the
+sibling peer-update folder.
 
 ## Remote update send and status
 
-Workspace 0.8.0 adds explicit SEND from Workspace to the selected trusted peer,
+Workspace 0.9.0 adds explicit SEND from Workspace to the selected trusted peer,
 plus exact status for that peer fingerprint, transfer ID, and local agent
 instance. Sending is manual
 only; there is no automatic resend. The bundled `peer-update` folder contains the
-g34 legacy-compatible agent/control bundle only. The receiving g32 legacy control
-app must remain running so it can automatically APPLY the received bundle.
-Workspace-only auto-apply on the receiver is unsupported, and sending does not
-install Workspace on the recipient. Extract the entire Workspace ZIP before running.
+g35 Workspace agent/control bundle under the g34-compatible filenames. The first
+g34 to g35 update needs the existing control running on the receiver so it can
+automatically APPLY the received bundle; afterwards a running Workspace suffices.
+The receiver switches to the Workspace UI automatically after validation, and
+sending updates the recipient to Workspace. Extract the entire Workspace ZIP before running.
 Peer management-channel observations are online only on a
 response within 15 seconds, stale for older observations, and unknown when there
 are no observations. Version comparison uses generations and build identities,
@@ -57,7 +64,8 @@ do not mutate real permissions. Actual two-PC update delivery has not been teste
 on real devices.
 
 The per-peer INSPECT local API was added in agent generation 33, included with
-the Workspace UI 0.8.0 bundle (agent generation 34). Agents below generation 33
+the Workspace UI 0.8.0 bundle (agent generation 34) and carried in the 0.9.0
+bundle (agent generation 35). Agents below generation 33
 report peer-info lookup as unavailable while the existing permission API continues
 to work.
 
@@ -134,6 +142,6 @@ for the shared pump, controller-presence probe and native controller regressions
 Automated checks do not read or replace the user's current clipboard; two-PC
 copy/paste and visible consent-dialog testing remain manual.
 
-Standard action icons remain Phosphor. The UI package is 0.8.0 and the Workspace
-bundle includes agent generation 34. Building the bundle does not replace the
+Standard action icons remain Phosphor. The UI package is 0.9.0 and the Workspace
+bundle includes agent generation 35. Building the bundle does not replace the
 running agent.

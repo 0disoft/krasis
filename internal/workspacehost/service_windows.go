@@ -1,6 +1,6 @@
 //go:build windows && desktop
 
-package main
+package workspacehost
 
 import (
 	"context"
@@ -25,6 +25,8 @@ type WorkspaceService struct {
 	pairs       *productpanel.PairingBridge
 	diagnostics *productpanel.DiagnosticsBridge
 	updates     *productpanel.UpdateSettingsBridge
+	receiver    *productpanel.WorkspaceUpdateReceiver
+	quit        func()
 	done        chan struct{}
 	jobs        sync.WaitGroup
 }
@@ -38,6 +40,10 @@ func (s *WorkspaceService) ServiceStartup(context.Context, application.ServiceOp
 			defer s.jobs.Done()
 			launcherui.RunClipboardWorker(s.ctx, s.control, s.title, &s.clipGate, &s.clipEpoch)
 		}()
+		if s.receiver != nil && s.quit != nil {
+			s.jobs.Add(1)
+			go s.runUpdateReceiver()
+		}
 	}
 	return nil
 }

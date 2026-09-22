@@ -131,7 +131,7 @@
       await run('refresh');
       if (new URLSearchParams(location.search).get('smoke') === '1') {
         const { Call } = await import(/* @vite-ignore */ '/wails/runtime.js');
-        await Call.ByName('main.WorkspaceSmoke.Report', snapshot.schema ?? '', snapshot.state, snapshot.code);
+        await Call.ByName('github.com/0disoft/krasis/internal/workspacehost.WorkspaceSmoke.Report', snapshot.schema ?? '', snapshot.state, snapshot.code);
         return;
       }
       if (!clipBusy && !disposed && clipboardBridge) {
@@ -153,7 +153,7 @@
       try {
         const { Call } = await import(/* @vite-ignore */ '/wails/runtime.js');
         if (disposed) return;
-        const name = 'main.WorkspaceService.';
+        const name = 'github.com/0disoft/krasis/internal/workspacehost.WorkspaceService.';
         bridge = createBridge({
           Refresh: () => Call.ByName(name + 'Refresh'),
           Connect: (alias, fingerprint) => Call.ByName(name + 'Connect', alias, fingerprint),

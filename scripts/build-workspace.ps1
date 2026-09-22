@@ -4,7 +4,7 @@ $env:GOMODCACHE = Join-Path (Get-Location) '.cache/go-mod'
 $env:GOCACHE = Join-Path (Get-Location) '.cache/go-build'
 $env:GOPROXY = 'off'
 $env:CGO_ENABLED = '0'
-gofmt -w cmd/krasis-workspace/main_windows.go cmd/krasis-workspace/service_windows.go assets/windows/embed.go internal/productpanel/desktop_lifecycle.go internal/productpanel/desktop_lifecycle_test.go
+gofmt -w cmd/krasis-workspace/main_windows.go internal/workspacehost/main_windows.go internal/workspacehost/service_windows.go assets/windows/embed.go internal/productpanel/desktop_lifecycle.go internal/productpanel/desktop_lifecycle_test.go
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 npm.cmd --prefix frontend test
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

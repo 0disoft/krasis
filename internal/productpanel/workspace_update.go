@@ -1,0 +1,170 @@
+package productpanel
+
+import (
+	"context"
+	"encoding/hex"
+	"errors"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/0disoft/krasis/internal/localapi"
+)
+
+type WorkspaceUpdateLaunch struct {
+	Alias, Revision string
+	WaitPID         uint32
+}
+
+// Only the verified updater supplies these arguments. Paths and commands are
+// never accepted, and the expected build is checked again before reconnecting.
+func ParseWorkspaceUpdateLaunch(args []string) (WorkspaceUpdateLaunch, error) {
+	var v WorkspaceUpdateLaunch
+	if (len(args) != 4 && len(args) != 6) || args[0] != "--updated-peer" || args[2] != "--expected-build" {
+		return v, errors.New("invalid update arguments")
+	}
+	v.Alias, v.Revision = args[1], args[3]
+	if v.Alias == "" || len(v.Alias) > 256 || strings.ContainsRune(v.Alias, 0) || len(v.Revision) != 40 {
+		return WorkspaceUpdateLaunch{}, errors.New("invalid update identity")
+	}
+	if _, err := hex.DecodeString(v.Revision); err != nil {
+		return WorkspaceUpdateLaunch{}, err
+	}
+	if len(args) == 6 {
+		if args[4] != "--wait-pid" {
+			return WorkspaceUpdateLaunch{}, errors.New("invalid update wait")
+		}
+		pid, err := strconv.ParseUint(args[5], 10, 32)
+		if err != nil || pid == 0 {
+			return WorkspaceUpdateLaunch{}, errors.New("invalid update pid")
+		}
+		v.WaitPID = uint32(pid)
+	}
+	return v, nil
+}
+
+type UpdatedWorkspaceClient interface {
+	Runtime(context.Context) (localapi.RuntimeInfo, error)
+	Trust(context.Context) (localapi.Trust, error)
+	Connect(context.Context, string) (localapi.OperationResult, error)
+}
+
+func ResumeUpdatedWorkspace(ctx context.Context, c UpdatedWorkspaceClient, v WorkspaceUpdateLaunch) error {
+	info, err := c.Runtime(ctx)
+	if err != nil || info.Build != v.Revision {
+		return errors.New("updated agent build mismatch")
+	}
+	trust, err := c.Trust(ctx)
+	if err != nil {
+		return err
+	}
+	trusted := false
+	for _, p := range trust.Peers {
+		if p.Alias == v.Alias && !p.Revoked {
+			trusted = true
+		}
+	}
+	if !trusted {
+		return errors.New("updated peer no longer trusted")
+	}
+	result, err := c.Connect(ctx, v.Alias)
+	if err != nil {
+		return err
+	}
+	if result.Status != "COMPLETED" {
+		return errors.New("updated connection rejected")
+	}
+	return nil
+}
+
+// Receiver applies only a READY job whose trust and receive permission remain
+// valid. The agent revalidates both when claiming the exact ID. The native
+// launcher validates the staged bundle before starting a replacement UI.
+type WorkspaceUpdateReceiver struct {
+	ctx       context.Context
+	open      func() (UpdateSettingsClient, error)
+	launch    func(string, string, string) error
+	mu        sync.Mutex
+	attempted string
+}
+
+func NewWorkspaceUpdateReceiver(ctx context.Context, open func() (UpdateSettingsClient, error), launch func(string, string, string) error) *WorkspaceUpdateReceiver {
+	return &WorkspaceUpdateReceiver{ctx: ctx, open: open, launch: launch}
+}
+func (b *WorkspaceUpdateReceiver) Poll() bool {
+	if b == nil || b.ctx == nil || b.open == nil || b.launch == nil || !b.mu.TryLock() {
+		return false
+	}
+	defer b.mu.Unlock()
+	ctx, cancel := context.WithTimeout(b.ctx, 15*time.Second)
+	defer cancel()
+	c, err := b.open()
+	if err != nil || c == nil {
+		return false
+	}
+	r, err := c.Update(ctx, localapi.UpdateRequest{Schema: localapi.UpdateSchema, Action: "STATUS"})
+	s := r.Status
+	if err != nil || r.Code != "ok" || s.State != "READY" || !validTransferID(s.ID) || s.ID == b.attempted || len(s.Peer) != 64 || len(s.Revision) != 40 || safeUpdateBuild(s.Revision) == "" {
+		return false
+	}
+	if updatePermission(s.Allowed, s.Peer) != "ALLOWED" {
+		return false
+	}
+	trust, err := c.Trust(ctx)
+	if err != nil {
+		return false
+	}
+	alias := ""
+	for _, p := range trust.Peers {
+		if p.Fingerprint == s.Peer && !p.Revoked {
+			alias = p.Alias
+		}
+	}
+	if alias == "" {
+		return false
+	}
+	before, err := c.Runtime(ctx)
+	if err != nil || before.Instance == "" {
+		return false
+	}
+	b.attempted = s.ID
+	request := localapi.UpdateRequest{Schema: localapi.UpdateSchema, Action: "APPLY", Peer: s.Peer, ID: s.ID}
+	fail := func() {
+		cleanup, done := context.WithTimeout(b.ctx, 5*time.Second)
+		defer done()
+		request.Action = "APPLY_FAILED"
+		_, _ = c.Update(cleanup, request)
+	}
+	r, err = c.Update(ctx, request)
+	if err != nil {
+		fail()
+		return false
+	}
+	if r.Code != "apply_ready" {
+		return false
+	}
+	after, err := c.Runtime(ctx)
+	if err != nil || after.Instance != before.Instance || r.Status.ID != s.ID || r.Status.Peer != s.Peer || r.Status.Revision != s.Revision || r.Status.Generation != s.Generation || r.Alias != alias || ctx.Err() != nil {
+		fail()
+		return false
+	}
+	if err := b.launch(r.Directory, s.Revision, alias); err != nil {
+		fail()
+		return false
+	}
+	return true
+}
+
+// Serialize the handoff with native connect/recovery operations.
+func (b *DesktopLifecycle) ApplyReceivedUpdate(receiver *WorkspaceUpdateReceiver) bool {
+	if !b.gate.TryLock() {
+		return false
+	}
+	defer b.gate.Unlock()
+	if receiver.Poll() {
+		b.stopped.Store(true)
+		return true
+	}
+	return false
+}
