@@ -17,6 +17,7 @@ import (
 const wmSourceReady = 0x8002
 
 type SourceHook struct {
+	timing       HookTimingObserver
 	observer     SourcePipelineObserver
 	capture      *sourceWheelCapture
 	returnCursor returnCursorShield
@@ -38,8 +39,12 @@ func (observer *serializedBoundaryObserver) Observe(action control.InputAction, 
 	return observer.next.Observe(action, pointerX)
 }
 
-func NewSourceHook() *SourceHook {
-	return NewSourceHookObserved(nil)
+func NewSourceHook(timing ...HookTimingObserver) *SourceHook {
+	hook := NewSourceHookObserved(nil)
+	if len(timing) > 0 {
+		hook.timing = timing[0]
+	}
+	return hook
 }
 
 func NewSourceHookObserved(observer SourcePipelineObserver) *SourceHook {
@@ -101,12 +106,12 @@ func (hook *SourceHook) RunWithBoundary(
 	readySignals := make(chan struct{}, 3)
 	results := make(chan sourceInputThreadResult, 3)
 	startSourceInputThread(results, "low-level-hook", func() error {
-		return runSourceLowLevelHookThread(runCtx, session, boundary, hook.observer, hook.capture, pointerState, func() {
+		return runSourceLowLevelHookThread(runCtx, session, boundary, hook.observer, hook.capture, pointerState, hook.timing, func() {
 			readySignals <- struct{}{}
 		}, &hook.returnCursor)
 	})
 	startSourceInputThread(results, "raw-mouse", func() error {
-		return runSourceRawMouseThread(runCtx, session, boundary, pointerState, func() {
+		return runSourceRawMouseThread(runCtx, session, boundary, pointerState, hook.timing, func() {
 			readySignals <- struct{}{}
 		})
 	})
@@ -233,6 +238,7 @@ func runSourceLowLevelHookThread(
 	observer SourcePipelineObserver,
 	wheelCapture SourceActivation,
 	pointerState *sourcePointerState,
+	timing HookTimingObserver,
 	ready func(),
 	shields ...*returnCursorShield,
 ) error {
@@ -296,7 +302,7 @@ func runSourceLowLevelHookThread(
 		}
 		return callNextHook(code, wParam, lParam)
 	}
-	owner := &sourceHookCallbacks{keyboard: keyboardCallback, mouse: mouseCallback}
+	owner := &sourceHookCallbacks{keyboard: timedSourceCallback(keyboardCallback, timing), mouse: timedSourceCallback(mouseCallback, timing)}
 	if _, loaded := sourceHookOwners.LoadOrStore(threadID, owner); loaded {
 		return errors.New("source hook thread already has an owner")
 	}
@@ -353,6 +359,7 @@ func runSourceRawMouseThread(
 	session *SourceSession,
 	boundary BoundaryObserver,
 	pointerState *sourcePointerState,
+	timing HookTimingObserver,
 	ready func(),
 ) error {
 	threadID, _, _ := procGetCurrentThreadID.Call()
@@ -383,6 +390,9 @@ func runSourceRawMouseThread(
 		return err
 	}
 	visitRawMouse := func(header rawInputHeader, mouse rawMouse) error {
+		if timing != nil {
+			timing.ObserveRawInput(time.Now())
+		}
 		return sourceStage("raw-route", routeRawMouse(session, boundary, pointerState, header, mouse))
 	}
 	loopErr := runSourceRawMessageLoop(ctx, threadID, ready, rawReader, visitRawMouse)

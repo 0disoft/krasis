@@ -84,3 +84,22 @@ func TestRuntimeObserverIsAllocationFreeAndRaceSafe(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestHookTimingDistinguishesIdleFromRawProgressDuringCallback(t *testing.T) {
+	d := newRuntimeDiagnostics()
+	start := d.started.Add(time.Second)
+	if s := d.snapshot(start); s.HookObserved || s.RawInputs != 0 || s.HookCalls != 0 {
+		t.Fatal("idle fabricated progress")
+	}
+	d.ObserveHookStarted(start)
+	d.ObserveRawInput(start.Add(time.Second))
+	s := d.snapshot(start.Add(time.Second))
+	if s.HookActiveMicros != 1000000 || s.RawInputs != 1 || s.HookCalls != 0 {
+		t.Fatalf("stalled callback=%+v", s)
+	}
+	d.ObserveHookCompleted(start.Add(2 * time.Second))
+	s = d.snapshot(start.Add(3 * time.Second))
+	if s.HookCalls != 1 || s.HookMaxMicros != 2000000 || s.LastHookAgeMicros != 1000000 || !s.HookObserved || s.HookActiveMicros != 0 {
+		t.Fatalf("completed callback=%+v", s)
+	}
+}

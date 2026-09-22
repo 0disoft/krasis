@@ -9,7 +9,7 @@ import (
 
 type SourceHook struct{}
 
-func NewSourceHook() *SourceHook { return &SourceHook{} }
+func NewSourceHook(...HookTimingObserver) *SourceHook { return &SourceHook{} }
 
 func (hook *SourceHook) Run(context.Context, *SourceSession, func()) error {
 	return fmt.Errorf("%w: source hook requires Windows", ErrUnsupportedInput)

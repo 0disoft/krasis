@@ -13,12 +13,26 @@ import (
 // stay off input, reader and heartbeat paths. Counters are diagnostic hints, not
 // lease authority; snapshots across atomics are deliberately approximate.
 type runtimeDiagnostics struct {
+	hookStart, hookLast, hookMax            atomic.Int64
+	hookCalls, rawInputs                    atomic.Uint64
 	started                                 time.Time
 	readStart, dispatchStart, send, receive atomic.Int64
 	kind                                    atomic.Uint32
 	frames, dispatches                      atomic.Uint64
 	dispatchMax, timerMax                   atomic.Int64
 }
+
+func (d *runtimeDiagnostics) ObserveHookStarted(t time.Time) { d.hookStart.Store(d.stamp(t)) }
+func (d *runtimeDiagnostics) ObserveHookCompleted(t time.Time) {
+	stamp := d.stamp(t)
+	start := d.hookStart.Swap(0)
+	if start > 0 {
+		observeMaximum(&d.hookMax, max(0, stamp-start))
+	}
+	d.hookLast.Store(stamp)
+	d.hookCalls.Add(1)
+}
+func (d *runtimeDiagnostics) ObserveRawInput(time.Time) { d.rawInputs.Add(1) }
 
 func newRuntimeDiagnostics() *runtimeDiagnostics             { return &runtimeDiagnostics{started: time.Now()} }
 func (d *runtimeDiagnostics) stamp(t time.Time) int64        { return max(1, t.Sub(d.started).Microseconds()) }
@@ -74,6 +88,13 @@ func (d *runtimeDiagnostics) snapshot(now time.Time) productlog.RuntimeSummary {
 		}
 	}
 	send, receive := d.send.Load(), d.receive.Load()
+	s.HookCalls = d.hookCalls.Swap(0)
+	s.RawInputs = d.rawInputs.Swap(0)
+	s.HookMaxMicros = d.hookMax.Swap(0)
+	s.HookActiveMicros = age(d.hookStart.Load())
+	lastHook := d.hookLast.Load()
+	s.LastHookAgeMicros = age(lastHook)
+	s.HookObserved = lastHook > 0
 	s.HeartbeatSent = send > 0
 	s.HeartbeatReceived = receive > 0
 	s.HeartbeatSendAgeMicros = age(send)

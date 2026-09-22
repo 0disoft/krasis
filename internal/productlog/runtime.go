@@ -5,6 +5,12 @@ package productlog
 // runnable histograms use upper-bound buckets <=100us,1ms,10ms,100ms,1s,>1s.
 // An idle socket can have a large read age without being faulty.
 type RuntimeSummary struct {
+	HookCalls                 uint64    `json:"hookCalls"`
+	RawInputs                 uint64    `json:"rawInputs"`
+	HookMaxMicros             int64     `json:"hookMaxMicros"`
+	HookActiveMicros          int64     `json:"hookActiveMicros"`
+	LastHookAgeMicros         int64     `json:"lastHookAgeMicros"`
+	HookObserved              bool      `json:"hookObserved"`
 	IntervalMicros            int64     `json:"intervalMicros"`
 	HeapBytes                 uint64    `json:"heapBytes"`
 	AllocatedBytes            uint64    `json:"allocatedBytes"`
@@ -29,6 +35,9 @@ type RuntimeSummary struct {
 
 func init() { allowed["runtime_summary"] = true }
 func (s RuntimeSummary) valid() bool {
+	if s.HookMaxMicros < 0 || s.HookActiveMicros < 0 || s.LastHookAgeMicros < 0 {
+		return false
+	}
 	if s.IntervalMicros <= 0 || s.TimerLateMicros < 0 || s.ReadAgeMicros < 0 || s.DispatchAgeMicros < 0 || s.DispatchMaxMicros < 0 || s.HeartbeatSendAgeMicros < 0 || s.HeartbeatReceiveAgeMicros < 0 {
 		return false
 	}

@@ -183,7 +183,7 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 		backoff := agent.DefaultBackoffPolicy()
 		backoff.Jitter = true
 		return agent.RunSupervisor(ctx, agent.SupervisorConfig{Session: config, Backoff: backoff, Now: time.Now, Wait: agent.Wait, Observer: observer}, agent.SupervisorDependencies{
-			Source: source, Hook: wininput.NewSourceHook(), Input: &guardedProductInput{InputBoundaryPort: input, guard: guard, log: log}, Effects: agent.RuntimeEffects{}, Authorizer: productAuthorizer{trust}, RunSession: agent.RunSession,
+			Source: source, Hook: wininput.NewSourceHook(progress), Input: &guardedProductInput{InputBoundaryPort: input, guard: guard, log: log}, Effects: agent.RuntimeEffects{}, Authorizer: productAuthorizer{trust}, RunSession: agent.RunSession,
 		})
 	}
 }
