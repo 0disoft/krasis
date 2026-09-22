@@ -48,7 +48,6 @@ func launch() error {
 		return err
 	}
 	cmd := exec.Command(control, os.Args[1:]...)
-	cmd.Dir = filepath.Dir(control)
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 	if len(os.Args) > 1 {
