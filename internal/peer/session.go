@@ -186,10 +186,10 @@ func classifyPeerReadFailure(connection SessionConnection, readErr error) error 
 		state.ObserveReadAfterLocalInterrupt()
 		return errors.Join(ErrPeerReadAfterLocalInterrupt, state.LocalInterruptCause(), readErr)
 	}
-	if errors.Is(readErr, io.EOF) {
+	if errors.Is(readErr, io.EOF) && !errors.Is(readErr, transport.ErrInvalidFrame) {
 		return errors.Join(ErrPeerRemoteEOF, io.ErrUnexpectedEOF)
 	}
-	if errors.Is(readErr, io.ErrUnexpectedEOF) {
+	if errors.Is(readErr, io.ErrUnexpectedEOF) || errors.Is(readErr, transport.ErrFramePayloadTruncated) {
 		return errors.Join(ErrPeerFrameTruncated, readErr)
 	}
 	return errors.Join(ErrPeerReadFailure, readErr)

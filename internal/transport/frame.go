@@ -51,20 +51,23 @@ func (reader *Reader) ReadFrame() (Frame, error) {
 	if _, err := io.ReadFull(reader.source, header[:]); errors.Is(err, io.EOF) {
 		return Frame{}, io.EOF
 	} else if err != nil {
+		if errors.Is(err, io.ErrUnexpectedEOF) {
+			err = errors.Join(ErrFrameHeaderTruncated, err)
+		}
 		return Frame{}, fmt.Errorf("%w: read header: %w", ErrInvalidFrame, err)
 	}
 	if [4]byte(header[0:4]) != frameMagic {
-		return Frame{}, fmt.Errorf("%w: magic does not match", ErrInvalidFrame)
+		return Frame{}, errors.Join(ErrInvalidFrame, ErrFrameMagic)
 	}
 	if header[4] != ProtocolVersion {
-		return Frame{}, fmt.Errorf("%w: protocol version %d", ErrUnsupportedFrame, header[4])
+		return Frame{}, errors.Join(ErrUnsupportedFrame, ErrFrameVersion)
 	}
 	kind := MessageKind(header[5])
 	if !kind.Valid() {
-		return Frame{}, fmt.Errorf("%w: message kind %d", ErrUnsupportedFrame, kind)
+		return Frame{}, errors.Join(ErrUnsupportedFrame, ErrFrameKind)
 	}
 	if binary.BigEndian.Uint16(header[6:8]) != 0 {
-		return Frame{}, fmt.Errorf("%w: reserved flags are not zero", ErrUnsupportedFrame)
+		return Frame{}, errors.Join(ErrUnsupportedFrame, ErrFrameFlags)
 	}
 	payloadSize := binary.BigEndian.Uint32(header[8:12])
 	if payloadSize > reader.maxPayload {
@@ -72,6 +75,9 @@ func (reader *Reader) ReadFrame() (Frame, error) {
 	}
 	payload := make([]byte, payloadSize)
 	if _, err := io.ReadFull(reader.source, payload); err != nil {
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+			err = errors.Join(ErrFramePayloadTruncated, err)
+		}
 		return Frame{}, fmt.Errorf("%w: read payload: %w", ErrInvalidFrame, err)
 	}
 	return Frame{Kind: kind, Payload: payload}, nil

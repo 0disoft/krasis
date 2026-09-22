@@ -64,6 +64,9 @@ func DescribeSessionFailure(err error) FailureDescriptor {
 		return FailureDescriptor{Component: "source-session", Phase: "source-activate", Code: "activation_failed"}
 	}
 	var write *transport.FrameWriteFailure
+	if code := transport.FrameFailureCode(err); code != "" {
+		return FailureDescriptor{Component: "peer-reader", Phase: "framing", Code: code}
+	}
 	if errors.As(err, &write) {
 		code := "failed"
 		var networkError net.Error

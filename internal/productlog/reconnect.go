@@ -27,6 +27,9 @@ var reconnectReasons = map[[3]string]string{
 }
 
 func init() {
+	for _, code := range []string{"header_truncated", "payload_truncated", "magic_invalid", "version_unsupported", "kind_unsupported", "flags_unsupported", "payload_oversized", "control_invalid", "control_unsupported", "input_invalid", "input_unsupported", "heartbeat_invalid", "heartbeat_unsupported"} {
+		reconnectReasons[[3]string{"peer-reader", "framing", code}] = "reconnect_frame_" + code
+	}
 	for _, phase := range []string{"admission", "io", "deadline"} {
 		for _, code := range []string{"failed", "timeout", "canceled"} {
 			reconnectReasons[[3]string{"peer-writer", "write-" + phase, code}] = "reconnect_write_" + phase + "_" + code
