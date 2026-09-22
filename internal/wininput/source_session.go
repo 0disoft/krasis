@@ -268,6 +268,11 @@ func (session *SourceSession) RunWithReady(ctx context.Context, ready func()) er
 		return errors.New("source session context is required")
 	}
 	if session.terminal.Load() {
+		// Retirement can win the scheduling race before this worker starts.
+		// A canceled first start owns no native resources and is normal shutdown.
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		return errors.New("source session worker cannot be restarted")
 	}
 	if !session.started.CompareAndSwap(false, true) {
