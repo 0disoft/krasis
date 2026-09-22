@@ -1,8 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createUpdateSettingsBridge, emptyUpdateSettings } from './update-settings-bridge.js';
+import { createUpdateSettingsBridge, emptyUpdateSettings, emptyUpdateTransfer } from './update-settings-bridge.js';
 const peer = 'a'.repeat(64);
 const value = {...emptyUpdateSettings(peer),code:'ok',permission:'ALLOWED',remotePermission:'DENIED',peerState:'ONLINE',localGeneration:32,localBuild:'c'.repeat(40),peerGeneration:32,peerBuild:'c'.repeat(40),comparison:'SAME_BUILD'};
+
+test('update transfer sends only an explicit peer and preserves delivered vs updated', async () => {
+  const calls=[];
+  const delivered={...emptyUpdateTransfer(peer,'DELIVERED'),id:'c'.repeat(32),generation:34,build:'d'.repeat(40),total:100,bytes:100};
+  const bridge=createUpdateSettingsBridge({SendUpdate:async(...args)=>{calls.push(args);return {...delivered,path:'secret'};},UpdateTransfer:async()=>({...delivered,state:'UPDATED'})});
+  assert.deepEqual(await bridge.send(peer),delivered);
+  assert.deepEqual(calls,[[peer]]);
+  assert.equal((await bridge.transfer(peer)).state,'UPDATED');
+  assert.equal(calls.length,1);
+});
+test('update transfer rejects foreign jobs and never retries uncertain send',async()=>{
+  let calls=0;
+  const bridge=createUpdateSettingsBridge({SendUpdate:async()=>{calls++;throw Error('secret');},UpdateTransfer:async()=>emptyUpdateTransfer('b'.repeat(64),'UPDATED')});
+  assert.equal((await bridge.send(peer)).state,'TRANSFER_UNKNOWN');
+  assert.equal((await bridge.transfer(peer)).state,'TRANSFER_UNKNOWN');
+  assert.equal(calls,1);
+  assert.equal((await bridge.send('../path')).state,'INVALID_PEER');
+  assert.equal(calls,1);
+});
 test('update settings separate permission directions and narrow native payloads', async () => {
   const calls = [];
   const bridge = createUpdateSettingsBridge({UpdateSettings:async()=>({...value,path:'private',token:'private'}),UpdatePermission:async(...args)=>{calls.push(args);return {...value,code:'permission_saved'};}});

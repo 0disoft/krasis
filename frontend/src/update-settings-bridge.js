@@ -8,8 +8,28 @@ const validBuild = build => typeof build === 'string' && (build === '' || build 
 const validGeneration = n => Number.isInteger(n) && n >= 0 && n <= 1000000;
 export const emptyUpdateSettings = (peer = '', code = 'unavailable') => ({schema,code,peer,permission:'UNKNOWN',remotePermission:'UNKNOWN',peerState:'UNKNOWN',localGeneration:0,localBuild:'',peerGeneration:0,peerBuild:'',comparison:'UNKNOWN'});
 
+const transferSchema = 'krasis.update-transfer/v1';
+export const transferStates = new Set(['IDLE','BUSY','UNAVAILABLE','INVALID_PEER','STALE_PEER','AGENT_CHANGED','REJECTED','PREPARING','QUEUED','SENDING','VERIFYING','DELIVERED','UPDATED','RESTART_UNCONFIRMED','SAME_VERSION','PEER_NEWER','GENERATION_CONFLICT','PEER_BUSY','PEER_UNREACHABLE','PEER_UNSUPPORTED','PEER_NOT_ALLOWED','INVALID_BUNDLE','BUNDLE_MISSING','HASH_MISMATCH','STORAGE_FAILED','TRANSFER_INTERRUPTED','PEER_APPLY_FAILED','EXPIRED','PEER_REJECTED','TRANSFER_UNKNOWN']);
+export const emptyUpdateTransfer = (peer = '', state = 'IDLE') => ({schema:transferSchema,peer,state,id:'',bytes:0,total:0,generation:0,build:''});
+export const transferActive = state => ['PREPARING','QUEUED','SENDING','VERIFYING','DELIVERED'].includes(state);
+
 export function createUpdateSettingsBridge(binding) {
   let busy = false;
+  async function transfer(method,peer) {
+    const fallback = state => emptyUpdateTransfer(peer,state);
+    if (!validPeer(peer)) return fallback('INVALID_PEER');
+    if (busy) return fallback('BUSY');
+    busy = true;
+    try {
+      const v = await binding[method](peer);
+      if (!v || v.schema !== transferSchema || v.peer !== peer || !transferStates.has(v.state) ||
+          typeof v.id !== 'string' || (v.id !== '' && !/^[a-f0-9]{32}$/i.test(v.id)) ||
+          !Number.isSafeInteger(v.bytes) || !Number.isSafeInteger(v.total) || v.bytes < 0 || v.total < 0 || v.bytes > v.total || v.total > 96*1024*1024 ||
+          !validGeneration(v.generation) || !validBuild(v.build)) return fallback('TRANSFER_UNKNOWN');
+      return Object.fromEntries(Object.keys(emptyUpdateTransfer()).map(key => [key,v[key]]));
+    } catch { return fallback(method === 'SendUpdate' ? 'TRANSFER_UNKNOWN' : 'UNAVAILABLE'); }
+    finally { busy = false; }
+  }
   async function call(method, peer, ...args) {
     if (!validPeer(peer)) return emptyUpdateSettings('', 'invalid_peer');
     if (busy) return emptyUpdateSettings(peer, 'busy');
@@ -30,6 +50,8 @@ export function createUpdateSettingsBridge(binding) {
     finally { busy = false; }
   }
   return Object.freeze({
+    transfer: peer => transfer('UpdateTransfer',peer),
+    send: peer => transfer('SendUpdate',peer),
     status: peer => call('UpdateSettings', peer),
     permit: (peer, allow) => typeof allow === 'boolean' ? call('UpdatePermission', peer, allow) : Promise.resolve(emptyUpdateSettings('', 'invalid_peer')),
   });

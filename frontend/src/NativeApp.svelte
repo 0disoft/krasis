@@ -182,6 +182,8 @@
           DiagnosticsOpen:()=>Call.ByName(name+'DiagnosticsOpen'),
         });
         updateSettingsBridge=createUpdateSettingsBridge({
+          SendUpdate:peer=>Call.ByName(name+'SendUpdate',peer),
+          UpdateTransfer:peer=>Call.ByName(name+'UpdateTransfer',peer),
           UpdateSettings:peer=>Call.ByName(name+'UpdateSettings',peer),
           UpdatePermission:(peer,allow)=>Call.ByName(name+'UpdatePermission',peer,allow),
         });
