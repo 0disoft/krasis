@@ -20,9 +20,10 @@ import (
 
 type transferClient struct {
 	*settingsClient
-	status   peerupdate.Status
-	sent     int
-	failSend bool
+	status     peerupdate.Status
+	sent       int
+	failSend   bool
+	rejectSend bool
 }
 
 func (c *transferClient) Update(ctx context.Context, r localapi.UpdateRequest) (localapi.UpdateResult, error) {
@@ -33,6 +34,9 @@ func (c *transferClient) Update(ctx context.Context, r localapi.UpdateRequest) (
 		}
 		if c.failSend {
 			return localapi.UpdateResult{}, errors.New("private")
+		}
+		if c.rejectSend {
+			return localapi.UpdateResult{Code: "rejected", Status: c.status}, nil
 		}
 		c.status = peerupdate.Status{Peer: r.Peer, ID: strings.Repeat("d", 32), State: "QUEUED", Generation: 34, Revision: strings.Repeat("c", 40), Total: 100}
 		return localapi.UpdateResult{Code: "queued", Status: c.status}, nil
@@ -73,6 +77,19 @@ func TestUpdateTransferTracksExactJobAndRuntime(t *testing.T) {
 	c.runtime.Instance = "replacement"
 	if b.TransferStatus(peer).State != "AGENT_CHANGED" {
 		t.Fatal("new process reused")
+	}
+}
+
+func TestUpdateTransferRejectionDoesNotAdoptPreviousJob(t *testing.T) {
+	b, c, peer := transferTestBridge()
+	c.rejectSend = true
+	c.status = peerupdate.Status{Peer: strings.Repeat("b", 64), ID: strings.Repeat("e", 32), State: "UPDATED", Generation: 999, Revision: strings.Repeat("c", 40)}
+	v := b.Send(peer)
+	if v.State != "REJECTED" || v.ID != "" || v.Generation != 0 || v.Build != "" {
+		t.Fatal(v)
+	}
+	if b.TransferStatus(peer).State != "REJECTED" {
+		t.Fatal("foreign result reused")
 	}
 }
 func TestUpdateTransferRejectsRevokedAndDoesNotRetryUnknown(t *testing.T) {

@@ -113,11 +113,10 @@ func (b *UpdateSettingsBridge) transferCall(peer string, send bool) UpdateTransf
 			return b.transfer
 		} // Never retry a request whose outcome is unknown.
 		if result.Code != "queued" {
-			state := "REJECTED"
+			b.transfer = fail("REJECTED")
 			if result.Code == "bundle_failed" && result.Status.Peer == peer {
-				state = result.Status.State
+				b.transfer = projectTransfer(peer, result.Status, result.Status.State)
 			}
-			b.transfer = projectTransfer(peer, result.Status, state)
 			return b.transfer
 		}
 		if result.Status.Peer != peer || !validTransferID(result.Status.ID) {
