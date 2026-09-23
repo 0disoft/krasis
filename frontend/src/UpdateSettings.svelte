@@ -10,7 +10,8 @@
   let sendTrigger;
   let allowTrigger;
   let refreshTrigger;
-  let peerSelect;
+  let peerSelect = $state.raw();
+  let initialFocusPending = true;
   let sendConfirmation = $state.raw();
   let allowConfirmation = $state.raw();
   let confirmingSend = $state(false);
@@ -26,6 +27,14 @@
   const selectedName = $derived(peers.find(peer => peer.fingerprint === selected)?.alias ?? '');
   const permissionText = permission => t(permission === 'ALLOWED' ? 'upd_allowed' : permission === 'DENIED' ? 'upd_denied' : 'upd_permission_unknown');
   const version = (generation, build) => generation ? `g${generation} · ${build ? build === 'development' ? build : build.slice(0,8) : t('upd_unknown')}` : t('upd_unknown');
+  $effect(() => {
+    if (busy || !initialFocusPending || !peerSelect) return;
+    const dialog = peerSelect.closest('dialog');
+    if (!dialog?.open) return;
+    initialFocusPending = false;
+    const close = dialog.querySelector('.dlg-foot button');
+    if (document.activeElement === close || document.activeElement === dialog) peerSelect.focus();
+  });
   $effect(() => {
     if (!peers.some(peer => peer.fingerprint === selected)) selected = (peers.find(peer => peer.fingerprint === initialPeer) ?? peers[0])?.fingerprint ?? '';
   });
