@@ -34,7 +34,8 @@
   let updatesOpen = $state(false);
   let opener = null;
   function focusFirstControl(dlg) { dlg?.querySelector('select:not([disabled]), input:not([disabled]), button:not([disabled])')?.focus(); }
-  function openDialog(dlg) { if (!dlg || dlg.open) return; dlg.showModal(); focusFirstControl(dlg); }
+  function openDialog(dlg) { if (!dlg || dlg.open) return; opener = document.activeElement; dlg.showModal(); focusFirstControl(dlg); }
+  function restoreDialogFocus() { if (opener && opener.focus) opener.focus(); opener = null; }
   async function openUpdates() { if (!updatesDlg || updatesDlg.open) return; opener = document.activeElement; updatesOpen = true; await tick(); if (updatesDlg.open) { focusFirstControl(updatesDlg); return; } updatesDlg.showModal(); focusFirstControl(updatesDlg); }
   let clipboard = $state({peer:'',code:'unavailable'});
   let pairing = $state({schema:'krasis.pairing/v1',code:'ok',pin:'',job:'',alias:'',candidates:[]});
@@ -245,11 +246,11 @@
     <p role="status">{clipNotice ? t(clipNotice) : clipboard.code !== 'ok' ? t(clipboard.code) : t(layout.code)}</p>
   {/if}
 </main>
-<dialog bind:this={updatesDlg} aria-labelledby="update-settings-title" onclose={() => { updatesOpen = false; if (opener && opener.focus) opener.focus(); opener = null; }}>
+<dialog bind:this={updatesDlg} aria-labelledby="update-settings-title" onclose={() => { updatesOpen = false; restoreDialogFocus(); }}>
   {#if updatesOpen}<UpdateSettings bridge={updateSettingsBridge} peers={snapshot.peers} initialPeer={selected} {locale} />{/if}
   <div class="dlg-foot"><button class="primary" onclick={() => updatesDlg.close()}>{t('close')}</button></div>
 </dialog>
-<dialog bind:this={diagnosticsDlg} aria-labelledby="diagnostics-title">
+<dialog bind:this={diagnosticsDlg} aria-labelledby="diagnostics-title" onclose={restoreDialogFocus}>
   <div class="dlg-head"><h2 id="diagnostics-title">{t('diag_title')}</h2><p>{t('diag_help')}</p></div>
   <div class="dlg-body">
     <p>{t('diag_local')}: {t(diagnostics.saved ? 'diag_available' : diagnostics.code === 'unavailable' ? 'diag_unavailable' : 'diag_none')}</p>
@@ -265,12 +266,12 @@
   </div>
   <div class="dlg-foot"><button class="primary" onclick={() => diagnosticsDlg.close()}>{t('close')}</button></div>
 </dialog>
-<dialog bind:this={consent} aria-labelledby="clipboard-consent-title">
+<dialog bind:this={consent} aria-labelledby="clipboard-consent-title" onclose={restoreDialogFocus}>
   <div class="dlg-head"><h2 id="clipboard-consent-title">{t('clipboard')}</h2></div>
   <div class="dlg-body"><p>{t('clipboard_consent')}</p></div>
   <div class="dlg-foot"><button onclick={()=>consent.close()}>{t('cancel')}</button><button onclick={()=>{consent.close();void setClipboard(consentPeer,true);}}>{t('clipboard_enable')}</button></div>
 </dialog>
-<dialog bind:this={pairingDlg} aria-labelledby="pair-title">
+<dialog bind:this={pairingDlg} aria-labelledby="pair-title" onclose={restoreDialogFocus}>
   <div class="dlg-head"><h2 id="pair-title">{t('pairingTitle')}</h2><p>{t('pairingHelp')}</p></div>
   <div class="dlg-body">
   {#if pairing.pin}<p class="pin-display" role="status">{pairing.pin}</p>{/if}

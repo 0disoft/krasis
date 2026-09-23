@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { emptyUpdateSettings, emptyUpdateTransfer, transferActive } from './update-settings-bridge.js';
   import { nativeText } from './native-i18n.js';
   let { bridge, peers, initialPeer = '', locale } = $props();
@@ -7,8 +7,14 @@
   let value = $state(emptyUpdateSettings());
   let busy = $state(false);
   let notice = $state('');
-  let consent;
-  let sendConsent;
+  let sendTrigger;
+  let allowTrigger;
+  let refreshTrigger;
+  let peerSelect;
+  let sendConfirmation = $state.raw();
+  let allowConfirmation = $state.raw();
+  let confirmingSend = $state(false);
+  let confirmingAllow = $state(false);
   let sendPeer = $state('');
   let transfer = $state(emptyUpdateTransfer());
   let consentPeer = $state('');
@@ -38,21 +44,25 @@
       if (action !== 'status') notice = 'upd_' + result.code;
     } finally { if (!disposed) busy = false; }
   }
-  function choose() { value = emptyUpdateSettings(selected); transfer = emptyUpdateTransfer(selected); notice = ''; void run(); }
-  function requestSend() { sendPeer = selected; if (!sendConsent.open) sendConsent.showModal(); sendConsent.querySelector('button:not([disabled])')?.focus(); }
+  function choose() { confirmingSend = false; confirmingAllow = false; value = emptyUpdateSettings(selected); transfer = emptyUpdateTransfer(selected); notice = ''; void run(); }
+  async function requestSend() { sendPeer = selected; confirmingAllow = false; confirmingSend = true; await tick(); sendConfirmation?.querySelector('button')?.focus(); }
+  async function cancelSend() { confirmingSend = false; await tick(); sendTrigger?.focus(); }
   async function confirmSend() {
-    sendConsent.close();
     const peer = sendPeer;
     if (!canSend || selected !== peer || !peers.some(p => p.fingerprint === peer)) return;
+    confirmingSend = false;
     busy = true;
     transfer = emptyUpdateTransfer(peer,'PREPARING');
     try { const next = await bridge.send(peer); if (!disposed && selected === peer) transfer = next; }
-    finally { if (!disposed) busy = false; }
+    finally { if (!disposed) { busy = false; await tick(); peerSelect?.focus(); } }
   }
-  function requestAllow() { consentPeer = selected; if (!consent.open) consent.showModal(); consent.querySelector('button:not([disabled])')?.focus(); }
-  function confirmAllow() {
-    consent.close();
-    if (consentPeer === selected && peers.some(peer => peer.fingerprint === consentPeer)) void run('allow', consentPeer);
+  async function requestAllow() { consentPeer = selected; confirmingSend = false; confirmingAllow = true; await tick(); allowConfirmation?.querySelector('button')?.focus(); }
+  async function cancelAllow() { confirmingAllow = false; await tick(); allowTrigger?.focus(); }
+  async function confirmAllow() {
+    if (busy || consentPeer !== selected || !peers.some(peer => peer.fingerprint === consentPeer)) return;
+    confirmingAllow = false;
+    if (current.permission !== 'ALLOWED') await run('allow', consentPeer);
+    await tick(); refreshTrigger?.focus();
   }
   onMount(() => {
     let timer;
@@ -67,7 +77,7 @@
 </div>
 <div class="dlg-body">
   <label>{t('peer')}
-    <select bind:value={selected} onchange={choose} disabled={busy}>
+    <select bind:this={peerSelect} bind:value={selected} onchange={choose} disabled={busy}>
       <option value="">{t('choose')}</option>
       {#each peers as peer (peer.fingerprint)}<option value={peer.fingerprint}>{peer.alias}</option>{/each}
     </select>
@@ -80,8 +90,15 @@
     <p>{t('upd_' + current.peerState.toLowerCase())} · {t('upd_comparison_' + current.comparison)}</p>
     {#if current.peerState !== 'ONLINE'}<p>{t('upd_receiver_required')}</p>{/if}
     <div class="upd-send-row">
-      <button class="primary" disabled={!canSend} onclick={requestSend}>{t('upd_send')}</button>
+      <button bind:this={sendTrigger} class="primary" disabled={!canSend || confirmingSend || confirmingAllow} onclick={requestSend}>{t('upd_send')}</button>
     </div>
+    {#if confirmingSend}
+      <section class="upd-confirm" aria-labelledby="send-update-title" bind:this={sendConfirmation}>
+        <h3 id="send-update-title">{t('upd_send_confirm_title')}</h3>
+        <p>{selectedName}</p><p>{t('upd_send_confirm')}</p>
+        <div class="pair-actions"><button onclick={cancelSend}>{t('cancel')}</button><button class="primary" disabled={!canSend || sendPeer !== selected} onclick={confirmSend}>{t('upd_send')}</button></div>
+      </section>
+    {/if}
     {#if job.state !== 'IDLE'}<p class="upd-job" role="status" aria-live="polite">{t('upd_state_' + job.state)}{#if job.state === 'SENDING' && job.total > 0} · {Math.floor(job.bytes*100/job.total)}%{/if}</p>{/if}
     {#if job.generation}<p class="upd-job">{t('upd_bundle_version')}: {version(job.generation,job.build)}</p>{/if}
     {#if job.state === 'SENDING' && job.total > 0}<div class="upd-job"><progress value={job.bytes} max={job.total} aria-label={t('upd_send')}>{Math.floor(job.bytes*100/job.total)}%</progress></div>{/if}
@@ -91,24 +108,22 @@
     <p>{permissionText(current.permission)}</p>
     <p>{t('upd_remote_permission')}: {permissionText(current.remotePermission)}</p>
     <div class="pair-actions">
-      <button disabled={!selected || busy || !bridge} onclick={() => run()}>{t('upd_refresh')}</button>
-      <button disabled={!selected || busy || !bridge || current.permission === 'ALLOWED'} onclick={requestAllow}>{t('upd_allow')}</button>
+      <button bind:this={refreshTrigger} disabled={!selected || busy || !bridge} onclick={() => run()}>{t('upd_refresh')}</button>
+      <button bind:this={allowTrigger} disabled={!selected || busy || !bridge || current.permission === 'ALLOWED' || confirmingSend || confirmingAllow} onclick={requestAllow}>{t('upd_allow')}</button>
       <button disabled={!selected || busy || !bridge || current.permission === 'DENIED'} onclick={() => run('deny')}>{t('upd_deny')}</button>
     </div>
+    {#if confirmingAllow}
+      <section class="upd-confirm" aria-labelledby="update-consent-title" bind:this={allowConfirmation}>
+        <h3 id="update-consent-title">{t('upd_consent_title')}</h3>
+        <p>{selectedName}</p><p>{t('upd_consent')}</p>
+        <div class="pair-actions"><button onclick={cancelAllow}>{t('cancel')}</button><button disabled={busy || consentPeer !== selected || current.permission === 'ALLOWED'} onclick={confirmAllow}>{t('upd_confirm')}</button></div>
+      </section>
+    {/if}
   </section>
   {#if notice || current.code !== 'ok'}<p role="status">{notice ? t(notice) : t('upd_' + current.code)}</p>{/if}
 </div>
-<dialog bind:this={sendConsent} aria-labelledby="send-update-title">
-  <div class="dlg-head"><h2 id="send-update-title">{t('upd_send_confirm_title')}</h2></div>
-  <div class="dlg-body"><p>{selectedName}</p><p>{t('upd_send_confirm')}</p></div>
-  <div class="dlg-foot"><button onclick={() => sendConsent.close()}>{t('cancel')}</button><button class="primary" disabled={!canSend || sendPeer !== selected} onclick={confirmSend}>{t('upd_send')}</button></div>
-</dialog>
-<dialog bind:this={consent} aria-labelledby="update-consent-title">
-  <div class="dlg-head"><h2 id="update-consent-title">{t('upd_consent_title')}</h2></div>
-  <div class="dlg-body"><p>{selectedName}</p><p>{t('upd_consent')}</p></div>
-  <div class="dlg-foot"><button onclick={() => consent.close()}>{t('cancel')}</button><button disabled={busy || consentPeer !== selected} onclick={confirmAllow}>{t('upd_confirm')}</button></div>
-</dialog>
 <style>
+  .upd-confirm { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
   @media (max-width: 700px) {
     .upd-cards { grid-template-columns: 1fr; }
   }
