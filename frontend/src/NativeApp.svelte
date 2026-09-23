@@ -36,7 +36,7 @@
   function focusFirstControl(dlg) { dlg?.querySelector('select:not([disabled]), input:not([disabled]), button:not([disabled])')?.focus(); }
   function openDialog(dlg) { if (!dlg || dlg.open) return; opener = document.activeElement; dlg.showModal(); focusFirstControl(dlg); }
   function restoreDialogFocus() { if (opener && opener.focus) opener.focus(); opener = null; }
-  async function openUpdates() { if (!updatesDlg || updatesDlg.open) return; opener = document.activeElement; updatesOpen = true; await tick(); if (updatesDlg.open) { focusFirstControl(updatesDlg); return; } updatesDlg.showModal(); focusFirstControl(updatesDlg); }
+  async function openUpdates() { if (!updatesDlg || updatesDlg.open) return; opener = document.activeElement; updatesOpen = true; await tick(); if (updatesDlg.open) { focusFirstControl(updatesDlg); return; } updatesDlg.showModal(); await tick(); focusFirstControl(updatesDlg); }
   let clipboard = $state({peer:'',code:'unavailable'});
   let pairing = $state({schema:'krasis.pairing/v1',code:'ok',pin:'',job:'',alias:'',candidates:[]});
   let layout = $state({edge:'RIGHT',rearm:32,code:'unavailable'});
