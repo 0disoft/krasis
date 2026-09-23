@@ -24,6 +24,71 @@ func TestSourceSessionSendsAcceptedActionsInOrder(t *testing.T) {
 	}
 }
 
+func TestSourceSessionCoalescesPendingMovesWhileSenderIsBlocked(t *testing.T) {
+	blockSend := make(chan struct{})
+	t.Cleanup(func() {
+		select {
+		case <-blockSend:
+		default:
+			close(blockSend)
+		}
+	})
+	sink := &recordingSourceSink{blockSend: blockSend, sent: make(chan control.InputAction, 2)}
+	session := startSourceSession(t, 1, sink)
+	move := control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}
+	if !session.Offer(move) {
+		t.Fatal("first move was not accepted")
+	}
+	if got := receiveAction(t, sink.sent); got != move {
+		t.Fatalf("first move = %+v", got)
+	}
+	for i := 0; i < 1000; i++ {
+		if !session.Offer(move) {
+			t.Fatalf("pending move %d overflowed", i)
+		}
+	}
+	if got := len(session.queue); got != 1 {
+		t.Fatalf("pending queue depth = %d, want 1", got)
+	}
+	close(blockSend)
+	if got := receiveAction(t, sink.sent); got.Kind != control.InputPointerMove || got.DeltaX != 1000 {
+		t.Fatalf("coalesced move = %+v", got)
+	}
+}
+
+func TestSourceSessionKeepsDiscreteBoundaryBetweenPendingMoves(t *testing.T) {
+	blockSend := make(chan struct{})
+	t.Cleanup(func() {
+		select {
+		case <-blockSend:
+		default:
+			close(blockSend)
+		}
+	})
+	sink := &recordingSourceSink{blockSend: blockSend, sent: make(chan control.InputAction, 4)}
+	session := startSourceSession(t, 3, sink)
+	wheel := control.InputAction{Kind: control.InputWheel, DeltaY: 120}
+	move := control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}
+	key := control.InputAction{Kind: control.InputKeyDown, Code: 65}
+	if !session.Offer(wheel) {
+		t.Fatal("wheel was not accepted")
+	}
+	if got := receiveAction(t, sink.sent); got != wheel {
+		t.Fatalf("wheel = %+v", got)
+	}
+	for _, action := range []control.InputAction{move, key, move} {
+		if !session.Offer(action) {
+			t.Fatalf("action %+v was not accepted", action)
+		}
+	}
+	close(blockSend)
+	for _, want := range []control.InputAction{move, key, move} {
+		if got := receiveAction(t, sink.sent); got != want {
+			t.Fatalf("action = %+v, want %+v", got, want)
+		}
+	}
+}
+
 func TestSourceSessionDoesNotSuppressWhileInactive(t *testing.T) {
 	sink := &recordingSourceSink{sent: make(chan control.InputAction, 1)}
 	session, err := NewSourceSession(1, sink)
@@ -205,7 +270,7 @@ func TestSourceSessionInterruptsBlockedSendBeforeFaultCleanup(t *testing.T) {
 		failed:      make(chan error, 1),
 	}
 	session := startSourceSession(t, 1, sink)
-	action := control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}
+	action := control.InputAction{Kind: control.InputWheel, DeltaY: 120}
 	if !session.Offer(action) {
 		t.Fatal("first action was not accepted")
 	}

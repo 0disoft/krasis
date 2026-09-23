@@ -124,8 +124,10 @@ type SourceSession struct {
 	observer      SourcePipelineObserver
 	queueObserver SourceQueueObserver
 	cleanup       time.Duration
-	queue         chan queuedAction
+	queue         chan *queuedAction
 	queueDepth    atomic.Int64
+	queueMu       sync.Mutex
+	pendingMove   *queuedAction
 	faults        chan error
 	now           func() time.Time
 	started       atomic.Bool
@@ -159,7 +161,7 @@ func NewSourceSessionWithObservers(capacity int, sink SourceSink, observer Sourc
 		observer:      observer,
 		queueObserver: queueObserver,
 		cleanup:       SourceCleanupTimeout,
-		queue:         make(chan queuedAction, capacity),
+		queue:         make(chan *queuedAction, capacity),
 		faults:        make(chan error, 1),
 		now:           time.Now,
 	}, nil
@@ -236,9 +238,29 @@ func (session *SourceSession) Offer(action control.InputAction) bool {
 	}
 	generation := session.generation
 	queuedAt := session.now()
+	session.queueMu.Lock()
+	if action.Kind == control.InputPointerMove && session.pendingMove != nil && session.pendingMove.generation == generation {
+		pending := session.pendingMove
+		dx := int64(pending.action.DeltaX) + int64(action.DeltaX)
+		dy := int64(pending.action.DeltaY) + int64(action.DeltaY)
+		if dx >= -1<<31 && dx <= 1<<31-1 && dy >= -1<<31 && dy <= 1<<31-1 {
+			pending.action.DeltaX = int32(dx)
+			pending.action.DeltaY = int32(dy)
+			session.queueMu.Unlock()
+			session.stateMu.RUnlock()
+			return true
+		}
+	}
+	item := &queuedAction{generation: generation, action: action, queuedAt: queuedAt}
 	depth := session.queueDepth.Add(1)
 	select {
-	case session.queue <- queuedAction{generation: generation, action: action, queuedAt: queuedAt}:
+	case session.queue <- item:
+		if action.Kind == control.InputPointerMove {
+			session.pendingMove = item
+		} else {
+			session.pendingMove = nil
+		}
+		session.queueMu.Unlock()
 		session.stateMu.RUnlock()
 		if session.observer != nil {
 			session.observer.ObserveSourceQueueEnqueued(uint64(depth))
@@ -250,6 +272,7 @@ func (session *SourceSession) Offer(action control.InputAction) bool {
 		return true
 	default:
 		session.queueDepth.Add(-1)
+		session.queueMu.Unlock()
 		session.stateMu.RUnlock()
 		session.abort(ErrSourceQueueOverflow)
 		session.observeWheelQueue(action, SourceQueueRejectedOverflow)
@@ -325,7 +348,13 @@ func (session *SourceSession) runSender(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case item := <-session.queue:
+		case queued := <-session.queue:
+			session.queueMu.Lock()
+			if session.pendingMove == queued {
+				session.pendingMove = nil
+			}
+			item := *queued
+			session.queueMu.Unlock()
 			session.queueDepth.Add(-1)
 			residence := session.now().Sub(item.queuedAt)
 			if residence < 0 {
@@ -344,6 +373,9 @@ func (session *SourceSession) runSender(ctx context.Context) error {
 				if session.queueObserver != nil {
 					session.queueObserver.ObserveSourceQueueDiscardedStale()
 				}
+				continue
+			}
+			if item.action.Kind == control.InputPointerMove && item.action.DeltaX == 0 && item.action.DeltaY == 0 {
 				continue
 			}
 			if err := session.sink.SendAction(ctx, item.action, func() bool { return session.current(item.generation) }); err != nil {
