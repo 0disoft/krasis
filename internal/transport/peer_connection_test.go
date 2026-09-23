@@ -23,6 +23,8 @@ func TestPeerConnectionExchangesFramesAfterAuthentication(t *testing.T) {
 	if serverErr != nil || clientErr != nil {
 		t.Fatalf("peer authentication errors: server=%v client=%v", serverErr, clientErr)
 	}
+	var readBytes int
+	server.SetReadProgressObserver(func(count int, _ time.Time) { readBytes += count })
 
 	want := Frame{Kind: MessageInput, Payload: []byte("input")}
 	writeContext, cancelWrite := context.WithTimeout(context.Background(), time.Second)
@@ -38,6 +40,9 @@ func TestPeerConnectionExchangesFramesAfterAuthentication(t *testing.T) {
 	}
 	if got.Kind != want.Kind || !bytes.Equal(got.Payload, want.Payload) {
 		t.Fatalf("ReadFrame() = %#v, want %#v", got, want)
+	}
+	if readBytes != headerSize+len(want.Payload) {
+		t.Fatalf("read progress=%d, want %d", readBytes, headerSize+len(want.Payload))
 	}
 }
 

@@ -75,6 +75,13 @@ func (connection *PeerConnection) ReadFrame() (Frame, error) {
 	return connection.reader.ReadFrame()
 }
 
+// SetReadProgressObserver is configured before the session reader starts.
+func (connection *PeerConnection) SetReadProgressObserver(observer func(int, time.Time)) {
+	if connection != nil && connection.reader != nil {
+		connection.reader.SetReadProgressObserver(observer)
+	}
+}
+
 func (connection *PeerConnection) WriteFrameContext(ctx context.Context, frame Frame) error {
 	started := time.Now()
 	var admitted time.Time

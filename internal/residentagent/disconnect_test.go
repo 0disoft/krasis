@@ -15,9 +15,28 @@ import (
 
 type disconnectTestConnection struct {
 	agent.Connection
-	frames  []transport.Frame
-	closed  int
-	blocked bool
+	frames       []transport.Frame
+	closed       int
+	blocked      bool
+	readProgress func(int, time.Time)
+}
+
+func (c *disconnectTestConnection) SetReadProgressObserver(observer func(int, time.Time)) {
+	c.readProgress = observer
+}
+
+func TestDisconnectConnectionForwardsReadProgressObserver(t *testing.T) {
+	raw := &disconnectTestConnection{}
+	connection := &disconnectConnection{Connection: raw}
+	var observed int
+	connection.SetReadProgressObserver(func(count int, _ time.Time) { observed += count })
+	if raw.readProgress == nil {
+		t.Fatal("read progress observer was not forwarded")
+	}
+	raw.readProgress(3, time.Now())
+	if observed != 3 {
+		t.Fatalf("read progress=%d", observed)
+	}
 }
 
 func (c *disconnectTestConnection) WriteFrameContext(ctx context.Context, frame transport.Frame) error {

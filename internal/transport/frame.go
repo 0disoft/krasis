@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 )
 
 const (
@@ -37,6 +38,7 @@ type Frame struct {
 type Reader struct {
 	source     io.Reader
 	maxPayload uint32
+	progress   func(int, time.Time)
 }
 
 func NewReader(source io.Reader) (*Reader, error) {
@@ -46,9 +48,25 @@ func NewReader(source io.Reader) (*Reader, error) {
 	return &Reader{source: source, maxPayload: MaxPayloadSize}, nil
 }
 
+// SetReadProgressObserver must be called before ReadFrame starts. It reports
+// only the count of TLS-decoded bytes read, never their contents.
+func (reader *Reader) SetReadProgressObserver(observer func(int, time.Time)) {
+	if reader != nil {
+		reader.progress = observer
+	}
+}
+
+func (reader *Reader) Read(data []byte) (int, error) {
+	n, err := reader.source.Read(data)
+	if n > 0 && reader.progress != nil {
+		reader.progress(n, time.Now())
+	}
+	return n, err
+}
+
 func (reader *Reader) ReadFrame() (Frame, error) {
 	var header [headerSize]byte
-	if _, err := io.ReadFull(reader.source, header[:]); errors.Is(err, io.EOF) {
+	if _, err := io.ReadFull(reader, header[:]); errors.Is(err, io.EOF) {
 		return Frame{}, io.EOF
 	} else if err != nil {
 		if errors.Is(err, io.ErrUnexpectedEOF) {
@@ -74,7 +92,7 @@ func (reader *Reader) ReadFrame() (Frame, error) {
 		return Frame{}, fmt.Errorf("%w: declared=%d maximum=%d", ErrPayloadTooLarge, payloadSize, reader.maxPayload)
 	}
 	payload := make([]byte, payloadSize)
-	if _, err := io.ReadFull(reader.source, payload); err != nil {
+	if _, err := io.ReadFull(reader, payload); err != nil {
 		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 			err = errors.Join(ErrFramePayloadTruncated, err)
 		}

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"testing"
+	"time"
 )
 
 func TestFrameWriterUsesOneWritePerFrameAndPreservesWireBytes(t *testing.T) {
@@ -129,6 +130,31 @@ func TestFrameReaderHandlesFragmentedInput(t *testing.T) {
 	}
 	if got.Kind != want.Kind || !bytes.Equal(got.Payload, want.Payload) {
 		t.Fatalf("ReadFrame() = %#v, want %#v", got, want)
+	}
+}
+
+func TestFrameReaderReportsOnlyByteCountsDuringFragmentedFrame(t *testing.T) {
+	var wire bytes.Buffer
+	writer, _ := NewWriter(&wire)
+	want := Frame{Kind: MessageInput, Payload: []byte("fragmented")}
+	if err := writer.WriteFrame(want); err != nil {
+		t.Fatal(err)
+	}
+	reader, _ := NewReader(oneByteReader{source: bytes.NewReader(wire.Bytes())})
+	var calls, bytesRead int
+	reader.SetReadProgressObserver(func(count int, at time.Time) {
+		if count != 1 || at.IsZero() {
+			t.Errorf("progress count=%d at=%v", count, at)
+		}
+		calls++
+		bytesRead += count
+	})
+	got, err := reader.ReadFrame()
+	if err != nil || got.Kind != want.Kind || !bytes.Equal(got.Payload, want.Payload) {
+		t.Fatalf("frame=%+v err=%v", got, err)
+	}
+	if calls != len(wire.Bytes()) || bytesRead != len(wire.Bytes()) {
+		t.Fatalf("read progress calls=%d bytes=%d wire=%d", calls, bytesRead, wire.Len())
 	}
 }
 

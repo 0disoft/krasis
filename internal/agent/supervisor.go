@@ -238,6 +238,15 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 		if connection == nil {
 			return supervisorExit("nil-connection", errors.New("connection source returned a nil connection"))
 		}
+		if progress, ok := config.Session.LivenessObserver.(interface {
+			ObserveReadConnectionStarted()
+			ObserveReadBytes(int, time.Time)
+		}); ok {
+			progress.ObserveReadConnectionStarted()
+			if readable, ok := connection.(interface{ SetReadProgressObserver(func(int, time.Time)) }); ok {
+				readable.SetReadProgressObserver(progress.ObserveReadBytes)
+			}
+		}
 		ownedConnection := &supervisedConnection{Connection: connection}
 		if diagnostic, ok := connection.(interface{ DiagnosticID() string }); ok {
 			connectionID = diagnostic.DiagnosticID()

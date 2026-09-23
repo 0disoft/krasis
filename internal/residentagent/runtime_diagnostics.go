@@ -16,9 +16,9 @@ type runtimeDiagnostics struct {
 	hookStart, hookLast, hookMax                            atomic.Int64
 	hookCalls, rawInputs                                    atomic.Uint64
 	started                                                 time.Time
-	readStart, dispatchStart, send, receive                 atomic.Int64
+	readStart, lastReadByte, dispatchStart, send, receive   atomic.Int64
 	kind                                                    atomic.Uint32
-	frames, dispatches                                      atomic.Uint64
+	frames, frameReadBytes, dispatches                      atomic.Uint64
 	dispatchMax, timerMax                                   atomic.Int64
 	queueHigh, queueEnqueued, queueDequeued, queueCoalesced atomic.Uint64
 	queueStale                                              atomic.Uint64
@@ -37,8 +37,21 @@ func (d *runtimeDiagnostics) ObserveHookCompleted(t time.Time) {
 }
 func (d *runtimeDiagnostics) ObserveRawInput(time.Time) { d.rawInputs.Add(1) }
 
-func newRuntimeDiagnostics() *runtimeDiagnostics             { return &runtimeDiagnostics{started: time.Now()} }
-func (d *runtimeDiagnostics) stamp(t time.Time) int64        { return max(1, t.Sub(d.started).Microseconds()) }
+func newRuntimeDiagnostics() *runtimeDiagnostics      { return &runtimeDiagnostics{started: time.Now()} }
+func (d *runtimeDiagnostics) stamp(t time.Time) int64 { return max(1, t.Sub(d.started).Microseconds()) }
+func (d *runtimeDiagnostics) ObserveReadConnectionStarted() {
+	d.readStart.Store(0)
+	d.lastReadByte.Store(0)
+	d.dispatchStart.Store(0)
+	d.kind.Store(0)
+}
+func (d *runtimeDiagnostics) ObserveReadBytes(count int, at time.Time) {
+	if count <= 0 {
+		return
+	}
+	d.frameReadBytes.Add(uint64(count))
+	d.lastReadByte.Store(d.stamp(at))
+}
 func (d *runtimeDiagnostics) ObserveReadStarted(t time.Time) { d.readStart.Store(d.stamp(t)) }
 func (d *runtimeDiagnostics) ObserveReadCompleted(time.Time) { d.readStart.Store(0); d.frames.Add(1) }
 func (d *runtimeDiagnostics) ObserveDispatchStarted(k transport.MessageKind, t time.Time) {
@@ -88,7 +101,10 @@ func (d *runtimeDiagnostics) snapshot(now time.Time) productlog.RuntimeSummary {
 		}
 		return max(0, stamp-start)
 	}
-	s := productlog.RuntimeSummary{DispatchKind: "idle", ReadAgeMicros: age(d.readStart.Load()), FramesReceived: d.frames.Swap(0), Dispatches: d.dispatches.Swap(0), DispatchMaxMicros: d.dispatchMax.Swap(0), TimerLateMicros: d.timerMax.Swap(0)}
+	s := productlog.RuntimeSummary{DispatchKind: "idle", ReadAgeMicros: age(d.readStart.Load()), FrameReadBytes: d.frameReadBytes.Swap(0), FramesReceived: d.frames.Swap(0), Dispatches: d.dispatches.Swap(0), DispatchMaxMicros: d.dispatchMax.Swap(0), TimerLateMicros: d.timerMax.Swap(0)}
+	lastReadByte := d.lastReadByte.Load()
+	s.ReadByteObserved = lastReadByte > 0
+	s.LastReadByteAgeMicros = age(lastReadByte)
 	if start := d.dispatchStart.Load(); start != 0 {
 		s.DispatchAgeMicros = age(start)
 		switch transport.MessageKind(d.kind.Load()) {

@@ -8,7 +8,7 @@ import (
 
 func TestRuntimeExportPreservesBoundedNumericEvidence(t *testing.T) {
 	l := &Logger{queue: make(chan record, 1)}
-	s := RuntimeSummary{IntervalMicros: 5000000, HeapBytes: 1000, AllocatedBytes: 500, QueueCoalesced: 7, DispatchKind: "input", DispatchAgeMicros: 700000, CPUKnown: true, CPUMicros: 500, WorkingSetKnown: true, WorkingSetBytes: 5000, GCPauses: [6]uint64{1, 2}}
+	s := RuntimeSummary{IntervalMicros: 5000000, HeapBytes: 1000, AllocatedBytes: 500, QueueCoalesced: 7, FrameReadBytes: 19, LastReadByteAgeMicros: 1000, ReadByteObserved: true, DispatchKind: "input", DispatchAgeMicros: 700000, CPUKnown: true, CPUMicros: 500, WorkingSetKnown: true, WorkingSetBytes: 5000, GCPauses: [6]uint64{1, 2}}
 	l.Runtime(s)
 	raw, _ := json.Marshal(<-l.queue)
 	result := sanitizeLog("agent.jsonl", strings.NewReader(string(raw)+"\n"))

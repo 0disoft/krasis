@@ -47,6 +47,12 @@ func (connection *disconnectConnection) DiagnosticID() string {
 	return ""
 }
 
+func (connection *disconnectConnection) SetReadProgressObserver(observer func(int, time.Time)) {
+	if source, ok := connection.Connection.(interface{ SetReadProgressObserver(func(int, time.Time)) }); ok {
+		source.SetReadProgressObserver(observer)
+	}
+}
+
 func (connection *disconnectConnection) Close() error {
 	connection.once.Do(func() {
 		if errors.Is(context.Cause(connection.intent), errLocalDisconnect) {

@@ -13,8 +13,11 @@ func TestRuntimeDiagnosticsSeparatesReadDispatchAndValidatedHeartbeat(t *testing
 	d := newRuntimeDiagnostics()
 	start := d.started.Add(time.Second)
 	d.ObserveReadStarted(start)
+	d.ObserveReadBytes(7, start.Add(time.Second))
 	if s := d.snapshot(start.Add(3 * time.Second)); s.ReadAgeMicros != 3000000 || s.DispatchKind != "idle" || s.HeartbeatReceived {
 		t.Fatalf("idle read=%+v", s)
+	} else if s.FrameReadBytes != 7 || !s.ReadByteObserved || s.LastReadByteAgeMicros != 2000000 {
+		t.Fatalf("partial frame progress=%+v", s)
 	}
 	d.ObserveReadCompleted(start.Add(3 * time.Second))
 	d.ObserveDispatchStarted(transport.MessageInput, start.Add(3*time.Second))
@@ -30,6 +33,15 @@ func TestRuntimeDiagnosticsSeparatesReadDispatchAndValidatedHeartbeat(t *testing
 	}
 	if next := d.snapshot(start.Add(8 * time.Second)); next.Dispatches != 0 || next.DispatchMaxMicros != 0 || next.TimerLateMicros != 0 {
 		t.Fatalf("interval counters repeated=%+v", next)
+	}
+	d.ObserveReadConnectionStarted()
+	if reset := d.snapshot(start.Add(9 * time.Second)); reset.ReadByteObserved || reset.LastReadByteAgeMicros != 0 || reset.FrameReadBytes != 0 {
+		t.Fatalf("new connection inherited old read progress=%+v", reset)
+	}
+	d.ObserveDispatchStarted(transport.MessageInput, start.Add(10*time.Second))
+	d.ObserveReadConnectionStarted()
+	if reset := d.snapshot(start.Add(11 * time.Second)); reset.DispatchKind != "idle" || reset.DispatchAgeMicros != 0 {
+		t.Fatalf("new connection inherited old dispatch=%+v", reset)
 	}
 }
 

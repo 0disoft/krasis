@@ -202,6 +202,7 @@ liveness 갱신 횟수로 해석하지 않는다. 이 수정은 캡처 실패나
 드러낼 수 있으므로 공유 전에 내용을 확인한다. PIN 등록 중에는 내보내기를 비활성화한다.
 저장 실패 시 기존 진단 파일은 유지하고 저장 공간·폴더 권한 확인 안내를 표시한다.
 `runtime_summary`는 5초 주기와 종료 시 기록된다. 힙 크기, 집계 구간 할당량, GC 일시정지와 runnable 지연 상한 버킷, working set과 집계 구간 CPU 시간, 타이머 늦음, 훅 호출·원시 입력 진행, 수신 대기 및 프레임 처리 시작 후 경과 시간과 처리 종류·최대 시간을 담는다. AllocatedBytes와 CPUMicros는 누적 총량이 아니라 이전/현재 샘플 차이다. 콜백 전체 시간에는 외부 `CallNextHookEx` 체인이 포함되므로 관찰값만으로 특정 제품이 원인이라고 단정하지 않는다. 원시 입력과 윈도우 제목, desktop 이름은 수집하지 않는다. 카운터는 원자적 핫패스와 worker 집계이며, 근사 관측값은 lease 검증을 대신하지 않는다. 오래된 idle read는 단절이 아니다. `desktop_switch` 통지 시 기존 process owner를 취소하므로 새 lease가 필요하며, 실제 UAC 전환과 두 PC 검증은 하지 않았다. 화면 좌표가 바뀌면 기존 session은 영구 무효화되며, source boundary/activation과 inbound prepare/commit을 다시 검증하고 pending은 rollback한 뒤 새 runner에서만 재구성한다. 실제 DPI/모니터 전환 테스트는 하지 않았다.
+`FrameReadBytes`, `LastReadByteAgeMicros`, `ReadByteObserved`는 TLS에서 복호화되어 프레임 리더에 전달된 바이트의 진행만 나타낸다. 수신 중인 프레임과 이미 받은 프레임의 처리 정체를 구분하는 힌트이며 TCP 재전송·RTT나 상대의 송신 상태를 직접 측정하지 않는다.
 일반 support export는 best-effort다. 최대 6초만 관측하고, 동시 export worker는 1개이며, 늦은 결과가 lifecycle 상태를 변경하지 않는다. 저장 실패나 지연은 `diagnostic_failed` 안내로 남지만 Startup.Ensure나 정상 reacquire를 막지 않는다. 입력 안전에 필수인 상태 저장과 guard 실패는 여전히 차단한다.
 임시 파일을 동기화한 뒤 교체하지만 전원 차단 시 저장 완료까지 보장하지는 않는다.
 

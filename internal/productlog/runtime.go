@@ -13,6 +13,9 @@ type RuntimeSummary struct {
 	QueueCoalesced            uint64    `json:"queueCoalesced"`
 	QueueStaleDiscards        uint64    `json:"queueStaleDiscards"`
 	QueueMaxResidenceMicros   int64     `json:"queueMaxResidenceMicros"`
+	FrameReadBytes            uint64    `json:"frameReadBytes"`
+	LastReadByteAgeMicros     int64     `json:"lastReadByteAgeMicros"`
+	ReadByteObserved          bool      `json:"readByteObserved"`
 	HookMaxMicros             int64     `json:"hookMaxMicros"`
 	HookActiveMicros          int64     `json:"hookActiveMicros"`
 	LastHookAgeMicros         int64     `json:"lastHookAgeMicros"`
@@ -44,7 +47,7 @@ func (s RuntimeSummary) valid() bool {
 	if s.HookMaxMicros < 0 || s.HookActiveMicros < 0 || s.LastHookAgeMicros < 0 || s.QueueMaxResidenceMicros < 0 {
 		return false
 	}
-	if s.IntervalMicros <= 0 || s.TimerLateMicros < 0 || s.ReadAgeMicros < 0 || s.DispatchAgeMicros < 0 || s.DispatchMaxMicros < 0 || s.HeartbeatSendAgeMicros < 0 || s.HeartbeatReceiveAgeMicros < 0 {
+	if s.IntervalMicros <= 0 || s.TimerLateMicros < 0 || s.ReadAgeMicros < 0 || s.LastReadByteAgeMicros < 0 || s.DispatchAgeMicros < 0 || s.DispatchMaxMicros < 0 || s.HeartbeatSendAgeMicros < 0 || s.HeartbeatReceiveAgeMicros < 0 {
 		return false
 	}
 	if !s.WorkingSetKnown && s.WorkingSetBytes != 0 || !s.CPUKnown && s.CPUMicros != 0 {
