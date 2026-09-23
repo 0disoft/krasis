@@ -64,7 +64,6 @@
 
 <div class="dlg-head">
   <h2 id="update-settings-title">{t('upd_title')}</h2>
-  <p>{t('upd_help')}</p>
 </div>
 <div class="dlg-body">
   <label>{t('peer')}
@@ -74,17 +73,16 @@
     </select>
   </label>
   <section class="upd-section" aria-label={t('upd_send')}>
-    <h3>{t('upd_send')}</h3>
     <div class="upd-cards">
       <div class="upd-card"><strong>{t('upd_local_version')}</strong>{version(current.localGeneration,current.localBuild)}</div>
       <div class="upd-card"><strong>{t('upd_peer_version')}</strong>{version(current.peerGeneration,current.peerBuild)}</div>
     </div>
     <p>{t('upd_' + current.peerState.toLowerCase())} · {t('upd_comparison_' + current.comparison)}</p>
-    <p>{t('upd_receiver_required')}</p>
+    {#if current.peerState !== 'ONLINE'}<p>{t('upd_receiver_required')}</p>{/if}
     <div class="upd-send-row">
       <button class="primary" disabled={!canSend} onclick={requestSend}>{t('upd_send')}</button>
     </div>
-    <p class="upd-job" role="status" aria-live="polite">{t('upd_state_' + job.state)}{#if job.state === 'SENDING' && job.total > 0} · {Math.floor(job.bytes*100/job.total)}%{/if}</p>
+    {#if job.state !== 'IDLE'}<p class="upd-job" role="status" aria-live="polite">{t('upd_state_' + job.state)}{#if job.state === 'SENDING' && job.total > 0} · {Math.floor(job.bytes*100/job.total)}%{/if}</p>{/if}
     {#if job.generation}<p class="upd-job">{t('upd_bundle_version')}: {version(job.generation,job.build)}</p>{/if}
     {#if job.state === 'SENDING' && job.total > 0}<div class="upd-job"><progress value={job.bytes} max={job.total} aria-label={t('upd_send')}>{Math.floor(job.bytes*100/job.total)}%</progress></div>{/if}
   </section>
@@ -98,8 +96,7 @@
       <button disabled={!selected || busy || !bridge || current.permission === 'DENIED'} onclick={() => run('deny')}>{t('upd_deny')}</button>
     </div>
   </section>
-  <p role="status">{notice ? t(notice) : current.code === 'ok' ? '' : t('upd_' + current.code)}</p>
-  <p>{t('upd_sending_later')}</p>
+  {#if notice || current.code !== 'ok'}<p role="status">{notice ? t(notice) : t('upd_' + current.code)}</p>{/if}
 </div>
 <dialog bind:this={sendConsent} aria-labelledby="send-update-title">
   <div class="dlg-head"><h2 id="send-update-title">{t('upd_send_confirm_title')}</h2></div>

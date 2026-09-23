@@ -218,7 +218,6 @@
   {#if error}
     <p class="fault-banner" role="alert">{t(error)}</p>
   {/if}
-  <p class="info-line" role="status"><Icon name="info" size={16} />{t('scope')}</p>
   <label class="peer-select">{t('peer')}<select bind:value={selected} disabled={busy || snapshot.state !== 'LOCAL'}><option value="">{t('choose')}</option>{#each snapshot.peers as peer (peer.fingerprint)}<option value={peer.fingerprint}>{peer.alias}</option>{/each}</select></label>
   <section class="canvas" aria-label={t('devices')}>
     <div class="screens" class:reversed={layout.edge === 'LEFT'}>
@@ -242,7 +241,9 @@
     <button class="utility utility-button" aria-haspopup="dialog" onclick={() => openDialog(pairingDlg)}><Icon name="plus" /><div><h2>{t('pair')}</h2></div></button>
     <button class="utility utility-button" aria-haspopup="dialog" onclick={() => openDialog(diagnosticsDlg)}><Icon name="info" /><div><h2>{t('diag_title')}</h2></div></button>
   </section>
-  <p role="status">{clipNotice ? t(clipNotice) : clipboard.code !== 'ok' ? t(clipboard.code) : layout.code !== 'ok' && layout.code !== 'unavailable' && layout.code !== 'unconfigured' ? t(layout.code) : t('clipboard_help')}</p>
+  {#if clipNotice || clipboard.code !== 'ok' || (layout.code !== 'ok' && layout.code !== 'unavailable' && layout.code !== 'unconfigured')}
+    <p role="status">{clipNotice ? t(clipNotice) : clipboard.code !== 'ok' ? t(clipboard.code) : t(layout.code)}</p>
+  {/if}
 </main>
 <dialog bind:this={updatesDlg} aria-labelledby="update-settings-title" onclose={() => { updatesOpen = false; if (opener && opener.focus) opener.focus(); opener = null; }}>
   {#if updatesOpen}<UpdateSettings bridge={updateSettingsBridge} peers={snapshot.peers} initialPeer={selected} {locale} />{/if}
