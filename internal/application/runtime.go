@@ -48,6 +48,13 @@ type InputDispositionObserver interface {
 	ObserveDestinationInputDisposition(InputDisposition)
 }
 
+// InputInjectionObserver measures adapter work separately from frame dispatch.
+// Implementations on this path must not wait or perform I/O.
+type InputInjectionObserver interface {
+	ObserveDestinationInjectionStarted(time.Time)
+	ObserveDestinationInjectionCompleted(time.Time)
+}
+
 // SessionRuntime is the single serialized owner of one peer session's mutable
 // control, ordering, liveness, and pressed-input state.
 type SessionRuntime struct {
@@ -499,6 +506,20 @@ func (runtime *SessionRuntime) HandleInputAction(
 	}
 	runtime.stream = next
 
+	err = runtime.injectAction(ctx, action)
+	if err == nil {
+		disposition = InputDispositionApplied
+		return nil
+	}
+	_, faultErr := runtime.faultLocked(ctx, err)
+	return faultErr
+}
+
+func (runtime *SessionRuntime) injectAction(ctx context.Context, action control.InputAction) (err error) {
+	if observer, ok := runtime.inputObserver.(InputInjectionObserver); ok {
+		observer.ObserveDestinationInjectionStarted(time.Now())
+		defer func() { observer.ObserveDestinationInjectionCompleted(time.Now()) }()
+	}
 	if token, pressed, discrete := action.PressedToken(); discrete {
 		if pressed {
 			err = InjectPress(ctx, &runtime.pressed, runtime.input, token)
@@ -510,12 +531,7 @@ func (runtime *SessionRuntime) HandleInputAction(
 	} else {
 		err = runtime.input.Wheel(ctx, action.DeltaX, action.DeltaY)
 	}
-	if err == nil {
-		disposition = InputDispositionApplied
-		return nil
-	}
-	_, faultErr := runtime.faultLocked(ctx, err)
-	return faultErr
+	return err
 }
 
 func (runtime *SessionRuntime) ObserveHeartbeat(

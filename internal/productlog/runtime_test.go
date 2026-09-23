@@ -15,7 +15,7 @@ func TestRuntimeExportPreservesBoundedNumericEvidence(t *testing.T) {
 	if len(result.Events) != 1 || result.Events[0].Runtime == nil || *result.Events[0].Runtime != s {
 		t.Fatalf("lost evidence: %s", raw)
 	}
-	for _, invalid := range []RuntimeSummary{{IntervalMicros: 1, DispatchKind: "sensitive free text"}, {IntervalMicros: 1, DispatchKind: "input", WorkingSetBytes: 1}, {IntervalMicros: 1, DispatchKind: "idle", TimerLateMicros: -1}, {IntervalMicros: 1, DispatchKind: "idle", QueueMaxResidenceMicros: -1}} {
+	for _, invalid := range []RuntimeSummary{{IntervalMicros: 1, DispatchKind: "sensitive free text"}, {IntervalMicros: 1, DispatchKind: "input", WorkingSetBytes: 1}, {IntervalMicros: 1, DispatchKind: "idle", TimerLateMicros: -1}, {IntervalMicros: 1, DispatchKind: "idle", QueueMaxResidenceMicros: -1}, {IntervalMicros: 1, DispatchKind: "idle", InjectionAgeMicros: -1}, {IntervalMicros: 1, DispatchKind: "idle", InjectionMaxMicros: -1}} {
 		l.Runtime(invalid)
 		if len(l.queue) != 0 {
 			t.Fatal("invalid summary queued")

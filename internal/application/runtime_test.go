@@ -349,6 +349,9 @@ func TestSessionRuntimeDrainsOrderedInputAfterLocalReturnWithoutInjection(t *tes
 	if observer.received != 3 || observer.applied != 1 || observer.retiredDrained != 1 || observer.rejected != 1 {
 		t.Fatalf("input dispositions = %+v", observer)
 	}
+	if observer.injectionStarted != 1 || observer.injectionCompleted != 1 {
+		t.Fatalf("retired/rejected input reached injection observer: %+v", observer)
+	}
 }
 
 func TestSessionRuntimeDrainsRetiredSessionHeartbeatAfterLocalReturn(t *testing.T) {
@@ -447,10 +450,19 @@ func newTestRuntime(t *testing.T, port InputPort) *SessionRuntime {
 }
 
 type recordingInputDispositionObserver struct {
-	received       uint64
-	applied        uint64
-	retiredDrained uint64
-	rejected       uint64
+	received                             uint64
+	applied                              uint64
+	retiredDrained                       uint64
+	rejected                             uint64
+	injectionStarted, injectionCompleted uint64
+}
+
+func (observer *recordingInputDispositionObserver) ObserveDestinationInjectionStarted(time.Time) {
+	observer.injectionStarted++
+}
+
+func (observer *recordingInputDispositionObserver) ObserveDestinationInjectionCompleted(time.Time) {
+	observer.injectionCompleted++
 }
 
 func (observer *recordingInputDispositionObserver) ObserveDestinationInputReceived() {

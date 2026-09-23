@@ -2,11 +2,13 @@ package residentagent
 
 import (
 	"context"
-	"github.com/0disoft/krasis/internal/productlog"
-	"github.com/0disoft/krasis/internal/transport"
 	"runtime/metrics"
 	"sync/atomic"
 	"time"
+
+	"github.com/0disoft/krasis/internal/application"
+	"github.com/0disoft/krasis/internal/productlog"
+	"github.com/0disoft/krasis/internal/transport"
 )
 
 // Session callbacks only update atomics. Runtime/OS sampling and JSON/disk work
@@ -20,6 +22,8 @@ type runtimeDiagnostics struct {
 	kind                                                    atomic.Uint32
 	frames, frameReadBytes, dispatches                      atomic.Uint64
 	dispatchMax, timerMax                                   atomic.Int64
+	injectionStart, injectionMax                            atomic.Int64
+	injections                                              atomic.Uint64
 	queueHigh, queueEnqueued, queueDequeued, queueCoalesced atomic.Uint64
 	queueStale                                              atomic.Uint64
 	queueResidenceMax                                       atomic.Int64
@@ -43,6 +47,7 @@ func (d *runtimeDiagnostics) ObserveReadConnectionStarted() {
 	d.readStart.Store(0)
 	d.lastReadByte.Store(0)
 	d.dispatchStart.Store(0)
+	d.injectionStart.Store(0)
 	d.kind.Store(0)
 }
 func (d *runtimeDiagnostics) ObserveReadBytes(count int, at time.Time) {
@@ -71,6 +76,18 @@ func (d *runtimeDiagnostics) ObserveHeartbeatReceived(_ string, t time.Time) {
 }
 func (d *runtimeDiagnostics) ObserveTimerLateness(delay time.Duration) {
 	observeMaximum(&d.timerMax, max(0, delay.Microseconds()))
+}
+func (*runtimeDiagnostics) ObserveDestinationInputReceived()                                {}
+func (*runtimeDiagnostics) ObserveDestinationInputDisposition(application.InputDisposition) {}
+func (d *runtimeDiagnostics) ObserveDestinationInjectionStarted(t time.Time) {
+	d.injectionStart.Store(d.stamp(t))
+}
+func (d *runtimeDiagnostics) ObserveDestinationInjectionCompleted(t time.Time) {
+	start := d.injectionStart.Swap(0)
+	if start > 0 {
+		observeMaximum(&d.injectionMax, max(0, d.stamp(t)-start))
+		d.injections.Add(1)
+	}
 }
 func (d *runtimeDiagnostics) ObserveSourceQueueEnqueued(depth uint64) {
 	d.queueEnqueued.Add(1)
@@ -102,6 +119,9 @@ func (d *runtimeDiagnostics) snapshot(now time.Time) productlog.RuntimeSummary {
 		return max(0, stamp-start)
 	}
 	s := productlog.RuntimeSummary{DispatchKind: "idle", ReadAgeMicros: age(d.readStart.Load()), FrameReadBytes: d.frameReadBytes.Swap(0), FramesReceived: d.frames.Swap(0), Dispatches: d.dispatches.Swap(0), DispatchMaxMicros: d.dispatchMax.Swap(0), TimerLateMicros: d.timerMax.Swap(0)}
+	s.InjectionAgeMicros = age(d.injectionStart.Load())
+	s.InjectionMaxMicros = d.injectionMax.Swap(0)
+	s.Injections = d.injections.Swap(0)
 	lastReadByte := d.lastReadByte.Load()
 	s.ReadByteObserved = lastReadByte > 0
 	s.LastReadByteAgeMicros = age(lastReadByte)

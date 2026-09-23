@@ -62,6 +62,31 @@ func TestRuntimeDiagnosticsReportsBoundedQueueAggregates(t *testing.T) {
 	}
 }
 
+func TestRuntimeDiagnosticsSeparatesInjectionFromDispatch(t *testing.T) {
+	d := newRuntimeDiagnostics()
+	start := d.started.Add(time.Second)
+	d.ObserveDispatchStarted(transport.MessageInput, start)
+	d.ObserveDestinationInjectionStarted(start.Add(time.Second))
+	active := d.snapshot(start.Add(3 * time.Second))
+	if active.DispatchAgeMicros != 3000000 || active.InjectionAgeMicros != 2000000 || active.Injections != 0 {
+		t.Fatalf("active injection=%+v", active)
+	}
+	d.ObserveDestinationInjectionCompleted(start.Add(4 * time.Second))
+	d.ObserveDispatchCompleted(start.Add(5 * time.Second))
+	complete := d.snapshot(start.Add(6 * time.Second))
+	if complete.InjectionAgeMicros != 0 || complete.InjectionMaxMicros != 3000000 || complete.Injections != 1 || complete.DispatchMaxMicros != 5000000 {
+		t.Fatalf("completed injection=%+v", complete)
+	}
+	if reset := d.snapshot(start.Add(7 * time.Second)); reset.InjectionMaxMicros != 0 || reset.Injections != 0 {
+		t.Fatalf("injection interval repeated=%+v", reset)
+	}
+	d.ObserveDestinationInjectionStarted(start.Add(8 * time.Second))
+	d.ObserveReadConnectionStarted()
+	if reset := d.snapshot(start.Add(9 * time.Second)); reset.InjectionAgeMicros != 0 {
+		t.Fatalf("new connection inherited injection=%+v", reset)
+	}
+}
+
 func TestRuntimeSamplingUsesHistogramDeltasAndKnownOSCounters(t *testing.T) {
 	h := &metrics.Float64Histogram{Buckets: []float64{0, .00005, .0005, .005, .05, .5, math.Inf(1)}, Counts: []uint64{1, 2, 3, 4, 5, 6}}
 	if got := aggregateHistogram(h); got != [6]uint64{1, 2, 3, 4, 5, 6} {

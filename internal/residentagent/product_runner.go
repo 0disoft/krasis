@@ -171,6 +171,7 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 		progress := newRuntimeDiagnostics()
 		config.LivenessObserver = progress
 		config.QueueObserver = progress
+		config.DestinationObserver = progress
 		progressCtx, stopProgress := context.WithCancel(ctx)
 		progressDone := make(chan struct{})
 		go func() { defer close(progressDone); progress.run(progressCtx, log) }()
