@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/0disoft/krasis/internal/control"
 )
@@ -48,6 +50,82 @@ func TestBoundaryOrchestratorDropsIntentWhileOutboundIsNotReady(t *testing.T) {
 	}
 	if beginner.calls != 0 || identityCalls != 0 {
 		t.Fatalf("begin calls = %d, identity calls = %d", beginner.calls, identityCalls)
+	}
+}
+
+func TestBoundaryIntentObservationDoesNotBlockHookHandoff(t *testing.T) {
+	detector, err := control.NewBoundaryDetector(control.BoundaryConfig{
+		Edge: control.ScreenEdgeRight, ScreenWidth: 100, ActivationGap: 1, RearmDistance: 10,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	emitter, err := control.NewBoundaryIntentEmitter(detector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	orchestrator, err := NewBoundaryOrchestrator(&recordingBoundaryBeginner{}, func() (OutboundIdentity, error) {
+		return OutboundIdentity{}, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	var observed atomic.Int32
+	go func() {
+		done <- orchestrator.RunWithIntentObserver(ctx, emitter.Intents(), func(control.BoundaryIntent) {
+			if observed.Add(1) == 1 {
+				close(entered)
+				<-release
+			}
+		})
+	}()
+	if err := emitter.Observe(control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}, 99); err != nil {
+		close(release)
+		t.Fatal(err)
+	}
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		close(release)
+		t.Fatal("orchestrator did not observe queued intent")
+	}
+	if err := emitter.Observe(control.InputAction{Kind: control.InputPointerMove, DeltaX: -12}, 87); err != nil {
+		close(release)
+		t.Fatal(err)
+	}
+	if err := emitter.Observe(control.InputAction{Kind: control.InputPointerMove, DeltaX: 12}, 99); err != nil {
+		close(release)
+		t.Fatalf("hook handoff blocked by diagnostic observer: %v", err)
+	}
+	close(release)
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("orchestrator did not stop")
+	}
+}
+
+func TestBoundaryIntentObserverPanicFailsSession(t *testing.T) {
+	orchestrator, err := NewBoundaryOrchestrator(&recordingBoundaryBeginner{ready: true}, func() (OutboundIdentity, error) {
+		return OutboundIdentity{SessionID: "s", Epoch: "e"}, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	intents := make(chan control.BoundaryIntent, 1)
+	intents <- control.BoundaryIntent{Edge: control.ScreenEdgeRight, X: 99}
+	close(intents)
+	err = orchestrator.RunWithIntentObserver(context.Background(), intents, func(control.BoundaryIntent) {
+		panic("private input")
+	})
+	if !errors.Is(err, ErrBoundaryIntentObserverPanic) || err.Error() != ErrBoundaryIntentObserverPanic.Error() {
+		t.Fatalf("observer panic returned %v", err)
 	}
 }
 

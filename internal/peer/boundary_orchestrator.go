@@ -12,6 +12,8 @@ import (
 
 const outboundIdentifierBytes = 16
 
+var ErrBoundaryIntentObserverPanic = errors.New("boundary intent observer panicked")
+
 type OutboundIdentity struct {
 	SessionID string
 	Epoch     string
@@ -89,6 +91,16 @@ func (orchestrator *BoundaryOrchestrator) Run(
 	ctx context.Context,
 	intents <-chan control.BoundaryIntent,
 ) error {
+	return orchestrator.RunWithIntentObserver(ctx, intents, nil)
+}
+
+// RunWithIntentObserver reports queued intents after they leave the hook's
+// bounded channel, so diagnostic observers cannot delay the hook callback.
+func (orchestrator *BoundaryOrchestrator) RunWithIntentObserver(
+	ctx context.Context,
+	intents <-chan control.BoundaryIntent,
+	observeIntent func(control.BoundaryIntent),
+) error {
 	if orchestrator == nil || orchestrator.beginner == nil || orchestrator.identity == nil {
 		return errors.New("boundary orchestrator is not initialized")
 	}
@@ -102,6 +114,11 @@ func (orchestrator *BoundaryOrchestrator) Run(
 		case intent, ok := <-intents:
 			if !ok {
 				return nil
+			}
+			if observeIntent != nil {
+				if err := observeQueuedIntent(observeIntent, intent); err != nil {
+					return err
+				}
 			}
 			if !orchestrator.beginner.Ready() {
 				observeControlFlow(orchestrator.observer, ControlFlowBoundaryDroppedNotReady)
@@ -151,6 +168,16 @@ func (orchestrator *BoundaryOrchestrator) Run(
 			observeControlFlow(orchestrator.observer, ControlFlowBoundaryAdmitted)
 		}
 	}
+}
+
+func observeQueuedIntent(observer func(control.BoundaryIntent), intent control.BoundaryIntent) (err error) {
+	defer func() {
+		if recover() != nil {
+			err = ErrBoundaryIntentObserverPanic
+		}
+	}()
+	observer(intent)
+	return nil
 }
 
 func NewRandomOutboundIdentity() (OutboundIdentity, error) {

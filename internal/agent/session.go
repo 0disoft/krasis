@@ -89,11 +89,7 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	if err != nil {
 		return Result{}, err
 	}
-	var observeBoundary func(control.BoundaryIntent)
-	if config.SourceObserver != nil {
-		observeBoundary = config.SourceObserver.ObserveBoundaryIntent
-	}
-	emitter, err := control.NewBoundaryIntentEmitterObserved(detector, observeBoundary)
+	emitter, err := control.NewBoundaryIntentEmitter(detector)
 	if err != nil {
 		return Result{}, err
 	}
@@ -199,6 +195,9 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 			return dependencies.Hook.RunWithBoundary(runContext, source, emergency, func() { close(hookReady) })
 		}},
 		{name: "boundary-orchestrator", wait: hookReady, run: func() error {
+			if config.SourceObserver != nil {
+				return orchestrator.RunWithIntentObserver(runContext, emitter.Intents(), config.SourceObserver.ObserveBoundaryIntent)
+			}
 			return orchestrator.Run(runContext, emitter.Intents())
 		}},
 		{name: "return-controller", run: func() error {
