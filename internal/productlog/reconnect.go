@@ -27,7 +27,7 @@ var reconnectReasons = map[[3]string]string{
 }
 
 func init() {
-	for _, code := range []string{"network_failed", "network_timeout", "tls_canceled", "tls_timeout", "tls_certificate_time_invalid", "tls_certificate_invalid", "tls_untrusted", "tls_identity_mismatch", "tls_version_rejected", "tls_alpn_rejected", "tls_chain_unverified", "tls_role_rejected", "tls_handshake_failed"} {
+	for _, code := range []string{"network_failed", "network_timeout", "network_refused", "network_unreachable", "network_reset", "tls_canceled", "tls_timeout", "tls_certificate_time_invalid", "tls_certificate_invalid", "tls_untrusted", "tls_identity_mismatch", "tls_version_rejected", "tls_alpn_rejected", "tls_chain_unverified", "tls_role_rejected", "tls_handshake_failed"} {
 		allowed["reconnect_acquire_"+code] = true
 		allowed["preauth_"+code] = true
 	}

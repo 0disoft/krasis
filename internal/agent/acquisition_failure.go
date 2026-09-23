@@ -3,9 +3,11 @@ package agent
 import (
 	"context"
 	"errors"
-	"github.com/0disoft/krasis/internal/transport"
 	"net"
+	"syscall"
 	"time"
+
+	"github.com/0disoft/krasis/internal/transport"
 )
 
 func describeAcquisitionFailure(err error) FailureDescriptor {
@@ -14,8 +16,15 @@ func describeAcquisitionFailure(err error) FailureDescriptor {
 	}
 	code := "network_failed"
 	var network net.Error
-	if errors.Is(err, context.DeadlineExceeded) || errors.As(err, &network) && network.Timeout() {
+	switch {
+	case errors.Is(err, context.DeadlineExceeded) || errors.As(err, &network) && network.Timeout():
 		code = "network_timeout"
+	case errors.Is(err, syscall.ECONNREFUSED):
+		code = "network_refused"
+	case errors.Is(err, syscall.ENETUNREACH), errors.Is(err, syscall.EHOSTUNREACH):
+		code = "network_unreachable"
+	case errors.Is(err, syscall.ECONNRESET):
+		code = "network_reset"
 	}
 	return FailureDescriptor{Component: "peer-acquire", Phase: "network", Code: code}
 }

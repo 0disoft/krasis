@@ -24,6 +24,20 @@ func TestReconnectReasonsSurviveSanitizedExport(t *testing.T) {
 	}
 }
 
+func TestAcquireNetworkReasonsSurviveSanitizedExport(t *testing.T) {
+	for _, reason := range []string{"network_refused", "network_unreachable", "network_reset", "network_timeout"} {
+		code := ReconnectCode("acquire", "peer-acquire", "network", reason)
+		if code != "reconnect_acquire_"+reason {
+			t.Fatalf("reason %s mapped to %s", reason, code)
+		}
+		data, _ := json.Marshal(record{Time: "2026-09-23T00:00:00Z", Code: code})
+		exported := sanitizeLog("agent.jsonl", strings.NewReader(string(data)+"\n"))
+		if exported.Incomplete || len(exported.Events) != 1 || exported.Events[0].Code != code {
+			t.Fatalf("reason dropped: %s", code)
+		}
+	}
+}
+
 func TestReconnectReasonsDoNotCopyPrivateDescriptors(t *testing.T) {
 	for _, values := range [][4]string{{"private", "private", "private", "private"}, {"session", "private", "read", "remote_eof"}, {"session", "peer-reader", "read", "private"}} {
 		if got := ReconnectCode(values[0], values[1], values[2], values[3]); got != "reconnect_session_unknown" {

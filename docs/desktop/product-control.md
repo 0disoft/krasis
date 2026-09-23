@@ -178,6 +178,7 @@ AgentGeneration 8부터 입력 에이전트와 crash guard는 시작 직후 모�
 
 AgentGeneration 9는 재시도 대기 진입마다 고정된 `reconnect_*` 원인 이벤트를 남긴다.
 `reconnect_acquire_failed`는 연결 획득 실패이며 활성 제어 중 단절과 구분한다. cursor-present/restore/release 단계 오류는 보존되어 작업자 종료 오류로 합쳐지고, `Destroy` 실패 시 window와 registry 등록을 유지하므로 recovery 확인으로 승격하지 않는다. `ShowCursor`/`ClipCursor`는 쓰지 않고 보조 window로만 커서를 표현한다.
+이후 버전의 연결 획득 진단에서 `network_refused`, `network_unreachable`, `network_reset`, `network_timeout`은 TCP 오류 종류만 나타낸다. AP 격리·방화벽·경로 변경 같은 환경 원인은 별도 증거가 없으면 알 수 없다.
 `reconnect_remote_eof`는 상대가 스트림을 닫았다는 뜻이지 상대가 정상 종료했다는 증거는 아니다.
 `reconnect_read_io_failure`, `reconnect_*_write_failed`, `reconnect_*_dispatch_failed`는
 읽기, 쓰기, 메시지 처리 실패를 구분한다. capture/focus 관련 코드는 입력 캡처·포커스 단계의 실패다. capture `setError`는 `session.Abort`로 즉시 suppression을 영구 중단하며, normal inactive 입력은 승격하지 않는다. source cleanup 확인 전에는 재사용하지 않는다.

@@ -3,9 +3,12 @@ package agent
 import (
 	"context"
 	"errors"
+	"net"
+	"syscall"
+	"testing"
+
 	"github.com/0disoft/krasis/internal/productlog"
 	"github.com/0disoft/krasis/internal/transport"
-	"testing"
 )
 
 func TestAcquireDeadlineDistinguishesNetworkFromTLS(t *testing.T) {
@@ -16,6 +19,24 @@ func TestAcquireDeadlineDistinguishesNetworkFromTLS(t *testing.T) {
 		d := describeAcquisitionFailure(test.err)
 		if got := productlog.ReconnectCode("acquire", d.Component, d.Phase, d.Code); got != "reconnect_acquire_"+test.want {
 			t.Fatal(got)
+		}
+	}
+}
+
+func TestAcquireNetworkFailureSeparatesReachabilityFromAuthentication(t *testing.T) {
+	for _, test := range []struct {
+		err  error
+		want string
+	}{
+		{&net.OpError{Op: "dial", Net: "tcp", Err: syscall.ECONNREFUSED}, "network_refused"},
+		{&net.OpError{Op: "dial", Net: "tcp", Err: syscall.ENETUNREACH}, "network_unreachable"},
+		{&net.OpError{Op: "dial", Net: "tcp", Err: syscall.EHOSTUNREACH}, "network_unreachable"},
+		{&net.OpError{Op: "read", Net: "tcp", Err: syscall.ECONNRESET}, "network_reset"},
+		{errors.New("private peer address"), "network_failed"},
+	} {
+		d := describeAcquisitionFailure(test.err)
+		if got := productlog.ReconnectCode("acquire", d.Component, d.Phase, d.Code); got != "reconnect_acquire_"+test.want {
+			t.Fatalf("error %T: got %s, want %s", test.err, got, test.want)
 		}
 	}
 }
