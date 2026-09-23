@@ -264,6 +264,14 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 			continue
 		}
 		if outcome != nil && !expectedWorkerCancellation(outcome, runContext.Err()) {
+			if components[index].name == "source-session" &&
+				errors.Is(cause, wininput.ErrSourceCaptureLostForeground) &&
+				foregroundLossCleanupOnly(outcome, false) {
+				// The source worker can report the same verified foreground
+				// loss after another component wins cancellation.
+				cause = errors.Join(cause, outcome)
+				continue
+			}
 			if components[index].name == "source-hook" &&
 				errors.Is(cause, wininput.ErrSourceCaptureLostForeground) &&
 				foregroundLossCleanupOnly(outcome, false) {
