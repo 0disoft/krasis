@@ -206,7 +206,7 @@
 <main>
   <div class="connection-bar">
     <span class="connection" class:fault={snapshot.state !== 'CONNECTED'}><span class="status-dot"></span>{t(snapshot.state)}</span>
-    <button disabled={busy || !bridge} onclick={() => run('refresh')}>{t('refresh')}</button>
+    <button disabled={busy || !bridge} onclick={() => run(snapshot.state === 'LOCAL' ? 'restart' : 'refresh')}>{t('refresh')}</button>
     {#if snapshot.state === 'LOCAL'}
       <button disabled={busy || !selectedPeer || !!pairing.job} onclick={() => run('connect')}>{t('connect')}</button>
     {:else if snapshot.state === 'FAULTED' || snapshot.state === 'UNKNOWN'}

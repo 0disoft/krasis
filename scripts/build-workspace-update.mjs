@@ -12,7 +12,7 @@ const revision = git(['rev-parse','HEAD']);
 const generation = Number(fs.readFileSync('internal/localapi/runtime.go','utf8').match(/const AgentGeneration = (\d+)/u)?.[1]);
 if (!Number.isSafeInteger(generation)) throw Error('Missing generation');
 const bundleRoot = process.argv[2];
-if (!bundleRoot || path.resolve(bundleRoot) !== path.resolve('dist/workspace', revision)) throw Error('Expected revision-scoped distribution');
+if (!bundleRoot || path.resolve(bundleRoot) !== path.resolve('dist/workspace', `g${generation}`)) throw Error('Expected generation-scoped distribution');
 const directory = path.join(bundleRoot,'peer-update');
 fs.mkdirSync(directory,{recursive:true});
 for (const name of ['krasis','krasis-agent','krasis-control']) {

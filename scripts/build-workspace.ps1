@@ -11,8 +11,10 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $revision = (git rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $revision -notmatch '^[a-f0-9]{40}$') { throw 'Missing source revision' }
 if (git status --porcelain --untracked-files=no) { throw 'Commit source changes before packaging' }
-$bundle = Join-Path 'dist/workspace' $revision
-if (Test-Path -LiteralPath $bundle) { throw 'Revision artifact already exists; do not overwrite running programs' }
+$generation = [regex]::Match((Get-Content -Raw -LiteralPath 'internal/localapi/runtime.go'), '(?m)^const AgentGeneration = ([1-9][0-9]*)$')
+if (-not $generation.Success) { throw 'Missing agent generation' }
+$bundle = Join-Path 'dist/workspace' ('g' + $generation.Groups[1].Value)
+if (Test-Path -LiteralPath $bundle) { throw 'Generation artifact already exists; do not overwrite running programs' }
 New-Item -ItemType Directory -Path $bundle | Out-Null
 Copy-Item -LiteralPath 'frontend/README.md' -Destination (Join-Path $bundle 'START-HERE.md')
 $notice = [Collections.Generic.List[string]]::new()
@@ -37,7 +39,4 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $files = @('krasis.exe','START-HERE.md','THIRD-PARTY-NOTICES.txt')
 $sums = foreach ($file in $files) { (Get-FileHash -LiteralPath (Join-Path $bundle $file) -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $file }
 [IO.File]::WriteAllLines((Join-Path $bundle 'SHA256SUMS.txt'), $sums, [Text.UTF8Encoding]::new($false))
-$files += @('SHA256SUMS.txt','peer-update')
-$archive = "dist/workspace/krasis-$revision.zip"
-Compress-Archive -LiteralPath ($files | ForEach-Object {Join-Path $bundle $_}) -DestinationPath $archive
-Write-Output "Workspace packaged: $archive (shared UI and agent; installed processes unchanged)."
+Write-Output "Workspace packaged: $bundle (shared UI and agent; installed processes unchanged)."

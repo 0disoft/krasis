@@ -20,9 +20,8 @@ See ADR 0061 for its identity, concurrency and cancellation boundaries.
 
 ## Native Windows Workspace
 
-The optional Wails v3 host ships as an immutable clean distribution under
-`dist/workspace/<git revision>/`, with the ZIP kept outside at
-`dist/workspace/krasis-<revision>.zip`.
+The optional Wails v3 host ships as a complete, unpacked distribution under
+`dist/workspace/g<generation>/`.
 The actual Wails UI lives in `peer-update/krasis-control.exe` and the resident
 agent in `peer-update/krasis-agent.exe`, each as a single copy; it embeds the
 native Svelte assets and uses the Go module's own
@@ -31,13 +30,12 @@ The root `krasis.exe` is a small icon-bearing launcher: it verifies
 the compiled-in SHA256 of `peer-update/krasis-control.exe` and then starts it.
 There is no duplicate root agent. Keep the entire distribution directory;
 do not copy the launcher alone. Wails v3 is an explicitly selected prerelease
-dependency. The Go language requirement is unchanged; the bundle includes agent
-generation 39, and building does not replace the running process. All Go
-release exes build with trimpath plus `-s -w` (Go build metadata is kept, so
+dependency. The Go language requirement is unchanged; building does not replace
+the running process. All Go release executables build with trimpath plus
+`-s -w` (Go build metadata is kept, so
 stack traces still resolve; native debugger symbols are removed).
 
-Extract the complete Workspace ZIP and double-click the root krasis.exe
-inside its directory.
+Keep the complete generation folder together and double-click its root krasis.exe.
 The launcher verifies and starts `peer-update/krasis-control.exe` automatically.
 The existing controller is not required for startup, connection or recovery.
 Closing the window keeps Workspace in the tray; its menu can reopen it,
@@ -64,7 +62,7 @@ no delta update yet. The first
 g34 to g35 update needs the existing control running on the receiver so it can
 automatically APPLY the received bundle; afterwards a running Workspace suffices.
 The receiver switches to the Workspace UI automatically after validation, and
-sending updates the recipient to Workspace. Extract the entire Workspace ZIP before running.
+sending updates the recipient to Workspace. Keep the entire generation folder together.
 Peer management-channel observations are online only on a
 response within 15 seconds, stale for older observations, and unknown when there
 are no observations. Version comparison uses generations and build identities,
