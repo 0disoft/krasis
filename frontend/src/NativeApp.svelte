@@ -210,7 +210,7 @@
 <header><span class="brand"><img src={logo} alt="" />Krasis</span><nav aria-label="Krasis"><button class="active" aria-current="page"><Icon name="monitor" />{t('workspace')}</button></nav><span class="preview-label">{t('integration')}</span></header>
 <main>
   <div class="connection-bar">
-    <span class="connection" class:fault={snapshot.state !== 'CONNECTED'}><span class="status-dot"></span>{t(snapshot.state)}</span>
+    <span class="connection" class:fault={snapshot.state !== 'CONNECTED'} role="status" aria-atomic="true"><span class="status-dot"></span>{t(snapshot.state)}</span>
     <button disabled={busy || !bridge} onclick={() => run(snapshot.state === 'LOCAL' ? 'restart' : 'refresh')}>{t('refresh')}</button>
     {#if snapshot.state === 'LOCAL'}
       <button disabled={busy || !selectedPeer || !!pairing.job} onclick={() => run('connect')}>{t('connect')}</button>
