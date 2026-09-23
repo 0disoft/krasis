@@ -45,6 +45,7 @@ type Config struct {
 	LivenessObserver          peer.LivenessObserver
 	SourceObserver            SourceActivityObserver
 	PipelineObserver          wininput.SourcePipelineObserver
+	QueueObserver             wininput.SourceQueueObserver
 	ControlObserver           peer.ControlFlowObserver
 	DestinationObserver       application.InputDispositionObserver
 	RecoveryObserver          func(RecoveryReport)
@@ -116,7 +117,7 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	if config.SourceObserver != nil {
 		sourceSink = &observedSourceSink{delegate: actionSink, observer: config.SourceObserver}
 	}
-	source, err := wininput.NewSourceSessionObserved(config.QueueCapacity, sourceSink, config.PipelineObserver)
+	source, err := wininput.NewSourceSessionWithObservers(config.QueueCapacity, sourceSink, config.PipelineObserver, config.QueueObserver)
 	if err != nil {
 		return Result{}, err
 	}

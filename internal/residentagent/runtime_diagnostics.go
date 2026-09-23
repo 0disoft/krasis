@@ -20,6 +20,9 @@ type runtimeDiagnostics struct {
 	kind                                    atomic.Uint32
 	frames, dispatches                      atomic.Uint64
 	dispatchMax, timerMax                   atomic.Int64
+	queueHigh, queueEnqueued, queueDequeued atomic.Uint64
+	queueStale                              atomic.Uint64
+	queueResidenceMax                       atomic.Int64
 }
 
 func (d *runtimeDiagnostics) ObserveHookStarted(t time.Time) { d.hookStart.Store(d.stamp(t)) }
@@ -56,6 +59,19 @@ func (d *runtimeDiagnostics) ObserveHeartbeatReceived(_ string, t time.Time) {
 func (d *runtimeDiagnostics) ObserveTimerLateness(delay time.Duration) {
 	observeMaximum(&d.timerMax, max(0, delay.Microseconds()))
 }
+func (d *runtimeDiagnostics) ObserveSourceQueueEnqueued(depth uint64) {
+	d.queueEnqueued.Add(1)
+	for old := d.queueHigh.Load(); depth > old; old = d.queueHigh.Load() {
+		if d.queueHigh.CompareAndSwap(old, depth) {
+			break
+		}
+	}
+}
+func (d *runtimeDiagnostics) ObserveSourceQueueDequeued(residence time.Duration) {
+	d.queueDequeued.Add(1)
+	observeMaximum(&d.queueResidenceMax, max(0, residence.Microseconds()))
+}
+func (d *runtimeDiagnostics) ObserveSourceQueueDiscardedStale() { d.queueStale.Add(1) }
 func observeMaximum(target *atomic.Int64, value int64) {
 	for old := target.Load(); value > old; old = target.Load() {
 		if target.CompareAndSwap(old, value) {
@@ -90,6 +106,11 @@ func (d *runtimeDiagnostics) snapshot(now time.Time) productlog.RuntimeSummary {
 	send, receive := d.send.Load(), d.receive.Load()
 	s.HookCalls = d.hookCalls.Swap(0)
 	s.RawInputs = d.rawInputs.Swap(0)
+	s.QueueHighWatermark = d.queueHigh.Swap(0)
+	s.QueueEnqueued = d.queueEnqueued.Swap(0)
+	s.QueueDequeued = d.queueDequeued.Swap(0)
+	s.QueueStaleDiscards = d.queueStale.Swap(0)
+	s.QueueMaxResidenceMicros = d.queueResidenceMax.Swap(0)
 	s.HookMaxMicros = d.hookMax.Swap(0)
 	s.HookActiveMicros = age(d.hookStart.Load())
 	lastHook := d.hookLast.Load()

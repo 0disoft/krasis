@@ -59,6 +59,14 @@ type SourcePipelineObserver interface {
 	ObserveSourceQueueDiscardedStale()
 }
 
+// SourceQueueObserver receives aggregate queue events without physical input data.
+// Implementations on a hook callback must not wait or perform I/O.
+type SourceQueueObserver interface {
+	ObserveSourceQueueEnqueued(depth uint64)
+	ObserveSourceQueueDequeued(residence time.Duration)
+	ObserveSourceQueueDiscardedStale()
+}
+
 type SourceForegroundFallbackResult uint8
 
 const (
@@ -114,6 +122,7 @@ type queuedAction struct {
 type SourceSession struct {
 	sink          SourceSink
 	observer      SourcePipelineObserver
+	queueObserver SourceQueueObserver
 	cleanup       time.Duration
 	queue         chan queuedAction
 	queueDepth    atomic.Int64
@@ -135,6 +144,10 @@ func NewSourceSession(capacity int, sink SourceSink) (*SourceSession, error) {
 }
 
 func NewSourceSessionObserved(capacity int, sink SourceSink, observer SourcePipelineObserver) (*SourceSession, error) {
+	return NewSourceSessionWithObservers(capacity, sink, observer, nil)
+}
+
+func NewSourceSessionWithObservers(capacity int, sink SourceSink, observer SourcePipelineObserver, queueObserver SourceQueueObserver) (*SourceSession, error) {
 	if capacity <= 0 || capacity > MaxSourceQueueCapacity {
 		return nil, fmt.Errorf("source queue capacity must be between 1 and %d", MaxSourceQueueCapacity)
 	}
@@ -142,12 +155,13 @@ func NewSourceSessionObserved(capacity int, sink SourceSink, observer SourcePipe
 		return nil, errors.New("source sink is required")
 	}
 	return &SourceSession{
-		sink:     sink,
-		observer: observer,
-		cleanup:  SourceCleanupTimeout,
-		queue:    make(chan queuedAction, capacity),
-		faults:   make(chan error, 1),
-		now:      time.Now,
+		sink:          sink,
+		observer:      observer,
+		queueObserver: queueObserver,
+		cleanup:       SourceCleanupTimeout,
+		queue:         make(chan queuedAction, capacity),
+		faults:        make(chan error, 1),
+		now:           time.Now,
 	}, nil
 }
 
@@ -228,6 +242,9 @@ func (session *SourceSession) Offer(action control.InputAction) bool {
 		session.stateMu.RUnlock()
 		if session.observer != nil {
 			session.observer.ObserveSourceQueueEnqueued(uint64(depth))
+		}
+		if session.queueObserver != nil {
+			session.queueObserver.ObserveSourceQueueEnqueued(uint64(depth))
 		}
 		session.observeWheelQueue(action, SourceQueueAccepted)
 		return true
@@ -317,9 +334,15 @@ func (session *SourceSession) runSender(ctx context.Context) error {
 			if session.observer != nil {
 				session.observer.ObserveSourceQueueDequeued(residence)
 			}
+			if session.queueObserver != nil {
+				session.queueObserver.ObserveSourceQueueDequeued(residence)
+			}
 			if !session.current(item.generation) {
 				if session.observer != nil {
 					session.observer.ObserveSourceQueueDiscardedStale()
+				}
+				if session.queueObserver != nil {
+					session.queueObserver.ObserveSourceQueueDiscardedStale()
 				}
 				continue
 			}
@@ -327,6 +350,9 @@ func (session *SourceSession) runSender(ctx context.Context) error {
 				if !session.current(item.generation) {
 					if session.observer != nil {
 						session.observer.ObserveSourceQueueDiscardedStale()
+					}
+					if session.queueObserver != nil {
+						session.queueObserver.ObserveSourceQueueDiscardedStale()
 					}
 					continue
 				}

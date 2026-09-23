@@ -33,6 +33,22 @@ func TestRuntimeDiagnosticsSeparatesReadDispatchAndValidatedHeartbeat(t *testing
 	}
 }
 
+func TestRuntimeDiagnosticsReportsBoundedQueueAggregates(t *testing.T) {
+	d := newRuntimeDiagnostics()
+	d.ObserveSourceQueueEnqueued(1)
+	d.ObserveSourceQueueEnqueued(3)
+	d.ObserveSourceQueueDequeued(250 * time.Millisecond)
+	d.ObserveSourceQueueDiscardedStale()
+	s := d.snapshot(d.started.Add(time.Second))
+	if s.QueueHighWatermark != 3 || s.QueueEnqueued != 2 || s.QueueDequeued != 1 || s.QueueStaleDiscards != 1 || s.QueueMaxResidenceMicros != 250000 {
+		t.Fatalf("queue aggregates=%+v", s)
+	}
+	next := d.snapshot(d.started.Add(2 * time.Second))
+	if next.QueueHighWatermark != 0 || next.QueueEnqueued != 0 || next.QueueDequeued != 0 || next.QueueStaleDiscards != 0 || next.QueueMaxResidenceMicros != 0 {
+		t.Fatalf("queue counters repeated=%+v", next)
+	}
+}
+
 func TestRuntimeSamplingUsesHistogramDeltasAndKnownOSCounters(t *testing.T) {
 	h := &metrics.Float64Histogram{Buckets: []float64{0, .00005, .0005, .005, .05, .5, math.Inf(1)}, Counts: []uint64{1, 2, 3, 4, 5, 6}}
 	if got := aggregateHistogram(h); got != [6]uint64{1, 2, 3, 4, 5, 6} {

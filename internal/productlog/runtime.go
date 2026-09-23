@@ -7,6 +7,11 @@ package productlog
 type RuntimeSummary struct {
 	HookCalls                 uint64    `json:"hookCalls"`
 	RawInputs                 uint64    `json:"rawInputs"`
+	QueueHighWatermark        uint64    `json:"queueHighWatermark"`
+	QueueEnqueued             uint64    `json:"queueEnqueued"`
+	QueueDequeued             uint64    `json:"queueDequeued"`
+	QueueStaleDiscards        uint64    `json:"queueStaleDiscards"`
+	QueueMaxResidenceMicros   int64     `json:"queueMaxResidenceMicros"`
 	HookMaxMicros             int64     `json:"hookMaxMicros"`
 	HookActiveMicros          int64     `json:"hookActiveMicros"`
 	LastHookAgeMicros         int64     `json:"lastHookAgeMicros"`
@@ -35,7 +40,7 @@ type RuntimeSummary struct {
 
 func init() { allowed["runtime_summary"] = true }
 func (s RuntimeSummary) valid() bool {
-	if s.HookMaxMicros < 0 || s.HookActiveMicros < 0 || s.LastHookAgeMicros < 0 {
+	if s.HookMaxMicros < 0 || s.HookActiveMicros < 0 || s.LastHookAgeMicros < 0 || s.QueueMaxResidenceMicros < 0 {
 		return false
 	}
 	if s.IntervalMicros <= 0 || s.TimerLateMicros < 0 || s.ReadAgeMicros < 0 || s.DispatchAgeMicros < 0 || s.DispatchMaxMicros < 0 || s.HeartbeatSendAgeMicros < 0 || s.HeartbeatReceiveAgeMicros < 0 {

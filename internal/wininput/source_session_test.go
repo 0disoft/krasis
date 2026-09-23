@@ -35,6 +35,24 @@ func TestSourceSessionDoesNotSuppressWhileInactive(t *testing.T) {
 	}
 }
 
+func TestSourceSessionReportsQueueWithoutWheelPipelineObserver(t *testing.T) {
+	observer := &recordingSourcePipelineObserver{}
+	session, err := NewSourceSessionWithObservers(1, &recordingSourceSink{}, nil, observer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	session.started.Store(true)
+	if err := session.Activate(); err != nil {
+		t.Fatal(err)
+	}
+	if !session.Offer(control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}) {
+		t.Fatal("active move was not accepted")
+	}
+	if observer.queueEnqueued != 1 || observer.maxQueueDepth != 1 || observer.queueAccepted != 0 {
+		t.Fatalf("separate queue observer = %+v", observer)
+	}
+}
+
 func TestSourceSessionReportsAcceptedAndRejectedWheelOffers(t *testing.T) {
 	observer := &recordingSourcePipelineObserver{}
 	sink := &recordingSourceSink{sent: make(chan control.InputAction, 1)}
