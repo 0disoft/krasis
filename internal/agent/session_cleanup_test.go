@@ -16,6 +16,52 @@ type lateCleanupHook struct {
 	failure error
 }
 
+type foregroundLossHook struct{ cleanup error }
+
+func (hook foregroundLossHook) RunWithBoundary(ctx context.Context, session *wininput.SourceSession, _ wininput.BoundaryObserver, ready func()) error {
+	ready()
+	session.Abort(wininput.ErrSourceCaptureLostForeground)
+	<-ctx.Done()
+	return errors.Join(ctx.Err(), wininput.ErrSourceCaptureLostForeground, hook.cleanup)
+}
+
+func TestSessionReconnectsOnlyAfterVerifiedForegroundLossCleanup(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		cleanup error
+	}{
+		{name: "native-owner-released"},
+		{name: "native-cleanup-failed", cleanup: errors.New("native cleanup failed")},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			left, right := openConnectionPair(t)
+			defer left.Close()
+			defer right.Close()
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			result, err := RunSession(ctx, DefaultConfig(control.BoundaryConfig{
+				Edge: control.ScreenEdgeRight, ScreenWidth: 100, RearmDistance: 10,
+			}), Dependencies{
+				Connection: right, Hook: foregroundLossHook{cleanup: test.cleanup},
+				Input: newTestInput(false), Effects: noopEffects{}, Authorizer: acceptingAuthorizer{},
+			})
+			if !errors.Is(err, wininput.ErrSourceCaptureLostForeground) {
+				t.Fatalf("foreground loss omitted: %v", err)
+			}
+			if result.FinalState != control.StateLocal {
+				t.Fatalf("input did not return LOCAL: %+v, %v", result, err)
+			}
+			if test.cleanup == nil {
+				if errors.Is(err, ErrRecoveryUnverified) || result.Recovery.NativeOwnersReleased != RecoveryConfirmed || result.Recovery.PressedLedgerEmpty != RecoveryConfirmed {
+					t.Fatalf("clean foreground loss cannot reconnect: %+v, %v", result.Recovery, err)
+				}
+			} else if !errors.Is(err, test.cleanup) || !errors.Is(err, ErrRecoveryUnverified) {
+				t.Fatalf("native cleanup failure allowed reconnect: %v", err)
+			}
+		})
+	}
+}
+
 func (h *lateCleanupHook) RunWithBoundary(ctx context.Context, _ *wininput.SourceSession, _ wininput.BoundaryObserver, ready func()) error {
 	ready()
 	close(h.ready)

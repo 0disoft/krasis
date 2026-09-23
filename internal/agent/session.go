@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"net"
 	"sync"
 	"time"
 
@@ -254,6 +256,7 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	if expired {
 		cause = errors.Join(cause, ErrRecoveryUnverified)
 	}
+	foregroundOwnerReleased := false
 	// Wait establishes that every slot is final. Cancellation selects the first
 	// cause; it must not discard errors produced later by native/input cleanup.
 	for index, outcome := range outcomes {
@@ -261,6 +264,23 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 			continue
 		}
 		if outcome != nil && !expectedWorkerCancellation(outcome, runContext.Err()) {
+			if components[index].name == "source-hook" &&
+				errors.Is(cause, wininput.ErrSourceCaptureLostForeground) &&
+				foregroundLossCleanupOnly(outcome, false) {
+				// The capture owner exited after foreground loss. Its joined
+				// cancellation is expected; keep the cause for reconnect telemetry.
+				cause = errors.Join(cause, outcome)
+				foregroundOwnerReleased = true
+				continue
+			}
+			if components[index].name == "peer-session" &&
+				errors.Is(cause, wininput.ErrSourceCaptureLostForeground) &&
+				foregroundLossCleanupOnly(outcome, true) {
+				// The read ended because this source closed its own connection.
+				// Keep the diagnostic without treating that closure as a second fault.
+				cause = errors.Join(cause, outcome)
+				continue
+			}
 			if !errors.Is(cause, outcome) {
 				cause = errors.Join(cause, outcome, ErrRecoveryUnverified)
 			} else if components[index].name == "source-hook" {
@@ -276,7 +296,7 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	}
 	snapshot := runtime.Snapshot()
 	for index, current := range components {
-		if current.name == "source-hook" && expectedWorkerCancellation(outcomes[index], runContext.Err()) {
+		if current.name == "source-hook" && (foregroundOwnerReleased || expectedWorkerCancellation(outcomes[index], runContext.Err())) {
 			recovery.NativeOwnersReleased = RecoveryConfirmed
 		}
 	}
@@ -291,6 +311,55 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 		return result, errors.Join(cause, ErrRecoveryUnverified)
 	}
 	return result, cause
+}
+
+// A foreground-loss owner exit may contain only its cause and cancellation.
+// Its peer read may also contain the local interruption and a closed stream.
+// Any unrelated cleanup failure keeps recovery unverified.
+func foregroundLossCleanupOnly(err error, peerRead bool) bool {
+	seenLoss := false
+	seenInterrupt := false
+	seenClosed := false
+	var check func(error) bool
+	check = func(current error) bool {
+		if current == nil {
+			return true
+		}
+		if joined, ok := current.(interface{ Unwrap() []error }); ok {
+			for _, child := range joined.Unwrap() {
+				if !check(child) {
+					return false
+				}
+			}
+			return true
+		}
+		if wrapped, ok := current.(interface{ Unwrap() error }); ok {
+			return check(wrapped.Unwrap())
+		}
+		if current == wininput.ErrSourceCaptureLostForeground {
+			seenLoss = true
+			return true
+		}
+		if current == context.Canceled {
+			return true
+		}
+		if !peerRead {
+			return false
+		}
+		switch current {
+		case peer.ErrPeerReadAfterLocalInterrupt:
+			seenInterrupt = true
+			return true
+		case peer.ErrSourceSessionInterrupted, transport.ErrInvalidFrame:
+			return true
+		case io.ErrClosedPipe, net.ErrClosed, io.EOF:
+			seenClosed = true
+			return true
+		default:
+			return false
+		}
+	}
+	return check(err) && seenLoss && (!peerRead || seenInterrupt && seenClosed)
 }
 
 func expectedWorkerCancellation(err, expected error) bool {
