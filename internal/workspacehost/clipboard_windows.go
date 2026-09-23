@@ -25,7 +25,7 @@ func (s *WorkspaceService) ClipboardStatus() ClipboardSettings {
 		return ClipboardSettings{Code: "unavailable"}
 	}
 	value, err := client.Update(ctx, localapi.UpdateRequest{Schema: localapi.UpdateSchema, Action: "STATUS"})
-	if err != nil {
+	if err != nil || value.Code != "ok" {
 		return ClipboardSettings{Code: "unavailable"}
 	}
 	return ClipboardSettings{Peer: value.Status.ClipboardPeer, Code: "ok"}
