@@ -38,13 +38,14 @@ func TestRuntimeDiagnosticsReportsBoundedQueueAggregates(t *testing.T) {
 	d.ObserveSourceQueueEnqueued(1)
 	d.ObserveSourceQueueEnqueued(3)
 	d.ObserveSourceQueueDequeued(250 * time.Millisecond)
+	d.ObserveSourceQueueCoalesced()
 	d.ObserveSourceQueueDiscardedStale()
 	s := d.snapshot(d.started.Add(time.Second))
-	if s.QueueHighWatermark != 3 || s.QueueEnqueued != 2 || s.QueueDequeued != 1 || s.QueueStaleDiscards != 1 || s.QueueMaxResidenceMicros != 250000 {
+	if s.QueueHighWatermark != 3 || s.QueueEnqueued != 2 || s.QueueDequeued != 1 || s.QueueCoalesced != 1 || s.QueueStaleDiscards != 1 || s.QueueMaxResidenceMicros != 250000 {
 		t.Fatalf("queue aggregates=%+v", s)
 	}
 	next := d.snapshot(d.started.Add(2 * time.Second))
-	if next.QueueHighWatermark != 0 || next.QueueEnqueued != 0 || next.QueueDequeued != 0 || next.QueueStaleDiscards != 0 || next.QueueMaxResidenceMicros != 0 {
+	if next.QueueHighWatermark != 0 || next.QueueEnqueued != 0 || next.QueueDequeued != 0 || next.QueueCoalesced != 0 || next.QueueStaleDiscards != 0 || next.QueueMaxResidenceMicros != 0 {
 		t.Fatalf("queue counters repeated=%+v", next)
 	}
 }

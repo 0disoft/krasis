@@ -89,6 +89,32 @@ func TestSourceSessionKeepsDiscreteBoundaryBetweenPendingMoves(t *testing.T) {
 	}
 }
 
+func TestSourceSessionDoesNotCoalesceAcrossGeneration(t *testing.T) {
+	observer := &recordingSourcePipelineObserver{}
+	session, err := NewSourceSessionWithObservers(2, &recordingSourceSink{}, nil, observer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	session.started.Store(true)
+	if err := session.Activate(); err != nil {
+		t.Fatal(err)
+	}
+	move := control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}
+	if !session.Offer(move) || !session.Offer(move) {
+		t.Fatal("same-generation moves were not accepted")
+	}
+	if observer.queueCoalesced != 1 || len(session.queue) != 1 {
+		t.Fatalf("same-generation queue: coalesced=%d depth=%d", observer.queueCoalesced, len(session.queue))
+	}
+	session.Deactivate()
+	if err := session.Activate(); err != nil {
+		t.Fatal(err)
+	}
+	if !session.Offer(move) || observer.queueCoalesced != 1 || len(session.queue) != 2 {
+		t.Fatalf("new generation coalesced with retired move: coalesced=%d depth=%d", observer.queueCoalesced, len(session.queue))
+	}
+}
+
 func TestSourceSessionDoesNotSuppressWhileInactive(t *testing.T) {
 	sink := &recordingSourceSink{sent: make(chan control.InputAction, 1)}
 	session, err := NewSourceSession(1, sink)
@@ -384,6 +410,7 @@ type recordingSourcePipelineObserver struct {
 	rejectedOverflow     uint64
 	queueEnqueued        uint64
 	queueDequeued        uint64
+	queueCoalesced       uint64
 	queueDiscardedStale  uint64
 	maxQueueDepth        uint64
 	residenceSamples     uint64
@@ -475,6 +502,10 @@ func (observer *recordingSourcePipelineObserver) ObserveSourceQueueDequeued(resi
 
 func (observer *recordingSourcePipelineObserver) ObserveSourceQueueDiscardedStale() {
 	observer.queueDiscardedStale++
+}
+
+func (observer *recordingSourcePipelineObserver) ObserveSourceQueueCoalesced() {
+	observer.queueCoalesced++
 }
 
 func receiveAction(t *testing.T, actions <-chan control.InputAction) control.InputAction {

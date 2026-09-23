@@ -13,16 +13,16 @@ import (
 // stay off input, reader and heartbeat paths. Counters are diagnostic hints, not
 // lease authority; snapshots across atomics are deliberately approximate.
 type runtimeDiagnostics struct {
-	hookStart, hookLast, hookMax            atomic.Int64
-	hookCalls, rawInputs                    atomic.Uint64
-	started                                 time.Time
-	readStart, dispatchStart, send, receive atomic.Int64
-	kind                                    atomic.Uint32
-	frames, dispatches                      atomic.Uint64
-	dispatchMax, timerMax                   atomic.Int64
-	queueHigh, queueEnqueued, queueDequeued atomic.Uint64
-	queueStale                              atomic.Uint64
-	queueResidenceMax                       atomic.Int64
+	hookStart, hookLast, hookMax                            atomic.Int64
+	hookCalls, rawInputs                                    atomic.Uint64
+	started                                                 time.Time
+	readStart, dispatchStart, send, receive                 atomic.Int64
+	kind                                                    atomic.Uint32
+	frames, dispatches                                      atomic.Uint64
+	dispatchMax, timerMax                                   atomic.Int64
+	queueHigh, queueEnqueued, queueDequeued, queueCoalesced atomic.Uint64
+	queueStale                                              atomic.Uint64
+	queueResidenceMax                                       atomic.Int64
 }
 
 func (d *runtimeDiagnostics) ObserveHookStarted(t time.Time) { d.hookStart.Store(d.stamp(t)) }
@@ -71,6 +71,7 @@ func (d *runtimeDiagnostics) ObserveSourceQueueDequeued(residence time.Duration)
 	d.queueDequeued.Add(1)
 	observeMaximum(&d.queueResidenceMax, max(0, residence.Microseconds()))
 }
+func (d *runtimeDiagnostics) ObserveSourceQueueCoalesced()      { d.queueCoalesced.Add(1) }
 func (d *runtimeDiagnostics) ObserveSourceQueueDiscardedStale() { d.queueStale.Add(1) }
 func observeMaximum(target *atomic.Int64, value int64) {
 	for old := target.Load(); value > old; old = target.Load() {
@@ -109,6 +110,7 @@ func (d *runtimeDiagnostics) snapshot(now time.Time) productlog.RuntimeSummary {
 	s.QueueHighWatermark = d.queueHigh.Swap(0)
 	s.QueueEnqueued = d.queueEnqueued.Swap(0)
 	s.QueueDequeued = d.queueDequeued.Swap(0)
+	s.QueueCoalesced = d.queueCoalesced.Swap(0)
 	s.QueueStaleDiscards = d.queueStale.Swap(0)
 	s.QueueMaxResidenceMicros = d.queueResidenceMax.Swap(0)
 	s.HookMaxMicros = d.hookMax.Swap(0)

@@ -67,6 +67,10 @@ type SourceQueueObserver interface {
 	ObserveSourceQueueDiscardedStale()
 }
 
+type SourceQueueCoalescedObserver interface {
+	ObserveSourceQueueCoalesced()
+}
+
 type SourceForegroundFallbackResult uint8
 
 const (
@@ -248,6 +252,9 @@ func (session *SourceSession) Offer(action control.InputAction) bool {
 			pending.action.DeltaY = int32(dy)
 			session.queueMu.Unlock()
 			session.stateMu.RUnlock()
+			if observer, ok := session.queueObserver.(SourceQueueCoalescedObserver); ok {
+				observer.ObserveSourceQueueCoalesced()
+			}
 			return true
 		}
 	}

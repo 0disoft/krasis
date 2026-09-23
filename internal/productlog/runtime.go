@@ -10,6 +10,7 @@ type RuntimeSummary struct {
 	QueueHighWatermark        uint64    `json:"queueHighWatermark"`
 	QueueEnqueued             uint64    `json:"queueEnqueued"`
 	QueueDequeued             uint64    `json:"queueDequeued"`
+	QueueCoalesced            uint64    `json:"queueCoalesced"`
 	QueueStaleDiscards        uint64    `json:"queueStaleDiscards"`
 	QueueMaxResidenceMicros   int64     `json:"queueMaxResidenceMicros"`
 	HookMaxMicros             int64     `json:"hookMaxMicros"`
