@@ -9,6 +9,8 @@ const fixture = `
 const peer='a'.repeat(64), build='b'.repeat(40);
 const params=new URLSearchParams(location.search);
 let state=params.get('state')==='LOCAL'?'LOCAL':'CONNECTED';
+let clipboardPeer=params.get('clipboard')==='on'?peer:'';
+const clipboardAvailable=params.get('clipboard')!=='unknown';
 const alias=params.get('long')==='1'?'오른쪽 노트북 · 아주 긴 기기 이름 테스트':'B';
 const snapshot=()=>({schema:'krasis.desktop/v1',state,peerAlias:state==='CONNECTED'?alias:'',peers:[{alias,fingerprint:peer}],code:'ok',notice:''});
 export const Call={ByName:async(name,...args)=>{
@@ -17,7 +19,12 @@ export const Call={ByName:async(name,...args)=>{
  case 'Refresh':return snapshot();
  case 'Disconnect':state='LOCAL';return snapshot();
  case 'Connect':state='CONNECTED';return snapshot();
- case 'ClipboardStatus':return {peer:'',code:'ok'};
+ case 'ClipboardStatus':return clipboardAvailable?{peer:clipboardPeer,code:'ok'}:{peer:'',code:'unavailable'};
+ case 'ClipboardSet':
+  if(!clipboardAvailable)return {peer:'',code:'unavailable'};
+  if(params.get('clipboard')==='reject')return {peer:'',code:'rejected'};
+  clipboardPeer=args[1]?args[0]:'';
+  return {peer:clipboardPeer,code:'ok'};
  case 'PairStatus':return {schema:'krasis.pairing/v1',code:'ok',pin:'',job:'',alias:'',candidates:[]};
  case 'LayoutStatus':return {edge:'RIGHT',rearm:32,code:'ok'};
  case 'DiagnosticsStatus':return {schema:'krasis.diagnostics/v1',code:'ok',saved:true,received:false,transfer:'NONE'};

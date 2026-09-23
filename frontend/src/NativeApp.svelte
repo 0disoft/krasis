@@ -46,12 +46,16 @@
   let pairBusy = $state(false);
   let pairNotice = $state('');
   let clipNotice = $state('');
+  let clipError = $state.raw();
   let consent;
   let pairingDlg;
   let consentPeer = '';
   let disposed = false;
   const t = key => nativeText(locale, key);
   const selectedPeer = $derived(snapshot.peers.find(p => p.fingerprint === selected));
+  const clipboardKnown = $derived(clipboard.code === 'ok');
+  const clipboardEnabled = $derived(clipboardKnown && !!clipboard.peer);
+  const clipboardAlias = $derived(snapshot.peers.find(p => p.fingerprint === clipboard.peer)?.alias ?? '');
   const canDisconnect = $derived(['CONNECTING','CONNECTED','RECONNECTING'].includes(snapshot.state));
   const canPlace = $derived(snapshot.state === 'LOCAL' && !!selectedPeer && !pairing.job && !busy);
   const canPair = $derived(snapshot.state === 'LOCAL' && !pairing.job && !busy && !pairBusy);
@@ -70,10 +74,11 @@
   async function setClipboard(peer,enable) {
     if (!clipboardBridge || clipBusy || disposed) return;
     clipBusy=true;
-    try { const value=await clipboardBridge.set(peer,enable); if(!disposed) {clipboard=value;clipNotice=value.code==='ok'?'':value.code;} }
+    try { const value=await clipboardBridge.set(peer,enable); if(!disposed) {clipboard=value;clipNotice=value.code==='ok'?'':value.code==='rejected'?'clipboard_rejected':value.code; if(clipNotice) { await tick(); clipError?.focus(); }} }
     finally {if(!disposed)clipBusy=false;}
   }
   function toggleClipboard() {
+    if (!clipboardKnown) return;
     if(clipboard.peer) {void setClipboard(clipboard.peer,false);return;}
     if(!selectedPeer)return;
     consentPeer=selectedPeer.fingerprint;
@@ -237,13 +242,21 @@
     </div>
   </section>
   <section class="utilities">
-    <button class="utility utility-button" disabled={clipBusy || (!clipboard.peer && !selectedPeer)} onclick={toggleClipboard} aria-pressed={!!clipboard.peer}><Icon name="clipboard" /><div><h2>{t('clipboard')}</h2></div></button>
+    <div class="utility utility-clipboard">
+      <Icon name="clipboard" />
+      <div class="utility-copy">
+        <h2>{t('clipboard')}</h2>
+        <span id="clipboard-state" class="utility-state" aria-live="polite">{t(!clipboardKnown ? 'clipboard_unknown' : clipboardEnabled ? 'clipboard_enabled' : 'clipboard_disabled')}{#if clipboardEnabled && clipboardAlias} · {clipboardAlias}{/if}</span>
+        {#if clipNotice}<small class="utility-error" role="alert" tabindex="-1" bind:this={clipError}>{t(clipNotice)}</small>{/if}
+      </div>
+      <button type="button" class="switch" role="switch" aria-checked={clipboardEnabled} aria-label={t('clipboard')} aria-describedby="clipboard-state" disabled={clipBusy || !clipboardKnown || (!clipboardEnabled && !selectedPeer)} onclick={toggleClipboard}><span></span></button>
+    </div>
     <button class="utility utility-button" aria-haspopup="dialog" onclick={openUpdates}><Icon name="arrows-clockwise" /><div><h2>{t('update')}</h2></div></button>
     <button class="utility utility-button" aria-haspopup="dialog" onclick={() => openDialog(pairingDlg)}><Icon name="plus" /><div><h2>{t('pair')}</h2></div></button>
     <button class="utility utility-button" aria-haspopup="dialog" onclick={() => openDialog(diagnosticsDlg)}><Icon name="info" /><div><h2>{t('diag_title')}</h2></div></button>
   </section>
-  {#if clipNotice || clipboard.code !== 'ok' || (layout.code !== 'ok' && layout.code !== 'unavailable' && layout.code !== 'unconfigured')}
-    <p role="status">{clipNotice ? t(clipNotice) : clipboard.code !== 'ok' ? t(clipboard.code) : t(layout.code)}</p>
+  {#if layout.code !== 'ok' && layout.code !== 'unavailable' && layout.code !== 'unconfigured'}
+    <p role="status">{t(layout.code)}</p>
   {/if}
 </main>
 <dialog bind:this={updatesDlg} aria-labelledby="update-settings-title" onclose={() => { updatesOpen = false; restoreDialogFocus(); }}>
