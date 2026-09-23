@@ -25,34 +25,46 @@ func TestSourceSessionSendsAcceptedActionsInOrder(t *testing.T) {
 }
 
 func TestSourceSessionCoalescesPendingMovesWhileSenderIsBlocked(t *testing.T) {
-	blockSend := make(chan struct{})
-	t.Cleanup(func() {
-		select {
-		case <-blockSend:
-		default:
+	for _, tc := range []struct {
+		name  string
+		count int
+	}{
+		{"125 events", 125},
+		{"1000 events", 1000},
+		{"4000 events", 4000},
+		{"8000 events", 8000},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			blockSend := make(chan struct{})
+			t.Cleanup(func() {
+				select {
+				case <-blockSend:
+				default:
+					close(blockSend)
+				}
+			})
+			sink := &recordingSourceSink{blockSend: blockSend, sent: make(chan control.InputAction, 2)}
+			session := startSourceSession(t, 1, sink)
+			move := control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}
+			if !session.Offer(move) {
+				t.Fatal("first move was not accepted")
+			}
+			if got := receiveAction(t, sink.sent); got != move {
+				t.Fatalf("first move = %+v", got)
+			}
+			for i := 0; i < tc.count; i++ {
+				if !session.Offer(move) {
+					t.Fatalf("pending move %d overflowed", i)
+				}
+			}
+			if got := len(session.queue); got != 1 {
+				t.Fatalf("pending queue depth = %d, want 1", got)
+			}
 			close(blockSend)
-		}
-	})
-	sink := &recordingSourceSink{blockSend: blockSend, sent: make(chan control.InputAction, 2)}
-	session := startSourceSession(t, 1, sink)
-	move := control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}
-	if !session.Offer(move) {
-		t.Fatal("first move was not accepted")
-	}
-	if got := receiveAction(t, sink.sent); got != move {
-		t.Fatalf("first move = %+v", got)
-	}
-	for i := 0; i < 1000; i++ {
-		if !session.Offer(move) {
-			t.Fatalf("pending move %d overflowed", i)
-		}
-	}
-	if got := len(session.queue); got != 1 {
-		t.Fatalf("pending queue depth = %d, want 1", got)
-	}
-	close(blockSend)
-	if got := receiveAction(t, sink.sent); got.Kind != control.InputPointerMove || got.DeltaX != 1000 {
-		t.Fatalf("coalesced move = %+v", got)
+			if got := receiveAction(t, sink.sent); got.Kind != control.InputPointerMove || got.DeltaX != int32(tc.count) {
+				t.Fatalf("coalesced move = %+v", got)
+			}
+		})
 	}
 }
 
