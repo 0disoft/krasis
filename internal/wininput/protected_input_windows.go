@@ -48,27 +48,69 @@ func inputDesktopDefault() bool {
 // uncertainAsProtected keeps the normal session guard conservative, while the
 // attended probe requires a positively identified broker before injecting.
 func credentialBrokerForeground(uncertainAsProtected bool) bool {
+	state := inspectCredentialForeground()
+	return state == credentialForegroundBroker || (uncertainAsProtected && state == credentialForegroundUnknown)
+}
+
+type credentialForegroundState uint8
+
+const (
+	credentialForegroundMissing credentialForegroundState = iota
+	credentialForegroundUnknown
+	credentialForegroundOther
+	credentialForegroundBroker
+)
+
+func inspectCredentialForeground() credentialForegroundState {
 	window, _, _ := procGetProtectedForeground.Call()
 	if window == 0 {
-		return false
+		return credentialForegroundMissing
 	}
 	var pid uint32
 	procGetProtectedWindowPID.Call(window, uintptr(unsafe.Pointer(&pid)))
 	if pid == 0 {
-		return uncertainAsProtected
+		return credentialForegroundUnknown
 	}
 	process, _, _ := procOpenProtectedProcess.Call(0x1000, 0, uintptr(pid)) // PROCESS_QUERY_LIMITED_INFORMATION
 	if process == 0 {
-		return uncertainAsProtected && protectedWindowStillForeground(window)
+		if protectedWindowStillForeground(window) {
+			return credentialForegroundUnknown
+		}
+		return credentialForegroundMissing
 	}
 	defer procCloseHandle.Call(process)
 	var image [1024]uint16
 	size := uint32(len(image))
 	ok, _, _ := procQueryProtectedImage.Call(process, 0, uintptr(unsafe.Pointer(&image[0])), uintptr(unsafe.Pointer(&size)))
 	if ok == 0 || size == 0 || size > uint32(len(image)) {
-		return uncertainAsProtected && protectedWindowStillForeground(window)
+		if protectedWindowStillForeground(window) {
+			return credentialForegroundUnknown
+		}
+		return credentialForegroundMissing
 	}
-	return protectedWindowStillForeground(window) && isCredentialBrokerImage(syscall.UTF16ToString(image[:size]))
+	if !protectedWindowStillForeground(window) {
+		return credentialForegroundMissing
+	}
+	if isCredentialBrokerImage(syscall.UTF16ToString(image[:size])) {
+		return credentialForegroundBroker
+	}
+	return credentialForegroundOther
+}
+
+func credentialProbeObservation() CredentialUIProbeResult {
+	if !inputDesktopDefault() {
+		return CredentialUIProbeDesktopUnavailable
+	}
+	switch inspectCredentialForeground() {
+	case credentialForegroundBroker:
+		return CredentialUIProbeBrokerObserved
+	case credentialForegroundUnknown:
+		return CredentialUIProbeIdentityUnknown
+	case credentialForegroundOther:
+		return CredentialUIProbeOtherForeground
+	default:
+		return CredentialUIProbeNoForeground
+	}
 }
 
 func protectedWindowStillForeground(window uintptr) bool {

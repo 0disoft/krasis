@@ -14,7 +14,7 @@ func RunCredentialUIProbe(ctx context.Context) CredentialUIProbeResult {
 	if err != nil || !process.Elevated {
 		return CredentialUIProbeNotElevated
 	}
-	return runCredentialUIProbe(ctx, true, CredentialBrokerForeground, func(ctx context.Context) error {
+	return runCredentialUIProbe(ctx, true, credentialProbeObservation, func(ctx context.Context) error {
 		if !CredentialBrokerForeground() {
 			return context.Canceled
 		}
@@ -24,5 +24,5 @@ func RunCredentialUIProbe(ctx context.Context) CredentialUIProbeResult {
 			_ = sendInputs(context.Background(), []input{keyboardEvent(0x01, false, true)})
 		}
 		return err
-	}, 60*time.Second)
+	}, 120*time.Second)
 }
