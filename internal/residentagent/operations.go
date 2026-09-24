@@ -254,7 +254,7 @@ func (operations *Operations) Connect(requestContext context.Context, request lo
 		defer cancel(nil)
 		err := operations.runner(ctx, alias, &sessionObserver{operations: operations, done: done})
 		displayChanged := ctx.Err() == nil && displayChangeOnly(err)
-		operations.finishSession(done, outcome, err, (ctx.Err() != nil && cancellationOnly(err, context.Cause(ctx))) || peerDisconnectOnly(err), displayChanged)
+		operations.finishSession(done, outcome, err, (ctx.Err() != nil && cancellationOnly(err, context.Cause(ctx))) || peerDisconnectOnly(err) || protectedInputOnly(err), displayChanged)
 	}(request.PeerAlias)
 	return completed("connect_started"), nil
 }

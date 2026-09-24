@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/0disoft/krasis/internal/agent"
@@ -110,6 +111,9 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 			if errors.Is(context.Cause(ctx), wininput.ErrDisplayGeometryChanged) {
 				err = errors.Join(err, wininput.ErrDisplayGeometryChanged)
 			}
+			if errors.Is(context.Cause(ctx), wininput.ErrProtectedInput) {
+				err = errors.Join(err, wininput.ErrProtectedInput)
+			}
 		}()
 		for _, start := range auxiliary {
 			start(ctx, alias, prepared)
@@ -161,6 +165,21 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 			})
 		}()
 		defer func() { cancel(); <-monitorDone }()
+		var protectedOnce sync.Once
+		stopProtected := func() {
+			protectedOnce.Do(func() {
+				log.Event("protected_input_detected")
+				cancelCause(wininput.ErrProtectedInput)
+			})
+		}
+		protectedDone := make(chan struct{})
+		go func() {
+			defer close(protectedDone)
+			ticker := time.NewTicker(100 * time.Millisecond)
+			defer ticker.Stop()
+			monitorProtectedInput(ctx, ticker.C, wininput.ProtectedInputActive, stopProtected)
+		}()
+		defer func() { cancel(); <-protectedDone }()
 		config := agent.DefaultConfig(control.BoundaryConfig{Edge: control.ScreenEdge(prepared.profile.Edge), ScreenLeft: diagnostics.Display.Left, ScreenWidth: diagnostics.Display.Width, RearmDistance: prepared.profile.Rearm()})
 		physicalWidth, physicalHeight, awareness := wininput.DisplayCoordinates()
 		boundary := &boundaryDiagnostics{summary: productlog.BoundarySummary{
@@ -192,7 +211,7 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 		hook := wininput.NewSourceHook(progress)
 		hook.SetBoundaryGuard(checkGeometry)
 		return agent.RunSupervisor(ctx, agent.SupervisorConfig{Session: config, Backoff: backoff, Now: time.Now, Wait: agent.Wait, Observer: observer}, agent.SupervisorDependencies{
-			Source: source, Hook: hook, Input: &guardedProductInput{InputBoundaryPort: input, guard: guard, log: log, geometry: checkGeometry}, Effects: agent.RuntimeEffects{}, Authorizer: productAuthorizer{trust}, RunSession: agent.RunSession,
+			Source: source, Hook: hook, Input: &guardedProductInput{InputBoundaryPort: input, guard: guard, log: log, geometry: checkGeometry, protected: wininput.ProtectedInputActive, stopProtected: stopProtected}, Effects: agent.RuntimeEffects{}, Authorizer: productAuthorizer{trust}, RunSession: agent.RunSession,
 		})
 	}
 }

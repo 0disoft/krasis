@@ -3,6 +3,7 @@ package residentagent
 import (
 	"context"
 	"errors"
+
 	"github.com/0disoft/krasis/internal/agent"
 	"github.com/0disoft/krasis/internal/peer"
 	"github.com/0disoft/krasis/internal/productlog"
@@ -17,6 +18,10 @@ type sessionOutcome struct {
 
 func displayChangeOnly(err error) bool {
 	return errors.Is(err, wininput.ErrDisplayGeometryChanged) && cancellationOnly(err, wininput.ErrDisplayGeometryChanged)
+}
+
+func protectedInputOnly(err error) bool {
+	return errors.Is(err, wininput.ErrProtectedInput) && cancellationOnly(err, wininput.ErrProtectedInput)
 }
 
 // Caller holds operations.mu; the ledger belongs to one runner generation.

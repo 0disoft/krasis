@@ -3,11 +3,13 @@ package residentagent
 import (
 	"context"
 	"errors"
+	"sync"
+
 	"github.com/0disoft/krasis/internal/agent"
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/productlog"
-	"sync"
+	"github.com/0disoft/krasis/internal/wininput"
 )
 
 type productInputGuard interface {
@@ -18,15 +20,20 @@ type productInputGuard interface {
 
 type guardedProductInput struct {
 	agent.InputBoundaryPort
-	guard    productInputGuard
-	log      *productlog.Logger
-	mu       sync.Mutex
-	geometry func() error
+	guard         productInputGuard
+	log           *productlog.Logger
+	mu            sync.Mutex
+	geometry      func() error
+	protected     func() bool
+	stopProtected func()
 }
 
 func (input *guardedProductInput) Press(ctx context.Context, token control.PressedToken) error {
 	input.mu.Lock()
 	defer input.mu.Unlock()
+	if err := input.checkProtectedInput(); err != nil {
+		return err
+	}
 	prepared, err := input.guard.PreparePress(token)
 	if err != nil {
 		return err
@@ -63,6 +70,9 @@ func (input *guardedProductInput) Wheel(ctx context.Context, x, y int32) error {
 	return err
 }
 func (input *guardedProductInput) PrepareEntry(ctx context.Context, edge control.ScreenEdge) error {
+	if err := input.checkProtectedInput(); err != nil {
+		return err
+	}
 	if err := input.ValidateEntry(ctx); err != nil {
 		return err
 	}
@@ -72,6 +82,16 @@ func (input *guardedProductInput) PrepareEntry(ctx context.Context, edge control
 		return input.ValidateEntry(ctx)
 	}
 	return err
+}
+
+func (input *guardedProductInput) checkProtectedInput() error {
+	if input.protected != nil && input.protected() {
+		if input.stopProtected != nil {
+			input.stopProtected()
+		}
+		return wininput.ErrProtectedInput
+	}
+	return nil
 }
 
 func (input *guardedProductInput) ValidateEntry(ctx context.Context) error {

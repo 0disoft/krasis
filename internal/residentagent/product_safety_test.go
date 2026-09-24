@@ -9,6 +9,7 @@ import (
 	"github.com/0disoft/krasis/internal/agent"
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/wininput"
 )
 
 type safetyInput struct {
@@ -68,6 +69,22 @@ func TestProductGuardRetainsUncertainInjectionObligations(t *testing.T) {
 	}
 	if !reflect.DeepEqual(events, []string{"inject_release", "released"}) {
 		t.Fatalf("release ordering=%v", events)
+	}
+}
+
+func TestProductGuardRejectsProtectedCredentialInputBeforeInjection(t *testing.T) {
+	var events []string
+	input := &guardedProductInput{
+		InputBoundaryPort: safetyInput{events: &events},
+		guard:             safetyGuard{&events},
+		protected:         func() bool { return true },
+		stopProtected:     func() { events = append(events, "stop") },
+	}
+	if err := input.Press(context.Background(), control.PressedToken{Kind: control.PressedKeyboardKey, Code: 30}); !errors.Is(err, wininput.ErrProtectedInput) {
+		t.Fatalf("Press() error = %v", err)
+	}
+	if !reflect.DeepEqual(events, []string{"stop"}) {
+		t.Fatalf("protected input touched the injection boundary: %v", events)
 	}
 }
 
