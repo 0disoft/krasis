@@ -13,7 +13,7 @@ func TestFinalRunnerErrorCannotLoseFaultReason(t *testing.T) {
 	done := make(chan struct{})
 	outcome := &sessionOutcome{}
 	o.sessionDone, o.sessionOutcome = done, outcome
-	o.finishSession(done, outcome, errors.Join(wininput.ErrSourceCaptureLostForeground, errors.New("private native details")), false)
+	o.finishSession(done, outcome, errors.Join(wininput.ErrSourceCaptureLostForeground, errors.New("private native details")), false, false)
 	if o.counters["fault_capture_foreground_lost"] != 1 || o.counters["session_failed"] != 1 {
 		t.Fatalf("final cause omitted: %+v", o.counters)
 	}
@@ -26,13 +26,13 @@ func TestFinalFaultDeduplicatesObserverAndIgnoresStaleSession(t *testing.T) {
 	o.sessionDone, o.sessionOutcome = done, outcome
 	observer := &sessionObserver{operations: o, done: done}
 	observer.ObserveSupervisor(agent.SupervisorSnapshot{State: agent.SupervisorStopped, FailureKind: "session", FailureComponent: "source-capture", FailurePhase: "capture-runtime", FailureCode: "foreground_lost"})
-	o.finishSession(done, outcome, wininput.ErrSourceCaptureLostForeground, false)
+	o.finishSession(done, outcome, wininput.ErrSourceCaptureLostForeground, false, false)
 	if o.counters["fault_capture_foreground_lost"] != 1 {
 		t.Fatal("same fault counted twice")
 	}
 	o.sessionDone = make(chan struct{})
 	stale := make(chan struct{})
-	o.finishSession(stale, &sessionOutcome{}, wininput.ErrSourceCaptureCommandTimeout, false)
+	o.finishSession(stale, &sessionOutcome{}, wininput.ErrSourceCaptureCommandTimeout, false, false)
 	if o.counters["fault_capture_command_timeout"] != 0 {
 		t.Fatal("old session polluted current diagnostics")
 	}
@@ -43,7 +43,7 @@ func TestNormalCancellationDoesNotRecordFault(t *testing.T) {
 	o := testOperations(t, func(context.Context, string, agent.SupervisorObserver) error { return nil })
 	done := make(chan struct{})
 	o.sessionDone = done
-	o.finishSession(done, &sessionOutcome{}, context.Canceled, true)
+	o.finishSession(done, &sessionOutcome{}, context.Canceled, true, false)
 	if o.counters["fault_session_unknown"] != 0 || o.counters["session_stopped"] != 1 {
 		t.Fatal(o.counters)
 	}

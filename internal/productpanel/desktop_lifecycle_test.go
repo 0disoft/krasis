@@ -97,3 +97,28 @@ func TestDesktopLifecycleWorkerStopsWithOwner(t *testing.T) {
 		t.Fatal(starts)
 	}
 }
+
+func TestDesktopLifecycleReconnectsDisplayChangeOnceAfterGeometrySettles(t *testing.T) {
+	fp := strings.Repeat("a", 64)
+	client := &fakeClient{state: "LOCAL", stopReason: "display_change", peers: []localapi.TrustedPeer{{Alias: "B", Fingerprint: fp}}}
+	ready := false
+	starts := 0
+	b := NewDesktopLifecycle(context.Background(), func() (Client, error) { return client, nil }, func(context.Context) error { starts++; return nil }, nil, func() bool { return ready })
+	b.recovery.Alias, b.recovery.Fingerprint = "B", fp
+	now := time.Now()
+	b.tick(now)
+	b.tick(now.Add(4 * time.Second))
+	if starts != 0 || client.connects != 0 {
+		t.Fatal("connected before stable geometry")
+	}
+	ready = true
+	b.tick(now.Add(5 * time.Second))
+	if starts != 1 || client.connects != 1 || b.Refresh().State != "CONNECTING" {
+		t.Fatal(starts, client.connects, b.Refresh())
+	}
+	client.state, client.stopReason = "LOCAL", "display_change"
+	b.tick(now.Add(10 * time.Second))
+	if client.connects != 1 {
+		t.Fatal("repeated display recovery")
+	}
+}

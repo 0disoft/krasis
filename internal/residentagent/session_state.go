@@ -2,14 +2,21 @@ package residentagent
 
 import (
 	"context"
+	"errors"
 	"github.com/0disoft/krasis/internal/agent"
 	"github.com/0disoft/krasis/internal/peer"
 	"github.com/0disoft/krasis/internal/productlog"
+	"github.com/0disoft/krasis/internal/wininput"
 )
 
 type sessionOutcome struct {
 	failed     bool
+	connected  bool
 	faultCodes map[string]bool
+}
+
+func displayChangeOnly(err error) bool {
+	return errors.Is(err, wininput.ErrDisplayGeometryChanged) && cancellationOnly(err, wininput.ErrDisplayGeometryChanged)
 }
 
 // Caller holds operations.mu; the ledger belongs to one runner generation.
@@ -115,6 +122,9 @@ func (observer *sessionObserver) ObserveSupervisor(snapshot agent.SupervisorSnap
 		}
 	case agent.SupervisorActive:
 		state = "CONNECTED"
+		if operations.sessionOutcome != nil {
+			operations.sessionOutcome.connected = true
+		}
 	case agent.SupervisorBackoff:
 		reason := productlog.ReconnectCode(snapshot.FailureKind, snapshot.FailureComponent, snapshot.FailurePhase, snapshot.FailureCode)
 		operations.log.Event(reason)

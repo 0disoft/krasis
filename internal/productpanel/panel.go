@@ -18,6 +18,8 @@ type Client interface {
 
 type View struct {
 	PeerAlias      string
+	StopReason     string
+	DisplayReady   bool
 	DiagnosticPath string
 	Update         localapi.UpdateResult
 	ExitForUpdate  bool
@@ -63,7 +65,7 @@ func Execute(ctx context.Context, open func() (Client, error), action, alias str
 		}
 		return View{State: status.State, Notice: "기기 목록을 읽지 못했습니다. 연결을 시작하지 않습니다."}
 	}
-	view := View{State: status.State, PeerAlias: status.PeerAlias, Fingerprints: map[string]string{}}
+	view := View{State: status.State, PeerAlias: status.PeerAlias, StopReason: status.StopReason, Fingerprints: map[string]string{}}
 	if status.State == "FAULTED" {
 		view.Notice = faultNotice
 	}
@@ -114,6 +116,7 @@ func Execute(ctx context.Context, open func() (Client, error), action, alias str
 	} else {
 		view.State = current.State
 		view.PeerAlias = current.PeerAlias
+		view.StopReason = current.StopReason
 	}
 	return view
 }

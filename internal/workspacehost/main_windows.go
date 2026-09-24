@@ -18,6 +18,7 @@ import (
 	"github.com/0disoft/krasis/internal/productidentity"
 	"github.com/0disoft/krasis/internal/productlog"
 	"github.com/0disoft/krasis/internal/productpanel"
+	"github.com/0disoft/krasis/internal/wininput"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 )
@@ -89,7 +90,21 @@ func Run() {
 				os.Exit(1)
 			}
 		}
-		service.managed = productpanel.NewDesktopLifecycle(ctx, func() (productpanel.Client, error) { return localapi.OpenClient(paths.Control) }, startup.Ensure, diagnose(os.Getenv("LOCALAPPDATA"), paths.Control))
+		var lastGeometry wininput.DisplayGeometry
+		var stableSince time.Time
+		displayReady := func() bool {
+			geometry := wininput.CurrentDisplayGeometry()
+			if !geometry.Valid() {
+				stableSince = time.Time{}
+				return false
+			}
+			if geometry != lastGeometry {
+				lastGeometry, stableSince = geometry, time.Now()
+				return false
+			}
+			return time.Since(stableSince) >= 2*time.Second
+		}
+		service.managed = productpanel.NewDesktopLifecycle(ctx, func() (productpanel.Client, error) { return localapi.OpenClient(paths.Control) }, startup.Ensure, diagnose(os.Getenv("LOCALAPPDATA"), paths.Control), displayReady)
 		base := os.Getenv("LOCALAPPDATA")
 		self, executableErr := os.Executable()
 		if executableErr != nil {

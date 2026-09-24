@@ -57,6 +57,8 @@ type Operations struct {
 	sessionFaulted bool
 	sessionOutcome *sessionOutcome
 	peerAlias      string
+	lastStopReason string
+	manualStop     bool
 	lastCode       string
 	counters       map[string]uint64
 }
@@ -188,6 +190,7 @@ func (operations *Operations) Status(context.Context) (localapi.Status, error) {
 		SchemaVersion:      localapi.StatusSchemaVersion,
 		State:              state,
 		PeerAlias:          operations.peerAlias,
+		StopReason:         operations.lastStopReason,
 		Actions:            actions,
 		DeviceFingerprint:  operations.identity.Fingerprint,
 		IdentityGeneration: operations.identity.Generation,
@@ -244,11 +247,14 @@ func (operations *Operations) Connect(requestContext context.Context, request lo
 	operations.sessionDone = done
 	operations.sessionState = "CONNECTING"
 	operations.peerAlias = request.PeerAlias
+	operations.lastStopReason = ""
+	operations.manualStop = false
 	operations.recordLocked("connect_started")
 	go func(alias string) {
 		defer cancel(nil)
 		err := operations.runner(ctx, alias, &sessionObserver{operations: operations, done: done})
-		operations.finishSession(done, outcome, err, (ctx.Err() != nil && cancellationOnly(err, context.Cause(ctx))) || peerDisconnectOnly(err))
+		displayChanged := ctx.Err() == nil && displayChangeOnly(err)
+		operations.finishSession(done, outcome, err, (ctx.Err() != nil && cancellationOnly(err, context.Cause(ctx))) || peerDisconnectOnly(err), displayChanged)
 	}(request.PeerAlias)
 	return completed("connect_started"), nil
 }
@@ -258,6 +264,8 @@ func (operations *Operations) Disconnect(ctx context.Context, _ localapi.Operati
 		return rejected("invalid_request"), nil
 	}
 	operations.mu.Lock()
+	operations.lastStopReason = ""
+	operations.manualStop = true
 	stop, done := operations.sessionStop, operations.sessionDone
 	outcome := operations.sessionOutcome
 	if stop == nil || done == nil {
@@ -358,9 +366,11 @@ func (operations *Operations) Close(ctx context.Context) error {
 	return errors.New(result.Code)
 }
 
-func (operations *Operations) finishSession(done chan struct{}, outcome *sessionOutcome, err error, cancelled bool) {
+func (operations *Operations) finishSession(done chan struct{}, outcome *sessionOutcome, err error, cancelled, displayChanged bool) {
 	operations.mu.Lock()
 	defer operations.mu.Unlock()
+	displayChanged = displayChanged && outcome.connected && !operations.manualStop && operations.root.Err() == nil
+	cancelled = cancelled || displayChanged
 	outcome.failed = !cancelled || operations.sessionFaulted
 	if operations.sessionDone == done {
 		if outcome.failed && !cancelled {
@@ -375,6 +385,11 @@ func (operations *Operations) finishSession(done chan struct{}, outcome *session
 		operations.sessionOutcome = nil
 		operations.sessionState = ""
 		operations.sessionFaulted = operations.sessionFaulted || outcome.failed
+		if displayChanged && !outcome.failed {
+			operations.lastStopReason = "display_change"
+		} else {
+			operations.lastStopReason = ""
+		}
 		operations.peerAlias = ""
 		if outcome.failed {
 			operations.recordLocked("session_failed")

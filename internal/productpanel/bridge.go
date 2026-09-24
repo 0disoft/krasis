@@ -16,13 +16,14 @@ const BridgeSchema = "krasis.desktop/v1"
 // Notice is legacy localized panel copy; native integration must map it to catalog
 // codes before advertising complete localization of agent failures.
 type BridgeSnapshot struct {
-	Revision  uint64       `json:"revision,omitempty"`
-	Schema    string       `json:"schema"`
-	State     string       `json:"state"`
-	PeerAlias string       `json:"peerAlias"`
-	Peers     []BridgePeer `json:"peers"`
-	Code      string       `json:"code"`
-	Notice    string       `json:"notice"`
+	Revision   uint64       `json:"revision,omitempty"`
+	Schema     string       `json:"schema"`
+	State      string       `json:"state"`
+	PeerAlias  string       `json:"peerAlias"`
+	StopReason string       `json:"stopReason,omitempty"`
+	Peers      []BridgePeer `json:"peers"`
+	Code       string       `json:"code"`
+	Notice     string       `json:"notice"`
 }
 
 type BridgePeer struct {
@@ -83,7 +84,7 @@ func (b *DesktopBridge) execute(action, alias, fingerprint string) BridgeSnapsho
 	if guard.stale {
 		return bridgeFailure("stale_peer")
 	}
-	result := BridgeSnapshot{Schema: BridgeSchema, State: view.State, PeerAlias: view.PeerAlias,
+	result := BridgeSnapshot{Schema: BridgeSchema, State: view.State, PeerAlias: view.PeerAlias, StopReason: view.StopReason,
 		Peers: []BridgePeer{}, Code: "ok", Notice: view.Notice}
 	if action != "refresh" && (!guard.attempted || guard.rejected) {
 		result.Code = "rejected"

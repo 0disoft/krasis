@@ -9,6 +9,8 @@ type AutomaticRecovery struct {
 	Attempts           int
 	blocked, diagnosed bool
 	next               time.Time
+	displaySince       time.Time
+	displayTried       bool
 }
 
 func (r *AutomaticRecovery) Reset() { *r = AutomaticRecovery{} }
@@ -24,11 +26,32 @@ func (r *AutomaticRecovery) Next(now time.Time, view View) string {
 		}
 		r.diagnosed = false
 		r.next = time.Time{}
+		r.displaySince = time.Time{}
+		r.displayTried = false
 		return ""
 	}
 	if view.State == "LOCAL" {
+		if view.StopReason == "display_change" && r.Alias != "" && view.Fingerprints[r.Alias] == r.Fingerprint {
+			if r.displayTried {
+				return ""
+			}
+			if r.displaySince.IsZero() {
+				r.displaySince = now
+				return ""
+			}
+			if now.Sub(r.displaySince) >= 30*time.Second {
+				r.displayTried = true
+				return "display_recovery_expired"
+			}
+			if now.Sub(r.displaySince) >= 3*time.Second && view.DisplayReady {
+				r.displayTried = true
+				return "display_reconnect"
+			}
+			return ""
+		}
 		r.Alias, r.Fingerprint = "", ""
 		r.diagnosed = false
+		r.displaySince = time.Time{}
 		return ""
 	}
 	if (view.State != "FAULTED" && view.State != "RECONNECTING") || (view.State == "RECONNECTING" && r.Alias == "") {

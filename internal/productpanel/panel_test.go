@@ -12,13 +12,14 @@ import (
 
 type fakeClient struct {
 	state                 string
+	stopReason            string
 	peers                 []localapi.TrustedPeer
 	connects, disconnects int
 	err, trustErr         error
 }
 
 func (c *fakeClient) Status(context.Context) (localapi.Status, error) {
-	return localapi.Status{State: c.state}, c.err
+	return localapi.Status{State: c.state, StopReason: c.stopReason}, c.err
 }
 func (c *fakeClient) Trust(context.Context) (localapi.Trust, error) {
 	return localapi.Trust{Peers: c.peers}, c.trustErr
@@ -26,11 +27,13 @@ func (c *fakeClient) Trust(context.Context) (localapi.Trust, error) {
 func (c *fakeClient) Connect(context.Context, string) (localapi.OperationResult, error) {
 	c.connects++
 	c.state = "CONNECTING"
+	c.stopReason = ""
 	return localapi.OperationResult{Status: "COMPLETED"}, nil
 }
 func (c *fakeClient) Disconnect(context.Context) (localapi.OperationResult, error) {
 	c.disconnects++
 	c.state = "LOCAL"
+	c.stopReason = ""
 	return localapi.OperationResult{Status: "COMPLETED"}, nil
 }
 

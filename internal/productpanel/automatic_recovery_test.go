@@ -51,3 +51,56 @@ func TestAutomaticRecoveryNeverStartsUnknownOrUserStoppedPeer(t *testing.T) {
 		t.Fatal("manual stop rearmed")
 	}
 }
+
+func TestDisplayChangeRecoveryWaitsForStableGeometryAndRunsOnce(t *testing.T) {
+	const alias = "B"
+	fp := strings.Repeat("a", 64)
+	now := time.Now()
+	r := AutomaticRecovery{}
+	r.Next(now, View{State: "CONNECTED", PeerAlias: alias, Fingerprints: map[string]string{alias: fp}})
+	local := View{State: "LOCAL", StopReason: "display_change", Fingerprints: map[string]string{alias: fp}}
+	if got := r.Next(now, local); got != "" {
+		t.Fatal(got)
+	}
+	local.DisplayReady = true
+	if got := r.Next(now.Add(2*time.Second), local); got != "" {
+		t.Fatal("reconnected before geometry settled", got)
+	}
+	local.DisplayReady = false
+	if got := r.Next(now.Add(4*time.Second), local); got != "" {
+		t.Fatal("reconnected on unstable geometry", got)
+	}
+	local.DisplayReady = true
+	if got := r.Next(now.Add(5*time.Second), local); got != "display_reconnect" {
+		t.Fatal(got)
+	}
+	if got := r.Next(now.Add(10*time.Second), local); got != "" {
+		t.Fatal("replayed one-shot recovery", got)
+	}
+	r.Stop()
+	if got := r.Next(now.Add(11*time.Second), local); got != "" {
+		t.Fatal("manual stop rearmed display recovery", got)
+	}
+}
+
+func TestDisplayChangeRecoveryExpiresWithoutStableGeometryOrIdentity(t *testing.T) {
+	fp := strings.Repeat("a", 64)
+	now := time.Now()
+	r := AutomaticRecovery{}
+	r.Next(now, View{State: "CONNECTED", PeerAlias: "B", Fingerprints: map[string]string{"B": fp}})
+	local := View{State: "LOCAL", StopReason: "display_change", Fingerprints: map[string]string{"B": strings.Repeat("b", 64)}, DisplayReady: true}
+	if got := r.Next(now, local); got != "" || r.Alias != "" {
+		t.Fatal("changed identity retained", got)
+	}
+	r.Next(now, View{State: "CONNECTED", PeerAlias: "B", Fingerprints: map[string]string{"B": fp}})
+	local.Fingerprints["B"] = fp
+	local.DisplayReady = false
+	r.Next(now, local)
+	if got := r.Next(now.Add(31*time.Second), local); got != "display_recovery_expired" {
+		t.Fatal(got)
+	}
+	local.DisplayReady = true
+	if got := r.Next(now.Add(32*time.Second), local); got != "" {
+		t.Fatal("expired recovery rearmed", got)
+	}
+}

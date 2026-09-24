@@ -107,6 +107,9 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 			if errors.Is(context.Cause(ctx), crashguard.ErrUnexpectedExit) {
 				err = errors.Join(err, crashguard.ErrUnexpectedExit)
 			}
+			if errors.Is(context.Cause(ctx), wininput.ErrDisplayGeometryChanged) {
+				err = errors.Join(err, wininput.ErrDisplayGeometryChanged)
+			}
 		}()
 		for _, start := range auxiliary {
 			start(ctx, alias, prepared)

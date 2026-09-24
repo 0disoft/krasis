@@ -15,6 +15,7 @@ type DesktopLifecycle struct {
 	open             func() (Client, error)
 	ensure           func(context.Context) error
 	diagnose         func(context.Context, string) error
+	displayReady     func() bool
 	diagnosticActive atomic.Bool
 	gate             sync.Mutex
 	cancelMu         sync.Mutex
@@ -25,8 +26,11 @@ type DesktopLifecycle struct {
 	state            BridgeSnapshot
 }
 
-func NewDesktopLifecycle(ctx context.Context, open func() (Client, error), ensure func(context.Context) error, diagnose func(context.Context, string) error) *DesktopLifecycle {
+func NewDesktopLifecycle(ctx context.Context, open func() (Client, error), ensure func(context.Context) error, diagnose func(context.Context, string) error, displayReady ...func() bool) *DesktopLifecycle {
 	b := &DesktopLifecycle{ctx: ctx, open: open, ensure: ensure, diagnose: diagnose, state: bridgeFailure("preparing")}
+	if len(displayReady) > 0 {
+		b.displayReady = displayReady[0]
+	}
 	return b
 }
 
@@ -182,7 +186,7 @@ func (b *DesktopLifecycle) tick(now time.Time) {
 	previous := b.Refresh()
 	if previous.State == value.State {
 		switch previous.Code {
-		case "diagnostic_failed", "startup_failed", "startup_busy", "agent_incompatible", "recovery_exhausted":
+		case "diagnostic_failed", "startup_failed", "startup_busy", "agent_incompatible", "recovery_exhausted", "display_recovery_expired":
 			value.Code = previous.Code
 		}
 	}
@@ -190,7 +194,10 @@ func (b *DesktopLifecycle) tick(now time.Time) {
 	if b.stopped.Load() {
 		return
 	}
-	view := View{State: value.State, PeerAlias: value.PeerAlias, Fingerprints: map[string]string{}}
+	view := View{State: value.State, PeerAlias: value.PeerAlias, StopReason: value.StopReason, DisplayReady: true, Fingerprints: map[string]string{}}
+	if value.State == "LOCAL" && value.StopReason == "display_change" && b.displayReady != nil {
+		view.DisplayReady = b.displayReady()
+	}
 	for _, peer := range value.Peers {
 		view.Fingerprints[peer.Alias] = peer.Fingerprint
 	}
@@ -199,6 +206,23 @@ func (b *DesktopLifecycle) tick(now time.Time) {
 		if value.State == "FAULTED" && b.recovery.Attempts >= 3 {
 			value.Code = "recovery_exhausted"
 			b.save(value)
+		}
+		return
+	}
+	if action == "display_recovery_expired" {
+		value.Code = action
+		b.save(value)
+		return
+	}
+	if action == "display_reconnect" {
+		value.Code = "display_reconnecting"
+		b.save(value)
+		if err := b.startup(ctx); err != nil {
+			b.failedStartup(ctx, err)
+			return
+		}
+		if !b.stopped.Load() && ctx.Err() == nil {
+			b.save(bridge.Connect(b.recovery.Alias, b.recovery.Fingerprint))
 		}
 		return
 	}

@@ -3,12 +3,42 @@ package residentagent
 import (
 	"context"
 	"errors"
+	"github.com/0disoft/krasis/internal/wininput"
 	"testing"
 	"testing/synctest"
 
 	"github.com/0disoft/krasis/internal/agent"
 	"github.com/0disoft/krasis/internal/localapi"
 )
+
+func TestDisplayChangeStopReasonRequiresCleanPreviouslyConnectedSession(t *testing.T) {
+	for _, test := range []struct {
+		name, wantState, wantReason string
+		connected, manualStop       bool
+		err                         error
+		cancelled                   bool
+	}{
+		{"clean display change", "LOCAL", "display_change", true, false, errors.Join(context.Canceled, wininput.ErrDisplayGeometryChanged), false},
+		{"never connected", "FAULTED", "", false, false, errors.Join(context.Canceled, wininput.ErrDisplayGeometryChanged), false},
+		{"cleanup failure", "FAULTED", "", true, false, errors.Join(context.Canceled, wininput.ErrDisplayGeometryChanged, errors.New("cleanup failed")), false},
+		{"manual disconnect", "LOCAL", "", true, true, errors.Join(context.Canceled, wininput.ErrDisplayGeometryChanged), true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			operations := testOperations(t, nil)
+			done := make(chan struct{})
+			outcome := &sessionOutcome{connected: test.connected}
+			operations.sessionDone = done
+			operations.sessionOutcome = outcome
+			operations.peerAlias = "B"
+			operations.manualStop = test.manualStop
+			operations.finishSession(done, outcome, test.err, test.cancelled, displayChangeOnly(test.err))
+			status, err := operations.Status(context.Background())
+			if err != nil || status.State != test.wantState || status.StopReason != test.wantReason || status.PeerAlias != "" {
+				t.Fatalf("status = %+v, %v", status, err)
+			}
+		})
+	}
+}
 
 func TestSessionStateUsesCurrentSupervisorAndCleanupCompletion(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {

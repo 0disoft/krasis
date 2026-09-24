@@ -37,6 +37,7 @@ type Status struct {
 	SchemaVersion      string   `json:"schemaVersion"`
 	State              string   `json:"state"`
 	PeerAlias          string   `json:"peerAlias,omitempty"`
+	StopReason         string   `json:"stopReason,omitempty"`
 	Actions            []string `json:"actions"`
 	DeviceFingerprint  string   `json:"deviceFingerprint"`
 	IdentityGeneration uint64   `json:"identityGeneration"`
