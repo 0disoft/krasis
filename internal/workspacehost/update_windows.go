@@ -23,10 +23,14 @@ func updateBundleDirectory(self string) string {
 }
 
 func transitionBundleDirectory(self string) string {
+	root := filepath.Dir(filepath.Dir(self))
 	if filepath.Base(self) == "krasis-control.exe" {
-		return ""
+		if filepath.Base(filepath.Dir(self)) != "peer-update" {
+			return ""
+		}
+		root = filepath.Dir(root)
 	}
-	candidate := filepath.Join(filepath.Dir(filepath.Dir(self)), "g61", "peer-update")
+	candidate := filepath.Join(root, "g61", "peer-update")
 	info, err := os.Stat(filepath.Join(candidate, "BUILD.json"))
 	if err != nil || !info.Mode().IsRegular() {
 		return ""

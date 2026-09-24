@@ -31,6 +31,9 @@ func TestUpdateEntryPointsUseOwnedBundleDirectory(t *testing.T) {
 	if got := transitionBundleDirectory(filepath.Join(base, "g63", "krasis.exe")); got != filepath.Join(base, "g61", "peer-update") {
 		t.Fatal(got)
 	}
+	if got := transitionBundleDirectory(filepath.Join(base, "g64", "peer-update", "krasis-control.exe")); got != filepath.Join(base, "g61", "peer-update") {
+		t.Fatal(got)
+	}
 	if err := waitUpdateParent(uint32(os.Getpid())); err == nil {
 		t.Fatal("waited on self")
 	}
