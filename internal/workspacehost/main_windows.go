@@ -194,6 +194,11 @@ func Run() {
 		menu.Add("연결 해제 / Disconnect").OnClick(func(*application.Context) {
 			service.disconnectAsync()
 		})
+		menu.Add("PIN 창 입력 시험").OnClick(func(*application.Context) {
+			if err := launchCredentialProbe(paths.Control); err != nil {
+				showCredentialProbeLaunchError()
+			}
+		})
 		menu.AddSeparator()
 		menu.Add("관리 앱 종료 · 에이전트 유지 / Quit UI").OnClick(func(*application.Context) { app.Quit() })
 		tray.SetMenu(menu)
