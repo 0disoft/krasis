@@ -23,6 +23,7 @@ type transferClient struct {
 	*settingsClient
 	status     peerupdate.Status
 	sent       int
+	sentDir    string
 	failSend   bool
 	rejectSend bool
 }
@@ -30,9 +31,7 @@ type transferClient struct {
 func (c *transferClient) Update(ctx context.Context, r localapi.UpdateRequest) (localapi.UpdateResult, error) {
 	if r.Action == "SEND" {
 		c.sent++
-		if r.Directory != "native/bundle" {
-			panic("renderer selected path")
-		}
+		c.sentDir = r.Directory
 		if c.failSend {
 			return localapi.UpdateResult{}, errors.New("private")
 		}
@@ -50,14 +49,14 @@ func (c *transferClient) Update(ctx context.Context, r localapi.UpdateRequest) (
 func transferTestBridge() (*UpdateSettingsBridge, *transferClient, string) {
 	c, peer := newSettingsTestClient()
 	f := &transferClient{settingsClient: c, status: peerupdate.Status{State: "IDLE"}}
-	return NewUpdateTransferBridge(context.Background(), func() (UpdateSettingsClient, error) { return f, nil }, "native/bundle"), f, peer
+	return NewUpdateTransferBridge(context.Background(), func() (UpdateSettingsClient, error) { return f, nil }, "native/bundle", "native/transition"), f, peer
 }
 func TestUpdateTransferTracksExactJobAndRuntime(t *testing.T) {
 	b, c, peer := transferTestBridge()
 	if b.TransferStatus(peer).State != "IDLE" || c.sent != 0 {
 		t.Fatal("poll sent update")
 	}
-	if b.Send(peer).State != "QUEUED" || c.sent != 1 {
+	if b.Send(peer).State != "QUEUED" || c.sent != 1 || c.sentDir != "native/transition" {
 		t.Fatal("send failed")
 	}
 	if b.Send(peer).State != "PEER_BUSY" || c.sent != 1 {
@@ -78,6 +77,36 @@ func TestUpdateTransferTracksExactJobAndRuntime(t *testing.T) {
 	c.runtime.Instance = "replacement"
 	if b.TransferStatus(peer).State != "AGENT_CHANGED" {
 		t.Fatal("new process reused")
+	}
+}
+
+func TestUpdateTransferChoosesLegacyBundleForGeneration60(t *testing.T) {
+	for _, tc := range []struct {
+		generation int
+		state      string
+		wantDir    string
+	}{
+		{60, "ONLINE", "native/transition"},
+		{61, "ONLINE", "native/bundle"},
+		{60, "STALE", ""},
+	} {
+		b, c, peer := transferTestBridge()
+		c.info.Generation = tc.generation
+		c.info.State = tc.state
+		got := b.Send(peer)
+		if tc.wantDir == "" {
+			if got.State != "PEER_UNREACHABLE" || c.sent != 0 {
+				t.Fatalf("stale peer sent update: %+v", got)
+			}
+		} else if got.State != "QUEUED" || c.sentDir != tc.wantDir {
+			t.Fatalf("wrong update bundle: %+v, %q", got, c.sentDir)
+		}
+	}
+	b, c, peer := transferTestBridge()
+	b.transitionDirectory = ""
+	c.info.Generation = 60
+	if got := b.Send(peer); got.State != "TRANSITION_REQUIRED" || c.sent != 0 {
+		t.Fatalf("missing legacy bundle sent update: %+v", got)
 	}
 }
 

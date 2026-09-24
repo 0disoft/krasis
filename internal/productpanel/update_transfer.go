@@ -23,9 +23,10 @@ type UpdateTransferSnapshot struct {
 }
 
 // The directory comes from the native executable location, never the renderer.
-func NewUpdateTransferBridge(ctx context.Context, open func() (UpdateSettingsClient, error), directory string) *UpdateSettingsBridge {
+func NewUpdateTransferBridge(ctx context.Context, open func() (UpdateSettingsClient, error), directory, transitionDirectory string) *UpdateSettingsBridge {
 	b := NewUpdateSettingsBridge(ctx, open)
 	b.bundleDirectory = directory
+	b.transitionDirectory = transitionDirectory
 	return b
 }
 
@@ -106,9 +107,20 @@ func (b *UpdateSettingsBridge) transferCall(peer string, send bool) UpdateTransf
 		if updateTransferActive(result.Status.State) {
 			return fail("PEER_BUSY")
 		}
+		inspection, err := c.Update(ctx, localapi.UpdateRequest{Schema: localapi.UpdateSchema, Action: "INSPECT", Peer: peer})
+		if err != nil || inspection.Code != "peer_status" || inspection.PeerInfo == nil || inspection.PeerInfo.Peer != peer || inspection.PeerInfo.State != "ONLINE" || inspection.PeerInfo.Generation < 21 || inspection.PeerInfo.Generation > 1000000 {
+			return fail("PEER_UNREACHABLE")
+		}
+		directory := b.bundleDirectory
+		if inspection.PeerInfo.Generation <= 60 {
+			if b.transitionDirectory == "" {
+				return fail("TRANSITION_REQUIRED")
+			}
+			directory = b.transitionDirectory
+		}
 		b.transfer = fail("TRANSFER_UNKNOWN")
 		b.transferInstance = runtime.Instance
-		result, err = c.Update(ctx, localapi.UpdateRequest{Schema: localapi.UpdateSchema, Action: "SEND", Peer: peer, Directory: b.bundleDirectory})
+		result, err = c.Update(ctx, localapi.UpdateRequest{Schema: localapi.UpdateSchema, Action: "SEND", Peer: peer, Directory: directory})
 		if err != nil {
 			return b.transfer
 		} // Never retry a request whose outcome is unknown.
@@ -146,7 +158,7 @@ func validTransferID(id string) bool {
 func projectTransfer(peer string, s peerupdate.Status, state string) UpdateTransferSnapshot {
 	v := transferSnapshot(peer, "TRANSFER_UNKNOWN")
 	switch state {
-	case "PREPARING", "QUEUED", "SENDING", "VERIFYING", "DELIVERED", "UPDATED", "RESTART_UNCONFIRMED", "SAME_VERSION", "PEER_NEWER", "GENERATION_CONFLICT", "PEER_BUSY", "PEER_UNREACHABLE", "PEER_UNSUPPORTED", "PEER_NOT_ALLOWED", "INVALID_BUNDLE", "BUNDLE_MISSING", "HASH_MISMATCH", "STORAGE_FAILED", "TRANSFER_INTERRUPTED", "PEER_APPLY_FAILED", "EXPIRED", "PEER_REJECTED", "TRANSFER_UNKNOWN", "REJECTED":
+	case "PREPARING", "QUEUED", "SENDING", "VERIFYING", "DELIVERED", "UPDATED", "RESTART_UNCONFIRMED", "SAME_VERSION", "PEER_NEWER", "GENERATION_CONFLICT", "PEER_BUSY", "PEER_UNREACHABLE", "PEER_UNSUPPORTED", "PEER_NOT_ALLOWED", "INVALID_BUNDLE", "BUNDLE_MISSING", "TRANSITION_REQUIRED", "HASH_MISMATCH", "STORAGE_FAILED", "TRANSFER_INTERRUPTED", "PEER_APPLY_FAILED", "EXPIRED", "PEER_REJECTED", "TRANSFER_UNKNOWN", "REJECTED":
 		v.State = state
 	}
 	if validTransferID(s.ID) {

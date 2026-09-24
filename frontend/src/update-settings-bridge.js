@@ -9,7 +9,7 @@ const validGeneration = n => Number.isInteger(n) && n >= 0 && n <= 1000000;
 export const emptyUpdateSettings = (peer = '', code = 'unavailable') => ({schema,code,peer,permission:'UNKNOWN',remotePermission:'UNKNOWN',peerState:'UNKNOWN',localGeneration:0,localBuild:'',peerGeneration:0,peerBuild:'',comparison:'UNKNOWN'});
 
 const transferSchema = 'krasis.update-transfer/v1';
-export const transferStates = new Set(['IDLE','BUSY','UNAVAILABLE','INVALID_PEER','STALE_PEER','AGENT_CHANGED','REJECTED','PREPARING','QUEUED','SENDING','VERIFYING','DELIVERED','UPDATED','RESTART_UNCONFIRMED','SAME_VERSION','PEER_NEWER','GENERATION_CONFLICT','PEER_BUSY','PEER_UNREACHABLE','PEER_UNSUPPORTED','PEER_NOT_ALLOWED','INVALID_BUNDLE','BUNDLE_MISSING','HASH_MISMATCH','STORAGE_FAILED','TRANSFER_INTERRUPTED','PEER_APPLY_FAILED','EXPIRED','PEER_REJECTED','TRANSFER_UNKNOWN']);
+export const transferStates = new Set(['IDLE','BUSY','UNAVAILABLE','INVALID_PEER','STALE_PEER','AGENT_CHANGED','REJECTED','PREPARING','QUEUED','SENDING','VERIFYING','DELIVERED','UPDATED','RESTART_UNCONFIRMED','SAME_VERSION','PEER_NEWER','GENERATION_CONFLICT','PEER_BUSY','PEER_UNREACHABLE','PEER_UNSUPPORTED','PEER_NOT_ALLOWED','INVALID_BUNDLE','BUNDLE_MISSING','TRANSITION_REQUIRED','HASH_MISMATCH','STORAGE_FAILED','TRANSFER_INTERRUPTED','PEER_APPLY_FAILED','EXPIRED','PEER_REJECTED','TRANSFER_UNKNOWN']);
 export const emptyUpdateTransfer = (peer = '', state = 'IDLE') => ({schema:transferSchema,peer,state,id:'',bytes:0,total:0,generation:0,build:''});
 export const transferActive = state => ['PREPARING','QUEUED','SENDING','VERIFYING','DELIVERED'].includes(state);
 

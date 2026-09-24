@@ -22,6 +22,18 @@ func updateBundleDirectory(self string) string {
 	return filepath.Join(filepath.Dir(self), "peer-update")
 }
 
+func transitionBundleDirectory(self string) string {
+	if filepath.Base(self) == "krasis-control.exe" {
+		return ""
+	}
+	candidate := filepath.Join(filepath.Dir(filepath.Dir(self)), "g61", "peer-update")
+	info, err := os.Stat(filepath.Join(candidate, "BUILD.json"))
+	if err != nil || !info.Mode().IsRegular() {
+		return ""
+	}
+	return candidate
+}
+
 func prepareUpdatedWorkspace(ctx context.Context, control string, startup productpanel.Startup, launch productpanel.WorkspaceUpdateLaunch) error {
 	revision := ""
 	if info, ok := debug.ReadBuildInfo(); ok {
