@@ -35,6 +35,8 @@ Runtime local-data mutation no longer follows a pathname after acquiring its tar
 
 Power loss can prevent cleanup from running. Windows secure desktops and higher-integrity targets are outside the MVP guarantee. Laptop-specific drivers and touchpad conversion require physical evidence. Local resource exhaustion, firewall misconfiguration, certificate lifecycle mistakes, and compromised trusted peers remain release blockers until their owning issues are accepted.
 
+The attended credential UI probe is an experimental, elevated one-shot command. Its possible side effect is closing the foreground PIN prompt with Escape. It must positively identify the broker before injection, never observe credential contents, never start a peer session, and never be interpreted as evidence that remote keyboard or mouse input works in a protected dialog.
+
 ## Privacy boundary
 
 Never collect or emit raw key events, typed text, pointer trajectories, clipboard or screen content, private keys, certificate bodies, local usernames, absolute paths, IP addresses, hostnames, device identifiers, window handles, thread identifiers, or unrestricted command lines.

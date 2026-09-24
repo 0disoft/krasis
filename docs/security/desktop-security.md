@@ -11,6 +11,8 @@ Krasis is a same-user, direct peer-input product for explicitly paired Windows d
 
 The resident agent, UI, CLI, launcher, and crash guard run without elevation in the current interactive session. They must never request elevation merely to broaden input reach. Control of a higher-integrity application is not a supported guarantee, and Windows sign-in, UAC secure desktop, lock screen, Session 0, and another user's desktop are excluded.
 
+An attended, one-shot `credential-ui-probe` experiment is the sole exception to the no-elevation rule. It exits before resident startup, requires the user to launch it as administrator on the destination device, identifies only a foreground `CredentialUIBroker.exe` on the Default desktop, and sends a single Escape press/release. It does not read credential content or enable elevated peer input. A successful observation does not change the supported product boundary.
+
 ## Input safety
 
 The destination must prepare before source suppression starts. Exact session, lease, epoch, and sequence identity govern every active-control transition. Disconnect, timeout, lifecycle termination, injection uncertainty, stale traffic, local emergency release, or component failure revokes control, disables suppression, attempts `ReleaseAll`, and converges to `LOCAL` or an explicit fault state.

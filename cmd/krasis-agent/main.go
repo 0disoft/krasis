@@ -12,6 +12,9 @@ import (
 )
 
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "credential-ui-probe" {
+		os.Exit(runCredentialProbe())
+	}
 	if err := wininput.InitializePhysicalCoordinates(); err != nil {
 		fmt.Fprintln(os.Stderr, "agent_error: physical screen coordinates unavailable")
 		os.Exit(1)
