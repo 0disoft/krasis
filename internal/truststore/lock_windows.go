@@ -21,10 +21,14 @@ var (
 	procUnlockFileEx = trustKernel32.NewProc("UnlockFileEx")
 )
 
-func acquireFileLock(file *os.File) (func() error, error) {
+func acquireFileLock(file *os.File, shared bool) (func() error, error) {
 	var overlapped syscall.Overlapped
+	flags := uintptr(lockfileFailImmediately)
+	if !shared {
+		flags |= lockfileExclusiveLock
+	}
 	result, _, callErr := procLockFileEx.Call(
-		file.Fd(), lockfileFailImmediately|lockfileExclusiveLock, 0, 1, 0,
+		file.Fd(), flags, 0, 1, 0,
 		uintptr(unsafe.Pointer(&overlapped)),
 	)
 	if result == 0 {

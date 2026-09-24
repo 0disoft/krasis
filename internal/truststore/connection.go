@@ -158,7 +158,7 @@ func (store *Store) Connection(alias string) (ConnectionProfile, error) {
 	if store == nil {
 		return ConnectionProfile{}, errors.New("trust store is not initialized")
 	}
-	document, directory, release, err := store.openLocked(false)
+	document, directory, release, err := store.openReadLocked()
 	if err != nil {
 		return ConnectionProfile{}, err
 	}

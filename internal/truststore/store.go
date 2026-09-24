@@ -205,7 +205,7 @@ func (store *Store) List() (Document, error) {
 	if store == nil {
 		return Document{}, errors.New("trust store is not initialized")
 	}
-	return store.readLocked(false)
+	return store.readLocked()
 }
 
 func (store *Store) mutate(create bool, now time.Time, change func(*Document) error) error {
@@ -239,8 +239,8 @@ func (store *Store) mutatePrepared(create bool, now time.Time, change func(*Docu
 	return store.write(directory, document)
 }
 
-func (store *Store) readLocked(create bool) (Document, error) {
-	document, _, release, err := store.openLocked(create)
+func (store *Store) readLocked() (Document, error) {
+	document, _, release, err := store.openReadLocked()
 	if err != nil {
 		return Document{}, err
 	}
@@ -248,7 +248,15 @@ func (store *Store) readLocked(create bool) (Document, error) {
 	return document, nil
 }
 
+func (store *Store) openReadLocked() (Document, *securefs.Directory, func(), error) {
+	return store.openLockedMode(false, true)
+}
+
 func (store *Store) openLocked(create bool) (Document, *securefs.Directory, func(), error) {
+	return store.openLockedMode(create, false)
+}
+
+func (store *Store) openLockedMode(create, shared bool) (Document, *securefs.Directory, func(), error) {
 	if err := store.prepareDirectory(create); err != nil {
 		return Document{}, nil, nil, err
 	}
@@ -274,7 +282,7 @@ func (store *Store) openLocked(create bool) (Document, *securefs.Directory, func
 		closeLock()
 		return Document{}, nil, nil, err
 	}
-	unlock, err := acquireFileLock(lockFile)
+	unlock, err := acquireFileLock(lockFile, shared)
 	if err != nil {
 		closeLock()
 		return Document{}, nil, nil, err

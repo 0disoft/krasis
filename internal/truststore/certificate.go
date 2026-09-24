@@ -28,7 +28,7 @@ func (store *Store) ReconfirmWithCertificate(peer transport.AuthenticatedPeerCon
 	if _, err := validatePeerCertificate(peer, der, now); err != nil {
 		return PeerRecord{}, err
 	}
-	document, directory, release, err := store.openLocked(false)
+	document, directory, release, err := store.openReadLocked()
 	if err != nil {
 		return PeerRecord{}, err
 	}
@@ -89,7 +89,7 @@ func (store *Store) PeerCertificate(peer transport.AuthenticatedPeerContext, now
 	if err := peer.Validate(); err != nil {
 		return nil, err
 	}
-	document, directory, release, err := store.openLocked(false)
+	document, directory, release, err := store.openReadLocked()
 	if err != nil {
 		return nil, err
 	}

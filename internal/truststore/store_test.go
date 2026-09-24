@@ -215,13 +215,67 @@ func TestStoreRejectsConcurrentMutationLock(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer lock.Close()
-	unlock, err := acquireFileLock(lock)
+	unlock, err := acquireFileLock(lock, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer unlock()
 	if _, err := store.List(); !errors.Is(err, ErrStoreBusy) {
 		t.Fatalf("List() error = %v, want ErrStoreBusy", err)
+	}
+}
+
+func TestFileLockAllowsReadersButExcludesWriter(t *testing.T) {
+	store := mustStore(t)
+	if _, err := store.Import(testPeer(), "peer", true, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	directory, err := securefs.OpenDirectory(store.directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer directory.Close()
+	first, _, err := openLockFile(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer first.Close()
+	second, _, err := openLockFile(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer second.Close()
+	writer, _, err := openLockFile(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer writer.Close()
+	unlockFirst, err := acquireFileLock(first, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unlockSecond, err := acquireFileLock(second, true)
+	if err != nil {
+		_ = unlockFirst()
+		t.Fatal(err)
+	}
+	if _, err := acquireFileLock(writer, false); !errors.Is(err, ErrStoreBusy) {
+		_ = unlockSecond()
+		_ = unlockFirst()
+		t.Fatalf("writer lock error = %v, want ErrStoreBusy", err)
+	}
+	if err := unlockSecond(); err != nil {
+		t.Fatal(err)
+	}
+	if err := unlockFirst(); err != nil {
+		t.Fatal(err)
+	}
+	unlockWriter, err := acquireFileLock(writer, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := unlockWriter(); err != nil {
+		t.Fatal(err)
 	}
 }
 

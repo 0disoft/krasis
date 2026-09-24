@@ -35,6 +35,38 @@ func replacementCertificate(t *testing.T, now time.Time) (transport.Authenticate
 	return peer, certificate
 }
 
+func TestConcurrentTrustReadsDoNotHideRevocation(t *testing.T) {
+	now := time.Now().UTC()
+	peer, certificate := replacementCertificate(t, now)
+	store := mustStore(t)
+	if _, err := store.ImportWithCertificate(peer, certificate.Certificate[0], "peer", false, now); err != nil {
+		t.Fatal(err)
+	}
+	_, _, release, err := store.openReadLocked()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.PeerCertificate(peer, now); err != nil {
+		release()
+		t.Fatalf("parallel certificate read: %v", err)
+	}
+	if _, err := store.ReconfirmWithCertificate(peer, certificate.Certificate[0], "peer", false, now); err != nil {
+		release()
+		t.Fatalf("parallel reconfirmation read: %v", err)
+	}
+	if _, err := store.Revoke(peer.CertificateSHA256, now); !errors.Is(err, ErrStoreBusy) {
+		release()
+		t.Fatalf("revocation during shared read = %v, want ErrStoreBusy", err)
+	}
+	release()
+	if _, err := store.Revoke(peer.CertificateSHA256, now); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.PeerCertificate(peer, now); !errors.Is(err, ErrPeerRevoked) {
+		t.Fatalf("certificate after revocation = %v, want ErrPeerRevoked", err)
+	}
+}
+
 func TestReconfirmationPreservesExactExistingGrant(t *testing.T) {
 	now := time.Now().UTC()
 	peer, certificate := replacementCertificate(t, now)
