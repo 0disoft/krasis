@@ -36,11 +36,11 @@ try {
         throw 'Signed package certificate mismatch'
     }
     $hash = (Get-FileHash -LiteralPath $signed -Algorithm SHA256).Hash.ToLowerInvariant()
-    [IO.File]::WriteAllLines((Join-Path $candidate.FullName 'TEST-CERT-DETAILS.txt'), @(
-        'Subject: ' + $certificate.Subject,
-        'Thumbprint: ' + $certificate.Thumbprint,
-        'Expires UTC: ' + $certificate.NotAfter.ToUniversalTime().ToString('u'),
-        'Package SHA256: ' + $hash
+    [IO.File]::WriteAllLines((Join-Path $candidate.FullName 'TEST-CERT-DETAILS.txt'), [string[]]@(
+        "Subject: $($certificate.Subject)"
+        "Thumbprint: $($certificate.Thumbprint)"
+        "Expires UTC: $($certificate.NotAfter.ToUniversalTime().ToString('u'))"
+        "Package SHA256: $hash"
     ), [Text.UTF8Encoding]::new($false))
     Write-Output "Test-signed package: $signed"
     Write-Output "SHA256: $hash"
