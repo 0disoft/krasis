@@ -21,7 +21,7 @@ if (-not (Test-Path -LiteralPath $signtool)) { throw 'SignTool unavailable' }
 $certificate = New-SelfSignedCertificate -Type CodeSigningCert `
     -Subject 'CN=KrasisDevelopment' -CertStoreLocation 'Cert:\CurrentUser\My' `
     -KeyAlgorithm RSA -KeyLength 3072 -HashAlgorithm SHA256 `
-    -KeyExportPolicy NonExportable -NotAfter (Get-Date).AddDays(2)
+    -KeyExportPolicy NonExportable -NotAfter (Get-Date).AddDays(7)
 if (-not $certificate -or $certificate.Subject -ne 'CN=KrasisDevelopment') {
     throw 'Test certificate creation failed'
 }
@@ -36,6 +36,12 @@ try {
         throw 'Signed package certificate mismatch'
     }
     $hash = (Get-FileHash -LiteralPath $signed -Algorithm SHA256).Hash.ToLowerInvariant()
+    [IO.File]::WriteAllLines((Join-Path $candidate.FullName 'TEST-CERT-DETAILS.txt'), @(
+        'Subject: ' + $certificate.Subject,
+        'Thumbprint: ' + $certificate.Thumbprint,
+        'Expires UTC: ' + $certificate.NotAfter.ToUniversalTime().ToString('u'),
+        'Package SHA256: ' + $hash
+    ), [Text.UTF8Encoding]::new($false))
     Write-Output "Test-signed package: $signed"
     Write-Output "SHA256: $hash"
     Write-Output "Public test certificate: $public"
