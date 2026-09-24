@@ -11,15 +11,17 @@ import (
 	"testing"
 )
 
-func fixture(t *testing.T, mutate func(map[string][]byte), extra string) []byte {
+func fixture(t *testing.T, mutate func(map[string][]byte), extra string, withProbe ...bool) []byte {
 	t.Helper()
+	includeProbe := len(withProbe) != 0 && withProbe[0]
+	selected := selectedNames(includeProbe)
 	files := map[string][]byte{}
-	for _, name := range names {
+	for _, name := range selected {
 		files[name] = []byte("test fixture")
 	}
 	files["BUILD.json"], _ = json.Marshal(Metadata{Revision: strings.Repeat("a", 40), Platform: "windows/amd64", Purpose: "manual-two-pc-smoke", Generation: 21})
 	var sums strings.Builder
-	for _, name := range names[:len(names)-1] {
+	for _, name := range selected[:len(selected)-1] {
 		fmt.Fprintf(&sums, "%x  %s\n", sha256.Sum256(files[name]), name)
 	}
 	files["SHA256SUMS.txt"] = []byte(sums.String())
@@ -28,7 +30,7 @@ func fixture(t *testing.T, mutate func(map[string][]byte), extra string) []byte 
 	}
 	var buffer bytes.Buffer
 	w := zip.NewWriter(&buffer)
-	for _, name := range names {
+	for _, name := range selected {
 		if data, ok := files[name]; ok {
 			f, err := w.Create(name)
 			if err != nil {
@@ -101,5 +103,45 @@ func TestBundleStagesOnlyVerifiedFixedNamesWithoutOverwrite(t *testing.T) {
 	}
 	if _, err := Read(bytes.NewReader(data), MaxArchiveBytes+1); err == nil {
 		t.Fatal("accepted oversized archive")
+	}
+}
+
+func TestProbePayloadStagesAsAnAtomicPair(t *testing.T) {
+	data := fixture(t, nil, "", true)
+	b, err := read(bytes.NewReader(data), int64(len(data)), func(string, []byte, string) error { return nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := os.OpenRoot(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	id := strings.Repeat("c", 32)
+	if err := b.Stage(root, id); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range probeNames {
+		f, err := root.Open(id + "/" + name)
+		if err != nil {
+			t.Fatalf("missing staged %s: %v", name, err)
+		}
+		f.Close()
+	}
+	for _, tc := range []struct {
+		name   string
+		mutate func(map[string][]byte)
+	}{
+		{"missing package", func(f map[string][]byte) { delete(f, probeNames[0]) }},
+		{"missing certificate", func(f map[string][]byte) { delete(f, probeNames[1]) }},
+		{"oversized certificate", func(f map[string][]byte) { f[probeNames[1]] = bytes.Repeat([]byte("x"), (16<<10)+1) }},
+		{"tampered package", func(f map[string][]byte) { f[probeNames[0]] = []byte("tampered") }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			invalid := fixture(t, tc.mutate, "", true)
+			if _, err := read(bytes.NewReader(invalid), int64(len(invalid)), func(string, []byte, string) error { return nil }); err == nil {
+				t.Fatal("accepted invalid probe payload")
+			}
+		})
 	}
 }

@@ -25,6 +25,16 @@ const maxDocumentBytes int64 = 1 << 20
 var ErrInvalid = errors.New("invalid Krasis update bundle")
 
 var names = []string{"krasis.exe", "krasis-agent.exe", "krasis-control.exe", "START-HERE.md", "BUILD.json", "THIRD-PARTY-NOTICES.txt", "SHA256SUMS.txt"}
+var probeNames = []string{"KrasisBrokeredProbe-TESTSIGNED.msix", "KrasisBrokeredProbe-TESTCERT.cer"}
+
+func selectedNames(withProbe bool) []string {
+	if !withProbe {
+		return names
+	}
+	selected := append([]string{}, names[:len(names)-1]...)
+	selected = append(selected, probeNames...)
+	return append(selected, names[len(names)-1])
+}
 
 type Metadata struct {
 	Revision   string `json:"revision"`
@@ -52,7 +62,7 @@ func read(source io.ReaderAt, size int64, executable func(string, []byte, string
 		return nil, ErrInvalid
 	}
 	r, err := zip.NewReader(source, size)
-	if err != nil || len(r.File) != len(names) {
+	if err != nil || (len(r.File) != len(names) && len(r.File) != len(names)+len(probeNames)) {
 		return nil, ErrInvalid
 	}
 	files := make(map[string][]byte, len(names))
@@ -79,6 +89,10 @@ func read(source io.ReaderAt, size int64, executable func(string, []byte, string
 			return nil, ErrInvalid
 		}
 	}
+	if (files[probeNames[0]] == nil) != (files[probeNames[1]] == nil) {
+		return nil, ErrInvalid
+	}
+	selected := selectedNames(files[probeNames[0]] != nil)
 	checksums := map[string]string{}
 	for _, line := range strings.Split(strings.TrimSuffix(string(files["SHA256SUMS.txt"]), "\n"), "\n") {
 		parts := strings.SplitN(strings.TrimSuffix(line, "\r"), "  ", 2)
@@ -87,10 +101,14 @@ func read(source io.ReaderAt, size int64, executable func(string, []byte, string
 		}
 		checksums[parts[1]] = parts[0]
 	}
-	if len(checksums) != len(names)-1 {
+	if len(checksums) != len(selected)-1 {
 		return nil, ErrInvalid
 	}
-	for name, expected := range checksums {
+	for _, name := range selected[:len(selected)-1] {
+		expected, ok := checksums[name]
+		if !ok {
+			return nil, ErrInvalid
+		}
 		hash := sha256.Sum256(files[name])
 		if hex.EncodeToString(hash[:]) != expected {
 			return nil, ErrInvalid
@@ -121,6 +139,12 @@ func fileLimit(name string) int64 {
 			}
 			return maxDocumentBytes
 		}
+	}
+	if name == probeNames[0] {
+		return 16 << 20
+	}
+	if name == probeNames[1] {
+		return 16 << 10
 	}
 	return 0
 }
@@ -159,7 +183,13 @@ func verifyExecutable(name string, data []byte, revision string) error {
 // Stage creates a fresh directory under a caller-owned, protected root. It never
 // overwrites an installed bundle and never uses archive-controlled path names.
 func (b *Bundle) Stage(parent *os.Root, directory string) (err error) {
-	if b == nil || len(b.files) != len(names) || !validHex(directory, 32) {
+	if b == nil || (len(b.files) != len(names) && len(b.files) != len(names)+len(probeNames)) || !validHex(directory, 32) {
+		return ErrInvalid
+	}
+	selected := names
+	if b.files[probeNames[0]] != nil && b.files[probeNames[1]] != nil {
+		selected = selectedNames(true)
+	} else if len(b.files) != len(names) {
 		return ErrInvalid
 	}
 	if err = parent.Mkdir(directory, 0700); err != nil {
@@ -172,14 +202,14 @@ func (b *Bundle) Stage(parent *os.Root, directory string) (err error) {
 	defer root.Close()
 	defer func() {
 		if err != nil {
-			for _, name := range names {
+			for _, name := range selected {
 				_ = root.Remove(name)
 			}
 			_ = root.Close()
 			_ = parent.Remove(directory)
 		}
 	}()
-	for _, name := range names {
+	for _, name := range selected {
 		file, createErr := root.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 		if createErr != nil {
 			return createErr
@@ -201,7 +231,24 @@ func Pack(root interface {
 }) ([]byte, error) {
 	var buffer bytes.Buffer
 	w := zip.NewWriter(&buffer)
-	for _, name := range names {
+	selected := names
+	var present int
+	for _, name := range probeNames {
+		f, err := root.Open(name)
+		if err == nil {
+			present++
+			f.Close()
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+	}
+	if present == 1 {
+		return nil, ErrInvalid
+	}
+	if present == len(probeNames) {
+		selected = selectedNames(true)
+	}
+	for _, name := range selected {
 		f, err := root.Open(name)
 		if err != nil {
 			return nil, err

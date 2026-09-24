@@ -96,6 +96,13 @@ they are not inferred to mean an already-current peer. Raw error text is not sen
 
 ## Verification boundary
 
+Generation 61 is a transition build. Its update receiver accepts the original
+seven-file archive or a fixed nine-file archive with a signed experimental
+`KrasisBrokeredProbe` MSIX and public test certificate. The sender still emits
+the seven-file archive so generation 60 can install generation 61. The added
+files are only staged; this path does not install the MSIX or trust its
+certificate. Both files must be present with bounded sizes and checksums.
+
 Unit tests cover denied and revoked permissions, single-use apply, malformed ZIPs,
 generation checks and integrity checks. Packaged two-PC upgrade, firewall behavior,
 native GUI relaunch and post-upgrade input require manual verification. No official
