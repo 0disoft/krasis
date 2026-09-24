@@ -9,6 +9,7 @@ import (
 	"github.com/0disoft/krasis/internal/agent"
 	"github.com/0disoft/krasis/internal/productlog"
 	"github.com/0disoft/krasis/internal/transport"
+	"github.com/0disoft/krasis/internal/wininput"
 )
 
 var errLocalDisconnect = errors.New("local disconnect requested")
@@ -17,8 +18,9 @@ var errLocalDisconnect = errors.New("local disconnect requested")
 // trust expiry, crashes and lifecycle cancellation keep their existing policy.
 type disconnectSource struct {
 	agent.ConnectionSource
-	intent context.Context
-	log    *productlog.Logger
+	intent    context.Context
+	protected context.Context
+	log       *productlog.Logger
 }
 
 func (source *disconnectSource) Next(ctx context.Context) (agent.Connection, error) {
@@ -29,15 +31,16 @@ func (source *disconnectSource) Next(ctx context.Context) (agent.Connection, err
 	if policy, ok := connection.(interface{ KeepAlivePolicy() string }); ok {
 		source.log.Event(policy.KeepAlivePolicy())
 	}
-	return &disconnectConnection{Connection: connection, intent: source.intent, log: source.log}, nil
+	return &disconnectConnection{Connection: connection, intent: source.intent, protected: source.protected, log: source.log}, nil
 }
 
 type disconnectConnection struct {
 	agent.Connection
-	intent context.Context
-	log    *productlog.Logger
-	once   sync.Once
-	err    error
+	intent    context.Context
+	protected context.Context
+	log       *productlog.Logger
+	once      sync.Once
+	err       error
 }
 
 func (connection *disconnectConnection) DiagnosticID() string {
@@ -55,7 +58,8 @@ func (connection *disconnectConnection) SetReadProgressObserver(observer func(in
 
 func (connection *disconnectConnection) Close() error {
 	connection.once.Do(func() {
-		if errors.Is(context.Cause(connection.intent), errLocalDisconnect) {
+		protectedStop := connection.protected != nil && errors.Is(context.Cause(connection.protected), wininput.ErrProtectedInput)
+		if errors.Is(context.Cause(connection.intent), errLocalDisconnect) || protectedStop {
 			// The transport write gate serializes this final frame with any
 			// in-flight input. A lost peer must never hold up local release.
 			ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)

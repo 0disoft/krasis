@@ -7,6 +7,7 @@ import (
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/peer"
 	"github.com/0disoft/krasis/internal/transport"
+	"github.com/0disoft/krasis/internal/wininput"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -91,6 +92,30 @@ func TestDisconnectNotificationIsIntentionalBoundedAndOnce(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestProtectedInputNotifiesPeerBeforeClosingTransport(t *testing.T) {
+	for _, test := range []struct {
+		cause error
+		want  int
+	}{
+		{wininput.ErrProtectedInput, 1},
+		{context.Canceled, 0},
+	} {
+		protected, cancel := context.WithCancelCause(context.Background())
+		cancel(test.cause)
+		raw := &disconnectTestConnection{}
+		connection := &disconnectConnection{Connection: raw, intent: context.Background(), protected: protected}
+		if err := connection.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if raw.closed != 1 || len(raw.frames) != test.want {
+			t.Fatalf("cause=%v closed=%d frames=%d", test.cause, raw.closed, len(raw.frames))
+		}
+		if test.want == 1 && raw.frames[0].Kind != transport.MessageDisconnect {
+			t.Fatalf("protected stop frame=%v", raw.frames[0].Kind)
+		}
+	}
 }
 
 func TestRemoteDisconnectPublishesLocalAndPreservesCleanupErrors(t *testing.T) {
