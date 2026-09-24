@@ -13,6 +13,7 @@ using namespace winrt::Windows::UI::Input::Preview::Injection;
 namespace {
 
 enum class target_kind { credential_broker, elevated_shell };
+enum class input_kind { escape, click };
 
 bool default_input_desktop() {
     HDESK desktop = OpenInputDesktop(0, FALSE, DESKTOP_READOBJECTS);
@@ -103,6 +104,35 @@ void result(const wchar_t* message) {
     MessageBoxW(nullptr, message, L"Krasis 입력 경로 시험", MB_OK | MB_ICONINFORMATION);
 }
 
+void send_escape(InputInjector const& injector) {
+    InjectedInputKeyboardInfo down;
+    down.VirtualKey(VK_ESCAPE);
+    InjectedInputKeyboardInfo up;
+    up.VirtualKey(VK_ESCAPE);
+    up.KeyOptions(InjectedInputKeyOptions::KeyUp);
+    try {
+        injector.InjectKeyboardInput(std::vector<InjectedInputKeyboardInfo>{down, up});
+    } catch (...) {
+        try { injector.InjectKeyboardInput(std::vector<InjectedInputKeyboardInfo>{up}); }
+        catch (...) { /* The operator still has B's physical keyboard. */ }
+        throw;
+    }
+}
+
+void send_click(InputInjector const& injector) {
+    InjectedInputMouseInfo down;
+    down.MouseOptions(InjectedInputMouseOptions::LeftDown);
+    InjectedInputMouseInfo up;
+    up.MouseOptions(InjectedInputMouseOptions::LeftUp);
+    try {
+        injector.InjectMouseInput(std::vector<InjectedInputMouseInfo>{down, up});
+    } catch (...) {
+        try { injector.InjectMouseInput(std::vector<InjectedInputMouseInfo>{up}); }
+        catch (...) { /* The operator still has B's physical touchpad. */ }
+        throw;
+    }
+}
+
 }  // namespace
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
@@ -113,6 +143,12 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     if (choice == IDCANCEL) return 0;
     const target_kind target = choice == IDYES ? target_kind::credential_broker
                                                : target_kind::elevated_shell;
+    const int action = MessageBoxW(nullptr,
+        L"마우스 왼쪽 클릭은 예, 키보드 Esc는 아니요를 누르세요.\n"
+        L"클릭 시험에서는 B의 포인터를 안전한 입력 영역에 두세요.",
+        L"Krasis 입력 경로 시험", MB_YESNOCANCEL | MB_ICONQUESTION);
+    if (action == IDCANCEL) return 0;
+    const input_kind input = action == IDYES ? input_kind::click : input_kind::escape;
 
     try {
         winrt::init_apartment(winrt::apartment_type::multi_threaded);
@@ -121,10 +157,15 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             result(L"input_injector_unavailable: Windows 입력 권한을 얻지 못했습니다.");
             return 2;
         }
-        result(target == target_kind::credential_broker
-            ? L"확인을 누른 뒤 2분 안에 B에서 PIN 창을 띄우세요. PIN은 입력하지 마세요."
-            : L"확인을 누른 뒤 2분 안에 B에서 관리자 PowerShell을 전면에 두세요.\n"
-              L"빈 명령줄에 시험용 글자를 입력해 두면 Esc 효과를 확인하기 쉽습니다.");
+        if (target == target_kind::credential_broker) {
+            result(input == input_kind::escape
+                ? L"확인을 누른 뒤 2분 안에 B에서 PIN 창을 띄우세요. PIN은 입력하지 마세요."
+                : L"확인을 누른 뒤 2분 안에 B에서 PIN 창을 띄우고, 포인터를 PIN 입력란에 두세요. PIN은 입력하지 마세요.");
+        } else {
+            result(input == input_kind::escape
+                ? L"확인을 누른 뒤 2분 안에 B에서 관리자 PowerShell을 전면에 두세요.\n빈 명령줄에 시험용 글자를 입력해 두면 Esc 효과를 확인하기 쉽습니다."
+                : L"확인을 누른 뒤 2분 안에 B에서 관리자 PowerShell을 전면에 두고, 포인터를 안전한 빈 영역에 두세요.");
+        }
 
         HWND observed = nullptr;
         const ULONGLONG deadline = GetTickCount64() + 120000;
@@ -141,12 +182,13 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             return 3;
         }
 
-        InjectedInputKeyboardInfo down;
-        down.VirtualKey(VK_ESCAPE);
-        InjectedInputKeyboardInfo up;
-        up.VirtualKey(VK_ESCAPE);
-        up.KeyOptions(InjectedInputKeyOptions::KeyUp);
-        injector.InjectKeyboardInput(std::vector<InjectedInputKeyboardInfo>{down, up});
+        if (input == input_kind::click) {
+            send_click(injector);
+            Sleep(1000);
+            result(L"click_sent: B에서 포인터 위치의 클릭이 실제로 적용됐는지 확인해 주세요.");
+            return 0;
+        }
+        send_escape(injector);
 
         if (target == target_kind::elevated_shell) {
             result(L"escape_sent: 관리자 PowerShell의 시험용 글자가 지워졌는지 직접 확인해 주세요.");
