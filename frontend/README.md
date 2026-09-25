@@ -89,11 +89,15 @@ on real devices.
 
 ## Clipboard sharing
 
-Workspace supports the existing opt-in text sharing protocol. Enable it on both
-PCs using the clipboard card. Enabling requires a warning/confirmation; disabling
-does not. The switch reflects acknowledged agent settings, not optimistic UI.
-Only the peer fingerprint and a status code cross the WebView boundary. Copied
-text stays in the native Windows worker and the authenticated local agent.
+Krasis shares newly copied text, screenshots, and Explorer files and folders
+with one selected paired PC. Enable clipboard sharing on both PCs; enabling
+shows a confirmation. Upgrading from a version without file sharing requires
+enabling it again on both PCs. The switch reflects acknowledged agent settings.
+Only the peer fingerprint and status cross the WebView boundary; content stays
+in the native Windows worker and authenticated local agent. Files and folders
+are limited to 40 MiB and 512 entries. The receiving PC temporarily stores
+their bytes in a private directory for Explorer paste, then removes them after
+24 hours while Krasis runs or at its next start.
 
 The worker reuses the legacy controller's Unicode size limits, excluded-content
 formats, remote-write marker, exact sequence comparison and acknowledgment logic.
@@ -103,7 +107,7 @@ does not create an unpumped owner window. Closing to tray keeps the worker alive
 
 If the legacy controller is also open, Workspace defers to its existing pump.
 On takeover, changing peer, revocation or disabling, the baseline resets so old
-clipboard contents are not republished. Files/images are not supported.
+clipboard contents are not republished.
 Consent changes and native synchronization are serialized. An off/on cycle,
 including an ambiguous setting response, resets the native sequence baseline
 before synchronization resumes.
