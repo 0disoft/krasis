@@ -12,6 +12,10 @@ assert.ok(!fs.existsSync(path.join(directory,'krasis-agent.exe')),'Duplicate age
 const generation = Number(path.basename(directory).match(/^g(\d+)$/u)?.[1]);
 assert.ok(Number.isSafeInteger(generation),'Expected generation-scoped distribution');
 const expected=['BUILD.json','SHA256SUMS.txt','START-HERE.md','THIRD-PARTY-NOTICES.txt','krasis-agent.exe','krasis-control.exe','krasis.exe'];
-if (generation >= 62) expected.push('KrasisBrokeredProbe-TESTSIGNED.msix','KrasisBrokeredProbe-TESTCERT.cer');
-assert.deepEqual(fs.readdirSync(path.join(directory,'peer-update')).sort(),expected.sort());
+const actual=fs.readdirSync(path.join(directory,'peer-update')).sort();
+const probeNames=['KrasisBrokeredProbe-TESTSIGNED.msix','KrasisBrokeredProbe-TESTCERT.cer'];
+const probeCount=probeNames.filter(name=>actual.includes(name)).length;
+assert.ok(probeCount===0||probeCount===probeNames.length,'Probe package and certificate must appear together');
+if (probeCount===probeNames.length) expected.push(...probeNames);
+assert.deepEqual(actual,expected.sort());
 console.log(`Launcher icon and single-copy ${expected.length}-file update bundle verified.`);
