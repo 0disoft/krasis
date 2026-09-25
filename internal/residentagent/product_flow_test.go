@@ -383,7 +383,9 @@ func productRenewalFlow(t *testing.T, both, allowInbound bool) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	handshake, stop := context.WithTimeout(ctx, 3*time.Second)
+	// Windows CI can spend several seconds validating the peer certificates
+	// against the temporary trust stores. Keep the test bound above that I/O.
+	handshake, stop := context.WithTimeout(ctx, 10*time.Second)
 	defer stop()
 	type acceptedPeer struct {
 		connection agent.Connection
@@ -404,11 +406,8 @@ func productRenewalFlow(t *testing.T, both, allowInbound bool) {
 	if conn != nil {
 		defer conn.Close()
 	}
-	if err != nil {
-		t.Fatal(err)
-	}
-	if serverPeer.err != nil {
-		t.Fatal(serverPeer.err)
+	if err != nil || serverPeer.err != nil {
+		t.Fatalf("initial TLS: client=%v server=%v preauth=%+v", err, serverPeer.err, source.PreAuthMetrics())
 	}
 	conn.Close()
 	serverPeer.connection.Close()
