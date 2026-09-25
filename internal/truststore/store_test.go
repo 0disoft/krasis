@@ -318,9 +318,34 @@ func TestPeerCertificateTraceLocatesBusyLockWithoutChangingTrust(t *testing.T) {
 	}
 	snapshot = trace.Snapshot()
 	_, reachedRead := snapshot.Durations["store_read"]
+	_, reachedReadOpen := snapshot.Durations["store_read_open"]
+	_, reachedReadACL := snapshot.Durations["store_read_acl"]
+	_, reachedReadBytes := snapshot.Durations["store_read_bytes"]
+	_, reachedReadDecode := snapshot.Durations["store_read_decode"]
+	_, reachedReadClose := snapshot.Durations["store_read_close"]
 	_, reachedCertificate = snapshot.Durations["certificate"]
-	if snapshot.Phase != "" || snapshot.Attempts != 1 || !reachedRead || !reachedCertificate {
+	if snapshot.Phase != "" || snapshot.Attempts != 1 || !reachedRead || !reachedReadOpen || !reachedReadACL || !reachedReadBytes || !reachedReadDecode || !reachedReadClose || !reachedCertificate {
 		t.Fatalf("in-lock phase: %+v", snapshot)
+	}
+}
+
+func TestReadTraceKeepsParentTimingAndActiveStep(t *testing.T) {
+	trace := NewReadTrace()
+	trace.enter("prelock")
+	trace.enterStep("prelock_parent_acl")
+	snapshot := trace.Snapshot()
+	if snapshot.Phase != "prelock_parent_acl" || snapshot.Durations["prelock"] < snapshot.Durations["prelock_parent_acl"] {
+		t.Fatalf("active nested phase: %+v", snapshot)
+	}
+	trace.enter("lock")
+	snapshot = trace.Snapshot()
+	_, completedStep := snapshot.Durations["prelock_parent_acl"]
+	if snapshot.Phase != "lock" || !completedStep {
+		t.Fatalf("completed nested phase: %+v", snapshot)
+	}
+	trace.finish()
+	if trace.Snapshot().Phase != "" {
+		t.Fatal("finished read retained an active phase")
 	}
 }
 

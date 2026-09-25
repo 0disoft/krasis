@@ -131,3 +131,35 @@ func TestTrustReadTimeoutReportsCurrentPhaseAndKeepsSessionStopped(t *testing.T)
 		}
 	})
 }
+
+func TestTrustTraceReportsNestedTimeoutStep(t *testing.T) {
+	snapshot := truststore.ReadTraceSnapshot{
+		Phase: "store_read_acl",
+		Durations: map[string]time.Duration{
+			"store_read": time.Second,
+			"store_read_acl": time.Second,
+		},
+	}
+	var codes []string
+	recordTrustTrace(snapshot, func(code string) { codes = append(codes, code) })
+	if len(codes) != 3 || codes[0] != "trust_timing_store_read_ge1s" ||
+		codes[1] != "trust_timing_store_read_acl_ge1s" || codes[2] != "trust_active_store_read_acl" {
+		t.Fatalf("nested timeout codes: %v", codes)
+	}
+}
+
+func TestTrustTraceOmitsFastCompletedSubsteps(t *testing.T) {
+	snapshot := truststore.ReadTraceSnapshot{
+		Durations: map[string]time.Duration{
+			"prelock": 100 * time.Millisecond,
+			"prelock_parent_acl": time.Millisecond,
+			"prelock_directory_open": 99 * time.Millisecond,
+		},
+	}
+	var codes []string
+	recordTrustTrace(snapshot, func(code string) { codes = append(codes, code) })
+	if len(codes) != 2 || codes[0] != "trust_timing_prelock_lt1s" ||
+		codes[1] != "trust_timing_prelock_directory_open_lt100ms" {
+		t.Fatalf("slow substep codes: %v", codes)
+	}
+}

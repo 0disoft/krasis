@@ -41,6 +41,8 @@ type ReadTrace struct {
 	started   time.Time
 	entered   time.Time
 	phase     string
+	step      string
+	stepStart time.Time
 	durations map[string]time.Duration
 	attempts  int
 }
@@ -53,7 +55,7 @@ type ReadTraceSnapshot struct {
 }
 
 func NewReadTrace() *ReadTrace {
-	return &ReadTrace{started: time.Now(), durations: make(map[string]time.Duration, 5)}
+	return &ReadTrace{started: time.Now(), durations: make(map[string]time.Duration, 15)}
 }
 
 func (trace *ReadTrace) enter(phase string) {
@@ -63,6 +65,7 @@ func (trace *ReadTrace) enter(phase string) {
 	trace.mu.Lock()
 	defer trace.mu.Unlock()
 	now := time.Now()
+	trace.finishStep(now)
 	if trace.phase != "" {
 		trace.durations[trace.phase] += now.Sub(trace.entered)
 	}
@@ -72,12 +75,31 @@ func (trace *ReadTrace) enter(phase string) {
 	}
 }
 
+func (trace *ReadTrace) enterStep(step string) {
+	if trace == nil {
+		return
+	}
+	trace.mu.Lock()
+	defer trace.mu.Unlock()
+	now := time.Now()
+	trace.finishStep(now)
+	trace.step, trace.stepStart = step, now
+}
+
+func (trace *ReadTrace) finishStep(now time.Time) {
+	if trace.step != "" {
+		trace.durations[trace.step] += now.Sub(trace.stepStart)
+		trace.step = ""
+	}
+}
+
 func (trace *ReadTrace) finish() {
 	if trace == nil {
 		return
 	}
 	trace.mu.Lock()
 	defer trace.mu.Unlock()
+	trace.finishStep(time.Now())
 	if trace.phase != "" {
 		trace.durations[trace.phase] += time.Since(trace.entered)
 		trace.phase = ""
@@ -93,6 +115,10 @@ func (trace *ReadTrace) Snapshot() ReadTraceSnapshot {
 	snapshot := ReadTraceSnapshot{Phase: trace.phase, Durations: make(map[string]time.Duration, len(trace.durations)+1), Attempts: trace.attempts, Elapsed: now.Sub(trace.started)}
 	for phase, duration := range trace.durations {
 		snapshot.Durations[phase] = duration
+	}
+	if trace.step != "" {
+		snapshot.Phase = trace.step
+		snapshot.Durations[trace.step] += now.Sub(trace.stepStart)
 	}
 	if trace.phase != "" {
 		snapshot.Durations[trace.phase] += now.Sub(trace.entered)
@@ -329,13 +355,15 @@ func (store *Store) openLocked(create bool) (Document, *securefs.Directory, func
 
 func (store *Store) openLockedMode(create, shared bool, trace *ReadTrace) (Document, *securefs.Directory, func(), error) {
 	trace.enter("prelock")
-	if err := store.prepareDirectory(create); err != nil {
+	if err := store.prepareDirectoryTraced(create, trace); err != nil {
 		return Document{}, nil, nil, err
 	}
+	trace.enterStep("prelock_directory_open")
 	directory, err := securefs.OpenDirectory(store.directory)
 	if err != nil {
 		return Document{}, nil, nil, fmt.Errorf("open trust store directory handle: %w", err)
 	}
+	trace.enterStep("prelock_lockfile_open")
 	lockFile, created, err := openLockFile(directory)
 	if err != nil {
 		_ = directory.Close()
@@ -345,6 +373,7 @@ func (store *Store) openLockedMode(create, shared bool, trace *ReadTrace) (Docum
 		_ = lockFile.Close()
 		_ = directory.Close()
 	}
+	trace.enterStep("prelock_lockfile_acl")
 	if created {
 		if err := peercredentials.ProtectSecurityFileHandle(lockFile); err != nil {
 			closeLock()
@@ -366,7 +395,7 @@ func (store *Store) openLockedMode(create, shared bool, trace *ReadTrace) (Docum
 		_ = directory.Close()
 	}
 	trace.enter("store_read")
-	document, err := store.read(directory)
+	document, err := store.read(directory, trace)
 	if err != nil {
 		if create && errors.Is(err, ErrStoreNotFound) {
 			return Document{SchemaVersion: SchemaVersion, Peers: []PeerRecord{}}, directory, release, nil
@@ -378,9 +407,15 @@ func (store *Store) openLockedMode(create, shared bool, trace *ReadTrace) (Docum
 }
 
 func (store *Store) prepareDirectory(create bool) error {
+	return store.prepareDirectoryTraced(create, nil)
+}
+
+func (store *Store) prepareDirectoryTraced(create bool, trace *ReadTrace) error {
+	trace.enterStep("prelock_parent_acl")
 	if _, err := peercredentials.ValidateSecurityDirectory(filepath.Dir(store.directory)); err != nil {
 		return fmt.Errorf("validate trust store parent security: %w", err)
 	}
+	trace.enterStep("prelock_directory_lstat")
 	info, err := os.Lstat(store.directory)
 	if errors.Is(err, os.ErrNotExist) {
 		if !create {
@@ -401,11 +436,13 @@ func (store *Store) prepareDirectory(create bool) error {
 	if !info.IsDir() {
 		return errors.New("trust store path must be a directory")
 	}
+	trace.enterStep("prelock_directory_acl")
 	_, err = peercredentials.ValidateSecurityDirectory(store.directory)
 	return err
 }
 
-func (store *Store) read(directory *securefs.Directory) (Document, error) {
+func (store *Store) read(directory *securefs.Directory, trace *ReadTrace) (Document, error) {
+	trace.enterStep("store_read_open")
 	file, err := directory.Open(storeFilename)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -413,10 +450,15 @@ func (store *Store) read(directory *securefs.Directory) (Document, error) {
 		}
 		return Document{}, fmt.Errorf("open trust store: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		trace.enterStep("store_read_close")
+		_ = file.Close()
+	}()
+	trace.enterStep("store_read_acl")
 	if err := peercredentials.ValidateSecurityFileHandle(file); err != nil {
 		return Document{}, fmt.Errorf("validate trust store security: %w", err)
 	}
+	trace.enterStep("store_read_bytes")
 	data, err := io.ReadAll(io.LimitReader(file, maxStoreBytes+1))
 	if err != nil {
 		return Document{}, fmt.Errorf("read trust store: %w", err)
@@ -424,6 +466,7 @@ func (store *Store) read(directory *securefs.Directory) (Document, error) {
 	if len(data) > maxStoreBytes {
 		return Document{}, errors.New("trust store exceeds size limit")
 	}
+	trace.enterStep("store_read_decode")
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	var document Document

@@ -15,7 +15,7 @@ func TestProductMonitorReasonsSurviveExport(t *testing.T) {
 }
 
 func TestTrustTimingCodesSurviveExportWithoutArbitraryDetails(t *testing.T) {
-	for _, code := range []string{"trust_timing_prelock_lt1ms", "trust_timing_lock_lt100ms", "trust_timing_store_read_lt1s", "trust_timing_certificate_ge1s", "trust_timing_retry_wait_lt100ms", "trust_active_prelock", "trust_active_store_read"} {
+	for _, code := range []string{"trust_timing_prelock_lt1ms", "trust_timing_prelock_parent_acl_ge1s", "trust_timing_lock_lt100ms", "trust_timing_store_read_lt1s", "trust_timing_store_read_acl_ge1s", "trust_timing_certificate_ge1s", "trust_timing_retry_wait_lt100ms", "trust_active_prelock", "trust_active_prelock_lockfile_open", "trust_active_store_read_acl"} {
 		result := sanitizeLog("agent.jsonl", strings.NewReader(`{"time":"2026-09-17T00:00:00Z","code":"`+code+`"}`+"\n"))
 		if result.Incomplete || len(result.Events) != 1 || result.Events[0].Code != code {
 			t.Fatal(code)

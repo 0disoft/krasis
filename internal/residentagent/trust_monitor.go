@@ -3,6 +3,7 @@ package residentagent
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/0disoft/krasis/internal/agent"
@@ -11,7 +12,12 @@ import (
 
 const trustReadTimeout = time.Second
 
-var trustReadPhases = [...]string{"prelock", "lock", "store_read", "certificate", "retry_wait"}
+var trustReadPhases = [...]string{
+	"prelock", "prelock_parent_acl", "prelock_directory_lstat", "prelock_directory_acl",
+	"prelock_directory_open", "prelock_lockfile_open", "prelock_lockfile_acl",
+	"lock", "store_read", "store_read_open", "store_read_acl", "store_read_bytes",
+	"store_read_decode", "store_read_close", "certificate", "retry_wait",
+}
 
 // Emit fixed, coarse timing codes so exported diagnostics locate a slow phase
 // without exposing peer identity, paths, certificates, or raw error text.
@@ -19,6 +25,10 @@ func recordTrustTrace(snapshot truststore.ReadTraceSnapshot, record func(string)
 	for _, phase := range trustReadPhases {
 		duration, observed := snapshot.Durations[phase]
 		if !observed {
+			continue
+		}
+		if (strings.HasPrefix(phase, "prelock_") || strings.HasPrefix(phase, "store_read_")) &&
+			duration < 10*time.Millisecond && snapshot.Phase != phase {
 			continue
 		}
 		bucket := "lt1ms"

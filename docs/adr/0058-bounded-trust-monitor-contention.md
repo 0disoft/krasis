@@ -35,3 +35,13 @@ certificate validation, and retry waiting. On timeout it also records the
 active phase. These fixed codes contain no peer, path, certificate, or error
 text. They identify where a future failure spends time; they do not by
 themselves prove that the g54 study-pair disconnect is resolved.
+
+Generation 68 keeps those aggregate buckets and additionally records fixed
+substeps for parent/directory ACL and metadata checks, directory and lockfile
+opens, lockfile ACL, and trust-file open, ACL, byte read, decode, and close. The active
+substep is recorded on timeout; completed substeps under 10 ms are omitted.
+Substep durations overlap their aggregate
+`prelock` or `store_read` duration and must not be added to it. Codes still
+contain no path, peer identity, certificate, input, or raw error. This narrows
+the next failure investigation; it does not relax the one-second trust deadline
+or change fail-closed behavior.
