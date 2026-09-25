@@ -15,6 +15,8 @@ func clipboardContentType(format string) string {
 		return "image/png"
 	case "dib":
 		return "application/x-krasis-dib"
+	case "files":
+		return "application/x-krasis-files+zip"
 	default:
 		return "text/plain; charset=utf-8"
 	}

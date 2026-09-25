@@ -30,7 +30,7 @@ func (m *Manager) info(peer string) PeerInfo {
 	info := PeerInfo{Protocol: 2, Generation: m.generation, Revision: m.revision, Allowed: m.permitted(peer), Clipboard: allowed, ClipboardID: id, ClipboardSize: size, ClipboardFormat: format}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if format != "" && m.peers[peer].info.Generation < 69 {
+	if format != "" && (m.peers[peer].info.Generation < 69 || format == "files" && m.peers[peer].info.Generation < 70) {
 		info.ClipboardID, info.ClipboardSize, info.ClipboardFormat = "", 0, ""
 	}
 	if m.status.Peer == peer && m.status.State == "APPLY_FAILED" {
@@ -49,7 +49,7 @@ func readPeerInfo(reader io.Reader) (PeerInfo, error) {
 	}
 	limit := MaxClipboardBytes
 	if info.ClipboardFormat != "" {
-		if info.Generation < 69 || (info.ClipboardFormat != "png" && info.ClipboardFormat != "dib") {
+		if info.Generation < 69 || (info.ClipboardFormat != "png" && info.ClipboardFormat != "dib" && (info.Generation < 70 || info.ClipboardFormat != "files")) {
 			return PeerInfo{}, ErrDenied
 		}
 		limit = MaxClipboardImageBytes

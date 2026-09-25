@@ -38,7 +38,7 @@ func (r ClipboardRequest) Valid() bool {
 	if r.Format == "" {
 		return len(r.Data) == 0 && (r.Text == nil || len(*r.Text) <= peerupdate.MaxClipboardBytes)
 	}
-	return r.Text == nil && peerupdate.ValidClipboardImage(r.Format, r.Data)
+	return r.Text == nil && peerupdate.ValidClipboardPayload(r.Format, r.Data)
 }
 func (c *Client) Clipboard(ctx context.Context, r ClipboardRequest) (ClipboardResult, error) {
 	var v ClipboardResult

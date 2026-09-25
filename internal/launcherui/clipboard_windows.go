@@ -267,7 +267,10 @@ func (p *clipboardPump) sync(ctx context.Context, hwnd uintptr, control, peer st
 	}
 	request := localapi.ClipboardRequest{Action: "SYNC", Peer: peer}
 	if current != p.sequence {
-		format, data, sequence, present, err := readClipboardImage(hwnd)
+		format, data, sequence, present, err := readClipboardFiles(hwnd)
+		if !present {
+			format, data, sequence, present, err = readClipboardImage(hwnd)
+		}
 		if sequence != 0 {
 			p.sequence = sequence
 		}
@@ -298,6 +301,8 @@ func (p *clipboardPump) sync(ctx context.Context, hwnd uintptr, control, peer st
 	var sequence uintptr
 	if result.Value.Format == "" {
 		sequence, err = writeRemoteClipboardText(hwnd, current, result.Value.Text, result.Value.ID)
+	} else if result.Value.Format == "files" {
+		sequence, err = writeRemoteClipboardFiles(hwnd, current, result.Value.Data, result.Value.ID)
 	} else {
 		sequence, err = writeRemoteClipboardImage(hwnd, current, result.Value.Format, result.Value.Data, result.Value.ID)
 	}

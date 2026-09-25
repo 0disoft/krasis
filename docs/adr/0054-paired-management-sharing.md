@@ -34,8 +34,12 @@ The GUI explicitly warns about secrets; applications marking clipboard content
 `ExcludeClipboardContentFromMonitorProcessing` are excluded. Unicode text is
 limited to 64 KiB UTF-8 and rejects NUL or invalid UTF-8. PNG and ordinary
 uncompressed DIB images are bounded to 40 MiB and 10 million pixels. Explorer
-file lists are not treated as text or image clipboard data. Clipboard content
-is never persisted or logged by Krasis.
+file and folder lists are transferred as a bounded 40 MiB ZIP of actual file
+bytes, with at most 512 entries and no reparse points, symlinks or special files.
+File contents are unpacked into a private local clipboard directory on the
+receiving PC and removed after 24 hours while Krasis runs, or at the next
+start after that deadline. Text and image clipboard content is
+never persisted or logged by Krasis; file content is never logged.
 
 The authenticated local `/v1/clipboard` API provides ENABLE, DISABLE and SYNC.
 Both agents advertise permission and latest change metadata in management status
@@ -44,8 +48,10 @@ receipts and duplicate suppression. One outgoing and one incoming value are kept
 in memory with 15-second and 10-second deadlines. There is no offline replay.
 Concurrent local copies win over pending remote copies; simultaneous conflicting
 copies may require copying again rather than silently choosing a device winner.
-Image metadata is advertised only to peers that support it; older text-only
-agents continue to exchange text without receiving an oversized image offer.
+Image and file metadata is advertised only to peers that support each format;
+older agents continue to exchange supported formats. Upgrading from a version
+whose consent did not include files resets clipboard sharing until the user
+enables it again on both PCs.
 
 Native clipboard sequence is checked while the clipboard is open before a remote
 write, preventing an in-flight response from replacing a newer local copy. A

@@ -19,12 +19,13 @@ type ClipboardValue struct {
 	expires time.Time
 }
 type clipboardState struct {
-	mu          sync.Mutex
-	peer        string
+	mu           sync.Mutex
+	peer         string
 	imageAllowed bool
-	out, in     *ClipboardValue
-	seen        []string
-	activeUntil time.Time
+	filesAllowed bool
+	out, in      *ClipboardValue
+	seen         []string
+	activeUntil  time.Time
 }
 
 func (m *Manager) SetClipboardPeer(peer string) error {
@@ -41,8 +42,14 @@ func (m *Manager) SetClipboardPeer(peer string) error {
 			return err
 		}
 	}
+	if m.generation >= 70 {
+		if err := m.writeClipboardSetting("clipboard-files-peer.txt", peer); err != nil {
+			return err
+		}
+	}
 	m.clipboard.peer = peer
 	m.clipboard.imageAllowed = peer != "" && m.generation >= 69
+	m.clipboard.filesAllowed = peer != "" && m.generation >= 70
 	m.clipboard.in = nil
 	m.clipboard.out = nil
 	m.clipboard.seen = nil
@@ -118,11 +125,11 @@ func (m *Manager) SyncClipboardPayload(peer string, local *ClipboardValue, ack s
 	}
 	m.clipboard.activeUntil = time.Now().Add(5 * time.Second)
 	if local != nil {
-		if local.Format != "" && !m.clipboard.imageAllowed {
+		if local.Format != "" && !m.clipboard.imageAllowed || local.Format == "files" && !m.clipboard.filesAllowed {
 			return ClipboardValue{}, ErrDenied
 		}
 		if local.Format == "" && (len(local.Data) != 0 || !validClipboardText(local.Text)) ||
-			local.Format != "" && (local.Text != "" || !ValidClipboardImage(local.Format, local.Data)) {
+			local.Format != "" && (local.Text != "" || !ValidClipboardPayload(local.Format, local.Data)) {
 			return ClipboardValue{}, ErrDenied
 		}
 		m.clipboard.out = &ClipboardValue{ID: randomID(), Text: local.Text, Format: local.Format,
@@ -169,13 +176,13 @@ func (m *Manager) clipboardReceivePayload(peer, id, format string, r io.Reader, 
 	}
 	data, err := io.ReadAll(io.LimitReader(r, int64(limit)+1))
 	if err != nil || !authorized() || format == "" && !validClipboardText(string(data)) ||
-		format != "" && !ValidClipboardImage(format, data) {
+		format != "" && !ValidClipboardPayload(format, data) {
 		return ErrDenied
 	}
 	m.clipboard.mu.Lock()
 	defer m.clipboard.mu.Unlock()
 	if m.clipboard.peer != peer || time.Now().After(m.clipboard.activeUntil) ||
-		format != "" && !m.clipboard.imageAllowed {
+		format != "" && !m.clipboard.imageAllowed || format == "files" && !m.clipboard.filesAllowed {
 		return ErrDenied
 	}
 	for _, seen := range m.clipboard.seen {

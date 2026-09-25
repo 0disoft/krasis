@@ -128,6 +128,23 @@ func Open(productRoot string, generation int) (*Manager, error) {
 			return nil, e
 		}
 	}
+	if generation >= 70 && m.clipboard.peer != "" {
+		f, e := root.Open("clipboard-files-peer.txt")
+		if e == nil {
+			data, readErr := io.ReadAll(io.LimitReader(f, 65))
+			_ = f.Close()
+			if readErr != nil || len(data) > 64 || string(data) != m.clipboard.peer {
+				m.clipboard.peer = "" // Earlier consent did not include files.
+			} else {
+				m.clipboard.filesAllowed = true
+			}
+		} else if errors.Is(e, os.ErrNotExist) {
+			m.clipboard.peer = ""
+		} else {
+			root.Close()
+			return nil, e
+		}
+	}
 	f, err := root.Open("permissions.json")
 	if err == nil {
 		defer f.Close()

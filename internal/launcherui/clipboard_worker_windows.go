@@ -22,12 +22,21 @@ func RunClipboardWorker(ctx context.Context, control, title string, gate *sync.M
 	defer runtime.UnlockOSThread()
 	timer := time.NewTicker(750 * time.Millisecond)
 	defer timer.Stop()
+	cleanup := time.NewTicker(time.Hour)
+	defer cleanup.Stop()
+	if base, err := clipboardFilesRoot(); err == nil {
+		cleanupClipboardFiles(base)
+	}
 	var pump clipboardPump
 	var lastRevision uint64
 	for {
 		select {
 		case <-ctx.Done():
 			return
+		case <-cleanup.C:
+			if base, err := clipboardFilesRoot(); err == nil {
+				cleanupClipboardFiles(base)
+			}
 		case <-timer.C:
 			// The UI thread pumps owner-window notifications; a window on this
 			// network worker thread would stall other applications' clipboard writes.
