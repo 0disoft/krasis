@@ -122,9 +122,11 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 		if prepared.peer.Role == transport.AuthenticatedPeerConnector {
 			source, err = agent.NewListenSource(prepared.profile.Address, prepared.tls)
 		} else {
-			var dial *agent.DialSource
-			dial, err = agent.NewDialSource(prepared.profile.Address, prepared.tls, 5*time.Second)
-			source = &boundedProductDial{dial}
+			source = &boundedProductDial{
+				load:        func() (truststore.ConnectionProfile, error) { return trust.Connection(alias) },
+				fingerprint: prepared.peer.CertificateSHA256,
+				tlsConfig:   prepared.tls,
+			}
 		}
 		if err != nil {
 			return err
@@ -218,13 +220,30 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 	}
 }
 
-type boundedProductDial struct{ *agent.DialSource }
+type boundedProductDial struct {
+	load        func() (truststore.ConnectionProfile, error)
+	fingerprint string
+	tlsConfig   *tls.Config
+}
 
 func (source *boundedProductDial) Next(ctx context.Context) (agent.Connection, error) {
 	handshake, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	return source.DialSource.Next(handshake)
+	profile, err := source.load()
+	if err != nil {
+		return nil, err
+	}
+	if profile.Fingerprint != source.fingerprint {
+		return nil, errors.New("connection profile peer changed during reconnect")
+	}
+	dial, err := agent.NewDialSource(profile.Address, source.tlsConfig, 5*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	return dial.Next(handshake)
 }
+
+func (*boundedProductDial) Close() error { return nil }
 
 type productAuthorizer struct{ trust *truststore.Store }
 
