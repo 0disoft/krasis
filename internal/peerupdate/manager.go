@@ -111,6 +111,23 @@ func Open(productRoot string, generation int) (*Manager, error) {
 		root.Close()
 		return nil, e
 	}
+	if generation >= 69 && m.clipboard.peer != "" {
+		f, e := root.Open("clipboard-media-peer.txt")
+		if e == nil {
+			data, readErr := io.ReadAll(io.LimitReader(f, 65))
+			_ = f.Close()
+			if readErr != nil || len(data) > 64 || string(data) != m.clipboard.peer {
+				m.clipboard.peer = "" // Old text-only consent cannot grant image sharing.
+			} else {
+				m.clipboard.imageAllowed = true
+			}
+		} else if errors.Is(e, os.ErrNotExist) {
+			m.clipboard.peer = ""
+		} else {
+			root.Close()
+			return nil, e
+		}
+	}
 	f, err := root.Open("permissions.json")
 	if err == nil {
 		defer f.Close()

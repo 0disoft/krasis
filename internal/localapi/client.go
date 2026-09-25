@@ -118,6 +118,10 @@ func (client *Client) request(ctx context.Context, method, path string, body, ta
 }
 
 func (client *Client) requestHeaders(ctx context.Context, method, path string, body, target any, headers map[string]string) error {
+	return client.requestHeadersLimit(ctx, method, path, body, target, headers, maxResponseBytes)
+}
+
+func (client *Client) requestHeadersLimit(ctx context.Context, method, path string, body, target any, headers map[string]string, responseLimit int64) error {
 	if client == nil || client.http == nil || client.credentials.Token == "" {
 		return ErrUnavailable
 	}
@@ -157,11 +161,11 @@ func (client *Client) requestHeaders(ctx context.Context, method, path string, b
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return fmt.Errorf("%w: HTTP status %d", ErrProtocol, response.StatusCode)
 	}
-	data, err := io.ReadAll(io.LimitReader(response.Body, maxResponseBytes+1))
+	data, err := io.ReadAll(io.LimitReader(response.Body, responseLimit+1))
 	if err != nil {
 		return fmt.Errorf("%w: read response", ErrTransport)
 	}
-	if len(data) > maxResponseBytes {
+	if int64(len(data)) > responseLimit {
 		return fmt.Errorf("%w: response exceeds size limit", ErrProtocol)
 	}
 	decoder := json.NewDecoder(bytes.NewReader(data))

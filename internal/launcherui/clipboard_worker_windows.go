@@ -54,7 +54,7 @@ func RunClipboardWorker(ctx context.Context, control, title string, gate *sync.M
 				pump = clipboardPump{}
 				lastRevision = currentRevision
 			}
-			tick, cancel := context.WithTimeout(ctx, 3*time.Second)
+			tick, cancel := context.WithTimeout(ctx, 12*time.Second)
 			clipboardWorkerTick(tick, control, hwnd, &pump)
 			cancel()
 			gate.Unlock()

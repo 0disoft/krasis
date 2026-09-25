@@ -124,6 +124,9 @@ func readClipboardText(hwnd uintptr) (string, uintptr, error) {
 			return "", sequence, errClipboardUnavailable
 		}
 	}
+	if clipboardHasFormat(cfHDROP) {
+		return "", sequence, errClipboardUnavailable
+	}
 	handle, _, _ := clipGet.Call(13)
 	if handle == 0 {
 		return "", sequence, errClipboardUnavailable
@@ -264,13 +267,24 @@ func (p *clipboardPump) sync(ctx context.Context, hwnd uintptr, control, peer st
 	}
 	request := localapi.ClipboardRequest{Action: "SYNC", Peer: peer}
 	if current != p.sequence {
-		text, sequence, err := readClipboardText(hwnd)
+		format, data, sequence, present, err := readClipboardImage(hwnd)
 		if sequence != 0 {
 			p.sequence = sequence
 		}
-		if err == nil {
-			request.Text = &text
-			current = sequence
+		if present {
+			if err == nil {
+				request.Format, request.Data = format, data
+				current = sequence
+			}
+		} else {
+			text, textSequence, textErr := readClipboardText(hwnd)
+			if textSequence != 0 {
+				p.sequence = textSequence
+			}
+			if textErr == nil {
+				request.Text = &text
+				current = textSequence
+			}
 		}
 	}
 	client, err := localapi.OpenClient(control)
@@ -281,7 +295,12 @@ func (p *clipboardPump) sync(ctx context.Context, hwnd uintptr, control, peer st
 	if err != nil || result.Code != "ok" || result.Value.ID == "" {
 		return
 	}
-	sequence, err := writeRemoteClipboardText(hwnd, current, result.Value.Text, result.Value.ID)
+	var sequence uintptr
+	if result.Value.Format == "" {
+		sequence, err = writeRemoteClipboardText(hwnd, current, result.Value.Text, result.Value.ID)
+	} else {
+		sequence, err = writeRemoteClipboardImage(hwnd, current, result.Value.Format, result.Value.Data, result.Value.ID)
+	}
 	if err != nil {
 		return
 	}
@@ -305,7 +324,7 @@ func (a *productWindow) toggleClipboard() {
 	if a.view.Update.Status.ClipboardPeer == peer {
 		action = "clipboard_disable"
 	} else {
-		text := "선택한 기기와 복사한 텍스트를 자동 공유할까요?\n\n비밀번호 등 민감한 내용도 포함될 수 있습니다. 양쪽에서 켜야 동작하며, 버튼을 다시 누르면 끕니다. 기존 클립보드 내용은 보내지 않습니다."
+		text := "선택한 기기와 복사한 텍스트·이미지를 자동 공유할까요?\n\n비밀번호 등 민감한 내용도 포함될 수 있습니다. 양쪽에서 켜야 동작하며, 버튼을 다시 누르면 끕니다. 기존 클립보드 내용은 보내지 않습니다."
 		result, _, _ := clipUser.NewProc("MessageBoxW").Call(a.hwnd, uintptr(unsafe.Pointer(utf16Ptr(text))), uintptr(unsafe.Pointer(utf16Ptr("클립보드 공유"))), 0x134)
 		if result != 6 {
 			return

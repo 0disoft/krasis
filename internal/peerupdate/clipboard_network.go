@@ -1,11 +1,24 @@
 package peerupdate
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"strings"
 	"time"
 )
+
+func clipboardContentType(format string) string {
+	switch format {
+	case "png":
+		return "image/png"
+	case "dib":
+		return "application/x-krasis-dib"
+	default:
+		return "text/plain; charset=utf-8"
+	}
+}
 
 func (m *Manager) remoteClipboard(peer string) (PeerInfo, bool) {
 	m.mu.Lock()
@@ -28,14 +41,18 @@ func (m *Manager) clipboardHTTP(w http.ResponseWriter, r *http.Request, peer str
 			w.WriteHeader(204)
 			return
 		}
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		_, _ = w.Write([]byte(value.Text))
+		w.Header().Set("Content-Type", clipboardContentType(value.Format))
+		if value.Format == "" {
+			_, _ = io.WriteString(w, value.Text)
+		} else {
+			_, _ = w.Write(value.Data)
+		}
 	case http.MethodPost:
-		if id != remote.ClipboardID || r.Header.Get("Content-Type") != "text/plain; charset=utf-8" {
+		if id != remote.ClipboardID || r.Header.Get("Content-Type") != clipboardContentType(remote.ClipboardFormat) {
 			w.WriteHeader(400)
 			return
 		}
-		if err := m.clipboardReceive(peer, id, r.Body, authorized); err != nil {
+		if err := m.clipboardReceivePayload(peer, id, remote.ClipboardFormat, r.Body, authorized); err != nil {
 			w.WriteHeader(409)
 			return
 		}
@@ -57,13 +74,17 @@ func (m *Manager) pollClipboard(ctx context.Context, c *http.Client, address, pe
 	if !ok || !local || !authorized() {
 		return
 	}
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 12*time.Second)
 	defer cancel()
 	url := "https://" + address + "/v1/clipboard"
 	_, id, _ := m.ClipboardInfo(peer)
-	if value := m.clipboardOutgoing(peer, id); value != nil {
-		req, _ := http.NewRequestWithContext(ctx, http.MethodPost, url, strings.NewReader(value.Text))
-		req.Header.Set("Content-Type", "text/plain; charset=utf-8")
+	if value := m.clipboardOutgoing(peer, id); value != nil && (value.Format == "" || remote.Generation >= 69) {
+		var body io.Reader = strings.NewReader(value.Text)
+		if value.Format != "" {
+			body = bytes.NewReader(value.Data)
+		}
+		req, _ := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
+		req.Header.Set("Content-Type", clipboardContentType(value.Format))
 		req.Header.Set("X-Krasis-ID", id)
 		if resp, err := c.Do(req); err == nil {
 			resp.Body.Close()
@@ -82,7 +103,8 @@ func (m *Manager) pollClipboard(ctx context.Context, c *http.Client, address, pe
 		return
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 || !authorized() || m.clipboardReceive(peer, remote.ClipboardID, resp.Body, authorized) != nil {
+	if resp.StatusCode != 200 || resp.Header.Get("Content-Type") != clipboardContentType(remote.ClipboardFormat) ||
+		!authorized() || m.clipboardReceivePayload(peer, remote.ClipboardID, remote.ClipboardFormat, resp.Body, authorized) != nil {
 		return
 	}
 	resp.Body.Close()

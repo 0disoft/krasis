@@ -45,3 +45,18 @@ func TestClipboardRequestActionIsolation(t *testing.T) {
 		}
 	}
 }
+
+func TestClipboardImageRequestCannotMasqueradeAsTextOrPermission(t *testing.T) {
+	peer := strings.Repeat("a", 64)
+	data := []byte{1, 2, 3}
+	text := "private"
+	for _, request := range []ClipboardRequest{
+		{Action: "ENABLE", Peer: peer, Format: "png", Data: data},
+		{Action: "SYNC", Peer: peer, Format: "png", Text: &text, Data: data},
+		{Action: "SYNC", Peer: peer, Data: data},
+	} {
+		if request.Valid() {
+			t.Fatal("invalid image request accepted")
+		}
+	}
+}

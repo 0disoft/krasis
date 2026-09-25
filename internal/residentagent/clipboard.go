@@ -3,6 +3,7 @@ package residentagent
 import (
 	"context"
 	"github.com/0disoft/krasis/internal/localapi"
+	"github.com/0disoft/krasis/internal/peerupdate"
 )
 
 func (o *Operations) Clipboard(ctx context.Context, r localapi.ClipboardRequest) (localapi.ClipboardResult, error) {
@@ -25,7 +26,14 @@ func (o *Operations) Clipboard(ctx context.Context, r localapi.ClipboardRequest)
 		}
 		return v, nil
 	}
-	value, err := o.updates.SyncClipboard(r.Peer, r.Text, r.Ack)
+	var local *peerupdate.ClipboardValue
+	if r.Text != nil || r.Format != "" {
+		local = &peerupdate.ClipboardValue{Format: r.Format, Data: r.Data}
+		if r.Text != nil {
+			local.Text = *r.Text
+		}
+	}
+	value, err := o.updates.SyncClipboardPayload(r.Peer, local, r.Ack)
 	if err == nil {
 		v.Code = "ok"
 		v.Value = value

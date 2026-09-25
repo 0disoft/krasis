@@ -10,10 +10,14 @@ import (
 	"net/http"
 )
 
+const maxClipboardJSONBytes = ((peerupdate.MaxClipboardImageBytes + 2) / 3 * 4) + 4096
+
 type ClipboardRequest struct {
 	Action string  `json:"action"`
 	Peer   string  `json:"peer"`
 	Text   *string `json:"text,omitempty"`
+	Format string  `json:"format,omitempty"`
+	Data   []byte  `json:"data,omitempty"`
 	Ack    string  `json:"ack,omitempty"`
 }
 type ClipboardResult struct {
@@ -26,13 +30,19 @@ func (r ClipboardRequest) Valid() bool {
 		return false
 	}
 	if r.Action == "ENABLE" || r.Action == "DISABLE" {
-		return r.Text == nil && r.Ack == ""
+		return r.Text == nil && r.Format == "" && len(r.Data) == 0 && r.Ack == ""
 	}
-	return r.Action == "SYNC" && (r.Ack == "" || validPairingID(r.Ack)) && (r.Text == nil || len(*r.Text) <= peerupdate.MaxClipboardBytes)
+	if r.Action != "SYNC" || (r.Ack != "" && !validPairingID(r.Ack)) {
+		return false
+	}
+	if r.Format == "" {
+		return len(r.Data) == 0 && (r.Text == nil || len(*r.Text) <= peerupdate.MaxClipboardBytes)
+	}
+	return r.Text == nil && peerupdate.ValidClipboardImage(r.Format, r.Data)
 }
 func (c *Client) Clipboard(ctx context.Context, r ClipboardRequest) (ClipboardResult, error) {
 	var v ClipboardResult
-	err := c.request(ctx, http.MethodPost, "/v1/clipboard", r, &v)
+	err := c.requestHeadersLimit(ctx, http.MethodPost, "/v1/clipboard", r, &v, nil, maxClipboardJSONBytes)
 	return v, err
 }
 func (h *handler) clipboard(w http.ResponseWriter, r *http.Request) {
@@ -62,7 +72,7 @@ func (h *handler) clipboard(w http.ResponseWriter, r *http.Request) {
 
 func decodeClipboardRequest(r io.Reader, value *ClipboardRequest) error {
 	// JSON may encode each text byte as six bytes (for example '<' as \u003c).
-	const limit = 6*peerupdate.MaxClipboardBytes + 1024
+	const limit = maxClipboardJSONBytes
 	data, err := io.ReadAll(io.LimitReader(r, limit+1))
 	if err != nil {
 		return err

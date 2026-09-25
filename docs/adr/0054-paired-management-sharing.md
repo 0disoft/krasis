@@ -26,14 +26,16 @@ receiver storage acknowledgment, not merely bytes written to a connection.
 Tests cover trust rejection, peer binding, duplicate delivery and sanitization.
 Two-PC delivery and native UI presentation require manual verification.
 
-## Text clipboard
+## Clipboard
 
 Clipboard sharing is independently opt-in, persisted for one selected paired
 certificate on each device. Update permission never grants clipboard access.
 The GUI explicitly warns about secrets; applications marking clipboard content
-`ExcludeClipboardContentFromMonitorProcessing` are excluded. Plain Unicode text
-only, at most 64 KiB UTF-8, is accepted; NUL, invalid UTF-8 and file/image formats
-are rejected. Clipboard content is never persisted or logged by Krasis.
+`ExcludeClipboardContentFromMonitorProcessing` are excluded. Unicode text is
+limited to 64 KiB UTF-8 and rejects NUL or invalid UTF-8. PNG and ordinary
+uncompressed DIB images are bounded to 40 MiB and 10 million pixels. Explorer
+file lists are not treated as text or image clipboard data. Clipboard content
+is never persisted or logged by Krasis.
 
 The authenticated local `/v1/clipboard` API provides ENABLE, DISABLE and SYNC.
 Both agents advertise permission and latest change metadata in management status
@@ -42,6 +44,8 @@ receipts and duplicate suppression. One outgoing and one incoming value are kept
 in memory with 15-second and 10-second deadlines. There is no offline replay.
 Concurrent local copies win over pending remote copies; simultaneous conflicting
 copies may require copying again rather than silently choosing a device winner.
+Image metadata is advertised only to peers that support it; older text-only
+agents continue to exchange text without receiving an oversized image offer.
 
 Native clipboard sequence is checked while the clipboard is open before a remote
 write, preventing an in-flight response from replacing a newer local copy. A
@@ -52,9 +56,9 @@ Enabling/restarting baselines the current clipboard without transmitting it.
 
 Only the unlocked Default input desktop is used. No clipboard read or write is
 attempted on lock/secure desktop. The GUI heartbeat permits transport for five
-seconds; an already-authorized request has a three-second deadline. Text copied
+seconds; an already-authorized request has a twelve-second deadline. Content copied
 before locking can therefore finish an already-admitted transfer, but locked
-desktop contents are never sampled. The GUI must remain running or in tray.
+  desktop contents are never sampled. The GUI must remain running or in tray.
 
 Unit tests cover opt-in, cross-peer denial, revocation, expiry, duplicate IDs,
 local-copy conflicts and malformed content. Native clipboard ownership, lock and

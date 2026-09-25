@@ -9,15 +9,16 @@ import (
 
 // PeerInfo is exchanged only inside the pinned mutually authenticated channel.
 type PeerInfo struct {
-	UpdateID      string `json:"updateID,omitempty"`
-	UpdateState   string `json:"updateState,omitempty"`
-	Clipboard     bool   `json:"clipboard,omitempty"`
-	ClipboardID   string `json:"clipboardID,omitempty"`
-	ClipboardSize int    `json:"clipboardSize,omitempty"`
-	Protocol      int    `json:"protocol"`
-	Generation    int    `json:"generation"`
-	Revision      string `json:"revision"`
-	Allowed       bool   `json:"allowed"`
+	UpdateID        string `json:"updateID,omitempty"`
+	UpdateState     string `json:"updateState,omitempty"`
+	Clipboard       bool   `json:"clipboard,omitempty"`
+	ClipboardID     string `json:"clipboardID,omitempty"`
+	ClipboardSize   int    `json:"clipboardSize,omitempty"`
+	ClipboardFormat string `json:"clipboardFormat,omitempty"`
+	Protocol        int    `json:"protocol"`
+	Generation      int    `json:"generation"`
+	Revision        string `json:"revision"`
+	Allowed         bool   `json:"allowed"`
 }
 type peerObservation struct {
 	info PeerInfo
@@ -25,10 +26,13 @@ type peerObservation struct {
 }
 
 func (m *Manager) info(peer string) PeerInfo {
-	allowed, id, size := m.ClipboardInfo(peer)
-	info := PeerInfo{Protocol: 2, Generation: m.generation, Revision: m.revision, Allowed: m.permitted(peer), Clipboard: allowed, ClipboardID: id, ClipboardSize: size}
+	allowed, id, size, format := m.ClipboardPayloadInfo(peer)
+	info := PeerInfo{Protocol: 2, Generation: m.generation, Revision: m.revision, Allowed: m.permitted(peer), Clipboard: allowed, ClipboardID: id, ClipboardSize: size, ClipboardFormat: format}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if format != "" && m.peers[peer].info.Generation < 69 {
+		info.ClipboardID, info.ClipboardSize, info.ClipboardFormat = "", 0, ""
+	}
 	if m.status.Peer == peer && m.status.State == "APPLY_FAILED" {
 		info.UpdateID, info.UpdateState = m.status.ID, m.status.State
 	}
@@ -43,7 +47,16 @@ func readPeerInfo(reader io.Reader) (PeerInfo, error) {
 	if json.Unmarshal(data, &info) != nil || info.Protocol != 2 || info.Generation < 21 || info.Generation > 1000000 || (info.Revision != "" && !validID(info.Revision, 40)) {
 		return PeerInfo{}, ErrDenied
 	}
-	if info.ClipboardSize < 0 || info.ClipboardSize > MaxClipboardBytes || (info.ClipboardID != "" && !validID(info.ClipboardID, 32)) {
+	limit := MaxClipboardBytes
+	if info.ClipboardFormat != "" {
+		if info.Generation < 69 || (info.ClipboardFormat != "png" && info.ClipboardFormat != "dib") {
+			return PeerInfo{}, ErrDenied
+		}
+		limit = MaxClipboardImageBytes
+	}
+	if info.ClipboardSize < 0 || info.ClipboardSize > limit ||
+		(info.ClipboardID != "" && !validID(info.ClipboardID, 32)) ||
+		(info.ClipboardFormat != "" && (info.ClipboardID == "" || info.ClipboardSize == 0)) {
 		return PeerInfo{}, ErrDenied
 	}
 	if (info.UpdateState != "" && info.UpdateState != "APPLY_FAILED") ||
