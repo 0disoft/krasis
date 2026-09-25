@@ -13,9 +13,16 @@ After confirmed exit, capture, move/size and pressed-input checks run again.
 Existing source activation verification and rollback remain unchanged.
 
 A timed-out window procedure can complete later; a timeout never grants control.
-Custom application menus that ignore WM_CANCELMODE remain unsupported by this
-native-menu path. No global Esc fallback is added. Windows UIPI can block the
-message to elevated applications; the existing fail-closed behavior is retained.
+In g67, an idle foreground GUI thread with mouse capture but no native menu
+flag also receives a bounded WM_CANCELMODE at its capture window. Boundary
+admission proceeds only after the same active window reports no capture, menu,
+or move/size state and no physical input is held. Failed delivery, changed
+foreground, retained or transferred capture, and new menu state still block
+crossing. This targets capture-backed custom menus without cancelling an active
+drag. Custom menus that expose neither native menu state nor mouse capture, or
+ignore WM_CANCELMODE, remain unsupported by this path. No global Esc fallback
+is added. Windows UIPI can block the message to elevated applications; the
+existing fail-closed behavior is retained.
 
 Mocked tests cover successful dismissal, rejection, held input, foreground/menu
 replacement and remaining capture/move-size states. Native system/context menus,

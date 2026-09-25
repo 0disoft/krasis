@@ -15,10 +15,13 @@ import (
 func TestSourceBoundaryAdmissionClassifiesForegroundInteraction(t *testing.T) {
 	originalInfo := sourceForegroundGUIThreadInfo
 	originalPressed := sourceAnyInputPressed
+	originalCancel := sourceCancelMenu
 	t.Cleanup(func() {
 		sourceForegroundGUIThreadInfo = originalInfo
 		sourceAnyInputPressed = originalPressed
+		sourceCancelMenu = originalCancel
 	})
+	sourceCancelMenu = func(context.Context, uintptr) bool { return false }
 
 	for _, test := range []struct {
 		name     string
@@ -61,6 +64,53 @@ func TestSourceBoundaryAdmissionClassifiesForegroundInteraction(t *testing.T) {
 			}
 			if decision != test.want {
 				t.Fatalf("AdmitBoundary() = %v, want %v", decision, test.want)
+			}
+		})
+	}
+}
+
+func TestBoundaryDismissesIdleMouseCaptureBeforeCrossing(t *testing.T) {
+	oldInfo, oldPressed, oldCancel := sourceForegroundGUIThreadInfo, sourceAnyInputPressed, sourceCancelMenu
+	t.Cleanup(func() {
+		sourceForegroundGUIThreadInfo, sourceAnyInputPressed, sourceCancelMenu = oldInfo, oldPressed, oldCancel
+	})
+	for _, test := range []struct {
+		name      string
+		delivered bool
+		held      bool
+		after     sourceGUIThreadInfo
+		want      peer.BoundaryAdmissionDecision
+	}{
+		{"released", true, false, sourceGUIThreadInfo{Active: 7}, peer.BoundaryAdmissionAllowed},
+		{"message rejected", false, false, sourceGUIThreadInfo{}, peer.BoundaryAdmissionBlockedMouseCapture},
+		{"button held", true, true, sourceGUIThreadInfo{}, peer.BoundaryAdmissionBlockedMouseCapture},
+		{"capture retained", true, false, sourceGUIThreadInfo{Active: 7, Capture: 42}, peer.BoundaryAdmissionBlockedMouseCapture},
+		{"capture moved", true, false, sourceGUIThreadInfo{Active: 7, Capture: 43}, peer.BoundaryAdmissionBlockedMouseCapture},
+		{"foreground changed", true, false, sourceGUIThreadInfo{Active: 8}, peer.BoundaryAdmissionBlockedMouseCapture},
+		{"menu appeared", true, false, sourceGUIThreadInfo{Active: 7, Flags: guiInMenuMode}, peer.BoundaryAdmissionBlockedMouseCapture},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			queries, sends := 0, 0
+			sourceForegroundGUIThreadInfo = func(info *sourceGUIThreadInfo) error {
+				queries++
+				if queries == 1 {
+					*info = sourceGUIThreadInfo{Active: 7, Capture: 42}
+				} else {
+					*info = test.after
+				}
+				return nil
+			}
+			sourceAnyInputPressed = func() bool { return test.held }
+			sourceCancelMenu = func(_ context.Context, owner uintptr) bool {
+				sends++
+				if owner != 42 {
+					t.Fatalf("cancel target = %d, want capture owner 42", owner)
+				}
+				return test.delivered
+			}
+			decision, err := (&SourceHook{}).AdmitBoundary(context.Background(), control.BoundaryIntent{Edge: control.ScreenEdgeRight})
+			if err != nil || decision != test.want || (test.held && sends != 0) {
+				t.Fatalf("decision=%v err=%v sends=%d", decision, err, sends)
 			}
 		})
 	}
@@ -114,6 +164,9 @@ func TestBoundaryDismissesMenuAndRechecksInteraction(t *testing.T) {
 			sourceAnyInputPressed = func() bool { return test.held }
 			sourceCancelMenu = func(_ context.Context, owner uintptr) bool {
 				sends++
+				if owner == 9 && test.name == "capture remains" {
+					return false
+				}
 				if owner != 42 {
 					t.Fatal("wrong menu owner")
 				}

@@ -79,6 +79,42 @@ func dismissBoundaryMenu(ctx context.Context, info sourceGUIThreadInfo) (sourceG
 	}
 }
 
+// Some custom context menus hold mouse capture without entering the native
+// Win32 menu loop. Cancel only an idle capture, then prove that the same
+// foreground window released it before allowing the boundary crossing.
+func dismissBoundaryCapture(ctx context.Context, info sourceGUIThreadInfo) (sourceGUIThreadInfo, bool, error) {
+	if info.Capture == 0 || info.Flags&(guiInMoveSize|guiMenuModeMask) != 0 || info.MoveSize != 0 || sourceAnyInputPressed() {
+		return info, false, nil
+	}
+	if !sourceCancelMenu(ctx, info.Capture) {
+		return info, false, nil
+	}
+	wait, cancel := context.WithTimeout(ctx, 150*time.Millisecond)
+	defer cancel()
+	for {
+		next := sourceGUIThreadInfo{Size: uint32(unsafe.Sizeof(sourceGUIThreadInfo{}))}
+		if err := sourceForegroundGUIThreadInfo(&next); err != nil {
+			return info, false, err
+		}
+		if next.Active != info.Active || next.Flags&(guiInMoveSize|guiMenuModeMask) != 0 || next.MoveSize != 0 {
+			return next, false, nil
+		}
+		if next.Capture == 0 {
+			return next, true, nil
+		}
+		if next.Capture != info.Capture {
+			return next, false, nil
+		}
+		timer := time.NewTimer(10 * time.Millisecond)
+		select {
+		case <-wait.Done():
+			timer.Stop()
+			return next, false, nil
+		case <-timer.C:
+		}
+	}
+}
+
 type sourceGUIThreadInfo struct {
 	Size      uint32
 	Flags     uint32
@@ -152,7 +188,17 @@ func (hook *SourceHook) AdmitBoundary(ctx context.Context, _ control.BoundaryInt
 		info = updated
 	}
 	if info.Capture != 0 {
-		return peer.BoundaryAdmissionBlockedMouseCapture, nil
+		updated, released, err := dismissBoundaryCapture(ctx, info)
+		if err != nil {
+			return 0, fmt.Errorf("verify mouse capture dismissal: %w", err)
+		}
+		if err := ctx.Err(); err != nil {
+			return 0, err
+		}
+		if !released {
+			return peer.BoundaryAdmissionBlockedMouseCapture, nil
+		}
+		info = updated
 	}
 	if info.Flags&guiInMoveSize != 0 || info.MoveSize != 0 {
 		return peer.BoundaryAdmissionBlockedMoveSize, nil
