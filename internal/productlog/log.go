@@ -34,6 +34,12 @@ func init() {
 	for _, code := range []string{"session_certificate_deadline", "session_guard_exited", "session_guard_close_failed", "session_trust_check_failed", "session_trust_busy_exhausted"} {
 		allowed[code] = true
 	}
+	for _, phase := range []string{"prelock", "lock", "store_read", "certificate", "retry_wait"} {
+		allowed["trust_active_"+phase] = true
+		for _, bucket := range []string{"lt1ms", "lt10ms", "lt100ms", "lt1s", "ge1s"} {
+			allowed["trust_timing_"+phase+"_"+bucket] = true
+		}
+	}
 	allowed["boundary_summary"] = true
 	allowed["protected_input_detected"] = true
 	allowed["peer_disconnect_requested"] = true

@@ -6,10 +6,11 @@ The g30 reports show B stopping first with `fault_session_unknown`, followed by
 A seeing EOF. They do not prove whether the monitor, guard, or another component
 caused this incident.
 
-Source review found that the one-second product trust monitor cancels the session
-on any PeerCertificate error. Store reads take a nonblocking exclusive file lock,
-so a concurrent status or management read can return ErrStoreBusy without any
-trust change. This is a reproducible failure path, not evidence of revocation.
+Source review of the g30 implementation found that the one-second product trust
+monitor cancels the session on any PeerCertificate error. Store reads then took
+a nonblocking exclusive file lock, so a concurrent status or management read
+could return ErrStoreBusy without any trust change. This was a reproducible
+failure path, not evidence of revocation.
 
 Retry only the exact ErrStoreBusy sentinel, at 25 ms intervals, at most five
 checks (100 ms total scheduled waiting). No cached trust verdict substitutes for
@@ -26,3 +27,11 @@ unchanged. Targeted tests cover bounded retries, revocation after contention,
 I/O failure, cancellation, monitor reason ordering, and sanitized export.
 Two-device testing is still required to establish whether this fixes the observed
 incident; these reports alone cannot establish that causal link.
+
+Subsequent trust-store reads use a shared file lock; mutation and revocation
+remain exclusive. Generation 65 adds coarse timing buckets for pre-lock
+directory and ACL work, lock acquisition, in-lock store read and ACL work,
+certificate validation, and retry waiting. On timeout it also records the
+active phase. These fixed codes contain no peer, path, certificate, or error
+text. They identify where a future failure spends time; they do not by
+themselves prove that the g54 study-pair disconnect is resolved.

@@ -279,6 +279,51 @@ func TestFileLockAllowsReadersButExcludesWriter(t *testing.T) {
 	}
 }
 
+func TestPeerCertificateTraceLocatesBusyLockWithoutChangingTrust(t *testing.T) {
+	store := mustStore(t)
+	peer := testPeer()
+	if _, err := store.Import(peer, "peer", true, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	directory, err := securefs.OpenDirectory(store.directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer directory.Close()
+	lock, _, err := openLockFile(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lock.Close()
+	unlock, err := acquireFileLock(lock, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	trace := NewReadTrace()
+	if _, err := store.PeerCertificateTraced(peer, time.Now(), trace); !errors.Is(err, ErrStoreBusy) {
+		t.Fatalf("traced read: %v", err)
+	}
+	snapshot := trace.Snapshot()
+	_, reachedLock := snapshot.Durations["lock"]
+	_, reachedCertificate := snapshot.Durations["certificate"]
+	if snapshot.Phase != "" || snapshot.Attempts != 1 || !reachedLock || reachedCertificate {
+		t.Fatalf("busy lock phase: %+v", snapshot)
+	}
+	if err := unlock(); err != nil {
+		t.Fatal(err)
+	}
+	trace = NewReadTrace()
+	if _, err := store.PeerCertificateTraced(peer, time.Now(), trace); !errors.Is(err, ErrPeerCertificateUnavailable) {
+		t.Fatalf("traced read granted trust without certificate: %v", err)
+	}
+	snapshot = trace.Snapshot()
+	_, reachedRead := snapshot.Durations["store_read"]
+	_, reachedCertificate = snapshot.Durations["certificate"]
+	if snapshot.Phase != "" || snapshot.Attempts != 1 || !reachedRead || !reachedCertificate {
+		t.Fatalf("in-lock phase: %+v", snapshot)
+	}
+}
+
 func TestPeerRecordRejectsUnsafeAlias(t *testing.T) {
 	record := PeerRecord{
 		Fingerprint: testPeer().CertificateSHA256, Role: transport.AuthenticatedPeerConnector,

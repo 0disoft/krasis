@@ -83,17 +83,25 @@ func (store *Store) ReplaceWithCertificate(fingerprint string, replacement trans
 // PeerCertificate checks current trust and certificate validity under the same
 // store lock. A cached certificate must not replace this check on reconnect.
 func (store *Store) PeerCertificate(peer transport.AuthenticatedPeerContext, now time.Time) (*x509.Certificate, error) {
+	return store.PeerCertificateTraced(peer, now, nil)
+}
+
+// PeerCertificateTraced has the same authorization behavior as PeerCertificate.
+// The optional trace contains phase timings only, never peer or path details.
+func (store *Store) PeerCertificateTraced(peer transport.AuthenticatedPeerContext, now time.Time, trace *ReadTrace) (*x509.Certificate, error) {
 	if store == nil {
 		return nil, errors.New("trust store is not initialized")
 	}
 	if err := peer.Validate(); err != nil {
 		return nil, err
 	}
-	document, directory, release, err := store.openReadLocked()
+	defer trace.finish()
+	document, directory, release, err := store.openReadLockedTraced(trace)
 	if err != nil {
 		return nil, err
 	}
 	defer release()
+	trace.enter("certificate")
 	for _, record := range document.Peers {
 		if record.Fingerprint != peer.CertificateSHA256 {
 			continue

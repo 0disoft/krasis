@@ -97,3 +97,37 @@ func TestCertificateExpiryDuringTrustReadKeepsDeadlineReason(t *testing.T) {
 		}
 	})
 }
+
+func TestTrustReadTimeoutReportsCurrentPhaseAndKeepsSessionStopped(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		ticks := make(chan time.Time, 1)
+		ticks <- time.Now()
+		entered := make(chan struct{})
+		release := make(chan struct{})
+		finished := make(chan struct{})
+		var codes []string
+		go func() {
+			defer close(finished)
+			monitorProductSessionObserved(ctx, ticks, nil, func(trace *truststore.ReadTrace) error {
+				trace.EnterRetryWait()
+				close(entered)
+				<-release
+				return nil
+			}, cancel, func(code string) { codes = append(codes, code) }, func(snapshot truststore.ReadTraceSnapshot) {
+				recordTrustTrace(snapshot, func(code string) { codes = append(codes, code) })
+			})
+		}()
+		<-entered
+		<-finished
+		if ctx.Err() != context.Canceled || len(codes) != 3 || codes[0] != "trust_timing_retry_wait_ge1s" || codes[1] != "trust_active_retry_wait" || codes[2] != "session_trust_read_timeout" {
+			t.Fatalf("timeout evidence and fail-closed stop: %v, %v", codes, ctx.Err())
+		}
+		close(release)
+		synctest.Wait()
+		if len(codes) != 3 {
+			t.Fatalf("late success altered stopped session: %v", codes)
+		}
+	})
+}

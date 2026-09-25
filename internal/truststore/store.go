@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/0disoft/krasis/internal/peercredentials"
@@ -31,6 +32,72 @@ var (
 
 type Store struct {
 	directory string
+}
+
+// ReadTrace records only time spent in fixed trust-read phases. It is safe to
+// snapshot while a bounded monitor is waiting for a blocked filesystem call.
+type ReadTrace struct {
+	mu        sync.Mutex
+	started   time.Time
+	entered   time.Time
+	phase     string
+	durations map[string]time.Duration
+	attempts  int
+}
+
+type ReadTraceSnapshot struct {
+	Phase     string
+	Durations map[string]time.Duration
+	Attempts  int
+	Elapsed   time.Duration
+}
+
+func NewReadTrace() *ReadTrace {
+	return &ReadTrace{started: time.Now(), durations: make(map[string]time.Duration, 5)}
+}
+
+func (trace *ReadTrace) enter(phase string) {
+	if trace == nil {
+		return
+	}
+	trace.mu.Lock()
+	defer trace.mu.Unlock()
+	now := time.Now()
+	if trace.phase != "" {
+		trace.durations[trace.phase] += now.Sub(trace.entered)
+	}
+	trace.phase, trace.entered = phase, now
+	if phase == "prelock" {
+		trace.attempts++
+	}
+}
+
+func (trace *ReadTrace) finish() {
+	if trace == nil {
+		return
+	}
+	trace.mu.Lock()
+	defer trace.mu.Unlock()
+	if trace.phase != "" {
+		trace.durations[trace.phase] += time.Since(trace.entered)
+		trace.phase = ""
+	}
+}
+
+func (trace *ReadTrace) EnterRetryWait() { trace.enter("retry_wait") }
+
+func (trace *ReadTrace) Snapshot() ReadTraceSnapshot {
+	trace.mu.Lock()
+	defer trace.mu.Unlock()
+	now := time.Now()
+	snapshot := ReadTraceSnapshot{Phase: trace.phase, Durations: make(map[string]time.Duration, len(trace.durations)+1), Attempts: trace.attempts, Elapsed: now.Sub(trace.started)}
+	for phase, duration := range trace.durations {
+		snapshot.Durations[phase] = duration
+	}
+	if trace.phase != "" {
+		snapshot.Durations[trace.phase] += now.Sub(trace.entered)
+	}
+	return snapshot
 }
 
 func New(directory string) (*Store, error) {
@@ -249,14 +316,19 @@ func (store *Store) readLocked() (Document, error) {
 }
 
 func (store *Store) openReadLocked() (Document, *securefs.Directory, func(), error) {
-	return store.openLockedMode(false, true)
+	return store.openLockedMode(false, true, nil)
+}
+
+func (store *Store) openReadLockedTraced(trace *ReadTrace) (Document, *securefs.Directory, func(), error) {
+	return store.openLockedMode(false, true, trace)
 }
 
 func (store *Store) openLocked(create bool) (Document, *securefs.Directory, func(), error) {
-	return store.openLockedMode(create, false)
+	return store.openLockedMode(create, false, nil)
 }
 
-func (store *Store) openLockedMode(create, shared bool) (Document, *securefs.Directory, func(), error) {
+func (store *Store) openLockedMode(create, shared bool, trace *ReadTrace) (Document, *securefs.Directory, func(), error) {
+	trace.enter("prelock")
 	if err := store.prepareDirectory(create); err != nil {
 		return Document{}, nil, nil, err
 	}
@@ -282,6 +354,7 @@ func (store *Store) openLockedMode(create, shared bool) (Document, *securefs.Dir
 		closeLock()
 		return Document{}, nil, nil, err
 	}
+	trace.enter("lock")
 	unlock, err := acquireFileLock(lockFile, shared)
 	if err != nil {
 		closeLock()
@@ -292,6 +365,7 @@ func (store *Store) openLockedMode(create, shared bool) (Document, *securefs.Dir
 		_ = lockFile.Close()
 		_ = directory.Close()
 	}
+	trace.enter("store_read")
 	document, err := store.read(directory)
 	if err != nil {
 		if create && errors.Is(err, ErrStoreNotFound) {

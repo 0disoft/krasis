@@ -154,14 +154,16 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 			defer close(monitorDone)
 			ticker := time.NewTicker(time.Second)
 			defer ticker.Stop()
-			monitorProductSession(ctx, ticker.C, guard.Done(), func() error {
-				_, checkErr := trust.PeerCertificate(prepared.peer, time.Now())
+			monitorProductSessionObserved(ctx, ticker.C, guard.Done(), func(trace *truststore.ReadTrace) error {
+				_, checkErr := trust.PeerCertificateTraced(prepared.peer, time.Now(), trace)
 				return checkErr
 			}, cancel, func(code string) {
 				log.Event(code)
 				if code == "session_guard_exited" {
 					cancelCause(crashguard.ErrUnexpectedExit)
 				}
+			}, func(snapshot truststore.ReadTraceSnapshot) {
+				recordTrustTrace(snapshot, log.Event)
 			})
 		}()
 		defer func() { cancel(); <-monitorDone }()
