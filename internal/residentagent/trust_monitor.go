@@ -11,6 +11,7 @@ import (
 )
 
 const trustReadTimeout = time.Second
+const trustValidationMaxAge = 5 * time.Second
 
 var trustReadPhases = [...]string{
 	"prelock", "prelock_parent_acl", "prelock_directory_lstat", "prelock_directory_acl",
@@ -125,10 +126,22 @@ func monitorProductSession(ctx context.Context, ticks <-chan time.Time, guardDon
 }
 
 func monitorProductSessionObserved(ctx context.Context, ticks <-chan time.Time, guardDone <-chan struct{}, check func(*truststore.ReadTrace) error, cancel context.CancelFunc, record func(string), recordTrace func(truststore.ReadTraceSnapshot)) {
+	deadline := time.Now().Add(trustValidationMaxAge)
+	freshness := time.NewTimer(trustValidationMaxAge)
+	defer freshness.Stop()
+	deferred := false
 	for {
 		select {
 		case <-ctx.Done():
 			if ctx.Err() == context.DeadlineExceeded {
+				record("session_certificate_deadline")
+			}
+			return
+		case <-freshness.C:
+			if ctx.Err() == nil {
+				record("session_trust_freshness_expired")
+				cancel()
+			} else if ctx.Err() == context.DeadlineExceeded {
 				record("session_certificate_deadline")
 			}
 			return
@@ -143,8 +156,16 @@ func monitorProductSessionObserved(ctx context.Context, ticks <-chan time.Time, 
 			if recordTrace != nil {
 				trace = truststore.NewReadTrace()
 			}
-			err := boundedMonitoredTrustObserved(ctx, guardDone, check, trace)
+			checkCtx, stopCheck := context.WithDeadline(ctx, deadline)
+			err := boundedMonitoredTrustObserved(checkCtx, guardDone, check, trace)
+			stopCheck()
 			if err == nil {
+				deadline = time.Now().Add(trustValidationMaxAge)
+				freshness.Reset(trustValidationMaxAge)
+				if deferred {
+					record("session_trust_read_recovered")
+					deferred = false
+				}
 				if trace != nil {
 					snapshot := trace.Snapshot()
 					if snapshot.Elapsed >= 50*time.Millisecond {
@@ -162,14 +183,22 @@ func monitorProductSessionObserved(ctx context.Context, ticks <-chan time.Time, 
 			if trace != nil {
 				recordTrace(trace.Snapshot())
 			}
+			if errors.Is(err, context.DeadlineExceeded) {
+				record("session_trust_freshness_expired")
+				cancel()
+				return
+			}
+			if errors.Is(err, errTrustReadTimeout) || errors.Is(err, errTrustReadPending) {
+				if !deferred {
+					record("session_trust_read_deferred")
+					deferred = true
+				}
+				continue
+			}
 			code := "session_trust_check_failed"
 			switch {
 			case errors.Is(err, errMonitorGuardExited):
 				code = "session_guard_exited"
-			case errors.Is(err, errTrustReadTimeout):
-				code = "session_trust_read_timeout"
-			case errors.Is(err, errTrustReadPending):
-				code = "session_trust_read_pending"
 			case errors.Is(err, truststore.ErrStoreBusy):
 				code = "session_trust_busy_exhausted"
 			case errors.Is(err, truststore.ErrPeerRevoked):

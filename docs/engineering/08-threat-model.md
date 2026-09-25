@@ -17,7 +17,7 @@ The UI, launcher, peer socket, report consumer, and caller-provided paths are no
 
 ## Threats and required controls
 
-Unauthenticated or revoked peers must never obtain an application session or active lease. Session, lease, epoch, sequence, and live trust authorization are checked at use time, not inferred from a previous connection.
+Unauthenticated or already-revoked peers cannot start an application session or active lease. Session, lease, epoch, sequence, and live trust authorization are checked at use time. Explicit active-session revocation stops the lease immediately. An existing pinned session may use its last successful trust read for at most five seconds when a subsequent filesystem read stalls; a definite revocation or trust error still stops it immediately.
 
 Malformed, duplicated, stale, out-of-order, or outcome-unknown input is dropped and escalated to cleanup. Krasis does not guess delivery or replay uncertain input. Local emergency release and Windows lifecycle termination revoke control and attempt `ReleaseAll`.
 

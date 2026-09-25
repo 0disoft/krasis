@@ -38,21 +38,26 @@ func TestBlockedTrustReadCannotDelayGuardStopOrResumeSession(t *testing.T) {
 					close(guard)
 				}
 				<-finished
-				want := "session_trust_read_timeout"
-				elapsed := trustReadTimeout
+				want := []string{"session_trust_read_deferred", "session_trust_freshness_expired"}
+				elapsed := trustValidationMaxAge
 				if guardExit {
-					want = "session_guard_exited"
+					want = []string{"session_guard_exited"}
 					elapsed = 0
 				}
-				if len(codes) != 1 || codes[0] != want || time.Since(started) != elapsed || ctx.Err() != context.Canceled {
-					t.Errorf("stop: %v, %s, %v", codes, time.Since(started), ctx.Err())
+				if len(codes) != len(want) || time.Since(started) != elapsed || ctx.Err() != context.Canceled {
+					t.Fatalf("stop: %v, %s, %v", codes, time.Since(started), ctx.Err())
+				}
+				for i := range want {
+					if codes[i] != want[i] {
+						t.Fatalf("stop codes: %v", codes)
+					}
 				}
 				if err := boundedMonitoredTrust(context.Background(), nil, func() error { t.Error("started overlapping blocked read"); return nil }); !errors.Is(err, errTrustReadPending) {
 					t.Errorf("unbounded workers: %v", err)
 				}
 				close(release)
 				synctest.Wait()
-				if ctx.Err() != context.Canceled || len(codes) != 1 {
+				if ctx.Err() != context.Canceled || len(codes) != len(want) {
 					t.Fatal("late trust success changed stopped session")
 				}
 			})
@@ -121,13 +126,80 @@ func TestTrustReadTimeoutReportsCurrentPhaseAndKeepsSessionStopped(t *testing.T)
 		}()
 		<-entered
 		<-finished
-		if ctx.Err() != context.Canceled || len(codes) != 3 || codes[0] != "trust_timing_retry_wait_ge1s" || codes[1] != "trust_active_retry_wait" || codes[2] != "session_trust_read_timeout" {
+		if ctx.Err() != context.Canceled || len(codes) != 4 || codes[0] != "trust_timing_retry_wait_ge1s" || codes[1] != "trust_active_retry_wait" || codes[2] != "session_trust_read_deferred" || codes[3] != "session_trust_freshness_expired" {
 			t.Fatalf("timeout evidence and fail-closed stop: %v, %v", codes, ctx.Err())
 		}
 		close(release)
 		synctest.Wait()
-		if len(codes) != 3 {
+		if len(codes) != 4 {
 			t.Fatalf("late success altered stopped session: %v", codes)
+		}
+	})
+}
+
+func TestTransientTrustReadTimeoutRecoversWithoutDisconnect(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		ticks := make(chan time.Time, 2)
+		events := make(chan string, 3)
+		finished := make(chan struct{})
+		calls := 0
+		go func() {
+			defer close(finished)
+			monitorProductSession(ctx, ticks, nil, func() error {
+				calls++
+				if calls == 1 {
+					return errTrustReadTimeout
+				}
+				return nil
+			}, cancel, func(code string) { events <- code })
+		}()
+		ticks <- time.Now()
+		if code := <-events; code != "session_trust_read_deferred" || ctx.Err() != nil {
+			t.Fatalf("first slow read ended session: %s, %v", code, ctx.Err())
+		}
+		ticks <- time.Now()
+		if code := <-events; code != "session_trust_read_recovered" || ctx.Err() != nil {
+			t.Fatalf("retry did not recover: %s, %v", code, ctx.Err())
+		}
+		cancel()
+		<-finished
+		if calls != 2 || len(events) != 0 {
+			t.Fatalf("unexpected follow-up: calls=%d events=%d", calls, len(events))
+		}
+	})
+}
+
+func TestRevocationStillStopsDuringTrustReadGrace(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		ticks := make(chan time.Time, 2)
+		events := make(chan string, 2)
+		finished := make(chan struct{})
+		calls := 0
+		go func() {
+			defer close(finished)
+			monitorProductSession(ctx, ticks, nil, func() error {
+				calls++
+				if calls == 1 {
+					return errTrustReadTimeout
+				}
+				return truststore.ErrPeerRevoked
+			}, cancel, func(code string) { events <- code })
+		}()
+		ticks <- time.Now()
+		if code := <-events; code != "session_trust_read_deferred" {
+			t.Fatal(code)
+		}
+		ticks <- time.Now()
+		if code := <-events; code != "session_trust_revoked" {
+			t.Fatal(code)
+		}
+		<-finished
+		if ctx.Err() != context.Canceled || calls != 2 {
+			t.Fatalf("revocation did not stop: %v, %d", ctx.Err(), calls)
 		}
 	})
 }

@@ -28,7 +28,7 @@ func init() {
 	for _, code := range []string{"tcp_keepalive_15_5_3", "tcp_keepalive_unavailable", "tcp_keepalive_not_tcp"} {
 		allowed[code] = true
 	}
-	for _, code := range []string{"session_trust_read_timeout", "session_trust_read_pending", "session_trust_revoked", "session_trust_peer_missing", "session_trust_store_missing"} {
+	for _, code := range []string{"session_trust_read_timeout", "session_trust_read_pending", "session_trust_read_deferred", "session_trust_read_recovered", "session_trust_freshness_expired", "session_trust_revoked", "session_trust_peer_missing", "session_trust_store_missing"} {
 		allowed[code] = true
 	}
 	for _, code := range []string{"session_certificate_deadline", "session_guard_exited", "session_guard_close_failed", "session_trust_check_failed", "session_trust_busy_exhausted"} {

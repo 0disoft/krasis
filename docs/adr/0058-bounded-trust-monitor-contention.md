@@ -45,3 +45,17 @@ Substep durations overlap their aggregate
 contain no path, peer identity, certificate, input, or raw error. This narrows
 the next failure investigation; it does not relax the one-second trust deadline
 or change fail-closed behavior.
+
+Generation 71 separates a slow trust read from a negative trust verdict. The
+g68 two-device logs showed two one-second trust-check deadlines, with different
+active steps (certificate and directory ACL); A disconnected and B saw EOF.
+The logs do not identify the external source of the delay. A timed-out or
+still-running read is inconclusive: keep the pinned session for at most five
+seconds since its last complete trust validation and retry on subsequent ticks.
+One blocked worker remains the maximum. A hard freshness deadline also stops
+the session if ticks cease; a late result cannot revive it. Revocation, missing
+trust, corrupt data, other read errors, guard exit and certificate expiry still
+stop immediately. This deliberately permits up to five seconds of previously
+validated trust during a filesystem stall, rather than treating the one-second
+sampling budget as a revocation. Fixed deferred/recovered/expired codes reveal
+the outcome without paths or certificate data.
