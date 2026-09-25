@@ -136,7 +136,7 @@ func TestTrustTraceReportsNestedTimeoutStep(t *testing.T) {
 	snapshot := truststore.ReadTraceSnapshot{
 		Phase: "store_read_acl",
 		Durations: map[string]time.Duration{
-			"store_read": time.Second,
+			"store_read":     time.Second,
 			"store_read_acl": time.Second,
 		},
 	}
@@ -151,8 +151,8 @@ func TestTrustTraceReportsNestedTimeoutStep(t *testing.T) {
 func TestTrustTraceOmitsFastCompletedSubsteps(t *testing.T) {
 	snapshot := truststore.ReadTraceSnapshot{
 		Durations: map[string]time.Duration{
-			"prelock": 100 * time.Millisecond,
-			"prelock_parent_acl": time.Millisecond,
+			"prelock":                100 * time.Millisecond,
+			"prelock_parent_acl":     time.Millisecond,
 			"prelock_directory_open": 99 * time.Millisecond,
 		},
 	}
