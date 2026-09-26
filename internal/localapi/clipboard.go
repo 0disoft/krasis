@@ -8,9 +8,11 @@ import (
 	"github.com/0disoft/krasis/internal/peerupdate"
 	"io"
 	"net/http"
+	"time"
 )
 
-const maxClipboardJSONBytes = ((peerupdate.MaxClipboardImageBytes + 2) / 3 * 4) + 4096
+const maxClipboardJSONBytes = ((peerupdate.MaxClipboardFileBytes + 2) / 3 * 4) + 4096
+const clipboardRequestTimeout = 60 * time.Second
 
 type ClipboardRequest struct {
 	Action string  `json:"action"`
@@ -42,7 +44,14 @@ func (r ClipboardRequest) Valid() bool {
 }
 func (c *Client) Clipboard(ctx context.Context, r ClipboardRequest) (ClipboardResult, error) {
 	var v ClipboardResult
-	err := c.requestHeadersLimit(ctx, http.MethodPost, "/v1/clipboard", r, &v, nil, maxClipboardJSONBytes)
+	if c == nil || c.http == nil {
+		return v, ErrUnavailable
+	}
+	client := *c
+	client.http = new(http.Client)
+	*client.http = *c.http
+	client.http.Timeout = clipboardRequestTimeout
+	err := client.requestHeadersLimit(ctx, http.MethodPost, "/v1/clipboard", r, &v, nil, maxClipboardJSONBytes)
 	return v, err
 }
 func (h *handler) clipboard(w http.ResponseWriter, r *http.Request) {
@@ -50,6 +59,10 @@ func (h *handler) clipboard(w http.ResponseWriter, r *http.Request) {
 		writeMethodNotAllowed(w)
 		return
 	}
+	deadline := time.Now().Add(clipboardRequestTimeout)
+	controller := http.NewResponseController(w)
+	_ = controller.SetReadDeadline(deadline)
+	_ = controller.SetWriteDeadline(deadline)
 	var req ClipboardRequest
 	if decodeClipboardRequest(r.Body, &req) != nil || !req.Valid() {
 		writeJSON(w, 400, ClipboardResult{Code: "invalid_request"})

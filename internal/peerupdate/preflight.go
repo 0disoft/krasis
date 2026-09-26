@@ -26,11 +26,13 @@ type peerObservation struct {
 }
 
 func (m *Manager) info(peer string) PeerInfo {
-	allowed, id, size, format := m.ClipboardPayloadInfo(peer)
+	allowed, id, size, format, legacyFiles := m.ClipboardPayloadInfo(peer)
 	info := PeerInfo{Protocol: 2, Generation: m.generation, Revision: m.revision, Allowed: m.permitted(peer), Clipboard: allowed, ClipboardID: id, ClipboardSize: size, ClipboardFormat: format}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if format != "" && (m.peers[peer].info.Generation < 69 || format == "files" && m.peers[peer].info.Generation < 70) {
+	peerGeneration := m.peers[peer].info.Generation
+	if format != "" && (peerGeneration < 69 || format == "files" &&
+		(peerGeneration < 70 || peerGeneration < 72 && !legacyFiles)) {
 		info.ClipboardID, info.ClipboardSize, info.ClipboardFormat = "", 0, ""
 	}
 	if m.status.Peer == peer && m.status.State == "APPLY_FAILED" {
@@ -52,7 +54,10 @@ func readPeerInfo(reader io.Reader) (PeerInfo, error) {
 		if info.Generation < 69 || (info.ClipboardFormat != "png" && info.ClipboardFormat != "dib" && (info.Generation < 70 || info.ClipboardFormat != "files")) {
 			return PeerInfo{}, ErrDenied
 		}
-		limit = MaxClipboardImageBytes
+		limit = clipboardPayloadLimit(info.ClipboardFormat)
+	}
+	if info.ClipboardFormat == "files" && info.Generation < 72 && info.ClipboardSize > legacyMaxClipboardFileBytes {
+		return PeerInfo{}, ErrDenied
 	}
 	if info.ClipboardSize < 0 || info.ClipboardSize > limit ||
 		(info.ClipboardID != "" && !validID(info.ClipboardID, 32)) ||

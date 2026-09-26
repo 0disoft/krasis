@@ -52,3 +52,24 @@ func TestClipboardFileAndFolderRoundTrip(t *testing.T) {
 		t.Fatal("invalid CF_HDROP", err)
 	}
 }
+
+func TestClipboard47MiBFileRoundTrip(t *testing.T) {
+	source := filepath.Join(t.TempDir(), "large.bin")
+	content := bytes.Repeat([]byte("a"), 47<<20)
+	if err := os.WriteFile(source, content, 0600); err != nil {
+		t.Fatal(err)
+	}
+	packed, err := packClipboardFiles([]string{source})
+	if err != nil {
+		t.Fatal("pack 47 MiB file", err)
+	}
+	stage, paths, err := extractClipboardFilesAt(t.TempDir(), packed)
+	if err != nil {
+		t.Fatal("extract 47 MiB file", err)
+	}
+	defer os.RemoveAll(stage)
+	got, err := os.ReadFile(paths[0])
+	if err != nil || !bytes.Equal(got, content) {
+		t.Fatal("large file changed", err)
+	}
+}

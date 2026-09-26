@@ -11,12 +11,24 @@ import (
 
 const MaxClipboardBytes = 64 << 10
 
+func clipboardPayloadLimit(format string) int {
+	switch format {
+	case "files":
+		return MaxClipboardFileBytes
+	case "png", "dib":
+		return MaxClipboardImageBytes
+	default:
+		return MaxClipboardBytes
+	}
+}
+
 type ClipboardValue struct {
-	ID      string `json:"id,omitempty"`
-	Text    string `json:"text,omitempty"`
-	Format  string `json:"format,omitempty"`
-	Data    []byte `json:"data,omitempty"`
-	expires time.Time
+	ID          string `json:"id,omitempty"`
+	Text        string `json:"text,omitempty"`
+	Format      string `json:"format,omitempty"`
+	Data        []byte `json:"data,omitempty"`
+	expires     time.Time
+	legacyFiles bool
 }
 type clipboardState struct {
 	mu           sync.Mutex
@@ -87,25 +99,25 @@ func (m *Manager) ClipboardPeer() string {
 	return m.clipboard.peer
 }
 func (m *Manager) ClipboardInfo(peer string) (bool, string, int) {
-	allowed, id, size, _ := m.ClipboardPayloadInfo(peer)
+	allowed, id, size, _, _ := m.ClipboardPayloadInfo(peer)
 	return allowed, id, size
 }
-func (m *Manager) ClipboardPayloadInfo(peer string) (bool, string, int, string) {
+func (m *Manager) ClipboardPayloadInfo(peer string) (bool, string, int, string, bool) {
 	m.clipboard.mu.Lock()
 	defer m.clipboard.mu.Unlock()
 	if m.clipboard.peer != peer || time.Now().After(m.clipboard.activeUntil) {
-		return false, "", 0, ""
+		return false, "", 0, "", false
 	}
 	if m.clipboard.out != nil && time.Now().After(m.clipboard.out.expires) {
 		m.clipboard.out = nil
 	}
 	if m.clipboard.out == nil {
-		return true, "", 0, ""
+		return true, "", 0, "", false
 	}
 	if m.clipboard.out.Format != "" {
-		return true, m.clipboard.out.ID, len(m.clipboard.out.Data), m.clipboard.out.Format
+		return true, m.clipboard.out.ID, len(m.clipboard.out.Data), m.clipboard.out.Format, m.clipboard.out.legacyFiles
 	}
-	return true, m.clipboard.out.ID, len(m.clipboard.out.Text), ""
+	return true, m.clipboard.out.ID, len(m.clipboard.out.Text), "", false
 }
 func validClipboardText(text string) bool {
 	return len(text) <= MaxClipboardBytes && utf8.ValidString(text) && !strings.ContainsRune(text, 0)
@@ -132,8 +144,13 @@ func (m *Manager) SyncClipboardPayload(peer string, local *ClipboardValue, ack s
 			local.Format != "" && (local.Text != "" || !ValidClipboardPayload(local.Format, local.Data)) {
 			return ClipboardValue{}, ErrDenied
 		}
+		expires := 15 * time.Second
+		if local.Format == "files" {
+			expires = 75 * time.Second
+		}
 		m.clipboard.out = &ClipboardValue{ID: randomID(), Text: local.Text, Format: local.Format,
-			Data: append([]byte(nil), local.Data...), expires: time.Now().Add(15 * time.Second)}
+			Data: append([]byte(nil), local.Data...), expires: time.Now().Add(expires),
+			legacyFiles: local.Format == "files" && clipboardFilesFitLegacy(local.Data)}
 		m.clipboard.in = nil // A new local copy supersedes a pending remote copy.
 	}
 	if m.clipboard.in != nil && (m.clipboard.in.ID == ack || time.Now().After(m.clipboard.in.expires)) {
@@ -170,9 +187,13 @@ func (m *Manager) clipboardReceivePayload(peer, id, format string, r io.Reader, 
 	if !validID(id, 32) || !authorized() {
 		return ErrDenied
 	}
-	limit := MaxClipboardBytes
-	if format != "" {
-		limit = MaxClipboardImageBytes
+	limit := clipboardPayloadLimit(format)
+	m.clipboard.mu.Lock()
+	active := m.clipboard.peer == peer && time.Now().Before(m.clipboard.activeUntil) &&
+		(format == "" || m.clipboard.imageAllowed) && (format != "files" || m.clipboard.filesAllowed)
+	m.clipboard.mu.Unlock()
+	if !active {
+		return ErrDenied
 	}
 	data, err := io.ReadAll(io.LimitReader(r, int64(limit)+1))
 	if err != nil || !authorized() || format == "" && !validClipboardText(string(data)) ||
@@ -181,7 +202,7 @@ func (m *Manager) clipboardReceivePayload(peer, id, format string, r io.Reader, 
 	}
 	m.clipboard.mu.Lock()
 	defer m.clipboard.mu.Unlock()
-	if m.clipboard.peer != peer || time.Now().After(m.clipboard.activeUntil) ||
+	if m.clipboard.peer != peer ||
 		format != "" && !m.clipboard.imageAllowed || format == "files" && !m.clipboard.filesAllowed {
 		return ErrDenied
 	}
@@ -193,7 +214,11 @@ func (m *Manager) clipboardReceivePayload(peer, id, format string, r io.Reader, 
 	if m.clipboard.out != nil && time.Now().Before(m.clipboard.out.expires) {
 		return ErrBusy
 	}
-	value := &ClipboardValue{ID: id, Format: format, expires: time.Now().Add(10 * time.Second)}
+	expires := 10 * time.Second
+	if format == "files" {
+		expires = 60 * time.Second
+	}
+	value := &ClipboardValue{ID: id, Format: format, expires: time.Now().Add(expires)}
 	if format == "" {
 		value.Text = string(data)
 	} else {

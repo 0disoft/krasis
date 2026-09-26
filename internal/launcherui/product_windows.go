@@ -436,6 +436,8 @@ func (a *productWindow) performTarget(action, alias string) {
 		budget := 20 * time.Second
 		if action == "auto_recover" {
 			budget = 40 * time.Second
+		} else if action == "refresh" {
+			budget = 60 * time.Second // File clipboard synchronization may include a large local API response.
 		}
 		ctx, cancel := context.WithTimeout(a.ctx, budget)
 		defer cancel()

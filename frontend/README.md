@@ -95,7 +95,7 @@ shows a confirmation. Upgrading from a version without file sharing requires
 enabling it again on both PCs. The switch reflects acknowledged agent settings.
 Only the peer fingerprint and status cross the WebView boundary; content stays
 in the native Windows worker and authenticated local agent. Files and folders
-are limited to 40 MiB and 512 entries. The receiving PC temporarily stores
+are limited to 64 MiB and 512 entries. The receiving PC temporarily stores
 their bytes in a private directory for Explorer paste, then removes them after
 24 hours while Krasis runs or at its next start.
 

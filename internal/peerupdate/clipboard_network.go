@@ -76,11 +76,19 @@ func (m *Manager) pollClipboard(ctx context.Context, c *http.Client, address, pe
 	if !ok || !local || !authorized() {
 		return
 	}
-	ctx, cancel := context.WithTimeout(ctx, 12*time.Second)
+	_, id, _ := m.ClipboardInfo(peer)
+	outgoing := m.clipboardOutgoing(peer, id)
+	deadline := 12 * time.Second
+	if remote.ClipboardFormat == "files" || outgoing != nil && outgoing.Format == "files" {
+		deadline = 60 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(ctx, deadline)
 	defer cancel()
 	url := "https://" + address + "/v1/clipboard"
-	_, id, _ := m.ClipboardInfo(peer)
-	if value := m.clipboardOutgoing(peer, id); value != nil && (value.Format == "" || remote.Generation >= 69) {
+	if value := outgoing; value != nil &&
+		(value.Format == "" || remote.Generation >= 69) &&
+		(value.Format != "files" || remote.Generation >= 70 &&
+			(remote.Generation >= 72 || value.legacyFiles)) {
 		var body io.Reader = strings.NewReader(value.Text)
 		if value.Format != "" {
 			body = bytes.NewReader(value.Data)

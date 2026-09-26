@@ -9,7 +9,26 @@ import (
 )
 
 const MaxClipboardFiles = 512
-const MaxClipboardFileBytes = 40 << 20
+const MaxClipboardFileBytes = 64 << 20
+const legacyMaxClipboardFileBytes = 40 << 20
+
+func clipboardFilesFitLegacy(data []byte) bool {
+	if len(data) == 0 || len(data) > legacyMaxClipboardFileBytes {
+		return false
+	}
+	r, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return false
+	}
+	var total uint64
+	for _, f := range r.File {
+		if f.UncompressedSize64 > uint64(legacyMaxClipboardFileBytes)-total {
+			return false
+		}
+		total += f.UncompressedSize64
+	}
+	return true
+}
 
 // ValidClipboardFiles validates the metadata before a peer can advertise or
 // receive a file copy. Extraction must separately enforce these byte limits.

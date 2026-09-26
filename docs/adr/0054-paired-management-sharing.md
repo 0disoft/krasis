@@ -34,8 +34,11 @@ The GUI explicitly warns about secrets; applications marking clipboard content
 `ExcludeClipboardContentFromMonitorProcessing` are excluded. Unicode text is
 limited to 64 KiB UTF-8 and rejects NUL or invalid UTF-8. PNG and ordinary
 uncompressed DIB images are bounded to 40 MiB and 10 million pixels. Explorer
-file and folder lists are transferred as a bounded 40 MiB ZIP of actual file
+file and folder lists are transferred as a bounded 64 MiB ZIP of actual file
 bytes, with at most 512 entries and no reparse points, symlinks or special files.
+Both archive size and total extracted bytes obey the 64 MiB bound. Transfers
+above the former 40 MiB bound require generation 72 on both devices, including
+when compression makes the archive itself smaller than 40 MiB.
 File contents are unpacked into a private local clipboard directory on the
 receiving PC and removed after 24 hours while Krasis runs, or at the next
 start after that deadline. Text and image clipboard content is
@@ -45,7 +48,8 @@ The authenticated local `/v1/clipboard` API provides ENABLE, DISABLE and SYNC.
 Both agents advertise permission and latest change metadata in management status
 before transporting content on `/v1/clipboard`. Random change IDs bind requests,
 receipts and duplicate suppression. One outgoing and one incoming value are kept
-in memory with 15-second and 10-second deadlines. There is no offline replay.
+in memory with 15-second and 10-second deadlines for text and images, or
+75-second and 60-second deadlines for files. There is no offline replay.
 Concurrent local copies win over pending remote copies; simultaneous conflicting
 copies may require copying again rather than silently choosing a device winner.
 Image and file metadata is advertised only to peers that support each format;
@@ -62,7 +66,8 @@ Enabling/restarting baselines the current clipboard without transmitting it.
 
 Only the unlocked Default input desktop is used. No clipboard read or write is
 attempted on lock/secure desktop. The GUI heartbeat permits transport for five
-seconds; an already-authorized request has a twelve-second deadline. Content copied
+seconds; an already-authorized text or image request has a twelve-second deadline,
+while a file request has a sixty-second deadline. Content copied
 before locking can therefore finish an already-admitted transfer, but locked
   desktop contents are never sampled. The GUI must remain running or in tray.
 

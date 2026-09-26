@@ -11,6 +11,9 @@ import (
 )
 
 func TestClipboardJSONExpansionRemainsBounded(t *testing.T) {
+	if maxClipboardJSONBytes < ((peerupdate.MaxClipboardFileBytes+2)/3*4)+4096 {
+		t.Fatal("file payload exceeds local API JSON cap")
+	}
 	text := strings.Repeat("<", peerupdate.MaxClipboardBytes)
 	input := ClipboardRequest{Action: "SYNC", Peer: strings.Repeat("a", 64), Text: &text}
 	data, err := json.Marshal(input)
