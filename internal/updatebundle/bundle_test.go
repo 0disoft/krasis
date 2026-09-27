@@ -14,7 +14,7 @@ import (
 func fixture(t *testing.T, mutate func(map[string][]byte), extra string, withProbe ...bool) []byte {
 	t.Helper()
 	includeProbe := len(withProbe) != 0 && withProbe[0]
-	selected := selectedNames(includeProbe)
+	selected := selectedNames(legacyNames, includeProbe)
 	files := map[string][]byte{}
 	for _, name := range selected {
 		files[name] = []byte("test fixture")
@@ -47,6 +47,71 @@ func fixture(t *testing.T, mutate func(map[string][]byte), extra string, withPro
 		t.Fatal(err)
 	}
 	return buffer.Bytes()
+}
+
+func TestBundleAcceptsBothExclusiveExecutableLayouts(t *testing.T) {
+	for _, current := range []bool{false, true} {
+		selected := legacyNames
+		ui := "krasis-control.exe"
+		if current {
+			selected = currentNames
+			ui = "krasis.exe"
+		}
+		data := fixtureLayout(t, selected)
+		bundle, err := read(bytes.NewReader(data), int64(len(data)), func(string, []byte, string) error { return nil })
+		if err != nil || bundle.UIExecutable() != ui {
+			t.Fatalf("current=%v: %v", current, err)
+		}
+		root, err := os.OpenRoot(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := bundle.Stage(root, strings.Repeat("d", 32)); err != nil {
+			t.Fatal(err)
+		}
+		root.Close()
+	}
+}
+
+func fixtureLayout(t *testing.T, selected []string) []byte {
+	t.Helper()
+	files := map[string][]byte{}
+	for _, name := range selected[:len(selected)-1] {
+		files[name] = []byte("test fixture")
+	}
+	files["BUILD.json"], _ = json.Marshal(Metadata{Revision: strings.Repeat("a", 40), Platform: "windows/amd64", Purpose: "manual-two-pc-smoke", Generation: 76})
+	var sums strings.Builder
+	for _, name := range selected[:len(selected)-1] {
+		fmt.Fprintf(&sums, "%x  %s\n", sha256.Sum256(files[name]), name)
+	}
+	files["SHA256SUMS.txt"] = []byte(sums.String())
+	var buffer bytes.Buffer
+	w := zip.NewWriter(&buffer)
+	for _, name := range selected {
+		f, err := w.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.Write(files[name]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buffer.Bytes()
+}
+
+func TestBundleRejectsMixedLayouts(t *testing.T) {
+	for _, selected := range [][]string{
+		{"krasis.exe", "krasis-agent.exe", "krasis-cli.exe", "krasis-control.exe", "START-HERE.md", "BUILD.json", "THIRD-PARTY-NOTICES.txt", "SHA256SUMS.txt"},
+		{"krasis.exe", "krasis-agent.exe", "START-HERE.md", "BUILD.json", "THIRD-PARTY-NOTICES.txt", "SHA256SUMS.txt"},
+	} {
+		data := fixtureLayout(t, selected)
+		if _, err := read(bytes.NewReader(data), int64(len(data)), func(string, []byte, string) error { return nil }); err == nil {
+			t.Fatal("mixed or incomplete layout accepted")
+		}
+	}
 }
 
 func TestBundleRejectsUnsafeAndCorruptArchives(t *testing.T) {

@@ -66,7 +66,7 @@ func launchReceivedUpdate(directory, revision, alias string, generation int, sta
 	if bundle.Metadata().Revision != revision || bundle.Metadata().Generation <= generation {
 		return errors.New("stale update")
 	}
-	command := exec.Command(filepath.Join(absolute, "krasis-control.exe"), "--updated-peer", alias, "--expected-build", revision)
+	command := exec.Command(filepath.Join(absolute, bundle.UIExecutable()), "--updated-peer", alias, "--expected-build", revision)
 	command.Dir = absolute
 	command.SysProcAttr = &syscall.SysProcAttr{CreationFlags: 0x08000000}
 	for _, key := range []string{"SystemRoot", "WINDIR", "LOCALAPPDATA", "TEMP", "TMP", "USERPROFILE"} {

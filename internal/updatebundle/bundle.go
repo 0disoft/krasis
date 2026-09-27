@@ -24,16 +24,30 @@ const maxDocumentBytes int64 = 1 << 20
 
 var ErrInvalid = errors.New("invalid Krasis update bundle")
 
-var names = []string{"krasis.exe", "krasis-agent.exe", "krasis-control.exe", "START-HERE.md", "BUILD.json", "THIRD-PARTY-NOTICES.txt", "SHA256SUMS.txt"}
+var legacyNames = []string{"krasis.exe", "krasis-agent.exe", "krasis-control.exe", "START-HERE.md", "BUILD.json", "THIRD-PARTY-NOTICES.txt", "SHA256SUMS.txt"}
+var currentNames = []string{"krasis.exe", "krasis-agent.exe", "krasis-cli.exe", "START-HERE.md", "BUILD.json", "THIRD-PARTY-NOTICES.txt", "SHA256SUMS.txt"}
+var names = legacyNames // The transition build still sends the layout understood by older receivers.
 var probeNames = []string{"KrasisBrokeredProbe-TESTSIGNED.msix", "KrasisBrokeredProbe-TESTCERT.cer"}
 
-func selectedNames(withProbe bool) []string {
+func selectedNames(base []string, withProbe bool) []string {
 	if !withProbe {
-		return names
+		return base
 	}
-	selected := append([]string{}, names[:len(names)-1]...)
+	selected := append([]string{}, base[:len(base)-1]...)
 	selected = append(selected, probeNames...)
-	return append(selected, names[len(names)-1])
+	return append(selected, base[len(base)-1])
+}
+
+func layout(files map[string][]byte) ([]string, error) {
+	_, legacy := files["krasis-control.exe"]
+	_, current := files["krasis-cli.exe"]
+	if legacy == current {
+		return nil, ErrInvalid
+	}
+	if current {
+		return currentNames, nil
+	}
+	return legacyNames, nil
 }
 
 type Metadata struct {
@@ -52,6 +66,12 @@ type Bundle struct {
 }
 
 func (b *Bundle) Metadata() Metadata { return b.metadata }
+func (b *Bundle) UIExecutable() string {
+	if b.files["krasis-cli.exe"] != nil {
+		return "krasis.exe"
+	}
+	return "krasis-control.exe"
+}
 
 func Read(source io.ReaderAt, size int64) (*Bundle, error) {
 	return read(source, size, verifyExecutable)
@@ -62,10 +82,10 @@ func read(source io.ReaderAt, size int64, executable func(string, []byte, string
 		return nil, ErrInvalid
 	}
 	r, err := zip.NewReader(source, size)
-	if err != nil || (len(r.File) != len(names) && len(r.File) != len(names)+len(probeNames)) {
+	if err != nil || (len(r.File) != len(legacyNames) && len(r.File) != len(legacyNames)+len(probeNames)) {
 		return nil, ErrInvalid
 	}
-	files := make(map[string][]byte, len(names))
+	files := make(map[string][]byte, len(legacyNames))
 	var total int64
 	for _, entry := range r.File {
 		limit := fileLimit(entry.Name)
@@ -84,7 +104,11 @@ func read(source io.ReaderAt, size int64, executable func(string, []byte, string
 		}
 		files[entry.Name] = data
 	}
-	for _, name := range names {
+	base, err := layout(files)
+	if err != nil {
+		return nil, err
+	}
+	for _, name := range base {
 		if _, ok := files[name]; !ok {
 			return nil, ErrInvalid
 		}
@@ -92,7 +116,10 @@ func read(source io.ReaderAt, size int64, executable func(string, []byte, string
 	if (files[probeNames[0]] == nil) != (files[probeNames[1]] == nil) {
 		return nil, ErrInvalid
 	}
-	selected := selectedNames(files[probeNames[0]] != nil)
+	selected := selectedNames(base, files[probeNames[0]] != nil)
+	if len(files) != len(selected) {
+		return nil, ErrInvalid
+	}
 	checksums := map[string]string{}
 	for _, line := range strings.Split(strings.TrimSuffix(string(files["SHA256SUMS.txt"]), "\n"), "\n") {
 		parts := strings.SplitN(strings.TrimSuffix(line, "\r"), "  ", 2)
@@ -120,7 +147,7 @@ func read(source io.ReaderAt, size int64, executable func(string, []byte, string
 	if decoder.Decode(&metadata) != nil || decoder.Decode(new(any)) != io.EOF || !validHex(metadata.Revision, 40) || metadata.Platform != "windows/amd64" || metadata.CGO || metadata.Purpose != "manual-two-pc-smoke" || metadata.Signed || metadata.Generation < 21 {
 		return nil, ErrInvalid
 	}
-	for _, name := range names[:3] {
+	for _, name := range base[:3] {
 		if err := executable(name, files[name], metadata.Revision); err != nil {
 			return nil, errors.Join(ErrInvalid, err)
 		}
@@ -129,7 +156,7 @@ func read(source io.ReaderAt, size int64, executable func(string, []byte, string
 }
 
 func fileLimit(name string) int64 {
-	for index, allowed := range names {
+	for index, allowed := range legacyNames {
 		if name == allowed {
 			if index < 3 {
 				return maxExecutableBytes
@@ -139,6 +166,9 @@ func fileLimit(name string) int64 {
 			}
 			return maxDocumentBytes
 		}
+	}
+	if name == "krasis-cli.exe" {
+		return maxExecutableBytes
 	}
 	if name == probeNames[0] {
 		return 16 << 20
@@ -183,13 +213,17 @@ func verifyExecutable(name string, data []byte, revision string) error {
 // Stage creates a fresh directory under a caller-owned, protected root. It never
 // overwrites an installed bundle and never uses archive-controlled path names.
 func (b *Bundle) Stage(parent *os.Root, directory string) (err error) {
-	if b == nil || (len(b.files) != len(names) && len(b.files) != len(names)+len(probeNames)) || !validHex(directory, 32) {
+	if b == nil || (len(b.files) != len(legacyNames) && len(b.files) != len(legacyNames)+len(probeNames)) || !validHex(directory, 32) {
 		return ErrInvalid
 	}
-	selected := names
+	base, err := layout(b.files)
+	if err != nil {
+		return err
+	}
+	selected := base
 	if b.files[probeNames[0]] != nil && b.files[probeNames[1]] != nil {
-		selected = selectedNames(true)
-	} else if len(b.files) != len(names) {
+		selected = selectedNames(base, true)
+	} else if len(b.files) != len(base) {
 		return ErrInvalid
 	}
 	if err = parent.Mkdir(directory, 0700); err != nil {
@@ -231,7 +265,25 @@ func Pack(root interface {
 }) ([]byte, error) {
 	var buffer bytes.Buffer
 	w := zip.NewWriter(&buffer)
-	selected := names
+	selected := legacyNames
+	legacy, err := root.Open("krasis-control.exe")
+	if err == nil {
+		legacy.Close()
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	current, err := root.Open("krasis-cli.exe")
+	if err == nil {
+		current.Close()
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	if (legacy == nil) == (current == nil) {
+		return nil, ErrInvalid
+	}
+	if current != nil {
+		selected = currentNames
+	}
 	var present int
 	for _, name := range probeNames {
 		f, err := root.Open(name)
@@ -246,7 +298,7 @@ func Pack(root interface {
 		return nil, ErrInvalid
 	}
 	if present == len(probeNames) {
-		selected = selectedNames(true)
+		selected = selectedNames(selected, true)
 	}
 	for _, name := range selected {
 		f, err := root.Open(name)

@@ -103,6 +103,14 @@ the seven-file archive so generation 60 can install generation 61. The added
 files are only staged; this path does not install the MSIX or trust its
 certificate. Both files must be present with bounded sizes and checksums.
 
+Generation 75 is a second transition build. It still sends the legacy three-EXE
+layout so older peers can install it, but accepts either that layout or the
+three-EXE `krasis.exe` UI, `krasis-agent.exe`, `krasis-cli.exe` layout.
+The two layouts are mutually exclusive; every executable remains bounded and
+verified against its own Go command path, source revision, and checksum. The
+receiver launches only the verified UI named by the selected layout. Upgrade
+older receivers to generation 75 before sending a new-layout bundle.
+
 Unit tests cover denied and revoked permissions, single-use apply, malformed ZIPs,
 generation checks and integrity checks. Packaged two-PC upgrade, firewall behavior,
 native GUI relaunch and post-upgrade input require manual verification. No official
