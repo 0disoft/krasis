@@ -14,17 +14,17 @@ const generation = Number(fs.readFileSync('internal/localapi/runtime.go','utf8')
 if (!Number.isSafeInteger(generation)) throw Error('Missing generation');
 const bundleRoot = process.argv[2];
 if (!bundleRoot || path.resolve(bundleRoot) !== path.resolve('dist/workspace', `g${generation}`)) throw Error('Expected generation-scoped distribution');
-const directory = path.join(bundleRoot,'peer-update');
-fs.mkdirSync(directory,{recursive:true});
-for (const name of ['krasis','krasis-agent','krasis-control']) {
-  const tags = name === 'krasis-control' ? ['-tags','desktop,production'] : [];
-  execFileSync('go',['build','-trimpath',...tags,'-ldflags=-s -w -H=windowsgui','-o',path.join(directory,`${name}.exe`),`./cmd/${name}`],{stdio:'inherit',env:{...process.env,GOOS:'windows',GOARCH:'amd64',CGO_ENABLED:'0',GOPROXY:'off',GOSUMDB:'off'}});
+const directory = bundleRoot;
+for (const name of ['krasis','krasis-agent','krasis-cli']) {
+  const tags = name === 'krasis' ? ['-tags','desktop,production'] : [];
+  const ldflags = name === 'krasis-cli' ? '-s -w' : '-s -w -H=windowsgui';
+  execFileSync('go',['build','-trimpath',...tags,`-ldflags=${ldflags}`,'-o',path.join(directory,`${name}.exe`),`./cmd/${name}`],{stdio:'inherit',env:{...process.env,GOOS:'windows',GOARCH:'amd64',CGO_ENABLED:'0',GOPROXY:'off',GOSUMDB:'off'}});
   verifyExecutableIcon(fs.readFileSync(path.join(directory,`${name}.exe`)));
 }
 fs.copyFileSync('frontend/README.md',path.join(directory,'START-HERE.md'));
 fs.copyFileSync(path.join(bundleRoot,'THIRD-PARTY-NOTICES.txt'),path.join(directory,'THIRD-PARTY-NOTICES.txt'));
 fs.writeFileSync(path.join(directory,'BUILD.json'),JSON.stringify({revision,generation,platform:'windows/amd64',cgo:false,purpose:'manual-two-pc-smoke',signed:false},null,2)+'\n');
-const names=['krasis.exe','krasis-agent.exe','krasis-control.exe','START-HERE.md','BUILD.json','THIRD-PARTY-NOTICES.txt'];
+const names=['krasis.exe','krasis-agent.exe','krasis-cli.exe','START-HERE.md','BUILD.json','THIRD-PARTY-NOTICES.txt'];
 if (generation >= 62) {
   const probeRoot = path.resolve('dist/brokered-input-probe');
   const candidates = fs.existsSync(probeRoot) ? fs.readdirSync(probeRoot,{withFileTypes:true})

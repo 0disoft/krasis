@@ -6,7 +6,7 @@
 
 ## 결정
 
-정식 제품 CLI는 `krasis.exe`다. `krasis-lab.exe`의 실험 명령을 승격하거나 재사용하지 않으며,
+정식 제품 CLI는 `krasis-cli.exe`다. `krasis.exe`는 관리 UI다. `krasis-lab.exe`의 실험 명령을 승격하거나 재사용하지 않으며,
 입력 hook·peer transport·trust 파일을 직접 소유하지 않는다. 모든 제품 동작은 현재 사용자 세션의
 `krasis-agent.exe`가 게시한 authenticated loopback API를 통해 수행한다.
 

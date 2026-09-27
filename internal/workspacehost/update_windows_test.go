@@ -16,6 +16,15 @@ func TestUpdateEntryPointsUseOwnedBundleDirectory(t *testing.T) {
 	if got := updateBundleDirectory(filepath.Join(base, "krasis-workspace.exe")); got != filepath.Join(base, "peer-update") {
 		t.Fatal(got)
 	}
+	if got := updateBundleDirectory(filepath.Join(base, "krasis.exe")); got != filepath.Join(base, "peer-update") {
+		t.Fatal(got)
+	}
+	if err := os.WriteFile(filepath.Join(base, "BUILD.json"), []byte("{}"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if got := updateBundleDirectory(filepath.Join(base, "krasis.exe")); got != base {
+		t.Fatal(got)
+	}
 	if got := transitionBundleDirectory(filepath.Join(base, "krasis-control.exe")); got != "" {
 		t.Fatal(got)
 	}

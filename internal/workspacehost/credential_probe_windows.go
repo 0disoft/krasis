@@ -14,7 +14,7 @@ import (
 )
 
 func credentialProbeAgentPath(controlExecutable string) (string, error) {
-	if !filepath.IsAbs(controlExecutable) || filepath.Base(controlExecutable) != "krasis-control.exe" {
+	if !filepath.IsAbs(controlExecutable) || (filepath.Base(controlExecutable) != "krasis-control.exe" && filepath.Base(controlExecutable) != "krasis.exe") {
 		return "", errors.New("invalid controller executable")
 	}
 	return filepath.Join(filepath.Dir(controlExecutable), "krasis-agent.exe"), nil

@@ -13,7 +13,11 @@ func TestCredentialProbeAgentPathIsAdjacentToController(t *testing.T) {
 	if err != nil || path != filepath.Join(base, "krasis-agent.exe") {
 		t.Fatalf("agent path = %q, err = %v", path, err)
 	}
-	for _, invalid := range []string{"krasis-control.exe", filepath.Join(base, "krasis.exe"), filepath.Join(base, "other.exe")} {
+	path, err = credentialProbeAgentPath(filepath.Join(base, "krasis.exe"))
+	if err != nil || path != filepath.Join(base, "krasis-agent.exe") {
+		t.Fatalf("new UI agent path = %q, err = %v", path, err)
+	}
+	for _, invalid := range []string{"krasis-control.exe", filepath.Join(base, "other.exe")} {
 		if _, err := credentialProbeAgentPath(invalid); err == nil {
 			t.Fatalf("accepted invalid controller %q", invalid)
 		}

@@ -170,7 +170,7 @@ func TestWorkspaceUpdatePackage(t *testing.T) {
 	if bundle.Metadata().Revision != os.Getenv("KRASIS_UPDATE_REVISION") || bundle.Metadata().Generation != localapi.AgentGeneration {
 		t.Fatal("build provenance mismatch")
 	}
-	controlInfo, err := buildinfo.ReadFile(filepath.Join(directory, "krasis-control.exe"))
+	controlInfo, err := buildinfo.ReadFile(filepath.Join(directory, "krasis.exe"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -204,7 +204,7 @@ func TestWorkspaceUpdatePackage(t *testing.T) {
 	called := false
 	err = launchReceivedUpdate(filepath.Join(parent, id), bundle.Metadata().Revision, "A", 34, func(cmd *exec.Cmd) error {
 		called = true
-		if filepath.Base(cmd.Path) != "krasis-control.exe" {
+		if filepath.Base(cmd.Path) != "krasis.exe" {
 			t.Fatal("wrong receiver")
 		}
 		if cmd.SysProcAttr == nil || cmd.SysProcAttr.HideWindow || cmd.SysProcAttr.CreationFlags != 0x08000000 {

@@ -26,7 +26,6 @@ var ErrInvalid = errors.New("invalid Krasis update bundle")
 
 var legacyNames = []string{"krasis.exe", "krasis-agent.exe", "krasis-control.exe", "START-HERE.md", "BUILD.json", "THIRD-PARTY-NOTICES.txt", "SHA256SUMS.txt"}
 var currentNames = []string{"krasis.exe", "krasis-agent.exe", "krasis-cli.exe", "START-HERE.md", "BUILD.json", "THIRD-PARTY-NOTICES.txt", "SHA256SUMS.txt"}
-var names = legacyNames // The transition build still sends the layout understood by older receivers.
 var probeNames = []string{"KrasisBrokeredProbe-TESTSIGNED.msix", "KrasisBrokeredProbe-TESTCERT.cer"}
 
 func selectedNames(base []string, withProbe bool) []string {

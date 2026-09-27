@@ -19,6 +19,11 @@ func updateBundleDirectory(self string) string {
 	if filepath.Base(self) == "krasis-control.exe" {
 		return filepath.Dir(self)
 	}
+	if filepath.Base(self) == "krasis.exe" {
+		if info, err := os.Stat(filepath.Join(filepath.Dir(self), "BUILD.json")); err == nil && info.Mode().IsRegular() {
+			return filepath.Dir(self)
+		}
+	}
 	return filepath.Join(filepath.Dir(self), "peer-update")
 }
 

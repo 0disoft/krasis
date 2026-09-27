@@ -111,6 +111,12 @@ verified against its own Go command path, source revision, and checksum. The
 receiver launches only the verified UI named by the selected layout. Upgrade
 older receivers to generation 75 before sending a new-layout bundle.
 
+Generation 76 ships the new layout from a single directory. `krasis.exe` owns
+the desktop UI, `krasis-agent.exe` remains the sole resident input and trust
+owner, and `krasis-cli.exe` calls the local agent API with terminal output and
+exit codes. The sender and receiver use the same directory. The old layout is
+still accepted so an older saved distribution can be inspected or recovered.
+
 Unit tests cover denied and revoked permissions, single-use apply, malformed ZIPs,
 generation checks and integrity checks. Packaged two-PC upgrade, firewall behavior,
 native GUI relaunch and post-upgrade input require manual verification. No official
