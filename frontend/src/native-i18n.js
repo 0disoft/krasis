@@ -2,6 +2,7 @@ export const nativeCatalogs = {
   ko: {
     "upd_title": "기기 업데이트",
     "upd_send": "업데이트 보내기",
+    "upd_send_confirm_action": "보내기",
     "upd_send_confirm_title": "원격 업데이트를 보낼까요?",
     "upd_send_confirm": "서명 없는 개발용 묶음을 보내고 대상 PC에서 검증 후 자동으로 적용합니다. 적용 중 입력 연결이 잠시 끊길 수 있습니다.",
     "upd_send_transition_confirm": "g60에서 받을 수 있는 g61 전환 업데이트를 보냅니다. 적용되면 다시 업데이트를 눌러 최신 버전을 보내세요.",
@@ -152,6 +153,7 @@ export const nativeCatalogs = {
   en: {
     "upd_title": "Device update",
     "upd_send": "Send update",
+    "upd_send_confirm_action": "Send",
     "upd_send_confirm_title": "Send remote update?",
     "upd_send_confirm": "Sends an unsigned development bundle. The target verifies it, then applies it automatically. Input may briefly disconnect during application.",
     "upd_send_transition_confirm": "Sends the g61 transition update accepted by g60. Once applied, send the current update again.",

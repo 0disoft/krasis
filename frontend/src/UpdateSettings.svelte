@@ -7,7 +7,7 @@
   let value = $state(emptyUpdateSettings());
   let busy = $state(false);
   let notice = $state('');
-  let sendTrigger;
+  let sendTrigger = $state.raw();
   let allowTrigger;
   let refreshTrigger;
   let peerSelect = $state.raw();
@@ -100,14 +100,16 @@
     {#if current.peerState !== 'ONLINE'}<p>{t('upd_receiver_required')}</p>{/if}
     {#if current.peerState === 'ONLINE' && current.peerGeneration <= 60}<p>{t('upd_transition_first')}</p>{/if}
     {#if current.peerState === 'ONLINE' && current.peerGeneration === 61}<p>{t('upd_transition_next')}</p>{/if}
-    <div class="upd-send-row">
-      <button bind:this={sendTrigger} class="primary" disabled={!canSend || confirmingSend || confirmingAllow} onclick={requestSend}>{t('upd_send')}</button>
-    </div>
+    {#if !confirmingSend}
+      <div class="upd-send-row">
+        <button bind:this={sendTrigger} class="primary" disabled={!canSend || confirmingAllow} onclick={requestSend}>{t('upd_send')}</button>
+      </div>
+    {/if}
     {#if confirmingSend}
       <section class="upd-confirm" aria-labelledby="send-update-title" bind:this={sendConfirmation}>
         <h3 id="send-update-title">{t('upd_send_confirm_title')}</h3>
         <p>{selectedName}</p><p>{t(current.peerGeneration <= 60 ? 'upd_send_transition_confirm' : 'upd_send_confirm')}</p>
-        <div class="pair-actions"><button onclick={cancelSend}>{t('cancel')}</button><button class="primary" disabled={!canSend || sendPeer !== selected} onclick={confirmSend}>{t('upd_send')}</button></div>
+        <div class="pair-actions"><button onclick={cancelSend}>{t('cancel')}</button><button class="primary" disabled={!canSend || sendPeer !== selected} onclick={confirmSend}>{t('upd_send_confirm_action')}</button></div>
       </section>
     {/if}
     {#if job.state !== 'IDLE'}<p class="upd-job" role="status" aria-live="polite">{t('upd_state_' + job.state)}{#if job.state === 'SENDING' && job.total > 0} · {Math.floor(job.bytes*100/job.total)}%{/if}</p>{/if}
