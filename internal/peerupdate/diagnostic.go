@@ -9,7 +9,8 @@ import (
 	"time"
 )
 
-const MaxDiagnosticBytes = 1 << 20
+const MaxDiagnosticBytes = 5 << 20
+const diagnosticPollTimeout = 15 * time.Second
 
 type diagnosticTransfer struct {
 	mu              sync.Mutex
@@ -126,7 +127,7 @@ func (m *Manager) pollDiagnostic(ctx context.Context, c *http.Client, address, p
 	if !authorized() {
 		return
 	}
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, diagnosticPollTimeout)
 	defer cancel()
 	url := "https://" + address + "/v1/diagnostic-transfer"
 	if offer := m.diagnosticOffer(peer); offer != nil {

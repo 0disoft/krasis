@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-const maxBytes = 256 << 10
+const maxBytes = 1 << 20
 
 // Only fixed event codes cross this boundary, never error strings or input data.
 var allowed = map[string]bool{}

@@ -13,7 +13,7 @@ destination filename is accepted.
 Local authenticated POST `/v1/diagnostic-transfer` accepts only a peer fingerprint.
 The resident agent exports its own logs. The management route of the same name
 uses POST to upload, GET to pull, and PUT to acknowledge durable receipt by job ID.
-There is one outgoing snapshot, capped at 1 MiB, expiring after one minute.
+There is one outgoing snapshot, capped at 5 MiB, expiring after one minute.
 Retries retain the same ID; duplicate receipt is idempotent within the process.
 Old peers return unsupported; network loss retains local export and expires the job.
 
@@ -25,6 +25,10 @@ receiver storage acknowledgment, not merely bytes written to a connection.
 
 Tests cover trust rejection, peer binding, duplicate delivery and sanitization.
 Two-PC delivery and native UI presentation require manual verification.
+From generation 73, each local log is capped at 1 MiB with one previous file;
+runtime summaries are recorded once per minute and on session shutdown. This
+extends the event history without claiming a fixed retention duration. A g72
+receiver still rejects snapshots above its 1 MiB limit until it is updated.
 
 ## Clipboard
 

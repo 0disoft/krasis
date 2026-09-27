@@ -27,6 +27,20 @@ func TestDiagnosticPeerBindingAndReceipt(t *testing.T) {
 		t.Fatal("receipt missing")
 	}
 }
+func TestDiagnosticQueueAcceptsExtendedSupport(t *testing.T) {
+	m := testManager(t)
+	peer := strings.Repeat("a", 64)
+	data := []byte(strings.Repeat("x", (1<<20)+1))
+	if err := m.QueueDiagnostic(peer, data); err != nil {
+		t.Fatalf("extended support rejected: %v", err)
+	}
+	if offer := m.diagnosticOffer(peer); offer == nil || len(offer.data) != len(data) {
+		t.Fatal("extended support offer missing")
+	}
+	if err := m.QueueDiagnostic(peer, make([]byte, MaxDiagnosticBytes+1)); err == nil {
+		t.Fatal("oversized support accepted")
+	}
+}
 func TestDiagnosticRouteChecksTrustAndDeduplicates(t *testing.T) {
 	m := testManager(t)
 	peer := strings.Repeat("a", 64)

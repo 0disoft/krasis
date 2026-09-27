@@ -10,7 +10,8 @@ import (
 	"time"
 )
 
-const MaxSupportBytes = 1 << 20
+// Four bounded log files plus the support document envelope.
+const MaxSupportBytes = 5 << 20
 
 // SanitizeSupport reprojects an untrusted support document, never raw logs.
 func SanitizeSupport(data []byte) ([]byte, error) {

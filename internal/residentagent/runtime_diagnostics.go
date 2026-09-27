@@ -231,7 +231,7 @@ func (d *runtimeDiagnostics) sample(current, previous runtimeSample) productlog.
 func (d *runtimeDiagnostics) run(ctx context.Context, log *productlog.Logger) {
 	read := newRuntimeSampler()
 	previous := read()
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 	for {
 		select {
