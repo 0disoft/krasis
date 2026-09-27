@@ -31,16 +31,16 @@ func TestUpdateEntryPointsUseOwnedBundleDirectory(t *testing.T) {
 	if got := transitionBundleDirectory(filepath.Join(base, "g63", "krasis.exe")); got != "" {
 		t.Fatal("missing transition bundle was offered")
 	}
-	if err := os.MkdirAll(filepath.Join(base, "g61", "peer-update"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(base, "g75", "peer-update"), 0700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(base, "g61", "peer-update", "BUILD.json"), []byte("{}"), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(base, "g75", "peer-update", "BUILD.json"), []byte("{}"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if got := transitionBundleDirectory(filepath.Join(base, "g63", "krasis.exe")); got != filepath.Join(base, "g61", "peer-update") {
+	if got := transitionBundleDirectory(filepath.Join(base, "g77", "krasis.exe")); got != filepath.Join(base, "g75", "peer-update") {
 		t.Fatal(got)
 	}
-	if got := transitionBundleDirectory(filepath.Join(base, "g64", "peer-update", "krasis-control.exe")); got != filepath.Join(base, "g61", "peer-update") {
+	if got := transitionBundleDirectory(filepath.Join(base, "g64", "peer-update", "krasis-control.exe")); got != filepath.Join(base, "g75", "peer-update") {
 		t.Fatal(got)
 	}
 	if err := waitUpdateParent(uint32(os.Getpid())); err == nil {

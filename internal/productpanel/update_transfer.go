@@ -112,7 +112,7 @@ func (b *UpdateSettingsBridge) transferCall(peer string, send bool) UpdateTransf
 			return fail("PEER_UNREACHABLE")
 		}
 		directory := b.bundleDirectory
-		if inspection.PeerInfo.Generation <= 60 {
+		if inspection.PeerInfo.Generation < 75 {
 			if b.transitionDirectory == "" {
 				return fail("TRANSITION_REQUIRED")
 			}

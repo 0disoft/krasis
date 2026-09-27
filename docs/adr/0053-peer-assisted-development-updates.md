@@ -117,6 +117,12 @@ owner, and `krasis-cli.exe` calls the local agent API with terminal output and
 exit codes. The sender and receiver use the same directory. The old layout is
 still accepted so an older saved distribution can be inspected or recovered.
 
+Generation 77 makes the sender select the adjacent g75 legacy-layout bundle
+for every peer below generation 75, then the current three-EXE bundle after
+that peer reports g75. This avoids sending a format that older receivers
+reject. If g75 is not adjacent, SEND reports a missing transition instead of
+attempting the incompatible bundle.
+
 Unit tests cover denied and revoked permissions, single-use apply, malformed ZIPs,
 generation checks and integrity checks. Packaged two-PC upgrade, firewall behavior,
 native GUI relaunch and post-upgrade input require manual verification. No official

@@ -38,8 +38,8 @@ Closing the window keeps Workspace in the tray; its menu can reopen it,
 disconnect, or quit only the controller while leaving the agent running.
 PIN pairing and left/right placement are available in Workspace. Update SEND is
 explicit from Workspace to the selected trusted peer; no legacy control is
-required on the sender. Install g75 before sending the g76 three-executable
-bundle to an older receiver. The Workspace receiver
+required on the sender. Keep g75 next to the current generation folder; SEND
+first installs g75 on older receivers, then the three-executable bundle. The Workspace receiver
 auto-applies previously permitted updates through the native worker, keeping
 stored trust and permissions and existing directories. New bundles send from
 their own directory; older launchers still use their adjacent `peer-update` folder.
@@ -50,7 +50,7 @@ Workspace 0.9.0 adds explicit SEND from Workspace to the selected trusted peer,
 plus exact status for that peer fingerprint, transfer ID, and local agent
 instance. Sending is manual only; there is no automatic resend or delta update.
 Generation 75 uses legacy update filenames and accepts both layouts. Generation
-76 uses the three-executable layout and needs a g75 or newer receiver.
+76 onward uses the three-executable layout and needs a g75 or newer receiver.
 The receiver switches to the Workspace UI automatically after validation, and
 sending updates the recipient to Workspace. Keep the entire generation folder together.
 Peer management-channel observations are online only on a
@@ -59,7 +59,7 @@ are no observations. Version comparison uses generations and build identities,
 not semver; different build identities in the same generation cannot be ordered.
 Older local agents without the per-peer INSPECT action report peer status as
 unavailable while existing permission settings remain usable. Automated tests
-do not mutate real permissions. The g76 layout still needs a two-PC update test.
+do not mutate real permissions. The new layout still needs a two-PC update test.
 
 The per-peer INSPECT local API was added in agent generation 33, included with
 the Workspace UI 0.8.0 bundle (agent generation 34) and carried in the 0.9.0

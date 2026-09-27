@@ -35,7 +35,7 @@ func transitionBundleDirectory(self string) string {
 		}
 		root = filepath.Dir(root)
 	}
-	candidate := filepath.Join(root, "g61", "peer-update")
+	candidate := filepath.Join(root, "g75", "peer-update")
 	info, err := os.Stat(filepath.Join(candidate, "BUILD.json"))
 	if err != nil || !info.Mode().IsRegular() {
 		return ""

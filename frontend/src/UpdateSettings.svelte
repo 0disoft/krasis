@@ -98,8 +98,8 @@
     </div>
     <p>{t('upd_' + current.peerState.toLowerCase())} · {t('upd_comparison_' + current.comparison)}</p>
     {#if current.peerState !== 'ONLINE'}<p>{t('upd_receiver_required')}</p>{/if}
-    {#if current.peerState === 'ONLINE' && current.peerGeneration <= 60}<p>{t('upd_transition_first')}</p>{/if}
-    {#if current.peerState === 'ONLINE' && current.peerGeneration === 61}<p>{t('upd_transition_next')}</p>{/if}
+    {#if current.peerState === 'ONLINE' && current.peerGeneration < 75}<p>{t('upd_transition_first')}</p>{/if}
+    {#if current.peerState === 'ONLINE' && current.peerGeneration === 75}<p>{t('upd_transition_next')}</p>{/if}
     {#if !confirmingSend}
       <div class="upd-send-row">
         <button bind:this={sendTrigger} class="primary" disabled={!canSend || confirmingAllow} onclick={requestSend}>{t('upd_send')}</button>
@@ -108,7 +108,7 @@
     {#if confirmingSend}
       <section class="upd-confirm" aria-labelledby="send-update-title" bind:this={sendConfirmation}>
         <h3 id="send-update-title">{t('upd_send_confirm_title')}</h3>
-        <p>{selectedName}</p><p>{t(current.peerGeneration <= 60 ? 'upd_send_transition_confirm' : 'upd_send_confirm')}</p>
+        <p>{selectedName}</p><p>{t(current.peerGeneration < 75 ? 'upd_send_transition_confirm' : 'upd_send_confirm')}</p>
         <div class="pair-actions"><button onclick={cancelSend}>{t('cancel')}</button><button class="primary" disabled={!canSend || sendPeer !== selected} onclick={confirmSend}>{t('upd_send_confirm_action')}</button></div>
       </section>
     {/if}

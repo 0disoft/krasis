@@ -80,14 +80,16 @@ func TestUpdateTransferTracksExactJobAndRuntime(t *testing.T) {
 	}
 }
 
-func TestUpdateTransferChoosesLegacyBundleForGeneration60(t *testing.T) {
+func TestUpdateTransferChoosesTransitionBundleForPre75Receivers(t *testing.T) {
 	for _, tc := range []struct {
 		generation int
 		state      string
 		wantDir    string
 	}{
 		{60, "ONLINE", "native/transition"},
-		{61, "ONLINE", "native/bundle"},
+		{61, "ONLINE", "native/transition"},
+		{74, "ONLINE", "native/transition"},
+		{75, "ONLINE", "native/bundle"},
 		{60, "STALE", ""},
 	} {
 		b, c, peer := transferTestBridge()
