@@ -69,7 +69,8 @@ newer peer build prevents a redundant transfer. An unknown send result can be
 resolved to SAME_VERSION only from that exact live build; stale observations do
 not prove completion or trigger an automatic resend.
 Local launch failure clears the apply fence. If the new GUI starts but agent
-startup fails, it remains visible for diagnosis and manual recovery. A
+startup fails, it reports APPLY_FAILED only for the exact active job, trusted
+peer and expected build, then remains visible for diagnosis and manual recovery. A
 new-process crash or parent-wait failure still requires reopening the preserved
 old distribution; automatic rollback is not claimed. Permissions survive
 restart; pending transfers deliberately do not.

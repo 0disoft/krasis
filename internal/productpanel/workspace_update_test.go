@@ -131,6 +131,33 @@ func TestUpdatedWorkspaceReconnectRequiresExactBuildAndTrust(t *testing.T) {
 	}
 }
 
+func TestFailedUpdatedWorkspaceReleasesOnlyExactClaim(t *testing.T) {
+	for _, mode := range []string{"exact", "wrong build", "wrong generation", "wrong alias", "revoked", "not applying"} {
+		t.Run(mode, func(t *testing.T) {
+			c := newReceiverClient()
+			c.status.State = "APPLYING"
+			c.status.Generation = localapi.AgentGeneration
+			v := WorkspaceUpdateLaunch{Alias: "B", Revision: c.status.Revision}
+			switch mode {
+			case "wrong build":
+				v.Revision = strings.Repeat("e", 40)
+			case "wrong generation":
+				c.status.Generation--
+			case "wrong alias":
+				v.Alias = "other"
+			case "revoked":
+				c.peers[0].Revoked = true
+			case "not applying":
+				c.status.State = "READY"
+			}
+			got := ReportFailedUpdatedWorkspace(context.Background(), c, v)
+			if got != (mode == "exact") || (c.failed == 1) != (mode == "exact") {
+				t.Fatalf("incorrect failed-apply report: sent=%d result=%t", c.failed, got)
+			}
+		})
+	}
+}
+
 func TestWorkspaceUpdateHandoffSerializesRecovery(t *testing.T) {
 	c := newReceiverClient()
 	b := NewDesktopLifecycle(context.Background(), nil, nil, nil)

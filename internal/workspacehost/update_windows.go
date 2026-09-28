@@ -60,9 +60,13 @@ func prepareUpdatedWorkspaceWithRevision(ctx context.Context, control string, st
 		return errors.New("unexpected Workspace build")
 	}
 	if err := waitUpdateParent(launch.WaitPID); err != nil {
+		reportFailedWorkspaceUpdate(ctx, control, launch)
 		return err
 	}
 	if err := startup.Ensure(ctx); err != nil {
+		if !errors.Is(err, productpanel.ErrStartupBusy) {
+			reportFailedWorkspaceUpdate(ctx, control, launch)
+		}
 		// Keep the verified replacement UI available for diagnosis and manual
 		// recovery. Its managed startup will show the same failure to the user.
 		return nil
@@ -74,6 +78,14 @@ func prepareUpdatedWorkspaceWithRevision(ctx context.Context, control string, st
 	// Reconnect is best-effort: a temporary peer outage must not hide the new UI.
 	_ = productpanel.ResumeUpdatedWorkspace(ctx, c, launch)
 	return nil
+}
+
+func reportFailedWorkspaceUpdate(ctx context.Context, control string, launch productpanel.WorkspaceUpdateLaunch) {
+	cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	if client, err := localapi.OpenClient(control); err == nil {
+		_ = productpanel.ReportFailedUpdatedWorkspace(cleanup, client, launch)
+	}
 }
 
 // Waiting is read-only and bounded. It avoids the old Workspace single-instance

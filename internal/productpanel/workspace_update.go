@@ -78,6 +78,34 @@ func ResumeUpdatedWorkspace(ctx context.Context, c UpdatedWorkspaceClient, v Wor
 	return nil
 }
 
+// A failed replacement may leave the old resident agent fenced in APPLYING.
+// Clear only the exact claimed job for the still-trusted launch peer.
+func ReportFailedUpdatedWorkspace(ctx context.Context, c UpdateSettingsClient, v WorkspaceUpdateLaunch) bool {
+	if c == nil || len(v.Revision) != 40 || v.Alias == "" {
+		return false
+	}
+	result, err := c.Update(ctx, localapi.UpdateRequest{Schema: localapi.UpdateSchema, Action: "STATUS"})
+	status := result.Status
+	if err != nil || result.Code != "ok" || status.State != "APPLYING" || status.Revision != v.Revision || status.Generation != localapi.AgentGeneration || !validTransferID(status.ID) || len(status.Peer) != 64 {
+		return false
+	}
+	trust, err := c.Trust(ctx)
+	if err != nil {
+		return false
+	}
+	matched := false
+	for _, peer := range trust.Peers {
+		if peer.Alias == v.Alias && peer.Fingerprint == status.Peer && !peer.Revoked {
+			matched = true
+		}
+	}
+	if !matched {
+		return false
+	}
+	result, err = c.Update(ctx, localapi.UpdateRequest{Schema: localapi.UpdateSchema, Action: "APPLY_FAILED", Peer: status.Peer, ID: status.ID})
+	return err == nil && result.Code == "apply_failed"
+}
+
 // Receiver applies only a READY job whose trust and receive permission remain
 // valid. The agent revalidates both when claiming the exact ID. The native
 // launcher validates the staged bundle before starting a replacement UI.
