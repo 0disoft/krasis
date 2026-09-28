@@ -188,7 +188,7 @@ func monitorProductSessionObserved(ctx context.Context, ticks <-chan time.Time, 
 				cancel()
 				return
 			}
-			if errors.Is(err, errTrustReadTimeout) || errors.Is(err, errTrustReadPending) {
+			if errors.Is(err, errTrustReadTimeout) || errors.Is(err, errTrustReadPending) || err == truststore.ErrStoreBusy {
 				if !deferred {
 					record("session_trust_read_deferred")
 					deferred = true
@@ -199,8 +199,6 @@ func monitorProductSessionObserved(ctx context.Context, ticks <-chan time.Time, 
 			switch {
 			case errors.Is(err, errMonitorGuardExited):
 				code = "session_guard_exited"
-			case errors.Is(err, truststore.ErrStoreBusy):
-				code = "session_trust_busy_exhausted"
 			case errors.Is(err, truststore.ErrPeerRevoked):
 				code = "session_trust_revoked"
 			case errors.Is(err, truststore.ErrPeerNotFound):

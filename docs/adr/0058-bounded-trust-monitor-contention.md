@@ -59,3 +59,11 @@ stop immediately. This deliberately permits up to five seconds of previously
 validated trust during a filesystem stall, rather than treating the one-second
 sampling budget as a revocation. Fixed deferred/recovered/expired codes reveal
 the outcome without paths or certificate data.
+
+Generation 88 applies the same five-second freshness boundary to an exhausted
+nonblocking store-lock retry. A busy lock is an inconclusive read, not a trust
+denial: a later successful read recovers without disconnecting, while persistent
+contention still cancels the session at the freshness deadline. Negative trust
+verdicts still stop immediately. This does not address a read blocked inside
+Windows parent-directory ACL validation; that separate delay remains visible in
+the fixed trust timing codes and requires two-device follow-up.

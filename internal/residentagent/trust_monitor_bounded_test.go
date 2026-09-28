@@ -137,36 +137,69 @@ func TestTrustReadTimeoutReportsCurrentPhaseAndKeepsSessionStopped(t *testing.T)
 	})
 }
 
-func TestTransientTrustReadTimeoutRecoversWithoutDisconnect(t *testing.T) {
+func TestTransientTrustReadFailureRecoversWithoutDisconnect(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		cause error
+		calls int
+	}{
+		{"timeout", errTrustReadTimeout, 1},
+		{"lock contention", truststore.ErrStoreBusy, 5},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				ticks := make(chan time.Time, 2)
+				events := make(chan string, 3)
+				finished := make(chan struct{})
+				calls := 0
+				go func() {
+					defer close(finished)
+					monitorProductSession(ctx, ticks, nil, func() error {
+						calls++
+						if calls <= tc.calls {
+							return tc.cause
+						}
+						return nil
+					}, cancel, func(code string) { events <- code })
+				}()
+				ticks <- time.Now()
+				if code := <-events; code != "session_trust_read_deferred" || ctx.Err() != nil {
+					t.Fatalf("first inconclusive read ended session: %s, %v", code, ctx.Err())
+				}
+				ticks <- time.Now()
+				if code := <-events; code != "session_trust_read_recovered" || ctx.Err() != nil {
+					t.Fatalf("retry did not recover: %s, %v", code, ctx.Err())
+				}
+				cancel()
+				<-finished
+				if calls != tc.calls+1 || len(events) != 0 {
+					t.Fatalf("unexpected follow-up: calls=%d events=%d", calls, len(events))
+				}
+			})
+		})
+	}
+}
+
+func TestPersistentTrustLockContentionStopsAtFreshnessDeadline(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		ticks := make(chan time.Time, 2)
-		events := make(chan string, 3)
+		ticks := make(chan time.Time, 1)
+		events := make(chan string, 2)
 		finished := make(chan struct{})
-		calls := 0
 		go func() {
 			defer close(finished)
-			monitorProductSession(ctx, ticks, nil, func() error {
-				calls++
-				if calls == 1 {
-					return errTrustReadTimeout
-				}
-				return nil
-			}, cancel, func(code string) { events <- code })
+			monitorProductSession(ctx, ticks, nil, func() error { return truststore.ErrStoreBusy }, cancel, func(code string) { events <- code })
 		}()
 		ticks <- time.Now()
 		if code := <-events; code != "session_trust_read_deferred" || ctx.Err() != nil {
-			t.Fatalf("first slow read ended session: %s, %v", code, ctx.Err())
+			t.Fatalf("contention stopped before freshness deadline: %s, %v", code, ctx.Err())
 		}
-		ticks <- time.Now()
-		if code := <-events; code != "session_trust_read_recovered" || ctx.Err() != nil {
-			t.Fatalf("retry did not recover: %s, %v", code, ctx.Err())
-		}
-		cancel()
 		<-finished
-		if calls != 2 || len(events) != 0 {
-			t.Fatalf("unexpected follow-up: calls=%d events=%d", calls, len(events))
+		if code := <-events; code != "session_trust_freshness_expired" || ctx.Err() != context.Canceled || len(events) != 0 {
+			t.Fatalf("contention did not stop safely: %s, %v", code, ctx.Err())
 		}
 	})
 }
