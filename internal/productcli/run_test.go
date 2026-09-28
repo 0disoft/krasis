@@ -102,9 +102,16 @@ type stubClient struct {
 	pairRequest localapi.OperationRequest
 	status      localapi.Status
 	operation   localapi.OperationResult
+	runtime     localapi.RuntimeInfo
 }
 
 func (client *stubClient) Status(context.Context) (localapi.Status, error) { return client.status, nil }
+func (client *stubClient) Runtime(context.Context) (localapi.RuntimeInfo, error) {
+	if client.runtime.SchemaVersion == "" {
+		return localapi.RuntimeInfo{SchemaVersion: localapi.RuntimeSchemaVersion, Protocol: localapi.AgentProtocol, Generation: localapi.AgentGeneration, Build: "development", Instance: strings.Repeat("a", 32)}, nil
+	}
+	return client.runtime, nil
+}
 func (*stubClient) Diagnostics(context.Context) (localapi.Diagnostics, error) {
 	return localapi.Diagnostics{SchemaVersion: localapi.DiagnosticsSchemaVersion, State: "ready", Counters: map[string]uint64{}}, nil
 }

@@ -26,6 +26,7 @@ const (
 )
 
 type apiClient interface {
+	Runtime(context.Context) (localapi.RuntimeInfo, error)
 	Status(context.Context) (localapi.Status, error)
 	Diagnostics(context.Context) (localapi.Diagnostics, error)
 	Trust(context.Context) (localapi.Trust, error)
@@ -67,6 +68,13 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, deps depe
 		writeUsageError(stderr, err)
 		return ExitUsage
 	}
+	if parsed.args[0] == "version" {
+		var client apiClient
+		if control, err := ResolveControlDirectory(deps.localAppData, parsed.controlDir); err == nil {
+			client, _ = deps.openClient(control)
+		}
+		return writeOutput(stdout, stderr, version(ctx, client), ExitOK, parsed.json)
+	}
 	control, err := ResolveControlDirectory(deps.localAppData, parsed.controlDir)
 	if err != nil {
 		fmt.Fprintln(stderr, "config_error: invalid CLI configuration")
@@ -80,7 +88,11 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, deps depe
 	if err != nil {
 		return writeClientError(stderr, err)
 	}
-	if parsed.json {
+	return writeOutput(stdout, stderr, value, code, parsed.json)
+}
+
+func writeOutput(stdout, stderr io.Writer, value any, code int, jsonOutput bool) int {
+	if jsonOutput {
 		if err := json.NewEncoder(stdout).Encode(value); err != nil {
 			fmt.Fprintln(stderr, "internal_error: write output")
 			return ExitInternal
@@ -97,6 +109,8 @@ func dispatch(ctx context.Context, client apiClient, args []string) (any, int, e
 		return dispatchCredential(ctx, client, args[1:])
 	case "connection":
 		return dispatchConnection(ctx, client, args[1:])
+	case "doctor":
+		return doctor(ctx, client)
 	case "status":
 		if len(args) != 1 {
 			return nil, ExitUsage, usageError("status accepts no arguments")
@@ -226,7 +240,7 @@ func validateCommandArgs(args []string) error {
 	case "connection":
 		_, err := parseConnection(args[1:])
 		return err
-	case "status", "diagnostics", "topology", "disconnect", "safe-stop":
+	case "status", "diagnostics", "topology", "disconnect", "safe-stop", "version", "doctor":
 		if len(args) != 1 {
 			return usageError(args[0] + " accepts no arguments")
 		}
@@ -332,7 +346,7 @@ func writeUsageError(stderr io.Writer, err error) {
 	if err != nil {
 		fmt.Fprintln(stderr, "usage_error:", err)
 	}
-	fmt.Fprintln(stderr, "usage: krasis [--json] [--control-dir DIR] status|diagnostics|topology|credential|connection|connect|disconnect|pair|trust|safe-stop")
+	fmt.Fprintln(stderr, "usage: krasis-cli [--json] [--control-dir DIR] version|doctor|status|diagnostics|topology|credential|connection|connect|disconnect|pair|trust|safe-stop")
 }
 
 func writeHuman(output io.Writer, value any) {
@@ -344,6 +358,17 @@ func writeHuman(output io.Writer, value any) {
 		}
 		if item.Code == "credential_renewed_repair_required" {
 			fmt.Fprintln(output, "Re-pair with each peer before connecting; remote trust was not changed.")
+		}
+	case versionResult:
+		fmt.Fprintf(output, "CLI: g%d %s\nAgent: %s", item.CLIGeneration, item.CLIBuild, item.AgentState)
+		if item.AgentState == "RUNNING" {
+			fmt.Fprintf(output, " g%d %s (protocol %d)", item.AgentGeneration, item.AgentBuild, item.AgentProtocol)
+		}
+		fmt.Fprintln(output)
+	case doctorResult:
+		fmt.Fprintf(output, "Agent: %s\nConnection: %s\nCLI: g%d\nAgent version: g%d\nProtocol: %s\n", item.Agent, item.Connection, item.CLIGeneration, item.AgentGeneration, item.Protocol)
+		if item.PeerAlias != "" {
+			fmt.Fprintf(output, "Peer: %s\n", item.PeerAlias)
 		}
 	case localapi.ConnectionResult:
 		fmt.Fprintf(output, "%s: %s\n", item.Status, item.Code)

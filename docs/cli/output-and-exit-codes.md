@@ -5,6 +5,12 @@
 human output은 상태와 안전한 복구 행동을 위한 짧은 text다. `--json`은 local API가 반환한 다음
 versioned object 하나를 stdout에 출력한다.
 
+`krasis-cli version`은 CLI 자체의 generation/build를 agent가 없어도 출력한다. 접근 가능한
+agent가 있으면 실행 중인 agent의 generation/build/protocol도 함께 표시한다. JSON은
+`krasis.cli.version/v1`이다. `krasis-cli doctor`는 agent protocol과 연결 상태를 확인하며,
+JSON은 `krasis.cli.doctor/v1`이다. 연결이 끊긴 상태면 exit `7`, protocol이 다르면 exit `6`이다.
+두 명령의 JSON은 여러 사실을 합친 CLI projection이며 아래의 단일 local API 응답 투영과 구분한다.
+
 - `krasis.agent.status/v1`
 - `krasis.agent.diagnostics/v1`
 - `krasis.agent.trust/v1`
