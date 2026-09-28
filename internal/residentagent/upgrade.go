@@ -13,6 +13,9 @@ func (operations *Operations) StopForUpgrade(ctx context.Context) (localapi.Oper
 	if ctx.Err() != nil || operations.root.Err() != nil {
 		return rejected("operation_cancelled"), nil
 	}
+	if operations.updateApplying {
+		return rejected("update_apply_in_progress"), nil
+	}
 	if operations.sessionDone != nil {
 		return rejected("active_session_requires_disconnect"), nil
 	}

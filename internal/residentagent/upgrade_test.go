@@ -8,8 +8,14 @@ import (
 
 func TestUpgradeStopRejectsActiveSessionAndRetiresIdleAgent(t *testing.T) {
 	ops := testOperations(t, nil)
-	ops.sessionDone = make(chan struct{})
+	ops.updateApplying = true
 	result, err := ops.StopForUpgrade(context.Background())
+	if err != nil || result.Code != "update_apply_in_progress" || ops.Context().Err() != nil {
+		t.Fatal("update apply was interrupted")
+	}
+	ops.updateApplying = false
+	ops.sessionDone = make(chan struct{})
+	result, err = ops.StopForUpgrade(context.Background())
 	if err != nil || result.Code != "active_session_requires_disconnect" || ops.Context().Err() != nil {
 		t.Fatal("active agent stopped")
 	}
