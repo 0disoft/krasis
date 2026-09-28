@@ -29,6 +29,7 @@ const (
 type apiClient interface {
 	Runtime(context.Context) (localapi.RuntimeInfo, error)
 	Update(context.Context, localapi.UpdateRequest) (localapi.UpdateResult, error)
+	SendDiagnostic(context.Context, string) (localapi.DiagnosticTransferResult, error)
 	Clipboard(context.Context, localapi.ClipboardRequest) (localapi.ClipboardResult, error)
 	Status(context.Context) (localapi.Status, error)
 	Diagnostics(context.Context) (localapi.Diagnostics, error)
@@ -146,11 +147,7 @@ func dispatch(ctx context.Context, client apiClient, args []string, executable s
 		value, err := client.Status(ctx)
 		return value, ExitOK, err
 	case "diagnostics":
-		if len(args) != 1 {
-			return nil, ExitUsage, usageError("diagnostics accepts no arguments")
-		}
-		value, err := client.Diagnostics(ctx)
-		return value, ExitOK, err
+		return dispatchDiagnostics(ctx, client, args[1:])
 	case "topology":
 		if len(args) != 1 {
 			return nil, ExitUsage, usageError("topology accepts no arguments")
@@ -273,9 +270,10 @@ func validateCommandArgs(args []string) error {
 			return usageError(args[0] + " accepts no arguments")
 		}
 	case "diagnostics":
-		if len(args) != 1 && (len(args) != 2 || args[1] != "export") {
-			return usageError("diagnostics accepts no arguments or export")
+		if len(args) == 1 || len(args) == 2 && (args[1] == "export" || args[1] == "status") || len(args) == 3 && args[1] == "send" && validAlias(args[2]) {
+			return nil
 		}
+		return usageError("diagnostics requires export, status, or send ALIAS")
 	case "connect":
 		if len(args) != 2 || !validAlias(args[1]) {
 			return usageError("connect requires a valid peer alias")
@@ -463,6 +461,14 @@ func writeHuman(output io.Writer, value any) {
 		fmt.Fprintf(output, "Diagnostics: %s\n", item.Code)
 		if item.Path != "" {
 			fmt.Fprintf(output, "File: %s\n", item.Path)
+		}
+	case diagnosticTransferResult:
+		fmt.Fprintf(output, "Diagnostics: %s\n", item.Code)
+		if item.PeerAlias != "" {
+			fmt.Fprintf(output, "Peer: %s\n", item.PeerAlias)
+		}
+		if item.Transfer != "" {
+			fmt.Fprintf(output, "Latest transfer: %s\n", item.Transfer)
 		}
 	case localapi.Trust:
 		fmt.Fprintf(output, "Trust revision: %d\n", item.Revision)

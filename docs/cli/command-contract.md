@@ -9,6 +9,8 @@
 krasis-cli [--json] [--control-dir DIR] status
 krasis-cli [--json] [--control-dir DIR] diagnostics
 krasis-cli [--json] diagnostics export
+krasis-cli [--json] [--control-dir DIR] diagnostics status
+krasis-cli [--json] [--control-dir DIR] diagnostics send ALIAS
 krasis-cli [--json] [--control-dir DIR] topology
 krasis-cli [--json] [--control-dir DIR] connect ALIAS
 krasis-cli [--json] [--control-dir DIR] disconnect

@@ -15,6 +15,13 @@ JSON은 `krasis.cli.doctor/v1`이다. 연결이 끊긴 상태면 exit `7`, proto
 `krasis.cli.diagnostics-export/v1`은 `code: saved`일 때만 절대 `path`를 포함한다.
 저장 실패는 `code: save_failed`, exit `1`이며 내부 경로나 원인을 출력하지 않는다.
 
+`diagnostics send ALIAS`는 에이전트가 새 진단 파일을 정제해 신뢰된 상대에게 한 번만 전송
+대기열에 넣는다. `queued`는 수신 완료가 아니다. 이미 진단 전송이 대기 중이면 새 요청을 보내지
+않는다. 응답을 잃으면 `outcome_unknown`과 exit `7`을 반환하며 자동 재전송하지 않는다.
+에이전트가 반환한 파일 경로는 출력하지 않는다. `diagnostics status`는 에이전트의 **최근 전역**
+진단 전송 상태를 보여줄 뿐 특정 상대의 수신 확인은 아니다. 두 명령의 JSON은
+`krasis.cli.diagnostic-transfer/v1`이다.
+
 `krasis-cli update status`는 로컬 전송 상태를, `update status ALIAS`는 신뢰된 상대의
 관측 버전·업데이트 수신 허용·현재 전송 상태를 조회한다. 상대 정보가 오래됐으면 버전을 추측하지
 않고 `peerState: STALE` 또는 `UNKNOWN`으로 표시한다. 상대 상태 JSON은

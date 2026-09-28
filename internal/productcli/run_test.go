@@ -130,15 +130,16 @@ func testDependencies(client apiClient) dependencies {
 }
 
 type stubClient struct {
-	pairRequest localapi.OperationRequest
-	status      localapi.Status
-	operation   localapi.OperationResult
-	runtime     localapi.RuntimeInfo
-	update      localapi.UpdateResult
-	trust       localapi.Trust
-	requests    []localapi.UpdateRequest
-	updateFn    func(localapi.UpdateRequest) (localapi.UpdateResult, error)
-	clipboardFn func(localapi.ClipboardRequest) (localapi.ClipboardResult, error)
+	pairRequest  localapi.OperationRequest
+	status       localapi.Status
+	operation    localapi.OperationResult
+	runtime      localapi.RuntimeInfo
+	update       localapi.UpdateResult
+	trust        localapi.Trust
+	requests     []localapi.UpdateRequest
+	updateFn     func(localapi.UpdateRequest) (localapi.UpdateResult, error)
+	clipboardFn  func(localapi.ClipboardRequest) (localapi.ClipboardResult, error)
+	diagnosticFn func(string) (localapi.DiagnosticTransferResult, error)
 }
 
 func (client *stubClient) Status(context.Context) (localapi.Status, error) { return client.status, nil }
@@ -163,6 +164,12 @@ func (client *stubClient) Update(_ context.Context, request localapi.UpdateReque
 		return client.updateFn(request)
 	}
 	return client.update, nil
+}
+func (client *stubClient) SendDiagnostic(_ context.Context, peer string) (localapi.DiagnosticTransferResult, error) {
+	if client.diagnosticFn != nil {
+		return client.diagnosticFn(peer)
+	}
+	return localapi.DiagnosticTransferResult{Code: "rejected"}, nil
 }
 func (client *stubClient) Clipboard(_ context.Context, request localapi.ClipboardRequest) (localapi.ClipboardResult, error) {
 	if client.clipboardFn != nil {
