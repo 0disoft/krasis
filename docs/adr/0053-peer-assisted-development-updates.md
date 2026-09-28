@@ -64,6 +64,10 @@ The sender GUI also prepares its agent and reconnects after the receiver's stop.
 The sender refuses a new transfer while its running resident agent is from a
 different generation than the GUI. The update dialog reports both versions so
 the operator can disconnect and recover the local agent first.
+Before sending, an authenticated live observation of the exact current or a
+newer peer build prevents a redundant transfer. An unknown send result can be
+resolved to SAME_VERSION only from that exact live build; stale observations do
+not prove completion or trigger an automatic resend.
 Local launch failure clears the apply fence. If the new GUI starts but agent
 startup fails, it remains visible for diagnosis and manual recovery. A
 new-process crash or parent-wait failure still requires reopening the preserved

@@ -96,12 +96,19 @@ func (b *UpdateSettingsBridge) transferCall(peer string, send bool) UpdateTransf
 	if !send && runtime.Instance != b.transferInstance {
 		return fail("AGENT_CHANGED")
 	}
-	if !send && b.transfer.ID == "" {
+	if !send && b.transfer.ID == "" && b.transfer.State != "TRANSFER_UNKNOWN" {
 		return b.transfer
 	}
 	result, err := c.Update(ctx, localapi.UpdateRequest{Schema: localapi.UpdateSchema, Action: "STATUS"})
 	if err != nil || result.Code != "ok" {
 		return fail("UNAVAILABLE")
+	}
+	if !send && b.transfer.ID == "" {
+		inspection, err := c.Update(ctx, localapi.UpdateRequest{Schema: localapi.UpdateSchema, Action: "INSPECT", Peer: peer})
+		if err == nil && inspection.Code == "peer_status" && inspection.PeerInfo != nil && inspection.PeerInfo.Peer == peer && inspection.PeerInfo.State == "ONLINE" && peerBuildResult(runtime, inspection.PeerInfo.Generation, inspection.PeerInfo.Revision) == "SAME_VERSION" {
+			b.transfer = fail("SAME_VERSION")
+		}
+		return b.transfer
 	}
 	if send {
 		if b.bundleDirectory == "" {
@@ -113,6 +120,9 @@ func (b *UpdateSettingsBridge) transferCall(peer string, send bool) UpdateTransf
 		inspection, err := c.Update(ctx, localapi.UpdateRequest{Schema: localapi.UpdateSchema, Action: "INSPECT", Peer: peer})
 		if err != nil || inspection.Code != "peer_status" || inspection.PeerInfo == nil || inspection.PeerInfo.Peer != peer || inspection.PeerInfo.State != "ONLINE" || inspection.PeerInfo.Generation < 21 || inspection.PeerInfo.Generation > 1000000 {
 			return fail("PEER_UNREACHABLE")
+		}
+		if state := peerBuildResult(runtime, inspection.PeerInfo.Generation, inspection.PeerInfo.Revision); state != "" {
+			return fail(state)
 		}
 		directory := b.bundleDirectory
 		if inspection.PeerInfo.Generation < 75 {
@@ -149,6 +159,20 @@ func (b *UpdateSettingsBridge) transferCall(peer string, send bool) UpdateTransf
 		return fail("AGENT_CHANGED")
 	}
 	return b.transfer
+}
+
+func peerBuildResult(local localapi.RuntimeInfo, generation int, revision string) string {
+	if generation > local.Generation {
+		return "PEER_NEWER"
+	}
+	localBuild, peerBuild := safeUpdateBuild(local.Build), safeUpdateBuild(revision)
+	if generation != local.Generation || len(localBuild) != 40 || len(peerBuild) != 40 {
+		return ""
+	}
+	if localBuild == peerBuild {
+		return "SAME_VERSION"
+	}
+	return "GENERATION_CONFLICT"
 }
 
 func validTransferID(id string) bool {

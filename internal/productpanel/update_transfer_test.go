@@ -119,6 +119,41 @@ func TestUpdateTransferChoosesTransitionBundleForPre75Receivers(t *testing.T) {
 		t.Fatalf("missing legacy bundle sent update: %+v", got)
 	}
 }
+func TestUpdateTransferSkipsKnownCurrentOrNewerPeer(t *testing.T) {
+	for _, test := range []struct {
+		generation int
+		revision   string
+		want       string
+	}{
+		{localapi.AgentGeneration, strings.Repeat("c", 40), "SAME_VERSION"},
+		{localapi.AgentGeneration, strings.Repeat("d", 40), "GENERATION_CONFLICT"},
+		{localapi.AgentGeneration + 1, strings.Repeat("d", 40), "PEER_NEWER"},
+	} {
+		b, c, peer := transferTestBridge()
+		c.info.Generation, c.info.Revision = test.generation, test.revision
+		if got := b.Send(peer); got.State != test.want || c.sent != 0 {
+			t.Fatalf("sent to known current/newer peer: %+v", got)
+		}
+	}
+}
+
+func TestUnknownTransferResolvesOnlyFromLiveExactPeerBuild(t *testing.T) {
+	b, c, peer := transferTestBridge()
+	c.failSend = true
+	if b.Send(peer).State != "TRANSFER_UNKNOWN" {
+		t.Fatal("uncertain send became definite")
+	}
+	c.info.Generation = localapi.AgentGeneration
+	c.info.Revision = c.runtime.Build
+	c.info.State = "STALE"
+	if b.TransferStatus(peer).State != "TRANSFER_UNKNOWN" {
+		t.Fatal("stale observation resolved transfer")
+	}
+	c.info.State = "ONLINE"
+	if b.TransferStatus(peer).State != "SAME_VERSION" || c.sent != 1 {
+		t.Fatal("exact live build did not prevent resend")
+	}
+}
 
 func TestUpdateTransferRejectionDoesNotAdoptPreviousJob(t *testing.T) {
 	b, c, peer := transferTestBridge()
