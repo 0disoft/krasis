@@ -37,19 +37,21 @@ type trustStore interface {
 }
 
 type Operations struct {
-	localAppData   string
-	updates        *peerupdate.Manager
-	updateApplying bool
-	log            *productlog.Logger
-	root           context.Context
-	stopAgent      context.CancelCauseFunc
-	identity       productidentity.PublicIdentity
-	runner         SessionRunner
-	preflight      func(string) error
-	credentials    *productidentity.Store
-	pairing        PairWorkflow
-	trust          trustStore
-	now            func() time.Time
+	localAppData           string
+	updates                *peerupdate.Manager
+	updateApplying         bool
+	updateTargetGeneration int
+	updateTargetRevision   string
+	log                    *productlog.Logger
+	root                   context.Context
+	stopAgent              context.CancelCauseFunc
+	identity               productidentity.PublicIdentity
+	runner                 SessionRunner
+	preflight              func(string) error
+	credentials            *productidentity.Store
+	pairing                PairWorkflow
+	trust                  trustStore
+	now                    func() time.Time
 
 	mu             sync.Mutex
 	sessionStop    context.CancelCauseFunc

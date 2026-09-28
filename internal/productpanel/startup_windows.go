@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"syscall"
 )
@@ -22,6 +23,16 @@ func NewStartup(control string) (Startup, error) {
 		return Startup{}, err
 	}
 	base := filepath.Dir(self)
+	revision := ""
+	if info, ok := debug.ReadBuildInfo(); ok {
+		for _, setting := range info.Settings {
+			if setting.Key == "vcs.revision" && len(setting.Value) == 40 {
+				if _, err := hex.DecodeString(setting.Value); err == nil {
+					revision = setting.Value
+				}
+			}
+		}
+	}
 	return Startup{
 		Open: func() (RuntimeClient, error) { return localapi.OpenClient(control) },
 		Lock: func() (io.Closer, error) { return agentinstance.AcquireControlStartup() },
@@ -51,7 +62,7 @@ func NewStartup(control string) (Startup, error) {
 			// Detached agent owns its own single-instance lease and safe-stop lifecycle.
 			return command.Process.Release()
 		},
-		Pause: startupPause, Generation: localapi.AgentGeneration,
+		Pause: startupPause, Generation: localapi.AgentGeneration, Revision: revision,
 	}, nil
 }
 

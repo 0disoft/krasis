@@ -9,11 +9,14 @@ import (
 
 type upgradeStub struct {
 	stubOperations
-	stops int
+	stops      int
+	generation int
+	revision   string
 }
 
-func (s *upgradeStub) StopForUpgrade(context.Context) (OperationResult, error) {
+func (s *upgradeStub) StopForUpgrade(_ context.Context, generation int, revision string) (OperationResult, error) {
 	s.stops++
+	s.generation, s.revision = generation, revision
 	return OperationResult{SchemaVersion: ResultSchemaVersion, Status: "COMPLETED", Code: "upgrade_stop_requested"}, nil
 }
 
@@ -46,5 +49,21 @@ func TestRuntimeAndUpgradeRequireAuthenticationAndExactInstance(t *testing.T) {
 	}
 	if ops.stops != 1 {
 		t.Fatalf("upgrade stops=%d", ops.stops)
+	}
+	r := httptest.NewRequest("POST", "/v1/upgrade-stop", nil)
+	r.Header.Set("Authorization", "Bearer "+h.token)
+	r.Header.Set("If-Match", info.Instance)
+	r.Header.Set("X-Krasis-Upgrade-Generation", "83")
+	r.Header.Set("X-Krasis-Upgrade-Build", strings.Repeat("b", 40))
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	if w.Code != 200 || ops.stops != 2 || ops.generation != 83 || ops.revision != strings.Repeat("b", 40) {
+		t.Fatal("update target was not bound to upgrade stop")
+	}
+	r.Header.Set("X-Krasis-Upgrade-Build", "invalid")
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	if w.Code != 400 || ops.stops != 2 {
+		t.Fatal("invalid update target reached agent")
 	}
 }

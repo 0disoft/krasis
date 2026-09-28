@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"net/http"
 	"runtime/debug"
+	"strconv"
 )
 
 const RuntimeSchemaVersion = "krasis.agent.runtime/v1"
@@ -45,9 +46,14 @@ func (client *Client) Runtime(ctx context.Context) (RuntimeInfo, error) {
 	return value, err
 }
 
-func (client *Client) StopForUpgrade(ctx context.Context, instance string) (OperationResult, error) {
+func (client *Client) StopForUpgrade(ctx context.Context, instance string, generation int, revision string) (OperationResult, error) {
 	var value OperationResult
-	err := client.requestHeaders(ctx, http.MethodPost, "/v1/upgrade-stop", nil, &value, map[string]string{"If-Match": instance})
+	headers := map[string]string{"If-Match": instance}
+	if generation > 0 && len(revision) == 40 {
+		headers["X-Krasis-Upgrade-Generation"] = strconv.Itoa(generation)
+		headers["X-Krasis-Upgrade-Build"] = revision
+	}
+	err := client.requestHeaders(ctx, http.MethodPost, "/v1/upgrade-stop", nil, &value, headers)
 	if err == nil && value.SchemaVersion != ResultSchemaVersion {
 		err = ErrProtocol
 	}
@@ -63,14 +69,29 @@ func (handler *handler) upgradeStop(response http.ResponseWriter, request *http.
 		writeResult(response, http.StatusConflict, OperationResult{SchemaVersion: ResultSchemaVersion, Status: "REJECTED", Code: "agent_changed"})
 		return
 	}
+	generation := 0
+	revision := request.Header.Get("X-Krasis-Upgrade-Build")
+	if raw := request.Header.Get("X-Krasis-Upgrade-Generation"); raw != "" {
+		var err error
+		generation, err = strconv.Atoi(raw)
+		if err != nil || generation < 1 || generation > 1000000 {
+			writeResult(response, http.StatusBadRequest, OperationResult{SchemaVersion: ResultSchemaVersion, Status: "REJECTED", Code: "invalid_upgrade_target"})
+			return
+		}
+	}
+	_, revisionErr := hex.DecodeString(revision)
+	if (generation == 0) != (revision == "") || (revision != "" && (len(revision) != 40 || revisionErr != nil)) {
+		writeResult(response, http.StatusBadRequest, OperationResult{SchemaVersion: ResultSchemaVersion, Status: "REJECTED", Code: "invalid_upgrade_target"})
+		return
+	}
 	operations, ok := handler.operations.(interface {
-		StopForUpgrade(context.Context) (OperationResult, error)
+		StopForUpgrade(context.Context, int, string) (OperationResult, error)
 	})
 	if !ok {
 		writeResult(response, http.StatusConflict, OperationResult{SchemaVersion: ResultSchemaVersion, Status: "REJECTED", Code: "not_configured"})
 		return
 	}
-	value, err := operations.StopForUpgrade(request.Context())
+	value, err := operations.StopForUpgrade(request.Context(), generation, revision)
 	if err != nil {
 		writeInternalFailure(response)
 		return

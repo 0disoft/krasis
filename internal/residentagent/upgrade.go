@@ -7,13 +7,13 @@ import (
 )
 
 // The idle check and root cancellation share Connect/Pair/Credential's lock.
-func (operations *Operations) StopForUpgrade(ctx context.Context) (localapi.OperationResult, error) {
+func (operations *Operations) StopForUpgrade(ctx context.Context, generation int, revision string) (localapi.OperationResult, error) {
 	operations.mu.Lock()
 	defer operations.mu.Unlock()
 	if ctx.Err() != nil || operations.root.Err() != nil {
 		return rejected("operation_cancelled"), nil
 	}
-	if operations.updateApplying {
+	if operations.updateApplying && (generation == 0 || revision == "" || generation != operations.updateTargetGeneration || revision != operations.updateTargetRevision) {
 		return rejected("update_apply_in_progress"), nil
 	}
 	if operations.sessionDone != nil {

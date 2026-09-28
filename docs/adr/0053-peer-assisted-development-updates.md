@@ -57,6 +57,9 @@ the permission lock. New pairing/connections are fenced until handoff finishes.
 The GUI retains the old distribution, launches the freshly revalidated bundle,
 and exits normally. The new GUI waits for old GUI ownership, uses the existing
 agent-upgrade handshake, checks the exact expected runtime build, and reconnects.
+During APPLYING, that handshake may stop the old agent only when the new GUI
+declares the exact generation and revision of the claimed update. Unrelated or
+legacy launchers cannot consume the handoff.
 The sender GUI also prepares its agent and reconnects after the receiver's stop.
 The sender refuses a new transfer while its running resident agent is from a
 different generation than the GUI. The update dialog reports both versions so

@@ -35,7 +35,10 @@ clipboard, environment 또는 UI projection에 복제하지 않는다.
 | `POST` | `/v1/safe-stop` | agent root cancellation 요청 |
 
 upgrade-stop은 인증 후 빈 body와 현재 instance nonce를 검사한다. nonce 불일치는 409로 거부한다.
-연결·페어링 중에는 agent 잠금 안에서 종료를 거부한다. 일반 safe-stop과 별개인 자동 교체 전용 경로다.
+선택적인 `X-Krasis-Upgrade-Generation`과 `X-Krasis-Upgrade-Build`는 함께 전달하며,
+형식 오류는 400으로 거부한다. 업데이트 적용 중에는 두 값이 수신·검증된 작업의 세대와
+40자리 빌드 리비전에 정확히 일치할 때만 기존 에이전트를 종료한다. 연결·페어링 중에는
+agent 잠금 안에서 종료를 거부한다. 일반 safe-stop과 별개인 자동 교체 전용 경로다.
 runtime schema는 `krasis.agent.runtime/v1`이며 기존 status/result schema는 변경하지 않는다.
 
 connection과 upgrade-stop을 제외한 mutation body schema는 `krasis.agent.operation/v1`, 결과는

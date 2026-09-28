@@ -19,7 +19,7 @@ var (
 type RuntimeClient interface {
 	Status(context.Context) (localapi.Status, error)
 	Runtime(context.Context) (localapi.RuntimeInfo, error)
-	StopForUpgrade(context.Context, string) (localapi.OperationResult, error)
+	StopForUpgrade(context.Context, string, int, string) (localapi.OperationResult, error)
 }
 
 type Startup struct {
@@ -30,6 +30,7 @@ type Startup struct {
 	Start      func() error
 	Pause      func(context.Context) error
 	Generation int
+	Revision   string
 }
 
 // Ensure is a bounded, single-start operation. Timers in the GUI do not invoke it.
@@ -92,7 +93,7 @@ func (s Startup) Ensure(ctx context.Context) error {
 				if err := s.Verify(); err != nil {
 					return err
 				}
-				result, err := client.StopForUpgrade(ctx, info.Instance)
+				result, err := client.StopForUpgrade(ctx, info.Instance, s.Generation, s.Revision)
 				if err != nil {
 					return err
 				}

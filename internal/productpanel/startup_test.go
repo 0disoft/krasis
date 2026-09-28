@@ -94,7 +94,7 @@ func (r *runtimeStub) Runtime(context.Context) (localapi.RuntimeInfo, error) {
 	}
 	return localapi.RuntimeInfo{Protocol: 1, Generation: r.generation, Instance: "instance"}, nil
 }
-func (r *runtimeStub) StopForUpgrade(context.Context, string) (localapi.OperationResult, error) {
+func (r *runtimeStub) StopForUpgrade(context.Context, string, int, string) (localapi.OperationResult, error) {
 	r.stops++
 	if r.busy {
 		return localapi.OperationResult{Status: "REJECTED"}, nil

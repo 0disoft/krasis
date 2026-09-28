@@ -52,6 +52,8 @@ func (o *Operations) Update(ctx context.Context, r localapi.UpdateRequest) (loca
 		if o.updateApplying && status.ID == r.ID && status.Peer == r.Peer {
 			o.updates.ApplyFailed()
 			o.updateApplying = false
+			o.updateTargetGeneration = 0
+			o.updateTargetRevision = ""
 			result.Code = "apply_failed"
 		}
 		o.mu.Unlock()
@@ -78,12 +80,14 @@ func (o *Operations) Update(ctx context.Context, r localapi.UpdateRequest) (loca
 			o.mu.Unlock()
 			return result, nil
 		}
-		directory, _, err := o.updates.Claim(r.ID, r.Peer)
+		directory, revision, err := o.updates.Claim(r.ID, r.Peer)
 		if err != nil {
 			o.mu.Unlock()
 			return result, nil
 		}
 		o.updateApplying = true
+		o.updateTargetGeneration = o.updates.Status().Generation
+		o.updateTargetRevision = revision
 		idle := o.sessionDone == nil
 		o.mu.Unlock()
 		stop := completed("no_active_session")
@@ -94,6 +98,8 @@ func (o *Operations) Update(ctx context.Context, r localapi.UpdateRequest) (loca
 			o.updates.ApplyFailed()
 			o.mu.Lock()
 			o.updateApplying = false
+			o.updateTargetGeneration = 0
+			o.updateTargetRevision = ""
 			o.mu.Unlock()
 			result.Code = "cleanup_failed"
 			return result, nil
