@@ -333,9 +333,13 @@ func TestReadTraceKeepsParentTimingAndActiveStep(t *testing.T) {
 	trace := NewReadTrace()
 	trace.enter("prelock")
 	trace.enterStep("prelock_parent_acl")
+	trace.enterDetail("prelock_parent_acl_query")
 	snapshot := trace.Snapshot()
-	if snapshot.Phase != "prelock_parent_acl" || snapshot.Durations["prelock"] < snapshot.Durations["prelock_parent_acl"] {
+	if snapshot.Phase != "prelock_parent_acl_query" || snapshot.Durations["prelock"] < snapshot.Durations["prelock_parent_acl"] {
 		t.Fatalf("active nested phase: %+v", snapshot)
+	}
+	if _, timedDetail := snapshot.Durations["prelock_parent_acl_query"]; timedDetail {
+		t.Fatal("active detail replaced the parent duration")
 	}
 	trace.enter("lock")
 	snapshot = trace.Snapshot()

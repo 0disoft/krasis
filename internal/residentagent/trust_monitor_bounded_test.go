@@ -253,6 +253,22 @@ func TestTrustTraceReportsNestedTimeoutStep(t *testing.T) {
 	}
 }
 
+func TestTrustTraceReportsActiveParentACLCall(t *testing.T) {
+	snapshot := truststore.ReadTraceSnapshot{
+		Phase: "prelock_parent_acl_query",
+		Durations: map[string]time.Duration{
+			"prelock":            time.Second,
+			"prelock_parent_acl": time.Second,
+		},
+	}
+	var codes []string
+	recordTrustTrace(snapshot, func(code string) { codes = append(codes, code) })
+	if len(codes) != 3 || codes[0] != "trust_timing_prelock_ge1s" ||
+		codes[1] != "trust_timing_prelock_parent_acl_ge1s" || codes[2] != "trust_active_prelock_parent_acl_query" {
+		t.Fatalf("active parent ACL call: %v", codes)
+	}
+}
+
 func TestTrustTraceOmitsFastCompletedSubsteps(t *testing.T) {
 	snapshot := truststore.ReadTraceSnapshot{
 		Durations: map[string]time.Duration{

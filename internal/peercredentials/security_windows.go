@@ -90,11 +90,17 @@ func ProtectSecurityDirectory(directory string) (string, error) {
 }
 
 func ValidateSecurityDirectory(directory string) (string, error) {
-	absolute, err := validatePrivateKeyDirectory(directory)
+	return ValidateSecurityDirectoryObserved(directory, nil)
+}
+
+// ValidateSecurityDirectoryObserved reports only fixed operation names; the
+// verdict and path-security checks are identical to ValidateSecurityDirectory.
+func ValidateSecurityDirectoryObserved(directory string, observe func(string)) (string, error) {
+	absolute, err := validatePrivateKeyDirectoryObserved(directory, observe)
 	if err != nil {
 		return "", err
 	}
-	if err := validateExactCurrentUserDACL(absolute, objectInheritACE|containerInheritACE); err != nil {
+	if err := validateExactCurrentUserDACLObserved(absolute, objectInheritACE|containerInheritACE, observe); err != nil {
 		return "", fmt.Errorf("%w: security directory: %v", ErrInsecurePrivateKey, err)
 	}
 	return absolute, nil
@@ -255,6 +261,10 @@ func validateExactCurrentUserDACLHandle(handle uintptr, expectedFlags byte) erro
 }
 
 func validatePrivateKeyDirectory(directory string) (string, error) {
+	return validatePrivateKeyDirectoryObserved(directory, nil)
+}
+
+func validatePrivateKeyDirectoryObserved(directory string, observe func(string)) (string, error) {
 	if directory == "" {
 		return "", errors.New("credential directory is required")
 	}
@@ -262,8 +272,14 @@ func validatePrivateKeyDirectory(directory string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("resolve credential directory: %w", err)
 	}
+	if observe != nil {
+		observe("reparse")
+	}
 	if err := rejectReparseComponents(absolute); err != nil {
 		return "", err
+	}
+	if observe != nil {
+		observe("stat")
 	}
 	info, err := os.Lstat(absolute)
 	if err != nil {
@@ -386,12 +402,19 @@ func applyCurrentUserDACL(path string, directory bool) error {
 }
 
 func validateExactCurrentUserDACL(path string, expectedFlags byte) error {
+	return validateExactCurrentUserDACLObserved(path, expectedFlags, nil)
+}
+
+func validateExactCurrentUserDACLObserved(path string, expectedFlags byte, observe func(string)) error {
 	pathPointer, err := syscall.UTF16PtrFromString(path)
 	if err != nil {
 		return err
 	}
 	var dacl *windowsACL
 	var descriptor unsafe.Pointer
+	if observe != nil {
+		observe("acl_query")
+	}
 	status, _, _ := procGetNamedSecurityInfoW.Call(
 		uintptr(unsafe.Pointer(pathPointer)), seFileObject, daclSecurityInformation,
 		0, 0, uintptr(unsafe.Pointer(&dacl)), 0, uintptr(unsafe.Pointer(&descriptor)),
@@ -400,6 +423,9 @@ func validateExactCurrentUserDACL(path string, expectedFlags byte) error {
 		return syscall.Errno(status)
 	}
 	defer syscall.LocalFree(syscall.Handle(descriptor))
+	if observe != nil {
+		observe("acl_check")
+	}
 	return validateCurrentUserDACL(dacl, descriptor, expectedFlags)
 }
 

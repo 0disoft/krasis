@@ -67,3 +67,11 @@ contention still cancels the session at the freshness deadline. Negative trust
 verdicts still stop immediately. This does not address a read blocked inside
 Windows parent-directory ACL validation; that separate delay remains visible in
 the fixed trust timing codes and requires two-device follow-up.
+
+Generation 89 keeps the same trust checks and freshness deadline. When a parent
+directory security check is still running at a timeout, diagnostics now identify
+whether it is traversing reparse components, reading directory metadata,
+querying the Windows ACL, or checking that ACL. The existing parent-ACL timing
+bucket remains the whole operation; the new fixed codes identify only the
+active call and contain no path, SID, certificate, or error text. A later
+two-device diagnostic is needed before changing the security check itself.

@@ -50,6 +50,13 @@ func ValidateSecurityDirectory(directory string) (string, error) {
 	return absolute, nil
 }
 
+func ValidateSecurityDirectoryObserved(directory string, observe func(string)) (string, error) {
+	if observe != nil {
+		observe("stat")
+	}
+	return ValidateSecurityDirectory(directory)
+}
+
 func ProtectSecurityFile(path string) error {
 	info, err := os.Lstat(path)
 	if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {

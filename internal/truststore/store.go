@@ -42,6 +42,7 @@ type ReadTrace struct {
 	entered   time.Time
 	phase     string
 	step      string
+	detail    string
 	stepStart time.Time
 	durations map[string]time.Duration
 	attempts  int
@@ -86,7 +87,21 @@ func (trace *ReadTrace) enterStep(step string) {
 	trace.step, trace.stepStart = step, now
 }
 
+// A detail identifies the fixed operation currently running within a timed step.
+// The enclosing step keeps its full duration for comparisons across builds.
+func (trace *ReadTrace) enterDetail(detail string) {
+	if trace == nil {
+		return
+	}
+	trace.mu.Lock()
+	defer trace.mu.Unlock()
+	if trace.step != "" {
+		trace.detail = detail
+	}
+}
+
 func (trace *ReadTrace) finishStep(now time.Time) {
+	trace.detail = ""
 	if trace.step != "" {
 		trace.durations[trace.step] += now.Sub(trace.stepStart)
 		trace.step = ""
@@ -119,6 +134,9 @@ func (trace *ReadTrace) Snapshot() ReadTraceSnapshot {
 	if trace.step != "" {
 		snapshot.Phase = trace.step
 		snapshot.Durations[trace.step] += now.Sub(trace.stepStart)
+	}
+	if trace.detail != "" {
+		snapshot.Phase = trace.detail
 	}
 	if trace.phase != "" {
 		snapshot.Durations[trace.phase] += now.Sub(trace.entered)
@@ -412,7 +430,11 @@ func (store *Store) prepareDirectory(create bool) error {
 
 func (store *Store) prepareDirectoryTraced(create bool, trace *ReadTrace) error {
 	trace.enterStep("prelock_parent_acl")
-	if _, err := peercredentials.ValidateSecurityDirectory(filepath.Dir(store.directory)); err != nil {
+	var observe func(string)
+	if trace != nil {
+		observe = func(step string) { trace.enterDetail("prelock_parent_" + step) }
+	}
+	if _, err := peercredentials.ValidateSecurityDirectoryObserved(filepath.Dir(store.directory), observe); err != nil {
 		return fmt.Errorf("validate trust store parent security: %w", err)
 	}
 	trace.enterStep("prelock_directory_lstat")

@@ -35,7 +35,8 @@ func init() {
 		allowed[code] = true
 	}
 	for _, phase := range []string{
-		"prelock", "prelock_parent_acl", "prelock_directory_lstat", "prelock_directory_acl",
+		"prelock", "prelock_parent_acl", "prelock_parent_reparse", "prelock_parent_stat",
+		"prelock_parent_acl_query", "prelock_parent_acl_check", "prelock_directory_lstat", "prelock_directory_acl",
 		"prelock_directory_open", "prelock_lockfile_open", "prelock_lockfile_acl",
 		"lock", "store_read", "store_read_open", "store_read_acl", "store_read_bytes",
 		"store_read_decode", "store_read_close", "certificate", "retry_wait",
