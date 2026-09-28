@@ -42,6 +42,8 @@ bundle. TLS 1.3, certificate expiry/revocation, current CONNECTED peer identity,
 and per-device opt-in are checked separately. Input protocol v1 is unchanged.
 Transfers have a 90-second limit, offers expire after three minutes, and only one
 bundle is admitted at a time. There is no blind retry of an ambiguous upload.
+An accepted bundle must also be applied within three minutes of staging. The
+receiver rejects an expired READY job at claim time even if its GUI was closed.
 
 The authenticated loopback API adds POST `/v1/update` with schema
 `krasis.peer-update/v1`: STATUS (no fields), ALLOW/DENY (exact fingerprint), SEND

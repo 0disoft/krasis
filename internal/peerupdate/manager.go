@@ -227,6 +227,9 @@ func (m *Manager) Status() Status {
 	if m.status.State == "STAGED" && !m.stagedUntil.IsZero() && time.Now().After(m.stagedUntil) {
 		m.status.State = "RECEIVE_FAILED"
 	}
+	if m.status.State == "READY" && (m.stagedUntil.IsZero() || time.Now().After(m.stagedUntil)) {
+		m.status.State = "EXPIRED"
+	}
 	if m.out != nil && time.Now().After(m.out.expires) {
 		m.out = nil
 		m.status.State = "EXPIRED"
@@ -445,6 +448,10 @@ func (m *Manager) receive(peer, id, expected string, reader io.Reader, authorize
 func (m *Manager) Claim(id, peer string) (string, string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.status.State == "READY" && (m.stagedUntil.IsZero() || time.Now().After(m.stagedUntil)) {
+		m.status.State = "EXPIRED"
+		return "", "", ErrDenied
+	}
 	if m.status.State != "READY" || m.status.ID != id || m.status.Peer != peer || !m.allowed[peer] {
 		return "", "", ErrDenied
 	}

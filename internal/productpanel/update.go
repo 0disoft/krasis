@@ -71,7 +71,7 @@ func UpdateNotice(state string) string {
 	case "PEER_APPLY_FAILED":
 		return "상대가 업데이트 적용 실패를 보고했습니다. 자동 재연결을 중단했습니다. 상대 진단을 확인하세요."
 	case "EXPIRED":
-		return "전송 대기 만료 · 상대의 업데이트 허용·버전·방화벽을 확인하세요."
+		return "업데이트 작업이 만료되었습니다. 상대 버전을 확인한 뒤 다시 보내세요."
 	case "PEER_NOT_ALLOWED":
 		return "상대 기기에서 이 기기의 업데이트를 먼저 허용하세요."
 	case "INVALID_BUNDLE":

@@ -59,6 +59,7 @@ func TestUpdateClaimIsSingleUseAndKeepsPeerBinding(t *testing.T) {
 	id := strings.Repeat("c", 32)
 	m.allowed[peer] = true
 	m.status = Status{State: "READY", Peer: peer, ID: id, Revision: strings.Repeat("d", 40)}
+	m.stagedUntil = time.Now().Add(time.Minute)
 	if _, _, err := m.Claim(id, strings.Repeat("b", 64)); err == nil {
 		t.Fatal("wrong peer accepted")
 	}
@@ -70,6 +71,17 @@ func TestUpdateClaimIsSingleUseAndKeepsPeerBinding(t *testing.T) {
 	}
 	if err := m.Permit(peer, false); err != ErrBusy {
 		t.Fatal("apply authority mutated after commit")
+	}
+}
+func TestReadyUpdateExpiresEvenWithoutStatusPolling(t *testing.T) {
+	m := testManager(t)
+	peer := strings.Repeat("a", 64)
+	id := strings.Repeat("c", 32)
+	m.allowed[peer] = true
+	m.status = Status{State: "READY", Peer: peer, ID: id}
+	m.stagedUntil = time.Now().Add(-time.Second)
+	if _, _, err := m.Claim(id, peer); err != ErrDenied || m.Status().State != "EXPIRED" {
+		t.Fatal("expired update was claimed")
 	}
 }
 func TestUpdateReceiveDeniesBeforeReadingBody(t *testing.T) {
