@@ -87,6 +87,9 @@ func (b *UpdateSettingsBridge) transferCall(peer string, send bool) UpdateTransf
 	if err != nil || runtime.Instance == "" {
 		return fail("UNAVAILABLE")
 	}
+	if send && runtime.Generation != localapi.AgentGeneration {
+		return fail("AGENT_MISMATCH")
+	}
 	if !send && b.transfer.Peer != peer {
 		return fail("IDLE")
 	}
@@ -158,7 +161,7 @@ func validTransferID(id string) bool {
 func projectTransfer(peer string, s peerupdate.Status, state string) UpdateTransferSnapshot {
 	v := transferSnapshot(peer, "TRANSFER_UNKNOWN")
 	switch state {
-	case "PREPARING", "QUEUED", "SENDING", "VERIFYING", "DELIVERED", "UPDATED", "RESTART_UNCONFIRMED", "SAME_VERSION", "PEER_NEWER", "GENERATION_CONFLICT", "PEER_BUSY", "PEER_UNREACHABLE", "PEER_UNSUPPORTED", "PEER_NOT_ALLOWED", "INVALID_BUNDLE", "BUNDLE_MISSING", "TRANSITION_REQUIRED", "HASH_MISMATCH", "STORAGE_FAILED", "TRANSFER_INTERRUPTED", "PEER_APPLY_FAILED", "EXPIRED", "PEER_REJECTED", "TRANSFER_UNKNOWN", "REJECTED":
+	case "PREPARING", "QUEUED", "SENDING", "VERIFYING", "DELIVERED", "UPDATED", "RESTART_UNCONFIRMED", "SAME_VERSION", "PEER_NEWER", "GENERATION_CONFLICT", "PEER_BUSY", "PEER_UNREACHABLE", "PEER_UNSUPPORTED", "PEER_NOT_ALLOWED", "INVALID_BUNDLE", "BUNDLE_MISSING", "TRANSITION_REQUIRED", "HASH_MISMATCH", "STORAGE_FAILED", "TRANSFER_INTERRUPTED", "PEER_APPLY_FAILED", "EXPIRED", "PEER_REJECTED", "TRANSFER_UNKNOWN", "REJECTED", "AGENT_MISMATCH":
 		v.State = state
 	}
 	if validTransferID(s.ID) {

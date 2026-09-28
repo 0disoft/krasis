@@ -20,6 +20,7 @@ type UpdateSettingsSnapshot struct {
 	Permission       string `json:"permission"`
 	RemotePermission string `json:"remotePermission"`
 	PeerState        string `json:"peerState"`
+	AppGeneration    int    `json:"appGeneration"`
 	LocalGeneration  int    `json:"localGeneration"`
 	LocalBuild       string `json:"localBuild"`
 	PeerGeneration   int    `json:"peerGeneration"`
@@ -58,7 +59,7 @@ func (b *UpdateSettingsBridge) Permit(peer string, allow bool) UpdateSettingsSna
 }
 
 func updateSettingsFailure(peer, code string) UpdateSettingsSnapshot {
-	return UpdateSettingsSnapshot{Schema: UpdateSettingsSchema, Code: code, Peer: peer, Permission: "UNKNOWN", RemotePermission: "UNKNOWN", PeerState: "UNKNOWN", Comparison: "UNKNOWN"}
+	return UpdateSettingsSnapshot{Schema: UpdateSettingsSchema, Code: code, Peer: peer, Permission: "UNKNOWN", RemotePermission: "UNKNOWN", PeerState: "UNKNOWN", AppGeneration: localapi.AgentGeneration, Comparison: "UNKNOWN"}
 }
 func (b *UpdateSettingsBridge) execute(peer, action string) UpdateSettingsSnapshot {
 	v := updateSettingsFailure("", "unavailable")

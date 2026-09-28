@@ -48,8 +48,16 @@ func (c *transferClient) Update(ctx context.Context, r localapi.UpdateRequest) (
 }
 func transferTestBridge() (*UpdateSettingsBridge, *transferClient, string) {
 	c, peer := newSettingsTestClient()
+	c.runtime.Generation = localapi.AgentGeneration
 	f := &transferClient{settingsClient: c, status: peerupdate.Status{State: "IDLE"}}
 	return NewUpdateTransferBridge(context.Background(), func() (UpdateSettingsClient, error) { return f, nil }, "native/bundle", "native/transition"), f, peer
+}
+func TestUpdateTransferRefusesMismatchedResidentAgent(t *testing.T) {
+	b, c, peer := transferTestBridge()
+	c.runtime.Generation--
+	if got := b.Send(peer); got.State != "AGENT_MISMATCH" || c.sent != 0 {
+		t.Fatalf("stale agent sent update: %+v", got)
+	}
 }
 func TestUpdateTransferTracksExactJobAndRuntime(t *testing.T) {
 	b, c, peer := transferTestBridge()

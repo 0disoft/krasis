@@ -98,6 +98,16 @@ func TestDesktopLifecycleWorkerStopsWithOwner(t *testing.T) {
 	}
 }
 
+func TestDesktopLifecycleKeepsUpgradeBusyNoticeWhileAgentRemainsConnected(t *testing.T) {
+	client := &fakeClient{state: "CONNECTED"}
+	b := NewDesktopLifecycle(context.Background(), func() (Client, error) { return client, nil }, nil, nil)
+	b.failedStartup(context.Background(), ErrAgentBusy)
+	b.tick(time.Now())
+	if b.Refresh().Code != "agent_busy" {
+		t.Fatal("upgrade refusal disappeared while old agent remained connected")
+	}
+}
+
 func TestDesktopLifecycleReconnectsDisplayChangeOnceAfterGeometrySettles(t *testing.T) {
 	fp := strings.Repeat("a", 64)
 	client := &fakeClient{state: "LOCAL", stopReason: "display_change", peers: []localapi.TrustedPeer{{Alias: "B", Fingerprint: fp}}}

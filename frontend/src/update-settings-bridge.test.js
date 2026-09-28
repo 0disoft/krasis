@@ -33,7 +33,7 @@ test('update settings separate permission directions and narrow native payloads'
   assert.equal(calls.length,1);
 });
 test('update settings reject cross-peer results and clear stale observations', async () => {
-  for (const bad of [{...value,peer:'b'.repeat(64)},{...value,localBuild:'private path'},{...value,permission:true}]) {
+  for (const bad of [{...value,peer:'b'.repeat(64)},{...value,localBuild:'private path'},{...value,appGeneration:'private path'},{...value,permission:true}]) {
     assert.equal((await createUpdateSettingsBridge({UpdateSettings:async()=>bad}).status(peer)).code,'unavailable');
   }
   const stale = await createUpdateSettingsBridge({UpdateSettings:async()=>({...value,peerState:'STALE'})}).status(peer);

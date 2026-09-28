@@ -71,7 +71,7 @@ func TestUpdateSettingsSeparatesPermissionDirectionsAndRedactsMetadata(t *testin
 	c.allowed = []string{peer}
 	v := settingsBridge(c).Status(peer)
 	raw, _ := json.Marshal(v)
-	if v.Code != "ok" || v.Permission != "ALLOWED" || v.RemotePermission != "DENIED" || v.Comparison != "SAME_BUILD" || strings.Contains(string(raw), "private") {
+	if v.Code != "ok" || v.AppGeneration != localapi.AgentGeneration || v.Permission != "ALLOWED" || v.RemotePermission != "DENIED" || v.Comparison != "SAME_BUILD" || strings.Contains(string(raw), "private") {
 		t.Fatalf("projection: %s", raw)
 	}
 	for _, r := range c.actions {

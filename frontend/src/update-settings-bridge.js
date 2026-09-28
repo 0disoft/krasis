@@ -6,10 +6,10 @@ const comparisons = new Set(['UNKNOWN','SAME_BUILD','LOCAL_NEWER','PEER_NEWER','
 const validPeer = peer => typeof peer === 'string' && /^[a-f0-9]{64}$/i.test(peer);
 const validBuild = build => typeof build === 'string' && (build === '' || build === 'development' || /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i.test(build));
 const validGeneration = n => Number.isInteger(n) && n >= 0 && n <= 1000000;
-export const emptyUpdateSettings = (peer = '', code = 'unavailable') => ({schema,code,peer,permission:'UNKNOWN',remotePermission:'UNKNOWN',peerState:'UNKNOWN',localGeneration:0,localBuild:'',peerGeneration:0,peerBuild:'',comparison:'UNKNOWN'});
+export const emptyUpdateSettings = (peer = '', code = 'unavailable') => ({schema,code,peer,permission:'UNKNOWN',remotePermission:'UNKNOWN',peerState:'UNKNOWN',appGeneration:0,localGeneration:0,localBuild:'',peerGeneration:0,peerBuild:'',comparison:'UNKNOWN'});
 
 const transferSchema = 'krasis.update-transfer/v1';
-export const transferStates = new Set(['IDLE','BUSY','UNAVAILABLE','INVALID_PEER','STALE_PEER','AGENT_CHANGED','REJECTED','PREPARING','QUEUED','SENDING','VERIFYING','DELIVERED','UPDATED','RESTART_UNCONFIRMED','SAME_VERSION','PEER_NEWER','GENERATION_CONFLICT','PEER_BUSY','PEER_UNREACHABLE','PEER_UNSUPPORTED','PEER_NOT_ALLOWED','INVALID_BUNDLE','BUNDLE_MISSING','TRANSITION_REQUIRED','HASH_MISMATCH','STORAGE_FAILED','TRANSFER_INTERRUPTED','PEER_APPLY_FAILED','EXPIRED','PEER_REJECTED','TRANSFER_UNKNOWN']);
+export const transferStates = new Set(['IDLE','BUSY','UNAVAILABLE','INVALID_PEER','STALE_PEER','AGENT_CHANGED','AGENT_MISMATCH','REJECTED','PREPARING','QUEUED','SENDING','VERIFYING','DELIVERED','UPDATED','RESTART_UNCONFIRMED','SAME_VERSION','PEER_NEWER','GENERATION_CONFLICT','PEER_BUSY','PEER_UNREACHABLE','PEER_UNSUPPORTED','PEER_NOT_ALLOWED','INVALID_BUNDLE','BUNDLE_MISSING','TRANSITION_REQUIRED','HASH_MISMATCH','STORAGE_FAILED','TRANSFER_INTERRUPTED','PEER_APPLY_FAILED','EXPIRED','PEER_REJECTED','TRANSFER_UNKNOWN']);
 export const emptyUpdateTransfer = (peer = '', state = 'IDLE') => ({schema:transferSchema,peer,state,id:'',bytes:0,total:0,generation:0,build:''});
 export const transferActive = state => ['PREPARING','QUEUED','SENDING','VERIFYING','DELIVERED'].includes(state);
 
@@ -39,7 +39,7 @@ export function createUpdateSettingsBridge(binding) {
       if (!v || v.schema !== schema || v.peer !== peer || !codes.has(v.code) ||
           !permissions.has(v.permission) || !permissions.has(v.remotePermission) ||
           !states.has(v.peerState) || !comparisons.has(v.comparison) ||
-          !validGeneration(v.localGeneration) || !validGeneration(v.peerGeneration) ||
+          !validGeneration(v.appGeneration) || !validGeneration(v.localGeneration) || !validGeneration(v.peerGeneration) ||
           !validBuild(v.localBuild) || !validBuild(v.peerBuild)) return emptyUpdateSettings(peer);
       const result = Object.fromEntries(Object.keys(emptyUpdateSettings()).map(key => [key, v[key]]));
       if (result.peerState !== 'ONLINE') {

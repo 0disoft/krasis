@@ -23,7 +23,7 @@
   const t = key => nativeText(locale, key);
   const current = $derived(value.peer === selected ? value : emptyUpdateSettings(selected));
   const job = $derived(transfer.peer === selected ? transfer : emptyUpdateTransfer(selected));
-  const canSend = $derived(!!selected && !!bridge && !busy && current.peerState === 'ONLINE' && current.remotePermission === 'ALLOWED' && !transferActive(job.state));
+  const canSend = $derived(!!selected && !!bridge && !busy && current.appGeneration > 0 && current.localGeneration === current.appGeneration && current.peerState === 'ONLINE' && current.remotePermission === 'ALLOWED' && !transferActive(job.state));
   const selectedName = $derived(peers.find(peer => peer.fingerprint === selected)?.alias ?? '');
   const permissionText = permission => t(permission === 'ALLOWED' ? 'upd_allowed' : permission === 'DENIED' ? 'upd_denied' : 'upd_permission_unknown');
   const version = (generation, build) => generation ? `g${generation} · ${build ? build === 'development' ? build : build.slice(0,8) : t('upd_unknown')}` : t('upd_unknown');
@@ -96,6 +96,7 @@
       <div class="upd-card"><strong>{t('upd_local_version')}</strong>{version(current.localGeneration,current.localBuild)}</div>
       <div class="upd-card"><strong>{t('upd_peer_version')}</strong>{version(current.peerGeneration,current.peerBuild)}</div>
     </div>
+    {#if current.appGeneration && current.localGeneration && current.appGeneration !== current.localGeneration}<p role="status">{t('upd_agent_mismatch')}</p>{/if}
     <p>{t('upd_' + current.peerState.toLowerCase())} · {t('upd_comparison_' + current.comparison)}</p>
     {#if current.peerState !== 'ONLINE'}<p>{t('upd_receiver_required')}</p>{/if}
     {#if current.peerState === 'ONLINE' && current.peerGeneration < 75}<p>{t('upd_transition_first')}</p>{/if}
