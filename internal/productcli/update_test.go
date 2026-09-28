@@ -77,6 +77,27 @@ func TestUpdateSendSelectsCurrentOrTransitionBundle(t *testing.T) {
 	}
 }
 
+func TestUpdateSendUsesCurrentFlatPackageLayout(t *testing.T) {
+	root := t.TempDir()
+	current := filepath.Join(root, "g79")
+	transition := filepath.Join(root, "g75", "peer-update")
+	for _, directory := range []string{current, transition} {
+		if err := os.MkdirAll(directory, 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(directory, "BUILD.json"), []byte("{}"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	executable := filepath.Join(current, "krasis-cli.exe")
+	if got := currentBundleDirectory(executable, 78); got != current {
+		t.Fatalf("flat bundle = %q, want %q", got, current)
+	}
+	if got := currentBundleDirectory(executable, 74); got != transition {
+		t.Fatalf("transition bundle = %q, want %q", got, transition)
+	}
+}
+
 func TestUpdateSendNeverSendsMissingBundleOrUnknownPeer(t *testing.T) {
 	peer := strings.Repeat("b", 64)
 	for _, test := range []struct {

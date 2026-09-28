@@ -135,15 +135,23 @@ func projectUpdateStatus(alias, peer string, runtime localapi.RuntimeInfo, statu
 
 func currentBundleDirectory(executable string, peerGeneration int) string {
 	directory := filepath.Dir(executable)
-	if filepath.Base(directory) != "peer-update" {
+	if filepath.Base(executable) != "krasis-cli.exe" || !bundleManifestExists(directory) {
 		return ""
 	}
 	if peerGeneration < 75 {
-		directory = filepath.Join(filepath.Dir(filepath.Dir(directory)), "g75", "peer-update")
+		root := filepath.Dir(directory)
+		if filepath.Base(directory) == "peer-update" {
+			root = filepath.Dir(root)
+		}
+		directory = filepath.Join(root, "g75", "peer-update")
 	}
-	info, err := os.Stat(filepath.Join(directory, "BUILD.json"))
-	if err != nil || !info.Mode().IsRegular() {
+	if !bundleManifestExists(directory) {
 		return ""
 	}
 	return directory
+}
+
+func bundleManifestExists(directory string) bool {
+	info, err := os.Stat(filepath.Join(directory, "BUILD.json"))
+	return err == nil && info.Mode().IsRegular()
 }
