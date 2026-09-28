@@ -6,6 +6,8 @@
 로컬 진단 내보내기와 업데이트 묶음 검증은 오프라인에서 동작한다.
 
 ```text
+krasis-cli [--json] help
+krasis-cli --help
 krasis-cli [--json] [--control-dir DIR] status
 krasis-cli [--json] [--control-dir DIR] diagnostics
 krasis-cli [--json] diagnostics export
@@ -21,6 +23,9 @@ krasis-cli [--json] [--control-dir DIR] trust list
 krasis-cli [--json] [--control-dir DIR] trust revoke SHA256_FINGERPRINT
 krasis-cli [--json] [--control-dir DIR] safe-stop
 ```
+
+`help`와 `--help`는 에이전트 없이 전체 명령을 보여준다. `help --json`은 각 명령의
+에이전트 필요 여부와 상태 변경 여부를 함께 반환한다. `--control-dir`는 사용할 수 없다.
 
 global option은 command 앞이나 뒤에 한 번만 사용할 수 있다. alias는 공백으로 감싸지 않은 유효한
 UTF-8 1~64자이고 control character를 허용하지 않는다. pairing ID는 lowercase 32자리 hex, code는

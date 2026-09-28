@@ -73,6 +73,13 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, deps depe
 		writeUsageError(stderr, err)
 		return ExitUsage
 	}
+	if parsed.args[0] == "help" {
+		if parsed.controlDir != "" {
+			writeUsageError(stderr, usageError("help does not use --control-dir"))
+			return ExitUsage
+		}
+		return writeOutput(stdout, stderr, commandHelp(), ExitOK, parsed.json)
+	}
 	if parsed.args[0] == "version" {
 		var client apiClient
 		if control, err := ResolveControlDirectory(deps.localAppData, parsed.controlDir); err == nil {
@@ -239,6 +246,8 @@ func parseGlobalOptions(args []string) (options, error) {
 				return options{}, usageError("--json may be specified once")
 			}
 			result.json = true
+		case "--help", "-h":
+			result.args = append(result.args, "help")
 		case "--control-dir":
 			if result.controlDir != "" || index+1 >= len(args) {
 				return options{}, usageError("--control-dir requires one value")
@@ -265,7 +274,7 @@ func validateCommandArgs(args []string) error {
 	case "connection":
 		_, err := parseConnection(args[1:])
 		return err
-	case "status", "topology", "disconnect", "safe-stop", "version", "doctor":
+	case "status", "topology", "disconnect", "safe-stop", "version", "doctor", "help":
 		if len(args) != 1 {
 			return usageError(args[0] + " accepts no arguments")
 		}
@@ -387,11 +396,17 @@ func writeUsageError(stderr io.Writer, err error) {
 	if err != nil {
 		fmt.Fprintln(stderr, "usage_error:", err)
 	}
-	fmt.Fprintln(stderr, "usage: krasis-cli [--json] [--control-dir DIR] version|doctor|update|clipboard|status|diagnostics|topology|credential|connection|connect|disconnect|pair|trust|safe-stop")
+	fmt.Fprintln(stderr, "usage: krasis-cli [--json] [--control-dir DIR] help|version|doctor|update|clipboard|status|diagnostics|topology|credential|connection|connect|disconnect|pair|trust|safe-stop")
 }
 
 func writeHuman(output io.Writer, value any) {
 	switch item := value.(type) {
+	case helpResult:
+		fmt.Fprintln(output, "Krasis CLI commands:")
+		for _, command := range item.Commands {
+			fmt.Fprintf(output, "  %-55s %s\n", command.Usage, command.Summary)
+		}
+		fmt.Fprintln(output, "Use --json for agent and state-change flags.")
 	case localapi.CredentialResult:
 		fmt.Fprintf(output, "%s: %s\n", item.Status, item.Code)
 		if item.Info != nil {

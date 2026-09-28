@@ -5,6 +5,10 @@
 human output은 상태와 안전한 복구 행동을 위한 짧은 text다. `--json`은 local API가 반환한 다음
 versioned object 하나를 stdout에 출력한다.
 
+`krasis-cli help --json`은 오프라인 명령 목록 `krasis.cli.help/v1`을 출력한다. 각 항목의
+`requiresAgent`는 실행에 에이전트가 필요한지, `changesState`는 로컬 파일·에이전트·상대 기기
+중 어느 곳이든 상태가 바뀔 수 있는지를 나타낸다. 실행 전 권한이나 연결 상태를 보장하지 않는다.
+
 `krasis-cli version`은 CLI 자체의 generation/build를 agent가 없어도 출력한다. 접근 가능한
 agent가 있으면 실행 중인 agent의 generation/build/protocol도 함께 표시한다. JSON은
 `krasis.cli.version/v1`이다. `krasis-cli doctor`는 agent protocol과 연결 상태를 확인하며,
