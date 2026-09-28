@@ -135,7 +135,7 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 		if listener, ok := source.(*agent.ListenSource); ok {
 			listener.SetAuthenticationFailureObserver(func(code string) { log.Event("preauth_" + code) })
 		}
-		source = &disconnectSource{ConnectionSource: source, intent: parent, protected: ctx, log: log}
+		source = &disconnectSource{ConnectionSource: source, intent: parent, log: log}
 		executable, err := os.Executable()
 		if err != nil {
 			return err

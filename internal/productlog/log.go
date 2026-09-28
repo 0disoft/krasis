@@ -47,6 +47,7 @@ func init() {
 	}
 	allowed["boundary_summary"] = true
 	allowed["protected_input_detected"] = true
+	allowed["protected_input_reconnecting"] = true
 	allowed["peer_disconnect_requested"] = true
 	allowed["disconnect_notification_failed"] = true
 	for _, code := range []string{"process_started", "process_stopped", "process_failed", "agent_ready", "prepare_started", "prepare_failed", "prepare_completed", "connect_started", "already_active", "not_configured", "credential_unavailable", "connection_not_configured", "peer_not_found", "peer_alias_ambiguous", "no_active_session", "disconnected", "shutdown_timeout", "safe_stop_requested", "session_failed", "session_stopped", "CONNECTED", "CONNECTING", "RECONNECTING", "DISCONNECTING", "upgrade_stop_requested"} {

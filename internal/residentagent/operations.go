@@ -13,6 +13,7 @@ import (
 	"github.com/0disoft/krasis/internal/productidentity"
 	"github.com/0disoft/krasis/internal/productlog"
 	"github.com/0disoft/krasis/internal/truststore"
+	"github.com/0disoft/krasis/internal/wininput"
 )
 
 const DefaultSessionStopTimeout = localapi.DefaultSessionStopTimeout
@@ -252,7 +253,7 @@ func (operations *Operations) Connect(requestContext context.Context, request lo
 	operations.recordLocked("connect_started")
 	go func(alias string) {
 		defer cancel(nil)
-		err := operations.runner(ctx, alias, &sessionObserver{operations: operations, done: done})
+		err := operations.runWithProtectedRecovery(ctx, alias, &sessionObserver{operations: operations, done: done}, wininput.ProtectedInputActive, agent.Wait)
 		displayChanged := ctx.Err() == nil && displayChangeOnly(err)
 		operations.finishSession(done, outcome, err, (ctx.Err() != nil && cancellationOnly(err, context.Cause(ctx))) || peerDisconnectOnly(err) || protectedInputOnly(err), displayChanged)
 	}(request.PeerAlias)
