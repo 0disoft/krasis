@@ -123,6 +123,33 @@ func TestUpdatePermissionUncertainOutcomeIsNotRetried(t *testing.T) {
 	}
 }
 
+func TestUpdateVerifyWorksWithoutAgentAndRejectsIncompleteBundle(t *testing.T) {
+	root := t.TempDir()
+	deps := dependencies{
+		executable: filepath.Join(root, "krasis-cli.exe"),
+		openClient: func(string) (apiClient, error) {
+			t.Fatal("local bundle verification contacted the agent")
+			return nil, nil
+		},
+	}
+	for _, test := range []struct {
+		manifest bool
+		code     string
+	}{
+		{false, "bundle_missing"}, {true, "bundle_invalid"},
+	} {
+		if test.manifest {
+			if err := os.WriteFile(filepath.Join(root, "BUILD.json"), []byte("{}"), 0600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		var out, errs bytes.Buffer
+		if code := run(context.Background(), []string{"--json", "update", "verify"}, &out, &errs, deps); code != ExitUnsafeState || !strings.Contains(out.String(), `"code":"`+test.code+`"`) || !strings.Contains(out.String(), `"valid":false`) || errs.Len() != 0 {
+			t.Fatalf("verify code=%d output=%q error=%q", code, out.String(), errs.String())
+		}
+	}
+}
+
 func TestUpdateSendSelectsCurrentOrTransitionBundle(t *testing.T) {
 	root := t.TempDir()
 	for _, generation := range []int{75, 77} {

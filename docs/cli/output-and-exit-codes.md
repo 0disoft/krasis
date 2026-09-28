@@ -26,6 +26,10 @@ JSON은 `krasis.cli.doctor/v1`이다. 연결이 끊긴 상태면 exit `7`, proto
 에이전트가 바뀌면 중복 실행하지 말고 `update status ALIAS`로 확인한다. JSON은
 `krasis.cli.update-permission/v1`이며 확인된 상태에서만 `receiveAllowed`를 반환한다.
 
+`krasis-cli update verify`는 에이전트 없이 CLI와 같은 폴더의 7개 파일을 전송과 동일한
+검증 규칙으로 검사한다. 다른 경로를 받지 않으며 파일·서명 오류의 세부 경로를 출력하지 않는다.
+JSON은 `krasis.cli.update-verify/v1`이고 성공 시 세대·빌드·묶음 크기를 반환한다.
+
 `krasis-cli clipboard status|on|off ALIAS`는 신뢰된 기기의 공유 상태를 조회하거나 변경한다.
 `on`은 이후 복사하는 텍스트·이미지·파일과 폴더를 상대 기기에 공유할 수 있으므로 명시적으로
 실행해야 한다. 현재 상태는 agent의 업데이트 상태를 읽어 판단하며, 설정 변경 후에도 다시 읽어

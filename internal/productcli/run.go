@@ -79,6 +79,14 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, deps depe
 		}
 		return writeOutput(stdout, stderr, version(ctx, client), ExitOK, parsed.json)
 	}
+	if parsed.args[0] == "update" && parsed.args[1] == "verify" {
+		executable := deps.executable
+		if executable == "" {
+			executable, _ = os.Executable()
+		}
+		value, code := verifyCurrentBundle(executable)
+		return writeOutput(stdout, stderr, value, code, parsed.json)
+	}
 	control, err := ResolveControlDirectory(deps.localAppData, parsed.controlDir)
 	if err != nil {
 		fmt.Fprintln(stderr, "config_error: invalid CLI configuration")
@@ -261,11 +269,11 @@ func validateCommandArgs(args []string) error {
 			return usageError("connect requires a valid peer alias")
 		}
 	case "update":
-		if len(args) == 2 && args[1] == "status" {
+		if len(args) == 2 && (args[1] == "status" || args[1] == "verify") {
 			return nil
 		}
 		if len(args) != 3 || (args[1] != "status" && args[1] != "send" && args[1] != "allow" && args[1] != "deny") || !validAlias(args[2]) {
-			return usageError("update requires status [ALIAS] or send|allow|deny ALIAS")
+			return usageError("update requires verify, status [ALIAS], or send|allow|deny ALIAS")
 		}
 	case "clipboard":
 		if len(args) != 3 || (args[1] != "status" && args[1] != "on" && args[1] != "off") || !validAlias(args[2]) {
@@ -405,6 +413,12 @@ func writeHuman(output io.Writer, value any) {
 			state = fmt.Sprint(*item.ReceiveAllowed)
 		}
 		fmt.Fprintf(output, "Receive updates from %s: %s (%s)\n", item.PeerAlias, state, item.Code)
+	case updateVerifyResult:
+		fmt.Fprintf(output, "Update bundle: %s", item.Code)
+		if item.Valid {
+			fmt.Fprintf(output, " (g%d %s, %d bytes)", item.Generation, item.Revision, item.SizeBytes)
+		}
+		fmt.Fprintln(output)
 	case localapi.UpdateResult:
 		fmt.Fprintf(output, "Update: %s\nTransfer: %s\n", item.Code, item.Status.State)
 	case clipboardState:

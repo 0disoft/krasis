@@ -1,16 +1,53 @@
 package productcli
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
 
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/peerupdate"
+	"github.com/0disoft/krasis/internal/updatebundle"
 )
 
 const updateStatusSchema = "krasis.cli.update-status/v1"
 const updatePermissionSchema = "krasis.cli.update-permission/v1"
+const updateVerifySchema = "krasis.cli.update-verify/v1"
+
+type updateVerifyResult struct {
+	SchemaVersion string `json:"schemaVersion"`
+	Code          string `json:"code"`
+	Valid         bool   `json:"valid"`
+	Generation    int    `json:"generation,omitempty"`
+	Revision      string `json:"revision,omitempty"`
+	SizeBytes     int    `json:"sizeBytes,omitempty"`
+}
+
+func verifyCurrentBundle(executable string) (updateVerifyResult, int) {
+	v := updateVerifyResult{SchemaVersion: updateVerifySchema, Code: "bundle_missing"}
+	directory := filepath.Dir(executable)
+	if filepath.Base(executable) != "krasis-cli.exe" || !bundleManifestExists(directory) {
+		return v, ExitUnsafeState
+	}
+	v.Code = "bundle_invalid"
+	root, err := os.OpenRoot(directory)
+	if err != nil {
+		return v, ExitUnsafeState
+	}
+	archive, err := updatebundle.Pack(root)
+	_ = root.Close()
+	if err != nil {
+		return v, ExitUnsafeState
+	}
+	bundle, err := updatebundle.Read(bytes.NewReader(archive), int64(len(archive)))
+	if err != nil {
+		return v, ExitUnsafeState
+	}
+	metadata := bundle.Metadata()
+	v.Code, v.Valid, v.Generation, v.Revision, v.SizeBytes = "ok", true, metadata.Generation, metadata.Revision, len(archive)
+	return v, ExitOK
+}
 
 type updatePermissionResult struct {
 	SchemaVersion  string `json:"schemaVersion"`
@@ -63,7 +100,7 @@ func dispatchUpdate(ctx context.Context, client apiClient, args []string, execut
 		return updateCall(ctx, client, localapi.UpdateRequest{Schema: localapi.UpdateSchema, Action: "STATUS"})
 	}
 	if len(args) != 2 {
-		return nil, ExitUsage, usageError("update requires status [ALIAS] or send|allow|deny ALIAS")
+		return nil, ExitUsage, usageError("update requires verify, status [ALIAS], or send|allow|deny ALIAS")
 	}
 	peer, code, err := resolvePeer(ctx, client, args[1])
 	if err != nil {
@@ -97,7 +134,7 @@ func dispatchUpdate(ctx context.Context, client apiClient, args []string, execut
 		return projectUpdateStatus(args[1], peer, runtime, status.Status, *inspection.PeerInfo), ExitOK, nil
 	}
 	if args[0] != "send" {
-		return nil, ExitUsage, usageError("update requires status [ALIAS] or send|allow|deny ALIAS")
+		return nil, ExitUsage, usageError("update requires verify, status [ALIAS], or send|allow|deny ALIAS")
 	}
 	if inspection.PeerInfo.State != "ONLINE" {
 		return localapi.UpdateResult{Schema: localapi.UpdateSchema, Code: "peer_unreachable"}, ExitUnsafeState, nil
