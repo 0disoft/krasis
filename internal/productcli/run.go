@@ -87,6 +87,14 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, deps depe
 		value, code := verifyCurrentBundle(executable)
 		return writeOutput(stdout, stderr, value, code, parsed.json)
 	}
+	if parsed.args[0] == "diagnostics" && len(parsed.args) == 2 && parsed.args[1] == "export" {
+		if parsed.controlDir != "" {
+			writeUsageError(stderr, usageError("diagnostics export does not use --control-dir"))
+			return ExitUsage
+		}
+		value, code := exportDiagnostics(deps.localAppData)
+		return writeOutput(stdout, stderr, value, code, parsed.json)
+	}
 	control, err := ResolveControlDirectory(deps.localAppData, parsed.controlDir)
 	if err != nil {
 		fmt.Fprintln(stderr, "config_error: invalid CLI configuration")
@@ -260,9 +268,13 @@ func validateCommandArgs(args []string) error {
 	case "connection":
 		_, err := parseConnection(args[1:])
 		return err
-	case "status", "diagnostics", "topology", "disconnect", "safe-stop", "version", "doctor":
+	case "status", "topology", "disconnect", "safe-stop", "version", "doctor":
 		if len(args) != 1 {
 			return usageError(args[0] + " accepts no arguments")
+		}
+	case "diagnostics":
+		if len(args) != 1 && (len(args) != 2 || args[1] != "export") {
+			return usageError("diagnostics accepts no arguments or export")
 		}
 	case "connect":
 		if len(args) != 2 || !validAlias(args[1]) {
@@ -446,6 +458,11 @@ func writeHuman(output io.Writer, value any) {
 		sort.Strings(keys)
 		for _, key := range keys {
 			fmt.Fprintf(output, "%s: %d\n", key, item.Counters[key])
+		}
+	case diagnosticsExportResult:
+		fmt.Fprintf(output, "Diagnostics: %s\n", item.Code)
+		if item.Path != "" {
+			fmt.Fprintf(output, "File: %s\n", item.Path)
 		}
 	case localapi.Trust:
 		fmt.Fprintf(output, "Trust revision: %d\n", item.Revision)

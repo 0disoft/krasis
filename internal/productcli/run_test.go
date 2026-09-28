@@ -3,7 +3,10 @@ package productcli
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -27,6 +30,34 @@ func TestRunProducesStableJSONAndHumanOutput(t *testing.T) {
 		if code != ExitOK || !strings.Contains(stdout.String(), test.want) || stderr.Len() != 0 {
 			t.Fatalf("run(%v) code=%d stdout=%q stderr=%q", test.args, code, stdout.String(), stderr.String())
 		}
+	}
+}
+
+func TestDiagnosticsExportWorksWithoutAgent(t *testing.T) {
+	base := t.TempDir()
+	deps := dependencies{localAppData: base, openClient: func(string) (apiClient, error) {
+		t.Fatal("offline export opened the agent")
+		return nil, nil
+	}}
+	var stdout, stderr bytes.Buffer
+	if code := run(context.Background(), []string{"diagnostics", "export", "--json"}, &stdout, &stderr, deps); code != ExitOK || stderr.Len() != 0 {
+		t.Fatalf("export code=%d stderr=%q", code, stderr.String())
+	}
+	var result diagnosticsExportResult
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(base, "Krasis", "diagnostics", "support-latest.json")
+	if result.SchemaVersion != diagnosticsExportSchema || result.Code != "saved" || result.Path != want {
+		t.Fatalf("unexpected export result: %+v", result)
+	}
+	if _, err := os.Stat(want); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := run(context.Background(), []string{"diagnostics", "export", "--control-dir", base}, &stdout, &stderr, deps); code != ExitUsage || stdout.Len() != 0 {
+		t.Fatalf("control override code=%d stdout=%q", code, stdout.String())
 	}
 }
 

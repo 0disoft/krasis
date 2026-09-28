@@ -11,6 +11,10 @@ agent가 있으면 실행 중인 agent의 generation/build/protocol도 함께 �
 JSON은 `krasis.cli.doctor/v1`이다. 연결이 끊긴 상태면 exit `7`, protocol이 다르면 exit `6`이다.
 두 명령의 JSON은 여러 사실을 합친 CLI projection이며 아래의 단일 local API 응답 투영과 구분한다.
 
+`krasis-cli diagnostics export`는 에이전트 없이 정제된 지원 파일을 저장한다. JSON
+`krasis.cli.diagnostics-export/v1`은 `code: saved`일 때만 절대 `path`를 포함한다.
+저장 실패는 `code: save_failed`, exit `1`이며 내부 경로나 원인을 출력하지 않는다.
+
 `krasis-cli update status`는 로컬 전송 상태를, `update status ALIAS`는 신뢰된 상대의
 관측 버전·업데이트 수신 허용·현재 전송 상태를 조회한다. 상대 정보가 오래됐으면 버전을 추측하지
 않고 `peerState: STALE` 또는 `UNKNOWN`으로 표시한다. 상대 상태 JSON은

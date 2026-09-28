@@ -1,21 +1,23 @@
 # CLI 명령 계약
 
-## 제품 CLI `krasis`
+## 제품 CLI `krasis-cli`
 
-정식 제품 CLI는 resident agent의 authenticated local API client다. 명령은 다음과 같다.
+정식 제품 CLI는 주로 resident agent의 authenticated local API를 사용한다.
+로컬 진단 내보내기와 업데이트 묶음 검증은 오프라인에서 동작한다.
 
 ```text
-krasis [--json] [--control-dir DIR] status
-krasis [--json] [--control-dir DIR] diagnostics
-krasis [--json] [--control-dir DIR] topology
-krasis [--json] [--control-dir DIR] connect ALIAS
-krasis [--json] [--control-dir DIR] disconnect
-krasis [--json] [--control-dir DIR] pair begin ALIAS --allow-inbound-control
-krasis [--json] [--control-dir DIR] pair confirm PAIRING_ID CODE
-krasis [--json] [--control-dir DIR] pair cancel PAIRING_ID
-krasis [--json] [--control-dir DIR] trust list
-krasis [--json] [--control-dir DIR] trust revoke SHA256_FINGERPRINT
-krasis [--json] [--control-dir DIR] safe-stop
+krasis-cli [--json] [--control-dir DIR] status
+krasis-cli [--json] [--control-dir DIR] diagnostics
+krasis-cli [--json] diagnostics export
+krasis-cli [--json] [--control-dir DIR] topology
+krasis-cli [--json] [--control-dir DIR] connect ALIAS
+krasis-cli [--json] [--control-dir DIR] disconnect
+krasis-cli [--json] [--control-dir DIR] pair begin ALIAS --allow-inbound-control
+krasis-cli [--json] [--control-dir DIR] pair confirm PAIRING_ID CODE
+krasis-cli [--json] [--control-dir DIR] pair cancel PAIRING_ID
+krasis-cli [--json] [--control-dir DIR] trust list
+krasis-cli [--json] [--control-dir DIR] trust revoke SHA256_FINGERPRINT
+krasis-cli [--json] [--control-dir DIR] safe-stop
 ```
 
 global option은 command 앞이나 뒤에 한 번만 사용할 수 있다. alias는 공백으로 감싸지 않은 유효한
@@ -25,6 +27,10 @@ UTF-8 1~64자이고 control character를 허용하지 않는다. pairing ID는 l
 `pair begin`의 inbound-control 승인은 생략할 수 없는 명시적 동의다. `safe-stop`은 agent와 소유한
 session 전체를 안전 종료하므로 일반 연결 해제에는 `disconnect`를 사용한다. `topology`의
 `UNCONFIGURED`는 배치가 저장됐다는 뜻이 아니며, CLI가 기본 edge를 추측하지 않는다.
+
+`diagnostics export`는 실행 중인 에이전트 없이도 검증된 로컬 이벤트 기록을
+`%LOCALAPPDATA%\Krasis\diagnostics\support-latest.json`에 저장한다. 기존 파일만 교체하며
+네트워크 전송은 하지 않는다. `--control-dir`는 사용할 수 없다.
 
 아래 `krasis-lab` 계약은 Phase 0 실험 표면이며 제품 CLI와 호환성 관계가 없다.
 
