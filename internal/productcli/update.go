@@ -10,6 +10,14 @@ import (
 )
 
 const updateStatusSchema = "krasis.cli.update-status/v1"
+const updatePermissionSchema = "krasis.cli.update-permission/v1"
+
+type updatePermissionResult struct {
+	SchemaVersion  string `json:"schemaVersion"`
+	PeerAlias      string `json:"peerAlias"`
+	Code           string `json:"code"`
+	ReceiveAllowed *bool  `json:"receiveAllowed,omitempty"`
+}
 
 type updateStatusResult struct {
 	SchemaVersion    string `json:"schemaVersion"`
@@ -55,7 +63,7 @@ func dispatchUpdate(ctx context.Context, client apiClient, args []string, execut
 		return updateCall(ctx, client, localapi.UpdateRequest{Schema: localapi.UpdateSchema, Action: "STATUS"})
 	}
 	if len(args) != 2 {
-		return nil, ExitUsage, usageError("update requires status [ALIAS] or send ALIAS")
+		return nil, ExitUsage, usageError("update requires status [ALIAS] or send|allow|deny ALIAS")
 	}
 	peer, code, err := resolvePeer(ctx, client, args[1])
 	if err != nil {
@@ -63,6 +71,9 @@ func dispatchUpdate(ctx context.Context, client apiClient, args []string, execut
 	}
 	if code != "" {
 		return localapi.UpdateResult{Schema: localapi.UpdateSchema, Code: code}, ExitUnsafeState, nil
+	}
+	if args[0] == "allow" || args[0] == "deny" {
+		return updatePermission(ctx, client, args[1], peer, args[0] == "allow")
 	}
 	runtime, err := client.Runtime(ctx)
 	if err != nil {
@@ -86,7 +97,7 @@ func dispatchUpdate(ctx context.Context, client apiClient, args []string, execut
 		return projectUpdateStatus(args[1], peer, runtime, status.Status, *inspection.PeerInfo), ExitOK, nil
 	}
 	if args[0] != "send" {
-		return nil, ExitUsage, usageError("update requires status [ALIAS] or send ALIAS")
+		return nil, ExitUsage, usageError("update requires status [ALIAS] or send|allow|deny ALIAS")
 	}
 	if inspection.PeerInfo.State != "ONLINE" {
 		return localapi.UpdateResult{Schema: localapi.UpdateSchema, Code: "peer_unreachable"}, ExitUnsafeState, nil
@@ -107,6 +118,66 @@ func dispatchUpdate(ctx context.Context, client apiClient, args []string, execut
 		return result, ExitTransport, nil
 	}
 	return result, ExitOK, nil
+}
+
+func updatePermission(ctx context.Context, client apiClient, alias, peer string, allow bool) (any, int, error) {
+	v := updatePermissionResult{SchemaVersion: updatePermissionSchema, PeerAlias: alias}
+	before, err := client.Runtime(ctx)
+	if err != nil {
+		return nil, ExitInternal, err
+	}
+	status, err := client.Update(ctx, localapi.UpdateRequest{Schema: localapi.UpdateSchema, Action: "STATUS"})
+	if err != nil {
+		return nil, ExitInternal, err
+	}
+	if status.Code != "ok" {
+		v.Code = "status_unavailable"
+		return v, ExitUnsafeState, nil
+	}
+	current := updateReceiveAllowed(status.Status.Allowed, peer)
+	v.ReceiveAllowed = &current
+	if current == allow {
+		v.Code = "ok"
+		return v, ExitOK, nil
+	}
+	action := "DENY"
+	if allow {
+		action = "ALLOW"
+	}
+	result, err := client.Update(ctx, localapi.UpdateRequest{Schema: localapi.UpdateSchema, Action: action, Peer: peer})
+	if err != nil {
+		// The agent may have saved the permission before losing its reply.
+		return nil, ExitInternal, err
+	}
+	if result.Code != "permission_saved" {
+		v.Code = result.Code
+		v.ReceiveAllowed = nil
+		return v, ExitUnsafeState, nil
+	}
+	after, err := client.Runtime(ctx)
+	if err != nil || after.Instance != before.Instance {
+		v.Code = "agent_changed"
+		v.ReceiveAllowed = nil
+		return v, ExitUnsafeState, nil
+	}
+	observed := updateReceiveAllowed(result.Status.Allowed, peer)
+	if observed != allow {
+		v.Code = "outcome_unknown"
+		v.ReceiveAllowed = nil
+		return v, ExitUnsafeState, nil
+	}
+	v.ReceiveAllowed = &observed
+	v.Code = "permission_saved"
+	return v, ExitOK, nil
+}
+
+func updateReceiveAllowed(allowed []string, peer string) bool {
+	for _, fingerprint := range allowed {
+		if fingerprint == peer {
+			return true
+		}
+	}
+	return false
 }
 
 func updateCall(ctx context.Context, client apiClient, request localapi.UpdateRequest) (any, int, error) {

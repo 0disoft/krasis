@@ -3,6 +3,7 @@ package productcli
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -41,6 +42,84 @@ func TestUpdateStatusShowsBothVersionsWithoutSending(t *testing.T) {
 		if r.Action == "SEND" {
 			t.Fatal("status sent an update")
 		}
+	}
+}
+
+func TestUpdatePermissionChangesOnlyLocalReceiveConsent(t *testing.T) {
+	peer := strings.Repeat("b", 64)
+	for _, test := range []struct {
+		action  string
+		initial bool
+	}{
+		{"allow", false}, {"deny", true},
+	} {
+		t.Run(test.action, func(t *testing.T) {
+			allowed := test.initial
+			client := updateFixture(peer, 80)
+			client.updateFn = func(r localapi.UpdateRequest) (localapi.UpdateResult, error) {
+				status := peerupdate.Status{State: "IDLE"}
+				if r.Action == "ALLOW" || r.Action == "DENY" {
+					if r.Peer != peer {
+						t.Fatalf("changed wrong peer: %+v", r)
+					}
+					allowed = r.Action == "ALLOW"
+				}
+				if allowed {
+					status.Allowed = []string{peer}
+				}
+				code := "ok"
+				if r.Action != "STATUS" {
+					code = "permission_saved"
+				}
+				return localapi.UpdateResult{Schema: localapi.UpdateSchema, Code: code, Status: status}, nil
+			}
+			for runNumber := range 2 {
+				var out, errs bytes.Buffer
+				if code := run(context.Background(), []string{"update", test.action, "B", "--json"}, &out, &errs, testDependencies(client)); code != ExitOK || errs.Len() != 0 || !strings.Contains(out.String(), fmt.Sprintf(`"receiveAllowed":%t`, allowed)) {
+					t.Fatalf("run=%d code=%d output=%q errors=%q", runNumber, code, out.String(), errs.String())
+				}
+			}
+			mutations := 0
+			for _, request := range client.requests {
+				if request.Action == "ALLOW" || request.Action == "DENY" {
+					mutations++
+				}
+				if request.Action == "INSPECT" || request.Action == "SEND" {
+					t.Fatalf("permission invoked remote action: %+v", request)
+				}
+			}
+			if mutations != 1 {
+				t.Fatalf("mutation count=%d requests=%+v", mutations, client.requests)
+			}
+		})
+	}
+}
+
+func TestUpdatePermissionUncertainOutcomeIsNotRetried(t *testing.T) {
+	peer := strings.Repeat("b", 64)
+	for _, test := range []struct {
+		name string
+		lost bool
+	}{
+		{"lost reply", true}, {"inconsistent reply", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			client := updateFixture(peer, 80)
+			client.updateFn = func(r localapi.UpdateRequest) (localapi.UpdateResult, error) {
+				if r.Action == "STATUS" {
+					return localapi.UpdateResult{Schema: localapi.UpdateSchema, Code: "ok"}, nil
+				}
+				if test.lost {
+					return localapi.UpdateResult{}, errors.New("lost reply")
+				}
+				return localapi.UpdateResult{Schema: localapi.UpdateSchema, Code: "permission_saved"}, nil
+			}
+			var out, errs bytes.Buffer
+			code := run(context.Background(), []string{"update", "allow", "B", "--json"}, &out, &errs, testDependencies(client))
+			if (test.lost && code != ExitInternal) || (!test.lost && (code != ExitUnsafeState || !strings.Contains(out.String(), `"code":"outcome_unknown"`) || strings.Contains(out.String(), `"receiveAllowed"`))) || len(client.requests) != 2 || client.requests[1].Action != "ALLOW" {
+				t.Fatalf("code=%d output=%q errors=%q requests=%+v", code, out.String(), errs.String(), client.requests)
+			}
+		})
 	}
 }
 

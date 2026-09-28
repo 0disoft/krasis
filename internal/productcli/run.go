@@ -264,8 +264,8 @@ func validateCommandArgs(args []string) error {
 		if len(args) == 2 && args[1] == "status" {
 			return nil
 		}
-		if len(args) != 3 || (args[1] != "status" && args[1] != "send") || !validAlias(args[2]) {
-			return usageError("update requires status [ALIAS] or send ALIAS")
+		if len(args) != 3 || (args[1] != "status" && args[1] != "send" && args[1] != "allow" && args[1] != "deny") || !validAlias(args[2]) {
+			return usageError("update requires status [ALIAS] or send|allow|deny ALIAS")
 		}
 	case "clipboard":
 		if len(args) != 3 || (args[1] != "status" && args[1] != "on" && args[1] != "off") || !validAlias(args[2]) {
@@ -399,6 +399,12 @@ func writeHuman(output io.Writer, value any) {
 			fmt.Fprintf(output, " g%d %s", item.PeerGeneration, item.PeerBuild)
 		}
 		fmt.Fprintf(output, "\nPeer permits updates: %t\nReceive allowed: %t\nTransfer: %s\n", item.PeerAllowsUpdate, item.ReceiveAllowed, item.TransferState)
+	case updatePermissionResult:
+		state := "unknown"
+		if item.ReceiveAllowed != nil {
+			state = fmt.Sprint(*item.ReceiveAllowed)
+		}
+		fmt.Fprintf(output, "Receive updates from %s: %s (%s)\n", item.PeerAlias, state, item.Code)
 	case localapi.UpdateResult:
 		fmt.Fprintf(output, "Update: %s\nTransfer: %s\n", item.Code, item.Status.State)
 	case clipboardState:

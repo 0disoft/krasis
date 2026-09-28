@@ -20,6 +20,12 @@ JSON은 `krasis.cli.doctor/v1`이다. 연결이 끊긴 상태면 exit `7`, proto
 아니다. 응답을 받지 못했을 때는 중복 전송을 피하기 위해 자동 재시도하지 않고 `update status`로
 확인한다.
 
+`krasis-cli update allow ALIAS`와 `update deny ALIAS`는 **해당 상대가 이 PC로 업데이트를
+보낼 수 있는 권한**을 변경한다. 상대 PC의 수신 권한은 변경하지 않는다. 이미 원하는 상태면
+요청을 다시 보내지 않고, 변경 후에는 동일 에이전트의 응답 상태를 확인한다. 응답을 잃었거나
+에이전트가 바뀌면 중복 실행하지 말고 `update status ALIAS`로 확인한다. JSON은
+`krasis.cli.update-permission/v1`이며 확인된 상태에서만 `receiveAllowed`를 반환한다.
+
 `krasis-cli clipboard status|on|off ALIAS`는 신뢰된 기기의 공유 상태를 조회하거나 변경한다.
 `on`은 이후 복사하는 텍스트·이미지·파일과 폴더를 상대 기기에 공유할 수 있으므로 명시적으로
 실행해야 한다. 현재 상태는 agent의 업데이트 상태를 읽어 판단하며, 설정 변경 후에도 다시 읽어
