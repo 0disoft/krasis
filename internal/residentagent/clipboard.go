@@ -12,7 +12,7 @@ func (o *Operations) Clipboard(ctx context.Context, r localapi.ClipboardRequest)
 		return v, nil
 	}
 	if r.Action == "DISABLE" {
-		if o.updates.SetClipboardPeer("") == nil {
+		if cleared, err := o.updates.ClearClipboardPeer(r.Peer); err == nil && cleared {
 			v.Code = "ok"
 		}
 		return v, nil
@@ -21,7 +21,7 @@ func (o *Operations) Clipboard(ctx context.Context, r localapi.ClipboardRequest)
 		return v, nil
 	}
 	if r.Action == "ENABLE" {
-		if o.updates.SetClipboardPeer(r.Peer) == nil {
+		if enabled, err := o.updates.EnableClipboardPeer(r.Peer); err == nil && enabled {
 			v.Code = "ok"
 		}
 		return v, nil

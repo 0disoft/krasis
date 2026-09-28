@@ -107,6 +107,7 @@ type stubClient struct {
 	trust       localapi.Trust
 	requests    []localapi.UpdateRequest
 	updateFn    func(localapi.UpdateRequest) (localapi.UpdateResult, error)
+	clipboardFn func(localapi.ClipboardRequest) (localapi.ClipboardResult, error)
 }
 
 func (client *stubClient) Status(context.Context) (localapi.Status, error) { return client.status, nil }
@@ -131,6 +132,12 @@ func (client *stubClient) Update(_ context.Context, request localapi.UpdateReque
 		return client.updateFn(request)
 	}
 	return client.update, nil
+}
+func (client *stubClient) Clipboard(_ context.Context, request localapi.ClipboardRequest) (localapi.ClipboardResult, error) {
+	if client.clipboardFn != nil {
+		return client.clipboardFn(request)
+	}
+	return localapi.ClipboardResult{Code: "rejected"}, nil
 }
 func (*stubClient) Topology(context.Context) (localapi.Topology, error) {
 	return localapi.Topology{SchemaVersion: localapi.TopologySchemaVersion, State: "LOCAL", Layout: "UNCONFIGURED", Peers: []localapi.TopologyPeer{}}, nil

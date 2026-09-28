@@ -20,6 +20,12 @@ JSON은 `krasis.cli.doctor/v1`이다. 연결이 끊긴 상태면 exit `7`, proto
 아니다. 응답을 받지 못했을 때는 중복 전송을 피하기 위해 자동 재시도하지 않고 `update status`로
 확인한다.
 
+`krasis-cli clipboard status|on|off ALIAS`는 신뢰된 기기의 공유 상태를 조회하거나 변경한다.
+`on`은 이후 복사하는 텍스트·이미지·파일과 폴더를 상대 기기에 공유할 수 있으므로 명시적으로
+실행해야 한다. 현재 상태는 agent의 업데이트 상태를 읽어 판단하며, 설정 변경 후에도 다시 읽어
+확인한다. 이미 원하는 상태면 재요청하지 않는다. 다른 기기가 공유 중이면 무심코 끄거나 바꾸지
+않고 exit `7`로 거부한다. JSON `krasis.cli.clipboard/v1`에는 공유 내용이나 파일 경로가 없다.
+
 - `krasis.agent.status/v1`
 - `krasis.agent.diagnostics/v1`
 - `krasis.agent.trust/v1`

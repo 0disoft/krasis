@@ -46,6 +46,31 @@ func TestClipboardTransportRequiresBothPermissionsAndAdvertisedID(t *testing.T) 
 	}
 }
 
+func TestClipboardClearDoesNotDisableAnotherPeer(t *testing.T) {
+	m := testManager(t)
+	first, second := strings.Repeat("a", 64), strings.Repeat("b", 64)
+	if err := m.SetClipboardPeer(second); err != nil {
+		t.Fatal(err)
+	}
+	if cleared, err := m.ClearClipboardPeer(first); cleared || err != nil || m.ClipboardPeer() != second {
+		t.Fatalf("stale clear changed peer: cleared=%t err=%v peer=%q", cleared, err, m.ClipboardPeer())
+	}
+	if cleared, err := m.ClearClipboardPeer(second); !cleared || err != nil || m.ClipboardPeer() != "" {
+		t.Fatalf("expected clear failed: cleared=%t err=%v peer=%q", cleared, err, m.ClipboardPeer())
+	}
+}
+
+func TestClipboardEnableDoesNotReplaceAnotherPeer(t *testing.T) {
+	m := testManager(t)
+	first, second := strings.Repeat("a", 64), strings.Repeat("b", 64)
+	if enabled, err := m.EnableClipboardPeer(first); !enabled || err != nil {
+		t.Fatalf("initial enable: %t %v", enabled, err)
+	}
+	if enabled, err := m.EnableClipboardPeer(second); enabled || err != nil || m.ClipboardPeer() != first {
+		t.Fatalf("replacement should be rejected: %t %v %q", enabled, err, m.ClipboardPeer())
+	}
+}
+
 func TestClipboardOptInScopeExpiryAndEcho(t *testing.T) {
 	m := testManager(t)
 	peer := strings.Repeat("a", 64)

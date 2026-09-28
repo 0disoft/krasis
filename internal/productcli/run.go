@@ -29,6 +29,7 @@ const (
 type apiClient interface {
 	Runtime(context.Context) (localapi.RuntimeInfo, error)
 	Update(context.Context, localapi.UpdateRequest) (localapi.UpdateResult, error)
+	Clipboard(context.Context, localapi.ClipboardRequest) (localapi.ClipboardResult, error)
 	Status(context.Context) (localapi.Status, error)
 	Diagnostics(context.Context) (localapi.Diagnostics, error)
 	Trust(context.Context) (localapi.Trust, error)
@@ -120,6 +121,8 @@ func dispatch(ctx context.Context, client apiClient, args []string, executable s
 		return doctor(ctx, client)
 	case "update":
 		return dispatchUpdate(ctx, client, args[1:], executable)
+	case "clipboard":
+		return dispatchClipboard(ctx, client, args[1:])
 	case "status":
 		if len(args) != 1 {
 			return nil, ExitUsage, usageError("status accepts no arguments")
@@ -264,6 +267,10 @@ func validateCommandArgs(args []string) error {
 		if len(args) != 3 || (args[1] != "status" && args[1] != "send") || !validAlias(args[2]) {
 			return usageError("update requires status [ALIAS] or send ALIAS")
 		}
+	case "clipboard":
+		if len(args) != 3 || (args[1] != "status" && args[1] != "on" && args[1] != "off") || !validAlias(args[2]) {
+			return usageError("clipboard requires status|on|off ALIAS")
+		}
 	case "trust":
 		if len(args) == 2 && args[1] == "list" {
 			return nil
@@ -362,7 +369,7 @@ func writeUsageError(stderr io.Writer, err error) {
 	if err != nil {
 		fmt.Fprintln(stderr, "usage_error:", err)
 	}
-	fmt.Fprintln(stderr, "usage: krasis-cli [--json] [--control-dir DIR] version|doctor|update|status|diagnostics|topology|credential|connection|connect|disconnect|pair|trust|safe-stop")
+	fmt.Fprintln(stderr, "usage: krasis-cli [--json] [--control-dir DIR] version|doctor|update|clipboard|status|diagnostics|topology|credential|connection|connect|disconnect|pair|trust|safe-stop")
 }
 
 func writeHuman(output io.Writer, value any) {
@@ -394,6 +401,11 @@ func writeHuman(output io.Writer, value any) {
 		fmt.Fprintf(output, "\nPeer permits updates: %t\nReceive allowed: %t\nTransfer: %s\n", item.PeerAllowsUpdate, item.ReceiveAllowed, item.TransferState)
 	case localapi.UpdateResult:
 		fmt.Fprintf(output, "Update: %s\nTransfer: %s\n", item.Code, item.Status.State)
+	case clipboardState:
+		fmt.Fprintf(output, "Clipboard %s: enabled=%t (%s)\n", item.PeerAlias, item.Enabled, item.Code)
+		if item.OtherPeerActive {
+			fmt.Fprintln(output, "Another peer has clipboard sharing enabled.")
+		}
 	case localapi.ConnectionResult:
 		fmt.Fprintf(output, "%s: %s\n", item.Status, item.Code)
 		if item.Profile != nil {

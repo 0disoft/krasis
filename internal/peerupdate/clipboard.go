@@ -46,6 +46,39 @@ func (m *Manager) SetClipboardPeer(peer string) error {
 	}
 	m.clipboard.mu.Lock()
 	defer m.clipboard.mu.Unlock()
+	return m.setClipboardPeerLocked(peer)
+}
+
+func (m *Manager) EnableClipboardPeer(peer string) (bool, error) {
+	if !validID(peer, 64) {
+		return false, ErrDenied
+	}
+	m.clipboard.mu.Lock()
+	defer m.clipboard.mu.Unlock()
+	if m.clipboard.peer != "" {
+		return m.clipboard.peer == peer, nil
+	}
+	return true, m.setClipboardPeerLocked(peer)
+}
+
+// Clear only the peer the caller observed. Another UI or CLI may have changed
+// the selection since that observation; a stale off request must not clear it.
+func (m *Manager) ClearClipboardPeer(expected string) (bool, error) {
+	if !validID(expected, 64) {
+		return false, ErrDenied
+	}
+	m.clipboard.mu.Lock()
+	defer m.clipboard.mu.Unlock()
+	if m.clipboard.peer == "" {
+		return true, nil
+	}
+	if m.clipboard.peer != expected {
+		return false, nil
+	}
+	return true, m.setClipboardPeerLocked("")
+}
+
+func (m *Manager) setClipboardPeerLocked(peer string) error {
 	if err := m.writeClipboardSetting("clipboard-peer.txt", peer); err != nil {
 		return err
 	}
