@@ -52,6 +52,10 @@ func prepareUpdatedWorkspace(ctx context.Context, control string, startup produc
 			}
 		}
 	}
+	return prepareUpdatedWorkspaceWithRevision(ctx, control, startup, launch, revision)
+}
+
+func prepareUpdatedWorkspaceWithRevision(ctx context.Context, control string, startup productpanel.Startup, launch productpanel.WorkspaceUpdateLaunch, revision string) error {
 	if revision == "" || revision != launch.Revision {
 		return errors.New("unexpected Workspace build")
 	}
@@ -59,7 +63,9 @@ func prepareUpdatedWorkspace(ctx context.Context, control string, startup produc
 		return err
 	}
 	if err := startup.Ensure(ctx); err != nil {
-		return err
+		// Keep the verified replacement UI available for diagnosis and manual
+		// recovery. Its managed startup will show the same failure to the user.
+		return nil
 	}
 	c, err := localapi.OpenClient(control)
 	if err != nil {
@@ -87,7 +93,7 @@ func waitUpdateParent(pid uint32) error {
 		return err
 	}
 	defer windows.CloseHandle(h)
-	result, err := windows.WaitForSingleObject(h, 15000)
+	result, err := windows.WaitForSingleObject(h, 45000)
 	if err != nil {
 		return err
 	}

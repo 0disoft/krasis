@@ -61,9 +61,11 @@ The sender GUI also prepares its agent and reconnects after the receiver's stop.
 The sender refuses a new transfer while its running resident agent is from a
 different generation than the GUI. The update dialog reports both versions so
 the operator can disconnect and recover the local agent first.
-Local launch failure clears the apply fence. A new-process crash/startup failure
-requires reopening the preserved old distribution; automatic rollback is not
-claimed. Permissions survive restart; pending transfers deliberately do not.
+Local launch failure clears the apply fence. If the new GUI starts but agent
+startup fails, it remains visible for diagnosis and manual recovery. A
+new-process crash or parent-wait failure still requires reopening the preserved
+old distribution; automatic rollback is not claimed. Permissions survive
+restart; pending transfers deliberately do not.
 The receiver GUI must be open or in the tray. Received files are never executed
 solely by the network handler. Fixed stage codes omit paths, contents and aliases.
 

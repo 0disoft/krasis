@@ -3,10 +3,26 @@
 package workspacehost
 
 import (
+	"context"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/0disoft/krasis/internal/productpanel"
 )
+
+func TestUpdatedWorkspaceKeepsManagementWindowWhenAgentStartupIsBusy(t *testing.T) {
+	revision := "verified-revision"
+	startup := productpanel.Startup{Lock: func() (io.Closer, error) { return nil, errors.New("busy") }}
+	if err := prepareUpdatedWorkspaceWithRevision(context.Background(), "unused", startup, productpanel.WorkspaceUpdateLaunch{Revision: revision}, revision); err != nil {
+		t.Fatal("verified replacement UI was lost after agent startup refusal", err)
+	}
+	if err := prepareUpdatedWorkspaceWithRevision(context.Background(), "unused", startup, productpanel.WorkspaceUpdateLaunch{Revision: "different"}, revision); err == nil {
+		t.Fatal("mismatched replacement build was shown")
+	}
+}
 
 func TestUpdateEntryPointsUseOwnedBundleDirectory(t *testing.T) {
 	base := t.TempDir()
