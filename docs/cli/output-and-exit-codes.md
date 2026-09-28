@@ -11,6 +11,15 @@ agent가 있으면 실행 중인 agent의 generation/build/protocol도 함께 �
 JSON은 `krasis.cli.doctor/v1`이다. 연결이 끊긴 상태면 exit `7`, protocol이 다르면 exit `6`이다.
 두 명령의 JSON은 여러 사실을 합친 CLI projection이며 아래의 단일 local API 응답 투영과 구분한다.
 
+`krasis-cli update status`는 로컬 전송 상태를, `update status ALIAS`는 신뢰된 상대의
+관측 버전·업데이트 수신 허용·현재 전송 상태를 조회한다. 상대 정보가 오래됐으면 버전을 추측하지
+않고 `peerState: STALE` 또는 `UNKNOWN`으로 표시한다. 상대 상태 JSON은
+`krasis.cli.update-status/v1`이다. `update send ALIAS`는 CLI 실행 파일과 함께 배포된
+`peer-update/BUILD.json` 묶음만 사용하며, g75 이전 상대에는 같은 배포 루트의 g75 전환 묶음을
+선택한다. 별도 경로 지정은 지원하지 않는다. 성공 결과 `queued`는 **전송 시작**일 뿐 설치 완료가
+아니다. 응답을 받지 못했을 때는 중복 전송을 피하기 위해 자동 재시도하지 않고 `update status`로
+확인한다.
+
 - `krasis.agent.status/v1`
 - `krasis.agent.diagnostics/v1`
 - `krasis.agent.trust/v1`

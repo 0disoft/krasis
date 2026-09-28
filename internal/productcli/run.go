@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"sort"
 	"strings"
 	"unicode"
@@ -27,6 +28,7 @@ const (
 
 type apiClient interface {
 	Runtime(context.Context) (localapi.RuntimeInfo, error)
+	Update(context.Context, localapi.UpdateRequest) (localapi.UpdateResult, error)
 	Status(context.Context) (localapi.Status, error)
 	Diagnostics(context.Context) (localapi.Diagnostics, error)
 	Trust(context.Context) (localapi.Trust, error)
@@ -41,6 +43,7 @@ type apiClient interface {
 type dependencies struct {
 	localAppData string
 	openClient   func(string) (apiClient, error)
+	executable   string
 }
 
 type options struct {
@@ -84,7 +87,11 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, deps depe
 	if err != nil {
 		return writeClientError(stderr, err)
 	}
-	value, code, err := dispatch(ctx, client, parsed.args)
+	executable := deps.executable
+	if executable == "" {
+		executable, _ = os.Executable()
+	}
+	value, code, err := dispatch(ctx, client, parsed.args, executable)
 	if err != nil {
 		return writeClientError(stderr, err)
 	}
@@ -103,7 +110,7 @@ func writeOutput(stdout, stderr io.Writer, value any, code int, jsonOutput bool)
 	return code
 }
 
-func dispatch(ctx context.Context, client apiClient, args []string) (any, int, error) {
+func dispatch(ctx context.Context, client apiClient, args []string, executable string) (any, int, error) {
 	switch args[0] {
 	case "credential":
 		return dispatchCredential(ctx, client, args[1:])
@@ -111,6 +118,8 @@ func dispatch(ctx context.Context, client apiClient, args []string) (any, int, e
 		return dispatchConnection(ctx, client, args[1:])
 	case "doctor":
 		return doctor(ctx, client)
+	case "update":
+		return dispatchUpdate(ctx, client, args[1:], executable)
 	case "status":
 		if len(args) != 1 {
 			return nil, ExitUsage, usageError("status accepts no arguments")
@@ -248,6 +257,13 @@ func validateCommandArgs(args []string) error {
 		if len(args) != 2 || !validAlias(args[1]) {
 			return usageError("connect requires a valid peer alias")
 		}
+	case "update":
+		if len(args) == 2 && args[1] == "status" {
+			return nil
+		}
+		if len(args) != 3 || (args[1] != "status" && args[1] != "send") || !validAlias(args[2]) {
+			return usageError("update requires status [ALIAS] or send ALIAS")
+		}
 	case "trust":
 		if len(args) == 2 && args[1] == "list" {
 			return nil
@@ -346,7 +362,7 @@ func writeUsageError(stderr io.Writer, err error) {
 	if err != nil {
 		fmt.Fprintln(stderr, "usage_error:", err)
 	}
-	fmt.Fprintln(stderr, "usage: krasis-cli [--json] [--control-dir DIR] version|doctor|status|diagnostics|topology|credential|connection|connect|disconnect|pair|trust|safe-stop")
+	fmt.Fprintln(stderr, "usage: krasis-cli [--json] [--control-dir DIR] version|doctor|update|status|diagnostics|topology|credential|connection|connect|disconnect|pair|trust|safe-stop")
 }
 
 func writeHuman(output io.Writer, value any) {
@@ -370,6 +386,14 @@ func writeHuman(output io.Writer, value any) {
 		if item.PeerAlias != "" {
 			fmt.Fprintf(output, "Peer: %s\n", item.PeerAlias)
 		}
+	case updateStatusResult:
+		fmt.Fprintf(output, "Local: g%d %s\nPeer %s: %s", item.LocalGeneration, item.LocalBuild, item.PeerAlias, item.PeerState)
+		if item.PeerState == "ONLINE" {
+			fmt.Fprintf(output, " g%d %s", item.PeerGeneration, item.PeerBuild)
+		}
+		fmt.Fprintf(output, "\nPeer permits updates: %t\nReceive allowed: %t\nTransfer: %s\n", item.PeerAllowsUpdate, item.ReceiveAllowed, item.TransferState)
+	case localapi.UpdateResult:
+		fmt.Fprintf(output, "Update: %s\nTransfer: %s\n", item.Code, item.Status.State)
 	case localapi.ConnectionResult:
 		fmt.Fprintf(output, "%s: %s\n", item.Status, item.Code)
 		if item.Profile != nil {

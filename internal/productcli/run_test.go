@@ -103,6 +103,10 @@ type stubClient struct {
 	status      localapi.Status
 	operation   localapi.OperationResult
 	runtime     localapi.RuntimeInfo
+	update      localapi.UpdateResult
+	trust       localapi.Trust
+	requests    []localapi.UpdateRequest
+	updateFn    func(localapi.UpdateRequest) (localapi.UpdateResult, error)
 }
 
 func (client *stubClient) Status(context.Context) (localapi.Status, error) { return client.status, nil }
@@ -115,8 +119,18 @@ func (client *stubClient) Runtime(context.Context) (localapi.RuntimeInfo, error)
 func (*stubClient) Diagnostics(context.Context) (localapi.Diagnostics, error) {
 	return localapi.Diagnostics{SchemaVersion: localapi.DiagnosticsSchemaVersion, State: "ready", Counters: map[string]uint64{}}, nil
 }
-func (*stubClient) Trust(context.Context) (localapi.Trust, error) {
+func (client *stubClient) Trust(context.Context) (localapi.Trust, error) {
+	if client.trust.SchemaVersion != "" {
+		return client.trust, nil
+	}
 	return localapi.Trust{SchemaVersion: localapi.TrustSchemaVersion, Peers: []localapi.TrustedPeer{}}, nil
+}
+func (client *stubClient) Update(_ context.Context, request localapi.UpdateRequest) (localapi.UpdateResult, error) {
+	client.requests = append(client.requests, request)
+	if client.updateFn != nil {
+		return client.updateFn(request)
+	}
+	return client.update, nil
 }
 func (*stubClient) Topology(context.Context) (localapi.Topology, error) {
 	return localapi.Topology{SchemaVersion: localapi.TopologySchemaVersion, State: "LOCAL", Layout: "UNCONFIGURED", Peers: []localapi.TopologyPeer{}}, nil
