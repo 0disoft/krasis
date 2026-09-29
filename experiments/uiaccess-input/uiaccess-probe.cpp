@@ -58,9 +58,10 @@ bool sendEscape() {
     INPUT events[2]{};
     for (auto& event : events) {
         event.type = INPUT_KEYBOARD;
+        event.ki.wVk = VK_ESCAPE;
         event.ki.wScan = 0x01;
-        event.ki.dwFlags = KEYEVENTF_SCANCODE;
-        event.ki.dwExtraInfo = 0x4B524153;
+        event.ki.dwFlags = 0;
+        event.ki.dwExtraInfo = 0;
     }
     events[1].ki.dwFlags |= KEYEVENTF_KEYUP;
     const UINT sent = SendInput(2, events, sizeof(INPUT));

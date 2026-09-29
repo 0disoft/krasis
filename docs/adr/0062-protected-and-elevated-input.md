@@ -62,6 +62,18 @@ installed input-only helper with authenticated, exact-lease IPC and no arbitrary
 command execution. Preserve the ordinary agent as unelevated. A failed probe
 keeps the existing guard; a successful API return alone is inconclusive.
 
+The attended g94 UIAccess test on GRAM13 had the expected signed executable,
+trusted certificate and `TokenUIAccess` grant. It observed the actual Chrome
+Windows Security PIN dialog and `SendInput` accepted the Escape pair, but
+returned `dialog_still_open`. The operator closed the dialog with B's touchpad;
+A's remote mouse and keyboard did not work while it was open. The test EXE and
+certificate were removed and checked absent. This disproves that the tested
+scan-code-only, marked UIAccess input path solves this dialog. A final bounded
+comparison uses the same `VK_ESCAPE` plus scan-code shape as Deskflow without
+the Krasis extra-info marker. If that still fails on B, investigate a
+separately installed SYSTEM input process with active-desktop ownership rather
+than broadening the ordinary agent or weakening the PIN guard.
+
 ## Acceptance sequence
 
 1. Build a one-shot, destination-local probe with no peer/network input path.
