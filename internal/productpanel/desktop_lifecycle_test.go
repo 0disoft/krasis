@@ -108,7 +108,7 @@ func TestDesktopLifecycleKeepsUpgradeBusyNoticeWhileAgentRemainsConnected(t *tes
 	}
 }
 
-func TestDesktopLifecycleReconnectsDisplayChangeOnceAfterGeometrySettles(t *testing.T) {
+func TestDesktopLifecycleRetriesDisplayChangeAfterGeometrySettles(t *testing.T) {
 	fp := strings.Repeat("a", 64)
 	client := &fakeClient{state: "LOCAL", stopReason: "display_change", peers: []localapi.TrustedPeer{{Alias: "B", Fingerprint: fp}}}
 	ready := false
@@ -123,12 +123,20 @@ func TestDesktopLifecycleReconnectsDisplayChangeOnceAfterGeometrySettles(t *test
 	}
 	ready = true
 	b.tick(now.Add(5 * time.Second))
+	if starts != 0 || client.connects != 0 {
+		t.Fatal("connected before stable display window")
+	}
+	b.tick(now.Add(8 * time.Second))
 	if starts != 1 || client.connects != 1 || b.Refresh().State != "CONNECTING" {
 		t.Fatal(starts, client.connects, b.Refresh())
 	}
 	client.state, client.stopReason = "LOCAL", "display_change"
 	b.tick(now.Add(10 * time.Second))
 	if client.connects != 1 {
-		t.Fatal("repeated display recovery")
+		t.Fatal("retried before backoff")
+	}
+	b.tick(now.Add(14 * time.Second))
+	if starts != 2 || client.connects != 2 {
+		t.Fatal("failed to retry transient display reconnect", starts, client.connects)
 	}
 }

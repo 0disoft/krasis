@@ -52,7 +52,7 @@ func TestAutomaticRecoveryNeverStartsUnknownOrUserStoppedPeer(t *testing.T) {
 	}
 }
 
-func TestDisplayChangeRecoveryWaitsForStableGeometryAndRunsOnce(t *testing.T) {
+func TestDisplayChangeRecoveryWaitsForStableGeometryAndRetriesWithinBudget(t *testing.T) {
 	const alias = "B"
 	fp := strings.Repeat("a", 64)
 	now := time.Now()
@@ -71,14 +71,29 @@ func TestDisplayChangeRecoveryWaitsForStableGeometryAndRunsOnce(t *testing.T) {
 		t.Fatal("reconnected on unstable geometry", got)
 	}
 	local.DisplayReady = true
-	if got := r.Next(now.Add(5*time.Second), local); got != "display_reconnect" {
+	if got := r.Next(now.Add(5*time.Second), local); got != "" {
+		t.Fatal("reconnected before a fresh stable interval", got)
+	}
+	if got := r.Next(now.Add(8*time.Second), local); got != "display_reconnect" {
 		t.Fatal(got)
 	}
 	if got := r.Next(now.Add(10*time.Second), local); got != "" {
-		t.Fatal("replayed one-shot recovery", got)
+		t.Fatal("ignored retry backoff", got)
+	}
+	if got := r.Next(now.Add(14*time.Second), local); got != "display_reconnect" {
+		t.Fatal("did not retry after first transient failure", got)
+	}
+	if got := r.Next(now.Add(25*time.Second), local); got != "display_reconnect" {
+		t.Fatal("did not use the final bounded retry", got)
+	}
+	if got := r.Next(now.Add(26*time.Second), local); got != "display_recovery_expired" {
+		t.Fatal("missing exhaustion notice", got)
+	}
+	if got := r.Next(now.Add(27*time.Second), local); got != "" {
+		t.Fatal("repeated exhaustion notice", got)
 	}
 	r.Stop()
-	if got := r.Next(now.Add(11*time.Second), local); got != "" {
+	if got := r.Next(now.Add(28*time.Second), local); got != "" {
 		t.Fatal("manual stop rearmed display recovery", got)
 	}
 }

@@ -10,7 +10,10 @@ type AutomaticRecovery struct {
 	blocked, diagnosed bool
 	next               time.Time
 	displaySince       time.Time
-	displayTried       bool
+	displayReadySince  time.Time
+	displayNext        time.Time
+	displayAttempts    int
+	displayExpired     bool
 }
 
 func (r *AutomaticRecovery) Reset() { *r = AutomaticRecovery{} }
@@ -27,31 +30,41 @@ func (r *AutomaticRecovery) Next(now time.Time, view View) string {
 		r.diagnosed = false
 		r.next = time.Time{}
 		r.displaySince = time.Time{}
-		r.displayTried = false
+		r.displayReadySince = time.Time{}
+		r.displayNext = time.Time{}
 		return ""
 	}
 	if view.State == "LOCAL" {
 		if view.StopReason == "display_change" && r.Alias != "" && view.Fingerprints[r.Alias] == r.Fingerprint {
-			if r.displayTried {
+			if r.displayExpired {
 				return ""
 			}
 			if r.displaySince.IsZero() {
 				r.displaySince = now
-				return ""
 			}
-			if now.Sub(r.displaySince) >= 30*time.Second {
-				r.displayTried = true
+			if now.Sub(r.displaySince) >= 30*time.Second || r.displayAttempts >= 3 {
+				r.displayExpired = true
 				return "display_recovery_expired"
 			}
-			if now.Sub(r.displaySince) >= 3*time.Second && view.DisplayReady {
-				r.displayTried = true
-				return "display_reconnect"
+			if !view.DisplayReady {
+				r.displayReadySince = time.Time{}
+				return ""
 			}
-			return ""
+			if r.displayReadySince.IsZero() {
+				r.displayReadySince = now
+			}
+			if now.Sub(r.displayReadySince) < 3*time.Second || now.Before(r.displayNext) {
+				return ""
+			}
+			r.displayAttempts++
+			r.displayNext = now.Add([]time.Duration{5 * time.Second, 10 * time.Second, 20 * time.Second}[r.displayAttempts-1])
+			return "display_reconnect"
 		}
 		r.Alias, r.Fingerprint = "", ""
 		r.diagnosed = false
 		r.displaySince = time.Time{}
+		r.displayReadySince = time.Time{}
+		r.displayNext = time.Time{}
 		return ""
 	}
 	if (view.State != "FAULTED" && view.State != "RECONNECTING") || (view.State == "RECONNECTING" && r.Alias == "") {

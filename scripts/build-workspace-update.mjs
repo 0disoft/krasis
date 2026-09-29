@@ -49,10 +49,10 @@ if (generation >= 62) {
     names.push(packageName,certificateName);
   }
 }
-// g91 carries one pinned, attended capability test through the normal peer
-// update. Later generations do not silently inherit the development payload.
+// g91 and its g92 recovery follow-up carry one pinned, attended capability
+// test. Later generations do not silently inherit the development payload.
 // Neither building nor receiving the bundle trusts its certificate or runs it.
-if (generation === 91) {
+if (generation === 91 || generation === 92) {
   const source = path.resolve('dist/uiaccess-input-probe/9f73fe9980ca-20260929043811');
   const executableName = 'KrasisUIAccessProbe-TESTSIGNED.exe';
   const certificateName = 'KrasisUIAccessProbe-TESTCERT.cer';
