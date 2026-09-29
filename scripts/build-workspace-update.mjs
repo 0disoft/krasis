@@ -49,16 +49,21 @@ if (generation >= 62) {
     names.push(packageName,certificateName);
   }
 }
-// g91 and its g92-g94 follow-ups carry one pinned, attended capability
-// test. Later generations do not silently inherit the development payload.
+// Only the listed generations carry a pinned, attended capability test.
+// Other generations do not silently inherit the development payload.
 // Neither building nor receiving the bundle trusts its certificate or runs it.
-if (generation >= 91 && generation <= 94) {
-  const source = path.resolve('dist/uiaccess-input-probe/9f73fe9980ca-20260929043811');
+const uiAccessTest = generation >= 91 && generation <= 94
+  ? { source: '9f73fe9980ca-20260929043811', hash: 'c4fad81215a94ff67abe99ac1985dcfbb3f5b1e6f252848156debf23c63f98c4', thumbprint: '6ab1765f3c268d3bdd64a5f2e2a7ebb2071ee036' }
+  : generation === 97
+    ? { source: '580af88924da-20260929100017', hash: '6cb515d5174e152910f811a12f03ce0467c1a84a1f601a516e14bcef839f005e', thumbprint: 'af3540c895b677a1a8f7fe6e8569086f6f30e493' }
+    : null;
+if (uiAccessTest) {
+  const source = path.resolve('dist/uiaccess-input-probe', uiAccessTest.source);
   const executableName = 'KrasisUIAccessProbe-TESTSIGNED.exe';
   const certificateName = 'KrasisUIAccessProbe-TESTCERT.cer';
   const detailsName = 'TEST-CERT-DETAILS.txt';
-  const expectedHash = 'c4fad81215a94ff67abe99ac1985dcfbb3f5b1e6f252848156debf23c63f98c4';
-  const expectedThumbprint = '6ab1765f3c268d3bdd64a5f2e2a7ebb2071ee036';
+  const expectedHash = uiAccessTest.hash;
+  const expectedThumbprint = uiAccessTest.thumbprint;
   const executable = fs.readFileSync(path.join(source, executableName));
   const certificate = fs.readFileSync(path.join(source, certificateName));
   const details = fs.readFileSync(path.join(source, detailsName), 'utf8').replaceAll('\r', '');

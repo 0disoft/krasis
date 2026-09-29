@@ -146,6 +146,11 @@ only staged; peer update never trusts the certificate or runs the experiment.
 Upgrade a generation-89 receiver to generation 90 before sending a bundle
 that includes the UIAccess experiment.
 
+The attended g97 comparison bundle contains a newly signed Escape-format
+UIAccess probe and its public test certificate as the same complete six-file
+set. Delivery only stages the files. Certificate trust, installation, test
+execution and removal remain attended on the destination PC.
+
 Generation 93 selects the adjacent g90 distribution for peers on generations
 75 through 89, then the current distribution after the peer reports g90.
 This keeps the transition and experiment in the same update UI without asking
