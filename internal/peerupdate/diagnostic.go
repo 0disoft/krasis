@@ -59,6 +59,19 @@ func (m *Manager) DiagnosticRequestStatus(peer, id string) (string, string, stri
 	return r.state, r.localPath, r.path
 }
 
+func (m *Manager) DiagnosticRequestHandled(peer, id string) bool {
+	m.diagnostic.mu.Lock()
+	defer m.diagnostic.mu.Unlock()
+	if m.diagnostic.out != nil && time.Now().After(m.diagnostic.out.expires) {
+		if m.diagnostic.out.requestID != "" && m.diagnostic.handled[m.diagnostic.out.peer] == m.diagnostic.out.requestID {
+			delete(m.diagnostic.handled, m.diagnostic.out.peer)
+		}
+		m.diagnostic.out = nil
+		m.diagnostic.state = "EXPIRED"
+	}
+	return validID(peer, 64) && validID(id, 32) && m.diagnostic.handled[peer] == id
+}
+
 func (m *Manager) diagnosticRequestOffer(peer string) string {
 	m.diagnostic.mu.Lock()
 	defer m.diagnostic.mu.Unlock()

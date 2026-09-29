@@ -43,6 +43,9 @@ func TestDiagnosticCollectionReturnsPeerExportInBothRoles(t *testing.T) {
 				if peer != fpA || requestID != id {
 					t.Fatal("request crossed peer or ID")
 				}
+				if b.DiagnosticRequestHandled(peer, requestID) {
+					return nil
+				}
 				exports++
 				return b.QueueDiagnosticForRequest(peer, requestID, []byte(`{}`))
 			}
@@ -69,7 +72,7 @@ func TestDiagnosticCollectionReturnsPeerExportInBothRoles(t *testing.T) {
 				a.pollDiagnostic(context.Background(), server.Client(), address, fpB, func() bool { return true })
 			}
 			state, local, remote := a.DiagnosticRequestStatus(fpB, id)
-			if state != "RECEIVED" || local != "local.json" || remote != "peer.json" || exports != 2 || receives != 1 {
+			if state != "RECEIVED" || local != "local.json" || remote != "peer.json" || exports != 1 || receives != 1 {
 				t.Fatalf("state=%s local=%s remote=%s exports=%d receives=%d", state, local, remote, exports, receives)
 			}
 		})

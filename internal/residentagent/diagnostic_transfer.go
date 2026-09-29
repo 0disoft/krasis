@@ -80,6 +80,9 @@ func (o *Operations) exportDiagnosticForRequest(peer, requestID string) error {
 	if o.updates == nil || !o.updateAuthorized(o.Context(), "", peer) {
 		return peerupdate.ErrDenied
 	}
+	if o.updates.DiagnosticRequestHandled(peer, requestID) {
+		return nil
+	}
 	if _, err := productlog.Export(o.localAppData); err != nil {
 		return err
 	}

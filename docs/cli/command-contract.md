@@ -44,7 +44,7 @@ session 전체를 안전 종료하므로 일반 연결 해제에는 `disconnect`
 `diagnostics collect ALIAS`는 이 PC의 새 진단을 저장하고, 신뢰된 상대에게 상대 자신의 새
 진단을 요청한다. 최대 30초 기다려 양쪽 파일이 이 PC에 저장되면 `saved`를 반환한다.
 시간이 지나도 수신하지 못하면 `pending`과 요청 ID를 반환한다. 이 경우 명령을 다시 시작하지 말고
-`diagnostics collect-status ALIAS REQUEST_ID`로 확인한다. 상대도 g95 이상이어야 한다.
+`diagnostics collect-status ALIAS REQUEST_ID`로 확인한다. 상대도 g96 이상이어야 한다.
 상대가 오프라인이거나 요청이 1분 안에 처리되지 않으면 `EXPIRED`가 된다.
 
 아래 `krasis-lab` 계약은 Phase 0 실험 표면이며 제품 CLI와 호환성 관계가 없다.

@@ -25,7 +25,7 @@ receiver storage acknowledgment, not merely bytes written to a connection.
 
 Tests cover trust rejection, peer binding, duplicate delivery and sanitization.
 Two-PC delivery and native UI presentation require manual verification.
-From generation 95, `diagnostics collect ALIAS` exports this PC's own support
+From generation 96, `diagnostics collect ALIAS` exports this PC's own support
 snapshot and requests a fresh snapshot made on the peer. The request is bound
 to the authenticated peer certificate and a random 32-hex request ID, expires
 after one minute, and is not a general remote-command endpoint. The connector
