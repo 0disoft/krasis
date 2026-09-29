@@ -23,10 +23,11 @@ type UpdateTransferSnapshot struct {
 }
 
 // The directory comes from the native executable location, never the renderer.
-func NewUpdateTransferBridge(ctx context.Context, open func() (UpdateSettingsClient, error), directory, transitionDirectory string) *UpdateSettingsBridge {
+func NewUpdateTransferBridge(ctx context.Context, open func() (UpdateSettingsClient, error), directory, transitionDirectory, probeTransitionDirectory string) *UpdateSettingsBridge {
 	b := NewUpdateSettingsBridge(ctx, open)
 	b.bundleDirectory = directory
 	b.transitionDirectory = transitionDirectory
+	b.probeTransitionDirectory = probeTransitionDirectory
 	return b
 }
 
@@ -130,6 +131,11 @@ func (b *UpdateSettingsBridge) transferCall(peer string, send bool) UpdateTransf
 				return fail("TRANSITION_REQUIRED")
 			}
 			directory = b.transitionDirectory
+		} else if inspection.PeerInfo.Generation < 90 && runtime.Generation >= 91 {
+			if b.probeTransitionDirectory == "" {
+				return fail("TRANSITION_REQUIRED")
+			}
+			directory = b.probeTransitionDirectory
 		}
 		b.transfer = fail("TRANSFER_UNKNOWN")
 		b.transferInstance = runtime.Instance

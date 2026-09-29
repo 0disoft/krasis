@@ -50,7 +50,7 @@ func transferTestBridge() (*UpdateSettingsBridge, *transferClient, string) {
 	c, peer := newSettingsTestClient()
 	c.runtime.Generation = localapi.AgentGeneration
 	f := &transferClient{settingsClient: c, status: peerupdate.Status{State: "IDLE"}}
-	return NewUpdateTransferBridge(context.Background(), func() (UpdateSettingsClient, error) { return f, nil }, "native/bundle", "native/transition"), f, peer
+	return NewUpdateTransferBridge(context.Background(), func() (UpdateSettingsClient, error) { return f, nil }, "native/bundle", "native/transition", "native/probe-transition"), f, peer
 }
 func TestUpdateTransferRefusesMismatchedResidentAgent(t *testing.T) {
 	b, c, peer := transferTestBridge()
@@ -88,7 +88,7 @@ func TestUpdateTransferTracksExactJobAndRuntime(t *testing.T) {
 	}
 }
 
-func TestUpdateTransferChoosesTransitionBundleForPre75Receivers(t *testing.T) {
+func TestUpdateTransferChoosesTransitionBundleForOlderReceivers(t *testing.T) {
 	for _, tc := range []struct {
 		generation int
 		state      string
@@ -97,7 +97,9 @@ func TestUpdateTransferChoosesTransitionBundleForPre75Receivers(t *testing.T) {
 		{60, "ONLINE", "native/transition"},
 		{61, "ONLINE", "native/transition"},
 		{74, "ONLINE", "native/transition"},
-		{75, "ONLINE", "native/bundle"},
+		{75, "ONLINE", "native/probe-transition"},
+		{89, "ONLINE", "native/probe-transition"},
+		{90, "ONLINE", "native/bundle"},
 		{60, "STALE", ""},
 	} {
 		b, c, peer := transferTestBridge()
@@ -117,6 +119,12 @@ func TestUpdateTransferChoosesTransitionBundleForPre75Receivers(t *testing.T) {
 	c.info.Generation = 60
 	if got := b.Send(peer); got.State != "TRANSITION_REQUIRED" || c.sent != 0 {
 		t.Fatalf("missing legacy bundle sent update: %+v", got)
+	}
+	b, c, peer = transferTestBridge()
+	b.probeTransitionDirectory = ""
+	c.info.Generation = 89
+	if got := b.Send(peer); got.State != "TRANSITION_REQUIRED" || c.sent != 0 {
+		t.Fatalf("missing g90 bundle sent update: %+v", got)
 	}
 }
 func TestUpdateTransferSkipsKnownCurrentOrNewerPeer(t *testing.T) {

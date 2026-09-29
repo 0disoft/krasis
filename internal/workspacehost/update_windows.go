@@ -43,6 +43,21 @@ func transitionBundleDirectory(self string) string {
 	return candidate
 }
 
+// The g90 bundle is deliberately free of the attended UIAccess payload so
+// pre-g90 receivers can install it before a newer probe-carrying update.
+func probeTransitionBundleDirectory(self string) string {
+	if filepath.Base(self) != "krasis.exe" {
+		return ""
+	}
+	root := filepath.Dir(filepath.Dir(self))
+	candidate := filepath.Join(root, "g90")
+	info, err := os.Stat(filepath.Join(candidate, "BUILD.json"))
+	if err != nil || !info.Mode().IsRegular() {
+		return ""
+	}
+	return candidate
+}
+
 func prepareUpdatedWorkspace(ctx context.Context, control string, startup productpanel.Startup, launch productpanel.WorkspaceUpdateLaunch) error {
 	revision := ""
 	if info, ok := debug.ReadBuildInfo(); ok {
