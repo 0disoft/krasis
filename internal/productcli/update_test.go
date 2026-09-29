@@ -152,8 +152,11 @@ func TestUpdateVerifyWorksWithoutAgentAndRejectsIncompleteBundle(t *testing.T) {
 
 func TestUpdateSendSelectsCurrentOrTransitionBundle(t *testing.T) {
 	root := t.TempDir()
-	for _, generation := range []int{75, 77} {
+	for _, generation := range []int{75, 77, 90} {
 		bundle := filepath.Join(root, fmt.Sprintf("g%d", generation), "peer-update")
+		if generation == 90 {
+			bundle = filepath.Join(root, "g90")
+		}
 		if err := os.MkdirAll(bundle, 0700); err != nil {
 			t.Fatal(err)
 		}
@@ -168,7 +171,7 @@ func TestUpdateSendSelectsCurrentOrTransitionBundle(t *testing.T) {
 		want       string
 	}{
 		{74, filepath.Join(root, "g75", "peer-update")},
-		{76, filepath.Join(root, "g77", "peer-update")},
+		{76, filepath.Join(root, "g90")},
 	} {
 		client := updateFixture(peer, test.generation)
 		deps := testDependencies(client)
@@ -185,9 +188,10 @@ func TestUpdateSendSelectsCurrentOrTransitionBundle(t *testing.T) {
 
 func TestUpdateSendUsesCurrentFlatPackageLayout(t *testing.T) {
 	root := t.TempDir()
-	current := filepath.Join(root, "g79")
-	transition := filepath.Join(root, "g75", "peer-update")
-	for _, directory := range []string{current, transition} {
+	current := filepath.Join(root, "g94")
+	legacy := filepath.Join(root, "g75", "peer-update")
+	probeTransition := filepath.Join(root, "g90")
+	for _, directory := range []string{current, legacy, probeTransition} {
 		if err := os.MkdirAll(directory, 0700); err != nil {
 			t.Fatal(err)
 		}
@@ -196,11 +200,29 @@ func TestUpdateSendUsesCurrentFlatPackageLayout(t *testing.T) {
 		}
 	}
 	executable := filepath.Join(current, "krasis-cli.exe")
-	if got := currentBundleDirectory(executable, 78); got != current {
-		t.Fatalf("flat bundle = %q, want %q", got, current)
+	peer := strings.Repeat("b", 64)
+	for _, tc := range []struct {
+		generation int
+		want       string
+	}{
+		{74, legacy}, {89, probeTransition}, {90, current},
+	} {
+		client := updateFixture(peer, tc.generation)
+		deps := testDependencies(client)
+		deps.executable = executable
+		var out, errs bytes.Buffer
+		if code := run(context.Background(), []string{"update", "send", "B", "--json"}, &out, &errs, deps); code != ExitOK || errs.Len() != 0 {
+			t.Fatalf("send generation=%d code=%d out=%q err=%q", tc.generation, code, out.String(), errs.String())
+		}
+		if got := client.requests[len(client.requests)-1]; got.Action != "SEND" || got.Directory != tc.want {
+			t.Fatalf("wrong bundle generation=%d request=%+v", tc.generation, got)
+		}
 	}
-	if got := currentBundleDirectory(executable, 74); got != transition {
-		t.Fatalf("transition bundle = %q, want %q", got, transition)
+	if err := os.Remove(filepath.Join(probeTransition, "BUILD.json")); err != nil {
+		t.Fatal(err)
+	}
+	if got := currentBundleDirectory(executable, 89); got != "" {
+		t.Fatal("missing g90 transition accepted", got)
 	}
 }
 

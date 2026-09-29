@@ -20,7 +20,7 @@ Windows가 UIAccess를 부여하려면 EXE에 `uiAccess=true` 매니페스트와
 
 개발 PC에서 `scripts/build-uiaccess-input-probe.ps1`로 빌드하고
 `scripts/sign-uiaccess-input-probe-test.ps1`로 임시 인증서에 서명합니다.
-g91~g93 배포본은 g90 수신기를 통해 기기 업데이트하면 시험 파일 여섯 개를
+g91~g94 배포본은 g90 수신기를 통해 기기 업데이트하면 시험 파일 여섯 개를
 B의 새 `krasis.exe`와 같은 폴더로 전달합니다. g89 수신기에는 먼저
 시험 파일이 없는 g90 전환 버전을 업데이트한 다음 최신 버전을 보내야 합니다.
 파일 전달은 인증서 신뢰 등록이나 시험 실행을 하지 않습니다.

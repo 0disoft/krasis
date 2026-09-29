@@ -53,7 +53,7 @@ Before a driver, test the narrower Windows UIAccess route with the independent
 `experiments/uiaccess-input` probe. The probe's EXE must be signed, trusted and
 installed under an administrator-owned `Program Files` directory; it verifies
 the granted UIAccess token before sending one Escape pair. The developer test
-certificate is never installed automatically. Generations 91 through 93 carry the
+certificate is never installed automatically. Generations 91 through 94 carry the
 signed experiment files in a peer update after the receiver reaches generation
 90. The update stages these files beside the updated UI; it never launches the
 probe or trusts its certificate. This stage has no peer input or resident

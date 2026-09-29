@@ -17,7 +17,7 @@ if (probeCount===probeNames.length) expected.push(...probeNames);
 const uiAccessNames=['KrasisUIAccessProbe-TESTSIGNED.exe','KrasisUIAccessProbe-TESTCERT.cer','TEST-CERT-DETAILS.txt','README.md','install-test.ps1','remove-test.ps1'];
 const uiAccessCount=uiAccessNames.filter(name=>actual.includes(name)).length;
 assert.ok(uiAccessCount===0||uiAccessCount===uiAccessNames.length,'UIAccess test payload must be complete');
-assert.equal(uiAccessCount===uiAccessNames.length,generation>=91&&generation<=93,'Only the attended g91-g93 updates carry the UIAccess test payload');
+assert.equal(uiAccessCount===uiAccessNames.length,generation>=91&&generation<=94,'Only the attended g91-g94 updates carry the UIAccess test payload');
 if (uiAccessCount===uiAccessNames.length) expected.push(...uiAccessNames);
 assert.deepEqual(actual,expected.sort());
 console.log(`UI icon and single-copy ${expected.length}-file update bundle verified.`);

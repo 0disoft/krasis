@@ -39,7 +39,8 @@ disconnect, or quit only the controller while leaving the agent running.
 PIN pairing and left/right placement are available in Workspace. Update SEND is
 explicit from Workspace to the selected trusted peer; no legacy control is
 required on the sender. Keep g75 next to the current generation folder; SEND
-first installs g75 on older receivers, then the three-executable bundle. The Workspace receiver
+first installs g75 on receivers below g75. Keep g90 next to g94; SEND then
+installs g90 on g75–g89 receivers before offering the current bundle. The Workspace receiver
 auto-applies previously permitted updates through the native worker, keeping
 stored trust and permissions and existing directories. New bundles send from
 their own directory; older launchers still use their adjacent `peer-update` folder.

@@ -246,12 +246,16 @@ func currentBundleDirectory(executable string, peerGeneration int) string {
 	if filepath.Base(executable) != "krasis-cli.exe" || !bundleManifestExists(directory) {
 		return ""
 	}
-	if peerGeneration < 75 {
+	if peerGeneration < 90 {
 		root := filepath.Dir(directory)
 		if filepath.Base(directory) == "peer-update" {
 			root = filepath.Dir(root)
 		}
-		directory = filepath.Join(root, "g75", "peer-update")
+		if peerGeneration < 75 {
+			directory = filepath.Join(root, "g75", "peer-update")
+		} else {
+			directory = filepath.Join(root, "g90")
+		}
 	}
 	if !bundleManifestExists(directory) {
 		return ""

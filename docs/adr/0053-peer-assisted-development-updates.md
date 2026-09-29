@@ -151,6 +151,9 @@ Generation 93 selects the adjacent g90 distribution for peers on generations
 This keeps the transition and experiment in the same update UI without asking
 the operator to copy test files or switch the sender to g90. Each send remains
 an explicit click, and a missing g90 distribution fails before transfer.
+Generation 94 applies the same adjacent-g90 selection to `krasis-cli update
+send`, so a terminal client cannot accidentally offer the probe bundle to an
+older receiver. The CLI also fails before transfer if g90 is missing.
 
 Unit tests cover denied and revoked permissions, single-use apply, malformed ZIPs,
 generation checks and integrity checks. Packaged two-PC upgrade, firewall behavior,
