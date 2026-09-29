@@ -27,13 +27,16 @@ var ErrInvalid = errors.New("invalid Krasis update bundle")
 var legacyNames = []string{"krasis.exe", "krasis-agent.exe", "krasis-control.exe", "START-HERE.md", "BUILD.json", "THIRD-PARTY-NOTICES.txt", "SHA256SUMS.txt"}
 var currentNames = []string{"krasis.exe", "krasis-agent.exe", "krasis-cli.exe", "START-HERE.md", "BUILD.json", "THIRD-PARTY-NOTICES.txt", "SHA256SUMS.txt"}
 var probeNames = []string{"KrasisBrokeredProbe-TESTSIGNED.msix", "KrasisBrokeredProbe-TESTCERT.cer"}
+var uiAccessProbeNames = []string{"KrasisUIAccessProbe-TESTSIGNED.exe", "KrasisUIAccessProbe-TESTCERT.cer", "TEST-CERT-DETAILS.txt", "README.md", "install-test.ps1", "remove-test.ps1"}
 
-func selectedNames(base []string, withProbe bool) []string {
-	if !withProbe {
-		return base
-	}
+func selectedNames(base []string, withProbe, withUIAccess bool) []string {
 	selected := append([]string{}, base[:len(base)-1]...)
-	selected = append(selected, probeNames...)
+	if withProbe {
+		selected = append(selected, probeNames...)
+	}
+	if withUIAccess {
+		selected = append(selected, uiAccessProbeNames...)
+	}
 	return append(selected, base[len(base)-1])
 }
 
@@ -81,7 +84,7 @@ func read(source io.ReaderAt, size int64, executable func(string, []byte, string
 		return nil, ErrInvalid
 	}
 	r, err := zip.NewReader(source, size)
-	if err != nil || (len(r.File) != len(legacyNames) && len(r.File) != len(legacyNames)+len(probeNames)) {
+	if err != nil || len(r.File) < len(legacyNames) || len(r.File) > len(legacyNames)+len(probeNames)+len(uiAccessProbeNames) {
 		return nil, ErrInvalid
 	}
 	files := make(map[string][]byte, len(legacyNames))
@@ -115,7 +118,16 @@ func read(source io.ReaderAt, size int64, executable func(string, []byte, string
 	if (files[probeNames[0]] == nil) != (files[probeNames[1]] == nil) {
 		return nil, ErrInvalid
 	}
-	selected := selectedNames(base, files[probeNames[0]] != nil)
+	uiAccessCount := 0
+	for _, name := range uiAccessProbeNames {
+		if files[name] != nil {
+			uiAccessCount++
+		}
+	}
+	if uiAccessCount != 0 && uiAccessCount != len(uiAccessProbeNames) {
+		return nil, ErrInvalid
+	}
+	selected := selectedNames(base, files[probeNames[0]] != nil, uiAccessCount != 0)
 	if len(files) != len(selected) {
 		return nil, ErrInvalid
 	}
@@ -175,6 +187,17 @@ func fileLimit(name string) int64 {
 	if name == probeNames[1] {
 		return 16 << 10
 	}
+	for _, allowed := range uiAccessProbeNames {
+		if name == allowed {
+			if name == uiAccessProbeNames[0] {
+				return 16 << 20
+			}
+			if name == uiAccessProbeNames[1] {
+				return 16 << 10
+			}
+			return maxDocumentBytes
+		}
+	}
 	return 0
 }
 
@@ -212,17 +235,24 @@ func verifyExecutable(name string, data []byte, revision string) error {
 // Stage creates a fresh directory under a caller-owned, protected root. It never
 // overwrites an installed bundle and never uses archive-controlled path names.
 func (b *Bundle) Stage(parent *os.Root, directory string) (err error) {
-	if b == nil || (len(b.files) != len(legacyNames) && len(b.files) != len(legacyNames)+len(probeNames)) || !validHex(directory, 32) {
+	if b == nil || !validHex(directory, 32) {
 		return ErrInvalid
 	}
 	base, err := layout(b.files)
 	if err != nil {
 		return err
 	}
-	selected := base
-	if b.files[probeNames[0]] != nil && b.files[probeNames[1]] != nil {
-		selected = selectedNames(base, true)
-	} else if len(b.files) != len(base) {
+	uiAccessCount := 0
+	for _, name := range uiAccessProbeNames {
+		if b.files[name] != nil {
+			uiAccessCount++
+		}
+	}
+	if (b.files[probeNames[0]] == nil) != (b.files[probeNames[1]] == nil) || (uiAccessCount != 0 && uiAccessCount != len(uiAccessProbeNames)) {
+		return ErrInvalid
+	}
+	selected := selectedNames(base, b.files[probeNames[0]] != nil, uiAccessCount != 0)
+	if len(b.files) != len(selected) {
 		return ErrInvalid
 	}
 	if err = parent.Mkdir(directory, 0700); err != nil {
@@ -297,7 +327,23 @@ func Pack(root interface {
 		return nil, ErrInvalid
 	}
 	if present == len(probeNames) {
-		selected = selectedNames(selected, true)
+		selected = selectedNames(selected, true, false)
+	}
+	uiAccessPresent := 0
+	for _, name := range uiAccessProbeNames {
+		f, err := root.Open(name)
+		if err == nil {
+			uiAccessPresent++
+			f.Close()
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+	}
+	if uiAccessPresent != 0 && uiAccessPresent != len(uiAccessProbeNames) {
+		return nil, ErrInvalid
+	}
+	if uiAccessPresent == len(uiAccessProbeNames) {
+		selected = selectedNames(selected, false, true)
 	}
 	for _, name := range selected {
 		f, err := root.Open(name)

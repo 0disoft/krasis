@@ -138,6 +138,14 @@ that peer reports g75. This avoids sending a format that older receivers
 reject. If g75 is not adjacent, SEND reports a missing transition instead of
 attempting the incompatible bundle.
 
+Generation 90 is an update-format transition. It still sends the ordinary
+bundle accepted by generation 89, but its receiver also accepts six fixed,
+bounded UIAccess experiment files alongside either optional brokered probe
+pair. Each optional set must be complete and checksummed. Received files are
+only staged; peer update never trusts the certificate or runs the experiment.
+Upgrade a generation-89 receiver to generation 90 before sending a bundle
+that includes the UIAccess experiment.
+
 Unit tests cover denied and revoked permissions, single-use apply, malformed ZIPs,
 generation checks and integrity checks. Packaged two-PC upgrade, firewall behavior,
 native GUI relaunch and post-upgrade input require manual verification. No official

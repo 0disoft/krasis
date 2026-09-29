@@ -14,7 +14,7 @@ import (
 func fixture(t *testing.T, mutate func(map[string][]byte), extra string, withProbe ...bool) []byte {
 	t.Helper()
 	includeProbe := len(withProbe) != 0 && withProbe[0]
-	selected := selectedNames(legacyNames, includeProbe)
+	selected := selectedNames(legacyNames, includeProbe, false)
 	files := map[string][]byte{}
 	for _, name := range selected {
 		files[name] = []byte("test fixture")
@@ -208,5 +208,45 @@ func TestProbePayloadStagesAsAnAtomicPair(t *testing.T) {
 				t.Fatal("accepted invalid probe payload")
 			}
 		})
+	}
+}
+
+func TestUIAccessPayloadStagesOnlyAsACompleteSet(t *testing.T) {
+	for _, brokered := range []bool{false, true} {
+		selected := selectedNames(currentNames, brokered, true)
+		data := fixtureLayout(t, selected)
+		bundle, err := read(bytes.NewReader(data), int64(len(data)), func(string, []byte, string) error { return nil })
+		if err != nil {
+			t.Fatalf("brokered=%t: %v", brokered, err)
+		}
+		root, err := os.OpenRoot(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		id := strings.Repeat("d", 32)
+		if err := bundle.Stage(root, id); err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range uiAccessProbeNames {
+			file, err := root.Open(id + "/" + name)
+			if err != nil {
+				t.Fatalf("missing %s: %v", name, err)
+			}
+			file.Close()
+		}
+		root.Close()
+	}
+	for _, missing := range uiAccessProbeNames {
+		files := selectedNames(currentNames, false, true)
+		without := make([]string, 0, len(files)-1)
+		for _, name := range files {
+			if name != missing {
+				without = append(without, name)
+			}
+		}
+		data := fixtureLayout(t, without)
+		if _, err := read(bytes.NewReader(data), int64(len(data)), func(string, []byte, string) error { return nil }); err == nil {
+			t.Fatalf("accepted missing %s", missing)
+		}
 	}
 }
