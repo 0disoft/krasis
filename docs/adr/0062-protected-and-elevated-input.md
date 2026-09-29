@@ -53,8 +53,11 @@ Before a driver, test the narrower Windows UIAccess route with the independent
 `experiments/uiaccess-input` probe. The probe's EXE must be signed, trusted and
 installed under an administrator-owned `Program Files` directory; it verifies
 the granted UIAccess token before sending one Escape pair. The developer test
-certificate is never installed automatically. This stage has no peer input or
-resident helper. If B confirms the same PIN dialog closes, design a separately
+certificate is never installed automatically. Generation 91 carries the
+signed experiment files in a peer update after the receiver reaches generation
+90. The update stages these files beside the updated UI; it never launches the
+probe or trusts its certificate. This stage has no peer input or resident
+helper. If B confirms the same PIN dialog closes, design a separately
 installed input-only helper with authenticated, exact-lease IPC and no arbitrary
 command execution. Preserve the ordinary agent as unelevated. A failed probe
 keeps the existing guard; a successful API return alone is inconclusive.

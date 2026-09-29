@@ -15,8 +15,9 @@ An attended, one-shot `credential-ui-probe` experiment is the sole exception to 
 
 An independent UIAccess probe is also allowed as an attended experiment. It
 requires a separately trusted code signature and an administrator-owned
-installation location. The development certificate and executable are never
-installed by peer update, and the probe sends only one Escape pair after
+installation location. Generation 91 may deliver the test executable and
+public certificate through peer update, but neither is installed, trusted, or
+run by that update. The probe sends only one Escape pair after
 positive broker identification. It is not a resident privileged input path.
 
 ## Input safety

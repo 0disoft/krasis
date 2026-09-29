@@ -49,5 +49,36 @@ if (generation >= 62) {
     names.push(packageName,certificateName);
   }
 }
+// g91 carries one pinned, attended capability test through the normal peer
+// update. Later generations do not silently inherit the development payload.
+// Neither building nor receiving the bundle trusts its certificate or runs it.
+if (generation === 91) {
+  const source = path.resolve('dist/uiaccess-input-probe/9f73fe9980ca-20260929043811');
+  const executableName = 'KrasisUIAccessProbe-TESTSIGNED.exe';
+  const certificateName = 'KrasisUIAccessProbe-TESTCERT.cer';
+  const detailsName = 'TEST-CERT-DETAILS.txt';
+  const expectedHash = 'c4fad81215a94ff67abe99ac1985dcfbb3f5b1e6f252848156debf23c63f98c4';
+  const expectedThumbprint = '6ab1765f3c268d3bdd64a5f2e2a7ebb2071ee036';
+  const executable = fs.readFileSync(path.join(source, executableName));
+  const certificate = fs.readFileSync(path.join(source, certificateName));
+  const details = fs.readFileSync(path.join(source, detailsName), 'utf8').replaceAll('\r', '');
+  const parsedCertificate = new crypto.X509Certificate(certificate);
+  if (crypto.createHash('sha256').update(executable).digest('hex') !== expectedHash ||
+      parsedCertificate.fingerprint.replaceAll(':', '').toLowerCase() !== expectedThumbprint ||
+      Date.parse(parsedCertificate.validTo) <= Date.now() ||
+      details.match(/^EXE SHA256: ([a-f0-9]{64})$/mu)?.[1] !== expectedHash ||
+      details.match(/^Thumbprint: ([A-F0-9]{40})$/mu)?.[1]?.toLowerCase() !== expectedThumbprint) {
+    throw Error('UIAccess test artifact does not match pinned signing evidence');
+  }
+  for (const [name, content] of [
+    [executableName, executable], [certificateName, certificate], [detailsName, Buffer.from(details)],
+    ['README.md', fs.readFileSync('experiments/uiaccess-input/README.md')],
+    ['install-test.ps1', fs.readFileSync('experiments/uiaccess-input/install-test.ps1')],
+    ['remove-test.ps1', fs.readFileSync('experiments/uiaccess-input/remove-test.ps1')],
+  ]) {
+    fs.writeFileSync(path.join(directory, name), content, { flag: 'wx' });
+    names.push(name);
+  }
+}
 fs.writeFileSync(path.join(directory,'SHA256SUMS.txt'),names.map(name=>crypto.createHash('sha256').update(fs.readFileSync(path.join(directory,name))).digest('hex')+'  '+name).join('\n')+'\n');
 execFileSync('go',['test','-v','-count=1','-timeout','60s','-run','^TestWorkspaceUpdatePackage$','./internal/productpanel'],{stdio:'inherit',env:{...process.env,KRASIS_WORKSPACE_UPDATE:path.resolve(directory),KRASIS_UPDATE_REVISION:revision}});

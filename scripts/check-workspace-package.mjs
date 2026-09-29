@@ -14,5 +14,10 @@ const probeNames=['KrasisBrokeredProbe-TESTSIGNED.msix','KrasisBrokeredProbe-TES
 const probeCount=probeNames.filter(name=>actual.includes(name)).length;
 assert.ok(probeCount===0||probeCount===probeNames.length,'Probe package and certificate must appear together');
 if (probeCount===probeNames.length) expected.push(...probeNames);
+const uiAccessNames=['KrasisUIAccessProbe-TESTSIGNED.exe','KrasisUIAccessProbe-TESTCERT.cer','TEST-CERT-DETAILS.txt','README.md','install-test.ps1','remove-test.ps1'];
+const uiAccessCount=uiAccessNames.filter(name=>actual.includes(name)).length;
+assert.ok(uiAccessCount===0||uiAccessCount===uiAccessNames.length,'UIAccess test payload must be complete');
+assert.equal(uiAccessCount===uiAccessNames.length,generation===91,'Only the attended g91 update carries the UIAccess test payload');
+if (uiAccessCount===uiAccessNames.length) expected.push(...uiAccessNames);
 assert.deepEqual(actual,expected.sort());
 console.log(`UI icon and single-copy ${expected.length}-file update bundle verified.`);
