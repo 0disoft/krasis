@@ -140,6 +140,7 @@ type stubClient struct {
 	updateFn     func(localapi.UpdateRequest) (localapi.UpdateResult, error)
 	clipboardFn  func(localapi.ClipboardRequest) (localapi.ClipboardResult, error)
 	diagnosticFn func(string) (localapi.DiagnosticTransferResult, error)
+	collectionFn func(localapi.DiagnosticCollectionRequest) (localapi.DiagnosticCollectionResult, error)
 }
 
 func (client *stubClient) Status(context.Context) (localapi.Status, error) { return client.status, nil }
@@ -170,6 +171,12 @@ func (client *stubClient) SendDiagnostic(_ context.Context, peer string) (locala
 		return client.diagnosticFn(peer)
 	}
 	return localapi.DiagnosticTransferResult{Code: "rejected"}, nil
+}
+func (client *stubClient) CollectDiagnostic(_ context.Context, request localapi.DiagnosticCollectionRequest) (localapi.DiagnosticCollectionResult, error) {
+	if client.collectionFn != nil {
+		return client.collectionFn(request)
+	}
+	return localapi.DiagnosticCollectionResult{Code: "rejected"}, nil
 }
 func (client *stubClient) Clipboard(_ context.Context, request localapi.ClipboardRequest) (localapi.ClipboardResult, error) {
 	if client.clipboardFn != nil {

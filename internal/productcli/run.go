@@ -30,6 +30,7 @@ type apiClient interface {
 	Runtime(context.Context) (localapi.RuntimeInfo, error)
 	Update(context.Context, localapi.UpdateRequest) (localapi.UpdateResult, error)
 	SendDiagnostic(context.Context, string) (localapi.DiagnosticTransferResult, error)
+	CollectDiagnostic(context.Context, localapi.DiagnosticCollectionRequest) (localapi.DiagnosticCollectionResult, error)
 	Clipboard(context.Context, localapi.ClipboardRequest) (localapi.ClipboardResult, error)
 	Status(context.Context) (localapi.Status, error)
 	Diagnostics(context.Context) (localapi.Diagnostics, error)
@@ -279,10 +280,10 @@ func validateCommandArgs(args []string) error {
 			return usageError(args[0] + " accepts no arguments")
 		}
 	case "diagnostics":
-		if len(args) == 1 || len(args) == 2 && (args[1] == "export" || args[1] == "status") || len(args) == 3 && args[1] == "send" && validAlias(args[2]) {
+		if len(args) == 1 || len(args) == 2 && (args[1] == "export" || args[1] == "status") || len(args) == 3 && (args[1] == "send" || args[1] == "collect") && validAlias(args[2]) || len(args) == 4 && args[1] == "collect-status" && validAlias(args[2]) && validHex(args[3], 32) {
 			return nil
 		}
-		return usageError("diagnostics requires export, status, or send ALIAS")
+		return usageError("diagnostics requires export, status, send ALIAS, collect ALIAS, or collect-status ALIAS ID")
 	case "connect":
 		if len(args) != 2 || !validAlias(args[1]) {
 			return usageError("connect requires a valid peer alias")
@@ -484,6 +485,17 @@ func writeHuman(output io.Writer, value any) {
 		}
 		if item.Transfer != "" {
 			fmt.Fprintf(output, "Latest transfer: %s\n", item.Transfer)
+		}
+	case diagnosticCollectionResult:
+		fmt.Fprintf(output, "Diagnostics: %s\nPeer: %s\n", item.Code, item.PeerAlias)
+		if item.ID != "" {
+			fmt.Fprintf(output, "Request: %s\n", item.ID)
+		}
+		if item.LocalPath != "" {
+			fmt.Fprintf(output, "This PC: %s\n", item.LocalPath)
+		}
+		if item.PeerPath != "" {
+			fmt.Fprintf(output, "Peer copy: %s\n", item.PeerPath)
 		}
 	case localapi.Trust:
 		fmt.Fprintf(output, "Trust revision: %d\n", item.Revision)

@@ -25,6 +25,16 @@ receiver storage acknowledgment, not merely bytes written to a connection.
 
 Tests cover trust rejection, peer binding, duplicate delivery and sanitization.
 Two-PC delivery and native UI presentation require manual verification.
+From generation 95, `diagnostics collect ALIAS` exports this PC's own support
+snapshot and requests a fresh snapshot made on the peer. The request is bound
+to the authenticated peer certificate and a random 32-hex request ID, expires
+after one minute, and is not a general remote-command endpoint. The connector
+posts the request when it initiated collection; otherwise it polls the
+listener's request offer. The peer exports only its own allowlisted event log,
+then returns it over the existing diagnostic transfer route with that request
+ID. The requester reports success only after storing the matching response.
+Duplicate polls retain one outgoing response. A lost START response is not
+automatically retried, and a pending result can be checked by request ID.
 From generation 73, each local log is capped at 1 MiB with one previous file;
 runtime summaries are recorded once per minute and on session shutdown. This
 extends the event history without claiming a fixed retention duration. A g72

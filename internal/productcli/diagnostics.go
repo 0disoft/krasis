@@ -39,6 +39,9 @@ func dispatchDiagnostics(ctx context.Context, client apiClient, args []string) (
 		value, err := client.Diagnostics(ctx)
 		return value, ExitOK, err
 	}
+	if len(args) >= 2 && (args[0] == "collect" || args[0] == "collect-status") {
+		return collectDiagnostics(ctx, client, args)
+	}
 	result := diagnosticTransferResult{SchemaVersion: diagnosticTransferSchema, Code: "unavailable"}
 	if len(args) == 1 && args[0] == "status" {
 		status, err := client.Update(ctx, localapi.UpdateRequest{Schema: localapi.UpdateSchema, Action: "STATUS"})

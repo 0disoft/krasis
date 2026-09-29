@@ -206,6 +206,8 @@ func (handler *handler) ServeHTTP(response http.ResponseWriter, request *http.Re
 		handler.clipboard(response, request)
 	case "/v1/diagnostic-transfer":
 		handler.diagnosticTransfer(response, request)
+	case "/v1/diagnostic-collection":
+		handler.diagnosticCollection(response, request)
 	case "/v1/runtime":
 		if request.Method != http.MethodGet {
 			writeMethodNotAllowed(response)

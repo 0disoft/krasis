@@ -26,6 +26,13 @@ JSON은 `krasis.cli.doctor/v1`이다. 연결이 끊긴 상태면 exit `7`, proto
 진단 전송 상태를 보여줄 뿐 특정 상대의 수신 확인은 아니다. 두 명령의 JSON은
 `krasis.cli.diagnostic-transfer/v1`이다.
 
+`diagnostics collect ALIAS`는 이 PC의 새 파일과 상대가 자신의 로그로 새로 만든 파일을
+이 PC에 저장한다. JSON `krasis.cli.diagnostics-collection/v1`의 `saved`와 exit `0`은
+`localPath`, `peerPath`가 모두 확인된 때만 반환한다. `pending`은 완료가 아니며 exit `7`이다.
+`id`로 `diagnostics collect-status ALIAS ID`를 조회한다. 인증된 상대 기기 외에는
+원격 요청을 보내지 않고, 응답 유실 시 START를 자동 재실행하지 않는다. 각 기기의
+`support-latest.json`과 이 PC의 `support-peer-<fingerprint>.json`은 다음 내보내기로 교체될 수 있다.
+
 `krasis-cli update status`는 로컬 전송 상태를, `update status ALIAS`는 신뢰된 상대의
 관측 버전·업데이트 수신 허용·현재 전송 상태를 조회한다. 상대 정보가 오래됐으면 버전을 추측하지
 않고 `peerState: STALE` 또는 `UNKNOWN`으로 표시한다. 상대 상태 JSON은

@@ -1,6 +1,7 @@
 package peerupdate
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -25,6 +26,75 @@ func TestDiagnosticPeerBindingAndReceipt(t *testing.T) {
 	m.diagnosticDone(offer.id, "SENT")
 	if m.Status().Diagnostic != "SENT" {
 		t.Fatal("receipt missing")
+	}
+}
+
+func TestDiagnosticCollectionReturnsPeerExportInBothRoles(t *testing.T) {
+	for _, requesterListens := range []bool{true, false} {
+		t.Run(map[bool]string{true: "requester_listens", false: "peer_listens"}[requesterListens], func(t *testing.T) {
+			a, b := testManager(t), testManager(t)
+			fpA, fpB := strings.Repeat("a", 64), strings.Repeat("b", 64)
+			id, err := a.QueueDiagnosticRequest(fpB, "local.json")
+			if err != nil {
+				t.Fatal(err)
+			}
+			exports, receives := 0, 0
+			b.ExportDiagnostic = func(peer, requestID string) error {
+				if peer != fpA || requestID != id {
+					t.Fatal("request crossed peer or ID")
+				}
+				exports++
+				return b.QueueDiagnosticForRequest(peer, requestID, []byte(`{}`))
+			}
+			a.ReceiveDiagnostic = func(peer string, data []byte) (string, error) {
+				if peer != fpB || string(data) != `{}` {
+					t.Fatal("response crossed peer")
+				}
+				receives++
+				return "peer.json", nil
+			}
+			if requesterListens {
+				server := httptest.NewTLSServer(a.handler(fpB, func() bool { return true }))
+				defer server.Close()
+				address := strings.TrimPrefix(server.URL, "https://")
+				b.pollDiagnosticRequest(context.Background(), server.Client(), address, fpA, func() bool { return true })
+				b.pollDiagnosticRequest(context.Background(), server.Client(), address, fpA, func() bool { return true })
+				b.pollDiagnostic(context.Background(), server.Client(), address, fpA, func() bool { return true })
+			} else {
+				server := httptest.NewTLSServer(b.handler(fpA, func() bool { return true }))
+				defer server.Close()
+				address := strings.TrimPrefix(server.URL, "https://")
+				a.pushDiagnosticRequest(context.Background(), server.Client(), address, fpB, func() bool { return true })
+				a.pushDiagnosticRequest(context.Background(), server.Client(), address, fpB, func() bool { return true })
+				a.pollDiagnostic(context.Background(), server.Client(), address, fpB, func() bool { return true })
+			}
+			state, local, remote := a.DiagnosticRequestStatus(fpB, id)
+			if state != "RECEIVED" || local != "local.json" || remote != "peer.json" || exports != 2 || receives != 1 {
+				t.Fatalf("state=%s local=%s remote=%s exports=%d receives=%d", state, local, remote, exports, receives)
+			}
+		})
+	}
+}
+
+func TestDiagnosticCollectionRejectsUnmatchedResponseAndRevokedPeer(t *testing.T) {
+	a := testManager(t)
+	fp := strings.Repeat("b", 64)
+	id, err := a.QueueDiagnosticRequest(fp, "local.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.ReceiveDiagnostic = func(string, []byte) (string, error) { t.Fatal("unmatched response stored"); return "", nil }
+	if err := a.receiveDiagnostic(fp, strings.Repeat("c", 32), strings.Repeat("d", 32), strings.NewReader(`{}`), func() bool { return true }); err == nil {
+		t.Fatal("unmatched response accepted")
+	}
+	if state, _, _ := a.DiagnosticRequestStatus(fp, id); state != "PENDING" {
+		t.Fatal(state)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/v1/diagnostic-request", nil)
+	w := httptest.NewRecorder()
+	a.handler(fp, func() bool { return false }).ServeHTTP(w, req)
+	if w.Code != http.StatusForbidden || w.Header().Get("X-Krasis-Request-ID") != "" {
+		t.Fatalf("revoked peer received request: %d", w.Code)
 	}
 }
 func TestDiagnosticQueueAcceptsExtendedSupport(t *testing.T) {

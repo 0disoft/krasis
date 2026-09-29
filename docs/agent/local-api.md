@@ -29,6 +29,7 @@ clipboard, environment 또는 UI projection에 복제하지 않는다.
 | `POST` | `/v1/disconnect` | active runner cancel과 최대 5초 wait |
 | `POST` | `/v1/pair` | `LISTEN`, `DIAL`, `STATUS`, `CONFIRM`, `CANCEL` product pairing workflow |
 | `GET` | `/v1/diagnostics` | stable code별 aggregate counter와 마지막 state |
+| `POST` | `/v1/diagnostic-collection` | 신뢰된 peer 지문으로 양쪽 정제 진단 수집 START, 요청 ID별 STATUS |
 | `GET` | `/v1/trust` | fingerprint, alias, role, inbound capability와 revoked 상태의 redacted projection |
 | `POST` | `/v1/trust/revoke` | inactive trusted fingerprint의 atomic local revocation |
 | `GET` | `/v1/topology` | 연결 상태와 non-revoked peer 목록; 저장된 배치가 없으면 `UNCONFIGURED` |
@@ -62,6 +63,9 @@ store 조회 실패는 `FAILED/trust_store_unavailable`이며 자동 승인하�
 `status`와 diagnostics는 private key, certificate body, transport address, target token, session·lease·epoch,
 raw input, path와 internal error를 반환하지 않는다. active-lease exact revoke operation은
 `docs/agent/management-contract.md` 계약을 이 transport 위에서 사용한다.
+별도 `/v1/diagnostic-collection`은 인증된 로컬 CLI에만 두 저장 파일의 경로를 반환한다.
+START는 이 PC의 로그를 내보내고 인증된 상대에게 1분짜리 요청을 건다. STATUS는 같은 지문과
+32자리 요청 ID가 일치할 때만 `PENDING`, `RECEIVED`, `EXPIRED`와 경로를 반환한다.
 
 ## 안정 코드
 

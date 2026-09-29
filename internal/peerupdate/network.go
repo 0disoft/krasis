@@ -64,6 +64,8 @@ func (m *Manager) Run(ctx context.Context, address, peer string, listener bool, 
 				continue
 			}
 			m.pollDiagnostic(ctx, client, address, peer, authorized)
+			m.pushDiagnosticRequest(ctx, client, address, peer, authorized)
+			m.pollDiagnosticRequest(ctx, client, address, peer, authorized)
 			m.pollClipboard(ctx, client, address, peer, authorized)
 			if offer := m.offered(peer); offer != nil {
 				progress := &progressReader{Reader: bytes.NewReader(offer.data), update: func(n int64) { m.progress(peer, offer.id, "SENDING", n, int64(len(offer.data))) }}
@@ -162,6 +164,8 @@ func (m *Manager) handler(peer string, authorized func() bool) http.Handler {
 			m.clipboardHTTP(w, r, peer, authorized)
 		case r.URL.Path == "/v1/diagnostic-transfer":
 			m.diagnosticHTTP(w, r, peer, authorized)
+		case r.URL.Path == "/v1/diagnostic-request":
+			m.diagnosticRequestHTTP(w, r, peer, authorized)
 		case r.URL.Path == "/v2/status" && r.Method == http.MethodPost:
 			if r.Header.Get("Content-Type") != "application/json" {
 				w.WriteHeader(http.StatusBadRequest)

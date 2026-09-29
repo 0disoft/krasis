@@ -89,3 +89,66 @@ func TestDiagnosticStatusIsGlobalAndReadOnly(t *testing.T) {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 }
+
+func TestDiagnosticCollectReportsBothSavedFiles(t *testing.T) {
+	peer := strings.Repeat("b", 64)
+	client := updateFixture(peer, 95)
+	id := strings.Repeat("c", 32)
+	starts, statuses := 0, 0
+	client.collectionFn = func(request localapi.DiagnosticCollectionRequest) (localapi.DiagnosticCollectionResult, error) {
+		if request.Peer != peer {
+			t.Fatal("wrong peer")
+		}
+		if request.Action == "START" {
+			starts++
+			return localapi.DiagnosticCollectionResult{Code: "queued", ID: id, LocalPath: "A.json"}, nil
+		}
+		if request.Action == "STATUS" && request.ID == id {
+			statuses++
+			return localapi.DiagnosticCollectionResult{Code: "ok", ID: id, State: "RECEIVED", LocalPath: "A.json", PeerPath: "B.json"}, nil
+		}
+		t.Fatal("unexpected collection request")
+		return localapi.DiagnosticCollectionResult{}, nil
+	}
+	var stdout, stderr bytes.Buffer
+	code := run(context.Background(), []string{"diagnostics", "collect", "B", "--json"}, &stdout, &stderr, testDependencies(client))
+	var result diagnosticCollectionResult
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if code != ExitOK || result.Code != "saved" || result.LocalPath != "A.json" || result.PeerPath != "B.json" || starts != 1 || statuses != 1 || stderr.Len() != 0 {
+		t.Fatalf("code=%d result=%+v starts=%d statuses=%d stderr=%q", code, result, starts, statuses, stderr.String())
+	}
+}
+
+func TestDiagnosticCollectUncertainStartNeverRetries(t *testing.T) {
+	peer := strings.Repeat("b", 64)
+	client := updateFixture(peer, 95)
+	calls := 0
+	client.collectionFn = func(request localapi.DiagnosticCollectionRequest) (localapi.DiagnosticCollectionResult, error) {
+		calls++
+		return localapi.DiagnosticCollectionResult{}, errors.New("private path")
+	}
+	var stdout, stderr bytes.Buffer
+	code := run(context.Background(), []string{"diagnostics", "collect", "B", "--json"}, &stdout, &stderr, testDependencies(client))
+	if code != ExitUnsafeState || calls != 1 || !strings.Contains(stdout.String(), `"code":"outcome_unknown"`) || strings.Contains(stdout.String(), "private path") || stderr.Len() != 0 {
+		t.Fatalf("code=%d calls=%d stdout=%q stderr=%q", code, calls, stdout.String(), stderr.String())
+	}
+}
+
+func TestDiagnosticCollectStatusDoesNotStartAnotherExport(t *testing.T) {
+	peer := strings.Repeat("b", 64)
+	client := updateFixture(peer, 95)
+	id := strings.Repeat("c", 32)
+	client.collectionFn = func(request localapi.DiagnosticCollectionRequest) (localapi.DiagnosticCollectionResult, error) {
+		if request.Action != "STATUS" || request.Peer != peer || request.ID != id {
+			t.Fatal("status started work")
+		}
+		return localapi.DiagnosticCollectionResult{Code: "ok", State: "PENDING", LocalPath: "A.json"}, nil
+	}
+	var stdout, stderr bytes.Buffer
+	code := run(context.Background(), []string{"diagnostics", "collect-status", "B", id, "--json"}, &stdout, &stderr, testDependencies(client))
+	if code != ExitUnsafeState || !strings.Contains(stdout.String(), `"code":"pending"`) || !strings.Contains(stdout.String(), `"localPath":"A.json"`) || stderr.Len() != 0 {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+}

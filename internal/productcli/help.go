@@ -26,6 +26,8 @@ func commandHelp() helpResult {
 		{"diagnostics status", "Read latest local diagnostic transfer state", true, false},
 		{"diagnostics export", "Save sanitized local support file", false, true},
 		{"diagnostics send ALIAS", "Queue sanitized diagnostics to a trusted peer", true, true},
+		{"diagnostics collect ALIAS", "Export both PCs' diagnostics to this PC", true, true},
+		{"diagnostics collect-status ALIAS ID", "Read a collection request's progress", true, false},
 		{"trust list", "List trusted devices", true, false},
 		{"connection show ALIAS", "Read saved peer address and exit edge", true, false},
 		{"credential show LISTENER|CONNECTOR", "Read local credential status", true, false},
