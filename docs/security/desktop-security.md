@@ -13,6 +13,12 @@ The resident agent, UI, CLI, launcher, and crash guard run without elevation in 
 
 An attended, one-shot `credential-ui-probe` experiment is the sole exception to the no-elevation rule. The destination device's local tray menu can request UAC for this one-shot command; the user must approve locally. It exits before resident startup, identifies only a foreground `CredentialUIBroker.exe` on the Default desktop, and sends a single Escape press/release. It does not read credential content or enable elevated peer input. A successful observation does not change the supported product boundary.
 
+An independent UIAccess probe is also allowed as an attended experiment. It
+requires a separately trusted code signature and an administrator-owned
+installation location. The development certificate and executable are never
+installed by peer update, and the probe sends only one Escape pair after
+positive broker identification. It is not a resident privileged input path.
+
 ## Input safety
 
 The destination must prepare before source suppression starts. Exact session, lease, epoch, and sequence identity govern every active-control transition. Disconnect, timeout, lifecycle termination, injection uncertainty, stale traffic, local emergency release, or component failure revokes control, disables suppression, attempts `ReleaseAll`, and converges to `LOCAL` or an explicit fault state.
