@@ -92,8 +92,61 @@ investigate a separately installed SYSTEM input process with active-desktop
 ownership rather than broadening the ordinary agent or weakening the PIN guard.
 The generation-98 update carries the pinned, separately test-signed probe and
 its installation/removal scripts beside the product executables. Delivery does
-not install the probe, trust its certificate or run the trial. B's observed
-desktop-binding result and PIN response remain pending.
+not install the probe, trust its certificate or run the trial.
+
+The attended g98 trial on GRAM13 returned `escape_send_failed`; the B tester
+directly confirmed process exit code 4. The operator reported successful
+input-desktop binding, the worker already being on the same desktop, and the
+PIN dialog not closing after the trial. The six files, EXE hash, certificate
+thumbprint, signer and expiry matched the independently supplied values;
+installation returned 0, the installed signature was Valid, and execution was
+unelevated. The operator manually closed the PIN dialog, but whether this
+happened after all result items were recorded is unknown. Removal returned 0;
+the installed directory, executable, Root/TrustedPublisher certificate and
+trial process were checked absent.
+
+This rules out desktop binding alone as the fix for the tested path. The g98
+code returns 4 when the primary `SendInput` call accepts fewer than two events;
+it did not retain the accepted count or last error. Do not infer zero accepted
+events, a particular Windows error, or a proven UIPI cause from this code. The
+next probe records the primary accepted count and immediate `GetLastError`
+before cleanup, plus the cleanup key-up accepted count. Even these values do
+not identify UIPI blocking, and API acceptance still does not prove delivery.
+
+## Next bounded SYSTEM trial
+
+Desktop attachment no longer warrants another ordinary-user UIAccess-only
+trial. Deskflow's elevated watchdog branch duplicates the token of the active
+session's `winlogon.exe`, sets TokenUIAccess and launches its input process.
+Its unelevated branch uses the user's token instead. Which branch was active
+in the operator's successful Deskflow run is not yet established.
+
+Prepare a separate, attended service-launch experiment before changing the
+product. Its acceptance contract is:
+
+- A locally approved administrator installation uses a pinned executable in
+  an administrator-owned Program Files directory. No automatic trust or
+  service registration occurs through the peer update.
+- A demand-start, one-shot service launches only its fixed input probe into
+  the locally selected, current console session. No remote input, arbitrary
+  executable, command, PID, token source or session selector is accepted.
+- Verify SYSTEM identity, expected session, granted UIAccess and Default
+  desktop in the child before the single Escape pair; recheck session and
+  foreground broker immediately before input. Other desktops remain excluded.
+- Do not turn the service itself into an interactive GUI. Keep the privileged
+  child's result to numeric API metadata and fixed result codes; no network,
+  clipboard, PIN, window text or screen capture is part of the experiment.
+- Bound target observation and process lifetime. Service stop, session change
+  and timeout terminate only the child handle created by this trial, without
+  restarting it or executing queued input later. Installation and removal
+  must verify exact ownership, reject existing conflicting services and files,
+  and confirm that the child and service are gone before deleting files.
+- Include primary input acceptance, last error and cleanup acceptance in the
+  report, together with the operator's actual PIN response. A local Escape
+  success is a prerequisite, not proof of A-to-B elevated/PIN input support.
+
+No SYSTEM service experiment has been implemented, installed or accepted by
+this evidence update. Keep the resident product unelevated and its guard active.
 
 ## Acceptance sequence
 

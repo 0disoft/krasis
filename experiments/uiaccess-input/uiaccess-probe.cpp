@@ -58,7 +58,13 @@ void report(const wchar_t* message) {
     MessageBoxW(nullptr, message, L"Krasis UIAccess 입력 시험", MB_OK | MB_ICONINFORMATION);
 }
 
-bool sendEscape() {
+struct EscapeResult {
+    UINT accepted = 0;
+    DWORD error = ERROR_SUCCESS;
+    UINT releaseAccepted = 0;
+};
+
+EscapeResult sendEscape() {
     INPUT events[2]{};
     for (auto& event : events) {
         event.type = INPUT_KEYBOARD;
@@ -68,17 +74,23 @@ bool sendEscape() {
         event.ki.dwExtraInfo = 0;
     }
     events[1].ki.dwFlags |= KEYEVENTF_KEYUP;
-    const UINT sent = SendInput(2, events, sizeof(INPUT));
-    if (sent == 2) return true;
+    EscapeResult result;
+    SetLastError(ERROR_SUCCESS);
+    result.accepted = SendInput(2, events, sizeof(INPUT));
+    // Capture the primary call's error before cleanup can overwrite it.
+    if (result.accepted == 2) return result;
+    result.error = GetLastError();
     // A partial batch must not leave Escape pressed.
-    SendInput(1, &events[1], sizeof(INPUT));
-    return false;
+    result.releaseAccepted = SendInput(1, &events[1], sizeof(INPUT));
+    return result;
 }
 
 struct DesktopTrial {
     HWND target;
     bool alreadyDefault = false;
     bool bound = false;
+    bool inputAttempted = false;
+    EscapeResult escape;
 };
 
 DWORD WINAPI inputDesktopTrial(void* parameter) {
@@ -98,7 +110,9 @@ DWORD WINAPI inputDesktopTrial(void* parameter) {
             // Recheck identity, foreground and active desktop after binding.
             if (credentialBrokerForeground(trial.target)) {
                 result = 4;
-                if (sendEscape()) {
+                trial.inputAttempted = true;
+                trial.escape = sendEscape();
+                if (trial.escape.accepted == 2) {
                     Sleep(1000);
                     result = IsWindow(trial.target) && IsWindowVisible(trial.target) ? 5 : 0;
                 }
@@ -125,8 +139,10 @@ void reportTrial(DWORD result, const DesktopTrial& trial) {
     case 10: message = L"input_desktop_cleanup_failed: 데스크톱 복구에 실패했습니다. 시험 프로그램을 종료합니다."; break;
     }
     wchar_t details[768]{};
-    swprintf_s(details, L"%s\n\n입력 데스크톱 연결: %s\n시험 스레드가 원래도 같은 데스크톱: %s\n\n결과를 확인한 뒤 B 터치패드로 이 창을 닫으세요.",
-        message, trial.bound ? L"성공" : L"실패", trial.alreadyDefault ? L"예" : L"아니요");
+    swprintf_s(details, L"%s\n\n입력 데스크톱 연결: %s\n시험 스레드가 원래도 같은 데스크톱: %s\nEsc 전송 시도: %s\nEsc 입력 수락: %u / 2\nWin32 오류 번호: %lu\n실패 후 키 뗌 수락: %u / 1\n\n오류 번호만으로 Windows의 차단 원인을 확정할 수 없습니다.\n결과를 확인한 뒤 B 터치패드로 이 창을 닫으세요.",
+        message, trial.bound ? L"성공" : L"실패", trial.alreadyDefault ? L"예" : L"아니요",
+        trial.inputAttempted ? L"예" : L"아니요", trial.escape.accepted, trial.escape.error,
+        trial.escape.releaseAccepted);
     report(details);
 }
 
