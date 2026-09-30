@@ -223,6 +223,10 @@ operator SID/session, foreground target and lifetime restrictions still apply.
 Local x64 compilation, bootstrap manifest extraction and process-creation
 refusal checks passed for uninstalled service, worker and invalid invocations
 (code 12, no service or input). B's attended token comparison remains pending.
+Generation 101 stages the independently pinned, test-signed comparison through
+the existing six-file update transport. Receiving the update neither trusts the
+certificate nor installs or starts the service; B's local attended procedure
+is still required. Its actual token launch and PIN response are unverified.
 
 ## Acceptance sequence
 
