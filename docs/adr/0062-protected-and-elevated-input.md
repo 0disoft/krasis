@@ -331,6 +331,34 @@ generation 102 remain unchanged.
 
 ## Acceptance sequence
 
+An attended B retry without Computer Use then established current Deskflow
+success: the operator reported A-to-B pointer motion and Escape dismissal of
+the same Chrome credential PIN dialog, with no B touchpad intervention. The
+core PID remained 21232 before, during and after the trial. Read-only elevated
+queries while the dialog was open observed process/token session 1/1, integrity
+RID 16384 (System), elevation true/type 1 (Default), UIAccess true, SYSTEM true,
+and no restricted token or AppContainer. Unelevated metadata queries failed
+with error 5; that is not evidence of input denial. The actual core was
+1.26.0.0, NotSigned, SHA-256
+F2C8E5640081929242B3A1FEC492470EF0188AABC584ED636FF30A6171A8D99B.
+Windows remained 26100.9457. Krasis was already disconnected; the comparator
+did not alter connections or settings. This establishes a working contemporary
+comparator, not the specific cause of the earlier Krasis refusal.
+
+The next trial retains the g102 token and input mechanism. It adds read-only
+TokenIntegrityLevel, TokenElevation, TokenElevationType, UIAccess, session,
+restriction and AppContainer evidence. The input window callback snapshots
+both the process token and the effective thread token immediately before its
+single Escape attempt, then rechecks the fixed target. ERROR_NO_TOKEN on the
+thread means the process token is effective; other access errors stay unknown.
+Each unavailable field is JSON null, with a numeric first queryError, rather
+than an invented false/zero. Reporting-time process metadata is separate from
+input-time process/effective metadata. No SID, token privileges, PIN, window
+text or clipboard is serialized. A no-input local smoke checks real read-only
+queries and invalid-handle unknown serialization. B must run the attended
+trial without Computer Use calls while it is active; this removes a comparison
+variable without claiming such calls caused any earlier failure.
+
 1. Build a one-shot, destination-local probe with no peer/network input path.
    It sends only a bounded Escape press/release to a positively identified
    foreground target. Test an elevated PowerShell window and the observed

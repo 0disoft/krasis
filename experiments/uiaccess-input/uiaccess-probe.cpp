@@ -103,6 +103,7 @@ struct DesktopTrial {
     bool messageHandled = false;
     UINT downAccepted = 0;
     UINT upAccepted = 0;
+    system_trial::InputTokenEvidence inputTokens;
 #endif
 };
 
@@ -137,6 +138,7 @@ DWORD WINAPI inputDesktopTrial(void* parameter) {
                 trial.messageHandled = queued.messageHandled;
                 trial.downAccepted = queued.downAccepted;
                 trial.upAccepted = queued.upAccepted;
+                trial.inputTokens = queued.inputTokens;
                 trial.inputAttempted = queued.attempted;
                 trial.escape = {queued.downAccepted + queued.upAccepted, queued.error, queued.releaseAccepted};
                 result = queued.code;
@@ -165,7 +167,8 @@ void reportTrial(DWORD result, const DesktopTrial& trial) {
 #ifdef KRASIS_SYSTEM_TRIAL
     system_trial::writeEvidence(L"result.json", result, trial.escape.error, trial.bound,
         trial.alreadyDefault, trial.inputAttempted, trial.escape.accepted, trial.escape.releaseAccepted,
-        false, trial.queueReady, trial.hiddenWindowCreated, trial.messageHandled, trial.downAccepted, trial.upAccepted);
+        false, trial.queueReady, trial.hiddenWindowCreated, trial.messageHandled, trial.downAccepted, trial.upAccepted,
+        trial.inputTokens);
 #else
     const wchar_t* message = L"input_thread_failed: 입력 시험 스레드를 실행하지 못했습니다.";
     switch (result) {

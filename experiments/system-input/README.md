@@ -17,6 +17,15 @@ g102는 같은 토큰 경로를 유지하면서 데스크톱 메시지 큐와 **
 만들고, 자체 메시지 처리 중 Esc 누름·뗌을 한 이벤트씩 전송합니다.
 토큰 선택이나 창 준비가 실패하면 이전 경로로 대체하지 않습니다.
 
+다음 계측 시험은 같은 입력 경로를 유지하고 실제 입력 순간의 무결성 RID·상승 여부를
+추가로 확인합니다. Deskflow의 같은 PIN 창 제어는 Computer Use 없는 재시험에서
+System RID 16384·상승 true·UIAccess true 조건으로 성공했습니다. 기존 g102 자식의
+무결성 RID는 미측정이므로 아직 실패 원인을 단정하지 않습니다.
+
+**시험이 끝날 때까지 Computer Use·UI 자동화·화면 캡처·창 텍스트 조회를 호출하지 마세요.**
+PIN 창과 Esc 반응은 제로디가 직접 확인합니다. 결과 JSON과 서비스 상태는 터미널로만
+조회합니다. 서비스 시작 전에 안내를 모두 읽고, 실제 반응 확인 후 결과를 읽으세요.
+
 g102 기기 업데이트는 기존 수신기와 호환되는 여섯 파일 묶음으로 비교 시험을 전달합니다.
 EXE 파일명은 수신기 호환을 위해 `KrasisUIAccessProbe-TESTSIGNED.exe`를 유지합니다.
 g98의 일반 사용자 시험과 실행·설치 방법이 다르므로 이 안내문을 따르세요.
@@ -65,6 +74,17 @@ SYSTEM 프로세스는 창을 표시·활성화하지 않습니다. 준비된 �
    `winlogonTokenLaunched`는 서비스 결과에서만 자식 생성 성공을 뜻합니다.
    서비스의 `uiAccess`·데스크톱·입력 값은 서비스 자신의 상태입니다.
    입력 자식의 실제 값은 `result.json`에서 확인하며, 서비스 값과 합치지 않습니다.
+   새 계측의 `reportProcessToken`은 결과를 쓰는 순간의 프로세스 상태입니다.
+   `inputTokenCaptured`, `inputProcessToken`, `inputEffectiveToken`,
+   `inputEffectiveTokenSource`는 입력 callback에서 읽은 값입니다. callback 계측까지
+   도달하지 못하면 `inputTokenCaptured=false`이며 입력 토큰 필드는 null입니다.
+   계측 후 대상 재확인에서 중단되면 captured=true여도 inputAttempted=false일 수 있습니다.
+   각 토큰의 `integrityRid`, `elevated`, `elevationType`, `uiAccess`, `session`,
+   `restricted`, `appContainer`, `queryError`를 보고하세요. 상태 값 0/1은 false/true이며,
+   null은 조회되지 않았거나 실패한 값입니다. `queryError`는 첫 조회 오류 번호입니다.
+   유효 토큰 source가 `process`이면 스레드 impersonation 토큰이 없어서 프로세스
+   토큰을 사용한 것이고, `thread`이면 그 스레드 토큰을 읽은 것입니다. 오류 시에는
+   `unknown`으로 남깁니다. 특히 `result.json`의 입력 순간 RID를 확인하세요.
    `code=0`은 닫힘 후보이며 실제 화면 확인이 필요합니다. `4`는 입력 수락 실패,
    `5`는 창이 계속 열려 있음, `2`는 UIAccess 없음, `3`은 대상 미관측입니다.
    서비스 코드 `20~31`이면 세션·토큰·생성·중단·시간 초과 단계에서 실패한 것입니다.

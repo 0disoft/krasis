@@ -1,5 +1,6 @@
 #pragma once
 #include <windows.h>
+#include "token-evidence.h"
 
 namespace system_trial {
 struct QueuedEscape {
@@ -14,6 +15,7 @@ struct QueuedEscape {
     UINT releaseAccepted = 0;
     DWORD error = 0;
     DWORD code = 33;
+    InputTokenEvidence inputTokens;
 };
 inline constexpr UINT trialMessage = WM_APP + 0x102;
 inline LRESULT CALLBACK trialWindow(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
@@ -30,6 +32,8 @@ inline LRESULT CALLBACK trialWindow(HWND window, UINT message, WPARAM wparam, LP
         trial->messageHandled = true;
         trial->code = 3;
         if (!trial->allowed || !trial->allowed(trial->target)) return 0;
+        trial->inputTokens = captureInputTokens();
+        if (!trial->allowed(trial->target)) return 0;
         trial->attempted = true;
         INPUT event{};
         event.type = INPUT_KEYBOARD;

@@ -18,6 +18,22 @@ Krasis 제품 코드를 수정하거나 새 입력 시험을 만들지 마세요
 상승 false, UIAccess false였습니다. 이 결과는 g102 시험 자식의 권한을 측정한 것이
 아니며, 과거 Deskflow 성공 보고를 반박하거나 현재 성공을 입증하지도 않습니다.
 
+이후 **Computer Use를 호출하지 않은** 재시험에서는 제로디가 Deskflow A→B 마우스
+이동과 Esc로 PIN 창 닫힘을 확인했습니다. B 터치패드는 사용하지 않았습니다.
+시험 전·중·후 core PID는 21232로 같았으며, PIN 창이 열린 중에 관리자 읽기 전용
+조회로 프로세스·토큰 세션 1/1, 무결성 RID 16384(System), 상승 true/종류 1(Default),
+UIAccess true, SYSTEM true, 제한 토큰 false, AppContainer false가 확인됐습니다.
+일반 권한 조회는 오류 5로 실패했으므로 그 실패를 입력 실패로 분류하지 않습니다.
+실제 core는 1.26.0.0, NotSigned이며 SHA-256은
+`F2C8E5640081929242B3A1FEC492470EF0188AABC584ED636FF30A6171A8D99B`입니다.
+Krasis는 시험 전에 이미 연결 해제 상태였고 B Codex는 설정·연결을 변경하지 않았습니다.
+
+Deskflow의 현재 성공 조건은 확인됐습니다. 아래의 비교 절차는 재현용 기록이며,
+같은 Deskflow 시험을 반복할 필요는 없습니다. 다음 Krasis 시험은 Computer Use 호출 없이
+실제 입력 스레드에서 프로세스 토큰과 유효 스레드 토큰의 무결성·상승·UIAccess를
+읽고 동일 PIN 창에서 Esc 반응을 확인합니다. 이 성공만으로 g102의 거부 원인이
+무결성 차이 또는 Computer Use라고 확정하지 않습니다.
+
 먼저 아래의 agent 역할 확인만 읽기 전용으로 수행하세요. Deskflow 비교는 제로디가
 **A와 B의 기존 Deskflow 앱을 실행하고 연결 준비를 마쳤다고 확인한 뒤** 재개하세요.
 daemon만 실행 중이면 서비스 재설치나 인증서 변경 없이 `comparison_not_ready`로

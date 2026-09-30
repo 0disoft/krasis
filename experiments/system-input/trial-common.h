@@ -5,6 +5,7 @@
 #include <sddl.h>
 #include <string>
 #include <cstdio>
+#include "token-evidence.h"
 
 namespace system_trial {
 inline constexpr wchar_t serviceName[] = L"KrasisSystemInputTrial";
@@ -75,7 +76,8 @@ inline bool writeEvidence(const wchar_t* name, DWORD code, DWORD error,
                          bool bound = false, bool already = false, bool attempted = false,
                          UINT accepted = 0, UINT released = 0, bool winlogonToken = false,
                          bool queueReady = false, bool windowCreated = false, bool messageHandled = false,
-                         UINT downAccepted = 0, UINT upAccepted = 0) {
+                         UINT downAccepted = 0, UINT upAccepted = 0,
+                         const InputTokenEvidence& inputTokens = {}) {
     const auto root = directory();
     if (root.empty()) return false;
     const auto file = root + L"\\" + name;
@@ -84,19 +86,28 @@ inline bool writeEvidence(const wchar_t* name, DWORD code, DWORD error,
     if (output == INVALID_HANDLE_VALUE) return false;
     bool uiAccess = false, sessionMatches = false;
     const bool tokenInspected = tokenState(uiAccess, sessionMatches);
-    char data[1024]{};
+    const auto reportTokens = captureInputTokens();
+    char reportJSON[512]{}, processJSON[512]{}, effectiveJSON[512]{};
+    tokenJSON(reportTokens.process, reportJSON);
+    tokenJSON(inputTokens.process, processJSON);
+    tokenJSON(inputTokens.effective, effectiveJSON);
+    char data[4096]{};
     int length = sprintf_s(data,
         "{\"schema\":\"krasis.system-input-trial/v1\",\"code\":%lu,\"win32Error\":%lu,"
         "\"system\":%s,\"consoleSession\":%s,\"desktopBound\":%s,\"alreadyDefault\":%s,"
         "\"inputAttempted\":%s,\"accepted\":%u,\"releaseAccepted\":%u,"
         "\"tokenInspected\":%s,\"uiAccess\":%s,\"tokenSessionMatches\":%s,\"winlogonTokenLaunched\":%s,"
         "\"queueReady\":%s,\"hiddenWindowCreated\":%s,\"messageHandled\":%s,"
-        "\"downAccepted\":%u,\"upAccepted\":%u}\n",
+        "\"downAccepted\":%u,\"upAccepted\":%u,\"reportProcessToken\":%s,"
+        "\"inputTokenCaptured\":%s,\"inputProcessToken\":%s,\"inputEffectiveToken\":%s,"
+        "\"inputEffectiveTokenSource\":\"%s\"}\n",
         code, error, isSystem() ? "true" : "false", currentConsoleSession() ? "true" : "false",
         bound ? "true" : "false", already ? "true" : "false", attempted ? "true" : "false", accepted, released,
         tokenInspected ? "true" : "false", uiAccess ? "true" : "false", sessionMatches ? "true" : "false",
         winlogonToken ? "true" : "false", queueReady ? "true" : "false",
-        windowCreated ? "true" : "false", messageHandled ? "true" : "false", downAccepted, upAccepted);
+        windowCreated ? "true" : "false", messageHandled ? "true" : "false", downAccepted, upAccepted,
+        reportJSON, inputTokens.captured ? "true" : "false", processJSON, effectiveJSON,
+        inputTokens.effectiveSource);
     DWORD written = 0;
     bool ok = length > 0 && WriteFile(output, data, static_cast<DWORD>(length), &written, nullptr) &&
         written == static_cast<DWORD>(length) && FlushFileBuffers(output);

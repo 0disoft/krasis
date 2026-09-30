@@ -122,6 +122,10 @@ void WINAPI serviceMain(DWORD argc, wchar_t**) {
 }
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR command, int) {
+    if (wcscmp(command, L"--token-evidence-check") == 0) {
+        if (system_trial::isSystem() || system_trial::fixedLocation()) return 12;
+        return system_trial::tokenEvidenceSmoke() ? 0 : 39;
+    }
     // A local negative smoke exercises queue/window creation and teardown only.
     // It is unavailable to SYSTEM or the installed service, has no target, and
     // uses an unconditional denial callback, so it cannot send input.
