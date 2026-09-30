@@ -113,8 +113,13 @@ DWORD WINAPI inputDesktopTrial(void* parameter) {
     // before restoring the original desktop. Never rebind the UI thread.
     HDESK original = GetThreadDesktop(GetCurrentThreadId());
     trial.alreadyDefault = isDefaultDesktop(original);
-    HDESK desktop = OpenInputDesktop(0, FALSE,
-        DESKTOP_READOBJECTS | DESKTOP_WRITEOBJECTS | DESKTOP_CREATEWINDOW | DESKTOP_HOOKCONTROL);
+#ifdef KRASIS_SYSTEM_TRIAL
+    constexpr DWORD desktopAccess = system_trial::inputDesktopAccessMask;
+#else
+    constexpr DWORD desktopAccess =
+        DESKTOP_READOBJECTS | DESKTOP_WRITEOBJECTS | DESKTOP_CREATEWINDOW | DESKTOP_HOOKCONTROL;
+#endif
+    HDESK desktop = OpenInputDesktop(0, FALSE, desktopAccess);
     if (!desktop) return 6;
     DWORD result = 7;
     if (isDefaultDesktop(desktop)) {

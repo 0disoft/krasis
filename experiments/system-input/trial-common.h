@@ -6,6 +6,7 @@
 #include <string>
 #include <cstdio>
 #include "token-evidence.h"
+#include "desktop-access.h"
 
 namespace system_trial {
 inline constexpr wchar_t serviceName[] = L"KrasisSystemInputTrial";
@@ -100,14 +101,14 @@ inline bool writeEvidence(const wchar_t* name, DWORD code, DWORD error,
         "\"queueReady\":%s,\"hiddenWindowCreated\":%s,\"messageHandled\":%s,"
         "\"downAccepted\":%u,\"upAccepted\":%u,\"reportProcessToken\":%s,"
         "\"inputTokenCaptured\":%s,\"inputProcessToken\":%s,\"inputEffectiveToken\":%s,"
-        "\"inputEffectiveTokenSource\":\"%s\"}\n",
+        "\"inputEffectiveTokenSource\":\"%s\",\"configuredDesktopAccessMask\":%lu}\n",
         code, error, isSystem() ? "true" : "false", currentConsoleSession() ? "true" : "false",
         bound ? "true" : "false", already ? "true" : "false", attempted ? "true" : "false", accepted, released,
         tokenInspected ? "true" : "false", uiAccess ? "true" : "false", sessionMatches ? "true" : "false",
         winlogonToken ? "true" : "false", queueReady ? "true" : "false",
         windowCreated ? "true" : "false", messageHandled ? "true" : "false", downAccepted, upAccepted,
         reportJSON, inputTokens.captured ? "true" : "false", processJSON, effectiveJSON,
-        inputTokens.effectiveSource);
+        inputTokens.effectiveSource, inputDesktopAccessMask);
     DWORD written = 0;
     bool ok = length > 0 && WriteFile(output, data, static_cast<DWORD>(length), &written, nullptr) &&
         written == static_cast<DWORD>(length) && FlushFileBuffers(output);

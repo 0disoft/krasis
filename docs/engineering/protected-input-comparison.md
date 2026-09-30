@@ -34,6 +34,18 @@ Deskflow의 현재 성공 조건은 확인됐습니다. 아래의 비교 절차�
 읽고 동일 PIN 창에서 Esc 반응을 확인합니다. 이 성공만으로 g102의 거부 원인이
 무결성 차이 또는 Computer Use라고 확정하지 않습니다.
 
+그 다음 g103 시험도 Computer Use 없이 실패했습니다. 입력 시점의 프로세스·유효
+토큰까지 System RID 16384·상승 1/종류 1·UIAccess 1·세션 1·제한/AppContainer 0·조회
+오류 0이었으므로, 이번 실패를 권한 부족이나 UI 도구 호출 탓으로 설명하지 않습니다.
+실제 PIN 창은 시험 직후 그대로였으며 수동 닫힘 시점은 미확인입니다. 설치·제거는
+완료됐고 제로디가 Krasis 연결 복구와 Deskflow 해제 유지를 확인했습니다.
+
+현재 다음 비교 대상은 데스크톱 핸들의 요청 권한입니다. Deskflow v1.26.0의
+`MSWindowsDesks::openInputDesktop`은 `GENERIC_WRITE`를 사용하며 여기에는
+`DESKTOP_JOURNALPLAYBACK`이 포함됩니다. g103의 explicit mask에는 이 비트가 없습니다.
+다음 시험은 그 한 비트만 추가하고 토큰·키 입력·창 메시지 처리를 유지합니다.
+실제 성공이 나오기 전까지 원인 확정이나 제품의 PIN 제어 지원으로 보고하지 않습니다.
+
 먼저 아래의 agent 역할 확인만 읽기 전용으로 수행하세요. Deskflow 비교는 제로디가
 **A와 B의 기존 Deskflow 앱을 실행하고 연결 준비를 마쳤다고 확인한 뒤** 재개하세요.
 daemon만 실행 중이면 서비스 재설치나 인증서 변경 없이 `comparison_not_ready`로

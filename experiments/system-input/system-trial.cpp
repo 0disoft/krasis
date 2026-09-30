@@ -122,6 +122,10 @@ void WINAPI serviceMain(DWORD argc, wchar_t**) {
 }
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR command, int) {
+    if (wcscmp(command, L"--desktop-access-check") == 0) {
+        if (system_trial::isSystem() || system_trial::fixedLocation()) return 12;
+        return system_trial::desktopAccessSmoke() ? 0 : 40;
+    }
     if (wcscmp(command, L"--token-evidence-check") == 0) {
         if (system_trial::isSystem() || system_trial::fixedLocation()) return 12;
         return system_trial::tokenEvidenceSmoke() ? 0 : 39;

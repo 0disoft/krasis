@@ -359,6 +359,43 @@ queries and invalid-handle unknown serialization. B must run the attended
 trial without Computer Use calls while it is active; this removes a comparison
 variable without claiming such calls caused any earlier failure.
 
+The attended g103 trial ran without Computer Use or UI tools. The g103 package
+revision e9a58ae and the six payload files matched the independently supplied
+hash, certificate thumbprint, signer and expiry; B did not independently infer
+the trial source revision from the binary. Installation returned 0/Valid;
+service start returned 0/Running with start error 0. The child returned code 4,
+input error 5 and zero down/up/aggregate/cleanup acceptance. Input token capture
+was true, with effective source process. Reporting-time process, input-time
+process and effective-token metadata all agreed: integrity RID 16384,
+elevated 1/type 1, UIAccess 1, session 1, restriction 0, AppContainer 0 and query
+error 0. The service's own token had RID 16384, elevation 1/type 1, UIAccess 0,
+session 0; its input token was not captured and all input fields were null.
+The operator observed the PIN dialog still open immediately after the trial;
+manual dismissal timing was not established. Removal returned 0; exact service
+absence (1060), zero trial processes and installation/certificate absence were
+confirmed. The operator restored Krasis and kept Deskflow disconnected.
+Thus missing elevated integrity, process/effective token divergence and UI-tool
+participation do not explain this reproduced g103 denial. It is not evidence
+that any of these properties alone suffices for trusted input.
+
+The exact Deskflow v1.26.0 Escape path remains SendInput with one keyboard event
+per call, virtual-key Escape plus its scan code, flags 0 for down and KEYUP for
+up, time and extraInfo zero. Those fields match the trial; switching input APIs
+or scan-code flags has no source-backed reason here. A concrete difference is
+MSWindowsDesks::openInputDesktop: its requested mask contains GENERIC_WRITE.
+Microsoft's desktop access mapping includes DESKTOP_JOURNALPLAYBACK in that
+generic right. The g103 input thread's explicit mask was 0x8B and omitted that
+bit. The next bounded trial compares **only** adding DESKTOP_JOURNALPLAYBACK
+(0x20), producing 0xAB/171. Desktop flags remain 0, handle inheritance false;
+token launch, target checks, queue dispatch and Escape fields remain unchanged.
+configuredDesktopAccessMask records the compiled request mask, not a claim
+that the service opened or used the desktop. A no-input local smoke opens and
+closes a non-inheritable handle with this mask; compilation also checks that
+exactly one access bit changed and desktop-switch access was not added.
+No ACL, security policy, desktop switching or journaling hook API is changed.
+This is a supported hypothesis from the working comparator's source, not yet
+a proven cause or product fix. Acceptance still requires B's actual response.
+
 1. Build a one-shot, destination-local probe with no peer/network input path.
    It sends only a bounded Escape press/release to a positively identified
    foreground target. Test an elevated PowerShell window and the observed
@@ -403,6 +440,7 @@ existing user-mode agent and local-input recovery remain the fallback.
 - Microsoft VHF: https://learn.microsoft.com/en-us/windows-hardware/drivers/hid/virtual-hid-framework--vhf-
 - Microsoft UIAccess policy: https://learn.microsoft.com/en-us/windows/security/application-security/application-control/user-account-control/settings-and-configuration
 - Microsoft input desktop: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-openinputdesktop
+- Microsoft desktop access mapping: https://learn.microsoft.com/en-us/windows/win32/winstation/desktop-security-and-access-rights
 - Microsoft thread desktop: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setthreaddesktop
 - Deskflow input-desktop worker: https://github.com/deskflow/deskflow/blob/master/src/lib/platform/MSWindowsDesks.cpp
 - Deskflow interactive-session watchdog: https://github.com/deskflow/deskflow/blob/master/src/lib/platform/MSWindowsWatchdog.cpp

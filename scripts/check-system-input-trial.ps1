@@ -24,7 +24,7 @@ if ($xml -notmatch 'level="asInvoker"' -or $xml -notmatch 'uiAccess="false"') { 
 foreach ($case in @(
     @{Argument='--service'; Expected=12}, @{Argument='--worker'; Expected=12},
     @{Argument='--invalid'; Expected=12}, @{Argument='--queue-refusal-check'; Expected=0},
-    @{Argument='--token-evidence-check'; Expected=0}
+    @{Argument='--token-evidence-check'; Expected=0}, @{Argument='--desktop-access-check'; Expected=0}
 )) {
     $argument = $case.Argument
     $process = [Diagnostics.Process]::new()
