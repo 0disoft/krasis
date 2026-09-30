@@ -165,6 +165,41 @@ SCM stop/shutdown은 새 승인을 중단하고 현재 worker의 해제 결과�
 service failure로 반환하며 정상 종료나 다음 lease로 숨기지 않습니다. service·worker
 설치 또는 권한 변경을 실행하지 않았으며 새 binary는 빌드 검사만 수행합니다.
 
+## 설치 transaction의 복구 순서
+
+`install_transaction.go`는 설치·업데이트·제거의 내부 상태 전이를 구현합니다. 실제
+파일 배치와 SCM 변경을 수행하는 Windows backend 및 제품 updater 연결은 아직
+구현하지 않았으며 외부에서 호출할 수 있는 설치 명령도 추가하지 않았습니다.
+target digest는 향후 독립적으로 승인된 설치 payload에서만 구성해야 합니다.
+원격 묶음의 checksum/BUILD.json 또는 agent 요청은 실행 승인 근거가 아닙니다.
+
+한 번에 한 installer만 고정 설치 위치를 소유합니다. 기존의 검증된 두 EXE와 실행
+상태를 기록하고, candidate 및 rollback copy를 먼저 준비한 다음 worker의 clean
+release를 확인합니다. 그 후 고정 파일·SCM 구성을 교체하고 시작·trust·readiness를
+확인해 commit합니다. zero target은 기존 설치 제거이며 같은 rollback을 사용합니다.
+
+각 효과 전에 durable journal의 단계를 저장합니다. journal에는 단계·두 image digest·
+설치/실행 여부만 포함하며 경로·명령·PID·입력 내용은 포함하지 않습니다. 정규 형식·
+필수 필드·크기를 검사하며 duplicate/unknown field와 불가능한 상태는 거부합니다.
+journal은 복구 위치를 설명할 뿐 설치 권한을 부여하지 않습니다. Windows backend는
+record의 protected owner/DACL, fixed paths 및 pinned image를 별도로 검증해야 합니다.
+
+commit 전 중단은 rollback 방향으로만 복구합니다. 교체 또는 새 서비스의 준비 실패 시
+별도의 20초 문맥에서 candidate를 clean stop하고 이전 두 image·SCM 구성을 복원합니다.
+이전 서비스가 실행 중이었을 때만 재시작하며, 첫 설치 실패는 설치 전의 부재로 돌아갑니다.
+키·버튼 해제 영수증을 검증하지 못하면 복원·다른 backend 시작·artifact 삭제를 하지 않고
+journal을 유지합니다. 사용자 취소는 복구 문맥을 취소하지 않습니다. journal write 결과가
+불확실하면 추가 효과를 중단하고 다음 실행에서 실제 durable record를 대조합니다.
+
+durable commit 이후 artifact 정리 실패는 이미 확인한 새 설치를 되돌리지 않습니다.
+다음 실행에서 새 설치를 재검증하고 정리를 완료합니다. 정리가 끝나기 전 새 transaction은
+시작하지 않습니다. backend의 단계별 효과는 crash 이후 idempotent해야 하고 Finish는
+transaction 소유물만 제거한 뒤 journal을 마지막으로 삭제해야 합니다.
+
+가짜 backend로 첫 설치·업데이트·제거, 각 단계의 crash, journal 저장 전/후 오류,
+candidate 준비 실패, 입력 해제 실패, 취소, commit 후 정리 실패와 lock 충돌을 검사합니다.
+이 검사는 실제 Program Files 교체 또는 서비스 설치 성공을 의미하지 않습니다.
+
 ## 검증 범위
 
 in-memory stream과 fake input으로 EOF·취소·절대 만료·replay·wrong binding·불확실한
