@@ -270,10 +270,44 @@ An uninstalled, non-SYSTEM negative smoke uses a null target and unconditional
 denial callback to exercise real queue/window creation, dispatch and teardown
 without input. The installed/SYSTEM path refuses that smoke mode. Local x64
 compilation, bootstrap manifest checks, three uninstalled-path refusals (12)
-and the no-input queue smoke (0) passed. B's attended comparison remains pending.
+and the no-input queue smoke (0) passed.
 Generation 102 stages this pinned, test-signed trial in the existing six-file
 transport. It does not install trust or start the helper when receiving an
 update. Product protected-input behavior is unchanged until actual acceptance.
+
+On B, g102 was tested on Windows 26100.9457 with installed Deskflow executable
+file versions 1.26.0.0. Artifact pins matched; installation returned 0 and the
+signature was Valid. Service start returned 0, Running state and start error 0.
+The service reported winlogonTokenLaunched=true, propagated child code 4 and had
+launch error 0. The child reported SYSTEM, console session, desktop binding,
+already-Default desktop, token inspection, UIAccess and token/session agreement
+all true. Queue preparation, hidden-window creation and message handling also
+were true. Input was attempted, but down, up, aggregate and cleanup acceptance
+were all zero; the primary error was 5. The PIN dialog remained open. The
+operator manually closed it only after both JSON files and the actual response
+were checked. Removal returned 0; service absence (1060), zero trial processes,
+installation files and exact Root/TrustedPublisher certificate absence were
+confirmed. These results rule out failure to prepare this queue/window/token
+path; they do not establish the policy responsible for rejecting input.
+
+Source comparison against Deskflow's v1.26.0 tag, rather than current master,
+confirms single-event SendInput, desktop-thread dispatch, the optional winlogon
+token path with UIAccess, and winsta0\\Default/CreateProcessAsUser startup.
+Remaining source differences include environment creation, desktop open flags
+and handle inheritance, and thread-message versus window-message dispatch.
+None is currently evidenced as the cause. The installed file version alone
+does not prove the current Deskflow input process's elevated mode or token.
+
+Do not ship another input trial solely to toggle these flags. First perform the
+[current same-machine comparison](../engineering/protected-input-comparison.md):
+observe Deskflow's actual current PIN response and query only fixed-name input
+processes' non-content token/signature metadata. The g102 SYSTEM check identifies
+the account SID; it does not measure TokenIntegrityLevel or TokenElevation.
+Microsoft's documented trusted-input conditions explicitly distinguish elevated
+integrity from ordinary UIAccess applications. Capture the actual integrity RID,
+elevation, UIAccess and restriction state before attributing refusal to Windows
+hardening or escalating to a driver. An optional VHF backend remains an unproven
+design candidate, not an established requirement or a current product fix.
 
 ## Acceptance sequence
 
@@ -324,4 +358,7 @@ existing user-mode agent and local-input recovery remain the fallback.
 - Microsoft thread desktop: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setthreaddesktop
 - Deskflow input-desktop worker: https://github.com/deskflow/deskflow/blob/master/src/lib/platform/MSWindowsDesks.cpp
 - Deskflow interactive-session watchdog: https://github.com/deskflow/deskflow/blob/master/src/lib/platform/MSWindowsWatchdog.cpp
+- Deskflow 1.26.0 input worker: https://github.com/deskflow/deskflow/blob/v1.26.0/src/lib/platform/MSWindowsDesks.cpp
+- Deskflow 1.26.0 watchdog: https://github.com/deskflow/deskflow/blob/v1.26.0/src/lib/platform/MSWindowsWatchdog.cpp
+- Deskflow 1.26.0 process startup: https://github.com/deskflow/deskflow/blob/v1.26.0/src/lib/platform/MSWindowsProcess.cpp
 - Deskflow privileged IPC advisory: https://github.com/deskflow/deskflow/security/advisories/GHSA-6rx5-g478-775c
