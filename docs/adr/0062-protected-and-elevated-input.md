@@ -271,6 +271,9 @@ denial callback to exercise real queue/window creation, dispatch and teardown
 without input. The installed/SYSTEM path refuses that smoke mode. Local x64
 compilation, bootstrap manifest checks, three uninstalled-path refusals (12)
 and the no-input queue smoke (0) passed. B's attended comparison remains pending.
+Generation 102 stages this pinned, test-signed trial in the existing six-file
+transport. It does not install trust or start the helper when receiving an
+update. Product protected-input behavior is unchanged until actual acceptance.
 
 ## Acceptance sequence
 
@@ -314,6 +317,7 @@ existing user-mode agent and local-input recovery remain the fallback.
 - Microsoft `SendInput`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput
 - Microsoft input injection: https://learn.microsoft.com/en-us/windows/uwp/ui-input/input-injection
 - Microsoft credential dialog change: https://learn.microsoft.com/en-us/troubleshoot/power-platform/power-automate/desktop-flows/windows-credentials-dialog-issues
+- Microsoft credential input hardening and trusted contexts: https://support.microsoft.com/en-us/help/5080542
 - Microsoft VHF: https://learn.microsoft.com/en-us/windows-hardware/drivers/hid/virtual-hid-framework--vhf-
 - Microsoft UIAccess policy: https://learn.microsoft.com/en-us/windows/security/application-security/application-control/user-account-control/settings-and-configuration
 - Microsoft input desktop: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-openinputdesktop
