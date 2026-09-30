@@ -145,8 +145,21 @@ product. Its acceptance contract is:
   report, together with the operator's actual PIN response. A local Escape
   success is a prerequisite, not proof of A-to-B elevated/PIN input support.
 
-No SYSTEM service experiment has been implemented, installed or accepted by
-this evidence update. Keep the resident product unelevated and its guard active.
+`experiments/system-input` implements this local capability trial. The service
+duplicates its own LocalSystem primary token, binds it to the installed
+operator's console session and sets UIAccess. This avoids opening winlogon
+but is not asserted to be identical to Deskflow's elevated token configuration.
+The operator SID and session are recorded only in the administrator-owned
+installation configuration and rechecked through WTS before launch and input.
+The service and windowless worker share one fixed executable. The child joins
+a kill-on-close Job atomically at process creation, before its suspended thread
+is resumed. A per-install CREATE_NEW claim prevents repeated starts.
+Only numeric, content-free evidence is written to fixed files. The installation
+is demand-start with SYSTEM/administrator service access, and checks the pinned
+hash and certificate before local trust and registration. Removal verifies
+service executable/account, installation hashes and process absence.
+No SYSTEM trial has been installed or accepted on B yet. Keep the resident
+product unelevated and its guard active until attended evidence is obtained.
 
 ## Acceptance sequence
 

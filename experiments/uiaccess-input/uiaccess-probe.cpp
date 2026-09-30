@@ -55,7 +55,11 @@ bool credentialBrokerForeground(HWND window) {
 }
 
 void report(const wchar_t* message) {
+#ifdef KRASIS_SYSTEM_TRIAL
+    (void)message; // The privileged child creates no windows.
+#else
     MessageBoxW(nullptr, message, L"Krasis UIAccess 입력 시험", MB_OK | MB_ICONINFORMATION);
+#endif
 }
 
 struct EscapeResult {
@@ -108,7 +112,11 @@ DWORD WINAPI inputDesktopTrial(void* parameter) {
             trial.bound = true;
             result = 3;
             // Recheck identity, foreground and active desktop after binding.
-            if (credentialBrokerForeground(trial.target)) {
+            if (credentialBrokerForeground(trial.target)
+#ifdef KRASIS_SYSTEM_TRIAL
+                && system_trial::currentConsoleSession()
+#endif
+            ) {
                 result = 4;
                 trial.inputAttempted = true;
                 trial.escape = sendEscape();
@@ -127,6 +135,10 @@ DWORD WINAPI inputDesktopTrial(void* parameter) {
 }
 
 void reportTrial(DWORD result, const DesktopTrial& trial) {
+#ifdef KRASIS_SYSTEM_TRIAL
+    system_trial::writeEvidence(L"result.json", result, trial.escape.error, trial.bound,
+        trial.alreadyDefault, trial.inputAttempted, trial.escape.accepted, trial.escape.releaseAccepted);
+#else
     const wchar_t* message = L"input_thread_failed: 입력 시험 스레드를 실행하지 못했습니다.";
     switch (result) {
     case 0: message = L"dialog_dismissed_candidate: PIN 창이 실제로 닫혔는지 B에서 확인하세요."; break;
@@ -144,11 +156,12 @@ void reportTrial(DWORD result, const DesktopTrial& trial) {
         trial.inputAttempted ? L"예" : L"아니요", trial.escape.accepted, trial.escape.error,
         trial.escape.releaseAccepted);
     report(details);
+#endif
 }
 
 }  // namespace
 
-int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
+int runInputTrial() {
     if (!uiAccessEnabled()) {
         report(L"uiaccess_unavailable: 서명과 설치 위치를 확인하세요. 시험은 입력을 보내지 않았습니다.");
         return 2;
@@ -184,3 +197,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     reportTrial(result, trial);
     return static_cast<int>(result);
 }
+
+#ifndef KRASIS_SYSTEM_TRIAL
+int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) { return runInputTrial(); }
+#endif

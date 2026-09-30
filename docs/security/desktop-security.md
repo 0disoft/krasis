@@ -23,6 +23,18 @@ to the active Default desktop before revalidating the foreground broker. It
 does not switch to a secure desktop, register a service or enable peer input
 into credential UI. It is not a resident privileged input path.
 
+The independent `experiments/system-input` comparison is a second attended
+installation exception. A local administrator may trust the separately pinned
+test certificate and install a demand-start, one-shot LocalSystem service in
+Program Files. Peer update only delivers its six test files; it never installs
+or starts the service. The service executes only its own windowless input worker,
+with SYSTEM, UIAccess and the exact configured console user/session, to send one
+Escape pair on Default. It accepts no remote input or arbitrary commands. A
+creation-time Job bounds the child on service crash, stop, timeout or user/session
+change; a per-install claim prevents another trial without explicit removal.
+The ordinary product remains unelevated. This trial does not expand the supported
+remote-input boundary, secure-desktop scope or release acceptance.
+
 ## Input safety
 
 The destination must prepare before source suppression starts. Exact session, lease, epoch, and sequence identity govern every active-control transition. Disconnect, timeout, lifecycle termination, injection uncertainty, stale traffic, local emergency release, or component failure revokes control, disables suppression, attempts `ReleaseAll`, and converges to `LOCAL` or an explicit fault state.
