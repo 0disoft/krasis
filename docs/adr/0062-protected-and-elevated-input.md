@@ -309,6 +309,26 @@ elevation, UIAccess and restriction state before attributing refusal to Windows
 hardening or escalating to a driver. An optional VHF backend remains an unproven
 design candidate, not an established requirement or a current product fix.
 
+The subsequent B read-only comparison was not ready: deskflow.exe and
+deskflow-core.exe were absent. Only deskflow-daemon.exe was running, in session
+0 with System integrity RID 16384, elevation true and UIAccess false. Krasis UI
+and two agent-named processes were in session 1 with Medium RID 8192, elevation
+false and UIAccess false. Queries reported no access errors. These are product
+process observations, not the removed g102 trial child's integrity measurement.
+No live Deskflow input response, active core token, or current comparative
+success was established. Do not substitute daemon metadata for core metadata.
+
+Two agent-named processes do not establish a duplicate resident. The connected
+resident starts the same executable with product-crash-guard-internal; main
+dispatches that mode to the recovery pipe before residentagent.Run and its
+single-instance mutex. The guard is not another session/API owner. B's current
+roles remain unverified until fixed-mode classification, parent relationship,
+session, image and creation-time checks are returned. Do not kill either PID
+based on the process count. The comparison runbook now distinguishes these
+roles and requires operator-confirmed existing Deskflow connection readiness
+before resuming the same-machine PIN comparison. Product input behavior and
+generation 102 remain unchanged.
+
 ## Acceptance sequence
 
 1. Build a one-shot, destination-local probe with no peer/network input path.

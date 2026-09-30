@@ -9,6 +9,44 @@ SYSTEM 신원, UIAccess, 세션, Default 데스크톱, 메시지 큐, 숨은 창
 이번 목적은 **현재 B에서 동작하는 Deskflow의 실제 실행 조건을 확인**하는 것입니다.
 Krasis 제품 코드를 수정하거나 새 입력 시험을 만들지 마세요.
 
+## 현재까지 확인된 상태와 재개 조건
+
+첫 읽기 전용 확인에서는 `deskflow.exe`와 `deskflow-core.exe`가 실행 중이지 않아
+`comparison_not_ready`였습니다. 실행 중인 daemon은 세션 0, System 무결성 RID 16384,
+상승 true, UIAccess false였습니다. daemon의 권한을 실제 입력 worker의 권한으로
+대신 보고하지 마세요. Krasis UI와 agent 두 프로세스는 세션 1, Medium RID 8192,
+상승 false, UIAccess false였습니다. 이 결과는 g102 시험 자식의 권한을 측정한 것이
+아니며, 과거 Deskflow 성공 보고를 반박하거나 현재 성공을 입증하지도 않습니다.
+
+먼저 아래의 agent 역할 확인만 읽기 전용으로 수행하세요. Deskflow 비교는 제로디가
+**A와 B의 기존 Deskflow 앱을 실행하고 연결 준비를 마쳤다고 확인한 뒤** 재개하세요.
+daemon만 실행 중이면 서비스 재설치나 인증서 변경 없이 `comparison_not_ready`로
+남기세요. B Codex 단독으로 A의 연결 준비를 추정하지 마세요.
+
+### 같은 이름의 agent 두 프로세스 구분
+
+현재 코드에서 resident agent는 `Local\Krasis-Agent-v1` mutex를 소유합니다.
+연결 중에는 같은 EXE를 `product-crash-guard-internal` 모드로 한 번 더 실행합니다.
+이 child는 복구 pipe만 처리하며 resident mutex와 local API를 소유하지 않습니다.
+따라서 같은 세션의 EXE 두 개만 보고 중복 agent 장애로 판단하거나 종료하지 마세요.
+
+고정된 `krasis-agent.exe` 프로세스만 대상으로 PID, 부모 PID, 세션, 생성 시각,
+실제 EXE 경로를 확인하세요. 이 단계에 한해 시작 인수를 메모리에서 좁게 판별하되,
+전체 인수는 출력·저장하지 마세요. 판별 결과는 아래 세 값만 허용합니다.
+
+- EXE 경로 외 인수가 없음: `resident_candidate`
+- 인수가 정확히 `product-crash-guard-internal` 하나: `recovery_guard_candidate`
+- 조회 실패 또는 그 외 인수: `unknown` (조회 실패는 오류 숫자도 별도 기록)
+
+guard의 부모가 같은 세션의 resident 후보이며 실제 EXE 경로가 같은지, guard 생성
+시각이 부모보다 늦은지도 확인하세요. PID는 재사용될 수 있으므로 부모 PID만으로
+관계를 확정하지 마세요. 후보 이름은 mutex 획득이나 API 소유의 직접 증명이 아닙니다.
+resident 후보 하나와 그 자식 guard 하나는 코드상 예상되는 구성입니다. resident 후보가
+여럿이거나 부모가 없으면 관측을 보고하고, 프로세스 종료·재시작으로 증거를 지우지 마세요.
+
+관련 소스: `cmd/krasis-agent/main.go`, `internal/residentagent/run.go`,
+`internal/residentagent/product_runner.go`, `internal/crashguard/process.go`.
+
 ## 1. 읽기 전용 실행 상태 확인
 
 다음 고정된 이름만 대상으로 프로세스와 설치된 실행 파일을 확인하세요.
@@ -17,8 +55,9 @@ Krasis 제품 코드를 수정하거나 새 입력 시험을 만들지 마세요
 - `krasis.exe`, `krasis-agent.exe`
 
 프로세스가 없으면 `not_running`으로 기록하세요. 설치된 파일만 보고 런타임 권한을
-추정하지 마세요. 시작 인수, 환경 변수 전체, 일반 로그, 프로세스 메모리, 사용자 파일은
-읽지 마세요. 프로그램이 실제 사용한 파일의 버전·SHA-256·서명 상태만 확인하세요.
+추정하지 마세요. 위 agent 역할 판별 외의 시작 인수, 환경 변수 전체, 일반 로그,
+프로세스 메모리, 사용자 파일은 읽지 마세요. 프로그램이 실제 사용한 파일의
+버전·SHA-256·서명 상태만 확인하세요.
 서명 상태를 얻지 못하면 미확인으로 표시하고 인증서나 신뢰 저장소를 변경하지 마세요.
 
 현재 콘솔 세션에서 프로세스 핸들을 `PROCESS_QUERY_LIMITED_INFORMATION`, 토큰을
