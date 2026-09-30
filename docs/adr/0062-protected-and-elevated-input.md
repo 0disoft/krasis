@@ -396,6 +396,32 @@ No ACL, security policy, desktop switching or journaling hook API is changed.
 This is a supported hypothesis from the working comparator's source, not yet
 a proven cause or product fix. Acceptance still requires B's actual response.
 
+The attended g104 comparison succeeded at the B-local Escape boundary. The
+operator confirmed title generation 104; package revision 5c7e075 and all six
+payload files matched the independent hash/certificate pins. No Computer Use
+or UI tool was called. Installation returned 0/Valid; service start returned
+0/Running with start error 0. The child returned code 0/error 0, bound its
+desktop and attempted input, with down/up acceptance 1/1 and aggregate 2;
+no extra release was needed. configuredDesktopAccessMask was 171. Input token
+capture was true, with effective source process. All three child token
+snapshots still showed RID 16384, elevation 1/type 1, UIAccess 1, session 1,
+restriction/AppContainer 0 and query error 0. The service propagated code 0,
+did not attempt input, and retained its own session-0/System/non-UIAccess token.
+Its input metadata remained uncaptured/null as expected; the configured mask
+alone does not mean the service used that desktop.
+
+The operator reported that the trial Escape automatically dismissed the PIN
+dialog. Separate final confirmation of manual dismissal timing and connection
+restoration was pending in the report and remains unknown. Removal returned
+0; service absence 1060, zero trial processes, installation and exact certificate
+absence were confirmed. The controlled g103-to-g104 comparison supports the
+omitted desktop playback access bit as the failure cause in this bounded
+local path. It does not prove all keyboard/mouse formats, future Windows
+builds, or product A-to-B PIN control. Go implementation must preserve desktop
+access and OS-thread ownership rather than merely elevate the resident agent.
+The production transition is tracked in
+[ADR 0063](0063-go-input-desktop-ownership.md).
+
 1. Build a one-shot, destination-local probe with no peer/network input path.
    It sends only a bounded Escape press/release to a positively identified
    foreground target. Test an elevated PowerShell window and the observed
