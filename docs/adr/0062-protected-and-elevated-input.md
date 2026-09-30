@@ -160,6 +160,10 @@ hash and certificate before local trust and registration. Removal verifies
 service executable/account, installation hashes and process absence.
 No SYSTEM trial has been installed or accepted on B yet. Keep the resident
 product unelevated and its guard active until attended evidence is obtained.
+Generation 99 carries the signed SYSTEM trial in the same atomic six-file
+payload accepted by g90+ receivers. The legacy test EXE filename is retained
+for transport compatibility; its system-input README and scripts select the
+new installation/attended execution flow. The update only stages these files.
 
 ## Acceptance sequence
 

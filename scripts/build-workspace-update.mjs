@@ -58,8 +58,11 @@ const uiAccessTest = generation >= 91 && generation <= 94
     ? { source: '580af88924da-20260929100017', hash: '6cb515d5174e152910f811a12f03ce0467c1a84a1f601a516e14bcef839f005e', thumbprint: 'af3540c895b677a1a8f7fe6e8569086f6f30e493' }
     : generation === 98
       ? { source: '79c60db76d70-20260930064122', hash: '015224b317e298c572d79d07e4ed813e85d9f4a36abbf462e8029062ee4c12da', thumbprint: '539774816405d2bc1861daaeb9019829f7465b06' }
-      : null;
+      : generation === 99
+        ? { source: 'b4ebe88d74f8-20260930074811', hash: '4ba13bd4a84d84310f46564d09dea3d14c717aa40fe3ceaac99f6a7512e6575a', thumbprint: 'f9b42783461db4d3327ffb7eef580720975ab729' }
+        : null;
 if (uiAccessTest) {
+  const templateRoot = generation === 99 ? 'experiments/system-input' : 'experiments/uiaccess-input';
   const source = path.resolve('dist/uiaccess-input-probe', uiAccessTest.source);
   const executableName = 'KrasisUIAccessProbe-TESTSIGNED.exe';
   const certificateName = 'KrasisUIAccessProbe-TESTCERT.cer';
@@ -79,9 +82,9 @@ if (uiAccessTest) {
   }
   for (const [name, content] of [
     [executableName, executable], [certificateName, certificate], [detailsName, Buffer.from(details)],
-    ['README.md', fs.readFileSync('experiments/uiaccess-input/README.md')],
-    ['install-test.ps1', fs.readFileSync('experiments/uiaccess-input/install-test.ps1')],
-    ['remove-test.ps1', fs.readFileSync('experiments/uiaccess-input/remove-test.ps1')],
+    ['README.md', fs.readFileSync(path.join(templateRoot, 'README.md'))],
+    ['install-test.ps1', fs.readFileSync(path.join(templateRoot, 'install-test.ps1'))],
+    ['remove-test.ps1', fs.readFileSync(path.join(templateRoot, 'remove-test.ps1'))],
   ]) {
     fs.writeFileSync(path.join(directory, name), content, { flag: 'wx' });
     names.push(name);
