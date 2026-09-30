@@ -1,6 +1,6 @@
 # ADR 0064: 특권 입력 worker의 승인된 채널과 독립 복구
 
-- 상태: Accepted for worker core and authenticated local-channel primitives; service and product integration pending
+- 상태: Accepted for worker, service bootstrap and SCM entry point; installation/update and product integration pending
 - 결정일: 2026-09-30
 - 관련: ADR 0062, ADR 0063, ADR 0036
 
@@ -79,7 +79,8 @@ overlapped I/O는 버퍼를 pin하고, 시간 초과·취소·close 때 정확�
 kernel completion을 기다립니다. 그 전에 버퍼를 unpin하거나 이벤트·pipe handle을
 닫지 않습니다. 동시 close는 한 번만 handle을 닫고 동일한 완료를 기다립니다.
 파이프 연결은 각각 최대 5초·2초이며 송수신 deadline도 pending I/O에 적용됩니다.
-진짜 service·agent 상호 인증과 console worker 실행은 아직 연결하지 않았습니다.
+service·agent 상호 인증과 console worker 실행은 source에서 연결했으며 실제 설치 상태의
+SYSTEM 경로와 원격 입력은 아직 검증하지 않았습니다.
 
 ## 콘솔 worker 실행 기반
 
@@ -101,8 +102,8 @@ service process와 다른 스레드의 토큰은 변경하지 않으며 imperson
 supervisor는 먼저 입력 채널을 닫고 해제 결과를 기다린 뒤 worker를 종료해야 합니다.
 강제 process 종료 자체는 눌린 키·버튼 해제의 성공 증거가 아닙니다.
 
-이 단계는 실행 기반이며 service entry point·worker bootstrap·설치·제품 adapter는
-아직 연결하지 않았습니다. 서비스 또는 worker를 실제 설치·실행하지 않았고 agent
+service entry point·worker bootstrap은 아래 초기화 경로로 연결했습니다. 설치·제품
+adapter는 아직 연결하지 않았습니다. 서비스 또는 worker를 실제 설치·실행하지 않았고 agent
 generation은 유지합니다. 일반 권한 launch 거부, native Job 한도, 동시 close를
 입력 없이 검사하며 SYSTEM child 실행과 원격 PIN 입력은 별도 기기 검증이 필요합니다.
 
@@ -121,8 +122,6 @@ lease/binding/절대 만료를 사용하며 입력·heartbeat는 하나씩 송�
 현재 client도 제품 agent에 연결하지 않았으며 bootstrap·설치 신뢰 경계가 완성되기
 전에는 보호창 guard를 대체하지 않습니다. fake input의 실제 client/worker 왕복,
 EOF 복구·취소·응답 유실·잘못된 응답·미전송/부분전송 결과 분류를 검사합니다.
-
-## 검증 범위
 
 ## Service/worker 초기화와 해제 영수증
 
@@ -144,7 +143,27 @@ worker는 실제 desktop scope 준비 후에만 ready를 알립니다. 종료 co
 수락 동작 개수와 해제 attempted/released/remaining만 반환합니다. supervisor는 이
 영수증을 기다린 후 Job을 정리합니다. 누락·잘못된 영수증과 남은 입력은 recovery unknown
 또는 failure이며 다음 lease를 승인하지 않습니다. process exit 자체를 해제 성공으로
-간주하지 않습니다. 이 초기화 경로는 service entry point와 설치에 아직 연결하지 않았습니다.
+간주하지 않습니다. 이 초기화 경로는 SCM entry point에 연결했으며 설치·업데이트와
+resident agent 입력 adapter 활성화는 아직 연결하지 않았습니다.
+
+## SCM 실행과 보호된 설치 기록
+
+`cmd/krasis-input`는 `--service`와 `--input-worker` 두 고정 모드만 허용합니다.
+service는 SCM에서만, worker는 실제 console의 SYSTEM/UIAccess token에서만
+실행합니다. client가 다른 PID·파일·세션·명령을 고르는 실행 모드는 없습니다.
+
+`LoadInstallation`은 `%ProgramFiles%/Krasis/Input/INPUT-INSTALL.json`의
+`krasis.input.install/v1` 기록과 고정 agent/service EXE를 읽기 고정합니다. JSON에는
+schemaVersion·agentSHA256·serviceSHA256만 허용합니다. Krasis/Input 디렉터리,
+기록과 두 EXE에서 reparse point를 거부하고 owner가 SYSTEM/Builtin Administrators이며
+다른 주체의 쓰기·삭제·DACL 변경 권한이 없는지 확인합니다. 일반 사용자 소유 디렉터리,
+파일명만 맞춘 portable agent, user-writable digest와 요청 경로는 승인 근거가 아닙니다.
+설치 코드가 이 owner·DACL·정확한 두 image digest를 하나의 transaction으로 구성해야 합니다.
+
+SCM stop/shutdown은 새 승인을 중단하고 현재 worker의 해제 결과를 기다립니다.
+그동안 StopPending/checkpoint를 유지합니다. 남은 입력·없는 영수증·Job 정리 실패는
+service failure로 반환하며 정상 종료나 다음 lease로 숨기지 않습니다. service·worker
+설치 또는 권한 변경을 실행하지 않았으며 새 binary는 빌드 검사만 수행합니다.
 
 ## 검증 범위
 
@@ -156,6 +175,12 @@ agent exit 후 같은 logon의 복구와 close의 1회 실행도 검사합니다
 agent의 pipe 상호 인증 및 SYSTEM worker 실행은 별도로 검증해야 합니다.
 실제 Windows 파이프에서 bytes·kernel PID metadata, pending read의 timeout 후 재사용,
 pending read 중 동시 close와 first-instance 중복 거부도 입력 없이 검사합니다.
+
+2026-10-01 집중 검사에서 inputworker/inputdesktop 테스트, checkptr 검사,
+go vet와 `cmd/krasis-input`의 Windows EXE 빌드가 통과했습니다. SCM 상태 변경은
+가짜 worker로 검사했으며 실제 SYSTEM 서비스·다른 세션으로의 핸들 복제·원격
+마우스/키보드/PIN 제어는 이 검사에 포함되지 않습니다. 설치·업데이트와 제품
+활성화 전이 끝나기 전에는 agent generation을 104로 유지합니다.
 
 ## 참조
 

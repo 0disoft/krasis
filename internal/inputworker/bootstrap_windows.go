@@ -22,7 +22,7 @@ func workerPipeName(pid uint32) string {
 
 // RunAgentLease transfers only the authenticated pipe to the child it creates.
 // Digests come from the protected installation record, never agent metadata.
-func RunAgentLease(ctx context.Context, channel *Channel, lease Lease, agentDigest, serviceDigest [sha256.Size]byte) (Report, error) {
+func RunAgentLease(ctx context.Context, channel *Channel, lease Lease, agentDigest, serviceDigest [sha256.Size]byte) (report Report, result error) {
 	if ctx == nil || ctx.Err() != nil || channel == nil || channel.authority == nil || channel.authority.kind != authorityAgent || channel.authority.check(false) != nil || agentDigest == ([sha256.Size]byte{}) || serviceDigest == ([sha256.Size]byte{}) {
 		return Report{}, ErrAuthority
 	}
@@ -58,7 +58,11 @@ func RunAgentLease(ctx context.Context, channel *Channel, lease Lease, agentDige
 	if err != nil {
 		return Report{}, ErrAuthority
 	}
-	defer worker.Close()
+	defer func() {
+		if worker.Close() != nil {
+			result = errors.Join(result, ErrRecovery)
+		}
+	}()
 	startup, cancel := context.WithTimeout(ctx, startupTimeout)
 	defer cancel()
 	if control.connect(startup) != nil {
