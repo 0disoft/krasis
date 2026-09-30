@@ -158,8 +158,27 @@ Only numeric, content-free evidence is written to fixed files. The installation
 is demand-start with SYSTEM/administrator service access, and checks the pinned
 hash and certificate before local trust and registration. Removal verifies
 service executable/account, installation hashes and process absence.
-No SYSTEM trial has been installed or accepted on B yet. Keep the resident
-product unelevated and its guard active until attended evidence is obtained.
+The g99 installation on B passed artifact/signature checks, returned 0 and
+produced a Valid installed signature. Service start failed with exit 1 and
+Win32 740 (ERROR_ELEVATION_REQUIRED). After 130 seconds the run claim and both
+result files were absent, with zero trial processes. This is a service-bootstrap
+failure, not evidence about SYSTEM Escape delivery. The operator manually
+closed the PIN dialog; trial effect and manual-close ordering are unknown.
+Removal returned 0; service absence (1060), zero processes, installation files
+and Root/TrustedPublisher certificate absence were confirmed.
+
+The shared EXE's manifest incorrectly requested uiAccess=true, even for SCM
+bootstrap. This is the leading explanation for the pre-entrypoint 740 failure;
+the error alone does not establish the exact loader policy on B. Change the
+bootstrap manifest to asInvoker/uiAccess=false. The service continues explicitly
+setting TokenUIAccess on the duplicated child token before CreateProcessAsUser;
+the child still refuses injection unless its actual token grants UIAccess.
+The builder checks the embedded manifest, and a local regression launches the
+uninstalled cache EXE through ordinary CreateProcess-style APIs and requires
+code 12 for service/worker/invalid invocations, with no service or input execution.
+This verifies loader entry and denial locally; actual SCM start, child UIAccess
+and delivered Escape remain pending on B. Keep the resident product unelevated
+and its guard active until attended evidence is obtained.
 Generation 99 carries the signed SYSTEM trial in the same atomic six-file
 payload accepted by g90+ receivers. The legacy test EXE filename is retained
 for transport compatibility; its system-input README and scripts select the

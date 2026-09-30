@@ -19,7 +19,7 @@ $manifest = Join-Path $output 'embedded-manifest.xml'
 & $mt "-inputresource:$binary;#1" "-out:$manifest"
 if ($LASTEXITCODE -ne 0) { throw 'Manifest extraction failed' }
 $xml = Get-Content -Raw -LiteralPath $manifest
-if ($xml -notmatch 'level="asInvoker"' -or $xml -notmatch 'uiAccess="true"') { throw 'Unexpected trial manifest' }
+if ($xml -notmatch 'level="asInvoker"' -or $xml -notmatch 'uiAccess="false"') { throw 'Service bootstrap must not request manifest UIAccess' }
 # Keep the existing atomic six-file transport shape, compatible with g90+.
 Copy-Item -LiteralPath $binary -Destination (Join-Path $output 'KrasisUIAccessProbe-UNSIGNED.exe')
 foreach ($name in @('README.md','install-test.ps1','remove-test.ps1')) {
