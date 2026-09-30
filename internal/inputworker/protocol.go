@@ -130,3 +130,34 @@ func writeResponse(writer io.Writer, value response) error {
 	}
 	return err
 }
+
+func decodeResponse(data [responseSize]byte) (response, error) {
+	if string(data[:4]) != "KRA1" || data[4] != 1 || binary.BigEndian.Uint32(data[20:]) != 0 {
+		return response{}, ErrProtocol
+	}
+	value := response{op: operation(data[5]), status: data[6], certainty: data[7],
+		sequence: binary.BigEndian.Uint64(data[8:16]), requested: binary.BigEndian.Uint16(data[16:18]), inserted: binary.BigEndian.Uint16(data[18:20])}
+	if value.sequence == 0 || value.op < opPress || value.op > opHeartbeat || value.status > 1 || value.inserted > value.requested {
+		return response{}, ErrProtocol
+	}
+	if value.status == 0 {
+		if value.certainty != 0 || value.requested != 0 || value.inserted != 0 {
+			return response{}, ErrProtocol
+		}
+	} else {
+		switch value.certainty {
+		case 1:
+			if value.inserted != 0 {
+				return response{}, ErrProtocol
+			}
+		case 2:
+			if value.inserted == 0 || value.inserted == value.requested {
+				return response{}, ErrProtocol
+			}
+		case 3:
+		default:
+			return response{}, ErrProtocol
+		}
+	}
+	return value, nil
+}

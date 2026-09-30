@@ -106,6 +106,22 @@ supervisor는 먼저 입력 채널을 닫고 해제 결과를 기다린 뒤 work
 generation은 유지합니다. 일반 권한 launch 거부, native Job 한도, 동시 close를
 입력 없이 검사하며 SYSTEM child 실행과 원격 PIN 입력은 별도 기기 검증이 필요합니다.
 
+## 에이전트 입력 client
+
+`Client`는 인증된 service proof만 받아 기존 `application.InputPort`를 구현합니다.
+agent proof를 service proof로 사용하지 못합니다. service bootstrap에서 동의한
+lease/binding/절대 만료를 사용하며 입력·heartbeat는 하나씩 송수신합니다. 응답의
+순서·동작·결과 분류·예약 바이트와 수락 개수를 검사하고 native 오류는 반환하지
+않습니다. lease 만료·service 종료·잘못된 응답·전송 실패 후 같은 채널을 재사용하지
+않습니다. 입력을 보낸 뒤 응답이 유실되면 `OUTCOME_UNKNOWN`으로 반환하며 같은
+입력을 재전송하거나 일반 backend로 옮기지 않습니다.
+
+호출 취소는 pending read/write를 중단합니다. 채널 close가 성공한 사실과 worker
+해제 복구 성공은 구분합니다. 해제 결과는 service supervisor가 별도로 받아야 합니다.
+현재 client도 제품 agent에 연결하지 않았으며 bootstrap·설치 신뢰 경계가 완성되기
+전에는 보호창 guard를 대체하지 않습니다. fake input의 실제 client/worker 왕복,
+EOF 복구·취소·응답 유실·잘못된 응답·미전송/부분전송 결과 분류를 검사합니다.
+
 ## 검증 범위
 
 in-memory stream과 fake input으로 EOF·취소·절대 만료·replay·wrong binding·불확실한
