@@ -226,7 +226,33 @@ refusal checks passed for uninstalled service, worker and invalid invocations
 Generation 101 stages the independently pinned, test-signed comparison through
 the existing six-file update transport. Receiving the update neither trusts the
 certificate nor installs or starts the service; B's local attended procedure
-is still required. Its actual token launch and PIN response are unverified.
+is still required. On B, g101 artifacts and signing values matched the
+independently supplied pins. Installation returned 0 with a Valid signature;
+service start returned 0, Running state and start error 0. The service reported
+winlogonTokenLaunched=true and child code 4, with launch error 0. The child
+reported code 4, win32Error 5, SYSTEM=true, consoleSession=true,
+desktopBound=true, alreadyDefault=true, inputAttempted=true, tokenInspected=true,
+UIAccess=true and tokenSessionMatches=true. Both primary acceptance and cleanup
+acceptance were zero. The child report's winlogonTokenLaunched=false is its
+default field, not a contradiction: only the service records child creation.
+The PIN dialog remained open. The operator closed it with B's touchpad after
+inspecting the JSON results. Removal returned 0; service absence (1060), zero
+trial processes, installation files and exact Root/TrustedPublisher certificate
+absence were confirmed.
+
+The verified winlogon-token path alone did not restore input. Deskflow's input
+worker additionally creates a desktop message queue and hidden window, and
+dispatches keyboard events individually from that thread's message loop.
+The current trial sends a two-event batch from a windowless thread. Those are
+remaining comparison variables, not established causes. A bounded comparison
+may initialize a never-shown, non-activating worker window after desktop binding
+and send one Escape down/up through its private one-shot message. Keep the
+foreground/session checks, exact target, explicit acceptance/error evidence,
+cleanup and lifetime limits; never activate or manipulate the credential window.
+Microsoft documents credential-broker automation restrictions introduced by
+January 2026 updates, but this report does not establish B's update state or
+whether that restriction explains the refusal. A current, same-machine Deskflow
+comparison remains relevant before choosing a different input backend.
 
 ## Acceptance sequence
 
