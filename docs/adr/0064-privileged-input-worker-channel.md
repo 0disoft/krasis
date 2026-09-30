@@ -1,6 +1,6 @@
 # ADR 0064: 특권 입력 worker의 승인된 채널과 독립 복구
 
-- 상태: Accepted for worker core and process-authentication primitives; service and product integration pending
+- 상태: Accepted for worker core and authenticated local-channel primitives; service and product integration pending
 - 결정일: 2026-09-30
 - 관련: ADR 0062, ADR 0063, ADR 0036
 
@@ -65,6 +65,22 @@ transaction으로 함께 갱신해야 합니다. 일반 사용자가 쓴 digest�
 경로만으로 service EXE를 교체하는 endpoint는 허용하지 않습니다. 설치 및 배포 신뢰
 경계가 완성되기 전에는 현 portable agent를 승격하거나 보호창 guard를 끄지 않습니다.
 
+## Native 파이프 전송
+
+`AcceptAgent`와 `ConnectService`는 고정 이름 `Krasis.Input.v1`만 사용합니다. 서버는
+SYSTEM·session 0에서만 열며 first-instance·single-instance·remote-client rejection을
+설정합니다. interactive 사용자는 stream·attribute 접근만 가지며 추가 server instance를
+만드는 FILE_CREATE_PIPE_INSTANCE 비트는 포함하지 않습니다. 수신 전에 agent 인증을,
+client가 server 응답을 신뢰하기 전에 service 인증을 수행합니다. `Channel`의 stream과
+authority는 외부에서 바꿀 수 없는 한 쌍입니다. service proof를 agent 입력 승인으로
+사용할 수 없습니다.
+
+overlapped I/O는 버퍼를 pin하고, 시간 초과·취소·close 때 정확한 요청을 취소한 뒤
+kernel completion을 기다립니다. 그 전에 버퍼를 unpin하거나 이벤트·pipe handle을
+닫지 않습니다. 동시 close는 한 번만 handle을 닫고 동일한 완료를 기다립니다.
+파이프 연결은 각각 최대 5초·2초이며 송수신 deadline도 pending I/O에 적용됩니다.
+진짜 service·agent 상호 인증과 console worker 실행은 아직 연결하지 않았습니다.
+
 ## 검증 범위
 
 in-memory stream과 fake input으로 EOF·취소·절대 만료·replay·wrong binding·불확실한
@@ -73,6 +89,8 @@ press·해제 실패·malformed frame·응답 결과 분류를 검증합니다. 
 agent exit 후 같은 logon의 복구와 close의 1회 실행도 검사합니다. 실제 Windows에서는
 자기 process token metadata와 test EXE digest pin을 입력 없이 검사합니다. 실제 service와
 agent의 pipe 상호 인증 및 SYSTEM worker 실행은 별도로 검증해야 합니다.
+실제 Windows 파이프에서 bytes·kernel PID metadata, pending read의 timeout 후 재사용,
+pending read 중 동시 close와 first-instance 중복 거부도 입력 없이 검사합니다.
 
 ## 참조
 
