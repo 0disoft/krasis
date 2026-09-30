@@ -66,9 +66,11 @@ const uiAccessTest = generation >= 91 && generation <= 94
             ? { source: '88df8821d6fe-20260930091221', hash: '19c7270577ffd77db60ceaeb7b09ff58d9ba7eb2fcf5b8dd2b7690b9b79568ff', thumbprint: 'a39bfe34d80a8cf3cba5a0482a90dc565333c4b8' }
             : generation === 102
               ? { source: 'c49f894a1eef-20260930100335', hash: '35b0e2be4dc85be7044ac1cabf03a6f44ab78a9a22db03b5d4734962ce6471ce', thumbprint: '2fc5626f2874eb71ae5db7bd6eaedbf3ad853b58' }
-              : null;
+              : generation === 103
+                ? { source: '9b0bff07bb19-20260930125759', hash: 'b7e6e3ecb6e4d63060849a3b3fe4c42ae4dd4d0817aa25c3b783cbf375a42863', thumbprint: 'f0417926f4b338da41484779960350bfc064c543' }
+                : null;
 if (uiAccessTest) {
-  const templateRoot = [99,100,101,102].includes(generation) ? 'experiments/system-input' : 'experiments/uiaccess-input';
+  const templateRoot = [99,100,101,102,103].includes(generation) ? 'experiments/system-input' : 'experiments/uiaccess-input';
   const source = path.resolve('dist/uiaccess-input-probe', uiAccessTest.source);
   const executableName = 'KrasisUIAccessProbe-TESTSIGNED.exe';
   const certificateName = 'KrasisUIAccessProbe-TESTCERT.cer';
