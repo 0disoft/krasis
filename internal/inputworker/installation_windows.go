@@ -37,6 +37,12 @@ func LoadInstallation() (*Installation, error) {
 	if err != nil {
 		return nil, ErrAuthority
 	}
+	return loadInstallationDirectory(filepath.Join(root, "Krasis"), filepath.Join(root, "Krasis", "Input"))
+}
+
+// Private directory selection is shared with the elevated installer for its
+// three fixed staging locations. It is never selected by service/agent IPC.
+func loadInstallationDirectory(root, directory string) (*Installation, error) {
 	installation := &Installation{}
 	accepted := false
 	defer func() {
@@ -44,14 +50,13 @@ func LoadInstallation() (*Installation, error) {
 			_ = installation.Close()
 		}
 	}()
-	for _, path := range []string{filepath.Join(root, "Krasis"), filepath.Join(root, "Krasis", "Input")} {
+	for _, path := range []string{root, directory} {
 		file, err := openProtected(path, true)
 		if err != nil {
 			return nil, ErrAuthority
 		}
 		installation.files = append(installation.files, file)
 	}
-	directory := filepath.Join(root, "Krasis", "Input")
 	metadata, err := openProtected(filepath.Join(directory, "INPUT-INSTALL.json"), false)
 	if err != nil {
 		return nil, ErrAuthority
@@ -122,7 +127,7 @@ func openProtected(path string, directory bool) (*os.File, error) {
 	}
 	file := os.NewFile(uintptr(handle), "protected-input-installation")
 	var info windows.ByHandleFileInformation
-	if windows.GetFileInformationByHandle(handle, &info) != nil || info.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0 || (info.FileAttributes&windows.FILE_ATTRIBUTE_DIRECTORY != 0) != directory || protectedHandle(handle) != nil {
+	if windows.GetFileInformationByHandle(handle, &info) != nil || info.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0 || (info.FileAttributes&windows.FILE_ATTRIBUTE_DIRECTORY != 0) != directory || (!directory && info.NumberOfLinks != 1) || protectedHandle(handle) != nil {
 		_ = file.Close()
 		return nil, ErrAuthority
 	}

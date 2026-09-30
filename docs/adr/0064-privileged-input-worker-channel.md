@@ -167,9 +167,9 @@ service failure로 반환하며 정상 종료나 다음 lease로 숨기지 않�
 
 ## 설치 transaction의 복구 순서
 
-`install_transaction.go`는 설치·업데이트·제거의 내부 상태 전이를 구현합니다. 실제
-파일 배치와 SCM 변경을 수행하는 Windows backend 및 제품 updater 연결은 아직
-구현하지 않았으며 외부에서 호출할 수 있는 설치 명령도 추가하지 않았습니다.
+`install_transaction.go`는 설치·업데이트·제거의 내부 상태 전이를 구현합니다. Windows
+고정 위치의 파일 staging·journal·복원을 구현했으며, SCM 제어 backend 및 제품 updater
+연결은 아직 구현하지 않았습니다. 외부에서 호출할 수 있는 설치 명령도 없습니다.
 target digest는 향후 독립적으로 승인된 설치 payload에서만 구성해야 합니다.
 원격 묶음의 checksum/BUILD.json 또는 agent 요청은 실행 승인 근거가 아닙니다.
 
@@ -199,6 +199,35 @@ transaction 소유물만 제거한 뒤 journal을 마지막으로 삭제해야 �
 가짜 backend로 첫 설치·업데이트·제거, 각 단계의 crash, journal 저장 전/후 오류,
 candidate 준비 실패, 입력 해제 실패, 취소, commit 후 정리 실패와 lock 충돌을 검사합니다.
 이 검사는 실제 Program Files 교체 또는 서비스 설치 성공을 의미하지 않습니다.
+
+## Windows 설치 파일의 소유권과 교체
+
+`installFiles`는 이미 상승한 installer에서만 OS의 Program Files 위치를 선택합니다.
+일반 agent를 상승시키거나 환경 변수·RPC 경로를 받지 않습니다. 기존에 소유권이나
+DACL이 안전하지 않은 Krasis 디렉터리가 있으면 ACL을 덮어쓰지 않고 거부합니다.
+생성 객체는 Administrators 소유이며 SYSTEM·Administrators에만 쓰기 권한을,
+Users에는 읽기·실행만 부여합니다. root의 읽기 핸들을 유지해 다른 위치로 바뀌지 않게
+하고, 공유를 허용하지 않는 고정 lock 파일로 installer 간 실행을 직렬화합니다.
+
+candidate·rollback·retired 디렉터리는 각각 `Input.stage`·`Input.rollback`·
+`Input.retired`로 고정합니다. journal에는 실행 승인으로 쓰지 않는 digest와 단계만
+저장합니다. pending 파일은 기존 owner/DACL·reparse·hardlink를 확인한 뒤 쓰고 flush하며,
+동일 root 안에서 MoveFileEx(REPLACE_EXISTING|WRITE_THROUGH)로 교체합니다.
+이는 프로세스 중단 복구 절차이며 모든 저장장치의 전원 장애 내구성을 증명하지 않습니다.
+
+새 파일은 trusted installer의 독립 승인된 embedded payload에서만 받도록 내부 생성자를
+분리했습니다. 두 SHA-256 외에 PE amd64·Go command identity·Windows/amd64·CGO off·
+clean Git revision·두 image의 동일 revision을 확인하고 바이트를 복제해 보관합니다.
+이 검증은 publisher 서명 대신이 아니며, 아직 배포 installer에 embedded payload를
+연결하지 않았습니다. 원격 bundle checksum이 맞는 것만으로 호출할 수 없습니다.
+
+기존 image를 읽기 고정해 rollback copy를 검증한 뒤 candidate를 준비합니다. 교체는
+active를 retired로 옮기고 candidate를 active로 옮기는 두 단계이며, 그 사이의 중단은
+journal에 따라 rollback합니다. 기존 agent가 파일을 잡아 첫 rename이 실패했으면
+원본을 삭제하지 않고 그대로 보존합니다. 정리는 재귀 삭제 없이 세 고정 파일만 대상으로
+하며, 예상하지 못한 파일·하위 디렉터리·링크·권한이면 중단하고 journal을 유지합니다.
+Windows 파일 검사는 사용자 소유 파일의 수정 거부·내용 보존·취소·zero store를
+검사하며 실제 Program Files 설치는 실행하지 않습니다.
 
 ## 검증 범위
 
