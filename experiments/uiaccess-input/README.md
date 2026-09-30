@@ -5,9 +5,12 @@
 키 입력, 화면을 읽거나 기록하지 않습니다. API 반환과 창이 사라진 것만으로 성공을
 판정하지 말고 B 화면에서 직접 확인해야 합니다.
 
-이번 비교 시험은 `VK_ESCAPE`와 스캔코드를 함께 보내고 추가 입력 표시값을 넣지 않습니다.
-기존 시험의 스캔코드 전용 전송과 다른 점은 이 입력 형식뿐입니다. 성공하면 이 형식의
-효과를 확인한 것이며, 실패하면 UIAccess 토큰만으로 충분하다는 가설을 더는 적용하지 않습니다.
+g97에서 `VK_ESCAPE`와 스캔코드를 함께 보내고 추가 입력 표시값을 없애도 PIN 창은
+닫히지 않았습니다. 이번 시험은 그 입력 형식을 유지하고, 창이나 훅이 없는 입력 전용
+스레드에서 `OpenInputDesktop`과 `SetThreadDesktop`으로 현재 입력 데스크톱에
+연결한 뒤 Esc 한 번을 보냅니다. 일반 사용자 `Default` 데스크톱만 허용합니다.
+결과창에는 연결 성공 여부와 시험 스레드가 원래도 같은 데스크톱이었는지가 표시됩니다.
+데스크톱 열기·연결·대상 확인 실패 때에는 입력을 보내지 않습니다.
 
 Windows가 UIAccess를 부여하려면 EXE에 `uiAccess=true` 매니페스트와 신뢰된
 코드 서명이 있어야 하고, 관리자만 쓸 수 있는 `Program Files` 아래에 설치해야
@@ -17,7 +20,7 @@ Windows가 UIAccess를 부여하려면 EXE에 `uiAccess=true` 매니페스트와
 `uiaccess_unavailable`을 표시하고 입력을 보내지 않습니다.
 
 `dialog_dismissed_candidate`가 나와도 실제 PIN 창이 닫혔는지 B에서 확인하세요.
-`dialog_still_open`이면 UIAccess만으로는 이 PC의 PIN 창을 제어할 수 없으므로
+`dialog_still_open`이면 이 UIAccess·입력 데스크톱 조합은 실패한 것입니다.
 기존 사용자 모드 에이전트의 보호창 연결 해제 동작을 유지합니다. 이 시험은
 관리자 PowerShell, UAC 보안 데스크톱, 로그인 화면 또는 연결 중 원격 입력을
 검증하지 않습니다.
@@ -32,7 +35,9 @@ B의 관리자 PowerShell에서 새 업데이트 폴더의
 `install-test.ps1 -ArtifactDirectory <결과 폴더> -ExpectedSHA256 <A에서 별도로 확인한 EXE 해시> -ExpectedThumbprint <A에서 별도로 확인한 인증서 지문>`을 실행합니다. 결과 폴더 안의
 `TEST-CERT-DETAILS.txt`만 믿고 지문을 결정하지 마세요. 관리자 창을
 닫고 일반 탐색기에서 `C:\Program Files\KrasisUIAccessProbe\KrasisUIAccessProbe.exe`를
-실행해 PIN 창 시험을 합니다. 결과 코드와 **실제로 PIN 창이 닫혔는지** 기록합니다.
+실행해 PIN 창 시험을 합니다. 결과창을 유지한 채 코드, 데스크톱 연결 성공 여부,
+원래 같은 데스크톱이었는지, **실제로 PIN 창이 닫혔는지** 기록합니다.
+PIN 창을 수동으로 닫는 것은 결과 확인 뒤입니다.
 시험 뒤 B의 관리자 PowerShell에서 `remove-test.ps1 -Thumbprint <TEST-CERT-DETAILS.txt의 지문>`을
 실행해 설치 파일과 신뢰 인증서를 제거합니다. 두 스크립트는 다른 버전의 파일이나
 기존 신뢰 지문을 건드리지 않도록 일치 여부를 확인합니다.

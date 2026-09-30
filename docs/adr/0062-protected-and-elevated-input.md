@@ -68,11 +68,28 @@ Windows Security PIN dialog and `SendInput` accepted the Escape pair, but
 returned `dialog_still_open`. The operator closed the dialog with B's touchpad;
 A's remote mouse and keyboard did not work while it was open. The test EXE and
 certificate were removed and checked absent. This disproves that the tested
-scan-code-only, marked UIAccess input path solves this dialog. A final bounded
-comparison uses the same `VK_ESCAPE` plus scan-code shape as Deskflow without
-the Krasis extra-info marker. If that still fails on B, investigate a
-separately installed SYSTEM input process with active-desktop ownership rather
-than broadening the ordinary agent or weakening the PIN guard.
+scan-code-only, marked UIAccess input path solves this dialog.
+
+The attended g97 comparison also failed on GRAM13. The operator confirmed
+`dialog_still_open` in the retained result window, process exit code 5, and the
+PIN dialog remaining open immediately after the trial. Only after recording
+the result did the operator close the PIN dialog with B's touchpad. Removal
+returned 0; the installed directory, executable and experiment certificate in
+Root and TrustedPublisher were checked absent. Using `VK_ESCAPE` plus scan code
+without an extra-info marker therefore did not fix the tested path. This does
+not distinguish active-desktop attachment from the SYSTEM/session token
+boundary, or establish that all `SendInput` configurations fail.
+
+Next isolate active-desktop attachment with a fresh, windowless input thread.
+Keep g97's Escape event shape; open the current input desktop, require Default,
+bind the worker with `SetThreadDesktop`, and revalidate the exact foreground
+broker and session before the single pair. Report binding success and whether
+the worker was already on Default, without recording desktop names or input
+content. Observe visibility of the original dialog after injection rather than
+treating a foreground change as dismissal. An open/bind/target failure sends no
+input. A failed trial keeps the product guard. If B still confirms failure,
+investigate a separately installed SYSTEM input process with active-desktop
+ownership rather than broadening the ordinary agent or weakening the PIN guard.
 
 ## Acceptance sequence
 
@@ -82,8 +99,9 @@ than broadening the ordinary agent or weakening the PIN guard.
    `CredentialUIBroker.exe` dialog separately. Report only result codes, never
    window text, commands, PINs, clipboard content, or key payloads.
 2. On B, verify the visible effect for both target classes. If the PIN prompt
-   does not respond, keep the runtime guard and try the driver path only after
-   its signing, installation, rollback, and device access boundary are ready.
+   does not respond, keep the runtime guard and follow the desktop-bound worker,
+   separate SYSTEM process, then driver investigation sequence. Each needs its
+   own installation, rollback and input-boundary evidence before integration.
 3. Integrate a proven input backend behind the existing destination adapter.
    Keep the normal agent unelevated. A local helper must accept input only for
    the exact authenticated lease, session, epoch, and sequence; it must not
@@ -117,6 +135,8 @@ existing user-mode agent and local-input recovery remain the fallback.
 - Microsoft credential dialog change: https://learn.microsoft.com/en-us/troubleshoot/power-platform/power-automate/desktop-flows/windows-credentials-dialog-issues
 - Microsoft VHF: https://learn.microsoft.com/en-us/windows-hardware/drivers/hid/virtual-hid-framework--vhf-
 - Microsoft UIAccess policy: https://learn.microsoft.com/en-us/windows/security/application-security/application-control/user-account-control/settings-and-configuration
+- Microsoft input desktop: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-openinputdesktop
+- Microsoft thread desktop: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setthreaddesktop
 - Deskflow input-desktop worker: https://github.com/deskflow/deskflow/blob/master/src/lib/platform/MSWindowsDesks.cpp
 - Deskflow interactive-session watchdog: https://github.com/deskflow/deskflow/blob/master/src/lib/platform/MSWindowsWatchdog.cpp
 - Deskflow privileged IPC advisory: https://github.com/deskflow/deskflow/security/advisories/GHSA-6rx5-g478-775c

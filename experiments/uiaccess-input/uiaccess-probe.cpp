@@ -16,14 +16,18 @@ bool uiAccessEnabled() {
     return ok;
 }
 
-bool onDefaultDesktop() {
-    HDESK desktop = OpenInputDesktop(0, FALSE, DESKTOP_READOBJECTS);
+bool isDefaultDesktop(HDESK desktop) {
     if (!desktop) return false;
     wchar_t name[128]{};
     DWORD needed = 0;
-    const bool ok = GetUserObjectInformationW(desktop, UOI_NAME, name, sizeof(name), &needed) &&
-                    wcscmp(name, L"Default") == 0;
-    CloseDesktop(desktop);
+    return GetUserObjectInformationW(desktop, UOI_NAME, name, sizeof(name), &needed) &&
+           wcscmp(name, L"Default") == 0;
+}
+
+bool onDefaultDesktop() {
+    HDESK desktop = OpenInputDesktop(0, FALSE, DESKTOP_READOBJECTS);
+    const bool ok = isDefaultDesktop(desktop);
+    if (desktop) CloseDesktop(desktop);
     return ok;
 }
 
@@ -71,6 +75,61 @@ bool sendEscape() {
     return false;
 }
 
+struct DesktopTrial {
+    HWND target;
+    bool alreadyDefault = false;
+    bool bound = false;
+};
+
+DWORD WINAPI inputDesktopTrial(void* parameter) {
+    auto& trial = *static_cast<DesktopTrial*>(parameter);
+    // This thread has no windows or hooks. The UI thread must not be rebound.
+    HDESK original = GetThreadDesktop(GetCurrentThreadId());
+    trial.alreadyDefault = isDefaultDesktop(original);
+    HDESK desktop = OpenInputDesktop(0, FALSE,
+        DESKTOP_READOBJECTS | DESKTOP_WRITEOBJECTS | DESKTOP_CREATEWINDOW | DESKTOP_HOOKCONTROL);
+    if (!desktop) return 6;
+    DWORD result = 7;
+    if (isDefaultDesktop(desktop)) {
+        result = 8;
+        if (SetThreadDesktop(desktop)) {
+            trial.bound = true;
+            result = 3;
+            // Recheck identity, foreground and active desktop after binding.
+            if (credentialBrokerForeground(trial.target)) {
+                result = 4;
+                if (sendEscape()) {
+                    Sleep(1000);
+                    result = IsWindow(trial.target) && IsWindowVisible(trial.target) ? 5 : 0;
+                }
+            }
+            // Leave the opened desktop before closing it. If restoration fails,
+            // thread exit releases the attachment; the process owns the handle.
+            if (!SetThreadDesktop(original)) return 10;
+        }
+    }
+    if (!CloseDesktop(desktop)) return 10;
+    return result;
+}
+
+void reportTrial(DWORD result, const DesktopTrial& trial) {
+    const wchar_t* message = L"input_thread_failed: 입력 시험 스레드를 실행하지 못했습니다.";
+    switch (result) {
+    case 0: message = L"dialog_dismissed_candidate: PIN 창이 실제로 닫혔는지 B에서 확인하세요."; break;
+    case 3: message = L"target_not_observed: 대상 PIN 창이 바뀌어 입력을 보내지 않았습니다."; break;
+    case 4: message = L"escape_send_failed: Esc 입력 전송에 실패했습니다."; break;
+    case 5: message = L"dialog_still_open: 입력 데스크톱 연결 후에도 PIN 창이 열려 있습니다."; break;
+    case 6: message = L"input_desktop_open_failed: 입력 데스크톱을 열지 못해 입력을 보내지 않았습니다."; break;
+    case 7: message = L"input_desktop_excluded: 일반 사용자 데스크톱이 아니므로 입력을 보내지 않았습니다."; break;
+    case 8: message = L"input_desktop_bind_failed: 입력 데스크톱에 연결하지 못해 입력을 보내지 않았습니다."; break;
+    case 10: message = L"input_desktop_cleanup_failed: 데스크톱 복구에 실패했습니다. 시험 프로그램을 종료합니다."; break;
+    }
+    wchar_t details[768]{};
+    swprintf_s(details, L"%s\n\n입력 데스크톱 연결: %s\n시험 스레드가 원래도 같은 데스크톱: %s\n\n결과를 확인한 뒤 B 터치패드로 이 창을 닫으세요.",
+        message, trial.bound ? L"성공" : L"실패", trial.alreadyDefault ? L"예" : L"아니요");
+    report(details);
+}
+
 }  // namespace
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
@@ -93,15 +152,19 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         report(L"target_not_observed: 대상 PIN 창을 확인하지 못해 입력을 보내지 않았습니다.");
         return 3;
     }
-    if (!sendEscape()) {
-        report(L"escape_send_failed: Esc 입력 전송에 실패했습니다.");
-        return 4;
+    DesktopTrial trial{observed};
+    HANDLE worker = CreateThread(nullptr, 0, inputDesktopTrial, &trial, 0, nullptr);
+    if (!worker) {
+        report(L"input_thread_failed: 입력 시험 스레드를 만들지 못해 입력을 보내지 않았습니다.");
+        return 9;
     }
-    Sleep(1000);
-    if (credentialBrokerForeground(observed)) {
-        report(L"dialog_still_open: Esc 전송 후에도 PIN 창이 전면에 있습니다.");
-        return 5;
+    // No timed-out worker may outlive its target/context or send delayed input.
+    if (WaitForSingleObject(worker, 5000) != WAIT_OBJECT_0) {
+        ExitProcess(9);
     }
-    report(L"dialog_dismissed_candidate: PIN 창이 실제로 닫혔는지 B에서 확인하세요.");
-    return 0;
+    DWORD result = 9;
+    GetExitCodeThread(worker, &result);
+    CloseHandle(worker);
+    reportTrial(result, trial);
+    return static_cast<int>(result);
 }
