@@ -185,8 +185,29 @@ for transport compatibility; its system-input README and scripts select the
 new installation/attended execution flow. The update only stages these files.
 Generation 100 carries the startup-corrected manifest, independently pinned
 signed EXE and current trial instructions through that same six-file transport.
-Local process creation/refusal and manifest checks passed. B's SCM launch,
-actual child UIAccess and PIN response remain unverified.
+Local process creation/refusal and manifest checks passed. On B, g100 artifact
+and signing checks passed, installation returned 0 and the installed signature
+was Valid. Service start returned 0, with Running state and start error 0.
+The child result was code 4, win32Error 5, SYSTEM=true, consoleSession=true,
+desktopBound=true, alreadyDefault=true and inputAttempted=true. SendInput
+accepted zero of two events; cleanup accepted zero releases. The child's
+UIAccess gate precedes target observation and input, so reaching this result
+also establishes that its actual TokenUIAccess check passed. The service
+propagated child code 4 with launch error 0; its desktop/input fields describe
+the service, not a second input attempt. The PIN dialog remained open until
+the operator manually closed it after inspecting both JSON files. Removal
+returned 0, with service absence (1060), zero trial processes and absence of
+installation files and the exact Root/TrustedPublisher certificate confirmed.
+
+This establishes refusal of this SYSTEM/UIAccess/default-desktop SendInput
+path. Error 5 alone does not identify UIPI or the specific rejecting policy.
+Deskflow's elevated watchdog duplicates the current session's winlogon token;
+this experiment instead duplicated the service token and changed its session.
+Token provenance remains an untested difference. The next bounded comparison
+must select only the verified System32 winlogon in the installed console
+session, validate its SYSTEM identity and token session, and retain all existing
+operator, target, one-shot, lifetime and job-ownership checks. It must not accept
+an arbitrary token source or expose a remote privileged input endpoint.
 
 ## Acceptance sequence
 
