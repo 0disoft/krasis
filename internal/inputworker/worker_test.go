@@ -58,7 +58,7 @@ func startWorker(t *testing.T, ctx context.Context, input *recordingInput, lease
 	server, client := net.Pipe()
 	done := make(chan finish, 1)
 	go func() {
-		report, err := serve(ctx, server, input, lease, testExecute, time.Now)
+		report, err := serve(ctx, server, input, lease, testExecute, testExecute, time.Now)
 		done <- finish{report, err}
 	}()
 	t.Cleanup(func() { _ = client.Close() })

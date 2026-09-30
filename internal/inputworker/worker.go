@@ -59,19 +59,35 @@ type executor func(context.Context, func() error) error
 // lease only and always closes the stream. A missing response is outcome-unknown
 // to the caller; callers must not retry an input or switch backends.
 // This foundational entry point is not reachable from the product agent yet.
-func Serve(ctx context.Context, stream net.Conn, input application.InputPort, lease Lease) (report Report, err error) {
-	if !validLease(ctx, stream, input, lease, time.Now()) {
+func Serve(ctx context.Context, channel *Channel, input application.InputPort, lease Lease) (report Report, err error) {
+	if channel == nil {
+		return report, ErrAuthority
+	}
+	stream, authority := channel.stream, channel.authority
+	defer channel.Close()
+	if !validLease(ctx, stream, input, lease, time.Now()) || authority == nil || authority.kind != authorityAgent || authority.check(false) != nil {
 		if stream != nil {
 			_ = stream.Close()
 		}
 		return report, ErrAuthority
 	}
-	defer stream.Close()
 	// Root ownership stays alive during independent key-up recovery after ctx
 	// cancellation. The loop itself observes ctx and the immutable lease expiry.
 	err = inputdesktop.Run(context.Background(), func(scope *inputdesktop.Scope) error {
 		var runErr error
-		report, runErr = serve(ctx, stream, input, lease, scope.Do, time.Now)
+		inputDo := func(ctx context.Context, operation func() error) error {
+			if err := authority.check(false); err != nil {
+				return err
+			}
+			return scope.Do(ctx, operation)
+		}
+		recoveryDo := func(ctx context.Context, operation func() error) error {
+			if err := authority.check(true); err != nil {
+				return err
+			}
+			return scope.Do(ctx, operation)
+		}
+		report, runErr = serve(ctx, stream, input, lease, inputDo, recoveryDo, time.Now)
 		return runErr
 	})
 	return report, err
@@ -89,7 +105,7 @@ func validLease(ctx context.Context, stream net.Conn, input application.InputPor
 	return true
 }
 
-func serve(ctx context.Context, stream net.Conn, input application.InputPort, lease Lease, do executor, now func() time.Time) (report Report, err error) {
+func serve(ctx context.Context, stream net.Conn, input application.InputPort, lease Lease, do, recoveryDo executor, now func() time.Time) (report Report, err error) {
 	var pressed control.PressedState
 	defer func() {
 		// Close first to interrupt the sole bounded reader. Cleanup cannot wait
@@ -100,7 +116,7 @@ func serve(ctx context.Context, stream net.Conn, input application.InputPort, le
 		}
 		recoveryCtx, cancel := context.WithTimeout(context.Background(), RecoveryTimeout)
 		defer cancel()
-		recoveryErr := do(recoveryCtx, func() error {
+		recoveryErr := recoveryDo(recoveryCtx, func() error {
 			var releaseErr error
 			report.Recovery, releaseErr = application.ReleaseAll(recoveryCtx, &pressed, input)
 			return releaseErr
