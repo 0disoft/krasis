@@ -80,7 +80,7 @@ without an extra-info marker therefore did not fix the tested path. This does
 not distinguish active-desktop attachment from the SYSTEM/session token
 boundary, or establish that all `SendInput` configurations fail.
 
-Next isolate active-desktop attachment with a fresh, windowless input thread.
+Generation 98 isolates active-desktop attachment with a fresh, windowless input thread.
 Keep g97's Escape event shape; open the current input desktop, require Default,
 bind the worker with `SetThreadDesktop`, and revalidate the exact foreground
 broker and session before the single pair. Report binding success and whether
@@ -90,6 +90,10 @@ treating a foreground change as dismissal. An open/bind/target failure sends no
 input. A failed trial keeps the product guard. If B still confirms failure,
 investigate a separately installed SYSTEM input process with active-desktop
 ownership rather than broadening the ordinary agent or weakening the PIN guard.
+The generation-98 update carries the pinned, separately test-signed probe and
+its installation/removal scripts beside the product executables. Delivery does
+not install the probe, trust its certificate or run the trial. B's observed
+desktop-binding result and PIN response remain pending.
 
 ## Acceptance sequence
 

@@ -15,10 +15,13 @@ An attended, one-shot `credential-ui-probe` experiment is the sole exception to 
 
 An independent UIAccess probe is also allowed as an attended experiment. It
 requires a separately trusted code signature and an administrator-owned
-installation location. Generations 91 through 94 may deliver the test executable and
+installation location. Generations 91 through 94, 97 and 98 may deliver the test executable and
 public certificate through peer update, but neither is installed, trusted, or
 run by that update. The probe sends only one Escape pair after
-positive broker identification. It is not a resident privileged input path.
+positive broker identification. Generation 98 binds a windowless input worker
+to the active Default desktop before revalidating the foreground broker. It
+does not switch to a secure desktop, register a service or enable peer input
+into credential UI. It is not a resident privileged input path.
 
 ## Input safety
 
