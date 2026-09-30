@@ -1,6 +1,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include "trial-common.h"
+#include "winlogon-token.h"
 #define KRASIS_SYSTEM_TRIAL
 #include "../uiaccess-input/uiaccess-probe.cpp"
 
@@ -22,40 +23,21 @@ DWORD WINAPI control(DWORD event, DWORD, void*, void*) {
     if ((event == SERVICE_CONTROL_STOP || event == SERVICE_CONTROL_SHUTDOWN) && stopEvent) SetEvent(stopEvent);
     return NO_ERROR;
 }
-DWORD launchTrial(DWORD& error) {
+DWORD launchTrial(DWORD& error, bool& winlogonTokenLaunched) {
     DWORD session = WTSGetActiveConsoleSessionId();
     if (!session || session == 0xFFFFFFFF || !system_trial::isSystem() || !system_trial::fixedLocation()) return 20;
-    HANDLE privileges = nullptr;
-    TOKEN_PRIVILEGES enabledPrivileges{};
-    enabledPrivileges.PrivilegeCount = 1;
-    enabledPrivileges.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
-    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &privileges)) {
-        error = GetLastError(); return 22;
-    }
-    SetLastError(ERROR_SUCCESS);
-    BOOL adjusted = LookupPrivilegeValueW(nullptr, SE_TCB_NAME, &enabledPrivileges.Privileges[0].Luid) &&
-        AdjustTokenPrivileges(privileges, FALSE, &enabledPrivileges, 0, nullptr, nullptr);
-    error = GetLastError();
-    CloseHandle(privileges);
-    if (!adjusted || error != ERROR_SUCCESS || !system_trial::consoleMatchesConfig()) return 22;
+    if (!system_trial::enablePrivilege(SE_TCB_NAME, error) ||
+        !system_trial::enablePrivilege(SE_DEBUG_NAME, error) || !system_trial::consoleMatchesConfig()) return 22;
     auto marker = system_trial::directory() + L"\\run-claimed";
     HANDLE claim = CreateFileW(marker.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW,
         FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
     if (claim == INVALID_HANDLE_VALUE) { error = GetLastError(); return 21; }
     CloseHandle(claim);
 
-    HANDLE source = nullptr, token = nullptr;
-    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY | TOKEN_DUPLICATE, &source)) {
-        error = GetLastError(); return 22;
-    }
-    BOOL duplicated = DuplicateTokenEx(source, TOKEN_QUERY | TOKEN_DUPLICATE | TOKEN_ASSIGN_PRIMARY |
-        TOKEN_ADJUST_SESSIONID | TOKEN_ADJUST_DEFAULT, nullptr, SecurityImpersonation, TokenPrimary, &token);
-    error = duplicated ? ERROR_SUCCESS : GetLastError();
-    CloseHandle(source);
-    if (!duplicated) return 22;
+    HANDLE token = system_trial::consoleWinlogonToken(session, error);
+    if (!token) return 32;
     DWORD enabled = 1;
-    BOOL prepared = SetTokenInformation(token, TokenSessionId, &session, sizeof(session)) &&
-        SetTokenInformation(token, TokenUIAccess, &enabled, sizeof(enabled));
+    BOOL prepared = SetTokenInformation(token, TokenUIAccess, &enabled, sizeof(enabled));
     if (!prepared) { error = GetLastError(); CloseHandle(token); return 23; }
 
     HANDLE job = CreateJobObjectW(nullptr, nullptr);
@@ -84,6 +66,12 @@ DWORD launchTrial(DWORD& error) {
     std::wstring command = L"\"" + binary + L"\" --worker";
     wchar_t environment[] = L"\0";
     auto root = system_trial::directory();
+    // Do not create a child after an operator/session change during token preparation.
+    if (!system_trial::consoleMatchesConfig() || !system_trial::tokenInSession(token, session)) {
+        DeleteProcThreadAttributeList(startup.lpAttributeList);
+        HeapFree(GetProcessHeap(), 0, startup.lpAttributeList);
+        CloseHandle(job); CloseHandle(token); return 20;
+    }
     BOOL created = CreateProcessAsUserW(token, binary.c_str(), command.data(), nullptr, nullptr, FALSE,
         CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT | CREATE_NO_WINDOW | EXTENDED_STARTUPINFO_PRESENT,
         environment, root.c_str(), &startup.StartupInfo, &child);
@@ -92,6 +80,7 @@ DWORD launchTrial(DWORD& error) {
     HeapFree(GetProcessHeap(), 0, startup.lpAttributeList);
     CloseHandle(token);
     if (!created) { CloseHandle(job); return 25; }
+    winlogonTokenLaunched = true;
     DWORD result = 26;
     // The child belongs to the kill-on-close job at creation, even if we crash
     // before resuming it. There is no unowned suspended-process interval.
@@ -122,8 +111,10 @@ void WINAPI serviceMain(DWORD argc, wchar_t**) {
     if (!stopEvent || argc != 1) { status(SERVICE_STOPPED, 20); return; }
     status(SERVICE_RUNNING);
     DWORD error = 0;
-    DWORD result = launchTrial(error);
-    system_trial::writeEvidence(L"service-result.json", result, error);
+    bool winlogonTokenLaunched = false;
+    DWORD result = launchTrial(error, winlogonTokenLaunched);
+    system_trial::writeEvidence(L"service-result.json", result, error, false, false, false, 0, 0,
+        winlogonTokenLaunched);
     status(SERVICE_STOPPED, result);
     // Keep the handler's event valid until this one-shot process exits.
 }
@@ -132,7 +123,15 @@ void WINAPI serviceMain(DWORD argc, wchar_t**) {
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR command, int) {
     if (!system_trial::fixedLocation() || !system_trial::isSystem()) return 12;
     if (wcscmp(command, L"--worker") == 0) {
+        DWORD error = 0;
+        if (!system_trial::enablePrivilege(SE_TCB_NAME, error)) {
+            system_trial::writeEvidence(L"result.json", 22, error); return 22;
+        }
         if (!system_trial::currentConsoleSession()) return 12;
+        bool uiAccess = false, sessionMatches = false;
+        if (!system_trial::tokenState(uiAccess, sessionMatches) || !uiAccess || !sessionMatches) {
+            system_trial::writeEvidence(L"result.json", 23, ERROR_INVALID_OWNER); return 23;
+        }
         int result = runInputTrial();
         // A detailed result already exists after injection; CREATE_NEW preserves it.
         system_trial::writeEvidence(L"result.json", static_cast<DWORD>(result), 0);

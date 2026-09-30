@@ -209,6 +209,21 @@ session, validate its SYSTEM identity and token session, and retain all existing
 operator, target, one-shot, lifetime and job-ownership checks. It must not accept
 an arbitrary token source or expose a remote privileged input endpoint.
 
+The comparison selects exactly one System32 winlogon process in the expected
+active console session, rechecks its image through the opened process handle,
+and validates SYSTEM identity and TokenSessionId before duplication. It grants
+UIAccess without rewriting the source session. Failure has no service-token
+fallback. The worker validates its actual UIAccess and token/process session
+agreement before target observation. Added numeric/boolean evidence makes the
+worker's token state explicit and distinguishes successful winlogon-token child
+creation in the service report from the worker's actual injection result.
+Only the temporary service enables debug privilege for source-token access;
+the normal product remains unchanged. Existing ownership, fixed executable,
+operator SID/session, foreground target and lifetime restrictions still apply.
+Local x64 compilation, bootstrap manifest extraction and process-creation
+refusal checks passed for uninstalled service, worker and invalid invocations
+(code 12, no service or input). B's attended token comparison remains pending.
+
 ## Acceptance sequence
 
 1. Build a one-shot, destination-local probe with no peer/network input path.
