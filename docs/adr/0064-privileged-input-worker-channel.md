@@ -168,8 +168,8 @@ service failure로 반환하며 정상 종료나 다음 lease로 숨기지 않�
 ## 설치 transaction의 복구 순서
 
 `install_transaction.go`는 설치·업데이트·제거의 내부 상태 전이를 구현합니다. Windows
-고정 위치의 파일 staging·journal·복원을 구현했으며, SCM 제어 backend 및 제품 updater
-연결은 아직 구현하지 않았습니다. 외부에서 호출할 수 있는 설치 명령도 없습니다.
+고정 위치의 파일 staging·journal·복원과 SCM 제어 backend를 구현했습니다. 제품 updater와
+배포 installer에는 아직 연결하지 않았으며, 외부에서 호출할 수 있는 설치 명령도 없습니다.
 target digest는 향후 독립적으로 승인된 설치 payload에서만 구성해야 합니다.
 원격 묶음의 checksum/BUILD.json 또는 agent 요청은 실행 승인 근거가 아닙니다.
 
@@ -250,6 +250,28 @@ clean 저장 실패도 SCM failure로 반환해 installer가 프로세스 종료
 
 ## 검증 범위
 
+`windowsInstallBackend`가 transaction을 고정 Windows 파일 작업과 SCM 제어에 연결합니다.
+이미 상승한 installer와 보호 root에서만 생성하며 생성자와 payload는 private입니다.
+자동 업데이트·CLI·UI에는 실행 endpoint를 노출하지 않습니다. SCM manager에는
+connect/create만 요청하고, 제어 전에 고정 own-process·demand-start·LocalSystem·quoted
+EXE와 --service 인수·빈 dependency/group·owner/DACL을 확인합니다. Users에는 query/read만
+허용합니다. crash restart·custom command·trigger도 없어야 하며, 다른 기존 서비스는
+덮어쓰거나 삭제하지 않습니다. 생성 직후 권한 설정 실패 시 아직 실행하지 않은 그
+서비스만 제거를 시도하고 transaction record를 보존합니다.
+
+Start는 실제 PID의 session 0·SYSTEM·System integrity·비제한 token·고정 보호 digest 및
+그 PID와 digest의 ready record까지 확인합니다. Stop은 process handle을 유지하고 clean
+record와 실제 종료를 기다립니다. 이미 멈춘 서비스에도 clean record가 필요하며 SCM의
+never-started 상태만 입력이 없었던 별도 경우로 취급합니다. 해제 실패·missing/failed
+record·timeout은 교체·복원을 진행하지 않습니다. 두 rename 사이의 중단은 retired/rollback
+image로 종료를 대조한 후 복원합니다. 제거는 SCM object 부재까지 기다리고 lifecycle
+record를 삭제한 후 journal을 마지막으로 지웁니다. 보호 root와 lock anchor는 유지합니다.
+현재 demand-start 계약이며 부팅 정책과 제품 agent 실행 전환은 후속 통합 대상입니다.
+
+config·ACL 거부, kernel 문자열 pointer 범위, zero backend, clean build payload의 command
+role·바이트 소유권을 입력 없이 검사합니다. 실제 Program Files 배치·SCM 등록/시작/종료와
+A→B 입력은 실행하지 않았으므로 native API 조합의 실기기 결과는 아직 미검증입니다.
+
 in-memory stream과 fake input으로 EOF·취소·절대 만료·replay·wrong binding·불확실한
 press·해제 실패·malformed frame·응답 결과 분류를 검증합니다. 실제 입력은 전송하지
 않습니다. zero authority·다른 session·낮은 integrity·restricted/AppContainer 거부,
@@ -270,3 +292,5 @@ go vet와 `cmd/krasis-input`의 Windows EXE 빌드가 통과했습니다. SCM �
 - [GetNamedPipeClientProcessId](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getnamedpipeclientprocessid)
 - [Named Pipe Security](https://learn.microsoft.com/en-us/windows/win32/ipc/named-pipe-security-and-access-rights)
 - [Windows Go service API](https://pkg.go.dev/golang.org/x/sys/windows/svc)
+- [Windows service security objects](https://learn.microsoft.com/en-us/windows/win32/secauthz/securable-objects)
+- [Service trigger configuration](https://learn.microsoft.com/en-us/windows/win32/api/winsvc/ns-winsvc-service_trigger_info)
