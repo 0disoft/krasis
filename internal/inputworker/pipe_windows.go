@@ -21,6 +21,10 @@ const pipeName = `\\.\pipe\Krasis.Input.v1`
 // AcceptAgent is a bounded, local-only, single-instance service endpoint. No
 // frame is read before the exact agent process has been authenticated.
 func AcceptAgent(ctx context.Context, agentDigest [sha256.Size]byte) (*Channel, error) {
+	return acceptAgentReady(ctx, agentDigest, nil)
+}
+
+func acceptAgentReady(ctx context.Context, agentDigest [sha256.Size]byte, ready func() error) (*Channel, error) {
 	if ctx == nil || ctx.Err() != nil || agentDigest == ([sha256.Size]byte{}) {
 		return nil, ErrAuthority
 	}
@@ -37,6 +41,12 @@ func AcceptAgent(ctx context.Context, agentDigest [sha256.Size]byte) (*Channel, 
 	}
 	pipe, err := makePipe(pipeName)
 	if err != nil {
+		return nil, ErrAuthority
+	}
+	// Persist readiness only after this service owns the first pipe instance,
+	// and before authenticating or consuming any agent lease/input.
+	if ready != nil && ready() != nil {
+		_ = pipe.Close()
 		return nil, ErrAuthority
 	}
 	if err := pipe.connect(ctx); err != nil {

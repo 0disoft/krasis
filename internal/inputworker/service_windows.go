@@ -24,7 +24,7 @@ func RunService(installation *Installation) error {
 	if err != nil || !managed {
 		return ErrAuthority
 	}
-	if svc.Run(ServiceName, &serviceHandler{run: func(ctx context.Context) error { return runServiceLoop(ctx, installation) }}) != nil {
+	if svc.Run(ServiceName, &serviceHandler{run: func(ctx context.Context) error { return runInstalledService(ctx, installation, service) }}) != nil {
 		return ErrAuthority
 	}
 	return nil
@@ -64,13 +64,23 @@ func RunInstalledWorker(ctx context.Context, installation *Installation) error {
 	return RunConsoleInput(ctx, agent, service)
 }
 
-func runServiceLoop(ctx context.Context, installation *Installation) error {
+func runServiceLoop(ctx context.Context, installation *Installation, ready func() error) error {
 	agent, service, err := installation.digests()
 	if err != nil {
 		return ErrAuthority
 	}
 	for ctx.Err() == nil {
-		channel, err := AcceptAgent(ctx, agent)
+		readyFailed := false
+		channel, err := acceptAgentReady(ctx, agent, func() error {
+			if ready != nil && ready() != nil {
+				readyFailed = true
+				return ErrAuthority
+			}
+			return nil
+		})
+		if readyFailed {
+			return ErrAuthority
+		}
 		if err == nil {
 			lease, leaseErr := receiveLease(ctx, channel)
 			if leaseErr == nil {

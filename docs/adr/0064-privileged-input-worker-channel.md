@@ -229,6 +229,25 @@ journal에 따라 rollback합니다. 기존 agent가 파일을 잡아 첫 rename
 Windows 파일 검사는 사용자 소유 파일의 수정 거부·내용 보존·취소·zero store를
 검사하며 실제 Program Files 설치는 실행하지 않습니다.
 
+## 서비스의 준비·종료 영수증
+
+SCM의 Running/Stopped 상태만으로 endpoint 준비 또는 입력 해제를 추정하지 않습니다.
+service는 고정 보호 root의 `INPUT-SERVICE.record`에 80바이트 정규 record를 저장합니다.
+내용은 phase·kernel PID·run별 무작위 식별자·설치된 service digest뿐이며 입력 payload나
+사용자 식별자는 포함하지 않습니다. 기록을 읽는 installer도 보호 owner/DACL·고정 image·
+SCM과 실제 process metadata를 별도로 검증해야 합니다.
+
+service는 starting 기록을 먼저 쓰며 first-instance pipe 생성 후 ready를 원자적으로
+저장한 다음에만 agent 인증과 lease 수신을 진행합니다. ready 기록 실패 시 채널을 닫고
+입력을 받지 않습니다. ready 전 실패는 입력이 없었다는 clean 기록을 남길 수 있습니다.
+ready 이후 worker 복구 실패는 failed이며, 정상 복구가 완료된 경우에만 clean을 씁니다.
+clean 저장 실패도 SCM failure로 반환해 installer가 프로세스 종료만으로 교체하지 않게
+합니다. 기록은 service 취소와 독립된 2초 문맥에서 flush·교체합니다.
+
+입력 없는 fake run으로 ready 전 승인 차단·중복 ready·복구 실패·취소 이후 기록·
+종료 기록 저장 실패 및 wire 형식을 검사합니다. 실제 SCM 설치와 원격 제어 검증은
+아직 수행하지 않았습니다.
+
 ## 검증 범위
 
 in-memory stream과 fake input으로 EOF·취소·절대 만료·replay·wrong binding·불확실한
