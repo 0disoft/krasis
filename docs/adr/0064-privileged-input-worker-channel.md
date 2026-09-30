@@ -81,6 +81,31 @@ kernel completion을 기다립니다. 그 전에 버퍼를 unpin하거나 이벤
 파이프 연결은 각각 최대 5초·2초이며 송수신 deadline도 pending I/O에 적용됩니다.
 진짜 service·agent 상호 인증과 console worker 실행은 아직 연결하지 않았습니다.
 
+## 콘솔 worker 실행 기반
+
+`LaunchConsoleWorker`는 SYSTEM·session 0·고정 설치 위치의 service와 인증된 agent
+authority에서만 실행됩니다. service의 승인 digest로 자기 EXE를 읽기 고정하고,
+현재 console session의 System32/winlogon.exe 토큰만 복제합니다. 복제한 토큰에
+UIAccess를 설정하고 생성된 자식의 실제 SYSTEM·UIAccess·session·제한 여부를
+재검사한 뒤 실행합니다. 토큰 준비 전후 agent/logon/console 승인을 재확인합니다.
+
+필요한 privilege는 전용 OS 스레드의 복제 impersonation token에만 적용합니다.
+service process와 다른 스레드의 토큰은 변경하지 않으며 impersonation 해제 실패 시
+그 스레드를 runtime pool로 반환하지 않습니다. 원시 오류·SID·사용자명은 반환하지
+않습니다. 환경은 빈 Unicode block, desktop은 winsta0/default, 인수는 고정 worker
+모드이며 client가 경로·PID·token source·session·명령을 고르지 못합니다.
+
+자식은 생성 순간부터 kill-on-close Job에 속하며 활성 프로세스 한도는 1입니다.
+생성 후 job 할당까지의 service crash 공백이 없습니다. 인증 취소·세션 변경·agent
+종료 후에는 bounded recovery 기회를 두고 소유 job을 닫습니다. service stop/업데이트
+supervisor는 먼저 입력 채널을 닫고 해제 결과를 기다린 뒤 worker를 종료해야 합니다.
+강제 process 종료 자체는 눌린 키·버튼 해제의 성공 증거가 아닙니다.
+
+이 단계는 실행 기반이며 service entry point·worker bootstrap·설치·제품 adapter는
+아직 연결하지 않았습니다. 서비스 또는 worker를 실제 설치·실행하지 않았고 agent
+generation은 유지합니다. 일반 권한 launch 거부, native Job 한도, 동시 close를
+입력 없이 검사하며 SYSTEM child 실행과 원격 PIN 입력은 별도 기기 검증이 필요합니다.
+
 ## 검증 범위
 
 in-memory stream과 fake input으로 EOF·취소·절대 만료·replay·wrong binding·불확실한
