@@ -109,15 +109,22 @@ func TestConsoleCloseIsConcurrentAndZeroSafeWithoutInput(t *testing.T) {
 		t.Fatal("owned job creation failed")
 	}
 	worker := &ConsoleWorker{job: job, done: make(chan struct{})}
+	if worker.exited() {
+		t.Fatal("unstarted worker reported exited")
+	}
 	var group sync.WaitGroup
 	for range 12 {
 		group.Go(func() {
+			_ = worker.exited()
 			if worker.Close() != nil {
 				t.Error("concurrent job close failed")
 			}
 		})
 	}
 	group.Wait()
+	if !worker.exited() {
+		t.Fatal("closed worker still reported active")
+	}
 	select {
 	case <-worker.done:
 	default:

@@ -19,6 +19,8 @@ import (
 // primitive, not an input authorization endpoint. The service must close the
 // authenticated input channel and finish recovery before calling Close.
 type ConsoleWorker struct {
+	mu           sync.Mutex
+	closed       bool
 	job, process windows.Handle
 	image        *os.File
 	done         chan struct{}
@@ -136,6 +138,10 @@ func (worker *ConsoleWorker) watch(ctx context.Context, agent *Authority) {
 			_ = worker.Close()
 			return
 		case <-ticker.C:
+			if worker.exited() {
+				_ = worker.Close()
+				return
+			}
 			if agent.check(false) != nil {
 				// The channel's independent recovery has a bounded opportunity
 				// to release inputs before we forcibly reap the owned process.
@@ -153,6 +159,19 @@ func (worker *ConsoleWorker) watch(ctx context.Context, agent *Authority) {
 	}
 }
 
+func (worker *ConsoleWorker) exited() bool {
+	worker.mu.Lock()
+	defer worker.mu.Unlock()
+	if worker.closed {
+		return true
+	}
+	if worker.process == 0 {
+		return false
+	}
+	state, err := windows.WaitForSingleObject(worker.process, 0)
+	return err != nil || state != uint32(windows.WAIT_TIMEOUT)
+}
+
 // Close is idempotent and waits for the exact owned child, never a PID lookup.
 // Job close also covers service crash and a child that has not resumed yet.
 func (worker *ConsoleWorker) Close() error {
@@ -160,6 +179,9 @@ func (worker *ConsoleWorker) Close() error {
 		return nil
 	}
 	worker.once.Do(func() {
+		worker.mu.Lock()
+		defer worker.mu.Unlock()
+		worker.closed = true
 		if worker.done != nil {
 			close(worker.done)
 		}
