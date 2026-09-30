@@ -183,6 +183,10 @@ Generation 99 carries the signed SYSTEM trial in the same atomic six-file
 payload accepted by g90+ receivers. The legacy test EXE filename is retained
 for transport compatibility; its system-input README and scripts select the
 new installation/attended execution flow. The update only stages these files.
+Generation 100 carries the startup-corrected manifest, independently pinned
+signed EXE and current trial instructions through that same six-file transport.
+Local process creation/refusal and manifest checks passed. B's SCM launch,
+actual child UIAccess and PIN response remain unverified.
 
 ## Acceptance sequence
 
