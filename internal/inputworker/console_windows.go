@@ -33,6 +33,14 @@ type ConsoleWorker struct {
 // path, PID, session, command, desktop or environment is accepted.
 // It is not wired into the resident agent or installer yet.
 func LaunchConsoleWorker(ctx context.Context, agent *Authority, digest [sha256.Size]byte) (*ConsoleWorker, error) {
+	worker, err := launchManagedConsole(ctx, agent, digest, nil)
+	if err == nil {
+		go worker.watch(ctx, agent)
+	}
+	return worker, err
+}
+
+func launchManagedConsole(ctx context.Context, agent *Authority, digest [sha256.Size]byte, prepare func(windows.Handle, uint32) error) (*ConsoleWorker, error) {
 	if ctx == nil || ctx.Err() != nil || agent == nil || agent.kind != authorityAgent || agent.check(false) != nil || digest == ([sha256.Size]byte{}) {
 		return nil, ErrAuthority
 	}
@@ -56,7 +64,7 @@ func LaunchConsoleWorker(ctx context.Context, agent *Authority, digest [sha256.S
 			ready <- result{err: ErrAuthority}
 			return
 		}
-		worker, err := launchConsole(ctx, agent, digest)
+		worker, err := launchConsole(ctx, agent, digest, prepare)
 		if undo() != nil {
 			clean = false
 			if worker != nil {
@@ -75,11 +83,10 @@ func LaunchConsoleWorker(ctx context.Context, agent *Authority, digest [sha256.S
 		_ = value.worker.Close()
 		return nil, ErrAuthority
 	}
-	go value.worker.watch(ctx, agent)
 	return value.worker, nil
 }
 
-func launchConsole(ctx context.Context, agent *Authority, digest [sha256.Size]byte) (*ConsoleWorker, error) {
+func launchConsole(ctx context.Context, agent *Authority, digest [sha256.Size]byte, prepare func(windows.Handle, uint32) error) (*ConsoleWorker, error) {
 	self, err := inspectProcess(windows.GetCurrentProcessId())
 	if err != nil {
 		return nil, ErrAuthority
@@ -119,7 +126,7 @@ func launchConsole(ctx context.Context, agent *Authority, digest [sha256.Size]by
 	}
 	worker.process, err = createConsoleProcess(ctx, token, path, worker.job, func() bool {
 		return windows.WTSGetActiveConsoleSessionId() == session && agent.check(false) == nil
-	})
+	}, prepare)
 	if err != nil {
 		return nil, ErrAuthority
 	}

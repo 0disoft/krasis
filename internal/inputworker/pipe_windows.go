@@ -84,13 +84,17 @@ type pipeConn struct {
 }
 
 func makePipe(name string) (*pipeConn, error) {
+	return makePipeACL(name, "D:P(A;;GA;;;SY)(A;;0x0012019B;;;IU)")
+}
+
+func makePipeACL(name, dacl string) (*pipeConn, error) {
 	path, err := windows.UTF16PtrFromString(name)
 	if err != nil {
 		return nil, ErrAuthority
 	}
 	// Give interactive users stream and attribute access. Do not grant
 	// FILE_CREATE_PIPE_INSTANCE (the FILE_APPEND_DATA bit in GENERIC_WRITE).
-	sd, err := windows.SecurityDescriptorFromString("D:P(A;;GA;;;SY)(A;;0x0012019B;;;IU)")
+	sd, err := windows.SecurityDescriptorFromString(dacl)
 	if err != nil {
 		return nil, ErrAuthority
 	}

@@ -6,6 +6,7 @@ import (
 	"context"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -33,7 +34,7 @@ func makeWorkerJob() (windows.Handle, error) {
 	return job, nil
 }
 
-func createConsoleProcess(ctx context.Context, token windows.Token, path string, job windows.Handle, authorized func() bool) (windows.Handle, error) {
+func createConsoleProcess(ctx context.Context, token windows.Token, path string, job windows.Handle, authorized func() bool, prepare func(windows.Handle, uint32) error) (windows.Handle, error) {
 	attributes, err := windows.NewProcThreadAttributeList(1)
 	if err != nil {
 		return 0, ErrAuthority
@@ -89,9 +90,15 @@ func createConsoleProcess(ctx context.Context, token windows.Token, path string,
 	}
 	session := windows.WTSGetActiveConsoleSessionId()
 	valid := session != 0 && session != 0xffffffff && identity.system && identity.uiAccess && identity.integrity == 0x4000 &&
-		identity.session == session && !identity.restricted && !identity.appContainer && identity.image == path
+		identity.session == session && !identity.restricted && !identity.appContainer && strings.EqualFold(identity.image, path)
 	_ = identity.close()
 	if !valid || ctx.Err() != nil || !authorized() {
+		return 0, ErrAuthority
+	}
+	if prepare != nil && prepare(child.Process, child.ProcessId) != nil {
+		return 0, ErrAuthority
+	}
+	if ctx.Err() != nil || !authorized() {
 		return 0, ErrAuthority
 	}
 	previous, err := windows.ResumeThread(child.Thread)

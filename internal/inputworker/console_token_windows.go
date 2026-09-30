@@ -40,20 +40,7 @@ func launchPrivileges() (func() error, error) {
 	}
 	defer thread.Close()
 	for _, name := range []string{"SeTcbPrivilege", "SeDebugPrivilege", "SeAssignPrimaryTokenPrivilege", "SeIncreaseQuotaPrivilege"} {
-		ptr, err := windows.UTF16PtrFromString(name)
-		if err != nil {
-			return nil, ErrAuthority
-		}
-		privileges := windows.Tokenprivileges{PrivilegeCount: 1}
-		if windows.LookupPrivilegeValue(nil, ptr, &privileges.Privileges[0].Luid) != nil {
-			return nil, ErrAuthority
-		}
-		privileges.Privileges[0].Attributes = windows.SE_PRIVILEGE_ENABLED
-		if windows.AdjustTokenPrivileges(thread, false, &privileges, 0, nil, nil) != nil {
-			return nil, ErrAuthority
-		}
-		// A successful BOOL can still mean NOT_ALL_ASSIGNED. Verify the token.
-		if !privilegeEnabled(thread, privileges.Privileges[0].Luid) {
+		if enablePrivilege(thread, name) != nil {
 			return nil, ErrAuthority
 		}
 	}
@@ -61,6 +48,22 @@ func launchPrivileges() (func() error, error) {
 		return nil, ErrAuthority
 	}
 	return windows.RevertToSelf, nil
+}
+
+func enablePrivilege(token windows.Token, name string) error {
+	ptr, err := windows.UTF16PtrFromString(name)
+	if err != nil {
+		return ErrAuthority
+	}
+	privileges := windows.Tokenprivileges{PrivilegeCount: 1}
+	if windows.LookupPrivilegeValue(nil, ptr, &privileges.Privileges[0].Luid) != nil {
+		return ErrAuthority
+	}
+	privileges.Privileges[0].Attributes = windows.SE_PRIVILEGE_ENABLED
+	if windows.AdjustTokenPrivileges(token, false, &privileges, 0, nil, nil) != nil || !privilegeEnabled(token, privileges.Privileges[0].Luid) {
+		return ErrAuthority
+	}
+	return nil
 }
 
 func privilegeEnabled(token windows.Token, luid windows.LUID) bool {
@@ -130,11 +133,13 @@ func consoleToken(session uint32) (windows.Token, error) {
 	}
 	defer source.Close()
 	var token windows.Token
-	if windows.DuplicateTokenEx(source, windows.TOKEN_QUERY|windows.TOKEN_DUPLICATE|windows.TOKEN_ASSIGN_PRIMARY|windows.TOKEN_ADJUST_DEFAULT, nil, windows.SecurityImpersonation, windows.TokenPrimary, &token) != nil {
+	if windows.DuplicateTokenEx(source, windows.TOKEN_QUERY|windows.TOKEN_DUPLICATE|windows.TOKEN_ASSIGN_PRIMARY|windows.TOKEN_ADJUST_DEFAULT|windows.TOKEN_ADJUST_PRIVILEGES, nil, windows.SecurityImpersonation, windows.TokenPrimary, &token) != nil {
 		return 0, ErrAuthority
 	}
 	var enabled uint32 = 1
-	if windows.SetTokenInformation(token, windows.TokenUIAccess, (*byte)(unsafe.Pointer(&enabled)), 4) != nil || !validConsoleToken(token, session) {
+	// The child re-authenticates the transferred agent against the console
+	// logon using WTSQueryUserToken, which requires SYSTEM + enabled SeTcb.
+	if enablePrivilege(token, "SeTcbPrivilege") != nil || windows.SetTokenInformation(token, windows.TokenUIAccess, (*byte)(unsafe.Pointer(&enabled)), 4) != nil || !validConsoleToken(token, session) {
 		_ = token.Close()
 		return 0, ErrAuthority
 	}

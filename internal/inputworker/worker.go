@@ -60,6 +60,10 @@ type executor func(context.Context, func() error) error
 // to the caller; callers must not retry an input or switch backends.
 // This foundational entry point is not reachable from the product agent yet.
 func Serve(ctx context.Context, channel *Channel, input application.InputPort, lease Lease) (report Report, err error) {
+	return serveReady(ctx, channel, input, lease, nil)
+}
+
+func serveReady(ctx context.Context, channel *Channel, input application.InputPort, lease Lease, ready func() error) (report Report, err error) {
 	if channel == nil {
 		return report, ErrAuthority
 	}
@@ -74,6 +78,16 @@ func Serve(ctx context.Context, channel *Channel, input application.InputPort, l
 	// Root ownership stays alive during independent key-up recovery after ctx
 	// cancellation. The loop itself observes ctx and the immutable lease expiry.
 	err = inputdesktop.Run(context.Background(), func(scope *inputdesktop.Scope) error {
+		if ready != nil {
+			if err := scope.Do(ctx, func() error {
+				if authority.check(false) != nil {
+					return ErrAuthority
+				}
+				return ready()
+			}); err != nil {
+				return err
+			}
+		}
 		var runErr error
 		inputDo := func(ctx context.Context, operation func() error) error {
 			if err := authority.check(false); err != nil {

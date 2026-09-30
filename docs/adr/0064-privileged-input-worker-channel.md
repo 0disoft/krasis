@@ -124,6 +124,30 @@ EOF 복구·취소·응답 유실·잘못된 응답·미전송/부분전송 결�
 
 ## 검증 범위
 
+## Service/worker 초기화와 해제 영수증
+
+`ConnectLease`는 이미 승인된 원격 lease를 인증된 service에 전달하며 desktop worker의
+준비 응답을 기다립니다. lease frame은 고정 432바이트이고 세 식별자·binding·절대 만료만
+포함합니다. 빈 값·비정규 padding·예약 바이트·만료·1시간을 넘는 만료를 거부합니다.
+frame은 새로운 인증이나 mTLS 승인을 대신하지 않습니다.
+
+service는 자식이 suspended인 동안 SYSTEM-only private pipe를 만들고, 이미 인증한
+agent pipe의 핸들만 해당 자식에 복제합니다. client가 핸들이나 PID를 제공하지 않습니다.
+worker는 실제 service PID·image digest를 재검사하고, 복제 pipe의 kernel client PID로
+agent를 다시 인증합니다. Win32 [DuplicateHandle](https://learn.microsoft.com/en-us/windows/win32/api/handleapi/nf-handleapi-duplicatehandle)
+계약에 따라 복제 핸들의 소유권은 자식에 있으며 부모는 승인·image pin을 별도로 유지합니다.
+worker가 console logon을 다시 확인하도록 복제 token의 SeTcbPrivilege를 명시적으로
+활성화합니다. service process token은 변경하지 않습니다.
+
+worker는 실제 desktop scope 준비 후에만 ready를 알립니다. 종료 control은 정리 요청
+하나뿐이며 명령·경로·token 변경을 받지 않습니다. worker는 독립 입력 해제가 끝난 뒤
+수락 동작 개수와 해제 attempted/released/remaining만 반환합니다. supervisor는 이
+영수증을 기다린 후 Job을 정리합니다. 누락·잘못된 영수증과 남은 입력은 recovery unknown
+또는 failure이며 다음 lease를 승인하지 않습니다. process exit 자체를 해제 성공으로
+간주하지 않습니다. 이 초기화 경로는 service entry point와 설치에 아직 연결하지 않았습니다.
+
+## 검증 범위
+
 in-memory stream과 fake input으로 EOF·취소·절대 만료·replay·wrong binding·불확실한
 press·해제 실패·malformed frame·응답 결과 분류를 검증합니다. 실제 입력은 전송하지
 않습니다. zero authority·다른 session·낮은 integrity·restricted/AppContainer 거부,
