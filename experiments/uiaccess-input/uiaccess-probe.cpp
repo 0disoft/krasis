@@ -56,7 +56,7 @@ bool credentialBrokerForeground(HWND window) {
 
 void report(const wchar_t* message) {
 #ifdef KRASIS_SYSTEM_TRIAL
-    (void)message; // The privileged child creates no windows.
+    (void)message; // The privileged child never displays a dialog.
 #else
     MessageBoxW(nullptr, message, L"Krasis UIAccess 입력 시험", MB_OK | MB_ICONINFORMATION);
 #endif
@@ -68,6 +68,7 @@ struct EscapeResult {
     UINT releaseAccepted = 0;
 };
 
+#ifndef KRASIS_SYSTEM_TRIAL
 EscapeResult sendEscape() {
     INPUT events[2]{};
     for (auto& event : events) {
@@ -88,6 +89,7 @@ EscapeResult sendEscape() {
     result.releaseAccepted = SendInput(1, &events[1], sizeof(INPUT));
     return result;
 }
+#endif
 
 struct DesktopTrial {
     HWND target;
@@ -95,11 +97,19 @@ struct DesktopTrial {
     bool bound = false;
     bool inputAttempted = false;
     EscapeResult escape;
+#ifdef KRASIS_SYSTEM_TRIAL
+    bool queueReady = false;
+    bool hiddenWindowCreated = false;
+    bool messageHandled = false;
+    UINT downAccepted = 0;
+    UINT upAccepted = 0;
+#endif
 };
 
 DWORD WINAPI inputDesktopTrial(void* parameter) {
     auto& trial = *static_cast<DesktopTrial*>(parameter);
-    // This thread has no windows or hooks. The UI thread must not be rebound.
+    // Bind before creating any windows/hooks; destroy the transient queue window
+    // before restoring the original desktop. Never rebind the UI thread.
     HDESK original = GetThreadDesktop(GetCurrentThreadId());
     trial.alreadyDefault = isDefaultDesktop(original);
     HDESK desktop = OpenInputDesktop(0, FALSE,
@@ -117,10 +127,27 @@ DWORD WINAPI inputDesktopTrial(void* parameter) {
                 && system_trial::currentConsoleSession()
 #endif
             ) {
+                bool complete = false;
+#ifdef KRASIS_SYSTEM_TRIAL
+                const auto queued = system_trial::sendQueuedEscape(trial.target, [](HWND target) {
+                    return credentialBrokerForeground(target) && system_trial::currentConsoleSession();
+                });
+                trial.queueReady = queued.queueReady;
+                trial.hiddenWindowCreated = queued.windowCreated;
+                trial.messageHandled = queued.messageHandled;
+                trial.downAccepted = queued.downAccepted;
+                trial.upAccepted = queued.upAccepted;
+                trial.inputAttempted = queued.attempted;
+                trial.escape = {queued.downAccepted + queued.upAccepted, queued.error, queued.releaseAccepted};
+                result = queued.code;
+                complete = queued.code == 0 && trial.escape.accepted == 2;
+#else
                 result = 4;
                 trial.inputAttempted = true;
                 trial.escape = sendEscape();
-                if (trial.escape.accepted == 2) {
+                complete = trial.escape.accepted == 2;
+#endif
+                if (complete) {
                     Sleep(1000);
                     result = IsWindow(trial.target) && IsWindowVisible(trial.target) ? 5 : 0;
                 }
@@ -137,7 +164,8 @@ DWORD WINAPI inputDesktopTrial(void* parameter) {
 void reportTrial(DWORD result, const DesktopTrial& trial) {
 #ifdef KRASIS_SYSTEM_TRIAL
     system_trial::writeEvidence(L"result.json", result, trial.escape.error, trial.bound,
-        trial.alreadyDefault, trial.inputAttempted, trial.escape.accepted, trial.escape.releaseAccepted);
+        trial.alreadyDefault, trial.inputAttempted, trial.escape.accepted, trial.escape.releaseAccepted,
+        false, trial.queueReady, trial.hiddenWindowCreated, trial.messageHandled, trial.downAccepted, trial.upAccepted);
 #else
     const wchar_t* message = L"input_thread_failed: 입력 시험 스레드를 실행하지 못했습니다.";
     switch (result) {

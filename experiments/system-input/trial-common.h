@@ -73,7 +73,9 @@ inline bool currentConsoleSession() {
 }
 inline bool writeEvidence(const wchar_t* name, DWORD code, DWORD error,
                          bool bound = false, bool already = false, bool attempted = false,
-                         UINT accepted = 0, UINT released = 0, bool winlogonToken = false) {
+                         UINT accepted = 0, UINT released = 0, bool winlogonToken = false,
+                         bool queueReady = false, bool windowCreated = false, bool messageHandled = false,
+                         UINT downAccepted = 0, UINT upAccepted = 0) {
     const auto root = directory();
     if (root.empty()) return false;
     const auto file = root + L"\\" + name;
@@ -82,16 +84,19 @@ inline bool writeEvidence(const wchar_t* name, DWORD code, DWORD error,
     if (output == INVALID_HANDLE_VALUE) return false;
     bool uiAccess = false, sessionMatches = false;
     const bool tokenInspected = tokenState(uiAccess, sessionMatches);
-    char data[768]{};
+    char data[1024]{};
     int length = sprintf_s(data,
         "{\"schema\":\"krasis.system-input-trial/v1\",\"code\":%lu,\"win32Error\":%lu,"
         "\"system\":%s,\"consoleSession\":%s,\"desktopBound\":%s,\"alreadyDefault\":%s,"
         "\"inputAttempted\":%s,\"accepted\":%u,\"releaseAccepted\":%u,"
-        "\"tokenInspected\":%s,\"uiAccess\":%s,\"tokenSessionMatches\":%s,\"winlogonTokenLaunched\":%s}\n",
+        "\"tokenInspected\":%s,\"uiAccess\":%s,\"tokenSessionMatches\":%s,\"winlogonTokenLaunched\":%s,"
+        "\"queueReady\":%s,\"hiddenWindowCreated\":%s,\"messageHandled\":%s,"
+        "\"downAccepted\":%u,\"upAccepted\":%u}\n",
         code, error, isSystem() ? "true" : "false", currentConsoleSession() ? "true" : "false",
         bound ? "true" : "false", already ? "true" : "false", attempted ? "true" : "false", accepted, released,
         tokenInspected ? "true" : "false", uiAccess ? "true" : "false", sessionMatches ? "true" : "false",
-        winlogonToken ? "true" : "false");
+        winlogonToken ? "true" : "false", queueReady ? "true" : "false",
+        windowCreated ? "true" : "false", messageHandled ? "true" : "false", downAccepted, upAccepted);
     DWORD written = 0;
     bool ok = length > 0 && WriteFile(output, data, static_cast<DWORD>(length), &written, nullptr) &&
         written == static_cast<DWORD>(length) && FlushFileBuffers(output);

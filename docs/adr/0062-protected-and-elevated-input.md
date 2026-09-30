@@ -254,6 +254,24 @@ January 2026 updates, but this report does not establish B's update state or
 whether that restriction explains the refusal. A current, same-machine Deskflow
 comparison remains relevant before choosing a different input backend.
 
+The next trial initializes its queue only after desktop binding, creates an
+invisible WS_EX_NOACTIVATE tool window, and posts one private message. The
+callback consumes the request once even on denial, rechecks the exact foreground
+broker and console operator, sends down and up separately, and sends at most one
+additional key-up cleanup if release was not accepted. It does not call
+ShowWindow, SetForegroundWindow, AttachThreadInput, SetCapture or mutate the
+broker. The queue wait is limited to 500 ms; the window is destroyed and its
+class unregistered before desktop restoration. Additional boolean/numeric
+evidence records queue/window preparation, message dispatch and each event's
+acceptance. No key-down replay or local/remote generic command endpoint exists.
+This compares the combined GUI-dispatch and single-event-call differences;
+success would still require a later actual A-to-B mouse/keyboard acceptance.
+An uninstalled, non-SYSTEM negative smoke uses a null target and unconditional
+denial callback to exercise real queue/window creation, dispatch and teardown
+without input. The installed/SYSTEM path refuses that smoke mode. Local x64
+compilation, bootstrap manifest checks, three uninstalled-path refusals (12)
+and the no-input queue smoke (0) passed. B's attended comparison remains pending.
+
 ## Acceptance sequence
 
 1. Build a one-shot, destination-local probe with no peer/network input path.

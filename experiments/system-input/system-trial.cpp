@@ -2,6 +2,7 @@
 #include <windows.h>
 #include "trial-common.h"
 #include "winlogon-token.h"
+#include "desktop-queue.h"
 #define KRASIS_SYSTEM_TRIAL
 #include "../uiaccess-input/uiaccess-probe.cpp"
 
@@ -121,6 +122,15 @@ void WINAPI serviceMain(DWORD argc, wchar_t**) {
 }
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR command, int) {
+    // A local negative smoke exercises queue/window creation and teardown only.
+    // It is unavailable to SYSTEM or the installed service, has no target, and
+    // uses an unconditional denial callback, so it cannot send input.
+    if (wcscmp(command, L"--queue-refusal-check") == 0) {
+        if (system_trial::isSystem() || system_trial::fixedLocation()) return 12;
+        const auto trial = system_trial::sendQueuedEscape(nullptr, [](HWND) { return false; });
+        return trial.code == 3 && trial.queueReady && trial.windowCreated && trial.messageHandled &&
+            !trial.attempted && !trial.downAccepted && !trial.upAccepted && !trial.releaseAccepted ? 0 : 38;
+    }
     if (!system_trial::fixedLocation() || !system_trial::isSystem()) return 12;
     if (wcscmp(command, L"--worker") == 0) {
         DWORD error = 0;

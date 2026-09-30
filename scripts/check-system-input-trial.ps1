@@ -18,9 +18,14 @@ if ($LASTEXITCODE -ne 0) { throw 'Manifest extraction failed' }
 $xml = Get-Content -Raw -LiteralPath $manifest
 if ($xml -notmatch 'level="asInvoker"' -or $xml -notmatch 'uiAccess="false"') { throw 'Invalid service bootstrap manifest' }
 # Exercise process creation, not a service or an input trial. This cache path
-# cannot equal the hard-coded Program Files installation, so each invocation
-# must reach the entrypoint and deny execution with code 12, without UI/input.
-foreach ($argument in @('--service','--worker','--invalid')) {
+# cannot equal the hard-coded Program Files installation, so service/worker
+# invocations must deny execution with code 12. The separate queue smoke creates
+# a never-shown window with an unconditional denial callback and sends no input.
+foreach ($case in @(
+    @{Argument='--service'; Expected=12}, @{Argument='--worker'; Expected=12},
+    @{Argument='--invalid'; Expected=12}, @{Argument='--queue-refusal-check'; Expected=0}
+)) {
+    $argument = $case.Argument
     $process = [Diagnostics.Process]::new()
     try {
         $process.StartInfo.FileName = $binary
@@ -30,8 +35,8 @@ foreach ($argument in @('--service','--worker','--invalid')) {
         $process.StartInfo.CreateNoWindow = $true
         if (-not $process.Start()) { throw 'Process creation failed' }
         if (-not $process.WaitForExit(5000)) { $process.Kill(); $process.WaitForExit(); throw 'Refusal probe timed out' }
-        if ($process.ExitCode -ne 12) { throw "Uninstalled trial did not refuse $argument : $($process.ExitCode)" }
-        Write-Output "Process creation and uninstalled-path refusal passed: $argument (12)"
+        if ($process.ExitCode -ne $case.Expected) { throw "Trial check failed for $argument : $($process.ExitCode)" }
+        Write-Output "Process creation and bounded refusal check passed: $argument ($($case.Expected))"
     } finally { $process.Dispose() }
 }
 git diff --check
