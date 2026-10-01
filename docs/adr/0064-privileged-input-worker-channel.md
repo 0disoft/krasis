@@ -352,6 +352,16 @@ checkpoint를 저장합니다. `inProgress:true`, `result:5`, `recovery:required
 설치·복원 순서는 불변이고 panic·오류 내용은 기록하지 않습니다. 실패한 저장이나 fatal
 종료까지 보장하지 않으며, 최종 JSON·stderr·서비스·transaction 상태를 함께 대조해야 합니다.
 
+g111 부분 설치 후 파일 hash만 맞는 설치 에이전트를 선택하면 stopped 서비스에
+원격 제어 lease를 요청해 A→B 전환 실패/재연결을 반복할 수 있습니다. g113은 UI의
+설치 에이전트 선택 전에 fixed SCM 설정·서비스 보안 정보·Running/PID와 보호된
+service-ready receipt의 phase/PID/image digest/run을 읽기 전용으로 대조합니다.
+직접 실행된 설치 에이전트의 privileged backend 선택에도 같은 준비 검사를 적용합니다.
+준비되지 않은 서비스는 시작·수정하지 않고 기존 검증된 portable 에이전트 경로를
+선택합니다. 일반 제어 복구와 관리자/PIN 입력은 별도이며, 실제 privileged lease의
+인증·권한·회수 검증은 설치된 에이전트가 계속 수행합니다. 실행 후 서비스가 종료되는
+경합은 기존 입력 회수와 연결 실패 처리에 맡기며 제어 중 자동 backend 전환은 하지 않습니다.
+
 `scripts/build-input-installer.mjs`는 source clean 확인 후 revision별 출력 폴더를 만들며
 기존 산출물은 덮어쓰지 않습니다. 실행 파일의 실제 PE resource에서 아이콘과 관리자
 매니페스트를 대조합니다. 관리자 resource는 일반 테스트 EXE에 영향을 주지 않도록
