@@ -12,6 +12,7 @@ import (
 	"github.com/0disoft/krasis/internal/agent"
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/crashguard"
+	"github.com/0disoft/krasis/internal/peer"
 	"github.com/0disoft/krasis/internal/productidentity"
 	"github.com/0disoft/krasis/internal/productlog"
 	"github.com/0disoft/krasis/internal/transport"
@@ -96,14 +97,27 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 		if diagnostics.Display.MonitorCount != 1 {
 			return errors.New("one active display is required")
 		}
-		input, err := wininput.NewInputAdapterWithReturnRearmDistance(prepared.profile.Rearm(), diagnostics.Display.Width)
-		if err != nil {
-			return err
-		}
 		deadlineCtx, cancel := context.WithDeadline(parent, prepared.deadline)
 		defer cancel()
 		ctx, cancelCause := context.WithCancelCause(deadlineCtx)
 		defer cancelCause(context.Canceled)
+		worker := installedProductInput(prepared.deadline, cancelCause)
+		var input *wininput.InputAdapter
+		if worker != nil {
+			worker.event = log.Event
+			defer worker.close(nil)
+			input, err = wininput.NewInputAdapterWithInjection(prepared.profile.Rearm(), diagnostics.Display.Width, worker)
+			log.Event("installed_input_selected")
+		} else {
+			input, err = wininput.NewInputAdapterWithReturnRearmDistance(prepared.profile.Rearm(), diagnostics.Display.Width)
+		}
+		if err != nil {
+			return err
+		}
+		protectedActive := wininput.ProtectedInputActive
+		if worker != nil {
+			protectedActive = func() bool { return false }
+		}
 		defer func() {
 			if errors.Is(context.Cause(ctx), crashguard.ErrUnexpectedExit) {
 				err = errors.Join(err, crashguard.ErrUnexpectedExit)
@@ -113,6 +127,9 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 			}
 			if errors.Is(context.Cause(ctx), wininput.ErrProtectedInput) {
 				err = errors.Join(err, wininput.ErrProtectedInput)
+			}
+			if errors.Is(context.Cause(ctx), errPrivilegedInput) {
+				err = errors.Join(err, errPrivilegedInput)
 			}
 		}()
 		for _, start := range auxiliary {
@@ -181,7 +198,7 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 			defer close(protectedDone)
 			ticker := time.NewTicker(100 * time.Millisecond)
 			defer ticker.Stop()
-			monitorProtectedInput(ctx, ticker.C, wininput.ProtectedInputActive, stopProtected)
+			monitorProtectedInput(ctx, ticker.C, protectedActive, stopProtected)
 		}()
 		defer func() { cancel(); <-protectedDone }()
 		config := agent.DefaultConfig(control.BoundaryConfig{Edge: control.ScreenEdge(prepared.profile.Edge), ScreenLeft: diagnostics.Display.Left, ScreenWidth: diagnostics.Display.Width, RearmDistance: prepared.profile.Rearm()})
@@ -214,8 +231,24 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 		checkGeometry := displayGeometryGuard(ctx, geometry, wininput.CurrentDisplayGeometry, func() { log.Event("lifecycle_display_change"); cancelCause(wininput.ErrDisplayGeometryChanged) })
 		hook := wininput.NewSourceHook(progress)
 		hook.SetBoundaryGuard(checkGeometry)
+		var inputGuard productInputGuard = guard
+		if worker != nil {
+			inputGuard = workerOwnedPressGuard{}
+		}
+		guarded := &guardedProductInput{InputBoundaryPort: input, guard: inputGuard, log: log, geometry: checkGeometry, protected: protectedActive, stopProtected: stopProtected}
+		var boundaryInput agent.InputBoundaryPort = guarded
+		var authorizer peer.LeaseAuthorizer = productAuthorizer{trust}
+		runSession := agent.RunSession
+		if worker != nil {
+			boundaryInput = &privilegedBoundary{guardedProductInput: guarded, worker: worker}
+			authorizer = privilegedAuthorizer{LeaseAuthorizer: authorizer, input: worker}
+			runSession = func(ctx context.Context, config agent.Config, dependencies agent.Dependencies) (agent.Result, error) {
+				defer worker.close(nil)
+				return agent.RunSession(ctx, config, dependencies)
+			}
+		}
 		return agent.RunSupervisor(ctx, agent.SupervisorConfig{Session: config, Backoff: backoff, Now: time.Now, Wait: agent.Wait, Observer: observer}, agent.SupervisorDependencies{
-			Source: source, Hook: hook, Input: &guardedProductInput{InputBoundaryPort: input, guard: guard, log: log, geometry: checkGeometry, protected: wininput.ProtectedInputActive, stopProtected: stopProtected}, Effects: agent.RuntimeEffects{}, Authorizer: productAuthorizer{trust}, RunSession: agent.RunSession,
+			Source: source, Hook: hook, Input: boundaryInput, Effects: agent.RuntimeEffects{}, Authorizer: authorizer, RunSession: runSession,
 		})
 	}
 }

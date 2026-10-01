@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"github.com/0disoft/krasis/internal/agentinstance"
+	"github.com/0disoft/krasis/internal/inputworker"
 	"github.com/0disoft/krasis/internal/localapi"
 	"io"
 	"os"
@@ -48,7 +49,20 @@ func NewStartup(control string) (Startup, error) {
 		},
 		Verify: func() error { return verifyAgentBundle(base, filepath.Base(self)) },
 		Start: func() error {
-			command := exec.Command(filepath.Join(base, "krasis-agent.exe"))
+			if err := verifyAgentBundle(base, filepath.Base(self)); err != nil {
+				return err
+			}
+			agentPath := filepath.Join(base, "krasis-agent.exe")
+			data, err := os.ReadFile(agentPath)
+			if err != nil {
+				return err
+			}
+			installed, installErr := inputworker.OpenAgentLaunch(sha256.Sum256(data))
+			if installErr == nil && installed != nil {
+				defer installed.Close()
+				agentPath = installed.Path()
+			}
+			command := exec.Command(agentPath)
 			command.Dir = base
 			command.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
 			for _, key := range []string{"SystemRoot", "WINDIR", "LOCALAPPDATA", "TEMP", "TMP", "USERPROFILE"} {
