@@ -121,7 +121,7 @@ func openProtected(path string, directory bool) (*os.File, error) {
 	if directory {
 		flags |= windows.FILE_FLAG_BACKUP_SEMANTICS
 	}
-	handle, err := windows.CreateFile(name, windows.GENERIC_READ|windows.READ_CONTROL, windows.FILE_SHARE_READ, nil, windows.OPEN_EXISTING, flags, 0)
+	handle, err := windows.CreateFile(name, windows.GENERIC_READ|windows.READ_CONTROL, protectedShareMode(directory), nil, windows.OPEN_EXISTING, flags, 0)
 	if err != nil {
 		return nil, installNativeError("file_open", ErrAuthority, err)
 	}
@@ -140,6 +140,18 @@ func openProtected(path string, directory bool) (*os.File, error) {
 		return nil, err
 	}
 	return file, nil
+}
+
+// A directory pin must allow writes to its children, including journal/receipt
+// renames. Denying write sharing on the parent makes our own MoveFileEx fail
+// with ERROR_SHARING_VIOLATION. Never share DELETE: the pinned directory itself
+// cannot be replaced. Metadata and executable file pins still deny all writes.
+func protectedShareMode(directory bool) uint32 {
+	sharing := uint32(windows.FILE_SHARE_READ)
+	if directory {
+		sharing |= windows.FILE_SHARE_WRITE
+	}
+	return sharing
 }
 
 func protectedHandle(handle windows.Handle) error {

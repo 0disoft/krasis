@@ -323,6 +323,22 @@ g110은 기존 code·state에 선택적인 `diagnostic`과 `diagnosticSaved`를 
 `installationIncomplete:true`로 표시합니다. g108·g109의 과거 실패에는 원래 숫자
 오류가 남아 있지 않으므로 새 빌드의 B 실기기 receipt가 원인 확정에 필요합니다.
 
+g110 B 실기기에서 최초 journal 저장이 `save/stage/file_move`, Win32 `32`로
+실패했습니다. 로컬 Windows 재현에서도 작성 핸들을 닫은 상태에서 상위 폴더의
+`FILE_SHARE_READ` pin이 journal 이동을 막았고, directory pin에 `FILE_SHARE_WRITE`를
+함께 지정하면 신규 저장·기존 journal 교체·자식 파일 정리가 성공했습니다.
+g111은 directory handle에만 이 공유 모드를 적용합니다. `FILE_SHARE_DELETE`는
+허용하지 않아 폴더 자체의 교체를 막으며, 개별 metadata·EXE handle의 write/delete
+차단과 소유자·DACL·reparse·단일 링크 검증은 유지합니다. 같은 pin을 쓰는 서비스
+receipt 저장과 설치 정리 경로에도 적용됩니다. journal 교체 전에 닫는 검증 핸들의
+close 실패도 숫자 진단으로 반환하며 이동을 진행하지 않습니다.
+
+`journal_unknown`은 Save 오류 이후 durable journal 상태를 확정하지 못해 추가 설치·
+복원·정리를 수행하지 않았다는 뜻입니다. 복원 오류 번호 미확인은 복원 성공이 아니며,
+다음 attended 설치기의 기존 journal 검증/복구 경로가 상태를 대조합니다. 이 실패를
+자동 재시도하거나 transaction 파일을 수동 삭제하지 않습니다. native 이동 재현과
+복원 경계 테스트의 성공은 B 제품 서비스 설치 또는 A→B PIN 입력 성공을 뜻하지 않습니다.
+
 `scripts/build-input-installer.mjs`는 source clean 확인 후 revision별 출력 폴더를 만들며
 기존 산출물은 덮어쓰지 않습니다. 실행 파일의 실제 PE resource에서 아이콘과 관리자
 매니페스트를 대조합니다. 관리자 resource는 일반 테스트 EXE에 영향을 주지 않도록

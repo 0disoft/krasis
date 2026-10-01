@@ -64,3 +64,23 @@ func TestInstallerRetainsFailureWhenBackendCloseAlsoFails(t *testing.T) {
 		t.Fatal("native error changed public authority contract")
 	}
 }
+
+type journalFailureBackend struct{ installTestBackend }
+
+func (b *journalFailureBackend) Save(ctx context.Context, journal installJournal) error {
+	_ = b.operation(ctx, "save:"+string(journal.Phase))
+	return installNativeError("file_move", ErrAuthority, syscall.Errno(32))
+}
+
+func TestInstallerJournalAmbiguityKeepsOriginalErrorAndStopsEffects(t *testing.T) {
+	backend := &journalFailureBackend{}
+	s := installationdiag.Summary{Time: "2026-10-02T00:00:00Z", Action: "install", Stage: "validation", Recovery: "not_attempted"}
+	report := runObservedInstallation(context.Background(), backend, installTestImages("new"), s, func() error { return nil })
+	got := report.Diagnostic
+	if report.Result != InstallationRecoveryRequired || !got.Valid() || got.Stage != "save" || got.Phase != "stage" || got.Operation != "file_move" || got.Win32Error != 32 || !got.Win32Known || got.Recovery != "journal_unknown" || got.RecoveryStage != "" || got.RecoveryWin32Known {
+		t.Fatal("unknown journal persistence was treated as restored or lost its cause")
+	}
+	if backend.locked || backend.staged || backend.state.Present || backend.operations[len(backend.operations)-1] != "save:stage" {
+		t.Fatal("installation effects continued after ambiguous journal write")
+	}
+}

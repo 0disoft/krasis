@@ -198,7 +198,9 @@ func (files *installFiles) save(ctx context.Context, journal installJournal) err
 		if err != nil {
 			return err
 		}
-		_ = file.Close()
+		if err := file.Close(); err != nil {
+			return installNativeError("file_close", ErrAuthority, err)
+		}
 	}
 	if ctx.Err() != nil {
 		return ErrAuthority
