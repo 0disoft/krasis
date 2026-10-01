@@ -618,15 +618,12 @@ func (current *sourceWheelCaptureRun) hideActiveCursor() bool {
 }
 
 func (current *sourceWheelCaptureRun) activateForegroundFallback() (SourceForegroundFallbackResult, error) {
-	foreground := sourceWheelCaptureGetForeground()
+	foreground, foregroundErr := current.foregroundAfterTransition()
+	if foregroundErr != nil {
+		return SourceForegroundFallbackAttachFailed, errors.Join(ErrSourceCaptureThreadAttachFailed, foregroundErr)
+	}
 	if foreground == current.window && foreground != 0 {
 		return SourceForegroundFallbackSucceeded, nil
-	}
-	if foreground == 0 {
-		return SourceForegroundFallbackAttachFailed, errors.Join(
-			ErrSourceCaptureThreadAttachFailed,
-			ErrSourceForegroundUnavailable,
-		)
 	}
 	result, err := current.setForegroundWithThreadAttach(current.window, foreground)
 	switch result {

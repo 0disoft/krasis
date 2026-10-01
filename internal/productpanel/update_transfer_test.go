@@ -89,6 +89,10 @@ func TestUpdateTransferTracksExactJobAndRuntime(t *testing.T) {
 }
 
 func TestUpdateTransferChoosesTransitionBundleForOlderReceivers(t *testing.T) {
+	modernDirectory := "native/bundle"
+	if localapi.AgentGeneration >= updatebundle.InstallerBundleGeneration {
+		modernDirectory = "native/installer-transition"
+	}
 	for _, tc := range []struct {
 		generation int
 		state      string
@@ -99,7 +103,7 @@ func TestUpdateTransferChoosesTransitionBundleForOlderReceivers(t *testing.T) {
 		{74, "ONLINE", "native/transition"},
 		{75, "ONLINE", "native/probe-transition"},
 		{89, "ONLINE", "native/probe-transition"},
-		{90, "ONLINE", "native/bundle"},
+		{90, "ONLINE", modernDirectory},
 		{60, "STALE", ""},
 	} {
 		b, c, peer := transferTestBridge()
