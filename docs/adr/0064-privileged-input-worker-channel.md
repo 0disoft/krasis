@@ -251,7 +251,7 @@ clean 저장 실패도 SCM failure로 반환해 installer가 프로세스 종료
 ## 검증 범위
 
 `windowsInstallBackend`가 transaction을 고정 Windows 파일 작업과 SCM 제어에 연결합니다.
-이미 상승한 installer와 보호 root에서만 생성하며 생성자와 payload는 private입니다.
+이미 상승한 installer와 보호 root에서만 생성하며 backend 생성자와 payload는 private입니다.
 자동 업데이트·CLI·UI에는 실행 endpoint를 노출하지 않습니다. SCM manager에는
 connect/create만 요청하고, 제어 전에 고정 own-process·demand-start·LocalSystem·quoted
 EXE와 --service 인수·빈 dependency/group·owner/DACL을 확인합니다. Users에는 query/read만
@@ -286,6 +286,34 @@ go vet와 `cmd/krasis-input`의 Windows EXE 빌드가 통과했습니다. SCM �
 가짜 worker로 검사했으며 실제 SYSTEM 서비스·다른 세션으로의 핸들 복제·원격
 마우스/키보드/PIN 제어는 이 검사에 포함되지 않습니다. 설치·업데이트와 제품
 활성화 전이 끝나기 전에는 agent generation을 104로 유지합니다.
+
+## 내장 payload 설치기
+
+`cmd/krasis-install`은 `--install` 또는 `--remove` 하나만 받습니다. 외부 파일 경로,
+manifest, checksum, 임의 서비스명은 받지 않습니다. Go로 구현하며 별도 C++ 런타임을
+추가하지 않습니다. 일반 Go 빌드는 payload가 없어 설치를 거부하고, 전용 builder만
+clean committed revision의 agent·input EXE와 두 SHA-256을 `go:embed`로 내장합니다.
+실행 시 해시뿐 아니라 PE·Go command role·revision·수정되지 않은 source 조건도 검증합니다.
+
+전용 설치 EXE에는 Krasis 아이콘과 `requireAdministrator`, `uiAccess=false` 매니페스트가
+들어갑니다. installer 자체에 UIAccess를 부여하지 않으며 제품 agent를 자동 상승시키지
+않습니다. 이미 상승한 실행만 기존 고정 보호 root와 SCM transaction에 연결됩니다.
+적용 문맥은 60초이고 rollback은 기존 취소 독립 문맥을 사용합니다. 제거도 같은 복구
+경로를 거치며 보호 root·lock anchor를 남깁니다. 인증서 저장소나 Windows 보안 정책은
+변경하지 않습니다.
+
+결과는 `krasis.input.install-result/v1` JSON으로 code·state만 반환합니다. 종료 코드
+0은 installed/removed, 2는 invalid_arguments, 3은 installation_denied, 4는
+previous_installation_restored, 5는 recovery_required, 6은 결과 출력 실패입니다.
+네이티브 오류·경로·사용자 식별자·입력 내용을 출력하지 않습니다. 결과를 못 썼다는
+코드 6은 설치가 수행되지 않았다는 뜻이 아니므로 재실행 전에 상태 대조가 필요합니다.
+
+`scripts/build-input-installer.mjs`는 source clean 확인 후 revision별 출력 폴더를 만들며
+기존 산출물은 덮어쓰지 않습니다. 실행 파일의 실제 PE resource에서 아이콘과 관리자
+매니페스트를 대조합니다. 관리자 resource는 일반 테스트 EXE에 영향을 주지 않도록
+빌드 후 제거합니다. builder는 installer를 실행하지 않습니다. 현재 설치기는 서명 없는
+로컬 산출물이고 자동 업데이트 전달·실제 서비스 설치·제품 입력 활성화는 후속 작업입니다.
+이 단계에서도 배포 generation은 104로 유지합니다.
 
 ## 참조
 

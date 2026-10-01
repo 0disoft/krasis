@@ -9,8 +9,8 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// The installer entry point is still private. Merely receiving an update bundle
-// cannot construct this backend or elevate an ordinary agent into its service.
+// Only the attended embedded-payload installer connects this private backend.
+// Receiving an update bundle cannot elevate an ordinary agent into its service.
 type windowsInstallBackend struct {
 	files *installFiles
 	scm   *installSCM

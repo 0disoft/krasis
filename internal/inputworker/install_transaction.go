@@ -106,7 +106,8 @@ func decodeInstallJournal(data []byte) (installJournal, error) {
 // alone is insufficient. Replace/Restore include the fixed SCM configuration.
 // Start confirms readiness; Verify checks both image trust and service state.
 // Finish removes only transaction-owned artifacts, deleting the journal last.
-// No public installer or portable-agent endpoint exposes this interface.
+// The embedded-payload installer owns this interface; no portable-agent endpoint
+// exposes it.
 type installBackend interface {
 	Lock(context.Context) (func(), error)
 	Load(context.Context) (*installJournal, error)
@@ -121,8 +122,8 @@ type installBackend interface {
 	Finish(context.Context) error
 }
 
-// applyInputInstallation is intentionally private and not wired to the product
-// yet. A future native installer must derive target from its independently
+// applyInputInstallation is private and not wired to product updates yet.
+// The native installer must derive target from its independently
 // authorized payload, never from received BUILD.json/checksums or RPC arguments.
 // A zero target removes an existing installation through the same recovery path.
 func applyInputInstallation(ctx context.Context, backend installBackend, target installImages) error {
