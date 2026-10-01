@@ -7,6 +7,7 @@ import (
 
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/peerupdate"
+	"github.com/0disoft/krasis/internal/updatebundle"
 )
 
 const UpdateTransferSchema = "krasis.update-transfer/v1"
@@ -23,11 +24,12 @@ type UpdateTransferSnapshot struct {
 }
 
 // The directory comes from the native executable location, never the renderer.
-func NewUpdateTransferBridge(ctx context.Context, open func() (UpdateSettingsClient, error), directory, transitionDirectory, probeTransitionDirectory string) *UpdateSettingsBridge {
+func NewUpdateTransferBridge(ctx context.Context, open func() (UpdateSettingsClient, error), directory, transitionDirectory, probeTransitionDirectory, installerTransitionDirectory string) *UpdateSettingsBridge {
 	b := NewUpdateSettingsBridge(ctx, open)
 	b.bundleDirectory = directory
 	b.transitionDirectory = transitionDirectory
 	b.probeTransitionDirectory = probeTransitionDirectory
+	b.installerTransitionDirectory = installerTransitionDirectory
 	return b
 }
 
@@ -125,17 +127,9 @@ func (b *UpdateSettingsBridge) transferCall(peer string, send bool) UpdateTransf
 		if state := peerBuildResult(runtime, inspection.PeerInfo.Generation, inspection.PeerInfo.Revision); state != "" {
 			return fail(state)
 		}
-		directory := b.bundleDirectory
-		if inspection.PeerInfo.Generation < 75 {
-			if b.transitionDirectory == "" {
-				return fail("TRANSITION_REQUIRED")
-			}
-			directory = b.transitionDirectory
-		} else if inspection.PeerInfo.Generation < 90 && runtime.Generation >= 91 {
-			if b.probeTransitionDirectory == "" {
-				return fail("TRANSITION_REQUIRED")
-			}
-			directory = b.probeTransitionDirectory
+		directory := b.transferDirectory(runtime.Generation, inspection.PeerInfo.Generation)
+		if directory == "" {
+			return fail("TRANSITION_REQUIRED")
 		}
 		b.transfer = fail("TRANSFER_UNKNOWN")
 		b.transferInstance = runtime.Instance
@@ -165,6 +159,19 @@ func (b *UpdateSettingsBridge) transferCall(peer string, send bool) UpdateTransf
 		return fail("AGENT_CHANGED")
 	}
 	return b.transfer
+}
+
+func (b *UpdateSettingsBridge) transferDirectory(localGeneration, peerGeneration int) string {
+	if peerGeneration < 75 {
+		return b.transitionDirectory
+	}
+	if peerGeneration < 90 && localGeneration >= 91 {
+		return b.probeTransitionDirectory
+	}
+	if peerGeneration < updatebundle.InstallerLayoutGeneration && localGeneration >= updatebundle.InstallerBundleGeneration {
+		return b.installerTransitionDirectory
+	}
+	return b.bundleDirectory
 }
 
 func peerBuildResult(local localapi.RuntimeInfo, generation int, revision string) string {

@@ -50,7 +50,7 @@ func transferTestBridge() (*UpdateSettingsBridge, *transferClient, string) {
 	c, peer := newSettingsTestClient()
 	c.runtime.Generation = localapi.AgentGeneration
 	f := &transferClient{settingsClient: c, status: peerupdate.Status{State: "IDLE"}}
-	return NewUpdateTransferBridge(context.Background(), func() (UpdateSettingsClient, error) { return f, nil }, "native/bundle", "native/transition", "native/probe-transition"), f, peer
+	return NewUpdateTransferBridge(context.Background(), func() (UpdateSettingsClient, error) { return f, nil }, "native/bundle", "native/transition", "native/probe-transition", "native/installer-transition"), f, peer
 }
 func TestUpdateTransferRefusesMismatchedResidentAgent(t *testing.T) {
 	b, c, peer := transferTestBridge()
@@ -127,6 +127,26 @@ func TestUpdateTransferChoosesTransitionBundleForOlderReceivers(t *testing.T) {
 		t.Fatalf("missing g90 bundle sent update: %+v", got)
 	}
 }
+func TestInstallerTransitionRoutingPreservesOlderBridges(t *testing.T) {
+	b, _, _ := transferTestBridge()
+	for _, test := range []struct {
+		local, peer int
+		directory   string
+	}{
+		{105, 104, "native/bundle"}, {106, 104, "native/installer-transition"},
+		{106, 105, "native/bundle"}, {106, 90, "native/installer-transition"},
+		{106, 89, "native/probe-transition"}, {106, 74, "native/transition"},
+	} {
+		if got := b.transferDirectory(test.local, test.peer); got != test.directory {
+			t.Fatal("incompatible bundle selected", test, got)
+		}
+	}
+	b.installerTransitionDirectory = ""
+	if b.transferDirectory(106, 104) != "" {
+		t.Fatal("missing g105 bridge fell back to incompatible installer bundle")
+	}
+}
+
 func TestUpdateTransferSkipsKnownCurrentOrNewerPeer(t *testing.T) {
 	for _, test := range []struct {
 		generation int
@@ -223,6 +243,10 @@ func TestWorkspaceUpdatePackage(t *testing.T) {
 	if bundle.Metadata().Revision != os.Getenv("KRASIS_UPDATE_REVISION") || bundle.Metadata().Generation != localapi.AgentGeneration {
 		t.Fatal("build provenance mismatch")
 	}
+	_, installerErr := os.Stat(filepath.Join(directory, "krasis-install.exe"))
+	if bundle.HasInputInstaller() != (installerErr == nil) {
+		t.Fatal("installer presence lost during packing")
+	}
 	controlInfo, err := buildinfo.ReadFile(filepath.Join(directory, "krasis.exe"))
 	if err != nil {
 		t.Fatal(err)
@@ -253,6 +277,13 @@ func TestWorkspaceUpdatePackage(t *testing.T) {
 	id := strings.Repeat("a", 32)
 	if err := bundle.Stage(staged, id); err != nil {
 		t.Fatal(err)
+	}
+	if bundle.HasInputInstaller() {
+		file, err := staged.Open(filepath.Join(id, "krasis-install.exe"))
+		if err != nil {
+			t.Fatal("installer missing after staging")
+		}
+		file.Close()
 	}
 	called := false
 	err = launchReceivedUpdate(filepath.Join(parent, id), bundle.Metadata().Revision, "A", 34, func(cmd *exec.Cmd) error {

@@ -24,8 +24,14 @@ const maxDocumentBytes int64 = 1 << 20
 
 var ErrInvalid = errors.New("invalid Krasis update bundle")
 
+// g105 learns the installer layout without carrying it to pre-g105 receivers.
+const InstallerLayoutGeneration = 105
+const InstallerBundleGeneration = 106
+const installerName = "krasis-install.exe"
+
 var legacyNames = []string{"krasis.exe", "krasis-agent.exe", "krasis-control.exe", "START-HERE.md", "BUILD.json", "THIRD-PARTY-NOTICES.txt", "SHA256SUMS.txt"}
 var currentNames = []string{"krasis.exe", "krasis-agent.exe", "krasis-cli.exe", "START-HERE.md", "BUILD.json", "THIRD-PARTY-NOTICES.txt", "SHA256SUMS.txt"}
+var installerNames = append(append(append([]string{}, currentNames[:3]...), installerName), currentNames[3:]...)
 var probeNames = []string{"KrasisBrokeredProbe-TESTSIGNED.msix", "KrasisBrokeredProbe-TESTCERT.cer"}
 var uiAccessProbeNames = []string{"KrasisUIAccessProbe-TESTSIGNED.exe", "KrasisUIAccessProbe-TESTCERT.cer", "TEST-CERT-DETAILS.txt", "README.md", "install-test.ps1", "remove-test.ps1"}
 
@@ -43,11 +49,18 @@ func selectedNames(base []string, withProbe, withUIAccess bool) []string {
 func layout(files map[string][]byte) ([]string, error) {
 	_, legacy := files["krasis-control.exe"]
 	_, current := files["krasis-cli.exe"]
+	_, installer := files[installerName]
 	if legacy == current {
 		return nil, ErrInvalid
 	}
 	if current {
+		if installer {
+			return installerNames, nil
+		}
 		return currentNames, nil
+	}
+	if installer {
+		return nil, ErrInvalid
 	}
 	return legacyNames, nil
 }
@@ -67,7 +80,8 @@ type Bundle struct {
 	files    map[string][]byte
 }
 
-func (b *Bundle) Metadata() Metadata { return b.metadata }
+func (b *Bundle) Metadata() Metadata      { return b.metadata }
+func (b *Bundle) HasInputInstaller() bool { return b != nil && b.files[installerName] != nil }
 func (b *Bundle) UIExecutable() string {
 	if b.files["krasis-cli.exe"] != nil {
 		return "krasis.exe"
@@ -84,7 +98,7 @@ func read(source io.ReaderAt, size int64, executable func(string, []byte, string
 		return nil, ErrInvalid
 	}
 	r, err := zip.NewReader(source, size)
-	if err != nil || len(r.File) < len(legacyNames) || len(r.File) > len(legacyNames)+len(probeNames)+len(uiAccessProbeNames) {
+	if err != nil || len(r.File) < len(legacyNames) || len(r.File) > len(installerNames)+len(probeNames)+len(uiAccessProbeNames) {
 		return nil, ErrInvalid
 	}
 	files := make(map[string][]byte, len(legacyNames))
@@ -163,6 +177,14 @@ func read(source io.ReaderAt, size int64, executable func(string, []byte, string
 			return nil, errors.Join(ErrInvalid, err)
 		}
 	}
+	if files[installerName] != nil {
+		if metadata.Generation < InstallerLayoutGeneration {
+			return nil, ErrInvalid
+		}
+		if err := executable(installerName, files[installerName], metadata.Revision); err != nil {
+			return nil, errors.Join(ErrInvalid, err)
+		}
+	}
 	return &Bundle{metadata: metadata, files: files}, nil
 }
 
@@ -178,7 +200,7 @@ func fileLimit(name string) int64 {
 			return maxDocumentBytes
 		}
 	}
-	if name == "krasis-cli.exe" {
+	if name == "krasis-cli.exe" || name == installerName {
 		return maxExecutableBytes
 	}
 	if name == probeNames[0] {
@@ -228,6 +250,15 @@ func verifyExecutable(name string, data []byte, revision string) error {
 	}
 	if settings["GOOS"] != "windows" || settings["GOARCH"] != "amd64" || settings["CGO_ENABLED"] != "0" || settings["vcs.revision"] != revision || settings["vcs.modified"] != "false" {
 		return ErrInvalid
+	}
+	if name == installerName {
+		present := false
+		for _, tag := range strings.FieldsFunc(settings["-tags"], func(r rune) bool { return r == ',' || r == ' ' }) {
+			present = present || tag == "inputinstaller"
+		}
+		if !present {
+			return ErrInvalid
+		} // Generic builds deliberately have no payload.
 	}
 	return nil
 }
@@ -312,6 +343,16 @@ func Pack(root interface {
 	}
 	if current != nil {
 		selected = currentNames
+	}
+	installer, err := root.Open(installerName)
+	if err == nil {
+		installer.Close()
+		if current == nil {
+			return nil, ErrInvalid
+		}
+		selected = installerNames
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
 	}
 	var present int
 	for _, name := range probeNames {

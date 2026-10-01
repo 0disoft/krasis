@@ -110,7 +110,7 @@ func Run() {
 		if executableErr != nil {
 			os.Exit(1)
 		}
-		service.updates = productpanel.NewUpdateTransferBridge(ctx, func() (productpanel.UpdateSettingsClient, error) { return localapi.OpenClient(paths.Control) }, updateBundleDirectory(self), transitionBundleDirectory(self), probeTransitionBundleDirectory(self))
+		service.updates = productpanel.NewUpdateTransferBridge(ctx, func() (productpanel.UpdateSettingsClient, error) { return localapi.OpenClient(paths.Control) }, updateBundleDirectory(self), transitionBundleDirectory(self), probeTransitionBundleDirectory(self), installerTransitionBundleDirectory(self))
 		service.receiver = productpanel.NewWorkspaceUpdateReceiver(ctx, func() (productpanel.UpdateSettingsClient, error) { return localapi.OpenClient(paths.Control) }, productpanel.LaunchReceivedWorkspaceUpdate)
 		service.diagnostics = productpanel.NewDiagnosticsBridge(ctx,
 			func() (productpanel.DiagnosticClient, error) { return localapi.OpenClient(paths.Control) },

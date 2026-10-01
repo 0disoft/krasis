@@ -73,13 +73,17 @@ func TestBundleAcceptsBothExclusiveExecutableLayouts(t *testing.T) {
 	}
 }
 
-func fixtureLayout(t *testing.T, selected []string) []byte {
+func fixtureLayout(t *testing.T, selected []string, generation ...int) []byte {
 	t.Helper()
 	files := map[string][]byte{}
 	for _, name := range selected[:len(selected)-1] {
 		files[name] = []byte("test fixture")
 	}
-	files["BUILD.json"], _ = json.Marshal(Metadata{Revision: strings.Repeat("a", 40), Platform: "windows/amd64", Purpose: "manual-two-pc-smoke", Generation: 76})
+	g := 76
+	if len(generation) != 0 {
+		g = generation[0]
+	}
+	files["BUILD.json"], _ = json.Marshal(Metadata{Revision: strings.Repeat("a", 40), Platform: "windows/amd64", Purpose: "manual-two-pc-smoke", Generation: g})
 	var sums strings.Builder
 	for _, name := range selected[:len(selected)-1] {
 		fmt.Fprintf(&sums, "%x  %s\n", sha256.Sum256(files[name]), name)

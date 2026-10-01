@@ -18,13 +18,33 @@ const directory = bundleRoot;
 for (const name of ['krasis','krasis-agent','krasis-cli']) {
   const tags = name === 'krasis' ? ['-tags','desktop,production'] : [];
   const ldflags = name === 'krasis-cli' ? '-s -w' : '-s -w -H=windowsgui';
-  execFileSync('go',['build','-trimpath',...tags,`-ldflags=${ldflags}`,'-o',path.join(directory,`${name}.exe`),`./cmd/${name}`],{stdio:'inherit',env:{...process.env,GOOS:'windows',GOARCH:'amd64',CGO_ENABLED:'0',GOPROXY:'off',GOSUMDB:'off'}});
+  execFileSync('go',['build','-trimpath','-buildvcs=true',...tags,`-ldflags=${ldflags}`,'-o',path.join(directory,`${name}.exe`),`./cmd/${name}`],{stdio:'inherit',env:{...process.env,GOFLAGS:'',GOOS:'windows',GOARCH:'amd64',CGO_ENABLED:'0',GOPROXY:'off',GOSUMDB:'off'}});
   verifyExecutableIcon(fs.readFileSync(path.join(directory,`${name}.exe`)));
 }
 fs.copyFileSync('frontend/README.md',path.join(directory,'START-HERE.md'));
 fs.copyFileSync(path.join(bundleRoot,'THIRD-PARTY-NOTICES.txt'),path.join(directory,'THIRD-PARTY-NOTICES.txt'));
 fs.writeFileSync(path.join(directory,'BUILD.json'),JSON.stringify({revision,generation,platform:'windows/amd64',cgo:false,purpose:'manual-two-pc-smoke',signed:false},null,2)+'\n');
 const names=['krasis.exe','krasis-agent.exe','krasis-cli.exe','START-HERE.md','BUILD.json','THIRD-PARTY-NOTICES.txt'];
+// g105 is an installer-free compatibility bridge. Newer bundles carry the
+// installer, but neither the builder nor update receipt elevates or runs it.
+if (generation >= 106) {
+  const installerRoot = path.resolve('dist/input-installer', revision);
+  if (!fs.existsSync(path.join(installerRoot, 'BUILD.json'))) {
+    execFileSync('node', ['scripts/build-input-installer.mjs'], { stdio: 'inherit' });
+  }
+  const evidence = JSON.parse(fs.readFileSync(path.join(installerRoot, 'BUILD.json'), 'utf8'));
+  const executable = fs.readFileSync(path.join(installerRoot, 'krasis-install.exe'));
+  const digest = data => crypto.createHash('sha256').update(data).digest('hex');
+  if (evidence.schemaVersion !== 'krasis.input.installer-build/v1' || evidence.revision !== revision ||
+      evidence.platform !== 'windows/amd64' || evidence.executionLevel !== 'requireAdministrator' ||
+      evidence.signed !== false || evidence.installed !== false || evidence.sha256 !== digest(executable) ||
+      evidence.agentSha256 !== digest(fs.readFileSync(path.join(directory, 'krasis-agent.exe')))) {
+    throw Error('Installer provenance or embedded agent differs from this update build');
+  }
+  verifyExecutableIcon(executable);
+  fs.writeFileSync(path.join(directory, 'krasis-install.exe'), executable, { flag: 'wx' });
+  names.push('krasis-install.exe');
+}
 if (generation >= 62) {
   const probeRoot = path.resolve('dist/brokered-input-probe');
   const candidates = fs.existsSync(probeRoot) ? fs.readdirSync(probeRoot,{withFileTypes:true})

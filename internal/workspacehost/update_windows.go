@@ -4,7 +4,9 @@ package workspacehost
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -12,6 +14,7 @@ import (
 
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/productpanel"
+	"github.com/0disoft/krasis/internal/updatebundle"
 	"golang.org/x/sys/windows"
 )
 
@@ -53,6 +56,40 @@ func probeTransitionBundleDirectory(self string) string {
 	candidate := filepath.Join(root, "g90")
 	info, err := os.Stat(filepath.Join(candidate, "BUILD.json"))
 	if err != nil || !info.Mode().IsRegular() {
+		return ""
+	}
+	return candidate
+}
+
+// Discovery is a bounded routing hint only; SEND re-packs and verifies all bytes.
+func installerTransitionBundleDirectory(self string) string {
+	if filepath.Base(self) != "krasis.exe" {
+		return ""
+	}
+	candidate := filepath.Join(filepath.Dir(filepath.Dir(self)), "g105")
+	root, err := os.OpenRoot(candidate)
+	if err != nil {
+		return ""
+	}
+	defer root.Close()
+	if f, err := root.Open("krasis-install.exe"); err == nil {
+		f.Close()
+		return ""
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return ""
+	}
+	file, err := root.Open("BUILD.json")
+	if err != nil {
+		return ""
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil || !info.Mode().IsRegular() || info.Size() > 8192 {
+		return ""
+	}
+	data, err := io.ReadAll(io.LimitReader(file, 8193))
+	var metadata updatebundle.Metadata
+	if err != nil || len(data) > 8192 || json.Unmarshal(data, &metadata) != nil || metadata.Generation != updatebundle.InstallerLayoutGeneration {
 		return ""
 	}
 	return candidate

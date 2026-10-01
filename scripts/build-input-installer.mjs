@@ -28,7 +28,8 @@ const env = {
   GOMODCACHE: path.join(root, '.cache/go-mod'), GOCACHE: path.join(root, '.cache/go-build'),
 };
 const build = (name, destination, tags = []) => execFileSync('go', [
-  'build', '-trimpath', '-buildvcs=true', ...tags, '-ldflags=-s -w',
+  'build', '-trimpath', '-buildvcs=true', ...tags,
+  name === 'krasis-agent' ? '-ldflags=-s -w -H=windowsgui' : '-ldflags=-s -w',
   '-o', destination, `./cmd/${name}`,
 ], { env, stdio: 'inherit' });
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');

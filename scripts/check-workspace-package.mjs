@@ -10,6 +10,11 @@ const generation = Number(path.basename(directory).match(/^g(\d+)$/u)?.[1]);
 assert.ok(Number.isSafeInteger(generation),'Expected generation-scoped distribution');
 const expected=['BUILD.json','SHA256SUMS.txt','START-HERE.md','THIRD-PARTY-NOTICES.txt','krasis-agent.exe','krasis-cli.exe','krasis.exe'];
 const actual=fs.readdirSync(directory).sort();
+assert.equal(actual.includes('krasis-install.exe'),generation>=106,'g105 must remain installer-free; g106+ must carry the installer');
+if (generation>=106) {
+  expected.push('krasis-install.exe');
+  verifyExecutableIcon(fs.readFileSync(path.join(directory,'krasis-install.exe')));
+}
 const probeNames=['KrasisBrokeredProbe-TESTSIGNED.msix','KrasisBrokeredProbe-TESTCERT.cer'];
 const probeCount=probeNames.filter(name=>actual.includes(name)).length;
 assert.ok(probeCount===0||probeCount===probeNames.length,'Probe package and certificate must appear together');

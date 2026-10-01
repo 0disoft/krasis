@@ -315,6 +315,26 @@ previous_installation_restored, 5는 recovery_required, 6은 결과 출력 실�
 로컬 산출물이고 자동 업데이트 전달·실제 서비스 설치·제품 입력 활성화는 후속 작업입니다.
 이 단계에서도 배포 generation은 104로 유지합니다.
 
+## 설치기 전달과 이전 버전 호환
+
+g105부터 current UI·agent·CLI 묶음에 `krasis-install.exe`가 선택적으로 포함될 수
+있습니다. installer가 있으면 checksum·PE·Go command role·동일 revision·clean source와
+`inputinstaller` build tag도 검증합니다. 기존 legacy UI 묶음이나 g104 이하 metadata에는
+허용하지 않습니다. Pack→Read→Stage는 같은 파일 목록을 사용하며 UI 실행 대상은 계속
+`krasis.exe`입니다. installer 수신은 설치·상승·실행 승인이 아닙니다.
+
+g104 이하의 기존 수신기는 새 파일을 거부하므로 g105 배포 폴더에는 설치기를 넣지
+않습니다. g106 이상을 보내는 UI는 상대가 g90–g104이면 먼저 고정 g105 폴더를 선택하고,
+그 폴더가 없으면 TRANSITION_REQUIRED로 중단합니다. 더 오래된 기기는 기존 g75/g90
+전환을 우선합니다. g105 탐색은 제한된 BUILD.json을 읽는 routing hint이고 실제 전송은
+기존 trust·version·bundle 재검증을 거칩니다. 자동 재전송은 추가하지 않습니다.
+
+g106 이상 builder는 현재 revision의 설치기를 만들거나 같은 revision 산출물만 사용합니다.
+내장 agent가 일반 업데이트 agent와 동일하도록 GUI linker flags를 맞추고 SHA-256을
+대조합니다. 설치기를 checksum 목록에 포함한 뒤 실제 bundle Pack·Read·Stage와 기존 UI
+launch 준비를 검사합니다. 설치기는 실행하지 않습니다. 실제 서비스 설치와 원격 PIN
+제어는 제품 입력 경로 연결 및 실기기 검증이 남아 있습니다.
+
 ## 참조
 
 - [GetNamedPipeClientProcessId](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getnamedpipeclientprocessid)
