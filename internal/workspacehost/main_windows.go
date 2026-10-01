@@ -14,6 +14,7 @@ import (
 
 	windowsassets "github.com/0disoft/krasis/assets/windows"
 	"github.com/0disoft/krasis/frontend"
+	"github.com/0disoft/krasis/internal/launchrecord"
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/productidentity"
 	"github.com/0disoft/krasis/internal/productlog"
@@ -170,6 +171,17 @@ func Run() {
 		Hidden:           smoke && !visibleSmoke,
 	})
 	shown := make(chan bool, 1)
+	if !smoke {
+		var recordOnce sync.Once
+		window.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) {
+			recordOnce.Do(func() {
+				self, err := os.Executable()
+				if err == nil {
+					_ = launchrecord.Register(os.Getenv("LOCALAPPDATA"), self, localapi.AgentGeneration, "")
+				}
+			})
+		})
+	}
 	if visibleSmoke || (!smoke && updated.Revision != "") {
 		var showOnce sync.Once
 		window.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) {

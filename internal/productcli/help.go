@@ -19,6 +19,7 @@ func commandHelp() helpResult {
 	return helpResult{SchemaVersion: helpSchema, Commands: []helpCommand{
 		{"help", "List commands and their effects", false, false},
 		{"version", "Show CLI build and optional running agent build", false, false},
+		{"relaunch", "Open the last product UI without a running agent", false, true},
 		{"doctor", "Check agent protocol and connection", true, false},
 		{"status", "Read connection state", true, false},
 		{"topology", "Read device layout", true, false},

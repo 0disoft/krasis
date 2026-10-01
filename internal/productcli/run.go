@@ -47,6 +47,7 @@ type dependencies struct {
 	localAppData string
 	openClient   func(string) (apiClient, error)
 	executable   string
+	launch       func(string) error
 }
 
 type options struct {
@@ -87,6 +88,14 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, deps depe
 			client, _ = deps.openClient(control)
 		}
 		return writeOutput(stdout, stderr, version(ctx, client), ExitOK, parsed.json)
+	}
+	if parsed.args[0] == "relaunch" {
+		if parsed.controlDir != "" {
+			writeUsageError(stderr, usageError("relaunch does not use --control-dir"))
+			return ExitUsage
+		}
+		value, code := relaunch(deps)
+		return writeOutput(stdout, stderr, value, code, parsed.json)
 	}
 	if parsed.args[0] == "update" && parsed.args[1] == "verify" {
 		executable := deps.executable
@@ -269,6 +278,10 @@ func parseGlobalOptions(args []string) (options, error) {
 
 func validateCommandArgs(args []string) error {
 	switch args[0] {
+	case "relaunch":
+		if len(args) != 1 {
+			return usageError("relaunch accepts no arguments")
+		}
 	case "credential":
 		_, err := parseCredential(args[1:])
 		return err
@@ -402,6 +415,8 @@ func writeUsageError(stderr io.Writer, err error) {
 
 func writeHuman(output io.Writer, value any) {
 	switch item := value.(type) {
+	case relaunchResult:
+		fmt.Fprintf(output, "앱 열기: %s\n", item.Code)
 	case helpResult:
 		fmt.Fprintln(output, "Krasis CLI commands:")
 		for _, command := range item.Commands {
