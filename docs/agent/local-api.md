@@ -30,6 +30,7 @@ clipboard, environment 또는 UI projection에 복제하지 않는다.
 | `POST` | `/v1/pair` | `LISTEN`, `DIAL`, `STATUS`, `CONFIRM`, `CANCEL` product pairing workflow |
 | `GET` | `/v1/diagnostics` | stable code별 aggregate counter와 마지막 state |
 | `POST` | `/v1/diagnostic-collection` | 신뢰된 peer 지문으로 양쪽 정제 진단 수집 START, 요청 ID별 STATUS |
+| `POST` | `/v1/app-open` | 신뢰된 peer 지문으로 마지막 UI 열기 START, 요청 ID별 STATUS |
 | `GET` | `/v1/trust` | fingerprint, alias, role, inbound capability와 revoked 상태의 redacted projection |
 | `POST` | `/v1/trust/revoke` | inactive trusted fingerprint의 atomic local revocation |
 | `GET` | `/v1/topology` | 연결 상태와 non-revoked peer 목록; 저장된 배치가 없으면 `UNCONFIGURED` |
@@ -41,6 +42,13 @@ upgrade-stop은 인증 후 빈 body와 현재 instance nonce를 검사한다. no
 40자리 빌드 리비전에 정확히 일치할 때만 기존 에이전트를 종료한다. 연결·페어링 중에는
 agent 잠금 안에서 종료를 거부한다. 일반 safe-stop과 별개인 자동 교체 전용 경로다.
 runtime schema는 `krasis.agent.runtime/v1`이며 기존 status/result schema는 변경하지 않는다.
+
+g109의 `/v1/app-open`은 `{action: "START", peer: FINGERPRINT}` 또는
+`{action: "STATUS", peer: FINGERPRINT, id: REQUEST_ID}`만 받는다. 경로나 실행 인자를
+받지 않는다. 관리 채널의 `/v1/app-open`은 등록된 TLS 상대에게만 동일 요청 ID를 전달한다.
+수신자는 매 요청에서 신뢰와 inbound-control 권한을 확인하고, 자신의 보호된 실행 기록과
+SHA-256을 검증한 후 일반 사용자 세션에서 UI를 연다. 요청은 1분 후 만료되며 반복 요청은
+2분간 중복 실행하지 않는다. `launch_requested`는 실행 요청 성공만 의미한다.
 
 connection과 upgrade-stop을 제외한 mutation body schema는 `krasis.agent.operation/v1`, 결과는
 `krasis.agent.operation-result/v1`이다. 모든 body는 64KiB 이하 strict JSON이다. `connect`는 alias만,

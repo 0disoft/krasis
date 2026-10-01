@@ -64,6 +64,7 @@ func (m *Manager) Run(ctx context.Context, address, peer string, listener bool, 
 				continue
 			}
 			m.pollDiagnostic(ctx, client, address, peer, authorized)
+			m.pollAppOpen(ctx, client, address, peer, authorized)
 			m.pushDiagnosticRequest(ctx, client, address, peer, authorized)
 			m.pollDiagnosticRequest(ctx, client, address, peer, authorized)
 			m.pollClipboard(ctx, client, address, peer, authorized)
@@ -160,6 +161,8 @@ func (m *Manager) handler(peer string, authorized func() bool) http.Handler {
 			return
 		}
 		switch {
+		case r.URL.Path == "/v1/app-open":
+			m.appOpenHTTP(w, r, peer, authorized)
 		case r.URL.Path == "/v1/clipboard":
 			m.clipboardHTTP(w, r, peer, authorized)
 		case r.URL.Path == "/v1/diagnostic-transfer":

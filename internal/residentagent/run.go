@@ -129,6 +129,7 @@ func run(ctx context.Context, localAppData string, dependencies runDependencies)
 				return productlog.SaveRemoteSupport(localAppData, peer, data)
 			}
 			updates.ExportDiagnostic = operations.exportDiagnosticForRequest
+			updates.OpenUI = operations.openUIForPeer
 			defer updates.Close()
 			managementCtx, stopManagement := context.WithCancel(operations.Context())
 			managementDone := make(chan struct{})

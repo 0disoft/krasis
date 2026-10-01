@@ -37,6 +37,9 @@ func TestRelaunchRemembersLastUIAndRejectsChangedImage(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(path, "krasis-cli.exe")); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := os.Stat(filepath.Join(path, "Krasis.cmd")); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(self, []byte("MZ-changed"), 0600); err != nil {
 		t.Fatal(err)
 	}

@@ -147,6 +147,8 @@ func writeOutput(stdout, stderr io.Writer, value any, code int, jsonOutput bool)
 
 func dispatch(ctx context.Context, client apiClient, args []string, executable string) (any, int, error) {
 	switch args[0] {
+	case "app":
+		return openPeerApp(ctx, client, args[1:])
 	case "credential":
 		return dispatchCredential(ctx, client, args[1:])
 	case "connection":
@@ -278,6 +280,11 @@ func parseGlobalOptions(args []string) (options, error) {
 
 func validateCommandArgs(args []string) error {
 	switch args[0] {
+	case "app":
+		if len(args) == 3 && args[1] == "open" && validAlias(args[2]) || len(args) == 4 && args[1] == "open-status" && validAlias(args[2]) && validHex(args[3], 32) {
+			return nil
+		}
+		return usageError("app requires open ALIAS or open-status ALIAS ID")
 	case "relaunch":
 		if len(args) != 1 {
 			return usageError("relaunch accepts no arguments")
@@ -415,6 +422,11 @@ func writeUsageError(stderr io.Writer, err error) {
 
 func writeHuman(output io.Writer, value any) {
 	switch item := value.(type) {
+	case appOpenResult:
+		fmt.Fprintf(output, "상대 앱 열기: %s\n", item.Code)
+		if item.ID != "" {
+			fmt.Fprintf(output, "Request: %s\n", item.ID)
+		}
 	case relaunchResult:
 		fmt.Fprintf(output, "앱 열기: %s\n", item.Code)
 	case helpResult:

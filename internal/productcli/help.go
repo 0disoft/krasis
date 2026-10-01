@@ -20,6 +20,8 @@ func commandHelp() helpResult {
 		{"help", "List commands and their effects", false, false},
 		{"version", "Show CLI build and optional running agent build", false, false},
 		{"relaunch", "Open the last product UI without a running agent", false, true},
+		{"app open ALIAS", "Open the remembered UI on a trusted PC", true, true},
+		{"app open-status ALIAS ID", "Read a peer UI launch request result", true, false},
 		{"doctor", "Check agent protocol and connection", true, false},
 		{"status", "Read connection state", true, false},
 		{"topology", "Read device layout", true, false},

@@ -9,6 +9,8 @@
 krasis-cli [--json] help
 krasis-cli --help
 krasis-cli [--json] relaunch
+krasis-cli [--json] [--control-dir DIR] app open ALIAS
+krasis-cli [--json] [--control-dir DIR] app open-status ALIAS REQUEST_ID
 krasis-cli [--json] [--control-dir DIR] status
 krasis-cli [--json] [--control-dir DIR] diagnostics
 krasis-cli [--json] diagnostics export
@@ -51,10 +53,18 @@ session 전체를 안전 종료하므로 일반 연결 해제에는 `disconnect`
 `relaunch`는 마지막으로 창을 연 `krasis.exe`를 다시 실행한다. 실행 중이면 기존 창을 앞으로
 가져온다. 에이전트가 종료돼 있어도 사용할 수 있으며 `--control-dir`와 실행 경로 인자는 받지 않는다.
 UI 시작 후 `%LOCALAPPDATA%\Krasis\launch\krasis-cli.exe`가 고정 복구 명령으로 준비된다.
+같은 폴더의 `Krasis.cmd`를 더블클릭해도 앱을 열 수 있다.
 `& "$env:LOCALAPPDATA\Krasis\launch\krasis-cli.exe" relaunch --json`으로 실행할 수 있다.
 기록된 실행 파일이 삭제되거나 SHA-256이 달라지면 실행을 거부한다. 기록이 없는 경우에만
 명령을 실행한 CLI와 같은 폴더의 `krasis.exe`를 사용한다. `launch_requested`는 프로세스 실행
 요청 성공이며, 창 표시나 에이전트 연결 성공까지 보장하지 않는다.
+
+`app open B`는 등록된 B의 관리 채널로 앱 열기를 요청한다. 상대의 에이전트가 살아 있고,
+상대가 이 기기의 입력 제어를 허용한 경우에만 마지막 UI를 실행한다. 두 기기 모두 g109 이상이
+필요하다. 입력 연결 해제 상태에서도 관리 채널은 사용할 수 있다. 경로나 명령어는 전송하지 않는다.
+15초 뒤에도 결과가 없으면 `pending`과 요청 ID를 반환한다. 재전송 대신
+`app open-status B REQUEST_ID`로 확인한다. 요청은 1분 후 만료되며 실행 결과 확인과 실제
+창 표시 여부는 별개다. B의 에이전트까지 완전히 종료된 경우 B에서 고정 복구 명령을 실행해야 한다.
 
 아래 `krasis-lab` 계약은 Phase 0 실험 표면이며 제품 CLI와 호환성 관계가 없다.
 

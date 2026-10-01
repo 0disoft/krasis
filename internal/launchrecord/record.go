@@ -94,14 +94,17 @@ func Register(localAppData, executable string, generation int, revision string) 
 		return err
 	}
 	defer dir.Close()
-	if err = copyCLI(dir, filepath.Dir(executable)); err != nil {
-		return err
-	}
 	data, err := json.Marshal(Record{schema, executable, hash, generation, revision, time.Now().UTC()})
 	if err != nil {
 		return err
 	}
-	return replace(dir, "current.json", data)
+	if err = replace(dir, "current.json", data); err != nil {
+		return err
+	}
+	if err = copyCLI(dir, filepath.Dir(executable)); err != nil {
+		return err
+	}
+	return replace(dir, "Krasis.cmd", []byte("@echo off\r\n\"%~dp0krasis-cli.exe\" relaunch\r\nif errorlevel 1 pause\r\n"))
 }
 
 func copyCLI(destination *securefs.Directory, source string) error {

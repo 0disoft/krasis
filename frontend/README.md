@@ -26,6 +26,15 @@ The three executables share one directory: `krasis.exe` is the Wails UI,
 `krasis-agent.exe` is the resident agent, and `krasis-cli.exe` is the terminal
 client. The UI embeds the native Svelte assets and uses the Go module's own
 `/wails/runtime.js`; there is no separate npm runtime version to synchronize.
+
+From g109, opening the UI records its current executable and prepares a stable
+recovery CLI at `%LOCALAPPDATA%\Krasis\launch\krasis-cli.exe`. On the local PC,
+run `krasis-cli relaunch` to reopen the remembered UI. From the trusted peer,
+run `krasis-cli app open B` to request B's UI; B's agent must still be running
+and permit inbound control. If both B processes stopped, use B's fixed recovery
+CLI locally. `launch_requested` confirms process launch, not window visibility.
+Double-click `%LOCALAPPDATA%\Krasis\launch\Krasis.cmd` for local recovery.
+
 Keep the entire distribution directory. Wails v3 is an explicitly selected prerelease
 dependency. The Go language requirement is unchanged; building does not replace
 the running process. All Go release executables build with trimpath plus

@@ -1,5 +1,6 @@
 // Package peerupdate owns explicitly delegated development-bundle delivery.
-// It never sends input or executes files. The local GUI owns apply and relaunch.
+// It never sends input or applies updates. A narrow trusted callback can open
+// the locally recorded UI; callers cannot supply a program or arguments.
 package peerupdate
 
 import (
@@ -51,6 +52,8 @@ type stagedBundle interface {
 	Stage(*os.Root, string) error
 }
 type Manager struct {
+	appOpen           appOpenState
+	OpenUI            func(string) string
 	clipboard         clipboardState
 	diagnostic        diagnosticTransfer
 	ReceiveDiagnostic func(string, []byte) (string, error)
