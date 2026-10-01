@@ -21,6 +21,9 @@ type Summary struct {
 	CloseOperation     string `json:"closeOperation,omitempty"`
 	CloseWin32Error    uint32 `json:"closeWin32Error"`
 	CloseWin32Known    bool   `json:"closeWin32Known"`
+	InProgress         bool   `json:"inProgress,omitempty"`
+	ActiveStage        string `json:"activeStage,omitempty"`
+	ActivePhase        string `json:"activePhase,omitempty"`
 }
 
 func (s Summary) Valid() bool {
@@ -31,6 +34,13 @@ func (s Summary) Valid() bool {
 		return false
 	}
 	if s.Result != 0 && s.Result != 3 && s.Result != 4 && s.Result != 5 {
+		return false
+	}
+	if s.InProgress {
+		if s.Result != 5 || !stage(s.ActiveStage, false) || !phase(s.ActivePhase) || s.Recovery != "required" {
+			return false
+		}
+	} else if s.ActiveStage != "" || s.ActivePhase != "" {
 		return false
 	}
 	if !stage(s.Stage, false) || !stage(s.RecoveryStage, true) || !phase(s.Phase) || !phase(s.RecoveryPhase) || !operation(s.Operation) || !operation(s.RecoveryOperation) || !operation(s.CloseOperation) {

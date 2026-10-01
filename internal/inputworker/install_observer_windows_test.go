@@ -84,3 +84,47 @@ func TestInstallerJournalAmbiguityKeepsOriginalErrorAndStopsEffects(t *testing.T
 		t.Fatal("installation effects continued after ambiguous journal write")
 	}
 }
+
+type interruptedInstallBackend struct{ installTestBackend }
+
+func (b *interruptedInstallBackend) Replace(context.Context, installImages) error {
+	panic("PRIVATE-PATH")
+}
+
+func TestInterruptedInstallerLeavesIncompleteCheckpointBeforeEffects(t *testing.T) {
+	backend := &interruptedInstallBackend{}
+	s := installationdiag.Summary{Time: "2026-10-02T00:00:00Z", Action: "install", Stage: "validation", Recovery: "not_attempted"}
+	var last installationdiag.Summary
+	func() {
+		defer func() {
+			if recover() == nil {
+				t.Fatal("fixture did not interrupt installation")
+			}
+		}()
+		runTrackedInstallation(context.Background(), backend, installTestImages("new"), s, func() error { return nil }, func(s installationdiag.Summary) { last = s })
+	}()
+	if !last.Valid() || !last.InProgress || last.Result != 5 || last.Recovery != "required" || last.ActiveStage != "replace" || last.ActivePhase != "replace" || backend.locked {
+		t.Fatal("interruption lost active stage or claimed success")
+	}
+	data, _ := json.Marshal(last)
+	if strings.Contains(string(data), "PRIVATE") {
+		t.Fatal("panic payload entered receipt")
+	}
+}
+
+func TestInstallerCheckpointsKeepOriginalFailureDuringRollback(t *testing.T) {
+	backend := &receiptInstallBackend{}
+	s := installationdiag.Summary{Time: "2026-10-02T00:00:00Z", Action: "install", Stage: "validation", Recovery: "not_attempted"}
+	rollbackObserved := false
+	report := runTrackedInstallation(context.Background(), backend, installTestImages("new"), s, func() error { return nil }, func(s installationdiag.Summary) {
+		if !s.Valid() || !s.InProgress || s.Result != 5 {
+			t.Fatal("invalid progress receipt")
+		}
+		if s.ActiveStage == "restore" {
+			rollbackObserved = s.Stage == "replace" && s.Operation == "file_move" && s.Win32Error == 32 && s.ActivePhase == "rollback_restore"
+		}
+	})
+	if !rollbackObserved || report.Result != InstallationRestored || report.Diagnostic.InProgress || report.Diagnostic.ActiveStage != "" || !report.Diagnostic.Valid() {
+		t.Fatal("checkpoint replaced original error or final result")
+	}
+}

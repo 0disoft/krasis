@@ -15,9 +15,13 @@ import (
 )
 
 func main() {
-	os.Exit(runDetailed(os.Args[1:], os.Stdout, loadEmbeddedPayload, inputworker.ManageEmbeddedInstallationDetailed, func(s installationdiag.Summary) error {
+	save := func(s installationdiag.Summary) error {
 		return productlog.SaveInstallation(os.Getenv("LOCALAPPDATA"), s)
-	}))
+	}
+	apply := func(ctx context.Context, remove bool, a, i []byte, ap, ip [32]byte) inputworker.InstallationReport {
+		return inputworker.ManageEmbeddedInstallationTracked(ctx, remove, a, i, ap, ip, func(s installationdiag.Summary) { _ = save(s) })
+	}
+	os.Exit(runDetailed(os.Args[1:], os.Stdout, loadEmbeddedPayload, apply, save))
 }
 
 type installerPayload struct {

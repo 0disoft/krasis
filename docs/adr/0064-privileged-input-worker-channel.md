@@ -339,6 +339,19 @@ close 실패도 숫자 진단으로 반환하며 이동을 진행하지 않습�
 자동 재시도하거나 transaction 파일을 수동 삭제하지 않습니다. native 이동 재현과
 복원 경계 테스트의 성공은 B 제품 서비스 설치 또는 A→B PIN 입력 성공을 뜻하지 않습니다.
 
+g111 B 실행은 서비스·파일 생성 후 종료 코드 2와 stdout 부재로 보고됐으며, stderr와
+최종 native 단계는 미확인입니다. 코드 2의 정상 인자 오류 경로도 JSON을 쓰므로 이
+관측을 인자 오류 또는 특정 panic으로 확정하지 않습니다. 서비스 1077은 시작하지 않은
+상태의 관측이며 설치 완료나 복원 성공을 증명하지 않습니다.
+
+g112 설치기는 native backend 동작 직전에 같은 보호 diagnostics 위치에 미완료
+checkpoint를 저장합니다. `inProgress:true`, `result:5`, `recovery:required`와 고정
+`activeStage`·`activePhase`는 마지막으로 시작하려던 작업이며 성공/실패 결과가 아닙니다.
+최초 실패와 복원 실패는 기존 필드에 유지합니다. 정상 반환 후 최종 receipt가 checkpoint를
+대체하며, 중간 종료 시 이전 세대 결과만 남는 것을 줄입니다. checkpoint 저장은 best-effort,
+설치·복원 순서는 불변이고 panic·오류 내용은 기록하지 않습니다. 실패한 저장이나 fatal
+종료까지 보장하지 않으며, 최종 JSON·stderr·서비스·transaction 상태를 함께 대조해야 합니다.
+
 `scripts/build-input-installer.mjs`는 source clean 확인 후 revision별 출력 폴더를 만들며
 기존 산출물은 덮어쓰지 않습니다. 실행 파일의 실제 PE resource에서 아이콘과 관리자
 매니페스트를 대조합니다. 관리자 resource는 일반 테스트 EXE에 영향을 주지 않도록

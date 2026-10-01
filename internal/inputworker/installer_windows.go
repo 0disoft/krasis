@@ -35,6 +35,12 @@ type InstallationReport struct {
 }
 
 func ManageEmbeddedInstallationDetailed(ctx context.Context, remove bool, agent, input []byte, agentPin, inputPin [sha256.Size]byte) InstallationReport {
+	return ManageEmbeddedInstallationTracked(ctx, remove, agent, input, agentPin, inputPin, nil)
+}
+
+// report persists an incomplete receipt before each native operation. It is
+// observational only: a failed write never changes installation or recovery.
+func ManageEmbeddedInstallationTracked(ctx context.Context, remove bool, agent, input []byte, agentPin, inputPin [sha256.Size]byte, report func(installationdiag.Summary)) InstallationReport {
 	action := "install"
 	if remove {
 		action = "remove"
@@ -48,10 +54,13 @@ func ManageEmbeddedInstallationDetailed(ctx context.Context, remove bool, agent,
 	if ctx == nil || ctx.Err() != nil {
 		return rejected("validation", nil)
 	}
+	checkpoint := &observedInstallBackend{summary: summary, report: report}
+	checkpoint.begin("payload")
 	payload, err := pinnedInstallPayload(agent, input, installImages{Agent: agentPin, Service: inputPin})
 	if err != nil {
 		return rejected("payload", err)
 	}
+	checkpoint.begin("backend")
 	backend, err := newWindowsInstallBackend(payload)
 	if err != nil {
 		return rejected("backend", err)
@@ -60,11 +69,15 @@ func ManageEmbeddedInstallationDetailed(ctx context.Context, remove bool, agent,
 	if remove {
 		target = installImages{}
 	}
-	return runObservedInstallation(ctx, backend, target, summary, backend.Close)
+	return runTrackedInstallation(ctx, backend, target, summary, backend.Close, report)
 }
 
 func runObservedInstallation(ctx context.Context, backend installBackend, target installImages, summary installationdiag.Summary, closeBackend func() error) InstallationReport {
-	observed := &observedInstallBackend{installBackend: backend, summary: summary}
+	return runTrackedInstallation(ctx, backend, target, summary, closeBackend, nil)
+}
+
+func runTrackedInstallation(ctx context.Context, backend installBackend, target installImages, summary installationdiag.Summary, closeBackend func() error, report func(installationdiag.Summary)) InstallationReport {
+	observed := &observedInstallBackend{installBackend: backend, summary: summary, report: report}
 	err := applyInputInstallation(ctx, observed, target)
 	result := installationResult(err)
 	summary = observed.summary
@@ -80,6 +93,7 @@ func runObservedInstallation(ctx context.Context, backend installBackend, target
 	if !observed.failed && err != nil {
 		summary.Stage = "validation"
 	}
+	observed.begin("close")
 	if closeErr := closeBackend(); closeErr != nil {
 		result = InstallationRecoveryRequired
 		summary.CloseOperation, summary.CloseWin32Error, summary.CloseWin32Known = installErrorFields(closeErr)

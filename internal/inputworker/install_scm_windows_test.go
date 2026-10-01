@@ -84,6 +84,41 @@ func TestInstallServiceStringParserBoundsKernelPointers(t *testing.T) {
 	}
 }
 
+func TestInstallSCMQueriesNativeServiceWithoutMutation(t *testing.T) {
+	manager, err := windows.OpenSCManager(nil, nil, windows.SC_MANAGER_CONNECT)
+	if err != nil {
+		t.Fatal("read-only SCM open failed")
+	}
+	defer windows.CloseServiceHandle(manager)
+	name, _ := windows.UTF16PtrFromString("EventLog")
+	handle, err := windows.OpenService(manager, name, windows.READ_CONTROL|windows.SERVICE_QUERY_CONFIG|windows.SERVICE_QUERY_STATUS)
+	if err != nil {
+		t.Fatal("read-only native service open failed")
+	}
+	defer windows.CloseServiceHandle(handle)
+	config, err := readInstallServiceConfig(handle)
+	if err != nil || config.binary == "" {
+		t.Fatal("native service config parser failed")
+	}
+	descriptor, err := windows.GetSecurityInfo(handle, windows.SE_SERVICE, windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION)
+	if err != nil {
+		t.Fatal("native descriptor read failed")
+	}
+	_ = protectedInstallService(descriptor)
+	buffer := make([]byte, 8192)
+	var needed uint32
+	if err := windows.QueryServiceConfig2(handle, windows.SERVICE_CONFIG_FAILURE_ACTIONS, &buffer[0], uint32(len(buffer)), &needed); err != nil {
+		t.Fatal("native failure-action query failed")
+	}
+	actions := (*windows.SERVICE_FAILURE_ACTIONS)(unsafe.Pointer(&buffer[0]))
+	if _, err := installServiceString(buffer, actions.Command); err != nil {
+		t.Fatal("native failure-action command parser failed")
+	}
+	if err := windows.QueryServiceConfig2(handle, windows.SERVICE_CONFIG_TRIGGER_INFO, &buffer[0], uint32(len(buffer)), &needed); err != nil {
+		t.Fatal("native trigger query failed")
+	}
+}
+
 func TestInstallBackendZeroValueCannotOpenOrControlSCM(t *testing.T) {
 	ctx := context.Background()
 	var backend windowsInstallBackend
