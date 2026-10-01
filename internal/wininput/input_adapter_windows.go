@@ -144,8 +144,14 @@ func (adapter *InputAdapter) Move(ctx context.Context, deltaX, deltaY int32) err
 	if err != nil {
 		return err
 	}
-	if err := sendInputs(ctx, []input{event}); err != nil {
-		return err
+	var injectErr error
+	if adapter.injection != nil {
+		injectErr = adapter.injection.Move(ctx, deltaX, deltaY)
+	} else {
+		injectErr = sendInputs(ctx, []input{event})
+	}
+	if injectErr != nil {
+		return injectErr
 	}
 	position, err := cursorPosition()
 	if err != nil {
@@ -161,6 +167,9 @@ func (adapter *InputAdapter) Wheel(ctx context.Context, deltaX, deltaY int32) er
 	events, err := wheelEvents(deltaX, deltaY)
 	if err != nil {
 		return err
+	}
+	if adapter.injection != nil {
+		return adapter.injection.Wheel(ctx, deltaX, deltaY)
 	}
 	return sendInputs(ctx, events)
 }
@@ -192,6 +201,12 @@ func (adapter *InputAdapter) writeDiscrete(ctx context.Context, token control.Pr
 	}
 	if err := token.Validate(); err != nil {
 		return errorsJoinUnsupported(err)
+	}
+	if adapter.injection != nil {
+		if released {
+			return adapter.injection.Release(ctx, token)
+		}
+		return adapter.injection.Press(ctx, token)
 	}
 	switch token.Kind {
 	case control.PressedKeyboardKey:

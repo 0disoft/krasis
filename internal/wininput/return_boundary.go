@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
 )
 
@@ -13,8 +14,23 @@ const ReturnIntentQueueCapacity = 1
 const defaultReturnRearmDistance int32 = 32
 
 type InputAdapter struct {
-	returns *returnBoundaryState
-	entry   *cursorEntryState
+	returns   *returnBoundaryState
+	entry     *cursorEntryState
+	injection application.InputPort
+}
+
+// NewInputAdapterWithInjection keeps cursor entry and return tracking local.
+// The immutable delegate owns injection; errors never fall back to SendInput.
+func NewInputAdapterWithInjection(distance, screenWidth int32, port application.InputPort) (*InputAdapter, error) {
+	if port == nil {
+		return nil, ErrUnsupportedInput
+	}
+	adapter, err := NewInputAdapterWithReturnRearmDistance(distance, screenWidth)
+	if err != nil {
+		return nil, err
+	}
+	adapter.injection = port
+	return adapter, nil
 }
 
 type cursorEntryState struct {
