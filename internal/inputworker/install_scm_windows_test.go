@@ -84,6 +84,23 @@ func TestInstallServiceStringParserBoundsKernelPointers(t *testing.T) {
 	}
 }
 
+func TestInstallServiceBufferHonorsNativeStructureAlignment(t *testing.T) {
+	buffer := installServiceBuffer()
+	if len(buffer) != 8192 {
+		t.Fatal("native query buffer exceeds its fixed bound")
+	}
+	address := uintptr(unsafe.Pointer(&buffer[0]))
+	for _, alignment := range []uintptr{
+		unsafe.Alignof(windows.QUERY_SERVICE_CONFIG{}),
+		unsafe.Alignof(windows.SERVICE_FAILURE_ACTIONS{}),
+		unsafe.Alignof(uintptr(0)), // SERVICE_TRIGGER_INFO contains native pointers.
+	} {
+		if address%alignment != 0 {
+			t.Fatal("SCM output buffer violates native structure alignment")
+		}
+	}
+}
+
 func TestInstallSCMQueriesNativeServiceWithoutMutation(t *testing.T) {
 	manager, err := windows.OpenSCManager(nil, nil, windows.SC_MANAGER_CONNECT)
 	if err != nil {
@@ -105,7 +122,7 @@ func TestInstallSCMQueriesNativeServiceWithoutMutation(t *testing.T) {
 		t.Fatal("native descriptor read failed")
 	}
 	_ = protectedInstallService(descriptor)
-	buffer := make([]byte, 8192)
+	buffer := installServiceBuffer()
 	var needed uint32
 	if err := windows.QueryServiceConfig2(handle, windows.SERVICE_CONFIG_FAILURE_ACTIONS, &buffer[0], uint32(len(buffer)), &needed); err != nil {
 		t.Fatal("native failure-action query failed")

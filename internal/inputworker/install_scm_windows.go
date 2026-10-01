@@ -24,6 +24,16 @@ type installSCM struct {
 	root    string
 }
 
+// SCM writes pointer-bearing native structures into this storage. A []byte
+// backing array may be only byte-aligned on a Go stack; Windows RPC can fault
+// inside QueryServiceConfig before returning an error for such an address.
+// uint64 storage guarantees native alignment on the supported windows/amd64
+// target, including when the compiler keeps this bounded buffer on the stack.
+func installServiceBuffer() []byte {
+	words := make([]uint64, 8192/8)
+	return unsafe.Slice((*byte)(unsafe.Pointer(&words[0])), len(words)*8)
+}
+
 func (manager *installSCM) command() string {
 	return windows.EscapeArg(filepath.Join(manager.root, "Input", "krasis-input.exe")) + " --service"
 }
@@ -62,7 +72,7 @@ func installServiceString(buffer []byte, pointer *uint16) (string, error) {
 }
 
 func readInstallServiceConfig(handle windows.Handle) (installServiceConfig, error) {
-	buffer := make([]byte, 8192)
+	buffer := installServiceBuffer()
 	config := (*windows.QUERY_SERVICE_CONFIG)(unsafe.Pointer(&buffer[0]))
 	var needed uint32
 	if err := windows.QueryServiceConfig(handle, config, uint32(len(buffer)), &needed); err != nil {
@@ -137,7 +147,7 @@ func validateInstallService(handle windows.Handle, command string) error {
 	}
 	// No automatic crash restart, custom command or trigger may race the
 	// installer after it has obtained a clean stop receipt.
-	buffer := make([]byte, 8192)
+	buffer := installServiceBuffer()
 	var needed uint32
 	if err := windows.QueryServiceConfig2(handle, windows.SERVICE_CONFIG_FAILURE_ACTIONS, &buffer[0], uint32(len(buffer)), &needed); err != nil {
 		return installNativeError("service_config", ErrAuthority, err)

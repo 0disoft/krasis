@@ -362,6 +362,13 @@ service-ready receipt의 phase/PID/image digest/run을 읽기 전용으로 대�
 인증·권한·회수 검증은 설치된 에이전트가 계속 수행합니다. 실행 후 서비스가 종료되는
 경합은 기존 입력 회수와 연결 실패 처리에 맡기며 제어 중 자동 backend 전환은 하지 않습니다.
 
+g114는 SCM 출력 버퍼를 `uint64` backing storage로 만들어 native 구조체 정렬을
+보장합니다. Go 스택의 byte 배열은 8-byte 정렬을 보장하지 않습니다. 로컬 read-only
+EventLog 조회에서 8-byte 정렬은 성공했고 4-byte 어긋난 주소는 QueryServiceConfig
+내부 접근 위반 `0xc0000005`와 종료 코드 2를 재현했습니다. 기본 설정·failure actions·
+trigger 조회 모두 같은 bounded 정렬 버퍼를 사용합니다. 서비스 설정·권한·복원 순서는
+변경하지 않습니다. 이 수정의 로컬 조회 성공과 B의 실제 설치·PIN 입력 성공은 구분합니다.
+
 `scripts/build-input-installer.mjs`는 source clean 확인 후 revision별 출력 폴더를 만들며
 기존 산출물은 덮어쓰지 않습니다. 실행 파일의 실제 PE resource에서 아이콘과 관리자
 매니페스트를 대조합니다. 관리자 resource는 일반 테스트 EXE에 영향을 주지 않도록
