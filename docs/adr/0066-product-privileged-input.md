@@ -43,3 +43,23 @@ Focused tests use fake injection and authenticated in-memory channels; they do
 not enter credentials, elevate, install a service or demonstrate remote PIN
 success. Real two-PC mouse, keyboard, Esc, return and release-recovery checks
 remain required, especially cursor operations while a security dialog is open.
+
+## g108: Ordinary-agent service authentication
+
+The receiving service still checks the ordinary agent's actual token. In the
+opposite direction, the ordinary agent no longer reads the SYSTEM service's
+token or requests process synchronization access. B's earlier Deskflow token
+comparison reported access denied from ordinary privilege; product bootstrap
+must not assume that cross-account token query is available.
+
+The service client reads the named pipe's kernel server PID and requires that
+PID to be the running fixed own-process LocalSystem service. It verifies SCM
+configuration and its administrator-owned DACL, the fixed quoted image command,
+session 0, actual process image path, expected image digest and protected file
+ownership. A retained limited-query process handle checks GetExitCodeProcess,
+without PID lookup on subsequent requests. The pinned service itself checks
+SYSTEM/System integrity and restricted/AppContainer state before readiness.
+No service/process/token ACL or Windows security policy is changed.
+
+References: [process access rights](https://learn.microsoft.com/en-us/windows/win32/procthread/process-security-and-access-rights)
+and [service access rights](https://learn.microsoft.com/en-us/windows/win32/services/service-security-and-access-rights).

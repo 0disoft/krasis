@@ -113,8 +113,9 @@ func AuthenticateAgent(pipe uintptr, expected [sha256.Size]byte) (*Authority, er
 	}, nil
 }
 
-// AuthenticateService verifies the fixed service's actual running PID, SYSTEM
-// token, session 0 and administrator-owned image before an agent trusts its pipe.
+// AuthenticateService verifies the fixed LocalSystem service configuration,
+// actual running PID, session 0 and protected image. An ordinary agent must not
+// require permission to read another account's access token.
 // The caller pins the digest from an independently validated update package.
 func AuthenticateService(pipe uintptr, expected [sha256.Size]byte) (*Authority, error) {
 	if pipe == 0 || expected == ([sha256.Size]byte{}) {
@@ -133,18 +134,26 @@ func AuthenticateService(pipe uintptr, expected [sha256.Size]byte) (*Authority, 
 	if err != nil {
 		return nil, ErrAuthority
 	}
-	service, err := windows.OpenService(manager, name, windows.SERVICE_QUERY_STATUS)
+	service, err := windows.OpenService(manager, name, windows.SERVICE_QUERY_STATUS|windows.SERVICE_QUERY_CONFIG|windows.READ_CONTROL)
 	if err != nil {
 		return nil, ErrAuthority
 	}
 	defer windows.CloseServiceHandle(service)
+	root, err := windows.KnownFolderPath(windows.FOLDERID_ProgramFiles, 0)
+	if err != nil {
+		return nil, ErrAuthority
+	}
+	path := filepath.Join(root, "Krasis", "Input", "krasis-input.exe")
+	if validateInstallService(service, windows.EscapeArg(path)+" --service") != nil {
+		return nil, ErrAuthority
+	}
 	var status windows.SERVICE_STATUS_PROCESS
 	var needed uint32
 	err = windows.QueryServiceStatusEx(service, windows.SC_STATUS_PROCESS_INFO, (*byte)(unsafe.Pointer(&status)), uint32(unsafe.Sizeof(status)), &needed)
 	if err != nil || status.ProcessId != pid || status.CurrentState != windows.SERVICE_RUNNING {
 		return nil, ErrAuthority
 	}
-	identity, err := inspectProcess(pid)
+	identity, err := inspectServiceProcess(pid)
 	if err != nil {
 		return nil, ErrAuthority
 	}
@@ -154,20 +163,23 @@ func AuthenticateService(pipe uintptr, expected [sha256.Size]byte) (*Authority, 
 			_ = identity.close()
 		}
 	}()
-	if identity.session != 0 || !identity.system || identity.integrity != 0x4000 || identity.restricted || identity.appContainer {
+	if identity.session != 0 {
 		return nil, ErrAuthority
 	}
-	root, err := windows.KnownFolderPath(windows.FOLDERID_ProgramFiles, 0)
-	if err != nil || !strings.EqualFold(identity.image, filepath.Join(root, "Krasis", "Input", "krasis-input.exe")) {
+	if !strings.EqualFold(identity.image, path) {
 		return nil, ErrAuthority
 	}
 	image, err := lockImage(identity.image, expected)
 	if err != nil {
 		return nil, ErrAuthority
 	}
+	if protectedHandle(windows.Handle(image.Fd())) != nil {
+		_ = image.Close()
+		return nil, ErrAuthority
+	}
 	check := func() error {
-		state, err := windows.WaitForSingleObject(identity.handle, 0)
-		if err != nil || state != uint32(windows.WAIT_TIMEOUT) {
+		var code uint32
+		if windows.GetExitCodeProcess(identity.handle, &code) != nil || code != 259 {
 			return ErrAuthority
 		}
 		return nil
