@@ -53,13 +53,13 @@ func loadInstallationDirectory(root, directory string) (*Installation, error) {
 	for _, path := range []string{root, directory} {
 		file, err := openProtected(path, true)
 		if err != nil {
-			return nil, ErrAuthority
+			return nil, err
 		}
 		installation.files = append(installation.files, file)
 	}
 	metadata, err := openProtected(filepath.Join(directory, "INPUT-INSTALL.json"), false)
 	if err != nil {
-		return nil, ErrAuthority
+		return nil, err
 	}
 	installation.files = append(installation.files, metadata)
 	data, err := io.ReadAll(io.LimitReader(metadata, 4097))
@@ -123,13 +123,21 @@ func openProtected(path string, directory bool) (*os.File, error) {
 	}
 	handle, err := windows.CreateFile(name, windows.GENERIC_READ|windows.READ_CONTROL, windows.FILE_SHARE_READ, nil, windows.OPEN_EXISTING, flags, 0)
 	if err != nil {
-		return nil, ErrAuthority
+		return nil, installNativeError("file_open", ErrAuthority, err)
 	}
 	file := os.NewFile(uintptr(handle), "protected-input-installation")
 	var info windows.ByHandleFileInformation
-	if windows.GetFileInformationByHandle(handle, &info) != nil || info.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0 || (info.FileAttributes&windows.FILE_ATTRIBUTE_DIRECTORY != 0) != directory || (!directory && info.NumberOfLinks != 1) || protectedHandle(handle) != nil {
+	if err := windows.GetFileInformationByHandle(handle, &info); err != nil {
+		file.Close()
+		return nil, installNativeError("file_attributes", ErrAuthority, err)
+	}
+	if info.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0 || (info.FileAttributes&windows.FILE_ATTRIBUTE_DIRECTORY != 0) != directory || (!directory && info.NumberOfLinks != 1) {
 		_ = file.Close()
 		return nil, ErrAuthority
+	}
+	if err := protectedHandle(handle); err != nil {
+		file.Close()
+		return nil, err
 	}
 	return file, nil
 }
@@ -137,7 +145,7 @@ func openProtected(path string, directory bool) (*os.File, error) {
 func protectedHandle(handle windows.Handle) error {
 	descriptor, err := windows.GetSecurityInfo(handle, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION)
 	if err != nil {
-		return ErrAuthority
+		return installNativeError("file_security", ErrAuthority, err)
 	}
 	return protectedDescriptor(descriptor)
 }

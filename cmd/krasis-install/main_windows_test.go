@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/0disoft/krasis/internal/inputworker"
+	"github.com/0disoft/krasis/internal/installationdiag"
 )
 
 func TestInstallerArgumentsNeverSelectExternalPayload(t *testing.T) {
@@ -89,3 +90,16 @@ func TestInstallerLoadErrorIsSanitizedAndOutputFailureIsDistinct(t *testing.T) {
 type brokenWriter struct{}
 
 func (brokenWriter) Write([]byte) (int, error) { return 0, io.ErrClosedPipe }
+
+func TestDetailedInstallerPrintsReceiptEvenIfDiagnosticSaveFails(t *testing.T) {
+	s := installationdiag.Summary{Time: "2026-10-02T00:00:00Z", Action: "install", Result: 5, Stage: "stage", Operation: "file_open", Win32Error: 5, Win32Known: true, Recovery: "required"}
+	var out bytes.Buffer
+	code := runDetailed([]string{"--install"}, &out, func() (installerPayload, error) { return installerPayload{}, nil },
+		func(context.Context, bool, []byte, []byte, [32]byte, [32]byte) inputworker.InstallationReport {
+			return inputworker.InstallationReport{Result: inputworker.InstallationRecoveryRequired, Diagnostic: s}
+		},
+		func(installationdiag.Summary) error { return errors.New("PRIVATE-PATH") })
+	if code != 5 || !strings.Contains(out.String(), `"win32Error":5`) || !strings.Contains(out.String(), `"diagnosticSaved":false`) || strings.Contains(out.String(), "PRIVATE") {
+		t.Fatal("installer lost or leaked receipt")
+	}
+}

@@ -10,10 +10,14 @@ import (
 	"time"
 
 	"github.com/0disoft/krasis/internal/inputworker"
+	"github.com/0disoft/krasis/internal/installationdiag"
+	"github.com/0disoft/krasis/internal/productlog"
 )
 
 func main() {
-	os.Exit(run(os.Args[1:], os.Stdout, loadEmbeddedPayload, inputworker.ManageEmbeddedInstallation))
+	os.Exit(runDetailed(os.Args[1:], os.Stdout, loadEmbeddedPayload, inputworker.ManageEmbeddedInstallationDetailed, func(s installationdiag.Summary) error {
+		return productlog.SaveInstallation(os.Getenv("LOCALAPPDATA"), s)
+	}))
 }
 
 type installerPayload struct {
@@ -24,7 +28,15 @@ type installerPayload struct {
 type installerApply func(context.Context, bool, []byte, []byte, [32]byte, [32]byte) inputworker.InstallationResult
 
 func run(args []string, output io.Writer, load func() (installerPayload, error), apply installerApply) int {
+	return runDetailed(args, output, load, func(ctx context.Context, remove bool, a, i []byte, ap, ip [32]byte) inputworker.InstallationReport {
+		return inputworker.InstallationReport{Result: apply(ctx, remove, a, i, ap, ip)}
+	}, nil)
+}
+
+func runDetailed(args []string, output io.Writer, load func() (installerPayload, error), apply func(context.Context, bool, []byte, []byte, [32]byte, [32]byte) inputworker.InstallationReport, save func(installationdiag.Summary) error) int {
 	code, state := 2, "invalid_arguments"
+	var diagnostic *installationdiag.Summary
+	var diagnosticSaved *bool
 	if len(args) == 1 && args[0] == "--help" {
 		code, state = 0, "usage: krasis-install.exe --install | --remove"
 	} else if len(args) == 1 && (args[0] == "--install" || args[0] == "--remove") {
@@ -32,9 +44,16 @@ func run(args []string, output io.Writer, load func() (installerPayload, error),
 		payload, err := load()
 		if err == nil {
 			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-			result := apply(ctx, args[0] == "--remove", payload.agent, payload.input, payload.agentPin, payload.inputPin)
+			report := apply(ctx, args[0] == "--remove", payload.agent, payload.input, payload.agentPin, payload.inputPin)
 			cancel()
-			switch result {
+			if report.Diagnostic.Valid() {
+				diagnostic = &report.Diagnostic
+				if save != nil {
+					ok := save(report.Diagnostic) == nil
+					diagnosticSaved = &ok
+				}
+			}
+			switch report.Result {
 			case inputworker.InstallationOK:
 				code, state = 0, "installed"
 				if args[0] == "--remove" {
@@ -49,10 +68,12 @@ func run(args []string, output io.Writer, load func() (installerPayload, error),
 		}
 	}
 	if json.NewEncoder(output).Encode(struct {
-		Schema string `json:"schemaVersion"`
-		Code   int    `json:"code"`
-		State  string `json:"state"`
-	}{"krasis.input.install-result/v1", code, state}) != nil {
+		Schema          string                    `json:"schemaVersion"`
+		Code            int                       `json:"code"`
+		State           string                    `json:"state"`
+		Diagnostic      *installationdiag.Summary `json:"diagnostic,omitempty"`
+		DiagnosticSaved *bool                     `json:"diagnosticSaved,omitempty"`
+	}{"krasis.input.install-result/v1", code, state, diagnostic, diagnosticSaved}) != nil {
 		// An unreadable receipt must not be reported as a confirmed success.
 		return 6
 	}

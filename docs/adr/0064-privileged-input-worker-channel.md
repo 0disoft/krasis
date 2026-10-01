@@ -302,11 +302,26 @@ clean committed revision의 agent·input EXE와 두 SHA-256을 `go:embed`로 내
 경로를 거치며 보호 root·lock anchor를 남깁니다. 인증서 저장소나 Windows 보안 정책은
 변경하지 않습니다.
 
-결과는 `krasis.input.install-result/v1` JSON으로 code·state만 반환합니다. 종료 코드
+결과는 `krasis.input.install-result/v1` JSON으로 code·state를 반환합니다. 종료 코드
 0은 installed/removed, 2는 invalid_arguments, 3은 installation_denied, 4는
 previous_installation_restored, 5는 recovery_required, 6은 결과 출력 실패입니다.
-네이티브 오류·경로·사용자 식별자·입력 내용을 출력하지 않습니다. 결과를 못 썼다는
+네이티브 오류 문자열·경로·사용자 식별자·입력 내용을 출력하지 않습니다. 결과를 못 썼다는
 코드 6은 설치가 수행되지 않았다는 뜻이 아니므로 재실행 전에 상태 대조가 필요합니다.
+
+g110은 기존 code·state에 선택적인 `diagnostic`과 `diagnosticSaved`를 추가합니다.
+진단에는 최초 실패의 고정 stage·transaction phase·operation, 숫자 Win32 오류와
+`win32Known`, 복원 결과 및 복원 실패의 별도 stage·operation·숫자 오류가 들어갑니다.
+핸들 정리 실패도 `closeOperation`·`closeWin32Error`로 분리하므로 최초 오류나 확인된
+복원 결과를 덮어쓰지 않습니다. 숫자를 확인하지 못하면 `win32Known:false`, 오류 0으로
+표시하며 이것은 Win32 성공을 뜻하지 않습니다. 오류 문자열과 파일 경로는 저장하지 않습니다.
+
+검증된 receipt는 receiving user의 보호된 diagnostics 폴더에
+`installation-latest.json`으로 원자적으로 저장됩니다. 저장 실패는 결과 JSON의
+`diagnosticSaved:false`로 표시하며 실제 설치 결과를 바꾸거나 자동 재시도하지 않습니다.
+일반 `diagnostics export`와 peer 진단 전달에도 이 receipt를 포함합니다. 수신 측은
+고정 코드·필드·숫자를 다시 검증하고, 잘못된 receipt는 제거한 뒤
+`installationIncomplete:true`로 표시합니다. g108·g109의 과거 실패에는 원래 숫자
+오류가 남아 있지 않으므로 새 빌드의 B 실기기 receipt가 원인 확정에 필요합니다.
 
 `scripts/build-input-installer.mjs`는 source clean 확인 후 revision별 출력 폴더를 만들며
 기존 산출물은 덮어쓰지 않습니다. 실행 파일의 실제 PE resource에서 아이콘과 관리자

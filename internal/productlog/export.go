@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"github.com/0disoft/krasis/internal/installationdiag"
 	"io"
 	"path/filepath"
 	"time"
@@ -66,12 +67,15 @@ func exportTo(dir *securefs.Directory) error {
 		}
 		logs = append(logs, log)
 	}
+	installation, receiptErr := readInstallationReceipt(dir)
 	document := struct {
-		Schema  string      `json:"schema"`
-		Created string      `json:"created"`
-		Scope   string      `json:"scope"`
-		Logs    []exportLog `json:"logs"`
-	}{"krasis.support/v1", time.Now().UTC().Format(time.RFC3339), "Event history only; not a live agent status or complete crash report.", logs}
+		Schema                 string                    `json:"schema"`
+		Created                string                    `json:"created"`
+		Scope                  string                    `json:"scope"`
+		Logs                   []exportLog               `json:"logs"`
+		Installation           *installationdiag.Summary `json:"installation,omitempty"`
+		InstallationIncomplete bool                      `json:"installationIncomplete,omitempty"`
+	}{"krasis.support/v1", time.Now().UTC().Format(time.RFC3339), "Event history only; not a live agent status or complete crash report.", logs, installation, receiptErr != nil}
 	f, temp, err := dir.CreateTemporary(".support-", 0600)
 	if err != nil {
 		return err

@@ -37,8 +37,8 @@ func (files *installFiles) replace(ctx context.Context, target installImages) er
 		if old.Close() != nil {
 			return ErrAuthority
 		}
-		if moveInstallPath(files.directory(installActive), files.directory(installRetired), false) != nil {
-			return ErrAuthority
+		if err := moveInstallPath(files.directory(installActive), files.directory(installRetired), false); err != nil {
+			return err
 		}
 	}
 	if ctx.Err() != nil {
@@ -94,7 +94,7 @@ func (files *installFiles) removeDirectory(ctx context.Context, kind installDire
 	defer pinned.Close()
 	reader, err := os.Open(directory)
 	if err != nil {
-		return ErrAuthority
+		return installNativeError("file_open", ErrAuthority, err)
 	}
 	entries, readErr := reader.ReadDir(len(installFileNames) + 1)
 	_ = reader.Close()
@@ -125,8 +125,11 @@ func (files *installFiles) removeDirectory(ctx context.Context, kind installDire
 		return ErrAuthority
 	}
 	name, err := windows.UTF16PtrFromString(directory)
-	if err != nil || windows.RemoveDirectory(name) != nil {
+	if err != nil {
 		return ErrAuthority
+	}
+	if err := windows.RemoveDirectory(name); err != nil {
+		return installNativeError("directory_remove", ErrAuthority, err)
 	}
 	return nil
 }
@@ -146,8 +149,11 @@ func removeInstallFile(ctx context.Context, path string) error {
 		return ErrAuthority
 	}
 	name, err := windows.UTF16PtrFromString(path)
-	if err != nil || windows.DeleteFile(name) != nil {
+	if err != nil {
 		return ErrAuthority
+	}
+	if err := windows.DeleteFile(name); err != nil {
+		return installNativeError("file_delete", ErrAuthority, err)
 	}
 	return nil
 }

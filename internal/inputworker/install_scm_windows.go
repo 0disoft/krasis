@@ -65,7 +65,10 @@ func readInstallServiceConfig(handle windows.Handle) (installServiceConfig, erro
 	buffer := make([]byte, 8192)
 	config := (*windows.QUERY_SERVICE_CONFIG)(unsafe.Pointer(&buffer[0]))
 	var needed uint32
-	if windows.QueryServiceConfig(handle, config, uint32(len(buffer)), &needed) != nil || needed > uint32(len(buffer)) {
+	if err := windows.QueryServiceConfig(handle, config, uint32(len(buffer)), &needed); err != nil {
+		return installServiceConfig{}, installNativeError("service_config", ErrAuthority, err)
+	}
+	if needed > uint32(len(buffer)) {
 		return installServiceConfig{}, ErrAuthority
 	}
 	result := installServiceConfig{typeID: config.ServiceType, start: config.StartType, errorControl: config.ErrorControl, tag: config.TagId}
@@ -119,18 +122,27 @@ func protectedInstallService(descriptor *windows.SECURITY_DESCRIPTOR) error {
 
 func validateInstallService(handle windows.Handle, command string) error {
 	config, err := readInstallServiceConfig(handle)
-	if err != nil || !validInstallServiceConfig(config, command) {
+	if err != nil {
+		return err
+	}
+	if !validInstallServiceConfig(config, command) {
 		return ErrAuthority
 	}
 	descriptor, err := windows.GetSecurityInfo(handle, windows.SE_SERVICE, windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION)
-	if err != nil || protectedInstallService(descriptor) != nil {
-		return ErrAuthority
+	if err != nil {
+		return installNativeError("service_security", ErrAuthority, err)
+	}
+	if err := protectedInstallService(descriptor); err != nil {
+		return err
 	}
 	// No automatic crash restart, custom command or trigger may race the
 	// installer after it has obtained a clean stop receipt.
 	buffer := make([]byte, 8192)
 	var needed uint32
-	if windows.QueryServiceConfig2(handle, windows.SERVICE_CONFIG_FAILURE_ACTIONS, &buffer[0], uint32(len(buffer)), &needed) != nil || needed > uint32(len(buffer)) {
+	if err := windows.QueryServiceConfig2(handle, windows.SERVICE_CONFIG_FAILURE_ACTIONS, &buffer[0], uint32(len(buffer)), &needed); err != nil {
+		return installNativeError("service_config", ErrAuthority, err)
+	}
+	if needed > uint32(len(buffer)) {
 		return ErrAuthority
 	}
 	actions := (*windows.SERVICE_FAILURE_ACTIONS)(unsafe.Pointer(&buffer[0]))
@@ -138,7 +150,10 @@ func validateInstallService(handle windows.Handle, command string) error {
 	if err != nil || commandText != "" || actions.ActionsCount != 0 {
 		return ErrAuthority
 	}
-	if windows.QueryServiceConfig2(handle, windows.SERVICE_CONFIG_TRIGGER_INFO, &buffer[0], uint32(len(buffer)), &needed) != nil || needed > uint32(len(buffer)) || binary.LittleEndian.Uint32(buffer[:4]) != 0 {
+	if err := windows.QueryServiceConfig2(handle, windows.SERVICE_CONFIG_TRIGGER_INFO, &buffer[0], uint32(len(buffer)), &needed); err != nil {
+		return installNativeError("service_config", ErrAuthority, err)
+	}
+	if needed > uint32(len(buffer)) || binary.LittleEndian.Uint32(buffer[:4]) != 0 {
 		return ErrAuthority
 	}
 	return nil
@@ -157,11 +172,11 @@ func (manager *installSCM) open(ctx context.Context, access uint32) (windows.Han
 		if err == windows.ERROR_SERVICE_DOES_NOT_EXIST || err == windows.ERROR_SERVICE_MARKED_FOR_DELETE {
 			return 0, err
 		}
-		return 0, ErrAuthority
+		return 0, installNativeError("service_open", ErrAuthority, err)
 	}
-	if validateInstallService(handle, manager.command()) != nil {
+	if err := validateInstallService(handle, manager.command()); err != nil {
 		_ = windows.CloseServiceHandle(handle)
-		return 0, ErrAuthority
+		return 0, err
 	}
 	return handle, nil
 }
@@ -169,7 +184,10 @@ func (manager *installSCM) open(ctx context.Context, access uint32) (windows.Han
 func installServiceStatus(handle windows.Handle) (windows.SERVICE_STATUS_PROCESS, error) {
 	var status windows.SERVICE_STATUS_PROCESS
 	var needed uint32
-	if windows.QueryServiceStatusEx(handle, windows.SC_STATUS_PROCESS_INFO, (*byte)(unsafe.Pointer(&status)), uint32(unsafe.Sizeof(status)), &needed) != nil || status.ServiceType != windows.SERVICE_WIN32_OWN_PROCESS {
+	if err := windows.QueryServiceStatusEx(handle, windows.SC_STATUS_PROCESS_INFO, (*byte)(unsafe.Pointer(&status)), uint32(unsafe.Sizeof(status)), &needed); err != nil {
+		return status, installNativeError("service_status", ErrAuthority, err)
+	}
+	if status.ServiceType != windows.SERVICE_WIN32_OWN_PROCESS {
 		return status, ErrAuthority
 	}
 	return status, nil
@@ -181,7 +199,7 @@ func (manager *installSCM) query(ctx context.Context) (windows.SERVICE_STATUS_PR
 		return windows.SERVICE_STATUS_PROCESS{}, false, nil
 	}
 	if err != nil {
-		return windows.SERVICE_STATUS_PROCESS{}, false, ErrAuthority
+		return windows.SERVICE_STATUS_PROCESS{}, false, err
 	}
 	defer windows.CloseServiceHandle(handle)
 	status, err := installServiceStatus(handle)
@@ -253,7 +271,7 @@ func (manager *installSCM) start(ctx context.Context, digest [32]byte) error {
 	defer cancel()
 	handle, err := manager.open(ctx, windows.SERVICE_START)
 	if err != nil {
-		return ErrAuthority
+		return err
 	}
 	defer windows.CloseServiceHandle(handle)
 	status, err := installServiceStatus(handle)
@@ -261,15 +279,21 @@ func (manager *installSCM) start(ctx context.Context, digest [32]byte) error {
 		return err
 	}
 	if status.CurrentState == windows.SERVICE_STOPPED {
-		if windows.StartService(handle, 0, nil) != nil {
-			return ErrAuthority
+		if err := windows.StartService(handle, 0, nil); err != nil {
+			return installNativeError("service_start", ErrAuthority, err)
 		}
 	} else if status.CurrentState != windows.SERVICE_RUNNING && status.CurrentState != windows.SERVICE_START_PENDING {
 		return ErrAuthority
 	}
 	for ctx.Err() == nil {
 		status, err := installServiceStatus(handle)
-		if err != nil || status.CurrentState == windows.SERVICE_STOPPED {
+		if err != nil {
+			return err
+		}
+		if status.CurrentState == windows.SERVICE_STOPPED {
+			if status.Win32ExitCode != 0 {
+				return installNativeError("service_start", ErrAuthority, windows.Errno(status.Win32ExitCode))
+			}
 			return ErrAuthority
 		}
 		if status.CurrentState == windows.SERVICE_RUNNING && manager.ready(status, digest) == nil {
@@ -307,7 +331,7 @@ func (manager *installSCM) stop(ctx context.Context, digest [32]byte) error {
 		return nil
 	}
 	if err != nil {
-		return ErrAuthority
+		return err
 	}
 	defer windows.CloseServiceHandle(handle)
 	var process *processIdentity
@@ -355,8 +379,8 @@ func (manager *installSCM) stop(ctx context.Context, digest [32]byte) error {
 				return err
 			}
 			var result windows.SERVICE_STATUS
-			if windows.ControlService(handle, windows.SERVICE_CONTROL_STOP, &result) != nil {
-				return ErrRecovery
+			if err := windows.ControlService(handle, windows.SERVICE_CONTROL_STOP, &result); err != nil {
+				return installNativeError("service_stop", ErrRecovery, err)
 			}
 		} else if status.CurrentState != windows.SERVICE_RUNNING && status.CurrentState != windows.SERVICE_START_PENDING && status.CurrentState != windows.SERVICE_STOP_PENDING {
 			return ErrRecovery
@@ -407,9 +431,16 @@ func (manager *installSCM) configure(ctx context.Context, present bool) error {
 			return windows.CloseServiceHandle(handle)
 		}
 		status, err := installServiceStatus(handle)
-		if err != nil || status.CurrentState != windows.SERVICE_STOPPED || windows.DeleteService(handle) != nil {
+		if err != nil || status.CurrentState != windows.SERVICE_STOPPED {
 			_ = windows.CloseServiceHandle(handle)
+			if err != nil {
+				return err
+			}
 			return ErrAuthority
+		}
+		if err := windows.DeleteService(handle); err != nil {
+			windows.CloseServiceHandle(handle)
+			return installNativeError("service_delete", ErrAuthority, err)
 		}
 		_ = windows.CloseServiceHandle(handle)
 		// Wait until SCM actually removes it before considering removal complete.
@@ -430,7 +461,7 @@ func (manager *installSCM) create(ctx context.Context) error {
 	access := uint32(windows.READ_CONTROL | windows.WRITE_DAC | windows.WRITE_OWNER | windows.DELETE | windows.SERVICE_QUERY_CONFIG | windows.SERVICE_QUERY_STATUS)
 	handle, err := windows.CreateService(manager.manager, name, display, access, windows.SERVICE_WIN32_OWN_PROCESS, windows.SERVICE_DEMAND_START, windows.SERVICE_ERROR_NORMAL, command, nil, nil, nil, nil, nil)
 	if err != nil {
-		return ErrAuthority
+		return installNativeError("service_create", ErrAuthority, err)
 	}
 	defer windows.CloseServiceHandle(handle)
 	descriptor, err := windows.SecurityDescriptorFromString("O:BAG:BAD:P(A;;0xF01FF;;;SY)(A;;0xF01FF;;;BA)(A;;0x20005;;;BU)")
@@ -444,9 +475,17 @@ func (manager *installSCM) create(ctx context.Context) error {
 		return ErrAuthority
 	}
 	dacl, _, err := descriptor.DACL()
-	if err != nil || windows.SetSecurityInfo(handle, windows.SE_SERVICE, windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION, owner, nil, dacl, nil) != nil || validateInstallService(handle, manager.command()) != nil {
-		_ = windows.DeleteService(handle)
+	if err != nil {
+		windows.DeleteService(handle)
 		return ErrAuthority
+	}
+	if err := windows.SetSecurityInfo(handle, windows.SE_SERVICE, windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION, owner, nil, dacl, nil); err != nil {
+		_ = windows.DeleteService(handle)
+		return installNativeError("service_security", ErrAuthority, err)
+	}
+	if err := validateInstallService(handle, manager.command()); err != nil {
+		windows.DeleteService(handle)
+		return err
 	}
 	return nil
 }

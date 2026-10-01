@@ -52,7 +52,7 @@ func newInstallFiles(payload *installPayload) (*installFiles, error) {
 	}
 	root, err := windows.KnownFolderPath(windows.FOLDERID_ProgramFiles, 0)
 	if err != nil {
-		return nil, ErrAuthority
+		return nil, installNativeError("known_folder", ErrAuthority, err)
 	}
 	root = filepath.Join(root, "Krasis")
 	if err := createInstallDirectory(root); err != nil {
@@ -91,7 +91,7 @@ func createInstallDirectory(path string) error {
 		return err
 	}
 	if err := windows.CreateDirectory(name, attributes); err != nil && err != windows.ERROR_ALREADY_EXISTS {
-		return ErrAuthority
+		return installNativeError("directory_create", ErrAuthority, err)
 	}
 	file, err := openProtected(path, true)
 	if err != nil {
@@ -113,13 +113,21 @@ func openInstallWrite(path string) (*os.File, error) {
 	}
 	handle, err := windows.CreateFile(name, windows.GENERIC_READ|windows.GENERIC_WRITE|windows.READ_CONTROL, 0, attributes, windows.OPEN_ALWAYS, windows.FILE_FLAG_OPEN_REPARSE_POINT|windows.FILE_FLAG_WRITE_THROUGH, 0)
 	if err != nil {
-		return nil, ErrAuthority
+		return nil, installNativeError("file_open", ErrAuthority, err)
 	}
 	file := os.NewFile(uintptr(handle), "protected-input-write")
 	var info windows.ByHandleFileInformation
-	if windows.GetFileInformationByHandle(handle, &info) != nil || info.FileAttributes&(windows.FILE_ATTRIBUTE_REPARSE_POINT|windows.FILE_ATTRIBUTE_DIRECTORY) != 0 || info.NumberOfLinks != 1 || protectedHandle(handle) != nil {
+	if err := windows.GetFileInformationByHandle(handle, &info); err != nil {
+		_ = file.Close()
+		return nil, installNativeError("file_attributes", ErrAuthority, err)
+	}
+	if info.FileAttributes&(windows.FILE_ATTRIBUTE_REPARSE_POINT|windows.FILE_ATTRIBUTE_DIRECTORY) != 0 || info.NumberOfLinks != 1 {
 		_ = file.Close()
 		return nil, ErrAuthority
+	}
+	if err := protectedHandle(handle); err != nil {
+		file.Close()
+		return nil, err
 	}
 	return file, nil
 }
@@ -163,7 +171,7 @@ func (files *installFiles) load(ctx context.Context) (*installJournal, error) {
 	defer file.Close()
 	data, err := io.ReadAll(io.LimitReader(file, 2049))
 	if err != nil {
-		return nil, errInstallRecovery
+		return nil, installNativeError("file_read", errInstallRecovery, err)
 	}
 	journal, err := decodeInstallJournal(data)
 	if err != nil {
@@ -207,15 +215,18 @@ func writeInstallFile(ctx context.Context, path string, data []byte) error {
 		return err
 	}
 	defer file.Close()
-	if file.Truncate(0) != nil {
-		return ErrAuthority
+	if err := file.Truncate(0); err != nil {
+		return installNativeError("file_write", ErrAuthority, err)
 	}
 	reader := &contextInstallReader{ctx: ctx, reader: bytes.NewReader(data)}
-	if _, err := io.Copy(file, reader); err != nil || file.Sync() != nil {
-		return ErrAuthority
+	if _, err := io.Copy(file, reader); err != nil {
+		return installNativeError("file_write", ErrAuthority, err)
 	}
-	if file.Close() != nil {
-		return ErrAuthority
+	if err := file.Sync(); err != nil {
+		return installNativeError("file_sync", ErrAuthority, err)
+	}
+	if err := file.Close(); err != nil {
+		return installNativeError("file_close", ErrAuthority, err)
 	}
 	return nil
 }
@@ -253,8 +264,8 @@ func moveInstallPath(from, to string, replace bool) error {
 	if replace {
 		flags |= windows.MOVEFILE_REPLACE_EXISTING
 	}
-	if windows.MoveFileEx(source, destination, flags) != nil {
-		return ErrAuthority
+	if err := windows.MoveFileEx(source, destination, flags); err != nil {
+		return installNativeError("file_move", ErrAuthority, err)
 	}
 	return nil
 }
@@ -340,8 +351,8 @@ func (files *installFiles) close() error {
 		files.lock = nil
 	}
 	if files.pinned != nil {
-		if files.pinned.Close() != nil {
-			result = ErrAuthority
+		if err := files.pinned.Close(); err != nil {
+			result = installNativeError("file_close", ErrAuthority, err)
 		}
 		files.pinned = nil
 	}

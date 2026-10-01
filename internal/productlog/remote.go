@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"github.com/0disoft/krasis/internal/installationdiag"
 	"github.com/0disoft/krasis/internal/productidentity"
 	"path/filepath"
 	"time"
@@ -19,10 +20,12 @@ func SanitizeSupport(data []byte) ([]byte, error) {
 		return nil, errors.New("support size exceeded")
 	}
 	var doc struct {
-		Schema  string      `json:"schema"`
-		Created string      `json:"created"`
-		Scope   string      `json:"scope"`
-		Logs    []exportLog `json:"logs"`
+		Schema                 string                    `json:"schema"`
+		Created                string                    `json:"created"`
+		Scope                  string                    `json:"scope"`
+		Logs                   []exportLog               `json:"logs"`
+		Installation           *installationdiag.Summary `json:"installation,omitempty"`
+		InstallationIncomplete bool                      `json:"installationIncomplete,omitempty"`
 	}
 	if json.Unmarshal(data, &doc) != nil || doc.Schema != "krasis.support/v1" || len(doc.Logs) > 4 {
 		return nil, errors.New("invalid support document")
@@ -33,6 +36,10 @@ func SanitizeSupport(data []byte) ([]byte, error) {
 	}
 	doc.Created = created.UTC().Format(time.RFC3339)
 	doc.Scope = "Event history only; received from a paired device; not a live status."
+	if doc.Installation != nil && !doc.Installation.Valid() {
+		doc.Installation = nil
+		doc.InstallationIncomplete = true
+	}
 	seen := map[string]bool{}
 	for i, l := range doc.Logs {
 		if seen[l.Source] || (l.Source != "agent.jsonl" && l.Source != "agent.previous.jsonl" && l.Source != "control.jsonl" && l.Source != "control.previous.jsonl") {

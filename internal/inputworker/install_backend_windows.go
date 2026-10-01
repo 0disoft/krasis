@@ -26,7 +26,7 @@ func newWindowsInstallBackend(payload *installPayload) (*windowsInstallBackend, 
 	manager, err := windows.OpenSCManager(nil, nil, windows.SC_MANAGER_CONNECT|windows.SC_MANAGER_CREATE_SERVICE)
 	if err != nil {
 		_ = files.close()
-		return nil, ErrAuthority
+		return nil, installNativeError("scm_open", ErrAuthority, err)
 	}
 	return &windowsInstallBackend{files: files, scm: &installSCM{manager: manager, root: files.root}}, nil
 }
@@ -37,13 +37,15 @@ func (backend *windowsInstallBackend) Close() error {
 	}
 	var result error
 	if backend.scm != nil && backend.scm.manager != 0 {
-		if windows.CloseServiceHandle(backend.scm.manager) != nil {
-			result = ErrAuthority
+		if err := windows.CloseServiceHandle(backend.scm.manager); err != nil {
+			result = installNativeError("scm_close", ErrAuthority, err)
 		}
 		backend.scm.manager = 0
 	}
-	if backend.files != nil && backend.files.close() != nil {
-		result = ErrAuthority
+	if backend.files != nil {
+		if err := backend.files.close(); err != nil && result == nil {
+			result = err
+		}
 	}
 	return result
 }
@@ -188,11 +190,17 @@ func (backend *windowsInstallBackend) Start(ctx context.Context) error {
 }
 
 func (backend *windowsInstallBackend) Verify(ctx context.Context, expected installSnapshot) error {
-	if err := backend.check(ctx); err != nil || !expected.valid() {
+	if err := backend.check(ctx); err != nil {
+		return err
+	}
+	if !expected.valid() {
 		return ErrAuthority
 	}
 	actual, err := backend.Snapshot(ctx)
-	if err != nil || actual != expected {
+	if err != nil {
+		return err
+	}
+	if actual != expected {
 		return ErrAuthority
 	}
 	return nil
@@ -204,7 +212,10 @@ func (backend *windowsInstallBackend) Finish(ctx context.Context) error {
 	}
 	if missingInstallPath(backend.files.directory(installActive)) {
 		_, present, err := backend.scm.query(ctx)
-		if err != nil || present {
+		if err != nil {
+			return err
+		}
+		if present {
 			return ErrAuthority
 		}
 		// Delete lifecycle evidence before the transaction journal, so an
