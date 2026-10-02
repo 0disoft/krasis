@@ -369,6 +369,13 @@ EventLog 조회에서 8-byte 정렬은 성공했고 4-byte 어긋난 주소는 Q
 trigger 조회 모두 같은 bounded 정렬 버퍼를 사용합니다. 서비스 설정·권한·복원 순서는
 변경하지 않습니다. 이 수정의 로컬 조회 성공과 B의 실제 설치·PIN 입력 성공은 구분합니다.
 
+g115는 설치 성공 후 remote lease 연결 실패를 고정 `installed_input_stage_*` 코드로
+구분합니다. pipe open, SCM/서버 PID·설정·상태·프로세스·이미지 검증, lease metadata/
+write, worker-ready 응답과 client 검증 중 최초 실패를 보존합니다. 알려진 native 오류는
+2/5/32/231/1314와 other/unknown으로만 분류하며 원문·사용자·경로·입력은 기록하지 않습니다.
+기존 인증·회수·backend 선택 규칙은 불변입니다. 설치 성공은 실제 lease-ready 성공을
+보장하지 않으며 이 진단만으로 실패 원인을 확정하거나 PIN 제어 성공을 주장하지 않습니다.
+
 `scripts/build-input-installer.mjs`는 source clean 확인 후 revision별 출력 폴더를 만들며
 기존 산출물은 덮어쓰지 않습니다. 실행 파일의 실제 PE resource에서 아이콘과 관리자
 매니페스트를 대조합니다. 관리자 resource는 일반 테스트 EXE에 영향을 주지 않도록

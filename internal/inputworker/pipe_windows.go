@@ -71,12 +71,12 @@ func ConnectService(ctx context.Context, serviceDigest [sha256.Size]byte) (*Chan
 	defer cancel()
 	pipe, err := openPipe(ctx, pipeName)
 	if err != nil {
-		return nil, ErrAuthority
+		return nil, connectionFailed("pipe_open", err)
 	}
 	proof, err := AuthenticateService(uintptr(pipe.handle), serviceDigest)
 	if err != nil {
 		_ = pipe.Close()
-		return nil, ErrAuthority
+		return nil, connectionFailed("service_config", err)
 	}
 	return &Channel{stream: pipe, authority: proof}, nil
 }

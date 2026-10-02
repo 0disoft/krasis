@@ -122,12 +122,12 @@ func AuthenticateService(pipe uintptr, expected [sha256.Size]byte) (*Authority, 
 		return nil, ErrAuthority
 	}
 	var pid uint32
-	if windows.GetNamedPipeServerProcessId(windows.Handle(pipe), &pid) != nil {
-		return nil, ErrAuthority
+	if err := windows.GetNamedPipeServerProcessId(windows.Handle(pipe), &pid); err != nil {
+		return nil, connectionFailed("service_pid", err)
 	}
 	manager, err := windows.OpenSCManager(nil, nil, windows.SC_MANAGER_CONNECT)
 	if err != nil {
-		return nil, ErrAuthority
+		return nil, connectionFailed("service_manager", err)
 	}
 	defer windows.CloseServiceHandle(manager)
 	name, err := windows.UTF16PtrFromString(ServiceName)
@@ -136,7 +136,7 @@ func AuthenticateService(pipe uintptr, expected [sha256.Size]byte) (*Authority, 
 	}
 	service, err := windows.OpenService(manager, name, windows.SERVICE_QUERY_STATUS|windows.SERVICE_QUERY_CONFIG|windows.READ_CONTROL)
 	if err != nil {
-		return nil, ErrAuthority
+		return nil, connectionFailed("service_open", err)
 	}
 	defer windows.CloseServiceHandle(service)
 	root, err := windows.KnownFolderPath(windows.FOLDERID_ProgramFiles, 0)
@@ -144,18 +144,18 @@ func AuthenticateService(pipe uintptr, expected [sha256.Size]byte) (*Authority, 
 		return nil, ErrAuthority
 	}
 	path := filepath.Join(root, "Krasis", "Input", "krasis-input.exe")
-	if validateInstallService(service, windows.EscapeArg(path)+" --service") != nil {
-		return nil, ErrAuthority
+	if err := validateInstallService(service, windows.EscapeArg(path)+" --service"); err != nil {
+		return nil, connectionFailed("service_config", err)
 	}
 	var status windows.SERVICE_STATUS_PROCESS
 	var needed uint32
 	err = windows.QueryServiceStatusEx(service, windows.SC_STATUS_PROCESS_INFO, (*byte)(unsafe.Pointer(&status)), uint32(unsafe.Sizeof(status)), &needed)
 	if err != nil || status.ProcessId != pid || status.CurrentState != windows.SERVICE_RUNNING {
-		return nil, ErrAuthority
+		return nil, connectionFailed("service_status", err)
 	}
 	identity, err := inspectServiceProcess(pid)
 	if err != nil {
-		return nil, ErrAuthority
+		return nil, err
 	}
 	accepted := false
 	defer func() {
@@ -164,18 +164,18 @@ func AuthenticateService(pipe uintptr, expected [sha256.Size]byte) (*Authority, 
 		}
 	}()
 	if identity.session != 0 {
-		return nil, ErrAuthority
+		return nil, connectionFailed("service_process_metadata", ErrAuthority)
 	}
 	if !strings.EqualFold(identity.image, path) {
-		return nil, ErrAuthority
+		return nil, connectionFailed("service_image", ErrAuthority)
 	}
 	image, err := lockImage(identity.image, expected)
 	if err != nil {
-		return nil, ErrAuthority
+		return nil, connectionFailed("service_image", err)
 	}
 	if protectedHandle(windows.Handle(image.Fd())) != nil {
 		_ = image.Close()
-		return nil, ErrAuthority
+		return nil, connectionFailed("service_image_acl", ErrAuthority)
 	}
 	check := func() error {
 		var code uint32

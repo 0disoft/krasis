@@ -9,6 +9,7 @@ import (
 
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/inputworker"
 	"github.com/0disoft/krasis/internal/transport"
 )
 
@@ -16,6 +17,19 @@ type testPrivilegedClient struct {
 	closes  atomic.Int32
 	presses atomic.Int32
 	err     error
+}
+
+func TestPrivilegedInputFailedStartupLogsBoundedDiagnosticsWithoutGrant(t *testing.T) {
+	var events []string
+	input := &privilegedLeaseInput{expires: time.Now().Add(time.Hour), event: func(code string) { events = append(events, code) }, connect: func(context.Context, application.LeaseIdentity, time.Time) (privilegedClient, error) {
+		return nil, errors.New("private diagnostic contents")
+	}}
+	if input.open(context.Background(), application.LeaseIdentity{SessionID: "s", LeaseID: "l", Epoch: "e"}, time.Now()) != errPrivilegedInput || input.client != nil {
+		t.Fatal("failed privileged startup granted an input channel")
+	}
+	if len(events) != 3 || events[0] != "installed_input_connect_failed" || events[1] != inputworker.ConnectionFailureEvent(nil) || events[2] != inputworker.ConnectionNativeFailureEvent(nil) {
+		t.Fatal("startup failure omitted bounded diagnostic events")
+	}
 }
 
 func (p *testPrivilegedClient) Press(context.Context, control.PressedToken) error {

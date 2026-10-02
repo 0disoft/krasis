@@ -13,7 +13,7 @@ func inspectServiceProcess(pid uint32) (*processIdentity, error) {
 	}
 	handle, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
 	if err != nil {
-		return nil, ErrAuthority
+		return nil, connectionFailed("service_process_open", err)
 	}
 	identity := &processIdentity{handle: handle}
 	accepted := false
@@ -23,18 +23,27 @@ func inspectServiceProcess(pid uint32) (*processIdentity, error) {
 		}
 	}()
 	actual, err := windows.GetProcessId(handle)
-	if err != nil || actual != pid || windows.ProcessIdToSessionId(pid, &identity.session) != nil {
-		return nil, ErrAuthority
+	if err != nil || actual != pid {
+		return nil, connectionFailed("service_process_metadata", err)
+	}
+	if err := windows.ProcessIdToSessionId(pid, &identity.session); err != nil {
+		return nil, connectionFailed("service_process_metadata", err)
 	}
 	var image [32768]uint16
 	size := uint32(len(image))
-	if windows.QueryFullProcessImageName(handle, 0, &image[0], &size) != nil || size == 0 || size >= uint32(len(image)) {
-		return nil, ErrAuthority
+	if err := windows.QueryFullProcessImageName(handle, 0, &image[0], &size); err != nil {
+		return nil, connectionFailed("service_process_metadata", err)
+	}
+	if size == 0 || size >= uint32(len(image)) {
+		return nil, connectionFailed("service_process_metadata", ErrAuthority)
 	}
 	identity.image = windows.UTF16ToString(image[:size])
 	var code uint32
-	if windows.GetExitCodeProcess(handle, &code) != nil || code != 259 {
-		return nil, ErrAuthority
+	if err := windows.GetExitCodeProcess(handle, &code); err != nil {
+		return nil, connectionFailed("service_process_metadata", err)
+	}
+	if code != 259 {
+		return nil, connectionFailed("service_process_metadata", ErrAuthority)
 	}
 	accepted = true
 	return identity, nil

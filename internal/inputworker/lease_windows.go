@@ -19,11 +19,11 @@ func ConnectLease(ctx context.Context, serviceDigest [sha256.Size]byte, lease Le
 	}
 	data, err := encodeLease(lease, time.Now())
 	if err != nil {
-		return nil, ErrAuthority
+		return nil, connectionFailed("lease_metadata", err)
 	}
 	channel, err := ConnectService(ctx, serviceDigest)
 	if err != nil {
-		return nil, ErrAuthority
+		return nil, err
 	}
 	accepted := false
 	defer func() {
@@ -37,15 +37,24 @@ func ConnectLease(ctx context.Context, serviceDigest [sha256.Size]byte, lease Le
 	if limit, ok := ctx.Deadline(); ok && limit.Before(deadline) {
 		deadline = limit
 	}
-	if channel.stream.SetDeadline(deadline) != nil || writeFrame(channel.stream, data[:]) != nil || readReady(channel.stream) != nil || ctx.Err() != nil {
-		return nil, ErrAuthority
+	if err := channel.stream.SetDeadline(deadline); err != nil {
+		return nil, connectionFailed("lease_deadline", err)
+	}
+	if err := writeFrame(channel.stream, data[:]); err != nil {
+		return nil, connectionFailed("lease_write", err)
+	}
+	if err := readReady(channel.stream); err != nil {
+		return nil, connectionFailed("worker_ready", err)
+	}
+	if ctx.Err() != nil {
+		return nil, connectionFailed("worker_ready", ctx.Err())
 	}
 	if channel.stream.SetDeadline(time.Time{}) != nil {
-		return nil, ErrAuthority
+		return nil, connectionFailed("lease_deadline", ErrAuthority)
 	}
 	client, err := NewClient(ctx, channel, lease)
 	if err != nil {
-		return nil, ErrAuthority
+		return nil, connectionFailed("client_validation", err)
 	}
 	accepted = true
 	return client, nil

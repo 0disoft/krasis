@@ -8,6 +8,7 @@ import (
 
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/inputworker"
 	"github.com/0disoft/krasis/internal/peer"
 	"github.com/0disoft/krasis/internal/transport"
 )
@@ -74,6 +75,8 @@ func (input *privilegedLeaseInput) open(ctx context.Context, identity applicatio
 		}
 		if input.event != nil {
 			input.event("installed_input_connect_failed")
+			input.event(inputworker.ConnectionFailureEvent(err))
+			input.event(inputworker.ConnectionNativeFailureEvent(err))
 		}
 		return errPrivilegedInput
 	}
