@@ -5,6 +5,7 @@ package wininput
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -62,15 +63,77 @@ func TestForegroundTransitionRemainsBoundedAndCannotUseSavedFocus(t *testing.T) 
 	restore := stubSourceWheelCaptureActivation(t)
 	defer restore()
 	pauses, reads := 0, 0
+	requests := 0
 	stubForegroundTransitionPause(t, func(time.Duration) { pauses++ })
 	sourceWheelCaptureGetForeground = func() uintptr { reads++; return 0 }
 	sourceWheelCaptureWindowThread = func(uintptr) (uint32, error) { t.Fatal("missing foreground used a remembered window"); return 0, nil }
-	sourceWheelCaptureSetForeground = func(uintptr) error { t.Fatal("missing foreground forced activation"); return nil }
+	sourceWheelCaptureSetForeground = func(window uintptr) error {
+		if window != 10 {
+			t.Fatal("missing foreground used a remembered activation target")
+		}
+		requests++
+		return nil // API success alone does not prove foreground ownership.
+	}
 	sourceWheelCaptureAttachThreads = func(uint32, uint32, bool) error { t.Fatal("missing foreground attached a thread"); return nil }
 	current := &sourceWheelCaptureRun{window: 10, savedFocus: 20}
 	result, err := current.activateForegroundFallback()
-	if !errors.Is(err, ErrSourceForegroundUnavailable) || result != SourceForegroundFallbackAttachFailed || pauses != 5 || reads != 6 || current.active.Load() {
+	if !errors.Is(err, ErrSourceForegroundUnavailable) || result != SourceForegroundFallbackAttachFailed || pauses != 5 || reads != 11 || requests != 5 || current.active.Load() {
 		t.Fatal("persistent missing foreground bypassed refusal or retry budget", result, err, pauses, reads)
+	}
+}
+
+func TestForegroundTransitionReactivatesCaptureWithoutPhysicalClick(t *testing.T) {
+	for _, apiErr := range []error{nil, errors.New("API returned zero")} {
+		t.Run(fmt.Sprint(apiErr), func(t *testing.T) {
+			restore := stubSourceWheelCaptureActivation(t)
+			defer restore()
+			foreground := uintptr(0)
+			pauses, requests := 0, 0
+			stubForegroundTransitionPause(t, func(time.Duration) { pauses++ })
+			sourceWheelCaptureGetForeground = func() uintptr { return foreground }
+			sourceWheelCaptureSetForeground = func(window uintptr) error {
+				if window != 10 {
+					t.Fatal("wrong capture target")
+				}
+				requests++
+				foreground = window
+				return apiErr
+			}
+			sourceWheelCaptureAttachThreads = func(uint32, uint32, bool) error { t.Fatal("NULL recovery attached an unknown thread"); return nil }
+			current := &sourceWheelCaptureRun{window: 10, savedFocus: 20}
+			result, err := current.activateForegroundFallback()
+			if err != nil || result != SourceForegroundFallbackSucceeded || requests != 1 || pauses != 1 {
+				t.Fatal("verified capture ownership did not recover the transition", result, err, requests, pauses)
+			}
+		})
+	}
+}
+
+func TestForegroundTransitionDeniedRequestKeepsBoundedRefusal(t *testing.T) {
+	restore := stubSourceWheelCaptureActivation(t)
+	defer restore()
+	requests := 0
+	stubForegroundTransitionPause(t, func(time.Duration) {})
+	sourceWheelCaptureGetForeground = func() uintptr { return 0 }
+	sourceWheelCaptureSetForeground = func(uintptr) error { requests++; return errors.New("denied") }
+	current := &sourceWheelCaptureRun{window: 10}
+	_, err := current.activateForegroundFallback()
+	if !errors.Is(err, ErrSourceForegroundUnavailable) || requests != sourceForegroundTransitionAttempts || current.active.Load() {
+		t.Fatal("denied recovery bypassed refusal or retry budget", err, requests)
+	}
+}
+
+func TestForegroundTransitionCancellationDuringRequestCannotAuthorizeCapture(t *testing.T) {
+	restore := stubSourceWheelCaptureActivation(t)
+	defer restore()
+	current := &sourceWheelCaptureRun{window: 10}
+	requests, reads := 0, 0
+	stubForegroundTransitionPause(t, func(time.Duration) {})
+	sourceWheelCaptureGetForeground = func() uintptr { reads++; return 0 }
+	sourceWheelCaptureSetForeground = func(uintptr) error { requests++; current.setError(context.Canceled); return nil }
+	_, err := current.activateForegroundFallback()
+	if !errors.Is(err, context.Canceled) || requests != 1 || reads != 2 || current.active.Load() {
+		t.Fatal("cancelled request continued native work or authorized capture", err, requests, reads)
 	}
 }
 

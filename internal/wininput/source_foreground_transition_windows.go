@@ -10,7 +10,10 @@ const sourceForegroundTransitionInterval = 10 * time.Millisecond
 var sourceForegroundTransitionPause = time.Sleep
 
 // GetForegroundWindow may temporarily return NULL while activation changes.
-// Wait only for a newly observed foreground handle, never reuse savedFocus or
+// Resample before retrying activation of our own capture window. Windows allows
+// SetForegroundWindow when no foreground process exists, though it may still
+// deny the request. Passive polling alone can leave NULL until a physical click.
+// Only a freshly observed owner proves success; never reuse savedFocus or
 // attach to an unknown thread. Normal foreground paths have no added delay.
 // The capture command retains its existing two-second outer deadline.
 func (current *sourceWheelCaptureRun) foregroundAfterTransition() (uintptr, error) {
@@ -27,6 +30,19 @@ func (current *sourceWheelCaptureRun) foregroundAfterTransition() (uintptr, erro
 			return 0, err
 		}
 		foreground = sourceWheelCaptureGetForeground()
+		if foreground == 0 && current.window != 0 {
+			// This runs on the capture owner thread after ordinary activation
+			// failed. Request focus only for that capture, not a saved app, and
+			// verify ownership even if the API's return value says success.
+			if err := current.err(); err != nil {
+				return 0, err
+			}
+			_ = sourceWheelCaptureSetForeground(current.window)
+			if err := current.err(); err != nil {
+				return 0, err
+			}
+			foreground = sourceWheelCaptureGetForeground()
+		}
 	}
 	if foreground == 0 {
 		return 0, ErrSourceForegroundUnavailable

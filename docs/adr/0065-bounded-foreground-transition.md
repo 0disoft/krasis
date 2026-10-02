@@ -48,3 +48,30 @@ claim or a change to those native conversion paths.
 ## Reference
 
 - [GetForegroundWindow](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getforegroundwindow)
+
+## g132: Request activation when passive polling stays NULL
+
+The 2026-10-03 g131 device exports contain 12 source handoff profiles: two
+successful and ten refused with `activation_capture_foreground_unavailable`.
+The failed capture preparations took about 55–57 ms, consistent with exhausting
+the five observation intervals. The operator reports that a local mouse click
+then permits handoff. The exports identify the refused capture stage, not the
+Windows-internal reason for losing foreground ownership.
+
+Passive polling is insufficient when there is no foreground owner to restore
+itself. Within the same five intervals, resample first; if the result is still
+NULL, request `SetForegroundWindow` for the existing capture window and read the
+foreground handle again. Windows documents absence of a foreground process as
+one condition permitting this request; it also explicitly permits denial.
+Success still requires observing the actual capture handle. An API success
+without ownership remains a refusal, and a newly observed external window uses
+the existing response probe and attach/detach fallback. Cancellation is checked
+around each request. No remembered application handle, synthetic click/key,
+foreground permission grant, or system-setting change is used.
+
+Regression checks cover recovery without a physical click, API denial,
+unverified API success, cancellation inside the request, passive recovery to a
+responsive external owner, and the original bounded refusal. Two-device g132
+handoff without an extra click remains a manual validation requirement.
+
+- [SetForegroundWindow](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setforegroundwindow)
