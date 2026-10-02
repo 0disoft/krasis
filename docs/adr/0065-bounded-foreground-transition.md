@@ -104,3 +104,32 @@ attach/detach fallback, each NULL stage, clean refusal and sanitized export.
 Click-free A-to-B device handoff remains unverified until g133 is deployed.
 
 - [ShowWindow](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-showwindow)
+
+## g134: Preserve restored focus while hiding capture
+
+The 03:19 KST g133 exports contain 12 successful paired profiles, followed by
+eight `activation_capture_foreground_missing_before_show` events on A. The
+refusals first observe NULL before the capture show operation. No A reconnect
+event appears during those refusals. The bounded profiles omit later attempts;
+the initial 12 successes do not imply the full test succeeded.
+
+Return restores application focus and then used `ShowWindow(SW_HIDE)`, which
+also requests activation of another window. Remove that second activation
+request when a nonzero external foreground owner is freshly observed: hide the
+capture with `SetWindowPos(SWP_HIDEWINDOW | SWP_NOACTIVATE | SWP_NOZORDER |
+SWP_NOMOVE | SWP_NOSIZE)`. No external window is acted on or remembered handle
+reused for activation. If foreground is still capture or NULL, retain the
+ordinary hide/release path from ADR 0030.
+
+Verify capture release after hiding even if the preceding restoration reported
+success. A hidden capture remaining foreground is terminal; a hide API error
+is not swallowed as successful cleanup. The existing degraded-restore counters
+retain their contract: only a restoration failure increments post-hide evidence.
+
+Fake-native regressions cover 20 click-free activate/return cycles, exact native
+hide flags, API rejection, and hidden capture retention following an apparently
+successful restore. Existing degraded cleanup and attach/detach tests still
+apply. The exports do not establish that return hiding caused NULL; actual g134
+device behavior remains unverified.
+
+- [SetWindowPos](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowpos)

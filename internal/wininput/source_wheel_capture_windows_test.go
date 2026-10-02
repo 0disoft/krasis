@@ -25,6 +25,8 @@ func TestSourceWheelCaptureShutdownDoesNotPromoteCancellationToFailure(t *testin
 }
 
 func TestSourceWheelCaptureRestoresFocusBeforeHiding(t *testing.T) {
+	restore := stubSourceWheelCaptureActivation(t)
+	t.Cleanup(restore)
 	previousShow := sourceWheelCaptureShowWindow
 	previousGet := sourceWheelCaptureGetForeground
 	previousSet := sourceWheelCaptureSetForeground
@@ -60,7 +62,7 @@ func TestSourceWheelCaptureRestoresFocusBeforeHiding(t *testing.T) {
 	if err := current.deactivateWindow(); err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"get", "validate", "restore", "get", "hide"}
+	want := []string{"get", "validate", "restore", "get", "get", "hide", "get"}
 	if !slices.Equal(events, want) {
 		t.Fatalf("deactivation order = %v, want %v", events, want)
 	}
@@ -302,6 +304,8 @@ func TestSourceWheelCaptureClassifiesFocusRestoreFallbackRetryFailure(t *testing
 }
 
 func TestSourceWheelCaptureDoesNotRecordFocusForFailedActivationCleanup(t *testing.T) {
+	restore := stubSourceWheelCaptureActivation(t)
+	t.Cleanup(restore)
 	previousRegister := sourceWheelCaptureRegisterWindow
 	previousShow := sourceWheelCaptureShowWindow
 	previousGet := sourceWheelCaptureGetForeground
@@ -506,6 +510,7 @@ func stubSourceWheelCaptureActivation(t *testing.T) func() {
 	previousPosition := sourceWheelCaptureSetPosition
 	previousRegister := sourceWheelCaptureRegisterWindow
 	previousShow := sourceWheelCaptureShowWindow
+	previousHide := sourceWheelCaptureHideWithoutActivation
 	previousGet := sourceWheelCaptureGetForeground
 	previousSet := sourceWheelCaptureSetForeground
 	previousIsWindow := sourceWheelCaptureIsWindow
@@ -515,6 +520,10 @@ func stubSourceWheelCaptureActivation(t *testing.T) func() {
 	sourceWheelCaptureSetPosition = func(uintptr, int32, int32) error { return nil }
 	sourceWheelCaptureRegisterWindow = func(uintptr, uintptr, bool) error { return nil }
 	sourceWheelCaptureShowWindow = func(uintptr, uintptr) {}
+	sourceWheelCaptureHideWithoutActivation = func(window uintptr) error {
+		sourceWheelCaptureShowWindow(window, swHide)
+		return nil
+	}
 	sourceWheelCaptureIsWindow = func(uintptr) bool { return true }
 	return func() {
 		sourceWheelCaptureIsVisible = previousVisible
@@ -522,6 +531,7 @@ func stubSourceWheelCaptureActivation(t *testing.T) func() {
 		sourceWheelCaptureSetPosition = previousPosition
 		sourceWheelCaptureRegisterWindow = previousRegister
 		sourceWheelCaptureShowWindow = previousShow
+		sourceWheelCaptureHideWithoutActivation = previousHide
 		sourceWheelCaptureGetForeground = previousGet
 		sourceWheelCaptureSetForeground = previousSet
 		sourceWheelCaptureIsWindow = previousIsWindow

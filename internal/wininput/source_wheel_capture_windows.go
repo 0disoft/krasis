@@ -735,17 +735,19 @@ func (current *sourceWheelCaptureRun) deactivateWindow() error {
 	// Windows choose another foreground owner, which makes restoreFocus classify
 	// every ordinary return as skipped and loses the saved application focus.
 	restoreResult, restoreErr := current.restoreFocus()
-	sourceWheelCaptureShowWindow(current.window, swHide)
+	if hideErr := current.hideAfterFocusRestore(); hideErr != nil {
+		cleanupErr = errors.Join(cleanupErr, hideErr, ErrSourceCaptureRollbackFailed)
+	}
 	if current.observer != nil && wasActive {
 		current.observer.ObserveWheelFocusRestore(restoreResult)
 	}
 	current.savedFocus = 0
 	// Partial activation can own registration and foreground before active=true.
 	// It needs the same post-hide release proof as a fully active capture.
-	if restoreErr == nil {
-		return errors.Join(cleanupErr, restoreErr)
-	}
 	postHideResult, postHideErr := current.verifyPostHideFocusRelease()
+	if restoreErr == nil {
+		return errors.Join(cleanupErr, postHideErr)
+	}
 	if current.observer != nil {
 		current.observer.ObserveWheelPostHideFocus(postHideResult)
 	}
