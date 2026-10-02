@@ -115,6 +115,7 @@ type response struct {
 	status              byte
 	certainty           byte
 	requested, inserted uint16
+	timing              [3]byte
 }
 
 func writeResponse(writer io.Writer, value response) error {
@@ -124,6 +125,15 @@ func writeResponse(writer io.Writer, value response) error {
 	binary.BigEndian.PutUint64(data[8:16], value.sequence)
 	binary.BigEndian.PutUint16(data[16:18], value.requested)
 	binary.BigEndian.PutUint16(data[18:20], value.inserted)
+	if value.timing != ([3]byte{}) {
+		for _, bucket := range value.timing {
+			if bucket > 5 {
+				return ErrProtocol
+			}
+		}
+		data[4] = 2
+		copy(data[20:23], value.timing[:])
+	}
 	n, err := writer.Write(data[:])
 	if err == nil && n != len(data) {
 		return io.ErrShortWrite
@@ -132,11 +142,20 @@ func writeResponse(writer io.Writer, value response) error {
 }
 
 func decodeResponse(data [responseSize]byte) (response, error) {
-	if string(data[:4]) != "KRA1" || data[4] != 1 || binary.BigEndian.Uint32(data[20:]) != 0 {
+	if string(data[:4]) != "KRA1" || data[4] < 1 || data[4] > 2 || data[23] != 0 {
 		return response{}, ErrProtocol
 	}
 	value := response{op: operation(data[5]), status: data[6], certainty: data[7],
 		sequence: binary.BigEndian.Uint64(data[8:16]), requested: binary.BigEndian.Uint16(data[16:18]), inserted: binary.BigEndian.Uint16(data[18:20])}
+	copy(value.timing[:], data[20:23])
+	if data[4] == 1 && value.timing != ([3]byte{}) || data[4] == 2 && value.timing == ([3]byte{}) {
+		return response{}, ErrProtocol
+	}
+	for _, bucket := range value.timing {
+		if bucket > 5 {
+			return response{}, ErrProtocol
+		}
+	}
 	if value.sequence == 0 || value.op < opPress || value.op > opHeartbeat || value.status > 1 || value.inserted > value.requested {
 		return response{}, ErrProtocol
 	}

@@ -21,6 +21,15 @@ type Client struct {
 	lease    Lease
 	sequence uint64
 	failed   bool
+	timing   timingSampler
+}
+
+// SetTimingObserver enables bounded diagnostic summaries. The observer must
+// not block or call back into this client; it cannot change input outcomes.
+func (client *Client) SetTimingObserver(emit func(string)) {
+	client.mu.Lock()
+	defer client.mu.Unlock()
+	client.timing = timingSampler{emit: emit}
 }
 
 var _ application.InputPort = (*Client)(nil)
@@ -69,12 +78,31 @@ func (client *Client) perform(ctx context.Context, command request) error {
 	if client == nil || ctx == nil {
 		return notSent(ErrAuthority)
 	}
+	start := time.Now()
 	client.mu.Lock()
-	defer client.mu.Unlock()
+	var sample [7]byte
+	wasFailed := client.failed
+	sample[0] = timingBucket(time.Since(start))
+	defer func() {
+		if !wasFailed {
+			client.timing.observe(sample, time.Now())
+			if client.failed {
+				client.timing.flush(time.Now())
+			}
+		}
+		client.mu.Unlock()
+	}()
 	if client.failed || client.channel == nil || ctx.Err() != nil {
 		return notSent(ErrAuthority)
 	}
-	if !time.Now().Before(client.lease.ExpiresAt) || client.sequence == math.MaxUint64 || client.channel.authority.check(false) != nil {
+	if !time.Now().Before(client.lease.ExpiresAt) || client.sequence == math.MaxUint64 {
+		client.fail()
+		return notSent(ErrExpired)
+	}
+	start = time.Now()
+	authorityErr := client.channel.authority.check(false)
+	sample[1] = timingBucket(time.Since(start))
+	if authorityErr != nil {
 		client.fail()
 		return notSent(ErrExpired)
 	}
@@ -99,18 +127,23 @@ func (client *Client) perform(ctx context.Context, command request) error {
 	stopCancel := context.AfterFunc(ctx, func() { _ = client.channel.Close() })
 	defer stopCancel()
 	client.sequence++
+	start = time.Now()
 	n, err := stream.Write(data[:])
+	sample[2] = timingBucket(time.Since(start))
 	if err != nil || n != len(data) {
 		client.fail()
 		// Even a zero-byte write error does not prove that a prior native
 		// overlapped write was not consumed; classify transport loss as unknown.
 		return unknownInput(ErrProtocol)
 	}
+	start = time.Now()
 	ack, err := readResponse(stream)
+	sample[3] = timingBucket(time.Since(start))
 	if err != nil || ack.sequence != command.sequence || ack.op != command.op {
 		client.fail()
 		return unknownInput(ErrProtocol)
 	}
+	copy(sample[4:], ack.timing[:])
 	if ack.status == 0 {
 		return nil
 	}
@@ -134,6 +167,7 @@ func (client *Client) Close() error {
 	err := client.channel.Close()
 	client.mu.Lock()
 	client.failed = true
+	client.timing.flush(time.Now())
 	client.mu.Unlock()
 	return err
 }

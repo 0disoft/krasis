@@ -89,19 +89,15 @@ func serveReady(ctx context.Context, channel *Channel, input application.InputPo
 			}
 		}
 		var runErr error
-		inputDo := func(ctx context.Context, operation func() error) error {
-			if err := authority.check(false); err != nil {
-				return err
-			}
-			return scope.Do(ctx, operation)
-		}
+		timing := &workerTiming{}
+		inputDo := measureExecution(func() error { return authority.check(false) }, scope.Do, timing)
 		recoveryDo := func(ctx context.Context, operation func() error) error {
 			if err := authority.check(true); err != nil {
 				return err
 			}
 			return scope.Do(ctx, operation)
 		}
-		report, runErr = serve(ctx, stream, input, lease, inputDo, recoveryDo, time.Now)
+		report, runErr = serve(ctx, stream, input, lease, inputDo, recoveryDo, time.Now, timing)
 		return runErr
 	})
 	return report, err
@@ -119,7 +115,7 @@ func validLease(ctx context.Context, stream net.Conn, input application.InputPor
 	return true
 }
 
-func serve(ctx context.Context, stream net.Conn, input application.InputPort, lease Lease, do, recoveryDo executor, now func() time.Time) (report Report, err error) {
+func serve(ctx context.Context, stream net.Conn, input application.InputPort, lease Lease, do, recoveryDo executor, now func() time.Time, timings ...*workerTiming) (report Report, err error) {
 	var pressed control.PressedState
 	defer func() {
 		// Close first to interrupt the sole bounded reader. Cleanup cannot wait
@@ -203,6 +199,9 @@ func serve(ctx context.Context, stream net.Conn, input application.InputPort, le
 			operationErr := do(operationCtx, func() error { return apply(operationCtx, input, &pressed, command) })
 			cancel()
 			ack := response{sequence: command.sequence, op: command.op}
+			if len(timings) == 1 && timings[0] != nil {
+				ack.timing = timings[0].buckets
+			}
 			if operationErr != nil {
 				ack.status = 1
 				ack.certainty, ack.requested, ack.inserted = describeFailure(operationErr)
