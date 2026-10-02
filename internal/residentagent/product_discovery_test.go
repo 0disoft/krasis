@@ -12,8 +12,16 @@ import (
 )
 
 func TestProductDiscoveryAuthenticatesBeforeSavingEndpoint(t *testing.T) {
-	for _, validPeer := range []bool{false, true} {
-		t.Run(map[bool]string{false: "different_identity", true: "same_identity"}[validPeer], func(t *testing.T) {
+	for _, test := range []struct {
+		name, edit string
+		validPeer  bool
+	}{
+		{"different_identity", "", false},
+		{"same_identity", "", true},
+		{"concurrent_address_edit", "address", true},
+		{"concurrent_layout_edit", "layout", true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 			defer cancel()
 			server, client, rogue := newFlowNode(t, ctx), newFlowNode(t, ctx), newFlowNode(t, ctx)
@@ -42,7 +50,7 @@ func TestProductDiscoveryAuthenticatesBeforeSavingEndpoint(t *testing.T) {
 				}
 			}
 			remote := server
-			if !validPeer {
+			if !test.validPeer {
 				remote = rogue
 			}
 			config, err := prepareProductConnection(remote.pairing.identities, remote.pairing.trust, "client")
@@ -74,8 +82,23 @@ func TestProductDiscoveryAuthenticatesBeforeSavingEndpoint(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			saved := 0
-			source := &boundedProductDial{fingerprint: serverPeer.CertificateSHA256, tlsConfig: prepared.tls, load: func() (truststore.ConnectionProfile, error) { return client.pairing.trust.Connection("server") }, discover: func(context.Context) ([]string, error) { return []string{listener.Addr().String()}, nil }, save: func(before truststore.ConnectionProfile, address string) error {
+			saved, loads := 0, 0
+			editedAddress := net.JoinHostPort("127.0.0.3", port)
+			load := func() (truststore.ConnectionProfile, error) {
+				loads++
+				// The second lookup runs after candidate TLS authentication, before saving.
+				if loads == 2 && test.edit != "" {
+					settings := truststore.ConnectionSettings{Address: old, Edge: "LEFT", RearmDistance: 64}
+					if test.edit == "address" {
+						settings.Address = editedAddress
+					}
+					if _, err := client.pairing.trust.SetConnection("server", settings); err != nil {
+						t.Fatal(err)
+					}
+				}
+				return client.pairing.trust.Connection("server")
+			}
+			source := &boundedProductDial{fingerprint: serverPeer.CertificateSHA256, tlsConfig: prepared.tls, load: load, discover: func(context.Context) ([]string, error) { return []string{listener.Addr().String()}, nil }, save: func(before truststore.ConnectionProfile, address string) error {
 				saved++
 				_, err := client.pairing.trust.SetConnectionAddress("server", before.Fingerprint, before.Address, address)
 				return err
@@ -88,10 +111,11 @@ func TestProductDiscoveryAuthenticatesBeforeSavingEndpoint(t *testing.T) {
 			if raw != nil {
 				defer raw.Close()
 			}
-			if validPeer && (err != nil || connection == nil || saved != 1) {
+			wantSuccess := test.validPeer && test.edit != "address"
+			if wantSuccess && (err != nil || connection == nil || saved != 1) {
 				t.Fatalf("authenticated candidate not used: saved=%d err=%v", saved, err)
 			}
-			if !validPeer && (err == nil || connection != nil || saved != 0) {
+			if !wantSuccess && (err == nil || connection != nil || saved != 0) {
 				t.Fatalf("untrusted candidate accepted: saved=%d err=%v", saved, err)
 			}
 			p, err := client.pairing.trust.Connection("server")
@@ -99,10 +123,17 @@ func TestProductDiscoveryAuthenticatesBeforeSavingEndpoint(t *testing.T) {
 				t.Fatal(err)
 			}
 			want := old
-			if validPeer {
+			if wantSuccess {
 				want = listener.Addr().String()
 			}
-			if p.Address != want || p.Edge != "RIGHT" || p.RearmDistance != 128 || p.Fingerprint != serverPeer.CertificateSHA256 {
+			if test.edit == "address" {
+				want = editedAddress
+			}
+			wantEdge, wantRearm := "RIGHT", int32(128)
+			if test.edit != "" {
+				wantEdge, wantRearm = "LEFT", 64
+			}
+			if p.Address != want || p.Edge != wantEdge || p.RearmDistance != wantRearm || p.Fingerprint != serverPeer.CertificateSHA256 {
 				t.Fatalf("wrong persisted profile: %+v", p)
 			}
 		})
