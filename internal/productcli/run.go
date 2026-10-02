@@ -315,6 +315,10 @@ func validateCommandArgs(args []string) error {
 			return usageError("connect requires a valid peer alias")
 		}
 	case "update":
+		if len(args) > 1 && args[1] == "wait" {
+			_, err := parseUpdateWait(args[1:])
+			return err
+		}
 		if len(args) == 2 && (args[1] == "status" || args[1] == "verify") {
 			return nil
 		}
@@ -469,6 +473,14 @@ func writeHuman(output io.Writer, value any) {
 		}
 		for _, action := range item.NextActions {
 			fmt.Fprintf(output, "다음: %s\n", action.Message)
+		}
+	case updateWaitResult:
+		fmt.Fprintf(output, "상대 %s 업데이트: %s (%s)\n", item.PeerAlias, item.Code, item.TransferState)
+		if item.Code == "updated" {
+			fmt.Fprintf(output, "적용 확인: g%d · %s\n", item.Generation, item.Revision)
+		}
+		if item.Code == "timeout" || item.Code == "outcome_unknown" || item.Code == "agent_changed" {
+			fmt.Fprintln(output, "적용 여부를 확인하지 못했습니다. 다시 보내기 전에 상대 버전을 확인하세요.")
 		}
 	case updateStatusResult:
 		fmt.Fprintf(output, "Local: g%d %s\nPeer %s: %s", item.LocalGeneration, item.LocalBuild, item.PeerAlias, item.PeerState)

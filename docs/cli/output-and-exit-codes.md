@@ -53,6 +53,14 @@ local API transport/protocol 오류는 exit `6`이다. 일반 portable 입력과
 아니다. 응답을 받지 못했을 때는 중복 전송을 피하기 위해 자동 재시도하지 않고 `update status`로
 확인한다.
 
+`krasis-cli update wait ALIAS ID [--timeout 2m] --json`은 `send` 결과의 `status.id`에
+해당하는 송신 작업 하나의 적용 완료를 기다린다. 기본 2분, 허용 범위 1초~10분이다.
+JSON은 `krasis.cli.update-wait/v1`이며 `code`, `transferState`, 대상 generation/revision,
+전송 bytes/total을 포함한다. 상대가 인증된 관리 채널에서 정확한 빌드로 관측된 `UPDATED`만
+`code:updated`, exit `0`이다. `DELIVERED`는 완료가 아니다. 실패, timeout, 취소, 에이전트
+교체, 작업 ID/상대 교체, 응답 소실은 exit `7`이다. timeout은 업데이트 취소를 뜻하지 않으며,
+확인 실패 뒤 자동으로 재전송하지 않는다. 이 명령은 읽기 전용이다.
+
 `krasis-cli update allow ALIAS`와 `update deny ALIAS`는 **해당 상대가 이 PC로 업데이트를
 보낼 수 있는 권한**을 변경한다. 상대 PC의 수신 권한은 변경하지 않는다. 이미 원하는 상태면
 요청을 다시 보내지 않고, 변경 후에는 동일 에이전트의 응답 상태를 확인한다. 응답을 잃었거나

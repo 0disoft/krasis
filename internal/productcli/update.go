@@ -96,6 +96,9 @@ func resolvePeer(ctx context.Context, client apiClient, alias string) (string, s
 }
 
 func dispatchUpdate(ctx context.Context, client apiClient, args []string, executable string) (any, int, error) {
+	if len(args) > 0 && args[0] == "wait" {
+		return dispatchUpdateWait(ctx, client, args)
+	}
 	if len(args) == 1 && args[0] == "status" {
 		return updateCall(ctx, client, localapi.UpdateRequest{Schema: localapi.UpdateSchema, Action: "STATUS"})
 	}

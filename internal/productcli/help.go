@@ -37,6 +37,7 @@ func commandHelp() helpResult {
 		{"update verify", "Validate adjacent update bundle offline", false, false},
 		{"update status", "Read local update transfer state", true, false},
 		{"update status ALIAS", "Read peer version and update permission", true, false},
+		{"update wait ALIAS ID [--timeout DURATION]", "Wait for one update's verified application; default 2m, maximum 10m", true, false},
 		{"clipboard status ALIAS", "Read clipboard sharing state", true, false},
 		{"pair status PAIRING_ID", "Read pairing job state", true, false},
 		{"connect ALIAS", "Connect to a configured peer", true, true},
