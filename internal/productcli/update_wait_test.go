@@ -11,6 +11,49 @@ import (
 	"github.com/0disoft/krasis/internal/peerupdate"
 )
 
+type contextAwareWaitClient struct{ apiClient }
+
+func (c contextAwareWaitClient) Runtime(ctx context.Context) (localapi.RuntimeInfo, error) {
+	if ctx.Err() != nil {
+		return localapi.RuntimeInfo{}, ctx.Err()
+	}
+	return c.apiClient.Runtime(ctx)
+}
+func (c contextAwareWaitClient) Trust(ctx context.Context) (localapi.Trust, error) {
+	if ctx.Err() != nil {
+		return localapi.Trust{}, ctx.Err()
+	}
+	return c.apiClient.Trust(ctx)
+}
+
+func TestUpdateWaitInitialReadHonorsCancellationAndDeadline(t *testing.T) {
+	peer, id := strings.Repeat("b", 64), strings.Repeat("c", 32)
+	for _, deadline := range []bool{false, true} {
+		t.Run(map[bool]string{false: "canceled", true: "timeout"}[deadline], func(t *testing.T) {
+			client := updateFixture(peer, 119)
+			ctx, cancel := context.WithCancel(context.Background())
+			if deadline {
+				cancel()
+				ctx, cancel = context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+			} else {
+				cancel()
+			}
+			defer cancel()
+			aware := contextAwareWaitClient{client}
+			v, exit, err := waitUpdate(ctx, aware, "B", peer, id, 0)
+			want := map[bool]string{false: "canceled", true: "timeout"}[deadline]
+			if err != nil || exit != ExitUnsafeState || v.Code != want || len(client.requests) != 0 {
+				t.Fatalf("initial runtime: %+v exit=%d err=%v", v, exit, err)
+			}
+			value, exit, err := dispatchUpdateWait(ctx, aware, []string{"wait", "B", id})
+			result, ok := value.(updateWaitResult)
+			if err != nil || exit != ExitUnsafeState || !ok || result.Code != want || len(client.requests) != 0 {
+				t.Fatalf("initial trust: value=%+v exit=%d err=%v", value, exit, err)
+			}
+		})
+	}
+}
+
 func TestUpdateWaitRequiresExactApplication(t *testing.T) {
 	peer, id, revision := strings.Repeat("b", 64), strings.Repeat("c", 32), strings.Repeat("d", 40)
 	for _, test := range []struct {

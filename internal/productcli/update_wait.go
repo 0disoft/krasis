@@ -48,6 +48,9 @@ func dispatchUpdateWait(ctx context.Context, client apiClient, args []string) (a
 	defer cancel()
 	peer, code, err := resolvePeer(ctx, client, args[1])
 	if err != nil {
+		if ctx.Err() != nil {
+			return interruptedUpdateWait(ctx, updateWaitResult{SchemaVersion: updateWaitSchema, PeerAlias: args[1], ID: args[2], Code: "outcome_unknown"})
+		}
 		return nil, ExitInternal, err
 	}
 	if code != "" {
@@ -61,7 +64,7 @@ func waitUpdate(ctx context.Context, client apiClient, alias, peer, id string, i
 	v := updateWaitResult{SchemaVersion: updateWaitSchema, PeerAlias: alias, ID: id, Code: "outcome_unknown"}
 	before, err := client.Runtime(ctx)
 	if err != nil {
-		return v, ExitUnsafeState, nil
+		return interruptedUpdateWait(ctx, v)
 	}
 	for {
 		if ctx.Err() != nil {
@@ -109,6 +112,10 @@ func waitUpdate(ctx context.Context, client apiClient, alias, peer, id string, i
 		case <-timer.C:
 		}
 	}
+	return interruptedUpdateWait(ctx, v)
+}
+
+func interruptedUpdateWait(ctx context.Context, v updateWaitResult) (updateWaitResult, int, error) {
 	if ctx.Err() == context.DeadlineExceeded {
 		v.Code = "timeout"
 	} else if ctx.Err() != nil {
