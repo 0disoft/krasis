@@ -403,9 +403,33 @@ g106 이상 builder는 현재 revision의 설치기를 만들거나 같은 revis
 launch 준비를 검사합니다. 설치기는 실행하지 않습니다. 실제 서비스 설치와 원격 PIN
 제어는 제품 입력 경로 연결 및 실기기 검증이 남아 있습니다.
 
+### g116: ordinary-agent service proof without OpenProcess
+
+g115 실기기에서 설치는 성공했지만 일반 agent의 `OpenProcess`가 최소
+`PROCESS_QUERY_LIMITED_INFORMATION`에도 오류 5를 반환했습니다. 서비스 설정과
+파이프 조회는 통과했고 `service_process_open`에서만 실패했습니다.
+
+g116의 서비스 인증은 보호된 SCM object의 fixed own-process·LocalSystem·command·
+security/failure/trigger 검증, 고정 서비스 image의 digest/write lock/ACL 검증을
+그대로 유지합니다. `GetNamedPipeServerProcessId`가 반환한 실제 kernel pipe owner와
+`QueryServiceStatusEx`의 Running own-process PID가 같아야 합니다. service handle은
+Authority가 소유하고 채널 종료 시 닫으며, 이미지 pin 이후와 매 사용 전 같은 kernel
+PID/SCM 상태를 재확인합니다. stopped/pending/shared-process/PID 변경/조회 실패는
+즉시 거부합니다. SCM의 지연된 상태나 PID 재사용이 있어도 기존 pipe의 I/O 실패는
+fatal이며 입력 재전송·backend 전환을 하지 않습니다.
+
+일반 agent는 서비스 process/token을 열지 않으며 ACL·권한·UAC 설정을 바꾸지 않습니다.
+서비스의 자기 SYSTEM/session 확인과 agent의 console logon·image 인증은 유지합니다.
+SCM+pipe owner는 서비스 인증 근거이고, 단독 PID·파이프 이름·receipt는 권한이 아닙니다.
+회귀 검증은 실제 native pipe만으로 서비스 권한을 만들지 못하는 경우와 stop/restart·
+다른 PID·상태·service type·조회 오류를 검사합니다. A→B/PIN 효과는 실기기에서 별도로
+확인해야 합니다.
+
 ## 참조
 
 - [GetNamedPipeClientProcessId](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getnamedpipeclientprocessid)
+- [GetNamedPipeServerProcessId](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getnamedpipeserverprocessid)
+- [QueryServiceStatusEx](https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-queryservicestatusex)
 - [Named Pipe Security](https://learn.microsoft.com/en-us/windows/win32/ipc/named-pipe-security-and-access-rights)
 - [Windows Go service API](https://pkg.go.dev/golang.org/x/sys/windows/svc)
 - [Windows service security objects](https://learn.microsoft.com/en-us/windows/win32/secauthz/securable-objects)

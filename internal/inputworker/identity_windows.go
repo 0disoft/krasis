@@ -114,8 +114,9 @@ func AuthenticateAgent(pipe uintptr, expected [sha256.Size]byte) (*Authority, er
 }
 
 // AuthenticateService verifies the fixed LocalSystem service configuration,
-// actual running PID, session 0 and protected image. An ordinary agent must not
-// require permission to read another account's access token.
+// actual kernel pipe owner and protected image. SCM owns the process identity
+// of this administrator-protected LocalSystem own-process service; ordinary
+// agents do not need access to its process object or token.
 // The caller pins the digest from an independently validated update package.
 func AuthenticateService(pipe uintptr, expected [sha256.Size]byte) (*Authority, error) {
 	if pipe == 0 || expected == ([sha256.Size]byte{}) {
@@ -138,7 +139,12 @@ func AuthenticateService(pipe uintptr, expected [sha256.Size]byte) (*Authority, 
 	if err != nil {
 		return nil, connectionFailed("service_open", err)
 	}
-	defer windows.CloseServiceHandle(service)
+	accepted := false
+	defer func() {
+		if !accepted {
+			_ = windows.CloseServiceHandle(service)
+		}
+	}()
 	root, err := windows.KnownFolderPath(windows.FOLDERID_ProgramFiles, 0)
 	if err != nil {
 		return nil, ErrAuthority
@@ -147,29 +153,13 @@ func AuthenticateService(pipe uintptr, expected [sha256.Size]byte) (*Authority, 
 	if err := validateInstallService(service, windows.EscapeArg(path)+" --service"); err != nil {
 		return nil, connectionFailed("service_config", err)
 	}
-	var status windows.SERVICE_STATUS_PROCESS
-	var needed uint32
-	err = windows.QueryServiceStatusEx(service, windows.SC_STATUS_PROCESS_INFO, (*byte)(unsafe.Pointer(&status)), uint32(unsafe.Sizeof(status)), &needed)
-	if err != nil || status.ProcessId != pid || status.CurrentState != windows.SERVICE_RUNNING {
-		return nil, connectionFailed("service_status", err)
-	}
-	identity, err := inspectServiceProcess(pid)
-	if err != nil {
+	check := serviceProcessBinding(pid, func() (uint32, windows.SERVICE_STATUS_PROCESS, error) {
+		return readServicePipeProcess(windows.Handle(pipe), service)
+	})
+	if err := check(); err != nil {
 		return nil, err
 	}
-	accepted := false
-	defer func() {
-		if !accepted {
-			_ = identity.close()
-		}
-	}()
-	if identity.session != 0 {
-		return nil, connectionFailed("service_process_metadata", ErrAuthority)
-	}
-	if !strings.EqualFold(identity.image, path) {
-		return nil, connectionFailed("service_image", ErrAuthority)
-	}
-	image, err := lockImage(identity.image, expected)
+	image, err := lockImage(path, expected)
 	if err != nil {
 		return nil, connectionFailed("service_image", err)
 	}
@@ -177,18 +167,16 @@ func AuthenticateService(pipe uintptr, expected [sha256.Size]byte) (*Authority, 
 		_ = image.Close()
 		return nil, connectionFailed("service_image_acl", ErrAuthority)
 	}
-	check := func() error {
-		var code uint32
-		if windows.GetExitCodeProcess(identity.handle, &code) != nil || code != 259 {
-			return ErrAuthority
-		}
-		return nil
+	// Recheck after pinning the image to reject a stop/restart during setup.
+	if err := check(); err != nil {
+		_ = image.Close()
+		return nil, err
 	}
 	accepted = true
 	return &Authority{kind: authorityService, checkInput: check, checkRecovery: check, closeHandles: func() error {
 		imageErr := image.Close()
-		identityErr := identity.close()
-		if imageErr != nil || identityErr != nil {
+		serviceErr := windows.CloseServiceHandle(service)
+		if imageErr != nil || serviceErr != nil {
 			return ErrAuthority
 		}
 		return nil

@@ -2,49 +2,44 @@
 
 package inputworker
 
-import "golang.org/x/sys/windows"
+import (
+	"unsafe"
 
-// Only process facts available with limited-query rights are read here.
-// LocalSystem identity is established by protected SCM configuration and the
-// pinned service image, which validates its own token before becoming ready.
-func inspectServiceProcess(pid uint32) (*processIdentity, error) {
-	if pid == 0 {
-		return nil, ErrAuthority
+	"golang.org/x/sys/windows"
+)
+
+// Both values come from Windows, never a peer frame. The service handle refers
+// to the protected configuration validated by AuthenticateService and stays
+// owned by that channel's Authority.
+func readServicePipeProcess(pipe, service windows.Handle) (uint32, windows.SERVICE_STATUS_PROCESS, error) {
+	var pid uint32
+	var status windows.SERVICE_STATUS_PROCESS
+	if err := windows.GetNamedPipeServerProcessId(pipe, &pid); err != nil {
+		return 0, status, connectionFailed("service_pid", err)
 	}
-	handle, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
-	if err != nil {
-		return nil, connectionFailed("service_process_open", err)
+	var needed uint32
+	if err := windows.QueryServiceStatusEx(service, windows.SC_STATUS_PROCESS_INFO, (*byte)(unsafe.Pointer(&status)), uint32(unsafe.Sizeof(status)), &needed); err != nil {
+		return 0, status, connectionFailed("service_status", err)
 	}
-	identity := &processIdentity{handle: handle}
-	accepted := false
-	defer func() {
-		if !accepted {
-			_ = identity.close()
+	return pid, status, nil
+}
+
+// Bind one already-verified service to its actual kernel pipe owner. A change
+// of PID or a pending/stopped service invalidates the proof. Broken-pipe I/O
+// remains fatal even if SCM has not yet observed an exit or a PID is reused.
+// No OpenProcess, token query, privilege enablement or ACL write is required.
+func serviceProcessBinding(expected uint32, read func() (uint32, windows.SERVICE_STATUS_PROCESS, error)) func() error {
+	return func() error {
+		if expected == 0 || read == nil {
+			return connectionFailed("service_status", ErrAuthority)
 		}
-	}()
-	actual, err := windows.GetProcessId(handle)
-	if err != nil || actual != pid {
-		return nil, connectionFailed("service_process_metadata", err)
+		pid, status, err := read()
+		if err != nil {
+			return err
+		}
+		if pid != expected || status.ProcessId != expected || status.CurrentState != windows.SERVICE_RUNNING || status.ServiceType != windows.SERVICE_WIN32_OWN_PROCESS {
+			return connectionFailed("service_status", ErrAuthority)
+		}
+		return nil
 	}
-	if err := windows.ProcessIdToSessionId(pid, &identity.session); err != nil {
-		return nil, connectionFailed("service_process_metadata", err)
-	}
-	var image [32768]uint16
-	size := uint32(len(image))
-	if err := windows.QueryFullProcessImageName(handle, 0, &image[0], &size); err != nil {
-		return nil, connectionFailed("service_process_metadata", err)
-	}
-	if size == 0 || size >= uint32(len(image)) {
-		return nil, connectionFailed("service_process_metadata", ErrAuthority)
-	}
-	identity.image = windows.UTF16ToString(image[:size])
-	var code uint32
-	if err := windows.GetExitCodeProcess(handle, &code); err != nil {
-		return nil, connectionFailed("service_process_metadata", err)
-	}
-	if code != 259 {
-		return nil, connectionFailed("service_process_metadata", ErrAuthority)
-	}
-	accepted = true
-	return identity, nil
 }
