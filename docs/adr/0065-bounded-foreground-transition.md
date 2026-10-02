@@ -75,3 +75,32 @@ responsive external owner, and the original bounded refusal. Two-device g132
 handoff without an extra click remains a manual validation requirement.
 
 - [SetForegroundWindow](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setforegroundwindow)
+
+## g133: Separate visibility from activation
+
+The 03:07 KST g132 exports confirm the exact build on both devices. The bounded
+12 profiles contain six successful source handoffs followed by six refused
+captures; the event history contains 20 foreground-unavailable activation
+events. These profiles are capped and are not a total attempt count or a success
+rate. The NULL retries did not resolve the reported device failure.
+
+Previously `ShowWindow(SW_SHOW)` also requested activation before the explicit
+foreground request. Use `SW_SHOWNA` to show the capture at its configured size
+and position without independently activating it. The subsequent verified
+foreground request, responsiveness probe, thread detach and rollback stay
+mandatory. Preserving the external owner for fallback is the intended behavior;
+g132's exports do not prove that showing the window caused the NULL condition.
+
+On a foreground-unavailable refusal, attach only a fixed classification of the
+first observed NULL: `foreground_missing_before_show`,
+`foreground_missing_after_show`, or `foreground_missing_after_request`. The
+after-show observation occurs after the existing `UpdateWindow` call. These
+are observation stages, not proof of Win32 causality. They enter the existing
+sanitized activation event, without handles, window titles or process identity.
+Other failures keep their existing classification, especially rollback failure.
+
+Fake-native tests cover preserved foreground through showing and verified
+attach/detach fallback, each NULL stage, clean refusal and sanitized export.
+Click-free A-to-B device handoff remains unverified until g133 is deployed.
+
+- [ShowWindow](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-showwindow)

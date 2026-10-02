@@ -6,6 +6,20 @@ import (
 	"testing"
 )
 
+func TestCaptureForegroundStageCodesSurviveExport(t *testing.T) {
+	for _, stage := range []string{"before_show", "after_show", "after_request"} {
+		code := ActivationCode("source-capture", "capture-activate", "foreground_missing_"+stage)
+		if code != "activation_capture_foreground_missing_"+stage {
+			t.Fatal("capture stage collapsed to an unknown code", code)
+		}
+		data, _ := json.Marshal(record{Time: "2026-10-03T00:00:00Z", Code: code})
+		exported := sanitizeLog("agent.jsonl", strings.NewReader(string(data)+"\n"))
+		if exported.Incomplete || len(exported.Events) != 1 || exported.Events[0].Code != code {
+			t.Fatal("capture stage disappeared from support export", code)
+		}
+	}
+}
+
 func TestReconnectReasonsSurviveSanitizedExport(t *testing.T) {
 	for descriptor, code := range reconnectReasons {
 		if got := ReconnectCode("session", descriptor[0], descriptor[1], descriptor[2]); got != code {

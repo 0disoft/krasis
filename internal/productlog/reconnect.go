@@ -58,7 +58,7 @@ func init() {
 		reconnectReasons[[3]string{"source-hook", stage, "failed"}] = "reconnect_source_" + strings.ReplaceAll(stage, "-", "_") + "_failed"
 	}
 	for _, phase := range []string{"capture-activate", "focus-restore"} {
-		for _, code := range []string{"thread_detach_failed", "thread_attach_failed", "verification_lost", "api_rejected", "setup_failed", "activation_failed", "foreground_unavailable", "foreground_thread_unavailable", "foreground_probe_failed", "rollback_failed"} {
+		for _, code := range []string{"thread_detach_failed", "thread_attach_failed", "verification_lost", "api_rejected", "setup_failed", "activation_failed", "foreground_unavailable", "foreground_missing_before_show", "foreground_missing_after_show", "foreground_missing_after_request", "foreground_thread_unavailable", "foreground_probe_failed", "rollback_failed"} {
 			prefix := "reconnect_capture_"
 			if phase == "focus-restore" {
 				prefix = "reconnect_focus_restore_"

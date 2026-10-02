@@ -75,6 +75,12 @@ func DescribeSessionFailure(err error) FailureDescriptor {
 		return FailureDescriptor{Component: "source-capture", Phase: "capture-activate", Code: "foreground_probe_failed"}
 	case errors.Is(err, wininput.ErrSourceForegroundThreadUnavailable):
 		return FailureDescriptor{Component: "source-capture", Phase: "capture-activate", Code: "foreground_thread_unavailable"}
+	case errors.Is(err, wininput.ErrSourceForegroundMissingBeforeShow):
+		return FailureDescriptor{Component: "source-capture", Phase: "capture-activate", Code: "foreground_missing_before_show"}
+	case errors.Is(err, wininput.ErrSourceForegroundMissingAfterShow):
+		return FailureDescriptor{Component: "source-capture", Phase: "capture-activate", Code: "foreground_missing_after_show"}
+	case errors.Is(err, wininput.ErrSourceForegroundMissingAfterRequest):
+		return FailureDescriptor{Component: "source-capture", Phase: "capture-activate", Code: "foreground_missing_after_request"}
 	case errors.Is(err, wininput.ErrSourceForegroundUnavailable):
 		return FailureDescriptor{Component: "source-capture", Phase: "capture-activate", Code: "foreground_unavailable"}
 	case errors.Is(err, wininput.ErrSourceCaptureThreadAttachFailed):

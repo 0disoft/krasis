@@ -5,11 +5,14 @@ package wininput
 import "errors"
 
 var (
-	ErrSourceForegroundUnavailable       = errors.New("source foreground window unavailable")
-	ErrSourceForegroundThreadUnavailable = errors.New("source foreground thread unavailable")
-	ErrSourceForegroundProbeFailed       = errors.New("source foreground response probe failed")
-	ErrSourceCaptureRollbackFailed       = errors.New("source capture rollback unverified")
-	sourceWheelCaptureIsVisible          = func(window uintptr) bool {
+	ErrSourceForegroundUnavailable         = errors.New("source foreground window unavailable")
+	ErrSourceForegroundMissingBeforeShow   = errors.New("source foreground missing before capture show")
+	ErrSourceForegroundMissingAfterShow    = errors.New("source foreground missing after capture show")
+	ErrSourceForegroundMissingAfterRequest = errors.New("source foreground missing after activation request")
+	ErrSourceForegroundThreadUnavailable   = errors.New("source foreground thread unavailable")
+	ErrSourceForegroundProbeFailed         = errors.New("source foreground response probe failed")
+	ErrSourceCaptureRollbackFailed         = errors.New("source capture rollback unverified")
+	sourceWheelCaptureIsVisible            = func(window uintptr) bool {
 		visible, _, _ := user32.NewProc("IsWindowVisible").Call(window)
 		return visible != 0
 	}

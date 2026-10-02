@@ -29,6 +29,7 @@ const (
 	sourceWheelCaptureAlpha        = 1
 	sourceWheelCaptureAlphaFlag    = 0x00000002
 	swHide                         = 0
+	swShowWithoutActivation        = 8 // SW_SHOWNA preserves current size and position.
 	swpNoActivate                  = 0x0010
 	sourceWheelCaptureWidth        = 24
 	sourceWheelCaptureHeight       = 24
@@ -524,8 +525,12 @@ func (current *sourceWheelCaptureRun) activateWindow() (activationErr error) {
 	if current.active.Load() {
 		return errors.New("source wheel capture is already active")
 	}
+	var missingForegroundStage error
 	defer func() {
 		if activationErr != nil {
+			if errors.Is(activationErr, ErrSourceForegroundUnavailable) {
+				activationErr = errors.Join(activationErr, missingForegroundStage)
+			}
 			activationErr = current.rollbackActivation(activationErr)
 		}
 	}()
@@ -534,6 +539,9 @@ func (current *sourceWheelCaptureRun) activateWindow() (activationErr error) {
 		return fmt.Errorf("%w: position source wheel capture: %v", ErrSourceCaptureActivationSetup, err)
 	}
 	current.savedFocus = sourceWheelCaptureGetForeground()
+	if current.savedFocus == 0 {
+		missingForegroundStage = ErrSourceForegroundMissingBeforeShow
+	}
 	if err := current.err(); err != nil {
 		return err
 	}
@@ -552,7 +560,9 @@ func (current *sourceWheelCaptureRun) activateWindow() (activationErr error) {
 	if err := current.err(); err != nil {
 		return err
 	}
-	sourceWheelCaptureShowWindow(current.window, swShow)
+	// Showing must not separately activate the popup and discard the foreground
+	// owner needed by the verified SetForegroundWindow/thread-attach path below.
+	sourceWheelCaptureShowWindow(current.window, swShowWithoutActivation)
 	if err := current.err(); err != nil {
 		return err
 	}
@@ -560,9 +570,18 @@ func (current *sourceWheelCaptureRun) activateWindow() (activationErr error) {
 	if err := current.err(); err != nil {
 		return err
 	}
+	if sourceWheelCaptureGetForeground() == 0 && missingForegroundStage == nil {
+		missingForegroundStage = ErrSourceForegroundMissingAfterShow
+	}
+	if err := current.err(); err != nil {
+		return err
+	}
 	foregroundErr := sourceWheelCaptureSetForeground(current.window)
 	if err := current.err(); err != nil {
 		return err
+	}
+	if sourceWheelCaptureGetForeground() == 0 && missingForegroundStage == nil {
+		missingForegroundStage = ErrSourceForegroundMissingAfterRequest
 	}
 	if sourceWheelCaptureGetForeground() == current.window {
 		foregroundErr = nil
