@@ -425,6 +425,30 @@ SCM+pipe owner는 서비스 인증 근거이고, 단독 PID·파이프 이름·r
 다른 PID·상태·service type·조회 오류를 검사합니다. A→B/PIN 효과는 실기기에서 별도로
 확인해야 합니다.
 
+### g117: privileged input latency stages
+
+g116 실기기에서 원격 PIN Esc·취소 클릭과 양방향 입력에 성공했지만 버벅임이
+보고됐습니다. g117은 권한·데스크톱 검증을 줄이지 않고 비용부터 분리합니다.
+ordinary client의 mutex 대기·SCM/pipe authority 확인·request write·response 대기,
+worker의 console authority 확인·desktop scope 부대 비용·실제 apply를 측정합니다.
+worker scope는 전체 executor 시간에서 apply 시간을 뺀 값으로 scheduling 비용도
+포함하며, response 대기는 worker 비용·pipe 전달·scheduling을 포함하므로 서로
+더해서 전체 지연으로 해석하지 않습니다. Heartbeat도 같은 측정 창에 포함합니다.
+
+응답 길이는 24 bytes로 유지하고 v2의 기존 reserved 3 bytes에 worker의 coarse
+duration bucket만 넣습니다. 값은 0(미측정), 1–5(<1ms/<10ms/<100ms/<1s/≥1s)만
+허용하며 네 번째 reserved byte는 0입니다. 기존 v1은 reserved bytes가 전부 0인
+경우만 계속 허용하고, 빈 v2·범위 밖 bucket·잘못된 sequence/op/status/certainty는
+거부합니다. worker timing은 유효한 matching acknowledgement 이후에만 집계합니다.
+서비스·agent image digest 일치 검증은 기존대로여서 버전이 다른 설치 파일을 섞어
+실행하지 않습니다. 인증·입력 순서·expiry·release recovery·unknown 결과의 재전송
+금지는 변경하지 않습니다.
+
+로그는 15초 창마다 stage별 최대 bucket을 고정 `installed_input_timing_*` 코드로
+최대 7건 기록하고 lease 종료/실패 때 남은 창을 한 번 flush합니다. 로그 sink panic은
+입력 성공/실패를 변경하지 않습니다. 입력 종류·키·좌표·PIN·사용자·경로·오류 원문은
+추가하지 않습니다. g117은 진단 보강이며 latency 개선을 주장하지 않습니다.
+
 ## 참조
 
 - [GetNamedPipeClientProcessId](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getnamedpipeclientprocessid)

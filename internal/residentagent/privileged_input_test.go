@@ -17,6 +17,25 @@ type testPrivilegedClient struct {
 	closes  atomic.Int32
 	presses atomic.Int32
 	err     error
+	observe func(string)
+}
+
+func (p *testPrivilegedClient) SetTimingObserver(emit func(string)) { p.observe = emit }
+
+func TestPrivilegedInputRoutesTimingThroughFixedEventSink(t *testing.T) {
+	var events []string
+	client := &testPrivilegedClient{}
+	input := &privilegedLeaseInput{expires: time.Now().Add(time.Hour), event: func(code string) { events = append(events, code) }, connect: func(context.Context, application.LeaseIdentity, time.Time) (privilegedClient, error) {
+		return client, nil
+	}}
+	if err := input.open(context.Background(), application.LeaseIdentity{SessionID: "s", LeaseID: "l", Epoch: "e"}, time.Now()); err != nil || client.observe == nil {
+		t.Fatal("approved input omitted timing observer")
+	}
+	defer input.close(nil)
+	client.observe("installed_input_timing_client_authority_lt1ms")
+	if len(events) != 2 || events[0] != "installed_input_lease_ready" || events[1] != "installed_input_timing_client_authority_lt1ms" {
+		t.Fatal("diagnostic sink lost timing events or changed startup status")
+	}
 }
 
 func TestPrivilegedInputFailedStartupLogsBoundedDiagnosticsWithoutGrant(t *testing.T) {

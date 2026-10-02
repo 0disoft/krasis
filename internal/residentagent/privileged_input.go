@@ -80,6 +80,9 @@ func (input *privilegedLeaseInput) open(ctx context.Context, identity applicatio
 		}
 		return errPrivilegedInput
 	}
+	if observer, ok := client.(interface{ SetTimingObserver(func(string)) }); ok && input.event != nil {
+		observer.SetTimingObserver(input.event)
+	}
 	if input.event != nil {
 		input.event("installed_input_lease_ready")
 	}
