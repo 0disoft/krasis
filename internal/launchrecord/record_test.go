@@ -94,3 +94,47 @@ func TestRelaunchOnlyUsesFallbackWhenRecordMissing(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestRegistrationDoesNotPublishIncompleteRecovery(t *testing.T) {
+	base, bundle := t.TempDir(), t.TempDir()
+	self := filepath.Join(bundle, "krasis.exe")
+	if err := os.WriteFile(self, []byte("MZ-test"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	err := Register(base, self, 135, "test")
+	if RegistrationStage(err) != "cli" || !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("missing CLI stage: %v", err)
+	}
+	if _, err := Load(base); !errors.Is(err, ErrMissing) {
+		t.Fatal("incomplete recovery record published", err)
+	}
+	if err := os.WriteFile(filepath.Join(bundle, "krasis-cli.exe"), []byte("MZ-test"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := Register(base, self, 135, "test"); err != nil {
+		t.Fatal(err)
+	}
+	before, err := Inspect(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(bundle, "krasis-cli.exe")); err != nil {
+		t.Fatal(err)
+	}
+	if err := Register(base, self, 136, "other"); RegistrationStage(err) != "cli" {
+		t.Fatal(err)
+	}
+	after, err := Inspect(base)
+	if err != nil || before != after {
+		t.Fatal("failed registration replaced the last complete record", err)
+	}
+}
+
+func TestRegistrationStageIsBounded(t *testing.T) {
+	if RegistrationStage(errors.New("private path")) != "unknown" || RegistrationStage(nil) != "unknown" {
+		t.Fatal("unknown error classification")
+	}
+	if RegistrationStage(registrationFailure("private path", ErrInvalid)) != "unknown" {
+		t.Fatal("unbounded stage")
+	}
+}

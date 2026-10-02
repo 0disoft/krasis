@@ -83,28 +83,32 @@ func digest(file *os.File) (string, error) {
 func Register(localAppData, executable string, generation int, revision string) error {
 	file, hash, err := openExecutable(executable)
 	if err != nil {
-		return err
+		return registrationFailure("image", err)
 	}
 	defer file.Close()
 	if generation < 1 {
-		return ErrInvalid
+		return registrationFailure("metadata", ErrInvalid)
 	}
 	dir, err := productidentity.PrepareLaunch(localAppData)
 	if err != nil {
-		return err
+		return registrationFailure("directory", err)
 	}
 	defer dir.Close()
 	data, err := json.Marshal(Record{schema, executable, hash, generation, revision, time.Now().UTC()})
 	if err != nil {
-		return err
+		return registrationFailure("metadata", err)
+	}
+	// Publish the current record only after both fixed recovery entrypoints exist.
+	if err = copyCLI(dir, filepath.Dir(executable)); err != nil {
+		return registrationFailure("cli", err)
+	}
+	if err = replace(dir, "Krasis.cmd", []byte("@echo off\r\n\"%~dp0krasis-cli.exe\" relaunch\r\nif errorlevel 1 pause\r\n")); err != nil {
+		return registrationFailure("script", err)
 	}
 	if err = replace(dir, "current.json", data); err != nil {
-		return err
+		return registrationFailure("record", err)
 	}
-	if err = copyCLI(dir, filepath.Dir(executable)); err != nil {
-		return err
-	}
-	return replace(dir, "Krasis.cmd", []byte("@echo off\r\n\"%~dp0krasis-cli.exe\" relaunch\r\nif errorlevel 1 pause\r\n"))
+	return nil
 }
 
 func copyCLI(destination *securefs.Directory, source string) error {

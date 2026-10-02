@@ -14,6 +14,7 @@ import (
 
 	windowsassets "github.com/0disoft/krasis/assets/windows"
 	"github.com/0disoft/krasis/frontend"
+	"github.com/0disoft/krasis/internal/buildinfo"
 	"github.com/0disoft/krasis/internal/launchrecord"
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/productidentity"
@@ -111,6 +112,9 @@ func Run() {
 		if executableErr != nil {
 			os.Exit(1)
 		}
+		service.prepareRecovery = func() error {
+			return launchrecord.Register(base, self, localapi.AgentGeneration, buildinfo.Read().Revision)
+		}
 		service.updates = productpanel.NewUpdateTransferBridge(ctx, func() (productpanel.UpdateSettingsClient, error) { return localapi.OpenClient(paths.Control) }, updateBundleDirectory(self), transitionBundleDirectory(self), probeTransitionBundleDirectory(self), installerTransitionBundleDirectory(self))
 		service.receiver = productpanel.NewWorkspaceUpdateReceiver(ctx, func() (productpanel.UpdateSettingsClient, error) { return localapi.OpenClient(paths.Control) }, productpanel.LaunchReceivedWorkspaceUpdate)
 		service.diagnostics = productpanel.NewDiagnosticsBridge(ctx,
@@ -158,6 +162,11 @@ func Run() {
 		SingleInstance: instance,
 		Windows:        application.WindowsOptions{WebviewUserDataPath: webviewPath},
 	})
+	// application.New has already admitted this process as the primary instance.
+	// Service startup prepares recovery independently of renderer-ready events.
+	if !smoke {
+		service.log, _ = productlog.Open(os.Getenv("LOCALAPPDATA"), "control")
+	}
 	service.quit = app.Quit
 	url := "/"
 	if smoke {
@@ -171,17 +180,6 @@ func Run() {
 		Hidden:           smoke && !visibleSmoke,
 	})
 	shown := make(chan bool, 1)
-	if !smoke {
-		var recordOnce sync.Once
-		window.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) {
-			recordOnce.Do(func() {
-				self, err := os.Executable()
-				if err == nil {
-					_ = launchrecord.Register(os.Getenv("LOCALAPPDATA"), self, localapi.AgentGeneration, "")
-				}
-			})
-		})
-	}
 	if visibleSmoke || (!smoke && updated.Revision != "") {
 		var showOnce sync.Once
 		window.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) {

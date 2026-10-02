@@ -95,10 +95,10 @@ func runDoctor(ctx context.Context, parsed options, deps dependencies) (doctorRe
 		v.action("open_ui", "앱 창이 닫혀 있습니다. krasis-cli relaunch로 열 수 있습니다.")
 	}
 	if v.UI.State == "RECORD_INVALID" || v.UI.State == "RUNNING_UNVERIFIED" {
-		v.problem("launch_record_invalid", "repair_launch_record", "최근 실행 기록을 검증하지 못했습니다. 확인한 배포 폴더의 앱을 직접 여세요.", &exit)
+		v.problem("launch_record_invalid", "repair_launch_record", "확인한 최신 배포 폴더에서 krasis-cli app repair로 복구 경로를 갱신하세요.", &exit)
 	}
 	if v.LaunchRecord.State == "INVALID" || v.LaunchRecord.State == "NOT_FOUND" {
-		v.problem("launch_record_invalid", "repair_launch_record", "최근 앱의 실행 경로를 검증하지 못했습니다. 확인한 배포 폴더의 앱을 직접 열어 실행 기록을 갱신하세요.", &exit)
+		v.problem("launch_record_invalid", "repair_launch_record", "확인한 최신 배포 폴더에서 krasis-cli app repair로 복구 경로를 갱신하세요.", &exit)
 	}
 	if v.Service.PathStatus == "MISMATCH" {
 		v.problem("service_path_mismatch", "inspect_service_installation", "서비스 실행 설정이 고정 설치 위치와 다릅니다. 설치 상태를 확인하세요.", &exit)

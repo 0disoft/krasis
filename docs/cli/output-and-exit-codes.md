@@ -2,6 +2,12 @@
 
 ## 제품 CLI
 
+`app repair --json`의 schema는 `krasis.cli.app-repair/v1`이다. 성공은
+`code:recovery_ready`, `generation`과 exit `0`이다. 묶음 누락·검증 실패·CLI 빌드
+불일치는 `bundle_missing`, `bundle_invalid`, `bundle_version_mismatch`와 exit `7`이다.
+등록 실패는 `registration_failed`, 고정 `stage`와 exit `7`이다. 경로·원본 오류는 출력하지
+않는다. 잘못된 인자·`--control-dir`는 파일 변경 전에 exit `2`로 거부한다.
+
 g121부터 `clipboard status ALIAS`의 `transfer`는 파일 공유의 준비·대기·전송·수신·적용
 상태와 제한된 실패 코드, bytes/total만 담는다. `SENT`는 상대 프로세스의 수신 확인이며,
 `APPLIED`는 이 PC의 native clipboard 적용 후 ACK 확인이다. 상대 탐색기에서 실제 붙여넣은

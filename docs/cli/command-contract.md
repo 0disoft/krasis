@@ -15,6 +15,7 @@
 krasis-cli [--json] help
 krasis-cli --help
 krasis-cli [--json] relaunch
+krasis-cli [--json] app repair
 krasis-cli [--json] [--control-dir DIR] app open ALIAS
 krasis-cli [--json] [--control-dir DIR] app open-status ALIAS REQUEST_ID
 krasis-cli [--json] [--control-dir DIR] status
@@ -62,6 +63,9 @@ session 전체를 안전 종료하므로 일반 연결 해제에는 `disconnect`
 `relaunch`는 마지막으로 창을 연 `krasis.exe`를 다시 실행한다. 실행 중이면 기존 창을 앞으로
 가져온다. 에이전트가 종료돼 있어도 사용할 수 있으며 `--control-dir`와 실행 경로 인자는 받지 않는다.
 UI 시작 후 `%LOCALAPPDATA%\Krasis\launch\krasis-cli.exe`가 고정 복구 명령으로 준비된다.
+g135부터 renderer 준비 이벤트와 별개로 서비스 시작 때 실제 빌드 revision을 기록한다.
+CLI와 `Krasis.cmd` 준비에 성공한 뒤 실행 기록을 교체한다. 등록 실패는 경로나 원본 오류 없이
+고정 단계 코드 `launch_record_<stage>_failed`로 진단에 남으며 기존 실행 기록은 유지한다.
 같은 폴더의 `Krasis.cmd`를 더블클릭해도 앱을 열 수 있다.
 `& "$env:LOCALAPPDATA\Krasis\launch\krasis-cli.exe" relaunch --json`으로 실행할 수 있다.
 기록된 실행 파일이 삭제되거나 SHA-256이 달라지면 실행을 거부한다. 기록이 없는 경우에만
@@ -74,6 +78,13 @@ UI 시작 후 `%LOCALAPPDATA%\Krasis\launch\krasis-cli.exe`가 고정 복구 명
 15초 뒤에도 결과가 없으면 `pending`과 요청 ID를 반환한다. 재전송 대신
 `app open-status B REQUEST_ID`로 확인한다. 요청은 1분 후 만료되며 실행 결과 확인과 실제
 창 표시 여부는 별개다. B의 에이전트까지 완전히 종료된 경우 B에서 고정 복구 명령을 실행해야 한다.
+
+`app repair`는 명령을 실행한 CLI와 같은 폴더의 배포 묶음을 검증한 뒤 고정 복구 경로를
+다시 만든다. 묶음의 generation·revision이 실행 CLI와 일치해야 한다. 경로 인자와
+`--control-dir`는 받지 않으며 에이전트 없이 실행할 수 있다. 앱 실행·연결 해제·네트워크
+전송·서비스 변경은 하지 않는다. 최신 배포 폴더에서 `krasis-cli app repair --json`을
+실행한다. 성공은 `recovery_ready`, 검증 또는 등록 실패는 종료 코드 7이며 등록 실패의
+`stage`에는 고정 단계명만 담긴다. 고정 launch 폴더에는 배포 묶음이 없어 이 명령을 실행할 수 없다.
 
 아래 `krasis-lab` 계약은 Phase 0 실험 표면이며 제품 CLI와 호환성 관계가 없다.
 

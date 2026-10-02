@@ -99,6 +99,14 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, deps depe
 		value, code := relaunch(deps)
 		return writeOutput(stdout, stderr, value, code, parsed.json)
 	}
+	if parsed.args[0] == "app" && parsed.args[1] == "repair" {
+		if parsed.controlDir != "" {
+			writeUsageError(stderr, usageError("app repair does not use --control-dir"))
+			return ExitUsage
+		}
+		value, code := repairApp(deps)
+		return writeOutput(stdout, stderr, value, code, parsed.json)
+	}
 	if parsed.args[0] == "doctor" {
 		value, code := runDoctor(ctx, parsed, deps)
 		return writeOutput(stdout, stderr, value, code, parsed.json)
@@ -293,10 +301,13 @@ func parseGlobalOptions(args []string) (options, error) {
 func validateCommandArgs(args []string) error {
 	switch args[0] {
 	case "app":
+		if len(args) == 2 && args[1] == "repair" {
+			return nil
+		}
 		if len(args) == 3 && args[1] == "open" && validAlias(args[2]) || len(args) == 4 && args[1] == "open-status" && validAlias(args[2]) && validHex(args[3], 32) {
 			return nil
 		}
-		return usageError("app requires open ALIAS or open-status ALIAS ID")
+		return usageError("app requires repair, open ALIAS or open-status ALIAS ID")
 	case "relaunch":
 		if len(args) != 1 {
 			return usageError("relaunch accepts no arguments")
@@ -442,6 +453,11 @@ func writeUsageError(stderr io.Writer, err error) {
 
 func writeHuman(output io.Writer, value any) {
 	switch item := value.(type) {
+	case appRepairResult:
+		fmt.Fprintf(output, "앱 복구 경로: %s\n", item.Code)
+		if item.Stage != "" {
+			fmt.Fprintf(output, "단계: %s\n", item.Stage)
+		}
 	case appOpenResult:
 		fmt.Fprintf(output, "상대 앱 열기: %s\n", item.Code)
 		if item.ID != "" {

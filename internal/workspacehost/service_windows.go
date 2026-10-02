@@ -5,6 +5,7 @@ package workspacehost
 import (
 	"context"
 	"github.com/0disoft/krasis/internal/launcherui"
+	"github.com/0disoft/krasis/internal/launchrecord"
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/productlog"
 	"github.com/0disoft/krasis/internal/productpanel"
@@ -15,23 +16,32 @@ import (
 )
 
 type WorkspaceService struct {
-	ctx         context.Context
-	control     string
-	title       string
-	clipGate    sync.Mutex
-	clipEpoch   atomic.Uint64
-	raw         *productpanel.DesktopBridge
-	managed     *productpanel.DesktopLifecycle
-	pairs       *productpanel.PairingBridge
-	diagnostics *productpanel.DiagnosticsBridge
-	updates     *productpanel.UpdateSettingsBridge
-	receiver    *productpanel.WorkspaceUpdateReceiver
-	quit        func()
-	done        chan struct{}
-	jobs        sync.WaitGroup
+	ctx             context.Context
+	control         string
+	title           string
+	clipGate        sync.Mutex
+	clipEpoch       atomic.Uint64
+	raw             *productpanel.DesktopBridge
+	managed         *productpanel.DesktopLifecycle
+	pairs           *productpanel.PairingBridge
+	diagnostics     *productpanel.DiagnosticsBridge
+	updates         *productpanel.UpdateSettingsBridge
+	receiver        *productpanel.WorkspaceUpdateReceiver
+	quit            func()
+	done            chan struct{}
+	jobs            sync.WaitGroup
+	prepareRecovery func() error
+	log             *productlog.Logger
 }
 
 func (s *WorkspaceService) ServiceStartup(context.Context, application.ServiceOptions) error {
+	if s.prepareRecovery != nil {
+		if err := s.prepareRecovery(); err != nil {
+			s.log.Event("launch_record_" + launchrecord.RegistrationStage(err) + "_failed")
+		} else {
+			s.log.Event("launch_record_ready")
+		}
+	}
 	if s.managed != nil {
 		s.done = make(chan struct{})
 		go func() { defer close(s.done); s.managed.Run() }()
@@ -52,6 +62,7 @@ func (s *WorkspaceService) ServiceShutdown() error {
 		<-s.done
 	}
 	s.jobs.Wait()
+	s.log.Close()
 	return nil
 }
 func (s *WorkspaceService) disconnectAsync() {
