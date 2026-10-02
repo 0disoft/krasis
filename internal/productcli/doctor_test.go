@@ -98,3 +98,22 @@ func TestDoctorFlagsCLIAndRunningAgentBuildMismatch(t *testing.T) {
 		t.Fatal("same generation hid different source builds")
 	}
 }
+
+func TestDoctorDeduplicatesRepairForRunningUIWithoutRecord(t *testing.T) {
+	host := healthyDoctorHost()
+	host.UI.State, host.UI.Generation, host.UI.PathStatus = "RUNNING_UNVERIFIED", 0, "UNKNOWN"
+	host.LaunchRecord = doctorComponent{State: "NOT_FOUND"}
+	client := &stubClient{status: localapi.Status{SchemaVersion: localapi.StatusSchemaVersion, State: "CONNECTED"}}
+	deps := testDependencies(client)
+	deps.inspectHost = func(context.Context, string, string) doctorHost { return host }
+	v, exit := runDoctor(context.Background(), options{}, deps)
+	repairs := 0
+	for _, action := range v.NextActions {
+		if action.Code == "repair_launch_record" {
+			repairs++
+		}
+	}
+	if exit != ExitUnsafeState || v.Code != "launch_record_invalid" || repairs != 1 || v.UI.State != "RUNNING_UNVERIFIED" {
+		t.Fatalf("result=%+v exit=%d repair count=%d", v, exit, repairs)
+	}
+}

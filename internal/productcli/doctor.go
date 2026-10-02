@@ -94,7 +94,7 @@ func runDoctor(ctx context.Context, parsed options, deps dependencies) (doctorRe
 	if v.UI.State == "NOT_RUNNING" && v.LaunchRecord.State == "VERIFIED" {
 		v.action("open_ui", "앱 창이 닫혀 있습니다. krasis-cli relaunch로 열 수 있습니다.")
 	}
-	if v.UI.State == "RECORD_INVALID" {
+	if v.UI.State == "RECORD_INVALID" || v.UI.State == "RUNNING_UNVERIFIED" {
 		v.problem("launch_record_invalid", "repair_launch_record", "최근 실행 기록을 검증하지 못했습니다. 확인한 배포 폴더의 앱을 직접 여세요.", &exit)
 	}
 	if v.LaunchRecord.State == "INVALID" || v.LaunchRecord.State == "NOT_FOUND" {
@@ -138,6 +138,11 @@ func (v *doctorResult) addCheck(name, state string) {
 	v.Checks = append(v.Checks, doctorCheck{name, state})
 }
 func (v *doctorResult) action(code, message string) {
+	for _, action := range v.NextActions {
+		if action.Code == code {
+			return
+		}
+	}
 	v.NextActions = append(v.NextActions, doctorAction{code, message})
 }
 func (v *doctorResult) problem(code, action, message string, exit *int) {

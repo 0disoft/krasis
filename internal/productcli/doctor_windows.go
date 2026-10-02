@@ -62,20 +62,7 @@ func inspectDoctorHost(ctx context.Context, appData, agentBuild string) doctorHo
 		host.LaunchRecord.State = "INVALID"
 	}
 	uis := images["krasis.exe"]
-	if unknown {
-		host.UI.State = "UNKNOWN"
-	} else if len(uis) == 0 {
-		host.UI.State = "NOT_RUNNING"
-	} else if len(uis) != 1 {
-		host.UI.State = "UNKNOWN"
-	} else if recordErr != nil || !strings.EqualFold(uis[0], record.Executable) {
-		host.UI.State, host.UI.PathStatus = "RECORD_INVALID", "MISMATCH"
-	} else {
-		host.UI = doctorComponent{State: "RUNNING", Generation: record.Generation, Build: doctorImageBuild(uis[0]), PathStatus: "MATCHED"}
-		if host.UI.Build == "" || host.UI.Build != record.Revision {
-			host.UI.State = "UNKNOWN"
-		}
-	}
+	host.UI = doctorUIComponent(uis, unknown, record, recordErr, doctorImageBuild)
 	if agentBuild == "" {
 		host.AgentLocation = "UNAVAILABLE"
 		return host

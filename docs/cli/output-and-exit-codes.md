@@ -33,6 +33,11 @@ local API transport/protocol 오류는 exit `6`이다. 일반 portable 입력과
 시작하거나 권한·파일·연결을 변경하지 않으며 `nextActions`는 실행하지 않은 안내다.
 두 명령의 JSON은 여러 사실을 합친 CLI projection이며 아래의 단일 local API 응답 투영과 구분한다.
 
+g125부터 같은 세션의 UI 프로세스가 관측되지만 실행 기록이 없거나 불일치하면
+`ui.state:RUNNING_UNVERIFIED`다. 프로세스 실행과 기록 검증을 분리하며 UI generation은
+추측하지 않는다. 조회 실패·여러 이미지 경로는 계속 `UNKNOWN`이다. `nextActions`에는
+같은 복구 code를 한 번만 포함한다. 이 진단은 창의 표시·응답 여부를 보장하지 않는다.
+
 `krasis-cli diagnostics export`는 에이전트 없이 정제된 지원 파일을 저장한다. JSON
 `krasis.cli.diagnostics-export/v1`은 `code: saved`일 때만 절대 `path`를 포함한다.
 저장 실패는 `code: save_failed`, exit `1`이며 내부 경로나 원인을 출력하지 않는다.

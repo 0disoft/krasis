@@ -5,9 +5,44 @@ package productcli
 import (
 	"context"
 	"encoding/binary"
+	"errors"
+	"strings"
 	"testing"
 	"unsafe"
+
+	"github.com/0disoft/krasis/internal/launchrecord"
 )
+
+func TestDoctorKeepsUIProcessPresenceWithoutVerifiedRecord(t *testing.T) {
+	build := strings.Repeat("a", 40)
+	record := launchrecord.Record{Executable: `C:\product\krasis.exe`, Generation: 118, Revision: build}
+	for _, test := range []struct {
+		name             string
+		paths            []string
+		unknown          bool
+		recordErr        error
+		imageBuild       string
+		state, pathState string
+		generation       int
+	}{
+		{"verified", []string{record.Executable}, false, nil, build, "RUNNING", "MATCHED", 118},
+		{"missing_record", []string{record.Executable}, false, launchrecord.ErrMissing, build, "RUNNING_UNVERIFIED", "UNKNOWN", 0},
+		{"invalid_record", []string{record.Executable}, false, launchrecord.ErrInvalid, build, "RUNNING_UNVERIFIED", "MISMATCH", 0},
+		{"unreadable_record", []string{record.Executable}, false, errors.New("private path"), build, "RUNNING_UNVERIFIED", "UNKNOWN", 0},
+		{"different_image", []string{`C:\other\krasis.exe`}, false, nil, build, "RUNNING_UNVERIFIED", "MISMATCH", 0},
+		{"different_build", []string{record.Executable}, false, nil, strings.Repeat("b", 40), "RUNNING_UNVERIFIED", "MISMATCH", 0},
+		{"not_running", nil, false, launchrecord.ErrMissing, build, "NOT_RUNNING", "", 0},
+		{"query_unknown", []string{record.Executable}, true, nil, build, "UNKNOWN", "", 0},
+		{"multiple_images", []string{record.Executable, `C:\other\krasis.exe`}, false, nil, build, "UNKNOWN", "", 0},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			ui := doctorUIComponent(test.paths, test.unknown, record, test.recordErr, func(string) string { return test.imageBuild })
+			if ui.State != test.state || ui.PathStatus != test.pathState || ui.Generation != test.generation {
+				t.Fatalf("ui=%+v", ui)
+			}
+		})
+	}
+}
 
 func TestDoctorServiceStringsStayInsideAlignedBuffer(t *testing.T) {
 	words := make([]uint64, 4)

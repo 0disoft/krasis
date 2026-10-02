@@ -1,6 +1,9 @@
 package productcli
 
 func doctorHumanState(value string) string {
+	if value == "RUNNING_UNVERIFIED" {
+		return "실행 중 (실행 기록 미검증)"
+	}
 	if text, ok := map[string]string{
 		"healthy": "연결과 진단 항목 정상", "agent_unavailable": "에이전트 응답 없음", "connection_not_ready": "연결 준비 필요", "protocol_mismatch": "프로토콜 불일치",
 		"cli_agent_version_mismatch": "CLI와 실행 에이전트 버전 불일치", "ui_agent_version_mismatch": "앱과 실행 에이전트 버전 불일치", "installed_agent_version_mismatch": "설치 에이전트 버전 불일치",
@@ -14,6 +17,9 @@ func doctorHumanState(value string) string {
 }
 
 func doctorHumanCheck(value string) string {
+	if value == "ui" {
+		return "관리 앱"
+	}
 	if text, ok := map[string]string{"agent": "에이전트", "connection": "연결", "protocol": "프로토콜", "cli_agent_version": "CLI/에이전트 버전", "ui_agent_version": "앱/에이전트 버전", "installed_agent_version": "설치/실행 에이전트 버전", "ui": "앱 창", "launch_record": "최근 앱 실행 기록", "installed_agent": "보호된 설치 에이전트", "service": "입력 서비스"}[value]; ok {
 		return text
 	}
