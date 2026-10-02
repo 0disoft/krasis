@@ -119,11 +119,40 @@ func TestUpdateWaitArgumentValidationBeforeOpeningAgent(t *testing.T) {
 		{"update", "wait", "B"}, {"update", "wait", "B", "bad"},
 		{"update", "wait", "B", strings.Repeat("c", 32), "--timeout", "0s"},
 		{"update", "wait", "B", strings.Repeat("c", 32), "--timeout", "11m"},
+		{"update", "wait", "B", strings.Repeat("c", 32), "--timeout"},
+		{"update", "wait", "B", strings.Repeat("c", 32), "--timeout", "--json", "1s"},
+		{"update", "wait", "B", strings.Repeat("c", 32), "--timeout", "1s", "--timeout", "2s"},
+		{"status", "--timeout", "1s"},
 	} {
 		var out, errs bytes.Buffer
 		d := dependencies{openClient: func(string) (apiClient, error) { t.Fatal("opened agent for invalid arguments"); return nil, nil }}
 		if code := run(context.Background(), args, &out, &errs, d); code != ExitUsage {
 			t.Fatalf("args=%v code=%d", args, code)
+		}
+	}
+}
+
+func TestUpdateWaitTimeoutThroughCLI(t *testing.T) {
+	peer, id, revision := strings.Repeat("b", 64), strings.Repeat("c", 32), strings.Repeat("d", 40)
+	for _, args := range [][]string{
+		{"update", "wait", "B", id, "--timeout", "1s", "--json"},
+		{"--json", "update", "wait", "B", id, "--timeout", "10m"},
+		{"update", "wait", "B", id, "--json", "--timeout", "2m"},
+	} {
+		client := updateFixture(peer, 119)
+		client.updateFn = func(r localapi.UpdateRequest) (localapi.UpdateResult, error) {
+			if r.Action != "STATUS" {
+				t.Fatalf("wait changed state: %s", r.Action)
+			}
+			return localapi.UpdateResult{Code: "ok", Status: peerupdate.Status{
+				State: "UPDATED", Peer: peer, ID: id, Generation: 120, Revision: revision,
+				PeerGeneration: 120, PeerRevision: revision,
+			}}, nil
+		}
+		var out, errs bytes.Buffer
+		code := run(context.Background(), args, &out, &errs, testDependencies(client))
+		if code != ExitOK || errs.Len() != 0 || !strings.Contains(out.String(), `"code":"updated"`) || len(client.requests) != 1 {
+			t.Fatalf("args=%v code=%d output=%q errors=%q requests=%+v", args, code, out.String(), errs.String(), client.requests)
 		}
 	}
 }

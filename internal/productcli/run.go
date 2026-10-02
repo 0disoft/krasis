@@ -274,6 +274,12 @@ func parseGlobalOptions(args []string) (options, error) {
 			result.controlDir = args[index]
 		case "--allow-inbound-control", "--deny-inbound-control", "--replace":
 			result.args = append(result.args, args[index])
+		case "--timeout":
+			if index+1 >= len(args) || strings.HasPrefix(args[index+1], "--") {
+				return options{}, usageError("--timeout requires one duration")
+			}
+			result.args = append(result.args, args[index], args[index+1])
+			index++
 		default:
 			if strings.HasPrefix(args[index], "--") {
 				return options{}, usageError("unknown option")
