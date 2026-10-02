@@ -1,28 +1,26 @@
-# Auto Update
+# 기기 업데이트
 
-- Status: Draft
-- Repository Type: desktop-app
+- 상태: 승인한 peer를 통한 개발 빌드 전달·자동 적용 구현
+- 기준: `docs/product/02-spec.md`, `internal/peerupdate`, 관리 앱의 update controller
 
-## Repository Type Contract
+양쪽 기기를 명시적으로 페어링한 뒤, 받는 PC가 상대의 업데이트 수신을 허용해야 한다.
+입력 제어 권한과는 별도이며 철회할 수 있다. 송신자는 UI의 ‘업데이트 보내기’ 또는
+`krasis-cli update send ALIAS`로 현재 배포 폴더를 전달한다.
 
-This repository type owns installed app behavior, OS support, local data, installer, auto-update, crash reporting, permissions, and desktop-specific security contracts.
+관리 채널은 기존 인증서를 pin한 mTLS와 현재 trust를 확인한다. 묶음의 manifest,
+generation/revision, SHA-256 및 파일 구성을 검증해 별도 폴더에 저장한다. 관리 앱의
+자동 적용은 입력 연결을 안전하게 끝내고 새 UI와 agent를 시작한다. 이전 파일과
+페어링 정보는 보존한다. 받는 PC의 관리 앱은 창 또는 트레이에서 실행 중이어야 한다.
+에이전트도 종료됐다면 원격 명령을 받을 수 없으므로 해당 PC의 고정 복구 CLI를 사용한다.
 
-## Source of Truth
+`queued`는 시작, `DELIVERED`는 수신 확인, `UPDATED`는 상대의 정확한 새 agent 빌드
+관측이다. 수신과 적용 완료를 동일시하지 않는다. `update wait ALIAS ID`는 작업 ID를
+고정해 적용 확인 또는 실패까지 기다린다. 확인이 끊기면 자동으로 다시 전송하지 않는다.
 
-- Product decision: UNDECIDED
-- Technical owner: UNASSIGNED
-- Related ADR: UNDECIDED
+개발 EXE의 checksum 검증은 배포자 코드 서명이 아니다. 인터넷 배포 피드 기반 무인
+업데이트, 정식 서명·출시 후보 운영은 아직 #16과 release policy의 별도 조건이다.
+보호 입력 설치기는 함께 전달되지만 관리자 설치·교체를 자동 승인하지 않는다.
 
-## Required Decisions
-
-- Supported operating systems and architectures: UNDECIDED
-- Installer and update channel ownership: UNDECIDED
-- Local data and cache ownership: UNDECIDED
-- Crash report and diagnostic data policy: UNDECIDED
-- Desktop permission and security boundaries: UNDECIDED
-
-## Review Blockers
-
-- Installer, update, or OS support behavior changes without platform-specific validation.
-- Local data behavior changes without migration, privacy, and recovery notes.
-- Crash diagnostics or logs can expose private data.
+진단에는 버전·집계 상태·실패 코드만 사용하며 raw 입력, PIN, clipboard 내용과
+peer 주소를 기록하지 않는다. 설치·자동 적용의 실기기 증거와 외부 배포 승인은
+각각 기록한다.

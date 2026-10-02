@@ -1,6 +1,6 @@
 # Local data and diagnostic retention
 
-- Status: Active policy; identity and trust paths are accepted, remaining install paths are blocked by issue #16
+- Status: Active policy; identity, trust and protected input paths are implemented; complete uninstall and selective cleanup remain in #16
 - Owner: release owner named in the release manifest
 - Trust decision: `docs/adr/0006-persistent-trust-store.md`
 - Secret policy: `docs/ops/secrets.md`
@@ -12,8 +12,10 @@ Krasis keeps product configuration, device identity, peer trust, diagnostics, lo
 The current-user product data root is `%LOCALAPPDATA%\Krasis`. Device identity is stored under
 `identity`, peer trust under `trust`, CLI config in `config.json`, local API discovery credentials under `control`, and diagnostics
 under `diagnostics`; these classes are not
-interchangeable. Issue #16 still owns install scope, config and log paths, firewall ownership,
-uninstall, and cleanup. Limited beta remains blocked until those remaining paths are implemented and tested.
+interchangeable. The attended input installer owns the fixed system Program Files `Krasis\Input`
+location and `KrasisInput` service (ADR 0066). It does not remove user identity or trust data.
+Issue #16 still owns full-app install/startup policy, firewall ownership, complete uninstall and
+selective cleanup. Limited beta remains blocked until those remaining contracts are implemented and tested.
 
 The product root and identity data allow only the current user and `SYSTEM`. Existing permissive or
 reparse-backed roots fail closed instead of being silently repaired. Device identity uses

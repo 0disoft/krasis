@@ -14,6 +14,7 @@
 - Repository hygiene source: .editorconfig, .gitattributes, .gitignore
 - Desktop installer source: docs/desktop/installers.md
 - Desktop auto-update source: docs/desktop/auto-update.md
+- LAN address recovery: docs/desktop/address-recovery.md
 - Desktop local data source: docs/desktop/local-data.md
 - Phase 0 desktop launcher source: docs/desktop/phase-0-launcher.md
 - Desktop OS support source: docs/desktop/os-support.md

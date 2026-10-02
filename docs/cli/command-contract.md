@@ -2,6 +2,12 @@
 
 ## 제품 CLI `krasis-cli`
 
+`doctor`는 UI·agent·보호 설치·서비스를 읽기 전용으로 대조한다. agent가 없어도 JSON을
+출력한다. `update wait ALIAS ID [--timeout DURATION]`은 `send`에서 반환된 작업 ID의
+검증된 적용 완료를 기다리며 기본 2분, 최대 10분이다. `clipboard status ALIAS`는 파일
+준비·전송·수신·클립보드 적용과 제한된 실패 이유도 표시한다. 상세 schema와 종료 코드는
+`output-and-exit-codes.md`가 소유한다.
+
 정식 제품 CLI는 주로 resident agent의 authenticated local API를 사용한다.
 로컬 진단 내보내기와 업데이트 묶음 검증은 오프라인에서 동작한다.
 

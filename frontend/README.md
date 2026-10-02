@@ -22,9 +22,12 @@ See ADR 0061 for its identity, concurrency and cancellation boundaries.
 
 The optional Wails v3 host ships as a complete, unpacked distribution under
 `dist/workspace/g<generation>/`.
-The three executables share one directory: `krasis.exe` is the Wails UI,
+The four executables share one directory: `krasis.exe` is the Wails UI,
 `krasis-agent.exe` is the resident agent, and `krasis-cli.exe` is the terminal
-client. The UI embeds the native Svelte assets and uses the Go module's own
+client, and `krasis-install.exe` is the attended protected-input installer.
+The installer embeds its agent/service payload; the input service is not a fifth
+portable executable. A peer update carries the installer but never silently
+elevates or installs it. The UI embeds the native Svelte assets and uses the Go module's own
 `/wails/runtime.js`; there is no separate npm runtime version to synchronize.
 
 From g109, opening the UI records its current executable and prepares a stable
