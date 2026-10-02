@@ -38,6 +38,9 @@ func (a *advertisement) Close() error {
 	var err error
 	a.once.Do(func() { err = a.conn.Close() })
 	<-a.done
+	if errors.Is(err, net.ErrClosed) {
+		err = nil
+	}
 	return err
 }
 

@@ -17,6 +17,7 @@ const ConnectionSchemaVersion = "krasis.connection-profile/v1"
 var (
 	ErrAliasAmbiguous          = errors.New("peer alias is ambiguous")
 	ErrConnectionNotConfigured = errors.New("connection profile is not configured")
+	ErrConnectionChanged       = errors.New("connection address changed")
 )
 
 // Address is the remote dial address when the peer is LISTENER, and the local
@@ -74,7 +75,16 @@ func (settings ConnectionSettings) Validate() error {
 // SetConnection uses the trust-store lock so alias resolution and persistence
 // cannot race with a trust change. It never grants trust or inbound permission.
 func (store *Store) SetConnection(alias string, settings ConnectionSettings) (ConnectionProfile, error) {
-	return store.setConnection(alias, "", settings, false)
+	return store.setConnection(alias, "", settings, false, "")
+}
+
+// SetConnectionAddress preserves layout and rejects stale routing discoveries.
+// The caller must authenticate a remote candidate before saving its address.
+func (store *Store) SetConnectionAddress(alias, fingerprint, expectedAddress, address string) (ConnectionProfile, error) {
+	if validateFingerprint(fingerprint) != nil || expectedAddress == "" || (ConnectionSettings{Address: address, Edge: "LEFT"}).Validate() != nil {
+		return ConnectionProfile{}, errors.New("invalid address edit")
+	}
+	return store.setConnection(alias, fingerprint, ConnectionSettings{Address: address}, true, expectedAddress)
 }
 
 // SetConnectionEdge binds the edit to a device and preserves its address under
@@ -83,17 +93,17 @@ func (store *Store) SetConnectionEdge(alias, fingerprint, edge string) (Connecti
 	if validateFingerprint(fingerprint) != nil || (edge != "LEFT" && edge != "RIGHT") {
 		return ConnectionProfile{}, errors.New("invalid edge selection")
 	}
-	return store.setConnection(alias, fingerprint, ConnectionSettings{Edge: edge}, true)
+	return store.setConnection(alias, fingerprint, ConnectionSettings{Edge: edge}, true, "")
 }
 
 func (store *Store) SetConnectionRearm(alias, fingerprint string, distance int32) (ConnectionProfile, error) {
 	if validateFingerprint(fingerprint) != nil || !ValidRearm(distance) {
 		return ConnectionProfile{}, errors.New("invalid rearm selection")
 	}
-	return store.setConnection(alias, fingerprint, ConnectionSettings{RearmDistance: distance}, true)
+	return store.setConnection(alias, fingerprint, ConnectionSettings{RearmDistance: distance}, true, "")
 }
 
-func (store *Store) setConnection(alias, fingerprint string, settings ConnectionSettings, edgeOnly bool) (ConnectionProfile, error) {
+func (store *Store) setConnection(alias, fingerprint string, settings ConnectionSettings, edgeOnly bool, expectedAddress string) (ConnectionProfile, error) {
 	if store == nil {
 		return ConnectionProfile{}, errors.New("trust store is not initialized")
 	}
@@ -118,11 +128,18 @@ func (store *Store) setConnection(alias, fingerprint string, settings Connection
 		return ConnectionProfile{}, err
 	}
 	if edgeOnly {
-		settings.Address = previous.Address
-		if settings.Edge == "" {
-			settings.Edge = previous.Edge
+		if expectedAddress != "" {
+			if previous.Address != expectedAddress {
+				return ConnectionProfile{}, ErrConnectionChanged
+			}
+			settings.Edge, settings.RearmDistance = previous.Edge, previous.RearmDistance
 		} else {
-			settings.RearmDistance = previous.RearmDistance
+			settings.Address = previous.Address
+			if settings.Edge == "" {
+				settings.Edge = previous.Edge
+			} else {
+				settings.RearmDistance = previous.RearmDistance
+			}
 		}
 	}
 	profile := ConnectionProfile{SchemaVersion: ConnectionSchemaVersion, Fingerprint: peer.Fingerprint, ConnectionSettings: settings}
