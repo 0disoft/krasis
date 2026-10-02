@@ -13,6 +13,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/0disoft/krasis/internal/handoff"
 	"golang.org/x/sys/windows"
 )
 
@@ -69,11 +70,15 @@ func ConnectService(ctx context.Context, serviceDigest [sha256.Size]byte) (*Chan
 	}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
+	started := time.Now()
 	pipe, err := openPipe(ctx, pipeName)
+	handoff.Record(ctx, handoff.PipeOpen, time.Since(started))
 	if err != nil {
 		return nil, connectionFailed("pipe_open", err)
 	}
-	proof, err := AuthenticateService(uintptr(pipe.handle), serviceDigest)
+	started = time.Now()
+	proof, err := authenticateServiceObserved(ctx, uintptr(pipe.handle), serviceDigest)
+	handoff.Record(ctx, handoff.ServiceAuth, time.Since(started))
 	if err != nil {
 		_ = pipe.Close()
 		return nil, connectionFailed("service_config", err)

@@ -4,11 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
-	"github.com/0disoft/krasis/internal/installationdiag"
 	"io"
 	"path/filepath"
 	"time"
 
+	"github.com/0disoft/krasis/internal/handoff"
+	"github.com/0disoft/krasis/internal/installationdiag"
 	"github.com/0disoft/krasis/internal/peercredentials"
 	"github.com/0disoft/krasis/internal/productidentity"
 	"github.com/0disoft/krasis/internal/securefs"
@@ -29,6 +30,7 @@ type exportEvent struct {
 	Injection     *InjectionFailure `json:"injection,omitempty"`
 	Retry         *RetrySummary     `json:"retry,omitempty"`
 	Runtime       *RuntimeSummary   `json:"runtime,omitempty"`
+	Handoff       *handoff.Summary  `json:"handoff,omitempty"`
 }
 
 type exportLog struct {
@@ -138,7 +140,7 @@ func sanitizeLog(name string, r io.Reader) exportLog {
 			event.Sequence = input.Sequence
 			event.ElapsedMicros = input.ElapsedMicros
 		}
-		if validHex(input.Connection, 64) {
+		if input.Code != "handoff_profile" && validHex(input.Connection, 64) {
 			event.Connection = input.Connection
 		}
 		if input.Code == "injection_failure" {
@@ -161,6 +163,13 @@ func sanitizeLog(name string, r io.Reader) exportLog {
 				continue
 			}
 			event.Runtime = input.Runtime
+		}
+		if input.Code == "handoff_profile" {
+			if input.Handoff == nil || !input.Handoff.Valid() {
+				result.Incomplete = true
+				continue
+			}
+			event.Handoff = input.Handoff
 		}
 		if input.Code == "boundary_summary" {
 			if input.Boundary == nil || !input.Boundary.valid() {

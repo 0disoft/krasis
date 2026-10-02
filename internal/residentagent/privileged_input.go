@@ -8,6 +8,7 @@ import (
 
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/handoff"
 	"github.com/0disoft/krasis/internal/inputworker"
 	"github.com/0disoft/krasis/internal/peer"
 	"github.com/0disoft/krasis/internal/transport"
@@ -31,6 +32,7 @@ type privilegedLeaseInput struct {
 	failed   func(error)
 	event    func(string)
 	expires  time.Time
+	profile  context.Context
 }
 
 // Approval stays in the resident agent after the authenticated mTLS peer check.
@@ -41,7 +43,9 @@ type privilegedAuthorizer struct {
 }
 
 func (a privilegedAuthorizer) AuthorizeLease(ctx context.Context, p transport.AuthenticatedPeerContext, session, epoch string, now time.Time) (string, bool, error) {
+	started := time.Now()
 	id, accepted, err := a.LeaseAuthorizer.AuthorizeLease(ctx, p, session, epoch, now)
+	handoff.Record(ctx, handoff.PeerAuthorize, time.Since(started))
 	if err != nil || !accepted {
 		return id, accepted, err
 	}
@@ -56,8 +60,10 @@ func (input *privilegedLeaseInput) open(ctx context.Context, identity applicatio
 	if ctx == nil || ctx.Err() != nil || identity.SessionID == "" || identity.LeaseID == "" || identity.Epoch == "" {
 		return errPrivilegedInput
 	}
+	started := time.Now()
 	input.mu.Lock()
 	defer input.mu.Unlock()
+	handoff.Record(ctx, handoff.OpenLock, time.Since(started))
 	if input.client != nil || input.connect == nil {
 		return errPrivilegedInput
 	}
@@ -68,7 +74,10 @@ func (input *privilegedLeaseInput) open(ctx context.Context, identity applicatio
 	if !expires.After(now) {
 		return errPrivilegedInput
 	}
+	handoff.Backend(ctx, "installed")
+	started = time.Now()
 	client, err := input.connect(ctx, identity, expires)
+	handoff.Record(ctx, handoff.ConnectTotal, time.Since(started))
 	if err != nil || client == nil {
 		if client != nil {
 			_ = client.Close()
@@ -89,6 +98,7 @@ func (input *privilegedLeaseInput) open(ctx context.Context, identity applicatio
 	run, cancel := context.WithCancel(ctx)
 	done := make(chan struct{})
 	input.client, input.identity, input.cancel, input.done = client, identity, cancel, done
+	input.profile = ctx
 	go func() {
 		defer close(done)
 		ticker := time.NewTicker(250 * time.Millisecond)
@@ -120,9 +130,13 @@ func (input *privilegedLeaseInput) close(intent *control.ReturnIntent) {
 		return
 	}
 	client, cancel, done := input.client, input.cancel, input.done
+	profile := input.profile
+	input.profile = nil
 	input.client, input.cancel, input.done = nil, nil, nil
 	input.identity = application.LeaseIdentity{}
 	input.mu.Unlock()
+	started := time.Now()
+	defer func() { handoff.Record(profile, handoff.InputClose, time.Since(started)) }()
 	if cancel != nil {
 		cancel()
 	}
@@ -134,25 +148,30 @@ func (input *privilegedLeaseInput) close(intent *control.ReturnIntent) {
 	}
 }
 
-func (input *privilegedLeaseInput) perform(operation func(privilegedClient) error) error {
+func (input *privilegedLeaseInput) perform(ctx context.Context, operation func(privilegedClient) error) error {
+	started := time.Now()
 	input.mu.Lock()
 	defer input.mu.Unlock()
+	handoff.Record(ctx, handoff.OuterLock, time.Since(started))
 	if input.client == nil {
 		return &application.InjectionError{Certainty: application.InjectionNotApplied, Cause: errPrivilegedInput}
 	}
-	return operation(input.client)
+	started = time.Now()
+	err := operation(input.client)
+	handoff.Record(ctx, handoff.ClientTotal, time.Since(started))
+	return err
 }
 func (input *privilegedLeaseInput) Press(ctx context.Context, t control.PressedToken) error {
-	return input.perform(func(p privilegedClient) error { return p.Press(ctx, t) })
+	return input.perform(ctx, func(p privilegedClient) error { return p.Press(ctx, t) })
 }
 func (input *privilegedLeaseInput) Release(ctx context.Context, t control.PressedToken) error {
-	return input.perform(func(p privilegedClient) error { return p.Release(ctx, t) })
+	return input.perform(ctx, func(p privilegedClient) error { return p.Release(ctx, t) })
 }
 func (input *privilegedLeaseInput) Move(ctx context.Context, x, y int32) error {
-	return input.perform(func(p privilegedClient) error { return p.Move(ctx, x, y) })
+	return input.perform(ctx, func(p privilegedClient) error { return p.Move(ctx, x, y) })
 }
 func (input *privilegedLeaseInput) Wheel(ctx context.Context, x, y int32) error {
-	return input.perform(func(p privilegedClient) error { return p.Wheel(ctx, x, y) })
+	return input.perform(ctx, func(p privilegedClient) error { return p.Wheel(ctx, x, y) })
 }
 
 // Keep local cursor preparation and return tracking, but retire the worker only

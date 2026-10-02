@@ -7,6 +7,8 @@ import (
 	"crypto/sha256"
 	"io"
 	"time"
+
+	"github.com/0disoft/krasis/internal/handoff"
 )
 
 // ConnectLease is called only after resident-agent peer/lease approval. The
@@ -40,10 +42,16 @@ func ConnectLease(ctx context.Context, serviceDigest [sha256.Size]byte, lease Le
 	if err := channel.stream.SetDeadline(deadline); err != nil {
 		return nil, connectionFailed("lease_deadline", err)
 	}
-	if err := writeFrame(channel.stream, data[:]); err != nil {
+	started := time.Now()
+	writeErr := writeFrame(channel.stream, data[:])
+	handoff.Record(ctx, handoff.LeaseWrite, time.Since(started))
+	if err := writeErr; err != nil {
 		return nil, connectionFailed("lease_write", err)
 	}
-	if err := readReady(channel.stream); err != nil {
+	started = time.Now()
+	readyErr := readReady(channel.stream)
+	handoff.Record(ctx, handoff.ReadyWait, time.Since(started))
+	if err := readyErr; err != nil {
 		return nil, connectionFailed("worker_ready", err)
 	}
 	if ctx.Err() != nil {
@@ -52,7 +60,9 @@ func ConnectLease(ctx context.Context, serviceDigest [sha256.Size]byte, lease Le
 	if channel.stream.SetDeadline(time.Time{}) != nil {
 		return nil, connectionFailed("lease_deadline", ErrAuthority)
 	}
+	started = time.Now()
 	client, err := NewClient(ctx, channel, lease)
+	handoff.Record(ctx, handoff.NewClientCheck, time.Since(started))
 	if err != nil {
 		return nil, connectionFailed("client_validation", err)
 	}

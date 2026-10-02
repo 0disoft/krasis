@@ -3,6 +3,7 @@ package control
 import (
 	"errors"
 	"fmt"
+	"time"
 )
 
 type ScreenEdge string
@@ -23,8 +24,9 @@ type BoundaryConfig struct {
 }
 
 type BoundaryIntent struct {
-	Edge ScreenEdge
-	X    int32
+	Edge      ScreenEdge
+	X         int32
+	DecidedAt time.Time `json:"-"`
 }
 
 type BoundaryDetector struct {

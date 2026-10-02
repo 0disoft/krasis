@@ -9,6 +9,7 @@ import (
 
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/handoff"
 	"github.com/0disoft/krasis/internal/transport"
 )
 
@@ -130,9 +131,17 @@ func runSession(
 				err = errors.Join(ErrPeerControlDispatch, err)
 			}
 		case transport.MessageInput:
-			err = coordinateDispatch(ctx, coordinator, func() error {
-				return DispatchInputFrame(ctx, frame, runtime)
+			inputCtx, complete := handoff.Input(ctx, "receiver")
+			queued := time.Now()
+			recorded := false
+			err = coordinateDispatch(inputCtx, coordinator, func() (dispatchErr error) {
+				defer func() { complete(dispatchErr); recorded = true }()
+				handoff.Record(inputCtx, handoff.InputCoordinator, time.Since(queued))
+				return DispatchInputFrame(inputCtx, frame, runtime)
 			})
+			if !recorded {
+				complete(err)
+			}
 			if err != nil {
 				err = errors.Join(ErrPeerInputDispatch, err)
 			}

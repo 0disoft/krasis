@@ -7,6 +7,7 @@ import (
 
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/handoff"
 	"github.com/0disoft/krasis/internal/transport"
 )
 
@@ -49,7 +50,13 @@ func (controller *ReturnController) Revoke(ctx context.Context, intent control.R
 	if controller == nil || controller.Coordinator == nil || controller.Runtime == nil || controller.Returns == nil {
 		return errors.New("return controller is not initialized")
 	}
-	err := controller.Coordinator.Execute(ctx, func(writer FrameWriter) error {
+	var emitProfile func()
+	err := controller.Coordinator.Execute(ctx, func(writer FrameWriter) (operationErr error) {
+		defer func() {
+			if operationErr == nil {
+				emitProfile = handoff.Retire(handoff.Matching(ctx, "receiver", intent.SessionID, intent.Epoch), "ok")
+			}
+		}()
 		var present func()
 		if controller.Cursor != nil {
 			present = controller.Cursor.PrepareReturnCursor()
@@ -80,6 +87,9 @@ func (controller *ReturnController) Revoke(ctx context.Context, intent control.R
 	})
 	if errors.Is(err, application.ErrRuntimeInputHeld) {
 		controller.Returns.RearmReturn(intent)
+	}
+	if emitProfile != nil {
+		emitProfile()
 	}
 	return err
 }

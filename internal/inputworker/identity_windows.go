@@ -3,6 +3,7 @@
 package inputworker
 
 import (
+	"context"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/binary"
@@ -10,8 +11,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 	"unsafe"
 
+	"github.com/0disoft/krasis/internal/handoff"
 	"golang.org/x/sys/windows"
 )
 
@@ -119,6 +122,10 @@ func AuthenticateAgent(pipe uintptr, expected [sha256.Size]byte) (*Authority, er
 // agents do not need access to its process object or token.
 // The caller pins the digest from an independently validated update package.
 func AuthenticateService(pipe uintptr, expected [sha256.Size]byte) (*Authority, error) {
+	return authenticateServiceObserved(context.Background(), pipe, expected)
+}
+
+func authenticateServiceObserved(ctx context.Context, pipe uintptr, expected [sha256.Size]byte) (*Authority, error) {
 	if pipe == 0 || expected == ([sha256.Size]byte{}) {
 		return nil, ErrAuthority
 	}
@@ -159,7 +166,9 @@ func AuthenticateService(pipe uintptr, expected [sha256.Size]byte) (*Authority, 
 	if err := check(); err != nil {
 		return nil, err
 	}
+	started := time.Now()
 	image, err := lockImage(path, expected)
+	handoff.Record(ctx, handoff.ServiceImagePin, time.Since(started))
 	if err != nil {
 		return nil, connectionFailed("service_image", err)
 	}

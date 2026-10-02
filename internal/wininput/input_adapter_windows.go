@@ -6,10 +6,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 	"unsafe"
 
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/handoff"
 )
 
 var (
@@ -153,6 +155,8 @@ func (adapter *InputAdapter) Move(ctx context.Context, deltaX, deltaY int32) err
 	if injectErr != nil {
 		return injectErr
 	}
+	started := time.Now()
+	defer func() { handoff.Record(ctx, handoff.CursorPostprocess, time.Since(started)) }()
 	position, err := cursorPosition()
 	if err != nil {
 		return err

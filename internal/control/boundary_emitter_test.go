@@ -3,6 +3,7 @@ package control
 import (
 	"errors"
 	"testing"
+	"time"
 )
 
 func TestBoundaryIntentEmitterHandsOffWithoutBlocking(t *testing.T) {
@@ -15,6 +16,9 @@ func TestBoundaryIntentEmitterHandsOffWithoutBlocking(t *testing.T) {
 	}
 	select {
 	case intent := <-emitter.Intents():
+		if intent.DecidedAt.IsZero() || intent.DecidedAt.After(time.Now()) {
+			t.Fatal("consumer did not receive the pre-publication decision time")
+		}
 		if intent.Edge != ScreenEdgeRight || intent.X != 99 {
 			t.Fatalf("intent = %+v", intent)
 		}

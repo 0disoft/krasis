@@ -11,6 +11,7 @@ import (
 
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/handoff"
 	"github.com/0disoft/krasis/internal/peer"
 	"github.com/0disoft/krasis/internal/transport"
 	"github.com/0disoft/krasis/internal/wininput"
@@ -50,6 +51,7 @@ type Config struct {
 	DestinationObserver       application.InputDispositionObserver
 	RecoveryObserver          func(RecoveryReport)
 	ActivationFailureObserver func(error)
+	HandoffProfiles           *handoff.Collector
 }
 
 type SourceActivityObserver interface {
@@ -80,6 +82,8 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	if err := validate(config, dependencies); err != nil {
 		return Result{}, err
 	}
+	ctx = handoff.WithSession(ctx, config.HandoffProfiles)
+	defer handoff.EndSession(ctx)
 	connection := newSessionConnectionEvidence(dependencies.Connection, config.ControlObserver)
 	authenticatedPeer, err := connection.AuthenticatedPeer()
 	if err != nil {
@@ -127,7 +131,7 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 		if capture == nil {
 			return Result{}, errors.New("source capture provider returned no activation owner")
 		}
-		outboundSource = &combinedSourceActivation{source: source, capture: capture, observer: config.ControlObserver, failureObserver: config.ActivationFailureObserver}
+		outboundSource = &combinedSourceActivation{source: source, capture: capture, observer: config.ControlObserver, failureObserver: config.ActivationFailureObserver, profile: ctx}
 	}
 	outbound, err := peer.NewOutboundControllerObserved(coordinator, runtime, outboundSource, config.ControlObserver)
 	if err != nil {
@@ -395,6 +399,7 @@ func expectedWorkerCancellation(err, expected error) bool {
 }
 
 type combinedSourceActivation struct {
+	profile         context.Context
 	source          wininput.SourceActivation
 	capture         wininput.SourceActivation
 	observer        peer.ControlFlowObserver
@@ -405,7 +410,11 @@ func (activation *combinedSourceActivation) Activate() error {
 	if activation == nil || activation.source == nil || activation.capture == nil {
 		return errors.New("combined source activation is not initialized")
 	}
-	if err := activation.source.Activate(); err != nil {
+	profile := handoff.Current(activation.profile, "source")
+	started := time.Now()
+	sourceErr := activation.source.Activate()
+	handoff.Record(profile, handoff.SourceActivate, time.Since(started))
+	if err := sourceErr; err != nil {
 		activation.observe(peer.ControlFlowSourceSessionActivationFailed)
 		failure := fmt.Errorf("%w: %w", ErrSourceSessionActivation, err)
 		if activation.failureObserver != nil {
@@ -415,7 +424,10 @@ func (activation *combinedSourceActivation) Activate() error {
 	}
 	activation.observe(peer.ControlFlowSourceSessionActivationSucceeded)
 	activation.observe(peer.ControlFlowCaptureActivationAttempted)
-	if err := activation.capture.Activate(); err != nil {
+	started = time.Now()
+	captureErr := activation.capture.Activate()
+	handoff.Record(profile, handoff.CaptureActivate, time.Since(started))
+	if err := captureErr; err != nil {
 		activation.source.Deactivate()
 		activation.capture.Deactivate()
 		activation.observe(peer.ControlFlowCaptureActivationFailed)
@@ -447,6 +459,9 @@ func (activation *combinedSourceActivation) Deactivate() {
 	if activation == nil {
 		return
 	}
+	profile := handoff.Current(activation.profile, "source")
+	started := time.Now()
+	defer func() { handoff.Record(profile, handoff.SourceDeactivate, time.Since(started)) }()
 	if activation.source != nil {
 		activation.source.Deactivate()
 	}

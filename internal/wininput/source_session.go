@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/handoff"
 )
 
 const MaxSourceQueueCapacity = 65536
@@ -385,7 +386,7 @@ func (session *SourceSession) runSender(ctx context.Context) error {
 			if item.action.Kind == control.InputPointerMove && item.action.DeltaX == 0 && item.action.DeltaY == 0 {
 				continue
 			}
-			if err := session.sink.SendAction(ctx, item.action, func() bool { return session.current(item.generation) }); err != nil {
+			if err := session.sink.SendAction(handoff.Offered(ctx, item.queuedAt), item.action, func() bool { return session.current(item.generation) }); err != nil {
 				if !session.current(item.generation) {
 					if session.observer != nil {
 						session.observer.ObserveSourceQueueDiscardedStale()

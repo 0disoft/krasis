@@ -8,6 +8,7 @@ import (
 
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/handoff"
 	"github.com/0disoft/krasis/internal/transport"
 )
 
@@ -74,7 +75,15 @@ func (controller *OutboundController) BeginBoundary(
 	if intent.Edge != control.ScreenEdgeLeft && intent.Edge != control.ScreenEdgeRight {
 		return errors.New("outbound boundary intent requires a LEFT or RIGHT edge")
 	}
-	return controller.Begin(ctx, identity.SessionID, identity.Epoch, intent.Edge)
+	ctx = handoff.Begin(ctx, "source", identity.SessionID, identity.Epoch, intent.DecidedAt)
+	if !intent.DecidedAt.IsZero() {
+		handoff.Record(ctx, handoff.BoundaryToBegin, time.Since(intent.DecidedAt))
+	}
+	err := controller.Begin(ctx, identity.SessionID, identity.Epoch, intent.Edge)
+	if err != nil {
+		handoff.Finish(ctx, "error")
+	}
+	return err
 }
 
 func (controller *OutboundController) GrantPeer(
@@ -88,9 +97,12 @@ func (controller *OutboundController) GrantPeer(
 	if command.Kind != transport.ControlLeaseGrant {
 		return errors.New("outbound controller requires a lease grant")
 	}
+	ctx = handoff.Matching(ctx, "source", command.SessionID, command.Epoch)
+	handoff.Granted(ctx)
 	observeControlFlow(controller.Observer, ControlFlowGrantReceived)
 	preparationStarted := time.Now()
 	return controller.Coordinator.Execute(ctx, func(writer FrameWriter) error {
+		handoff.Record(ctx, handoff.GrantCoordinator, time.Since(preparationStarted))
 		if err := controller.Runtime.ValidateOutboundPreparation(ctx, command.SessionID, command.LeaseID, command.Epoch, observedAt); err != nil {
 			observeControlFlow(controller.Observer, ControlFlowGrantApplyFailed)
 			return failRuntime(ctx, controller.Runtime, fmt.Errorf("%w: %w", ErrOutboundGrantApply, err))
@@ -129,7 +141,10 @@ func (controller *OutboundController) GrantPeer(
 			Kind: transport.ControlLeaseCommit, SessionID: command.SessionID,
 			LeaseID: command.LeaseID, Epoch: command.Epoch,
 		}
-		if err := writeControlOrFail(ctx, writer, controller.Runtime, commit); err != nil {
+		started := time.Now()
+		commitErr := writeControlOrFail(ctx, writer, controller.Runtime, commit)
+		handoff.Record(ctx, handoff.CommitWrite, time.Since(started))
+		if err := commitErr; err != nil {
 			observeControlFlow(controller.Observer, ControlFlowCommitWriteOutcomeUnknown)
 			controller.Source.Deactivate()
 			return err
@@ -146,11 +161,19 @@ func (controller *OutboundController) RejectPeer(ctx context.Context, command tr
 	if command.Kind != transport.ControlLeaseReject {
 		return errors.New("outbound controller requires a lease rejection")
 	}
-	return controller.Coordinator.Execute(ctx, func(FrameWriter) error {
+	var emitProfile func()
+	err := controller.Coordinator.Execute(ctx, func(FrameWriter) error {
 		controller.Source.Deactivate()
 		_, err := controller.Runtime.RejectOutbound(ctx, command.SessionID, command.Epoch)
+		if err == nil {
+			emitProfile = handoff.Retire(handoff.Matching(ctx, "source", command.SessionID, command.Epoch), "error")
+		}
 		return err
 	})
+	if emitProfile != nil {
+		emitProfile()
+	}
+	return err
 }
 
 func (controller *OutboundController) RevokePeer(ctx context.Context, command transport.ControlCommand) error {
@@ -161,11 +184,19 @@ func (controller *OutboundController) RevokePeer(ctx context.Context, command tr
 		return errors.New("outbound controller requires a lease revocation")
 	}
 	observeControlFlow(controller.Observer, ControlFlowRevokeReceived)
-	return controller.Coordinator.Execute(ctx, func(FrameWriter) error {
+	var emitProfile func()
+	err := controller.Coordinator.Execute(ctx, func(FrameWriter) error {
 		controller.Source.Deactivate()
 		_, err := controller.Runtime.RevokePeer(ctx, command.SessionID, command.LeaseID, command.Epoch)
+		if err == nil {
+			emitProfile = handoff.Retire(handoff.Matching(ctx, "source", command.SessionID, command.Epoch), "ok")
+		}
 		return err
 	})
+	if emitProfile != nil {
+		emitProfile()
+	}
+	return err
 }
 
 func (controller *OutboundController) Fail(ctx context.Context, cause error) error {

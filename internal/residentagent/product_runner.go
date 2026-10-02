@@ -12,6 +12,7 @@ import (
 	"github.com/0disoft/krasis/internal/agent"
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/crashguard"
+	"github.com/0disoft/krasis/internal/handoff"
 	"github.com/0disoft/krasis/internal/peer"
 	"github.com/0disoft/krasis/internal/peerdiscovery"
 	"github.com/0disoft/krasis/internal/productidentity"
@@ -86,6 +87,7 @@ func prepareProductConnection(identities *productidentity.Store, trust *truststo
 }
 
 func productRunner(identities *productidentity.Store, trust *truststore.Store, log *productlog.Logger, auxiliary ...func(context.Context, string, productConnection)) SessionRunner {
+	profiles := handoff.New(log.Handoff)
 	return func(parent context.Context, alias string, observer agent.SupervisorObserver) (err error) {
 		prepared, err := prepareProductConnection(identities, trust, alias)
 		if err != nil {
@@ -221,6 +223,7 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 		log.Boundary(boundary.snapshot(false))
 		defer func() { log.Boundary(boundary.snapshot(true)) }()
 		config.SourceObserver = boundary
+		config.HandoffProfiles = profiles
 		progress := newRuntimeDiagnostics()
 		config.LivenessObserver = progress
 		config.QueueObserver = progress

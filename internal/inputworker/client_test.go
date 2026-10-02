@@ -11,10 +11,46 @@ import (
 
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/handoff"
 )
 
 func clientChannel(stream net.Conn, kind authorityKind) *Channel {
 	return &Channel{stream: stream, authority: &Authority{kind: kind, checkInput: func() error { return nil }, checkRecovery: func() error { return nil }, closeHandles: func() error { return nil }}}
+}
+
+func TestHandoffHeartbeatDoesNotConsumeFirstInputAndLostAckStaysUnknown(t *testing.T) {
+	var summaries []handoff.Summary
+	collector := handoff.New(func(s handoff.Summary) { summaries = append(summaries, s) })
+	ctx := handoff.WithSession(context.Background(), collector)
+	p := handoff.Begin(ctx, "receiver", "session", "epoch", time.Now())
+	server, conn := net.Pipe()
+	client, err := NewClient(ctx, clientChannel(conn, authorityService), testLease())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		defer server.Close()
+		heartbeat, _ := readRequest(server)
+		_ = writeResponse(server, response{sequence: heartbeat.sequence, op: opHeartbeat, timing: [3]byte{5, 5, 5}})
+		_, _ = readRequest(server) // discard the only real request, lose its ACK
+	}()
+	if err := client.Heartbeat(p); err != nil {
+		t.Fatal(err)
+	}
+	inputCtx, complete := handoff.Input(ctx, "receiver")
+	err = client.Move(inputCtx, 1, 1)
+	complete(err)
+	if certainty, ok := application.InjectionCertaintyOf(err); !ok || certainty != application.InjectionOutcomeUnknown {
+		t.Fatal("profile changed lost-ACK certainty")
+	}
+	handoff.Finish(p, "error")
+	<-done
+	if len(summaries) != 1 || summaries[0].First.Outcome != "error" || summaries[0].First.Worker != [3]byte{} || summaries[0].Preparation.Measured != 0 || summaries[0].Frames != 0 {
+		t.Fatalf("heartbeat or unverified ACK contaminated input profile: %+v", summaries)
+	}
 }
 
 func TestClientRejectsAgentAndMissingServiceProof(t *testing.T) {

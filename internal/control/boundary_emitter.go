@@ -1,6 +1,9 @@
 package control
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 const BoundaryIntentQueueCapacity = 1
 
@@ -38,6 +41,8 @@ func (emitter *BoundaryIntentEmitter) Observe(action InputAction, pointerX int32
 	if err != nil || !fired {
 		return err
 	}
+	// Preserve the local monotonic decision time before the consumer can run.
+	intent.DecidedAt = time.Now()
 	select {
 	case emitter.intents <- intent:
 		if emitter.observer != nil {

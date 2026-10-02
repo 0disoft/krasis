@@ -5,15 +5,17 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"github.com/0disoft/krasis/internal/agentinstance"
-	"github.com/0disoft/krasis/internal/productidentity"
-	"github.com/0disoft/krasis/internal/securefs"
 	"io"
 	"os"
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/0disoft/krasis/internal/agentinstance"
+	"github.com/0disoft/krasis/internal/handoff"
+	"github.com/0disoft/krasis/internal/productidentity"
+	"github.com/0disoft/krasis/internal/securefs"
 )
 
 const maxBytes = 1 << 20
@@ -73,6 +75,7 @@ type record struct {
 	Injection     *InjectionFailure `json:"injection,omitempty"`
 	Retry         *RetrySummary     `json:"retry,omitempty"`
 	Runtime       *RuntimeSummary   `json:"runtime,omitempty"`
+	Handoff       *handoff.Summary  `json:"handoff,omitempty"`
 }
 type Logger struct {
 	mu              sync.Mutex
@@ -158,7 +161,9 @@ func (l *Logger) enqueueRecord(r record) {
 	l.sequence++
 	r.BuildDirty = l.buildDirty
 	r.Run = l.run
-	r.Connection = l.connection
+	if code != "handoff_profile" {
+		r.Connection = l.connection
+	}
 	r.Sequence = l.sequence
 	if !l.started.IsZero() {
 		r.ElapsedMicros = time.Since(l.started).Microseconds()

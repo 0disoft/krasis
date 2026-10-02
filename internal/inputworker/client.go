@@ -9,6 +9,7 @@ import (
 
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/handoff"
 )
 
 // Client implements InputPort only over an authenticated service channel and
@@ -94,7 +95,11 @@ func (client *Client) perform(ctx context.Context, command request) error {
 	}
 	var sample [7]byte
 	wasFailed := client.failed
-	sample[0] = timingBucket(time.Since(start))
+	elapsed0 := time.Since(start)
+	sample[0] = timingBucket(elapsed0)
+	if command.op != opHeartbeat {
+		handoff.Record(ctx, handoff.ClientLock, elapsed0)
+	}
 	defer func() {
 		if !wasFailed {
 			sampler := &client.timing
@@ -124,7 +129,11 @@ func (client *Client) perform(ctx context.Context, command request) error {
 	}
 	start = time.Now()
 	authorityErr := client.channel.authority.check(false)
-	sample[1] = timingBucket(time.Since(start))
+	elapsed1 := time.Since(start)
+	sample[1] = timingBucket(elapsed1)
+	if command.op != opHeartbeat {
+		handoff.Record(ctx, handoff.ClientAuthority, elapsed1)
+	}
 	if authorityErr != nil {
 		client.fail()
 		return notSent(ErrExpired)
@@ -152,7 +161,11 @@ func (client *Client) perform(ctx context.Context, command request) error {
 	client.sequence++
 	start = time.Now()
 	n, err := stream.Write(data[:])
-	sample[2] = timingBucket(time.Since(start))
+	elapsed2 := time.Since(start)
+	sample[2] = timingBucket(elapsed2)
+	if command.op != opHeartbeat {
+		handoff.Record(ctx, handoff.ClientWrite, elapsed2)
+	}
 	if err != nil || n != len(data) {
 		client.fail()
 		// Even a zero-byte write error does not prove that a prior native
@@ -161,12 +174,19 @@ func (client *Client) perform(ctx context.Context, command request) error {
 	}
 	start = time.Now()
 	ack, err := readResponse(stream)
-	sample[3] = timingBucket(time.Since(start))
+	elapsed3 := time.Since(start)
+	sample[3] = timingBucket(elapsed3)
+	if command.op != opHeartbeat {
+		handoff.Record(ctx, handoff.ClientResponse, elapsed3)
+	}
 	if err != nil || ack.sequence != command.sequence || ack.op != command.op {
 		client.fail()
 		return unknownInput(ErrProtocol)
 	}
 	copy(sample[4:], ack.timing[:])
+	if command.op != opHeartbeat {
+		handoff.Worker(ctx, ack.timing)
+	}
 	if ack.status == 0 {
 		client.lastAcknowledged = time.Now()
 		return nil

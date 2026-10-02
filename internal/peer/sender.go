@@ -8,6 +8,7 @@ import (
 
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/handoff"
 	"github.com/0disoft/krasis/internal/transport"
 )
 
@@ -86,16 +87,20 @@ func BeginOutboundSessionObserved(
 	if coordinator == nil || runtime == nil {
 		return errors.New("write coordinator and runtime are required")
 	}
+	queued := time.Now()
 	return coordinator.Execute(ctx, func(writer FrameWriter) error {
+		handoff.Record(ctx, handoff.RequestCoordinator, time.Since(queued))
 		if _, err := runtime.BeginOutbound(ctx, sessionID, epoch); err != nil {
 			return fmt.Errorf("%w: %w", ErrOutboundBegin, err)
 		}
+		started := time.Now()
 		err := writeControlOrFail(ctx, writer, runtime, transport.ControlCommand{
 			Kind:      transport.ControlLeaseRequest,
 			SessionID: sessionID,
 			Epoch:     epoch,
 			Edge:      edge,
 		})
+		handoff.Record(ctx, handoff.RequestWrite, time.Since(started))
 		if err != nil {
 			observeControlFlow(observer, ControlFlowRequestWriteOutcomeUnknown)
 			return fmt.Errorf("%w: %w", ErrOutboundRequestWrite, err)
@@ -129,7 +134,12 @@ func sendInputAction(
 	if err := action.Validate(); err != nil {
 		return err
 	}
-	return coordinator.Execute(ctx, func(writer FrameWriter) error {
+	ctx, complete := handoff.Input(ctx, "source")
+	recorded := false
+	queued := time.Now()
+	err := coordinator.Execute(ctx, func(writer FrameWriter) (operationErr error) {
+		defer func() { complete(operationErr); recorded = true }()
+		handoff.Record(ctx, handoff.InputCoordinator, time.Since(queued))
 		if isCurrent != nil && !isCurrent() {
 			return ErrStaleSourceAction
 		}
@@ -141,11 +151,18 @@ func sendInputAction(
 		if err != nil {
 			return failRuntime(ctx, runtime, err)
 		}
-		if err := writer.WriteFrameContext(ctx, transport.Frame{Kind: transport.MessageInput, Payload: payload}); err != nil {
+		started := time.Now()
+		err = writer.WriteFrameContext(ctx, transport.Frame{Kind: transport.MessageInput, Payload: payload})
+		handoff.Record(ctx, handoff.InputWrite, time.Since(started))
+		if err != nil {
 			return failRuntime(ctx, runtime, err)
 		}
 		return nil
 	})
+	if !recorded {
+		complete(err)
+	}
+	return err
 }
 
 func SendHeartbeat(
@@ -213,7 +230,7 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 	ctx context.Context,
 	command transport.ControlCommand,
 	observedAt time.Time,
-) error {
+) (resultErr error) {
 	if responder == nil || responder.Coordinator == nil || responder.Runtime == nil || responder.Authorizer == nil || responder.Entry == nil || responder.Returns == nil {
 		return errors.New("lease responder is not initialized")
 	}
@@ -223,20 +240,34 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 	if command.Kind != transport.ControlLeaseRequest {
 		return errors.New("lease responder requires a lease request")
 	}
+	ctx = handoff.Begin(ctx, "receiver", command.SessionID, command.Epoch, time.Now())
+	rejected := false
+	defer func() {
+		if resultErr != nil || rejected {
+			handoff.Finish(ctx, "error")
+		}
+	}()
+	queued := time.Now()
 	observeControlFlow(responder.Observer, ControlFlowRequestReceived)
 	return responder.Coordinator.Execute(ctx, func(writer FrameWriter) error {
+		handoff.Record(ctx, handoff.RequestCoordinator, time.Since(queued))
 		if responder.Runtime.Snapshot().Control.State != control.StateLocal {
+			rejected = true
 			// A concurrent outbound request or an existing lease is ordinary
 			// contention, not a malformed frame or a broken connection.
 			return writeControlOrFail(ctx, writer, responder.Runtime, transport.ControlCommand{
 				Kind: transport.ControlLeaseReject, SessionID: command.SessionID, Epoch: command.Epoch,
 			})
 		}
+		handoff.Activate(ctx)
+		started := time.Now()
 		leaseID, accepted, err := responder.Authorizer.AuthorizeLease(ctx, responder.Peer, command.SessionID, command.Epoch, observedAt)
+		handoff.Record(ctx, handoff.AuthorizeTotal, time.Since(started))
 		if err != nil {
 			return err
 		}
 		if !accepted {
+			rejected = true
 			return writeControlOrFail(ctx, writer, responder.Runtime, transport.ControlCommand{
 				Kind:      transport.ControlLeaseReject,
 				SessionID: command.SessionID,
@@ -247,7 +278,10 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 			return errors.New("accepted lease requires an identifier")
 		}
 		returnIntent := control.ReturnIntent{SessionID: command.SessionID, Epoch: command.Epoch}
-		if err := responder.Returns.ArmReturn(returnIntent, command.Edge); err != nil {
+		started = time.Now()
+		armErr := responder.Returns.ArmReturn(returnIntent, command.Edge)
+		handoff.Record(ctx, handoff.ReturnArm, time.Since(started))
+		if err := armErr; err != nil {
 			return err
 		}
 		observeControlFlow(responder.Observer, ControlFlowReturnArmSucceeded)
@@ -263,11 +297,17 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 		if responder.Cursor != nil {
 			responder.Cursor.RestoreReturnCursor()
 		}
-		if err := responder.Entry.PrepareEntry(ctx, command.Edge); err != nil {
+		started = time.Now()
+		entryErr := responder.Entry.PrepareEntry(ctx, command.Edge)
+		handoff.Record(ctx, handoff.EntryPrepare, time.Since(started))
+		if err := entryErr; err != nil {
 			return rollbackEntry(err)
 		}
 		observeControlFlow(responder.Observer, ControlFlowEntryPrepared)
-		if _, err := responder.Runtime.PrepareInbound(ctx, command.SessionID, leaseID, command.Epoch); err != nil {
+		started = time.Now()
+		_, prepareErr := responder.Runtime.PrepareInbound(ctx, command.SessionID, leaseID, command.Epoch)
+		handoff.Record(ctx, handoff.PrepareInbound, time.Since(started))
+		if err := prepareErr; err != nil {
 			return rollbackEntry(err)
 		}
 		responder.pending = &pendingInboundLease{
@@ -282,9 +322,11 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 			LeaseID:   leaseID,
 			Epoch:     command.Epoch,
 		})
+		started = time.Now()
 		if err == nil {
 			err = writer.WriteFrameContext(ctx, transport.Frame{Kind: transport.MessageControl, Payload: payload})
 		}
+		handoff.Record(ctx, handoff.GrantWrite, time.Since(started))
 		if err != nil {
 			observeControlFlow(responder.Observer, ControlFlowGrantWriteOutcomeUnknown)
 			return responder.abortPendingLocked(ctx, fmt.Errorf("%w: %w", ErrInboundGrantWrite, err))
@@ -305,7 +347,12 @@ func (responder *LeaseResponder) HandleLeaseCommit(
 	if command.Kind != transport.ControlLeaseCommit {
 		return errors.New("lease responder requires a lease commit")
 	}
+	ctx = handoff.Matching(ctx, "receiver", command.SessionID, command.Epoch)
+	queued := time.Now()
 	return responder.Coordinator.Execute(ctx, func(FrameWriter) error {
+		handoff.Record(ctx, handoff.CommitCoordinator, time.Since(queued))
+		started := time.Now()
+		defer func() { handoff.Record(ctx, handoff.CommitApply, time.Since(started)) }()
 		observeControlFlow(responder.Observer, ControlFlowCommitReceived)
 		if !responder.matchesPending(command) {
 			return errors.New("lease commit does not match the prepared inbound lease")
