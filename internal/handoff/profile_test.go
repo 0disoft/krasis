@@ -3,6 +3,7 @@ package handoff
 import (
 	"context"
 	"errors"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -169,4 +170,27 @@ func TestRetirementFreezesBeforeNextAttemptAndEmitsOutsideCoordinator(t *testing
 		t.Fatalf("rapid reentry corrupted retirement: %+v", *out)
 	}
 	Finish(next, "error")
+}
+
+func TestExhaustedBudgetCannotAppendNewLeaseToLastAttempt(t *testing.T) {
+	for _, role := range []string{"source", "receiver"} {
+		t.Run(role, func(t *testing.T) {
+			_, ctx, out := collected(t)
+			for i := 1; i < Limit; i++ {
+				p := Begin(ctx, role, strconv.Itoa(i), "epoch", time.Now())
+				Finish(p, "ok")
+			}
+			last := Begin(ctx, role, "last", "epoch", time.Now())
+			_, complete := Input(ctx, role)
+			complete(nil)
+			Begin(ctx, role, "untracked", "next-epoch", time.Now())
+			x, complete := Input(ctx, role)
+			Record(x, ClientResponse, time.Second)
+			complete(nil)
+			Finish(last, "incomplete")
+			if len(*out) != Limit || (*out)[Limit-1].Frames != 0 || (*out)[Limit-1].Worst.Measured != 0 {
+				t.Fatalf("untracked lease appended to last attempt: %+v", (*out)[len(*out)-1])
+			}
+		})
+	}
 }

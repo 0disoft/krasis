@@ -10,7 +10,11 @@ The product runner shares one collector across reconnects. The first attempted
 handoff opens a 120-second window, with at most 12 attempts per agent process.
 Failed requests consume slots. A return or rejection emits the attempt once;
 session exit or expiry emits unfinished attempts as incomplete. There is no
-per-input disk output. Summaries use the existing bounded diagnostic queue.
+reuse of the last slot after the attempt budget is exhausted. Starting an
+untracked handoff freezes any old profile for that role as incomplete. Capture
+activation aborts and matching inbound aborts finish with diagnostic `error`,
+even when the control runtime successfully recovers and returns no error.
+There is no per-input disk output. Summaries use the existing bounded diagnostic queue.
 Queue loss remains visible through the logger's existing dropped/failed state;
 missing records are not evidence of a successful or zero-duration operation.
 

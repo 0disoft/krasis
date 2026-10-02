@@ -101,13 +101,21 @@ func (controller *OutboundController) GrantPeer(
 	handoff.Granted(ctx)
 	observeControlFlow(controller.Observer, ControlFlowGrantReceived)
 	preparationStarted := time.Now()
-	return controller.Coordinator.Execute(ctx, func(writer FrameWriter) error {
+	var emitProfile func()
+	aborted := false
+	resultErr := controller.Coordinator.Execute(ctx, func(writer FrameWriter) (operationErr error) {
+		defer func() {
+			if operationErr != nil || aborted {
+				emitProfile = handoff.Retire(ctx, "error")
+			}
+		}()
 		handoff.Record(ctx, handoff.GrantCoordinator, time.Since(preparationStarted))
 		if err := controller.Runtime.ValidateOutboundPreparation(ctx, command.SessionID, command.LeaseID, command.Epoch, observedAt); err != nil {
 			observeControlFlow(controller.Observer, ControlFlowGrantApplyFailed)
 			return failRuntime(ctx, controller.Runtime, fmt.Errorf("%w: %w", ErrOutboundGrantApply, err))
 		}
 		if err := controller.Source.Activate(); err != nil {
+			aborted = true
 			controller.Source.Deactivate()
 			abort := transport.ControlCommand{
 				Kind: transport.ControlLeaseAbort, SessionID: command.SessionID,
@@ -152,6 +160,12 @@ func (controller *OutboundController) GrantPeer(
 		observeControlFlow(controller.Observer, ControlFlowCommitWriteCompleted)
 		return nil
 	})
+	if emitProfile != nil {
+		emitProfile()
+	} else if resultErr != nil {
+		handoff.Finish(ctx, "error")
+	}
+	return resultErr
 }
 
 func (controller *OutboundController) RejectPeer(ctx context.Context, command transport.ControlCommand) error {

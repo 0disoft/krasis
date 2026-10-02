@@ -340,7 +340,7 @@ func (responder *LeaseResponder) HandleLeaseCommit(
 	ctx context.Context,
 	command transport.ControlCommand,
 	observedAt time.Time,
-) error {
+) (resultErr error) {
 	if responder == nil || responder.Coordinator == nil || responder.Runtime == nil || responder.Entry == nil || responder.Returns == nil {
 		return errors.New("lease responder is not initialized")
 	}
@@ -348,6 +348,11 @@ func (responder *LeaseResponder) HandleLeaseCommit(
 		return errors.New("lease responder requires a lease commit")
 	}
 	ctx = handoff.Matching(ctx, "receiver", command.SessionID, command.Epoch)
+	defer func() {
+		if resultErr != nil {
+			handoff.Finish(ctx, "error")
+		}
+	}()
 	queued := time.Now()
 	return responder.Coordinator.Execute(ctx, func(FrameWriter) error {
 		handoff.Record(ctx, handoff.CommitCoordinator, time.Since(queued))
@@ -382,22 +387,41 @@ func (responder *LeaseResponder) HandleLeaseAbort(
 	if command.Kind != transport.ControlLeaseAbort {
 		return errors.New("lease responder requires a lease abort")
 	}
-	return responder.Coordinator.Execute(ctx, func(FrameWriter) error {
+	ctx = handoff.Matching(ctx, "receiver", command.SessionID, command.Epoch)
+	var emitProfile func()
+	err := responder.Coordinator.Execute(ctx, func(FrameWriter) error {
 		observeControlFlow(responder.Observer, ControlFlowAbortReceived)
 		if !responder.matchesPending(command) {
 			return errors.New("lease abort does not match the prepared inbound lease")
 		}
-		return responder.abortPendingLocked(ctx, nil)
+		err := responder.abortPendingLocked(ctx, nil)
+		emitProfile = handoff.Retire(ctx, "error")
+		return err
 	})
+	if emitProfile != nil {
+		emitProfile()
+	}
+	return err
 }
 
 func (responder *LeaseResponder) AbortPending(ctx context.Context) error {
 	if responder == nil || responder.Coordinator == nil {
 		return errors.New("lease responder is not initialized")
 	}
-	return responder.Coordinator.Execute(ctx, func(FrameWriter) error {
-		return responder.abortPendingLocked(ctx, nil)
+	var emitProfile func()
+	err := responder.Coordinator.Execute(ctx, func(FrameWriter) error {
+		if pending := responder.pending; pending != nil {
+			profile := handoff.Matching(ctx, "receiver", pending.command.SessionID, pending.command.Epoch)
+			err := responder.abortPendingLocked(ctx, nil)
+			emitProfile = handoff.Retire(profile, "error")
+			return err
+		}
+		return nil
 	})
+	if emitProfile != nil {
+		emitProfile()
+	}
+	return err
 }
 
 func (responder *LeaseResponder) matchesPending(command transport.ControlCommand) bool {

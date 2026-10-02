@@ -172,8 +172,18 @@ func Begin(ctx context.Context, role, sessionID, epoch string, start time.Time) 
 	now := time.Now()
 	c.mu.Lock()
 	if c.count == Limit || (!c.started.IsZero() && now.Sub(c.started) >= Window) {
+		// A new untracked lease must never inherit a still-live slot from a
+		// prior attempt. Freeze that role's old record before dropping it.
+		old := s.receiver
+		if role == "source" {
+			old, s.source = s.source, nil
+		} else {
+			s.receiver = nil
+		}
+		emit := c.retireLocked(old, "incomplete")
 		c.mu.Unlock()
-		return ctx
+		emit()
+		return context.WithValue(ctx, attemptKey{}, (*attempt)(nil))
 	}
 	if c.started.IsZero() {
 		c.started = now
