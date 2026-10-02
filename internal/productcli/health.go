@@ -23,13 +23,24 @@ type versionResult struct {
 }
 
 type doctorResult struct {
-	SchemaVersion   string `json:"schemaVersion"`
-	Agent           string `json:"agent"`
-	Connection      string `json:"connection"`
-	PeerAlias       string `json:"peerAlias,omitempty"`
-	CLIGeneration   int    `json:"cliGeneration"`
-	AgentGeneration int    `json:"agentGeneration"`
-	Protocol        string `json:"protocol"`
+	SchemaVersion   string          `json:"schemaVersion"`
+	Agent           string          `json:"agent"`
+	Connection      string          `json:"connection"`
+	PeerAlias       string          `json:"peerAlias,omitempty"`
+	CLIGeneration   int             `json:"cliGeneration"`
+	AgentGeneration int             `json:"agentGeneration"`
+	Protocol        string          `json:"protocol"`
+	Code            string          `json:"code"`
+	CLIBuild        string          `json:"cliBuild"`
+	AgentBuild      string          `json:"agentBuild,omitempty"`
+	UI              doctorComponent `json:"ui"`
+	LaunchRecord    doctorComponent `json:"launchRecord"`
+	InstalledAgent  doctorComponent `json:"installedAgent"`
+	Service         doctorComponent `json:"service"`
+	AgentLocation   string          `json:"agentLocation"`
+	ProtectedInput  string          `json:"protectedInput"`
+	Checks          []doctorCheck   `json:"checks"`
+	NextActions     []doctorAction  `json:"nextActions"`
 }
 
 func localVersion() versionResult {
@@ -70,7 +81,7 @@ func doctor(ctx context.Context, client apiClient) (doctorResult, int, error) {
 	if err != nil {
 		return doctorResult{}, ExitInternal, err
 	}
-	v := doctorResult{SchemaVersion: doctorSchema, Agent: "RUNNING", Connection: status.State, PeerAlias: status.PeerAlias, CLIGeneration: localapi.AgentGeneration, AgentGeneration: runtime.Generation, Protocol: "COMPATIBLE"}
+	v := doctorResult{SchemaVersion: doctorSchema, Agent: "RUNNING", Connection: status.State, PeerAlias: status.PeerAlias, CLIGeneration: localapi.AgentGeneration, AgentGeneration: runtime.Generation, AgentBuild: runtime.Build, Protocol: "COMPATIBLE"}
 	if runtime.Protocol != localapi.AgentProtocol {
 		v.Protocol = "INCOMPATIBLE"
 		return v, ExitTransport, nil

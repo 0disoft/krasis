@@ -22,7 +22,7 @@ func commandHelp() helpResult {
 		{"relaunch", "Open the last product UI without a running agent", false, true},
 		{"app open ALIAS", "Open the remembered UI on a trusted PC", true, true},
 		{"app open-status ALIAS ID", "Read a peer UI launch request result", true, false},
-		{"doctor", "Check agent protocol and connection", true, false},
+		{"doctor", "Check UI, agent, installation and service without changing state", false, false},
 		{"status", "Read connection state", true, false},
 		{"topology", "Read device layout", true, false},
 		{"diagnostics", "Read live diagnostic counters", true, false},

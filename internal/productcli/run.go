@@ -48,6 +48,7 @@ type dependencies struct {
 	openClient   func(string) (apiClient, error)
 	executable   string
 	launch       func(string) error
+	inspectHost  func(context.Context, string, string) doctorHost
 }
 
 type options struct {
@@ -59,6 +60,7 @@ type options struct {
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer, localAppData string) int {
 	return run(ctx, args, stdout, stderr, dependencies{
 		localAppData: localAppData,
+		inspectHost:  inspectDoctorHost,
 		openClient: func(directory string) (apiClient, error) {
 			return localapi.OpenClient(directory)
 		},
@@ -95,6 +97,10 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, deps depe
 			return ExitUsage
 		}
 		value, code := relaunch(deps)
+		return writeOutput(stdout, stderr, value, code, parsed.json)
+	}
+	if parsed.args[0] == "doctor" {
+		value, code := runDoctor(ctx, parsed, deps)
 		return writeOutput(stdout, stderr, value, code, parsed.json)
 	}
 	if parsed.args[0] == "update" && parsed.args[1] == "verify" {
@@ -450,9 +456,19 @@ func writeHuman(output io.Writer, value any) {
 		}
 		fmt.Fprintln(output)
 	case doctorResult:
-		fmt.Fprintf(output, "Agent: %s\nConnection: %s\nCLI: g%d\nAgent version: g%d\nProtocol: %s\n", item.Agent, item.Connection, item.CLIGeneration, item.AgentGeneration, item.Protocol)
+		fmt.Fprintf(output, "진단: %s\n에이전트: %s\n연결: %s\nCLI: g%d\n", doctorHumanState(item.Code), doctorHumanState(item.Agent), doctorHumanState(item.Connection), item.CLIGeneration)
+		if item.AgentGeneration > 0 {
+			fmt.Fprintf(output, "실행 에이전트: g%d\n", item.AgentGeneration)
+		}
+		fmt.Fprintf(output, "프로토콜: %s\n", doctorHumanState(item.Protocol))
 		if item.PeerAlias != "" {
-			fmt.Fprintf(output, "Peer: %s\n", item.PeerAlias)
+			fmt.Fprintf(output, "상대: %s\n", item.PeerAlias)
+		}
+		for _, check := range item.Checks {
+			fmt.Fprintf(output, "%s: %s\n", doctorHumanCheck(check.Name), doctorHumanState(check.State))
+		}
+		for _, action := range item.NextActions {
+			fmt.Fprintf(output, "다음: %s\n", action.Message)
 		}
 	case updateStatusResult:
 		fmt.Fprintf(output, "Local: g%d %s\nPeer %s: %s", item.LocalGeneration, item.LocalBuild, item.PeerAlias, item.PeerState)

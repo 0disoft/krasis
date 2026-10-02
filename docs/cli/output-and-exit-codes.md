@@ -13,6 +13,17 @@ versioned object 하나를 stdout에 출력한다.
 agent가 있으면 실행 중인 agent의 generation/build/protocol도 함께 표시한다. JSON은
 `krasis.cli.version/v1`이다. `krasis-cli doctor`는 agent protocol과 연결 상태를 확인하며,
 JSON은 `krasis.cli.doctor/v1`이다. 연결이 끊긴 상태면 exit `7`, protocol이 다르면 exit `6`이다.
+g119부터 기존 필드를 유지하며 `code`, CLI/agent build, `ui`, `launchRecord`, `installedAgent`,
+`service`, `agentLocation`, `protectedInput`, `checks`, `nextActions`를 추가한다. 실행 기록의
+이미지 hash, 같은 세션의 UI/agent 이미지, 보호된 설치 파일과 서비스 상태·고정 실행 설정을
+읽기 전용으로 확인한다. 경로·명령줄·토큰·native 오류 원문은 결과에 포함하지 않는다.
+같은 generation이라도 build가 다르면 버전 불일치다. 조회 실패는 `UNKNOWN`이며 정상으로
+바꾸지 않는다. 검증 실패·버전 불일치·중지/준비 중인 설치 서비스·확인 불가 항목은 exit `7`이다.
+에이전트가 없어도 구조화된 JSON을 출력하며 unavailable은 exit `4`, 인증 실패는 exit `5`,
+local API transport/protocol 오류는 exit `6`이다. 일반 portable 입력과 미설치 서비스는
+지원되는 별도 상태로 표시하며, `protectedInput: CONFIGURED`는 예상 설치와 실행 경로가
+일치한다는 뜻이다. 현재 입력 lease나 PIN 제어 성공을 증명하지 않는다. doctor는 앱/서비스를
+시작하거나 권한·파일·연결을 변경하지 않으며 `nextActions`는 실행하지 않은 안내다.
 두 명령의 JSON은 여러 사실을 합친 CLI projection이며 아래의 단일 local API 응답 투영과 구분한다.
 
 `krasis-cli diagnostics export`는 에이전트 없이 정제된 지원 파일을 저장한다. JSON

@@ -204,6 +204,23 @@ func Load(localAppData string) (Record, error) {
 	return record, nil
 }
 
+// Inspect verifies the remembered image without launching or modifying it.
+func Inspect(localAppData string) (Record, error) {
+	record, err := Load(localAppData)
+	if err != nil {
+		return Record{}, err
+	}
+	file, hash, err := openExecutable(record.Executable)
+	if err != nil {
+		return Record{}, err
+	}
+	defer file.Close()
+	if hash != record.SHA256 {
+		return Record{}, ErrInvalid
+	}
+	return record, nil
+}
+
 // Relaunch verifies the recorded image. Fallback is only for first-time setup.
 func Relaunch(localAppData, fallback string, start func(string) error) (Record, error) {
 	record, err := Load(localAppData)
