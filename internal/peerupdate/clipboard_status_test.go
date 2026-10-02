@@ -59,6 +59,11 @@ func TestClipboardStatusRejectsStaleAndUnboundedReports(t *testing.T) {
 	if err := m.SetClipboardPeer(peer); err != nil {
 		t.Fatal(err)
 	}
+	m.clipboardProgress(peer, strings.Repeat("c", 32), "RECEIVE", "files", MaxClipboardFileBytes+1, 0)
+	m.clipboardReceiveFailed(peer, strings.Repeat("c", 32))
+	if s := m.ClipboardTransferStatus(); s.Bytes != MaxClipboardFileBytes || s.Code != "receive_failed" {
+		t.Fatalf("over-limit failure metadata: %+v", s)
+	}
 	if m.ReportClipboard(strings.Repeat("b", 64), "", "files", "size_limit") == nil || m.ReportClipboard(peer, "", "files", "private native error") == nil {
 		t.Fatal("unbounded or stale report accepted")
 	}

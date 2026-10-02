@@ -31,6 +31,13 @@ func (m *Manager) ClipboardTransferStatus() ClipboardTransfer {
 }
 
 func (m *Manager) clipboardProgress(peer, id, direction, format string, n, total int64) {
+	limit := int64(clipboardPayloadLimit(format))
+	if n > limit {
+		n = limit
+	}
+	if total > limit {
+		total = limit
+	}
 	m.clipboard.mu.Lock()
 	defer m.clipboard.mu.Unlock()
 	if m.clipboard.peer != peer {
