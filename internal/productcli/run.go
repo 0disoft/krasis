@@ -312,10 +312,14 @@ func validateCommandArgs(args []string) error {
 			return usageError(args[0] + " accepts no arguments")
 		}
 	case "diagnostics":
+		if len(args) > 1 && args[1] == "wait" {
+			_, err := parseWaitOptions(args[1:], "diagnostics")
+			return err
+		}
 		if len(args) == 1 || len(args) == 2 && (args[1] == "export" || args[1] == "status") || len(args) == 3 && (args[1] == "send" || args[1] == "collect") && validAlias(args[2]) || len(args) == 4 && args[1] == "collect-status" && validAlias(args[2]) && validHex(args[3], 32) {
 			return nil
 		}
-		return usageError("diagnostics requires export, status, send ALIAS, collect ALIAS, or collect-status ALIAS ID")
+		return usageError("diagnostics requires export, status, send ALIAS, collect ALIAS, collect-status ALIAS ID, or wait ALIAS ID [--timeout DURATION]")
 	case "connect":
 		if len(args) != 2 || !validAlias(args[1]) {
 			return usageError("connect requires a valid peer alias")

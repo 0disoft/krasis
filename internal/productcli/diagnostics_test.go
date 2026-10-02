@@ -144,7 +144,7 @@ func TestDiagnosticCollectStatusDoesNotStartAnotherExport(t *testing.T) {
 		if request.Action != "STATUS" || request.Peer != peer || request.ID != id {
 			t.Fatal("status started work")
 		}
-		return localapi.DiagnosticCollectionResult{Code: "ok", State: "PENDING", LocalPath: "A.json"}, nil
+		return localapi.DiagnosticCollectionResult{Code: "ok", ID: id, State: "PENDING", LocalPath: "A.json"}, nil
 	}
 	var stdout, stderr bytes.Buffer
 	code := run(context.Background(), []string{"diagnostics", "collect-status", "B", id, "--json"}, &stdout, &stderr, testDependencies(client))

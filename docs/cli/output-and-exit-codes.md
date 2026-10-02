@@ -56,6 +56,14 @@ g125부터 같은 세션의 UI 프로세스가 관측되지만 실행 기록이 
 원격 요청을 보내지 않고, 응답 유실 시 START를 자동 재실행하지 않는다. 각 기기의
 `support-latest.json`과 이 PC의 `support-peer-<fingerprint>.json`은 다음 내보내기로 교체될 수 있다.
 
+g128부터 `diagnostics wait ALIAS ID [--timeout DURATION]`은 기존 수집 요청의 양쪽 파일이
+확인될 때까지 기다린다. 기본 2분, 허용 범위 1초~10분이다. JSON은 같은
+`krasis.cli.diagnostics-collection/v1`이며 `RECEIVED`와 두 경로가 확인된 경우에만
+`code:saved`, exit `0`이다. 실패·만료는 `not_received`, 응답의 ID 불일치는
+`request_changed`, 에이전트 교체는 `agent_changed`, 시간 초과·취소는 `timeout`·`canceled`,
+조회 응답 소실은 `outcome_unknown`과 exit `7`이다. 요청을 다시 시작하거나 수집·전송을
+취소하지 않는다. `collect-status`도 응답 ID를 대조하며 다른 작업의 경로를 반환하지 않는다.
+
 `krasis-cli update status`는 로컬 전송 상태를, `update status ALIAS`는 신뢰된 상대의
 관측 버전·업데이트 수신 허용·현재 전송 상태를 조회한다. 상대 정보가 오래됐으면 버전을 추측하지
 않고 `peerState: STALE` 또는 `UNKNOWN`으로 표시한다. 상대 상태 JSON은

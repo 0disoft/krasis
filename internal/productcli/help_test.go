@@ -32,7 +32,7 @@ func TestHelpIsOfflineAndMarksStateChanges(t *testing.T) {
 			}
 			seen[command.Usage] = true
 			switch command.Usage {
-			case "status":
+			case "status", "diagnostics wait ALIAS ID [--timeout DURATION]":
 				if !command.RequiresAgent || command.ChangesState {
 					t.Fatalf("status effect: %+v", command)
 				}

@@ -31,6 +31,7 @@ func commandHelp() helpResult {
 		{"diagnostics send ALIAS", "Queue sanitized diagnostics to a trusted peer", true, true},
 		{"diagnostics collect ALIAS", "Export both PCs' diagnostics to this PC", true, true},
 		{"diagnostics collect-status ALIAS ID", "Read a collection request's progress", true, false},
+		{"diagnostics wait ALIAS ID [--timeout DURATION]", "Wait for both diagnostic files from one request; default 2m, maximum 10m", true, false},
 		{"trust list", "List trusted devices", true, false},
 		{"connection show ALIAS", "Read saved peer address and exit edge", true, false},
 		{"credential show LISTENER|CONNECTOR", "Read local credential status", true, false},

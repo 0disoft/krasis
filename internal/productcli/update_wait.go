@@ -22,21 +22,7 @@ type updateWaitResult struct {
 }
 
 func parseUpdateWait(args []string) (time.Duration, error) {
-	if (len(args) != 3 && len(args) != 5) || args[0] != "wait" || !validAlias(args[1]) || !validHex(args[2], 32) {
-		return 0, usageError("update wait requires ALIAS ID [--timeout DURATION]")
-	}
-	timeout := 2 * time.Minute
-	if len(args) == 5 {
-		var err error
-		if args[3] != "--timeout" {
-			return 0, usageError("update wait requires --timeout DURATION")
-		}
-		timeout, err = time.ParseDuration(args[4])
-		if err != nil || timeout < time.Second || timeout > 10*time.Minute {
-			return 0, usageError("update wait timeout must be between 1s and 10m")
-		}
-	}
-	return timeout, nil
+	return parseWaitOptions(args, "update")
 }
 
 func dispatchUpdateWait(ctx context.Context, client apiClient, args []string) (any, int, error) {

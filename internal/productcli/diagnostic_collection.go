@@ -58,7 +58,7 @@ func collectDiagnostics(ctx context.Context, client apiClient, args []string) (a
 			return result, ExitUnsafeState, nil
 		case <-ticker.C:
 			value, exit, _ := collectionStatus(await, client, result, peer, started.ID)
-			result = value.(diagnosticCollectionResult)
+			result = value
 			if result.Code != "pending" {
 				return result, exit, nil
 			}
@@ -66,7 +66,7 @@ func collectDiagnostics(ctx context.Context, client apiClient, args []string) (a
 	}
 }
 
-func collectionStatus(ctx context.Context, client apiClient, result diagnosticCollectionResult, peer, id string) (any, int, error) {
+func collectionStatus(ctx context.Context, client apiClient, result diagnosticCollectionResult, peer, id string) (diagnosticCollectionResult, int, error) {
 	result.ID = id
 	status, err := client.CollectDiagnostic(ctx, localapi.DiagnosticCollectionRequest{Action: "STATUS", Peer: peer, ID: id})
 	if err != nil {
@@ -78,6 +78,10 @@ func collectionStatus(ctx context.Context, client apiClient, result diagnosticCo
 		if status.Code == "unsupported" {
 			return result, ExitPolicyDenied, nil
 		}
+		return result, ExitUnsafeState, nil
+	}
+	if status.ID != id {
+		result.Code, result.State, result.LocalPath, result.PeerPath = "request_changed", "", "", ""
 		return result, ExitUnsafeState, nil
 	}
 	result.State, result.LocalPath, result.PeerPath = status.State, status.LocalPath, status.PeerPath
