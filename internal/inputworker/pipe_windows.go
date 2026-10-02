@@ -192,7 +192,12 @@ func (pipe *pipeConn) Read(data []byte) (int, error) {
 	if len(data) == 0 {
 		return 0, nil
 	}
-	n, err := pipe.overlapped(context.Background(), true, data, func(o *windows.Overlapped) error { return windows.ReadFile(pipe.handle, data, nil, o) })
+	n, err := pipe.overlapped(context.Background(), true, data, func(o *windows.Overlapped) error {
+		// x/sys inspects this pointer when race instrumentation is enabled.
+		// Overlapped completion remains the authoritative transferred count.
+		var immediate uint32
+		return windows.ReadFile(pipe.handle, data, &immediate, o)
+	})
 	if err == windows.ERROR_BROKEN_PIPE || err == windows.ERROR_PIPE_NOT_CONNECTED {
 		return int(n), io.EOF
 	}
@@ -212,7 +217,10 @@ func (pipe *pipeConn) Write(data []byte) (int, error) {
 	if len(data) == 0 {
 		return 0, nil
 	}
-	n, err := pipe.overlapped(context.Background(), false, data, func(o *windows.Overlapped) error { return windows.WriteFile(pipe.handle, data, nil, o) })
+	n, err := pipe.overlapped(context.Background(), false, data, func(o *windows.Overlapped) error {
+		var immediate uint32
+		return windows.WriteFile(pipe.handle, data, &immediate, o)
+	})
 	if err == nil && int(n) != len(data) {
 		return int(n), io.ErrShortWrite
 	}

@@ -99,7 +99,8 @@ func TestNativePipeCloseDrainsPendingReadOnce(t *testing.T) {
 		defer server.active.Done()
 		var data [1]byte
 		_, err := server.overlapped(context.Background(), true, data[:], func(o *windows.Overlapped) error {
-			err := windows.ReadFile(server.handle, data[:], nil, o)
+			var immediate uint32
+			err := windows.ReadFile(server.handle, data[:], &immediate, o)
 			if err == windows.ERROR_IO_PENDING {
 				close(pending)
 			}
