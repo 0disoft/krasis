@@ -5,7 +5,8 @@ import (
 	"time"
 )
 
-// Timing contains only coarse elapsed-time buckets, never operation kinds,
+// Timing separates input from idle maintenance with coarse elapsed-time buckets,
+// never keyboard, mouse or wheel operation kinds,
 // input values, identities or error strings. It is not an authority signal.
 var timingStages = [...]string{"client_lock", "client_authority", "client_write", "client_response", "worker_authority", "worker_scope", "worker_apply"}
 
@@ -35,9 +36,10 @@ func timingCode(stage int, bucket byte) string {
 }
 
 type timingSampler struct {
-	emit    func(string)
-	started time.Time
-	maximum [7]byte
+	emit      func(string)
+	heartbeat bool
+	started   time.Time
+	maximum   [7]byte
 }
 
 // Called under the client mutex. Emit must be nonblocking and must not reenter
@@ -63,6 +65,9 @@ func (sampler *timingSampler) flush(now time.Time) {
 	if sampler.emit != nil {
 		for stage, bucket := range sampler.maximum {
 			if code := timingCode(stage, bucket); code != "" {
+				if sampler.heartbeat {
+					code = "installed_input_heartbeat_timing_" + code[len("installed_input_timing_"):]
+				}
 				emitTiming(sampler.emit, code)
 			}
 		}

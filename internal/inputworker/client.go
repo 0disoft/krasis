@@ -16,12 +16,14 @@ import (
 // and expiry before construction; this constructor does not authorize a peer.
 // A lost acknowledgement is never retried or sent to another input backend.
 type Client struct {
-	mu       sync.Mutex
-	channel  *Channel
-	lease    Lease
-	sequence uint64
-	failed   bool
-	timing   timingSampler
+	mu               sync.Mutex
+	channel          *Channel
+	lease            Lease
+	sequence         uint64
+	failed           bool
+	timing           timingSampler
+	heartbeatTiming  timingSampler
+	lastAcknowledged time.Time
 }
 
 // SetTimingObserver enables bounded diagnostic summaries. The observer must
@@ -30,6 +32,7 @@ func (client *Client) SetTimingObserver(emit func(string)) {
 	client.mu.Lock()
 	defer client.mu.Unlock()
 	client.timing = timingSampler{emit: emit}
+	client.heartbeatTiming = timingSampler{emit: emit, heartbeat: true}
 }
 
 var _ application.InputPort = (*Client)(nil)
@@ -65,6 +68,9 @@ func (client *Client) Wheel(ctx context.Context, x, y int32) error {
 	return client.delta(ctx, opWheel, x, y)
 }
 func (client *Client) Heartbeat(ctx context.Context) error {
+	// Best-effort idle maintenance, not a liveness receipt. An in-flight
+	// operation owns bounded I/O and worker recovery; never queue maintenance
+	// behind it or add a roundtrip after a recent matching acknowledgement.
 	return client.perform(ctx, request{op: opHeartbeat})
 }
 func (client *Client) delta(ctx context.Context, op operation, x, y int32) error {
@@ -75,19 +81,30 @@ func (client *Client) delta(ctx context.Context, op operation, x, y int32) error
 }
 
 func (client *Client) perform(ctx context.Context, command request) error {
-	if client == nil || ctx == nil {
+	if client == nil || ctx == nil || ctx.Err() != nil {
 		return notSent(ErrAuthority)
 	}
 	start := time.Now()
-	client.mu.Lock()
+	if command.op == opHeartbeat {
+		if !client.mu.TryLock() {
+			return nil
+		}
+	} else {
+		client.mu.Lock()
+	}
 	var sample [7]byte
 	wasFailed := client.failed
 	sample[0] = timingBucket(time.Since(start))
 	defer func() {
 		if !wasFailed {
-			client.timing.observe(sample, time.Now())
+			sampler := &client.timing
+			if command.op == opHeartbeat {
+				sampler = &client.heartbeatTiming
+			}
+			sampler.observe(sample, time.Now())
 			if client.failed {
 				client.timing.flush(time.Now())
+				client.heartbeatTiming.flush(time.Now())
 			}
 		}
 		client.mu.Unlock()
@@ -98,6 +115,12 @@ func (client *Client) perform(ctx context.Context, command request) error {
 	if !time.Now().Before(client.lease.ExpiresAt) || client.sequence == math.MaxUint64 {
 		client.fail()
 		return notSent(ErrExpired)
+	}
+	if command.op == opHeartbeat && !client.lastAcknowledged.IsZero() && time.Since(client.lastAcknowledged) < 250*time.Millisecond {
+		// Every successful worker response renews its idle deadline. No wire
+		// request means no sequence consumption or fabricated worker timings.
+		sample = [7]byte{}
+		return nil
 	}
 	start = time.Now()
 	authorityErr := client.channel.authority.check(false)
@@ -145,6 +168,7 @@ func (client *Client) perform(ctx context.Context, command request) error {
 	}
 	copy(sample[4:], ack.timing[:])
 	if ack.status == 0 {
+		client.lastAcknowledged = time.Now()
 		return nil
 	}
 	client.fail()
@@ -168,6 +192,7 @@ func (client *Client) Close() error {
 	client.mu.Lock()
 	client.failed = true
 	client.timing.flush(time.Now())
+	client.heartbeatTiming.flush(time.Now())
 	client.mu.Unlock()
 	return err
 }

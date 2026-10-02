@@ -9,12 +9,12 @@ import (
 func TestInputConnectionDiagnosticAllowlistRejectsDynamicStages(t *testing.T) {
 	for _, stage := range []string{"client_lock", "client_authority", "client_write", "client_response", "worker_authority", "worker_scope", "worker_apply"} {
 		for _, bucket := range []string{"lt1ms", "lt10ms", "lt100ms", "lt1s", "ge1s"} {
-			if !allowed["installed_input_timing_"+stage+"_"+bucket] {
+			if !allowed["installed_input_timing_"+stage+"_"+bucket] || !allowed["installed_input_heartbeat_timing_"+stage+"_"+bucket] {
 				t.Fatal("fixed latency diagnostic would be dropped")
 			}
 		}
 	}
-	if allowed["installed_input_timing_private-path_lt1ms"] || allowed["installed_input_timing_worker_apply_123ms"] {
+	if allowed["installed_input_timing_private-path_lt1ms"] || allowed["installed_input_timing_worker_apply_123ms"] || allowed["installed_input_heartbeat_timing_private-path_lt1ms"] {
 		t.Fatal("dynamic latency data accepted")
 	}
 	if !allowed[inputworker.ConnectionFailureEvent(nil)] || !allowed[inputworker.ConnectionNativeFailureEvent(nil)] {

@@ -449,6 +449,28 @@ duration bucket만 넣습니다. 값은 0(미측정), 1–5(<1ms/<10ms/<100ms/<1
 입력 성공/실패를 변경하지 않습니다. 입력 종류·키·좌표·PIN·사용자·경로·오류 원문은
 추가하지 않습니다. g117은 진단 보강이며 latency 개선을 주장하지 않습니다.
 
+### g118: idle heartbeat yields to input
+
+g117 진단에서 client lock과 response의 100ms–1s 최대 bucket이 관측됐지만
+heartbeat와 입력이 섞여 전체 체감 지연 원인을 확정할 수 없었습니다. 재현 테스트는
+매 250ms maintenance가 진행 중인 입력 mutex 뒤에 대기하고, 성공 응답 직후에도
+다시 동기 왕복하는 중복 비용을 확인했습니다.
+
+g118 heartbeat는 TryLock 실패 시 대기하지 않습니다. 진행 중인 입력이 bounded I/O와
+worker recovery를 소유합니다. 잠금을 얻으면 기존 failure·context·lease expiry와
+sequence 상한을 먼저 확인하고, 최근 250ms 안에 matching success acknowledgement가
+있으면 추가 request를 보내지 않습니다. 실제 입력 성공도 worker idle deadline을
+갱신하므로 활동 중 별도 maintenance가 필요하지 않습니다. heartbeat nil은 건강
+확인 receipt가 아니며, 다음 idle tick이 채널 확인을 담당합니다. 성공하지 않은 응답은
+생존 근거가 아니고, idle timeout 2초·lease 최대 시간·입력 순서·매 실제 입력의
+client/worker authority 확인·lost ack의 unknown/no-retry 정책은 유지합니다.
+
+실제로 전송한 heartbeat는 별도 `installed_input_heartbeat_timing_*` 최대 bucket으로
+집계합니다. 기존 `installed_input_timing_*`는 g118부터 실제 입력만 포함합니다.
+각각 15초 창당 최대 7개 고정 코드이며, 생략된 heartbeat는 측정값을 만들지 않습니다.
+응답 프로토콜과 worker는 바꾸지 않습니다. 측정값을 합산하지 않으며, 실기기 전환
+지연 개선 및 PIN 입력 유지 여부는 새 설치 agent로 별도 확인해야 합니다.
+
 ## 참조
 
 - [GetNamedPipeClientProcessId](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getnamedpipeclientprocessid)
