@@ -56,6 +56,8 @@
   const clipboardKnown = $derived(clipboard.code === 'ok');
   const clipboardEnabled = $derived(clipboardKnown && !!clipboard.peer);
   const clipboardAlias = $derived(snapshot.peers.find(p => p.fingerprint === clipboard.peer)?.alias ?? '');
+	const fileTransfer = $derived(clipboardEnabled ? clipboard.transfer : null);
+	const fileTransferLabel = $derived(fileTransfer ? t('clipboard_files_' + (fileTransfer.state === 'FAILED' && fileTransfer.code ? fileTransfer.code : fileTransfer.state.toLowerCase())) : '');
   const canDisconnect = $derived(['CONNECTING','CONNECTED','RECONNECTING'].includes(snapshot.state));
   const canPlace = $derived(snapshot.state === 'LOCAL' && !!selectedPeer && !pairing.job && !busy);
   const canPair = $derived(snapshot.state === 'LOCAL' && !pairing.job && !busy && !pairBusy);
@@ -247,6 +249,7 @@
       <div class="utility-copy">
         <h2>{t('clipboard')}</h2>
         <span id="clipboard-state" class="utility-state" aria-live="polite">{t(!clipboardKnown ? 'clipboard_unknown' : clipboardEnabled ? 'clipboard_enabled' : 'clipboard_disabled')}{#if clipboardEnabled && clipboardAlias} · {clipboardAlias}{/if}</span>
+				{#if fileTransfer}<span class="utility-state" aria-live="polite">{fileTransferLabel}{#if fileTransfer.state === 'SENDING' && fileTransfer.total > 0} · {Math.floor(fileTransfer.bytes * 100 / fileTransfer.total)}%{/if}</span>{/if}
         {#if clipNotice}<small class="utility-error" role="alert" tabindex="-1" bind:this={clipError}>{t(clipNotice)}</small>{/if}
       </div>
       <button type="button" class="switch" role="switch" aria-checked={clipboardEnabled} aria-label={t('clipboard')} aria-describedby="clipboard-state" disabled={clipBusy || !clipboardKnown || (!clipboardEnabled && !selectedPeer)} onclick={toggleClipboard}><span></span></button>

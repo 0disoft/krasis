@@ -4,16 +4,18 @@ import (
 	"context"
 
 	"github.com/0disoft/krasis/internal/localapi"
+	"github.com/0disoft/krasis/internal/peerupdate"
 )
 
 const clipboardSchema = "krasis.cli.clipboard/v1"
 
 type clipboardState struct {
-	SchemaVersion   string `json:"schemaVersion"`
-	PeerAlias       string `json:"peerAlias"`
-	Code            string `json:"code"`
-	Enabled         bool   `json:"enabled"`
-	OtherPeerActive bool   `json:"otherPeerActive"`
+	Transfer        peerupdate.ClipboardTransfer `json:"transfer"`
+	SchemaVersion   string                       `json:"schemaVersion"`
+	PeerAlias       string                       `json:"peerAlias"`
+	Code            string                       `json:"code"`
+	Enabled         bool                         `json:"enabled"`
+	OtherPeerActive bool                         `json:"otherPeerActive"`
 }
 
 func dispatchClipboard(ctx context.Context, client apiClient, args []string) (any, int, error) {
@@ -37,6 +39,9 @@ func dispatchClipboard(ctx context.Context, client apiClient, args []string) (an
 		return v, ExitUnsafeState, nil
 	}
 	v.Enabled = status.Status.ClipboardPeer == peer
+	if v.Enabled {
+		v.Transfer = status.Status.ClipboardTransfer
+	}
 	v.OtherPeerActive = status.Status.ClipboardPeer != "" && !v.Enabled
 	if args[0] == "status" {
 		v.Code = "ok"

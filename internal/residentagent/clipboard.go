@@ -26,6 +26,12 @@ func (o *Operations) Clipboard(ctx context.Context, r localapi.ClipboardRequest)
 		}
 		return v, nil
 	}
+	if r.Action == "REPORT" {
+		if o.updates.ReportClipboard(r.Peer, r.Ack, r.Format, r.Report) == nil {
+			v.Code = "ok"
+		}
+		return v, nil
+	}
 	var local *peerupdate.ClipboardValue
 	if r.Text != nil || r.Format != "" {
 		local = &peerupdate.ClipboardValue{Format: r.Format, Data: r.Data}

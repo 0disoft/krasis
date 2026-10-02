@@ -31,6 +31,8 @@ type ClipboardValue struct {
 	legacyFiles bool
 }
 type clipboardState struct {
+	transfer     ClipboardTransfer
+	transferID   string
 	mu           sync.Mutex
 	peer         string
 	imageAllowed bool
@@ -99,6 +101,7 @@ func (m *Manager) setClipboardPeerLocked(peer string) error {
 	m.clipboard.out = nil
 	m.clipboard.seen = nil
 	m.clipboard.activeUntil = time.Time{}
+	m.clipboard.transfer, m.clipboard.transferID = ClipboardTransfer{}, ""
 	return nil
 }
 
@@ -142,6 +145,9 @@ func (m *Manager) ClipboardPayloadInfo(peer string) (bool, string, int, string, 
 		return false, "", 0, "", false
 	}
 	if m.clipboard.out != nil && time.Now().After(m.clipboard.out.expires) {
+		if m.clipboard.transferID == m.clipboard.out.ID {
+			m.clipboard.transfer.State, m.clipboard.transfer.Code = "FAILED", "expired"
+		}
 		m.clipboard.out = nil
 	}
 	if m.clipboard.out == nil {
@@ -185,8 +191,17 @@ func (m *Manager) SyncClipboardPayload(peer string, local *ClipboardValue, ack s
 			Data: append([]byte(nil), local.Data...), expires: time.Now().Add(expires),
 			legacyFiles: local.Format == "files" && clipboardFilesFitLegacy(local.Data)}
 		m.clipboard.in = nil // A new local copy supersedes a pending remote copy.
+		m.clipboard.transferID = m.clipboard.out.ID
+		m.clipboard.transfer = ClipboardTransfer{State: "QUEUED", Format: local.Format, Direction: "SEND", Total: int64(len(local.Data) + len(local.Text))}
 	}
 	if m.clipboard.in != nil && (m.clipboard.in.ID == ack || time.Now().After(m.clipboard.in.expires)) {
+		if m.clipboard.transferID == m.clipboard.in.ID {
+			if m.clipboard.in.ID == ack {
+				m.clipboard.transfer.State, m.clipboard.transfer.Code = "APPLIED", ""
+			} else {
+				m.clipboard.transfer.State, m.clipboard.transfer.Code = "FAILED", "apply_expired"
+			}
+		}
 		m.clipboard.in = nil
 	}
 	if m.clipboard.in == nil {
@@ -210,6 +225,10 @@ func (m *Manager) clipboardSent(peer, id string) {
 	m.clipboard.mu.Lock()
 	defer m.clipboard.mu.Unlock()
 	if m.clipboard.peer == peer && m.clipboard.out != nil && m.clipboard.out.ID == id {
+		if m.clipboard.transferID == id {
+			m.clipboard.transfer.State, m.clipboard.transfer.Code = "SENT", ""
+			m.clipboard.transfer.Bytes = m.clipboard.transfer.Total
+		}
 		m.clipboard.out = nil
 	}
 }
@@ -217,6 +236,7 @@ func (m *Manager) clipboardReceive(peer, id string, r io.Reader, authorized func
 	return m.clipboardReceivePayload(peer, id, "", r, authorized)
 }
 func (m *Manager) clipboardReceivePayload(peer, id, format string, r io.Reader, authorized func() bool) error {
+	defer m.clipboardReceiveFailed(peer, id)
 	if !validID(id, 32) || !authorized() {
 		return ErrDenied
 	}
@@ -228,7 +248,8 @@ func (m *Manager) clipboardReceivePayload(peer, id, format string, r io.Reader, 
 	if !active {
 		return ErrDenied
 	}
-	data, err := io.ReadAll(io.LimitReader(r, int64(limit)+1))
+	progress := &progressReader{Reader: r, update: func(n int64) { m.clipboardProgress(peer, id, "RECEIVE", format, n, 0) }}
+	data, err := io.ReadAll(io.LimitReader(progress, int64(limit)+1))
 	if err != nil || !authorized() || format == "" && !validClipboardText(string(data)) ||
 		format != "" && !ValidClipboardPayload(format, data) {
 		return ErrDenied
@@ -258,6 +279,8 @@ func (m *Manager) clipboardReceivePayload(peer, id, format string, r io.Reader, 
 		value.Data = data
 	}
 	m.clipboard.in = value
+	m.clipboard.transferID = id
+	m.clipboard.transfer = ClipboardTransfer{State: "READY", Format: format, Direction: "RECEIVE", Bytes: int64(len(data)), Total: int64(len(data))}
 	m.clipboard.seen = append(m.clipboard.seen, id)
 	if len(m.clipboard.seen) > 64 {
 		m.clipboard.seen = m.clipboard.seen[1:]

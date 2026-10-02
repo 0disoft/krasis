@@ -5,13 +5,15 @@ package workspacehost
 import (
 	"context"
 	"github.com/0disoft/krasis/internal/localapi"
+	"github.com/0disoft/krasis/internal/peerupdate"
 	"time"
 )
 
 // ClipboardSettings intentionally has no clipboard value or content field.
 type ClipboardSettings struct {
-	Peer string `json:"peer"`
-	Code string `json:"code"`
+	Transfer peerupdate.ClipboardTransfer `json:"transfer"`
+	Peer     string                       `json:"peer"`
+	Code     string                       `json:"code"`
 }
 
 func (s *WorkspaceService) ClipboardStatus() ClipboardSettings {
@@ -28,7 +30,7 @@ func (s *WorkspaceService) ClipboardStatus() ClipboardSettings {
 	if err != nil || value.Code != "ok" {
 		return ClipboardSettings{Code: "unavailable"}
 	}
-	return ClipboardSettings{Peer: value.Status.ClipboardPeer, Code: "ok"}
+	return ClipboardSettings{Peer: value.Status.ClipboardPeer, Code: "ok", Transfer: value.Status.ClipboardTransfer}
 }
 
 func (s *WorkspaceService) ClipboardSet(peer string, enable bool) ClipboardSettings {

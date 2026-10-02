@@ -44,11 +44,14 @@ func (m *Manager) clipboardHTTP(w http.ResponseWriter, r *http.Request, peer str
 			return
 		}
 		w.Header().Set("Content-Type", clipboardContentType(value.Format))
+		var err error
 		if value.Format == "" {
-			_, _ = io.WriteString(w, value.Text)
+			_, err = io.WriteString(w, value.Text)
 		} else {
-			_, _ = w.Write(value.Data)
+			reader := &progressReader{Reader: bytes.NewReader(value.Data), update: func(n int64) { m.clipboardProgress(peer, id, "SEND", value.Format, n, int64(len(value.Data))) }}
+			_, err = io.Copy(w, reader)
 		}
+		_ = err // A GET write is not receipt or application confirmation; await PUT.
 	case http.MethodPost:
 		if id != remote.ClipboardID || r.Header.Get("Content-Type") != clipboardContentType(remote.ClipboardFormat) {
 			w.WriteHeader(400)
@@ -93,6 +96,9 @@ func (m *Manager) pollClipboard(ctx context.Context, c *http.Client, address, pe
 		if value.Format != "" {
 			body = bytes.NewReader(value.Data)
 		}
+		body = &progressReader{Reader: body, update: func(n int64) {
+			m.clipboardProgress(peer, id, "SEND", value.Format, n, int64(len(value.Data)+len(value.Text)))
+		}}
 		req, _ := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
 		req.Header.Set("Content-Type", clipboardContentType(value.Format))
 		req.Header.Set("X-Krasis-ID", id)

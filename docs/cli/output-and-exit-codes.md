@@ -2,6 +2,13 @@
 
 ## 제품 CLI
 
+g121부터 `clipboard status ALIAS`의 `transfer`는 파일 공유의 준비·대기·전송·수신·적용
+상태와 제한된 실패 코드, bytes/total만 담는다. `SENT`는 상대 프로세스의 수신 확인이며,
+`APPLIED`는 이 PC의 native clipboard 적용 후 ACK 확인이다. 상대 탐색기에서 실제 붙여넣은
+성공을 뜻하지 않는다. 준비 실패는 `size_limit`, `item_limit`, `clipboard_changed`,
+`prepare_failed`; 수신/적용/만료는 `receive_failed`, `apply_failed`, `expired`,
+`apply_expired`다. 파일명·경로·내용·native 오류 원문은 renderer나 전송 상태에 포함하지 않는다.
+
 human output은 상태와 안전한 복구 행동을 위한 짧은 text다. `--json`은 local API가 반환한 다음
 versioned object 하나를 stdout에 출력한다.
 

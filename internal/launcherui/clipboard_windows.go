@@ -265,9 +265,23 @@ func (p *clipboardPump) sync(ctx context.Context, hwnd uintptr, control, peer st
 	if peer != p.peer {
 		*p = clipboardPump{peer: peer, sequence: current}
 	}
+	client, err := localapi.OpenClient(control)
+	if err != nil {
+		return
+	}
+	report := func(id, code string) {
+		_, _ = client.Clipboard(ctx, localapi.ClipboardRequest{Action: "REPORT", Peer: peer, Format: "files", Ack: id, Report: code})
+	}
 	request := localapi.ClipboardRequest{Action: "SYNC", Peer: peer}
 	if current != p.sequence {
+		fileCandidate := clipboardHasFormat(cfHDROP) && !clipboardHasFormat(clipboardFormat("Krasis.RemoteClipboard.v1")) && !clipboardHasFormat(clipboardFormat("ExcludeClipboardContentFromMonitorProcessing"))
+		if fileCandidate {
+			report("", "preparing")
+		}
 		format, data, sequence, present, err := readClipboardFiles(hwnd)
+		if fileCandidate && err != nil {
+			report("", clipboardFileFailure(err))
+		}
 		if !present {
 			format, data, sequence, present, err = readClipboardImage(hwnd)
 		}
@@ -290,10 +304,6 @@ func (p *clipboardPump) sync(ctx context.Context, hwnd uintptr, control, peer st
 			}
 		}
 	}
-	client, err := localapi.OpenClient(control)
-	if err != nil {
-		return
-	}
 	result, err := client.Clipboard(ctx, request)
 	if err != nil || result.Code != "ok" || result.Value.ID == "" {
 		return
@@ -307,6 +317,9 @@ func (p *clipboardPump) sync(ctx context.Context, hwnd uintptr, control, peer st
 		sequence, err = writeRemoteClipboardImage(hwnd, current, result.Value.Format, result.Value.Data, result.Value.ID)
 	}
 	if err != nil {
+		if result.Value.Format == "files" {
+			report(result.Value.ID, "apply_failed")
+		}
 		return
 	}
 	p.sequence = sequence

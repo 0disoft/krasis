@@ -6,6 +6,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -21,14 +22,34 @@ import (
 
 var dragQueryFile = syscall.NewLazyDLL("shell32.dll").NewProc("DragQueryFileW")
 
+var errClipboardFileSize = errors.New("clipboard file size limit")
+var errClipboardFileCount = errors.New("clipboard file count limit")
+var errClipboardChanged = errors.New("clipboard changed during preparation")
+
+func clipboardFileFailure(err error) string {
+	if errors.Is(err, errClipboardFileSize) {
+		return "size_limit"
+	}
+	if errors.Is(err, errClipboardFileCount) {
+		return "item_limit"
+	}
+	if errors.Is(err, errClipboardChanged) {
+		return "clipboard_changed"
+	}
+	return "prepare_failed"
+}
+
 func readClipboardFiles(hwnd uintptr) (string, []byte, uintptr, bool, error) {
 	paths, sequence, present, err := clipboardSelectedPaths(hwnd)
 	if err != nil || !present {
 		return "", nil, sequence, present, err
 	}
 	data, err := packClipboardFiles(paths)
-	if err != nil || clipboardSequence() != sequence {
-		return "", nil, sequence, true, errClipboardUnavailable
+	if err != nil {
+		return "", nil, sequence, true, err
+	}
+	if clipboardSequence() != sequence {
+		return "", nil, sequence, true, errClipboardChanged
 	}
 	return "files", data, sequence, true, nil
 }
@@ -56,7 +77,10 @@ func clipboardSelectedPaths(hwnd uintptr) ([]string, uintptr, bool, error) {
 		return nil, sequence, true, errClipboardUnavailable
 	}
 	count, _, _ := dragQueryFile.Call(handle, ^uintptr(0), 0, 0)
-	if count == 0 || count > 64 {
+	if count > 64 {
+		return nil, sequence, true, errClipboardFileCount
+	}
+	if count == 0 {
 		return nil, sequence, true, errClipboardUnavailable
 	}
 	paths := make([]string, 0, count)
@@ -76,7 +100,10 @@ func clipboardSelectedPaths(hwnd uintptr) ([]string, uintptr, bool, error) {
 }
 
 func packClipboardFiles(paths []string) ([]byte, error) {
-	if len(paths) == 0 || len(paths) > 64 {
+	if len(paths) > 64 {
+		return nil, errClipboardFileCount
+	}
+	if len(paths) == 0 {
 		return nil, errClipboardUnavailable
 	}
 	var buffer bytes.Buffer
@@ -89,7 +116,10 @@ func packClipboardFiles(paths []string) ([]byte, error) {
 		}
 		parent := filepath.Dir(source)
 		err := filepath.WalkDir(source, func(current string, entry os.DirEntry, walkErr error) error {
-			if walkErr != nil || entries >= peerupdate.MaxClipboardFiles {
+			if entries >= peerupdate.MaxClipboardFiles {
+				return errClipboardFileCount
+			}
+			if walkErr != nil {
 				return errClipboardUnavailable
 			}
 			info, err := os.Lstat(current)
@@ -118,7 +148,7 @@ func packClipboardFiles(paths []string) ([]byte, error) {
 				header.Method = zip.Store
 			} else {
 				if info.Size() < 0 || total+info.Size() > peerupdate.MaxClipboardFileBytes {
-					return errClipboardUnavailable
+					return errClipboardFileSize
 				}
 				header.Method = zip.Deflate
 			}
@@ -134,7 +164,10 @@ func packClipboardFiles(paths []string) ([]byte, error) {
 				}
 				n, copyErr := io.Copy(writer, io.LimitReader(file, peerupdate.MaxClipboardFileBytes-total+1))
 				closeErr := file.Close()
-				if copyErr != nil || closeErr != nil || n != info.Size() || n > peerupdate.MaxClipboardFileBytes-total {
+				if n > peerupdate.MaxClipboardFileBytes-total {
+					return errClipboardFileSize
+				}
+				if copyErr != nil || closeErr != nil || n != info.Size() {
 					return errClipboardUnavailable
 				}
 				total += n
@@ -142,10 +175,16 @@ func packClipboardFiles(paths []string) ([]byte, error) {
 			return nil
 		})
 		if err != nil {
-			return nil, errClipboardUnavailable
+			return nil, err
 		}
 	}
-	if archive.Close() != nil || !peerupdate.ValidClipboardFiles(buffer.Bytes()) {
+	if archive.Close() != nil {
+		return nil, errClipboardUnavailable
+	}
+	if buffer.Len() > peerupdate.MaxClipboardFileBytes {
+		return nil, errClipboardFileSize
+	}
+	if !peerupdate.ValidClipboardFiles(buffer.Bytes()) {
 		return nil, errClipboardUnavailable
 	}
 	return buffer.Bytes(), nil

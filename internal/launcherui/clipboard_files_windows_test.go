@@ -5,12 +5,33 @@ package launcherui
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/0disoft/krasis/internal/peerupdate"
 )
+
+func TestClipboardFileLimitReports(t *testing.T) {
+	file, err := os.Create(filepath.Join(t.TempDir(), "oversize.bin"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = file.Truncate(peerupdate.MaxClipboardFileBytes + 1)
+	closeErr := file.Close()
+	if err != nil || closeErr != nil {
+		t.Fatal(err, closeErr)
+	}
+	_, err = packClipboardFiles([]string{file.Name()})
+	if !errors.Is(err, errClipboardFileSize) || clipboardFileFailure(err) != "size_limit" {
+		t.Fatalf("wrong size report: %v", err)
+	}
+	_, err = packClipboardFiles(make([]string, 65))
+	if !errors.Is(err, errClipboardFileCount) || clipboardFileFailure(err) != "item_limit" {
+		t.Fatalf("wrong count report: %v", err)
+	}
+}
 
 func TestClipboardFileAndFolderRoundTrip(t *testing.T) {
 	source := t.TempDir()

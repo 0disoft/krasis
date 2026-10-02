@@ -26,19 +26,20 @@ var ErrDenied = errors.New("peer update not authorized")
 var ErrBusy = errors.New("peer update busy")
 
 type Status struct {
-	ClipboardPeer      string   `json:"clipboardPeer,omitempty"`
-	Diagnostic         string   `json:"diagnostic,omitempty"`
-	ReceivedDiagnostic string   `json:"receivedDiagnostic,omitempty"`
-	PeerGeneration     int      `json:"peerGeneration,omitempty"`
-	PeerRevision       string   `json:"peerRevision,omitempty"`
-	Bytes              int64    `json:"bytes,omitempty"`
-	Total              int64    `json:"total,omitempty"`
-	State              string   `json:"state"`
-	Allowed            []string `json:"allowed"`
-	ID                 string   `json:"id,omitempty"`
-	Revision           string   `json:"revision,omitempty"`
-	Generation         int      `json:"generation,omitempty"`
-	Peer               string   `json:"peer,omitempty"`
+	ClipboardTransfer  ClipboardTransfer `json:"clipboardTransfer"`
+	ClipboardPeer      string            `json:"clipboardPeer,omitempty"`
+	Diagnostic         string            `json:"diagnostic,omitempty"`
+	ReceivedDiagnostic string            `json:"receivedDiagnostic,omitempty"`
+	PeerGeneration     int               `json:"peerGeneration,omitempty"`
+	PeerRevision       string            `json:"peerRevision,omitempty"`
+	Bytes              int64             `json:"bytes,omitempty"`
+	Total              int64             `json:"total,omitempty"`
+	State              string            `json:"state"`
+	Allowed            []string          `json:"allowed"`
+	ID                 string            `json:"id,omitempty"`
+	Revision           string            `json:"revision,omitempty"`
+	Generation         int               `json:"generation,omitempty"`
+	Peer               string            `json:"peer,omitempty"`
 }
 
 type offer struct {
@@ -240,6 +241,7 @@ func (m *Manager) Status() Status {
 	}
 	s := m.status
 	s.ClipboardPeer = m.ClipboardPeer()
+	s.ClipboardTransfer = m.ClipboardTransferStatus()
 	m.diagnostic.mu.Lock()
 	if m.diagnostic.out != nil && time.Now().After(m.diagnostic.out.expires) {
 		m.diagnostic.out = nil

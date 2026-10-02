@@ -15,6 +15,7 @@ const maxClipboardJSONBytes = ((peerupdate.MaxClipboardFileBytes + 2) / 3 * 4) +
 const clipboardRequestTimeout = 60 * time.Second
 
 type ClipboardRequest struct {
+	Report string  `json:"report,omitempty"`
 	Action string  `json:"action"`
 	Peer   string  `json:"peer"`
 	Text   *string `json:"text,omitempty"`
@@ -29,6 +30,18 @@ type ClipboardResult struct {
 
 func (r ClipboardRequest) Valid() bool {
 	if !validFingerprint(r.Peer) {
+		return false
+	}
+	if r.Action == "REPORT" {
+		if r.Text != nil || len(r.Data) != 0 || r.Format != "files" {
+			return false
+		}
+		if r.Report == "apply_failed" {
+			return validPairingID(r.Ack)
+		}
+		return r.Ack == "" && (r.Report == "preparing" || r.Report == "prepare_failed" || r.Report == "size_limit" || r.Report == "item_limit" || r.Report == "clipboard_changed")
+	}
+	if r.Report != "" {
 		return false
 	}
 	if r.Action == "ENABLE" || r.Action == "DISABLE" {
