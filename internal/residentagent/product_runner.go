@@ -118,6 +118,9 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 			return err
 		}
 		protectedActive := func() bool { return false }
+		if reporter, ok := observer.(interface{ ObserveInputBackend(bool) }); ok {
+			reporter.ObserveInputBackend(worker != nil)
+		}
 		if worker == nil {
 			protectedActive = observedProtectedInput(wininput.InspectProtectedInput, log.Event)
 		}

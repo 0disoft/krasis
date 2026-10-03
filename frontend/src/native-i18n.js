@@ -1,5 +1,11 @@
 export const nativeCatalogs = {
   ko: {
+    "input_title": "PIN · 관리자 창 제어",
+    "input_portable": "보호 입력 설치 필요 · PIN 창에서 연결이 끊길 수 있습니다.",
+    "input_protected": "보호 입력 경로 사용 중",
+    "input_unknown": "입력 경로 확인 전",
+    "input_setup": "설치 안내",
+    "input_install_help": "이 PC에서 연결 해제 후 Krasis를 안전 종료하고, 같은 버전의 krasis-install.exe --install을 관리자 권한으로 한 번 실행하세요. 설치 성공 후 Krasis를 다시 여세요. 앱 업데이트만으로는 보호 입력이 갱신되지 않습니다.",
     "upd_title": "기기 업데이트",
     "upd_send": "업데이트 보내기",
     "upd_send_confirm_action": "보내기",
@@ -155,6 +161,12 @@ export const nativeCatalogs = {
     recovery_required:'입력 제어가 중단되었습니다. 진단을 자동 저장하고, 이전 연결은 최대 3회 복구합니다.',
   },
   en: {
+    "input_title": "PIN and administrator windows",
+    "input_portable": "Protected input setup needed · PIN windows may interrupt the connection.",
+    "input_protected": "Protected input path selected",
+    "input_unknown": "Input path not yet observed",
+    "input_setup": "Setup instructions",
+    "input_install_help": "On this PC, disconnect and safely stop Krasis, then run the matching krasis-install.exe --install once as administrator. Reopen Krasis only after installation succeeds. App updates do not refresh protected input automatically.",
     "upd_title": "Device update",
     "upd_send": "Send update",
     "upd_send_confirm_action": "Send",

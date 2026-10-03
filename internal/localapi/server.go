@@ -34,6 +34,8 @@ const (
 )
 
 type Status struct {
+	// InputBackend reports the selected runner path, not input authority or lease readiness.
+	InputBackend       string   `json:"inputBackend,omitempty"`
 	SchemaVersion      string   `json:"schemaVersion"`
 	State              string   `json:"state"`
 	PeerAlias          string   `json:"peerAlias,omitempty"`

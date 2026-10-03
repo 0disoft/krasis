@@ -20,7 +20,12 @@ clipboard, environment 또는 UI projection에 복제하지 않는다.
 
 | Method | Path | Operation |
 | --- | --- | --- |
-| `GET` | `/v1/status` | identity fingerprint/generation, 연결 lifecycle state, redacted alias, allowed actions, 안전한 화면 변경 종료 시 `stopReason: display_change` |
+| `GET` | `/v1/status` | identity fingerprint/generation, 연결 lifecycle state, redacted alias, allowed actions, 안전한 화면 변경 종료 시 `stopReason: display_change`, 선택된 입력 경로 `inputBackend` |
+
+g138의 선택적 `inputBackend`는 runner가 실제 선택한 `PROTECTED` 또는 `PORTABLE`이다.
+세션 종료·새 연결 시작 전에는 `UNKNOWN`이며, 이전 agent의 필드 생략도 확인 불가로
+처리한다. 이 표시는 서비스 설치·현재 lease 준비·PIN 입력 성공을 보증하지 않으며
+입력 권한 판단에 사용하지 않는다. portable 경로의 PIN·관리자 창 제한을 UI에 표시한다.
 | `GET` | `/v1/runtime` | schema, protocol, agent generation, build revision, process instance nonce |
 | `POST` | `/v1/upgrade-stop` | empty body와 `If-Match` instance nonce를 사용하는 idle-only 종료 |
 | `POST` | `/v1/connect` | configured shared-core session runner 시작 |

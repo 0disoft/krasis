@@ -25,6 +25,7 @@ export function createBridge(binding) {
       if (latest && value.revision > 0 && value.revision < latest.revision) return copy(latest);
       const result = { schema: value.schema, state: value.state, peerAlias: value.peerAlias,
         code: value.code, notice: value.notice,
+		inputBackend: ['PROTECTED','PORTABLE'].includes(value.inputBackend) ? value.inputBackend : 'UNKNOWN',
         ...(value.revision > 0 ? { revision: value.revision } : {}),
         peers: value.peers.map(p => ({ alias: p.alias, fingerprint: p.fingerprint })) };
       if (result.revision > 0) latest = copy(result);

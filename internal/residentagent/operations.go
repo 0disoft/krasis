@@ -57,6 +57,7 @@ type Operations struct {
 	sessionStop    context.CancelCauseFunc
 	sessionDone    chan struct{}
 	sessionState   string
+	inputBackend   string
 	sessionFaulted bool
 	sessionOutcome *sessionOutcome
 	peerAlias      string
@@ -192,6 +193,7 @@ func (operations *Operations) Status(context.Context) (localapi.Status, error) {
 	return localapi.Status{
 		SchemaVersion:      localapi.StatusSchemaVersion,
 		State:              state,
+		InputBackend:       operations.inputBackend,
 		PeerAlias:          operations.peerAlias,
 		StopReason:         operations.lastStopReason,
 		Actions:            actions,
@@ -249,6 +251,7 @@ func (operations *Operations) Connect(requestContext context.Context, request lo
 	operations.sessionStop = cancel
 	operations.sessionDone = done
 	operations.sessionState = "CONNECTING"
+	operations.inputBackend = "UNKNOWN"
 	operations.peerAlias = request.PeerAlias
 	operations.lastStopReason = ""
 	operations.manualStop = false
@@ -387,6 +390,7 @@ func (operations *Operations) finishSession(done chan struct{}, outcome *session
 		operations.sessionDone = nil
 		operations.sessionOutcome = nil
 		operations.sessionState = ""
+		operations.inputBackend = "UNKNOWN"
 		operations.sessionFaulted = operations.sessionFaulted || outcome.failed
 		if displayChanged && !outcome.failed {
 			operations.lastStopReason = "display_change"

@@ -226,6 +226,9 @@
   {#if error}
     <p class="fault-banner" role="alert">{t(error)}</p>
   {/if}
+  {#if snapshot.inputBackend === 'PORTABLE'}
+    <p class="fault-banner" role="status">{t('input_portable')} <button onclick={openUpdates}>{t('input_setup')}</button></p>
+  {/if}
   <label class="peer-select">{t('peer')}<select bind:value={selected} disabled={busy || snapshot.state !== 'LOCAL'}><option value="">{t('choose')}</option>{#each snapshot.peers as peer (peer.fingerprint)}<option value={peer.fingerprint}>{peer.alias}</option>{/each}</select></label>
   <section class="canvas" aria-label={t('devices')}>
     <div class="screens" class:reversed={layout.edge === 'LEFT'}>
@@ -263,7 +266,7 @@
   {/if}
 </main>
 <dialog bind:this={updatesDlg} aria-labelledby="update-settings-title" onclose={() => { updatesOpen = false; restoreDialogFocus(); }}>
-  {#if updatesOpen}<UpdateSettings bridge={updateSettingsBridge} peers={snapshot.peers} initialPeer={selected} {locale} />{/if}
+  {#if updatesOpen}<UpdateSettings bridge={updateSettingsBridge} peers={snapshot.peers} initialPeer={selected} inputBackend={snapshot.inputBackend ?? 'UNKNOWN'} {locale} />{/if}
   <div class="dlg-foot"><button class="primary" onclick={() => updatesDlg.close()}>{t('close')}</button></div>
 </dialog>
 <dialog bind:this={diagnosticsDlg} aria-labelledby="diagnostics-title" onclose={restoreDialogFocus}>

@@ -51,3 +51,14 @@ test('invalid revision is rejected and transport queries never invoke disconnect
   await assert.rejects(bridge.refresh(), /bridge_protocol/);
   assert.equal(disconnects, 0);
 });
+
+test('input mode follows fallback and unknown values cannot imply PIN support', async () => {
+  let mode = 'PROTECTED';
+  const bridge = createBridge({ Refresh: async () => ({...snapshot('CONNECTED'), inputBackend: mode}), Connect() {}, Disconnect() {} });
+  assert.equal((await bridge.refresh()).inputBackend, 'PROTECTED');
+  mode = 'PORTABLE';
+  assert.equal((await bridge.refresh()).inputBackend, 'PORTABLE');
+  for (mode of [undefined, 'private path', {state:'PROTECTED'}]) {
+    assert.equal((await bridge.refresh()).inputBackend, 'UNKNOWN');
+  }
+});

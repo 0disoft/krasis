@@ -33,6 +33,21 @@ func TestDesktopBridgeReadsFreshStateAndIdentity(t *testing.T) {
 	}
 }
 
+func TestDesktopBridgeDoesNotRetainProtectedModeAfterFallback(t *testing.T) {
+	c := &fakeClient{state: "CONNECTED", inputBackend: "PROTECTED"}
+	b := NewDesktopBridge(context.Background(), func() (Client, error) { return c, nil })
+	for _, mode := range []string{"PROTECTED", "PORTABLE", "", "private-path"} {
+		c.inputBackend = mode
+		want := mode
+		if mode != "PROTECTED" && mode != "PORTABLE" {
+			want = "UNKNOWN"
+		}
+		if r := b.Refresh(); r.InputBackend != want || r.State != "CONNECTED" {
+			t.Fatalf("mode=%s result=%+v", mode, r)
+		}
+	}
+}
+
 func TestDesktopBridgeFailsClosedAndRedacts(t *testing.T) {
 	b := NewDesktopBridge(context.Background(), func() (Client, error) { return nil, errors.New("private bearer and path") })
 	raw, _ := json.Marshal(b.Refresh())

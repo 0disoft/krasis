@@ -2,7 +2,7 @@
   import { onMount, tick } from 'svelte';
   import { emptyUpdateSettings, emptyUpdateTransfer, transferActive } from './update-settings-bridge.js';
   import { nativeText } from './native-i18n.js';
-  let { bridge, peers, initialPeer = '', locale } = $props();
+  let { bridge, peers, initialPeer = '', inputBackend = 'UNKNOWN', locale } = $props();
   let selected = $state('');
   let value = $state(emptyUpdateSettings());
   let busy = $state(false);
@@ -85,6 +85,11 @@
   <h2 id="update-settings-title">{t('upd_title')}</h2>
 </div>
 <div class="dlg-body">
+  <section class="upd-section" aria-label={t('input_title')}>
+    <h3>{t('input_title')}</h3>
+    <p role="status">{t('input_' + inputBackend.toLowerCase())}</p>
+    {#if inputBackend !== 'PROTECTED'}<p>{t('input_install_help')}</p>{/if}
+  </section>
   <label>{t('peer')}
     <select bind:this={peerSelect} bind:value={selected} onchange={choose} disabled={busy}>
       <option value="">{t('choose')}</option>

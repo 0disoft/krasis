@@ -71,6 +71,34 @@ func TestConcurrentProtectedMonitorAndInputRecordOneCause(t *testing.T) {
 	}
 }
 
+func TestSelectedInputBackendIsFencedAndClearedWithSession(t *testing.T) {
+	o := testOperations(t, nil)
+	done := make(chan struct{})
+	o.sessionDone = done
+	o.sessionState = "CONNECTED"
+	outcome := &sessionOutcome{connected: true}
+	o.sessionOutcome = outcome
+	observer := &sessionObserver{operations: o, done: done}
+	observer.ObserveInputBackend(true)
+	s, _ := o.Status(context.Background())
+	if s.InputBackend != "PROTECTED" {
+		t.Fatal(s.InputBackend)
+	}
+	observer.ObserveInputBackend(false)
+	stale := &sessionObserver{operations: o, done: make(chan struct{})}
+	stale.ObserveInputBackend(true)
+	s, _ = o.Status(context.Background())
+	if s.InputBackend != "PORTABLE" {
+		t.Fatal("stale callback hid portable fallback", s.InputBackend)
+	}
+	o.finishSession(done, outcome, context.Canceled, true, false)
+	observer.ObserveInputBackend(true)
+	s, _ = o.Status(context.Background())
+	if s.InputBackend != "UNKNOWN" {
+		t.Fatal("completed session retained protected mode", s.InputBackend)
+	}
+}
+
 func TestProtectedInputMonitorStopsOnceWhenPromptAppears(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

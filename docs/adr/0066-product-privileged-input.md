@@ -1,5 +1,18 @@
 # ADR 0066: Product leases use the installed input service
 
+## g138: Show portable fallback after updates
+
+The status API and desktop snapshot expose the runner's selected input backend.
+Portable selection shows a persistent PIN/administrator-window setup notice
+and links to installation instructions in the device update dialog. Installing
+the matching protected images requires attended Windows elevation after safe
+shutdown. Updating the app alone does not perform that installation.
+
+The observation is fenced to the current session and cleared at completion.
+Missing or unfamiliar values remain unknown, including older agents. It is
+neither permission to inject nor proof of worker lease readiness or PIN control.
+Image matching, installed-agent selection and input authorization are unchanged.
+
 ## g137: Distinguish portable protection causes
 
 The portable session guard records one fixed cause code per runner, from the

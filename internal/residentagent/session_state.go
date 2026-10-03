@@ -90,6 +90,19 @@ type sessionObserver struct {
 	retrying   bool
 }
 
+func (observer *sessionObserver) ObserveInputBackend(protected bool) {
+	operations := observer.operations
+	operations.mu.Lock()
+	defer operations.mu.Unlock()
+	if operations.sessionDone != observer.done || operations.root.Err() != nil {
+		return
+	}
+	operations.inputBackend = "PORTABLE"
+	if protected {
+		operations.inputBackend = "PROTECTED"
+	}
+}
+
 func (observer *sessionObserver) ObserveSupervisor(snapshot agent.SupervisorSnapshot) {
 	operations := observer.operations
 	operations.mu.Lock()
