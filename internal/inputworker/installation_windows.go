@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"unsafe"
 
@@ -24,6 +25,13 @@ type Installation struct {
 	closed                     bool
 	agentDigest, serviceDigest [sha256.Size]byte
 	files                      []*os.File
+	images                     [2]installationImage
+}
+
+type installationImage struct {
+	path   string
+	digest [sha256.Size]byte
+	file   *os.File
 }
 
 type installationRecord struct {
@@ -71,7 +79,7 @@ func loadInstallationDirectory(root, directory string) (*Installation, error) {
 		return nil, ErrAuthority
 	}
 	installation.agentDigest, installation.serviceDigest = agent, service
-	for _, image := range []struct {
+	for index, image := range []struct {
 		name   string
 		digest [sha256.Size]byte
 	}{{"krasis-agent.exe", agent}, {"krasis-input.exe", service}} {
@@ -83,6 +91,7 @@ func loadInstallationDirectory(root, directory string) (*Installation, error) {
 		if protectedHandle(windows.Handle(file.Fd())) != nil {
 			return nil, ErrAuthority
 		}
+		installation.images[index] = installationImage{path: filepath.Clean(filepath.Join(directory, image.name)), digest: image.digest, file: file}
 	}
 	accepted = true
 	return installation, nil
@@ -213,6 +222,40 @@ func (installation *Installation) digests() ([sha256.Size]byte, [sha256.Size]byt
 		return [sha256.Size]byte{}, [sha256.Size]byte{}, ErrAuthority
 	}
 	return installation.agentDigest, installation.serviceDigest, nil
+}
+
+// Reuse only this live installation's exact, verified file object. The source
+// pin denies writes and deletion from initial hashing through duplication; no
+// pathname is reopened and no digest-only or cross-process cache is consulted.
+// Each caller owns its duplicate, so closing a proof cannot release other pins.
+func (installation *Installation) duplicateImage(path string, expected [sha256.Size]byte) (*os.File, error) {
+	if installation == nil || expected == ([sha256.Size]byte{}) {
+		return nil, ErrAuthority
+	}
+	installation.mu.Lock()
+	defer installation.mu.Unlock()
+	if installation.closed || len(installation.files) != 5 {
+		return nil, ErrAuthority
+	}
+	for _, image := range installation.images {
+		if image.file == nil || image.digest != expected || !strings.EqualFold(image.path, filepath.Clean(path)) {
+			continue
+		}
+		var duplicate windows.Handle
+		if windows.DuplicateHandle(windows.CurrentProcess(), windows.Handle(image.file.Fd()), windows.CurrentProcess(), &duplicate, 0, false, windows.DUPLICATE_SAME_ACCESS) != nil {
+			return nil, ErrAuthority
+		}
+		return os.NewFile(uintptr(duplicate), "verified-input-image"), nil
+	}
+	return nil, ErrAuthority
+}
+
+func pinIdentityImage(installation *Installation, path string, expected [sha256.Size]byte) (*os.File, error) {
+	if installation != nil {
+		// A failed pinned lookup must never fall back to trusting a fresh path.
+		return installation.duplicateImage(path, expected)
+	}
+	return lockImage(path, expected)
 }
 
 func (installation *Installation) Close() error {

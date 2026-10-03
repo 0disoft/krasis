@@ -4,6 +4,8 @@ package inputworker
 
 import (
 	"context"
+	"crypto/sha256"
+	"os"
 	"runtime"
 	"testing"
 	"time"
@@ -42,5 +44,42 @@ func BenchmarkNativeWorkerRoundtrip(b *testing.B) {
 		}
 	case <-time.After(time.Second):
 		b.Fatal("worker cleanup stalled")
+	}
+}
+
+func BenchmarkInstalledImagePin(b *testing.B) {
+	installation := imagePinFixture(b)
+	image := installation.images[1]
+	if err := image.file.Close(); err != nil {
+		b.Fatal(err)
+	}
+	data := make([]byte, 8<<20)
+	if err := os.WriteFile(image.path, data, 0600); err != nil {
+		b.Fatal(err)
+	}
+	digest := sha256.Sum256(data)
+	file, err := lockImage(image.path, digest)
+	if err != nil {
+		b.Fatal(err)
+	}
+	installation.files[4] = file
+	installation.images[1] = installationImage{path: image.path, digest: digest, file: file}
+	for _, name := range []string{"rehash", "held-file"} {
+		b.Run(name, func(b *testing.B) {
+			var proof *Installation
+			if name == "held-file" {
+				proof = installation
+			}
+			b.ReportAllocs()
+			for b.Loop() {
+				pin, err := pinIdentityImage(proof, image.path, digest)
+				if err != nil {
+					b.Fatal(err)
+				}
+				if err := pin.Close(); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
 	}
 }

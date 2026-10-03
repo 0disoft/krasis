@@ -32,6 +32,10 @@ func RunService(installation *Installation) error {
 }
 
 func fixedInputProcess(digest [32]byte, console bool) bool {
+	return fixedInstalledInputProcess(digest, console, nil)
+}
+
+func fixedInstalledInputProcess(digest [32]byte, console bool, installation *Installation) bool {
 	identity, err := inspectProcess(windows.GetCurrentProcessId())
 	if err != nil {
 		return false
@@ -48,7 +52,7 @@ func fixedInputProcess(digest [32]byte, console bool) bool {
 	} else if identity.session != 0 {
 		return false
 	}
-	image, err := lockImage(identity.image, digest)
+	image, err := pinIdentityImage(installation, identity.image, digest)
 	if err != nil {
 		return false
 	}
@@ -61,11 +65,11 @@ func RunInstalledWorker(ctx context.Context, installation *Installation) error {
 	var profile handoff.StartupProfile
 	started := time.Now()
 	agent, service, err := installation.digests()
-	if err != nil || !fixedInputProcess(service, true) {
+	if err != nil || !fixedInstalledInputProcess(service, true, installation) {
 		return ErrAuthority
 	}
 	profile.Record(handoff.WorkerInstalledValidation, time.Since(started))
-	return runConsoleInput(ctx, agent, service, profile)
+	return runInstalledConsoleInput(ctx, agent, service, profile, installation)
 }
 
 func runServiceLoop(ctx context.Context, installation *Installation, ready func() error) error {

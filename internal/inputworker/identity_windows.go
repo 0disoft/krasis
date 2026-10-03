@@ -37,6 +37,10 @@ type processIdentity struct {
 // never from a request, user profile, environment variable or local API payload.
 // This function is intended for the SYSTEM service, not the ordinary agent.
 func AuthenticateAgent(pipe uintptr, expected [sha256.Size]byte) (*Authority, error) {
+	return authenticateAgentInstalled(pipe, expected, nil)
+}
+
+func authenticateAgentInstalled(pipe uintptr, expected [sha256.Size]byte, installation *Installation) (*Authority, error) {
 	if pipe == 0 || expected == ([sha256.Size]byte{}) {
 		return nil, ErrAuthority
 	}
@@ -74,7 +78,7 @@ func AuthenticateAgent(pipe uintptr, expected [sha256.Size]byte) (*Authority, er
 	if err != nil || consoleErr != nil || logon != consoleLogon {
 		return nil, ErrAuthority
 	}
-	image, err := lockImage(identity.image, expected)
+	image, err := pinIdentityImage(installation, identity.image, expected)
 	if err != nil {
 		return nil, ErrAuthority
 	}
@@ -126,6 +130,10 @@ func AuthenticateService(pipe uintptr, expected [sha256.Size]byte) (*Authority, 
 }
 
 func authenticateServiceObserved(ctx context.Context, pipe uintptr, expected [sha256.Size]byte) (*Authority, error) {
+	return authenticateServiceInstalled(ctx, pipe, expected, nil)
+}
+
+func authenticateServiceInstalled(ctx context.Context, pipe uintptr, expected [sha256.Size]byte, installation *Installation) (*Authority, error) {
 	if pipe == 0 || expected == ([sha256.Size]byte{}) {
 		return nil, ErrAuthority
 	}
@@ -167,7 +175,7 @@ func authenticateServiceObserved(ctx context.Context, pipe uintptr, expected [sh
 		return nil, err
 	}
 	started := time.Now()
-	image, err := lockImage(path, expected)
+	image, err := pinIdentityImage(installation, path, expected)
 	handoff.Record(ctx, handoff.ServiceImagePin, time.Since(started))
 	if err != nil {
 		return nil, connectionFailed("service_image", err)

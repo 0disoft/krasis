@@ -122,6 +122,10 @@ func RunConsoleInput(ctx context.Context, agentDigest, serviceDigest [sha256.Siz
 }
 
 func runConsoleInput(ctx context.Context, agentDigest, serviceDigest [sha256.Size]byte, profile handoff.StartupProfile) error {
+	return runInstalledConsoleInput(ctx, agentDigest, serviceDigest, profile, nil)
+}
+
+func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [sha256.Size]byte, profile handoff.StartupProfile, installation *Installation) error {
 	if ctx == nil || ctx.Err() != nil || agentDigest == ([sha256.Size]byte{}) || serviceDigest == ([sha256.Size]byte{}) {
 		return ErrAuthority
 	}
@@ -144,7 +148,7 @@ func runConsoleInput(ctx context.Context, agentDigest, serviceDigest [sha256.Siz
 	}
 	defer control.Close()
 	started = time.Now()
-	proof, err := AuthenticateService(uintptr(control.handle), serviceDigest)
+	proof, err := authenticateServiceInstalled(ctx, uintptr(control.handle), serviceDigest, installation)
 	profile.Record(handoff.WorkerServiceAuth, time.Since(started))
 	if err != nil {
 		return ErrAuthority
@@ -168,7 +172,7 @@ func runConsoleInput(ctx context.Context, agentDigest, serviceDigest [sha256.Siz
 		return ErrAuthority
 	}
 	started = time.Now()
-	authority, err := AuthenticateAgent(uintptr(pipe.handle), agentDigest)
+	authority, err := authenticateAgentInstalled(uintptr(pipe.handle), agentDigest, installation)
 	profile.Record(handoff.WorkerAgentAuth, time.Since(started))
 	if err != nil {
 		return ErrAuthority
