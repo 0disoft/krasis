@@ -31,3 +31,19 @@ UDP가 방화벽·AP 격리로 차단되거나, IPv6·서로 다른 subnet·어�
 다른 identity 거부, profile 비교 저장, listener accept 중단과 같은 IP 복구를 포함한다.
 실제 HP15↔GRAM13 DHCP 변경·방화벽 환경 검증은 별도로 필요하다. GitHub #70은
 그 실기기 완료 조건을 확인하기 전까지 열어 둔다.
+
+## 실기기 시험 시 역할 확인
+
+키보드가 붙어 있는 PC와 TLS 연결을 시작하는 PC는 같다고 가정하지 않는다.
+`trust list`에서 상대 역할이 `CONNECTOR`면 이 PC는 listener이며 저장 주소는
+이 PC의 bind 주소다. 상대 역할이 `LISTENER`면 이 PC가 connector다.
+주소 변경 시험은 listener PC를 대상으로 하고 connector PC에서 새 주소 발견을 확인한다.
+listener 자체에서 저장 주소와 같은 UDP 후보를 찾은 것은 자기 광고일 수 있어
+상대 PC에서의 검색 성공을 증명하지 않는다.
+
+DHCP 갱신에서 주소가 그대로면 불필요한 재연결 여부만 확인할 수 있다.
+실제 주소 변경 시험에는 같은 NIC·같은 private LAN에서 사용할 수 있는 다른 주소와
+원상 복구 절차가 필요하다. ping 무응답만으로 사용하지 않는 주소라고 판단하지 않는다.
+기기 역할·신뢰·경계·재진입 거리를 보존하고 주소가 바뀐 전후 양쪽 진단을 수집한다.
+
+g136의 주소 유지 갱신 관측은 [실기기 결과](../experiments/results/2026-10-03-g136-address-recovery.md)에 기록한다.

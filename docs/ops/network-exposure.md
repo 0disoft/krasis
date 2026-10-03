@@ -8,7 +8,7 @@
 
 Run the Krasis listener only on a trusted private LAN controlled by the user or on a personal hotspot. The current listener policy does not support a public Windows network profile, an untrusted shared LAN, or a network whose membership cannot be determined.
 
-The launcher binds the listener to the configured literal local IP, never to `0.0.0.0` or `::`. The configured IP must belong to the listener device on the selected private interface. If DHCP changes it, update the configuration before starting another session.
+The launcher binds the listener to the configured literal local IP, never to `0.0.0.0` or `::`. The configured IP must belong to the listener device on the selected private interface. From g122, a running listener follows a unique replacement private IPv4 address on that same interface, and the connector can discover and authenticate the new endpoint before saving it. An unchanged address does not trigger a listener rebind. Unavailable or ambiguous addresses, adapter replacement and unsupported routing still require operator recovery. See [LAN address recovery](../desktop/address-recovery.md) for the exact boundary and device-test requirements.
 
 Public Wi-Fi can isolate clients even when both devices appear connected. Do not compensate by opening a broad inbound rule, disabling the firewall, binding an unauthenticated listener, or weakening mTLS and trust authorization.
 
