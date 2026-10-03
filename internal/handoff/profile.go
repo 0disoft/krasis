@@ -67,17 +67,18 @@ type Vector struct {
 }
 
 type Summary struct {
-	Schema      uint8     `json:"schema"`
-	Attempt     uint8     `json:"attempt"`
-	Role        string    `json:"role"`
-	Backend     string    `json:"backend"`
-	Preparation Vector    `json:"preparation"`
-	First       Vector    `json:"first"`
-	Worst       Vector    `json:"worst"`
-	Frames      uint32    `json:"frames"`
-	Histogram   [5]uint32 `json:"histogram"`
-	End         string    `json:"end"`
-	Incomplete  bool      `json:"incomplete"`
+	Schema      uint8           `json:"schema"`
+	Attempt     uint8           `json:"attempt"`
+	Role        string          `json:"role"`
+	Backend     string          `json:"backend"`
+	Preparation Vector          `json:"preparation"`
+	First       Vector          `json:"first"`
+	Worst       Vector          `json:"worst"`
+	Frames      uint32          `json:"frames"`
+	Histogram   [5]uint32       `json:"histogram"`
+	End         string          `json:"end"`
+	Incomplete  bool            `json:"incomplete"`
+	Startup     *StartupProfile `json:"startup,omitempty"`
 }
 
 func (s Summary) Valid() bool {
@@ -86,6 +87,9 @@ func (s Summary) Valid() bool {
 		return false
 	}
 	if (s.Role == "source") != (s.Backend == "none") {
+		return false
+	}
+	if s.Startup != nil && (s.Role != "receiver" || s.Backend != "installed" || !s.Startup.Valid() || s.Startup.Measured == 0) {
 		return false
 	}
 	for _, v := range []Vector{s.Preparation, s.First, s.Worst} {

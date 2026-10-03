@@ -49,11 +49,12 @@ func ConnectLease(ctx context.Context, serviceDigest [sha256.Size]byte, lease Le
 		return nil, connectionFailed("lease_write", err)
 	}
 	started = time.Now()
-	readyErr := readReady(channel.stream)
+	profile, readyErr := readStartupReady(channel.stream)
 	handoff.Record(ctx, handoff.ReadyWait, time.Since(started))
 	if err := readyErr; err != nil {
 		return nil, connectionFailed("worker_ready", err)
 	}
+	handoff.RecordStartup(ctx, profile)
 	if ctx.Err() != nil {
 		return nil, connectionFailed("worker_ready", ctx.Err())
 	}

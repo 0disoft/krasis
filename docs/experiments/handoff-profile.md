@@ -3,8 +3,9 @@
 `handoff_profile` schema 1 measures software processing within each ordinary
 agent process. It does not measure pointer presentation, establish authority,
 prove recovery completion, or change the existing error certainty. Wire frames,
-worker ACK and ready formats, worker lifetime, authority checks and the service
-accept backoff are unchanged.
+worker ACK formats, worker lifetime, authority checks and the service accept
+backoff are unchanged. g139 extends only the authenticated local readiness
+envelope as described below; peer frames and lease metadata remain unchanged.
 
 The product runner shares one collector across reconnects. The first attempted
 handoff opens a 120-second window, with at most 12 attempts per agent process.
@@ -53,10 +54,58 @@ does not isolate CreateProcess time. Native receiver peer authorization is
 included in the full wrapper; its narrower installed-only span is absent.
 
 Not measured separately: rejected local admission before a lease request,
-service cleanup/200ms accept backoff, child launch substeps, OS cursor-restore
+service cleanup/200ms accept backoff, lower-level process creation substeps, OS cursor-restore
 message handling, actual display presentation. Missing spans must not be filled
 from older 15-second maxima or assumed to be zero. No stage maxima, overlapping
 spans or opposite-PC wall clocks may be summed into end-to-end latency.
+
+## g139 installed startup detail
+
+An installed receiver profile can additionally contain `startup`, schema 1,
+with a fixed eight-element `micros` array and eight-bit `measured` mask.
+The original 39-stage vectors, handoff schema, 120-second window and
+12-attempt budget are unchanged. Missing `startup` or absent presence bits
+mean unobserved. A numeric zero with its presence bit is measured at the
+recorded precision. All startup durations saturate at 120 seconds.
+
+The indices are owned by `internal/handoff/startup.go`:
+
+| Index | Span | Measurement boundary |
+|---|---|---|
+| 0 | ServiceLaunch | `launchManagedConsole`, including privileges, validation, token, image pin, process creation and transferred handle setup |
+| 1 | ServiceChildConnect | Service's wait for the child's control-pipe connection |
+| 2 | ServiceBootstrapReady | Bootstrap packet write through receipt of child readiness |
+| 3 | WorkerInstalledValidation | Child's installation digests and fixed SYSTEM/UIAccess image validation |
+| 4 | WorkerIdentity | Child's process/token validation in `runConsoleInput` |
+| 5 | WorkerServiceAuth | Child authenticating the service control pipe |
+| 6 | WorkerAgentAuth | Child authenticating the transferred agent pipe |
+| 7 | WorkerDesktopReady | `inputdesktop.Run` through first desktop-scope and authority validation, before invoking readiness |
+
+These are durations from each process's monotonic clock, never cross-process
+timestamps. Work in the child overlaps service waits; do not sum the rows.
+Process initialization before these boundaries and later desktop switches
+remain unmeasured. Failed startup has no complete child readiness detail.
+
+Only readiness uses a fixed 40-byte `KRD2` local envelope instead of the
+legacy eight-byte `KRD1`. New readers accept either; legacy readiness leaves
+detail unobserved. The child can contribute only worker spans, never replace
+service-local timings. Existing process/image authentication and verified
+desktop preparation still precede readiness. Input requests, ACKs, recovery
+receipts, deadlines and authority checks are unchanged.
+
+Malformed or truncated readiness still fails the existing protocol path.
+Invalid numeric diagnostics in a structurally valid receipt are consumed and
+discarded without changing readiness. No diagnostic value grants authority.
+Only validated detail is copied once into the active installed receiver
+attempt; late or duplicate detail cannot replace a frozen attempt. Export
+reprojects this fixed numeric schema and drops arbitrary fields.
+
+Deploy the matching g139 protected installation before measuring this detail;
+updating the portable UI alone does not update the SYSTEM service. Old readers
+do not accept KRD2, so do not run mixed service/worker/agent binaries. Keep the
+existing verified installation, image matching and recovery gates in place.
+Record actual protected backend selection before the six-entry trial, then
+recheck PIN Esc and cancel click without entering any PIN value.
 
 No peer identifiers, lease/binding values, paths, SID, coordinates, operation
 kinds, key values, window text or error strings enter the profile. Session and

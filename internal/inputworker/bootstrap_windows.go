@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/0disoft/krasis/internal/handoff"
 	"github.com/0disoft/krasis/internal/wininput"
 	"golang.org/x/sys/windows"
 )
@@ -43,6 +44,8 @@ func RunAgentLease(ctx context.Context, channel *Channel, lease Lease, agentDige
 	}()
 	var transferred windows.Handle
 	var pid uint32
+	var profile handoff.StartupProfile
+	started := time.Now()
 	worker, err := launchManagedConsole(ctx, channel.authority, serviceDigest, func(process windows.Handle, childID uint32) error {
 		pid = childID
 		var err error
@@ -55,6 +58,7 @@ func RunAgentLease(ctx context.Context, channel *Channel, lease Lease, agentDige
 		}
 		return nil
 	})
+	profile.Record(handoff.ServiceLaunch, time.Since(started))
 	if err != nil {
 		return Report{}, ErrAuthority
 	}
@@ -65,7 +69,10 @@ func RunAgentLease(ctx context.Context, channel *Channel, lease Lease, agentDige
 	}()
 	startup, cancel := context.WithTimeout(ctx, startupTimeout)
 	defer cancel()
-	if control.connect(startup) != nil {
+	started = time.Now()
+	connectErr := control.connect(startup)
+	profile.Record(handoff.ServiceChildConnect, time.Since(started))
+	if connectErr != nil {
 		return Report{}, ErrAuthority
 	}
 	var actual uint32
@@ -79,7 +86,15 @@ func RunAgentLease(ctx context.Context, channel *Channel, lease Lease, agentDige
 	copy(packet[16:], data[:])
 	_ = control.SetDeadline(time.Now().Add(startupTimeout))
 	stopStartup := context.AfterFunc(startup, func() { _ = control.Close() })
-	if writeFrame(control, packet[:]) != nil || readReady(control) != nil || startup.Err() != nil {
+	started = time.Now()
+	writeErr := writeFrame(control, packet[:])
+	var childProfile *handoff.StartupProfile
+	var readyErr error
+	if writeErr == nil {
+		childProfile, readyErr = readStartupReady(control)
+	}
+	profile.Record(handoff.ServiceBootstrapReady, time.Since(started))
+	if writeErr != nil || readyErr != nil || startup.Err() != nil {
 		stopStartup()
 		return Report{}, ErrAuthority
 	}
@@ -87,7 +102,8 @@ func RunAgentLease(ctx context.Context, channel *Channel, lease Lease, agentDige
 		return Report{}, ErrAuthority
 	}
 	_ = control.SetDeadline(time.Time{})
-	if channel.authority.check(false) != nil || channel.stream.SetWriteDeadline(time.Now().Add(time.Second)) != nil || writeFrame(channel.stream, readyFrame[:]) != nil {
+	mergeWorkerStartup(&profile, childProfile)
+	if channel.authority.check(false) != nil || channel.stream.SetWriteDeadline(time.Now().Add(time.Second)) != nil || writeStartupReady(channel.stream, profile) != nil {
 		// The child is ready but no readiness receipt reached the agent. Still
 		// request shutdown and consume recovery before killing the job.
 		stopped, stop := context.WithCancel(context.Background())
@@ -102,15 +118,21 @@ func RunAgentLease(ctx context.Context, channel *Channel, lease Lease, agentDige
 // mode. The protected installation supplies both digests. No command arguments
 // may select a pipe handle, executable, PID, session or token source.
 func RunConsoleInput(ctx context.Context, agentDigest, serviceDigest [sha256.Size]byte) error {
+	return runConsoleInput(ctx, agentDigest, serviceDigest, handoff.StartupProfile{})
+}
+
+func runConsoleInput(ctx context.Context, agentDigest, serviceDigest [sha256.Size]byte, profile handoff.StartupProfile) error {
 	if ctx == nil || ctx.Err() != nil || agentDigest == ([sha256.Size]byte{}) || serviceDigest == ([sha256.Size]byte{}) {
 		return ErrAuthority
 	}
+	started := time.Now()
 	self, err := inspectProcess(windows.GetCurrentProcessId())
 	if err != nil {
 		return ErrAuthority
 	}
 	allowed := validConsoleToken(self.token, windows.WTSGetActiveConsoleSessionId()) && self.integrity == 0x4000
 	_ = self.close()
+	profile.Record(handoff.WorkerIdentity, time.Since(started))
 	if !allowed {
 		return ErrAuthority
 	}
@@ -121,7 +143,9 @@ func RunConsoleInput(ctx context.Context, agentDigest, serviceDigest [sha256.Siz
 		return ErrAuthority
 	}
 	defer control.Close()
+	started = time.Now()
 	proof, err := AuthenticateService(uintptr(control.handle), serviceDigest)
+	profile.Record(handoff.WorkerServiceAuth, time.Since(started))
 	if err != nil {
 		return ErrAuthority
 	}
@@ -143,7 +167,9 @@ func RunConsoleInput(ctx context.Context, agentDigest, serviceDigest [sha256.Siz
 	if err != nil || proof.check(false) != nil {
 		return ErrAuthority
 	}
+	started = time.Now()
 	authority, err := AuthenticateAgent(uintptr(pipe.handle), agentDigest)
+	profile.Record(handoff.WorkerAgentAuth, time.Since(started))
 	if err != nil {
 		return ErrAuthority
 	}
@@ -166,13 +192,13 @@ func RunConsoleInput(ctx context.Context, agentDigest, serviceDigest [sha256.Siz
 		cancel()
 	}()
 	defer func() { _ = control.Close(); <-readerDone }()
-	report, result := serveReady(run, channel, wininput.NewInputAdapter(), lease, func() error {
+	report, result := serveReadyProfile(run, channel, wininput.NewInputAdapter(), lease, func() error {
 		if proof.check(false) != nil {
 			return ErrAuthority
 		}
 		_ = control.SetWriteDeadline(time.Now().Add(startupTimeout))
-		return writeFrame(control, readyFrame[:])
-	})
+		return writeStartupReady(control, profile)
+	}, &profile)
 	if requested.Load() && errors.Is(result, context.Canceled) && report.Recovery.Remaining == 0 {
 		result = nil
 	}

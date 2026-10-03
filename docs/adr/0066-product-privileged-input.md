@@ -100,3 +100,19 @@ No service/process/token ACL or Windows security policy is changed.
 
 References: [process access rights](https://learn.microsoft.com/en-us/windows/win32/procthread/process-security-and-access-rights)
 and [service access rights](https://learn.microsoft.com/en-us/windows/win32/services/service-security-and-access-rights).
+
+## g139: Bounded startup diagnostics
+
+The matched installed service and console child return a fixed 40-byte KRD2
+readiness envelope carrying eight bounded duration fields and a presence mask.
+The agent records validated detail only in its active installed receiver
+handoff profile. It accepts legacy eight-byte KRD1 readiness with no startup
+detail. Old readers do not accept KRD2; deployment still requires matched
+protected binaries and the existing image/installation checks.
+
+The envelope is diagnostic data after process/image authentication and desktop
+readiness, not an authorization claim. Malformed readiness retains protocol
+failure handling; invalid numeric diagnostics are consumed and discarded.
+Input requests, ACKs, bootstrap lease metadata, pressed-state recovery,
+authority checks, worker lifetime and service backoff are unchanged.
+See the [startup spans and trial](../experiments/handoff-profile.md).

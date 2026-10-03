@@ -30,3 +30,26 @@ func TestHandoffExportReprojectsFixedSchemaAndDropsIdentity(t *testing.T) {
 		t.Fatal("arbitrary profile string accepted")
 	}
 }
+
+func TestStartupExportReprojectsNumericSchemaAndRejectsInvalidValues(t *testing.T) {
+	profile := &handoff.StartupProfile{Schema: 1, Measured: 1}
+	profile.Micros[handoff.ServiceLaunch] = 1200
+	s := handoff.Summary{Schema: 1, Attempt: 1, Role: "receiver", Backend: "installed", End: "ok", Startup: profile}
+	r := record{Time: "2026-10-03T00:00:00Z", Code: "handoff_profile", Handoff: &s}
+	data, _ := json.Marshal(r)
+	data = []byte(strings.Replace(string(data), `"startup":{`, `"startup":{"pin":"secret-marker","path":"private-path",`, 1))
+	got := sanitizeLog("agent.jsonl", strings.NewReader(string(data)+"\n"))
+	encoded, _ := json.Marshal(got)
+	if got.Incomplete || len(got.Events) != 1 || got.Events[0].Handoff.Startup == nil || *got.Events[0].Handoff.Startup != *profile {
+		t.Fatal("validated startup diagnostics lost")
+	}
+	if strings.Contains(string(encoded), "secret-marker") || strings.Contains(string(encoded), "private-path") {
+		t.Fatal("private startup fields exported")
+	}
+	profile.Micros[handoff.WorkerIdentity] = 1
+	data, _ = json.Marshal(r)
+	got = sanitizeLog("agent.jsonl", strings.NewReader(string(data)+"\n"))
+	if !got.Incomplete || len(got.Events) != 0 {
+		t.Fatal("unmeasured startup value accepted by export")
+	}
+}

@@ -12,6 +12,7 @@ import (
 
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/handoff"
 	"github.com/0disoft/krasis/internal/inputdesktop"
 )
 
@@ -64,6 +65,10 @@ func Serve(ctx context.Context, channel *Channel, input application.InputPort, l
 }
 
 func serveReady(ctx context.Context, channel *Channel, input application.InputPort, lease Lease, ready func() error) (report Report, err error) {
+	return serveReadyProfile(ctx, channel, input, lease, ready, nil)
+}
+
+func serveReadyProfile(ctx context.Context, channel *Channel, input application.InputPort, lease Lease, ready func() error, profile *handoff.StartupProfile) (report Report, err error) {
 	if channel == nil {
 		return report, ErrAuthority
 	}
@@ -77,12 +82,14 @@ func serveReady(ctx context.Context, channel *Channel, input application.InputPo
 	}
 	// Root ownership stays alive during independent key-up recovery after ctx
 	// cancellation. The loop itself observes ctx and the immutable lease expiry.
+	desktopStarted := time.Now()
 	err = inputdesktop.Run(context.Background(), func(scope *inputdesktop.Scope) error {
 		if ready != nil {
 			if err := scope.Do(ctx, func() error {
 				if authority.check(false) != nil {
 					return ErrAuthority
 				}
+				profile.Record(handoff.WorkerDesktopReady, time.Since(desktopStarted))
 				return ready()
 			}); err != nil {
 				return err

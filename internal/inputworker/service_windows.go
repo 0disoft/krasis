@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/0disoft/krasis/internal/handoff"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
 )
@@ -57,11 +58,14 @@ func fixedInputProcess(digest [32]byte, console bool) bool {
 
 // RunInstalledWorker cannot consume a caller-provided trust record.
 func RunInstalledWorker(ctx context.Context, installation *Installation) error {
+	var profile handoff.StartupProfile
+	started := time.Now()
 	agent, service, err := installation.digests()
 	if err != nil || !fixedInputProcess(service, true) {
 		return ErrAuthority
 	}
-	return RunConsoleInput(ctx, agent, service)
+	profile.Record(handoff.WorkerInstalledValidation, time.Since(started))
+	return runConsoleInput(ctx, agent, service, profile)
 }
 
 func runServiceLoop(ctx context.Context, installation *Installation, ready func() error) error {
