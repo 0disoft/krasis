@@ -9,15 +9,17 @@ import (
 	"io"
 	"net"
 	"os"
+	"runtime"
 	"sync"
 	"syscall"
 	"testing"
 	"time"
 
+	"github.com/0disoft/krasis/internal/control"
 	"golang.org/x/sys/windows"
 )
 
-func nativePair(t *testing.T) (*pipeConn, *pipeConn) {
+func nativePair(t testing.TB) (*pipeConn, *pipeConn) {
 	t.Helper()
 	name := fmt.Sprintf(`\\.\pipe\Krasis.Input.Test.%d.%s`, os.Getpid(), t.Name())
 	server, err := makePipe(name)
@@ -152,5 +154,35 @@ func TestPublicPipeEndpointsRejectMissingAuthorityBeforeConnecting(t *testing.T)
 	}
 	if channel, err := ConnectService(context.Background(), [32]byte{}); channel != nil || err != ErrAuthority {
 		t.Fatal("zero service pin accepted")
+	}
+}
+
+func TestNativeWorkerPartialFrameExpiresAndRecoversOnOwnedThread(t *testing.T) {
+	server, client := nativePair(t)
+	lease := testLease()
+	lease.ExpiresAt = time.Now().Add(250 * time.Millisecond)
+	input := &recordingInput{}
+	done := make(chan finish, 1)
+	go func() {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		owner := windows.GetCurrentThreadId()
+		execute := func(ctx context.Context, work func() error) error {
+			if windows.GetCurrentThreadId() != owner {
+				return ErrAuthority
+			}
+			return testExecute(ctx, work)
+		}
+		report, err := serve(context.Background(), server, input, lease, execute, execute, time.Now)
+		done <- finish{report, err}
+	}()
+	send(t, client, request{op: opPress, sequence: 1, binding: lease.Binding, token: control.PressedToken{Kind: control.PressedMouseButton, Code: 1}})
+	send(t, client, request{op: opMove, sequence: 2, binding: lease.Binding, x: 1, y: 1})
+	if _, err := client.Write([]byte{'K'}); err != nil {
+		t.Fatal("native partial request was not written")
+	}
+	result := await(t, done)
+	if !errors.Is(result.err, ErrExpired) || result.report.Completed != 2 || result.report.Recovery.Released != 1 || input.released != 1 {
+		t.Fatal("native pending read escaped expiry, thread ownership or recovery")
 	}
 }

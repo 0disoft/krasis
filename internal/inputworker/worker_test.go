@@ -181,6 +181,39 @@ func TestLeaseExpiryCannotBeExtendedByHeartbeats(t *testing.T) {
 	}
 }
 
+func TestPartialFrameCannotKeepHeldInputPastLeaseExpiry(t *testing.T) {
+	lease := testLease()
+	lease.ExpiresAt = time.Now().Add(100 * time.Millisecond)
+	input := &recordingInput{}
+	client, done := startWorker(t, context.Background(), input, lease)
+	send(t, client, request{op: opPress, sequence: 1, binding: lease.Binding, token: control.PressedToken{Kind: control.PressedMouseButton, Code: 1}})
+	data, _ := encodeRequest(request{op: opRelease, sequence: 2, binding: lease.Binding, token: control.PressedToken{Kind: control.PressedMouseButton, Code: 1}})
+	if _, err := client.Write(data[:requestSize-1]); err != nil {
+		t.Fatal("partial request was not consumed")
+	}
+	result := await(t, done)
+	if !errors.Is(result.err, ErrExpired) || result.report.Completed != 1 || result.report.Recovery.Released != 1 || input.released != 1 {
+		t.Fatal("partial frame prolonged lease or escaped release recovery")
+	}
+}
+
+func TestCancellationInterruptsPartialFrameAndRecovers(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	lease := testLease()
+	input := &recordingInput{}
+	client, done := startWorker(t, ctx, input, lease)
+	send(t, client, request{op: opPress, sequence: 1, binding: lease.Binding, token: control.PressedToken{Kind: control.PressedMouseButton, Code: 1}})
+	if _, err := client.Write([]byte{'K'}); err != nil {
+		t.Fatal("partial request was not consumed")
+	}
+	cancel()
+	result := await(t, done)
+	if !errors.Is(result.err, context.Canceled) || result.report.Completed != 1 || result.report.Recovery.Released != 1 {
+		t.Fatal("canceled partial frame blocked independent recovery")
+	}
+}
+
 func TestRecoveryFailurePreservesRemainingCountWithoutPayload(t *testing.T) {
 	input := &recordingInput{releaseErr: errors.New("synthetic private input")}
 	lease := testLease()

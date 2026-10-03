@@ -143,98 +143,86 @@ func serve(ctx context.Context, stream net.Conn, input application.InputPort, le
 			err = errors.Join(err, ErrRecovery)
 		}
 	}()
-	type arrival struct {
-		command request
-		err     error
-	}
-	arrivals := make(chan arrival)
-	readerDone := make(chan struct{})
-	stopReader := make(chan struct{})
-	go func() {
-		defer close(readerDone)
-		for {
-			value, readErr := readRequest(stream)
-			select {
-			case arrivals <- arrival{value, readErr}:
-			case <-stopReader:
-				return
-			}
-			if readErr != nil {
-				return
-			}
-		}
-	}()
-	defer func() { close(stopReader); _ = stream.Close(); <-readerDone }()
+	// Read on the desktop-owning thread: a separate reader and rendezvous
+	// require another scheduler handoff for every serialized input. The stream
+	// deadline bounds even a partial frame; cancellation closes pending I/O.
+	stopCancel := context.AfterFunc(ctx, func() { _ = stream.Close() })
+	defer stopCancel()
 	sequence := uint64(1)
 	deadline := now().Add(IdleTimeout)
 	if lease.ExpiresAt.Before(deadline) {
 		deadline = lease.ExpiresAt
 	}
-	timer := time.NewTimer(time.Until(deadline))
-	defer timer.Stop()
 	for {
-		select {
-		case <-ctx.Done():
+		if ctx.Err() != nil {
 			return report, ctx.Err()
-		case <-timer.C:
+		}
+		if !now().Before(deadline) {
 			return report, ErrExpired
-		case received := <-arrivals:
-			if received.err != nil {
-				if errors.Is(received.err, io.EOF) {
-					return report, nil
-				}
-				return report, ErrProtocol
-			}
+		}
+		if err := stream.SetReadDeadline(deadline); err != nil {
 			if ctx.Err() != nil {
 				return report, ctx.Err()
 			}
-			if !now().Before(deadline) {
-				return report, ErrExpired
-			}
-			command := received.command
-			if command.sequence != sequence || sequence == math.MaxUint64 ||
-				subtle.ConstantTimeCompare(command.binding[:], lease.Binding[:]) != 1 {
-				return report, ErrProtocol
-			}
-			sequence++
-			if command.op == opClose {
-				// Close has no optimistic acknowledgement: connection teardown
-				// is not proof that recovery succeeded. Report remains supervisor-owned.
+			// A peer can close just after the previous ACK, before the next
+			// deadline is installed. Preserve normal EOF cleanup in that race.
+			if errors.Is(err, net.ErrClosed) || errors.Is(err, io.ErrClosedPipe) {
 				return report, nil
 			}
-			operationCtx, cancel := context.WithDeadline(ctx, deadline)
-			operationErr := do(operationCtx, func() error { return apply(operationCtx, input, &pressed, command) })
-			cancel()
-			ack := response{sequence: command.sequence, op: command.op}
-			if len(timings) == 1 && timings[0] != nil {
-				ack.timing = timings[0].buckets
+			return report, ErrProtocol
+		}
+		command, readErr := readRequest(stream)
+		if ctx.Err() != nil {
+			return report, ctx.Err()
+		}
+		if readErr != nil {
+			var timeout net.Error
+			if errors.As(readErr, &timeout) && timeout.Timeout() {
+				return report, ErrExpired
 			}
-			if operationErr != nil {
-				ack.status = 1
-				ack.certainty, ack.requested, ack.inserted = describeFailure(operationErr)
-			} else if command.op != opHeartbeat {
-				report.Completed++
+			if errors.Is(readErr, io.EOF) {
+				return report, nil
 			}
-			if deadlineErr := stream.SetWriteDeadline(deadline); deadlineErr != nil {
-				return report, ErrProtocol
-			}
-			if writeErr := writeResponse(stream, ack); writeErr != nil {
-				return report, ErrProtocol
-			}
-			if operationErr != nil {
-				return report, operationFailure(operationErr)
-			}
-			deadline = now().Add(IdleTimeout)
-			if lease.ExpiresAt.Before(deadline) {
-				deadline = lease.ExpiresAt
-			}
-			if !timer.Stop() {
-				select {
-				case <-timer.C:
-				default:
-				}
-			}
-			timer.Reset(time.Until(deadline))
+			return report, ErrProtocol
+		}
+		if !now().Before(deadline) {
+			return report, ErrExpired
+		}
+		if command.sequence != sequence || sequence == math.MaxUint64 ||
+			subtle.ConstantTimeCompare(command.binding[:], lease.Binding[:]) != 1 {
+			return report, ErrProtocol
+		}
+		sequence++
+		if command.op == opClose {
+			// Close has no optimistic acknowledgement: connection teardown
+			// is not proof that recovery succeeded. Report remains supervisor-owned.
+			return report, nil
+		}
+		operationCtx, cancel := context.WithDeadline(ctx, deadline)
+		operationErr := do(operationCtx, func() error { return apply(operationCtx, input, &pressed, command) })
+		cancel()
+		ack := response{sequence: command.sequence, op: command.op}
+		if len(timings) == 1 && timings[0] != nil {
+			ack.timing = timings[0].buckets
+		}
+		if operationErr != nil {
+			ack.status = 1
+			ack.certainty, ack.requested, ack.inserted = describeFailure(operationErr)
+		} else if command.op != opHeartbeat {
+			report.Completed++
+		}
+		if deadlineErr := stream.SetWriteDeadline(deadline); deadlineErr != nil {
+			return report, ErrProtocol
+		}
+		if writeErr := writeResponse(stream, ack); writeErr != nil {
+			return report, ErrProtocol
+		}
+		if operationErr != nil {
+			return report, operationFailure(operationErr)
+		}
+		deadline = now().Add(IdleTimeout)
+		if lease.ExpiresAt.Before(deadline) {
+			deadline = lease.ExpiresAt
 		}
 	}
 }

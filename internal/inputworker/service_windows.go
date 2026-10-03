@@ -93,8 +93,17 @@ func runServiceLoop(ctx context.Context, installation *Installation, ready func(
 					_ = channel.Close()
 					return ErrRecovery
 				}
+			} else {
+				err = leaseErr
 			}
-			_ = channel.Close()
+			if closeErr := channel.Close(); closeErr != nil && err == nil {
+				err = closeErr
+			}
+		}
+		// Recovery and the owned worker have already finished. A clean lease
+		// needs no retry backoff; the next accept still blocks awaiting a client.
+		if err == nil {
+			continue
 		}
 		timer := time.NewTimer(200 * time.Millisecond)
 		select {
