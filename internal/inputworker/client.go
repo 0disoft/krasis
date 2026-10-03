@@ -185,7 +185,7 @@ func (client *Client) perform(ctx context.Context, command request) error {
 	}
 	copy(sample[4:], ack.timing[:])
 	if command.op != opHeartbeat {
-		handoff.Worker(ctx, ack.timing)
+		handoff.WorkerDetail(ctx, ack.timing, ack.millis, ack.measured)
 	}
 	if ack.status == 0 {
 		client.lastAcknowledged = time.Now()

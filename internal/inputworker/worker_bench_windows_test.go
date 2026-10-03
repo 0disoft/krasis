@@ -14,13 +14,27 @@ import (
 // Measures the real native pipe and locked-thread request/ACK path with a fake
 // input adapter. It never injects input or starts the installed service.
 func BenchmarkNativeWorkerRoundtrip(b *testing.B) {
+	benchmarkNativeWorkerRoundtrip(b, false)
+}
+
+func BenchmarkNativeWorkerDetailedRoundtrip(b *testing.B) {
+	benchmarkNativeWorkerRoundtrip(b, true)
+}
+
+func benchmarkNativeWorkerRoundtrip(b *testing.B, detailed bool) {
 	server, conn := nativePair(b)
 	lease := testLease()
 	done := make(chan finish, 1)
 	go func() {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
-		report, err := serve(context.Background(), server, &recordingInput{}, lease, testExecute, testExecute, time.Now)
+		do := executor(testExecute)
+		var timing *workerTiming
+		if detailed {
+			timing = &workerTiming{}
+			do = measureExecution(func() error { return nil }, testExecute, timing)
+		}
+		report, err := serve(context.Background(), server, &recordingInput{}, lease, do, testExecute, time.Now, timing)
 		done <- finish{report, err}
 	}()
 	client, err := NewClient(context.Background(), clientChannel(conn, authorityService), lease)

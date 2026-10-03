@@ -204,6 +204,7 @@ func serve(ctx context.Context, stream net.Conn, input application.InputPort, le
 		ack := response{sequence: command.sequence, op: command.op}
 		if len(timings) == 1 && timings[0] != nil {
 			ack.timing = timings[0].buckets
+			ack.millis, ack.measured = timings[0].millis, timings[0].measured
 		}
 		if operationErr != nil {
 			ack.status = 1

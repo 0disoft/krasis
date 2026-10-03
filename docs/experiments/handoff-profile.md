@@ -131,3 +131,44 @@ this event; export validates and reprojects the fixed schema.
 This build is instrumentation only. The next performance change must follow
 the measured bottleneck. Revert this commit if profiling interferes with input,
 recovery, handle lifetime or diagnostic privacy.
+
+## g145 worker timing detail
+
+`handoff.Vector` gains additive fields `workerMillis` (fixed `[3]uint16`) and
+`workerMeasured` (three-bit presence mask) with slot order authority, scope and
+apply, matching the existing validated matching ACK. The existing worker bucket
+array, the client response microseconds and profile schema 1 are unchanged.
+
+The local `KRA1` ACK is still exactly 24 bytes on the same read/write path, with
+no additional calls or round trips; the existing `io.ReadFull` still accepts
+fragmented reads. Version 3 reuses bytes 20..23 as a
+big-endian `uint32` holding three ten-bit fields, slot `i` in bits
+`i*10 .. i*10+9`, with bits 30 and 31 zero. Encoded 0 is unobserved, 1 is a
+measured zero and 1023 is saturated at `MaxWorkerMillis` (1022 ms). A present
+slot decodes to `encoded-1` milliseconds, and `workerMeasured` derives from the
+present slots. Encoded 1023 is a lower bound of at least 1022 ms. For floored
+milliseconds this reproduces the legacy bucket exactly: values in 1000..1021 ms
+are not saturated and keep their own bucket, every span of one second or more
+stays in the legacy `>=1s` bucket, and only values at or above 1022 ms saturate.
+The writer emits version 3 only when precise detail is present; the
+decoder keeps the existing version 1 and 2 behavior, and a new client still
+accepts the legacy 24-byte ACK with the detail unobserved.
+
+Milliseconds are floored, so sub-millisecond spans truncate to zero. Validation
+rejects a value above 1022, a nonzero value without its presence bit, and a value
+that disagrees with its bucket. An absent bit stays unobserved even when the
+value is zero, so a measured zero is distinct from a missing sample. Values come
+from the same sequence- and operation-matching ACK and are retained on the first
+and worst dispatch vectors. Unrelated dispatch maxima must not be combined, and
+overlapping spans must not be subtracted into a claim about OS scheduler time.
+
+No value outside the ten-bit fields is representable, so no numeric detail is
+dropped. Valid `KRA1` ACK statuses and authorization are unchanged; malformed
+reserved bits, an all-zero detail word, or a truncated or structurally invalid
+ACK retain the existing protocol-failure and unknown-outcome handling with no
+retry. Nothing added here records input content, operation kinds, coordinates,
+paths, SIDs or PIN values, and there is no new per-input log; the existing
+120-second window and 12-attempt bound still apply. Service, agent and worker
+images must match with no permission weakening.
+
+This is instrumentation only, not a confirmed stutter fix.

@@ -11,6 +11,8 @@ import (
 	"testing"
 	"testing/iotest"
 	"time"
+
+	"github.com/0disoft/krasis/internal/handoff"
 )
 
 func TestDetailedTimingReplyKeepsLegacyFramingAndPresence(t *testing.T) {
@@ -19,6 +21,9 @@ func TestDetailedTimingReplyKeepsLegacyFramingAndPresence(t *testing.T) {
 	var encoded bytes.Buffer
 	if err := writeResponse(&encoded, precise); err != nil || encoded.Len() != responseSize {
 		t.Fatal("detailed ACK not fixed-size", err)
+	}
+	if !bytes.Equal(encoded.Bytes()[20:24], []byte{0x00, 0x53, 0x18, 0x01}) {
+		t.Fatal("wire slots or byte order changed")
 	}
 	if err := writeResponse(&encoded, legacy); err != nil || encoded.Len() != 2*responseSize {
 		t.Fatal("legacy framing changed", err)
@@ -32,6 +37,24 @@ func TestDetailedTimingReplyKeepsLegacyFramingAndPresence(t *testing.T) {
 	}
 	if encoded.Len() != 0 {
 		t.Fatal("ACK left trailing bytes")
+	}
+}
+
+func TestWorkerTimingDetailPrecisionBoundsAndAbsence(t *testing.T) {
+	for _, elapsed := range []time.Duration{-1, 0, 999 * time.Microsecond, time.Millisecond, 9999 * time.Microsecond, 10 * time.Millisecond, 99999 * time.Microsecond, 100 * time.Millisecond, time.Second, 1022 * time.Millisecond, 2 * time.Second, time.Hour} {
+		for stage := 0; stage < 3; stage++ {
+			timing := &workerTiming{}
+			timing.record(stage, elapsed)
+			var encoded bytes.Buffer
+			want := response{op: opMove, sequence: 1, timing: timing.buckets, millis: timing.millis, measured: timing.measured}
+			if err := writeResponse(&encoded, want); err != nil {
+				t.Fatal("valid measurement rejected", elapsed, err)
+			}
+			got, err := readResponse(&encoded)
+			if err != nil || got != want || got.measured != 1<<stage || got.millis[stage] > handoff.MaxWorkerMillis {
+				t.Fatal("precision, saturation or absence lost", elapsed, got, err)
+			}
+		}
 	}
 }
 
@@ -108,12 +131,16 @@ func TestTimingMeasurementPreservesAuthorizationAndInputFailures(t *testing.T) {
 	timing := &workerTiming{}
 	calls := 0
 	execute := measureExecution(func() error { return cause }, testExecute, timing)
-	if err := execute(context.Background(), func() error { calls++; return nil }); err != cause || calls != 0 || timing.buckets[0] == 0 || timing.buckets[1] != 0 || timing.buckets[2] != 0 {
+	if err := execute(context.Background(), func() error { calls++; return nil }); err != cause || calls != 0 || timing.buckets[0] == 0 || timing.buckets[1] != 0 || timing.buckets[2] != 0 || timing.measured != 1 {
 		t.Fatal("measurement bypassed failed authorization or invented input timing")
 	}
 	execute = measureExecution(func() error { return nil }, testExecute, timing)
-	if err := execute(context.Background(), func() error { calls++; return cause }); err != cause || calls != 1 || timing.buckets[1] == 0 || timing.buckets[2] == 0 {
+	if err := execute(context.Background(), func() error { calls++; return cause }); err != cause || calls != 1 || timing.buckets[1] == 0 || timing.buckets[2] == 0 || timing.measured != 7 {
 		t.Fatal("measurement changed input failure or omitted elapsed stages")
+	}
+	execute = measureExecution(func() error { return nil }, func(context.Context, func() error) error { return cause }, timing)
+	if err := execute(context.Background(), func() error { calls++; return nil }); err != cause || calls != 1 || timing.measured != 3 || timing.buckets[2] != 0 || timing.millis[2] != 0 {
+		t.Fatal("desktop failure inherited prior apply measurement")
 	}
 }
 
@@ -158,8 +185,18 @@ func TestTimingRoundtripPreservesInputAndRecovery(t *testing.T) {
 	}
 	var events []string
 	client.SetTimingObserver(func(code string) { events = append(events, code) })
-	if err := client.Move(context.Background(), 1, 1); err != nil {
+	var profile handoff.Summary
+	ctx := handoff.WithSession(context.Background(), handoff.New(func(s handoff.Summary) { profile = s }))
+	profileCtx := handoff.Begin(ctx, "receiver", "session", "epoch", time.Now())
+	handoff.Backend(profileCtx, "installed")
+	inputCtx, complete := handoff.Input(ctx, "receiver")
+	if err := client.Move(inputCtx, 1, 1); err != nil {
 		t.Fatal("measured authenticated input failed")
+	}
+	complete(nil)
+	handoff.Finish(profileCtx, "ok")
+	if !profile.Valid() || profile.First.WorkerMeasured != 7 || profile.First.Worker != timing.buckets || profile.First.WorkerMillis != timing.millis {
+		t.Fatal("matching ACK detail not attached to original dispatch", profile)
 	}
 	if err := client.Close(); err != nil {
 		t.Fatal(err)
@@ -177,13 +214,24 @@ func TestForeignAckCannotSupplyWorkerTimings(t *testing.T) {
 	}
 	var events []string
 	client.SetTimingObserver(func(code string) { events = append(events, code) })
+	var profile handoff.Summary
+	ctx := handoff.WithSession(context.Background(), handoff.New(func(s handoff.Summary) { profile = s }))
+	profileCtx := handoff.Begin(ctx, "receiver", "session", "epoch", time.Now())
+	handoff.Backend(profileCtx, "installed")
+	inputCtx, complete := handoff.Input(ctx, "receiver")
 	go func() {
 		defer server.Close()
 		req, _ := readRequest(server)
-		_ = writeResponse(server, response{op: req.op, sequence: req.sequence + 1, timing: [3]byte{5, 5, 5}})
+		_ = writeResponse(server, response{op: req.op, sequence: req.sequence + 1, timing: [3]byte{5, 5, 5}, millis: [3]uint16{1022, 1022, 1022}, measured: 7})
 	}()
-	if err := client.Move(context.Background(), 1, 1); err == nil {
+	err = client.Move(inputCtx, 1, 1)
+	if err == nil {
 		t.Fatal("foreign reply accepted")
+	}
+	complete(err)
+	handoff.Finish(profileCtx, "error")
+	if !profile.Valid() || profile.First.WorkerMeasured != 0 || profile.First.Worker != ([3]byte{}) {
+		t.Fatal("foreign ACK polluted handoff profile")
 	}
 	for _, event := range events {
 		if strings.Contains(event, "worker_") {

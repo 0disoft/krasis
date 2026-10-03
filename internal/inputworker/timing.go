@@ -3,6 +3,8 @@ package inputworker
 import (
 	"context"
 	"time"
+
+	"github.com/0disoft/krasis/internal/handoff"
 )
 
 // Timing separates input from idle maintenance with coarse elapsed-time buckets,
@@ -82,14 +84,31 @@ func emitTiming(emit func(string), code string) {
 	emit(code)
 }
 
-type workerTiming struct{ buckets [3]byte }
+type workerTiming struct {
+	buckets  [3]byte
+	millis   [3]uint16
+	measured uint8
+}
+
+func (timing *workerTiming) record(stage int, elapsed time.Duration) {
+	if elapsed < 0 {
+		elapsed = 0
+	}
+	timing.buckets[stage] = timingBucket(elapsed)
+	ms := elapsed.Milliseconds()
+	if ms > handoff.MaxWorkerMillis {
+		ms = handoff.MaxWorkerMillis
+	}
+	timing.millis[stage] = uint16(ms)
+	timing.measured |= 1 << stage
+}
 
 func measureExecution(authorize func() error, execute executor, timing *workerTiming) executor {
 	return func(ctx context.Context, work func() error) error {
-		timing.buckets = [3]byte{}
+		*timing = workerTiming{}
 		start := time.Now()
 		err := authorize()
-		timing.buckets[0] = timingBucket(time.Since(start))
+		timing.record(0, time.Since(start))
 		if err != nil {
 			return err
 		}
@@ -99,10 +118,10 @@ func measureExecution(authorize func() error, execute executor, timing *workerTi
 			begin := time.Now()
 			result := work()
 			applied = time.Since(begin)
-			timing.buckets[2] = timingBucket(applied)
+			timing.record(2, applied)
 			return result
 		})
-		timing.buckets[1] = timingBucket(time.Since(start) - applied)
+		timing.record(1, time.Since(start)-applied)
 		return err
 	}
 }
