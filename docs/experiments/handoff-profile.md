@@ -180,11 +180,11 @@ The g145 trial on receiver B gave 11 complete profiles and 924 further frames
 worker apply was 2..3 ms and worker authority/scope a floored 0 ms (under 1 ms,
 not missing); the historical 198 ms did not recur. Boundary preparation spanned
 223.349..265.820 ms, with service image pin 27.232..40.153 ms and service child
-connection 153.823..183.777 ms. One export log is incomplete, and the 12th
-receiver profile is absent because the B export was created at 17:37:30 UTC before
-that profile ended at 17:37:31, so the snapshot predates the final receiver profile
-instead of showing an unexplained defect. All samples are A-to-B from source A, so
-there is no new paired B-source evidence.
+connection 153.823..183.777 ms. One export log is incomplete: the B export contains
+11 receiver profiles and A contains 12 source profiles, the snapshot completion
+differs, and the final receiver profile is unobserved in the supplied export. Do
+not infer an end time or exact cause. All samples are A-to-B from source A, so there
+is no new paired B-source evidence.
 
 g146 makes the product connection own its verified installation pins via
 `OpenAgentService`, reusing a duplicate of the same file object in each service
