@@ -31,6 +31,8 @@ type WorkspaceService struct {
 	done            chan struct{}
 	jobs            sync.WaitGroup
 	prepareRecovery func() error
+	inputRefresh    func(context.Context) error
+	inputSetup      func() string
 	log             *productlog.Logger
 }
 
@@ -71,27 +73,41 @@ func (s *WorkspaceService) disconnectAsync() {
 }
 func (s *WorkspaceService) Refresh() productpanel.BridgeSnapshot {
 	if s.managed != nil {
-		return s.managed.Refresh()
+		return s.withInputSetup(s.managed.Refresh())
 	}
-	return s.raw.Refresh()
+	return s.withInputSetup(s.raw.Refresh())
+}
+
+func (s *WorkspaceService) withInputSetup(value productpanel.BridgeSnapshot) productpanel.BridgeSnapshot {
+	if s.inputSetup != nil {
+		value.InputSetup = s.inputSetup()
+	}
+	return value
+}
+
+func (s *WorkspaceService) InputRefresh() productpanel.BridgeSnapshot {
+	if s.managed == nil || s.inputRefresh == nil {
+		return s.Refresh()
+	}
+	return s.withInputSetup(s.managed.RefreshProtectedInput(s.inputRefresh))
 }
 func (s *WorkspaceService) Connect(alias, fingerprint string) productpanel.BridgeSnapshot {
 	if s.managed != nil {
-		return s.managed.Connect(alias, fingerprint)
+		return s.withInputSetup(s.managed.Connect(alias, fingerprint))
 	}
-	return s.raw.Connect(alias, fingerprint)
+	return s.withInputSetup(s.raw.Connect(alias, fingerprint))
 }
 func (s *WorkspaceService) Disconnect() productpanel.BridgeSnapshot {
 	if s.managed != nil {
-		return s.managed.Disconnect()
+		return s.withInputSetup(s.managed.Disconnect())
 	}
-	return s.raw.Disconnect()
+	return s.withInputSetup(s.raw.Disconnect())
 }
 func (s *WorkspaceService) Restart() productpanel.BridgeSnapshot {
 	if s.managed != nil {
-		return s.managed.Restart()
+		return s.withInputSetup(s.managed.Restart())
 	}
-	return s.raw.Refresh()
+	return s.withInputSetup(s.raw.Refresh())
 }
 
 // Export locally before replacement when available. The lifecycle bounds this

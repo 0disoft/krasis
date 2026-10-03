@@ -84,7 +84,7 @@ func runDoctor(ctx context.Context, parsed options, deps dependencies) (doctorRe
 			v.checkMatch("ui_agent_version", v.UI.Generation == v.AgentGeneration && compatibleBuild(v.UI.Build, v.AgentBuild), "restart_matching_ui", "실행 에이전트와 같은 버전의 앱을 여세요.", &exit)
 		}
 		if v.InstalledAgent.State == "VERIFIED" {
-			v.checkMatch("installed_agent_version", compatibleBuild(v.InstalledAgent.Build, v.AgentBuild), "update_input_installation", "보호된 입력 설치가 다른 버전입니다. 같은 배포 묶음의 설치기로 한 번 갱신하세요.", &exit)
+			v.checkMatch("installed_agent_version", compatibleBuild(v.InstalledAgent.Build, v.AgentBuild), "update_input_installation", "앱의 보호 입력 갱신 버튼으로 설치를 맞추세요. Windows 관리자 확인 후 자동으로 진행합니다.", &exit)
 		}
 	}
 	v.addCheck("ui", v.UI.State)

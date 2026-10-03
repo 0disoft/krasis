@@ -62,3 +62,19 @@ test('input mode follows fallback and unknown values cannot imply PIN support', 
     assert.equal((await bridge.refresh()).inputBackend, 'UNKNOWN');
   }
 });
+
+test('protected input refresh keeps cancellation and pending outcomes explicit', async () => {
+  let setup = 'CANCELLED';
+  let calls = 0;
+  const bridge = createBridge({ Refresh: async () => snapshot('LOCAL'), Connect() {}, Disconnect() {},
+    InputRefresh: async () => { calls++; return {...snapshot('LOCAL'), inputSetup:setup, diagnosticPath:'private', code:'input_refresh_cancelled'}; } });
+  const cancelled = await bridge.inputRefresh();
+  assert.equal(cancelled.inputSetup,'CANCELLED');
+  assert.equal(cancelled.code,'input_refresh_cancelled');
+  assert.equal(cancelled.diagnosticPath,undefined);
+  setup = 'PENDING';
+  assert.equal((await bridge.inputRefresh()).inputSetup,'PENDING');
+  setup = 'private native failure';
+  assert.equal((await bridge.inputRefresh()).inputSetup,'UNKNOWN');
+  assert.equal(calls,3);
+});

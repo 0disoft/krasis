@@ -84,6 +84,8 @@ func Run() {
 		if startupErr != nil {
 			os.Exit(1)
 		}
+		service.inputRefresh = startup.RefreshProtectedInput
+		service.inputSetup = startup.InputSetup
 		if updated.Revision != "" {
 			updateCtx, done := context.WithTimeout(ctx, 3*time.Minute)
 			err = prepareUpdatedWorkspace(updateCtx, paths.Control, startup, updated)

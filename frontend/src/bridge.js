@@ -1,4 +1,5 @@
 const states = new Set(['LOCAL', 'CONNECTING', 'CONNECTED', 'RECONNECTING', 'DISCONNECTING', 'FAULTED', 'UNKNOWN']);
+const inputSetupStates = new Set(['NOT_INSTALLED','UPDATE_REQUIRED','READY','UPDATING','CANCELLED','FAILED','PENDING','UNKNOWN']);
 
 // Only a native-owned binding is accepted. This module never discovers endpoint
 // files, makes HTTP calls, stores tokens, or silently falls back to mock success.
@@ -26,6 +27,7 @@ export function createBridge(binding) {
       const result = { schema: value.schema, state: value.state, peerAlias: value.peerAlias,
         code: value.code, notice: value.notice,
 		inputBackend: ['PROTECTED','PORTABLE'].includes(value.inputBackend) ? value.inputBackend : 'UNKNOWN',
+        inputSetup: inputSetupStates.has(value.inputSetup) ? value.inputSetup : 'UNKNOWN',
         ...(value.revision > 0 ? { revision: value.revision } : {}),
         peers: value.peers.map(p => ({ alias: p.alias, fingerprint: p.fingerprint })) };
       if (result.revision > 0) latest = copy(result);
@@ -47,5 +49,6 @@ export function createBridge(binding) {
     },
     disconnect: () => call('Disconnect'),
     restart: () => call('Restart'),
+    inputRefresh: () => call('InputRefresh'),
   });
 }

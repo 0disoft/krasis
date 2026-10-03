@@ -69,3 +69,42 @@ func TestInputMaintenanceDoesNotStopAnUnexpectedAgent(t *testing.T) {
 		t.Fatal("unexpected agent stopped")
 	}
 }
+
+type inputMaintenanceClient struct{ fakeClient }
+
+func (c *inputMaintenanceClient) Status(ctx context.Context) (localapi.Status, error) {
+	v, e := c.fakeClient.Status(ctx)
+	if v.State == "CONNECTED" {
+		v.PeerAlias = "B"
+	}
+	return v, e
+}
+
+func TestInputMaintenanceReconnectsOnlyTheSameTrustedPeerAfterTerminalOutcome(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		outcome  error
+		changed  bool
+		connects int
+	}{
+		{"complete", nil, false, 1}, {"cancelled", ErrInputRefreshCancelled, false, 1}, {"failed", ErrInputRefreshFailed, false, 1},
+		{"pending", ErrInputRefreshPending, false, 0}, {"identity changed", nil, true, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			client := &inputMaintenanceClient{fakeClient: fakeClient{state: "CONNECTED", peers: []localapi.TrustedPeer{{Alias: "B", Fingerprint: strings.Repeat("a", 64)}}}}
+			b := NewDesktopLifecycle(context.Background(), func() (Client, error) { return client, nil }, nil, nil)
+			value := b.RefreshProtectedInput(func(context.Context) error {
+				if client.state != "LOCAL" || client.disconnects != 1 {
+					t.Fatal("input not disconnected before installation")
+				}
+				if tc.changed {
+					client.peers[0].Fingerprint = strings.Repeat("b", 64)
+				}
+				return tc.outcome
+			})
+			if client.connects != tc.connects || value.Code == "ok" && tc.outcome != nil {
+				t.Fatal(value, client.connects)
+			}
+		})
+	}
+}

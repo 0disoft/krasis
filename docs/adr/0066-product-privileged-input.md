@@ -116,3 +116,35 @@ failure handling; invalid numeric diagnostics are consumed and discarded.
 Input requests, ACKs, bootstrap lease metadata, pressed-state recovery,
 authority checks, worker lifetime and service backoff are unchanged.
 See the [startup spans and trial](../experiments/handoff-profile.md).
+
+## g140: Attended protected input refresh in the app lifecycle
+
+After an authorized peer update or idle local agent replacement, startup checks
+the fixed protected installation before launching the new agent. A verified
+installed agent with a different digest triggers the matching bundled embedded
+installer through Windows `runas`. Initial installation requires the local
+app button. A matching image with an unready service, or an unverified existing
+installation, does not trigger automatic repair. The ordinary UI never gains
+privileged input or accepts executable paths from renderer/peer arguments.
+
+The app verifies bundled image checksums and clean VCS revisions, pins files
+against writes/replacement across consent, waits for a terminal installer exit,
+and independently verifies the installed agent and service readiness. This is
+integrity verification for an attended development build, not publisher trust.
+Windows administrator consent is still required; no signing key, certificate,
+security policy or unattended privileged update authority is introduced.
+
+The local install/refresh button serializes with connection recovery and peer
+update application, disconnects input, stops the exact idle agent through the
+existing instance-bound API and waits for its single-instance lease to end.
+After terminal success/cancellation/failure it starts a verified matching agent
+and requests reconnection only to the saved still-trusted fingerprint. A pending
+installer outcome fences further installation and agent launch. Transaction
+recovery remains owned by the installer; no journal is deleted by the UI.
+Cancellation/failure never repeats the prompt through polling or recovery.
+
+The native UI publishes bounded installation-state codes independently of the
+selected session input backend. A ready installation is not proof of a working
+PIN session. Local tests cover ownership, cancellation, pending results, image
+pins and reconnect identity; real two-device consent/update/PIN behavior remains
+to be checked on g140.

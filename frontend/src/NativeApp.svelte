@@ -15,9 +15,10 @@
   let saved;
   try { saved = localStorage.getItem('krasis.workspace.locale'); } catch {}
   let locale = $state(resolveLocale(saved, navigator.languages));
-  let snapshot = $state({state:'UNKNOWN', peerAlias:'', peers:[], code:'unavailable'});
+  let snapshot = $state({state:'UNKNOWN', peerAlias:'', peers:[], code:'unavailable', inputSetup:'UNKNOWN'});
   let selected = $state('');
   let busy = $state(false);
+  let inputBusy = $state(false);
   let error = $state('');
   let bridge = $state.raw();
   let clipboardBridge;
@@ -52,6 +53,9 @@
   let consentPeer = '';
   let disposed = false;
   const t = key => nativeText(locale, key);
+  const inputNotice = $derived(inputBusy ? 'UPDATING' : snapshot.inputSetup ?? 'UNKNOWN');
+  const inputNeedsAction = $derived(['NOT_INSTALLED','UPDATE_REQUIRED','CANCELLED','FAILED'].includes(inputNotice));
+  const inputNoticeKey = $derived(inputNotice === 'UNKNOWN' || inputNotice === 'READY' ? 'input_portable' : 'input_setup_' + inputNotice);
   const selectedPeer = $derived(snapshot.peers.find(p => p.fingerprint === selected));
   const clipboardKnown = $derived(clipboard.code === 'ok');
   const clipboardEnabled = $derived(clipboardKnown && !!clipboard.peer);
@@ -125,16 +129,22 @@
     if (busy || !bridge || disposed) return;
     busy = true;
     try {
-      const value = await (action === 'connect' ? bridge.connect(selectedPeer) : action === 'disconnect' ? bridge.disconnect() : action === 'restart' ? bridge.restart() : bridge.refresh());
+      const value = await (action === 'input' ? bridge.inputRefresh() : action === 'connect' ? bridge.connect(selectedPeer) : action === 'disconnect' ? bridge.disconnect() : action === 'restart' ? bridge.restart() : bridge.refresh());
       if (disposed) return;
       snapshot = value;
       if (!value.peers.some(p => p.fingerprint === selected)) {
         selected = (value.peers.find(p => p.alias === value.peerAlias) ?? value.peers[0])?.fingerprint ?? '';
       }
-      error = value.code === 'ok' ? '' : value.code;
+      error = value.code === 'ok' || value.code.startsWith('input_refresh_') ? '' : value.code;
     } catch {
       if (!disposed) { snapshot = {state:'UNKNOWN', peerAlias:'', peers:[], code:'unavailable'}; error = 'unavailable'; }
     } finally { if (!disposed) busy = false; }
+  }
+  async function refreshInput() {
+    if (busy || inputBusy || !bridge) return;
+    inputBusy = true;
+    try { await run('input'); }
+    finally { if (!disposed) inputBusy = false; }
   }
   onMount(() => {
     let timer;
@@ -170,6 +180,7 @@
           Connect: (alias, fingerprint) => Call.ByName(name + 'Connect', alias, fingerprint),
           Disconnect: () => Call.ByName(name + 'Disconnect'),
           Restart: () => Call.ByName(name + 'Restart'),
+          InputRefresh: () => Call.ByName(name + 'InputRefresh'),
         });
         clipboardBridge=createClipboardBridge({
           ClipboardStatus:()=>Call.ByName(name+'ClipboardStatus'),
@@ -226,8 +237,8 @@
   {#if error}
     <p class="fault-banner" role="alert">{t(error)}</p>
   {/if}
-  {#if snapshot.inputBackend === 'PORTABLE'}
-    <p class="fault-banner" role="status">{t('input_portable')} <button onclick={openUpdates}>{t('input_setup')}</button></p>
+  {#if inputNeedsAction || inputBusy || inputNotice === 'UPDATING' || inputNotice === 'PENDING' || snapshot.inputBackend === 'PORTABLE'}
+    <p class="fault-banner" role="status">{t(inputNoticeKey)} <button disabled={busy || !bridge || inputNotice === 'UPDATING' || inputNotice === 'PENDING'} onclick={refreshInput}>{t(inputNotice === 'NOT_INSTALLED' ? 'input_setup' : 'input_refresh')}</button></p>
   {/if}
   <label class="peer-select">{t('peer')}<select bind:value={selected} disabled={busy || snapshot.state !== 'LOCAL'}><option value="">{t('choose')}</option>{#each snapshot.peers as peer (peer.fingerprint)}<option value={peer.fingerprint}>{peer.alias}</option>{/each}</select></label>
   <section class="canvas" aria-label={t('devices')}>
@@ -266,7 +277,7 @@
   {/if}
 </main>
 <dialog bind:this={updatesDlg} aria-labelledby="update-settings-title" onclose={() => { updatesOpen = false; restoreDialogFocus(); }}>
-  {#if updatesOpen}<UpdateSettings bridge={updateSettingsBridge} peers={snapshot.peers} initialPeer={selected} inputBackend={snapshot.inputBackend ?? 'UNKNOWN'} {locale} />{/if}
+  {#if updatesOpen}<UpdateSettings bridge={updateSettingsBridge} peers={snapshot.peers} initialPeer={selected} inputBackend={snapshot.inputBackend ?? 'UNKNOWN'} inputSetup={snapshot.inputSetup ?? 'UNKNOWN'} {inputBusy} {refreshInput} {locale} />{/if}
   <div class="dlg-foot"><button class="primary" onclick={() => updatesDlg.close()}>{t('close')}</button></div>
 </dialog>
 <dialog bind:this={diagnosticsDlg} aria-labelledby="diagnostics-title" onclose={restoreDialogFocus}>

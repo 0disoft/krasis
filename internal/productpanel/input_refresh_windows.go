@@ -46,6 +46,9 @@ func newInputRefresh(base, revision string) *inputRefresh {
 					return "READY"
 				}
 			}
+			// A stopped/unknown service on an otherwise matching installation is
+			// a diagnostic condition, not permission for an automatic repair.
+			return "UNKNOWN"
 		}
 		return "UPDATE_REQUIRED"
 	}

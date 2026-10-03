@@ -2,7 +2,7 @@
   import { onMount, tick } from 'svelte';
   import { emptyUpdateSettings, emptyUpdateTransfer, transferActive } from './update-settings-bridge.js';
   import { nativeText } from './native-i18n.js';
-  let { bridge, peers, initialPeer = '', inputBackend = 'UNKNOWN', locale } = $props();
+  let { bridge, peers, initialPeer = '', inputBackend = 'UNKNOWN', inputSetup = 'UNKNOWN', inputBusy = false, refreshInput, locale } = $props();
   let selected = $state('');
   let value = $state(emptyUpdateSettings());
   let busy = $state(false);
@@ -23,7 +23,9 @@
   const t = key => nativeText(locale, key);
   const current = $derived(value.peer === selected ? value : emptyUpdateSettings(selected));
   const job = $derived(transfer.peer === selected ? transfer : emptyUpdateTransfer(selected));
-  const canSend = $derived(!!selected && !!bridge && !busy && current.appGeneration > 0 && current.localGeneration === current.appGeneration && current.peerState === 'ONLINE' && current.remotePermission === 'ALLOWED' && !transferActive(job.state));
+  const canSend = $derived(!!selected && !!bridge && !busy && !inputBusy && current.appGeneration > 0 && current.localGeneration === current.appGeneration && current.peerState === 'ONLINE' && current.remotePermission === 'ALLOWED' && !transferActive(job.state));
+  const inputState = $derived(inputBusy ? 'UPDATING' : inputSetup);
+  const inputStatusKey = $derived(inputState === 'UNKNOWN' ? 'input_' + inputBackend.toLowerCase() : 'input_setup_' + inputState);
   const selectedName = $derived(peers.find(peer => peer.fingerprint === selected)?.alias ?? '');
   const permissionText = permission => t(permission === 'ALLOWED' ? 'upd_allowed' : permission === 'DENIED' ? 'upd_denied' : 'upd_permission_unknown');
   const version = (generation, build) => generation ? `g${generation} · ${build ? build === 'development' ? build : build.slice(0,8) : t('upd_unknown')}` : t('upd_unknown');
@@ -39,7 +41,7 @@
     if (!peers.some(peer => peer.fingerprint === selected)) selected = (peers.find(peer => peer.fingerprint === initialPeer) ?? peers[0])?.fingerprint ?? '';
   });
   async function run(action = 'status', peer = selected) {
-    if (!bridge || !peer || busy || disposed) return;
+    if (!bridge || !peer || busy || inputBusy || disposed) return;
     busy = true;
     if (action !== 'status') notice = '';
     try {
@@ -87,11 +89,14 @@
 <div class="dlg-body">
   <section class="upd-section" aria-label={t('input_title')}>
     <h3>{t('input_title')}</h3>
-    <p role="status">{t('input_' + inputBackend.toLowerCase())}</p>
-    {#if inputBackend !== 'PROTECTED'}<p>{t('input_install_help')}</p>{/if}
+    <p role="status">{t(inputStatusKey)}</p>
+    {#if ['NOT_INSTALLED','UPDATE_REQUIRED','CANCELLED','FAILED'].includes(inputState) || inputBackend === 'PORTABLE' && inputState === 'READY'}
+      <p>{t('input_install_help')}</p>
+      <button disabled={busy || inputBusy || !refreshInput} onclick={refreshInput}>{t(inputState === 'NOT_INSTALLED' ? 'input_setup' : 'input_refresh')}</button>
+    {/if}
   </section>
   <label>{t('peer')}
-    <select bind:this={peerSelect} bind:value={selected} onchange={choose} disabled={busy}>
+    <select bind:this={peerSelect} bind:value={selected} onchange={choose} disabled={busy || inputBusy}>
       <option value="">{t('choose')}</option>
       {#each peers as peer (peer.fingerprint)}<option value={peer.fingerprint}>{peer.alias}</option>{/each}
     </select>
@@ -127,9 +132,9 @@
     <p>{permissionText(current.permission)}</p>
     <p>{t('upd_remote_permission')}: {permissionText(current.remotePermission)}</p>
     <div class="pair-actions">
-      <button bind:this={refreshTrigger} disabled={!selected || busy || !bridge} onclick={() => run()}>{t('upd_refresh')}</button>
-      <button bind:this={allowTrigger} disabled={!selected || busy || !bridge || current.permission === 'ALLOWED' || confirmingSend || confirmingAllow} onclick={requestAllow}>{t('upd_allow')}</button>
-      <button disabled={!selected || busy || !bridge || current.permission === 'DENIED'} onclick={() => run('deny')}>{t('upd_deny')}</button>
+      <button bind:this={refreshTrigger} disabled={!selected || busy || inputBusy || !bridge} onclick={() => run()}>{t('upd_refresh')}</button>
+      <button bind:this={allowTrigger} disabled={!selected || busy || inputBusy || !bridge || current.permission === 'ALLOWED' || confirmingSend || confirmingAllow} onclick={requestAllow}>{t('upd_allow')}</button>
+      <button disabled={!selected || busy || inputBusy || !bridge || current.permission === 'DENIED'} onclick={() => run('deny')}>{t('upd_deny')}</button>
     </div>
     {#if confirmingAllow}
       <section class="upd-confirm" aria-labelledby="update-consent-title" bind:this={allowConfirmation}>
