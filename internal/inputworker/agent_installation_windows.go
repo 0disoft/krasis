@@ -5,6 +5,8 @@ package inputworker
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -17,6 +19,39 @@ import (
 type AgentLaunch struct {
 	installation *Installation
 	path         string
+}
+
+// Read-only observation of the installer's exclusive file lock. It never
+// creates/deletes a lock or journal. This also fences app restart during setup.
+func InstallationRefreshRunning() (bool, error) {
+	root, err := windows.KnownFolderPath(windows.FOLDERID_ProgramFiles, 0)
+	if err != nil {
+		return false, ErrAuthority
+	}
+	return installationRefreshRunning(filepath.Join(root, "Krasis", "INPUT-TRANSACTION.lock"))
+}
+
+func installationRefreshRunning(path string) (bool, error) {
+	name, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		return false, ErrAuthority
+	}
+	handle, err := windows.CreateFile(name, windows.GENERIC_READ, windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE, nil, windows.OPEN_EXISTING, windows.FILE_FLAG_OPEN_REPARSE_POINT, 0)
+	if errors.Is(err, windows.ERROR_SHARING_VIOLATION) {
+		return true, nil
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, ErrAuthority
+	}
+	defer windows.CloseHandle(handle)
+	var info windows.ByHandleFileInformation
+	if windows.GetFileInformationByHandle(handle, &info) != nil || info.FileAttributes&(windows.FILE_ATTRIBUTE_REPARSE_POINT|windows.FILE_ATTRIBUTE_DIRECTORY) != 0 || info.NumberOfLinks != 1 {
+		return false, ErrAuthority
+	}
+	return false, nil
 }
 
 // Read-only identity comparison. This does not grant a lease or require service
@@ -39,6 +74,9 @@ func InstallationMatchesAgent(expected [sha256.Size]byte) (bool, error) {
 
 func OpenAgentLaunch(expected [sha256.Size]byte) (*AgentLaunch, error) {
 	if expected == ([sha256.Size]byte{}) {
+		return nil, ErrAuthority
+	}
+	if running, err := InstallationRefreshRunning(); err != nil || running {
 		return nil, ErrAuthority
 	}
 	installation, err := LoadInstallation()

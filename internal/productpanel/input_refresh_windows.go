@@ -24,6 +24,11 @@ import (
 
 func newInputRefresh(base, revision string) *inputRefresh {
 	inspect := func() string {
+		if running, err := inputworker.InstallationRefreshRunning(); err != nil {
+			return "UNKNOWN"
+		} else if running {
+			return "PENDING"
+		}
 		data, err := os.ReadFile(filepath.Join(base, "krasis-agent.exe"))
 		if err != nil {
 			return "UNKNOWN"

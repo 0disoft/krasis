@@ -20,6 +20,7 @@ func TestInputRefreshAutomaticConsentPolicy(t *testing.T) {
 	}{
 		{"NOT_INSTALLED", nil, false, "NOT_INSTALLED", 0, false},
 		{"UNKNOWN", nil, false, "UNKNOWN", 0, false},
+		{"PENDING", nil, false, "PENDING", 0, true},
 		{"READY", nil, true, "READY", 0, false},
 		{"UPDATE_REQUIRED", nil, true, "READY", 1, false},
 		{"UPDATE_REQUIRED", nil, false, "FAILED", 1, false},

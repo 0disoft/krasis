@@ -49,6 +49,10 @@ func (b *inputRefresh) apply(ctx context.Context, explicit bool) error {
 		return nil
 	}
 	state := b.inspect()
+	if state == "PENDING" {
+		b.setState(state)
+		return ErrInputRefreshPending
+	}
 	if state == "READY" || !explicit && state != "UPDATE_REQUIRED" {
 		b.setState(state)
 		return nil

@@ -147,4 +147,6 @@ The native UI publishes bounded installation-state codes independently of the
 selected session input backend. A ready installation is not proof of a working
 PIN session. Local tests cover ownership, cancellation, pending results, image
 pins and reconnect identity; real two-device consent/update/PIN behavior remains
-to be checked on g140.
+to be checked on the final g141 bundle. g141 also observes the installer's
+existing exclusive transaction lock without creating or deleting it, fencing
+installation and agent startup after reopening an app during setup.
