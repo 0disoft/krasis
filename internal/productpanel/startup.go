@@ -23,14 +23,17 @@ type RuntimeClient interface {
 }
 
 type Startup struct {
-	Open       func() (RuntimeClient, error)
-	Lock       func() (io.Closer, error)
-	Available  func() (bool, error)
-	Verify     func() error
-	Start      func() error
-	Pause      func(context.Context) error
-	Generation int
-	Revision   string
+	Open         func() (RuntimeClient, error)
+	Lock         func() (io.Closer, error)
+	Available    func() (bool, error)
+	Verify       func() error
+	Start        func() error
+	BeforeStart  func(context.Context) error
+	InputRefresh func(context.Context) error
+	InputSetup   func() string
+	Pause        func(context.Context) error
+	Generation   int
+	Revision     string
 }
 
 // Ensure is a bounded, single-start operation. Timers in the GUI do not invoke it.
@@ -51,7 +54,7 @@ func (s Startup) Ensure(ctx context.Context) error {
 				if err := s.Verify(); err != nil {
 					return err
 				}
-				if err := s.Start(); err != nil {
+				if err := s.start(ctx); err != nil {
 					return err
 				}
 				started, stopping = true, false
@@ -112,7 +115,7 @@ func (s Startup) Ensure(ctx context.Context) error {
 					if err := s.Verify(); err != nil {
 						return err
 					}
-					if err := s.Start(); err != nil {
+					if err := s.start(ctx); err != nil {
 						return err
 					}
 					started = true
@@ -124,6 +127,18 @@ func (s Startup) Ensure(ctx context.Context) error {
 		}
 	}
 	return ErrAgentNotReady
+}
+
+func (s Startup) start(ctx context.Context) error {
+	if s.BeforeStart != nil {
+		if err := s.BeforeStart(ctx); err != nil {
+			return err
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return s.Start()
 }
 
 func startupPause(ctx context.Context) error {

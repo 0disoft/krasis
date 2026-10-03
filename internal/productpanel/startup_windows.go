@@ -34,9 +34,13 @@ func NewStartup(control string) (Startup, error) {
 			}
 		}
 	}
+	refresh := newInputRefresh(base, revision)
 	return Startup{
-		Open: func() (RuntimeClient, error) { return localapi.OpenClient(control) },
-		Lock: func() (io.Closer, error) { return agentinstance.AcquireControlStartup() },
+		BeforeStart:  refresh.automatic,
+		InputRefresh: refresh.explicit,
+		InputSetup:   refresh.status,
+		Open:         func() (RuntimeClient, error) { return localapi.OpenClient(control) },
+		Lock:         func() (io.Closer, error) { return agentinstance.AcquireControlStartup() },
 		Available: func() (bool, error) {
 			lease, err := agentinstance.Acquire()
 			if errors.Is(err, agentinstance.ErrAlreadyRunning) {

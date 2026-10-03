@@ -52,7 +52,11 @@ func (b *DesktopLifecycle) save(value BridgeSnapshot) BridgeSnapshot {
 }
 
 func (b *DesktopLifecycle) operation() (context.Context, func()) {
-	ctx, cancel := context.WithTimeout(b.ctx, 40*time.Second)
+	return b.operationBudget(40 * time.Second)
+}
+
+func (b *DesktopLifecycle) operationBudget(budget time.Duration) (context.Context, func()) {
+	ctx, cancel := context.WithTimeout(b.ctx, budget)
 	b.cancelMu.Lock()
 	b.cancel = cancel
 	b.cancelMu.Unlock()
@@ -95,7 +99,7 @@ func (b *DesktopLifecycle) Connect(alias, fingerprint string) BridgeSnapshot {
 		return bridgeFailure("busy")
 	}
 	defer b.gate.Unlock()
-	ctx, done := b.operation()
+	ctx, done := b.operationBudget(3 * time.Minute)
 	defer done()
 	b.stopped.Store(false)
 	b.recovery.Reset()
@@ -125,7 +129,7 @@ func (b *DesktopLifecycle) Restart() BridgeSnapshot {
 		return bridgeFailure("busy")
 	}
 	defer b.gate.Unlock()
-	ctx, done := b.operation()
+	ctx, done := b.operationBudget(3 * time.Minute)
 	defer done()
 	view := NewDesktopBridge(ctx, b.open).Refresh()
 	// A restart button is never authority to interrupt an active session.
@@ -149,7 +153,7 @@ func (b *DesktopLifecycle) Restart() BridgeSnapshot {
 // It starts once and remains active even when WebView timers are throttled.
 func (b *DesktopLifecycle) Run() {
 	b.gate.Lock()
-	ctx, done := b.operation()
+	ctx, done := b.operationBudget(3 * time.Minute)
 	initial := NewDesktopBridge(ctx, b.open).Refresh()
 	var diagnosticErr error
 	if initial.State == "FAULTED" {

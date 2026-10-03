@@ -19,6 +19,24 @@ type AgentLaunch struct {
 	path         string
 }
 
+// Read-only identity comparison. This does not grant a lease or require service
+// readiness. Close every image pin before executing the elevated installer.
+func InstallationMatchesAgent(expected [sha256.Size]byte) (bool, error) {
+	installation, err := LoadInstallation()
+	if err != nil {
+		return false, err
+	}
+	agent, _, err := installation.digests()
+	closeErr := installation.Close()
+	if err != nil {
+		return false, err
+	}
+	if closeErr != nil {
+		return false, closeErr
+	}
+	return expected != ([sha256.Size]byte{}) && agent == expected, nil
+}
+
 func OpenAgentLaunch(expected [sha256.Size]byte) (*AgentLaunch, error) {
 	if expected == ([sha256.Size]byte{}) {
 		return nil, ErrAuthority

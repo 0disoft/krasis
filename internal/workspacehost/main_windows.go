@@ -85,7 +85,7 @@ func Run() {
 			os.Exit(1)
 		}
 		if updated.Revision != "" {
-			updateCtx, done := context.WithTimeout(ctx, 90*time.Second)
+			updateCtx, done := context.WithTimeout(ctx, 3*time.Minute)
 			err = prepareUpdatedWorkspace(updateCtx, paths.Control, startup, updated)
 			done()
 			if err != nil {
