@@ -1,5 +1,8 @@
 # g138 A protected input installation
 
+Subsequent B physical PIN cancellation results and received diagnostic checks
+are recorded separately in the [B recovery result](2026-10-03-g138-b-pin-recovery.md).
+
 ## Scope
 
 The operator explicitly requested installation on A (HP15). This records the
