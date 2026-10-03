@@ -197,3 +197,51 @@ stale pin or late open. Sharing keeps the existing write/delete exclusion and is
 not a pathname- or digest-only cache. The goal is to remove the repeated 27..40 ms
 hash work; child startup stays unresolved and the 198 ms tail unknown. This is not
 a measured g146 speed claim and adds no private input logging.
+
+## g146 observed device trial
+
+Both exports come from build c5fde05 (A created 2026-10-03T18:11:16Z, B created
+18:11:14Z). A holds 11 source profiles and B holds 10 receiver profiles, all with
+source A, so there are still no physical B-source measurements. B kept 2082
+continuous frames with histogram 255 `<1ms`, 1820 `<10ms`, 7 `<100ms`, 0 `<1s`,
+0 `>=1s`. The worst B dispatch was 16.073 ms with the same ACK workers `[0,0,12]`
+ms; two others reached 14.975 ms (`[0,0,14]`) and 13.598 ms (`[0,0,12]`). The
+historical 198 ms did not recur; this is not a complete-fix or p95 claim.
+
+| Span | g145 | g146 |
+|---|---|---|
+| Service image pin | 27.232..40.153 ms | 0..615 us, present in all 10 |
+| Service authentication | ~29..41 ms | 1.771..2.847 ms |
+| Receiver AuthorizeTotal | 223.349..265.820 ms | 177.842..208.960 ms |
+| Child connection | 153.823..183.777 ms | 139.156..163.956 ms |
+
+Attempts 8 and 9 failed with `activation_capture_foreground_missing_before_show`
+(18:10:57.9690119Z, 18:10:59.7108724Z). On B the same ordinal reached startup
+ready but produced no first frame and ended with an error. Both agent logs show one
+`CONNECTED` with no disconnect, reconnect or backend failure after it. Missing
+source foreground caused the activation rejection; why `GetForegroundWindow`
+returned NULL is unconfirmed, so do not blame Windows or the application, change
+the guard, or bypass the focus checks.
+
+The final receiver profile in the B export is absent and stays unobserved; do not
+infer cross-clock causality. Record only observed findings and keep the current
+gate distinct from an unconfirmed root cause.
+
+## g147 stateless injection port (static inspection)
+
+Static inspection found the SYSTEM worker built a full `wininput.NewInputAdapter`
+even though the worker adapter never calls `ArmReturn`. Its `Move` ran `SendInput`
+then `GetCursorPos`, two `GetSystemMetrics` calls and a state-mutex return, while
+the residentagent delegated outer adapter already owns and performs the real
+cursor and return tracking. g147 extracts `wininput.NewInjectionPort` returning a
+stateless `application.InputPort` with native `SendInput` only: `Press`/`Release`
+reuse the shared `writeNativeDiscrete` validation, and `Move`/`Wheel` reuse the
+same pointer/wheel encoding and `sendInputs` path. Native complete, zero and
+partial counts and cancellation are unchanged, with no retry or fallback. The
+worker uses it only after the existing authority, desktop and lease gates, and
+worker `control.PressedState` still owns recovery. Outer residentagent entry and
+return tracking is unchanged.
+
+This only removes static duplicate work. It is not claimed to cause the 12..14 ms
+tails or to fix the NULL foreground result, and hardware performance and PIN
+verification remain pending.

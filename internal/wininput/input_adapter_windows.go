@@ -203,14 +203,21 @@ func (adapter *InputAdapter) writeDiscrete(ctx context.Context, token control.Pr
 	if adapter == nil {
 		return fmt.Errorf("%w: input adapter is not initialized", ErrInputInjection)
 	}
-	if err := token.Validate(); err != nil {
-		return errorsJoinUnsupported(err)
-	}
 	if adapter.injection != nil {
+		if err := token.Validate(); err != nil {
+			return errorsJoinUnsupported(err)
+		}
 		if released {
 			return adapter.injection.Release(ctx, token)
 		}
 		return adapter.injection.Press(ctx, token)
+	}
+	return writeNativeDiscrete(ctx, token, released)
+}
+
+func writeNativeDiscrete(ctx context.Context, token control.PressedToken, released bool) error {
+	if err := token.Validate(); err != nil {
+		return errorsJoinUnsupported(err)
 	}
 	switch token.Kind {
 	case control.PressedKeyboardKey:

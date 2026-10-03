@@ -200,7 +200,7 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 		cancel()
 	}()
 	defer func() { _ = control.Close(); <-readerDone }()
-	report, result := serveReadyProfile(run, channel, wininput.NewInputAdapter(), lease, func() error {
+	report, result := serveReadyProfile(run, channel, wininput.NewInjectionPort(), lease, func() error {
 		if proof.check(false) != nil {
 			return ErrAuthority
 		}
