@@ -111,6 +111,17 @@ type Directory struct {
 }
 
 func OpenDirectory(path string) (*Directory, error) {
+	return openDirectory(path, standardRightsRead|fileListDirectory|fileReadAttributes|synchronizeAccess|deleteAccess|writeDAC)
+}
+
+// OpenReadDirectory opens a verified directory without requesting DELETE or
+// WRITE_DAC. Read-only inspections remain compatible with a live process's
+// working-directory handle, which need not allow delete sharing.
+func OpenReadDirectory(path string) (*Directory, error) {
+	return openDirectory(path, standardRightsRead|fileListDirectory|fileReadAttributes|synchronizeAccess)
+}
+
+func openDirectory(path string, access uint32) (*Directory, error) {
 	absolute, err := filepath.Abs(path)
 	if err != nil {
 		return nil, err
@@ -121,7 +132,7 @@ func OpenDirectory(path string) (*Directory, error) {
 	handle, err := ntCreate(
 		syscall.InvalidHandle,
 		`\??\`+absolute,
-		standardRightsRead|fileListDirectory|fileReadAttributes|synchronizeAccess|deleteAccess|writeDAC,
+		access,
 		fileOpen,
 		fileDirectoryFile|fileOpenForBackupIntent|fileOpenReparsePoint|fileSynchronousNonAlert,
 	)

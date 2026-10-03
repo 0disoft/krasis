@@ -51,7 +51,7 @@ func openExecutable(path string) (*os.File, string, error) {
 	if !validExecutable(path) {
 		return nil, "", ErrInvalid
 	}
-	dir, err := securefs.OpenDirectory(filepath.Dir(path))
+	dir, err := securefs.OpenReadDirectory(filepath.Dir(path))
 	if err != nil {
 		return nil, "", err
 	}
@@ -112,7 +112,7 @@ func Register(localAppData, executable string, generation int, revision string) 
 }
 
 func copyCLI(destination *securefs.Directory, source string) error {
-	dir, err := securefs.OpenDirectory(source)
+	dir, err := securefs.OpenReadDirectory(source)
 	if err != nil {
 		return err
 	}
@@ -174,7 +174,7 @@ func Load(localAppData string) (Record, error) {
 	if _, err = peercredentials.ValidateSecurityDirectory(path); err != nil {
 		return Record{}, err
 	}
-	dir, err := securefs.OpenDirectory(path)
+	dir, err := securefs.OpenReadDirectory(path)
 	if err != nil {
 		return Record{}, err
 	}

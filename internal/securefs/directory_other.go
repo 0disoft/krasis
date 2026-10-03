@@ -12,6 +12,10 @@ type Directory struct {
 	path string
 }
 
+func OpenReadDirectory(path string) (*Directory, error) {
+	return OpenDirectory(path)
+}
+
 func OpenDirectory(path string) (*Directory, error) {
 	absolute, err := filepath.Abs(path)
 	if err != nil {

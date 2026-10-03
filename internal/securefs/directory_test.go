@@ -112,8 +112,10 @@ func TestOpenDirectoryRejectsReparseTraversal(t *testing.T) {
 	if err := os.Symlink(target, link); err != nil {
 		t.Skipf("directory symlink unavailable: %v", err)
 	}
-	if directory, err := OpenDirectory(link); err == nil {
-		_ = directory.Close()
-		t.Fatal("OpenDirectory accepted reparse traversal")
+	for _, open := range []func(string) (*Directory, error){OpenDirectory, OpenReadDirectory} {
+		if directory, err := open(link); err == nil {
+			_ = directory.Close()
+			t.Fatal("directory opener accepted reparse traversal")
+		}
 	}
 }

@@ -66,6 +66,8 @@ UI 시작 후 `%LOCALAPPDATA%\Krasis\launch\krasis-cli.exe`가 고정 복구 명
 g135부터 renderer 준비 이벤트와 별개로 서비스 시작 때 실제 빌드 revision을 기록한다.
 CLI와 `Krasis.cmd` 준비에 성공한 뒤 실행 기록을 교체한다. 등록 실패는 경로나 원본 오류 없이
 고정 단계 코드 `launch_record_<stage>_failed`로 진단에 남으며 기존 실행 기록은 유지한다.
+g136부터 실행 파일·원본 CLI·실행 기록의 폴더를 읽을 때 삭제 권한을 요청하지 않는다.
+실행 중인 폴더의 공유 충돌을 피하면서 링크 검사와 EXE 해시 검증은 유지한다.
 같은 폴더의 `Krasis.cmd`를 더블클릭해도 앱을 열 수 있다.
 `& "$env:LOCALAPPDATA\Krasis\launch\krasis-cli.exe" relaunch --json`으로 실행할 수 있다.
 기록된 실행 파일이 삭제되거나 SHA-256이 달라지면 실행을 거부한다. 기록이 없는 경우에만
