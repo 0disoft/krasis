@@ -6,8 +6,10 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"time"
 
 	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/handoff"
 )
 
 const (
@@ -116,6 +118,8 @@ type response struct {
 	certainty           byte
 	requested, inserted uint16
 	timing              [3]byte
+	millis              [3]uint16
+	measured            uint8
 }
 
 func writeResponse(writer io.Writer, value response) error {
@@ -134,6 +138,22 @@ func writeResponse(writer io.Writer, value response) error {
 		data[4] = 2
 		copy(data[20:23], value.timing[:])
 	}
+	if value.measured != 0 || value.millis != ([3]uint16{}) {
+		if !handoff.ValidWorkerDetail(value.timing, value.millis, value.measured) {
+			return ErrProtocol
+		}
+		// Three ten-bit fields fit in the existing four diagnostic bytes:
+		// 0 is absent, 1 is measured zero, 1023 is >=1022ms. This adds no
+		// bytes, reads, writes or round trips to the serialized input path.
+		var detail uint32
+		for i, n := range value.millis {
+			if value.measured&(1<<i) != 0 {
+				detail |= uint32(n+1) << (i * 10)
+			}
+		}
+		data[4] = 3
+		binary.BigEndian.PutUint32(data[20:24], detail)
+	}
 	n, err := writer.Write(data[:])
 	if err == nil && n != len(data) {
 		return io.ErrShortWrite
@@ -142,12 +162,27 @@ func writeResponse(writer io.Writer, value response) error {
 }
 
 func decodeResponse(data [responseSize]byte) (response, error) {
-	if string(data[:4]) != "KRA1" || data[4] < 1 || data[4] > 2 || data[23] != 0 {
+	if string(data[:4]) != "KRA1" || data[4] < 1 || data[4] > 3 || (data[4] != 3 && data[23] != 0) {
 		return response{}, ErrProtocol
 	}
 	value := response{op: operation(data[5]), status: data[6], certainty: data[7],
 		sequence: binary.BigEndian.Uint64(data[8:16]), requested: binary.BigEndian.Uint16(data[16:18]), inserted: binary.BigEndian.Uint16(data[18:20])}
-	copy(value.timing[:], data[20:23])
+	if data[4] == 3 {
+		detail := binary.BigEndian.Uint32(data[20:24])
+		if detail == 0 || detail>>30 != 0 {
+			return response{}, ErrProtocol
+		}
+		for i := range value.millis {
+			encoded := (detail >> (i * 10)) & 1023
+			if encoded != 0 {
+				value.measured |= 1 << i
+				value.millis[i] = uint16(encoded - 1)
+				value.timing[i] = timingBucket(time.Duration(encoded-1) * time.Millisecond)
+			}
+		}
+	} else {
+		copy(value.timing[:], data[20:23])
+	}
 	if data[4] == 1 && value.timing != ([3]byte{}) || data[4] == 2 && value.timing == ([3]byte{}) {
 		return response{}, ErrProtocol
 	}

@@ -54,6 +54,43 @@ func TestFirstFailureAndWorstVectorRemainOneOperation(t *testing.T) {
 	}
 }
 
+func TestWorkerDetailStaysWithFirstAndWorstMatchingInput(t *testing.T) {
+	_, ctx, out := collected(t)
+	p := Begin(ctx, "receiver", "session", "epoch", time.Now())
+	Backend(p, "installed")
+	x, complete := Input(ctx, "receiver")
+	WorkerDetail(x, [3]byte{1, 1, 2}, [3]uint16{0, 0, 4}, 7)
+	WorkerDetail(x, [3]byte{5, 5, 5}, [3]uint16{1000, 1000, 1000}, 7)
+	complete(nil)
+	x, complete = Input(ctx, "receiver")
+	WorkerDetail(x, [3]byte{1, 4, 2}, [3]uint16{0, 197, 4}, 7)
+	x.Value(sampleKey{}).(*sample).started = time.Now().Add(-200 * time.Millisecond)
+	complete(nil)
+	x, complete = Input(ctx, "receiver")
+	WorkerDetail(x, [3]byte{5, 5, 5}, [3]uint16{1000, 1000, 1000}, 7)
+	x.Value(sampleKey{}).(*sample).started = time.Now().Add(-time.Millisecond)
+	complete(nil)
+	Finish(p, "ok")
+	s := (*out)[0]
+	if s.First.WorkerMeasured != 7 || s.First.WorkerMillis != ([3]uint16{0, 0, 4}) || s.Worst.WorkerMillis != ([3]uint16{0, 197, 4}) {
+		t.Fatal("worker detail mixed between operations", s)
+	}
+	for _, mutate := range []func(*Vector){
+		func(v *Vector) { v.WorkerMeasured = 8 },
+		func(v *Vector) { v.WorkerMeasured = 1 },
+		func(v *Vector) { v.WorkerMillis[1] = 2 },
+	} {
+		bad := s
+		mutate(&bad.Worst)
+		if bad.Valid() {
+			t.Fatal("invalid detail passed export boundary")
+		}
+	}
+	if !ValidWorkerDetail([3]byte{5}, [3]uint16{1022}, 1) {
+		t.Fatal("saturation rejected")
+	}
+}
+
 func TestLateOldSampleAndMismatchedObserverCannotChangeNewAttempt(t *testing.T) {
 	_, ctx, out := collected(t)
 	old := Begin(ctx, "receiver", "old-session", "old-epoch", time.Now())

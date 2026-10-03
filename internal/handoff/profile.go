@@ -11,6 +11,7 @@ import (
 
 const Limit = 12
 const Window = 120 * time.Second
+const MaxWorkerMillis = 1022
 
 type Stage uint8
 
@@ -60,10 +61,12 @@ const (
 // Vector preserves one operation, not unrelated per-stage maxima. Worker
 // buckets come only from the existing matching ACK (0 means unobserved).
 type Vector struct {
-	Micros   [StageCount]int64 `json:"micros"`
-	Measured uint64            `json:"measured"`
-	Worker   [3]byte           `json:"worker"`
-	Outcome  string            `json:"outcome"`
+	Micros         [StageCount]int64 `json:"micros"`
+	Measured       uint64            `json:"measured"`
+	Worker         [3]byte           `json:"worker"`
+	WorkerMillis   [3]uint16         `json:"workerMillis"`
+	WorkerMeasured uint8             `json:"workerMeasured"`
+	Outcome        string            `json:"outcome"`
 }
 
 type Summary struct {
@@ -105,6 +108,9 @@ func (s Summary) Valid() bool {
 			if b > 5 {
 				return false
 			}
+		}
+		if !ValidWorkerDetail(v.Worker, v.WorkerMillis, v.WorkerMeasured) {
+			return false
 		}
 	}
 	var total uint64
@@ -379,11 +385,43 @@ func Input(ctx context.Context, role string) (context.Context, func(error)) {
 }
 
 func Worker(ctx context.Context, buckets [3]byte) {
+	WorkerDetail(ctx, buckets, [3]uint16{}, 0)
+}
+
+// ValidWorkerDetail checks a fixed numeric diagnostic. Milliseconds are floored
+// and saturate at MaxWorkerMillis; a zero without a presence bit is unobserved.
+func ValidWorkerDetail(buckets [3]byte, millis [3]uint16, measured uint8) bool {
+	if measured & ^uint8(7) != 0 {
+		return false
+	}
+	for i, n := range millis {
+		if n > MaxWorkerMillis {
+			return false
+		}
+		if measured&(1<<i) == 0 {
+			if n != 0 {
+				return false
+			}
+			continue
+		}
+		if buckets[i] != byte(bucket(time.Duration(n)*time.Millisecond)) {
+			return false
+		}
+	}
+	return true
+}
+
+// WorkerDetail attaches only the matching ACK's three elapsed spans to the
+// original input sample. Recovery cannot overwrite it with a later ACK.
+func WorkerDetail(ctx context.Context, buckets [3]byte, millis [3]uint16, measured uint8) {
 	if ctx == nil {
 		return
 	}
 	if v, _ := ctx.Value(sampleKey{}).(*sample); v != nil && !v.workerRecorded {
 		v.vector.Worker = buckets
+		if ValidWorkerDetail(buckets, millis, measured) {
+			v.vector.WorkerMillis, v.vector.WorkerMeasured = millis, measured
+		}
 		v.workerRecorded = true
 	}
 }

@@ -3,12 +3,71 @@ package inputworker
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
+	"io"
 	"net"
 	"strings"
 	"testing"
+	"testing/iotest"
 	"time"
 )
+
+func TestDetailedTimingReplyKeepsLegacyFramingAndPresence(t *testing.T) {
+	precise := response{op: opMove, sequence: 1, timing: [3]byte{1, 4, 2}, millis: [3]uint16{0, 197, 4}, measured: 7}
+	legacy := response{op: opMove, sequence: 2, timing: [3]byte{1, 3, 5}}
+	var encoded bytes.Buffer
+	if err := writeResponse(&encoded, precise); err != nil || encoded.Len() != responseSize {
+		t.Fatal("detailed ACK not fixed-size", err)
+	}
+	if err := writeResponse(&encoded, legacy); err != nil || encoded.Len() != 2*responseSize {
+		t.Fatal("legacy framing changed", err)
+	}
+	reader := iotest.OneByteReader(&encoded)
+	for _, want := range []response{precise, legacy} {
+		got, err := readResponse(reader)
+		if err != nil || got != want {
+			t.Fatalf("mixed ACK frames: %+v, %v", got, err)
+		}
+	}
+	if encoded.Len() != 0 {
+		t.Fatal("ACK left trailing bytes")
+	}
+}
+
+func TestDetailedTimingRejectsInvalidDetailAndTruncatedFrames(t *testing.T) {
+	ack := response{op: opMove, sequence: 1, timing: [3]byte{1, 4, 2}, millis: [3]uint16{0, 197, 4}, measured: 7}
+	var encoded bytes.Buffer
+	if err := writeResponse(&encoded, ack); err != nil {
+		t.Fatal(err)
+	}
+	for _, mutate := range []func([]byte){
+		func(b []byte) { b[20] |= 0x40 },                           // reserved bit30
+		func(b []byte) { b[20] |= 0x80 },                           // reserved bit31
+		func(b []byte) { binary.BigEndian.PutUint32(b[20:24], 0) }, // empty detail
+	} {
+		data := append([]byte(nil), encoded.Bytes()...)
+		mutate(data)
+		if _, err := readResponse(bytes.NewReader(data)); !errors.Is(err, ErrProtocol) {
+			t.Fatal("malformed diagnostic frame accepted", err)
+		}
+	}
+	for _, size := range []int{0, responseSize - 1} {
+		if _, err := readResponse(io.LimitReader(bytes.NewReader(encoded.Bytes()), int64(size))); !errors.Is(err, ErrProtocol) {
+			t.Fatal("truncated ACK accepted", size)
+		}
+	}
+	for _, invalid := range []response{
+		{op: opMove, sequence: 1, timing: [3]byte{1}, measured: 8},
+		{op: opMove, sequence: 1, timing: [3]byte{1}, millis: [3]uint16{4}, measured: 1},
+		{op: opMove, sequence: 1, timing: [3]byte{5}, millis: [3]uint16{1023}, measured: 1},
+	} {
+		encoded.Reset()
+		if err := writeResponse(&encoded, invalid); !errors.Is(err, ErrProtocol) || encoded.Len() != 0 {
+			t.Fatal("invalid detail serialized", err)
+		}
+	}
+}
 
 func TestTimingReplyPreservesLegacyFormatAndRejectsInvalidBuckets(t *testing.T) {
 	for _, buckets := range [][3]byte{{}, {1, 3, 5}} {
