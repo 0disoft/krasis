@@ -21,35 +21,55 @@ var (
 // ProtectedInputActive inspects only the input desktop and foreground process
 // identity. It never reads a window title, credential field, or window content.
 func ProtectedInputActive() bool {
-	if !inputDesktopDefault() {
-		return true
+	return InspectProtectedInput() != ProtectedInputClear
+}
+
+// InspectProtectedInput classifies the same observation used by the guard.
+func InspectProtectedInput() ProtectedInputReason {
+	desktop := inspectInputDesktop()
+	if desktop != ProtectedInputClear {
+		return desktop
 	}
-	return credentialBrokerForeground(true)
+	return protectedCredentialReason(inspectCredentialForeground())
+}
+
+func protectedCredentialReason(state credentialForegroundState) ProtectedInputReason {
+	switch state {
+	case credentialForegroundBroker:
+		return ProtectedInputCredentialBroker
+	case credentialForegroundMissing, credentialForegroundOther:
+		return ProtectedInputClear
+	default:
+		return ProtectedInputIdentityUnknown
+	}
 }
 
 // CredentialBrokerForeground is deliberately narrower than ProtectedInputActive:
 // the probe must never send input to a non-default or unidentifiable desktop.
 func CredentialBrokerForeground() bool {
-	return inputDesktopDefault() && credentialBrokerForeground(false)
+	return inputDesktopDefault() && inspectCredentialForeground() == credentialForegroundBroker
 }
 
 func inputDesktopDefault() bool {
+	return inspectInputDesktop() == ProtectedInputClear
+}
+
+func inspectInputDesktop() ProtectedInputReason {
 	desktop, _, _ := procOpenInputDesktop.Call(0, 0, 0x0001) // DESKTOP_READOBJECTS
 	if desktop == 0 {
-		return false
+		return ProtectedInputDesktopUnavailable
 	}
 	var name [128]uint16
 	var needed uint32
 	ok, _, _ := procGetUserObjectInformation.Call(desktop, 2, uintptr(unsafe.Pointer(&name[0])), uintptr(len(name)*2), uintptr(unsafe.Pointer(&needed))) // UOI_NAME
 	procCloseDesktop.Call(desktop)
-	return ok != 0 && syscall.UTF16ToString(name[:]) == "Default"
-}
-
-// uncertainAsProtected keeps the normal session guard conservative, while the
-// attended probe requires a positively identified broker before injecting.
-func credentialBrokerForeground(uncertainAsProtected bool) bool {
-	state := inspectCredentialForeground()
-	return state == credentialForegroundBroker || (uncertainAsProtected && state == credentialForegroundUnknown)
+	if ok == 0 {
+		return ProtectedInputDesktopUnavailable
+	}
+	if syscall.UTF16ToString(name[:]) != "Default" {
+		return ProtectedInputNonDefaultDesktop
+	}
+	return ProtectedInputClear
 }
 
 type credentialForegroundState uint8

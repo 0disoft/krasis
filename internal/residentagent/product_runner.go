@@ -117,9 +117,9 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 		if err != nil {
 			return err
 		}
-		protectedActive := wininput.ProtectedInputActive
-		if worker != nil {
-			protectedActive = func() bool { return false }
+		protectedActive := func() bool { return false }
+		if worker == nil {
+			protectedActive = observedProtectedInput(wininput.InspectProtectedInput, log.Event)
 		}
 		defer func() {
 			if errors.Is(context.Cause(ctx), crashguard.ErrUnexpectedExit) {

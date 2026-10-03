@@ -1,6 +1,7 @@
 package productlog
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -24,5 +25,22 @@ func TestTrustTimingCodesSurviveExportWithoutArbitraryDetails(t *testing.T) {
 	result := sanitizeLog("agent.jsonl", strings.NewReader(`{"time":"2026-09-17T00:00:00Z","code":"trust_timing_private_path"}`+"\n"))
 	if !result.Incomplete || len(result.Events) != 0 {
 		t.Fatal("arbitrary trust detail crossed support export")
+	}
+}
+
+func TestProtectedInputReasonsSurviveExportWithoutPrivateDetails(t *testing.T) {
+	for _, code := range []string{"protected_input_desktop_unavailable", "protected_input_non_default_desktop", "protected_input_credential_broker", "protected_input_identity_unknown"} {
+		result := sanitizeLog("agent.jsonl", strings.NewReader(`{"time":"2026-09-17T00:00:00Z","code":"`+code+`","path":"private","title":"private"}`+"\n"))
+		if result.Incomplete || len(result.Events) != 1 || result.Events[0].Code != code {
+			t.Fatal(code)
+		}
+		encoded, err := json.Marshal(result)
+		if err != nil || strings.Contains(string(encoded), "private") {
+			t.Fatal("private details crossed support export")
+		}
+	}
+	result := sanitizeLog("agent.jsonl", strings.NewReader(`{"time":"2026-09-17T00:00:00Z","code":"protected_input_private_detail"}`+"\n"))
+	if !result.Incomplete || len(result.Events) != 0 {
+		t.Fatal("arbitrary protection detail crossed support export")
 	}
 }

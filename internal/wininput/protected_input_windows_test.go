@@ -4,6 +4,23 @@ package wininput
 
 import "testing"
 
+func TestProtectedCredentialReasonKeepsUnknownFailClosed(t *testing.T) {
+	for _, test := range []struct {
+		state credentialForegroundState
+		want  ProtectedInputReason
+	}{
+		{credentialForegroundMissing, ProtectedInputClear},
+		{credentialForegroundOther, ProtectedInputClear},
+		{credentialForegroundBroker, ProtectedInputCredentialBroker},
+		{credentialForegroundUnknown, ProtectedInputIdentityUnknown},
+		{credentialForegroundState(255), ProtectedInputIdentityUnknown},
+	} {
+		if got := protectedCredentialReason(test.state); got != test.want {
+			t.Fatalf("state=%d got=%d want=%d", test.state, got, test.want)
+		}
+	}
+}
+
 func TestCredentialBrokerImageIdentification(t *testing.T) {
 	for _, test := range []struct {
 		path string

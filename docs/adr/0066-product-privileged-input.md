@@ -1,5 +1,29 @@
 # ADR 0066: Product leases use the installed input service
 
+## g137: Distinguish portable protection causes
+
+The portable session guard records one fixed cause code per runner, from the
+same observation that detected protection:
+
+- `protected_input_desktop_unavailable`: the input desktop could not be opened
+  or its name could not be queried.
+- `protected_input_non_default_desktop`: the queried desktop is not Default.
+- `protected_input_credential_broker`: the foreground credential broker was
+  positively identified.
+- `protected_input_identity_unknown`: foreground process identity could not
+  be established while its window was still foreground, or its PID was unknown.
+
+These codes survive sanitized support export; no process path, window title,
+credential or input content is recorded. The first cause remains stable even
+if monitor and input checks race or the foreground changes before cancellation.
+Later checks still inspect current state rather than caching a protection
+decision. Unknown identity still stops the portable session. The installed
+worker path and recovery policy are unchanged.
+
+Older `protected_input_detected` records alone cannot distinguish these causes.
+New real-device evidence is needed before attributing a disconnect to a
+credential dialog or treating unknown identity as a false positive.
+
 The g104 local Esc probe succeeded with the required desktop access mask. That
 did not enable product A-to-B input: portable agents still injected at Medium
 integrity and stopped sessions when a credential prompt was observed.

@@ -51,6 +51,9 @@ func init() {
 	allowed["boundary_summary"] = true
 	allowed["protected_input_detected"] = true
 	allowed["protected_input_reconnecting"] = true
+	for _, code := range []string{"protected_input_desktop_unavailable", "protected_input_non_default_desktop", "protected_input_credential_broker", "protected_input_identity_unknown"} {
+		allowed[code] = true
+	}
 	allowed["peer_disconnect_requested"] = true
 	allowed["disconnect_notification_failed"] = true
 	for _, code := range []string{"address_discovery_started", "address_discovery_unavailable", "address_candidate_rejected", "address_discovery_confirmed", "address_discovery_exhausted", "address_save_failed", "address_advertisement_unavailable", "address_listener_rebound"} {
