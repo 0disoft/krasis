@@ -85,14 +85,14 @@ func runServiceLoop(ctx context.Context, installation *Installation, ready func(
 				return ErrAuthority
 			}
 			return nil
-		})
+		}, installation)
 		if readyFailed {
 			return ErrAuthority
 		}
 		if err == nil {
 			lease, leaseErr := receiveLease(ctx, channel)
 			if leaseErr == nil {
-				_, err = RunAgentLease(ctx, channel, lease, agent, service)
+				_, err = runInstalledAgentLease(ctx, channel, lease, agent, service, installation)
 				if errors.Is(err, ErrRecovery) {
 					_ = channel.Close()
 					return ErrRecovery

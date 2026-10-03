@@ -33,14 +33,14 @@ type ConsoleWorker struct {
 // path, PID, session, command, desktop or environment is accepted.
 // It is not wired into the resident agent or installer yet.
 func LaunchConsoleWorker(ctx context.Context, agent *Authority, digest [sha256.Size]byte) (*ConsoleWorker, error) {
-	worker, err := launchManagedConsole(ctx, agent, digest, nil)
+	worker, err := launchManagedConsole(ctx, agent, digest, nil, nil)
 	if err == nil {
 		go worker.watch(ctx, agent)
 	}
 	return worker, err
 }
 
-func launchManagedConsole(ctx context.Context, agent *Authority, digest [sha256.Size]byte, prepare func(windows.Handle, uint32) error) (*ConsoleWorker, error) {
+func launchManagedConsole(ctx context.Context, agent *Authority, digest [sha256.Size]byte, prepare func(windows.Handle, uint32) error, installation *Installation) (*ConsoleWorker, error) {
 	if ctx == nil || ctx.Err() != nil || agent == nil || agent.kind != authorityAgent || agent.check(false) != nil || digest == ([sha256.Size]byte{}) {
 		return nil, ErrAuthority
 	}
@@ -64,7 +64,7 @@ func launchManagedConsole(ctx context.Context, agent *Authority, digest [sha256.
 			ready <- result{err: ErrAuthority}
 			return
 		}
-		worker, err := launchConsole(ctx, agent, digest, prepare)
+		worker, err := launchConsole(ctx, agent, digest, prepare, installation)
 		if undo() != nil {
 			clean = false
 			if worker != nil {
@@ -86,7 +86,7 @@ func launchManagedConsole(ctx context.Context, agent *Authority, digest [sha256.
 	return value.worker, nil
 }
 
-func launchConsole(ctx context.Context, agent *Authority, digest [sha256.Size]byte, prepare func(windows.Handle, uint32) error) (*ConsoleWorker, error) {
+func launchConsole(ctx context.Context, agent *Authority, digest [sha256.Size]byte, prepare func(windows.Handle, uint32) error, installation *Installation) (*ConsoleWorker, error) {
 	self, err := inspectProcess(windows.GetCurrentProcessId())
 	if err != nil {
 		return nil, ErrAuthority
@@ -100,7 +100,7 @@ func launchConsole(ctx context.Context, agent *Authority, digest [sha256.Size]by
 	if !self.system || self.session != 0 || self.integrity != 0x4000 || self.restricted || self.appContainer || !strings.EqualFold(self.image, path) {
 		return nil, ErrAuthority
 	}
-	image, err := lockImage(path, digest)
+	image, err := pinIdentityImage(installation, path, digest)
 	if err != nil {
 		return nil, ErrAuthority
 	}
