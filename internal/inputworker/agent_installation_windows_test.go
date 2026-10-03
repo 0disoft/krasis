@@ -3,7 +3,9 @@
 package inputworker
 
 import (
+	"context"
 	"crypto/sha256"
+	"os"
 	"testing"
 
 	"golang.org/x/sys/windows"
@@ -24,6 +26,33 @@ func TestPortableTestProcessCannotEnableInstalledInput(t *testing.T) {
 	digest, err := CurrentAgentServiceDigest()
 	if digest != ([sha256.Size]byte{}) || err != ErrAuthority {
 		t.Fatal("portable test process enabled privileged input")
+	}
+}
+
+func TestAgentServiceRejectsUnboundClosedAndMismatchedInstallation(t *testing.T) {
+	ctx := context.Background()
+	var empty *AgentService
+	if empty.Close() != nil {
+		t.Fatal("nil owner cleanup failed")
+	}
+	installation := imagePinFixture(t)
+	installation.agentDigest, installation.serviceDigest = installation.images[0].digest, installation.images[1].digest
+	mismatch := installation.serviceDigest
+	mismatch[0] ^= 1
+	for _, owner := range []*AgentService{nil, {}, {installation: installation}, {installation: installation, digest: mismatch}} {
+		if client, err := owner.ConnectLease(ctx, testLease()); client != nil || err != ErrAuthority {
+			t.Fatal("unbound installation opened a service channel")
+		}
+	}
+	owner := &AgentService{installation: installation, digest: installation.serviceDigest}
+	if owner.Close() != nil || owner.Close() != nil {
+		t.Fatal("owner cleanup not idempotent")
+	}
+	if client, err := owner.ConnectLease(ctx, testLease()); client != nil || err != ErrAuthority {
+		t.Fatal("closed installation reopened service access")
+	}
+	if err := os.WriteFile(installation.images[1].path, []byte("replacement"), 0600); err != nil {
+		t.Fatal("connection cleanup retained an image pin", err)
 	}
 }
 

@@ -108,7 +108,7 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 		var input *wininput.InputAdapter
 		if worker != nil {
 			worker.event = log.Event
-			defer worker.close(nil)
+			defer func() { err = errors.Join(err, worker.shutdown()) }()
 			input, err = wininput.NewInputAdapterWithInjection(prepared.profile.Rearm(), diagnostics.Display.Width, worker)
 			log.Event("installed_input_selected")
 		} else {

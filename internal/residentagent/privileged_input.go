@@ -23,16 +23,20 @@ type privilegedClient interface {
 }
 
 type privilegedLeaseInput struct {
-	mu       sync.Mutex
-	client   privilegedClient
-	identity application.LeaseIdentity
-	cancel   context.CancelFunc
-	done     chan struct{}
-	connect  func(context.Context, application.LeaseIdentity, time.Time) (privilegedClient, error)
-	failed   func(error)
-	event    func(string)
-	expires  time.Time
-	profile  context.Context
+	mu           sync.Mutex
+	client       privilegedClient
+	identity     application.LeaseIdentity
+	cancel       context.CancelFunc
+	done         chan struct{}
+	connect      func(context.Context, application.LeaseIdentity, time.Time) (privilegedClient, error)
+	failed       func(error)
+	event        func(string)
+	expires      time.Time
+	profile      context.Context
+	dispose      func() error
+	shutdownOnce sync.Once
+	shutdownErr  error
+	stopped      bool
 }
 
 // Approval stays in the resident agent after the authenticated mTLS peer check.
@@ -64,7 +68,7 @@ func (input *privilegedLeaseInput) open(ctx context.Context, identity applicatio
 	input.mu.Lock()
 	defer input.mu.Unlock()
 	handoff.Record(ctx, handoff.OpenLock, time.Since(started))
-	if input.client != nil || input.connect == nil {
+	if input.stopped || input.client != nil || input.connect == nil {
 		return errPrivilegedInput
 	}
 	expires := now.Add(55 * time.Minute)
@@ -146,6 +150,22 @@ func (input *privilegedLeaseInput) close(intent *control.ReturnIntent) {
 	if done != nil {
 		<-done
 	}
+}
+
+// A boundary return closes only its lease; installation pins survive reentry.
+// Product connection shutdown waits for the client/heartbeat cleanup before
+// releasing the shared pins, so the next update can replace installed files.
+func (input *privilegedLeaseInput) shutdown() error {
+	input.shutdownOnce.Do(func() {
+		input.mu.Lock()
+		input.stopped = true
+		input.mu.Unlock()
+		input.close(nil)
+		if input.dispose != nil {
+			input.shutdownErr = input.dispose()
+		}
+	})
+	return input.shutdownErr
 }
 
 func (input *privilegedLeaseInput) perform(ctx context.Context, operation func(privilegedClient) error) error {

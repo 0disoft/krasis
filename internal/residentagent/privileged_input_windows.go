@@ -11,15 +11,15 @@ import (
 )
 
 func installedProductInput(expires time.Time, failed func(error)) *privilegedLeaseInput {
-	digest, err := inputworker.CurrentAgentServiceDigest()
+	service, err := inputworker.OpenAgentService()
 	if err != nil {
 		return nil
 	}
-	return &privilegedLeaseInput{expires: expires, failed: failed, connect: func(ctx context.Context, id application.LeaseIdentity, expires time.Time) (privilegedClient, error) {
+	return &privilegedLeaseInput{expires: expires, failed: failed, dispose: service.Close, connect: func(ctx context.Context, id application.LeaseIdentity, expires time.Time) (privilegedClient, error) {
 		binding, err := inputworker.NewBinding()
 		if err != nil {
 			return nil, err
 		}
-		return inputworker.ConnectLease(ctx, digest, inputworker.Lease{Identity: id, Binding: binding, ExpiresAt: expires})
+		return service.ConnectLease(ctx, inputworker.Lease{Identity: id, Binding: binding, ExpiresAt: expires})
 	}}
 }

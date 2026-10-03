@@ -16,6 +16,10 @@ import (
 // Readiness means the child has authenticated the transferred pipe and bound
 // its input thread; it does not prove that any particular input was accepted.
 func ConnectLease(ctx context.Context, serviceDigest [sha256.Size]byte, lease Lease) (*Client, error) {
+	return connectInstalledLease(ctx, serviceDigest, lease, nil)
+}
+
+func connectInstalledLease(ctx context.Context, serviceDigest [sha256.Size]byte, lease Lease, installation *Installation) (*Client, error) {
 	if ctx == nil || ctx.Err() != nil {
 		return nil, ErrAuthority
 	}
@@ -23,7 +27,7 @@ func ConnectLease(ctx context.Context, serviceDigest [sha256.Size]byte, lease Le
 	if err != nil {
 		return nil, connectionFailed("lease_metadata", err)
 	}
-	channel, err := ConnectService(ctx, serviceDigest)
+	channel, err := connectInstalledService(ctx, serviceDigest, installation)
 	if err != nil {
 		return nil, err
 	}

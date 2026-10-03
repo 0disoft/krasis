@@ -116,6 +116,44 @@ func TestPrivilegedInputPreservesUnknownOutcomeWithoutReplay(t *testing.T) {
 	input.close(nil)
 }
 
+func TestPrivilegedInputShutdownRetiresLeasesBeforeReleasingPins(t *testing.T) {
+	first, second := &testPrivilegedClient{}, &testPrivilegedClient{}
+	disposals, connects := 0, 0
+	cause := errors.New("pin close failed")
+	input := &privilegedLeaseInput{expires: time.Now().Add(time.Hour), connect: func(context.Context, application.LeaseIdentity, time.Time) (privilegedClient, error) {
+		connects++
+		if connects == 1 {
+			return first, nil
+		}
+		return second, nil
+	}}
+	input.dispose = func() error {
+		disposals++
+		if second.closes.Load() != 1 || input.client != nil || input.done != nil || input.cancel != nil {
+			t.Error("pins released before client and heartbeat retirement")
+		}
+		return cause
+	}
+	t.Cleanup(func() { _ = input.shutdown() })
+	id := application.LeaseIdentity{SessionID: "s", LeaseID: "l", Epoch: "e"}
+	if err := input.open(context.Background(), id, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	input.close(nil)
+	if first.closes.Load() != 1 || disposals != 0 {
+		t.Fatal("boundary return released shared image pins")
+	}
+	if err := input.open(context.Background(), id, time.Now()); err != nil {
+		t.Fatal("reentry failed", err)
+	}
+	if input.shutdown() != cause || input.shutdown() != cause || disposals != 1 {
+		t.Fatal("cleanup failure hidden or pins closed more than once")
+	}
+	if input.open(context.Background(), id, time.Now()) != errPrivilegedInput || connects != 2 {
+		t.Fatal("late lease reopened a retired installation")
+	}
+}
+
 func TestPrivilegedWorkerHeartbeatFailureCancelsSession(t *testing.T) {
 	ctx, cancel := context.WithCancelCause(context.Background())
 	defer cancel(context.Canceled)

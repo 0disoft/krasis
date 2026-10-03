@@ -65,6 +65,10 @@ func acceptAgentReady(ctx context.Context, agentDigest [sha256.Size]byte, ready 
 // ConnectService trusts neither the pipe name nor a claimed server identity.
 // The service proof is constructed only after checking the real kernel PID.
 func ConnectService(ctx context.Context, serviceDigest [sha256.Size]byte) (*Channel, error) {
+	return connectInstalledService(ctx, serviceDigest, nil)
+}
+
+func connectInstalledService(ctx context.Context, serviceDigest [sha256.Size]byte, installation *Installation) (*Channel, error) {
 	if ctx == nil || ctx.Err() != nil || serviceDigest == ([sha256.Size]byte{}) {
 		return nil, ErrAuthority
 	}
@@ -77,7 +81,7 @@ func ConnectService(ctx context.Context, serviceDigest [sha256.Size]byte) (*Chan
 		return nil, connectionFailed("pipe_open", err)
 	}
 	started = time.Now()
-	proof, err := authenticateServiceObserved(ctx, uintptr(pipe.handle), serviceDigest)
+	proof, err := authenticateServiceInstalled(ctx, uintptr(pipe.handle), serviceDigest, installation)
 	handoff.Record(ctx, handoff.ServiceAuth, time.Since(started))
 	if err != nil {
 		_ = pipe.Close()

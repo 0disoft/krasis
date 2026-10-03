@@ -142,33 +142,77 @@ func (launch *AgentLaunch) Close() error {
 // CurrentAgentServiceDigest enables product input only from the installed,
 // matching ordinary console agent. Portable agents retain conservative guards.
 func CurrentAgentServiceDigest() ([sha256.Size]byte, error) {
+	service, err := OpenAgentService()
+	if err != nil {
+		return [sha256.Size]byte{}, err
+	}
+	digest := service.digest
+	if err := service.Close(); err != nil {
+		return [sha256.Size]byte{}, err
+	}
+	return digest, nil
+}
+
+// AgentService owns verified installation pins for one product connection.
+// Per-lease authentication still checks the kernel pipe owner, SCM binding,
+// service configuration and image ACL. Close before installer/update work.
+type AgentService struct {
+	installation *Installation
+	digest       [sha256.Size]byte
+}
+
+func (service *AgentService) Close() error {
+	if service == nil {
+		return nil
+	}
+	return service.installation.Close()
+}
+
+func (service *AgentService) ConnectLease(ctx context.Context, lease Lease) (*Client, error) {
+	if service == nil || service.digest == ([sha256.Size]byte{}) {
+		return nil, ErrAuthority
+	}
+	_, digest, err := service.installation.digests()
+	if err != nil || digest != service.digest {
+		return nil, ErrAuthority
+	}
+	return connectInstalledLease(ctx, digest, lease, service.installation)
+}
+
+func OpenAgentService() (*AgentService, error) {
 	installation, err := LoadInstallation()
 	if err != nil {
-		return [sha256.Size]byte{}, ErrAuthority
+		return nil, ErrAuthority
 	}
-	defer installation.Close()
+	accepted := false
+	defer func() {
+		if !accepted {
+			_ = installation.Close()
+		}
+	}()
 	agent, service, err := installation.digests()
 	if err != nil {
-		return [sha256.Size]byte{}, ErrAuthority
+		return nil, ErrAuthority
 	}
 	self, err := inspectProcess(windows.GetCurrentProcessId())
 	if err != nil {
-		return [sha256.Size]byte{}, ErrAuthority
+		return nil, ErrAuthority
 	}
 	defer self.close()
 	root, err := windows.KnownFolderPath(windows.FOLDERID_ProgramFiles, 0)
 	if err != nil || !validAgentIdentity(self, windows.WTSGetActiveConsoleSessionId()) || !strings.EqualFold(self.image, filepath.Join(root, "Krasis", "Input", "krasis-agent.exe")) {
-		return [sha256.Size]byte{}, ErrAuthority
+		return nil, ErrAuthority
 	}
-	image, err := lockImage(self.image, agent)
+	image, err := pinIdentityImage(installation, self.image, agent)
 	if err != nil {
-		return [sha256.Size]byte{}, ErrAuthority
+		return nil, ErrAuthority
 	}
 	if image.Close() != nil {
-		return [sha256.Size]byte{}, ErrAuthority
+		return nil, ErrAuthority
 	}
 	if !installedServiceLaunchReady(filepath.Join(root, "Krasis"), service) {
-		return [sha256.Size]byte{}, ErrAuthority
+		return nil, ErrAuthority
 	}
-	return service, nil
+	accepted = true
+	return &AgentService{installation: installation, digest: service}, nil
 }
