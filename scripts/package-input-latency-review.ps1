@@ -1,8 +1,12 @@
-param([ValidateSet(118, 138)][int]$SourceGeneration = 118)
+param([ValidateSet(118, 138, 151)][int]$SourceGeneration = 118)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-$revision = if ($SourceGeneration -eq 138) { 'c3566d86d2066e8645fe567354966ce4bb356aa7' } else { 'b1b643be5b2ee8b9d308994a4e53b87593236346' }
+$revision = switch ($SourceGeneration) {
+  151 { '6e107e30f65afe87eacd18e9a705f24856ca8267' }
+  138 { 'c3566d86d2066e8645fe567354966ce4bb356aa7' }
+  118 { 'b1b643be5b2ee8b9d308994a4e53b87593236346' }
+}
 $prefix = 'krasis-g' + $SourceGeneration + '/'
 $archiveName = 'krasis-g' + $SourceGeneration + '-input-latency-review.zip'
 $folder = Join-Path (Get-Location) ('dist/reviews/g' + $SourceGeneration + '-input-latency/package')
@@ -12,8 +16,8 @@ if (-not $question.Contains($revision)) { throw 'Question source revision mismat
 $generation = & git show ($revision + ':internal/localapi/runtime.go')
 if ($LASTEXITCODE -ne 0 -or ($generation -join "`n") -notmatch ('(?m)^const AgentGeneration = ' + $SourceGeneration + '$')) { throw 'Source generation mismatch' }
 $extras = @(@{name='QUESTION.md';content=$question})
-if ($SourceGeneration -eq 138) {
-  $evidence = [IO.File]::ReadAllText((Join-Path (Get-Location) 'docs/reviews/g138-input-latency-evidence.json'))
+if ($SourceGeneration -in @(138, 151)) {
+  $evidence = [IO.File]::ReadAllText((Join-Path (Get-Location) ('docs/reviews/g' + $SourceGeneration + '-input-latency-evidence.json')))
   $data = $evidence | ConvertFrom-Json
   if ($data.generation -ne $SourceGeneration -or $data.revision -ne $revision) { throw 'Evidence source mismatch' }
   $extras += @{name='EVIDENCE.json';content=$evidence}
@@ -79,7 +83,7 @@ try {
   }
 } finally { $archive.Dispose() }
 Copy-Item -LiteralPath $questionPath -Destination (Join-Path $folder 'QUESTION.md')
-if ($SourceGeneration -eq 138) { [IO.File]::WriteAllText((Join-Path $folder 'EVIDENCE.json'), $evidence, [Text.UTF8Encoding]::new($false)) }
+if ($SourceGeneration -in @(138, 151)) { [IO.File]::WriteAllText((Join-Path $folder 'EVIDENCE.json'), $evidence, [Text.UTF8Encoding]::new($false)) }
 [IO.File]::WriteAllText((Join-Path $folder 'MANIFEST.json'), $manifest, [Text.UTF8Encoding]::new($false))
 $packageHash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
 [IO.File]::WriteAllText((Join-Path $folder 'SHA256SUMS.txt'), ($packageHash + '  ' + $archiveName + "`n" + $questionHash + '  QUESTION.md' + "`n"), [Text.UTF8Encoding]::new($false))
