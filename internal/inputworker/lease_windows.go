@@ -76,21 +76,32 @@ func connectInstalledLease(ctx context.Context, serviceDigest [sha256.Size]byte,
 }
 
 func receiveLease(ctx context.Context, channel *Channel) (Lease, error) {
+	lease, prepare, err := receiveAgentRequest(ctx, channel)
+	if prepare {
+		return Lease{}, ErrProtocol
+	}
+	return lease, err
+}
+
+func receiveAgentRequest(ctx context.Context, channel *Channel) (Lease, bool, error) {
 	if ctx == nil || ctx.Err() != nil || channel == nil || channel.authority == nil || channel.authority.kind != authorityAgent || channel.authority.check(false) != nil {
-		return Lease{}, ErrAuthority
+		return Lease{}, false, ErrAuthority
 	}
 	stop := context.AfterFunc(ctx, func() { _ = channel.stream.Close() })
 	defer stop()
 	if channel.stream.SetReadDeadline(time.Now().Add(startupTimeout)) != nil {
-		return Lease{}, ErrAuthority
+		return Lease{}, false, ErrAuthority
 	}
 	var data [leaseSize]byte
 	if _, err := io.ReadFull(channel.stream, data[:]); err != nil {
-		return Lease{}, ErrAuthority
+		return Lease{}, false, ErrAuthority
+	}
+	if ctx.Err() != nil || channel.authority.check(false) != nil || channel.stream.SetReadDeadline(time.Time{}) != nil {
+		return Lease{}, false, ErrAuthority
+	}
+	if isPreparation(data) {
+		return Lease{}, true, nil
 	}
 	lease, err := decodeLease(data, time.Now())
-	if err != nil || ctx.Err() != nil || channel.authority.check(false) != nil || channel.stream.SetReadDeadline(time.Time{}) != nil {
-		return Lease{}, ErrAuthority
-	}
-	return lease, nil
+	return lease, false, err
 }

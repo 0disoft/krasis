@@ -81,6 +81,7 @@ func runServiceLoop(ctx context.Context, installation *Installation, ready func(
 		return ErrAuthority
 	}
 	var next *preparedConsole
+	var lastPreparation time.Time
 	prepareNext := false
 	defer func() {
 		if next.close() != nil {
@@ -97,6 +98,7 @@ func runServiceLoop(ctx context.Context, installation *Installation, ready func(
 			}
 			if prepareNext {
 				prepareNext = false
+				lastPreparation = time.Now()
 				// The endpoint already exists: a quick next connection can wait
 				// in the pipe while one unbound child prepares. No extra accept
 				// failure or per-idle retry can create another warm child.
@@ -114,7 +116,32 @@ func runServiceLoop(ctx context.Context, installation *Installation, ready func(
 			return ErrAuthority
 		}
 		if err == nil {
-			lease, leaseErr := receiveLease(ctx, channel)
+			lease, prepare, leaseErr := receiveAgentRequest(ctx, channel)
+			if leaseErr == nil && prepare {
+				// No lease is created and no agent handle is transferred. A
+				// duplicate hint cannot extend expiry or replace a live child.
+				if next == nil || next.warmState.Load() == 2 {
+					if next.close() != nil {
+						_ = channel.Close()
+						return ErrRecovery
+					}
+					next = nil
+					if preparationAllowed(lastPreparation, time.Now()) {
+						lastPreparation = time.Now()
+						next, err = prepareServiceConsole(ctx, installation, service)
+					}
+				}
+				if err == nil && channel.authority.check(false) == nil {
+					_ = channel.stream.SetWriteDeadline(time.Now().Add(time.Second))
+					err = writeFrame(channel.stream, preparationReceipt[:])
+				}
+				closeErr := channel.Close()
+				if errors.Is(err, ErrRecovery) || closeErr != nil {
+					return ErrRecovery
+				}
+				// Preparation failures leave ordinary lease fallback usable.
+				continue
+			}
 			if leaseErr == nil {
 				candidate := next
 				next = nil
