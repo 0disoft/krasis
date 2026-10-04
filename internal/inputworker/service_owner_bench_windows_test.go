@@ -60,3 +60,35 @@ func BenchmarkNativePipeOwner(b *testing.B) {
 	b.ReportMetric(float64(cpuEnd-cpuStart)*100/float64(b.N), "thread-cpu-ns/op")
 	b.ReportMetric(float64(maximum.Nanoseconds()), "max-wall-ns")
 }
+
+// Candidate diagnostic overhead: both counters and the per-query thread pin
+// are included in ns/op and aggregate thread CPU. No cycles-to-time conversion.
+func BenchmarkNativePipeOwnerCycleProbe(b *testing.B) {
+	_, client := nativePair(b)
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	expected := windows.GetCurrentProcessId()
+	if _, _, _, measured, err := measurePipeOwner(client.handle, true); err != nil || !measured {
+		b.Fatal("thread cycle query unavailable")
+	}
+	cpuStart := benchThreadCPU(b)
+	var maximum time.Duration
+	var totalCycles uint64
+	for b.Loop() {
+		pid, elapsed, cycles, measured, err := measurePipeOwner(client.handle, true)
+		if err != nil || pid != expected || !measured {
+			b.Fatal("native probe failed")
+		}
+		totalCycles += cycles
+		if elapsed > maximum {
+			maximum = elapsed
+		}
+	}
+	cpuEnd := benchThreadCPU(b)
+	if cpuEnd < cpuStart {
+		b.Fatal("thread CPU accounting moved backwards")
+	}
+	b.ReportMetric(float64(cpuEnd-cpuStart)*100/float64(b.N), "thread-cpu-ns/op")
+	b.ReportMetric(float64(totalCycles)/float64(b.N), "cycles/op")
+	b.ReportMetric(float64(maximum.Nanoseconds()), "max-wall-ns")
+}

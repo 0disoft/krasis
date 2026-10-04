@@ -170,3 +170,27 @@ g156 실기기 exports에서 12전환 모두 ok였고 source 승인 median 137.2
 
 다음 단계는 bounded cycle probe 후보의 비용을 측정한 뒤 채택 여부를 판단하는 것이다. 별도
 g158 빌드는 실행하지 않았다.
+
+## g158 bounded cycle probes(진단 전용)
+
+g158은 선택적 진단만 추가한다. native owner 질의와 fresh SCM 검사는 그대로 두고, 호출 전후
+`QueryThreadCycleTime` 사이에 `runtime.LockOSThread`로 goroutine을 고정하며 unchanged native
+owner 질의는 한 번만 수행한다(`internal/inputworker/pipe_owner_cycles_windows.go`의
+`measurePipeOwner`, `internal/handoff/authority_cycles.go`). 고정은 스레드별 CPU 합계가
+섞이지 않게 하기 위한 것이고 스케줄링을 바꿀 수 있다. cycles에는 counter/clock 오버헤드가
+포함되며 주파수 변환은 하지 않는다. CPU 질의 실패·불가는 미측정으로 남고 auth 처리에는 영향이
+없다.
+
+probe는 collector당 최대 2048회로 제한하고 기존 12시도·120초 창을 그대로 쓴다. 재진입으로
+횟수 제한이 초기화되지 않는다. 값은 first/worst
+동일 벡터 필드 `pipeOwnerCycles`와 `pipeOwnerCyclesMeasured`에만 붙고 진짜 0은 absent와
+구분된다. old diagnostic과 호환되며 optional numeric은 `1<<48` 이하다. raw PID·입력 내용·새
+로그는 넣지 않는다.
+
+prototype 벤치는 first base 5576/5545/5652ns 대 probe 7635/7634/7591ns, 실제
+`measurePipeOwner`는 base 6215/7355/5975ns 대 probe 12968/9904/8017ns였다. 후보 예산에
+10us 미만이 더해지지만 paired same-load 대조가 아니고 두 벤치 모두 thread-pinned이며 full
+pipeline quota/export 비용은 벤치에 없다.
+
+관련 패키지 테스트·native fixture·static vet은 통과했다. g158의 실기기 효과는 아직
+확인하지 않았다. 앞선 native 벤치 커밋은 740be71이다.

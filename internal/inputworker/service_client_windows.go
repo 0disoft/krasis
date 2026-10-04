@@ -22,12 +22,18 @@ func readServicePipeProcessObserved(ctx context.Context, pipe, service windows.H
 	var pid uint32
 	var status windows.SERVICE_STATUS_PROCESS
 	var started time.Time
+	var err error
 	if ctx != nil {
-		started = time.Now()
-	}
-	err := windows.GetNamedPipeServerProcessId(pipe, &pid)
-	if ctx != nil {
-		handoff.RecordAuthority(ctx, handoff.AuthorityPipeOwner, time.Since(started))
+		var elapsed time.Duration
+		var cycles uint64
+		var measured bool
+		pid, elapsed, cycles, measured, err = measurePipeOwner(pipe, handoff.WantPipeOwnerCycles(ctx))
+		handoff.RecordAuthority(ctx, handoff.AuthorityPipeOwner, elapsed)
+		if measured {
+			handoff.RecordPipeOwnerCycles(ctx, cycles)
+		}
+	} else {
+		err = windows.GetNamedPipeServerProcessId(pipe, &pid)
 	}
 	if err != nil {
 		return 0, status, connectionFailed("service_pid", err)

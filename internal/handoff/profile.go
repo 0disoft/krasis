@@ -61,14 +61,16 @@ const (
 // Vector preserves one operation, not unrelated per-stage maxima. Worker
 // buckets come only from the existing matching ACK (0 means unobserved).
 type Vector struct {
-	Micros            [StageCount]int64 `json:"micros"`
-	Measured          uint64            `json:"measured"`
-	Worker            [3]byte           `json:"worker"`
-	WorkerMillis      [3]uint16         `json:"workerMillis"`
-	WorkerMeasured    uint8             `json:"workerMeasured"`
-	AuthorityMicros   [3]uint32         `json:"authorityMicros"`
-	AuthorityMeasured uint8             `json:"authorityMeasured"`
-	Outcome           string            `json:"outcome"`
+	Micros                  [StageCount]int64 `json:"micros"`
+	Measured                uint64            `json:"measured"`
+	Worker                  [3]byte           `json:"worker"`
+	WorkerMillis            [3]uint16         `json:"workerMillis"`
+	WorkerMeasured          uint8             `json:"workerMeasured"`
+	AuthorityMicros         [3]uint32         `json:"authorityMicros"`
+	AuthorityMeasured       uint8             `json:"authorityMeasured"`
+	PipeOwnerCycles         uint64            `json:"pipeOwnerCycles,omitempty"`
+	PipeOwnerCyclesMeasured bool              `json:"pipeOwnerCyclesMeasured,omitempty"`
+	Outcome                 string            `json:"outcome"`
 }
 
 type Summary struct {
@@ -121,6 +123,9 @@ func (s Summary) Valid() bool {
 		if !ValidAuthorityDetail(v.AuthorityMicros, v.AuthorityMeasured) {
 			return false
 		}
+		if !ValidPipeOwnerCycles(v.PipeOwnerCycles, v.PipeOwnerCyclesMeasured, v.AuthorityMeasured) {
+			return false
+		}
 	}
 	var total uint64
 	for _, n := range s.Histogram {
@@ -132,13 +137,14 @@ func (s Summary) Valid() bool {
 func validOutcome(s string) bool { return s == "ok" || s == "error" || s == "incomplete" }
 
 type Collector struct {
-	mu      sync.Mutex
-	emit    func(Summary)
-	started time.Time
-	count   uint8
-	active  [Limit]*attempt
-	timer   *time.Timer
-	stopped atomic.Bool
+	mu              sync.Mutex
+	emit            func(Summary)
+	started         time.Time
+	count           uint8
+	active          [Limit]*attempt
+	timer           *time.Timer
+	stopped         atomic.Bool
+	pipeOwnerProbes atomic.Uint32
 }
 type attempt struct {
 	summary          Summary
