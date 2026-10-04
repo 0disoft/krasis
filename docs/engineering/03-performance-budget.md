@@ -83,11 +83,39 @@ vet을 통과했다(name-proof demotion 테스트의 desktop 재실행 포함). 
 parallel 36.976/37.839/49.824us(추가 goroutine 포함)였다. 비용이 극히 작고 병렬 안이
 오히려 느려 채택하지 않는다.
 
-두 후보 모두 runtime 자체 변경 없이 되돌렸고 g154는 아직 미발행이다. 제품 런타임 변경은
-없으며, 실기기 개선 효과는 측정하지 않았다.
+두 후보 모두 runtime 자체 변경 없이 되돌렸다. 이는 g153 후보 판정 시점이며, 당시 제품
+런타임 변경은 없었고 실기기 개선 효과도 측정하지 않았다.
 
 세 번째 후보인 Windows CNG full SHA256도 미채택한다. warm 8MiB memory fixture를 32KiB
 chunk로 full same digest를 해시한 500ms 3회 측정에서 Go 7.959/8.006/8.150ms(2 allocs,
 160B) 대 CNG 8.396/8.406/8.419ms(263 allocs, ~8.4KiB)였다. hash·algorithm·native handle
 cleanup은 모두 확인했지만, OS native CNG가 더 느리고 힙 할당이 많아 채택하지 않는다. 이
 수치는 단일 메모리 digest 벤치라 파일 전체 설치나 g153 준비 실기기 증거가 아니다.
+
+## g154 capture foreground pending-activation dispatch
+
+g151은 NULL foreground에서만 PeekMessageW(PM_QS_SENDMESSAGE|PM_NOREMOVE) dispatch를
+수행했다. g154는 SetForegroundWindow가 nil 성공이어도 실제 foreground가 capture window가
+아닌 조건(이전 non-NULL foreground가 남은 verification-lost)에서 AttachThreadInput
+fallback을 호출하기 전에, owner thread에서 같은 단발 PeekMessageW dispatch를 한 번 수행하고
+fresh GetForegroundWindow를 다시 읽는다. NULL 전환도 같은 단발 dispatch를 쓰며, 취소는
+dispatch 전후로 검사하고 실패는 fail-closed로 유지한다. posted input·custom command·
+WM_QUIT를 제거하지 않고, 저장된 외부 HWND 신뢰나 알 수 없는 스레드 attach는 하지 않는다.
+
+이 비용은 기존 `CaptureForeground` span 안에 포함되고 새 span을 추가하지 않는다.
+fake-native 테스트는 이전 non-NULL 20에서 pending 10 dispatch로 실제 10이 되고(attach·sleep
+없음, savedFocus 20 보존) 취소 시 attach를 금지하는지 확인한다. 변경 범위는 source capture
+활성화 경로뿐이며 worker pipe·권한·캐시·중복 해시 worker는 그대로다. 실기기 개선 효과는 아직
+측정하지 않았고 설치 검증 절차도 변경하지 않는다.
+
+## 다음 작업: 중복 worker load hash 제거(2단계 부트스트랩)
+
+중복 worker load hash 제거는 별도 2단계 부트스트랩으로 진행한다. child는 보호 메타데이터를
+읽고 service exe를 기존 Go SHA/full hash로 직접 검증해 자기 이미지와 서비스 actual pipe
+owner + SCM 상태·설정을 독립적으로 확인한다. 인증이 끝난 뒤에만 서비스가 이미 검증해
+쓰기·삭제를 차단한 agent image의 exact file object duplicate를 owned child에 넘긴다.
+child는 agent PID·토큰·session·pipe owner 검증을 유지하고 agent 재hash만 제거하는 설계다.
+service 검증보다 핸들 신뢰가 앞서면 순환 신뢰이므로 거절한다. 인증 실패나 서비스 stop일 때
+child와 dup handle을 정리하고 recovery receipt 회귀 테스트를 거친 뒤 별도로 배포한다.
+g154에는 포함되지 않으며, 이 항목은 다음 작업 초안이라 설계 확정·구현·속도 개선을
+주장하지 않는다.
