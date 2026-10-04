@@ -68,7 +68,9 @@ func RunInstalledWorker(ctx context.Context, installation *Installation) error {
 	if err != nil || !fixedInstalledInputProcess(service, true, installation) {
 		return ErrAuthority
 	}
-	profile.Record(handoff.WorkerInstalledValidation, time.Since(started))
+	// Include the load/hash work performed before entering this function. The
+	// span overlaps ServiceChildConnect; it must not be added to that span.
+	profile.Record(handoff.WorkerInstalledValidation, installation.loadElapsed+time.Since(started))
 	return runInstalledConsoleInput(ctx, agent, service, profile, installation)
 }
 

@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -26,6 +27,7 @@ type Installation struct {
 	agentDigest, serviceDigest [sha256.Size]byte
 	files                      []*os.File
 	images                     [2]installationImage
+	loadElapsed                time.Duration
 }
 
 type installationImage struct {
@@ -51,6 +53,7 @@ func LoadInstallation() (*Installation, error) {
 // Private directory selection is shared with the elevated installer for its
 // three fixed staging locations. It is never selected by service/agent IPC.
 func loadInstallationDirectory(root, directory string) (*Installation, error) {
+	started := time.Now()
 	installation := &Installation{}
 	accepted := false
 	defer func() {
@@ -79,22 +82,52 @@ func loadInstallationDirectory(root, directory string) (*Installation, error) {
 		return nil, ErrAuthority
 	}
 	installation.agentDigest, installation.serviceDigest = agent, service
-	for index, image := range []struct {
-		name   string
-		digest [sha256.Size]byte
-	}{{"krasis-agent.exe", agent}, {"krasis-input.exe", service}} {
-		file, err := lockImage(filepath.Join(directory, image.name), image.digest)
-		if err != nil {
-			return nil, ErrAuthority
-		}
-		installation.files = append(installation.files, file)
-		if protectedHandle(windows.Handle(file.Fd())) != nil {
-			return nil, ErrAuthority
-		}
-		installation.images[index] = installationImage{path: filepath.Clean(filepath.Join(directory, image.name)), digest: image.digest, file: file}
+	images, err := lockInstallationImages(directory, [2][sha256.Size]byte{agent, service})
+	if err != nil {
+		return nil, ErrAuthority
 	}
+	// Own both pins before checking ACLs, so either failure closes both.
+	for _, image := range images {
+		installation.files = append(installation.files, image.file)
+	}
+	for _, image := range images {
+		if protectedHandle(windows.Handle(image.file.Fd())) != nil {
+			return nil, ErrAuthority
+		}
+	}
+	installation.images = images
+	installation.loadElapsed = time.Since(started)
 	accepted = true
 	return installation, nil
+}
+
+// Exactly two independent fixed images, never caller-sized fan-out. Join both
+// verifications before returning or closing a successful sibling's write/delete
+// pin. No digest cache or pathname-only trust is introduced.
+func lockInstallationImages(directory string, digests [2][sha256.Size]byte) ([2]installationImage, error) {
+	var images [2]installationImage
+	var failures [2]error
+	var done sync.WaitGroup
+	for i, name := range [2]string{"krasis-agent.exe", "krasis-input.exe"} {
+		done.Add(1)
+		go func() {
+			defer done.Done()
+			path := filepath.Clean(filepath.Join(directory, name))
+			file, err := lockImage(path, digests[i])
+			images[i] = installationImage{path: path, digest: digests[i], file: file}
+			failures[i] = err
+		}()
+	}
+	done.Wait()
+	if failures[0] != nil || failures[1] != nil {
+		for _, image := range images {
+			if image.file != nil {
+				_ = image.file.Close()
+			}
+		}
+		return [2]installationImage{}, ErrAuthority
+	}
+	return images, nil
 }
 
 func decodeInstallation(data []byte) ([sha256.Size]byte, [sha256.Size]byte, error) {

@@ -245,3 +245,32 @@ return tracking is unchanged.
 This only removes static duplicate work. It is not claimed to cause the 12..14 ms
 tails or to fix the NULL foreground result, and hardware performance and PIN
 verification remain pending.
+
+## g148 concurrent fixed-image verification
+
+`loadInstallationDirectory` now verifies its two fixed executable images
+(`krasis-agent.exe`, `krasis-input.exe`) concurrently with a fixed fan-out of
+exactly two goroutines, never a caller-sized one. Each goroutine runs the
+existing hash-and-pin verification; the directory load joins both before
+returning, owns every successful pin, and then runs the existing protected
+handle ACL check. If either verification fails, both goroutines are joined and
+every pin is closed, so one partial image never escapes; the caller still gets
+`ErrAuthority`. No digest cache, pathname-only trust or authentication
+relaxation is added, and the per-lease pin reuse from g146 is unchanged.
+
+`Installation.loadElapsed` is a new field set once at the end of the load and
+not mutated afterward. `service_windows.go` now records
+`WorkerInstalledValidation` (startup slot 3) as `installation.loadElapsed +
+time.Since(started)`, so the slot also covers the load and hashing that
+previously ran before the function was entered. The startup wire format, schema
+1 and the eight-element `micros` array are unchanged. This span overlaps the
+service's `ServiceChildConnect` wait and must not be summed with it. Because the
+measurement boundary changed, g148 slot 3 is not directly comparable to a g147
+slot 3.
+
+A local microbenchmark of the file verification alone on Windows Ryzen 5 7430U,
+with two 8 MiB temporary files and `benchtime=300ms`, `count=2`, measured the two
+sequential verifications at 32.599 and 35.450 ms and the two-goroutine path at
+13.589 and 14.569 ms. This is a file-verification microbenchmark only: the real
+B installation, PIN and desktop-switch total latency remains unverified, and
+these numbers are not an end-to-end handoff claim.
