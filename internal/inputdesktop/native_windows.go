@@ -20,8 +20,9 @@ var (
 )
 
 type desktopBinding struct {
-	original uintptr // Borrowed: never close the GetThreadDesktop result.
-	owned    uintptr
+	original       uintptr // Borrowed: never close the GetThreadDesktop result.
+	owned          uintptr
+	verifiedHandle uintptr // The Default name belongs to this exact live handle.
 }
 
 func currentThreadID() uintptr {
@@ -39,6 +40,9 @@ func openDesktop() (binding, error) {
 		return nil, errors.Join(ErrUnavailable, callErr)
 	}
 	desktop := &desktopBinding{original: original, owned: handle}
+	if err := desktop.verifyName(); err != nil {
+		return nil, errors.Join(ErrUnavailable, err, closeUnbound(handle))
+	}
 	if err := desktop.active(); err != nil {
 		return nil, errors.Join(ErrUnavailable, err, closeUnbound(handle))
 	}
@@ -49,27 +53,55 @@ func openDesktop() (binding, error) {
 	return desktop, nil
 }
 
+var readDesktopName = func(handle uintptr) (string, error) {
+	var name [128]uint16
+	var needed uint32
+	ok, _, callErr := getInformation.Call(handle, 2, uintptr(unsafe.Pointer(&name[0])),
+		uintptr(len(name)*2), uintptr(unsafe.Pointer(&needed))) // UOI_NAME
+	if ok == 0 {
+		return "", errors.Join(ErrInactive, callErr)
+	}
+	return syscall.UTF16ToString(name[:]), nil
+}
+
+var readDesktopInput = func(handle uintptr) (bool, error) {
+	var receiving int32
+	var needed uint32
+	ok, _, callErr := getInformation.Call(handle, 6, uintptr(unsafe.Pointer(&receiving)),
+		unsafe.Sizeof(receiving), uintptr(unsafe.Pointer(&needed))) // UOI_IO
+	if ok == 0 {
+		return false, errors.Join(ErrInactive, callErr)
+	}
+	return receiving != 0, nil
+}
+
+// The object name is validated when a handle is acquired. It is not an input
+// activity cache: active() still queries the changing UOI_IO before every work.
+func (desktop *desktopBinding) verifyName() error {
+	if desktop == nil || desktop.owned == 0 {
+		return ErrClosed
+	}
+	desktop.verifiedHandle = 0
+	name, err := readDesktopName(desktop.owned)
+	if err != nil || name != "Default" {
+		return errors.Join(ErrInactive, err)
+	}
+	desktop.verifiedHandle = desktop.owned
+	return nil
+}
+
 func (desktop *desktopBinding) active() error {
 	if desktop == nil || desktop.owned == 0 {
 		return ErrClosed
 	}
-	var name [128]uint16
-	var needed uint32
-	ok, _, callErr := getInformation.Call(desktop.owned, 2, uintptr(unsafe.Pointer(&name[0])),
-		uintptr(len(name)*2), uintptr(unsafe.Pointer(&needed))) // UOI_NAME
-	if ok == 0 {
-		return errors.Join(ErrInactive, callErr)
-	}
-	if syscall.UTF16ToString(name[:]) != "Default" {
+	if desktop.verifiedHandle != desktop.owned {
 		return ErrInactive
 	}
-	var receiving int32
-	ok, _, callErr = getInformation.Call(desktop.owned, 6, uintptr(unsafe.Pointer(&receiving)),
-		unsafe.Sizeof(receiving), uintptr(unsafe.Pointer(&needed))) // UOI_IO
-	if ok == 0 {
-		return errors.Join(ErrInactive, callErr)
+	receiving, err := readDesktopInput(desktop.owned)
+	if err != nil {
+		return errors.Join(ErrInactive, err)
 	}
-	if receiving == 0 {
+	if !receiving {
 		return ErrInactive
 	}
 	return nil
@@ -79,6 +111,7 @@ func (desktop *desktopBinding) close() error {
 	if desktop == nil || desktop.owned == 0 {
 		return ErrClosed
 	}
+	desktop.verifiedHandle = 0 // A closing/failed restoration cannot retain proof.
 	ok, _, callErr := setThread.Call(desktop.original)
 	if ok == 0 {
 		// The worker must exit. Do not close a still-attached desktop or return
