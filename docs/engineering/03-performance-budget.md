@@ -221,4 +221,27 @@ first or later cold handoff retains normal launch. KRD4 marks prepared startup
 and its bounded age; launch/child-connect measurements may precede the current
 attempt and must not be summed into its ready wait. Native pipe/job fixtures,
 freshness, expiry-versus-claim and framing tests cover local behavior. Actual
-two-PC latency and PIN behavior still require g159 verification.
+two-PC latency and PIN behavior were pending when g159 was built.
+
+### g159 device observations (2026-10-05 KST)
+
+The new exports were created at 2026-10-04 15:53:48/53 UTC. Filtering both
+devices to revision eb2ec89 produced twelve complete successful A-source and
+B-installed-receiver profiles. Eleven receivers used prepared children, with
+claim ages 3.321–946.204ms. No input connection/heartbeat failure or reconnect
+was recorded after CONNECTED; B's earlier acquisition timeout precedes connection.
+
+| Local diagnostic span | g158 median | g159 median |
+| --- | ---: | ---: |
+| A request-to-grant | 142.097ms | 29.186ms |
+| B lease-ready wait, all twelve | 123.262ms | 8.072ms |
+| B lease-ready wait, eleven prepared children | not applicable | 7.908ms |
+
+The first cold receiver waited 131.685ms. One prepared receiver still waited
+61.866ms, so preparation does not eliminate every delayed handoff. B's 520
+non-first frames included one 11.101ms dispatch; the others were below 10ms.
+Both installation receipts report success and B has sixty lease-ready records.
+These are bounded software timings from consecutive runs, not a controlled
+end-to-end pointer measurement. Historical control logs remain incomplete.
+User-perceived latency, reverse-direction profiles and g159 PIN behavior remain
+unconfirmed. No further runtime change follows from this snapshot alone.
