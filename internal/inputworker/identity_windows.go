@@ -168,9 +168,10 @@ func authenticateServiceInstalled(ctx context.Context, pipe uintptr, expected [s
 	if err := validateInstallService(service, windows.EscapeArg(path)+" --service"); err != nil {
 		return nil, connectionFailed("service_config", err)
 	}
-	check := serviceProcessBinding(pid, func() (uint32, windows.SERVICE_STATUS_PROCESS, error) {
-		return readServicePipeProcess(windows.Handle(pipe), service)
+	checkObserved := serviceProcessBindingObserved(pid, func(ctx context.Context) (uint32, windows.SERVICE_STATUS_PROCESS, error) {
+		return readServicePipeProcessObserved(ctx, windows.Handle(pipe), service)
 	})
+	check := func() error { return checkObserved(nil) }
 	if err := check(); err != nil {
 		return nil, err
 	}
@@ -190,7 +191,7 @@ func authenticateServiceInstalled(ctx context.Context, pipe uintptr, expected [s
 		return nil, err
 	}
 	accepted = true
-	return &Authority{kind: authorityService, checkInput: check, checkRecovery: check, closeHandles: func() error {
+	return &Authority{kind: authorityService, checkInput: check, checkInputObserved: checkObserved, checkRecovery: check, closeHandles: func() error {
 		imageErr := image.Close()
 		serviceErr := windows.CloseServiceHandle(service)
 		if imageErr != nil || serviceErr != nil {

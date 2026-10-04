@@ -1,6 +1,12 @@
 package inputworker
 
-import "sync"
+import (
+	"context"
+	"sync"
+	"time"
+
+	"github.com/0disoft/krasis/internal/handoff"
+)
 
 type authorityKind uint8
 
@@ -13,20 +19,34 @@ const (
 // A zero value never permits input. Its kernel process handle pins one process
 // lifetime; client-provided PIDs and claims cannot create this proof.
 type Authority struct {
-	kind          authorityKind
-	mu            sync.Mutex
-	closed        bool
-	checkInput    func() error
-	checkRecovery func() error
-	closeHandles  func() error
+	kind               authorityKind
+	mu                 sync.Mutex
+	closed             bool
+	checkInput         func() error
+	checkInputObserved func(context.Context) error
+	checkRecovery      func() error
+	closeHandles       func() error
 }
 
 func (authority *Authority) check(recovery bool) error {
+	return authority.checkObserved(nil, recovery)
+}
+
+// The context only selects diagnostic recording for an actual client input.
+// Closed/zero proofs and recovery use the same mandatory checks as before.
+func (authority *Authority) checkObserved(ctx context.Context, recovery bool) error {
 	if authority == nil {
 		return ErrAuthority
 	}
+	var started time.Time
+	if ctx != nil && !recovery {
+		started = time.Now()
+	}
 	authority.mu.Lock()
 	defer authority.mu.Unlock()
+	if !started.IsZero() {
+		handoff.RecordAuthority(ctx, handoff.AuthorityLock, time.Since(started))
+	}
 	if authority.closed || authority.checkInput == nil || authority.checkRecovery == nil || authority.closeHandles == nil {
 		return ErrAuthority
 	}
@@ -34,7 +54,13 @@ func (authority *Authority) check(recovery bool) error {
 	if recovery {
 		check = authority.checkRecovery
 	}
-	if check() != nil {
+	var err error
+	if ctx != nil && !recovery && authority.checkInputObserved != nil {
+		err = authority.checkInputObserved(ctx)
+	} else {
+		err = check()
+	}
+	if err != nil {
 		return ErrAuthority
 	}
 	return nil

@@ -73,3 +73,26 @@ func TestServerProofCannotAuthorizeAgentInput(t *testing.T) {
 		t.Fatal("service proof used as agent input authority")
 	}
 }
+
+func TestObservedAuthorityCannotBypassGuardsOrRecovery(t *testing.T) {
+	ordinary, observed, recovery := 0, 0, 0
+	a := &Authority{
+		checkInput:         func() error { ordinary++; return nil },
+		checkInputObserved: func(context.Context) error { observed++; return errors.New("synthetic private detail") },
+		checkRecovery:      func() error { recovery++; return nil },
+		closeHandles:       func() error { return nil },
+	}
+	ctx := context.Background()
+	if a.check(false) != nil || a.checkObserved(ctx, false) != ErrAuthority || a.checkObserved(ctx, true) != nil || ordinary != 1 || observed != 1 || recovery != 1 {
+		t.Fatal("observed authority changed outcome or recovery")
+	}
+	_ = a.Close()
+	if a.checkObserved(ctx, false) != ErrAuthority || observed != 1 {
+		t.Fatal("closed observed authority reused")
+	}
+	for _, zero := range []*Authority{nil, {}, {checkInputObserved: func(context.Context) error { t.Fatal("zero proof callback called"); return nil }}} {
+		if zero.checkObserved(ctx, false) != ErrAuthority {
+			t.Fatal("observed callback bypassed zero proof")
+		}
+	}
+}

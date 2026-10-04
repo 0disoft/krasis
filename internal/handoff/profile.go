@@ -61,12 +61,14 @@ const (
 // Vector preserves one operation, not unrelated per-stage maxima. Worker
 // buckets come only from the existing matching ACK (0 means unobserved).
 type Vector struct {
-	Micros         [StageCount]int64 `json:"micros"`
-	Measured       uint64            `json:"measured"`
-	Worker         [3]byte           `json:"worker"`
-	WorkerMillis   [3]uint16         `json:"workerMillis"`
-	WorkerMeasured uint8             `json:"workerMeasured"`
-	Outcome        string            `json:"outcome"`
+	Micros            [StageCount]int64 `json:"micros"`
+	Measured          uint64            `json:"measured"`
+	Worker            [3]byte           `json:"worker"`
+	WorkerMillis      [3]uint16         `json:"workerMillis"`
+	WorkerMeasured    uint8             `json:"workerMeasured"`
+	AuthorityMicros   [3]uint32         `json:"authorityMicros"`
+	AuthorityMeasured uint8             `json:"authorityMeasured"`
+	Outcome           string            `json:"outcome"`
 }
 
 type Summary struct {
@@ -110,6 +112,9 @@ func (s Summary) Valid() bool {
 			}
 		}
 		if !ValidWorkerDetail(v.Worker, v.WorkerMillis, v.WorkerMeasured) {
+			return false
+		}
+		if !ValidAuthorityDetail(v.AuthorityMicros, v.AuthorityMeasured) {
 			return false
 		}
 	}

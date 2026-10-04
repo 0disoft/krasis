@@ -24,7 +24,15 @@ func TestHandoffHeartbeatDoesNotConsumeFirstInputAndLostAckStaysUnknown(t *testi
 	ctx := handoff.WithSession(context.Background(), collector)
 	p := handoff.Begin(ctx, "receiver", "session", "epoch", time.Now())
 	server, conn := net.Pipe()
-	client, err := NewClient(ctx, clientChannel(conn, authorityService), testLease())
+	channel := clientChannel(conn, authorityService)
+	observed := 0
+	channel.authority.checkInputObserved = func(ctx context.Context) error {
+		observed++
+		handoff.RecordAuthority(ctx, handoff.AuthorityPipeOwner, time.Microsecond)
+		handoff.RecordAuthority(ctx, handoff.AuthorityServiceStatus, 15*time.Millisecond)
+		return nil
+	}
+	client, err := NewClient(ctx, channel, testLease())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,6 +58,9 @@ func TestHandoffHeartbeatDoesNotConsumeFirstInputAndLostAckStaysUnknown(t *testi
 	<-done
 	if len(summaries) != 1 || summaries[0].First.Outcome != "error" || summaries[0].First.Worker != [3]byte{} || summaries[0].Preparation.Measured != 0 || summaries[0].Frames != 0 {
 		t.Fatalf("heartbeat or unverified ACK contaminated input profile: %+v", summaries)
+	}
+	if observed != 1 || summaries[0].First.AuthorityMeasured != 7 || summaries[0].First.AuthorityMicros[1] != 1 || summaries[0].First.AuthorityMicros[2] != 15000 {
+		t.Fatal("authority detail missing, mixed with heartbeat, or lost with ACK", summaries)
 	}
 }
 

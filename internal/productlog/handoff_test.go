@@ -15,6 +15,8 @@ func TestHandoffExportReprojectsFixedSchemaAndDropsIdentity(t *testing.T) {
 	s.First.Worker = [3]byte{1, 4, 2}
 	s.First.WorkerMillis = [3]uint16{0, 197, 4}
 	s.First.WorkerMeasured = 7
+	s.First.AuthorityMicros = [3]uint32{0, 4, 15000}
+	s.First.AuthorityMeasured = 7
 	r := record{Time: "2026-10-03T00:00:00Z", Code: "handoff_profile", Connection: strings.Repeat("a", 64), Handoff: &s}
 	data, _ := json.Marshal(r)
 	data = []byte(strings.Replace(string(data), `"handoff":{`, `"handoff":{"pin":"secret-marker","path":"private-path",`, 1))
@@ -33,6 +35,13 @@ func TestHandoffExportReprojectsFixedSchemaAndDropsIdentity(t *testing.T) {
 		t.Fatal("unobserved worker milliseconds exported")
 	}
 	s.First.WorkerMeasured = 7
+	s.First.AuthorityMeasured = 1
+	data, _ = json.Marshal(r)
+	got = sanitizeLog("agent.jsonl", strings.NewReader(string(data)+"\n"))
+	if !got.Incomplete || len(got.Events) != 0 {
+		t.Fatal("unobserved authority microseconds exported")
+	}
+	s.First.AuthorityMeasured = 7
 	s.Backend = "secret-marker"
 	data, _ = json.Marshal(r)
 	got = sanitizeLog("agent.jsonl", strings.NewReader(string(data)+"\n"))

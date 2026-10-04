@@ -128,7 +128,12 @@ func (client *Client) perform(ctx context.Context, command request) error {
 		return nil
 	}
 	start = time.Now()
-	authorityErr := client.channel.authority.check(false)
+	var authorityErr error
+	if command.op == opHeartbeat {
+		authorityErr = client.channel.authority.check(false)
+	} else {
+		authorityErr = client.channel.authority.checkObserved(ctx, false)
+	}
 	elapsed1 := time.Since(start)
 	sample[1] = timingBucket(elapsed1)
 	if command.op != opHeartbeat {

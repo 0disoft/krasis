@@ -274,3 +274,26 @@ sequential verifications at 32.599 and 35.450 ms and the two-goroutine path at
 13.589 and 14.569 ms. This is a file-verification microbenchmark only: the real
 B installation, PIN and desktop-switch total latency remains unverified, and
 these numbers are not an end-to-end handoff claim.
+
+## g149 client authority-query detail
+
+`handoff.Vector` gains `authorityMicros [3]uint32` and `authorityMeasured uint8`.
+The three client-local subspans of the existing `ClientAuthority` stage are
+index 0 the authority mutex wait, index 1 `GetNamedPipeServerProcessId` and
+index 2 `QueryServiceStatusEx`. Values are elapsed microseconds clamped by the
+existing 120-second window; the low three bits of `authorityMeasured` each mark
+one observed index. A missing bit is unobserved even at value zero, and a
+present bit with a floored zero means observed under one microsecond. These are
+not new wire or authority fields: the 39-element `micros` array, the eight-element
+startup array and the 24-byte `KRA1` ACK are unchanged.
+
+Only the actual client input dispatch context records these subspans; heartbeats,
+startup and recovery do not, and recovery cannot replace a first measured call.
+The detail attaches to the same first and worst dispatch vectors as the existing
+worker and input fields, and unrelated dispatch maxima must not be combined.
+
+The observed authority wrapper runs exactly the same mandatory validations as
+the plain path, with no cache, skipped check, new trust or input retry. A failed
+query still records the elapsed span it spent before failing, and an incomplete
+substage set is absence, never success. This is instrumentation only: it is not
+claimed to fix the stutter, and PIN and hardware results remain pending.
