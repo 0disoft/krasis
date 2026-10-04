@@ -2,12 +2,30 @@
 
 package wininput
 
-import "time"
+import (
+	"time"
+	"unsafe"
+)
 
 const sourceForegroundTransitionAttempts = 5
 const sourceForegroundTransitionInterval = 10 * time.Millisecond
 
 var sourceForegroundTransitionPause = time.Sleep
+
+const sourceForegroundSentMessages = 0x00400000 // PM_QS_SENDMESSAGE | PM_NOREMOVE
+
+var callSourceForegroundMessages = procPeekMessageW.Call
+
+var sourceForegroundTransitionDispatch = func(window uintptr) {
+	if window == 0 {
+		return
+	}
+	var pending message
+	// PeekMessage services sent messages/internal activation events on this
+	// owner thread. Never remove or dispatch queued input, commands or WM_QUIT
+	// inside an activation command. Zero is normal when no posted item exists.
+	callSourceForegroundMessages(uintptr(unsafe.Pointer(&pending)), window, 0, 0, sourceForegroundSentMessages)
+}
 
 // GetForegroundWindow may temporarily return NULL while activation changes.
 // Resample before retrying activation of our own capture window. Windows allows
@@ -29,6 +47,13 @@ func (current *sourceWheelCaptureRun) foregroundAfterTransition() (uintptr, erro
 		if err := current.err(); err != nil {
 			return 0, err
 		}
+		// Sleeping inside our window procedure does not service an asynchronous
+		// foreground activation. Give Windows a chance to finish it before the
+		// next read; a physical click must not be needed to unblock the owner.
+		sourceForegroundTransitionDispatch(current.window)
+		if err := current.err(); err != nil {
+			return 0, err
+		}
 		foreground = sourceWheelCaptureGetForeground()
 		if foreground == 0 && current.window != 0 {
 			// This runs on the capture owner thread after ordinary activation
@@ -38,6 +63,10 @@ func (current *sourceWheelCaptureRun) foregroundAfterTransition() (uintptr, erro
 				return 0, err
 			}
 			_ = sourceWheelCaptureSetForeground(current.window)
+			if err := current.err(); err != nil {
+				return 0, err
+			}
+			sourceForegroundTransitionDispatch(current.window)
 			if err := current.err(); err != nil {
 				return 0, err
 			}
