@@ -70,3 +70,24 @@ name read만 비교한 격리된 desktop 검증 수치이고, 실제 KVM 동작�
 
 로컬 검증: inputdesktop, inputworker, wininput, residentagent, localapi 테스트와 scoped
 vet을 통과했다(name-proof demotion 테스트의 desktop 재실행 포함). 빌드는 미실행이다.
+
+## g153 준비 최적화 후보 검증
+
+두 후보를 모두 제외한다. 단일 이미지 read buffer를 32KiB에서 128KiB로 키운 warm 격리
+벤치의 이득(기본 128KiB 11.570~12.652ms, median 11.607 vs 기본 32KiB 12.394~15.155ms)은
+실제 두 이미지 병렬 경로에서 19.813~36.615ms 대 11.416~13.008ms 회귀로 뒤집혔다. 다만
+순차 before/after same-load 통제가 아니라 회귀 원인은 확정하지 않는다.
+
+두 이미지 protectedHandle ACL 검사를 기존 hash goroutine 안으로 옮기는 병렬 안의 격리
+측정은 actual installed fixed pinned object 2개에서 serial 24.455/24.771/25.209us,
+parallel 36.976/37.839/49.824us(추가 goroutine 포함)였다. 비용이 극히 작고 병렬 안이
+오히려 느려 채택하지 않는다.
+
+두 후보 모두 runtime 자체 변경 없이 되돌렸고 g154는 아직 미발행이다. 제품 런타임 변경은
+없으며, 실기기 개선 효과는 측정하지 않았다.
+
+세 번째 후보인 Windows CNG full SHA256도 미채택한다. warm 8MiB memory fixture를 32KiB
+chunk로 full same digest를 해시한 500ms 3회 측정에서 Go 7.959/8.006/8.150ms(2 allocs,
+160B) 대 CNG 8.396/8.406/8.419ms(263 allocs, ~8.4KiB)였다. hash·algorithm·native handle
+cleanup은 모두 확인했지만, OS native CNG가 더 느리고 힙 할당이 많아 채택하지 않는다. 이
+수치는 단일 메모리 digest 벤치라 파일 전체 설치나 g153 준비 실기기 증거가 아니다.
