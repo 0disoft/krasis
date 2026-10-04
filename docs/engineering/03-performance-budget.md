@@ -243,5 +243,7 @@ non-first frames included one 11.101ms dispatch; the others were below 10ms.
 Both installation receipts report success and B has sixty lease-ready records.
 These are bounded software timings from consecutive runs, not a controlled
 end-to-end pointer measurement. Historical control logs remain incomplete.
-User-perceived latency, reverse-direction profiles and g159 PIN behavior remain
-unconfirmed. No further runtime change follows from this snapshot alone.
+The user subsequently confirmed successful g159 PIN control on the real devices
+(2026-10-05 KST). This is the user's direct observation; support export does not
+collect PIN values or dialog contents. User-perceived latency and reverse-direction
+profiles remain unconfirmed. No further runtime change follows from this snapshot alone.
