@@ -378,3 +378,7 @@ historical control log; the bounded profiles cover A-to-B only. A slow approach 
 the two-second preparation expiry, reverse-direction profiles, perceived jitter and
 g161 PIN control remain unconfirmed. Evidence documentation needs no new build or
 runtime change.
+
+The user subsequently confirmed successful g161 PIN operation on the devices
+(2026-10-05 KST). This is direct operator evidence; the export records no PIN values
+or dialog contents. The timing and slow-approach limitations above remain open.
