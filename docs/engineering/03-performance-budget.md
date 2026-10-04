@@ -531,3 +531,42 @@ unknown-speed approach and the preparation-mutex overlap remain unresolved.
 Tests cover both directions, the renewal threshold, repeat suppression, and idle and
 ineligible/reversed-time cases. Device latency and PIN behavior are pending, and no
 reduced latency is promised.
+
+### g164 device observations
+
+Diagnostics were created at A 2026-10-04T18:44:43Z and B 2026-10-04T18:44:38Z and
+filtered to the exact revision 25f81f1f7e3cbe6b5e3f53882842c457f113cf57. There are 12
+source and 12 installed-receiver profiles: 10 ok/complete and 2 error/incomplete on each
+side (attempts 7 and 8). All 12 receiver startups are prepared true, with ReadyWait
+min/median/max 7.005/7.828/11.076ms.
+
+Idle A gaps at attempts 2/3/4/5 were 9.746211/9.469821/11.034118/11.953330s and B
+ReadyWait 7.005/7.900/7.756/11.076ms. Against the g163 idle cold observation of
+118–127ms these are now prepared, though this is not a controlled latency guarantee.
+Positive overlap appears on B attempts 2/4/5/6 with OpenLock
+42.569/34.762/34.998/110.636ms and measured preparation overlap
+42.569/34.762/34.455/110.636ms; the other eight are measured zero (absent numeric field
+with its presence flag). All prepared ages span 3.448–1396.869ms.
+
+A request-to-grant over the 12 attempts was min/median/max 25.090/32.9255/145.194ms and
+CaptureActivate 3.786/33.089/129.419ms. A's 716 non-first frames were [689, 26, 1, 0, 0]
+with a 15.120ms worst; B's 708 were [73, 635, 0, 0, 0] with a 9.063ms maximum.
+
+A's error attempts 7 and 8 coincide with
+activation_capture_foreground_missing_before_show at 18:44:15.783Z and 18:44:17.370Z;
+capture rollback measured 1.532/1.166ms, and the actual absent-foreground root cause is
+unconfirmed. A logged boundary_orchestrator_failed with RECONNECTING at
+18:44:10.9336585Z and CONNECTED at 18:44:13.1698384Z (a 2.236s process-local event
+interval); B logged remote_eof with RECONNECTING at 18:44:10.7542015Z then CONNECTED at
+18:44:13.0311542Z. No new disconnect follows the final CONNECTED even though the failed
+transitions 7/8 come after it. B recorded 10 network acquisition timeouts before the
+first CONNECTED and one TLS failure during the reconnect. User intervention or PIN must
+not be equated with the cause, which is unknown.
+
+Installation receipts are result 0/complete and each export has one incomplete historical
+log. B shows 10 prepared acknowledgements and 1 missed. The user states PIN works on
+g164; the exact PIN actions are not separately confirmed. Coverage is A-to-B only and the
+12-attempt quota was consumed over about 61s; no cross-device clocks were subtracted and
+overlapping spans are not summed. The next priority is diagnosing the remaining
+preparation-lock/capture readiness and the boundary_orchestrator failure; this is
+evidence only with no build or runtime source change.
