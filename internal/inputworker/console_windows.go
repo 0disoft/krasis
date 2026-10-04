@@ -44,6 +44,16 @@ func launchManagedConsole(ctx context.Context, agent *Authority, digest [sha256.
 	if ctx == nil || ctx.Err() != nil || agent == nil || agent.kind != authorityAgent || agent.check(false) != nil || digest == ([sha256.Size]byte{}) {
 		return nil, ErrAuthority
 	}
+	return launchManagedConsoleChecked(ctx, digest, prepare, installation, func() bool { return agent.check(false) == nil })
+}
+
+// Private launch core: the normal path supplies fresh agent authentication.
+// A service preparation path must supply its own protected service checks;
+// neither callback nor installation is supplied over IPC.
+func launchManagedConsoleChecked(ctx context.Context, digest [sha256.Size]byte, prepare func(windows.Handle, uint32) error, installation *Installation, authorized func() bool) (*ConsoleWorker, error) {
+	if ctx == nil || ctx.Err() != nil || digest == ([sha256.Size]byte{}) || authorized == nil || !authorized() {
+		return nil, ErrAuthority
+	}
 	type result struct {
 		worker *ConsoleWorker
 		err    error
@@ -64,7 +74,7 @@ func launchManagedConsole(ctx context.Context, agent *Authority, digest [sha256.
 			ready <- result{err: ErrAuthority}
 			return
 		}
-		worker, err := launchConsole(ctx, agent, digest, prepare, installation)
+		worker, err := launchConsole(ctx, digest, prepare, installation, authorized)
 		if undo() != nil {
 			clean = false
 			if worker != nil {
@@ -86,7 +96,7 @@ func launchManagedConsole(ctx context.Context, agent *Authority, digest [sha256.
 	return value.worker, nil
 }
 
-func launchConsole(ctx context.Context, agent *Authority, digest [sha256.Size]byte, prepare func(windows.Handle, uint32) error, installation *Installation) (*ConsoleWorker, error) {
+func launchConsole(ctx context.Context, digest [sha256.Size]byte, prepare func(windows.Handle, uint32) error, installation *Installation, authorized func() bool) (*ConsoleWorker, error) {
 	self, err := inspectProcess(windows.GetCurrentProcessId())
 	if err != nil {
 		return nil, ErrAuthority
@@ -112,7 +122,7 @@ func launchConsole(ctx context.Context, agent *Authority, digest [sha256.Size]by
 		}
 	}()
 	session := windows.WTSGetActiveConsoleSessionId()
-	if session == 0 || session == 0xffffffff || agent.check(false) != nil {
+	if session == 0 || session == 0xffffffff || !authorized() {
 		return nil, ErrAuthority
 	}
 	token, err := consoleToken(session)
@@ -125,7 +135,7 @@ func launchConsole(ctx context.Context, agent *Authority, digest [sha256.Size]by
 		return nil, ErrAuthority
 	}
 	worker.process, err = createConsoleProcess(ctx, token, path, worker.job, func() bool {
-		return windows.WTSGetActiveConsoleSessionId() == session && agent.check(false) == nil
+		return windows.WTSGetActiveConsoleSessionId() == session && authorized()
 	}, prepare)
 	if err != nil {
 		return nil, ErrAuthority

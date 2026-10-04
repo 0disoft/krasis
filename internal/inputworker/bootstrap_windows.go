@@ -42,28 +42,12 @@ func runInstalledAgentLease(ctx context.Context, channel *Channel, lease Lease, 
 	if err != nil {
 		return Report{}, ErrAuthority
 	}
-	var control *pipeConn
-	defer func() {
-		if control != nil {
-			_ = control.Close()
-		}
-	}()
-	var pid uint32
-	var profile handoff.StartupProfile
-	started := time.Now()
-	worker, err := launchManagedConsole(ctx, channel.authority, serviceDigest, func(process windows.Handle, childID uint32) error {
-		pid = childID
-		var err error
-		control, err = makePipeACL(workerPipeName(pid), "D:P(A;;GA;;;SY)")
-		if err != nil {
-			return ErrAuthority
-		}
-		return nil
-	}, installation)
-	profile.Record(handoff.ServiceLaunch, time.Since(started))
+	prepared, err := prepareAgentConsole(ctx, channel.authority, serviceDigest, installation)
 	if err != nil {
-		return Report{}, ErrAuthority
+		return Report{}, err
 	}
+	worker, control, pid, profile := prepared.worker, prepared.control, prepared.pid, prepared.profile
+	defer control.Close()
 	defer func() {
 		if worker.Close() != nil {
 			result = errors.Join(result, ErrRecovery)
@@ -71,12 +55,6 @@ func runInstalledAgentLease(ctx context.Context, channel *Channel, lease Lease, 
 	}()
 	startup, cancel := context.WithTimeout(ctx, startupTimeout)
 	defer cancel()
-	started = time.Now()
-	connectErr := control.connect(startup)
-	profile.Record(handoff.ServiceChildConnect, time.Since(started))
-	if connectErr != nil {
-		return Report{}, ErrAuthority
-	}
 	var actual uint32
 	if windows.GetNamedPipeClientProcessId(control.handle, &actual) != nil || actual != pid || channel.authority.check(false) != nil {
 		return Report{}, ErrAuthority
@@ -84,7 +62,7 @@ func runInstalledAgentLease(ctx context.Context, channel *Channel, lease Lease, 
 	_ = control.SetDeadline(time.Now().Add(startupTimeout))
 	stopStartup := context.AfterFunc(startup, func() { _ = control.Close() })
 	defer stopStartup()
-	started = time.Now()
+	started := time.Now()
 	// The worker cannot acknowledge before full service-image validation and
 	// SCM/actual pipe-owner authentication. No agent handle is transferred yet.
 	packet, err := bootstrapAfterAuthentication(startup, control, func() error {
