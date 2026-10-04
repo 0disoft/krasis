@@ -397,3 +397,47 @@ the 39-stage vectors and PIN authority are unchanged. The
 defines presence masks, bounds and overlap handling. Local tests cover reordered
 callbacks, stale association, expiry, limits, policy-clock separation and numeric
 export. g162 is diagnostic only; device latency and PIN behavior remain pending.
+
+### g162 device observations
+
+Exports were created at A 2026-10-04T17:52:53Z and B 2026-10-04T17:52:46Z and filtered
+to revision 7be3159e385cedb3700b1e2de7fe465b5980dd46. There are twelve source and twelve
+installed-receiver profiles, all end ok with incomplete false. Every source exchange
+mask is 3. Grant-read to matched handling records 0 microseconds in all twelve as a
+present clock reading, not an absent observation. Request-write completion to grant
+read has median/max 29.703/80.579ms. A grant median/max is 29.9445/81.127ms.
+
+Every receiver exchange mask is 12. Request-read to handler records 0 microseconds
+except attempt 3 at 0.661ms. Request-read to successful grant write has median/max
+19.3795/66.744ms. The two longest A grants coincide with nonzero receiver OpenLock:
+
+| Attempt | A grant | A write-complete to grant-read | B read to grant-write | B OpenLock | B ReadyWait | B prepared age |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 81.127ms | 80.579ms | 66.744ms | 44.634ms | 8.970ms | 4.851ms |
+| 7 | 50.036ms | 50.036ms | 37.678ms | 18.725ms | 7.850ms | 3.116ms |
+
+B AuthorizeTotal was 66.164/37.103ms on those attempts. The other ten OpenLock
+observations record zero. All B startups are prepared=true with ages 3.116–924.572ms;
+ReadyWait median/max is 8.021/10.084ms. Thus the two longer source waits occur before
+the grant is fully read, and receiver lock waiting has reappeared. The zero OpenLock
+result in g161 was specific to that sample, not a general elimination of contention.
+Static inspection shows PrepareInput holds the same input.mu as open across the local
+preparation request. The current profile does not identify the mutex holder, so
+preparation overlap remains a candidate rather than a proven owner attribution.
+
+A's 345 non-first frames are all below 1ms, maximum 0.752ms. B's 337 non-first frames
+include seventeen below 1ms and 320 in [1,10)ms, maximum 3.424ms. A's first activation
+records CaptureActivate 36.112ms and first Dispatch 31.480ms. These overlapping spans
+must not be summed. Neither export records failure or RECONNECTING after the latest
+CONNECTED. B's eight acquisition timeouts precede connection. Both installation
+receipts are result 0 with stage complete; each export has one incomplete historical
+control log.
+
+The first and last profile emissions are about 5.8s apart and the largest source
+reentry gap is 1.033s. The twelve-attempt quota was consumed during rapid reentries;
+no ten-second idle reentry was captured, and approach speed is unclassified. Only
+A-to-B profiles are covered. g162 PIN behavior remains unconfirmed; the earlier user
+confirmation applies to g161. Source wait includes peer work, transport and local
+reader scheduling, so no pure network RTT is derived by subtracting durations or
+cross-device clocks. The next investigation is preparation contention and controlled
+first/idle coverage. This evidence update changes no runtime or build.
