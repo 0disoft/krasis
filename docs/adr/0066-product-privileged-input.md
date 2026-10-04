@@ -1,5 +1,24 @@
 # ADR 0066: Product leases use the installed input service
 
+## g159: Prepare one unbound child after clean recovery
+
+After a successful lease recovery and owned job cleanup, the installed service
+may prepare one new child for the next lease. Its endpoint exists before this
+preparation. The child owns only a SYSTEM-only control pipe and independent
+installation checks; no agent image handle, input pipe or lease is transferred.
+It expires after two seconds and can be claimed only once in the same active
+console session. Expiry cannot close a claimed child. Cleanup failure stops the
+service instead of authorizing another lease. Missing, expired or exited
+preparation uses the normal fresh launch before any input is sent.
+
+The approved new lease still passes agent authentication, exact child pipe-owner
+checks, KRA1 service authentication and KRB2 agent-image binding. A new child
+consumes at most one lease; an active input worker is never recycled. KRD4 adds
+bounded preparation age to the internal diagnostic receipt. Its earlier launch
+and child-connect timings describe preparation outside the current handoff;
+ReadyWait remains the current lease's measured wait. External peer protocol and
+CLI behavior are unchanged. Real-device latency and PIN regression are pending.
+
 ## g138: Show portable fallback after updates
 
 The status API and desktop snapshot expose the runner's selected input backend.

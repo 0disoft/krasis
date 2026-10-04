@@ -23,15 +23,20 @@ const (
 )
 
 type StartupProfile struct {
-	Schema       uint8                     `json:"schema"`
-	Micros       [StartupStageCount]uint32 `json:"micros"`
-	Measured     uint8                     `json:"measured"`
-	LoadMicros   uint32                    `json:"loadMicros,omitempty"`
-	LoadMeasured bool                      `json:"loadMeasured,omitempty"`
+	Schema            uint8                     `json:"schema"`
+	Micros            [StartupStageCount]uint32 `json:"micros"`
+	Measured          uint8                     `json:"measured"`
+	LoadMicros        uint32                    `json:"loadMicros,omitempty"`
+	LoadMeasured      bool                      `json:"loadMeasured,omitempty"`
+	Prepared          bool                      `json:"prepared,omitempty"`
+	PreparedAgeMicros uint32                    `json:"preparedAgeMicros,omitempty"`
 }
 
 func (p StartupProfile) Valid() bool {
 	if p.Schema != 1 {
+		return false
+	}
+	if (!p.Prepared && p.PreparedAgeMicros != 0) || (p.Prepared && (p.PreparedAgeMicros >= 2_000_000 || p.Measured&3 != 3)) {
 		return false
 	}
 	for i, n := range p.Micros {

@@ -5,6 +5,25 @@ import (
 	"time"
 )
 
+func TestPreparedStartupDiagnosticRequiresBoundedAgeAndServiceSpans(t *testing.T) {
+	p := StartupProfile{Schema: 1, Measured: 3, Prepared: true, PreparedAgeMicros: 1_999_999}
+	if !p.Valid() {
+		t.Fatal("bounded prepared diagnostic rejected")
+	}
+	p.PreparedAgeMicros = 2_000_000
+	if p.Valid() {
+		t.Fatal("expired prepared diagnostic accepted")
+	}
+	p.PreparedAgeMicros, p.Measured = 0, 1
+	if p.Valid() {
+		t.Fatal("preparation without both service spans accepted")
+	}
+	p.Prepared, p.PreparedAgeMicros = false, 1
+	if p.Valid() {
+		t.Fatal("absent preparation had an age")
+	}
+}
+
 func TestStartupProfileBoundsPresenceAndFrozenAttempt(t *testing.T) {
 	_, ctx, out := collected(t)
 	p := Begin(ctx, "receiver", "session", "epoch", time.Now())

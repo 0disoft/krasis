@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"errors"
+	"sync/atomic"
 	"time"
 
 	"github.com/0disoft/krasis/internal/handoff"
@@ -21,6 +22,62 @@ type preparedConsole struct {
 	session    uint32
 	profile    handoff.StartupProfile
 	preparedAt time.Time
+	warmState  atomic.Uint32 // 0: unbound, 1: claimed once, 2: retired
+	warmTimer  *time.Timer
+}
+
+const preparedConsoleWindow = 2 * time.Second
+
+// Only the installed service can prepare an unbound child. It receives no
+// agent pipe, lease, image pin or input. The ordinary launch API stays agent-only.
+func prepareServiceConsole(ctx context.Context, installation *Installation, digest [sha256.Size]byte) (*preparedConsole, error) {
+	if ctx == nil || ctx.Err() != nil || installation == nil {
+		return nil, ErrAuthority
+	}
+	_, service, err := installation.digests()
+	if err != nil || service != digest || !fixedInstalledInputProcess(service, false, installation) {
+		return nil, ErrAuthority
+	}
+	p, err := prepareConsole(ctx, func(prepare func(windows.Handle, uint32) error) (*ConsoleWorker, error) {
+		return launchManagedConsoleChecked(ctx, digest, prepare, installation, func() bool {
+			return fixedInstalledInputProcess(digest, false, installation)
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+	// Expiry can only destroy an unbound child. Claim and expiry race through
+	// one atomic state; the callback can never close an active input lease.
+	p.warmTimer = time.AfterFunc(preparedConsoleWindow, func() {
+		// Both Close methods retain cleanup errors. The owning service loop
+		// must join close() before another child or lease can be created.
+		_ = p.retireUnbound()
+	})
+	return p, nil
+}
+
+func preparedConsoleFresh(age time.Duration, session, current uint32, alive bool) bool {
+	return age >= 0 && age < preparedConsoleWindow && session != 0 && session != 0xffffffff && session == current && alive
+}
+
+func (p *preparedConsole) claim(ctx context.Context) bool {
+	if p == nil || ctx == nil || ctx.Err() != nil || p.warmTimer == nil || !p.warmState.CompareAndSwap(0, 1) {
+		return false
+	}
+	p.warmTimer.Stop()
+	age := time.Since(p.preparedAt)
+	if p.worker == nil || p.worker.process == 0 || p.control == nil || p.pid == 0 || !preparedConsoleFresh(age, p.session, windows.WTSGetActiveConsoleSessionId(), !p.worker.exited()) || ctx.Err() != nil {
+		return false
+	}
+	p.profile.Prepared, p.profile.PreparedAgeMicros = true, uint32(age.Microseconds())
+	return true
+}
+
+func (p *preparedConsole) retireUnbound() error {
+	if p == nil || !p.warmState.CompareAndSwap(0, 2) {
+		return nil
+	}
+	return p.closeOwned()
 }
 
 type consoleLauncher func(func(windows.Handle, uint32) error) (*ConsoleWorker, error)
@@ -51,7 +108,7 @@ func prepareConsole(ctx context.Context, launch consoleLauncher) (prepared *prep
 	})
 	p.profile.Record(handoff.ServiceLaunch, time.Since(started))
 	if err != nil {
-		return nil, ErrAuthority
+		return nil, err
 	}
 	p.worker = worker
 	startup, cancel := context.WithTimeout(ctx, startupTimeout)
@@ -71,6 +128,14 @@ func (prepared *preparedConsole) close() error {
 	if prepared == nil {
 		return nil
 	}
+	prepared.warmState.Store(2)
+	if prepared.warmTimer != nil {
+		prepared.warmTimer.Stop()
+	}
+	return prepared.closeOwned()
+}
+
+func (prepared *preparedConsole) closeOwned() error {
 	var err error
 	if prepared.control != nil {
 		err = prepared.control.Close()

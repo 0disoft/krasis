@@ -108,6 +108,46 @@ func FuzzStartupReady(f *testing.F) {
 	})
 }
 
+func TestPreparedStartupReadyRoundtripRejectsMalformedAndDropsStaleDiagnostics(t *testing.T) {
+	var profile handoff.StartupProfile
+	profile.Record(handoff.ServiceLaunch, time.Millisecond)
+	profile.Record(handoff.ServiceChildConnect, 80*time.Millisecond)
+	profile.Record(handoff.WorkerInstalledValidation, 30*time.Millisecond)
+	profile.RecordLoad(20 * time.Millisecond)
+	profile.Prepared, profile.PreparedAgeMicros = true, 500_000
+	var buffer bytes.Buffer
+	if err := writeStartupReady(&buffer, profile); err != nil {
+		t.Fatal(err)
+	}
+	packet := append([]byte(nil), buffer.Bytes()...)
+	reader := bytes.NewReader(append(packet, 'S'))
+	got, err := readStartupReady(iotest.OneByteReader(reader))
+	if err != nil || got == nil || *got != profile {
+		t.Fatal("prepared startup timing lost")
+	}
+	if next, err := reader.ReadByte(); err != nil || next != 'S' {
+		t.Fatal("prepared receipt consumed next frame")
+	}
+	for _, offset := range []int{startupReadyLoadSize + 4, startupReadyLoadSize + 5} {
+		bad := append([]byte(nil), packet...)
+		bad[offset]++
+		if _, err := readStartupReady(bytes.NewReader(bad)); err != ErrProtocol {
+			t.Fatal("malformed preparation detail accepted")
+		}
+	}
+	if _, err := readStartupReady(bytes.NewReader(packet[:len(packet)-1])); err != ErrProtocol {
+		t.Fatal("truncated preparation detail accepted")
+	}
+	binary.BigEndian.PutUint32(packet[startupReadyLoadSize:], uint32(preparedConsoleWindow.Microseconds()))
+	reader = bytes.NewReader(append(packet, 'S'))
+	if got, err := readStartupReady(reader); err != nil || got != nil {
+		t.Fatal("stale diagnostic changed readiness")
+	}
+	if next, err := reader.ReadByte(); err != nil || next != 'S' {
+		t.Fatal("invalid preparation diagnostics misaligned protocol")
+	}
+}
+
 func TestStartupLoadReadyRoundtripBoundsAndFollowingFrame(t *testing.T) {
 	var p handoff.StartupProfile
 	p.Record(handoff.WorkerInstalledValidation, 20*time.Millisecond)

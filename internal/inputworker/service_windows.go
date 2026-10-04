@@ -75,27 +75,50 @@ func RunInstalledWorker(ctx context.Context, installation *Installation) error {
 	return runInstalledConsoleInput(ctx, agent, service, profile, installation)
 }
 
-func runServiceLoop(ctx context.Context, installation *Installation, ready func() error) error {
+func runServiceLoop(ctx context.Context, installation *Installation, ready func() error) (result error) {
 	agent, service, err := installation.digests()
 	if err != nil {
 		return ErrAuthority
 	}
+	var next *preparedConsole
+	prepareNext := false
+	defer func() {
+		if next.close() != nil {
+			result = errors.Join(result, ErrRecovery)
+		}
+	}()
 	for ctx.Err() == nil {
 		readyFailed := false
+		var preparationErr error
 		channel, err := acceptAgentReady(ctx, agent, func() error {
 			if ready != nil && ready() != nil {
 				readyFailed = true
 				return ErrAuthority
 			}
+			if prepareNext {
+				prepareNext = false
+				// The endpoint already exists: a quick next connection can wait
+				// in the pipe while one unbound child prepares. No extra accept
+				// failure or per-idle retry can create another warm child.
+				next, preparationErr = prepareServiceConsole(ctx, installation, service)
+				if errors.Is(preparationErr, ErrRecovery) {
+					return ErrRecovery
+				}
+			}
 			return nil
 		}, installation)
+		if errors.Is(preparationErr, ErrRecovery) {
+			return ErrRecovery
+		}
 		if readyFailed {
 			return ErrAuthority
 		}
 		if err == nil {
 			lease, leaseErr := receiveLease(ctx, channel)
 			if leaseErr == nil {
-				_, err = runInstalledAgentLease(ctx, channel, lease, agent, service, installation)
+				candidate := next
+				next = nil
+				_, err = runPreparedAgentLease(ctx, channel, lease, agent, service, installation, candidate)
 				if errors.Is(err, ErrRecovery) {
 					_ = channel.Close()
 					return ErrRecovery
@@ -110,8 +133,13 @@ func runServiceLoop(ctx context.Context, installation *Installation, ready func(
 		// Recovery and the owned worker have already finished. A clean lease
 		// needs no retry backoff; the next accept still blocks awaiting a client.
 		if err == nil {
+			prepareNext = true
 			continue
 		}
+		if next.close() != nil {
+			return ErrRecovery
+		}
+		next = nil
 		timer := time.NewTimer(200 * time.Millisecond)
 		select {
 		case <-ctx.Done():

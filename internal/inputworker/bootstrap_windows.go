@@ -30,6 +30,17 @@ func RunAgentLease(ctx context.Context, channel *Channel, lease Lease, agentDige
 }
 
 func runInstalledAgentLease(ctx context.Context, channel *Channel, lease Lease, agentDigest, serviceDigest [sha256.Size]byte, installation *Installation) (report Report, result error) {
+	return runPreparedAgentLease(ctx, channel, lease, agentDigest, serviceDigest, installation, nil)
+}
+
+func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, agentDigest, serviceDigest [sha256.Size]byte, installation *Installation, candidate *preparedConsole) (report Report, result error) {
+	if candidate != nil {
+		defer func() {
+			if candidate.close() != nil {
+				result = errors.Join(result, ErrRecovery)
+			}
+		}()
+	}
 	if ctx == nil || ctx.Err() != nil || channel == nil || channel.authority == nil || channel.authority.kind != authorityAgent || channel.authority.check(false) != nil || agentDigest == ([sha256.Size]byte{}) || serviceDigest == ([sha256.Size]byte{}) {
 		return Report{}, ErrAuthority
 	}
@@ -42,9 +53,15 @@ func runInstalledAgentLease(ctx context.Context, channel *Channel, lease Lease, 
 	if err != nil {
 		return Report{}, ErrAuthority
 	}
-	prepared, err := prepareAgentConsole(ctx, channel.authority, serviceDigest, installation)
-	if err != nil {
-		return Report{}, err
+	prepared := candidate
+	if !candidate.claim(ctx) {
+		if candidate != nil && candidate.close() != nil {
+			return Report{}, ErrRecovery
+		}
+		prepared, err = prepareAgentConsole(ctx, channel.authority, serviceDigest, installation)
+		if err != nil {
+			return Report{}, err
+		}
 	}
 	worker, control, pid, profile := prepared.worker, prepared.control, prepared.pid, prepared.profile
 	defer control.Close()
@@ -56,7 +73,7 @@ func runInstalledAgentLease(ctx context.Context, channel *Channel, lease Lease, 
 	startup, cancel := context.WithTimeout(ctx, startupTimeout)
 	defer cancel()
 	var actual uint32
-	if windows.GetNamedPipeClientProcessId(control.handle, &actual) != nil || actual != pid || channel.authority.check(false) != nil {
+	if windows.GetNamedPipeClientProcessId(control.handle, &actual) != nil || actual != pid || windows.WTSGetActiveConsoleSessionId() != prepared.session || channel.authority.check(false) != nil {
 		return Report{}, ErrAuthority
 	}
 	_ = control.SetDeadline(time.Now().Add(startupTimeout))
@@ -66,11 +83,14 @@ func runInstalledAgentLease(ctx context.Context, channel *Channel, lease Lease, 
 	// The worker cannot acknowledge before full service-image validation and
 	// SCM/actual pipe-owner authentication. No agent handle is transferred yet.
 	packet, err := bootstrapAfterAuthentication(startup, control, func() error {
-		if windows.GetNamedPipeClientProcessId(control.handle, &actual) != nil || actual != pid || channel.authority.check(false) != nil {
+		if windows.GetNamedPipeClientProcessId(control.handle, &actual) != nil || actual != pid || windows.WTSGetActiveConsoleSessionId() != prepared.session || channel.authority.check(false) != nil {
 			return ErrAuthority
 		}
 		return nil
 	}, func() ([bootstrapSize]byte, error) {
+		if windows.WTSGetActiveConsoleSessionId() != prepared.session {
+			return [bootstrapSize]byte{}, ErrAuthority
+		}
 		return transferWorkerBootstrap(startup, worker, channel.authority, agentPipe, agentDigest, serviceDigest, data, installation)
 	})
 	if err != nil {

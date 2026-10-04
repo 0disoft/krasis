@@ -12,12 +12,13 @@ import (
 // it. Legacy KRD1 has no diagnostic payload and remains readable.
 const startupReadySize = 8 + int(handoff.StartupStageCount)*4
 const startupReadyLoadSize = startupReadySize + 8
+const startupReadyPreparedSize = startupReadyLoadSize + 8
 
 func writeStartupReady(writer io.Writer, profile handoff.StartupProfile) error {
 	if !profile.Valid() || profile.Measured == 0 {
 		return writeFrame(writer, readyFrame[:])
 	}
-	var data [startupReadyLoadSize]byte
+	var data [startupReadyPreparedSize]byte
 	copy(data[:5], []byte{'K', 'R', 'D', '2', 2})
 	size := startupReadySize
 	if profile.LoadMeasured {
@@ -25,6 +26,12 @@ func writeStartupReady(writer io.Writer, profile handoff.StartupProfile) error {
 		size = startupReadyLoadSize
 		binary.BigEndian.PutUint32(data[startupReadySize:startupReadySize+4], profile.LoadMicros)
 		data[startupReadySize+4] = 1
+	}
+	if profile.Prepared {
+		copy(data[:5], []byte{'K', 'R', 'D', '4', 4})
+		size = startupReadyPreparedSize
+		binary.BigEndian.PutUint32(data[startupReadyLoadSize:startupReadyLoadSize+4], profile.PreparedAgeMicros)
+		data[startupReadyLoadSize+4] = 1
 	}
 	data[5] = profile.Measured
 	for i, n := range profile.Micros {
@@ -41,7 +48,8 @@ func readStartupReady(reader io.Reader) (*handoff.StartupProfile, error) {
 	if header == readyFrame {
 		return nil, nil
 	}
-	load := string(header[:4]) == "KRD3" && header[4] == 3
+	prepared := string(header[:4]) == "KRD4" && header[4] == 4
+	load := prepared || (string(header[:4]) == "KRD3" && header[4] == 3)
 	if (!load && (string(header[:4]) != "KRD2" || header[4] != 2)) || !zeroBytes(header[6:]) {
 		return nil, ErrProtocol
 	}
@@ -60,6 +68,13 @@ func readStartupReady(reader io.Reader) (*handoff.StartupProfile, error) {
 		}
 		profile.LoadMicros = binary.BigEndian.Uint32(detail[:4])
 		profile.LoadMeasured = detail[4] == 1
+	}
+	if prepared {
+		var detail [8]byte
+		if _, err := io.ReadFull(reader, detail[:]); err != nil || detail[4] != 1 || !zeroBytes(detail[5:]) {
+			return nil, ErrProtocol
+		}
+		profile.Prepared, profile.PreparedAgeMicros = true, binary.BigEndian.Uint32(detail[:4])
 	}
 	// Numeric diagnostics are not readiness proof. Consume the fixed payload,
 	// but drop invalid/missing measurements without changing a valid receipt.

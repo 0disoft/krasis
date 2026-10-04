@@ -5,6 +5,7 @@ package inputworker
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -77,26 +78,33 @@ func launchManagedConsoleChecked(ctx context.Context, digest [sha256.Size]byte, 
 		worker, err := launchConsole(ctx, digest, prepare, installation, authorized)
 		if undo() != nil {
 			clean = false
+			err = errors.Join(err, ErrAuthority)
 			if worker != nil {
-				_ = worker.Close()
+				if worker.Close() != nil {
+					err = errors.Join(err, ErrRecovery)
+				}
 				worker = nil
 			}
-			err = ErrAuthority
 		}
 		ready <- result{worker, err}
 	}()
 	value := <-ready
 	if value.err != nil {
+		if errors.Is(value.err, ErrRecovery) {
+			return nil, value.err
+		}
 		return nil, ErrAuthority
 	}
 	if ctx.Err() != nil {
-		_ = value.worker.Close()
+		if value.worker.Close() != nil {
+			return nil, ErrRecovery
+		}
 		return nil, ErrAuthority
 	}
 	return value.worker, nil
 }
 
-func launchConsole(ctx context.Context, digest [sha256.Size]byte, prepare func(windows.Handle, uint32) error, installation *Installation, authorized func() bool) (*ConsoleWorker, error) {
+func launchConsole(ctx context.Context, digest [sha256.Size]byte, prepare func(windows.Handle, uint32) error, installation *Installation, authorized func() bool) (result *ConsoleWorker, resultErr error) {
 	self, err := inspectProcess(windows.GetCurrentProcessId())
 	if err != nil {
 		return nil, ErrAuthority
@@ -118,7 +126,9 @@ func launchConsole(ctx context.Context, digest [sha256.Size]byte, prepare func(w
 	accepted := false
 	defer func() {
 		if !accepted {
-			_ = worker.Close()
+			if worker.Close() != nil {
+				resultErr = errors.Join(resultErr, ErrRecovery)
+			}
 		}
 	}()
 	session := windows.WTSGetActiveConsoleSessionId()

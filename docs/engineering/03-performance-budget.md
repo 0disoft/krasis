@@ -194,3 +194,31 @@ pipeline quota/export 비용은 벤치에 없다.
 
 관련 패키지 테스트·native fixture·static vet은 통과했다. g158의 실기기 효과는 아직
 확인하지 않았다. 앞선 native 벤치 커밋은 740be71이다.
+
+## g159 one-shot unbound console preparation
+
+The g158 exports created at 2026-10-04 14:47:50/54 UTC contain twelve matching
+A-source/B-installed-receiver attempts, all complete and successful. A grant
+median/max was 142.097/304.606ms. B ready-wait median was 123.262ms, launch
+19.708ms, child-connect 92.952ms and load 31.997ms. These nested/local spans
+must not be added. B's 763 non-first frames were all below 10ms. There were no
+post-connect pipe/heartbeat failures or reconnects in this exported g158 window.
+
+Four slow owner calls took 3.201–5.226ms wall with 68,400–102,060 cycles;
+all 24 exported first/worst owner cycle readings ranged 56,340–123,840. This
+suggests waiting/scheduling rather than proportional CPU work; cycles are not
+converted to time and do not identify the wait cause. The exports include one
+incomplete historical control log, and the bounded profiles cover A-to-B only.
+
+GOMAXPROCS=1 and deferred source callback registration were tested using only
+the input helper's invalid-mode exit, in alternating before/after order. Neither
+showed a consistent startup latency gain; neither change was adopted. The
+fixture performs no installation, elevation, input or service activity.
+
+g159 moves a single child's preparation after successful prior recovery and
+before the next lease, with a two-second, one-use, same-console lifetime. The
+first or later cold handoff retains normal launch. KRD4 marks prepared startup
+and its bounded age; launch/child-connect measurements may precede the current
+attempt and must not be summed into its ready wait. Native pipe/job fixtures,
+freshness, expiry-versus-claim and framing tests cover local behavior. Actual
+two-PC latency and PIN behavior still require g159 verification.
