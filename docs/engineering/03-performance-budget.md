@@ -154,3 +154,19 @@ g156 실기기 exports에서 12전환 모두 ok였고 source 승인 median 137.2
 
 검증은 native 임시 파이프 fixture로만 진행 중이며 제품 service 변경은 없다. 실기기 효과는
 아직 확인하지 않았다.
+
+## g157 native pipe owner query benchmark
+
+`service_owner_bench_windows_test.go`는 임시 named pipe 한 쌍만 쓰고 제품 service·입력·권한은
+건드리지 않는다. `runtime.LockOSThread`로 한 번 고정하고 warm PID를 확인한 뒤, `b.Loop`
+안에서는 호출마다 `time.Now`/`time.Since`를 재고 배치 전후 `GetThreadTimes`의 kernel+user
+합산(CPU 100ns 단위)을 기록한다. 300ms 3회에서 native owner 평균 6513/6665/6459 ns/op,
+배치 CPU 합계 6230/6633/5525 ns/op, wall max 2.3288/2.5776/1.7051 ms였다.
+
+이 수치는 임시 파이프 fixture의 호출 비용일 뿐, B 실기기에서 보인 초기 11.573ms 지연의
+원인을 확정하지 않는다. 호출의 고정 비용이나 PID 캐시 필요성으로도 보지 않는다. CPU 값은
+배치 합계라 개별 slow call의 CPU에 연결할 수 없고 Windows 계정 단위 정밀도를 갖는다. 참고:
+[GetThreadTimes](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getthreadtimes).
+
+다음 단계는 bounded cycle probe 후보의 비용을 측정한 뒤 채택 여부를 판단하는 것이다. 별도
+g158 빌드는 실행하지 않았다.
