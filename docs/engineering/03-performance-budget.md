@@ -463,3 +463,53 @@ sampling behavior, clipped overlap, numeric validation/export and shutdown joini
 preparation before releasing installation pins. The existing slow-approach limitation
 remains: a hint can expire before crossing without another hint until retreat.
 Device latency, controlled first/idle coverage and g163 PIN regression remain pending.
+
+### g163 device observations
+
+Exports were created at A 2026-10-04T18:19:38Z and B 2026-10-04T18:19:33Z and filtered
+to revision 880dde99aa070cc0cb52defc8db7081e7861671b. Twelve source and twelve
+installed-receiver profiles all end ok with incomplete false. Exchange masks are
+3/12 throughout; source grant-read to matched handling records a present zero in all
+twelve. A request-to-grant median/max is 34.1915/150.797ms.
+
+The first receiver provides direct overlap evidence: OpenLock and
+preparationLockMicros both record 82.019ms with preparationLockMeasured true. The
+latest preparation's locked interval overlaps the whole measured OpenLock. A grant
+is 111.701ms; B AuthorizeTotal is 104.139ms, prepared age 4.714ms and ReadyWait
+8.598ms. The remaining eleven OpenLock/overlap observations are measured zeros.
+The overlap remains a latest-interval lower bound and must not be added to OpenLock.
+
+Eight startups use prepared children and four use cold startup. The latter have
+valid startup detail with the optional prepared bool omitted, which decodes as
+false under the existing Go schema:
+
+| Attempt | A reentry gap | A grant | B ReadyWait | B preparation-lock overlap |
+| --- | ---: | ---: | ---: | ---: |
+| 5 | 7.980s | 136.346ms | 118.170ms | 0ms, measured |
+| 6 | 9.622s | 142.665ms | 116.326ms | 0ms, measured |
+| 7 | 8.401s | 150.797ms | 126.555ms | 0ms, measured |
+| 10 | 2.285s | 142.200ms | 118.427ms | 0ms, measured |
+
+Prepared ReadyWait ranges 6.443–8.598ms; the overall median is 8.2125ms. Excluding
+the first startup, prepared ages range 265.845–1704.496ms. Two preparation
+acknowledgements appear near the first attempt and about four seconds later; none
+appear during the subsequent idle cases. This does not identify the exact sender or
+receiver drop path. Static inspection shows sticky hint rearm requires physical
+retreat, while sender/receiver cooldowns and the unbound child's lifetime are two
+seconds. The 250ms lead has not solved either the observed first preparation overlap
+or the cold fallback after idle. These trials are not a controlled before/after run.
+
+A's 653 non-first frames include 650 below 1ms and three in [1,10)ms, maximum 1.482ms.
+B's 644 include 56 below 1ms and 588 in [1,10)ms, maximum 7.172ms. First source
+CaptureActivate/Dispatch are 29.419/22.234ms and overlap. Neither export records a
+failure or reconnect after latest CONNECTED. B's nine acquisition timeouts precede
+connection. Installation receipts report result 0, stage complete; each export has
+one incomplete historical control log. The profile emissions span about 44 seconds
+and include roughly eight-to-ten-second reentry gaps. Approach speed remains
+unclassified; coverage is A-to-B only and g163 PIN behavior is not operator-confirmed.
+
+The next investigation is bounded hint renewal after a completed crossing or expired
+preparation, plus first-approach anticipation. Fresh lease authorization, recovery,
+one-claim child ownership and resource bounds must remain intact. No cross-device
+clocks or overlapping spans are added to infer RTT or total pointer latency. This is
+an evidence-only update; no new runtime build follows from the record itself.
