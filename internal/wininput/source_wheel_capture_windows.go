@@ -766,6 +766,25 @@ func (current *sourceWheelCaptureRun) setForegroundWithThreadAttach(targetWindow
 	if foregroundErr != nil {
 		return foregroundThreadFallbackAPIRejected, foregroundErr
 	}
+	if err := current.err(); err != nil {
+		return foregroundThreadFallbackVerificationLost, err
+	}
+	// Detaching can resume an asynchronous activation in the target queue.
+	// The observation made while the queues were joined is not final proof.
+	if verified && sourceWheelCaptureGetForeground() != targetWindow {
+		if err := current.err(); err != nil {
+			return foregroundThreadFallbackVerificationLost, err
+		}
+		if targetWindow == current.window {
+			sourceForegroundTransitionDispatch(targetWindow)
+		} else if err := sourceWheelCaptureProbeForeground(targetWindow); err != nil {
+			return foregroundThreadFallbackVerificationLost, err
+		}
+		if err := current.err(); err != nil {
+			return foregroundThreadFallbackVerificationLost, err
+		}
+		verified = sourceWheelCaptureGetForeground() == targetWindow
+	}
 	if !verified {
 		return foregroundThreadFallbackVerificationLost, errors.New("foreground fallback target was not verified")
 	}
@@ -841,6 +860,14 @@ func (current *sourceWheelCaptureRun) restoreFocus() (SourceFocusRestoreResult, 
 	}
 	restoreErr := sourceWheelCaptureSetForeground(current.savedFocus)
 	verificationLost := restoreErr == nil && sourceWheelCaptureGetForeground() != current.savedFocus
+	if verificationLost {
+		// Cross-queue SetForegroundWindow can return before activation finishes.
+		// WM_NULL waits at most the existing 100ms probe deadline, without
+		// joining the application's input queue or synthesizing a click.
+		if sourceWheelCaptureProbeForeground(current.savedFocus) == nil {
+			verificationLost = sourceWheelCaptureGetForeground() != current.savedFocus
+		}
+	}
 	if restoreErr != nil || verificationLost {
 		fallbackResult, fallbackErr := current.restoreFocusFallback()
 		if current.observer != nil {
