@@ -329,6 +329,11 @@ type supervisedConnection struct {
 	disconnectReceived atomic.Bool
 }
 
+func (connection *supervisedConnection) SupportsInputPreparation() bool {
+	capability, ok := connection.Connection.(interface{ SupportsInputPreparation() bool })
+	return ok && capability.SupportsInputPreparation()
+}
+
 func (connection *supervisedConnection) ReadFrame() (transport.Frame, error) {
 	frame, err := connection.Connection.ReadFrame()
 	if err == nil && frame.Kind == transport.MessageDisconnect && len(frame.Payload) == 0 {

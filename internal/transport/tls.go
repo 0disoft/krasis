@@ -12,6 +12,14 @@ import (
 
 const ALPNProtocol = "krasis/1"
 
+const ALPNInputPreparation = "krasis/1.prepare"
+
+// Opt in only at a product endpoint that installs the preparation handler.
+// Both directions retain the legacy ALPN for mixed-generation connections.
+func EnableInputPreparation(config *tls.Config) {
+	config.NextProtos = []string{ALPNInputPreparation, ALPNProtocol}
+}
+
 type AuthenticatedPeerRole string
 
 const (
@@ -99,7 +107,7 @@ func AuthenticatePeerContext(ctx context.Context, connection *tls.Conn) (Authent
 	if state.Version != tls.VersionTLS13 {
 		return AuthenticatedPeerContext{}, errors.Join(ErrPeerAuthentication, ErrPeerTLSVersion)
 	}
-	if state.NegotiatedProtocol != ALPNProtocol {
+	if state.NegotiatedProtocol != ALPNProtocol && state.NegotiatedProtocol != ALPNInputPreparation {
 		return AuthenticatedPeerContext{}, errors.Join(ErrPeerAuthentication, ErrPeerALPN)
 	}
 	if len(state.PeerCertificates) == 0 || len(state.VerifiedChains) == 0 {

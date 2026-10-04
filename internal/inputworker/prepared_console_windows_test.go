@@ -38,6 +38,18 @@ func TestServicePreparationRejectsPortableAndMissingInstallationWithoutInput(t *
 	}
 }
 
+func TestAgentServicePreparationRejectsMissingPinsWithoutConnecting(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	for _, service := range []*AgentService{nil, {}} {
+		for _, ctx := range []context.Context{nil, ctx, context.Background()} {
+			if service.PrepareConsole(ctx) != ErrAuthority {
+				t.Fatal("uninstalled preparation accepted")
+			}
+		}
+	}
+}
+
 func TestPreparedConsoleFreshnessRejectsExpiredChangedAndDeadConsole(t *testing.T) {
 	if !preparedConsoleFresh(time.Millisecond, 1, 1, true) {
 		t.Fatal("fresh matching console rejected")

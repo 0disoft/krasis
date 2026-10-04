@@ -40,6 +40,11 @@ type disconnectConnection struct {
 	err    error
 }
 
+func (connection *disconnectConnection) SupportsInputPreparation() bool {
+	capability, ok := connection.Connection.(interface{ SupportsInputPreparation() bool })
+	return ok && capability.SupportsInputPreparation()
+}
+
 func (connection *disconnectConnection) DiagnosticID() string {
 	if diagnostic, ok := connection.Connection.(interface{ DiagnosticID() string }); ok {
 		return diagnostic.DiagnosticID()

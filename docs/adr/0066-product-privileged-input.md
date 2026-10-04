@@ -1,5 +1,31 @@
 # ADR 0066: Product leases use the installed input service
 
+## g160: Near-boundary preparation hint over negotiated ALPN
+
+When the pointer moves outward within 192px of the crossing edge, the source hook
+enqueues one timestamp hint into a non-blocking single-slot queue (the band is
+clamped to a quarter of the screen width). The flag is not re-armed until the
+pointer retreats beyond twice the band, and the hint carries no identifiers or
+geometry. Both product endpoints advertise TLS ALPN `krasis/1.prepare` with the
+legacy `krasis/1` fallback, so only negotiated peers exchange it: the control
+command is version 4 kind 7 with no identifiers or geometry, while ordinary lease
+commands remain version 3. A sender checks local run state before writing.
+
+The receiver accepts one hint, drops it after 500ms, enforces a 2s cooldown and a
+300ms local preparation wait, and requires the existing fresh trust, role and
+inbound permission check. The installed agent and service still authenticate the
+existing exact path, images, SCM and pipe owner. The fixed `KRP1` local packet
+carries zero authority; at most one unbound child is retained for 2s in the same
+console session and claimed once, and no input transfers before a fresh normal
+lease is approved. Duplicates do not extend expiry, slow/expired/missed requests
+use the existing cold fallback, and a failed cleanup remains a service failure.
+
+Existing `preparedAgeMicros`/`prepared` diagnostics are reused and the hint adds a
+fixed acknowledged/missed outcome; an acknowledgement is not lease readiness.
+g159's first cold handoff was about 132ms and g160's goal is only to move cold
+preparation off the handoff. There is no real-device evidence yet, and no latency
+improvement is claimed.
+
 ## g159: Prepare one unbound child after clean recovery
 
 After a successful lease recovery and owned job cleanup, the installed service

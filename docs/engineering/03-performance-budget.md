@@ -247,3 +247,31 @@ The user subsequently confirmed successful g159 PIN control on the real devices
 (2026-10-05 KST). This is the user's direct observation; support export does not
 collect PIN values or dialog contents. User-perceived latency and reverse-direction
 profiles remain unconfirmed. No further runtime change follows from this snapshot alone.
+
+## g160 near-boundary preparation hint
+
+g160 adds an opt-in preparation hint before the crossing. The source hook enqueues
+one timestamp when the pointer moves outward within 192px of the edge (single-slot
+non-blocking queue; band clamped to a quarter of the screen width) and does not
+re-arm until the pointer retreats beyond twice the band. The hint carries no
+identifiers or geometry and is checked against local run state before any write.
+
+Product endpoints advertise TLS ALPN `krasis/1.prepare` with the legacy
+`krasis/1` fallback, so only negotiated peers send it. The control command is
+version 4 kind 7 and the existing lease commands stay version 3. The receiver
+accepts one hint, drops it after 500ms, enforces a 2s cooldown and a 300ms local
+preparation wait, and requires a fresh trust/role/inbound permission check. The
+installed agent and service authenticate the existing exact path, images, SCM and
+pipe owner.
+
+The fixed `KRP1` local packet carries zero authority. At most one unbound child is
+retained for 2s in the same console session and can be claimed once; no input
+transfers before a fresh normal lease is approved. Duplicate hints do not extend
+expiry, slow/expired/missed requests use the existing cold fallback, and a failed
+cleanup remains a service failure. Existing `preparedAgeMicros`/`prepared` diagnostics
+are reused and the hint adds a fixed acknowledged/missed outcome; an
+acknowledgement is not lease readiness.
+
+g159's first cold handoff was about 132ms; g160's goal is only to move cold
+preparation off the handoff. There is no real-device evidence yet, and no latency
+improvement is claimed.

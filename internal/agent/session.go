@@ -121,7 +121,17 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	if err != nil {
 		return Result{}, err
 	}
-	emergency, err := wininput.NewEmergencyBoundaryObserver(source, emitter)
+	var boundaryObserver wininput.BoundaryObserver = emitter
+	var preparationHints chan time.Time
+	preparationSupported := false
+	if capability, ok := dependencies.Connection.(interface{ SupportsInputPreparation() bool }); ok {
+		preparationSupported = capability.SupportsInputPreparation()
+	}
+	if preparationSupported {
+		preparationHints = make(chan time.Time, 1)
+		boundaryObserver = &preparationBoundary{next: emitter, config: config.Boundary, hints: preparationHints}
+	}
+	emergency, err := wininput.NewEmergencyBoundaryObserver(source, boundaryObserver)
 	if err != nil {
 		return Result{}, err
 	}
@@ -210,6 +220,24 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 		{name: "peer-session", run: func() error {
 			return peer.RunSessionWithLifecycleObserved(runContext, connection, coordinator, runtime, responder, outbound, config.Now, peerTimeout, config.LivenessObserver)
 		}},
+	}
+	if preparationSupported {
+		incoming := make(chan time.Time, 1)
+		responder.Preparation = func(_ context.Context, _ time.Time) {
+			select {
+			case incoming <- time.Now():
+			default:
+			}
+		}
+		preparer, _ := dependencies.Authorizer.(inputPreparer)
+		components = append(components,
+			component{name: "preparation-sender", wait: hookReady, run: func() error {
+				return runPreparationSender(runContext, preparationHints, runtime, coordinator)
+			}},
+			component{name: "preparation-receiver", run: func() error {
+				return runPreparationReceiver(runContext, incoming, runtime, preparer, authenticatedPeer)
+			}},
+		)
 	}
 	if config.Liveness != nil {
 		policy := *config.Liveness

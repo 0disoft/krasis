@@ -210,6 +210,7 @@ type ReturnBoundaryPort interface {
 }
 
 type LeaseResponder struct {
+	Preparation func(context.Context, time.Time)
 	Cursor      ReturnCursorPresentation
 	Coordinator *SessionWriteCoordinator
 	Runtime     *application.SessionRuntime
@@ -219,6 +220,12 @@ type LeaseResponder struct {
 	Returns     ReturnBoundaryPort
 	Observer    ControlFlowObserver
 	pending     *pendingInboundLease
+}
+
+func (responder *LeaseResponder) HandleInputPreparation(ctx context.Context, now time.Time) {
+	if responder != nil && responder.Preparation != nil && ctx != nil && ctx.Err() == nil {
+		responder.Preparation(ctx, now)
+	}
 }
 
 type pendingInboundLease struct {

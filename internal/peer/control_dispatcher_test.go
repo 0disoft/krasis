@@ -135,6 +135,18 @@ type recordingLeaseRequests struct {
 	commands []transport.ControlCommand
 }
 
+func TestPreparationDispatchNeverIntroducesLeaseAuthority(t *testing.T) {
+	runtime, _ := application.NewSessionRuntime(effectExecutor{}, &inputPort{})
+	requests := &recordingLeaseRequests{}
+	frame := controlFrame(t, transport.ControlCommand{Kind: transport.ControlPrepareInput})
+	if err := DispatchControlFrame(context.Background(), frame, time.Now(), runtime, requests); err != nil {
+		t.Fatal(err)
+	}
+	if len(requests.commands) != 0 || runtime.Snapshot().Control.State != control.StateLocal {
+		t.Fatal("preparation entered lease dispatcher")
+	}
+}
+
 func (requests *recordingLeaseRequests) HandleLeaseRequest(
 	_ context.Context,
 	command transport.ControlCommand,

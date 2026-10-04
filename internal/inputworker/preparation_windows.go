@@ -10,7 +10,8 @@ import (
 )
 
 // PrepareConsole authenticates the same service and exact installed agent as a
-// lease. The receipt acknowledges only an unbound child, never input authority.
+// lease. The receipt acknowledges a bounded preparation request, never input
+// authority or a guarantee that a warm child will still be available at claim.
 func (service *AgentService) PrepareConsole(ctx context.Context) error {
 	if ctx == nil || ctx.Err() != nil || service == nil || service.installation == nil || service.digest == ([sha256.Size]byte{}) {
 		return ErrAuthority

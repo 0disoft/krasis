@@ -23,6 +23,10 @@ type LeaseAbortHandler interface {
 	HandleLeaseAbort(context.Context, transport.ControlCommand) error
 }
 
+type InputPreparationHandler interface {
+	HandleInputPreparation(context.Context, time.Time)
+}
+
 func DispatchControlFrame(
 	ctx context.Context,
 	frame transport.Frame,
@@ -67,6 +71,13 @@ func dispatchControlFrame(
 		return failControlDispatch(ctx, runtime, err, deferFailure)
 	}
 	switch command.Kind {
+	case transport.ControlPrepareInput:
+		// The hint carries no lease and must never mutate the runtime or
+		// block the frame reader on privileged process creation.
+		if handler, ok := requests.(InputPreparationHandler); ok {
+			handler.HandleInputPreparation(ctx, observedAt)
+		}
+		return nil
 	case transport.ControlLeaseRequest:
 		if requests == nil {
 			return failControlDispatch(ctx, runtime, errors.New("lease request handler is required"), deferFailure)

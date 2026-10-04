@@ -29,6 +29,7 @@ type privilegedLeaseInput struct {
 	cancel       context.CancelFunc
 	done         chan struct{}
 	connect      func(context.Context, application.LeaseIdentity, time.Time) (privilegedClient, error)
+	prepare      func(context.Context) error
 	failed       func(error)
 	event        func(string)
 	expires      time.Time

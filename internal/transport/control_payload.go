@@ -29,6 +29,7 @@ const (
 	ControlLeaseRevoke  ControlCommandKind = 4
 	ControlLeaseCommit  ControlCommandKind = 5
 	ControlLeaseAbort   ControlCommandKind = 6
+	ControlPrepareInput ControlCommandKind = 7
 )
 
 type ControlCommand struct {
@@ -45,6 +46,9 @@ func EncodeControlPayload(command ControlCommand) ([]byte, error) {
 	}
 	payload := make([]byte, controlHeaderSize+len(command.SessionID)+len(command.LeaseID)+len(command.Epoch))
 	payload[0] = ControlPayloadVersion
+	if command.Kind == ControlPrepareInput {
+		payload[0] = 4
+	}
 	payload[1] = byte(command.Kind)
 	payload[2] = byte(len(command.SessionID))
 	payload[3] = byte(len(command.LeaseID))
@@ -63,11 +67,14 @@ func DecodeControlPayload(payload []byte) (ControlCommand, error) {
 	if len(payload) < controlHeaderSize {
 		return ControlCommand{}, errors.Join(ErrInvalidControlPayload, errors.New("payload is truncated"))
 	}
-	if payload[0] != ControlPayloadVersion {
+	if payload[0] != ControlPayloadVersion && !(payload[0] == 4 && ControlCommandKind(payload[1]) == ControlPrepareInput) {
 		return ControlCommand{}, fmt.Errorf("%w: control payload version", ErrUnsupportedControlPayload)
 	}
 	if payload[6] != 0 || payload[7] != 0 {
 		return ControlCommand{}, fmt.Errorf("%w: reserved fields", ErrUnsupportedControlPayload)
+	}
+	if payload[0] != 4 && ControlCommandKind(payload[1]) == ControlPrepareInput {
+		return ControlCommand{}, ErrUnsupportedControlPayload
 	}
 	edge, err := decodeControlEdge(payload[5])
 	if err != nil {
@@ -101,6 +108,12 @@ func DecodeControlPayload(payload []byte) (ControlCommand, error) {
 func (command ControlCommand) Validate() error {
 	if !command.Kind.Valid() {
 		return fmt.Errorf("control command kind %d is not supported", command.Kind)
+	}
+	if command.Kind == ControlPrepareInput {
+		if command.SessionID != "" || command.LeaseID != "" || command.Epoch != "" || command.Edge != "" {
+			return errors.New("preparation must not carry lease authority or geometry")
+		}
+		return nil
 	}
 	if command.SessionID == "" || command.Epoch == "" {
 		return errors.New("session and epoch are required")
@@ -154,7 +167,7 @@ func decodeControlEdge(value uint8) (control.ScreenEdge, error) {
 
 func (kind ControlCommandKind) Valid() bool {
 	switch kind {
-	case ControlLeaseRequest, ControlLeaseGrant, ControlLeaseReject, ControlLeaseRevoke, ControlLeaseCommit, ControlLeaseAbort:
+	case ControlLeaseRequest, ControlLeaseGrant, ControlLeaseReject, ControlLeaseRevoke, ControlLeaseCommit, ControlLeaseAbort, ControlPrepareInput:
 		return true
 	default:
 		return false

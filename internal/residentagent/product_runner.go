@@ -68,6 +68,7 @@ func prepareProductConnection(identities *productidentity.Store, trust *truststo
 		return productConnection{}, err
 	}
 	config.SessionTicketsDisabled = true
+	transport.EnableInputPreparation(config)
 	config.VerifyConnection = func(state tls.ConnectionState) error {
 		if len(state.PeerCertificates) != 1 {
 			return errors.New("unexpected peer chain")

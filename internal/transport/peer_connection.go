@@ -21,6 +21,10 @@ type PeerConnection struct {
 
 const FrameWriteTimeout = 2 * time.Second
 
+func (connection *PeerConnection) SupportsInputPreparation() bool {
+	return connection != nil && connection.connection != nil && connection.connection.ConnectionState().NegotiatedProtocol == ALPNInputPreparation
+}
+
 func NewPeerConnection(ctx context.Context, connection *tls.Conn) (*PeerConnection, error) {
 	if connection == nil {
 		return nil, errors.New("TLS connection is required")
