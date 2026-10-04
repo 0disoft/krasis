@@ -275,3 +275,37 @@ acknowledgement is not lease readiness.
 g159's first cold handoff was about 132ms; g160's goal is only to move cold
 preparation off the handoff. There is no real-device evidence yet, and no latency
 improvement is claimed.
+
+### g160 device observations
+
+Support exports were created at A 2026-10-04T16:39:35Z and B 2026-10-04T16:39:28Z and
+filtered to the full revision 3d04734c590051e5c5e6d94af38cab3290c68ff6. There is one
+matching source run and receiver run, 12 profiles each, all end ok and incomplete
+false. All 12 B startups are prepared=true with ages 2.943–1170.362ms. A
+request-to-grant median/max was 28.918/134.225ms and B ReadyWait median/max was
+7.187/7.864ms. The first A grant was 126.796ms and the first B OpenLock 96.643ms.
+
+Attempts 4, 5 and 10 followed reentry gaps of about 6.6, 14.1 and 10.7s. Their A
+grants were 100.060/134.225/79.303ms, B OpenLock 71.983/104.918/52.484ms and their
+prepared ages 3.067/4.650/2.943ms. The new PrepareInput holds the same mutex as open
+across the local preparation request, so preparation overlaps the handoff and its
+waiting moved into OpenLock. Cold or idle handoff is therefore not solved even with
+all Prepared=true. Overlapping spans must not be summed and the two devices' wall
+clocks differ, so cross-device clocks must not be compared.
+
+B recorded 1654 non-first frames: 88 below 1ms, 1552 in [1,10)ms, 14 in [10,100)ms and
+0 at or above 100ms. The 20.562ms maximum matches the same sample's client_response of 20.247ms,
+which includes worker, transport and scheduling; the root wait cause is unresolved.
+The first input is excluded from the histogram. Both installation receipts are
+result 0 with stage complete. After the latest CONNECTED there is no
+connection/heartbeat failure or RECONNECTING in the export. B's five
+acquire-network-timeout events precede CONNECTED during update/setup, not post-connect
+losses. B's fixed preparation acknowledged 15 / missed 0 does not prove claim
+readiness; the actual startup profiles prove prepared use. Each export has one
+incomplete historical control log, the bounded profiles cover A-to-B only, and the
+reverse direction and the new g160 PIN outcome remain unconfirmed.
+
+The next direction is that preparation must lead the actual edge request by enough
+time; an improved cold latency cannot be claimed yet. Field indices were verified
+against handoff/profile.go (OpenLock 6, ServiceAuth 9, ReadyWait 12, Dispatch 28).
+No new build or runtime test was required because this is evidence only.
