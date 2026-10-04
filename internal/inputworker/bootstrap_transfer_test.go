@@ -3,6 +3,7 @@ package inputworker
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"testing"
 	"time"
 )
@@ -59,11 +60,12 @@ func TestWorkerBootstrapRejectsOldProtocolAndMalformedHandles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	packet, err := encodeWorkerBootstrap(4, 8, lease)
+	agent := [sha256.Size]byte{1, 2, 3}
+	packet, err := encodeWorkerBootstrap(4, 8, agent, lease)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if pipe, image, err := decodeWorkerBootstrapHandles(packet); err != nil || pipe != 4 || image != 8 || !bytes.Equal(packet[24:], lease[:]) {
+	if pipe, image, err := decodeWorkerBootstrapHandles(packet, agent); err != nil || pipe != 4 || image != 8 || !bytes.Equal(packet[bootstrapLeaseOffset:], lease[:]) {
 		t.Fatal("bootstrap lost handle/lease binding")
 	}
 	for _, mutate := range []func(*[bootstrapSize]byte){
@@ -73,16 +75,25 @@ func TestWorkerBootstrapRejectsOldProtocolAndMalformedHandles(t *testing.T) {
 		func(data *[bootstrapSize]byte) { data[15] = 0 },
 		func(data *[bootstrapSize]byte) { data[23] = 0 },
 		func(data *[bootstrapSize]byte) { data[23] = 4 },
+		func(data *[bootstrapSize]byte) { data[24] ^= 1 },
 	} {
 		bad := packet
 		mutate(&bad)
-		if _, _, err := decodeWorkerBootstrapHandles(bad); err != ErrProtocol {
+		if _, _, err := decodeWorkerBootstrapHandles(bad, agent); err != ErrProtocol {
 			t.Fatal("malformed bootstrap accepted")
 		}
 	}
 	for _, handles := range [][2]uint64{{0, 8}, {4, 0}, {4, 4}, {^uint64(0), 8}, {4, ^uint64(0)}} {
-		if _, err := encodeWorkerBootstrap(handles[0], handles[1], lease); err != ErrProtocol {
+		if _, err := encodeWorkerBootstrap(handles[0], handles[1], agent, lease); err != ErrProtocol {
 			t.Fatal("invalid native handle encoded")
 		}
+	}
+	for _, expected := range [][sha256.Size]byte{{}, {4, 5, 6}} {
+		if _, _, err := decodeWorkerBootstrapHandles(packet, expected); err != ErrProtocol {
+			t.Fatal("service pin was attributed to unrelated metadata digest")
+		}
+	}
+	if _, err := encodeWorkerBootstrap(4, 8, [sha256.Size]byte{}, lease); err != ErrProtocol {
+		t.Fatal("unverified agent digest encoded")
 	}
 }

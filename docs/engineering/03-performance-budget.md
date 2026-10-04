@@ -108,17 +108,24 @@ fake-native 테스트는 이전 non-NULL 20에서 pending 10 dispatch로 실제 
 활성화 경로뿐이며 worker pipe·권한·캐시·중복 해시 worker는 그대로다. 실기기 개선 효과는 아직
 측정하지 않았고 설치 검증 절차도 변경하지 않는다.
 
-## g155 독립 worker 서비스 이미지 검증(중복 agent 재hash 제거)
+## g156 독립 worker 서비스 이미지 검증(중복 agent 재hash 제거)
 
 서비스는 기존 두 이미지 full hash 검증 pin을 그대로 유지한다. 자식(worker)은 보호 metadata와
 service/input image만 full hash한 뒤 self 이미지·SCM 상태·설정·actual pipe owner를
 독립적으로 검증하고, 서비스에 KRA1 ack를 보낸다. 그 뒤 서비스가 이미 검증해 쓰기·삭제를
 차단한 agent image와 pipe를 exact owned child process handle로 `DuplicateHandle`해 KRB2
-456-byte packet으로 전달한다. 자식은 fixed protected path의 exact volume/file identity를
-확인한 다음에만 pending Installation을 채택하며 agent image를 다시 해시하지 않는다. agent
+packet으로 전달한다. 자식은 fixed protected path의 exact volume/file identity를 확인한
+다음에만 pending Installation을 채택하며 agent image를 다시 해시하지 않는다. agent
 PID·token·session·pipe owner 검증은 그대로 유지한다. 실패/취소 시 job을 cleanup하고,
 input ready 뒤에는 기존 recovery receipt 경로를 그대로 쓴다. worker_installation_windows.go,
 bootstrap_windows.go, bootstrap.go, cmd/krasis-input/main_windows.go가 바뀌었다.
+
+리뷰 blocker 수정으로 KRB2에 agent sha256 32바이트를 추가한다. generic `RunAgentLease`의
+nil service 경로가 검증한 digest와 worker 보호 metadata의 digest를 결합하기 위함이고,
+`decodeWorkerBootstrapHandles`는 전달된 agent digest가 기대한 protected agent digest와
+다르면 거절한다. packet은 24바이트 handle/header + 32바이트 digest + 432바이트 lease =
+488바이트다. g155 폴더는 로컬 빌드가 유효했지만 적용하지 않았고, 최종 리뷰에서 이 수정이
+나와 덮어쓰기를 피하려고 g156 새 폴더로 빌드한다. g155 내부 후보는 적용하지 않는다.
 
 `WorkerLoad` 계측은 이제 보호 metadata와 service-only hash를 재고 adoption 단계는
 `WorkerAgentAuth` span에 포함된다. 이전 full load 계측과 직접 동등 비교가 아니다.

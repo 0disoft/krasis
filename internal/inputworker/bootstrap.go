@@ -2,6 +2,7 @@ package inputworker
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"io"
@@ -13,11 +14,12 @@ import (
 )
 
 const (
-	leaseSize        = 432
-	bootstrapSize    = 24 + leaseSize
-	reportSize       = 32
-	startupTimeout   = 5 * time.Second
-	maxLeaseDuration = time.Hour
+	leaseSize            = 432
+	bootstrapLeaseOffset = 24 + sha256.Size
+	bootstrapSize        = bootstrapLeaseOffset + leaseSize
+	reportSize           = 32
+	startupTimeout       = 5 * time.Second
+	maxLeaseDuration     = time.Hour
 )
 
 var readyFrame = [8]byte{'K', 'R', 'D', '1', 1, 0, 0, 0}
@@ -45,22 +47,25 @@ func bootstrapAfterAuthentication(ctx context.Context, reader io.Reader, check f
 	return transfer()
 }
 
-func encodeWorkerBootstrap(pipe, image uint64, lease [leaseSize]byte) ([bootstrapSize]byte, error) {
+func encodeWorkerBootstrap(pipe, image uint64, agent [sha256.Size]byte, lease [leaseSize]byte) ([bootstrapSize]byte, error) {
 	var data [bootstrapSize]byte
-	if !validBootstrapHandles(pipe, image) {
+	if !validBootstrapHandles(pipe, image) || agent == ([sha256.Size]byte{}) {
 		return data, ErrProtocol
 	}
 	copy(data[:4], "KRB2")
 	data[4] = 2
 	binary.BigEndian.PutUint64(data[8:16], pipe)
 	binary.BigEndian.PutUint64(data[16:24], image)
-	copy(data[24:], lease[:])
+	copy(data[24:bootstrapLeaseOffset], agent[:])
+	copy(data[bootstrapLeaseOffset:], lease[:])
 	return data, nil
 }
 
-func decodeWorkerBootstrapHandles(data [bootstrapSize]byte) (uint64, uint64, error) {
+func decodeWorkerBootstrapHandles(data [bootstrapSize]byte, expectedAgent [sha256.Size]byte) (uint64, uint64, error) {
 	pipe, image := binary.BigEndian.Uint64(data[8:16]), binary.BigEndian.Uint64(data[16:24])
-	if string(data[:4]) != "KRB2" || data[4] != 2 || !zeroBytes(data[5:8]) || !validBootstrapHandles(pipe, image) {
+	var agent [sha256.Size]byte
+	copy(agent[:], data[24:bootstrapLeaseOffset])
+	if string(data[:4]) != "KRB2" || data[4] != 2 || !zeroBytes(data[5:8]) || !validBootstrapHandles(pipe, image) || expectedAgent == ([sha256.Size]byte{}) || agent != expectedAgent {
 		return 0, 0, ErrProtocol
 	}
 	return pipe, image, nil

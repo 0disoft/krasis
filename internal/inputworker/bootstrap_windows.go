@@ -175,7 +175,7 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 	if _, err := io.ReadFull(control, packet[:]); err != nil {
 		return ErrProtocol
 	}
-	handle, imageHandle, err := decodeWorkerBootstrapHandles(packet)
+	handle, imageHandle, err := decodeWorkerBootstrapHandles(packet, agentDigest)
 	if err != nil {
 		return ErrProtocol
 	}
@@ -188,7 +188,7 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 		}
 	}()
 	var leaseData [leaseSize]byte
-	copy(leaseData[:], packet[24:])
+	copy(leaseData[:], packet[bootstrapLeaseOffset:])
 	lease, err := decodeLease(leaseData, time.Now())
 	if err != nil || startup.Err() != nil || proof.check(false) != nil {
 		return ErrAuthority
@@ -278,5 +278,5 @@ func transferWorkerBootstrap(ctx context.Context, worker *ConsoleWorker, authori
 	if windows.DuplicateHandle(windows.CurrentProcess(), pipe.handle, worker.process, &pipeHandle, 0, false, windows.DUPLICATE_SAME_ACCESS) != nil || windows.DuplicateHandle(windows.CurrentProcess(), windows.Handle(image.Fd()), worker.process, &imageHandle, 0, false, windows.DUPLICATE_SAME_ACCESS) != nil || ctx.Err() != nil || authority.check(false) != nil {
 		return [bootstrapSize]byte{}, ErrAuthority
 	}
-	return encodeWorkerBootstrap(uint64(pipeHandle), uint64(imageHandle), lease)
+	return encodeWorkerBootstrap(uint64(pipeHandle), uint64(imageHandle), agent, lease)
 }
