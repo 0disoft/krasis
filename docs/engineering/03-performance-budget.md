@@ -334,3 +334,47 @@ not yet verified. Tests cover both directions, slow or raw-counts-only input,
 stale/reversed/outside/duplicate samples, sticky rearm, narrow-screen reachable reset
 and the existing session integration. No measured speedup is claimed; g161 real-device
 cold latency, continuous jitter and PIN regression remain pending.
+
+### g161 device observations
+
+Exports were created at A 2026-10-04T17:22:28Z and B 2026-10-04T17:22:24Z and filtered
+to revision fdb71781c9442afefe316cf4569fcaca538e31f0. There are twelve A-source and
+twelve B-installed-receiver profiles, all end ok with incomplete false. All twelve B
+startups are prepared=true with ages 0.862–1066.792ms. OpenLock is present in the
+measurement mask and records 0 microseconds in every B profile. The g160 first
+OpenLock was 96.643ms, with delayed reentry values of 52.484–104.918ms.
+
+| Local diagnostic span | g160 median / maximum | g161 median / maximum |
+| --- | ---: | ---: |
+| A request-to-grant | 28.918 / 134.225ms | 33.285 / 107.730ms |
+| B lease-ready wait | 7.187 / 7.864ms | 8.324 / 25.390ms |
+
+The first g161 profile had A grant 27.112ms, B ReadyWait 7.791ms and prepared age
+68.344ms. Attempt 4 followed a 10.129s source reentry gap with grant 34.486ms,
+B ReadyWait 9.354ms and prepared age 346.397ms. These observations support earlier
+preparation removing the measured OpenLock wait in this run. The overall grant median
+and ReadyWait did not improve, and consecutive runs are not a controlled comparison.
+
+Attempt 6 still had A grant 107.730ms after a 1.083s source reentry gap. Its B
+PeerAuthorize/AuthorizeTotal were 8.730/17.708ms, ConnectTotal/ReadyWait were
+8.977/7.073ms and prepared age was 1066.792ms. Source RequestWrite was 0.566ms and
+GrantCoordinator recorded 0 microseconds. The earlier preparation-mutex wait is absent
+from this attempt; the remaining source grant delay has no established cause.
+Transport, dispatch and scheduling need separate evidence before selecting a fix.
+Overlapping spans must not be summed and the devices' wall clocks must not be
+subtracted to infer a network duration.
+
+The first source activation recorded CaptureActivate 40.567ms and first Dispatch
+36.597ms; these spans are separate from non-first frame statistics. A's 541 non-first
+frames were 535 below 1ms and six in [1,10)ms, maximum 1.550ms. B's 527 non-first
+frames were 54 below 1ms and 473 in [1,10)ms, maximum 3.760ms. Neither device recorded
+a non-first dispatch at or above 10ms. This measures software dispatch, not visible
+pointer motion or total end-to-end latency.
+
+After the latest CONNECTED neither export records a connection/heartbeat failure,
+timeout or RECONNECTING. B's five acquisition timeouts precede connection. Both
+installation receipts are result 0 with stage complete. Each export has one incomplete
+historical control log; the bounded profiles cover A-to-B only. A slow approach past
+the two-second preparation expiry, reverse-direction profiles, perceived jitter and
+g161 PIN control remain unconfirmed. Evidence documentation needs no new build or
+runtime change.
