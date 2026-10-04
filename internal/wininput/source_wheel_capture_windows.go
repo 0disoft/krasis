@@ -635,6 +635,20 @@ func (current *sourceWheelCaptureRun) activateWindowProfile(profile context.Cont
 		stopForeground()
 		return err
 	}
+	if foregroundErr == nil && sourceWheelCaptureGetForeground() != current.window {
+		// Complete a pending request on our owner queue before joining the
+		// previous application's queue. A non-NULL previous foreground is
+		// also possible while activation is pending, not only a NULL owner.
+		if err := current.err(); err != nil {
+			stopForeground()
+			return err
+		}
+		sourceForegroundTransitionDispatch(current.window)
+		if err := current.err(); err != nil {
+			stopForeground()
+			return err
+		}
+	}
 	if sourceWheelCaptureGetForeground() == 0 && missingForegroundStage == nil {
 		missingForegroundStage = ErrSourceForegroundMissingAfterRequest
 	}

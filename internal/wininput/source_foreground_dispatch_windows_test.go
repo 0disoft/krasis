@@ -70,3 +70,59 @@ func TestForegroundDispatchDoesNotRemoveOrDispatchQueuedMessages(t *testing.T) {
 		t.Fatal("dispatch used an unknown owner or repeated the native call")
 	}
 }
+
+func TestCaptureActivationCompletesRequestWhilePreviousOwnerRemainsVisible(t *testing.T) {
+	restore := stubSourceWheelCaptureActivation(t)
+	defer restore()
+	foreground, pending := uintptr(20), uintptr(0)
+	dispatches := 0
+	sourceWheelCaptureGetForeground = func() uintptr { return foreground }
+	sourceWheelCaptureSetForeground = func(window uintptr) error { pending = window; return nil }
+	sourceForegroundTransitionDispatch = func(window uintptr) {
+		if window != 10 || pending != window {
+			t.Fatal("serviced an unrequested activation")
+		}
+		dispatches++
+		foreground = pending
+	}
+	sourceWheelCaptureAttachThreads = func(uint32, uint32, bool) error {
+		t.Fatal("joined the previous app's queue before completing our activation")
+		return nil
+	}
+	stubForegroundTransitionPause(t, func(time.Duration) { t.Fatal("pending non-NULL activation was delayed") })
+	current := &sourceWheelCaptureRun{window: 10}
+	if err := current.activateWindow(); err != nil || !current.active.Load() || foreground != 10 || current.savedFocus != 20 || dispatches != 1 {
+		t.Fatal("pending activation did not retain verified ownership and restore target", err, dispatches)
+	}
+}
+
+func TestCaptureActivationCancellationDuringPendingRequestDoesNotAttach(t *testing.T) {
+	restore := stubSourceWheelCaptureActivation(t)
+	defer restore()
+	current := &sourceWheelCaptureRun{window: 10}
+	sourceWheelCaptureGetForeground = func() uintptr { return 20 }
+	sourceWheelCaptureSetForeground = func(uintptr) error { return nil }
+	sourceForegroundTransitionDispatch = func(uintptr) { current.setError(context.Canceled) }
+	sourceWheelCaptureAttachThreads = func(uint32, uint32, bool) error { t.Fatal("cancelled activation joined a queue"); return nil }
+	if err := current.activateWindow(); !errors.Is(err, context.Canceled) || current.active.Load() {
+		t.Fatal("cancelled pending request became active", err)
+	}
+}
+
+func TestCaptureActivationCancellationDuringVerificationStopsBeforeDispatch(t *testing.T) {
+	restore := stubSourceWheelCaptureActivation(t)
+	defer restore()
+	current := &sourceWheelCaptureRun{window: 10}
+	requested := false
+	sourceWheelCaptureSetForeground = func(uintptr) error { requested = true; return nil }
+	sourceWheelCaptureGetForeground = func() uintptr {
+		if requested {
+			current.setError(context.Canceled)
+		}
+		return 20
+	}
+	sourceForegroundTransitionDispatch = func(uintptr) { t.Fatal("retired verification serviced another native request") }
+	if err := current.activateWindow(); !errors.Is(err, context.Canceled) || current.active.Load() {
+		t.Fatal("verification cancellation was ignored", err)
+	}
+}
