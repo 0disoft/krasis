@@ -28,6 +28,7 @@ type Installation struct {
 	files                      []*os.File
 	images                     [2]installationImage
 	loadElapsed                time.Duration
+	workerPending              bool
 }
 
 type installationImage struct {
@@ -43,18 +44,33 @@ type installationRecord struct {
 }
 
 func LoadInstallation() (*Installation, error) {
+	return loadFixedInstallation(false)
+}
+
+// LoadWorkerInstallation independently verifies the protected metadata and
+// input/service image. It cannot authorize an agent or service startup until
+// the authenticated service transfers its live agent-image pin.
+func LoadWorkerInstallation() (*Installation, error) {
+	return loadFixedInstallation(true)
+}
+
+func loadFixedInstallation(worker bool) (*Installation, error) {
 	root, err := windows.KnownFolderPath(windows.FOLDERID_ProgramFiles, 0)
 	if err != nil {
 		return nil, ErrAuthority
 	}
-	return loadInstallationDirectory(filepath.Join(root, "Krasis"), filepath.Join(root, "Krasis", "Input"))
+	return loadInstallationDirectoryMode(filepath.Join(root, "Krasis"), filepath.Join(root, "Krasis", "Input"), worker)
 }
 
 // Private directory selection is shared with the elevated installer for its
 // three fixed staging locations. It is never selected by service/agent IPC.
 func loadInstallationDirectory(root, directory string) (*Installation, error) {
+	return loadInstallationDirectoryMode(root, directory, false)
+}
+
+func loadInstallationDirectoryMode(root, directory string, worker bool) (*Installation, error) {
 	started := time.Now()
-	installation := &Installation{}
+	installation := &Installation{workerPending: worker}
 	accepted := false
 	defer func() {
 		if !accepted {
@@ -82,16 +98,26 @@ func loadInstallationDirectory(root, directory string) (*Installation, error) {
 		return nil, ErrAuthority
 	}
 	installation.agentDigest, installation.serviceDigest = agent, service
-	images, err := lockInstallationImages(directory, [2][sha256.Size]byte{agent, service})
+	var images [2]installationImage
+	if worker {
+		path := filepath.Clean(filepath.Join(directory, "krasis-input.exe"))
+		var file *os.File
+		file, err = lockImage(path, service)
+		images[1] = installationImage{path: path, digest: service, file: file}
+	} else {
+		images, err = lockInstallationImages(directory, [2][sha256.Size]byte{agent, service})
+	}
 	if err != nil {
 		return nil, ErrAuthority
 	}
 	// Own both pins before checking ACLs, so either failure closes both.
 	for _, image := range images {
-		installation.files = append(installation.files, image.file)
+		if image.file != nil {
+			installation.files = append(installation.files, image.file)
+		}
 	}
 	for _, image := range images {
-		if protectedHandle(windows.Handle(image.file.Fd())) != nil {
+		if image.file != nil && protectedHandle(windows.Handle(image.file.Fd())) != nil {
 			return nil, ErrAuthority
 		}
 	}
@@ -267,7 +293,7 @@ func (installation *Installation) duplicateImage(path string, expected [sha256.S
 	}
 	installation.mu.Lock()
 	defer installation.mu.Unlock()
-	if installation.closed || len(installation.files) != 5 {
+	if installation.closed || (len(installation.files) != 5 && !(installation.workerPending && len(installation.files) == 4)) {
 		return nil, ErrAuthority
 	}
 	for _, image := range installation.images {
