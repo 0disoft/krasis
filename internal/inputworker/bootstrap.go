@@ -1,6 +1,7 @@
 package inputworker
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"io"
@@ -13,13 +14,66 @@ import (
 
 const (
 	leaseSize        = 432
-	bootstrapSize    = 16 + leaseSize
+	bootstrapSize    = 24 + leaseSize
 	reportSize       = 32
 	startupTimeout   = 5 * time.Second
 	maxLeaseDuration = time.Hour
 )
 
 var readyFrame = [8]byte{'K', 'R', 'D', '1', 1, 0, 0, 0}
+
+// Distinct from readiness: this only acknowledges independent service auth.
+var workerAuthenticatedFrame = [8]byte{'K', 'R', 'A', '1', 1, 0, 0, 0}
+
+func readWorkerAuthenticated(reader io.Reader) error {
+	var data [8]byte
+	if _, err := io.ReadFull(reader, data[:]); err != nil || data != workerAuthenticatedFrame {
+		return ErrProtocol
+	}
+	return nil
+}
+
+// Native handle transfer is unreachable until the exact peer's authentication
+// acknowledgement and fresh authority checks have both completed.
+func bootstrapAfterAuthentication(ctx context.Context, reader io.Reader, check func() error, transfer func() ([bootstrapSize]byte, error)) ([bootstrapSize]byte, error) {
+	if ctx == nil || ctx.Err() != nil || check == nil || transfer == nil {
+		return [bootstrapSize]byte{}, ErrAuthority
+	}
+	if readWorkerAuthenticated(reader) != nil || ctx.Err() != nil || check() != nil || ctx.Err() != nil {
+		return [bootstrapSize]byte{}, ErrAuthority
+	}
+	return transfer()
+}
+
+func encodeWorkerBootstrap(pipe, image uint64, lease [leaseSize]byte) ([bootstrapSize]byte, error) {
+	var data [bootstrapSize]byte
+	if !validBootstrapHandles(pipe, image) {
+		return data, ErrProtocol
+	}
+	copy(data[:4], "KRB2")
+	data[4] = 2
+	binary.BigEndian.PutUint64(data[8:16], pipe)
+	binary.BigEndian.PutUint64(data[16:24], image)
+	copy(data[24:], lease[:])
+	return data, nil
+}
+
+func decodeWorkerBootstrapHandles(data [bootstrapSize]byte) (uint64, uint64, error) {
+	pipe, image := binary.BigEndian.Uint64(data[8:16]), binary.BigEndian.Uint64(data[16:24])
+	if string(data[:4]) != "KRB2" || data[4] != 2 || !zeroBytes(data[5:8]) || !validBootstrapHandles(pipe, image) {
+		return 0, 0, ErrProtocol
+	}
+	return pipe, image, nil
+}
+
+func validBootstrapHandles(pipe, image uint64) bool {
+	for _, handle := range []uint64{pipe, image} {
+		if handle == 0 || uint64(uintptr(handle)) != handle || uintptr(handle) == ^uintptr(0) {
+			return false
+		}
+	}
+	return pipe != image
+}
 
 func encodeLease(lease Lease, now time.Time) ([leaseSize]byte, error) {
 	var data [leaseSize]byte

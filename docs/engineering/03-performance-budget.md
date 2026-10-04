@@ -108,14 +108,20 @@ fake-native 테스트는 이전 non-NULL 20에서 pending 10 dispatch로 실제 
 활성화 경로뿐이며 worker pipe·권한·캐시·중복 해시 worker는 그대로다. 실기기 개선 효과는 아직
 측정하지 않았고 설치 검증 절차도 변경하지 않는다.
 
-## 다음 작업: 중복 worker load hash 제거(2단계 부트스트랩)
+## g155 독립 worker 서비스 이미지 검증(중복 agent 재hash 제거)
 
-중복 worker load hash 제거는 별도 2단계 부트스트랩으로 진행한다. child는 보호 메타데이터를
-읽고 service exe를 기존 Go SHA/full hash로 직접 검증해 자기 이미지와 서비스 actual pipe
-owner + SCM 상태·설정을 독립적으로 확인한다. 인증이 끝난 뒤에만 서비스가 이미 검증해
-쓰기·삭제를 차단한 agent image의 exact file object duplicate를 owned child에 넘긴다.
-child는 agent PID·토큰·session·pipe owner 검증을 유지하고 agent 재hash만 제거하는 설계다.
-service 검증보다 핸들 신뢰가 앞서면 순환 신뢰이므로 거절한다. 인증 실패나 서비스 stop일 때
-child와 dup handle을 정리하고 recovery receipt 회귀 테스트를 거친 뒤 별도로 배포한다.
-g154에는 포함되지 않으며, 이 항목은 다음 작업 초안이라 설계 확정·구현·속도 개선을
-주장하지 않는다.
+서비스는 기존 두 이미지 full hash 검증 pin을 그대로 유지한다. 자식(worker)은 보호 metadata와
+service/input image만 full hash한 뒤 self 이미지·SCM 상태·설정·actual pipe owner를
+독립적으로 검증하고, 서비스에 KRA1 ack를 보낸다. 그 뒤 서비스가 이미 검증해 쓰기·삭제를
+차단한 agent image와 pipe를 exact owned child process handle로 `DuplicateHandle`해 KRB2
+456-byte packet으로 전달한다. 자식은 fixed protected path의 exact volume/file identity를
+확인한 다음에만 pending Installation을 채택하며 agent image를 다시 해시하지 않는다. agent
+PID·token·session·pipe owner 검증은 그대로 유지한다. 실패/취소 시 job을 cleanup하고,
+input ready 뒤에는 기존 recovery receipt 경로를 그대로 쓴다. worker_installation_windows.go,
+bootstrap_windows.go, bootstrap.go, cmd/krasis-input/main_windows.go가 바뀌었다.
+
+`WorkerLoad` 계측은 이제 보호 metadata와 service-only hash를 재고 adoption 단계는
+`WorkerAgentAuth` span에 포함된다. 이전 full load 계측과 직접 동등 비교가 아니다.
+
+scoped Go 테스트와 vet은 통과했다. native service 설치·실기기 PIN·성능은 아직 미검증이고
+빌드는 계획 단계다.

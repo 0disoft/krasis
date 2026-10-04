@@ -64,7 +64,7 @@ func fixedInstalledInputProcess(digest [32]byte, console bool, installation *Ins
 func RunInstalledWorker(ctx context.Context, installation *Installation) error {
 	var profile handoff.StartupProfile
 	started := time.Now()
-	agent, service, err := installation.digests()
+	agent, service, err := installation.workerDigests()
 	if err != nil || !fixedInstalledInputProcess(service, true, installation) {
 		return ErrAuthority
 	}

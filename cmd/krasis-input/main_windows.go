@@ -15,7 +15,13 @@ func main() {
 		fmt.Fprintln(os.Stderr, "invalid_input_mode")
 		os.Exit(2)
 	}
-	installation, err := inputworker.LoadInstallation()
+	var installation *inputworker.Installation
+	var err error
+	if os.Args[1] == "--service" {
+		installation, err = inputworker.LoadInstallation()
+	} else {
+		installation, err = inputworker.LoadWorkerInstallation()
+	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "input_installation_unavailable")
 		os.Exit(1)

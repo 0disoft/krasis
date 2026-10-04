@@ -49,7 +49,13 @@ func TestPendingWorkerCannotAuthorizeServiceOrAgentImage(t *testing.T) {
 func TestWorkerImageRejectsMissingWrongOrRetiredServiceProof(t *testing.T) {
 	installation := pendingWorkerFixture(t)
 	file := installation.images[1].file
-	for _, proof := range []*Authority{nil, {}, {kind: authorityAgent, checkInput: func() error { return nil }}, {kind: authorityService, checkInput: func() error { return ErrAuthority }}} {
+	wrongKind := &Authority{kind: authorityAgent, checkInput: func() error { return nil }, checkRecovery: func() error { return nil }, closeHandles: func() error { return nil }}
+	retired := &Authority{kind: authorityService, checkInput: func() error { return ErrAuthority }, checkRecovery: func() error { return nil }, closeHandles: func() error { return nil }}
+	closed := &Authority{kind: authorityService, checkInput: func() error { return nil }, checkRecovery: func() error { return nil }, closeHandles: func() error { return nil }}
+	if closed.Close() != nil {
+		t.Fatal("service proof close failed")
+	}
+	for _, proof := range []*Authority{nil, {}, wrongKind, retired, closed} {
 		if err := installation.adoptWorkerAgentImage(proof, file); err != ErrAuthority {
 			t.Fatal("unauthenticated image adopted")
 		}

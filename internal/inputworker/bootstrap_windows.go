@@ -5,9 +5,10 @@ package inputworker
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/binary"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 	"strconv"
 	"sync/atomic"
 	"time"
@@ -21,7 +22,8 @@ func workerPipeName(pid uint32) string {
 	return `\\.\pipe\Krasis.Input.Worker.v1.` + strconv.FormatUint(uint64(pid), 10)
 }
 
-// RunAgentLease transfers only the authenticated pipe to the child it creates.
+// RunAgentLease transfers the authenticated pipe and agent-image pin only after
+// its exact owned child acknowledges independent service authentication.
 // Digests come from the protected installation record, never agent metadata.
 func RunAgentLease(ctx context.Context, channel *Channel, lease Lease, agentDigest, serviceDigest [sha256.Size]byte) (report Report, result error) {
 	return runInstalledAgentLease(ctx, channel, lease, agentDigest, serviceDigest, nil)
@@ -46,7 +48,6 @@ func runInstalledAgentLease(ctx context.Context, channel *Channel, lease Lease, 
 			_ = control.Close()
 		}
 	}()
-	var transferred windows.Handle
 	var pid uint32
 	var profile handoff.StartupProfile
 	started := time.Now()
@@ -55,9 +56,6 @@ func runInstalledAgentLease(ctx context.Context, channel *Channel, lease Lease, 
 		var err error
 		control, err = makePipeACL(workerPipeName(pid), "D:P(A;;GA;;;SY)")
 		if err != nil {
-			return ErrAuthority
-		}
-		if windows.DuplicateHandle(windows.CurrentProcess(), agentPipe.handle, process, &transferred, 0, false, windows.DUPLICATE_SAME_ACCESS) != nil {
 			return ErrAuthority
 		}
 		return nil
@@ -83,14 +81,23 @@ func runInstalledAgentLease(ctx context.Context, channel *Channel, lease Lease, 
 	if windows.GetNamedPipeClientProcessId(control.handle, &actual) != nil || actual != pid || channel.authority.check(false) != nil {
 		return Report{}, ErrAuthority
 	}
-	var packet [bootstrapSize]byte
-	copy(packet[:4], "KRB1")
-	packet[4] = 1
-	binary.BigEndian.PutUint64(packet[8:16], uint64(transferred))
-	copy(packet[16:], data[:])
 	_ = control.SetDeadline(time.Now().Add(startupTimeout))
 	stopStartup := context.AfterFunc(startup, func() { _ = control.Close() })
+	defer stopStartup()
 	started = time.Now()
+	// The worker cannot acknowledge before full service-image validation and
+	// SCM/actual pipe-owner authentication. No agent handle is transferred yet.
+	packet, err := bootstrapAfterAuthentication(startup, control, func() error {
+		if windows.GetNamedPipeClientProcessId(control.handle, &actual) != nil || actual != pid || channel.authority.check(false) != nil {
+			return ErrAuthority
+		}
+		return nil
+	}, func() ([bootstrapSize]byte, error) {
+		return transferWorkerBootstrap(startup, worker, channel.authority, agentPipe, agentDigest, serviceDigest, data, installation)
+	})
+	if err != nil {
+		return Report{}, ErrAuthority
+	}
 	writeErr := writeFrame(control, packet[:])
 	var childProfile *handoff.StartupProfile
 	var readyErr error
@@ -151,31 +158,48 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 		return ErrAuthority
 	}
 	defer control.Close()
+	stopControl := context.AfterFunc(startup, func() { _ = control.Close() })
+	defer stopControl()
 	started = time.Now()
-	proof, err := authenticateServiceInstalled(ctx, uintptr(control.handle), serviceDigest, installation)
+	proof, err := authenticateServiceInstalled(startup, uintptr(control.handle), serviceDigest, installation)
 	profile.Record(handoff.WorkerServiceAuth, time.Since(started))
 	if err != nil {
 		return ErrAuthority
 	}
 	defer proof.Close()
-	_ = control.SetReadDeadline(time.Now().Add(startupTimeout))
+	_ = control.SetDeadline(time.Now().Add(startupTimeout))
+	if startup.Err() != nil || proof.check(false) != nil || writeFrame(control, workerAuthenticatedFrame[:]) != nil {
+		return ErrAuthority
+	}
 	var packet [bootstrapSize]byte
-	if _, err := io.ReadFull(control, packet[:]); err != nil || string(packet[:4]) != "KRB1" || packet[4] != 1 || !zeroBytes(packet[5:8]) {
+	if _, err := io.ReadFull(control, packet[:]); err != nil {
 		return ErrProtocol
 	}
-	handle := binary.BigEndian.Uint64(packet[8:16])
-	if handle == 0 || uint64(uintptr(handle)) != handle {
+	handle, imageHandle, err := decodeWorkerBootstrapHandles(packet)
+	if err != nil {
 		return ErrProtocol
 	}
 	pipe := &pipeConn{handle: windows.Handle(handle), closed: make(chan struct{}), closeDone: make(chan struct{})}
 	defer pipe.Close()
+	image := os.NewFile(uintptr(imageHandle), "transferred-input-image")
+	defer func() {
+		if image != nil {
+			_ = image.Close()
+		}
+	}()
 	var leaseData [leaseSize]byte
-	copy(leaseData[:], packet[16:])
+	copy(leaseData[:], packet[24:])
 	lease, err := decodeLease(leaseData, time.Now())
-	if err != nil || proof.check(false) != nil {
+	if err != nil || startup.Err() != nil || proof.check(false) != nil {
 		return ErrAuthority
 	}
 	started = time.Now()
+	if installation != nil {
+		if installation.adoptWorkerAgentImage(proof, image) != nil {
+			return ErrAuthority
+		}
+		image = nil // installation owns the exact live pin until worker exit.
+	}
 	authority, err := authenticateAgentInstalled(uintptr(pipe.handle), agentDigest, installation)
 	profile.Record(handoff.WorkerAgentAuth, time.Since(started))
 	if err != nil {
@@ -186,7 +210,10 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 	if wininput.InitializePhysicalCoordinates() != nil {
 		return ErrAuthority
 	}
-	_ = control.SetReadDeadline(time.Time{})
+	if startup.Err() != nil || !stopControl() {
+		return ErrAuthority
+	}
+	_ = control.SetDeadline(time.Time{})
 	run, cancel := context.WithCancel(ctx)
 	defer cancel()
 	var requested atomic.Bool
@@ -215,4 +242,41 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 		return ErrRecovery
 	}
 	return result
+}
+
+// No PID reopening: worker.process is the handle returned for the exact
+// job-bound child. Failed/partial duplication is reaped by the owned job.
+func transferWorkerBootstrap(ctx context.Context, worker *ConsoleWorker, authority *Authority, pipe *pipeConn, agent, service [sha256.Size]byte, lease [leaseSize]byte, installation *Installation) ([bootstrapSize]byte, error) {
+	if ctx == nil || ctx.Err() != nil || worker == nil || pipe == nil || authority == nil || authority.kind != authorityAgent || authority.check(false) != nil {
+		return [bootstrapSize]byte{}, ErrAuthority
+	}
+	root, err := windows.KnownFolderPath(windows.FOLDERID_ProgramFiles, 0)
+	if err != nil {
+		return [bootstrapSize]byte{}, ErrAuthority
+	}
+	if installation != nil {
+		a, s, err := installation.digests()
+		if err != nil || a != agent || s != service {
+			return [bootstrapSize]byte{}, ErrAuthority
+		}
+	}
+	image, err := pinIdentityImage(installation, filepath.Join(root, "Krasis", "Input", "krasis-agent.exe"), agent)
+	if err != nil {
+		return [bootstrapSize]byte{}, ErrAuthority
+	}
+	defer image.Close()
+	worker.mu.Lock()
+	defer worker.mu.Unlock()
+	if ctx.Err() != nil || worker.closed || worker.process == 0 || authority.check(false) != nil {
+		return [bootstrapSize]byte{}, ErrAuthority
+	}
+	state, err := windows.WaitForSingleObject(worker.process, 0)
+	if err != nil || state != uint32(windows.WAIT_TIMEOUT) {
+		return [bootstrapSize]byte{}, ErrAuthority
+	}
+	var pipeHandle, imageHandle windows.Handle
+	if windows.DuplicateHandle(windows.CurrentProcess(), pipe.handle, worker.process, &pipeHandle, 0, false, windows.DUPLICATE_SAME_ACCESS) != nil || windows.DuplicateHandle(windows.CurrentProcess(), windows.Handle(image.Fd()), worker.process, &imageHandle, 0, false, windows.DUPLICATE_SAME_ACCESS) != nil || ctx.Err() != nil || authority.check(false) != nil {
+		return [bootstrapSize]byte{}, ErrAuthority
+	}
+	return encodeWorkerBootstrap(uint64(pipeHandle), uint64(imageHandle), lease)
 }
