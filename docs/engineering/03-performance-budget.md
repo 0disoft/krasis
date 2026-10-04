@@ -441,3 +441,25 @@ confirmation applies to g161. Source wait includes peer work, transport and loca
 reader scheduling, so no pure network RTT is derived by subtracting durations or
 cross-device clocks. The next investigation is preparation contention and controlled
 first/idle coverage. This evidence update changes no runtime or build.
+
+## g163 bounded preparation-lead tuning and lock overlap
+
+The pointer-position preview lead changes from 150ms to 250ms. The baseline 192px
+band (quarter-width cap), three-quarter-width prediction cap, sticky retreat rearm,
+4/16/50ms sampling, 500ms hint freshness, two-second cooldown and two-second
+one-claim unbound child remain unchanged. Authorization, lease checks, worker lifetime
+and mutex ownership are preserved. This is bounded tuning motivated by g162's
+44.634/18.725ms receiver OpenLock observations; it does not establish their owner.
+
+Optional preparationLockMicros/preparationLockMeasured detail records the overlap of
+OpenLock with the latest completed preparation lock interval. This is a lower bound
+on overlapping preparation ownership, not a complete mutex-owner history. It must
+not be summed with OpenLock. Raw timestamps stay in memory. Simply releasing the
+agent mutex would leave preparation serialized in the service and could relocate
+the wait without reducing it, so that approach was not adopted.
+
+Local tests cover earlier hints for moderate physical motion, retained width caps and
+sampling behavior, clipped overlap, numeric validation/export and shutdown joining
+preparation before releasing installation pins. The existing slow-approach limitation
+remains: a hint can expire before crossing without another hint until retreat.
+Device latency, controlled first/idle coverage and g163 PIN regression remain pending.

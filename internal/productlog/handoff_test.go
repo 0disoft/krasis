@@ -121,3 +121,23 @@ func TestExchangeExportProjectsOnlyValidNumericDetail(t *testing.T) {
 		t.Fatal("foreign-role exchange exported")
 	}
 }
+
+func TestPreparationLockExportPreservesPresenceAndBounds(t *testing.T) {
+	s := handoff.Summary{Schema: 1, Attempt: 1, Role: "receiver", Backend: "installed", End: "incomplete", Incomplete: true, PreparationLockMeasured: true, PreparationLockMicros: 4000}
+	s.Preparation.Measured = 1 << handoff.OpenLock
+	s.Preparation.Micros[handoff.OpenLock] = 5000
+	r := record{Time: "2026-10-05T00:00:00Z", Code: "handoff_profile", Handoff: &s}
+	data, _ := json.Marshal(r)
+	data = []byte(strings.Replace(string(data), `"handoff":{`, `"handoff":{"preparationOwner":"private-marker","preparationStarted":"private-time",`, 1))
+	got := sanitizeLog("agent.jsonl", strings.NewReader(string(data)+"\n"))
+	encoded, _ := json.Marshal(got)
+	if got.Incomplete || len(got.Events) != 1 || !got.Events[0].Handoff.PreparationLockMeasured || got.Events[0].Handoff.PreparationLockMicros != 4000 || strings.Contains(string(encoded), "private-") {
+		t.Fatal("numeric overlap lost or private fields exported")
+	}
+	s.PreparationLockMicros = 6000
+	data, _ = json.Marshal(r)
+	got = sanitizeLog("agent.jsonl", strings.NewReader(string(data)+"\n"))
+	if !got.Incomplete || len(got.Events) != 0 {
+		t.Fatal("overlap greater than the measured wait exported")
+	}
+}

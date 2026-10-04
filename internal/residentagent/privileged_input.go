@@ -23,21 +23,22 @@ type privilegedClient interface {
 }
 
 type privilegedLeaseInput struct {
-	mu           sync.Mutex
-	client       privilegedClient
-	identity     application.LeaseIdentity
-	cancel       context.CancelFunc
-	done         chan struct{}
-	connect      func(context.Context, application.LeaseIdentity, time.Time) (privilegedClient, error)
-	prepare      func(context.Context) error
-	failed       func(error)
-	event        func(string)
-	expires      time.Time
-	profile      context.Context
-	dispose      func() error
-	shutdownOnce sync.Once
-	shutdownErr  error
-	stopped      bool
+	mu                                      sync.Mutex
+	client                                  privilegedClient
+	identity                                application.LeaseIdentity
+	cancel                                  context.CancelFunc
+	done                                    chan struct{}
+	connect                                 func(context.Context, application.LeaseIdentity, time.Time) (privilegedClient, error)
+	prepare                                 func(context.Context) error
+	failed                                  func(error)
+	event                                   func(string)
+	expires                                 time.Time
+	profile                                 context.Context
+	dispose                                 func() error
+	shutdownOnce                            sync.Once
+	shutdownErr                             error
+	stopped                                 bool
+	preparationStarted, preparationFinished time.Time
 }
 
 // Approval stays in the resident agent after the authenticated mTLS peer check.
@@ -68,7 +69,9 @@ func (input *privilegedLeaseInput) open(ctx context.Context, identity applicatio
 	started := time.Now()
 	input.mu.Lock()
 	defer input.mu.Unlock()
-	handoff.Record(ctx, handoff.OpenLock, time.Since(started))
+	acquired := time.Now()
+	handoff.Record(ctx, handoff.OpenLock, acquired.Sub(started))
+	handoff.RecordPreparationLock(ctx, preparationLockOverlap(started, acquired, input.preparationStarted, input.preparationFinished))
 	if input.stopped || input.client != nil || input.connect == nil {
 		return errPrivilegedInput
 	}

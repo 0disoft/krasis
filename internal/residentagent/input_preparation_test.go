@@ -57,3 +57,71 @@ func TestPreparationDoesNotOpenLeaseAndRejectsInactivePolicy(t *testing.T) {
 		}
 	}
 }
+
+func TestPreparationLockOverlapClipsOnlyTheLatestInterval(t *testing.T) {
+	base := time.Unix(100, 0)
+	at := func(ms int) time.Time { return base.Add(time.Duration(ms) * time.Millisecond) }
+	for _, tc := range []struct {
+		start, end, prepStart, prepEnd int
+		want                           time.Duration
+	}{
+		{0, 10, 2, 8, 6 * time.Millisecond},
+		{4, 10, 2, 8, 4 * time.Millisecond},
+		{0, 5, 2, 8, 3 * time.Millisecond},
+		{0, 10, -2, 12, 10 * time.Millisecond},
+		{0, 10, -8, -2, 0},
+		{0, 10, 12, 18, 0},
+		{10, 0, 2, 8, 0},
+		{0, 10, 8, 2, 0},
+	} {
+		if got := preparationLockOverlap(at(tc.start), at(tc.end), at(tc.prepStart), at(tc.prepEnd)); got != tc.want {
+			t.Fatal("overlap includes unrelated wait or preparation time", got, tc.want)
+		}
+	}
+	if preparationLockOverlap(base, at(10), time.Time{}, time.Time{}) != 0 {
+		t.Fatal("missing preparation became an overlap")
+	}
+}
+
+func TestPreparationCompletionStillFencesShutdownAndPinDisposal(t *testing.T) {
+	entered, release := make(chan struct{}), make(chan struct{})
+	prepared, stopped := make(chan struct{}), make(chan struct{})
+	disposed := make(chan struct{})
+	input := &privilegedLeaseInput{expires: time.Now().Add(time.Hour), prepare: func(context.Context) error {
+		close(entered)
+		<-release
+		return nil
+	}, dispose: func() error { close(disposed); return nil }}
+	a := privilegedAuthorizer{LeaseAuthorizer: testPreparationPolicy{allowed: true}, input: input}
+	go func() {
+		a.PrepareInput(context.Background(), transport.AuthenticatedPeerContext{}, time.Now())
+		close(prepared)
+	}()
+	<-entered
+	if input.mu.TryLock() {
+		input.mu.Unlock()
+		close(release)
+		t.Fatal("preparation no longer retains the shutdown fence")
+	}
+	go func() { input.shutdown(); close(stopped) }()
+	select {
+	case <-disposed:
+		close(release)
+		t.Fatal("installation pins disposed during preparation")
+	default:
+	}
+	close(release)
+	select {
+	case <-stopped:
+	case <-time.After(time.Second):
+		t.Fatal("shutdown failed to join preparation")
+	}
+	<-prepared
+	<-disposed
+	input.mu.Lock()
+	valid := !input.preparationStarted.IsZero() && !input.preparationFinished.Before(input.preparationStarted) && input.stopped
+	input.mu.Unlock()
+	if !valid {
+		t.Fatal("completed lock interval or stop state lost")
+	}
+}

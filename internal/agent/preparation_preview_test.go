@@ -49,6 +49,26 @@ func TestPreparationUsesPixelsRatherThanRawCountsAndRejectsSlowApproach(t *testi
 	}
 }
 
+func TestPreparationLeavesMoreLeadForModeratePhysicalApproach(t *testing.T) {
+	for _, edge := range []control.ScreenEdge{control.ScreenEdgeRight, control.ScreenEdgeLeft} {
+		p := previewFixture(edge)
+		start, next, delta := int32(480), int32(520), int32(1)
+		if edge == control.ScreenEdgeLeft {
+			start, next, delta = 320, 280, -1
+		}
+		move := control.InputAction{Kind: control.InputPointerMove, DeltaX: delta}
+		at := time.Unix(100, 0)
+		if p.preview(move, start, at) {
+			t.Fatal("initial sample prepared before speed was known")
+		}
+		// 2px/ms predicts 500px with the larger lead. This position remains
+		// 379/380px from the boundary and outside the old 300px prediction.
+		if !p.preview(move, next, at.Add(20*time.Millisecond)) || p.band != 500 {
+			t.Fatal("moderate approach retained the last-moment hint", p.band)
+		}
+	}
+}
+
 func TestPreparationPredictionDropsStaleReversedAndOutOfDisplaySamples(t *testing.T) {
 	now := time.Unix(100, 0)
 	for _, gap := range []time.Duration{-time.Millisecond, previewSampleMaximum + time.Millisecond} {

@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	preparationPreviewLead = 150 * time.Millisecond
+	preparationPreviewLead = 250 * time.Millisecond
 	previewSampleMinimum   = 4 * time.Millisecond
 	previewSampleAdvance   = 16 * time.Millisecond
 	previewSampleMaximum   = 50 * time.Millisecond

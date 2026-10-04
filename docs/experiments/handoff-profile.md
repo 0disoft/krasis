@@ -1,5 +1,24 @@
 # Bounded handoff profile
 
+## g163 optional preparation-lock overlap
+
+Schema 1 gains optional preparationLockMicros (uint32) and preparationLockMeasured
+(bool). These represent the intersection of receiver OpenLock and the last completed
+local preparation interval. The resident agent samples the start immediately after
+acquiring input.mu and retains it only if preparation passes its guards. It samples
+the end after the acknowledged/missed callback, immediately before unlock. OpenLock
+starts before lock acquisition and ends after it; only the clipped overlap is exported.
+
+The recorder requires a receiver attempt and a measured OpenLock, preserves its first
+observation, saturates elapsed values at 120 seconds and ignores overlaps exceeding
+the measured OpenLock. Export validation rejects impossible bounds, wrong roles and
+nonzero values with an absent flag. The 12-attempt/120-second collector still applies.
+A present zero means no measured overlap with the latest interval, not proof of no
+other lock wait. Retaining only the latest interval makes this a lower bound rather
+than a complete ownership history. Do not add it to OpenLock or infer sole causation.
+No timestamps, PIN values, paths or identifiers are exported. Peer frames, ACKs and
+the 39-stage vectors are unchanged; older profiles without this detail remain valid.
+
 ## g162 additive exchange detail
 
 `Summary` gains optional `exchange`, schema 1, with a fixed `micros [4]uint32`
