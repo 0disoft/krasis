@@ -1,5 +1,45 @@
 # Bounded handoff profile
 
+## g162 additive exchange detail
+
+`Summary` gains optional `exchange`, schema 1, with a fixed `micros [4]uint32`
+array and a `uint8` `measured` mask. The indices are owned by
+`internal/handoff/exchange.go`:
+
+| Index | Stage | Measurement boundary |
+| --- | --- | --- |
+| 0 | RequestWrittenToGrantRead | Source: successful local request write completion to the full grant frame read |
+| 1 | GrantReadToHandler | Source: full grant read to `Granted`, after grant validation/`Matching` and before the coordinator |
+| 2 | RequestReadToHandler | Receiver: full request read to request handling, after the request checks and `Begin` |
+| 3 | RequestReadToGrantWritten | Receiver: full request read to successful local grant write completion |
+
+A source may set bits 0 and 1; a receiver may set bits 2 and 3. Unknown bits, a
+zero mask, values above 120 seconds and nonzero values without a presence bit are
+invalid. An absent bit is unobserved even if its value is zero. A present zero
+means an observed span floored to zero microseconds. Export reprojects the fixed
+numeric schema and drops arbitrary fields; old profiles without `exchange` remain
+valid.
+
+All endpoints use process-local `time.Now`, independently of the policy's injected
+`ObservationClock`. The read timestamp is captured immediately after a complete
+control frame is read, before progress observers, the policy clock and dispatch.
+Only successful writes supply write completion. Source endpoints are remembered
+once per attempt so reversed callback ordering can still produce a valid span.
+If the grant was actually read before the local write returned, that overlap is
+unmeasured. Negative/reversed spans are omitted rather than reported as zero;
+elapsed values saturate at the existing 120-second limit.
+
+The source wait includes peer work, network and local read-loop scheduling; it
+does not isolate network RTT. Receiver stages share one read origin and overlap;
+do not sum them or subtract wall clocks across devices. The 39-stage vectors,
+peer frames/payloads, worker ACK, PIN authority and lease lifetimes are unchanged.
+The existing 12-attempt/120-second collector still bounds emission. No input
+content, PIN values or peer/lease identifiers are exported, and no extra event
+stream is introduced. This is diagnostic instrumentation; device latency and PIN
+regression must still be checked on the matching build.
+
+## Existing profile contract
+
 `handoff_profile` schema 1 measures software processing within each ordinary
 agent process. It does not measure pointer presentation, establish authority,
 prove recovery completion, or change the existing error certainty. Wire frames,

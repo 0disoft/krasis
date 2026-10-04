@@ -100,11 +100,13 @@ func BeginOutboundSessionObserved(
 			Epoch:     epoch,
 			Edge:      edge,
 		})
-		handoff.Record(ctx, handoff.RequestWrite, time.Since(started))
+		writtenAt := time.Now()
+		handoff.Record(ctx, handoff.RequestWrite, writtenAt.Sub(started))
 		if err != nil {
 			observeControlFlow(observer, ControlFlowRequestWriteOutcomeUnknown)
 			return fmt.Errorf("%w: %w", ErrOutboundRequestWrite, err)
 		}
+		handoff.RequestWritten(ctx, writtenAt)
 		observeControlFlow(observer, ControlFlowRequestWriteCompleted)
 		return nil
 	})
@@ -248,6 +250,7 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 		return errors.New("lease responder requires a lease request")
 	}
 	ctx = handoff.Begin(ctx, "receiver", command.SessionID, command.Epoch, time.Now())
+	handoff.RequestReceived(ctx, time.Now())
 	rejected := false
 	defer func() {
 		if resultErr != nil || rejected {
@@ -333,11 +336,13 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 		if err == nil {
 			err = writer.WriteFrameContext(ctx, transport.Frame{Kind: transport.MessageControl, Payload: payload})
 		}
-		handoff.Record(ctx, handoff.GrantWrite, time.Since(started))
+		writtenAt := time.Now()
+		handoff.Record(ctx, handoff.GrantWrite, writtenAt.Sub(started))
 		if err != nil {
 			observeControlFlow(responder.Observer, ControlFlowGrantWriteOutcomeUnknown)
 			return responder.abortPendingLocked(ctx, fmt.Errorf("%w: %w", ErrInboundGrantWrite, err))
 		}
+		handoff.GrantWritten(ctx, writtenAt)
 		observeControlFlow(responder.Observer, ControlFlowGrantWriteCompleted)
 		return nil
 	})

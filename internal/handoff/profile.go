@@ -74,19 +74,20 @@ type Vector struct {
 }
 
 type Summary struct {
-	Schema      uint8           `json:"schema"`
-	Attempt     uint8           `json:"attempt"`
-	Role        string          `json:"role"`
-	Backend     string          `json:"backend"`
-	Preparation Vector          `json:"preparation"`
-	First       Vector          `json:"first"`
-	Worst       Vector          `json:"worst"`
-	Frames      uint32          `json:"frames"`
-	Histogram   [5]uint32       `json:"histogram"`
-	End         string          `json:"end"`
-	Incomplete  bool            `json:"incomplete"`
-	Startup     *StartupProfile `json:"startup,omitempty"`
-	Capture     *CaptureProfile `json:"capture,omitempty"`
+	Schema      uint8            `json:"schema"`
+	Attempt     uint8            `json:"attempt"`
+	Role        string           `json:"role"`
+	Backend     string           `json:"backend"`
+	Preparation Vector           `json:"preparation"`
+	First       Vector           `json:"first"`
+	Worst       Vector           `json:"worst"`
+	Frames      uint32           `json:"frames"`
+	Histogram   [5]uint32        `json:"histogram"`
+	End         string           `json:"end"`
+	Incomplete  bool             `json:"incomplete"`
+	Startup     *StartupProfile  `json:"startup,omitempty"`
+	Capture     *CaptureProfile  `json:"capture,omitempty"`
+	Exchange    *ExchangeProfile `json:"exchange,omitempty"`
 }
 
 func (s Summary) Valid() bool {
@@ -101,6 +102,9 @@ func (s Summary) Valid() bool {
 		return false
 	}
 	if s.Capture != nil && (s.Role != "source" || !s.Capture.Valid() || s.Capture.Measured == 0) {
+		return false
+	}
+	if s.Exchange != nil && !s.Exchange.Valid(s.Role) {
 		return false
 	}
 	for _, v := range []Vector{s.Preparation, s.First, s.Worst} {
@@ -147,11 +151,12 @@ type Collector struct {
 	pipeOwnerProbes atomic.Uint32
 }
 type attempt struct {
-	summary          Summary
-	started, request time.Time
-	sessionID, epoch string
-	finished         bool
-	firstStarted     bool
+	summary                   Summary
+	started, request          time.Time
+	requestWritten, grantRead time.Time
+	sessionID, epoch          string
+	finished                  bool
+	firstStarted              bool
 }
 type session struct {
 	collector        *Collector
@@ -337,7 +342,9 @@ func Backend(ctx context.Context, name string) {
 func Granted(ctx context.Context) {
 	a := getAttempt(ctx)
 	if a != nil {
-		Record(ctx, RequestToGrant, time.Since(a.request))
+		at := time.Now()
+		Record(ctx, RequestToGrant, at.Sub(a.request))
+		recordGrantRead(ctx, at)
 	}
 }
 

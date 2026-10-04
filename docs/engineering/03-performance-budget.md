@@ -382,3 +382,18 @@ runtime change.
 The user subsequently confirmed successful g161 PIN operation on the devices
 (2026-10-05 KST). This is direct operator evidence; the export records no PIN values
 or dialog contents. The timing and slow-approach limitations above remain open.
+
+## g162 additive handoff exchange detail
+
+g161's remaining outlier is A grant 107.730ms with B AuthorizeTotal 17.708ms,
+OpenLock 0 and ReadyWait 7.073ms. g162 adds optional `exchange` detail to separate
+successful request-write completion to full grant read from grant-read to matched
+grant handling, plus receiver request-read to handling and successful grant write.
+The four spans use local `time.Now` endpoints; receiver spans overlap and source
+wait includes peer work, network and local read-loop scheduling. They cannot
+isolate RTT or be summed into an end-to-end pointer latency. Peer payloads, ACKs,
+the 39-stage vectors and PIN authority are unchanged. The
+[exchange contract](../experiments/handoff-profile.md#g162-additive-exchange-detail)
+defines presence masks, bounds and overlap handling. Local tests cover reordered
+callbacks, stale association, expiry, limits, policy-clock separation and numeric
+export. g162 is diagnostic only; device latency and PIN behavior remain pending.

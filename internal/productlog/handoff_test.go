@@ -102,3 +102,22 @@ func TestCaptureExportProjectsNumericDetailAndRejectsInvalidPresence(t *testing.
 		t.Fatal("unobserved capture timings exported")
 	}
 }
+
+func TestExchangeExportProjectsOnlyValidNumericDetail(t *testing.T) {
+	p := &handoff.ExchangeProfile{Schema: 1, Measured: 3, Micros: [handoff.ExchangeStageCount]uint32{15000, 1000}}
+	s := handoff.Summary{Schema: 1, Attempt: 1, Role: "source", Backend: "none", End: "incomplete", Incomplete: true, Exchange: p}
+	r := record{Time: "2026-10-05T00:00:00Z", Code: "handoff_profile", Handoff: &s}
+	data, _ := json.Marshal(r)
+	data = []byte(strings.Replace(string(data), `"exchange":{`, `"exchange":{"pin":"private-marker","session":"private-id",`, 1))
+	got := sanitizeLog("agent.jsonl", strings.NewReader(string(data)+"\n"))
+	encoded, _ := json.Marshal(got)
+	if got.Incomplete || len(got.Events) != 1 || got.Events[0].Handoff.Exchange == nil || *got.Events[0].Handoff.Exchange != *p || strings.Contains(string(encoded), "private-") {
+		t.Fatal("exchange projection leaked or lost evidence")
+	}
+	p.Measured |= 1 << handoff.RequestReadToHandler
+	data, _ = json.Marshal(r)
+	got = sanitizeLog("agent.jsonl", strings.NewReader(string(data)+"\n"))
+	if !got.Incomplete || len(got.Events) != 0 {
+		t.Fatal("foreign-role exchange exported")
+	}
+}

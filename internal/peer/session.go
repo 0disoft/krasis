@@ -111,6 +111,10 @@ func runSession(
 			err = errors.Join(err, abortPendingLease(ctx, requests))
 			return failSessionWithLifecycle(ctx, coordinator, runtime, outbound, err)
 		}
+		controlCtx := ctx
+		if frame.Kind == transport.MessageControl {
+			controlCtx = handoff.WithControlRead(ctx, time.Now())
+		}
 		if progress != nil {
 			progress.ObserveReadCompleted(time.Now())
 			progress.ObserveDispatchStarted(frame.Kind, time.Now())
@@ -126,7 +130,7 @@ func runSession(
 			}
 		case transport.MessageControl:
 			observedAt = now()
-			err = DispatchControlFrameWithLifecycle(ctx, frame, observedAt, runtime, requests, outbound)
+			err = DispatchControlFrameWithLifecycle(controlCtx, frame, observedAt, runtime, requests, outbound)
 			if err != nil {
 				err = errors.Join(ErrPeerControlDispatch, err)
 			}
