@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/0disoft/krasis/internal/handoff"
 )
@@ -51,8 +52,10 @@ func TestHandoffExportReprojectsFixedSchemaAndDropsIdentity(t *testing.T) {
 }
 
 func TestStartupExportReprojectsNumericSchemaAndRejectsInvalidValues(t *testing.T) {
-	profile := &handoff.StartupProfile{Schema: 1, Measured: 1}
+	profile := &handoff.StartupProfile{Schema: 1, Measured: 1 | 1<<handoff.WorkerInstalledValidation}
 	profile.Micros[handoff.ServiceLaunch] = 1200
+	profile.Micros[handoff.WorkerInstalledValidation] = 2000
+	profile.RecordLoad(time.Millisecond)
 	s := handoff.Summary{Schema: 1, Attempt: 1, Role: "receiver", Backend: "installed", End: "ok", Startup: profile}
 	r := record{Time: "2026-10-03T00:00:00Z", Code: "handoff_profile", Handoff: &s}
 	data, _ := json.Marshal(r)

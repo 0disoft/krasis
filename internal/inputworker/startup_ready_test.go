@@ -91,14 +91,65 @@ func FuzzStartupReady(f *testing.F) {
 	var buffer bytes.Buffer
 	_ = writeStartupReady(&buffer, profile)
 	f.Add(buffer.Bytes())
+	profile.Record(handoff.WorkerInstalledValidation, time.Millisecond)
+	profile.RecordLoad(time.Microsecond)
+	buffer.Reset()
+	_ = writeStartupReady(&buffer, profile)
+	f.Add(buffer.Bytes())
 	f.Fuzz(func(t *testing.T, data []byte) {
 		reader := bytes.NewReader(data)
 		profile, err := readStartupReady(reader)
 		if profile != nil && (err != nil || !profile.Valid() || profile.Measured == 0) {
 			t.Fatal("unvalidated diagnostic escaped parser")
 		}
-		if len(data)-reader.Len() > startupReadySize {
+		if len(data)-reader.Len() > startupReadyLoadSize {
 			t.Fatal("unbounded readiness read")
 		}
 	})
+}
+
+func TestStartupLoadReadyRoundtripBoundsAndFollowingFrame(t *testing.T) {
+	var p handoff.StartupProfile
+	p.Record(handoff.WorkerInstalledValidation, 20*time.Millisecond)
+	p.RecordLoad(15 * time.Millisecond)
+	var b bytes.Buffer
+	if writeStartupReady(&b, p) != nil || b.Len() != startupReadyLoadSize || string(b.Bytes()[:4]) != "KRD3" {
+		t.Fatal("load receipt missing")
+	}
+	packet := append([]byte(nil), b.Bytes()...)
+	reader := bytes.NewReader(append(append([]byte(nil), packet...), 'S'))
+	got, err := readStartupReady(iotest.OneByteReader(reader))
+	if err != nil || got == nil || *got != p {
+		t.Fatal("load detail lost", got, err)
+	}
+	if next, err := reader.ReadByte(); err != nil || next != 'S' {
+		t.Fatal("extended receipt consumed next frame")
+	}
+	for length := startupReadySize; length < startupReadyLoadSize; length++ {
+		if _, err := readStartupReady(bytes.NewReader(packet[:length])); err != ErrProtocol {
+			t.Fatal("truncated load receipt accepted", length)
+		}
+	}
+	for _, offset := range []int{startupReadySize + 4, startupReadySize + 5, startupReadySize + 6, startupReadySize + 7} {
+		bad := append([]byte(nil), packet...)
+		bad[offset] = 2
+		if _, err := readStartupReady(bytes.NewReader(bad)); err != ErrProtocol {
+			t.Fatal("malformed extension accepted")
+		}
+	}
+	bad := append([]byte(nil), packet...)
+	binary.BigEndian.PutUint32(bad[startupReadySize:startupReadySize+4], 21000)
+	reader = bytes.NewReader(append(bad, 'S'))
+	if got, err := readStartupReady(reader); err != nil || got != nil {
+		t.Fatal("invalid numeric detail changed readiness")
+	}
+	if next, err := reader.ReadByte(); err != nil || next != 'S' {
+		t.Fatal("discarded load detail consumed next frame")
+	}
+	var service handoff.StartupProfile
+	service.Record(handoff.ServiceLaunch, time.Millisecond)
+	mergeWorkerStartup(&service, &p)
+	if !service.Valid() || !service.LoadMeasured || service.LoadMicros != 15000 || service.Micros[handoff.ServiceLaunch] != 1000 {
+		t.Fatal("merged load detail lost or replaced service measurement")
+	}
 }

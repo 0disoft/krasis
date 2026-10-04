@@ -71,6 +71,7 @@ func RunInstalledWorker(ctx context.Context, installation *Installation) error {
 	// Include the load/hash work performed before entering this function. The
 	// span overlaps ServiceChildConnect; it must not be added to that span.
 	profile.Record(handoff.WorkerInstalledValidation, installation.loadElapsed+time.Since(started))
+	profile.RecordLoad(installation.loadElapsed)
 	return runInstalledConsoleInput(ctx, agent, service, profile, installation)
 }
 

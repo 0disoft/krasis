@@ -53,3 +53,27 @@ func TestStartupRejectsWrongRoleBackendExpiredAndUnmeasuredValues(t *testing.T) 
 		})
 	}
 }
+
+func TestStartupLoadDetailRequiresObservedContainingSpan(t *testing.T) {
+	var p StartupProfile
+	p.Record(WorkerInstalledValidation, time.Millisecond)
+	p.RecordLoad(0)
+	if !p.Valid() || !p.LoadMeasured {
+		t.Fatal("observed zero load lost")
+	}
+	for _, bad := range []StartupProfile{
+		{Schema: 1, LoadMicros: 1},
+		{Schema: 1, LoadMeasured: true},
+		{Schema: 1, Measured: 1 << WorkerInstalledValidation, LoadMeasured: true, LoadMicros: 1},
+		{Schema: 1, Measured: 1 << WorkerInstalledValidation, LoadMeasured: true, LoadMicros: uint32(Window.Microseconds() + 1)},
+	} {
+		if bad.Valid() {
+			t.Fatal("invalid load detail accepted")
+		}
+	}
+	p.Record(WorkerInstalledValidation, Window)
+	p.RecordLoad(Window + time.Second)
+	if !p.Valid() || p.LoadMicros != uint32(Window.Microseconds()) {
+		t.Fatal("load measurement exceeded budget")
+	}
+}

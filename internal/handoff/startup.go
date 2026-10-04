@@ -23,9 +23,11 @@ const (
 )
 
 type StartupProfile struct {
-	Schema   uint8                     `json:"schema"`
-	Micros   [StartupStageCount]uint32 `json:"micros"`
-	Measured uint8                     `json:"measured"`
+	Schema       uint8                     `json:"schema"`
+	Micros       [StartupStageCount]uint32 `json:"micros"`
+	Measured     uint8                     `json:"measured"`
+	LoadMicros   uint32                    `json:"loadMicros,omitempty"`
+	LoadMeasured bool                      `json:"loadMeasured,omitempty"`
 }
 
 func (p StartupProfile) Valid() bool {
@@ -37,7 +39,27 @@ func (p StartupProfile) Valid() bool {
 			return false
 		}
 	}
+	if p.LoadMicros > uint32(Window.Microseconds()) || (!p.LoadMeasured && p.LoadMicros != 0) ||
+		(p.LoadMeasured && (p.Measured&(1<<WorkerInstalledValidation) == 0 || p.LoadMicros > p.Micros[WorkerInstalledValidation])) {
+		return false
+	}
 	return true
+}
+
+// RecordLoad is the measured file/metadata load within WorkerInstalledValidation,
+// not a new authority signal or an additional contribution to startup elapsed.
+func (p *StartupProfile) RecordLoad(elapsed time.Duration) {
+	if p == nil {
+		return
+	}
+	if elapsed < 0 {
+		elapsed = 0
+	}
+	if elapsed > Window {
+		elapsed = Window
+	}
+	p.LoadMicros = uint32(elapsed.Microseconds())
+	p.LoadMeasured = true
 }
 
 func (p *StartupProfile) Record(stage StartupStage, elapsed time.Duration) {
