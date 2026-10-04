@@ -75,7 +75,7 @@ func connectInstalledService(ctx context.Context, serviceDigest [sha256.Size]byt
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 	started := time.Now()
-	pipe, err := openPipe(ctx, pipeName)
+	pipe, err := openServicePipe(ctx)
 	handoff.Record(ctx, handoff.PipeOpen, time.Since(started))
 	if err != nil {
 		return nil, connectionFailed("pipe_open", err)
@@ -128,33 +128,32 @@ func makePipeACL(name, dacl string) (*pipeConn, error) {
 }
 
 func openPipe(ctx context.Context, name string) (*pipeConn, error) {
+	return openPipeWaiting(ctx, name, 0)
+}
+
+// The service removes its single pipe between owned workers. Only a new
+// service connection may wait briefly for that name to reappear. No lease or
+// input has been sent yet; authentication still follows the successful open.
+const servicePipeMissingGrace = 250 * time.Millisecond
+
+func openServicePipe(ctx context.Context) (*pipeConn, error) {
+	return openPipeWaiting(ctx, pipeName, servicePipeMissingGrace)
+}
+
+func openPipeWaiting(ctx context.Context, name string, missingGrace time.Duration) (*pipeConn, error) {
 	path, err := windows.UTF16PtrFromString(name)
 	if err != nil {
 		return nil, ErrAuthority
 	}
-	for {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
+	return dialPipe(ctx, missingGrace, func() (*pipeConn, error) {
 		access := uint32(windows.FILE_GENERIC_READ|windows.FILE_GENERIC_WRITE) &^ uint32(windows.FILE_APPEND_DATA)
 		handle, err := windows.CreateFile(path, access, 0, nil, windows.OPEN_EXISTING,
 			windows.FILE_FLAG_OVERLAPPED|windows.SECURITY_SQOS_PRESENT|windows.SECURITY_IDENTIFICATION, 0)
-		if err == nil {
-			return &pipeConn{handle: handle, closed: make(chan struct{}), closeDone: make(chan struct{})}, nil
-		}
-		if err != windows.ERROR_PIPE_BUSY {
+		if err != nil {
 			return nil, err
 		}
-		timer := time.NewTimer(20 * time.Millisecond)
-		select {
-		case <-ctx.Done():
-			if !timer.Stop() {
-				<-timer.C
-			}
-			return nil, ctx.Err()
-		case <-timer.C:
-		}
-	}
+		return &pipeConn{handle: handle, closed: make(chan struct{}), closeDone: make(chan struct{})}, nil
+	})
 }
 
 func (pipe *pipeConn) start() error {

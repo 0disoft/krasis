@@ -132,3 +132,25 @@ nil service 경로가 검증한 digest와 worker 보호 metadata의 digest를 �
 
 scoped Go 테스트와 vet은 통과했다. native service 설치·실기기 PIN·성능은 아직 미검증이고
 빌드는 계획 단계다.
+
+## g157 service pipe startup grace
+
+`connectInstalledService`가 여는 fixed service endpoint만 `ERROR_FILE_NOT_FOUND`를 dial
+시작 기준 최대 250ms 동안 20ms 간격으로 재시도한다. grace는 첫 open부터 세고 시도마다
+초기화하지 않으며 감싼 deadline을 늘리지 않는다. `ERROR_PIPE_BUSY`는 기존 caller-bounded
+wait(2초)를 그대로 유지하고, worker control pipe의 generic open은 이름이 없으면 즉시
+실패하는 기존 동작을 유지한다. `ACCESS_DENIED`·`ERROR_PATH_NOT_FOUND`·
+`ERROR_BROKEN_PIPE`와 authority/protocol 실패는 재시도하지 않는다.
+
+open이 성공하면 SCM actual pipe owner와 metadata/hash auth는 그대로 수행한다. 이 대기는
+lease/input을 보내기 전 연결 단계에서만 일어나고, 입력 재전송이나 backend fallback은 없다.
+context 취소·deadline이 우선하고 성공 후 취소면 handle을 닫는다.
+
+g156 실기기 exports에서 12전환 모두 ok였고 source 승인 median 137.204ms(g154 latest 12는
+181.647), B load median 28.808ms(g154는 69.718)였다. g156에서 작업이 제거돼 이전 수치와
+의미 범위가 다를 수 있다. B 연속 782 frame 중 15.436ms가 1건 있었다. export 직전
+`pipe_open`/`native_2` 1건은 service 종료인지 준비 틈인지 미확인이고, A 로그에서 약
+2.3초 자동 재연결을 확인했다.
+
+검증은 native 임시 파이프 fixture로만 진행 중이며 제품 service 변경은 없다. 실기기 효과는
+아직 확인하지 않았다.
