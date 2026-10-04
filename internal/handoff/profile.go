@@ -84,6 +84,7 @@ type Summary struct {
 	End         string          `json:"end"`
 	Incomplete  bool            `json:"incomplete"`
 	Startup     *StartupProfile `json:"startup,omitempty"`
+	Capture     *CaptureProfile `json:"capture,omitempty"`
 }
 
 func (s Summary) Valid() bool {
@@ -95,6 +96,9 @@ func (s Summary) Valid() bool {
 		return false
 	}
 	if s.Startup != nil && (s.Role != "receiver" || s.Backend != "installed" || !s.Startup.Valid() || s.Startup.Measured == 0) {
+		return false
+	}
+	if s.Capture != nil && (s.Role != "source" || !s.Capture.Valid() || s.Capture.Measured == 0) {
 		return false
 	}
 	for _, v := range []Vector{s.Preparation, s.First, s.Worst} {

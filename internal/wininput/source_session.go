@@ -35,6 +35,12 @@ type SourceActivation interface {
 	Active() bool
 }
 
+// Optional activation diagnostics; existing adapters keep SourceActivation.
+type SourceProfiledActivation interface {
+	SourceActivation
+	ActivateProfile(context.Context) error
+}
+
 type SourceWheelOwnership interface {
 	SourceActivation
 	OwnsWheel() bool

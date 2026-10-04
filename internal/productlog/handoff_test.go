@@ -72,3 +72,22 @@ func TestStartupExportReprojectsNumericSchemaAndRejectsInvalidValues(t *testing.
 		t.Fatal("unmeasured startup value accepted by export")
 	}
 }
+
+func TestCaptureExportProjectsNumericDetailAndRejectsInvalidPresence(t *testing.T) {
+	p := &handoff.CaptureProfile{Schema: 1, Measured: 1 << handoff.CaptureShow}
+	s := handoff.Summary{Schema: 1, Attempt: 1, Role: "source", Backend: "none", End: "incomplete", Incomplete: true, Capture: p}
+	r := record{Time: "2026-10-04T00:00:00Z", Code: "handoff_profile", Handoff: &s}
+	data, _ := json.Marshal(r)
+	data = []byte(strings.Replace(string(data), `"capture":{`, `"capture":{"window":"private-marker",`, 1))
+	got := sanitizeLog("agent.jsonl", strings.NewReader(string(data)+"\n"))
+	encoded, _ := json.Marshal(got)
+	if got.Incomplete || len(got.Events) != 1 || got.Events[0].Handoff.Capture == nil || *got.Events[0].Handoff.Capture != *p || strings.Contains(string(encoded), "private-marker") {
+		t.Fatal("capture projection leaked or lost evidence")
+	}
+	p.Micros[handoff.CaptureFallback] = 1
+	data, _ = json.Marshal(r)
+	got = sanitizeLog("agent.jsonl", strings.NewReader(string(data)+"\n"))
+	if !got.Incomplete || len(got.Events) != 0 {
+		t.Fatal("unobserved capture timings exported")
+	}
+}

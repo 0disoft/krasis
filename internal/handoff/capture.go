@@ -1,0 +1,88 @@
+package handoff
+
+import (
+	"context"
+	"time"
+)
+
+// Local source-capture spans. Nested waits are not additive; these never
+// participate in focus validation, command ordering or input authority.
+type CaptureStage uint8
+
+const (
+	CaptureSerializeWait CaptureStage = iota
+	CaptureAdmission
+	CapturePost
+	CaptureQueueToHandle
+	CapturePosition
+	CaptureTouchpadRegister
+	CaptureShow
+	CaptureUpdate
+	CaptureForeground
+	CaptureFallback
+	CaptureActiveCommit
+	CaptureHandlerTotal
+	CaptureResultWait
+	CaptureRollback
+	CaptureTotal
+	CaptureBoundaryBefore
+	CaptureBoundaryAfter
+	CaptureStageCount
+)
+
+type CaptureProfile struct {
+	Schema   uint8                     `json:"schema"`
+	Micros   [CaptureStageCount]uint32 `json:"micros"`
+	Measured uint32                    `json:"measured"`
+}
+
+func (p CaptureProfile) Valid() bool {
+	if p.Schema != 1 || p.Measured>>CaptureStageCount != 0 {
+		return false
+	}
+	for i, n := range p.Micros {
+		if n > uint32(Window.Microseconds()) || (p.Measured&(1<<i) == 0 && n != 0) {
+			return false
+		}
+	}
+	return true
+}
+
+// Commands retain the original attempt context across the local owner thread.
+// Retire freezes that attempt before emitting, so late command completion can
+// neither mutate its receipt nor attach measurements to a later attempt.
+func RecordCapture(ctx context.Context, stage CaptureStage, elapsed time.Duration) {
+	s, a := getSession(ctx), getAttempt(ctx)
+	if s == nil || a == nil || stage >= CaptureStageCount {
+		return
+	}
+	s.collector.mu.Lock()
+	defer s.collector.mu.Unlock()
+	if a.finished || s.collector.stopped.Load() || time.Since(s.collector.started) >= Window || a.summary.Role != "source" {
+		return
+	}
+	if a.summary.Capture == nil {
+		a.summary.Capture = &CaptureProfile{Schema: 1}
+	}
+	p := a.summary.Capture
+	if p.Measured&(1<<stage) != 0 {
+		return
+	}
+	if elapsed < 0 {
+		elapsed = 0
+	}
+	if elapsed > Window {
+		elapsed = Window
+	}
+	p.Micros[stage] = uint32(elapsed.Microseconds())
+	p.Measured |= 1 << stage
+}
+
+func CaptureSpan(ctx context.Context, stage CaptureStage) func() {
+	s, a := getSession(ctx), getAttempt(ctx)
+	if s == nil || a == nil || stage >= CaptureStageCount || s.collector.stopped.Load() {
+		return func() {}
+	}
+	started := time.Now()
+	return func() { RecordCapture(ctx, stage, time.Since(started)) }
+}

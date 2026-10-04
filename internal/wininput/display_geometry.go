@@ -1,6 +1,11 @@
 package wininput
 
-import "errors"
+import (
+	"context"
+	"errors"
+
+	"github.com/0disoft/krasis/internal/handoff"
+)
 
 type DisplayGeometry struct{ Count, Left, Top, Width, Height int32 }
 
@@ -20,13 +25,28 @@ type guardedSourceActivation struct {
 }
 
 func (s *guardedSourceActivation) Activate() error {
-	if err := s.check(); err != nil {
+	return s.ActivateProfile(nil)
+}
+
+func (s *guardedSourceActivation) ActivateProfile(ctx context.Context) error {
+	stopBefore := handoff.CaptureSpan(ctx, handoff.CaptureBoundaryBefore)
+	err := s.check()
+	stopBefore()
+	if err != nil {
 		return err
 	}
-	if err := s.SourceActivation.Activate(); err != nil {
+	if capture, ok := s.SourceActivation.(SourceProfiledActivation); ok {
+		err = capture.ActivateProfile(ctx)
+	} else {
+		err = s.SourceActivation.Activate()
+	}
+	if err != nil {
 		return err
 	}
-	if err := s.check(); err != nil {
+	stopAfter := handoff.CaptureSpan(ctx, handoff.CaptureBoundaryAfter)
+	err = s.check()
+	stopAfter()
+	if err != nil {
 		s.SourceActivation.Deactivate()
 		return err
 	}

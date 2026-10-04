@@ -15,6 +15,7 @@ import (
 	"unsafe"
 
 	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/handoff"
 	"github.com/0disoft/krasis/internal/lab"
 )
 
@@ -174,8 +175,10 @@ type sourceWheelCaptureRun struct {
 }
 
 type sourceWheelCaptureCommand struct {
-	message uint32
-	result  chan error
+	message  uint32
+	result   chan error
+	profile  context.Context
+	queuedAt time.Time
 }
 
 func newSourceWheelCapture(observer SourcePipelineObserver) *sourceWheelCapture {
@@ -183,10 +186,14 @@ func newSourceWheelCapture(observer SourcePipelineObserver) *sourceWheelCapture 
 }
 
 func (capture *sourceWheelCapture) Activate() error {
+	return capture.ActivateProfile(nil)
+}
+
+func (capture *sourceWheelCapture) ActivateProfile(profile context.Context) error {
 	if capture == nil {
 		return errors.New("source wheel capture is not initialized")
 	}
-	return capture.execute(wmSourceWheelCaptureActivate, false)
+	return capture.executeProfile(profile, wmSourceWheelCaptureActivate, false)
 }
 
 func (capture *sourceWheelCapture) Deactivate() {
@@ -222,17 +229,26 @@ func (capture *sourceWheelCapture) OwnsWheel() bool {
 }
 
 func (capture *sourceWheelCapture) execute(message uint32, allowMissing bool) error {
+	return capture.executeProfile(nil, message, allowMissing)
+}
+
+func (capture *sourceWheelCapture) executeProfile(profile context.Context, message uint32, allowMissing bool) error {
+	stopTotal := handoff.CaptureSpan(profile, handoff.CaptureTotal)
+	defer stopTotal()
 	timer := time.NewTimer(sourceWheelCaptureTimeout)
 	defer timer.Stop()
 	capture.opOnce.Do(func() { capture.opGate = make(chan struct{}, 1) })
+	stopSerialize := handoff.CaptureSpan(profile, handoff.CaptureSerializeWait)
 	select {
 	case capture.opGate <- struct{}{}:
 		defer func() { <-capture.opGate }()
 	case <-timer.C:
+		stopSerialize()
 		err := fmt.Errorf("source wheel capture command serialization timed out: %w", ErrSourceCaptureCommandTimeout)
 		capture.failCurrentRun(err)
 		return err
 	}
+	stopSerialize()
 	capture.runMu.RLock()
 	current := capture.run
 	capture.runMu.RUnlock()
@@ -248,17 +264,27 @@ func (capture *sourceWheelCapture) execute(message uint32, allowMissing bool) er
 		// as a native cleanup failure and latch an otherwise clean stop FAULTED.
 		return fmt.Errorf("source wheel capture window is terminal: %w", terminalErr)
 	}
-	command := sourceWheelCaptureCommand{message: message, result: make(chan error, 1)}
+	command := sourceWheelCaptureCommand{message: message, result: make(chan error, 1), profile: profile}
+	if profile != nil {
+		command.queuedAt = time.Now()
+	}
+	stopAdmission := handoff.CaptureSpan(profile, handoff.CaptureAdmission)
 	select {
 	case current.commands <- command:
 	case <-current.done:
+		stopAdmission()
 		return current.stoppedError()
 	case <-timer.C:
+		stopAdmission()
 		err := fmt.Errorf("source wheel capture command admission timed out: %w", ErrSourceCaptureCommandTimeout)
 		current.fail(err)
 		return err
 	}
-	if posted, _, postErr := procPostMessageWTouchpad.Call(current.window, uintptr(message), 0, 0); posted == 0 {
+	stopAdmission()
+	stopPost := handoff.CaptureSpan(profile, handoff.CapturePost)
+	posted, _, postErr := procPostMessageWTouchpad.Call(current.window, uintptr(message), 0, 0)
+	stopPost()
+	if posted == 0 {
 		select {
 		case <-current.commands:
 		default:
@@ -267,6 +293,8 @@ func (capture *sourceWheelCapture) execute(message uint32, allowMissing bool) er
 		current.fail(err)
 		return err
 	}
+	stopResult := handoff.CaptureSpan(profile, handoff.CaptureResultWait)
+	defer stopResult()
 	select {
 	case err := <-command.result:
 		return err
@@ -491,24 +519,31 @@ func (current *sourceWheelCaptureRun) handleCommand(message uint32) uintptr {
 		procPostQuitMessageTouchpad.Call(0)
 		return 0
 	}
+	if !command.queuedAt.IsZero() {
+		handoff.RecordCapture(command.profile, handoff.CaptureQueueToHandle, time.Since(command.queuedAt))
+	}
+	stopHandler := handoff.CaptureSpan(command.profile, handoff.CaptureHandlerTotal)
 	if command.message != message {
 		err := errors.New("source wheel capture command order mismatch")
 		current.setError(err)
+		stopHandler()
 		command.result <- err
 		procPostQuitMessageTouchpad.Call(0)
 		return 0
 	}
 	var err error
 	if terminalErr := current.err(); terminalErr != nil {
+		stopHandler()
 		command.result <- terminalErr
 		return 0
 	}
 	switch message {
 	case wmSourceWheelCaptureActivate:
-		err = current.activateWindow()
+		err = current.activateWindowProfile(command.profile)
 	case wmSourceWheelCaptureDeactivate:
 		err = current.deactivateWindow()
 	}
+	stopHandler()
 	command.result <- err
 	_, rollbackConfirmed := err.(*sourceCaptureActivationRejected)
 	if err != nil && !rollbackConfirmed {
@@ -519,6 +554,10 @@ func (current *sourceWheelCaptureRun) handleCommand(message uint32) uintptr {
 }
 
 func (current *sourceWheelCaptureRun) activateWindow() (activationErr error) {
+	return current.activateWindowProfile(nil)
+}
+
+func (current *sourceWheelCaptureRun) activateWindowProfile(profile context.Context) (activationErr error) {
 	if err := current.err(); err != nil {
 		return err
 	}
@@ -531,11 +570,15 @@ func (current *sourceWheelCaptureRun) activateWindow() (activationErr error) {
 			if errors.Is(activationErr, ErrSourceForegroundUnavailable) {
 				activationErr = errors.Join(activationErr, missingForegroundStage)
 			}
+			stopRollback := handoff.CaptureSpan(profile, handoff.CaptureRollback)
 			activationErr = current.rollbackActivation(activationErr)
+			stopRollback()
 		}
 	}()
+	stopPosition := handoff.CaptureSpan(profile, handoff.CapturePosition)
 	position, err := cursorPosition()
 	if err != nil {
+		stopPosition()
 		return fmt.Errorf("%w: position source wheel capture: %v", ErrSourceCaptureActivationSetup, err)
 	}
 	current.savedFocus = sourceWheelCaptureGetForeground()
@@ -543,17 +586,23 @@ func (current *sourceWheelCaptureRun) activateWindow() (activationErr error) {
 		missingForegroundStage = ErrSourceForegroundMissingBeforeShow
 	}
 	if err := current.err(); err != nil {
+		stopPosition()
 		return err
 	}
 	x, y := sourceWheelCapturePosition(position)
 	if positionErr := sourceWheelCaptureSetPosition(current.window, x, y); positionErr != nil {
+		stopPosition()
 		return fmt.Errorf("%w: %v", ErrSourceCaptureActivationSetup, positionErr)
 	}
+	stopPosition()
 	if err := current.err(); err != nil {
 		return err
 	}
 	current.registered = true // Also attempt unregister if registration reports failure.
-	if registerErr := sourceWheelCaptureRegisterWindow(current.registerProc, current.window, true); registerErr != nil {
+	stopRegister := handoff.CaptureSpan(profile, handoff.CaptureTouchpadRegister)
+	registerErr := sourceWheelCaptureRegisterWindow(current.registerProc, current.window, true)
+	stopRegister()
+	if registerErr != nil {
 		sourceWheelCaptureShowWindow(current.window, swHide)
 		return fmt.Errorf("%w: %v", ErrSourceCaptureActivationSetup, touchpadWin32Error("RegisterTouchpadCapableWindow(source TRUE)", registerErr))
 	}
@@ -562,11 +611,15 @@ func (current *sourceWheelCaptureRun) activateWindow() (activationErr error) {
 	}
 	// Showing must not separately activate the popup and discard the foreground
 	// owner needed by the verified SetForegroundWindow/thread-attach path below.
+	stopShow := handoff.CaptureSpan(profile, handoff.CaptureShow)
 	sourceWheelCaptureShowWindow(current.window, swShowWithoutActivation)
+	stopShow()
 	if err := current.err(); err != nil {
 		return err
 	}
+	stopUpdate := handoff.CaptureSpan(profile, handoff.CaptureUpdate)
 	procUpdateWindowTouchpad.Call(current.window)
+	stopUpdate()
 	if err := current.err(); err != nil {
 		return err
 	}
@@ -576,8 +629,10 @@ func (current *sourceWheelCaptureRun) activateWindow() (activationErr error) {
 	if err := current.err(); err != nil {
 		return err
 	}
+	stopForeground := handoff.CaptureSpan(profile, handoff.CaptureForeground)
 	foregroundErr := sourceWheelCaptureSetForeground(current.window)
 	if err := current.err(); err != nil {
+		stopForeground()
 		return err
 	}
 	if sourceWheelCaptureGetForeground() == 0 && missingForegroundStage == nil {
@@ -587,8 +642,11 @@ func (current *sourceWheelCaptureRun) activateWindow() (activationErr error) {
 		foregroundErr = nil
 	}
 	verificationLost := foregroundErr == nil && sourceWheelCaptureGetForeground() != current.window
+	stopForeground()
 	if foregroundErr != nil || verificationLost {
+		stopFallback := handoff.CaptureSpan(profile, handoff.CaptureFallback)
 		fallbackResult, fallbackErr := current.activateForegroundFallback()
+		stopFallback()
 		if current.observer != nil {
 			current.observer.ObserveWheelForegroundFallback(fallbackResult)
 		}
@@ -611,6 +669,8 @@ func (current *sourceWheelCaptureRun) activateWindow() (activationErr error) {
 	if verificationLost || sourceWheelCaptureGetForeground() != current.window {
 		return ErrSourceCaptureActivationVerificationLost
 	}
+	stopCommit := handoff.CaptureSpan(profile, handoff.CaptureActiveCommit)
+	defer stopCommit()
 	current.terminalMu.Lock()
 	if current.terminalErr != nil {
 		err := current.terminalErr

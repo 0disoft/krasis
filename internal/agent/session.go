@@ -425,7 +425,12 @@ func (activation *combinedSourceActivation) Activate() error {
 	activation.observe(peer.ControlFlowSourceSessionActivationSucceeded)
 	activation.observe(peer.ControlFlowCaptureActivationAttempted)
 	started = time.Now()
-	captureErr := activation.capture.Activate()
+	var captureErr error
+	if capture, ok := activation.capture.(wininput.SourceProfiledActivation); ok {
+		captureErr = capture.ActivateProfile(profile)
+	} else {
+		captureErr = activation.capture.Activate()
+	}
 	handoff.Record(profile, handoff.CaptureActivate, time.Since(started))
 	if err := captureErr; err != nil {
 		activation.source.Deactivate()

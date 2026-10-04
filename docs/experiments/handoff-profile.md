@@ -297,3 +297,30 @@ the plain path, with no cache, skipped check, new trust or input retry. A failed
 query still records the elapsed span it spent before failing, and an incomplete
 substage set is absence, never success. This is instrumentation only: it is not
 claimed to fix the stutter, and PIN and hardware results remain pending.
+
+## g150 source capture activation timing
+
+`Summary.Capture` is an optional `*CaptureProfile` (schema 1): a
+`micros [17]uint32` array and a `measured uint32` presence mask whose low 17 bits are used. The indices are
+`CaptureSerializeWait`, `CaptureAdmission`, `CapturePost`, `CaptureQueueToHandle`,
+`CapturePosition`, `CaptureTouchpadRegister`, `CaptureShow`, `CaptureUpdate`,
+`CaptureForeground`, `CaptureFallback`, `CaptureActiveCommit`,
+`CaptureHandlerTotal`, `CaptureResultWait`, `CaptureRollback`, `CaptureTotal`, `CaptureBoundaryBefore` and `CaptureBoundaryAfter`
+(0..16). Values are elapsed microseconds clamped by the existing 120-second
+window; an absent bit is unobserved, and a present zero is a clock-reported zero,
+not proof that no wait happened.
+
+Recording is scoped to the matching source attempt for `ActivateProfile(ctx)`,
+whose context is carried across the local capture thread. `RecordCapture` takes
+the collector lock and drops a finished, expired, wrong-role or duplicate sample,
+so a late timeout or completion cannot contaminate a newer attempt. The legacy
+`Activate()` and the existing source interface still work.
+
+These spans nest and must not be summed: `CaptureQueueToHandle` runs from
+admission start to the handler, so it overlaps `CaptureAdmission`/`CapturePost`;
+`CaptureResultWait` overlaps the remaining handler work and response delivery; `CaptureForeground` contains the request
+and verification, `CaptureFallback` is separate, and `CaptureTotal` is the underlying capture command's caller duration, overlapping with owner work; a late owner span is dropped once the original attempt is retired. The wrapper guard lookups (the two boundary stages) are part of the overall `CaptureActivate` span, not of `CaptureTotal`.
+The 39-stage vectors, the `KRA1` ACK and the startup schema are unchanged. Capture
+numerics are validated on the local schema and reprojected by the existing remote
+sanitization. No coordinates, window text, input, PID or paths are exported. This
+is instrumentation only, not a stutter-fix claim.
