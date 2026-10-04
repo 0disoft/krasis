@@ -1,5 +1,28 @@
 # ADR 0066: Product leases use the installed input service
 
+## g161: Preview the approach from recent pointer positions
+
+g160's first/idle attempts showed grants of 79–134ms with a preparation-mutex wait
+(OpenLock) of 52–105ms, so a hint emitted at the last moment still overlapped the
+handoff. g161 predicts the approach earlier from recent physical pointer X positions
+rather than raw mouse counts, which acceleration and DPI can change. The estimate is
+local and serialized with O(1) work per move: a baseline band of 192px clamped to a
+quarter of the width, projected about 150ms ahead and capped at three quarters of the
+width. Samples closer than 4ms are coalesced, the anchor advances no more often than every 16ms,
+and the estimate resets on a sample older than 50ms, a reversed clock or direction, or
+a position outside the display. The sticky approach threshold is kept until an actual
+retreat beyond band plus the configured rearm (capped at width-2), so a falling speed
+estimate cannot rearm the same outward approach.
+
+No coordinates are logged or sent and there are no new wire or service changes. The
+existing single-slot timestamp queue, 500ms freshness, 2s rate limit, 2s unbound
+one-claim same-console lifetime, independent authorization/bootstrap and 300ms local
+wait are unchanged. These are conservative tuning constants and the hardware effect is
+not yet verified. Tests cover both directions, slow or raw-counts-only input,
+stale/reversed/outside/duplicate samples, sticky rearm, narrow-screen reachable reset
+and the existing session integration. No measured speedup is claimed; g161 real-device
+cold latency, continuous jitter and PIN regression remain pending.
+
 ## g160: Near-boundary preparation hint over negotiated ALPN
 
 When the pointer moves outward within 192px of the crossing edge, the source hook

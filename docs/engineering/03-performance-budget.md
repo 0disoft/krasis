@@ -309,3 +309,28 @@ The next direction is that preparation must lead the actual edge request by enou
 time; an improved cold latency cannot be claimed yet. Field indices were verified
 against handoff/profile.go (OpenLock 6, ServiceAuth 9, ReadyWait 12, Dispatch 28).
 No new build or runtime test was required because this is evidence only.
+
+## g161 pointer-position approach preview
+
+g161 predicts the approach earlier than the g160 last-moment hint. g160's first/idle
+attempts measured grants of 79–134ms with a preparation-mutex wait (OpenLock) of
+52–105ms, so the preparation still overlapped the handoff. The new preview derives
+speed from recent physical pointer X positions, not raw mouse counts, and is local,
+serialized and O(1) per move.
+
+The baseline band is `min(192px, width/4)`; the projected region is about 150ms
+ahead, capped at `3/4 width`. Samples closer than 4ms are coalesced, the anchor
+advances no more often than every 16ms, and the estimate resets on a sample older than 50ms, a
+reversed clock, a reversed physical direction or an out-of-display position. The
+sticky approach threshold stays until an actual retreat beyond `band + configured
+rearm` (capped at `width-2`), so a falling speed estimate cannot rearm the same
+outward approach.
+
+The existing single-slot timestamp queue, 500ms freshness, 2s rate limit, 2s unbound
+one-claim same-console lifetime, independent authorization/bootstrap and 300ms local
+wait are unchanged; there are no new wire or service changes, and no coordinates are
+logged or sent. These are conservative tuning constants and the hardware effect is
+not yet verified. Tests cover both directions, slow or raw-counts-only input,
+stale/reversed/outside/duplicate samples, sticky rearm, narrow-screen reachable reset
+and the existing session integration. No measured speedup is claimed; g161 real-device
+cold latency, continuous jitter and PIN regression remain pending.
