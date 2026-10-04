@@ -324,3 +324,38 @@ The 39-stage vectors, the `KRA1` ACK and the startup schema are unchanged. Captu
 numerics are validated on the local schema and reprojected by the existing remote
 sanitization. No coordinates, window text, input, PID or paths are exported. This
 is instrumentation only, not a stutter-fix claim.
+
+## g152 worker installation load detail
+
+`StartupProfile` keeps schema 1, the eight-element `micros` array and the
+`measured` mask, and adds optional `loadMicros` (uint32) and `loadMeasured`
+(bool) on schema 1 — optional fields, not a ninth element of the `micros`
+array. `loadMicros` is the file/metadata load duration inside
+`WorkerInstalledValidation`: `RunInstalledWorker` in
+`internal/inputworker/service_windows.go` records the containing total first and
+then calls `RecordLoad(installation.loadElapsed)`. It is a subspan of that
+stage, not an additional contribution to startup elapsed and not an authority
+signal. An absent `loadMeasured` flag means unobserved; a present flag at zero
+is a clock-reported zero. `Valid()` rejects an unmeasured nonzero load, a load
+above the 120-second window, a measured load without the containing
+`WorkerInstalledValidation` bit, and a load greater than the containing total.
+`mergeWorkerStartup` copies child load detail only into the child-owned spans
+and never replaces a service-owned measurement.
+
+A readiness receipt that carries load detail is `KRD3`: 48 bytes, the existing
+`KRD2` 40-byte envelope plus an 8-byte extension (4-byte big-endian load
+microseconds, 1-byte presence, 3 reserved zero bytes). The writer emits `KRD3`
+only when `loadMeasured` is true, otherwise keeps `KRD2`, and a profile that is
+invalid or has no measured stage still falls back to the legacy `KRD1` frame.
+The reader accepts `KRD1`, `KRD2` and `KRD3`; a truncated envelope, an unknown
+header or nonzero reserved bytes fail with the existing protocol error, while a
+structurally valid but numerically invalid payload is consumed and dropped
+without changing readiness. An older reader does not accept `KRD3`, so the
+cryptographic product installation must match before measuring. Peer frames, the
+`KRA1` ACK, image matching and authority checks are unchanged. This is
+instrumentation only, not a latency claim.
+
+Separately, g152 binds the desktop object name `Default` to the exact owned
+handle once at acquisition and still queries UOI_IO before every work; a replaced
+handle does not inherit the previous name proof. That is not a profile change and
+is measured in `docs/engineering/03-performance-budget.md`.
