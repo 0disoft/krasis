@@ -138,3 +138,55 @@ func TestPreparationPredictionSmoothsVeryShortDuplicateSamples(t *testing.T) {
 		t.Fatal("short samples prevented subsequent valid prediction")
 	}
 }
+
+func TestPreparationRenewsAnExpiredApproachWithoutPhysicalRetreat(t *testing.T) {
+	for _, edge := range []control.ScreenEdge{control.ScreenEdgeRight, control.ScreenEdgeLeft} {
+		p := previewFixture(edge)
+		at := time.Unix(100, 0)
+		x, delta := int32(850), int32(1)
+		if edge == control.ScreenEdgeLeft {
+			x, delta = -50, -1
+		}
+		move := control.InputAction{Kind: control.InputPointerMove, DeltaX: delta}
+		if !p.preview(move, x, at) {
+			t.Fatal("initial approach did not prepare")
+		}
+		if p.preview(move, x, at.Add(preparationHintRenewal-time.Nanosecond)) {
+			t.Fatal("renewal ignored the cooldown margin")
+		}
+		if !p.preview(move, x, at.Add(preparationHintRenewal)) {
+			t.Fatal("expired hint still required a distant retreat")
+		}
+		if p.preview(move, x, at.Add(preparationHintRenewal+time.Millisecond)) {
+			t.Fatal("renewal repeated on consecutive input")
+		}
+		if !p.preview(move, x, at.Add(10*time.Second)) {
+			t.Fatal("idle reentry did not prepare again")
+		}
+	}
+}
+
+func TestPreparationExpiryDoesNotMakeIneligibleInputRenew(t *testing.T) {
+	at := time.Unix(100, 0)
+	for _, tc := range []struct {
+		name   string
+		action control.InputAction
+		x      int32
+		gap    time.Duration
+	}{
+		{"inward", control.InputAction{Kind: control.InputPointerMove, DeltaX: -1}, 850, 10 * time.Second},
+		{"no_outward_delta", control.InputAction{Kind: control.InputPointerMove}, 850, 10 * time.Second},
+		{"non_pointer", control.InputAction{Kind: control.InputButtonDown, Code: 1}, 850, 10 * time.Second},
+		{"outside", control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}, 900, 10 * time.Second},
+		{"distant", control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}, 600, 10 * time.Second},
+		{"reversed_clock", control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}, 850, -time.Second},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := previewFixture(control.ScreenEdgeRight)
+			p.preview(control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}, 850, at)
+			if p.preview(tc.action, tc.x, at.Add(tc.gap)) || !p.sentAt.Equal(at) {
+				t.Fatal("ineligible input emitted or refreshed a hint")
+			}
+		})
+	}
+}

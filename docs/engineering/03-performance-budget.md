@@ -513,3 +513,21 @@ preparation, plus first-approach anticipation. Fresh lease authorization, recove
 one-claim child ownership and resource bounds must remain intact. No cross-device
 clocks or overlapping spans are added to infer RTT or total pointer latency. This is
 an evidence-only update; no new runtime build follows from the record itself.
+
+## g164 bounded preparation-hint renewal
+
+g164 renews the preparation hint without requiring a retreat. `preparationBoundary`
+keeps a `sentAt` timestamp and, after the hint lifetime plus the existing 2s rate
+(`preparationHintRenewal` = 2s + 500ms), a fresh outward physical pointer move inside
+the eligible band re-emits one hint even if the pointer never retreated past the rearm
+threshold. The retreat rearm, the 250ms lead, the band caps and the 4/16/50ms sampling
+are unchanged.
+
+There are no timers or background renewals; renewal still needs an actual outward move.
+Authorization, the 2s one-claim unbound child TTL, maximum one child, and the 2s sender
+and receiver gates are unchanged. The motivation is the g163 idle cold starts; the first
+unknown-speed approach and the preparation-mutex overlap remain unresolved.
+
+Tests cover both directions, the renewal threshold, repeat suppression, and idle and
+ineligible/reversed-time cases. Device latency and PIN behavior are pending, and no
+reduced latency is promised.

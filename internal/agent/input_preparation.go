@@ -11,7 +11,12 @@ import (
 	"github.com/0disoft/krasis/internal/wininput"
 )
 
-const preparationHintLifetime = 500 * time.Millisecond
+const (
+	preparationHintLifetime = 500 * time.Millisecond
+	// Keep margin beyond the independent two-second sender/receiver gates.
+	// Renewal is driven only by fresh physical movement, never a timer.
+	preparationHintRenewal = 2*time.Second + preparationHintLifetime
+)
 
 type inputPreparer interface {
 	PrepareInput(context.Context, transport.AuthenticatedPeerContext, time.Time)
@@ -24,6 +29,7 @@ type preparationBoundary struct {
 	config   control.BoundaryConfig
 	hints    chan time.Time
 	sent     bool
+	sentAt   time.Time
 	rearmAt  int64
 	sampleX  int32
 	sampleAt time.Time

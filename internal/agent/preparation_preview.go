@@ -36,12 +36,17 @@ func (p *preparationBoundary) preview(action control.InputAction, x int32, now t
 	if p.sent && distance > p.rearmAt {
 		p.sent = false
 	}
-	if p.sent || !outward || distance > band {
+	if p.sent && (p.sentAt.IsZero() || now.Sub(p.sentAt) < preparationHintRenewal) {
+		return false
+	}
+	if !outward || distance > band {
 		return false
 	}
 	p.sent = true
+	p.sentAt = now
 	// Keep the threshold chosen at emission, so a falling speed estimate
-	// cannot rearm the same outward approach. Actual retreat is required.
+	// cannot rearm the same outward approach. Retreat or a bounded expiry
+	// followed by fresh outward movement is required.
 	p.rearmAt = band + int64(p.config.RearmDistance)
 	p.rearmAt = min(p.rearmAt, width-2)
 	return true
