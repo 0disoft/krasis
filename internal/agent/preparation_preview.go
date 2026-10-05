@@ -42,14 +42,18 @@ func (p *preparationBoundary) preview(action control.InputAction, x int32, now t
 	if !outward || distance > band {
 		return false
 	}
+	return true
+}
+
+// Commit approach suppression only after the bounded queue accepts the hint.
+func (p *preparationBoundary) preparationHintSent(now time.Time) {
 	p.sent = true
 	p.sentAt = now
 	// Keep the threshold chosen at emission, so a falling speed estimate
 	// cannot rearm the same outward approach. Retreat or a bounded expiry
 	// followed by fresh outward movement is required.
-	p.rearmAt = band + int64(p.config.RearmDistance)
-	p.rearmAt = min(p.rearmAt, width-2)
-	return true
+	p.rearmAt = p.band + int64(p.config.RearmDistance)
+	p.rearmAt = min(p.rearmAt, int64(p.config.ScreenWidth)-2)
 }
 
 func (p *preparationBoundary) previewBand(x int32, now time.Time) int64 {

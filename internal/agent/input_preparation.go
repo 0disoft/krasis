@@ -43,15 +43,23 @@ func (p *preparationBoundary) Observe(action control.InputAction, x int32) error
 	if action.Kind != control.InputPointerMove {
 		return nil
 	}
-	now := time.Now()
+	p.offerPreparation(action, x, time.Now())
+	return nil
+}
+
+func (p *preparationBoundary) offerPreparation(action control.InputAction, x int32, now time.Time) bool {
 	if !p.preview(action, x, now) {
-		return nil
+		return false
 	}
 	select {
 	case p.hints <- now:
+		p.preparationHintSent(now)
+		return true
 	default:
+		// A full queue has not accepted this renewal. Fresh movement may retry
+		// admission without consuming the 2.5-second local cooldown.
+		return false
 	}
-	return nil
 }
 
 func freshPreparationHint(at, now time.Time) bool {
