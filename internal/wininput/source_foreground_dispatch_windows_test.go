@@ -53,6 +53,21 @@ func TestForegroundDispatchCancellationCannotAuthorizeOrRetry(t *testing.T) {
 	}
 }
 
+func TestForegroundPendingRequestIsServicedBeforePollingSleep(t *testing.T) {
+	restore := stubSourceWheelCaptureActivation(t)
+	defer restore()
+	stubForegroundTransitionPause(t, func(time.Duration) { t.Fatal("already pending activation was delayed") })
+	foreground := uintptr(0)
+	sourceWheelCaptureGetForeground = func() uintptr { return foreground }
+	sourceForegroundTransitionDispatch = func(window uintptr) { foreground = window }
+	sourceWheelCaptureSetForeground = func(uintptr) error { t.Fatal("completed activation was requested again"); return nil }
+	current := &sourceWheelCaptureRun{window: 10}
+	window, err := current.foregroundAfterTransition()
+	if err != nil || window != 10 || current.active.Load() {
+		t.Fatal("pending request was not verified independently of active commit", window, err)
+	}
+}
+
 func TestForegroundDispatchDoesNotRemoveOrDispatchQueuedMessages(t *testing.T) {
 	previous := callSourceForegroundMessages
 	defer func() { callSourceForegroundMessages = previous }()

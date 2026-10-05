@@ -43,13 +43,8 @@ func (current *sourceWheelCaptureRun) foregroundAfterTransition() (uintptr, erro
 		if err := current.err(); err != nil {
 			return 0, err
 		}
-		sourceForegroundTransitionPause(sourceForegroundTransitionInterval)
-		if err := current.err(); err != nil {
-			return 0, err
-		}
-		// Sleeping inside our window procedure does not service an asynchronous
-		// foreground activation. Give Windows a chance to finish it before the
-		// next read; a physical click must not be needed to unblock the owner.
+		// Service pending activation before spending any polling delay. Sleeping
+		// inside our window procedure cannot complete these sent messages.
 		sourceForegroundTransitionDispatch(current.window)
 		if err := current.err(); err != nil {
 			return 0, err
@@ -67,6 +62,13 @@ func (current *sourceWheelCaptureRun) foregroundAfterTransition() (uintptr, erro
 				return 0, err
 			}
 			sourceForegroundTransitionDispatch(current.window)
+			if err := current.err(); err != nil {
+				return 0, err
+			}
+			foreground = sourceWheelCaptureGetForeground()
+		}
+		if foreground == 0 {
+			sourceForegroundTransitionPause(sourceForegroundTransitionInterval)
 			if err := current.err(); err != nil {
 				return 0, err
 			}
