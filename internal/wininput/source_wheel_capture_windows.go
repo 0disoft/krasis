@@ -744,70 +744,8 @@ func (current *sourceWheelCaptureRun) activateForegroundFallback() (SourceForegr
 }
 
 func (current *sourceWheelCaptureRun) setForegroundWithThreadAttach(targetWindow, peerWindow uintptr) (foregroundThreadFallbackResult, error) {
-	if current.attachedSource != 0 {
-		return foregroundThreadFallbackDetachFailed, ErrSourceCaptureThreadDetachFailed
-	}
-	if err := current.err(); err != nil {
-		return foregroundThreadFallbackAttachFailed, err
-	}
-	if targetWindow == 0 || peerWindow == 0 {
-		return foregroundThreadFallbackAttachFailed, ErrSourceForegroundUnavailable
-	}
-	sourceThread := sourceWheelCaptureCurrentThread()
-	peerThread, err := sourceWheelCaptureWindowThread(peerWindow)
-	if err != nil || sourceThread == 0 || peerThread == 0 || sourceThread == peerThread {
-		return foregroundThreadFallbackAttachFailed, errors.Join(
-			err,
-			ErrSourceForegroundThreadUnavailable,
-		)
-	}
-	// This rejects an already-unresponsive window. It is not a cancellation
-	// guarantee: the peer can still stall after this bounded probe.
-	if err := sourceWheelCaptureProbeForeground(peerWindow); err != nil {
-		return foregroundThreadFallbackAttachFailed, errors.Join(ErrSourceForegroundProbeFailed, err)
-	}
-	if err := current.err(); err != nil {
-		return foregroundThreadFallbackAttachFailed, err
-	}
-	if err := sourceWheelCaptureAttachThreads(sourceThread, peerThread, true); err != nil {
-		return foregroundThreadFallbackAttachFailed, err
-	}
-	current.attachedSource, current.attachedPeer = sourceThread, peerThread
-	foregroundErr := current.err()
-	if foregroundErr == nil {
-		foregroundErr = sourceWheelCaptureSetForeground(targetWindow)
-	}
-	verified := foregroundErr == nil && sourceWheelCaptureGetForeground() == targetWindow
-	detachErr := current.detachForegroundThreads()
-	if detachErr != nil {
-		return foregroundThreadFallbackDetachFailed, errors.Join(detachErr, foregroundErr)
-	}
-	if foregroundErr != nil {
-		return foregroundThreadFallbackAPIRejected, foregroundErr
-	}
-	if err := current.err(); err != nil {
-		return foregroundThreadFallbackVerificationLost, err
-	}
-	// Detaching can resume an asynchronous activation in the target queue.
-	// The observation made while the queues were joined is not final proof.
-	if verified && sourceWheelCaptureGetForeground() != targetWindow {
-		if err := current.err(); err != nil {
-			return foregroundThreadFallbackVerificationLost, err
-		}
-		if targetWindow == current.window {
-			sourceForegroundTransitionDispatch(targetWindow)
-		} else if err := sourceWheelCaptureProbeForeground(targetWindow); err != nil {
-			return foregroundThreadFallbackVerificationLost, err
-		}
-		if err := current.err(); err != nil {
-			return foregroundThreadFallbackVerificationLost, err
-		}
-		verified = sourceWheelCaptureGetForeground() == targetWindow
-	}
-	if !verified {
-		return foregroundThreadFallbackVerificationLost, errors.New("foreground fallback target was not verified")
-	}
-	return foregroundThreadFallbackSucceeded, nil
+	result, _, err := current.setForegroundWithThreadAttachDetailed(targetWindow, peerWindow)
+	return result, err
 }
 
 func (current *sourceWheelCaptureRun) deactivateWindow() error {
@@ -838,7 +776,7 @@ func (current *sourceWheelCaptureRun) deactivateWindowProfile(profile context.Co
 	// every ordinary return as skipped and loses the saved application focus.
 	current.observeFocus(profile, handoff.FocusBeforeRestore)
 	stopRestore := handoff.FocusSpan(profile, 0)
-	restoreResult, restoreErr := current.restoreFocus()
+	restoreResult, restoreErr := current.restoreFocusProfile(profile)
 	stopRestore()
 	handoff.RecordFocusResult(profile, 0, uint8(restoreResult))
 	current.observeFocus(profile, handoff.FocusAfterRestore)
@@ -906,6 +844,10 @@ func (current *sourceWheelCaptureRun) observeFocus(profile context.Context, stag
 }
 
 func (current *sourceWheelCaptureRun) restoreFocus() (SourceFocusRestoreResult, error) {
+	return current.restoreFocusProfile(nil)
+}
+
+func (current *sourceWheelCaptureRun) restoreFocusProfile(profile context.Context) (SourceFocusRestoreResult, error) {
 	if current.savedFocus == 0 {
 		return SourceFocusRestoreSkipped, nil
 	}
@@ -926,7 +868,7 @@ func (current *sourceWheelCaptureRun) restoreFocus() (SourceFocusRestoreResult, 
 		}
 	}
 	if restoreErr != nil || verificationLost {
-		fallbackResult, fallbackErr := current.restoreFocusFallback()
+		fallbackResult, fallbackErr := current.restoreFocusFallbackProfile(profile)
 		if current.observer != nil {
 			current.observer.ObserveWheelFocusRestoreFallback(fallbackResult)
 		}
@@ -945,7 +887,12 @@ func (current *sourceWheelCaptureRun) restoreFocus() (SourceFocusRestoreResult, 
 }
 
 func (current *sourceWheelCaptureRun) restoreFocusFallback() (SourceFocusRestoreFallbackResult, error) {
-	result, err := current.setForegroundWithThreadAttach(current.savedFocus, current.savedFocus)
+	return current.restoreFocusFallbackProfile(nil)
+}
+
+func (current *sourceWheelCaptureRun) restoreFocusFallbackProfile(profile context.Context) (mapped SourceFocusRestoreFallbackResult, mappedErr error) {
+	result, stage, err := current.setForegroundWithThreadAttachDetailed(current.savedFocus, current.savedFocus)
+	defer func() { handoff.RecordFocusFallback(profile, uint8(mapped), stage) }()
 	switch result {
 	case foregroundThreadFallbackSucceeded:
 		return SourceFocusRestoreFallbackSucceeded, nil

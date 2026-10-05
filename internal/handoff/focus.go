@@ -18,14 +18,17 @@ const (
 // State 0 is unobserved; 1 NULL, 2 capture, 3 saved original, 4 other.
 // No native handles or window/application metadata leave the owner thread.
 type FocusProfile struct {
-	Schema         uint8     `json:"schema"`
-	States         [4]uint8  `json:"states"`
-	Observed       uint8     `json:"observed"`
-	Restore        uint8     `json:"restore"`
-	PostHide       uint8     `json:"postHide"`
-	ResultMeasured uint8     `json:"resultMeasured"`
-	Micros         [2]uint32 `json:"micros"`
-	Measured       uint8     `json:"measured"`
+	Schema                  uint8              `json:"schema"`
+	States                  [4]uint8           `json:"states"`
+	Observed                uint8              `json:"observed"`
+	Restore                 uint8              `json:"restore"`
+	PostHide                uint8              `json:"postHide"`
+	RestoreFallback         uint8              `json:"restoreFallback,omitempty"`
+	RestoreFallbackStage    FocusFallbackStage `json:"restoreFallbackStage,omitempty"`
+	RestoreFallbackMeasured bool               `json:"restoreFallbackMeasured,omitempty"`
+	ResultMeasured          uint8              `json:"resultMeasured"`
+	Micros                  [2]uint32          `json:"micros"`
+	Measured                uint8              `json:"measured"`
 }
 
 func (p FocusProfile) Valid() bool {
@@ -51,7 +54,14 @@ func (p FocusProfile) Valid() bool {
 			return false
 		}
 	}
-	return p.Observed|p.ResultMeasured|p.Measured != 0
+	if p.RestoreFallbackMeasured {
+		if !validFocusFallback(p.RestoreFallback, p.RestoreFallbackStage) {
+			return false
+		}
+	} else if p.RestoreFallback != 0 || p.RestoreFallbackStage != 0 {
+		return false
+	}
+	return p.Observed|p.ResultMeasured|p.Measured != 0 || p.RestoreFallbackMeasured
 }
 
 // FocusEnabled gates optional native observations to the original live source

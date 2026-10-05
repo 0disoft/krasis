@@ -698,3 +698,33 @@ The next work is to preserve the existing restore fallback enum and its presence
 attempt (the current Focus loses the exact reason) without blind saved-handle
 reactivation; a savedFocus reset is not evidenced as the cause. This is evidence only,
 with no test, build, runtime or API change.
+
+## g167 restore-fallback cause diagnostics
+
+`Focus` schema 1 gains an additive `restoreFallback` (`uint8`) plus
+`restoreFallbackStage` (`handoff.FocusFallbackStage`, values 1..15) and its own
+`restoreFallbackMeasured` flag. The result reuses the existing restore fallback enum:
+1 success, 2 attach failure, 3 detach failure, 4 API rejection, 5 verification loss.
+The stage only refines that result. `FocusFallbackSucceeded` is the sole success stage;
+stages 3..8 (terminal-before, window unavailable, thread unavailable, probe failed,
+terminal-before-attach, attach failed) are attach, 2 and 11 are detach, 9 and 10 are API
+rejection, and 12..15 are verification loss. `Valid` requires the flag and the exact
+stage-to-result pairing, rejecting a measured flag with a mismatched pair and an
+unmeasured flag with either field set. `ResultMeasured` keeps its existing two bits
+unchanged. First write wins on the original source context under the existing
+12-attempt/120-second collector bound, and `Retire` deep-copies the fields so later
+updates cannot alter an emitted record.
+
+The detailed stage is recorded only by `restoreFocusProfile(ctx)`; legacy activation
+keeps `setForegroundWithThreadAttach` and ignores the stage. The shared thread-attach
+helper was extracted into `internal/wininput/source_foreground_attach_windows.go` with its
+existing call order, probe, ownership checks and outcomes unchanged. Its additional
+return value identifies the existing exit. No new native queries, retries, focus policy, wire
+or ACL changes, and no raw OS error text, handles or window/thread metadata are retained.
+
+AgentGeneration is 167. The nine-package desktop Go tests and vet with
+unsafeptr=false passed with exit 0. Packaging is a separate check. Tests cover legacy
+versus profile native call order and counts across eight
+scenarios, an actual-owner deactivation probe failure, late/expired/receiver-dropping
+input, an invalid stage and export privacy. Device delay and PIN behavior are unverified
+on g167.
