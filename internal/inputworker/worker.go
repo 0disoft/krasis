@@ -204,6 +204,15 @@ func serve(ctx context.Context, stream net.Conn, input application.InputPort, le
 			if command.op == opCursorRead {
 				return readCursorResponse(operationCtx, input, &ack)
 			}
+			if command.op == opMoveRead {
+				if err := apply(operationCtx, input, &pressed, command); err != nil {
+					return err
+				}
+				if err := readCursorResponse(operationCtx, input, &ack); err != nil {
+					return unknownInput(err)
+				}
+				return nil
+			}
 			return apply(operationCtx, input, &pressed, command)
 		})
 		cancel()
@@ -243,11 +252,11 @@ func apply(ctx context.Context, input application.InputPort, pressed *control.Pr
 	case opRelease:
 		_, err := application.InjectRelease(ctx, pressed, input, command.token)
 		return err
-	case opMove, opWheel:
+	case opMove, opWheel, opMoveRead:
 		if command.x < -maxDelta || command.x > maxDelta || command.y < -maxDelta || command.y > maxDelta {
 			return ErrProtocol
 		}
-		if command.op == opMove {
+		if command.op == opMove || command.op == opMoveRead {
 			return input.Move(ctx, command.x, command.y)
 		}
 		return input.Wheel(ctx, command.x, command.y)

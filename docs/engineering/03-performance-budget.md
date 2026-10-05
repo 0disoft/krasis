@@ -1106,3 +1106,22 @@ destroyed targets, pending attachment, cancellation, retained hidden capture,
 degraded release, frozen attempts and sanitized numeric export. A fresh device
 trial must check post-hide saved-target ownership, later activation failures,
 crossings without physical clicks and PIN behavior before declaring resolution.
+
+## g173 protected cursor I/O
+
+Protected entry now reads, sets and verifies the cursor through its authenticated
+worker instead of ordinary agent cursor APIs. The three entry requests add
+bounded local IPC at handoff; rollback similarly uses worker cursor I/O.
+Each relative motion combines injection and its return-boundary position in
+one request/ACK under one authorized desktop scope. The successful snapshot ACK
+grows from 24 to 32 bytes, sent in one pipe write; no extra per-motion roundtrip
+or authority bypass is introduced. Portable input retains local cursor I/O.
+Coordinates are not exported in logs or support. Entry failure certainty and
+lost-ACK non-replay behavior are preserved.
+
+Hosted checks assert one motion operation/scope, one snapshot ACK write,
+truncated-suffix rejection and no ordinary cursor fallback in protected entry,
+rollback or motion. These validate protocol and delegation rather than native
+PIN behavior or pointer latency. The g173 trial must leave B's PIN dialog open
+while crossing B-A-B repeatedly, then export both device diagnostics.
+No controlled latency comparison or native display-presentation claim is made.

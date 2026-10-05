@@ -247,7 +247,7 @@ func readResponse(reader io.Reader) (response, error) {
 	if err != nil {
 		return response{}, err
 	}
-	if value.op == opCursorRead && value.status == 0 {
+	if (value.op == opCursorRead || value.op == opMoveRead) && value.status == 0 {
 		var position [8]byte
 		if _, err := io.ReadFull(reader, position[:]); err != nil {
 			return response{}, ErrProtocol

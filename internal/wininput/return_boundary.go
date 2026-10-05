@@ -19,8 +19,9 @@ type InputAdapter struct {
 	injection application.InputPort
 }
 
-// NewInputAdapterWithInjection keeps cursor entry and return tracking local.
-// The immutable delegate owns injection; errors never fall back to SendInput.
+// NewInputAdapterWithInjection keeps entry transactions and return tracking
+// local. The immutable delegate owns injection and cursor I/O; failures never
+// fall back to ordinary SendInput/GetCursorPos/SetCursorPos.
 func NewInputAdapterWithInjection(distance, screenWidth int32, port application.InputPort) (*InputAdapter, error) {
 	if port == nil {
 		return nil, ErrUnsupportedInput

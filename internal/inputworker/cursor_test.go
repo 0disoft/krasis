@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"net"
 	"testing"
 	"time"
@@ -12,13 +13,57 @@ import (
 	"github.com/0disoft/krasis/internal/control"
 )
 
-type cursorInput struct {
-	recordingInput
-	x, y int32
-	sets int
+type cursorACKWriter struct {
+	bytes.Buffer
+	writes int
+	short  bool
 }
 
-func (p *cursorInput) CursorPosition(context.Context) (int32, int32, error) { return p.x, p.y, nil }
+func (w *cursorACKWriter) Write(data []byte) (int, error) {
+	w.writes++
+	if w.short {
+		data = data[:len(data)-1]
+	}
+	return w.Buffer.Write(data)
+}
+
+func TestCursorSnapshotACKUsesOneWriteAndRejectsPartialSuffix(t *testing.T) {
+	for _, op := range []operation{opCursorRead, opMoveRead} {
+		writer := &cursorACKWriter{}
+		ack := response{sequence: 1, op: op, x: -3, y: 4}
+		if err := writeResponse(writer, ack); err != nil || writer.writes != 1 || writer.Len() != responseSize+8 {
+			t.Fatal("cursor ACK added a pipe write or lost its suffix", err)
+		}
+		decoded, err := readResponse(writer)
+		if err != nil || decoded.op != op || decoded.x != -3 || decoded.y != 4 {
+			t.Fatal("cursor snapshot ACK lost framing", err)
+		}
+		writer = &cursorACKWriter{short: true}
+		if !errors.Is(writeResponse(writer, ack), io.ErrShortWrite) || writer.writes != 1 {
+			t.Fatal("short cursor ACK write accepted or retried")
+		}
+		if _, err := readResponse(writer); !errors.Is(err, ErrProtocol) {
+			t.Fatal("partial cursor suffix accepted")
+		}
+		writer = &cursorACKWriter{}
+		ack.status, ack.certainty = 1, 1
+		if err := writeResponse(writer, ack); err != nil || writer.Len() != responseSize {
+			t.Fatal("failed cursor ACK published a snapshot", err)
+		}
+	}
+}
+
+type cursorInput struct {
+	recordingInput
+	x, y    int32
+	sets    int
+	readErr error
+}
+
+func (p *cursorInput) CursorPosition(context.Context) (int32, int32, error) {
+	return p.x, p.y, p.readErr
+}
+func (p *cursorInput) Move(_ context.Context, x, y int32) error { p.x += x; p.y += y; return nil }
 func (p *cursorInput) SetCursorPosition(_ context.Context, x, y int32) error {
 	p.x, p.y = x, y
 	p.sets++
@@ -135,5 +180,40 @@ func TestCursorWrongBindingAndLostResponseNeverReplayOrFallback(t *testing.T) {
 		}
 		_ = client.Close()
 		<-done
+	}
+}
+
+func TestMotionSnapshotUsesOneOperationAndReadFailureStaysOutcomeUnknown(t *testing.T) {
+	for _, failed := range []bool{false, true} {
+		server, conn := net.Pipe()
+		input := &cursorInput{x: 10, y: 20}
+		lease := testLease()
+		if failed {
+			input.readErr = notSent(ErrAuthority)
+		}
+		done := make(chan finish, 1)
+		scopes := 0
+		do := func(ctx context.Context, f func() error) error { scopes++; return testExecute(ctx, f) }
+		go func() {
+			r, err := serve(context.Background(), server, input, lease, do, testExecute, time.Now)
+			done <- finish{r, err}
+		}()
+		client, err := NewClient(context.Background(), clientChannel(conn, authorityService), lease)
+		if err != nil {
+			t.Fatal(err)
+		}
+		x, y, err := client.MoveWithPosition(context.Background(), 1, 2)
+		if failed {
+			if certainty, ok := application.InjectionCertaintyOf(err); !ok || certainty != application.InjectionOutcomeUnknown {
+				t.Fatal("applied motion followed by failed snapshot became unapplied")
+			}
+		} else if err != nil || x != 11 || y != 22 {
+			t.Fatal("motion snapshot lost", err)
+		}
+		_ = client.Close()
+		result := await(t, done)
+		if scopes != 1 || input.x != 11 || input.y != 22 || (result.err != nil) != failed {
+			t.Fatal("motion snapshot repeated operation or hid failure")
+		}
 	}
 }

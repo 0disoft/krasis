@@ -218,3 +218,29 @@ pins and reconnect identity; real two-device consent/update/PIN behavior remains
 to be checked on the final g141 bundle. g141 also observes the installer's
 existing exclusive transaction lock without creating or deleting it, fencing
 installation and agent startup after reopening an app during setup.
+
+## g173: Cursor entry follows the selected protected backend
+
+The g172 operator reports working Esc/click in a B PIN dialog but a disconnect
+after returning to A and entering B again while the dialog remains open. In the
+2026-10-05 exports (A 12:20:50Z, B 12:20:47Z), exact revision
+`a355d82b998e6f7b21e39270c96c6a03c78c0491` has four B entry injection failures
+with outcome unknown and four control-dispatch reconnects. A has four remote EOF
+reconnects. The diagnostics identify the entry stage, not the failing native
+cursor call. Source inspection finds ordinary GetCursorPos/SetCursorPos still
+used by the protected adapter's entry path.
+
+g173 routes cursor snapshots, entry writes, verification and rollback through
+the selected lease-bound worker under its existing desktop scope. A lost write
+ACK retains an unverified pending transaction; an explicitly not-applied write
+clears it. Backend/capability errors never fall back to ordinary cursor APIs.
+Relative motion returns its position in the same ACK for return tracking.
+Portable input keeps its local cursor APIs. The native worker port does not
+need a separate combined method: its server performs move and snapshot in one
+scope without another IPC request.
+
+Agent and installed worker images must match through the existing attended
+refresh lifecycle. No installer, ACL, certificate, policy or consent behavior
+changes. Hosted regression checks cover delegation, repeated entry/rollback,
+lost ACK certainty, binding, bounds, cancellation and single-roundtrip motion.
+Actual PIN-open A-B-A-B connection continuity awaits the g173 device trial.

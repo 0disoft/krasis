@@ -30,6 +30,7 @@ const (
 	opClose
 	opCursorRead
 	opCursorSet
+	opMoveRead
 )
 
 type request struct {
@@ -67,7 +68,7 @@ func readRequest(reader io.Reader) (request, error) {
 		if value.token.Validate() != nil {
 			return request{}, ErrProtocol
 		}
-	case opMove, opWheel, opCursorSet:
+	case opMove, opWheel, opCursorSet, opMoveRead:
 		if data[6] != 0 {
 			return request{}, ErrProtocol
 		}
@@ -103,7 +104,7 @@ func encodeRequest(value request) ([requestSize]byte, error) {
 			return data, ErrProtocol
 		}
 		binary.BigEndian.PutUint32(data[32:36], value.token.Code)
-	case opMove, opWheel, opCursorSet:
+	case opMove, opWheel, opCursorSet, opMoveRead:
 		binary.BigEndian.PutUint32(data[32:36], uint32(value.x))
 		binary.BigEndian.PutUint32(data[36:40], uint32(value.y))
 	case opHeartbeat, opClose, opCursorRead:
@@ -126,7 +127,8 @@ type response struct {
 }
 
 func writeResponse(writer io.Writer, value response) error {
-	var data [responseSize]byte
+	var data [responseSize + 8]byte
+	size := responseSize
 	copy(data[:4], "KRA1")
 	data[4], data[5], data[6], data[7] = 1, byte(value.op), value.status, value.certainty
 	binary.BigEndian.PutUint64(data[8:16], value.sequence)
@@ -157,20 +159,16 @@ func writeResponse(writer io.Writer, value response) error {
 		data[4] = 3
 		binary.BigEndian.PutUint32(data[20:24], detail)
 	}
-	n, err := writer.Write(data[:])
-	if err == nil && n != len(data) {
-		return io.ErrShortWrite
+	if (value.op == opCursorRead || value.op == opMoveRead) && value.status == 0 {
+		// Cursor snapshots add eight private bytes in the same pipe write.
+		// Other ACKs retain their existing size; coordinates never enter logs.
+		binary.BigEndian.PutUint32(data[responseSize:responseSize+4], uint32(value.x))
+		binary.BigEndian.PutUint32(data[responseSize+4:], uint32(value.y))
+		size += 8
 	}
-	if err == nil && value.op == opCursorRead && value.status == 0 {
-		// Only this operation has an eight-byte coordinate suffix. Input ACKs
-		// retain their existing size; coordinates never enter diagnostic records.
-		var position [8]byte
-		binary.BigEndian.PutUint32(position[:4], uint32(value.x))
-		binary.BigEndian.PutUint32(position[4:], uint32(value.y))
-		n, err = writer.Write(position[:])
-		if err == nil && n != len(position) {
-			return io.ErrShortWrite
-		}
+	n, err := writer.Write(data[:size])
+	if err == nil && n != size {
+		return io.ErrShortWrite
 	}
 	return err
 }
@@ -205,7 +203,7 @@ func decodeResponse(data [responseSize]byte) (response, error) {
 			return response{}, ErrProtocol
 		}
 	}
-	if value.sequence == 0 || value.op < opPress || value.op > opCursorSet || value.op == opClose || value.status > 1 || value.inserted > value.requested {
+	if value.sequence == 0 || value.op < opPress || value.op > opMoveRead || value.op == opClose || value.status > 1 || value.inserted > value.requested {
 		return response{}, ErrProtocol
 	}
 	if value.status == 0 {

@@ -11,7 +11,8 @@ import (
 
 // NewInjectionPort supplies native injection only. The installed worker owns
 // authorization, desktop binding and pressed-state recovery; the resident agent
-// owns cursor entry and return tracking. This port grants no input authority.
+// owns cursor entry transactions and return tracking, using this port's cursor
+// I/O under the same worker scope. This port grants no input authority.
 func NewInjectionPort() application.InputPort { return nativeInjectionPort{} }
 
 type nativeInjectionPort struct{}

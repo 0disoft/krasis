@@ -489,9 +489,17 @@ process or desktop selector is accepted. Cursor set is refused while the worker
 owns pressed keys/buttons. The native backend must validate the target against
 its current display bounds. Missing cursor capability fails without fallback.
 
-Requests remain 48 bytes. A successful cursor-read ACK appends exactly eight
-bytes (two signed 32-bit coordinates) to the existing 24-byte response; other
+Requests remain 48 bytes. A successful cursor-read or move-with-position ACK
+appends exactly eight bytes (two signed 32-bit coordinates) to the existing
+24-byte response, emitted in one pipe write; other
 ACKs retain their existing size. A truncated suffix, wrong operation/sequence or
 lost ACK closes the channel without replay. Coordinates stay in the private local
 channel and are never added to product logs or support exports. Agent and worker
 must be updated together before enabling this capability in the product adapter.
+
+Move-with-position applies relative motion and snapshots the resulting cursor
+within one authorized desktop scope and one request/ACK roundtrip. A snapshot
+failure after successful motion is outcome-unknown, never not-applied. The
+ordinary agent uses the matching ACK position for return-boundary detection
+without a second cursor request. Entry read/set/verification and rollback retain
+their transaction semantics, with all cursor I/O delegated to the selected worker.

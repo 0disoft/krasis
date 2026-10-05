@@ -46,9 +46,9 @@ func (adapter *InputAdapter) PrepareEntry(ctx context.Context, sourceEdge contro
 	if state.pending {
 		return fmt.Errorf("%w: another cursor entry is pending", ErrCursorEntryState)
 	}
-	before, err := cursorPosition()
+	before, err := adapter.readCursor(ctx)
 	if err != nil {
-		return fmt.Errorf("%w: snapshot cursor before entry: %v", ErrInputInjection, err)
+		return fmt.Errorf("%w: snapshot cursor before entry: %w", ErrInputInjection, err)
 	}
 	x, y, err := cursorEntryPoint(
 		sourceEdge,
@@ -60,16 +60,24 @@ func (adapter *InputAdapter) PrepareEntry(ctx context.Context, sourceEdge contro
 	if err != nil {
 		return err
 	}
-	result, _, callErr := callSetCursorPos(uintptr(uint32(x)), uintptr(uint32(y)))
-	if result == 0 {
-		return fmt.Errorf("%w: SetCursorPos failed: %v", ErrInputInjection, callErr)
+	if adapter.injection != nil {
+		// A lost worker ACK may follow an applied cursor write. Preserve a
+		// pending, unverified entry instead of claiming rollback was unnecessary.
+		state.pending = true
+		state.previousX, state.previousY = before.X, before.Y
+	}
+	if err := adapter.writeCursor(ctx, x, y); err != nil {
+		if certainty, known := application.InjectionCertaintyOf(err); known && certainty == application.InjectionNotApplied {
+			state.clear()
+		}
+		return err
 	}
 	state.pending = true
 	state.previousX = before.X
 	state.previousY = before.Y
-	position, err := cursorPosition()
+	position, err := adapter.readCursor(ctx)
 	if err != nil {
-		return fmt.Errorf("%w: verify cursor entry: %v", ErrInputInjection, err)
+		return fmt.Errorf("%w: verify cursor entry: %w", ErrInputInjection, err)
 	}
 	state.enteredKnown = true
 	state.enteredX = position.X
@@ -100,23 +108,19 @@ func (adapter *InputAdapter) RollbackEntry(ctx context.Context) (application.Cur
 	if !state.enteredKnown {
 		return "", fmt.Errorf("%w: entry position could not be verified", ErrCursorEntryState)
 	}
-	current, err := cursorPosition()
+	current, err := adapter.readCursor(ctx)
 	if err != nil {
-		return "", fmt.Errorf("%w: inspect cursor before rollback: %v", ErrCursorEntryState, err)
+		return "", fmt.Errorf("%w: inspect cursor before rollback: %w", ErrCursorEntryState, err)
 	}
 	if current.X != state.enteredX || current.Y != state.enteredY {
 		return application.CursorRollbackNotRestored, nil
 	}
-	result, _, callErr := callSetCursorPos(
-		uintptr(uint32(state.previousX)),
-		uintptr(uint32(state.previousY)),
-	)
-	if result == 0 {
-		return "", fmt.Errorf("%w: SetCursorPos rollback failed: %v", ErrCursorEntryState, callErr)
+	if err := adapter.writeCursor(ctx, state.previousX, state.previousY); err != nil {
+		return "", errors.Join(ErrCursorEntryState, err)
 	}
-	restored, err := cursorPosition()
+	restored, err := adapter.readCursor(ctx)
 	if err != nil {
-		return "", fmt.Errorf("%w: verify cursor rollback: %v", ErrCursorEntryState, err)
+		return "", fmt.Errorf("%w: verify cursor rollback: %w", ErrCursorEntryState, err)
 	}
 	if restored.X != state.previousX || restored.Y != state.previousY {
 		return "", fmt.Errorf("%w: cursor rollback was clipped to (%d,%d)", ErrCursorEntryState, restored.X, restored.Y)
@@ -147,8 +151,15 @@ func (adapter *InputAdapter) Move(ctx context.Context, deltaX, deltaY int32) err
 		return err
 	}
 	var injectErr error
+	var position point
+	positioned := false
 	if adapter.injection != nil {
-		injectErr = adapter.injection.Move(ctx, deltaX, deltaY)
+		if port, ok := adapter.injection.(application.PositionedMovePort); ok {
+			position.X, position.Y, injectErr = port.MoveWithPosition(ctx, deltaX, deltaY)
+			positioned = true
+		} else {
+			injectErr = adapter.injection.Move(ctx, deltaX, deltaY)
+		}
 	} else {
 		injectErr = sendInputs(ctx, []input{event})
 	}
@@ -157,9 +168,11 @@ func (adapter *InputAdapter) Move(ctx context.Context, deltaX, deltaY int32) err
 	}
 	started := time.Now()
 	defer func() { handoff.Record(ctx, handoff.CursorPostprocess, time.Since(started)) }()
-	position, err := cursorPosition()
-	if err != nil {
-		return err
+	if !positioned {
+		position, err = adapter.readCursor(ctx)
+		if err != nil {
+			return err
+		}
 	}
 	return adapter.observeReturnPosition(position.X, systemMetric(smXVIRTUALSCREEN), systemMetric(smCXVIRTUALSCREEN))
 }

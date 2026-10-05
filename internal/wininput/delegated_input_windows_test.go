@@ -12,8 +12,10 @@ import (
 )
 
 type delegatedInput struct {
-	calls []string
-	err   error
+	calls    []string
+	err      error
+	cursor   func() point
+	position point
 }
 
 func (p *delegatedInput) Press(context.Context, control.PressedToken) error {
@@ -33,6 +35,21 @@ func (p *delegatedInput) Wheel(context.Context, int32, int32) error {
 	return p.err
 }
 
+func (p *delegatedInput) CursorPosition(context.Context) (int32, int32, error) {
+	position := p.position
+	if p.cursor != nil {
+		position = p.cursor()
+	}
+	return position.X, position.Y, p.err
+}
+func (p *delegatedInput) SetCursorPosition(_ context.Context, x, y int32) error {
+	p.calls = append(p.calls, "cursor-set")
+	if p.err == nil {
+		p.position = point{X: x, Y: y}
+	}
+	return p.err
+}
+
 func TestDelegatedInputPreservesReturnTrackingWithoutLocalInjection(t *testing.T) {
 	oldSend, oldCursor := callSendInput, callGetCursorPos
 	callSendInput = func(uintptr, *input, uintptr) (uintptr, uintptr, error) {
@@ -40,9 +57,12 @@ func TestDelegatedInputPreservesReturnTrackingWithoutLocalInjection(t *testing.T
 		return 0, 0, nil
 	}
 	x := int32(0)
-	callGetCursorPos = func(p *point) (uintptr, uintptr, error) { p.X = x; return 1, 0, nil }
+	callGetCursorPos = func(*point) (uintptr, uintptr, error) {
+		t.Fatal("delegated motion queried local cursor")
+		return 0, 0, nil
+	}
 	t.Cleanup(func() { callSendInput = oldSend; callGetCursorPos = oldCursor })
-	port := &delegatedInput{}
+	port := &delegatedInput{cursor: func() point { return point{X: x} }}
 	adapter, err := NewInputAdapterWithInjection(10, 1920, port)
 	if err != nil {
 		t.Fatal(err)
