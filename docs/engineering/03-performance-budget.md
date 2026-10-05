@@ -810,3 +810,25 @@ remain pending. Device timings are process-local and overlapping spans are not a
 
 The nine-package desktop Go tests, vet with unsafeptr=false and diff whitespace
 check passed locally. Packaging and bundle verification are separate checks.
+
+## g169 atomic rejection observation
+
+Final review found a collector-retirement gap in g168: recording the optional
+category before detach and the fallback outcome after detach could emit a partial
+profile if the collector ended between those writes. g169 retains the category in
+the owner's local numeric return value until cleanup completes, then records the
+category and final result/stage together in one collector update. If the profile
+ends during cleanup, neither field is recorded. First write freezes the complete
+pair, including an unobserved category, so later cleanup cannot fill it retroactively.
+The observation still occurs before detachment; native query counts, call order,
+ownership checks and restore outcomes are unchanged from g168. The collector lock
+for storing the category now runs after detachment.
+
+A regression test retires the collector from the detach stub and checks that the
+emitted summary remains valid with no partial focus evidence, while the original
+API rejection and detach cleanup are retained. Packaging did not activate g168;
+g169 is the intended device-test bundle. Real-device delay, focus recovery and PIN
+behavior remain unverified.
+
+The nine-package desktop Go tests, vet with unsafeptr=false and diff whitespace
+check passed locally. Packaging and bundle verification are separate checks.

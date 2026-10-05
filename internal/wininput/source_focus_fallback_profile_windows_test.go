@@ -234,3 +234,28 @@ func TestRejectedForegroundQueryRequiresLiveSourceProfile(t *testing.T) {
 		})
 	}
 }
+
+func TestRejectedForegroundRetirementDuringDetachCannotEmitPartialEvidence(t *testing.T) {
+	restore := stubSourceWheelCaptureActivation(t)
+	defer restore()
+	var summary handoff.Summary
+	c := handoff.New(func(s handoff.Summary) { summary = s })
+	ctx := handoff.WithSession(context.Background(), c)
+	p := handoff.Begin(ctx, "source", "session", "epoch", time.Now())
+	sourceWheelCaptureGetForeground = func() uintptr { return 10 }
+	sourceWheelCaptureSetForeground = func(uintptr) error { return errors.New("set rejection") }
+	sourceWheelCaptureCurrentThread = func() uint32 { return 11 }
+	sourceWheelCaptureWindowThread = func(uintptr) (uint32, error) { return 22, nil }
+	sourceWheelCaptureProbeForeground = func(uintptr) error { return nil }
+	sourceWheelCaptureAttachThreads = func(_, _ uint32, attach bool) error {
+		if !attach {
+			handoff.EndSession(ctx)
+		}
+		return nil
+	}
+	current := &sourceWheelCaptureRun{window: 10, savedFocus: 20}
+	result, err := current.restoreFocusFallbackProfile(p)
+	if result != SourceFocusRestoreFallbackAPIRejected || err == nil || !summary.Valid() || summary.Focus != nil || current.attachedSource != 0 {
+		t.Fatal("retirement emitted partial rejection evidence or changed cleanup", result, err, summary.Focus)
+	}
+}

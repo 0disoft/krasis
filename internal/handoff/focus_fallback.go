@@ -47,27 +47,22 @@ func validFocusFallback(result uint8, stage FocusFallbackStage) bool {
 }
 
 func RecordFocusFallback(ctx context.Context, result uint8, stage FocusFallbackStage) {
-	if !validFocusFallback(result, stage) {
+	RecordFocusFallbackObserved(ctx, result, stage, 0)
+}
+
+// Record the final outcome and optional pre-detach observation in one update.
+// Zero means unobserved; observing a target does not override native rejection.
+func RecordFocusFallbackObserved(ctx context.Context, result uint8, stage FocusFallbackStage, rejectedForeground uint8) {
+	if !validFocusFallback(result, stage) || rejectedForeground > 4 ||
+		(rejectedForeground != 0 && stage != FocusFallbackSetFailed && stage != FocusFallbackDetachFailed) {
 		return
 	}
 	updateFocus(ctx, func(p *FocusProfile) {
 		if !p.RestoreFallbackMeasured {
 			p.RestoreFallback, p.RestoreFallbackStage = result, stage
 			p.RestoreFallbackMeasured = true
-		}
-	})
-}
-
-// The existing SetForegroundWindow rejection is observed while queues are still
-// joined. It is a category, not ownership proof or a reason to change cleanup.
-func RecordFocusRestoreRejectedForeground(ctx context.Context, state uint8) {
-	if state < 1 || state > 4 {
-		return
-	}
-	updateFocus(ctx, func(p *FocusProfile) {
-		if !p.RestoreRejectedForegroundMeasured {
-			p.RestoreRejectedForeground = state
-			p.RestoreRejectedForegroundMeasured = true
+			p.RestoreRejectedForeground = rejectedForeground
+			p.RestoreRejectedForegroundMeasured = rejectedForeground != 0
 		}
 	})
 }

@@ -10,6 +10,7 @@ func TestFocusFallbackRetainsFirstResultAndRejectsLateOrExpiredOwners(t *testing
 	p := Begin(ctx, "source", "first", "epoch", time.Now())
 	RecordFocusFallback(p, 2, FocusFallbackProbeFailed)
 	RecordFocusFallback(p, 1, FocusFallbackSucceeded)
+	RecordFocusFallbackObserved(p, 4, FocusFallbackSetFailed, 3)
 	Finish(p, "error")
 	before := *(*out)[0].Focus
 	next := Begin(ctx, "source", "next", "epoch", time.Now())
@@ -17,7 +18,7 @@ func TestFocusFallbackRetainsFirstResultAndRejectsLateOrExpiredOwners(t *testing
 	c.started = time.Now().Add(-Window)
 	RecordFocusFallback(next, 3, FocusFallbackDetachFailed)
 	Finish(next, "error")
-	if before.RestoreFallback != 2 || before.RestoreFallbackStage != FocusFallbackProbeFailed || !before.RestoreFallbackMeasured || *(*out)[0].Focus != before || (*out)[1].Focus != nil {
+	if before.RestoreFallback != 2 || before.RestoreFallbackStage != FocusFallbackProbeFailed || !before.RestoreFallbackMeasured || before.RestoreRejectedForegroundMeasured || before.RestoreRejectedForeground != 0 || *(*out)[0].Focus != before || (*out)[1].Focus != nil {
 		t.Fatal("fallback overwritten, moved to next attempt or recorded after expiry", *out)
 	}
 	RecordFocusFallback(nil, 1, FocusFallbackSucceeded)
@@ -33,28 +34,27 @@ func TestFocusFallbackRetainsFirstResultAndRejectsLateOrExpiredOwners(t *testing
 func TestRejectedForegroundIsFirstWriteBoundedAndFrozen(t *testing.T) {
 	c, ctx, out := collected(t)
 	p := Begin(ctx, "source", "first", "epoch", time.Now())
-	RecordFocusRestoreRejectedForeground(p, 0)
-	RecordFocusRestoreRejectedForeground(p, 5)
-	RecordFocusRestoreRejectedForeground(p, 3)
-	RecordFocusRestoreRejectedForeground(p, 2)
-	RecordFocusFallback(p, 4, FocusFallbackSetFailed)
+	RecordFocusFallbackObserved(p, 4, FocusFallbackSetFailed, 5)
+	RecordFocusFallbackObserved(p, 1, FocusFallbackSucceeded, 2)
+	RecordFocusFallbackObserved(p, 4, FocusFallbackSetFailed, 3)
+	RecordFocusFallbackObserved(p, 4, FocusFallbackSetFailed, 2)
 	emit := Retire(p, "error")
 	before := *getAttempt(p).summary.Focus
 	getAttempt(p).summary.Focus.RestoreRejectedForeground = 4
-	RecordFocusRestoreRejectedForeground(p, 1)
+	RecordFocusFallbackObserved(p, 4, FocusFallbackSetFailed, 1)
 	emit()
 	if !before.Valid() || !before.RestoreRejectedForegroundMeasured || before.RestoreRejectedForeground != 3 || *(*out)[0].Focus != before {
 		t.Fatal("first rejection observation overwritten or not copied", *out)
 	}
 	next := Begin(ctx, "source", "next", "epoch", time.Now())
 	c.started = time.Now().Add(-Window)
-	RecordFocusRestoreRejectedForeground(next, 1)
+	RecordFocusFallbackObserved(next, 4, FocusFallbackSetFailed, 1)
 	Finish(next, "error")
 	c.started = time.Now()
 	receiver := Begin(ctx, "receiver", "receiver", "epoch", time.Now())
-	RecordFocusRestoreRejectedForeground(receiver, 1)
+	RecordFocusFallbackObserved(receiver, 4, FocusFallbackSetFailed, 1)
 	Finish(receiver, "ok")
-	RecordFocusRestoreRejectedForeground(nil, 1)
+	RecordFocusFallbackObserved(nil, 4, FocusFallbackSetFailed, 1)
 	if (*out)[1].Focus != nil || (*out)[2].Focus != nil {
 		t.Fatal("expired or foreign role accepted rejection observation", *out)
 	}
