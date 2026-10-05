@@ -4,10 +4,32 @@ import (
 	"context"
 
 	"github.com/0disoft/krasis/internal/application"
+	"github.com/0disoft/krasis/internal/control"
 )
 
 var _ application.CursorPositionPort = (*Client)(nil)
 var _ application.PositionedMovePort = (*Client)(nil)
+var _ application.CursorPlacementPort = (*Client)(nil)
+
+func (client *Client) PlaceCursor(ctx context.Context, x, y int32) (placement application.CursorPlacement, err error) {
+	err = client.performResponse(ctx, request{op: opCursorPlace, x: x, y: y}, func(ack response) {
+		placement = application.CursorPlacement{TargetX: ack.targetX, TargetY: ack.targetY, X: ack.x, Y: ack.y}
+	})
+	return
+}
+
+func placeCursorResponse(ctx context.Context, input application.InputPort, pressed *control.PressedState, command request, ack *response) error {
+	port, ok := input.(application.CursorPlacementPort)
+	if !ok || pressed.Count() != 0 {
+		return notSent(ErrProtocol)
+	}
+	placement, err := port.PlaceCursor(ctx, command.x, command.y)
+	if err != nil {
+		return err
+	}
+	ack.x, ack.y, ack.targetX, ack.targetY = placement.X, placement.Y, placement.TargetX, placement.TargetY
+	return nil
+}
 
 func (client *Client) CursorPosition(ctx context.Context) (x, y int32, err error) {
 	err = client.performResponse(ctx, request{op: opCursorRead}, func(ack response) { x, y = ack.x, ack.y })

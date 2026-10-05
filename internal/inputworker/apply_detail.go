@@ -28,6 +28,11 @@ func applyCommand(ctx context.Context, input application.InputPort, pressed *con
 	if command.op == opCursorRead {
 		return measureApplyPart(ack.applyDetail, 1, func() error { return readCursorResponse(ctx, input, ack) })
 	}
+	if command.op == opCursorPlace {
+		return measureApplyPart(ack.applyDetail, 0, func() error {
+			return placeCursorResponse(ctx, input, pressed, command, ack)
+		})
+	}
 	applyCtx := ctx
 	if command.submissionDetail {
 		applyCtx = handoff.WithWorkerApply(ctx, ack.applyDetail)

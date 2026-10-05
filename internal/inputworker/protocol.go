@@ -31,6 +31,7 @@ const (
 	opCursorRead
 	opCursorSet
 	opMoveRead
+	opCursorPlace
 )
 
 type request struct {
@@ -75,13 +76,13 @@ func readRequest(reader io.Reader) (request, error) {
 		if value.token.Validate() != nil {
 			return request{}, ErrProtocol
 		}
-	case opMove, opWheel, opCursorSet, opMoveRead:
+	case opMove, opWheel, opCursorSet, opMoveRead, opCursorPlace:
 		if data[6] != 0 {
 			return request{}, ErrProtocol
 		}
 		value.x = int32(binary.BigEndian.Uint32(data[32:36]))
 		value.y = int32(binary.BigEndian.Uint32(data[36:40]))
-		if value.op != opCursorSet && value.x == 0 && value.y == 0 {
+		if value.op != opCursorSet && value.op != opCursorPlace && value.x == 0 && value.y == 0 {
 			return request{}, ErrProtocol
 		}
 	case opHeartbeat, opClose, opCursorRead:
@@ -123,7 +124,7 @@ func encodeRequest(value request) ([requestSize]byte, error) {
 			return data, ErrProtocol
 		}
 		binary.BigEndian.PutUint32(data[32:36], value.token.Code)
-	case opMove, opWheel, opCursorSet, opMoveRead:
+	case opMove, opWheel, opCursorSet, opMoveRead, opCursorPlace:
 		binary.BigEndian.PutUint32(data[32:36], uint32(value.x))
 		binary.BigEndian.PutUint32(data[36:40], uint32(value.y))
 	case opHeartbeat, opClose, opCursorRead:
@@ -135,6 +136,7 @@ func encodeRequest(value request) ([requestSize]byte, error) {
 
 type response struct {
 	x, y                int32
+	targetX, targetY    int32
 	sequence            uint64
 	op                  operation
 	status              byte
@@ -147,7 +149,7 @@ type response struct {
 }
 
 func writeResponse(writer io.Writer, value response) error {
-	var data [responseSize + workerApplyDetailSize + workerSubmissionDetailSize + 8]byte
+	var data [responseSize + workerApplyDetailSize + workerSubmissionDetailSize + 16]byte
 	size := responseSize
 	copy(data[:4], "KRA1")
 	data[4], data[5], data[6], data[7] = 1, byte(value.op), value.status, value.certainty
@@ -189,12 +191,17 @@ func writeResponse(writer io.Writer, value response) error {
 			size += workerSubmissionDetailSize
 		}
 	}
-	if (value.op == opCursorRead || value.op == opMoveRead) && value.status == 0 {
+	if (value.op == opCursorRead || value.op == opMoveRead || value.op == opCursorPlace) && value.status == 0 {
 		// Cursor snapshots add eight private bytes in the same pipe write.
 		// Other ACKs retain their existing size; coordinates never enter logs.
 		binary.BigEndian.PutUint32(data[size:size+4], uint32(value.x))
 		binary.BigEndian.PutUint32(data[size+4:], uint32(value.y))
 		size += 8
+		if value.op == opCursorPlace {
+			binary.BigEndian.PutUint32(data[size:size+4], uint32(value.targetX))
+			binary.BigEndian.PutUint32(data[size+4:], uint32(value.targetY))
+			size += 8
+		}
 	}
 	n, err := writer.Write(data[:size])
 	if err == nil && n != size {
@@ -233,7 +240,7 @@ func decodeResponse(data [responseSize]byte) (response, error) {
 			return response{}, ErrProtocol
 		}
 	}
-	if value.sequence == 0 || value.op < opPress || value.op > opMoveRead || value.op == opClose || value.status > 1 || value.inserted > value.requested {
+	if value.sequence == 0 || value.op < opPress || value.op > opCursorPlace || value.op == opClose || value.status > 1 || value.inserted > value.requested {
 		return response{}, ErrProtocol
 	}
 	if value.status == 0 {

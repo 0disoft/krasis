@@ -14,3 +14,17 @@ type CursorPositionPort interface {
 type PositionedMovePort interface {
 	MoveWithPosition(context.Context, int32, int32) (int32, int32, error)
 }
+
+// CursorPlacement carries the backend's independently computed allowed target
+// and its readback. They are private cursor state, never diagnostic fields.
+// The caller must compare the two before committing an entry.
+type CursorPlacement struct {
+	TargetX, TargetY int32
+	X, Y             int32
+}
+
+// CursorPlacementPort places and inspects the cursor in one authorized backend
+// operation. It respects existing confinement without changing ClipCursor.
+type CursorPlacementPort interface {
+	PlaceCursor(context.Context, int32, int32) (CursorPlacement, error)
+}

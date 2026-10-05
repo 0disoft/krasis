@@ -27,7 +27,7 @@ func encodeWorkerSubmission(data []byte, p handoff.WorkerApplyProfile) {
 // Read the diagnostic and private cursor suffix together. A profiled cursor
 // response retains two reads and one write, with no extra request or roundtrip.
 func readResponseSuffix(reader io.Reader, version byte, value *response) error {
-	var data [workerApplyDetailSize + workerSubmissionDetailSize + 8]byte
+	var data [workerApplyDetailSize + workerSubmissionDetailSize + 16]byte
 	size := 0
 	if version >= 4 {
 		size = workerApplyDetailSize
@@ -35,9 +35,12 @@ func readResponseSuffix(reader io.Reader, version byte, value *response) error {
 	if version == 5 {
 		size += workerSubmissionDetailSize
 	}
-	cursor := (value.op == opCursorRead || value.op == opMoveRead) && value.status == 0
+	cursor := (value.op == opCursorRead || value.op == opMoveRead || value.op == opCursorPlace) && value.status == 0
 	if cursor {
 		size += 8
+		if value.op == opCursorPlace {
+			size += 8
+		}
 	}
 	if size == 0 {
 		return nil
@@ -70,6 +73,10 @@ func readResponseSuffix(reader io.Reader, version byte, value *response) error {
 	if cursor {
 		value.x = int32(binary.BigEndian.Uint32(data[offset : offset+4]))
 		value.y = int32(binary.BigEndian.Uint32(data[offset+4 : offset+8]))
+		if value.op == opCursorPlace {
+			value.targetX = int32(binary.BigEndian.Uint32(data[offset+8 : offset+12]))
+			value.targetY = int32(binary.BigEndian.Uint32(data[offset+12 : offset+16]))
+		}
 	}
 	return nil
 }
