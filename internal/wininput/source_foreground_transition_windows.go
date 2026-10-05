@@ -16,6 +16,14 @@ const sourceForegroundSentMessages = 0x00400000 // PM_QS_SENDMESSAGE | PM_NOREMO
 
 var callSourceForegroundMessages = procPeekMessageW.Call
 
+var callSourceCaptureActive = user32.NewProc("SetActiveWindow").Call
+
+// Used only on the capture owner thread with its own window. The previous
+// active HWND returned by Windows never proves actual foreground ownership.
+var sourceCapturePrepareActive = func(window uintptr) {
+	callSourceCaptureActive(window)
+}
+
 var sourceForegroundTransitionDispatch = func(window uintptr) {
 	if window == 0 {
 		return
@@ -39,6 +47,7 @@ func (current *sourceWheelCaptureRun) foregroundAfterTransition() (uintptr, erro
 		return 0, err
 	}
 	foreground := sourceWheelCaptureGetForeground()
+	prepared := false
 	for attempt := 0; foreground == 0 && attempt < sourceForegroundTransitionAttempts; attempt++ {
 		if err := current.err(); err != nil {
 			return 0, err
@@ -50,6 +59,24 @@ func (current *sourceWheelCaptureRun) foregroundAfterTransition() (uintptr, erro
 			return 0, err
 		}
 		foreground = sourceWheelCaptureGetForeground()
+		if foreground == 0 && current.window != 0 && current.attachedSource == 0 && !prepared {
+			// Prepare our queue's own active window once, only after a fresh
+			// NULL observation. Never activate savedFocus or join an unknown
+			// queue. This is not proof that the capture owns foreground.
+			if err := current.err(); err != nil {
+				return 0, err
+			}
+			prepared = true
+			sourceCapturePrepareActive(current.window)
+			if err := current.err(); err != nil {
+				return 0, err
+			}
+			sourceForegroundTransitionDispatch(current.window)
+			if err := current.err(); err != nil {
+				return 0, err
+			}
+			foreground = sourceWheelCaptureGetForeground()
+		}
 		if foreground == 0 && current.window != 0 {
 			// This runs on the capture owner thread after ordinary activation
 			// failed. Request focus only for that capture, not a saved app, and
@@ -74,6 +101,9 @@ func (current *sourceWheelCaptureRun) foregroundAfterTransition() (uintptr, erro
 			}
 			foreground = sourceWheelCaptureGetForeground()
 		}
+	}
+	if err := current.err(); err != nil {
+		return 0, err
 	}
 	if foreground == 0 {
 		return 0, ErrSourceForegroundUnavailable

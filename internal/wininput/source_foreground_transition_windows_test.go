@@ -77,7 +77,7 @@ func TestForegroundTransitionRemainsBoundedAndCannotUseSavedFocus(t *testing.T) 
 	sourceWheelCaptureAttachThreads = func(uint32, uint32, bool) error { t.Fatal("missing foreground attached a thread"); return nil }
 	current := &sourceWheelCaptureRun{window: 10, savedFocus: 20}
 	result, err := current.activateForegroundFallback()
-	if !errors.Is(err, ErrSourceForegroundUnavailable) || result != SourceForegroundFallbackAttachFailed || pauses != 5 || reads != 16 || requests != 5 || current.active.Load() {
+	if !errors.Is(err, ErrSourceForegroundUnavailable) || result != SourceForegroundFallbackAttachFailed || pauses != 5 || reads != 17 || requests != 5 || current.active.Load() {
 		t.Fatal("persistent missing foreground bypassed refusal or retry budget", result, err, pauses, reads)
 	}
 }
@@ -132,7 +132,7 @@ func TestForegroundTransitionCancellationDuringRequestCannotAuthorizeCapture(t *
 	sourceWheelCaptureGetForeground = func() uintptr { reads++; return 0 }
 	sourceWheelCaptureSetForeground = func(uintptr) error { requests++; current.setError(context.Canceled); return nil }
 	_, err := current.activateForegroundFallback()
-	if !errors.Is(err, context.Canceled) || requests != 1 || reads != 2 || current.active.Load() {
+	if !errors.Is(err, context.Canceled) || requests != 1 || reads != 3 || current.active.Load() {
 		t.Fatal("cancelled request continued native work or authorized capture", err, requests, reads)
 	}
 }
@@ -146,7 +146,7 @@ func TestForegroundTransitionCancellationStopsBeforeAnotherNativeOperation(t *te
 	stubForegroundTransitionPause(t, func(time.Duration) { pauses++; current.setError(context.Canceled) })
 	sourceWheelCaptureAttachThreads = func(uint32, uint32, bool) error { t.Fatal("cancelled transition attached a thread"); return nil }
 	_, err := current.activateForegroundFallback()
-	if !errors.Is(err, context.Canceled) || reads != 3 || pauses != 1 {
+	if !errors.Is(err, context.Canceled) || reads != 4 || pauses != 1 {
 		t.Fatal("cancelled transition kept retrying", err)
 	}
 }

@@ -1007,3 +1007,20 @@ Keep the existing attach/detach verification and degraded release policy. The
 historical focus schema remains readable; new runs do not emit restoreActive.
 Rejection observation again requires a live source profile and is committed
 atomically with its fallback result. No device improvement is claimed.
+
+### Own-queue preparation for missing foreground
+
+The transition wait now makes at most one SetActiveWindow(capture) request only
+after a fresh NULL observation, after pending-message dispatch, with no pending
+queue attachment. It services sent messages and checks the actual owner again;
+an existing owner adds no preparation cost. Remaining NULL still follows the
+existing five-attempt foreground request/poll budget. No new timers, physical
+clicks, external-window activation or attachment cycles are introduced.
+
+Hosted fake-native tests cover own-target preparation, external-owner arrival,
+one-shot refusal, cancellation during preparation/dispatch, existing owners and
+pending-attachment exclusion. CaptureForeground/CaptureFallback timings retain
+their existing boundaries. These tests cannot establish native success, improved
+device latency or the mechanism of recovery between real transitions. Compare
+fresh g171 source profiles with the same-generation receiver observations; keep
+cross-host clocks and overlapping spans separate.

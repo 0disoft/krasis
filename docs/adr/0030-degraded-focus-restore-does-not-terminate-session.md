@@ -121,6 +121,22 @@ another thread sets the calling thread's active status to NULL. The existing
 SetForegroundWindow/attach/detach path and degraded-hide policy remain. Historical
 restoreActive fields remain readable, but g171 does not emit them.
 
+## g171 prepare the capture's own active window
+
+If foreground is still NULL after servicing pending activation messages, prepare
+the capture owner's own window with SetActiveWindow once per transition wait.
+The window must exist and no pending input-queue attachment may remain. Service
+sent activation messages again and resample actual foreground before requesting
+SetForegroundWindow. A newly observed external owner is returned to the existing
+validated fallback; preparation never activates savedFocus or joins any queue.
+Cancellation before or after preparation/dispatch stops further requests.
+
+SetActiveWindow only prepares this thread's active-window state. Its return value
+does not authorize remote capture; fresh foreground verification and the existing
+active-commit gate remain required. The five 10ms polling attempts and outer
+command deadline remain unchanged. There is no additional polling sleep or retry
+cycle. Native-call latency and device improvement still require observation.
+
 ## 참고
 
 - [SetActiveWindow](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setactivewindow)
