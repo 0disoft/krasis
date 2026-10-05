@@ -115,7 +115,7 @@ func TestClientRequestsWorkerApplyOnlyForTrackedInputAndKeepsMatchingACK(t *test
 				result <- err
 				return
 			}
-			if r.applyDetail != (i == 1) {
+			if r.applyDetail != (i == 1) || r.submissionDetail != r.applyDetail {
 				result <- errors.New("detail escaped tracked input")
 				return
 			}

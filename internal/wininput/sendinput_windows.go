@@ -5,9 +5,11 @@ package wininput
 import (
 	"context"
 	"errors"
+	"time"
 	"unsafe"
 
 	"github.com/0disoft/krasis/internal/application"
+	"github.com/0disoft/krasis/internal/handoff"
 )
 
 const (
@@ -107,11 +109,19 @@ func sendInputs(ctx context.Context, events []input) error {
 	if len(events) == 0 {
 		return injectionFailure(application.InjectionNotApplied, 0, 0, errors.New("at least one event is required"))
 	}
+	probe := handoff.WorkerApplyProbe(ctx)
+	var started time.Time
+	if probe != nil {
+		started = time.Now()
+	}
 	sent, _, callErr := callSendInput(
 		uintptr(len(events)),
 		&events[0],
 		unsafe.Sizeof(input{}),
 	)
+	if probe != nil {
+		probe.RecordSubmission(time.Since(started))
+	}
 	inserted := int(sent)
 	if inserted == len(events) {
 		return nil

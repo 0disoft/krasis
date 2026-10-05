@@ -149,6 +149,7 @@ func (client *Client) performResponse(ctx context.Context, command request, obse
 	}
 	if command.op != opHeartbeat {
 		command.applyDetail = handoff.WantWorkerApply(ctx)
+		command.submissionDetail = command.applyDetail
 	}
 	deadline := time.Now().Add(IdleTimeout)
 	if client.lease.ExpiresAt.Before(deadline) {

@@ -34,12 +34,13 @@ const (
 )
 
 type request struct {
-	op          operation
-	sequence    uint64
-	binding     [16]byte
-	token       control.PressedToken
-	x, y        int32
-	applyDetail bool
+	op               operation
+	sequence         uint64
+	binding          [16]byte
+	token            control.PressedToken
+	x, y             int32
+	applyDetail      bool
+	submissionDetail bool
 }
 
 func readRequest(reader io.Reader) (request, error) {
@@ -47,11 +48,12 @@ func readRequest(reader io.Reader) (request, error) {
 	if _, err := io.ReadFull(reader, data[:]); err != nil {
 		return request{}, err
 	}
-	if string(data[:4]) != "KRI1" || (data[4] != 1 && data[4] != 2) || data[4] == 1 && data[7] != 0 || data[4] == 2 && data[7] != 1 || binary.BigEndian.Uint64(data[40:]) != 0 {
+	if string(data[:4]) != "KRI1" || (data[4] != 1 && data[4] != 2) || data[4] == 1 && data[7] != 0 || data[4] == 2 && data[7] != 1 && data[7] != 3 || binary.BigEndian.Uint64(data[40:]) != 0 {
 		return request{}, ErrProtocol
 	}
 	value := request{op: operation(data[5]), sequence: binary.BigEndian.Uint64(data[8:16])}
 	value.applyDetail = data[4] == 2
+	value.submissionDetail = value.applyDetail && data[7] == 3
 	if value.applyDetail && (value.op == opHeartbeat || value.op == opClose) {
 		return request{}, ErrProtocol
 	}
@@ -96,11 +98,17 @@ func encodeRequest(value request) ([requestSize]byte, error) {
 	var data [requestSize]byte
 	copy(data[:4], "KRI1")
 	data[4], data[5] = 1, byte(value.op)
+	if value.submissionDetail && !value.applyDetail {
+		return data, ErrProtocol
+	}
 	if value.applyDetail {
 		if value.op == opHeartbeat || value.op == opClose {
 			return data, ErrProtocol
 		}
 		data[4], data[7] = 2, 1
+		if value.submissionDetail {
+			data[7] = 3
+		}
 	}
 	binary.BigEndian.PutUint64(data[8:16], value.sequence)
 	copy(data[16:32], value.binding[:])
@@ -139,7 +147,7 @@ type response struct {
 }
 
 func writeResponse(writer io.Writer, value response) error {
-	var data [responseSize + workerApplyDetailSize + 8]byte
+	var data [responseSize + workerApplyDetailSize + workerSubmissionDetailSize + 8]byte
 	size := responseSize
 	copy(data[:4], "KRA1")
 	data[4], data[5], data[6], data[7] = 1, byte(value.op), value.status, value.certainty
@@ -175,6 +183,11 @@ func writeResponse(writer io.Writer, value response) error {
 		data[4] = 4
 		encodeWorkerApplyDetail(data[responseSize:responseSize+workerApplyDetailSize], *value.applyDetail)
 		size += workerApplyDetailSize
+		if value.applyDetail.SubmissionCalls != 0 {
+			data[4] = 5
+			encodeWorkerSubmission(data[size:size+workerSubmissionDetailSize], *value.applyDetail)
+			size += workerSubmissionDetailSize
+		}
 	}
 	if (value.op == opCursorRead || value.op == opMoveRead) && value.status == 0 {
 		// Cursor snapshots add eight private bytes in the same pipe write.
@@ -191,7 +204,7 @@ func writeResponse(writer io.Writer, value response) error {
 }
 
 func decodeResponse(data [responseSize]byte) (response, error) {
-	if string(data[:4]) != "KRA1" || data[4] < 1 || data[4] > 4 || (data[4] < 3 && data[23] != 0) {
+	if string(data[:4]) != "KRA1" || data[4] < 1 || data[4] > 5 || (data[4] < 3 && data[23] != 0) {
 		return response{}, ErrProtocol
 	}
 	value := response{op: operation(data[5]), status: data[6], certainty: data[7],

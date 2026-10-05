@@ -14,6 +14,11 @@ type WorkerApplyProfile struct {
 	Micros    [2]uint32 `json:"micros"`
 	Measured  uint8     `json:"measured"`
 	Saturated uint8     `json:"saturated,omitempty"`
+	// Submission is nested inside apply, not an additional disjoint part.
+	// Calls is 0 (absent), 1 (measured), or 2 (ambiguous; drop diagnostics).
+	SubmissionMicros    uint32 `json:"submissionMicros,omitempty"`
+	SubmissionCalls     uint8  `json:"submissionCalls,omitempty"`
+	SubmissionSaturated bool   `json:"submissionSaturated,omitempty"`
 }
 
 func (p WorkerApplyProfile) Valid() bool {
@@ -24,6 +29,12 @@ func (p WorkerApplyProfile) Valid() bool {
 		if n > uint32(Window.Microseconds()) || p.Measured&(1<<i) == 0 && n != 0 || p.Saturated&(1<<i) != 0 && n != uint32(Window.Microseconds()) {
 			return false
 		}
+	}
+	if p.SubmissionCalls > 1 || p.SubmissionCalls == 0 && (p.SubmissionMicros != 0 || p.SubmissionSaturated) {
+		return false
+	}
+	if p.SubmissionCalls == 1 && (p.Measured&1 == 0 || p.SubmissionMicros > p.Micros[0] || p.SubmissionSaturated && (p.SubmissionMicros != uint32(Window.Microseconds()) || p.Saturated&1 == 0)) {
+		return false
 	}
 	return true
 }
