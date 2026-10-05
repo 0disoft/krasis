@@ -9,9 +9,9 @@ import (
 	"github.com/0disoft/krasis/internal/handoff"
 )
 
-// Activation passes nil. Restore diagnostics add one foreground observation
-// only on a live profiled SetForegroundWindow rejection, before detachment.
-func (current *sourceWheelCaptureRun) setForegroundWithThreadAttachDetailed(targetWindow, peerWindow uintptr, profile context.Context) (foregroundThreadFallbackResult, handoff.FocusFallbackStage, uint8, error) {
+// activeRestore is non-nil only for restoration. Its numeric result never
+// authorizes ownership; actual foreground must survive detachment.
+func (current *sourceWheelCaptureRun) setForegroundWithThreadAttachDetailed(targetWindow, peerWindow uintptr, profile context.Context, activeRestore *uint8) (foregroundThreadFallbackResult, handoff.FocusFallbackStage, uint8, error) {
 	if current.attachedSource != 0 {
 		return foregroundThreadFallbackDetachFailed, handoff.FocusFallbackPendingDetach, 0, ErrSourceCaptureThreadDetachFailed
 	}
@@ -45,8 +45,23 @@ func (current *sourceWheelCaptureRun) setForegroundWithThreadAttachDetailed(targ
 	}
 	verified := foregroundErr == nil && sourceWheelCaptureGetForeground() == targetWindow
 	var rejectedForeground uint8
-	if foregroundErr != nil && foregroundStage == handoff.FocusFallbackSetFailed && handoff.FocusEnabled(profile) {
-		rejectedForeground = sourceFocusState(sourceWheelCaptureGetForeground(), current.window, current.savedFocus)
+	if foregroundErr != nil && foregroundStage == handoff.FocusFallbackSetFailed && (activeRestore != nil || handoff.FocusEnabled(profile)) {
+		foreground := sourceWheelCaptureGetForeground()
+		rejectedForeground = sourceFocusState(foreground, current.window, current.savedFocus)
+		// One queue-local activation, only while our capture still owns
+		// foreground and the responsive saved target remains valid. This never
+		// runs for capture activation, NULL foreground or an external owner.
+		if activeRestore != nil && foreground == current.window && current.window != 0 &&
+			targetWindow == current.savedFocus && peerWindow == targetWindow && targetWindow != current.window &&
+			current.err() == nil && sourceWheelCaptureIsWindow(targetWindow) && sourceWheelCaptureIsVisible(targetWindow) &&
+			sourceWheelCaptureIsEnabled(targetWindow) && sourceWheelCaptureGetForeground() == current.window && current.err() == nil {
+			sourceWheelCaptureSetActive(targetWindow)
+			*activeRestore = 2 // requested, not verified
+			if sourceWheelCaptureGetForeground() == targetWindow {
+				*activeRestore = 1 // verified while joined, not final ownership proof
+				verified, foregroundErr = true, nil
+			}
+		}
 	}
 	detachErr := current.detachForegroundThreads()
 	if detachErr != nil {
@@ -56,25 +71,25 @@ func (current *sourceWheelCaptureRun) setForegroundWithThreadAttachDetailed(targ
 		return foregroundThreadFallbackAPIRejected, foregroundStage, rejectedForeground, foregroundErr
 	}
 	if err := current.err(); err != nil {
-		return foregroundThreadFallbackVerificationLost, handoff.FocusFallbackTerminalAfterDetach, 0, err
+		return foregroundThreadFallbackVerificationLost, handoff.FocusFallbackTerminalAfterDetach, rejectedForeground, err
 	}
 	// Observation while queues were joined is not final proof after detachment.
 	if verified && sourceWheelCaptureGetForeground() != targetWindow {
 		if err := current.err(); err != nil {
-			return foregroundThreadFallbackVerificationLost, handoff.FocusFallbackTerminalDuringCompletion, 0, err
+			return foregroundThreadFallbackVerificationLost, handoff.FocusFallbackTerminalDuringCompletion, rejectedForeground, err
 		}
 		if targetWindow == current.window {
 			sourceForegroundTransitionDispatch(targetWindow)
 		} else if err := sourceWheelCaptureProbeForeground(targetWindow); err != nil {
-			return foregroundThreadFallbackVerificationLost, handoff.FocusFallbackCompletionProbeFailed, 0, err
+			return foregroundThreadFallbackVerificationLost, handoff.FocusFallbackCompletionProbeFailed, rejectedForeground, err
 		}
 		if err := current.err(); err != nil {
-			return foregroundThreadFallbackVerificationLost, handoff.FocusFallbackTerminalDuringCompletion, 0, err
+			return foregroundThreadFallbackVerificationLost, handoff.FocusFallbackTerminalDuringCompletion, rejectedForeground, err
 		}
 		verified = sourceWheelCaptureGetForeground() == targetWindow
 	}
 	if !verified {
-		return foregroundThreadFallbackVerificationLost, handoff.FocusFallbackVerificationLost, 0, errors.New("foreground fallback target was not verified")
+		return foregroundThreadFallbackVerificationLost, handoff.FocusFallbackVerificationLost, rejectedForeground, errors.New("foreground fallback target was not verified")
 	}
-	return foregroundThreadFallbackSucceeded, handoff.FocusFallbackSucceeded, 0, nil
+	return foregroundThreadFallbackSucceeded, handoff.FocusFallbackSucceeded, rejectedForeground, nil
 }

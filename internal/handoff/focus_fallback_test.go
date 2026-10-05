@@ -124,3 +124,43 @@ func TestFocusFallbackValidationChecksPresenceAndResultStagePairs(t *testing.T) 
 		}
 	}
 }
+
+func TestActiveRestoreEvidencePairsFinalResultAndFreezesWithFallback(t *testing.T) {
+	_, ctx, out := collected(t)
+	p := Begin(ctx, "source", "s", "e", time.Now())
+	RecordFocusFallbackActive(p, 1, FocusFallbackSucceeded, 2, 1)
+	RecordFocusFallbackActive(p, 4, FocusFallbackSetFailed, 2, 2)
+	emit := Retire(p, "ok")
+	before := *getAttempt(p).summary.Focus
+	getAttempt(p).summary.Focus.RestoreActive = 2
+	emit()
+	if !before.Valid() || before.RestoreActive != 1 || !before.RestoreActiveMeasured || *(*out)[0].Focus != before {
+		t.Fatal("active restore evidence changed after first result", *out)
+	}
+	for stage := FocusFallbackSucceeded; stage <= FocusFallbackVerificationLost; stage++ {
+		for active := uint8(1); active <= 2; active++ {
+			for result := uint8(1); result <= 5; result++ {
+				p := FocusProfile{Schema: 1, RestoreFallback: result, RestoreFallbackStage: stage, RestoreFallbackMeasured: true,
+					RestoreRejectedForeground: 2, RestoreRejectedForegroundMeasured: true, RestoreActive: active, RestoreActiveMeasured: true}
+				want := validFocusFallback(result, stage) && ((active == 1 && (result == 1 || result == 5 || stage == FocusFallbackDetachFailed)) ||
+					(active == 2 && (stage == FocusFallbackSetFailed || stage == FocusFallbackDetachFailed)))
+				if p.Valid() != want {
+					t.Fatal("active restore contradicts final exit", p)
+				}
+			}
+		}
+	}
+	for _, mutate := range []func(*FocusProfile){
+		func(p *FocusProfile) { p.RestoreActiveMeasured = false },
+		func(p *FocusProfile) { p.RestoreActive = 0 },
+		func(p *FocusProfile) { p.RestoreActive = 3 },
+		func(p *FocusProfile) { p.RestoreRejectedForeground = 3 },
+		func(p *FocusProfile) { p.RestoreRejectedForegroundMeasured = false },
+	} {
+		bad := before
+		mutate(&bad)
+		if bad.Valid() {
+			t.Fatal("invalid active restore accepted", bad)
+		}
+	}
+}

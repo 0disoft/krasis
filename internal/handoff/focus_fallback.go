@@ -53,8 +53,25 @@ func RecordFocusFallback(ctx context.Context, result uint8, stage FocusFallbackS
 // Record the final outcome and optional pre-detach observation in one update.
 // Zero means unobserved; observing a target does not override native rejection.
 func RecordFocusFallbackObserved(ctx context.Context, result uint8, stage FocusFallbackStage, rejectedForeground uint8) {
+	RecordFocusFallbackActive(ctx, result, stage, rejectedForeground, 0)
+}
+
+// Active 1 is foreground verified while joined; 2 is requested but unverified.
+// Final fallback results still require ownership proof after detachment.
+func validFocusActive(result uint8, stage FocusFallbackStage, active uint8) bool {
+	if !validFocusFallback(result, stage) {
+		return false
+	}
+	if active == 1 {
+		return result == 1 || result == 5 || stage == FocusFallbackDetachFailed
+	}
+	return active == 2 && (stage == FocusFallbackSetFailed || stage == FocusFallbackDetachFailed)
+}
+
+func RecordFocusFallbackActive(ctx context.Context, result uint8, stage FocusFallbackStage, rejectedForeground, active uint8) {
 	if !validFocusFallback(result, stage) || rejectedForeground > 4 ||
-		(rejectedForeground != 0 && stage != FocusFallbackSetFailed && stage != FocusFallbackDetachFailed) {
+		(active != 0 && (rejectedForeground != 2 || !validFocusActive(result, stage, active))) ||
+		(active == 0 && rejectedForeground != 0 && stage != FocusFallbackSetFailed && stage != FocusFallbackDetachFailed) {
 		return
 	}
 	updateFocus(ctx, func(p *FocusProfile) {
@@ -63,6 +80,7 @@ func RecordFocusFallbackObserved(ctx context.Context, result uint8, stage FocusF
 			p.RestoreFallbackMeasured = true
 			p.RestoreRejectedForeground = rejectedForeground
 			p.RestoreRejectedForegroundMeasured = rejectedForeground != 0
+			p.RestoreActive, p.RestoreActiveMeasured = active, active != 0
 		}
 	})
 }

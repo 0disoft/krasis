@@ -12,7 +12,7 @@ import (
 func TestFocusExportProjectsOnlyBoundedNumericStatesAndResults(t *testing.T) {
 	p := &handoff.FocusProfile{Schema: 1, States: [4]uint8{3, 2, 2, 1}, Observed: 15, Restore: 3, PostHide: 2, ResultMeasured: 3, Measured: 3,
 		RestoreFallback: 4, RestoreFallbackStage: handoff.FocusFallbackSetFailed, RestoreFallbackMeasured: true,
-		RestoreRejectedForeground: 2, RestoreRejectedForegroundMeasured: true}
+		RestoreRejectedForeground: 2, RestoreRejectedForegroundMeasured: true, RestoreActive: 2, RestoreActiveMeasured: true}
 	s := handoff.Summary{Schema: 1, Attempt: 1, Role: "source", Backend: "none", End: "ok", Focus: p}
 	r := record{Time: "2026-10-05T00:00:00Z", Code: "handoff_profile", Handoff: &s}
 	data, _ := json.Marshal(r)
@@ -41,6 +41,13 @@ func TestFocusExportProjectsOnlyBoundedNumericStatesAndResults(t *testing.T) {
 	got = sanitizeLog("agent.jsonl", strings.NewReader(string(data)+"\n"))
 	if !got.Incomplete || len(got.Events) != 0 {
 		t.Fatal("unobserved rejected foreground exported")
+	}
+	p.RestoreRejectedForegroundMeasured = true
+	p.RestoreActiveMeasured = false
+	data, _ = json.Marshal(r)
+	got = sanitizeLog("agent.jsonl", strings.NewReader(string(data)+"\n"))
+	if !got.Incomplete || len(got.Events) != 0 {
+		t.Fatal("unobserved active restore exported")
 	}
 }
 

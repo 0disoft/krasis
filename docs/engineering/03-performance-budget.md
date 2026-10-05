@@ -903,3 +903,43 @@ are not confirmed in this export. No runtime, API, database, runner or security
 setting was changed. Revision filtering, histogram/frame counts, trace-to-source
 mapping and diff whitespace were checked; tests and a rebuild are skipped because
 this change records device evidence only.
+
+## g170 guarded queue-local restore
+
+The restore path now makes one SetActiveWindow(savedFocus) request after the
+attached SetForegroundWindow restore rejects, while the exact saved target remains
+valid, visible, enabled and responsive, and capture still owns foreground.
+Activation, NULL/external foreground and terminal runs are excluded. The request
+uses the existing attachment, with no extra attach cycle, simulated click or retry
+loop. Target foreground must be verified before and after detach; the API return
+alone does not prove ownership. Unverified local activation preserves the original
+rejection, and detach failure remains terminal. ADR 0030 records the refinement.
+
+Focus schema 1 adds restoreActive and restoreActiveMeasured. Active 1 means target
+foreground was observed while joined after this request; 2 means the request was
+made but target foreground was not observed. Zero is unobserved/not attempted.
+Active 1 can accompany final fallback success, detach failure or post-detach
+verification failure; active 2 only accompanies SetFailed or DetachFailed. Both
+require measured rejected-foreground category 2. The final fallback still describes
+the post-detach outcome. The values are recorded together with that outcome in one
+first-write collector update and copied on retirement. No handles, input contents
+or window metadata are exported. Legacy g169 profiles remain valid.
+
+The runtime's eligibility queries run independently of the diagnostic budget.
+Diagnostic records remain bounded to twelve attempts within 120 seconds. This
+changes native call counts only on restore rejection; normal restoration and
+capture activation retain their existing policy. It adds one synchronous activation
+request in a joined queue and therefore does not establish a latency improvement
+or a strict native-call wall-clock bound. The g169 trust-freshness failure is a
+separate investigation; trust validation and security settings are unchanged.
+
+Tests cover one request within the existing attachment, success/unverified/detach
+failure/post-detach ownership loss/cancellation, invalid or hidden/disabled saved
+targets, external and NULL foreground, ownership changes during eligibility,
+unchanged activation policy, and a restore-then-reactivate sequence with no
+physical click. Schema and masked-export tests preserve first-write evidence and
+reject contradictory outcomes. AgentGeneration is 170. Real-device delay, focus
+recovery and PIN regression checks remain pending.
+
+The nine-package desktop Go tests, vet with unsafeptr=false and diff whitespace
+check passed locally. Packaging and bundle verification are separate checks.

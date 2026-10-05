@@ -88,7 +88,35 @@ terminal 처리, counter 합계만 증명한다. gram13에서 connection interru
 - 정확한 focus가 degraded된 회차에는 gram13 keyboard 입력 대상이 안전한 local window인지 수동 확인한다.
 - HP15의 pointer, click, drag, keyboard와 vertical/horizontal touchpad scroll 회귀가 없어야 한다.
 
+## g170 restore refinement
+
+g169 device evidence shows four rejected attached restore calls where capture
+remains foreground before and after detach, followed by NULL after hide. Five
+subsequent activations start with NULL and fail. The degraded-release policy remains,
+but one restoration-only queue-local activation is added inside the existing
+successful attachment to reduce this failure chain.
+
+After the attached SetForegroundWindow(savedFocus) call rejects, SetActiveWindow
+is requested once only when the saved target is still valid, visible, enabled and
+responsive to the existing probe; the exact target/peer is savedFocus; the run is
+not terminal; and capture still owns foreground immediately before the request.
+NULL, an external foreground, hidden/disabled/destroyed targets and capture
+activation never use this path. No extra attachment cycle or synthesized input is
+introduced. Diagnostics are optional and never gate this runtime operation.
+
+The API return is not ownership proof. The saved target must be observed as actual
+foreground while joined, and the existing ownership check after detach must also
+pass. A lost post-detach observation uses only the existing bounded completion
+probe; it does not repeat activation. Detach failure remains terminal regardless
+of the earlier observation. If local activation is unverified, preserve the
+original API rejection and degraded-hide policy. The existing native-call
+responsiveness risk of joined queues remains; a finite call count does not prove
+a wall-clock latency bound. Device verification is required before claiming the
+click-recovery symptom is resolved.
+
 ## 참고
 
+- [SetActiveWindow](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setactivewindow)
+- [Input queue synchronization](https://devblogs.microsoft.com/oldnewthing/20130607-00/?p=4143)
 - [SetForegroundWindow restrictions](https://learn.microsoft.com/en-us/windows/win32/winmsg/window-features)
 - [AttachThreadInput](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-attachthreadinput)

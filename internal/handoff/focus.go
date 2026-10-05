@@ -28,6 +28,8 @@ type FocusProfile struct {
 	RestoreFallbackMeasured           bool               `json:"restoreFallbackMeasured,omitempty"`
 	RestoreRejectedForeground         uint8              `json:"restoreRejectedForeground,omitempty"`
 	RestoreRejectedForegroundMeasured bool               `json:"restoreRejectedForegroundMeasured,omitempty"`
+	RestoreActive                     uint8              `json:"restoreActive,omitempty"`
+	RestoreActiveMeasured             bool               `json:"restoreActiveMeasured,omitempty"`
 	ResultMeasured                    uint8              `json:"resultMeasured"`
 	Micros                            [2]uint32          `json:"micros"`
 	Measured                          uint8              `json:"measured"`
@@ -63,9 +65,17 @@ func (p FocusProfile) Valid() bool {
 	} else if p.RestoreFallback != 0 || p.RestoreFallbackStage != 0 {
 		return false
 	}
+	if p.RestoreActiveMeasured {
+		if !p.RestoreFallbackMeasured || !p.RestoreRejectedForegroundMeasured || p.RestoreRejectedForeground != 2 ||
+			!validFocusActive(p.RestoreFallback, p.RestoreFallbackStage, p.RestoreActive) {
+			return false
+		}
+	} else if p.RestoreActive != 0 {
+		return false
+	}
 	if p.RestoreRejectedForegroundMeasured {
 		if p.RestoreRejectedForeground < 1 || p.RestoreRejectedForeground > 4 || !p.RestoreFallbackMeasured ||
-			(p.RestoreFallbackStage != FocusFallbackSetFailed && p.RestoreFallbackStage != FocusFallbackDetachFailed) {
+			(!p.RestoreActiveMeasured && p.RestoreFallbackStage != FocusFallbackSetFailed && p.RestoreFallbackStage != FocusFallbackDetachFailed) {
 			return false
 		}
 	} else if p.RestoreRejectedForeground != 0 {
