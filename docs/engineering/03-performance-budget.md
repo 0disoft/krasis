@@ -570,3 +570,32 @@ g164; the exact PIN actions are not separately confirmed. Coverage is A-to-B onl
 overlapping spans are not summed. The next priority is diagnosing the remaining
 preparation-lock/capture readiness and the boundary_orchestrator failure; this is
 evidence only with no build or runtime source change.
+
+## g165 prepared-hint commit ordering and activation dispatch
+
+A read-only GUI inspection failure marker now rejects only the local boundary intent
+while keeping the authenticated session, with the original
+ControlFlowBoundaryAdmissionFailed counter; guard, cancellation and unmarked failures
+remain fatal. The g164 boundary disconnect origin remains unconfirmed.
+
+`foregroundAfterTransition` dispatches the sent activation messages and a fresh capture
+request before any polling delay, so no polling sleep occurs when a pending activation
+completes immediately; a persistently NULL foreground still spends the five 10ms poll
+waits. The ownership validation, cancellation checks and the no-unknown-thread-attachment
+rule are unchanged.
+
+Preparation runs under the same shutdown/pin mutex but releases it before the diagnostic
+receipt callback (b85bdec), so the measured preparation-lock interval excludes that
+callback; the service synchronous launch wait and the prepare RPC stay under the lock.
+Preview eligibility is separate from the emission commit (06cd7c1): `sentAt`/rearm
+suppression applies only after the bounded single-slot queue accepts, so a full or failed
+queue retries only on a fresh physical move inside the outward band under the 2.5s
+renewal, with no timer and no lost full-queue cooldown.
+
+AgentGeneration is 165, and the nine-package desktop Go tests with vet -unsafeptr=false
+passed with exit 0; a build is not claimed. Tests cover cancellation and fatality of guards, a next
+intent on the same connection, no polling sleep when pending activation completes
+immediately, bounded refusal on a persistently NULL foreground, a blocked receipt
+callback holding no lease or pin, and full-queue initial/renew retries. Device delay and
+PIN are not verified on g165; the g164 PIN check was user-passed, and real ~110ms
+preparation and a missing foreground remain possible.
