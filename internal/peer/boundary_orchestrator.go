@@ -14,6 +14,11 @@ const outboundIdentifierBytes = 16
 
 var ErrBoundaryIntentObserverPanic = errors.New("boundary intent observer panicked")
 
+// A read-only local inspection could not prove admission. No lease or input
+// has started, so discard this intent while keeping the authenticated session.
+// Authority, lifecycle and transport failures must never carry this marker.
+var ErrBoundaryInspectionUnavailable = errors.New("boundary inspection unavailable")
+
 type OutboundIdentity struct {
 	SessionID string
 	Epoch     string
@@ -131,6 +136,9 @@ func (orchestrator *BoundaryOrchestrator) RunWithIntentObserver(
 						return ctx.Err()
 					}
 					observeControlFlow(orchestrator.observer, ControlFlowBoundaryAdmissionFailed)
+					if errors.Is(err, ErrBoundaryInspectionUnavailable) && ctx.Err() == nil {
+						continue
+					}
 					return err
 				}
 				if !decision.Valid() {

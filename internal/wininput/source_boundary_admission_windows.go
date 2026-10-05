@@ -172,12 +172,12 @@ func (hook *SourceHook) AdmitBoundary(ctx context.Context, _ control.BoundaryInt
 	}
 	info := sourceGUIThreadInfo{Size: uint32(unsafe.Sizeof(sourceGUIThreadInfo{}))}
 	if err := sourceForegroundGUIThreadInfo(&info); err != nil {
-		return 0, fmt.Errorf("inspect foreground GUI thread: %w", err)
+		return 0, boundaryInspectionUnavailable(ctx, "inspect foreground GUI thread", err)
 	}
 	if info.Flags&guiMenuModeMask != 0 {
 		updated, closed, err := dismissBoundaryMenu(ctx, info)
 		if err != nil {
-			return 0, fmt.Errorf("verify menu dismissal: %w", err)
+			return 0, boundaryInspectionUnavailable(ctx, "verify menu dismissal", err)
 		}
 		if err := ctx.Err(); err != nil {
 			return 0, err
@@ -190,7 +190,7 @@ func (hook *SourceHook) AdmitBoundary(ctx context.Context, _ control.BoundaryInt
 	if info.Capture != 0 {
 		updated, released, err := dismissBoundaryCapture(ctx, info)
 		if err != nil {
-			return 0, fmt.Errorf("verify mouse capture dismissal: %w", err)
+			return 0, boundaryInspectionUnavailable(ctx, "verify mouse capture dismissal", err)
 		}
 		if err := ctx.Err(); err != nil {
 			return 0, err
@@ -212,4 +212,13 @@ func (hook *SourceHook) AdmitBoundary(ctx context.Context, _ control.BoundaryInt
 		}
 	}
 	return peer.BoundaryAdmissionAllowed, nil
+}
+
+// This marker applies only to failed GUI reads, never boundaryGuard or a
+// cancelled session. Failed inspection cannot authorize a crossing.
+func boundaryInspectionUnavailable(ctx context.Context, operation string, cause error) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return fmt.Errorf("%s: %w", operation, errors.Join(peer.ErrBoundaryInspectionUnavailable, cause))
 }

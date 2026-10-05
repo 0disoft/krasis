@@ -193,6 +193,37 @@ func TestBoundaryOrchestratorFailsClosedWhenAdmissionInspectionFails(t *testing.
 
 type boundaryAdmissionGateFunc func(context.Context, control.BoundaryIntent) (BoundaryAdmissionDecision, error)
 
+func TestBoundaryInspectionUnavailableAllowsNextIntentOnSameSession(t *testing.T) {
+	beginner := &recordingBoundaryBeginner{ready: true}
+	recorder := &controlFlowRecorder{}
+	inspections, identities := 0, 0
+	orchestrator, err := NewBoundaryOrchestratorObservedWithGate(beginner,
+		func() (OutboundIdentity, error) {
+			identities++
+			return OutboundIdentity{SessionID: "s", Epoch: "e"}, nil
+		},
+		recorder, boundaryAdmissionGateFunc(func(context.Context, control.BoundaryIntent) (BoundaryAdmissionDecision, error) {
+			inspections++
+			if inspections == 1 {
+				return 0, errors.Join(ErrBoundaryInspectionUnavailable, errors.New("GUI query failed"))
+			}
+			return BoundaryAdmissionAllowed, nil
+		}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	intents := make(chan control.BoundaryIntent, 2)
+	intents <- control.BoundaryIntent{Edge: control.ScreenEdgeRight}
+	intents <- control.BoundaryIntent{Edge: control.ScreenEdgeRight}
+	close(intents)
+	if err := orchestrator.Run(context.Background(), intents); err != nil {
+		t.Fatal(err)
+	}
+	if inspections != 2 || identities != 1 || beginner.calls != 1 || recorder.count(ControlFlowBoundaryAdmissionFailed) != 1 || recorder.count(ControlFlowBoundaryAdmitted) != 1 {
+		t.Fatal("unavailable inspection disconnected, authorized input or prevented the next intent")
+	}
+}
+
 func (gate boundaryAdmissionGateFunc) AdmitBoundary(
 	ctx context.Context,
 	intent control.BoundaryIntent,

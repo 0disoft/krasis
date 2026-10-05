@@ -126,8 +126,25 @@ func TestSourceBoundaryAdmissionFailsClosed(t *testing.T) {
 		context.Background(),
 		control.BoundaryIntent{Edge: control.ScreenEdgeRight},
 	)
-	if decision != 0 || !errors.Is(err, cause) {
+	if decision != 0 || !errors.Is(err, cause) || !errors.Is(err, peer.ErrBoundaryInspectionUnavailable) {
 		t.Fatalf("AdmitBoundary() = %v, %v", decision, err)
+	}
+}
+
+func TestBoundaryInspectionCancellationAndGuardRemainFatal(t *testing.T) {
+	old := sourceForegroundGUIThreadInfo
+	t.Cleanup(func() { sourceForegroundGUIThreadInfo = old })
+	cause := errors.New("guard failed")
+	sourceForegroundGUIThreadInfo = func(*sourceGUIThreadInfo) error { t.Fatal("failed guard inspected GUI"); return nil }
+	_, err := (&SourceHook{boundaryGuard: func() error { return cause }}).AdmitBoundary(context.Background(), control.BoundaryIntent{})
+	if !errors.Is(err, cause) || errors.Is(err, peer.ErrBoundaryInspectionUnavailable) {
+		t.Fatal("guard failure became a recoverable inspection", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	sourceForegroundGUIThreadInfo = func(*sourceGUIThreadInfo) error { cancel(); return errors.New("query failed") }
+	_, err = (&SourceHook{}).AdmitBoundary(ctx, control.BoundaryIntent{})
+	if !errors.Is(err, context.Canceled) || errors.Is(err, peer.ErrBoundaryInspectionUnavailable) {
+		t.Fatal("cancelled inspection continued the session", err)
 	}
 }
 func TestBoundaryDismissesMenuAndRechecksInteraction(t *testing.T) {
