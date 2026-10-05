@@ -57,3 +57,17 @@ func RecordFocusFallback(ctx context.Context, result uint8, stage FocusFallbackS
 		}
 	})
 }
+
+// The existing SetForegroundWindow rejection is observed while queues are still
+// joined. It is a category, not ownership proof or a reason to change cleanup.
+func RecordFocusRestoreRejectedForeground(ctx context.Context, state uint8) {
+	if state < 1 || state > 4 {
+		return
+	}
+	updateFocus(ctx, func(p *FocusProfile) {
+		if !p.RestoreRejectedForegroundMeasured {
+			p.RestoreRejectedForeground = state
+			p.RestoreRejectedForegroundMeasured = true
+		}
+	})
+}

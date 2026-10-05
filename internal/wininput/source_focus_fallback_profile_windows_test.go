@@ -131,9 +131,105 @@ func TestRestoreFallbackStageKeepsNativeCallOrderAndOutcome(t *testing.T) {
 						t.Fatal("legacy path emitted fallback detail")
 					}
 					previousCalls = calls
-				} else if !slices.Equal(calls, previousCalls) || !summary.Valid() || summary.Focus == nil || !summary.Focus.RestoreFallbackMeasured || summary.Focus.RestoreFallback != test.result || summary.Focus.RestoreFallbackStage != test.stage {
-					t.Fatal("profile changed native calls or lost failure stage", calls, previousCalls, summary.Focus)
+				} else {
+					wantCalls := slices.Clone(previousCalls)
+					if test.name == "set" {
+						index := slices.Index(wantCalls, "detach") - 1 // cleanup checks current thread before detach
+						wantCalls = slices.Insert(wantCalls, index, "get")
+					}
+					if !slices.Equal(calls, wantCalls) || !summary.Valid() || summary.Focus == nil || !summary.Focus.RestoreFallbackMeasured || summary.Focus.RestoreFallback != test.result || summary.Focus.RestoreFallbackStage != test.stage {
+						t.Fatal("unexpected native calls or lost failure stage", calls, wantCalls, summary.Focus)
+					}
+					if summary.Focus.RestoreRejectedForegroundMeasured != (test.name == "set") || (test.name == "set" && summary.Focus.RestoreRejectedForeground != 2) {
+						t.Fatal("rejection observation missing or on wrong exit", summary.Focus)
+					}
 				}
+			}
+		})
+	}
+}
+
+func TestRestoreRejectedForegroundStaysBeforeDetachAndDoesNotOverrideFailure(t *testing.T) {
+	for _, detachFails := range []bool{false, true} {
+		restore := stubSourceWheelCaptureActivation(t)
+		foreground := uintptr(10)
+		sourceWheelCaptureGetForeground = func() uintptr { return foreground }
+		sourceWheelCaptureSetForeground = func(window uintptr) error {
+			foreground = window
+			return errors.New("rejected despite target observation")
+		}
+		sourceWheelCaptureCurrentThread = func() uint32 { return 11 }
+		sourceWheelCaptureWindowThread = func(uintptr) (uint32, error) { return 22, nil }
+		sourceWheelCaptureProbeForeground = func(uintptr) error { return nil }
+		sourceWheelCaptureAttachThreads = func(_, _ uint32, attach bool) error {
+			if !attach {
+				foreground = 10
+				if detachFails {
+					return errors.New("detach rejection")
+				}
+			}
+			return nil
+		}
+		var summary handoff.Summary
+		c := handoff.New(func(s handoff.Summary) { summary = s })
+		p := handoff.Begin(handoff.WithSession(context.Background(), c), "source", "session", "epoch", time.Now())
+		current := &sourceWheelCaptureRun{window: 10, savedFocus: 20}
+		result, err := current.restoreFocusProfile(p)
+		current.observeFocus(p, handoff.FocusAfterRestore)
+		handoff.Finish(p, "error")
+		restore()
+		wantStage := handoff.FocusFallbackSetFailed
+		if detachFails {
+			wantStage = handoff.FocusFallbackDetachFailed
+		}
+		if err == nil || result != SourceFocusRestoreAPIRejected || !summary.Valid() || summary.Focus == nil || summary.Focus.RestoreFallbackStage != wantStage || summary.Focus.RestoreRejectedForeground != 3 || !summary.Focus.RestoreRejectedForegroundMeasured || summary.Focus.States[handoff.FocusAfterRestore] != 2 {
+			t.Fatal("observation changed failure or crossed detach boundary", result, err, summary.Focus)
+		}
+	}
+}
+
+func TestRejectedForegroundQueryRequiresLiveSourceProfile(t *testing.T) {
+	for _, mode := range []string{"nil", "receiver", "retired", "quota", "ended", "source"} {
+		t.Run(mode, func(t *testing.T) {
+			restore := stubSourceWheelCaptureActivation(t)
+			defer restore()
+			queries := 0
+			sourceWheelCaptureGetForeground = func() uintptr { queries++; return 0 }
+			sourceWheelCaptureSetForeground = func(uintptr) error { return errors.New("set rejection") }
+			sourceWheelCaptureCurrentThread = func() uint32 { return 11 }
+			sourceWheelCaptureWindowThread = func(uintptr) (uint32, error) { return 22, nil }
+			sourceWheelCaptureProbeForeground = func(uintptr) error { return nil }
+			sourceWheelCaptureAttachThreads = func(uint32, uint32, bool) error { return nil }
+			c := handoff.New(nil)
+			ctx := handoff.WithSession(context.Background(), c)
+			role := "source"
+			if mode == "receiver" {
+				role = "receiver"
+			}
+			p := handoff.Begin(ctx, role, "session", "epoch", time.Now())
+			switch mode {
+			case "nil":
+				p = nil
+			case "retired":
+				handoff.Finish(p, "ok")
+			case "ended":
+				handoff.EndSession(ctx)
+			case "quota":
+				for i := 1; i < handoff.Limit; i++ {
+					handoff.Finish(p, "ok")
+					p = handoff.Begin(ctx, role, "session", "epoch", time.Now())
+				}
+				handoff.Finish(p, "ok")
+				p = handoff.Begin(ctx, role, "session", "epoch", time.Now())
+			}
+			current := &sourceWheelCaptureRun{window: 10, savedFocus: 20}
+			result, err := current.restoreFocusFallbackProfile(p)
+			wantQueries := 0
+			if mode == "source" {
+				wantQueries = 1
+			}
+			if result != SourceFocusRestoreFallbackAPIRejected || err == nil || queries != wantQueries || current.attachedSource != 0 {
+				t.Fatal("optional observation affected query bound or cleanup", result, err, queries)
 			}
 		})
 	}

@@ -773,3 +773,40 @@ compare it with the post-detach FocusAfterRestore, to separate a failure while t
 are joined from a transition lost after detach. No policy cause is proved, and no fix or
 pump is claimed. The optional user click answer is still pending. This is evidence only,
 with no test, build, runtime or API change.
+
+## g168 foreground observation before restore detachment
+
+The g167 failure at SetForegroundWindow leaves the state while input queues are
+joined unobserved. g168 adds `restoreRejectedForeground` and
+`restoreRejectedForegroundMeasured` to Focus schema 1. The state uses the existing
+categories: 1 NULL, 2 capture, 3 saved original, 4 other. Zero is unobserved.
+The native capture owner reads GetForegroundWindow once after the attached restore
+SetForegroundWindow call reports an error, before starting detach cleanup, only
+when the original source profile is live. Activation passes a nil profile. Success,
+pre-set terminal errors, probe/attach failures and untracked or retired contexts
+make no additional native query.
+
+Compare this category with the same attempt's existing FocusAfterRestore state
+(after detachment, before hide), then FocusAfterHide. Observing the saved original
+while joined does not override the API rejection or prove that focus will survive
+detachment. A later detach failure retains the earlier observation with the existing
+detach-failure result and stage. No focus retry, message pump, simulated click,
+authority change or native error interpretation is introduced.
+
+Valid requires a measured category in 1..4 and a measured fallback whose stage is
+SetFailed or DetachFailed, with the existing result/stage pairing still enforced.
+Unmeasured categories must remain zero; legacy g167 profiles remain valid. First
+write wins under the existing 12-attempt/120-second source collector bound, and
+Retire's value copy freezes both fields. Export retains only numeric categories and
+the presence flag; native handles, window metadata and input contents stay absent.
+
+AgentGeneration is 168. Tests cover unchanged legacy native call sequences and
+outcomes, exactly one extra observation on the profiled rejection path, its position
+before cleanup/detachment, saved-target observation without converting rejection to
+success, later detach failure, missing/receiver/retired/ended/quota contexts,
+expired recorder input, first-write and snapshot copying, contradictory evidence
+and sanitized export. Real-device focus recovery, delay and PIN regression checks
+remain pending. Device timings are process-local and overlapping spans are not added.
+
+The nine-package desktop Go tests, vet with unsafeptr=false and diff whitespace
+check passed locally. Packaging and bundle verification are separate checks.

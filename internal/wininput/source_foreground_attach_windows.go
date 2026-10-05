@@ -3,14 +3,15 @@
 package wininput
 
 import (
+	"context"
 	"errors"
 
 	"github.com/0disoft/krasis/internal/handoff"
 )
 
-// The extra result identifies existing exits only. Call order, cleanup and
-// ownership proof are shared by activation and restoration without extra calls.
-func (current *sourceWheelCaptureRun) setForegroundWithThreadAttachDetailed(targetWindow, peerWindow uintptr) (foregroundThreadFallbackResult, handoff.FocusFallbackStage, error) {
+// Activation passes nil. Restore diagnostics add one foreground observation
+// only on a live profiled SetForegroundWindow rejection, before detachment.
+func (current *sourceWheelCaptureRun) setForegroundWithThreadAttachDetailed(targetWindow, peerWindow uintptr, profile context.Context) (foregroundThreadFallbackResult, handoff.FocusFallbackStage, error) {
 	if current.attachedSource != 0 {
 		return foregroundThreadFallbackDetachFailed, handoff.FocusFallbackPendingDetach, ErrSourceCaptureThreadDetachFailed
 	}
@@ -43,6 +44,9 @@ func (current *sourceWheelCaptureRun) setForegroundWithThreadAttachDetailed(targ
 		foregroundStage = handoff.FocusFallbackSetFailed
 	}
 	verified := foregroundErr == nil && sourceWheelCaptureGetForeground() == targetWindow
+	if foregroundErr != nil && foregroundStage == handoff.FocusFallbackSetFailed && handoff.FocusEnabled(profile) {
+		handoff.RecordFocusRestoreRejectedForeground(profile, sourceFocusState(sourceWheelCaptureGetForeground(), current.window, current.savedFocus))
+	}
 	detachErr := current.detachForegroundThreads()
 	if detachErr != nil {
 		return foregroundThreadFallbackDetachFailed, handoff.FocusFallbackDetachFailed, errors.Join(detachErr, foregroundErr)
