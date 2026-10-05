@@ -1,5 +1,39 @@
 # Bounded handoff profile
 
+## g182 optional per-exchange diagnostic tag
+
+`Summary` gains optional `exchangeTag`, exactly 64 lowercase hexadecimal
+characters. The authenticated transport derives it from a dedicated TLS exporter
+label `krasis/handoff-diagnostic-correlation/v1` and a SHA-256 context of
+length-prefixed session/epoch identifiers. It returns only the SHA-256 digest of
+32 exporter bytes and clears those bytes. Raw identifiers, exporter material,
+timestamps, input content and user/desktop identities are not exported.
+
+The same request has the same tag on its two peers, independently of their local
+attempt ordinals. A different session, epoch or TLS connection has a different
+tag. This is a connection-scoped diagnostic label, never an authentication token
+or replay, lease, input or recovery decision. There is no new wire field, read,
+write, handshake or roundtrip. The supervisor forwards the optional capability
+and each `RunSession` binds its current connection's mapper before reader startup.
+
+Derivation runs once per retained source or receiver attempt, outside the collector
+mutex, under the existing 12-attempt/120-second budget. Expired/untracked attempts
+do not derive a tag; late results cannot update a retired attempt. Missing or
+invalid derivation yields no field and cannot change input outcome. Derivation
+cost is included in existing preparation/reader spans; its device overhead is not
+independently measured. Older profiles with no field remain valid. Local and peer
+export validate the fixed tag shape and omit unknown/raw identity fields.
+
+For a paired-device export, join only one source and one receiver with the same
+exact build and nonempty tag. Report duplicates, missing counterparts, incomplete
+profiles and absent/saturated durations separately; do not match by ordinal or
+nearby wall timestamps. Compare A's grant wait and B's handling for that request
+as independent host-local intervals. Write completion/read boundaries can overlap;
+do not subtract their timestamps or durations to call the result network RTT,
+packet loss or scheduler cost, and do not add nested preparation/input spans.
+Tags cannot make forged diagnostics authoritative. Device validation must first
+confirm unique peer matches and then inspect slow matched exchanges.
+
 ## g163 optional preparation-lock overlap
 
 Schema 1 gains optional preparationLockMicros (uint32) and preparationLockMeasured

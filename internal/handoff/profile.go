@@ -93,9 +93,13 @@ type Summary struct {
 	GrantProgress           *GrantProgressProfile `json:"grantProgress,omitempty"`
 	PreparationLockMicros   uint32                `json:"preparationLockMicros,omitempty"`
 	PreparationLockMeasured bool                  `json:"preparationLockMeasured,omitempty"`
+	ExchangeTag             string                `json:"exchangeTag,omitempty"`
 }
 
 func (s Summary) Valid() bool {
+	if s.ExchangeTag != "" && !ValidExchangeTag(s.ExchangeTag) {
+		return false
+	}
 	if s.Schema != 1 || s.Attempt < 1 || s.Attempt > Limit || (s.Role != "source" && s.Role != "receiver") ||
 		(s.Backend != "none" && s.Backend != "native" && s.Backend != "installed") || !validOutcome(s.End) {
 		return false
@@ -180,6 +184,7 @@ type attempt struct {
 	progress                  *grantProgress
 }
 type session struct {
+	exchangeTag      func(string, string) string
 	collector        *Collector
 	source, receiver *attempt
 	lastClose        time.Time
@@ -264,8 +269,19 @@ func Begin(ctx context.Context, role, sessionID, epoch string, start time.Time) 
 		put(&a.summary.Preparation, ReentryGap, now.Sub(s.lastClose))
 	}
 	beginGrantProgress(s, a, now)
+	tagger := s.exchangeTag
 	c.mu.Unlock()
 	c.finish(old, "incomplete")
+	if tagger != nil {
+		// Derive only for one of the retained attempts, outside the collector
+		// lock. A superseded/expired attempt cannot acquire a late tag.
+		tag := tagger(sessionID, epoch)
+		c.mu.Lock()
+		if exchangeActive(s, a) && ValidExchangeTag(tag) {
+			a.summary.ExchangeTag = tag
+		}
+		c.mu.Unlock()
+	}
 	return context.WithValue(ctx, attemptKey{}, a)
 }
 
