@@ -29,7 +29,13 @@ func NewInputAdapter() *InputAdapter {
 
 func (adapter *InputAdapter) PrepareEntry(ctx context.Context, sourceEdge control.ScreenEdge) (err error) {
 	stage := "state"
-	defer func() { err = cursorTransactionFailure("entry", stage, err) }()
+	var observation *application.CursorPlacementObservation
+	defer func() {
+		err = cursorTransactionFailure("entry", stage, err)
+		if failure, ok := err.(*application.CursorTransactionFailure); ok && stage == "mismatch" {
+			failure.Observation = observation
+		}
+	}()
 	if adapter == nil {
 		return fmt.Errorf("%w: input adapter is not initialized", ErrInputInjection)
 	}
@@ -86,6 +92,7 @@ func (adapter *InputAdapter) PrepareEntry(ctx context.Context, sourceEdge contro
 		}
 		x, y = placement.TargetX, placement.TargetY
 		position = point{X: placement.X, Y: placement.Y}
+		observation = placement.Observation
 	} else {
 		if err := adapter.writeCursor(ctx, x, y); err != nil {
 			if certainty, known := application.InjectionCertaintyOf(err); known && certainty == application.InjectionNotApplied {

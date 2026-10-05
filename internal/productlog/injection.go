@@ -8,17 +8,21 @@ import (
 // Counts describe API insertion only, not successful delivery to a target app.
 // No keys, coordinates, target window names or inferred UIPI cause are recorded.
 type InjectionFailure struct {
-	Operation   string                         `json:"operation"`
-	Certainty   application.InjectionCertainty `json:"certainty"`
-	Requested   int                            `json:"requested"`
-	Inserted    int                            `json:"inserted"`
-	CountsKnown bool                           `json:"countsKnown"`
-	CursorStage string                         `json:"cursorStage,omitempty"`
+	Operation         string                                  `json:"operation"`
+	Certainty         application.InjectionCertainty          `json:"certainty"`
+	Requested         int                                     `json:"requested"`
+	Inserted          int                                     `json:"inserted"`
+	CountsKnown       bool                                    `json:"countsKnown"`
+	CursorStage       string                                  `json:"cursorStage,omitempty"`
+	CursorObservation *application.CursorPlacementObservation `json:"cursorObservation,omitempty"`
 }
 
 func init() { allowed["injection_failure"] = true }
 
 func (s InjectionFailure) valid() bool {
+	if p := s.CursorObservation; p != nil && (s.Operation != "entry" || s.CursorStage != "mismatch" || !p.Valid() || p.Flags&application.CursorReadbackMatches != 0) {
+		return false
+	}
 	if s.CursorStage != "" && !application.ValidCursorFailureStage(s.Operation, s.CursorStage) {
 		return false
 	}
@@ -63,6 +67,10 @@ func (l *Logger) Injection(operation string, err error) {
 	var cursor *application.CursorTransactionFailure
 	if errors.As(err, &cursor) && cursor != nil && cursor.Cause != nil && cursor.Operation == operation && application.ValidCursorFailureStage(operation, cursor.Stage) {
 		s.CursorStage = cursor.Stage
+		if p := cursor.Observation; operation == "entry" && cursor.Stage == "mismatch" && p != nil && p.Valid() && p.Flags&application.CursorReadbackMatches == 0 {
+			copy := *p
+			s.CursorObservation = &copy
+		}
 	}
 	if s.valid() {
 		l.enqueueRecord(record{Code: "injection_failure", Injection: &s})

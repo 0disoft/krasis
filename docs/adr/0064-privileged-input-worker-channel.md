@@ -532,3 +532,41 @@ reentry and clipping-related disconnect recovery require device validation.
 Windows can adjust a requested position to keep it inside confinement; see
 [SetCursorPos](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setcursorpos)
 and [GetClipCursor](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getclipcursor).
+
+## g181 bounded cursor mismatch observations
+
+`opCursorPlaceProbe` performs the same placement under the same lease, sequence,
+pressed-state guard and desktop scope. Its successful ACK appends eighteen private
+bytes: the existing actual/target coordinates, then `known` and `flags` bytes.
+This adds no request, scope, write or roundtrip; the suffix shares the existing
+response read. Ordinary placement keeps its sixteen-byte suffix. Agent and
+installed worker must be updated together; an unsupported or lost ACK is never
+retried using another operation or backend.
+
+The client requests this variant once per tracked installed receiver entry, within
+the existing 120-second/12-attempt collector window and a 64-request collector
+cap across reconnect. Native port copies share a separate atomic 64-probe cap
+for their worker lifetime. Untracked, source, expired or cancelled entries do not
+request it. Zero metadata denotes an absent observation; malformed metadata is
+consumed and dropped without changing the placement receipt.
+
+Bits 0..5 mean target adjusted, readback matches target, confinement changed,
+virtual-screen bounds changed, physical cursor matches target, and physical cursor
+matches readback. `known` distinguishes an observed false comparison from an
+unavailable query. The first two comparisons come from existing local values.
+Only a mismatch queries confinement again, virtual-screen bounds again and
+`GetPhysicalCursorPos`, once each in that order with cancellation checks. A failed
+query remains unknown; it does not change input outcome or trigger another write.
+Physical comparisons are recorded as a pair from one physical snapshot.
+
+Only an `entry/mismatch` injection-failure record may export this comparison-only
+observation. Logging copies it into the same failure record, and both local and
+peer sanitizers validate its presence mask and flags. Positions, rectangles,
+desktop/window identities and error text remain private. Sequential snapshots
+cannot establish causality: physical movement, concurrent changes and coordinate
+space differences still need device evidence. Matching placement and subsequent
+ordinary pointer input add no diagnostic native queries. Entry rejection,
+rollback ownership, uncertainty and protected lease retirement remain unchanged.
+
+Physical-coordinate API contract:
+[GetPhysicalCursorPos](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getphysicalcursorpos).

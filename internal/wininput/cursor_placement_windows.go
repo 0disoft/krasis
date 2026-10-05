@@ -18,11 +18,20 @@ var readCursorBounds = func(bounds *cursorBounds) bool {
 }
 
 var _ application.CursorPlacementPort = nativeInjectionPort{}
+var _ application.CursorPlacementProbePort = nativeInjectionPort{}
 
 // The installed worker calls this on its authorized desktop-owning thread.
 // Observe confinement, set once and read back without another pipe operation.
 // A changed constraint or physical movement still fails the caller's comparison.
 func (port nativeInjectionPort) PlaceCursor(ctx context.Context, x, y int32) (application.CursorPlacement, error) {
+	return port.placeCursor(ctx, x, y, false)
+}
+
+func (port nativeInjectionPort) ProbeCursorPlacement(ctx context.Context, x, y int32) (application.CursorPlacement, error) {
+	return port.placeCursor(ctx, x, y, port.takePlacementProbe())
+}
+
+func (port nativeInjectionPort) placeCursor(ctx context.Context, x, y int32, probe bool) (application.CursorPlacement, error) {
 	var receipt application.CursorPlacement
 	if ctx == nil || ctx.Err() != nil {
 		return receipt, &application.InjectionError{Certainty: application.InjectionNotApplied, Cause: ErrInputInjection}
@@ -31,7 +40,8 @@ func (port nativeInjectionPort) PlaceCursor(ctx context.Context, x, y int32) (ap
 	if !readCursorBounds(&clip) {
 		return receipt, &application.InjectionError{Certainty: application.InjectionNotApplied, Cause: ErrInputInjection}
 	}
-	target, err := confinedCursorTarget(x, y, clip, systemMetric(smXVIRTUALSCREEN), systemMetric(smYVIRTUALSCREEN), systemMetric(smCXVIRTUALSCREEN), systemMetric(smCYVIRTUALSCREEN))
+	geometry := readPlacementGeometry()
+	target, err := confinedCursorTarget(x, y, clip, geometry.Left, geometry.Top, geometry.Width, geometry.Height)
 	if err != nil {
 		return receipt, &application.InjectionError{Certainty: application.InjectionNotApplied, Cause: err}
 	}
@@ -42,7 +52,11 @@ func (port nativeInjectionPort) PlaceCursor(ctx context.Context, x, y int32) (ap
 	if err != nil {
 		return receipt, &application.InjectionError{Certainty: application.InjectionOutcomeUnknown, Cause: err}
 	}
-	return application.CursorPlacement{TargetX: target.X, TargetY: target.Y, X: actualX, Y: actualY}, nil
+	receipt = application.CursorPlacement{TargetX: target.X, TargetY: target.Y, X: actualX, Y: actualY}
+	if probe {
+		receipt.Observation = observeCursorPlacement(ctx, point{X: x, Y: y}, receipt, clip, geometry)
+	}
+	return receipt, nil
 }
 
 // RECT's right/bottom bounds are exclusive. Intersect with current screen

@@ -15,6 +15,7 @@ type entryPlacementInput struct {
 	delegatedInput
 	places, reads int
 	mode          string
+	observation   *application.CursorPlacementObservation
 }
 
 func (p *entryPlacementInput) PlaceCursor(_ context.Context, x, y int32) (application.CursorPlacement, error) {
@@ -26,12 +27,29 @@ func (p *entryPlacementInput) PlaceCursor(_ context.Context, x, y int32) (applic
 	if p.mode == "unknown" {
 		return application.CursorPlacement{}, &application.InjectionError{Certainty: application.InjectionOutcomeUnknown}
 	}
-	placement := application.CursorPlacement{TargetX: x + 5, TargetY: y, X: x + 5, Y: y}
+	placement := application.CursorPlacement{TargetX: x + 5, TargetY: y, X: x + 5, Y: y, Observation: p.observation}
 	if p.mode == "mismatch" {
 		placement.X++
 		p.position.X++
 	}
 	return placement, nil
+}
+
+func TestEntryMismatchObservationRemainsAttachedToFailureAndRollback(t *testing.T) {
+	rejectOrdinaryCursorIO(t)
+	port := &entryPlacementInput{delegatedInput: delegatedInput{position: point{100, 200}}, mode: "mismatch", observation: &application.CursorPlacementObservation{Known: 63, Flags: 1}}
+	adapter, err := NewInputAdapterWithInjection(10, 1920, port)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = adapter.PrepareEntry(context.Background(), control.ScreenEdgeRight)
+	var failure *application.CursorTransactionFailure
+	if !errors.As(err, &failure) || failure.Stage != "mismatch" || failure.Observation != port.observation || !adapter.entry.enteredKnown {
+		t.Fatal("mismatch observation detached or transaction lost", err)
+	}
+	if _, err := adapter.RollbackEntry(context.Background()); err != nil || port.places != 1 {
+		t.Fatal("probe altered rollback", err)
+	}
 }
 
 func (p *entryPlacementInput) CursorPosition(context.Context) (int32, int32, error) {

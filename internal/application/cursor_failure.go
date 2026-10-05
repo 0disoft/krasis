@@ -3,9 +3,10 @@ package application
 // CursorTransactionFailure identifies a local transaction stage, not the native
 // cause or an input outcome. The original error remains available to recovery.
 type CursorTransactionFailure struct {
-	Operation string
-	Stage     string
-	Cause     error
+	Operation   string
+	Stage       string
+	Cause       error
+	Observation *CursorPlacementObservation
 }
 
 func (*CursorTransactionFailure) Error() string { return "cursor transaction failed" }
