@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/0disoft/krasis/internal/agent"
+	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/transport"
 )
 
@@ -21,6 +22,49 @@ func TestProductDisconnectWrapperPreservesNegotiatedPreparation(t *testing.T) {
 		if wrapped.SupportsInputPreparation() != expected {
 			t.Fatal("product wrapper changed preparation capability")
 		}
+	}
+}
+
+func TestPreparationReceiptObserverDoesNotBlockLeaseOrPinDisposal(t *testing.T) {
+	observing, release, finished := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	disposed := false
+	input := &privilegedLeaseInput{
+		expires: time.Now().Add(time.Hour),
+		prepare: func(context.Context) error { return nil },
+		connect: func(context.Context, application.LeaseIdentity, time.Time) (privilegedClient, error) {
+			return &testPrivilegedClient{}, nil
+		},
+		dispose: func() error { disposed = true; return nil },
+		event: func(code string) {
+			if code == "installed_input_preparation_acknowledged" {
+				close(observing)
+				<-release
+			}
+		},
+	}
+	a := privilegedAuthorizer{LeaseAuthorizer: testPreparationPolicy{allowed: true}, input: input}
+	go func() {
+		a.PrepareInput(context.Background(), transport.AuthenticatedPeerContext{}, time.Now())
+		close(finished)
+	}()
+	<-observing
+	defer func() { close(release); <-finished }()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	opened := make(chan error, 1)
+	go func() {
+		opened <- input.open(ctx, application.LeaseIdentity{SessionID: "s", LeaseID: "l", Epoch: "e"}, time.Now())
+	}()
+	select {
+	case err := <-opened:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("diagnostic callback retained lease admission")
+	}
+	if err := input.shutdown(); err != nil || !disposed {
+		t.Fatal("receipt observer retained completed preparation or installation pins", err)
 	}
 }
 

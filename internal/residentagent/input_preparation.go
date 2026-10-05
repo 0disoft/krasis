@@ -42,20 +42,12 @@ func (a privilegedAuthorizer) PrepareInput(ctx context.Context, p transport.Auth
 		return
 	}
 	input := a.input
-	// This also joins preparation before shutdown releases installation pins,
-	// and prevents preparation from competing with an approved active lease.
-	input.mu.Lock()
-	lockedAt := time.Now()
-	defer input.mu.Unlock()
-	if input.stopped || input.client != nil || input.prepare == nil || !input.expires.After(time.Now()) || ctx.Err() != nil {
+	prepared, err := input.prepareIdle(ctx)
+	if !prepared {
 		return
 	}
-	input.preparationStarted = lockedAt
-	input.preparationFinished = time.Time{}
-	// Runs before the earlier Unlock defer. The interval includes the receipt
-	// and event callback while the preparation operation still owns input.mu.
-	defer func() { input.preparationFinished = time.Now() }()
-	err = input.prepare(ctx)
+	// Diagnostic callbacks do not own installation pins or input authority.
+	// A slow receipt observer must not retain the lease admission mutex.
 	if input.event != nil {
 		if err == nil {
 			input.event("installed_input_preparation_acknowledged")
@@ -63,6 +55,23 @@ func (a privilegedAuthorizer) PrepareInput(ctx context.Context, p transport.Auth
 			input.event("installed_input_preparation_missed")
 		}
 	}
+}
+
+func (input *privilegedLeaseInput) prepareIdle(ctx context.Context) (bool, error) {
+	// This also joins preparation before shutdown releases installation pins,
+	// and prevents preparation from competing with an approved active lease.
+	input.mu.Lock()
+	lockedAt := time.Now()
+	defer input.mu.Unlock()
+	if input.stopped || input.client != nil || input.prepare == nil || !input.expires.After(time.Now()) || ctx.Err() != nil {
+		return false, nil
+	}
+	input.preparationStarted = lockedAt
+	input.preparationFinished = time.Time{}
+	// Runs before the earlier Unlock defer. Only preparation and its receipt
+	// own input.mu; the diagnostic callback runs after this helper returns.
+	defer func() { input.preparationFinished = time.Now() }()
+	return true, input.prepare(ctx)
 }
 
 // Both intervals use local monotonic readings. Only the most recent completed
