@@ -28,6 +28,8 @@ const (
 	opWheel
 	opHeartbeat
 	opClose
+	opCursorRead
+	opCursorSet
 )
 
 type request struct {
@@ -65,16 +67,16 @@ func readRequest(reader io.Reader) (request, error) {
 		if value.token.Validate() != nil {
 			return request{}, ErrProtocol
 		}
-	case opMove, opWheel:
+	case opMove, opWheel, opCursorSet:
 		if data[6] != 0 {
 			return request{}, ErrProtocol
 		}
 		value.x = int32(binary.BigEndian.Uint32(data[32:36]))
 		value.y = int32(binary.BigEndian.Uint32(data[36:40]))
-		if value.x == 0 && value.y == 0 {
+		if value.op != opCursorSet && value.x == 0 && value.y == 0 {
 			return request{}, ErrProtocol
 		}
-	case opHeartbeat, opClose:
+	case opHeartbeat, opClose, opCursorRead:
 		if data[6] != 0 || binary.BigEndian.Uint64(data[32:40]) != 0 {
 			return request{}, ErrProtocol
 		}
@@ -101,10 +103,10 @@ func encodeRequest(value request) ([requestSize]byte, error) {
 			return data, ErrProtocol
 		}
 		binary.BigEndian.PutUint32(data[32:36], value.token.Code)
-	case opMove, opWheel:
+	case opMove, opWheel, opCursorSet:
 		binary.BigEndian.PutUint32(data[32:36], uint32(value.x))
 		binary.BigEndian.PutUint32(data[36:40], uint32(value.y))
-	case opHeartbeat, opClose:
+	case opHeartbeat, opClose, opCursorRead:
 	default:
 		return data, ErrProtocol
 	}
@@ -112,6 +114,7 @@ func encodeRequest(value request) ([requestSize]byte, error) {
 }
 
 type response struct {
+	x, y                int32
 	sequence            uint64
 	op                  operation
 	status              byte
@@ -158,6 +161,17 @@ func writeResponse(writer io.Writer, value response) error {
 	if err == nil && n != len(data) {
 		return io.ErrShortWrite
 	}
+	if err == nil && value.op == opCursorRead && value.status == 0 {
+		// Only this operation has an eight-byte coordinate suffix. Input ACKs
+		// retain their existing size; coordinates never enter diagnostic records.
+		var position [8]byte
+		binary.BigEndian.PutUint32(position[:4], uint32(value.x))
+		binary.BigEndian.PutUint32(position[4:], uint32(value.y))
+		n, err = writer.Write(position[:])
+		if err == nil && n != len(position) {
+			return io.ErrShortWrite
+		}
+	}
 	return err
 }
 
@@ -191,7 +205,7 @@ func decodeResponse(data [responseSize]byte) (response, error) {
 			return response{}, ErrProtocol
 		}
 	}
-	if value.sequence == 0 || value.op < opPress || value.op > opHeartbeat || value.status > 1 || value.inserted > value.requested {
+	if value.sequence == 0 || value.op < opPress || value.op > opCursorSet || value.op == opClose || value.status > 1 || value.inserted > value.requested {
 		return response{}, ErrProtocol
 	}
 	if value.status == 0 {

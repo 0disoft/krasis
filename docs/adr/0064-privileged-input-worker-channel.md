@@ -8,14 +8,14 @@
 
 `internal/inputworker`는 이미 승인된 한 원격 lease의 입력과 해제를 소유합니다.
 wire 요청은 고정 크기 48바이트이며 허용하는 동작은 press, release, move, wheel,
-heartbeat, close뿐입니다. 임의 PID, 실행 경로, desktop, 명령, token 또는 privilege를
+heartbeat, close 및 아래 커서 I/O 확장입니다. 임의 PID, 실행 경로, desktop, 명령, token 또는 privilege를
 받지 않습니다. 요청마다 정확한 순서 번호와 암호학적 무작위 128비트 채널 binding을
 검사합니다. binding은 새 lease마다 바뀌며 process authentication의 대용이 아닙니다.
 
 worker는 `inputdesktop`의 고정 OS 스레드에서 입력과 복구를 수행합니다. 입력은 기존
 `application.InjectPress`/`InjectRelease`를 통해 처리하며 성공이 불명확한 press도
 복구 계획에 유지합니다. 확실히 미전송된 press만 제거합니다. 응답은 결과 분류와
-수락 개수만 포함하며 native error, 입력 내용, SID, 사용자 이름을 반환하지 않습니다.
+수락 개수와 커서 조회에 필요한 고정 좌표만 포함하며 native error, 키 입력 내용, SID, 사용자 이름을 반환하지 않습니다.
 
 입력 연결 EOF, 취소, 순서·binding 불일치, protocol 오류, 입력 실패, lease 만료와
 close는 worker를 종료시킵니다. worker는 별도의 취소되지 않은 2초 복구 문맥으로
@@ -480,3 +480,18 @@ client/worker authority 확인·lost ack의 unknown/no-retry 정책은 유지합
 - [Windows Go service API](https://pkg.go.dev/golang.org/x/sys/windows/svc)
 - [Windows service security objects](https://learn.microsoft.com/en-us/windows/win32/secauthz/securable-objects)
 - [Service trigger configuration](https://learn.microsoft.com/en-us/windows/win32/api/winsvc/ns-winsvc-service_trigger_info)
+
+## g173 cursor I/O extension
+
+Cursor read and absolute cursor set share the existing authenticated lease,
+sequence, binding, desktop scope, deadlines and failure recovery. No session,
+process or desktop selector is accepted. Cursor set is refused while the worker
+owns pressed keys/buttons. The native backend must validate the target against
+its current display bounds. Missing cursor capability fails without fallback.
+
+Requests remain 48 bytes. A successful cursor-read ACK appends exactly eight
+bytes (two signed 32-bit coordinates) to the existing 24-byte response; other
+ACKs retain their existing size. A truncated suffix, wrong operation/sequence or
+lost ACK closes the channel without replay. Coordinates stay in the private local
+channel and are never added to product logs or support exports. Agent and worker
+must be updated together before enabling this capability in the product adapter.

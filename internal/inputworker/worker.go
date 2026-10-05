@@ -199,9 +199,14 @@ func serve(ctx context.Context, stream net.Conn, input application.InputPort, le
 			return report, nil
 		}
 		operationCtx, cancel := context.WithDeadline(ctx, deadline)
-		operationErr := do(operationCtx, func() error { return apply(operationCtx, input, &pressed, command) })
-		cancel()
 		ack := response{sequence: command.sequence, op: command.op}
+		operationErr := do(operationCtx, func() error {
+			if command.op == opCursorRead {
+				return readCursorResponse(operationCtx, input, &ack)
+			}
+			return apply(operationCtx, input, &pressed, command)
+		})
+		cancel()
 		if len(timings) == 1 && timings[0] != nil {
 			ack.timing = timings[0].buckets
 			ack.millis, ack.measured = timings[0].millis, timings[0].measured
@@ -248,6 +253,12 @@ func apply(ctx context.Context, input application.InputPort, pressed *control.Pr
 		return input.Wheel(ctx, command.x, command.y)
 	case opHeartbeat:
 		return nil
+	case opCursorSet:
+		port, ok := input.(application.CursorPositionPort)
+		if !ok || pressed.Count() != 0 {
+			return notSent(ErrProtocol)
+		}
+		return port.SetCursorPosition(ctx, command.x, command.y)
 	default:
 		return ErrProtocol
 	}

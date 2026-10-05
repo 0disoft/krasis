@@ -2,6 +2,7 @@ package inputworker
 
 import (
 	"context"
+	"encoding/binary"
 	"io"
 	"math"
 	"sync"
@@ -82,6 +83,10 @@ func (client *Client) delta(ctx context.Context, op operation, x, y int32) error
 }
 
 func (client *Client) perform(ctx context.Context, command request) error {
+	return client.performResponse(ctx, command, nil)
+}
+
+func (client *Client) performResponse(ctx context.Context, command request, observed func(response)) error {
 	if client == nil || ctx == nil || ctx.Err() != nil {
 		return notSent(ErrAuthority)
 	}
@@ -194,6 +199,9 @@ func (client *Client) perform(ctx context.Context, command request) error {
 	}
 	if ack.status == 0 {
 		client.lastAcknowledged = time.Now()
+		if observed != nil {
+			observed(ack)
+		}
 		return nil
 	}
 	client.fail()
@@ -235,5 +243,17 @@ func readResponse(reader io.Reader) (response, error) {
 	if _, err := io.ReadFull(reader, data[:]); err != nil {
 		return response{}, ErrProtocol
 	}
-	return decodeResponse(data)
+	value, err := decodeResponse(data)
+	if err != nil {
+		return response{}, err
+	}
+	if value.op == opCursorRead && value.status == 0 {
+		var position [8]byte
+		if _, err := io.ReadFull(reader, position[:]); err != nil {
+			return response{}, ErrProtocol
+		}
+		value.x = int32(binary.BigEndian.Uint32(position[:4]))
+		value.y = int32(binary.BigEndian.Uint32(position[4:]))
+	}
+	return value, nil
 }
