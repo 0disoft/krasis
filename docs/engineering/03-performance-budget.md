@@ -943,3 +943,58 @@ recovery and PIN regression checks remain pending.
 
 The nine-package desktop Go tests, vet with unsafeptr=false and diff whitespace
 check passed locally. Packaging and bundle verification are separate checks.
+
+### g170 device observations
+
+Fixed exports were created at A 2026-10-05T11:25:05Z and B 11:25:00Z and filtered
+to revision 85d43ac8b6af4dabc23ebd51e667eca715bfc555. A has twelve source profiles
+and B twelve installed-receiver profiles; all twelve end ok on both devices.
+There is no missing-foreground/probe-failure activation event in these exports.
+
+The added active restore did not demonstrate a successful restoration. A attempts
+1..11 all record restoreActive 2 with its measured flag true: the request ran but
+target foreground was not observed. Each keeps rejected-foreground category 2,
+fallback 4 at stage 10 (SetFailed), restore 3 (APIRejected), postHide 2 (NULL) and
+states [3,2,2,1]. Capture remains foreground before and after detach and becomes
+NULL after hide. Thus the new runtime branch was exercised eleven times without
+changing the restore outcome. Attempt 12 succeeds through the existing fallback
+with result/stage 1, restore 2, postHide 1 and states [3,2,3,3]; it has no active
+restore measurement, so that success is not attributed to SetActiveWindow.
+
+Each next A attempt nevertheless begins with the saved original observed again.
+The mechanism of recovery between NULL after hide and the next attempt remains
+unobserved. Whether the user clicked between transfers is pending. Successful
+entries therefore do not establish that the added branch resolved click recovery.
+Its returned previous-window value/error is not recorded, so unverified target
+foreground does not identify why the native activation failed to take effect.
+
+A request-to-grant is min/median/max 23.841/28.937/277.322ms, capture activation
+5.507/7.7225/41.626ms, and source deactivation 4.809/6.656/71.349ms. Attempt 12's
+successful restore spans 68.401ms. A's frame histogram is [657,3,0,0,0] over 660
+frames with a 4.499ms worst dispatch. B's is [68,568,2,0,0] over 638 frames with a
+12.817ms worst dispatch. Each histogram was checked against its own frame count;
+cross-device totals are not asserted equal or interpreted as packet loss. Spans
+overlap and are not summed; this is not a controlled performance comparison.
+
+B is prepared true on all twelve with ages 2.975..1959.380ms. ReadyWait spans
+6.552..9.057ms. OpenLock and its preparation overlap are measured on all twelve:
+attempt 1 records 73.383ms in both, and the other eleven record measured zero.
+After CONNECTED the export includes 21 lease-ready and 8 preparation-acknowledged
+events, no preparation-missed or installed-input connect/heartbeat failure event.
+
+A CONNECTED at 11:24:20.6836289Z and B at 11:24:20.9492944Z. There is no subsequent
+disconnect, reconnect, session failure or trust-freshness expiry through these
+export endpoints, roughly 44 seconds on A and 39 seconds on B. B's one network
+timeout and RECONNECTING precede CONNECTED. This short interval does not assess
+the longer-running trust-validation failure observed in g169. No emitted slow
+trust trace is not a zero-duration measurement. Both installation receipts are
+result 0/complete, and each retains one incomplete historical log with no current
+revision events. PIN behavior and perceived delay are not confirmed by this export.
+
+The next focus decision must reconsider the ineffective active-restore branch
+and the unresolved recovery between transfers; repeating successful entry tests
+alone cannot validate restoration. No new runtime, API, database, runner or
+security changes are made in this evidence update. Revision filtering,
+active-result/state consistency, per-profile histogram counts, source mapping and
+diff whitespace were checked. Tests and rebuild are skipped for documentation
+only; g170 remains the current packaged generation.
