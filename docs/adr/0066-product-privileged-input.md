@@ -257,3 +257,11 @@ reading disposed native handles. KRD5 carries the service decision after
 verified readiness, with legacy receipts still readable and matched installed
 images required. Child timings cannot replace the selection code. No peer or
 input ACK protocol changes. See the [selection diagnostic contract](../experiments/prepared-worker-selection.md).
+
+## g176: Cursor transaction failure stages
+
+Entry and rollback failures now export a fixed operation-specific stage in
+their existing injection receipt. The wrapper preserves original error chains
+and unknown input outcomes; it does not replay input, change recovery or select
+another backend. Stage validation applies to local and peer diagnostics without
+exporting cursor positions or native error text. See the [stage contract](../experiments/cursor-transaction-failure-stages.md).

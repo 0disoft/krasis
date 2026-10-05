@@ -27,16 +27,20 @@ func NewInputAdapter() *InputAdapter {
 	return newInputAdapter()
 }
 
-func (adapter *InputAdapter) PrepareEntry(ctx context.Context, sourceEdge control.ScreenEdge) error {
+func (adapter *InputAdapter) PrepareEntry(ctx context.Context, sourceEdge control.ScreenEdge) (err error) {
+	stage := "state"
+	defer func() { err = cursorTransactionFailure("entry", stage, err) }()
 	if adapter == nil {
 		return fmt.Errorf("%w: input adapter is not initialized", ErrInputInjection)
 	}
+	stage = "context"
 	if ctx == nil {
 		return fmt.Errorf("%w: context is required", ErrInputInjection)
 	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	stage = "state"
 	state, err := adapter.cursorEntryState()
 	if err != nil {
 		return err
@@ -46,10 +50,12 @@ func (adapter *InputAdapter) PrepareEntry(ctx context.Context, sourceEdge contro
 	if state.pending {
 		return fmt.Errorf("%w: another cursor entry is pending", ErrCursorEntryState)
 	}
+	stage = "snapshot"
 	before, err := adapter.readCursor(ctx)
 	if err != nil {
 		return fmt.Errorf("%w: snapshot cursor before entry: %w", ErrInputInjection, err)
 	}
+	stage = "geometry"
 	x, y, err := cursorEntryPoint(
 		sourceEdge,
 		systemMetric(smXVIRTUALSCREEN),
@@ -66,6 +72,7 @@ func (adapter *InputAdapter) PrepareEntry(ctx context.Context, sourceEdge contro
 		state.pending = true
 		state.previousX, state.previousY = before.X, before.Y
 	}
+	stage = "set"
 	if err := adapter.writeCursor(ctx, x, y); err != nil {
 		if certainty, known := application.InjectionCertaintyOf(err); known && certainty == application.InjectionNotApplied {
 			state.clear()
@@ -75,6 +82,7 @@ func (adapter *InputAdapter) PrepareEntry(ctx context.Context, sourceEdge contro
 	state.pending = true
 	state.previousX = before.X
 	state.previousY = before.Y
+	stage = "verify"
 	position, err := adapter.readCursor(ctx)
 	if err != nil {
 		return fmt.Errorf("%w: verify cursor entry: %w", ErrInputInjection, err)
@@ -82,13 +90,16 @@ func (adapter *InputAdapter) PrepareEntry(ctx context.Context, sourceEdge contro
 	state.enteredKnown = true
 	state.enteredX = position.X
 	state.enteredY = position.Y
+	stage = "mismatch"
 	if position.X != x || position.Y != y {
-		return fmt.Errorf("%w: cursor entry was clipped to (%d,%d)", ErrInputInjection, position.X, position.Y)
+		return fmt.Errorf("%w: cursor entry position does not match", ErrInputInjection)
 	}
 	return nil
 }
 
-func (adapter *InputAdapter) RollbackEntry(ctx context.Context) (application.CursorRollbackOutcome, error) {
+func (adapter *InputAdapter) RollbackEntry(ctx context.Context) (outcome application.CursorRollbackOutcome, err error) {
+	stage := "state"
+	defer func() { err = cursorTransactionFailure("rollback", stage, err) }()
 	state, err := adapter.cursorEntryState()
 	if err != nil {
 		return "", err
@@ -99,15 +110,18 @@ func (adapter *InputAdapter) RollbackEntry(ctx context.Context) (application.Cur
 		return application.CursorRollbackNotRestored, nil
 	}
 	defer state.clear()
+	stage = "context"
 	if ctx == nil {
 		return "", fmt.Errorf("%w: rollback context is required", ErrCursorEntryState)
 	}
 	if err := ctx.Err(); err != nil {
 		return "", errors.Join(ErrCursorEntryState, err)
 	}
+	stage = "unverified"
 	if !state.enteredKnown {
 		return "", fmt.Errorf("%w: entry position could not be verified", ErrCursorEntryState)
 	}
+	stage = "inspect"
 	current, err := adapter.readCursor(ctx)
 	if err != nil {
 		return "", fmt.Errorf("%w: inspect cursor before rollback: %w", ErrCursorEntryState, err)
@@ -115,15 +129,18 @@ func (adapter *InputAdapter) RollbackEntry(ctx context.Context) (application.Cur
 	if current.X != state.enteredX || current.Y != state.enteredY {
 		return application.CursorRollbackNotRestored, nil
 	}
+	stage = "restore"
 	if err := adapter.writeCursor(ctx, state.previousX, state.previousY); err != nil {
 		return "", errors.Join(ErrCursorEntryState, err)
 	}
+	stage = "verify"
 	restored, err := adapter.readCursor(ctx)
 	if err != nil {
 		return "", fmt.Errorf("%w: verify cursor rollback: %w", ErrCursorEntryState, err)
 	}
+	stage = "mismatch"
 	if restored.X != state.previousX || restored.Y != state.previousY {
-		return "", fmt.Errorf("%w: cursor rollback was clipped to (%d,%d)", ErrCursorEntryState, restored.X, restored.Y)
+		return "", fmt.Errorf("%w: cursor rollback position does not match", ErrCursorEntryState)
 	}
 	return application.CursorRollbackRestored, nil
 }
