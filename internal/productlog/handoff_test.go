@@ -9,6 +9,25 @@ import (
 	"github.com/0disoft/krasis/internal/handoff"
 )
 
+func TestFocusExportProjectsOnlyBoundedNumericStatesAndResults(t *testing.T) {
+	p := &handoff.FocusProfile{Schema: 1, States: [4]uint8{3, 2, 3, 1}, Observed: 15, Restore: 2, PostHide: 2, ResultMeasured: 3, Measured: 3}
+	s := handoff.Summary{Schema: 1, Attempt: 1, Role: "source", Backend: "none", End: "ok", Focus: p}
+	r := record{Time: "2026-10-05T00:00:00Z", Code: "handoff_profile", Handoff: &s}
+	data, _ := json.Marshal(r)
+	data = []byte(strings.Replace(string(data), `"focus":{`, `"focus":{"window":"private-marker","title":"private-marker",`, 1))
+	got := sanitizeLog("agent.jsonl", strings.NewReader(string(data)+"\n"))
+	encoded, _ := json.Marshal(got)
+	if got.Incomplete || len(got.Events) != 1 || got.Events[0].Handoff.Focus == nil || *got.Events[0].Handoff.Focus != *p || strings.Contains(string(encoded), "private-marker") {
+		t.Fatal("focus projection leaked or lost evidence")
+	}
+	p.Observed = 7
+	data, _ = json.Marshal(r)
+	got = sanitizeLog("agent.jsonl", strings.NewReader(string(data)+"\n"))
+	if !got.Incomplete || len(got.Events) != 0 {
+		t.Fatal("unobserved focus state exported")
+	}
+}
+
 func TestHandoffExportReprojectsFixedSchemaAndDropsIdentity(t *testing.T) {
 	s := handoff.Summary{Schema: 1, Attempt: 1, Role: "receiver", Backend: "installed", End: "incomplete", Incomplete: true}
 	s.Preparation.Micros[handoff.ReadyWait] = 1000

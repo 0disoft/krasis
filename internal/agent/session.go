@@ -428,6 +428,8 @@ func expectedWorkerCancellation(err, expected error) bool {
 
 type combinedSourceActivation struct {
 	profile         context.Context
+	profileMu       sync.Mutex
+	activeProfile   context.Context
 	source          wininput.SourceActivation
 	capture         wininput.SourceActivation
 	observer        peer.ControlFlowObserver
@@ -439,6 +441,9 @@ func (activation *combinedSourceActivation) Activate() error {
 		return errors.New("combined source activation is not initialized")
 	}
 	profile := handoff.Current(activation.profile, "source")
+	activation.profileMu.Lock()
+	activation.activeProfile = profile
+	activation.profileMu.Unlock()
 	started := time.Now()
 	sourceErr := activation.source.Activate()
 	handoff.Record(profile, handoff.SourceActivate, time.Since(started))
@@ -462,7 +467,7 @@ func (activation *combinedSourceActivation) Activate() error {
 	handoff.Record(profile, handoff.CaptureActivate, time.Since(started))
 	if err := captureErr; err != nil {
 		activation.source.Deactivate()
-		activation.capture.Deactivate()
+		activation.deactivateCapture(profile)
 		activation.observe(peer.ControlFlowCaptureActivationFailed)
 		switch {
 		case errors.Is(err, wininput.ErrSourceCaptureActivationAPIRejected):
@@ -492,13 +497,23 @@ func (activation *combinedSourceActivation) Deactivate() {
 	if activation == nil {
 		return
 	}
-	profile := handoff.Current(activation.profile, "source")
+	activation.profileMu.Lock()
+	profile := activation.activeProfile
+	activation.profileMu.Unlock()
 	started := time.Now()
 	defer func() { handoff.Record(profile, handoff.SourceDeactivate, time.Since(started)) }()
 	if activation.source != nil {
 		activation.source.Deactivate()
 	}
 	if activation.capture != nil {
+		activation.deactivateCapture(profile)
+	}
+}
+
+func (activation *combinedSourceActivation) deactivateCapture(profile context.Context) {
+	if capture, ok := activation.capture.(wininput.SourceProfiledDeactivation); ok {
+		capture.DeactivateProfile(profile)
+	} else {
 		activation.capture.Deactivate()
 	}
 }

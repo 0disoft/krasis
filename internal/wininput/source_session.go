@@ -41,6 +41,12 @@ type SourceProfiledActivation interface {
 	ActivateProfile(context.Context) error
 }
 
+// Optional return/rollback diagnostics keep the same attempt on the native owner.
+type SourceProfiledDeactivation interface {
+	SourceActivation
+	DeactivateProfile(context.Context)
+}
+
 type SourceWheelOwnership interface {
 	SourceActivation
 	OwnsWheel() bool

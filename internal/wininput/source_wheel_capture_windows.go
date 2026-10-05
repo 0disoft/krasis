@@ -197,10 +197,14 @@ func (capture *sourceWheelCapture) ActivateProfile(profile context.Context) erro
 }
 
 func (capture *sourceWheelCapture) Deactivate() {
+	capture.DeactivateProfile(nil)
+}
+
+func (capture *sourceWheelCapture) DeactivateProfile(profile context.Context) {
 	if capture == nil {
 		return
 	}
-	if err := capture.execute(wmSourceWheelCaptureDeactivate, true); err != nil {
+	if err := capture.executeProfile(profile, wmSourceWheelCaptureDeactivate, true); err != nil {
 		capture.failCurrentRun(err)
 	}
 }
@@ -541,7 +545,7 @@ func (current *sourceWheelCaptureRun) handleCommand(message uint32) uintptr {
 	case wmSourceWheelCaptureActivate:
 		err = current.activateWindowProfile(command.profile)
 	case wmSourceWheelCaptureDeactivate:
-		err = current.deactivateWindow()
+		err = current.deactivateWindowProfile(command.profile)
 	}
 	stopHandler()
 	command.result <- err
@@ -571,7 +575,7 @@ func (current *sourceWheelCaptureRun) activateWindowProfile(profile context.Cont
 				activationErr = errors.Join(activationErr, missingForegroundStage)
 			}
 			stopRollback := handoff.CaptureSpan(profile, handoff.CaptureRollback)
-			activationErr = current.rollbackActivation(activationErr)
+			activationErr = current.rollbackActivationProfile(profile, activationErr)
 			stopRollback()
 		}
 	}()
@@ -582,6 +586,7 @@ func (current *sourceWheelCaptureRun) activateWindowProfile(profile context.Cont
 		return fmt.Errorf("%w: position source wheel capture: %v", ErrSourceCaptureActivationSetup, err)
 	}
 	current.savedFocus = sourceWheelCaptureGetForeground()
+	handoff.RecordFocusState(profile, handoff.FocusBeforeShow, sourceFocusState(current.savedFocus, current.window, current.savedFocus))
 	if current.savedFocus == 0 {
 		missingForegroundStage = ErrSourceForegroundMissingBeforeShow
 	}
@@ -806,6 +811,10 @@ func (current *sourceWheelCaptureRun) setForegroundWithThreadAttach(targetWindow
 }
 
 func (current *sourceWheelCaptureRun) deactivateWindow() error {
+	return current.deactivateWindowProfile(nil)
+}
+
+func (current *sourceWheelCaptureRun) deactivateWindowProfile(profile context.Context) error {
 	wasActive := current.active.Swap(false)
 	wasRegistered := current.registered
 	// Retry only the exact native pair we attached, never a newly discovered owner.
@@ -827,17 +836,26 @@ func (current *sourceWheelCaptureRun) deactivateWindow() error {
 	// Restore while the capture window is still foreground. Hiding it first lets
 	// Windows choose another foreground owner, which makes restoreFocus classify
 	// every ordinary return as skipped and loses the saved application focus.
+	current.observeFocus(profile, handoff.FocusBeforeRestore)
+	stopRestore := handoff.FocusSpan(profile, 0)
 	restoreResult, restoreErr := current.restoreFocus()
-	if hideErr := current.hideAfterFocusRestore(); hideErr != nil {
+	stopRestore()
+	handoff.RecordFocusResult(profile, 0, uint8(restoreResult))
+	current.observeFocus(profile, handoff.FocusAfterRestore)
+	stopHide := handoff.FocusSpan(profile, 1)
+	hideErr := current.hideAfterFocusRestore()
+	stopHide()
+	if hideErr != nil {
 		cleanupErr = errors.Join(cleanupErr, hideErr, ErrSourceCaptureRollbackFailed)
 	}
 	if current.observer != nil && wasActive {
 		current.observer.ObserveWheelFocusRestore(restoreResult)
 	}
+	savedFocus := current.savedFocus
 	current.savedFocus = 0
 	// Partial activation can own registration and foreground before active=true.
 	// It needs the same post-hide release proof as a fully active capture.
-	postHideResult, postHideErr := current.verifyPostHideFocusRelease()
+	postHideResult, postHideErr := current.verifyPostHideFocusReleaseProfile(profile, savedFocus)
 	if restoreErr == nil {
 		return errors.Join(cleanupErr, postHideErr)
 	}
@@ -851,7 +869,13 @@ func (current *sourceWheelCaptureRun) deactivateWindow() error {
 }
 
 func (current *sourceWheelCaptureRun) verifyPostHideFocusRelease() (SourcePostHideFocusResult, error) {
+	return current.verifyPostHideFocusReleaseProfile(nil, 0)
+}
+
+func (current *sourceWheelCaptureRun) verifyPostHideFocusReleaseProfile(profile context.Context, savedFocus uintptr) (result SourcePostHideFocusResult, err error) {
 	foreground := sourceWheelCaptureGetForeground()
+	handoff.RecordFocusState(profile, handoff.FocusAfterHide, sourceFocusState(foreground, current.window, savedFocus))
+	defer func() { handoff.RecordFocusResult(profile, 1, uint8(result)) }()
 	switch foreground {
 	case current.window:
 		return SourcePostHideFocusCaptureRetained, ErrSourceFocusReleaseCaptureRetained
@@ -859,6 +883,25 @@ func (current *sourceWheelCaptureRun) verifyPostHideFocusRelease() (SourcePostHi
 		return SourcePostHideFocusUnavailable, nil
 	default:
 		return SourcePostHideFocusRecovered, nil
+	}
+}
+
+func sourceFocusState(foreground, capture, saved uintptr) uint8 {
+	switch {
+	case foreground == 0:
+		return 1
+	case foreground == capture:
+		return 2
+	case foreground == saved:
+		return 3
+	default:
+		return 4
+	}
+}
+
+func (current *sourceWheelCaptureRun) observeFocus(profile context.Context, stage handoff.FocusStage) {
+	if handoff.FocusEnabled(profile) {
+		handoff.RecordFocusState(profile, stage, sourceFocusState(sourceWheelCaptureGetForeground(), current.window, current.savedFocus))
 	}
 }
 

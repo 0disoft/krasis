@@ -47,8 +47,16 @@ func (s *guardedSourceActivation) ActivateProfile(ctx context.Context) error {
 	err = s.check()
 	stopAfter()
 	if err != nil {
-		s.SourceActivation.Deactivate()
+		s.DeactivateProfile(ctx)
 		return err
 	}
 	return nil
+}
+
+func (s *guardedSourceActivation) DeactivateProfile(ctx context.Context) {
+	if capture, ok := s.SourceActivation.(SourceProfiledDeactivation); ok {
+		capture.DeactivateProfile(ctx)
+	} else {
+		s.SourceActivation.Deactivate()
+	}
 }

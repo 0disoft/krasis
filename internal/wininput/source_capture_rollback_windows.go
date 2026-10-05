@@ -2,7 +2,10 @@
 
 package wininput
 
-import "errors"
+import (
+	"context"
+	"errors"
+)
 
 var (
 	ErrSourceForegroundUnavailable         = errors.New("source foreground window unavailable")
@@ -26,7 +29,13 @@ func (e *sourceCaptureActivationRejected) Error() string { return e.cause.Error(
 func (e *sourceCaptureActivationRejected) Unwrap() error { return e.cause }
 
 func (current *sourceWheelCaptureRun) rollbackActivation(cause error) error {
-	cleanupErr := current.deactivateWindow()
+	return current.rollbackActivationProfile(nil, cause)
+}
+
+func (current *sourceWheelCaptureRun) rollbackActivationProfile(profile context.Context, cause error) error {
+	cleanupErr := current.deactivateWindowProfile(profile)
+	// This second proof also runs when cleanup returned before any hide attempt.
+	// Only deactivateWindowProfile records afterHide following a real hide call.
 	_, focusErr := current.verifyPostHideFocusRelease()
 	terminalErr := current.err()
 	if sourceWheelCaptureIsVisible(current.window) || current.active.Load() || current.registered ||

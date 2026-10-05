@@ -54,6 +54,12 @@ func TestCaptureOwnerProfilesSuccessAndRollbackWithoutChangingOutcome(t *testing
 			if (detail.Measured&(1<<handoff.CaptureRollback) != 0) != failRegister || (detail.Measured&(1<<handoff.CaptureForeground) != 0) == failRegister {
 				t.Fatal("partial rollback fabricated successful spans", detail)
 			}
+			if summary.Focus == nil || summary.Focus.States[handoff.FocusBeforeShow] != 3 {
+				t.Fatal("activation dropped original foreground observation", summary.Focus)
+			}
+			if failRegister && (summary.Focus.Observed != 15 || summary.Focus.Restore != 1 || summary.Focus.PostHide != 1 || summary.Focus.States != [4]uint8{3, 3, 3, 3}) {
+				t.Fatal("native rollback lost original attempt focus evidence", summary.Focus)
+			}
 		})
 	}
 }

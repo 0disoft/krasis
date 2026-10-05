@@ -87,6 +87,7 @@ type Summary struct {
 	Incomplete              bool             `json:"incomplete"`
 	Startup                 *StartupProfile  `json:"startup,omitempty"`
 	Capture                 *CaptureProfile  `json:"capture,omitempty"`
+	Focus                   *FocusProfile    `json:"focus,omitempty"`
 	Exchange                *ExchangeProfile `json:"exchange,omitempty"`
 	PreparationLockMicros   uint32           `json:"preparationLockMicros,omitempty"`
 	PreparationLockMeasured bool             `json:"preparationLockMeasured,omitempty"`
@@ -104,6 +105,9 @@ func (s Summary) Valid() bool {
 		return false
 	}
 	if s.Capture != nil && (s.Role != "source" || !s.Capture.Valid() || s.Capture.Measured == 0) {
+		return false
+	}
+	if s.Focus != nil && (s.Role != "source" || !s.Focus.Valid()) {
 		return false
 	}
 	if s.Exchange != nil && !s.Exchange.Valid(s.Role) {
@@ -511,6 +515,10 @@ func (c *Collector) retireLocked(a *attempt, outcome string) func() {
 	a.summary.Preparation.Outcome = outcome
 	a.summary.Incomplete = a.summary.Incomplete || outcome == "incomplete" || a.summary.First.Outcome == ""
 	summary := a.summary
+	if summary.Focus != nil {
+		focus := *summary.Focus
+		summary.Focus = &focus
+	}
 	c.active[summary.Attempt-1] = nil
 	return func() {
 		if c.emit != nil {

@@ -48,6 +48,11 @@ func (capture *profiledGeometryCapture) ActivateProfile(ctx context.Context) err
 	return capture.geometryCapture.Activate()
 }
 
+func (capture *profiledGeometryCapture) DeactivateProfile(ctx context.Context) {
+	handoff.RecordFocusResult(ctx, 0, 1)
+	capture.geometryCapture.Deactivate()
+}
+
 func TestProfiledGeometryGuardForwardsContextAndStillRollsBack(t *testing.T) {
 	var summary handoff.Summary
 	c := handoff.New(func(s handoff.Summary) { summary = s })
@@ -69,5 +74,8 @@ func TestProfiledGeometryGuardForwardsContextAndStillRollsBack(t *testing.T) {
 	mask := uint32(1<<handoff.CaptureShow | 1<<handoff.CaptureBoundaryBefore | 1<<handoff.CaptureBoundaryAfter)
 	if !summary.Valid() || summary.Capture == nil || summary.Capture.Measured != mask || summary.Capture.Micros[handoff.CaptureShow] != 1000 {
 		t.Fatal("guard swallowed profile context or partial evidence", summary)
+	}
+	if summary.Focus == nil || summary.Focus.Restore != 1 {
+		t.Fatal("geometry rollback lost activation attempt context")
 	}
 }

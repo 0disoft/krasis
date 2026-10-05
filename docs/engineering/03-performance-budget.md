@@ -636,3 +636,27 @@ recovery is unconfirmed for this run. The next diagnosis focuses on capture fore
 loss and restoration while retaining fresh ownership checks. These timing observations
 do not isolate the effect of the g165 changes. This is evidence only with no build or
 runtime change.
+
+## g166 optional focus-state diagnostics
+
+`Summary` gains an optional `Focus`, schema 1. `states[4]` covers beforeShow,
+beforeRestore, afterRestore and afterHide with values 0 unobserved, 1 NULL, 2 capture,
+3 saved original and 4 other, plus an `observed` 4-bit mask. A `restore` result is 1
+skipped, 2 succeeded, 3 API rejected or 4 verification lost; `postHide` is 1 recovered,
+2 NULL or 3 capture retained; `resultMeasured` holds their two bits. `micros[2]` carries
+the restoreFocus and hideAfterFocusRestore durations with their own measured bits.
+A profile must have at least one observed, result or duration bit, and values respect
+the 120-second window.
+
+Each field keeps its first write on the original source attempt, the existing
+12-attempt/120-second collector bound applies, and `Retire` deep-copies the profile so
+later updates cannot change an emitted record. The extra native focus queries are
+alive-gated by `FocusEnabled` and run outside the collector lock. No focus policy, TTL,
+lease or wire behavior changes, and no handles or window/application metadata leave the
+owner thread.
+
+AgentGeneration is 166. The nine-package desktop Go tests and vet with
+unsafeptr=false passed with exit 0, including native return/rollback context,
+late-owner isolation, post-hide NULL observation, bounded schema export and private
+field removal. Device delay and PIN behavior are unverified on g166. The g165
+foreground-loss findings motivate the preceding-return investigation.
