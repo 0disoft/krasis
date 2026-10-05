@@ -660,3 +660,41 @@ unsafeptr=false passed with exit 0, including native return/rollback context,
 late-owner isolation, post-hide NULL observation, bounded schema export and private
 field removal. Device delay and PIN behavior are unverified on g166. The g165
 foreground-loss findings motivate the preceding-return investigation.
+
+### g166 device observations
+
+Exports were created at A 2026-10-05T08:51:05Z and B 2026-10-05T08:50:55Z and filtered to
+the exact revision 8ac5ee046ff3bac1226f9ef14be84fac017971ae. A has 12 source and B 12
+installed-receiver profiles; handoff end=ok is observed in attempts 1, 5, 6, 7, 8, 9, 10
+and end=error in 2, 3, 4, 11, 12.
+
+All A profiles carry Focus schema 1 with observed 15, measured 3 and resultMeasured 3.
+Handoff end=ok attempts 1, 9 and 10 have states [3,2,2,1] with restore 3 (APIRejected) and postHide 2
+(NULL), and their restore durations are 3.799/28.194/4.737ms with hide durations
+7.751/8.382/31.421ms. Failures have states [1,1,1,1] with restore 1 (skipped) and
+postHide 2. Successes 5..8 have states [3,2,3,3] with restore 2 (succeeded) and postHide
+1 (recovered), with restore durations 191.954/399.587/649.035/285.129ms. Sequences
+1->2..4 and 10->11..12 support a failed restore followed by a NULL next activation, while
+9->10 starts non-NULL so the intervening recovery cause is unobserved. Twelve
+missing-before-show codes were logged, five matching failed profiles and seven after the
+quota was consumed.
+
+Every B profile is prepared true with ages 1.120–1606.273ms. OpenLock is measured in all
+twelve: attempt 8 is 84.285ms, exactly the preparation-lock value, and the others are
+zero. B ReadyWait is min/max 6.428/93.971ms over the 12 profiles. A's histogram is
+[364,45,0,1,0] over 410 frames with a 456.566ms worst at attempt 7; B's is
+[42,351,2,0,0] over 395 with an 11.365ms maximum at attempt 5. A SourceDeactivate reached
+1425.024ms at attempt 7; nested overlapping spans are not additive.
+
+A CONNECTED at 08:50:09.074549 and B at 08:50:08.0245578, with no later disconnect,
+reconnect or session stop. B's 11 network timeouts, 1 disconnect and session stop all
+precede the connection, and after CONNECTED B recorded 32 leaseReady, 12 prepareAck and 1
+prepareMiss at 08:50:08.3504985, before the first profile. Each support export has one
+incomplete historical log with no current-revision events, and both receipts are
+result 0/complete. PIN and click recovery are not confirmed for g166. Timings are
+process-local; clock values from different devices are never subtracted.
+
+The next work is to preserve the existing restore fallback enum and its presence per
+attempt (the current Focus loses the exact reason) without blind saved-handle
+reactivation; a savedFocus reset is not evidenced as the cause. This is evidence only,
+with no test, build, runtime or API change.
