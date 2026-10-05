@@ -243,4 +243,7 @@ Agent and installed worker images must match through the existing attended
 refresh lifecycle. No installer, ACL, certificate, policy or consent behavior
 changes. Hosted regression checks cover delegation, repeated entry/rollback,
 lost ACK certainty, binding, bounds, cancellation and single-roundtrip motion.
-Actual PIN-open A-B-A-B connection continuity awaits the g173 device trial.
+The operator reported success after the requested PIN-open B-A-B g173 trial.
+The matching exports contain no post-connect entry failure or reconnect in
+their short observation windows. See the [g173 trial observations](../experiments/g173-pin-reentry-observations.md)
+for the evidence boundary and remaining transition-delay work.
