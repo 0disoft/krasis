@@ -74,23 +74,24 @@ type Vector struct {
 }
 
 type Summary struct {
-	Schema                  uint8            `json:"schema"`
-	Attempt                 uint8            `json:"attempt"`
-	Role                    string           `json:"role"`
-	Backend                 string           `json:"backend"`
-	Preparation             Vector           `json:"preparation"`
-	First                   Vector           `json:"first"`
-	Worst                   Vector           `json:"worst"`
-	Frames                  uint32           `json:"frames"`
-	Histogram               [5]uint32        `json:"histogram"`
-	End                     string           `json:"end"`
-	Incomplete              bool             `json:"incomplete"`
-	Startup                 *StartupProfile  `json:"startup,omitempty"`
-	Capture                 *CaptureProfile  `json:"capture,omitempty"`
-	Focus                   *FocusProfile    `json:"focus,omitempty"`
-	Exchange                *ExchangeProfile `json:"exchange,omitempty"`
-	PreparationLockMicros   uint32           `json:"preparationLockMicros,omitempty"`
-	PreparationLockMeasured bool             `json:"preparationLockMeasured,omitempty"`
+	Schema                  uint8                 `json:"schema"`
+	Attempt                 uint8                 `json:"attempt"`
+	Role                    string                `json:"role"`
+	Backend                 string                `json:"backend"`
+	Preparation             Vector                `json:"preparation"`
+	First                   Vector                `json:"first"`
+	Worst                   Vector                `json:"worst"`
+	Frames                  uint32                `json:"frames"`
+	Histogram               [5]uint32             `json:"histogram"`
+	End                     string                `json:"end"`
+	Incomplete              bool                  `json:"incomplete"`
+	Startup                 *StartupProfile       `json:"startup,omitempty"`
+	Capture                 *CaptureProfile       `json:"capture,omitempty"`
+	Focus                   *FocusProfile         `json:"focus,omitempty"`
+	Exchange                *ExchangeProfile      `json:"exchange,omitempty"`
+	GrantProgress           *GrantProgressProfile `json:"grantProgress,omitempty"`
+	PreparationLockMicros   uint32                `json:"preparationLockMicros,omitempty"`
+	PreparationLockMeasured bool                  `json:"preparationLockMeasured,omitempty"`
 }
 
 func (s Summary) Valid() bool {
@@ -111,6 +112,9 @@ func (s Summary) Valid() bool {
 		return false
 	}
 	if s.Exchange != nil && !s.Exchange.Valid(s.Role) {
+		return false
+	}
+	if s.GrantProgress != nil && !s.GrantProgress.Valid(s.Role) {
 		return false
 	}
 	if !validPreparationLock(s) {
@@ -166,11 +170,14 @@ type attempt struct {
 	sessionID, epoch          string
 	finished                  bool
 	firstStarted              bool
+	progress                  *grantProgress
 }
 type session struct {
 	collector        *Collector
 	source, receiver *attempt
 	lastClose        time.Time
+	reader           grantReader
+	pendingGrant     atomic.Pointer[attempt]
 }
 type sample struct {
 	vector         Vector
@@ -248,6 +255,7 @@ func Begin(ctx context.Context, role, sessionID, epoch string, start time.Time) 
 	if !s.lastClose.IsZero() {
 		put(&a.summary.Preparation, ReentryGap, now.Sub(s.lastClose))
 	}
+	beginGrantProgress(s, a, now)
 	c.mu.Unlock()
 	c.finish(old, "incomplete")
 	return context.WithValue(ctx, attemptKey{}, a)
@@ -486,6 +494,7 @@ func Retire(ctx context.Context, outcome string) func() {
 		return func() {}
 	}
 	s.collector.mu.Lock()
+	finishGrantProgress(s, a, time.Now(), false)
 	if !a.finished && (s.source == a || s.receiver == a) {
 		s.lastClose = time.Now()
 	}
@@ -509,6 +518,13 @@ func (c *Collector) finish(a *attempt, outcome string) {
 func (c *Collector) retireLocked(a *attempt, outcome string) func() {
 	if a == nil || a.finished {
 		return func() {}
+	}
+	if a.progress != nil && !a.progress.ended {
+		at := time.Now()
+		if limit := c.started.Add(Window); at.After(limit) {
+			at = limit
+		}
+		finishGrantProgressAt(a, a.progress.phase, at, false)
 	}
 	a.finished = true
 	a.summary.End = outcome

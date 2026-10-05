@@ -91,6 +91,7 @@ func recordGrantRead(ctx context.Context, handledAt time.Time) {
 		return
 	}
 	a.grantRead = readAt
+	finishGrantProgress(s, a, handledAt, true)
 	putExchange(a, GrantReadToHandler, handledAt.Sub(readAt))
 	recordGrantWait(a)
 }
