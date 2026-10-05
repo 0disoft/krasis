@@ -144,7 +144,7 @@ func (s Summary) Valid() bool {
 		if !ValidPipeOwnerCycles(v.PipeOwnerCycles, v.PipeOwnerCyclesMeasured, v.AuthorityMeasured) {
 			return false
 		}
-		if v.WorkerApply != nil && (s.Role != "receiver" || s.Backend != "installed" || !v.WorkerApply.Valid() || v.WorkerApply.Measured == 0) {
+		if v.WorkerApply != nil && (s.Role != "receiver" || s.Backend != "installed" || !v.WorkerApply.ValidForWorker(v.WorkerMillis, v.WorkerMeasured) || v.WorkerApply.Measured == 0) {
 			return false
 		}
 	}

@@ -201,19 +201,7 @@ func serve(ctx context.Context, stream net.Conn, input application.InputPort, le
 		operationCtx, cancel := context.WithDeadline(ctx, deadline)
 		ack := response{sequence: command.sequence, op: command.op}
 		operationErr := do(operationCtx, func() error {
-			if command.op == opCursorRead {
-				return readCursorResponse(operationCtx, input, &ack)
-			}
-			if command.op == opMoveRead {
-				if err := apply(operationCtx, input, &pressed, command); err != nil {
-					return err
-				}
-				if err := readCursorResponse(operationCtx, input, &ack); err != nil {
-					return unknownInput(err)
-				}
-				return nil
-			}
-			return apply(operationCtx, input, &pressed, command)
+			return applyCommand(operationCtx, input, &pressed, command, &ack)
 		})
 		cancel()
 		if len(timings) == 1 && timings[0] != nil {

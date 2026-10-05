@@ -147,6 +147,9 @@ func (client *Client) performResponse(ctx context.Context, command request, obse
 		client.fail()
 		return notSent(ErrExpired)
 	}
+	if command.op != opHeartbeat {
+		command.applyDetail = handoff.WantWorkerApply(ctx)
+	}
 	deadline := time.Now().Add(IdleTimeout)
 	if client.lease.ExpiresAt.Before(deadline) {
 		deadline = client.lease.ExpiresAt
@@ -195,6 +198,9 @@ func (client *Client) performResponse(ctx context.Context, command request, obse
 	copy(sample[4:], ack.timing[:])
 	if command.op != opHeartbeat {
 		handoff.WorkerDetail(ctx, ack.timing, ack.millis, ack.measured)
+		if command.applyDetail {
+			handoff.RecordWorkerApply(ctx, ack.applyDetail)
+		}
 	}
 	if ack.status == 0 {
 		client.lastAcknowledged = time.Now()

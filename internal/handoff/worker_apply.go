@@ -28,6 +28,18 @@ func (p WorkerApplyProfile) Valid() bool {
 	return true
 }
 
+// When the containing span is present and unsaturated, disjoint parts must fit
+// below its next millisecond boundary. Do not derive a scheduler residual.
+func (p WorkerApplyProfile) ValidForWorker(millis [3]uint16, measured uint8) bool {
+	if !p.Valid() {
+		return false
+	}
+	if measured&4 != 0 && millis[2] < MaxWorkerMillis {
+		return uint64(p.Micros[0])+uint64(p.Micros[1]) < uint64(millis[2]+1)*1000
+	}
+	return true
+}
+
 func (p *WorkerApplyProfile) Record(slot int, elapsed time.Duration) {
 	if p == nil || slot < 0 || slot >= len(p.Micros) || p.Measured&(1<<slot) != 0 {
 		return
@@ -75,7 +87,7 @@ func RecordWorkerApply(ctx context.Context, p *WorkerApplyProfile) {
 		return
 	}
 	v.workerApplyRecorded = true
-	if p != nil && p.Valid() && p.Measured != 0 {
+	if p != nil && p.ValidForWorker(v.vector.WorkerMillis, v.vector.WorkerMeasured) && p.Measured != 0 {
 		copy := *p
 		v.vector.WorkerApply = &copy
 	}

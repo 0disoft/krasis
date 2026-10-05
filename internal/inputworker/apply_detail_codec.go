@@ -41,7 +41,7 @@ func readResponseSuffix(reader io.Reader, version byte, value *response) error {
 		p := handoff.WorkerApplyProfile{Micros: [2]uint32{binary.BigEndian.Uint32(data[:4]), binary.BigEndian.Uint32(data[4:8])}, Measured: data[8], Saturated: data[9]}
 		// Consume structurally valid diagnostics even when numeric fields are
 		// invalid. Metadata cannot turn an acknowledged input into a failure.
-		if p.Valid() {
+		if p.ValidForWorker(value.millis, value.measured) {
 			value.applyDetail = &p
 		}
 		offset = workerApplyDetailSize

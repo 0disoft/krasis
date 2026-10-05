@@ -273,3 +273,11 @@ disarm until runtime release and cursor rollback finish. Installed disarm also
 closes the cursor backend; early retirement prevented rollback inspection.
 Bounded cancellation-independent cleanup, lease matching and error aggregation
 remain intact, with unconditional retirement on failure. See the [cleanup lifetime correction](../experiments/cursor-rollback-before-retirement.md).
+
+## g178: Bounded worker apply decomposition
+
+Tracked installed receiver inputs can request two worker-local duration parts
+within the existing input scope: application and cursor snapshot. A bounded
+diagnostic flag/ACK extension carries only numeric timing, with original worker
+timings retained and legacy traffic unchanged. Measurements do not alter input
+order, authority, cursor outcomes or recovery. See the [split measurement contract](../experiments/worker-apply-split.md).

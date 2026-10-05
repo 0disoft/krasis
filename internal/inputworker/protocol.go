@@ -171,7 +171,7 @@ func writeResponse(writer io.Writer, value response) error {
 		data[4] = 3
 		binary.BigEndian.PutUint32(data[20:24], detail)
 	}
-	if value.applyDetail != nil && value.applyDetail.Valid() && (value.measured != 0 || value.timing == ([3]byte{})) {
+	if value.applyDetail != nil && value.applyDetail.ValidForWorker(value.millis, value.measured) && (value.measured != 0 || value.timing == ([3]byte{})) {
 		data[4] = 4
 		encodeWorkerApplyDetail(data[responseSize:responseSize+workerApplyDetailSize], *value.applyDetail)
 		size += workerApplyDetailSize

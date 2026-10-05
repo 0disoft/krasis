@@ -58,3 +58,13 @@ func TestWorkerApplyPresenceSaturationAndInvalidNumbers(t *testing.T) {
 		}
 	}
 }
+
+func TestWorkerApplyPartsFitContainingSpanWhenMeasured(t *testing.T) {
+	p := WorkerApplyProfile{Micros: [2]uint32{31000, 2000}, Measured: 3}
+	if !p.ValidForWorker([3]uint16{0, 0, 33}, 4) || p.ValidForWorker([3]uint16{0, 0, 31}, 4) {
+		t.Fatal("disjoint parts violate parent span")
+	}
+	if !p.ValidForWorker([3]uint16{}, 0) || !p.ValidForWorker([3]uint16{0, 0, MaxWorkerMillis}, 4) {
+		t.Fatal("missing/saturated parent invented a bound")
+	}
+}

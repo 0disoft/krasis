@@ -10,6 +10,8 @@ two-bit `measured`, and two-bit `saturated`. Missing evidence differs from a
 measured zero. Durations floor to microseconds and saturate at the existing
 120-second bound, with explicit saturation bits. The spans describe the existing
 apply function and subsequent cursor snapshot, not exclusively syscall time.
+When the containing worker span is measured and unsaturated, the two parts must
+fit below its next millisecond boundary; inconsistent numeric detail is dropped.
 They are disjoint parts within WorkerApply, not additional end-to-end latency;
 never sum them with their parent or subtract cross-process clocks.
 
@@ -42,4 +44,19 @@ kind, input content, PIN, coordinates, identities or paths enter this diagnostic
 Hosted foundations cover probe budgets, immutable sample association, numeric
 presence/saturation, partial framing, legacy replies, same-write cursor layout,
 numeric rejection without outcome changes, and local/peer export sanitization.
-Native wiring and its failure/cancellation tests are a separate bounded slice.
+## g178 native wiring
+
+The client sets the flag after its existing successful authority check and only
+records detail from a sequence/op-matching response. The worker creates the
+profile inside the existing authorized desktop callback. Failed authority or
+desktop scope produces no fabricated apply measurements. The original apply
+function runs exactly once; snapshot follows only when required and when apply
+succeeds. Post-move snapshot failure keeps outcome-unknown classification.
+No input is replayed and cancellation/recovery follow their existing paths.
+
+Hosted tests use virtual time to distinguish 31ms apply from a 2ms snapshot,
+including failed/absent work, disabled profiling and snapshot-only behavior.
+Client/worker transport checks cover flagged tracked input and unchanged idle
+or untracked traffic. Apply g178 to both devices, repeat ordinary crossings and
+PIN-open reentry, then export diagnostics to identify which measured part stalls.
+This build narrows evidence; it does not claim reduced latency.
