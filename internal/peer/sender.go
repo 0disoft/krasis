@@ -296,7 +296,9 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 		}
 		observeControlFlow(responder.Observer, ControlFlowReturnArmSucceeded)
 		rollbackEntry := func(cause error) error {
-			responder.Returns.DisarmReturn(returnIntent)
+			// Installed DisarmReturn retires cursor access along with the lease.
+			// Keep that backend alive for rollback, even after request cancellation.
+			defer responder.Returns.DisarmReturn(returnIntent)
 			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), CleanupTimeout)
 			defer cancel()
 			observeControlFlow(responder.Observer, ControlFlowEntryRollbackAttempted)
@@ -449,7 +451,9 @@ func (responder *LeaseResponder) abortPendingLocked(ctx context.Context, cause e
 	}
 	pending := responder.pending
 	responder.pending = nil
-	responder.Returns.DisarmReturn(pending.returnIntent)
+	// Runtime release and cursor rollback still need the installed worker.
+	// Retirement must run after both, including when either cleanup fails.
+	defer responder.Returns.DisarmReturn(pending.returnIntent)
 	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), CleanupTimeout)
 	defer cancel()
 	_, runtimeErr := responder.Runtime.AbortInbound(

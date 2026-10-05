@@ -265,3 +265,11 @@ their existing injection receipt. The wrapper preserves original error chains
 and unknown input outcomes; it does not replay input, change recovery or select
 another backend. Stage validation applies to local and peer diagnostics without
 exporting cursor positions or native error text. See the [stage contract](../experiments/cursor-transaction-failure-stages.md).
+
+## g177: Recover cursor before retiring its worker
+
+Receiver entry-failure and prepared-abort cleanup now defer matching return
+disarm until runtime release and cursor rollback finish. Installed disarm also
+closes the cursor backend; early retirement prevented rollback inspection.
+Bounded cancellation-independent cleanup, lease matching and error aggregation
+remain intact, with unconditional retirement on failure. See the [cleanup lifetime correction](../experiments/cursor-rollback-before-retirement.md).
