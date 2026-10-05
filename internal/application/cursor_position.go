@@ -21,10 +21,17 @@ type PositionedMovePort interface {
 type CursorPlacement struct {
 	TargetX, TargetY int32
 	X, Y             int32
+	Observation      *CursorPlacementObservation
 }
 
 // CursorPlacementPort places and inspects the cursor in one authorized backend
 // operation. It respects existing confinement without changing ClipCursor.
 type CursorPlacementPort interface {
 	PlaceCursor(context.Context, int32, int32) (CursorPlacement, error)
+}
+
+// CursorPlacementProbePort adds bounded, read-only mismatch classification to
+// the same placement operation. It never retries or changes placement policy.
+type CursorPlacementProbePort interface {
+	ProbeCursorPlacement(context.Context, int32, int32) (CursorPlacement, error)
 }

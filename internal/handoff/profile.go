@@ -158,15 +158,16 @@ func (s Summary) Valid() bool {
 func validOutcome(s string) bool { return s == "ok" || s == "error" || s == "incomplete" }
 
 type Collector struct {
-	mu                sync.Mutex
-	emit              func(Summary)
-	started           time.Time
-	count             uint8
-	active            [Limit]*attempt
-	timer             *time.Timer
-	stopped           atomic.Bool
-	pipeOwnerProbes   atomic.Uint32
-	workerApplyProbes uint32
+	mu                    sync.Mutex
+	emit                  func(Summary)
+	started               time.Time
+	count                 uint8
+	active                [Limit]*attempt
+	timer                 *time.Timer
+	stopped               atomic.Bool
+	pipeOwnerProbes       atomic.Uint32
+	workerApplyProbes     uint32
+	cursorPlacementProbes uint32
 }
 type attempt struct {
 	summary                   Summary
@@ -174,6 +175,7 @@ type attempt struct {
 	requestWritten, grantRead time.Time
 	sessionID, epoch          string
 	finished                  bool
+	cursorPlacementRequested  bool
 	firstStarted              bool
 	progress                  *grantProgress
 }
