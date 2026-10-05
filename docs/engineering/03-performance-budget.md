@@ -1024,3 +1024,60 @@ their existing boundaries. These tests cannot establish native success, improved
 device latency or the mechanism of recovery between real transitions. Compare
 fresh g171 source profiles with the same-generation receiver observations; keep
 cross-host clocks and overlapping spans separate.
+
+### g171 device observations
+
+The exports created on 2026-10-05 at 11:56:09Z (A) and 11:56:05Z (B) contain
+revision 7012b338a7d0adc86fcbe69bc4e07d081c9ffdd4. Filter by that exact revision:
+A has twelve source profiles and B twelve installed-receiver profiles, each
+ending ok and incomplete false. These are not twenty-four independent successful
+transfers or a complete account of the trial: the detailed collector stops after
+twelve attempts (within its 120-second window).
+
+All twelve A profiles record focus states [3,2,2,1], restore 3 (APIRejected),
+postHide 2 (NULL), fallback 4 at stage 10 (SetFailed) and rejected foreground 2
+(capture). No restoreActive measurement is emitted. Thus every profiled release
+retains capture at the rejected restore, then has no foreground after hide.
+Later successful attempts start with saved-original foreground again, but the
+recovery mechanism between attempts is unobserved.
+
+After A's twelfth profile at 11:55:10.9829452Z, six separate
+activation_capture_foreground_missing_before_show events are recorded between
+11:55:44.2501306Z and 11:55:54.4188333Z. They identify failed activation attempts
+that started with NULL foreground. Their detailed focus/capture profiles are
+absent after the quota, so the new own-queue preparation's execution and result
+cannot be independently attributed. g171 has not eliminated this failure class.
+The operator reports a blocked crossing followed by successful movement without
+a click. The precise relation to these events and the native recovery mechanism
+remain unobserved; do not describe eventual recovery as a complete fix.
+
+For the twelve successful source profiles, RequestToGrant min/median/max is
+22.424/27.659/34.658ms, CaptureActivate 5.962/8.117/25.849ms and SourceDeactivate
+4.877/12.9145/20.307ms. CaptureFallback is 3.777/4.7375/10.818ms. These local,
+possibly nested spans must not be added. Failed attempts outside the quota are
+not represented in these distributions. This is an observation, not a controlled
+comparison with g170 or evidence of pointer presentation latency.
+
+A's histogram totals [529,2,0,0,0] over 531 frames; its worst Dispatch is
+1.509ms. B totals [34,483,2,0,0] over 519 frames and worst Dispatch is 28.012ms.
+Each profile's histogram sum equals its own frame count. B is prepared true on
+all twelve, ReadyWait is 6.472..8.178ms, and OpenLock is measured zero on all
+twelve. B records sixty lease-ready and nineteen preparation acknowledgements,
+with no installed-input connection or heartbeat failure event in this revision.
+
+A CONNECTED at 11:54:55.3315166Z and B at 11:54:55.5625859Z. No subsequent
+disconnect, reconnect, session failure or trust expiry is recorded through their
+respective exports, about 74 seconds on A and 69 seconds on B. B's two acquisition
+timeouts and RECONNECTING occur before CONNECTED. The six local activation
+failures are distinct from connection failure. Both installation receipts are
+result 0/complete, and each export has one incomplete historical log containing
+no current-revision events. PIN behavior is unconfirmed by this export.
+
+The next focus work must address the rejected saved-window restore and subsequent
+NULL foreground, preserving degraded release and terminal detach/retained-capture
+guards. Repeating activation retries alone is not supported as a remedy. This
+update records evidence only: no runtime, API, database, runner or security change.
+Checks cover revision isolation, event identity uniqueness, histogram conservation,
+measured-span masks, focus categories and same-host event ordering. Tests and
+rebuild are skipped for documentation-only changes; g171 remains the packaged
+generation.
