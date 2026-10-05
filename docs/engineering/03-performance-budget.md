@@ -998,3 +998,12 @@ security changes are made in this evidence update. Revision filtering,
 active-result/state consistency, per-profile histogram counts, source mapping and
 diff whitespace were checked. Tests and rebuild are skipped for documentation
 only; g170 remains the current packaged generation.
+
+## g171 retire unverified active restoration
+
+Remove the g170 cross-thread SetActiveWindow(savedFocus) request after eleven
+device attempts returned restoreActive 2 without verified saved-target ownership.
+Keep the existing attach/detach verification and degraded release policy. The
+historical focus schema remains readable; new runs do not emit restoreActive.
+Rejection observation again requires a live source profile and is committed
+atomically with its fallback result. No device improvement is claimed.

@@ -133,6 +133,9 @@ func TestRestoreFallbackStageKeepsNativeCallOrderAndOutcome(t *testing.T) {
 					previousCalls = calls
 				} else {
 					wantCalls := slices.Clone(previousCalls)
+					if test.name == "set" {
+						wantCalls = slices.Insert(wantCalls, len(wantCalls)-2, "get")
+					}
 					if !slices.Equal(calls, wantCalls) || !summary.Valid() || summary.Focus == nil || !summary.Focus.RestoreFallbackMeasured || summary.Focus.RestoreFallback != test.result || summary.Focus.RestoreFallbackStage != test.stage {
 						t.Fatal("unexpected native calls or lost failure stage", calls, wantCalls, summary.Focus)
 					}
@@ -184,7 +187,7 @@ func TestRestoreRejectedForegroundStaysBeforeDetachAndDoesNotOverrideFailure(t *
 	}
 }
 
-func TestRestoreRecoveryQueryDoesNotDependOnDiagnosticProfile(t *testing.T) {
+func TestRejectedForegroundQueryRequiresLiveSourceProfile(t *testing.T) {
 	for _, mode := range []string{"nil", "receiver", "retired", "quota", "ended", "source"} {
 		t.Run(mode, func(t *testing.T) {
 			restore := stubSourceWheelCaptureActivation(t)
@@ -220,7 +223,10 @@ func TestRestoreRecoveryQueryDoesNotDependOnDiagnosticProfile(t *testing.T) {
 			}
 			current := &sourceWheelCaptureRun{window: 10, savedFocus: 20}
 			result, err := current.restoreFocusFallbackProfile(p)
-			wantQueries := 1 // runtime eligibility proof, independent of diagnostic budget
+			wantQueries := 0
+			if mode == "source" {
+				wantQueries = 1
+			}
 			if result != SourceFocusRestoreFallbackAPIRejected || err == nil || queries != wantQueries || current.attachedSource != 0 {
 				t.Fatal("optional observation affected query bound or cleanup", result, err, queries)
 			}

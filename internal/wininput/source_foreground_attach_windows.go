@@ -9,9 +9,7 @@ import (
 	"github.com/0disoft/krasis/internal/handoff"
 )
 
-// activeRestore is non-nil only for restoration. Its numeric result never
-// authorizes ownership; actual foreground must survive detachment.
-func (current *sourceWheelCaptureRun) setForegroundWithThreadAttachDetailed(targetWindow, peerWindow uintptr, profile context.Context, activeRestore *uint8) (foregroundThreadFallbackResult, handoff.FocusFallbackStage, uint8, error) {
+func (current *sourceWheelCaptureRun) setForegroundWithThreadAttachDetailed(targetWindow, peerWindow uintptr, profile context.Context) (foregroundThreadFallbackResult, handoff.FocusFallbackStage, uint8, error) {
 	if current.attachedSource != 0 {
 		return foregroundThreadFallbackDetachFailed, handoff.FocusFallbackPendingDetach, 0, ErrSourceCaptureThreadDetachFailed
 	}
@@ -45,23 +43,9 @@ func (current *sourceWheelCaptureRun) setForegroundWithThreadAttachDetailed(targ
 	}
 	verified := foregroundErr == nil && sourceWheelCaptureGetForeground() == targetWindow
 	var rejectedForeground uint8
-	if foregroundErr != nil && foregroundStage == handoff.FocusFallbackSetFailed && (activeRestore != nil || handoff.FocusEnabled(profile)) {
+	if foregroundErr != nil && foregroundStage == handoff.FocusFallbackSetFailed && handoff.FocusEnabled(profile) {
 		foreground := sourceWheelCaptureGetForeground()
 		rejectedForeground = sourceFocusState(foreground, current.window, current.savedFocus)
-		// One queue-local activation, only while our capture still owns
-		// foreground and the responsive saved target remains valid. This never
-		// runs for capture activation, NULL foreground or an external owner.
-		if activeRestore != nil && foreground == current.window && current.window != 0 &&
-			targetWindow == current.savedFocus && peerWindow == targetWindow && targetWindow != current.window &&
-			current.err() == nil && sourceWheelCaptureIsWindow(targetWindow) && sourceWheelCaptureIsVisible(targetWindow) &&
-			sourceWheelCaptureIsEnabled(targetWindow) && sourceWheelCaptureGetForeground() == current.window && current.err() == nil {
-			sourceWheelCaptureSetActive(targetWindow)
-			*activeRestore = 2 // requested, not verified
-			if sourceWheelCaptureGetForeground() == targetWindow {
-				*activeRestore = 1 // verified while joined, not final ownership proof
-				verified, foregroundErr = true, nil
-			}
-		}
 	}
 	detachErr := current.detachForegroundThreads()
 	if detachErr != nil {

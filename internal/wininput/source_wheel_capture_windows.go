@@ -744,7 +744,7 @@ func (current *sourceWheelCaptureRun) activateForegroundFallback() (SourceForegr
 }
 
 func (current *sourceWheelCaptureRun) setForegroundWithThreadAttach(targetWindow, peerWindow uintptr) (foregroundThreadFallbackResult, error) {
-	result, _, _, err := current.setForegroundWithThreadAttachDetailed(targetWindow, peerWindow, nil, nil)
+	result, _, _, err := current.setForegroundWithThreadAttachDetailed(targetWindow, peerWindow, nil)
 	return result, err
 }
 
@@ -891,10 +891,9 @@ func (current *sourceWheelCaptureRun) restoreFocusFallback() (SourceFocusRestore
 }
 
 func (current *sourceWheelCaptureRun) restoreFocusFallbackProfile(profile context.Context) (mapped SourceFocusRestoreFallbackResult, mappedErr error) {
-	var activeRestore uint8
-	result, stage, rejectedForeground, err := current.setForegroundWithThreadAttachDetailed(current.savedFocus, current.savedFocus, profile, &activeRestore)
+	result, stage, rejectedForeground, err := current.setForegroundWithThreadAttachDetailed(current.savedFocus, current.savedFocus, profile)
 	defer func() {
-		handoff.RecordFocusFallbackActive(profile, uint8(mapped), stage, rejectedForeground, activeRestore)
+		handoff.RecordFocusFallbackObserved(profile, uint8(mapped), stage, rejectedForeground)
 	}()
 	switch result {
 	case foregroundThreadFallbackSucceeded:

@@ -88,7 +88,7 @@ terminal 처리, counter 합계만 증명한다. gram13에서 connection interru
 - 정확한 focus가 degraded된 회차에는 gram13 keyboard 입력 대상이 안전한 local window인지 수동 확인한다.
 - HP15의 pointer, click, drag, keyboard와 vertical/horizontal touchpad scroll 회귀가 없어야 한다.
 
-## g170 restore refinement
+## g170 restore refinement (retired in g171)
 
 g169 device evidence shows four rejected attached restore calls where capture
 remains foreground before and after detach, followed by NULL after hide. Five
@@ -113,6 +113,13 @@ original API rejection and degraded-hide policy. The existing native-call
 responsiveness risk of joined queues remains; a finite call count does not prove
 a wall-clock latency bound. Device verification is required before claiming the
 click-recovery symptom is resolved.
+
+g170 device observations exercised this request eleven times without observing
+the saved target as foreground. g171 removes the cross-thread SetActiveWindow
+request and its eligibility probes. Microsoft documents that a target created by
+another thread sets the calling thread's active status to NULL. The existing
+SetForegroundWindow/attach/detach path and degraded-hide policy remain. Historical
+restoreActive fields remain readable, but g171 does not emit them.
 
 ## 참고
 
