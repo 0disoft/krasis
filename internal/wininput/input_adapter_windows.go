@@ -73,20 +73,37 @@ func (adapter *InputAdapter) PrepareEntry(ctx context.Context, sourceEdge contro
 		state.previousX, state.previousY = before.X, before.Y
 	}
 	stage = "set"
-	if err := adapter.writeCursor(ctx, x, y); err != nil {
-		if certainty, known := application.InjectionCertaintyOf(err); known && certainty == application.InjectionNotApplied {
-			state.clear()
+	var position point
+	if port, ok := adapter.injection.(application.CursorPlacementPort); ok {
+		// Protected placement observes confinement and reads back on the same
+		// authorized worker thread. Its expected target is not the readback.
+		placement, placeErr := port.PlaceCursor(ctx, x, y)
+		if placeErr != nil {
+			if certainty, known := application.InjectionCertaintyOf(placeErr); known && certainty == application.InjectionNotApplied {
+				state.clear()
+			}
+			return placeErr
 		}
-		return err
+		x, y = placement.TargetX, placement.TargetY
+		position = point{X: placement.X, Y: placement.Y}
+	} else {
+		if err := adapter.writeCursor(ctx, x, y); err != nil {
+			if certainty, known := application.InjectionCertaintyOf(err); known && certainty == application.InjectionNotApplied {
+				state.clear()
+			}
+			return err
+		}
+		state.pending = true
+		state.previousX, state.previousY = before.X, before.Y
+		stage = "verify"
+		position, err = adapter.readCursor(ctx)
+		if err != nil {
+			return fmt.Errorf("%w: verify cursor entry: %w", ErrInputInjection, err)
+		}
 	}
 	state.pending = true
 	state.previousX = before.X
 	state.previousY = before.Y
-	stage = "verify"
-	position, err := adapter.readCursor(ctx)
-	if err != nil {
-		return fmt.Errorf("%w: verify cursor entry: %w", ErrInputInjection, err)
-	}
 	state.enteredKnown = true
 	state.enteredX = position.X
 	state.enteredY = position.Y

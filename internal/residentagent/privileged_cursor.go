@@ -8,6 +8,23 @@ import (
 
 var _ application.CursorPositionPort = (*privilegedLeaseInput)(nil)
 var _ application.PositionedMovePort = (*privilegedLeaseInput)(nil)
+var _ application.CursorPlacementPort = (*privilegedLeaseInput)(nil)
+
+func (input *privilegedLeaseInput) PlaceCursor(ctx context.Context, x, y int32) (placement application.CursorPlacement, err error) {
+	err = input.perform(ctx, func(client privilegedClient) error {
+		port, ok := client.(application.CursorPlacementPort)
+		if !ok {
+			return &application.InjectionError{Certainty: application.InjectionNotApplied, Cause: errPrivilegedInput}
+		}
+		var placeErr error
+		placement, placeErr = port.PlaceCursor(ctx, x, y)
+		return placeErr
+	})
+	if err != nil && input.event != nil {
+		input.event("installed_input_cursor_set_failed")
+	}
+	return
+}
 
 func (input *privilegedLeaseInput) CursorPosition(ctx context.Context) (x, y int32, err error) {
 	err = input.perform(ctx, func(client privilegedClient) error {

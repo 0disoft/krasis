@@ -503,3 +503,32 @@ failure after successful motion is outcome-unknown, never not-applied. The
 ordinary agent uses the matching ACK position for return-boundary detection
 without a second cursor request. Entry read/set/verification and rollback retain
 their transaction semantics, with all cursor I/O delegated to the selected worker.
+
+## g180 confined cursor placement
+
+Protected entry adds `CursorPlacementPort` and local operation `opCursorPlace`.
+The worker observes `GetClipCursor`, intersects its rectangle with current screen
+bounds, computes a permitted target, sets the cursor once and reads it back within
+one existing authorized desktop scope. It never changes confinement. The expected
+target comes from the observed rectangle, independently of actual readback.
+
+The 48-byte request still contains only the requested coordinates, sequence and
+lease binding. A successful placement ACK has a private sixteen-byte suffix:
+actual X/Y followed by expected target X/Y. The client validates the matching ACK,
+and the agent compares actual position with expected target before committing
+entry. Ordinary cursor read/move ACKs and their eight-byte suffix are unchanged;
+truncated placement suffixes fail closed. Agent and installed worker must both
+support this operation; no compatibility retry or ordinary-backend fallback is
+allowed after a missing or failed ACK.
+
+Placement is refused while the worker owns pressed keys/buttons. Cancellation or
+invalid confinement before mutation is not-applied; lost ACK or failed cursor
+readback after a successful write is outcome-unknown. The adapter retains pending
+rollback ownership and rejects real readback mismatches. The prior-cursor snapshot,
+commit, rollback comparison and protected lease retirement remain unchanged.
+Coordinates and confinement rectangles do not enter diagnostics. Native PIN
+reentry and clipping-related disconnect recovery require device validation.
+
+Windows can adjust a requested position to keep it inside confinement; see
+[SetCursorPos](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setcursorpos)
+and [GetClipCursor](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getclipcursor).
