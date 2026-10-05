@@ -832,3 +832,74 @@ behavior remain unverified.
 
 The nine-package desktop Go tests, vet with unsafeptr=false and diff whitespace
 check passed locally. Packaging and bundle verification are separate checks.
+
+### g169 device observations
+
+Exports captured for this analysis were created at A 2026-10-05T10:57:15Z and B
+10:57:04Z. Both are filtered to revision
+ac821e58b094255f66aacb1dca4917d1b9402980. Export files changed during inspection;
+the conclusions below use a fixed, ignored analysis snapshot instead of a moving
+latest pointer. Earlier exports at A 10:55:10Z and B 10:55:02Z already contain the
+same twelve profiles; those earlier snapshots precede the later session failure.
+
+A has twelve source and B twelve installed-receiver profiles. Attempts 3, 4, 5,
+11 and 12 end ok; 1, 2 and 6..10 end error. Attempts 1 and 2 have A focus states
+[3,3,3,3], skipped restoration, and foreground-probe failure events. Thus these
+two activation failures occur with an observable saved foreground, independently
+of the later NULL-foreground sequence.
+
+Attempts 3, 4, 5 and 11 have states [3,2,2,1], restore 3 (APIRejected), postHide 2
+(NULL), fallback 4 at stage 10 (SetFailed), and the new rejected-foreground category
+2 with its measured flag true. Capture therefore remains foreground at the
+pre-detach observation and at the post-detach, pre-hide observation. Restoration
+was not observed to reach the saved target while queues were joined; these records
+do not support a saved-target transition being lost only on detachment. The
+underlying Windows reason for rejection remains unobserved.
+
+After attempt 5's failed restore and NULL post-hide observation, attempts 6..10 all
+start with NULL and fail activation, recording states [1,1,1,1]. Five
+missing-before-show events match these failures. Attempt 11 again begins with the
+saved original, but how focus recovered in between is unknown; user clicking has
+not been confirmed. Attempt 12 restores successfully with states [3,2,3,3] and
+fallback result/stage 1. Its restore span is 202.936ms and source deactivation is
+260.360ms. The four rejected restore spans are 37.419/6.747/3.528/4.095ms.
+
+A request-to-grant spans 26.225..171.911ms and capture activation
+8.444..1862.742ms. Attempt 9's capture fallback span is 1835.210ms inside its
+1862.742ms activation; these overlapping spans are not additive. A's frame histogram
+is [363,33,0,1,0] and B's [17,369,11,0,0], each totaling 397 frames. A's worst
+dispatch is 544.036ms at attempt 4, matching that vector's InputWrite value; B's
+worst dispatch is 17.843ms. These remain separate latency observations, not a
+controlled comparison or an attribution of all perceived delay to one cause.
+
+B is prepared true on eleven profiles; attempt 8 has no prepared flag, which is
+not interpreted as a preparation duration of zero. ReadyWait spans
+6.521..121.449ms, with the largest value at attempt 8. OpenLock and its preparation
+overlap are measured on all twelve: attempt 10 is 54.628ms in both, while the
+other eleven are measured zero. After B's connection, the fixed snapshot includes
+22 lease-ready and 17 preparation-acknowledged events and no preparation-missed or
+installed-input connect/heartbeat failure event. Both installation receipts are
+result 0/complete; one incomplete historical log per device has no exact-revision
+events.
+
+There is no connection loss during the retained profile sequence. A connects at
+10:53:56.8264087Z and B at 10:53:57.1168604Z. However, the later snapshot contains a
+separate session failure: A records trust-read recovery at 10:56:56.7383439Z,
+deferred validation at 10:56:59.7158309Z, and freshness expiry at
+10:57:02.7673042Z with the trace active at prelock_directory_acl. A then records
+DISCONNECTING at 10:57:03.7483561Z and session_failed at 10:57:03.8824806Z. B
+independently records remote EOF and RECONNECTING at 10:57:03.0788222Z. Cross-device
+timestamps are not subtracted or used to prove event ordering. The resident trust
+monitor's five-second freshness bound cancels a session when validation has not
+completed successfully in time. A's eight deferred and seven recovered events
+after connection show repeated local read delays; why those filesystem/security
+queries stalled is not determined by these coarse trace categories.
+
+The next focus work concerns restore rejection before detachment and the ensuing
+NULL foreground, rather than a post-detach completion pump. The later trust
+freshness failure needs a separate investigation of validation I/O while preserving
+revocation and freshness checks. PIN behavior and the user's click-recovery action
+are not confirmed in this export. No runtime, API, database, runner or security
+setting was changed. Revision filtering, histogram/frame counts, trace-to-source
+mapping and diff whitespace were checked; tests and a rebuild are skipped because
+this change records device evidence only.
