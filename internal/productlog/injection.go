@@ -13,11 +13,15 @@ type InjectionFailure struct {
 	Requested   int                            `json:"requested"`
 	Inserted    int                            `json:"inserted"`
 	CountsKnown bool                           `json:"countsKnown"`
+	CursorStage string                         `json:"cursorStage,omitempty"`
 }
 
 func init() { allowed["injection_failure"] = true }
 
 func (s InjectionFailure) valid() bool {
+	if s.CursorStage != "" && !application.ValidCursorFailureStage(s.Operation, s.CursorStage) {
+		return false
+	}
 	switch s.Operation {
 	case "press", "release", "move", "wheel", "entry", "rollback":
 	default:
@@ -55,6 +59,10 @@ func (l *Logger) Injection(operation string, err error) {
 		if candidate.valid() {
 			s = candidate
 		}
+	}
+	var cursor *application.CursorTransactionFailure
+	if errors.As(err, &cursor) && cursor != nil && cursor.Cause != nil && cursor.Operation == operation && application.ValidCursorFailureStage(operation, cursor.Stage) {
+		s.CursorStage = cursor.Stage
 	}
 	if s.valid() {
 		l.enqueueRecord(record{Code: "injection_failure", Injection: &s})
