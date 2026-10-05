@@ -75,3 +75,8 @@ inspect `grantProgress` together with its existing exchange/preparation spans.
 Do not identify separate machines' attempts by ordinal or claim packet loss
 from a long read phase. Socket-level evidence remains a separate next step if
 decoded-byte and local-dispatch evidence cannot explain the wait.
+
+The [g174 export observations](g174-grant-progress-observations.md) confirm
+that the first device trial produced complete numeric progress profiles. They
+also identify a local receiver readiness outlier and an independent source
+focus-restore delay; neither is evidence of TCP retransmission.
