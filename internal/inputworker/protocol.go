@@ -34,11 +34,12 @@ const (
 )
 
 type request struct {
-	op       operation
-	sequence uint64
-	binding  [16]byte
-	token    control.PressedToken
-	x, y     int32
+	op          operation
+	sequence    uint64
+	binding     [16]byte
+	token       control.PressedToken
+	x, y        int32
+	applyDetail bool
 }
 
 func readRequest(reader io.Reader) (request, error) {
@@ -46,10 +47,14 @@ func readRequest(reader io.Reader) (request, error) {
 	if _, err := io.ReadFull(reader, data[:]); err != nil {
 		return request{}, err
 	}
-	if string(data[:4]) != "KRI1" || data[4] != 1 || data[7] != 0 || binary.BigEndian.Uint64(data[40:]) != 0 {
+	if string(data[:4]) != "KRI1" || (data[4] != 1 && data[4] != 2) || data[4] == 1 && data[7] != 0 || data[4] == 2 && data[7] != 1 || binary.BigEndian.Uint64(data[40:]) != 0 {
 		return request{}, ErrProtocol
 	}
 	value := request{op: operation(data[5]), sequence: binary.BigEndian.Uint64(data[8:16])}
+	value.applyDetail = data[4] == 2
+	if value.applyDetail && (value.op == opHeartbeat || value.op == opClose) {
+		return request{}, ErrProtocol
+	}
 	copy(value.binding[:], data[16:32])
 	switch value.op {
 	case opPress, opRelease:
@@ -91,6 +96,12 @@ func encodeRequest(value request) ([requestSize]byte, error) {
 	var data [requestSize]byte
 	copy(data[:4], "KRI1")
 	data[4], data[5] = 1, byte(value.op)
+	if value.applyDetail {
+		if value.op == opHeartbeat || value.op == opClose {
+			return data, ErrProtocol
+		}
+		data[4], data[7] = 2, 1
+	}
 	binary.BigEndian.PutUint64(data[8:16], value.sequence)
 	copy(data[16:32], value.binding[:])
 	switch value.op {
@@ -124,10 +135,11 @@ type response struct {
 	timing              [3]byte
 	millis              [3]uint16
 	measured            uint8
+	applyDetail         *handoff.WorkerApplyProfile
 }
 
 func writeResponse(writer io.Writer, value response) error {
-	var data [responseSize + 8]byte
+	var data [responseSize + workerApplyDetailSize + 8]byte
 	size := responseSize
 	copy(data[:4], "KRA1")
 	data[4], data[5], data[6], data[7] = 1, byte(value.op), value.status, value.certainty
@@ -159,11 +171,16 @@ func writeResponse(writer io.Writer, value response) error {
 		data[4] = 3
 		binary.BigEndian.PutUint32(data[20:24], detail)
 	}
+	if value.applyDetail != nil && value.applyDetail.Valid() && (value.measured != 0 || value.timing == ([3]byte{})) {
+		data[4] = 4
+		encodeWorkerApplyDetail(data[responseSize:responseSize+workerApplyDetailSize], *value.applyDetail)
+		size += workerApplyDetailSize
+	}
 	if (value.op == opCursorRead || value.op == opMoveRead) && value.status == 0 {
 		// Cursor snapshots add eight private bytes in the same pipe write.
 		// Other ACKs retain their existing size; coordinates never enter logs.
-		binary.BigEndian.PutUint32(data[responseSize:responseSize+4], uint32(value.x))
-		binary.BigEndian.PutUint32(data[responseSize+4:], uint32(value.y))
+		binary.BigEndian.PutUint32(data[size:size+4], uint32(value.x))
+		binary.BigEndian.PutUint32(data[size+4:], uint32(value.y))
 		size += 8
 	}
 	n, err := writer.Write(data[:size])
@@ -174,14 +191,14 @@ func writeResponse(writer io.Writer, value response) error {
 }
 
 func decodeResponse(data [responseSize]byte) (response, error) {
-	if string(data[:4]) != "KRA1" || data[4] < 1 || data[4] > 3 || (data[4] != 3 && data[23] != 0) {
+	if string(data[:4]) != "KRA1" || data[4] < 1 || data[4] > 4 || (data[4] < 3 && data[23] != 0) {
 		return response{}, ErrProtocol
 	}
 	value := response{op: operation(data[5]), status: data[6], certainty: data[7],
 		sequence: binary.BigEndian.Uint64(data[8:16]), requested: binary.BigEndian.Uint16(data[16:18]), inserted: binary.BigEndian.Uint16(data[18:20])}
-	if data[4] == 3 {
+	if data[4] >= 3 {
 		detail := binary.BigEndian.Uint32(data[20:24])
-		if detail == 0 || detail>>30 != 0 {
+		if data[4] == 3 && detail == 0 || detail>>30 != 0 {
 			return response{}, ErrProtocol
 		}
 		for i := range value.millis {

@@ -2,7 +2,6 @@ package inputworker
 
 import (
 	"context"
-	"encoding/binary"
 	"io"
 	"math"
 	"sync"
@@ -247,13 +246,8 @@ func readResponse(reader io.Reader) (response, error) {
 	if err != nil {
 		return response{}, err
 	}
-	if (value.op == opCursorRead || value.op == opMoveRead) && value.status == 0 {
-		var position [8]byte
-		if _, err := io.ReadFull(reader, position[:]); err != nil {
-			return response{}, ErrProtocol
-		}
-		value.x = int32(binary.BigEndian.Uint32(position[:4]))
-		value.y = int32(binary.BigEndian.Uint32(position[4:]))
+	if err := readResponseSuffix(reader, data[4], &value); err != nil {
+		return response{}, err
 	}
 	return value, nil
 }

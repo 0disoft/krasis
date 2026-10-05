@@ -61,16 +61,17 @@ const (
 // Vector preserves one operation, not unrelated per-stage maxima. Worker
 // buckets come only from the existing matching ACK (0 means unobserved).
 type Vector struct {
-	Micros                  [StageCount]int64 `json:"micros"`
-	Measured                uint64            `json:"measured"`
-	Worker                  [3]byte           `json:"worker"`
-	WorkerMillis            [3]uint16         `json:"workerMillis"`
-	WorkerMeasured          uint8             `json:"workerMeasured"`
-	AuthorityMicros         [3]uint32         `json:"authorityMicros"`
-	AuthorityMeasured       uint8             `json:"authorityMeasured"`
-	PipeOwnerCycles         uint64            `json:"pipeOwnerCycles,omitempty"`
-	PipeOwnerCyclesMeasured bool              `json:"pipeOwnerCyclesMeasured,omitempty"`
-	Outcome                 string            `json:"outcome"`
+	Micros                  [StageCount]int64   `json:"micros"`
+	Measured                uint64              `json:"measured"`
+	Worker                  [3]byte             `json:"worker"`
+	WorkerMillis            [3]uint16           `json:"workerMillis"`
+	WorkerMeasured          uint8               `json:"workerMeasured"`
+	AuthorityMicros         [3]uint32           `json:"authorityMicros"`
+	AuthorityMeasured       uint8               `json:"authorityMeasured"`
+	PipeOwnerCycles         uint64              `json:"pipeOwnerCycles,omitempty"`
+	PipeOwnerCyclesMeasured bool                `json:"pipeOwnerCyclesMeasured,omitempty"`
+	WorkerApply             *WorkerApplyProfile `json:"workerApply,omitempty"`
+	Outcome                 string              `json:"outcome"`
 }
 
 type Summary struct {
@@ -143,6 +144,9 @@ func (s Summary) Valid() bool {
 		if !ValidPipeOwnerCycles(v.PipeOwnerCycles, v.PipeOwnerCyclesMeasured, v.AuthorityMeasured) {
 			return false
 		}
+		if v.WorkerApply != nil && (s.Role != "receiver" || s.Backend != "installed" || !v.WorkerApply.Valid() || v.WorkerApply.Measured == 0) {
+			return false
+		}
 	}
 	var total uint64
 	for _, n := range s.Histogram {
@@ -154,14 +158,15 @@ func (s Summary) Valid() bool {
 func validOutcome(s string) bool { return s == "ok" || s == "error" || s == "incomplete" }
 
 type Collector struct {
-	mu              sync.Mutex
-	emit            func(Summary)
-	started         time.Time
-	count           uint8
-	active          [Limit]*attempt
-	timer           *time.Timer
-	stopped         atomic.Bool
-	pipeOwnerProbes atomic.Uint32
+	mu                sync.Mutex
+	emit              func(Summary)
+	started           time.Time
+	count             uint8
+	active            [Limit]*attempt
+	timer             *time.Timer
+	stopped           atomic.Bool
+	pipeOwnerProbes   atomic.Uint32
+	workerApplyProbes uint32
 }
 type attempt struct {
 	summary                   Summary
@@ -180,10 +185,11 @@ type session struct {
 	pendingGrant     atomic.Pointer[attempt]
 }
 type sample struct {
-	vector         Vector
-	started        time.Time
-	first          bool
-	workerRecorded bool
+	vector                                    Vector
+	started                                   time.Time
+	first                                     bool
+	workerRecorded                            bool
+	workerApplyRequested, workerApplyRecorded bool
 }
 type sessionKey struct{}
 type attemptKey struct{}
