@@ -137,6 +137,40 @@ active-commit gate remain required. The five 10ms polling attempts and outer
 command deadline remain unchanged. There is no additional polling sleep or retry
 cycle. Native-call latency and device improvement still require observation.
 
+## g172 restore once after a verified release
+
+g171 records twelve rejected saved-window restorations, NULL foreground after
+hide, and six later activation failures. Its own-capture preparation does not
+eliminate that failure class. g172 retains the pre-hide restore and, after a
+fully active capture is hidden without cleanup failure, makes one additional
+saved-window request only if foreground is freshly NULL. This uses the documented
+no-foreground condition for SetForegroundWindow rather than activating another
+thread's window with SetActiveWindow.
+
+The original result must be APIRejected without attach/detach failure. The run
+must not be terminal, active or registered, and no attachment may remain. The
+saved target must be nonzero, distinct from capture, valid, visible, enabled and
+responsive to the existing 100ms probe. Revalidate after that probe and refuse
+if any other foreground owner appears. There is no queue attachment, synthetic
+input, retry loop or additional hide. An accepted but still NULL request uses
+at most one completion probe, then actual foreground is sampled again.
+
+The original restore failure and fallback evidence remain intact. The optional
+focus fields postHideRestoreMeasured, postHideRestoreAccepted,
+postHideRestoreForeground and postHideRestoreMicros record the first request's
+API acceptance, actual foreground category (1 NULL, 2 capture, 3 saved original,
+4 other) and local elapsed span atomically. False acceptance is known when the
+measured flag is true; absent fields are unobserved. A retired or quota-exhausted
+attempt cannot receive the measurement or influence runtime behavior. Terminal
+cancellation before the final observation leaves this detail unobserved.
+
+The existing final post-hide observation still rejects hidden capture retention
+and detach failure. An unverified retry with released capture remains degraded
+and non-terminal. The span includes up to two 100ms probes; finite call counts
+do not establish a wall-clock bound for native activation. The outer capture
+command deadline remains unchanged. Device improvement and PIN regression still
+require a fresh g172 two-device trial.
+
 ## 참고
 
 - [SetActiveWindow](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setactivewindow)

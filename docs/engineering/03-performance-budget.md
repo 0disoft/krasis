@@ -1081,3 +1081,28 @@ Checks cover revision isolation, event identity uniqueness, histogram conservati
 measured-span masks, focus categories and same-host event ordering. Tests and
 rebuild are skipped for documentation-only changes; g171 remains the packaged
 generation.
+
+## g172 post-hide restoration
+
+After the original restore rejects, a fully active capture with successful
+cleanup now attempts the saved window once after hiding, only while actual
+foreground is NULL. Target validity, visibility, enabled state, responsiveness,
+terminal state and released registration/attachment are rechecked before the
+request. Intervening external owners stop this path. Original restore rejection
+and fallback categories are retained; final post-hide release guards still run.
+
+Optional focus fields postHideRestoreMeasured/Accepted/Foreground/Micros separate
+API acceptance from actual ownership and record one local duration, including
+the pre-request probe and possible completion probe. The foreground categories
+match existing focus states. This work occurs after the original restore/hide
+spans; SourceDeactivate includes it and must not be added to those nested spans.
+At most two existing 100ms responsiveness probes and one foreground request are
+added on this guarded failure path. No sleeping retry loop or attachment cycle
+is added. Actual native-call latency and improvement remain unmeasured.
+
+Hosted tests cover repeated returns after pre-hide rejection, accepted-but-NULL
+and rejected requests, asynchronous completion, intervening owners, disabled or
+destroyed targets, pending attachment, cancellation, retained hidden capture,
+degraded release, frozen attempts and sanitized numeric export. A fresh device
+trial must check post-hide saved-target ownership, later activation failures,
+crossings without physical clicks and PIN behavior before declaring resolution.

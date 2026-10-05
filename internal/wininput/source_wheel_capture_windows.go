@@ -789,6 +789,11 @@ func (current *sourceWheelCaptureRun) deactivateWindowProfile(profile context.Co
 	if current.observer != nil && wasActive {
 		current.observer.ObserveWheelFocusRestore(restoreResult)
 	}
+	if wasActive && cleanupErr == nil {
+		// The first restore's failure remains recorded. Only a fresh NULL owner
+		// after hide permits this separate, one-shot saved-window request.
+		current.restoreAfterHideProfile(profile, restoreResult, restoreErr)
+	}
 	savedFocus := current.savedFocus
 	current.savedFocus = 0
 	// Partial activation can own registration and foreground before active=true.

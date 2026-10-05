@@ -30,6 +30,10 @@ type FocusProfile struct {
 	RestoreRejectedForegroundMeasured bool               `json:"restoreRejectedForegroundMeasured,omitempty"`
 	RestoreActive                     uint8              `json:"restoreActive,omitempty"`
 	RestoreActiveMeasured             bool               `json:"restoreActiveMeasured,omitempty"`
+	PostHideRestoreForeground         uint8              `json:"postHideRestoreForeground,omitempty"`
+	PostHideRestoreAccepted           bool               `json:"postHideRestoreAccepted,omitempty"`
+	PostHideRestoreMeasured           bool               `json:"postHideRestoreMeasured,omitempty"`
+	PostHideRestoreMicros             uint32             `json:"postHideRestoreMicros,omitempty"`
 	ResultMeasured                    uint8              `json:"resultMeasured"`
 	Micros                            [2]uint32          `json:"micros"`
 	Measured                          uint8              `json:"measured"`
@@ -79,6 +83,14 @@ func (p FocusProfile) Valid() bool {
 			return false
 		}
 	} else if p.RestoreRejectedForeground != 0 {
+		return false
+	}
+	if p.PostHideRestoreMeasured {
+		if p.Restore != 3 || p.ResultMeasured&1 == 0 || p.PostHideRestoreForeground < 1 || p.PostHideRestoreForeground > 4 ||
+			p.PostHideRestoreMicros > uint32(Window.Microseconds()) {
+			return false
+		}
+	} else if p.PostHideRestoreForeground != 0 || p.PostHideRestoreAccepted || p.PostHideRestoreMicros != 0 {
 		return false
 	}
 	return p.Observed|p.ResultMeasured|p.Measured != 0 || p.RestoreFallbackMeasured
