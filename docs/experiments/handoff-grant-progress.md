@@ -45,3 +45,33 @@ Hosted validation covers phase conservation, zero/absent byte evidence,
 matching and stale callbacks, partial retirement, frozen summaries, saturation,
 window limits and sanitized export. Device behavior and observed overhead must
 be checked on the integrated g174 bundle before any latency-improvement claim.
+
+## g174 reader integration
+
+Agent session startup installs the additional decoded-byte observer before
+starting its reader and source goroutines, preserving the existing runtime
+byte-progress callback. The transport, disconnect and supervisor wrappers
+forward the optional capability and its actual availability. A fresh callback
+captures each connection session; a retired connection cannot update the next
+session's source attempt. Unsupported connections still record local reader
+phases with `byteProgressMeasured:false`.
+
+The peer reader records the phase transitions around ReadFrame and ordered
+dispatch, reusing the existing runtime observer timestamps. The profile ends
+at the matching source grant handler; later activation, revoke and input cannot
+modify it. Connection failure retires a partial interval. No message order,
+authority check, timeout, installation behavior or socket option changes.
+
+Hosted session tests inject a 20ms read delay and a separate 20ms local policy
+dispatch delay. Both preserve ordered grant/revoke cleanup and classify the
+delay in the expected local phase. Fragmented frame tests verify both byte
+observers see identical counts/timestamps and unchanged payload framing.
+Wrapper, reconnect-scoping and sanitizer tests cover missing capability and
+stale callbacks. These are functional timing-contract checks, not a benchmark.
+
+Apply g174 on both devices, confirm protected PIN reentry still works, cross the
+boundary several times and export fresh diagnostics. For a slow source attempt,
+inspect `grantProgress` together with its existing exchange/preparation spans.
+Do not identify separate machines' attempts by ordinal or claim packet loss
+from a long read phase. Socket-level evidence remains a separate next step if
+decoded-byte and local-dispatch evidence cannot explain the wait.

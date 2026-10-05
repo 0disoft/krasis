@@ -86,6 +86,10 @@ func (connection *PeerConnection) SetReadProgressObserver(observer func(int, tim
 	}
 }
 
+func (connection *PeerConnection) SetReadDetailObserver(observer func(int, time.Time)) bool {
+	return connection != nil && connection.reader.SetReadDetailObserver(observer)
+}
+
 func (connection *PeerConnection) WriteFrameContext(ctx context.Context, frame Frame) error {
 	started := time.Now()
 	var admitted time.Time

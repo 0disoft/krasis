@@ -39,6 +39,7 @@ type Reader struct {
 	source     io.Reader
 	maxPayload uint32
 	progress   func(int, time.Time)
+	detail     func(int, time.Time)
 }
 
 func NewReader(source io.Reader) (*Reader, error) {
@@ -56,10 +57,26 @@ func (reader *Reader) SetReadProgressObserver(observer func(int, time.Time)) {
 	}
 }
 
+// SetReadDetailObserver adds a session-scoped diagnostic callback without
+// replacing the runtime progress observer. Configure before ReadFrame starts.
+func (reader *Reader) SetReadDetailObserver(observer func(int, time.Time)) bool {
+	if reader == nil {
+		return false
+	}
+	reader.detail = observer
+	return true
+}
+
 func (reader *Reader) Read(data []byte) (int, error) {
 	n, err := reader.source.Read(data)
-	if n > 0 && reader.progress != nil {
-		reader.progress(n, time.Now())
+	if n > 0 && (reader.progress != nil || reader.detail != nil) {
+		at := time.Now()
+		if reader.progress != nil {
+			reader.progress(n, at)
+		}
+		if reader.detail != nil {
+			reader.detail(n, at)
+		}
 	}
 	return n, err
 }

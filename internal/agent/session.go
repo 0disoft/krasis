@@ -84,6 +84,9 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	}
 	ctx = handoff.WithSession(ctx, config.HandoffProfiles)
 	defer handoff.EndSession(ctx)
+	if config.HandoffProfiles != nil {
+		configureGrantReadProgress(ctx, dependencies.Connection)
+	}
 	connection := newSessionConnectionEvidence(dependencies.Connection, config.ControlObserver)
 	authenticatedPeer, err := connection.AuthenticatedPeer()
 	if err != nil {

@@ -97,8 +97,10 @@ func runSession(
 
 	progress, _ := observer.(SessionProgressObserver)
 	for {
+		readStarted := time.Now()
+		handoff.ReadProgress(ctx, handoff.ReadWaiting, readStarted, false)
 		if progress != nil {
-			progress.ObserveReadStarted(time.Now())
+			progress.ObserveReadStarted(readStarted)
 		}
 		frame, err := ownedConnection.ReadFrame()
 		if err != nil {
@@ -112,12 +114,18 @@ func runSession(
 			return failSessionWithLifecycle(ctx, coordinator, runtime, outbound, err)
 		}
 		controlCtx := ctx
+		readCompleted := time.Now()
+		handoff.ReadProgress(ctx, handoff.ReadBetweenFrames, readCompleted, true)
 		if frame.Kind == transport.MessageControl {
-			controlCtx = handoff.WithControlRead(ctx, time.Now())
+			controlCtx = handoff.WithControlRead(ctx, readCompleted)
 		}
 		if progress != nil {
-			progress.ObserveReadCompleted(time.Now())
-			progress.ObserveDispatchStarted(frame.Kind, time.Now())
+			progress.ObserveReadCompleted(readCompleted)
+		}
+		dispatchStarted := time.Now()
+		handoff.ReadProgress(ctx, handoff.ReadDispatch, dispatchStarted, false)
+		if progress != nil {
+			progress.ObserveDispatchStarted(frame.Kind, dispatchStarted)
 		}
 		var observedAt time.Time
 		var heartbeat HeartbeatObservation
@@ -177,8 +185,10 @@ func runSession(
 		default:
 			err = transport.ErrUnsupportedFrame
 		}
+		dispatchCompleted := time.Now()
+		handoff.ReadProgress(ctx, handoff.ReadBetweenFrames, dispatchCompleted, false)
 		if progress != nil {
-			progress.ObserveDispatchCompleted(time.Now())
+			progress.ObserveDispatchCompleted(dispatchCompleted)
 		}
 		if err != nil {
 			_ = ownedConnection.Close()
