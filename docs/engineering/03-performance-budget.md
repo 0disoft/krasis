@@ -728,3 +728,48 @@ versus profile native call order and counts across eight
 scenarios, an actual-owner deactivation probe failure, late/expired/receiver-dropping
 input, an invalid stage and export privacy. Device delay and PIN behavior are unverified
 on g167.
+
+### g167 device observations
+
+Exports were created at A 2026-10-05T09:59:39Z and B 09:59:37Z, filtered to the exact
+revision 6296110a60c59422ea47d14109a336a6cd86fb7b. A has 12 source and B 12
+installed-receiver profiles; every handoff ends ok and complete.
+
+All A profiles carry the new fallback diagnostics: states [3,2,2,1] with observed 15,
+resultMeasured 3, measured 3 and restoreFallbackMeasured true, with restoreFallback 4
+(APIRejected) at restoreFallbackStage 10 (SetFailed), restore 3 (APIRejected) and
+postHide 2 (NULL).
+The existing code path shows the thread lookup, probe and AttachThreadInput all succeeded
+and DetachThreadInput succeeded; SetForegroundWindow exited on error, and the helper
+skips ownership verification while attached on that error path. The underlying Windows cause is not yet
+known. Every next A attempt begins beforeShow 3 again, so the intervening recovery is
+unobserved, and whether the user clicked is still pending.
+
+After the 12-attempt quota, A logged three missing-before-show events at
+09:59:13.9985629, 09:59:14.4962803 and 09:59:15.6127829, while profile emission spans
+09:58:32.7543292..09:58:43.8789202 (about 11.125s), so no failure profile is retained for
+the later events. A request-to-grant is min/median/max 22.804/27.090/57.652ms,
+CaptureActivate 5.422/6.0635/23.693ms, SourceDeactivate 4.888/9.2895/14.836ms, restore
+2.142/6.365/10.531ms and hide 2.149/3.2935/5.078ms. A's frame histogram is [457,1,0,0,0]
+over 458 with a 1.003ms maximum; B's is [47,393,0,0,0] over 440 with a 9.759ms maximum.
+
+B is prepared true on all twelve with ages 2.860..1380.892ms; OpenLock is measured on all
+twelve, attempt 1 at 31.507ms exactly the preparation-lock value and all others zero;
+ReadyWait is 6.951/7.2695/9.372ms. A CONNECTED at 09:58:30.0735642 and B at
+09:58:30.428267, with no later disconnect, reconnect, session stop, connect or heartbeat
+failure. B's 12 network timeouts, 2 reconnect attempts, 1 disconnect and 1 session stop
+all precede the final connection, the last network timeout at 09:58:30.1596969, and after
+CONNECTED B recorded 64 leaseReady, 16 prepareAck and 0 prepareMiss. Both receipts are
+result 0/complete, and each export keeps one incomplete historical log with no exact
+revision events in it.
+
+PIN and click recovery are not confirmed for g167. Timings are process-local; clock
+values from different devices are never subtracted, overlapping spans are not summed,
+and these diagnostics make no controlled performance claim. FocusAfterRestore already
+observes the foreground freshly before hiding, and there is no evidence yet that an owner
+queue pump would help. The next open evidence gap is narrower: on the existing restore
+SetForegroundWindow failure path, record the foreground category before detach and
+compare it with the post-detach FocusAfterRestore, to separate a failure while the queues
+are joined from a transition lost after detach. No policy cause is proved, and no fix or
+pump is claimed. The optional user click answer is still pending. This is evidence only,
+with no test, build, runtime or API change.
