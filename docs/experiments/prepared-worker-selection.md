@@ -49,3 +49,28 @@ history. In particular, no candidate does not prove no preparation hint was
 sent, and a successful preparation receipt does not prove a reusable child was
 still alive at claim. Native device effects and reason distributions require
 a fresh g175 export; no latency improvement is claimed by this diagnostic.
+
+## g175 native selection wiring
+
+Claim preserves the existing checks and atomic transition from unbound to
+claimed. Timer expiration now uses a distinct retired marker in the same atomic
+state, allowing a later claim to report expiry without inspecting disposed
+handles. Both expired and explicitly retired markers remain unusable; the
+service's existing cleanup/replacement branch recognizes both. The timer's
+compare-and-swap still cannot dispose a claimed worker. Explicit retirement,
+cleanup error retention and one-child ownership remain unchanged.
+
+For a successful cold fallback, its fresh startup timings carry the original
+candidate rejection code. Timings from the rejected candidate are not substituted
+for the newly launched child. A prepared success carries code 1 and its existing
+bounded age. Native startup authentication and subsequent lease/desktop checks
+run independently of every diagnostic code.
+
+Hosted checks cover selection condition precedence, cancellation without claim,
+missing resources, repeated claim, expired/retired distinction, expiry after
+claim, retained cleanup failure, fixed receipt bounds, legacy framing, child
+non-overwrite and sanitized exports. No actual input or privileged service is
+started by these checks. After applying g175 to both devices, repeat ordinary
+crossings and PIN-open B-A-B reentry, then export fresh diagnostics. The next
+decision should use the observed rejection code and local readiness spans;
+until then, preparation scheduling and the two-second lifetime remain intact.

@@ -54,7 +54,8 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 		return Report{}, ErrAuthority
 	}
 	prepared := candidate
-	if !candidate.claim(ctx) {
+	decision := candidate.claimDecision(ctx)
+	if decision != handoff.PreparationUsed {
 		if candidate != nil && candidate.close() != nil {
 			return Report{}, ErrRecovery
 		}
@@ -64,6 +65,7 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 		}
 	}
 	worker, control, pid, profile := prepared.worker, prepared.control, prepared.pid, prepared.profile
+	profile.PreparationDecision = decision
 	defer control.Close()
 	defer func() {
 		if worker.Close() != nil {

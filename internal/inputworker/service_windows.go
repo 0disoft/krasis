@@ -120,7 +120,7 @@ func runServiceLoop(ctx context.Context, installation *Installation, ready func(
 			if leaseErr == nil && prepare {
 				// No lease is created and no agent handle is transferred. A
 				// duplicate hint cannot extend expiry or replace a live child.
-				if next == nil || next.warmState.Load() == 2 {
+				if next == nil || next.retired() {
 					if next.close() != nil {
 						_ = channel.Close()
 						return ErrRecovery

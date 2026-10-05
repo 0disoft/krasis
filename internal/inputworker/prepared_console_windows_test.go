@@ -76,7 +76,7 @@ func TestPreparedConsoleExpiryCannotCloseClaimedWorkerWithoutInput(t *testing.T)
 		if claimed {
 			p.warmState.Store(1)
 		}
-		if p.retireUnbound() != nil {
+		if p.expireUnbound() != nil {
 			t.Fatal("expiry cleanup failed")
 		}
 		if p.worker.exited() == claimed {
@@ -96,7 +96,7 @@ func TestPreparedConsoleExpiryRetainsCleanupFailureWithoutInput(t *testing.T) {
 	// InvalidHandle (-1) is also the current-process pseudo handle. Use an
 	// impossible unaligned positive kernel handle for a real close failure.
 	p := &preparedConsole{worker: &ConsoleWorker{job: windows.Handle(0x7ffffffe), done: make(chan struct{})}}
-	if p.retireUnbound() == nil || p.close() == nil {
+	if p.expireUnbound() == nil || p.close() == nil {
 		t.Fatal("asynchronous preparation cleanup failure lost")
 	}
 	if p.claim(context.Background()) {

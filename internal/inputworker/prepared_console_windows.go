@@ -22,11 +22,9 @@ type preparedConsole struct {
 	session    uint32
 	profile    handoff.StartupProfile
 	preparedAt time.Time
-	warmState  atomic.Uint32 // 0: unbound, 1: claimed once, 2: retired
+	warmState  atomic.Uint32 // 0: unbound, 1: claimed once, 2: retired, 3: expired
 	warmTimer  *time.Timer
 }
-
-const preparedConsoleWindow = 2 * time.Second
 
 // Only the installed service can prepare an unbound child. It receives no
 // agent pipe, lease, image pin or input. The ordinary launch API stays agent-only.
@@ -51,30 +49,63 @@ func prepareServiceConsole(ctx context.Context, installation *Installation, dige
 	p.warmTimer = time.AfterFunc(preparedConsoleWindow, func() {
 		// Both Close methods retain cleanup errors. The owning service loop
 		// must join close() before another child or lease can be created.
-		_ = p.retireUnbound()
+		_ = p.expireUnbound()
 	})
 	return p, nil
 }
 
 func preparedConsoleFresh(age time.Duration, session, current uint32, alive bool) bool {
-	return age >= 0 && age < preparedConsoleWindow && session != 0 && session != 0xffffffff && session == current && alive
+	return preparedConsoleHealth(age, session, current, alive) == handoff.PreparationUsed
 }
 
 func (p *preparedConsole) claim(ctx context.Context) bool {
-	if p == nil || ctx == nil || ctx.Err() != nil || p.warmTimer == nil || !p.warmState.CompareAndSwap(0, 1) {
-		return false
+	return p.claimDecision(ctx) == handoff.PreparationUsed
+}
+
+func (p *preparedConsole) claimDecision(ctx context.Context) handoff.PreparationDecision {
+	if p == nil {
+		return handoff.PreparationNoCandidate
+	}
+	if ctx == nil || ctx.Err() != nil {
+		return handoff.PreparationCancelled
+	}
+	if p.warmTimer == nil {
+		return handoff.PreparationUnusable
+	}
+	if !p.warmState.CompareAndSwap(0, 1) {
+		if p.warmState.Load() == 3 {
+			return handoff.PreparationExpired
+		}
+		return handoff.PreparationClaimLost
 	}
 	p.warmTimer.Stop()
 	age := time.Since(p.preparedAt)
-	if p.worker == nil || p.worker.process == 0 || p.control == nil || p.pid == 0 || !preparedConsoleFresh(age, p.session, windows.WTSGetActiveConsoleSessionId(), !p.worker.exited()) || ctx.Err() != nil {
-		return false
+	if p.worker == nil || p.worker.process == 0 || p.control == nil || p.pid == 0 {
+		return handoff.PreparationUnusable
+	}
+	decision := preparedConsoleHealth(age, p.session, windows.WTSGetActiveConsoleSessionId(), !p.worker.exited())
+	if decision != handoff.PreparationUsed {
+		return decision
+	}
+	if ctx.Err() != nil {
+		return handoff.PreparationCancelled
 	}
 	p.profile.Prepared, p.profile.PreparedAgeMicros = true, uint32(age.Microseconds())
-	return true
+	return handoff.PreparationUsed
 }
 
 func (p *preparedConsole) retireUnbound() error {
-	if p == nil || !p.warmState.CompareAndSwap(0, 2) {
+	return p.retireUnboundState(2)
+}
+
+func (p *preparedConsole) expireUnbound() error {
+	return p.retireUnboundState(3)
+}
+
+func (p *preparedConsole) retired() bool { return p != nil && p.warmState.Load() >= 2 }
+
+func (p *preparedConsole) retireUnboundState(state uint32) error {
+	if p == nil || !p.warmState.CompareAndSwap(0, state) {
 		return nil
 	}
 	return p.closeOwned()

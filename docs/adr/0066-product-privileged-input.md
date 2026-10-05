@@ -247,3 +247,13 @@ The operator reported success after the requested PIN-open B-A-B g173 trial.
 The matching exports contain no post-connect entry failure or reconnect in
 their short observation windows. See the [g173 trial observations](../experiments/g173-pin-reentry-observations.md)
 for the evidence boundary and remaining transition-delay work.
+
+## g175: Prepared worker selection evidence
+
+The service reports a bounded candidate selection code in the optional startup
+diagnostic. It preserves the existing claim, expiry, cleanup and cold-launch
+fallback policy; a distinct atomic expired marker provides a reason without
+reading disposed native handles. KRD5 carries the service decision after
+verified readiness, with legacy receipts still readable and matched installed
+images required. Child timings cannot replace the selection code. No peer or
+input ACK protocol changes. See the [selection diagnostic contract](../experiments/prepared-worker-selection.md).
