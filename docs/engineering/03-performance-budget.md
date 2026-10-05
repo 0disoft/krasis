@@ -599,3 +599,40 @@ immediately, bounded refusal on a persistently NULL foreground, a blocked receip
 callback holding no lease or pin, and full-queue initial/renew retries. Device delay and
 PIN are not verified on g165; the g164 PIN check was user-passed, and real ~110ms
 preparation and a missing foreground remain possible.
+
+### g165 device observations
+
+Exports were created at A 2026-10-05T07:48:32Z and B 2026-10-05T07:48:23Z and filtered
+to the exact revision bbaf3aeee1d9cdb88a74c7d5e4ba061d049a98d5. Of 12 A-source and 12
+B-installed-receiver profiles, 5 are ok/complete (attempts 1/2/3/4/11) and 7 are
+error/incomplete (attempts 5/6/7/8/9/10/12). All 12 B startups are prepared true with
+ages 4.743–1405.859ms and ReadyWait min/median/max 6.633/7.306/7.923ms.
+
+OpenLock overlap is measured in all 12: attempt 4 is 24.717ms, exactly the same
+preparation-lock value, and the other eleven are zero. The prior g164 maximum of
+110.636ms is observational only and not a controlled improvement. A request-to-grant was
+min/median/max 23.891/31.9085/246.206ms. Successful CaptureActivate was
+3.873/7.083/22.477ms, while failed attempts were 55.888/57.629/76.440ms with fallback
+52.046–64.564ms and rollback 1.045–1.843ms.
+
+A logged 23 activation_capture_foreground_missing_before_show codes between
+07:47:46.3604603Z and 07:48:20.8675897Z; 7 match the failed profiles and 16 occur after
+the quota was consumed. The 12 profiles span 25.783287s on A and 25.8048999s on B and are
+all A-to-B. The NULL foreground is observed before the show and carries the failure
+classification; why it was absent is unknown. Existing restoreFocus/deactivateWindow
+logic does not provide evidence of the preceding focus transition in this export.
+
+A's 362 non-first frames were [361, 1, 0, 0, 0] with a 1.049ms maximum; B's 352 were
+[34, 318, 0, 0, 0] with a 7.200ms maximum. A CONNECTED at 07:47:25.9698826Z and B at
+07:47:24.9878862Z, and neither export shows a reconnect, disconnect or session stop after
+CONNECTED. B's 40 network timeouts, 1 disconnect requested and session stop all precede
+the initial CONNECTED and are not counted as connected-test failures. B recorded 35
+lease_ready, 15 prepare acknowledgements and 0 preparation-missed, connect-failure or
+heartbeat-failure events. Both receipts are result 0/complete, and each export has one
+incomplete historical log with no current-revision events inside it.
+
+The user has not confirmed g165 PIN behavior (g164 success is previous). Click-mediated
+recovery is unconfirmed for this run. The next diagnosis focuses on capture foreground
+loss and restoration while retaining fresh ownership checks. These timing observations
+do not isolate the effect of the g165 changes. This is evidence only with no build or
+runtime change.
