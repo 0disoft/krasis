@@ -96,13 +96,18 @@ func FuzzStartupReady(f *testing.F) {
 	buffer.Reset()
 	_ = writeStartupReady(&buffer, profile)
 	f.Add(buffer.Bytes())
+	buffer.Reset()
+	profile.Record(handoff.ServiceChildConnect, time.Millisecond)
+	profile.PreparationDecision = handoff.PreparationNoCandidate
+	_ = writeStartupReady(&buffer, profile)
+	f.Add(buffer.Bytes())
 	f.Fuzz(func(t *testing.T, data []byte) {
 		reader := bytes.NewReader(data)
 		profile, err := readStartupReady(reader)
 		if profile != nil && (err != nil || !profile.Valid() || profile.Measured == 0) {
 			t.Fatal("unvalidated diagnostic escaped parser")
 		}
-		if len(data)-reader.Len() > startupReadyLoadSize {
+		if len(data)-reader.Len() > startupReadyDecisionSize {
 			t.Fatal("unbounded readiness read")
 		}
 	})

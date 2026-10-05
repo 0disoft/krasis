@@ -7,18 +7,19 @@ import (
 	"github.com/0disoft/krasis/internal/handoff"
 )
 
-// KRD2/KRD3 are fixed, one-shot local readiness envelopes, never an input ACK or
+// KRD2-KRD5 are fixed, one-shot local readiness envelopes, never an input ACK or
 // peer frame. Process/image authentication and desktop readiness still precede
 // it. Legacy KRD1 has no diagnostic payload and remains readable.
 const startupReadySize = 8 + int(handoff.StartupStageCount)*4
 const startupReadyLoadSize = startupReadySize + 8
 const startupReadyPreparedSize = startupReadyLoadSize + 8
+const startupReadyDecisionSize = startupReadyPreparedSize + 8
 
 func writeStartupReady(writer io.Writer, profile handoff.StartupProfile) error {
 	if !profile.Valid() || profile.Measured == 0 {
 		return writeFrame(writer, readyFrame[:])
 	}
-	var data [startupReadyPreparedSize]byte
+	var data [startupReadyDecisionSize]byte
 	copy(data[:5], []byte{'K', 'R', 'D', '2', 2})
 	size := startupReadySize
 	if profile.LoadMeasured {
@@ -32,6 +33,11 @@ func writeStartupReady(writer io.Writer, profile handoff.StartupProfile) error {
 		size = startupReadyPreparedSize
 		binary.BigEndian.PutUint32(data[startupReadyLoadSize:startupReadyLoadSize+4], profile.PreparedAgeMicros)
 		data[startupReadyLoadSize+4] = 1
+	}
+	if profile.PreparationDecision != handoff.PreparationUnobserved {
+		copy(data[:5], []byte{'K', 'R', 'D', '5', 5})
+		size = startupReadyDecisionSize
+		data[startupReadyPreparedSize] = byte(profile.PreparationDecision)
 	}
 	data[5] = profile.Measured
 	for i, n := range profile.Micros {
@@ -48,7 +54,8 @@ func readStartupReady(reader io.Reader) (*handoff.StartupProfile, error) {
 	if header == readyFrame {
 		return nil, nil
 	}
-	prepared := string(header[:4]) == "KRD4" && header[4] == 4
+	decision := string(header[:4]) == "KRD5" && header[4] == 5
+	prepared := decision || (string(header[:4]) == "KRD4" && header[4] == 4)
 	load := prepared || (string(header[:4]) == "KRD3" && header[4] == 3)
 	if (!load && (string(header[:4]) != "KRD2" || header[4] != 2)) || !zeroBytes(header[6:]) {
 		return nil, ErrProtocol
@@ -71,10 +78,20 @@ func readStartupReady(reader io.Reader) (*handoff.StartupProfile, error) {
 	}
 	if prepared {
 		var detail [8]byte
-		if _, err := io.ReadFull(reader, detail[:]); err != nil || detail[4] != 1 || !zeroBytes(detail[5:]) {
+		if _, err := io.ReadFull(reader, detail[:]); err != nil || detail[4] > 1 || (!decision && detail[4] != 1) || !zeroBytes(detail[5:]) {
 			return nil, ErrProtocol
 		}
-		profile.Prepared, profile.PreparedAgeMicros = true, binary.BigEndian.Uint32(detail[:4])
+		profile.Prepared, profile.PreparedAgeMicros = detail[4] == 1, binary.BigEndian.Uint32(detail[:4])
+	}
+	if decision {
+		var detail [8]byte
+		if _, err := io.ReadFull(reader, detail[:]); err != nil || !zeroBytes(detail[1:]) {
+			return nil, ErrProtocol
+		}
+		profile.PreparationDecision = handoff.PreparationDecision(detail[0])
+		if profile.PreparationDecision == handoff.PreparationUnobserved {
+			return nil, nil
+		}
 	}
 	// Numeric diagnostics are not readiness proof. Consume the fixed payload,
 	// but drop invalid/missing measurements without changing a valid receipt.
