@@ -19,7 +19,7 @@ func RegistrationStage(err error) string {
 	var failure *registrationError
 	if errors.As(err, &failure) {
 		switch failure.stage {
-		case "image", "metadata", "directory", "cli", "script", "record":
+		case "image", "metadata", "directory", "cli", "script", "record", "version":
 			return failure.stage
 		}
 	}

@@ -24,6 +24,7 @@ const maxExecutable = 64 << 20
 
 var ErrMissing = errors.New("launch record missing")
 var ErrInvalid = errors.New("launch record invalid")
+var ErrOlder = errors.New("newer launch record already registered")
 
 type Record struct {
 	Schema     string    `json:"schema"`
@@ -94,6 +95,18 @@ func Register(localAppData, executable string, generation int, revision string) 
 		return registrationFailure("directory", err)
 	}
 	defer dir.Close()
+	unlock, err := lockRegistration(dir)
+	if err != nil {
+		return registrationFailure("record", err)
+	}
+	defer unlock()
+	previous, err := Load(localAppData)
+	if err == nil && previous.Generation > generation {
+		return registrationFailure("version", ErrOlder)
+	}
+	if err != nil && !errors.Is(err, ErrMissing) {
+		return registrationFailure("record", err)
+	}
 	data, err := json.Marshal(Record{schema, executable, hash, generation, revision, time.Now().UTC()})
 	if err != nil {
 		return registrationFailure("metadata", err)

@@ -138,3 +138,27 @@ func TestRegistrationStageIsBounded(t *testing.T) {
 		t.Fatal("unbounded stage")
 	}
 }
+
+func TestOlderRegistrationCannotReplaceRecoveryCLIOrRecord(t *testing.T) {
+	base, latest, older := t.TempDir(), t.TempDir(), t.TempDir()
+	for _, folder := range []string{latest, older} {
+		for _, name := range []string{"krasis.exe", "krasis-cli.exe"} {
+			if err := os.WriteFile(filepath.Join(folder, name), []byte("MZ-"+folder), 0600); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if err := Register(base, filepath.Join(latest, "krasis.exe"), 186, "new"); err != nil {
+		t.Fatal(err)
+	}
+	dir, _ := Directory(base)
+	before, _ := os.ReadFile(filepath.Join(dir, "krasis-cli.exe"))
+	if err := Register(base, filepath.Join(older, "krasis.exe"), 185, "old"); !errors.Is(err, ErrOlder) {
+		t.Fatal(err)
+	}
+	after, _ := os.ReadFile(filepath.Join(dir, "krasis-cli.exe"))
+	r, err := Inspect(base)
+	if err != nil || r.Generation != 186 || r.Executable != filepath.Join(latest, "krasis.exe") || string(after) != string(before) {
+		t.Fatal("recovery downgraded", err)
+	}
+}
