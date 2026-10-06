@@ -8,10 +8,12 @@ import (
 	"errors"
 	"io"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/0disoft/krasis/internal/peercredentials"
 	"github.com/0disoft/krasis/internal/productidentity"
+	"github.com/0disoft/krasis/internal/securefs"
 )
 
 const Schema = "krasis.app-settings/v1"
@@ -84,7 +86,20 @@ func SaveResume(base string, v Resume) error {
 	return write(base, "resume.json", v)
 }
 func read(base, name string, value any) error {
-	dir, err := productidentity.PrepareLaunch(base)
+	paths, err := productidentity.ResolveWindowsPaths(base)
+	if err != nil {
+		return err
+	}
+	path := filepath.Join(paths.Root, "launch")
+	if _, err = os.Lstat(path); err != nil {
+		return err
+	}
+	if _, err = peercredentials.ValidateSecurityDirectory(path); err != nil {
+		return err
+	}
+	// The scheduled recovery CLI runs from this folder. A read must not
+	// request DELETE/WRITE_DAC or create state through PrepareLaunch.
+	dir, err := securefs.OpenReadDirectory(path)
 	if err != nil {
 		return err
 	}
