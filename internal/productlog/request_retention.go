@@ -20,7 +20,6 @@ var errRequestRetention = errors.New("diagnostic request storage limit")
 
 type requestSnapshotGroup struct {
 	id       string
-	names    []string
 	bytes    int64
 	modified time.Time
 }
@@ -50,6 +49,9 @@ func snapshotRequestID(name string) string {
 // requests are never pruned; if they fill the budget, reject the new export.
 // Names come from enumeration, but inspection/removal stays handle-relative.
 func reserveRequestSnapshot(dir *securefs.Directory, id, name string, size int64) error {
+	if err := resumeRequestPruning(dir); err != nil {
+		return err
+	}
 	entries, err := dir.ReadNames()
 	if err != nil {
 		return err
@@ -85,7 +87,6 @@ func reserveRequestSnapshot(dir *securefs.Directory, id, name string, size int64
 			group = &requestSnapshotGroup{id: requestID}
 			groups[requestID] = group
 		}
-		group.names = append(group.names, entry)
 		group.bytes += info.Size()
 		total += info.Size()
 		if info.ModTime().After(group.modified) {
@@ -116,10 +117,11 @@ func reserveRequestSnapshot(dir *securefs.Directory, id, name string, size int64
 		if count <= maxSupportRequests && total+size <= maxRequestSupportBytes {
 			break
 		}
-		for _, leaf := range group.names {
-			if err := dir.Remove(leaf); err != nil {
-				return err
-			}
+		if err := markRequestPrune(dir, group.id); err != nil {
+			return err
+		}
+		if err := finishRequestPrune(dir, group.id, dir.Remove); err != nil {
+			return err
 		}
 		count--
 		total -= group.bytes
