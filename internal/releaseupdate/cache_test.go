@@ -77,6 +77,9 @@ func TestReadyPruneKeepsTwoPublicStagesAndIgnoresPeerStages(t *testing.T) {
 		data, _ := json.Marshal(m)
 		envelope, _ := json.Marshal(Envelope{base64.StdEncoding.EncodeToString(data), base64.StdEncoding.EncodeToString(ed25519.Sign(priv, data))})
 		history[id] = envelope
+		if err = writeCache(dir, archiveName(m), []byte("archive retention fixture")); err != nil {
+			t.Fatal(err)
+		}
 	}
 	raw, _ := json.Marshal(readyReceipt{Folders: ids, History: history})
 	if err = writeCache(dir, "release-ready.json", raw); err != nil {
@@ -92,6 +95,19 @@ func TestReadyPruneKeepsTwoPublicStagesAndIgnoresPeerStages(t *testing.T) {
 	}
 	if _, err = os.Stat(filepath.Join(parent, ids[2])); !errors.Is(err, os.ErrNotExist) {
 		t.Fatal("old public folder retained", err)
+	}
+	for i, id := range ids {
+		m, err := Verify(history[id], base64.StdEncoding.EncodeToString(pub))
+		if err != nil {
+			t.Fatal(err)
+		}
+		f, err := dir.Open(archiveName(m))
+		if f != nil {
+			f.Close()
+		}
+		if (i < 2 && err != nil) || (i == 2 && !errors.Is(err, os.ErrNotExist)) {
+			t.Fatal("archive retention does not match stages", id, err)
+		}
 	}
 }
 

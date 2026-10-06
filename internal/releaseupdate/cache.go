@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/0disoft/krasis/internal/launchrecord"
 	"github.com/0disoft/krasis/internal/peercredentials"
@@ -23,9 +24,17 @@ type readyReceipt struct {
 
 const maxReceiptBytes = 2 << 20 // 64 bounded signed envelopes, base64 encoded.
 
+// Serialize publication and pruning within the UI process. Readers pin one
+// receipt; archive names derive from its verified full digest.
+var readyGate sync.Mutex
+
+func archiveName(m Manifest) string { return "release-ready-" + m.SHA256 + ".zip" }
+
 // CachedDirectories lets peer-stage cleanup preserve every public-release stage.
 // This is a retention hint only; it never authorizes execution of a release.
 func CachedDirectories(base string) ([]string, error) {
+	readyGate.Lock()
+	defer readyGate.Unlock()
 	path, err := launchrecord.Directory(base)
 	if err != nil {
 		return nil, err
@@ -82,7 +91,11 @@ func writeCache(dir *securefs.Directory, name string, data []byte) error {
 	}
 	defer dir.Remove(temp)
 	if err = peercredentials.ProtectSecurityFileHandle(f); err == nil {
-		_, err = f.Write(data)
+		var n int
+		n, err = f.Write(data)
+		if err == nil && n != len(data) {
+			err = io.ErrShortWrite
+		}
 	}
 	if err == nil {
 		err = f.Sync()
@@ -115,8 +128,13 @@ func loadReady(dir *securefs.Directory) (readyReceipt, error) {
 }
 
 // SaveReady persists the publisher's signed envelope AND its original archive.
-// A torn two-file write is rejected on restore. Repeated checks reuse one stage.
+// The digest-named archive is written before the receipt is atomically replaced.
+// Failed publication leaves the previous receipt and archive usable.
 func SaveReady(base string, envelope, archive []byte, key string) (string, Manifest, error) {
+	return saveReady(base, envelope, archive, key, writeCache)
+}
+
+func saveReady(base string, envelope, archive []byte, key string, write func(*securefs.Directory, string, []byte) error) (string, Manifest, error) {
 	m, err := Verify(envelope, key)
 	if err != nil {
 		return "", m, err
@@ -125,6 +143,8 @@ func SaveReady(base string, envelope, archive []byte, key string) (string, Manif
 	if err != nil {
 		return "", m, err
 	}
+	readyGate.Lock()
+	defer readyGate.Unlock()
 	dir, err := productidentity.PrepareLaunch(base)
 	if err != nil {
 		return "", m, err
@@ -157,17 +177,19 @@ func SaveReady(base string, envelope, archive []byte, key string) (string, Manif
 	if len(r.Folders) > 64 {
 		return "", m, ErrInvalid
 	}
-	if err = writeCache(dir, "release-ready.zip", archive); err != nil {
+	if err = write(dir, archiveName(m), archive); err != nil {
 		return "", m, err
 	}
 	data, _ := json.Marshal(r)
-	if err = writeCache(dir, "release-ready.json", data); err != nil {
+	if err = write(dir, "release-ready.json", data); err != nil {
 		return "", m, err
 	}
 	return directory, m, nil
 }
 
 func RestoreReady(base, key string, current int) (string, Manifest, error) {
+	readyGate.Lock()
+	defer readyGate.Unlock()
 	dir, err := productidentity.PrepareLaunch(base)
 	if err != nil {
 		return "", Manifest{}, err
@@ -187,7 +209,12 @@ func RestoreReady(base, key string, current int) (string, Manifest, error) {
 	if r.Folders[0] != m.SHA256[:32] {
 		return "", m, ErrInvalid
 	}
-	archive, err := readCache(dir, "release-ready.zip", m.Size)
+	archive, err := readCache(dir, archiveName(m), m.Size)
+	// Read pre-migration caches only when the digest-named archive is absent.
+	// A corrupt or inaccessible new archive must never fall back silently.
+	if errors.Is(err, os.ErrNotExist) {
+		archive, err = readCache(dir, "release-ready.zip", m.Size)
+	}
 	if err != nil {
 		return "", m, err
 	}
@@ -211,6 +238,8 @@ func RestoreReady(base, key string, current int) (string, Manifest, error) {
 // PruneReady removes only recorded public-release stages. Keep the two newest,
 // the running UI and the recovery record. Peer updates are never enumerated.
 func PruneReady(base, key string) error {
+	readyGate.Lock()
+	defer readyGate.Unlock()
 	dir, err := productidentity.PrepareLaunch(base)
 	if err != nil {
 		return err
@@ -253,17 +282,24 @@ func PruneReady(base, key string) error {
 			continue
 		}
 		guard, e := securefs.OpenReadDirectory(folder)
-		if errors.Is(e, os.ErrNotExist) {
-			continue
-		}
-		if e != nil {
+		if e != nil && !errors.Is(e, os.ErrNotExist) {
 			failures = errors.Join(failures, e)
 			kept = append(kept, id)
 			continue
 		}
-		e = guard.Close()
+		if guard != nil {
+			e = guard.Close()
+			if e == nil {
+				e = root.RemoveAll(id)
+			}
+		} else {
+			e = nil
+		}
 		if e == nil {
-			e = root.RemoveAll(id)
+			e = dir.Remove(archiveName(m))
+			if errors.Is(e, os.ErrNotExist) {
+				e = nil
+			}
 		}
 		if e != nil {
 			failures = errors.Join(failures, e)
