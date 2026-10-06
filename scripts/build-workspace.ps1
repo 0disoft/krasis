@@ -11,7 +11,7 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $revision = (git rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $revision -notmatch '^[a-f0-9]{40}$') { throw 'Missing source revision' }
 if (git status --porcelain --untracked-files=no) { throw 'Commit source changes before packaging' }
-$generation = [regex]::Match((Get-Content -Raw -LiteralPath 'internal/localapi/runtime.go'), '(?m)^const AgentGeneration = ([1-9][0-9]*)$')
+$generation = [regex]::Match((Get-Content -Raw -LiteralPath 'internal/localapi/runtime.go'), '(?m)^const AgentGeneration = ([1-9][0-9]*)\r?$')
 if (-not $generation.Success) { throw 'Missing agent generation' }
 $bundle = Join-Path 'dist/workspace' ('g' + $generation.Groups[1].Value)
 if (Test-Path -LiteralPath $bundle) { throw 'Generation artifact already exists; do not overwrite running programs' }
