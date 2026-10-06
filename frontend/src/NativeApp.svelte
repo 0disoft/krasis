@@ -2,6 +2,7 @@
   import { onMount, tick } from 'svelte';
   import UpdateSettings from './UpdateSettings.svelte';
   import AppSettings from './AppSettings.svelte';
+  import KeyboardPanel from './KeyboardPanel.svelte';
   import PeerAppButton from './PeerAppButton.svelte';
   import { createAppOpenBridge } from './app-open-bridge.js';
   import { createUpdateSettingsBridge } from './update-settings-bridge.js';
@@ -269,6 +270,7 @@
   {#if snapshot.boundaryBlocked}<p class="placement-hint" role="status">{t(`boundary_${snapshot.boundaryBlocked}`)}</p>{/if}
   <label class="peer-select">{t('peer')}<select bind:value={selected} disabled={busy || snapshot.state !== 'LOCAL'}><option value="">{t('choose')}</option>{#each snapshot.peers as peer (peer.fingerprint)}<option value={peer.fingerprint}>{peer.alias}</option>{/each}</select></label>
   <PeerAppButton bridge={appOpenBridge} peer={selectedPeer} {locale} />
+  <KeyboardPanel peer={selected} {locale} />
   <section class="canvas" aria-label={t('devices')}>
     <div class="screens" class:reversed={shownEdge === 'LEFT'}>
       <div class="screen"><img class="monitor-art" src={monitor} alt="" /><div class="screen-content"><strong>{t('local')}</strong><span>{t('thisPC')}</span><small>{shownEdge ? t(shownEdge === 'LEFT' ? 'right' : 'left') : '—'}</small></div></div>

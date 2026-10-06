@@ -225,6 +225,8 @@ func (handler *handler) ServeHTTP(response http.ResponseWriter, request *http.Re
 		handler.upgradeStop(response, request)
 	case "/v1/release-claim":
 		handler.releaseClaim(response, request)
+	case "/v1/keyboard":
+		handler.keyboard(response, request)
 	case "/v1/update":
 		handler.update(response, request)
 	case "/v1/credential":

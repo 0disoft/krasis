@@ -2,6 +2,7 @@ package peerupdate
 
 import (
 	"encoding/json"
+	"github.com/0disoft/krasis/internal/keyboardstate"
 	"io"
 	"net/http"
 	"time"
@@ -9,16 +10,18 @@ import (
 
 // PeerInfo is exchanged only inside the pinned mutually authenticated channel.
 type PeerInfo struct {
-	UpdateID        string `json:"updateID,omitempty"`
-	UpdateState     string `json:"updateState,omitempty"`
-	Clipboard       bool   `json:"clipboard,omitempty"`
-	ClipboardID     string `json:"clipboardID,omitempty"`
-	ClipboardSize   int    `json:"clipboardSize,omitempty"`
-	ClipboardFormat string `json:"clipboardFormat,omitempty"`
-	Protocol        int    `json:"protocol"`
-	Generation      int    `json:"generation"`
-	Revision        string `json:"revision"`
-	Allowed         bool   `json:"allowed"`
+	Keyboard          *keyboardstate.State `json:"keyboard,omitempty"`
+	KeyboardAgeMillis int64                `json:"keyboardAgeMillis,omitempty"`
+	UpdateID          string               `json:"updateID,omitempty"`
+	UpdateState       string               `json:"updateState,omitempty"`
+	Clipboard         bool                 `json:"clipboard,omitempty"`
+	ClipboardID       string               `json:"clipboardID,omitempty"`
+	ClipboardSize     int                  `json:"clipboardSize,omitempty"`
+	ClipboardFormat   string               `json:"clipboardFormat,omitempty"`
+	Protocol          int                  `json:"protocol"`
+	Generation        int                  `json:"generation"`
+	Revision          string               `json:"revision"`
+	Allowed           bool                 `json:"allowed"`
 }
 type peerObservation struct {
 	info PeerInfo
@@ -30,6 +33,11 @@ func (m *Manager) info(peer string) PeerInfo {
 	info := PeerInfo{Protocol: 2, Generation: m.generation, Revision: m.revision, Allowed: m.permitted(peer), Clipboard: allowed, ClipboardID: id, ClipboardSize: size, ClipboardFormat: format}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	age := time.Since(m.keyboard.at)
+	if !m.keyboard.at.IsZero() && age >= 0 && age < keyboardLifetime && m.keyboard.state.Valid() {
+		state := m.keyboard.state
+		info.Keyboard, info.KeyboardAgeMillis = &state, age.Milliseconds()
+	}
 	peerGeneration := m.peers[peer].info.Generation
 	if format != "" && (peerGeneration < 69 || format == "files" &&
 		(peerGeneration < 70 || peerGeneration < 72 && !legacyFiles)) {
@@ -47,6 +55,9 @@ func readPeerInfo(reader io.Reader) (PeerInfo, error) {
 		return info, ErrDenied
 	}
 	if json.Unmarshal(data, &info) != nil || info.Protocol != 2 || info.Generation < 21 || info.Generation > 1000000 || (info.Revision != "" && !validID(info.Revision, 40)) {
+		return PeerInfo{}, ErrDenied
+	}
+	if info.KeyboardAgeMillis < 0 || info.KeyboardAgeMillis > keyboardLifetime.Milliseconds() || (info.Keyboard != nil && !info.Keyboard.Valid()) || (info.Keyboard == nil && info.KeyboardAgeMillis != 0) {
 		return PeerInfo{}, ErrDenied
 	}
 	limit := MaxClipboardBytes

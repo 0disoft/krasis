@@ -53,6 +53,7 @@ type stagedBundle interface {
 	Stage(*os.Root, string) error
 }
 type Manager struct {
+	keyboard          keyboardObservation
 	appOpen           appOpenState
 	OpenUI            func(string) string
 	UIReady           func(time.Time) bool
