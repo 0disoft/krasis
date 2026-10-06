@@ -4,11 +4,28 @@ import (
 	"context"
 	"errors"
 	"os"
+	"time"
 
 	"github.com/0disoft/krasis/internal/launchrecord"
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/peerupdate"
 )
+
+func (o *Operations) UIReady(ctx context.Context, pid uint32) (localapi.OperationResult, error) {
+	if ctx.Err() != nil || !launchrecord.UIProcessMatches(o.localAppData, pid) {
+		return rejected("ui_unverified"), nil
+	}
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.uiReadyAt, o.uiReadyPID = time.Now(), pid
+	return completed("ui_ready"), nil
+}
+func (o *Operations) uiReadySince(since time.Time) bool {
+	o.mu.Lock()
+	at, pid := o.uiReadyAt, o.uiReadyPID
+	o.mu.Unlock()
+	return at.After(since) && time.Since(at) < time.Minute && launchrecord.UIProcessMatches(o.localAppData, pid)
+}
 
 func (o *Operations) OpenApp(ctx context.Context, r localapi.AppOpenRequest) (localapi.AppOpenResult, error) {
 	result := localapi.AppOpenResult{Code: "rejected"}

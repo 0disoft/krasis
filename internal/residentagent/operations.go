@@ -44,6 +44,8 @@ type Operations struct {
 	updateTargetGeneration int
 	updateTargetRevision   string
 	releaseClaimID         string
+	uiReadyAt              time.Time
+	uiReadyPID             uint32
 	log                    *productlog.Logger
 	root                   context.Context
 	stopAgent              context.CancelCauseFunc

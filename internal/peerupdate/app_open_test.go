@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestAppOpenDeduplicatesAndRechecksAuthorization(t *testing.T) {
@@ -31,6 +32,30 @@ func TestAppOpenDeduplicatesAndRechecksAuthorization(t *testing.T) {
 	}
 	if code := m.acceptAppOpen(peer, "bad", func() bool { return true }); code != "rejected" {
 		t.Fatal(code)
+	}
+}
+
+func TestAppOpenWaitsForWindowReportWithoutRepeatingLaunch(t *testing.T) {
+	peer, id := strings.Repeat("a", 64), strings.Repeat("b", 32)
+	launches, ready := 0, false
+	m := &Manager{OpenUI: func(string) string { launches++; return "launch_requested" }, UIReady: func(time.Time) bool { return ready }}
+	allowed := func() bool { return true }
+	if m.acceptAppOpen(peer, id, allowed) != "launch_requested" {
+		t.Fatal("premature completion")
+	}
+	ready = true
+	if m.acceptAppOpen(peer, id, allowed) != "window_ready" || launches != 1 {
+		t.Fatal("window not observed or repeated launch")
+	}
+	sender := &Manager{}
+	queued, _ := sender.QueueAppOpen(peer)
+	sender.finishAppOpen(peer, queued, "launch_requested")
+	if sender.appOpenOffer(peer) != queued {
+		t.Fatal("stopped polling before window ready")
+	}
+	sender.finishAppOpen(peer, queued, "window_ready")
+	if sender.AppOpenStatus(peer, queued) != "window_ready" {
+		t.Fatal("window completion lost")
 	}
 }
 

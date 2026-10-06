@@ -30,7 +30,7 @@ func (m *Manager) QueueAppOpen(peer string) (string, error) {
 	}
 	m.appOpen.mu.Lock()
 	defer m.appOpen.mu.Unlock()
-	if old := m.appOpen.out; old != nil && old.code == "pending" && time.Now().Before(old.expires) {
+	if old := m.appOpen.out; old != nil && (old.code == "pending" || old.code == "launch_requested") && time.Now().Before(old.expires) {
 		return "", ErrBusy
 	}
 	id := randomID()
@@ -48,6 +48,9 @@ func (m *Manager) AppOpenStatus(peer, id string) string {
 	if r.code == "pending" && time.Now().After(r.expires) {
 		r.code = "expired"
 	}
+	if r.code == "launch_requested" && time.Now().After(r.expires) {
+		r.code = "window_unconfirmed"
+	}
 	return r.code
 }
 
@@ -55,7 +58,7 @@ func (m *Manager) appOpenOffer(peer string) string {
 	m.appOpen.mu.Lock()
 	defer m.appOpen.mu.Unlock()
 	r := m.appOpen.out
-	if r == nil || r.peer != peer || r.code != "pending" || time.Now().After(r.expires) {
+	if r == nil || r.peer != peer || (r.code != "pending" && r.code != "launch_requested") || time.Now().After(r.expires) {
 		return ""
 	}
 	return r.id
@@ -63,7 +66,7 @@ func (m *Manager) appOpenOffer(peer string) string {
 
 func validAppOpenCode(code string) bool {
 	switch code {
-	case "launch_requested", "launch_failed", "launch_record_missing", "launch_record_invalid", "rejected", "unsupported", "busy":
+	case "launch_requested", "window_ready", "launch_failed", "launch_record_missing", "launch_record_invalid", "rejected", "unsupported", "busy":
 		return true
 	}
 	return false
@@ -75,7 +78,7 @@ func (m *Manager) finishAppOpen(peer, id, code string) {
 	}
 	m.appOpen.mu.Lock()
 	defer m.appOpen.mu.Unlock()
-	if r := m.appOpen.out; r != nil && r.peer == peer && r.id == id && r.code == "pending" && time.Now().Before(r.expires) {
+	if r := m.appOpen.out; r != nil && r.peer == peer && r.id == id && (r.code == "pending" || r.code == "launch_requested") && time.Now().Before(r.expires) {
 		r.code = code
 	}
 }
@@ -93,6 +96,10 @@ func (m *Manager) acceptAppOpen(peer, id string, authorized func() bool) string 
 	now := time.Now()
 	if old, ok := m.appOpen.received[peer]; ok {
 		if old.id == id && now.Sub(old.at) < 2*time.Minute {
+			if old.code == "launch_requested" && m.UIReady != nil && m.UIReady(old.at) {
+				old.code = "window_ready"
+				m.appOpen.received[peer] = old
+			}
 			return old.code
 		}
 		if now.Sub(old.at) < 3*time.Second {

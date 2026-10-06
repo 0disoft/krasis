@@ -13,6 +13,18 @@ test('peer launch sends once and polls the same receipt without exposing native 
   assert.equal((await bridge.open('../path')).code,'invalid_peer');
   assert.equal(calls.length,2);
 });
+test('reload restores the same request and clears it only after window confirmation',async()=>{
+  const values=new Map();const storage={getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
+  const first=createAppOpenBridge({PeerAppOpen:async()=>value},storage);
+  await first.open(peer);
+  let writes=0;
+  const next=createAppOpenBridge({PeerAppOpen:async(p,r)=>{assert.equal(r,id);writes++;return {...value,code:'window_ready'};}},storage);
+  assert.equal(next.resume(peer).id,id);
+  assert.equal(next.resume('c'.repeat(64)),undefined);
+  assert.equal((await next.status(peer,id)).code,'window_ready');
+  assert.equal(writes,1);
+  assert.equal(next.resume(peer),undefined);
+});
 test('lost replies are not retried and mismatched or premature success is rejected',async()=>{
   let calls=0;
   const failed=createAppOpenBridge({PeerAppOpen:async()=>{calls++;throw Error('private token');}});

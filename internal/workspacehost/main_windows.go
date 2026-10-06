@@ -171,6 +171,9 @@ func Run() {
 				window.Restore()
 				window.Show()
 				window.Focus()
+				if window.IsVisible() {
+					go service.reportUIReady()
+				}
 			}
 		},
 	}
@@ -223,6 +226,9 @@ func Run() {
 				window.Restore()
 				window.Focus()
 				shown <- window.IsVisible()
+				if !smoke && window.IsVisible() {
+					go service.reportUIReady()
+				}
 			})
 		})
 	}

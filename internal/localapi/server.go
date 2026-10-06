@@ -206,6 +206,8 @@ func (handler *handler) ServeHTTP(response http.ResponseWriter, request *http.Re
 	switch request.URL.Path {
 	case "/v1/app-open":
 		handler.appOpen(response, request)
+	case "/v1/ui-ready":
+		handler.uiReady(response, request)
 	case "/v1/clipboard":
 		handler.clipboard(response, request)
 	case "/v1/diagnostic-transfer":

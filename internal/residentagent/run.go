@@ -130,6 +130,7 @@ func run(ctx context.Context, localAppData string, dependencies runDependencies)
 			}
 			updates.ExportDiagnostic = operations.exportDiagnosticForRequest
 			updates.OpenUI = operations.openUIForPeer
+			updates.UIReady = operations.uiReadySince
 			defer updates.Close()
 			managementCtx, stopManagement := context.WithCancel(operations.Context())
 			managementDone := make(chan struct{})

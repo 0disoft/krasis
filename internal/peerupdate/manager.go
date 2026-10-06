@@ -55,6 +55,7 @@ type stagedBundle interface {
 type Manager struct {
 	appOpen           appOpenState
 	OpenUI            func(string) string
+	UIReady           func(time.Time) bool
 	clipboard         clipboardState
 	diagnostic        diagnosticTransfer
 	ReceiveDiagnostic func(string, []byte) (string, error)
