@@ -22,7 +22,7 @@ func commandHelp() helpResult {
 		{"relaunch", "Open the last product UI without a running agent", false, true},
 		{"app repair", "Rebuild recovery entrypoints from this verified product bundle", false, true},
 		{"app ensure", "Recover a missing agent when automatic startup is enabled", false, true},
-		{"app recovery-status", "Read the last automatic recovery receipt and scheduled task status", true, true},
+		{"app recovery-status", "Read the last automatic recovery receipt and scheduled task status", false, false},
 		{"app open ALIAS", "Open the remembered UI on a trusted PC", true, true},
 		{"app open-status ALIAS ID", "Read a peer UI launch request result", true, false},
 		{"doctor", "Check UI, agent, installation and service without changing state", false, false},

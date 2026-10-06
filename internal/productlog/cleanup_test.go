@@ -12,6 +12,9 @@ func TestCleanupReceiptIsReadOnlyAndExported(t *testing.T) {
 	if receipt, err := CleanupReceipt(base); err != nil || receipt != nil {
 		t.Fatal(receipt, err)
 	}
+	if receipt, err := RecoveryReceipt(base); err != nil || receipt != nil {
+		t.Fatal(receipt, err)
+	}
 	entries, err := os.ReadDir(base)
 	if err != nil || len(entries) != 0 {
 		t.Fatal("read-only query created files", err)

@@ -9,6 +9,7 @@ import (
 	"github.com/0disoft/krasis/internal/securefs"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -60,7 +61,17 @@ func SaveRecovery(base string, value RecoverySummary) error {
 }
 
 func RecoveryReceipt(base string) (*RecoverySummary, error) {
-	dir, err := productidentity.PrepareDiagnostics(base)
+	paths, err := productidentity.ResolveWindowsPaths(base)
+	if err != nil {
+		return nil, err
+	}
+	if _, err = os.Lstat(paths.Diagnostics); errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if _, err = peercredentials.ValidateSecurityDirectory(paths.Diagnostics); err != nil {
+		return nil, err
+	}
+	dir, err := securefs.OpenReadDirectory(filepath.Clean(paths.Diagnostics))
 	if err != nil {
 		return nil, err
 	}
