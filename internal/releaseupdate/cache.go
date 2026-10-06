@@ -89,6 +89,11 @@ func SaveReady(base string, envelope, archive []byte, key string) (string, Manif
 	if err != nil {
 		return "", m, err
 	}
+	dir, err := productidentity.PrepareLaunch(base)
+	if err != nil {
+		return "", m, err
+	}
+	defer dir.Close()
 	id := m.SHA256[:32]
 	directory, err := stage(base, b, id)
 	if errors.Is(err, os.ErrExist) {
@@ -104,11 +109,6 @@ func SaveReady(base string, envelope, archive []byte, key string) (string, Manif
 	if err != nil {
 		return "", m, err
 	}
-	dir, err := productidentity.PrepareLaunch(base)
-	if err != nil {
-		return "", m, err
-	}
-	defer dir.Close()
 	r := readyReceipt{Envelope: envelope, Folders: []string{id}, History: map[string][]byte{id: envelope}}
 	if old, e := loadReady(dir); e == nil {
 		for _, entry := range old.Folders {
