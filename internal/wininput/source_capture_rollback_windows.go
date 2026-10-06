@@ -45,6 +45,6 @@ func (current *sourceWheelCaptureRun) rollbackActivationProfile(profile context.
 	if cleanupErr != nil || focusErr != nil || terminalErr != nil {
 		return errors.Join(cause, cleanupErr, focusErr, terminalErr, ErrSourceCaptureRollbackFailed)
 	}
-	current.savedFocus = 0
+	current.forgetSavedFocus()
 	return &sourceCaptureActivationRejected{cause: cause}
 }

@@ -27,7 +27,7 @@ func (current *sourceWheelCaptureRun) restoreAfterHideProfile(profile context.Co
 		return
 	}
 	target := current.savedFocus
-	if target == 0 || target == current.window || !sourceWheelCaptureIsWindow(target) ||
+	if target == 0 || target == current.window || !sourceFocusMatches(target, current.savedFocusIdentity) ||
 		!sourceWheelCaptureIsVisible(target) || !sourceRestoreWindowEnabled(target) || sourceWheelCaptureGetForeground() != 0 {
 		return
 	}
@@ -38,7 +38,7 @@ func (current *sourceWheelCaptureRun) restoreAfterHideProfile(profile context.Co
 	// Probe before attempting restoration, and recheck both target lifetime and
 	// foreground after this wait. An intervening owner must never be replaced.
 	if sourceWheelCaptureProbeForeground(target) != nil || current.err() != nil ||
-		!sourceWheelCaptureIsWindow(target) || !sourceWheelCaptureIsVisible(target) || !sourceRestoreWindowEnabled(target) ||
+		!sourceFocusMatches(target, current.savedFocusIdentity) || !sourceWheelCaptureIsVisible(target) || !sourceRestoreWindowEnabled(target) ||
 		sourceWheelCaptureGetForeground() != 0 || current.err() != nil {
 		return
 	}

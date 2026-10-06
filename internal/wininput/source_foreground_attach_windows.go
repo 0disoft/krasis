@@ -38,7 +38,11 @@ func (current *sourceWheelCaptureRun) setForegroundWithThreadAttachDetailed(targ
 	foregroundErr := current.err()
 	foregroundStage := handoff.FocusFallbackTerminalBeforeSet
 	if foregroundErr == nil {
-		foregroundErr = sourceWheelCaptureSetForeground(targetWindow)
+		if targetWindow == current.savedFocus && !sourceFocusMatches(targetWindow, current.savedFocusIdentity) {
+			foregroundErr = ErrSourceFocusRestoreVerificationLost
+		} else {
+			foregroundErr = sourceWheelCaptureSetForeground(targetWindow)
+		}
 		foregroundStage = handoff.FocusFallbackSetFailed
 	}
 	verified := foregroundErr == nil && sourceWheelCaptureGetForeground() == targetWindow

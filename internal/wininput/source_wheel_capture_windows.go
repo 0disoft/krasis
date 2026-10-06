@@ -170,6 +170,7 @@ type sourceWheelCaptureRun struct {
 	terminalErr                  error
 	registerProc                 uintptr
 	savedFocus                   uintptr
+	savedFocusIdentity           sourceFocusIdentity
 	registered                   bool
 	fullscreenMarked             bool // Capture owner thread only; presentation, not input authority.
 	fullscreenAttempted          bool // Includes timed-out work that still needs a clear request.
@@ -472,6 +473,7 @@ func (current *sourceWheelCaptureRun) run(ctx context.Context, ready func()) (re
 	defer sourceWindowOwners.Delete(window)
 	defer func() {
 		resultErr = errors.Join(resultErr, current.deactivateWindow())
+		current.forgetSavedFocus()
 		presentation.retire()
 		sourcePresentationWindows.CompareAndDelete(window, presentation)
 		if !windowDestroyed {
@@ -594,7 +596,9 @@ func (current *sourceWheelCaptureRun) activateWindowProfile(profile context.Cont
 		stopPosition()
 		return fmt.Errorf("%w: position source wheel capture: %v", ErrSourceCaptureActivationSetup, err)
 	}
+	current.forgetSavedFocus()
 	current.savedFocus = sourceWheelCaptureGetForeground()
+	current.savedFocusIdentity = sourceFocusRemember(current.savedFocus)
 	handoff.RecordFocusState(profile, handoff.FocusBeforeShow, sourceFocusState(current.savedFocus, current.window, current.savedFocus))
 	if current.savedFocus == 0 {
 		missingForegroundStage = ErrSourceForegroundMissingBeforeShow
@@ -807,7 +811,7 @@ func (current *sourceWheelCaptureRun) deactivateWindowProfile(profile context.Co
 		current.restoreAfterHideProfile(profile, restoreResult, restoreErr)
 	}
 	savedFocus := current.savedFocus
-	current.savedFocus = 0
+	current.forgetSavedFocus()
 	// Partial activation can own registration and foreground before active=true.
 	// It needs the same post-hide release proof as a fully active capture.
 	postHideResult, postHideErr := current.verifyPostHideFocusReleaseProfile(profile, savedFocus)
@@ -871,7 +875,7 @@ func (current *sourceWheelCaptureRun) restoreFocusProfile(profile context.Contex
 	if sourceWheelCaptureGetForeground() != current.window {
 		return SourceFocusRestoreSkipped, nil
 	}
-	if !sourceWheelCaptureIsWindow(current.savedFocus) {
+	if !sourceFocusMatches(current.savedFocus, current.savedFocusIdentity) {
 		return SourceFocusRestoreSkipped, nil
 	}
 	restoreErr := sourceWheelCaptureSetForeground(current.savedFocus)
@@ -908,6 +912,9 @@ func (current *sourceWheelCaptureRun) restoreFocusFallback() (SourceFocusRestore
 }
 
 func (current *sourceWheelCaptureRun) restoreFocusFallbackProfile(profile context.Context) (mapped SourceFocusRestoreFallbackResult, mappedErr error) {
+	if !sourceFocusMatches(current.savedFocus, current.savedFocusIdentity) {
+		return SourceFocusRestoreFallbackVerificationLost, ErrSourceFocusRestoreVerificationLost
+	}
 	result, stage, rejectedForeground, err := current.setForegroundWithThreadAttachDetailed(current.savedFocus, current.savedFocus, profile)
 	defer func() {
 		handoff.RecordFocusFallbackObserved(profile, uint8(mapped), stage, rejectedForeground)
