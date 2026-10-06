@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sync"
 	"time"
@@ -80,6 +81,24 @@ func Run() {
 		updated, err = productpanel.ParseWorkspaceUpdateLaunch(os.Args[1:])
 		if err != nil {
 			os.Exit(1)
+		}
+	}
+	if !smoke {
+		inJob, jobErr := launchrecord.InJob()
+		if jobErr != nil {
+			os.Exit(1)
+		}
+		if inJob && os.Getenv("KRASIS_INDEPENDENT_LAUNCH") != "1" {
+			self, err := os.Executable()
+			if err != nil {
+				os.Exit(1)
+			}
+			command := exec.Command(self, os.Args[1:]...)
+			command.Dir = filepath.Dir(self)
+			if err = launchrecord.StartIndependent(command); err != nil {
+				os.Exit(1)
+			}
+			return
 		}
 	}
 	assets, err := fs.Sub(frontend.NativeAssets, "dist-native")
@@ -193,7 +212,7 @@ func Run() {
 		Hidden:           startAtLogin || (smoke && !visibleSmoke),
 	})
 	shown := make(chan bool, 1)
-	if visibleSmoke || (!smoke && updated.Revision != "") {
+	if visibleSmoke || (!smoke && !startAtLogin) {
 		var showOnce sync.Once
 		window.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) {
 			showOnce.Do(func() {

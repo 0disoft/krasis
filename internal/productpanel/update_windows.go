@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"syscall"
 
+	"github.com/0disoft/krasis/internal/launchrecord"
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/peercredentials"
 	"github.com/0disoft/krasis/internal/securefs"
@@ -20,29 +21,20 @@ import (
 func LaunchReceivedWorkspaceUpdate(directory, revision, alias string) error {
 	return launchReceivedUpdate(directory, revision, alias, localapi.AgentGeneration, func(command *exec.Cmd) error {
 		command.Args = append(command.Args, "--wait-pid", strconv.Itoa(os.Getpid()))
-		if err := command.Start(); err != nil {
-			return err
-		}
-		return command.Process.Release()
+		return launchrecord.StartIndependent(command)
 	})
 }
 
 func LaunchReleaseWorkspaceUpdate(directory, revision string) error {
 	return launchReceivedUpdate(directory, revision, "", localapi.AgentGeneration, func(command *exec.Cmd) error {
 		command.Args = []string{command.Path, "--release-build", revision, "--wait-pid", strconv.Itoa(os.Getpid())}
-		if err := command.Start(); err != nil {
-			return err
-		}
-		return command.Process.Release()
+		return launchrecord.StartIndependent(command)
 	})
 }
 
 func LaunchReceivedUpdate(directory, revision, alias string) error {
 	return launchReceivedUpdate(directory, revision, alias, localapi.AgentGeneration, func(command *exec.Cmd) error {
-		if err := command.Start(); err != nil {
-			return err
-		}
-		return command.Process.Release()
+		return launchrecord.StartIndependent(command)
 	})
 }
 

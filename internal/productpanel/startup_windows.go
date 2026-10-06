@@ -8,6 +8,7 @@ import (
 	"errors"
 	"github.com/0disoft/krasis/internal/agentinstance"
 	"github.com/0disoft/krasis/internal/inputworker"
+	"github.com/0disoft/krasis/internal/launchrecord"
 	"github.com/0disoft/krasis/internal/localapi"
 	"io"
 	"os"
@@ -74,11 +75,8 @@ func NewStartup(control string) (Startup, error) {
 					command.Env = append(command.Env, key+"="+value)
 				}
 			}
-			if err := command.Start(); err != nil {
-				return err
-			}
 			// Detached agent owns its own single-instance lease and safe-stop lifecycle.
-			return command.Process.Release()
+			return launchrecord.StartIndependent(command)
 		},
 		Pause: startupPause, Generation: localapi.AgentGeneration, Revision: revision,
 	}, nil

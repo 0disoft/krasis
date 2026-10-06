@@ -22,8 +22,5 @@ func startWithArgs(path string, args ...string) error {
 			command.Env = append(command.Env, key+"="+value)
 		}
 	}
-	if err := command.Start(); err != nil {
-		return err
-	}
-	return command.Process.Release()
+	return StartIndependent(command)
 }
