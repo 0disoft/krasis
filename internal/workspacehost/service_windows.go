@@ -18,6 +18,7 @@ import (
 )
 
 type WorkspaceService struct {
+	release         releaseState
 	settingsGate    sync.Mutex
 	startAtLogin    bool
 	ctx             context.Context
@@ -62,6 +63,12 @@ func (s *WorkspaceService) ServiceStartup(context.Context, application.ServiceOp
 		if s.receiver != nil && s.quit != nil {
 			s.jobs.Add(1)
 			go s.runUpdateReceiver()
+		}
+		if s.quit != nil {
+			s.release.wake = make(chan struct{}, 1)
+			s.release.value = ReleaseSnapshot{State: "IDLE"}
+			s.jobs.Add(1)
+			go s.runReleaseUpdater()
 		}
 	}
 	return nil

@@ -12,6 +12,7 @@ import (
 // operations are serialized; Disconnect cancels an in-flight recovery first.
 type DesktopLifecycle struct {
 	StartupResume    func(context.Context, BridgeSnapshot) BridgeSnapshot
+	updateHandedOff  bool
 	ctx              context.Context
 	open             func() (Client, error)
 	ensure           func(context.Context) error
@@ -100,6 +101,9 @@ func (b *DesktopLifecycle) Connect(alias, fingerprint string) BridgeSnapshot {
 		return bridgeFailure("busy")
 	}
 	defer b.gate.Unlock()
+	if b.updateHandedOff {
+		return bridgeFailure("agent_busy")
+	}
 	ctx, done := b.operationBudget(3 * time.Minute)
 	defer done()
 	b.stopped.Store(false)
@@ -130,6 +134,9 @@ func (b *DesktopLifecycle) Restart() BridgeSnapshot {
 		return bridgeFailure("busy")
 	}
 	defer b.gate.Unlock()
+	if b.updateHandedOff {
+		return bridgeFailure("agent_busy")
+	}
 	ctx, done := b.operationBudget(3 * time.Minute)
 	defer done()
 	view := NewDesktopBridge(ctx, b.open).Refresh()

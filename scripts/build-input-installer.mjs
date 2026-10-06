@@ -40,7 +40,8 @@ const pins = {
   input: hash(fs.readFileSync(path.join(payload, 'krasis-input.exe'))),
 };
 fs.writeFileSync(path.join(payload, 'pins.json'), JSON.stringify(pins));
-const tools = path.join(root, '.cache/tools/llvm-mingw-20260908-ucrt-x86_64/bin');
+const tools = process.env.KRASIS_LLVM_BIN || path.join(root, '.cache/tools/llvm-mingw-20260908-ucrt-x86_64/bin');
+assert.ok(path.isAbsolute(tools), 'LLVM tools require an absolute directory.');
 const res = path.join(output, 'installer.res');
 execFileSync(path.join(tools, 'llvm-rc.exe'), ['/FO', res, 'krasis-install.rc'], {
   cwd: path.join(root, 'assets/windows'), stdio: 'inherit',

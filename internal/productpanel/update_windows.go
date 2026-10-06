@@ -27,6 +27,16 @@ func LaunchReceivedWorkspaceUpdate(directory, revision, alias string) error {
 	})
 }
 
+func LaunchReleaseWorkspaceUpdate(directory, revision string) error {
+	return launchReceivedUpdate(directory, revision, "", localapi.AgentGeneration, func(command *exec.Cmd) error {
+		command.Args = []string{command.Path, "--release-build", revision, "--wait-pid", strconv.Itoa(os.Getpid())}
+		if err := command.Start(); err != nil {
+			return err
+		}
+		return command.Process.Release()
+	})
+}
+
 func LaunchReceivedUpdate(directory, revision, alias string) error {
 	return launchReceivedUpdate(directory, revision, alias, localapi.AgentGeneration, func(command *exec.Cmd) error {
 		if err := command.Start(); err != nil {

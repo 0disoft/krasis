@@ -1,0 +1,79 @@
+name: release
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing approved generation tag, e.g. g184
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: krasis-release
+  cancel-in-progress: false
+jobs:
+  windows-release:
+    runs-on: windows-latest
+    environment: release
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+      KRASIS_RELEASE_PUBLIC_KEY: ${{ vars.KRASIS_RELEASE_PUBLIC_KEY }}
+    steps:
+      - name: Checkout approved tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag }}
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - name: Validate release and prepare dependencies
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:RELEASE_TAG -notmatch '^g[1-9][0-9]*$') { throw 'Expected a generation tag' }
+          $generation = [regex]::Match((Get-Content internal/localapi/runtime.go -Raw), 'const AgentGeneration = ([0-9]+)').Groups[1].Value
+          if ($env:RELEASE_TAG -ne "g$generation") { throw 'Tag and source generation differ' }
+          if ([string]::IsNullOrWhiteSpace($env:KRASIS_RELEASE_PUBLIC_KEY)) { throw 'Release public key is not configured' }
+          $llvm = 'C:\Program Files\LLVM\bin'
+          if (!(Test-Path "$llvm\llvm-rc.exe") -or !(Test-Path "$llvm\llvm-cvtres.exe")) { throw 'LLVM resource tools unavailable' }
+          "KRASIS_LLVM_BIN=$llvm" >> $env:GITHUB_ENV
+          $env:GOMODCACHE = Join-Path (Get-Location) '.cache/go-mod'
+          go mod download
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npm.cmd --prefix frontend ci --no-audit --no-fund
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Verify and build release folder
+        shell: pwsh
+        run: |
+          $env:GOMODCACHE = Join-Path (Get-Location) '.cache/go-mod'
+          $env:GOCACHE = Join-Path (Get-Location) '.cache/go-build'
+          $env:GOPROXY = 'off'
+          go test -timeout 90s ./internal/appsettings ./internal/releaseupdate ./internal/productpanel ./internal/launchrecord ./internal/productcli
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          ./scripts/build-workspace.ps1
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Sign immutable update feed
+        shell: pwsh
+        env:
+          KRASIS_RELEASE_PRIVATE_KEY: ${{ secrets.KRASIS_RELEASE_PRIVATE_KEY }}
+        run: |
+          node scripts/sign-release.mjs "dist/workspace/$env:RELEASE_TAG"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Publish verified release assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $archive = "dist/releases/$env:RELEASE_TAG/krasis-$env:RELEASE_TAG-windows-amd64.zip"
+          $feed = "dist/releases/$env:RELEASE_TAG/latest.json"
+          gh release create $env:RELEASE_TAG $archive $feed --verify-tag --title "Krasis $env:RELEASE_TAG" --generate-notes --latest
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }

@@ -17,7 +17,9 @@ if (!bundleRoot || path.resolve(bundleRoot) !== path.resolve('dist/workspace', `
 const directory = bundleRoot;
 for (const name of ['krasis','krasis-agent','krasis-cli']) {
   const tags = name === 'krasis' ? ['-tags','desktop,production'] : [];
-  const ldflags = name === 'krasis-cli' ? '-s -w' : '-s -w -H=windowsgui';
+  const publicKey = process.env.KRASIS_RELEASE_PUBLIC_KEY ?? '';
+  if (publicKey && (!/^[A-Za-z0-9+/]{43}=$/u.test(publicKey) || Buffer.from(publicKey,'base64').length !== 32)) throw Error('Invalid release public key');
+  const ldflags = (name === 'krasis-cli' ? '-s -w' : '-s -w -H=windowsgui') + (publicKey ? ` -X=github.com/0disoft/krasis/internal/releaseupdate.PublicKey=${publicKey}` : '');
   execFileSync('go',['build','-trimpath','-buildvcs=true',...tags,`-ldflags=${ldflags}`,'-o',path.join(directory,`${name}.exe`),`./cmd/${name}`],{stdio:'inherit',env:{...process.env,GOFLAGS:'',GOOS:'windows',GOARCH:'amd64',CGO_ENABLED:'0',GOPROXY:'off',GOSUMDB:'off'}});
   verifyExecutableIcon(fs.readFileSync(path.join(directory,`${name}.exe`)));
 }

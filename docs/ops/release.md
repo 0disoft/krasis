@@ -60,7 +60,7 @@ Rebuilding the same version with different bytes creates a new candidate identif
 
 ## Rollout
 
-There is no automatic update in the MVP. Rollout is manual, one peer pair at a time. The release owner confirms both devices are `LOCAL`, installs the candidate, verifies signatures and checksums, starts one side at a time, re-pairs when required, and runs the bounded smoke procedure before enabling input transfer.
+Peer-assisted development updates and the publisher-signed GitHub release updater are implemented. Public distribution remains subject to the release decision above. The release owner configures the release environment signing keys, approves an immutable generation tag and manually dispatches the release workflow. The client verifies the signed feed and bundle, downloads in the background and applies only after input and pairing are idle. The release owner confirms both devices are `LOCAL`, verifies signatures and checksums and runs the bounded smoke procedure before external distribution.
 
 The cohort, support window, owner, exact devices, start date, stop date, and rollback revision are recorded in the release manifest.
 

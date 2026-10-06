@@ -20,6 +20,11 @@ type WorkspaceUpdateLaunch struct {
 // Only the verified updater supplies these arguments. Paths and commands are
 // never accepted, and the expected build is checked again before reconnecting.
 func ParseWorkspaceUpdateLaunch(args []string) (WorkspaceUpdateLaunch, error) {
+	if len(args) == 4 && args[0] == "--release-build" && args[2] == "--wait-pid" {
+		value, err := ParseWorkspaceUpdateLaunch([]string{"--updated-peer", "release", "--expected-build", args[1], "--wait-pid", args[3]})
+		value.Alias = ""
+		return value, err
+	}
 	var v WorkspaceUpdateLaunch
 	if (len(args) != 4 && len(args) != 6) || args[0] != "--updated-peer" || args[2] != "--expected-build" {
 		return v, errors.New("invalid update arguments")
@@ -190,9 +195,37 @@ func (b *DesktopLifecycle) ApplyReceivedUpdate(receiver *WorkspaceUpdateReceiver
 		return false
 	}
 	defer b.gate.Unlock()
+	if b.updateHandedOff {
+		return false
+	}
 	if receiver.Poll() {
+		b.updateHandedOff = true
 		b.stopped.Store(true)
 		return true
 	}
 	return false
+}
+
+// Public release replacement waits for disconnected input and shares the same
+// gate as connect, recovery and peer-update application.
+func (b *DesktopLifecycle) ApplyReleaseUpdate(launch func() error) bool {
+	if launch == nil || !b.gate.TryLock() {
+		return false
+	}
+	defer b.gate.Unlock()
+	if b.updateHandedOff {
+		return false
+	}
+	ctx, cancel := b.operation()
+	defer cancel()
+	view := NewDesktopBridge(ctx, b.open).Refresh()
+	if view.Code != "ok" || view.State != "LOCAL" {
+		return false
+	}
+	if err := launch(); err != nil {
+		return false
+	}
+	b.updateHandedOff = true
+	b.stopped.Store(true)
+	return true
 }

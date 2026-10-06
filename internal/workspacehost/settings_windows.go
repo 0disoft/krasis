@@ -53,6 +53,16 @@ func (s *WorkspaceService) SetAppSettings(startAtLogin, autoUpdate bool) AppSett
 		_ = appsettings.SetStartup(base, old.StartAtLogin)
 		return AppSettingsSnapshot{Schema: appsettings.Schema, Code: "save_failed", StartAtLogin: old.StartAtLogin, AutoUpdate: old.AutoUpdate}
 	}
+	if autoUpdate && !old.AutoUpdate {
+		s.CheckRelease()
+	}
+	if !autoUpdate {
+		s.release.gate.Lock()
+		if s.release.cancel != nil {
+			s.release.cancel()
+		}
+		s.release.gate.Unlock()
+	}
 	return s.appSettings()
 }
 func (s *WorkspaceService) prepareAppSettings() error {
