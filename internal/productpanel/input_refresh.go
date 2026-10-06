@@ -25,6 +25,11 @@ type inputRefresh struct {
 
 func (b *inputRefresh) status() string {
 	if state := b.state.Load(); state != nil {
+		if *state == "PENDING" && b.mu.TryLock() {
+			b.refreshPendingLocked()
+			b.mu.Unlock()
+			return *b.state.Load()
+		}
 		return *state
 	}
 	state := b.inspect()
@@ -34,6 +39,14 @@ func (b *inputRefresh) status() string {
 
 func (b *inputRefresh) setState(state string) { b.state.Store(&state) }
 
+func (b *inputRefresh) refreshPendingLocked() {
+	if state := b.state.Load(); state != nil && *state == "PENDING" {
+		// Observe completion; never automatically start a second installer.
+		b.attempted = true
+		b.setState(b.inspect())
+	}
+}
+
 func (b *inputRefresh) automatic(ctx context.Context) error { return b.apply(ctx, false) }
 func (b *inputRefresh) explicit(ctx context.Context) error  { return b.apply(ctx, true) }
 
@@ -42,6 +55,7 @@ func (b *inputRefresh) apply(ctx context.Context, explicit bool) error {
 		return ErrStartupBusy
 	}
 	defer b.mu.Unlock()
+	b.refreshPendingLocked()
 	if state := b.state.Load(); state != nil && *state == "PENDING" {
 		return ErrInputRefreshPending
 	}
@@ -50,6 +64,7 @@ func (b *inputRefresh) apply(ctx context.Context, explicit bool) error {
 	}
 	state := b.inspect()
 	if state == "PENDING" {
+		b.attempted = true
 		b.setState(state)
 		return ErrInputRefreshPending
 	}

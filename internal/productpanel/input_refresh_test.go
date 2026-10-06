@@ -35,6 +35,9 @@ func TestInputRefreshAutomaticConsentPolicy(t *testing.T) {
 				if tc.verified {
 					state = "READY"
 				}
+				if errors.Is(tc.result, ErrInputRefreshPending) {
+					state = "PENDING" // the transaction is still running
+				}
 				return tc.result
 			}}
 			for range 3 {
