@@ -4,6 +4,9 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/0disoft/krasis/internal/peercredentials"
+	"github.com/0disoft/krasis/internal/productidentity"
 )
 
 func TestDefaultsAndDisabledSurviveReload(t *testing.T) {
@@ -38,5 +41,59 @@ func TestDefaultsAndDisabledSurviveReload(t *testing.T) {
 	gotPeer, err = LoadResume(base)
 	if err != nil || gotPeer.Alias != "" {
 		t.Fatal("disconnect not retained")
+	}
+}
+
+func TestIncompleteSettingsNeverEnableStartupOrUpdates(t *testing.T) {
+	for _, raw := range []string{"", "{}", "null", `{"schema":"krasis.app-settings/v1"}`, `{"schema":"krasis.app-settings/v1","startAtLogin":false}`, `{"schema":"krasis.app-settings/v1","autoUpdate":false}`, `{"schema":"krasis.app-settings/v1","startAtLogin":null,"autoUpdate":false}`, `{"schema":"krasis.app-settings/v1","startAtLogin":false,"autoUpdate":null}`} {
+		t.Run(raw, func(t *testing.T) {
+			base := t.TempDir()
+			writeRawSettings(t, base, "settings.json", raw)
+			got, err := Load(base)
+			if err == nil || got.StartAtLogin || got.AutoUpdate {
+				t.Fatalf("incomplete settings became defaults: %+v %v", got, err)
+			}
+		})
+	}
+}
+
+func TestIncompleteRecoverySettingsNeverResumeRecovery(t *testing.T) {
+	for _, raw := range []string{"", "{}", "null", `{"paused":null}`} {
+		t.Run(raw, func(t *testing.T) {
+			base := t.TempDir()
+			writeRawSettings(t, base, "recovery.json", raw)
+			if _, err := RecoveryPaused(base); err == nil {
+				t.Fatal("incomplete recovery settings accepted")
+			}
+		})
+	}
+	base := t.TempDir()
+	for _, paused := range []bool{true, false} {
+		if err := PauseRecovery(base, paused); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := RecoveryPaused(base); err != nil || got != paused {
+			t.Fatal(got, err)
+		}
+	}
+}
+
+func writeRawSettings(t *testing.T, base, name, raw string) {
+	t.Helper()
+	dir, err := productidentity.PrepareLaunch(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dir.Close()
+	f, err := dir.CreateExclusive(name, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if err = peercredentials.ProtectSecurityFileHandle(f); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = f.WriteString(raw); err != nil {
+		t.Fatal(err)
 	}
 }

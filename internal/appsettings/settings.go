@@ -34,15 +34,19 @@ type Resume struct {
 var gate sync.Mutex
 
 func Load(base string) (Settings, error) {
-	value := Settings{Schema: Schema, StartAtLogin: true, AutoUpdate: true}
+	var value struct {
+		Schema       string `json:"schema"`
+		StartAtLogin *bool  `json:"startAtLogin"`
+		AutoUpdate   *bool  `json:"autoUpdate"`
+	}
 	err := read(base, "settings.json", &value)
 	if errors.Is(err, os.ErrNotExist) {
-		return value, nil
+		return Settings{Schema: Schema, StartAtLogin: true, AutoUpdate: true}, nil
 	}
-	if err != nil || value.Schema != Schema {
+	if err != nil || value.Schema != Schema || value.StartAtLogin == nil || value.AutoUpdate == nil {
 		return Settings{}, errors.New("invalid app settings")
 	}
-	return value, nil
+	return Settings{Schema: value.Schema, StartAtLogin: *value.StartAtLogin, AutoUpdate: *value.AutoUpdate}, nil
 }
 func Save(base string, value Settings) error {
 	if value.Schema != Schema {
