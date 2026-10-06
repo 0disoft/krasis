@@ -33,6 +33,9 @@ type RecoveryFailure struct {
 
 var recoveryGate sync.Mutex
 var errInvalidRecoveryReceipt = errors.New("invalid recovery receipt")
+var errRecoverySavePending = errors.New("recovery receipt save pending")
+
+const recoveryPendingName = "recovery-pending.json"
 
 func (v RecoverySummary) failed() bool {
 	switch v.Code {
@@ -79,12 +82,21 @@ func SaveRecovery(base string, value RecoverySummary) error {
 		return err
 	}
 	defer dir.Close()
+	if err = resumeRecoverySave(dir); err != nil {
+		return err
+	}
 	previous, err := readRecoveryReceipt(dir)
 	corrupt := errors.Is(err, errInvalidRecoveryReceipt)
 	if err != nil && !corrupt {
 		return err
 	}
 	value.HistoryIncomplete = corrupt || (previous != nil && previous.HistoryIncomplete)
+	if previous == nil && !corrupt {
+		value.HistoryIncomplete, err = hasCorruptRecoveryArchive(dir)
+		if err != nil {
+			return err
+		}
+	}
 	value.LastFailure = nil
 	if value.failed() {
 		value.LastFailure = value.failure()
@@ -113,9 +125,13 @@ func SaveRecovery(base string, value RecoverySummary) error {
 		return err
 	}
 	if corrupt {
+		if err = dir.PromoteNoReplace(name, recoveryPendingName); err != nil {
+			return err
+		}
 		if err = archiveCorruptRecovery(dir); err != nil {
 			return err
 		}
+		return dir.Replace(recoveryPendingName, "recovery-latest.json")
 	}
 	return dir.Replace(name, "recovery-latest.json")
 }
@@ -140,7 +156,16 @@ func RecoveryReceipt(base string) (*RecoverySummary, error) {
 }
 
 func readRecoveryReceipt(dir *securefs.Directory) (*RecoverySummary, error) {
-	f, err := dir.Open("recovery-latest.json")
+	if pending, err := readRecoveryReceiptNamed(dir, recoveryPendingName); err != nil {
+		return nil, err
+	} else if pending != nil {
+		return nil, errRecoverySavePending
+	}
+	return readRecoveryReceiptNamed(dir, "recovery-latest.json")
+}
+
+func readRecoveryReceiptNamed(dir *securefs.Directory, name string) (*RecoverySummary, error) {
+	f, err := dir.Open(name)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}
