@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -20,6 +21,7 @@ import (
 	"github.com/0disoft/krasis/internal/buildinfo"
 	"github.com/0disoft/krasis/internal/launchrecord"
 	"github.com/0disoft/krasis/internal/localapi"
+	"github.com/0disoft/krasis/internal/productcli"
 	"github.com/0disoft/krasis/internal/productidentity"
 	"github.com/0disoft/krasis/internal/productlog"
 	"github.com/0disoft/krasis/internal/productpanel"
@@ -47,6 +49,12 @@ func (s *WorkspaceSmoke) Report(schema, state, code string) {
 }
 
 func Run() {
+	if len(os.Args) == 2 && os.Args[1] == appsettings.RecoveryArgument {
+		ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+		code := productcli.Run(ctx, []string{"app", "ensure", "--json"}, io.Discard, io.Discard, os.Getenv("LOCALAPPDATA"))
+		cancel()
+		os.Exit(code)
+	}
 	if len(os.Args) == 3 && os.Args[1] == "--release-key-check" {
 		if !releaseupdate.MatchEmbeddedKey(os.Args[2]) {
 			os.Exit(2)

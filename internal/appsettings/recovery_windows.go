@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"golang.org/x/sys/windows"
@@ -17,10 +18,12 @@ import (
 	"syscall"
 	"time"
 	"unicode/utf16"
+
+	"github.com/0disoft/krasis/internal/launchrecord"
 )
 
-// The task runs as the logged-in user with limited privileges. It polls only
-// the fixed CLI; no network listener, password, arbitrary command or UAC bypass.
+// The task runs the remembered GUI image in background recovery mode as the
+// limited logged-in user. The console CLI remains available for terminal use.
 const recoveryTaskScript = `
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
@@ -42,7 +45,15 @@ try {
     if (-not $krasisTaskUser.StartsWith('S-')) {
       $krasisTaskUser=(New-Object Security.Principal.NTAccount($krasisTaskUser)).Translate([Security.Principal.SecurityIdentifier]).Value
     }
-    if ($krasisDefinition.RegistrationInfo.Description -ne 'Krasis recovery v1' -or
+    $krasisAction=$krasisDefinition.Actions.Item(1)
+    $krasisLegacy=($krasisDefinition.RegistrationInfo.Description -eq 'Krasis recovery v1' -and
+      $krasisAction.Path -eq $env:KRASIS_RECOVERY_LEGACY_TARGET -and
+      $krasisAction.Arguments -eq 'app ensure --json')
+    $krasisPrevious=[string[]](ConvertFrom-Json $env:KRASIS_RECOVERY_PREVIOUS)
+    $krasisOwned=($krasisDefinition.RegistrationInfo.Description -eq 'Krasis recovery v2' -and
+      $krasisAction.Arguments -eq '--background-recovery' -and
+      ($krasisAction.Path -eq $env:KRASIS_RECOVERY_TARGET -or $krasisPrevious -contains $krasisAction.Path))
+    if ((-not $krasisLegacy -and -not $krasisOwned) -or
         $krasisTaskUser -ne $krasisSid -or
         $krasisDefinition.Principal.LogonType -ne 3 -or
         $krasisDefinition.Principal.RunLevel -ne 0 -or
@@ -50,21 +61,26 @@ try {
         $krasisDefinition.Triggers.Item(1).Type -ne 1 -or
         $krasisDefinition.Triggers.Item(1).Repetition.Interval -ne 'PT1M' -or
         $krasisDefinition.Settings.ExecutionTimeLimit -ne 'PT30S' -or
-        $krasisDefinition.Actions.Count -ne 1 -or
-        $krasisDefinition.Actions.Item(1).Path -ne $env:KRASIS_RECOVERY_TARGET -or
-        $krasisDefinition.Actions.Item(1).Arguments -ne 'app ensure --json') { exit 3 }
+        $krasisDefinition.Actions.Count -ne 1) { exit 3 }
     if ($env:KRASIS_RECOVERY_CHECK -eq '1') {
-      if ($krasisTask.Enabled) { exit 0 } else { exit 4 }
+      if ($krasisTask.Enabled -and $krasisOwned -and $krasisAction.Path -eq $env:KRASIS_RECOVERY_TARGET) { exit 0 } else { exit 4 }
     }
     if ($env:KRASIS_RECOVERY_ENABLED -eq '0') { $krasisFolder.DeleteTask($krasisName,0);exit 0 }
-    if (-not $krasisTask.Enabled) { $krasisTask.Enabled=$true }
+    if (-not (Test-Path -LiteralPath $env:KRASIS_RECOVERY_TARGET -PathType Leaf)) { exit 2 }
+    $krasisDefinition.RegistrationInfo.Description='Krasis recovery v2'
+    $krasisDefinition.Settings.Enabled=$true
+    $krasisAction.Path=$env:KRASIS_RECOVERY_TARGET
+    $krasisAction.Arguments='--background-recovery'
+    $krasisAction.WorkingDirectory=[IO.Path]::GetDirectoryName($env:KRASIS_RECOVERY_TARGET)
+    $krasisSddl='D:P(A;;GA;;;SY)(A;;GA;;;'+$krasisSid+')'
+    $null=$krasisFolder.RegisterTaskDefinition($krasisName,$krasisDefinition,6,$krasisSid,$null,3,$krasisSddl)
     exit 0
   }
   if ($env:KRASIS_RECOVERY_CHECK -eq '1') { exit 4 }
   if ($env:KRASIS_RECOVERY_ENABLED -eq '0') { exit 0 }
   if (-not (Test-Path -LiteralPath $env:KRASIS_RECOVERY_TARGET -PathType Leaf)) { exit 2 }
   $krasisDefinition=$krasisService.NewTask(0)
-  $krasisDefinition.RegistrationInfo.Description='Krasis recovery v1'
+  $krasisDefinition.RegistrationInfo.Description='Krasis recovery v2'
   $krasisDefinition.Principal.UserId=$krasisSid
   $krasisDefinition.Principal.LogonType=3
   $krasisDefinition.Principal.RunLevel=0
@@ -78,7 +94,7 @@ try {
   $krasisTrigger.Repetition.Interval='PT1M'
   $krasisAction=$krasisDefinition.Actions.Create(0)
   $krasisAction.Path=$env:KRASIS_RECOVERY_TARGET
-  $krasisAction.Arguments='app ensure --json'
+  $krasisAction.Arguments='--background-recovery'
   $krasisAction.WorkingDirectory=[IO.Path]::GetDirectoryName($env:KRASIS_RECOVERY_TARGET)
   $krasisSddl='D:P(A;;GA;;;SY)(A;;GA;;;'+$krasisSid+')'
   $null=$krasisFolder.RegisterTaskDefinition($krasisName,$krasisDefinition,2,$krasisSid,$null,3,$krasisSddl)
@@ -122,19 +138,33 @@ func runRecoveryTask(base, suffix string, enabled, inspect bool) error {
 			return errors.New("invalid recovery task suffix")
 		}
 	}
+	record, err := launchrecord.Load(base)
+	if err != nil {
+		return errors.New("recovery launch record unavailable")
+	}
+	if enabled && !inspect {
+		if _, err = launchrecord.Inspect(base); err != nil {
+			return errors.New("recovery launch image invalid")
+		}
+	}
+	previous, err := launchrecord.RecoveryDirectories(base)
+	if err != nil {
+		return errors.New("recovery launch history unavailable")
+	}
+	for i := range previous {
+		previous[i] = filepath.Join(previous[i], "krasis.exe")
+	}
+	history, err := json.Marshal(previous)
+	if err != nil {
+		return err
+	}
 	system, err := windows.GetSystemDirectory()
 	if err != nil {
 		return err
 	}
-	units := utf16.Encode([]rune(recoveryTaskScript))
-	encoded := make([]byte, 2*len(units))
-	for i, u := range units {
-		binary.LittleEndian.PutUint16(encoded[2*i:], u)
-	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, filepath.Join(system, "WindowsPowerShell", "v1.0", "powershell.exe"), "-NoProfile", "-NonInteractive", "-EncodedCommand", base64.StdEncoding.EncodeToString(encoded))
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: windows.CREATE_NO_WINDOW}
+	cmd := recoveryScriptCommand(ctx, system, recoveryTaskScript)
 	flag := "0"
 	if enabled {
 		flag = "1"
@@ -143,7 +173,7 @@ func runRecoveryTask(base, suffix string, enabled, inspect bool) error {
 	if inspect {
 		check = "1"
 	}
-	cmd.Env = append(os.Environ(), "KRASIS_RECOVERY_TARGET="+filepath.Join(base, "Krasis", "launch", "krasis-cli.exe"), "KRASIS_RECOVERY_ENABLED="+flag, "KRASIS_RECOVERY_SUFFIX="+suffix, "KRASIS_RECOVERY_CHECK="+check)
+	cmd.Env = append(os.Environ(), "KRASIS_RECOVERY_TARGET="+record.Executable, "KRASIS_RECOVERY_LEGACY_TARGET="+filepath.Join(base, "Krasis", "launch", "krasis-cli.exe"), "KRASIS_RECOVERY_PREVIOUS="+string(history), "KRASIS_RECOVERY_ENABLED="+flag, "KRASIS_RECOVERY_SUFFIX="+suffix, "KRASIS_RECOVERY_CHECK="+check)
 	output, runErr := cmd.CombinedOutput()
 	if runErr != nil {
 		var exitErr *exec.ExitError
@@ -156,4 +186,15 @@ func runRecoveryTask(base, suffix string, enabled, inspect bool) error {
 		return errors.New("recovery task registration failed")
 	}
 	return nil
+}
+
+func recoveryScriptCommand(ctx context.Context, system, script string) *exec.Cmd {
+	units := utf16.Encode([]rune(script))
+	encoded := make([]byte, 2*len(units))
+	for i, u := range units {
+		binary.LittleEndian.PutUint16(encoded[2*i:], u)
+	}
+	cmd := exec.CommandContext(ctx, filepath.Join(system, "WindowsPowerShell", "v1.0", "powershell.exe"), "-NoProfile", "-NonInteractive", "-EncodedCommand", base64.StdEncoding.EncodeToString(encoded))
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: windows.CREATE_NO_WINDOW}
+	return cmd
 }

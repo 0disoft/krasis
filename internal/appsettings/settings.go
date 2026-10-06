@@ -18,6 +18,9 @@ import (
 
 const Schema = "krasis.app-settings/v1"
 
+// Internal GUI entrypoint for the scheduled task; it never creates a console.
+const RecoveryArgument = "--background-recovery"
+
 type Settings struct {
 	Schema       string `json:"schema"`
 	StartAtLogin bool   `json:"startAtLogin"`
