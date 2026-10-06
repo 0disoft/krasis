@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"errors"
 	"io"
 	"net/http"
 	"sync"
@@ -24,6 +25,7 @@ type diagnosticReceipt struct {
 type diagnosticTransfer struct {
 	mu              sync.Mutex
 	preparing       bool
+	receiving       bool
 	out             *diagnosticOffer
 	request         *diagnosticRequest
 	state, received string
@@ -52,7 +54,7 @@ func (m *Manager) PrepareDiagnosticRequest(peer string, save func(string) (strin
 		return "", ErrDenied
 	}
 	m.diagnostic.mu.Lock()
-	if r := m.diagnostic.request; m.diagnostic.preparing || (r != nil && r.state == "PENDING" && time.Now().Before(r.expires)) {
+	if r := m.diagnostic.request; m.diagnostic.preparing || m.diagnostic.receiving || (r != nil && r.state == "PENDING" && time.Now().Before(r.expires)) {
 		m.diagnostic.mu.Unlock()
 		return "", ErrBusy
 	}
@@ -200,32 +202,16 @@ func (m *Manager) receiveDiagnostic(peer, id, requestID string, r io.Reader, aut
 	if !authorized() {
 		return ErrDenied
 	}
-	m.diagnostic.mu.Lock()
-	defer m.diagnostic.mu.Unlock()
-	now := time.Now()
-	for peer, receipt := range m.diagnostic.last {
-		if !now.Before(receipt.expires) {
-			delete(m.diagnostic.last, peer)
-		}
-	}
 	digest := sha256.Sum256(data)
-	if receipt, ok := m.diagnostic.last[peer]; ok && receipt.id == id {
-		// The original request is already RECEIVED (or has since been replaced).
-		// Only its exact saved response may receive another acknowledgement.
-		if receipt.requestID == requestID && receipt.digest == digest {
-			return nil
-		}
-		return ErrDenied
+	replayed, err := m.reserveDiagnosticReceive(peer, id, requestID, digest)
+	if err != nil || replayed {
+		return err
 	}
-	if requestID != "" {
-		request := m.diagnostic.request
-		if !validID(requestID, 32) || request == nil || request.peer != peer || request.id != requestID || request.state != "PENDING" || time.Now().After(request.expires) {
-			return ErrDenied
-		}
-	}
-	if _, known := m.diagnostic.last[peer]; !known && len(m.diagnostic.last) >= 32 {
-		return ErrBusy
-	}
+	defer func() {
+		m.diagnostic.mu.Lock()
+		m.diagnostic.receiving = false
+		m.diagnostic.mu.Unlock()
+	}()
 	var path string
 	if requestID != "" && m.ReceiveCollection != nil {
 		path, err = m.ReceiveCollection(peer, requestID, data)
@@ -238,6 +224,11 @@ func (m *Manager) receiveDiagnostic(peer, id, requestID string, r io.Reader, aut
 	if path == "" {
 		return ErrDenied
 	}
+	if !authorized() {
+		return ErrDenied
+	}
+	m.diagnostic.mu.Lock()
+	defer m.diagnostic.mu.Unlock()
 	if m.diagnostic.last == nil {
 		m.diagnostic.last = map[string]diagnosticReceipt{}
 	}
@@ -248,6 +239,39 @@ func (m *Manager) receiveDiagnostic(peer, id, requestID string, r io.Reader, aut
 		m.diagnostic.request.path = path
 	}
 	return nil
+}
+
+// Reserve one save without holding the state lock across filesystem operations.
+// New requests cannot replace the collection until this reservation is released.
+func (m *Manager) reserveDiagnosticReceive(peer, id, requestID string, digest [sha256.Size]byte) (bool, error) {
+	m.diagnostic.mu.Lock()
+	defer m.diagnostic.mu.Unlock()
+	now := time.Now()
+	for key, receipt := range m.diagnostic.last {
+		if !now.Before(receipt.expires) {
+			delete(m.diagnostic.last, key)
+		}
+	}
+	if receipt, ok := m.diagnostic.last[peer]; ok && receipt.id == id {
+		if receipt.requestID == requestID && receipt.digest == digest {
+			return true, nil
+		}
+		return false, ErrDenied
+	}
+	if m.diagnostic.receiving {
+		return false, ErrBusy
+	}
+	if requestID != "" {
+		request := m.diagnostic.request
+		if request == nil || request.peer != peer || request.id != requestID || request.state != "PENDING" || now.After(request.expires) {
+			return false, ErrDenied
+		}
+	}
+	if _, known := m.diagnostic.last[peer]; !known && len(m.diagnostic.last) >= 32 {
+		return false, ErrBusy
+	}
+	m.diagnostic.receiving = true
+	return false, nil
 }
 func (m *Manager) diagnosticHTTP(w http.ResponseWriter, r *http.Request, peer string, authorized func() bool) {
 	switch r.Method {
@@ -269,6 +293,10 @@ func (m *Manager) diagnosticHTTP(w http.ResponseWriter, r *http.Request, peer st
 			return
 		}
 		if err := m.receiveDiagnostic(peer, r.Header.Get("X-Krasis-ID"), r.Header.Get("X-Krasis-Request-ID"), r.Body, authorized); err != nil {
+			if errors.Is(err, ErrBusy) {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				return
+			}
 			w.WriteHeader(422)
 			return
 		}
@@ -376,6 +404,8 @@ func (m *Manager) pollDiagnostic(ctx context.Context, c *http.Client, address, p
 				m.diagnosticDone(offer.id, "SENT")
 			} else if resp.StatusCode == 404 {
 				m.diagnosticDone(offer.id, "UNSUPPORTED")
+			} else if resp.StatusCode == http.StatusServiceUnavailable {
+				// Retry the same transfer at the next poll until its existing deadline.
 			} else {
 				m.diagnosticDone(offer.id, "REJECTED")
 			}
