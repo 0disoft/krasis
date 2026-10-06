@@ -134,6 +134,24 @@ func (b *sourcePresentationBroker) run() {
 				}
 				r.state.report(op, result, time.Since(started))
 			}
+			// Clear failures get exactly one serialized retry. Never retry a mark,
+			// retired window or superseded desired state, and never spawn a loop.
+			if !accepted && !r.enabled && r.current() {
+				started = time.Now()
+				accepted = b.apply(r.state.window, false)
+				result = "superseded"
+				if r.current() {
+					result = "failed"
+					if accepted {
+						result = "accepted"
+					}
+				} else {
+					accepted = false
+				}
+				if r.state.report != nil {
+					r.state.report("clear_retry", result, time.Since(started))
+				}
+			}
 		}
 		r.result <- accepted
 	}

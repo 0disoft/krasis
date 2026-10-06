@@ -3,7 +3,7 @@ package productlog
 import "time"
 
 func init() {
-	for _, operation := range []string{"geometry", "mark", "clear", "mark_native", "clear_native"} {
+	for _, operation := range []string{"geometry", "hint", "mark", "clear", "mark_native", "clear_native", "clear_retry"} {
 		for _, result := range []string{"normal", "fullscreen", "accepted", "failed", "timeout", "superseded"} {
 			for _, bucket := range []string{"lt1ms", "lt10ms", "lt100ms", "lt1s", "ge1s"} {
 				allowed["source_presentation_"+operation+"_"+result+"_"+bucket] = true

@@ -45,6 +45,22 @@ func TestNativeFullscreenShellMarkForHiddenOwnedWindow(t *testing.T) {
 		t.Fatal("create hidden test window", err)
 	}
 	defer procDestroyWindow.Call(window)
+	presentation := &sourcePresentationState{window: window}
+	sourcePresentationWindows.Store(window, presentation)
+	defer sourcePresentationWindows.Delete(window)
+	if !setSourceCaptureNormalHint(window, true) {
+		t.Fatal("native normal-window hint rejected")
+	}
+	property := user32.NewProc("GetPropW")
+	if value, _, _ := property.Call(window, uintptr(unsafe.Pointer(sourceNormalHintName))); value != 1 {
+		t.Fatal("normal-window hint was not set")
+	}
+	if !setSourceCaptureNormalHint(window, false) {
+		t.Fatal("normal-window hint removal rejected")
+	}
+	if value, _, _ := property.Call(window, uintptr(unsafe.Pointer(sourceNormalHintName))); value != 0 {
+		t.Fatal("normal-window hint remained set")
+	}
 	if !markSourceCaptureFullscreen(window, true) {
 		t.Fatal("native fullscreen mark rejected")
 	}
@@ -156,5 +172,40 @@ func TestFullscreenClearingRetriesAfterReturn(t *testing.T) {
 	}
 	if err := current.deactivateWindow(); err != nil || current.fullscreenMarked || clears != 2 {
 		t.Fatal("repeated deactivation did not clear marking", err, clears)
+	}
+}
+
+func TestNormalHintIsAppliedBeforeShowingNormalCaptureAndAfterFailedClear(t *testing.T) {
+	restore := stubSourceWheelCaptureActivation(t)
+	defer restore()
+	foreground := uintptr(20)
+	sourceWheelCaptureGetForeground = func() uintptr { return foreground }
+	sourceWheelCaptureSetForeground = func(window uintptr) error { foreground = window; return nil }
+	events := []string{}
+	sourceCaptureNormalHint = func(window uintptr, normal bool) bool {
+		if window != 10 || !normal {
+			t.Fatal("wrong window or normal hint")
+		}
+		events = append(events, "normal")
+		return true
+	}
+	sourceCaptureMarkFullscreen = func(uintptr, bool) bool { events = append(events, "failed_clear"); return false }
+	sourceWheelCaptureShowWindow = func(_ uintptr, command uintptr) {
+		if command == swShowWithoutActivation {
+			events = append(events, "show")
+		}
+	}
+	current := &sourceWheelCaptureRun{window: 10, fullscreenAttempted: true, fullscreenMarked: true}
+	if err := current.activateWindow(); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(events, []string{"failed_clear", "normal", "show"}) {
+		t.Fatal(events)
+	}
+	if err := current.deactivateWindow(); err != nil {
+		t.Fatal(err)
+	}
+	if !current.fullscreenAttempted {
+		t.Fatal("failed clear discarded outstanding cleanup")
 	}
 }

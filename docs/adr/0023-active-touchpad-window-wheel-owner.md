@@ -133,6 +133,14 @@ Product diagnostics retain fixed `source_presentation` codes for geometry,
 client mark/clear waits and native mark/clear outcomes, with duration buckets.
 They contain no HWND, application identity, title, screen content or native text.
 
+Clearing failures get exactly one worker-side retry while the same window and
+request generation are still current. Mark failures are not retried. Before
+showing an ordinary capture and after returning, set `NonRudeHWND` on that owned
+HWND; remove the hint for a newly observed fullscreen source. This preserves an
+explicit normal-window policy while COM cleanup is delayed. A failed hint or
+clear is diagnosed, never reported as acknowledged cleanup or made an input
+failure. The outstanding clear is retained for the next transition.
+
 - [MarkFullscreenWindow](https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-itaskbarlist2-markfullscreenwindow)
 
 ## 대안

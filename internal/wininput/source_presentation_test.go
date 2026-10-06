@@ -83,3 +83,15 @@ func TestPresentationRetirementRejectsWorkForReusedWindowNumber(t *testing.T) {
 	default:
 	}
 }
+
+func TestPresentationClearFailureHasOneRetryAndNoInfiniteLoop(t *testing.T) {
+	for _, recover := range []bool{true, false} {
+		calls := 0
+		b := newSourcePresentationBroker(func(uintptr, bool) bool { calls++; return recover && calls == 2 })
+		s := &sourcePresentationState{window: 10}
+		if accepted := b.request(s, false, time.Second); accepted != recover || calls != 2 {
+			t.Fatal("clear retry was not bounded", accepted, calls)
+		}
+		close(b.wake)
+	}
+}

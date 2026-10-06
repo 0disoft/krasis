@@ -27,7 +27,35 @@ var (
 	fullscreenIsIconic          = user32.NewProc("IsIconic")
 	sourceCaptureIsFullscreen   = sourceWindowFullscreen
 	sourceCaptureMarkFullscreen = requestSourceCaptureFullscreen
+	sourceCaptureNormalHint     = setSourceCaptureNormalHint
 )
+
+var sourceNormalHintName, _ = syscall.UTF16PtrFromString("NonRudeHWND")
+var sourceSetNormalHint = user32.NewProc("SetPropW")
+var sourceRemoveNormalHint = user32.NewProc("RemovePropW")
+
+// Only set the Shell hint on our lifetime-registered HWND. This gives an ordinary
+// capture an explicit non-fullscreen policy even when COM clearing is delayed.
+func setSourceCaptureNormalHint(window uintptr, normal bool) bool {
+	value, owned := sourcePresentationWindows.Load(window)
+	if !owned {
+		return false
+	}
+	s := value.(*sourcePresentationState)
+	s.mu.Lock()
+	live := !s.retired
+	s.mu.Unlock()
+	if !live {
+		return false
+	}
+	if normal {
+		ok, _, _ := sourceSetNormalHint.Call(window, uintptr(unsafe.Pointer(sourceNormalHintName)), 1)
+		return ok != 0
+	}
+	// Absence is already the desired result; only we own this property.
+	sourceRemoveNormalHint.Call(window, uintptr(unsafe.Pointer(sourceNormalHintName)))
+	return true
+}
 
 var sourcePresentationWindows sync.Map // Owned HWND -> lifetime-specific state.
 var sourcePresentationOnce sync.Once
@@ -135,6 +163,7 @@ func (current *sourceWheelCaptureRun) inheritFullscreenPresentation() {
 		}
 		current.presentationReport("geometry", result, time.Since(started))
 	}
+	current.setNormalPresentationHint(!fullscreen)
 	if fullscreen {
 		current.fullscreenAttempted = true // A timeout may still apply later; always request clearing.
 		current.fullscreenMarked = sourceCaptureMarkFullscreen(current.window, true)
@@ -142,8 +171,23 @@ func (current *sourceWheelCaptureRun) inheritFullscreenPresentation() {
 }
 
 func (current *sourceWheelCaptureRun) releaseFullscreenPresentation() {
+	if current.fullscreenAttempted {
+		current.setNormalPresentationHint(true)
+	}
 	if current.fullscreenAttempted && sourceCaptureMarkFullscreen(current.window, false) {
 		current.fullscreenMarked = false
 		current.fullscreenAttempted = false
+	}
+}
+
+func (current *sourceWheelCaptureRun) setNormalPresentationHint(normal bool) {
+	started := time.Now()
+	accepted := sourceCaptureNormalHint(current.window, normal)
+	if current.presentationReport != nil {
+		result := "failed"
+		if accepted {
+			result = "accepted"
+		}
+		current.presentationReport("hint", result, time.Since(started))
 	}
 }
