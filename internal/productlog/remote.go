@@ -93,6 +93,10 @@ func saveRemoteSupport(base, peer, id string, data []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if id != "" {
+		requestSnapshotGate.Lock()
+		defer requestSnapshotGate.Unlock()
+	}
 	dir, err := productidentity.PrepareDiagnostics(base)
 	if err != nil {
 		return "", err
@@ -101,6 +105,9 @@ func saveRemoteSupport(base, peer, id string, data []byte) (string, error) {
 	name := "support-peer-" + peer + ".json"
 	if id != "" {
 		name = "support-request-" + id + "-peer-" + peer + ".json"
+		if err = reserveRequestSnapshot(dir, id, name, int64(len(clean))); err != nil {
+			return "", err
+		}
 	}
 	f, temp, err := dir.CreateTemporary(".peer-support-", 0600)
 	if err != nil {

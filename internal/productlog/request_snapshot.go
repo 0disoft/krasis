@@ -40,6 +40,8 @@ func ExportForRequest(base, id string) (string, error) {
 	if !validRequestID(id) {
 		return "", errors.New("invalid diagnostic request")
 	}
+	requestSnapshotGate.Lock()
+	defer requestSnapshotGate.Unlock()
 	dir, err := productidentity.PrepareDiagnostics(base)
 	if err != nil {
 		return "", err
@@ -47,6 +49,9 @@ func ExportForRequest(base, id string) (string, error) {
 	defer dir.Close()
 	name := "support-request-" + id + "-local.json"
 	if _, err = readSupportSnapshot(dir, name); errors.Is(err, os.ErrNotExist) {
+		if err = reserveRequestSnapshot(dir, id, name, MaxSupportBytes); err != nil {
+			return "", err
+		}
 		err = exportToNamed(dir, name, true)
 		if errors.Is(err, os.ErrExist) {
 			_, err = readSupportSnapshot(dir, name)
