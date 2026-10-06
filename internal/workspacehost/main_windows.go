@@ -210,7 +210,7 @@ func Run() {
 	app := application.New(application.Options{
 		Name:           "Krasis",
 		Icon:           windowsassets.Icon,
-		OnShutdown:     cancel,
+		OnShutdown:     func() { service.clipboardWindow.Store(0); cancel() },
 		MarshalError:   func(error) []byte { return []byte(`"bridge_failed"`) },
 		Assets:         application.AssetOptions{Handler: application.AssetFileServerFS(assets)},
 		Services:       services,
@@ -235,6 +235,11 @@ func Run() {
 		Hidden:           startAtLogin || (smoke && !visibleSmoke),
 	})
 	service.visibleWindow.Store(window)
+	if !smoke {
+		window.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) {
+			service.clipboardWindow.Store(uintptr(window.NativeWindow()))
+		})
+	}
 	shown := make(chan bool, 1)
 	if visibleSmoke || (!smoke && !startAtLogin) {
 		var showOnce sync.Once

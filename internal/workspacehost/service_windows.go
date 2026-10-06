@@ -16,12 +16,13 @@ import (
 )
 
 type WorkspaceService struct {
-	uiReplacement uiReplacement
-	visibleWindow atomic.Pointer[application.WebviewWindow]
-	uiReadyEpoch  atomic.Uint64
-	release       releaseState
-	settingsGate  sync.Mutex
-	startAtLogin  bool
+	uiReplacement   uiReplacement
+	visibleWindow   atomic.Pointer[application.WebviewWindow]
+	uiReadyEpoch    atomic.Uint64
+	clipboardWindow atomic.Uintptr
+	release         releaseState
+	settingsGate    sync.Mutex
+	startAtLogin    bool
 
 	startMenuFailed       atomic.Bool
 	launchRecordFailed    atomic.Bool
@@ -98,7 +99,7 @@ func (s *WorkspaceService) ServiceStartup(context.Context, application.ServiceOp
 		s.jobs.Add(1)
 		go func() {
 			defer s.jobs.Done()
-			launcherui.RunClipboardWorker(s.ctx, s.control, s.title, &s.clipGate, &s.clipEpoch)
+			launcherui.RunClipboardWorker(s.ctx, s.control, &s.clipboardWindow, &s.clipGate, &s.clipEpoch)
 		}()
 		if s.receiver != nil && s.quit != nil {
 			s.jobs.Add(1)

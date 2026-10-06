@@ -17,7 +17,7 @@ import (
 // RunClipboardWorker uses this process's UI window as clipboard owner. No clipboard
 // text enters the renderer; this reuses the legacy sequence/marker protections.
 // The caller cancels ctx and joins the worker before exiting.
-func RunClipboardWorker(ctx context.Context, control, title string, gate *sync.Mutex, revision *atomic.Uint64) {
+func RunClipboardWorker(ctx context.Context, control string, owner *atomic.Uintptr, gate *sync.Mutex, revision *atomic.Uint64) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	timer := time.NewTicker(750 * time.Millisecond)
@@ -29,6 +29,7 @@ func RunClipboardWorker(ctx context.Context, control, title string, gate *sync.M
 	}
 	var pump clipboardPump
 	var lastRevision uint64
+	var lastOwner uintptr
 	for {
 		select {
 		case <-ctx.Done():
@@ -40,15 +41,10 @@ func RunClipboardWorker(ctx context.Context, control, title string, gate *sync.M
 		case <-timer.C:
 			// The UI thread pumps owner-window notifications; a window on this
 			// network worker thread would stall other applications' clipboard writes.
-			name := utf16(title)
-			hwnd, _, _ := clipUser.NewProc("FindWindowW").Call(0, uintptr(unsafe.Pointer(name)))
-			runtime.KeepAlive(name)
-			var pid uint32
-			if hwnd != 0 {
-				clipUser.NewProc("GetWindowThreadProcessId").Call(hwnd, uintptr(unsafe.Pointer(&pid)))
-			}
-			if hwnd == 0 || pid != uint32(os.Getpid()) {
+			hwnd := clipboardOwnerWindow(owner)
+			if hwnd == 0 {
 				pump = clipboardPump{}
+				lastOwner = 0
 				continue
 			}
 			// The legacy controller already owns a pump. On handover reset the baseline
@@ -59,6 +55,10 @@ func RunClipboardWorker(ctx context.Context, control, title string, gate *sync.M
 				continue
 			}
 			gate.Lock()
+			if hwnd != lastOwner {
+				pump = clipboardPump{}
+				lastOwner = hwnd
+			}
 			if currentRevision := revision.Load(); currentRevision != lastRevision {
 				pump = clipboardPump{}
 				lastRevision = currentRevision
@@ -69,6 +69,27 @@ func RunClipboardWorker(ctx context.Context, control, title string, gate *sync.M
 			gate.Unlock()
 		}
 	}
+}
+
+// The host publishes its real UI handle once ready. Titles and visibility are
+// presentation state; neither may select a clipboard owner or reset its baseline.
+func clipboardOwnerWindow(owner *atomic.Uintptr) uintptr {
+	if owner == nil {
+		return 0
+	}
+	hwnd := owner.Load()
+	if hwnd == 0 {
+		return 0
+	}
+	if live, _, _ := clipUser.NewProc("IsWindow").Call(hwnd); live == 0 {
+		return 0
+	}
+	var pid uint32
+	clipUser.NewProc("GetWindowThreadProcessId").Call(hwnd, uintptr(unsafe.Pointer(&pid)))
+	if pid != uint32(os.Getpid()) {
+		return 0
+	}
+	return hwnd
 }
 
 func clipboardWorkerTick(ctx context.Context, control string, hwnd uintptr, pump *clipboardPump) {

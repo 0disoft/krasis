@@ -78,6 +78,13 @@ acknowledges an incoming ID after SetClipboardData succeeds. Network receipt onl
 means the bounded agent inbox accepted the content, not that an app pasted it.
 Enabling/restarting baselines the current clipboard without transmitting it.
 
+The desktop host publishes its native UI window handle at runtime readiness,
+including hidden startup windows, and clears it at shutdown. The clipboard worker
+checks that the handle is live and belongs to this process. Window title changes
+(including a pending version replacement) do not stop sharing or reset its
+sequence baseline. A missing or replaced owner resets the baseline before any
+new clipboard sampling; renderer data cannot select the owner.
+
 Only the unlocked Default input desktop is used. No clipboard read or write is
 attempted on lock/secure desktop. The GUI heartbeat permits transport for five
 seconds; an already-authorized text or image request has a twelve-second deadline,
