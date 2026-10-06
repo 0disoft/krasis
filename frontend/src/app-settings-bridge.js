@@ -21,5 +21,12 @@ export function createAppSettingsBridge(binding) {
       return {state:value.state,generation:value.generation};
     } catch { return {state:'FAILED',generation:0}; }
   }
-  return {status:()=>call('AppSettings'),set:(startup,update)=>typeof startup==='boolean'&&typeof update==='boolean'?call('SetAppSettings',startup,update):Promise.resolve(emptyAppSettings()),release:()=>release('ReleaseStatus'),check:()=>release('CheckRelease')};
+  async function set(startup,update) {
+    if(typeof startup!=='boolean'||typeof update!=='boolean') return emptyAppSettings();
+    const result=await call('SetAppSettings',startup,update);
+    if(result.code==='ok') return result;
+    const actual=await call('AppSettings');
+    return actual.code==='unavailable'?result:{...actual,code:result.code};
+  }
+  return {status:()=>call('AppSettings'),set,release:()=>release('ReleaseStatus'),check:()=>release('CheckRelease')};
 }

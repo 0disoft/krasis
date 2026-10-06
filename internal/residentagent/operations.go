@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/0disoft/krasis/internal/agent"
+	"github.com/0disoft/krasis/internal/appsettings"
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/peerupdate"
 	"github.com/0disoft/krasis/internal/productidentity"
@@ -256,6 +257,7 @@ func (operations *Operations) Connect(requestContext context.Context, request lo
 	operations.lastStopReason = ""
 	operations.manualStop = false
 	operations.recordLocked("connect_started")
+	operations.rememberConnectionLocked(request.PeerAlias)
 	go func(alias string) {
 		defer cancel(nil)
 		err := operations.runWithProtectedRecovery(ctx, alias, &sessionObserver{operations: operations, done: done}, wininput.ProtectedInputActive, agent.Wait)
@@ -266,10 +268,19 @@ func (operations *Operations) Connect(requestContext context.Context, request lo
 }
 
 func (operations *Operations) Disconnect(ctx context.Context, _ localapi.OperationRequest) (localapi.OperationResult, error) {
+	return operations.disconnect(ctx, true)
+}
+
+func (operations *Operations) disconnect(ctx context.Context, forget bool) (localapi.OperationResult, error) {
 	if ctx == nil {
 		return rejected("invalid_request"), nil
 	}
 	operations.mu.Lock()
+	if forget && operations.localAppData != "" {
+		if err := appsettings.SaveResume(operations.localAppData, appsettings.Resume{}); err != nil {
+			operations.recordLocked("resume_save_failed")
+		}
+	}
 	operations.lastStopReason = ""
 	operations.manualStop = true
 	stop, done := operations.sessionStop, operations.sessionDone
@@ -362,7 +373,7 @@ func (operations *Operations) Close(ctx context.Context) error {
 			return err
 		}
 	}
-	result, err := operations.Disconnect(ctx, localapi.OperationRequest{})
+	result, err := operations.disconnect(ctx, false)
 	if err != nil {
 		return err
 	}

@@ -11,3 +11,10 @@ test('settings toggle is a single explicit native boolean write',async()=>{
   assert.equal((await b.set(false,true)).startAtLogin,false);assert.deepEqual(calls,[[false,true]]);
   await b.set('false',true);assert.equal(calls.length,1);
 });
+test('failed write reloads persisted checks and retains the failure notice',async()=>{
+  const b=createAppSettingsBridge({
+    SetAppSettings:()=>({schema:'krasis.app-settings/v1',code:'startup_failed',startAtLogin:false,autoUpdate:false}),
+    AppSettings:()=>({schema:'krasis.app-settings/v1',code:'ok',startAtLogin:true,autoUpdate:true})
+  });
+  assert.deepEqual(await b.set(false,false),{schema:'krasis.app-settings/v1',code:'startup_failed',startAtLogin:true,autoUpdate:true});
+});

@@ -92,7 +92,7 @@ func (o *Operations) Update(ctx context.Context, r localapi.UpdateRequest) (loca
 		o.mu.Unlock()
 		stop := completed("no_active_session")
 		if !idle {
-			stop, err = o.Disconnect(ctx, localapi.OperationRequest{})
+			stop, err = o.disconnect(ctx, false)
 		}
 		if err != nil || stop.Status != "COMPLETED" {
 			o.updates.ApplyFailed()
