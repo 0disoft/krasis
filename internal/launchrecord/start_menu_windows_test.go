@@ -3,6 +3,7 @@
 package launchrecord
 
 import (
+	"github.com/0disoft/krasis/internal/productidentity"
 	"os"
 	"path/filepath"
 	"testing"
@@ -39,5 +40,31 @@ func TestStartMenuShortcutUsesFixedCLIAndPreservesForeignLink(t *testing.T) {
 	after, err = os.ReadFile(link)
 	if err != nil || string(before) != string(after) {
 		t.Fatal("foreign shortcut not preserved")
+	}
+}
+
+func TestStartMenuReceiptSkipsHelperUntilShortcutChanges(t *testing.T) {
+	base := t.TempDir()
+	dir, err := productidentity.PrepareLaunch(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dir.Close()
+	target, link := filepath.Join(base, "krasis-cli.exe"), filepath.Join(t.TempDir(), "Krasis.lnk")
+	calls := 0
+	register := func(string, string) error { calls++; return os.WriteFile(link, []byte("verified link"), 0600) }
+	for range 2 {
+		if err := ensureStartMenuLink(dir, target, link, register); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if calls != 1 {
+		t.Fatal("helper repeated", calls)
+	}
+	if err := os.WriteFile(link, []byte("changed link"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := ensureStartMenuLink(dir, target, link, register); err != nil || calls != 2 {
+		t.Fatal("change not rechecked", err)
 	}
 }

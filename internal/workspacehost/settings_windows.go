@@ -35,6 +35,9 @@ func (s *WorkspaceService) appSettings() AppSettingsSnapshot {
 		return result
 	}
 	result.Code = "ok"
+	if s.startMenuFailed.Load() {
+		result.Code = "start_menu_failed"
+	}
 	return result
 }
 func (s *WorkspaceService) SetAppSettings(startAtLogin, autoUpdate bool) AppSettingsSnapshot {

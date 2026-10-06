@@ -1,5 +1,5 @@
 const schema = 'krasis.app-settings/v1';
-const codes = new Set(['ok','unavailable','startup_failed','save_failed']);
+const codes = new Set(['ok','unavailable','startup_failed','save_failed','start_menu_failed']);
 export const emptyAppSettings = () => ({schema,code:'unavailable',startAtLogin:false,autoUpdate:false});
 export function createAppSettingsBridge(binding) {
   let busy = false;

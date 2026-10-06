@@ -19,6 +19,7 @@ type WorkspaceService struct {
 	release          releaseState
 	settingsGate     sync.Mutex
 	startAtLogin     bool
+	startMenuFailed  atomic.Bool
 	ctx              context.Context
 	control          string
 	title            string
@@ -48,6 +49,7 @@ func (s *WorkspaceService) ServiceStartup(context.Context, application.ServiceOp
 			s.log.Event("launch_record_ready")
 			if s.prepareStartMenu != nil {
 				if err := s.prepareStartMenu(); err != nil {
+					s.startMenuFailed.Store(true)
 					s.log.Event("start_menu_registration_failed")
 				}
 			}

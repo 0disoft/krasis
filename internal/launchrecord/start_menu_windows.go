@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
@@ -15,6 +16,8 @@ import (
 	"time"
 	"unicode/utf16"
 
+	"github.com/0disoft/krasis/internal/productidentity"
+	"github.com/0disoft/krasis/internal/securefs"
 	"golang.org/x/sys/windows"
 )
 
@@ -32,7 +35,62 @@ func RegisterStartMenu(localAppData string) error {
 	if err != nil {
 		return err
 	}
-	return registerStartMenuLink(filepath.Join(dir, "krasis-cli.exe"), filepath.Join(programs, "Krasis.lnk"))
+	guard, err := productidentity.PrepareLaunch(localAppData)
+	if err != nil {
+		return err
+	}
+	defer guard.Close()
+	return ensureStartMenuLink(guard, filepath.Join(dir, "krasis-cli.exe"), filepath.Join(programs, "Krasis.lnk"), registerStartMenuLink)
+}
+
+type menuReceipt struct{ Target, Link, SHA256 string }
+
+func linkDigest(link string) (string, error) {
+	dir, err := securefs.OpenReadDirectory(filepath.Dir(link))
+	if err != nil {
+		return "", err
+	}
+	defer dir.Close()
+	f, err := dir.Open(filepath.Base(link))
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil || info.Size() > 65536 {
+		return "", ErrInvalid
+	}
+	return digest(f)
+}
+
+// A protected receipt skips the COM helper only while the exact verified link
+// bytes and fixed target remain unchanged. A removed/edited link is rechecked.
+func ensureStartMenuLink(dir *securefs.Directory, target, link string, register func(string, string) error) error {
+	if f, err := dir.Open("start-menu.json"); err == nil {
+		var r menuReceipt
+		info, statErr := f.Stat()
+		if statErr == nil && info.Size() <= 8192 {
+			_ = json.NewDecoder(f).Decode(&r)
+		}
+		f.Close()
+		if r.Target == target && r.Link == link && r.SHA256 != "" {
+			if hash, err := linkDigest(link); err == nil && hash == r.SHA256 {
+				return nil
+			}
+		}
+	}
+	if err := register(target, link); err != nil {
+		return err
+	}
+	hash, err := linkDigest(link)
+	if err != nil {
+		return err
+	}
+	data, err := json.Marshal(menuReceipt{target, link, hash})
+	if err != nil {
+		return err
+	}
+	return replace(dir, "start-menu.json", data)
 }
 
 const startMenuScript = `
