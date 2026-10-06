@@ -88,6 +88,16 @@ func (o *Operations) Update(ctx context.Context, r localapi.UpdateRequest) (loca
 		o.updateApplying = true
 		o.updateTargetGeneration = o.updates.Status().Generation
 		o.updateTargetRevision = revision
+		// Allow the bounded installer/replacement to finish, but never fence
+		// local input and management forever after a replacement UI crashes.
+		time.AfterFunc(5*time.Minute, func() {
+			o.mu.Lock()
+			defer o.mu.Unlock()
+			if o.updateApplying && o.releaseClaimID == "" && o.updates.ExpireClaim(r.ID, r.Peer) {
+				o.clearReleaseClaimLocked()
+				o.recordLocked("peer_update_apply_timeout")
+			}
+		})
 		idle := o.sessionDone == nil
 		o.mu.Unlock()
 		stop := completed("no_active_session")
