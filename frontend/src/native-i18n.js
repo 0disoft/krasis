@@ -3,6 +3,7 @@ export const nativeCatalogs = {
     "app_open": "상대 앱 열기",
     "app_open_pending": "열기 요청 중…",
     "app_open_launch_requested": "상대 앱을 여는 중…",
+    "app_open_launch_accepted": "상대 앱 실행 준비 중…",
     "app_open_window_ready": "상대 앱 열림",
     "app_open_window_unconfirmed": "실행 요청됨 · 창 열림 확인 안 됨",
     "app_open_launch_failed": "상대 앱을 실행하지 못했습니다.",
@@ -191,6 +192,7 @@ export const nativeCatalogs = {
   en: {
     "app_open": "Open peer app",
     "app_open_pending": "Requesting app launch…",
+    "app_open_launch_accepted": "Preparing the peer app…",
     "app_open_query_busy": "Checking launch status…",
     "app_open_peer_unresponsive": "Peer agent not responding. Open Krasis on the peer PC.",
     "app_open_launch_requested": "Opening the peer app…",

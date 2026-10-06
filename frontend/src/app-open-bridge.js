@@ -1,13 +1,13 @@
 const schema = 'krasis.app-open/v1';
-const codes = new Set(['pending','launch_requested','window_ready','window_unconfirmed','launch_failed','launch_record_missing','launch_record_invalid',
+const codes = new Set(['pending','launch_accepted','launch_requested','window_ready','window_unconfirmed','launch_failed','launch_record_missing','launch_record_invalid',
   'expired','peer_unresponsive','unknown_request','rejected','unsupported','busy','query_busy','invalid_peer','stale_peer','unavailable','outcome_unknown']);
 
 export function appOpenProgress(previous, status, expired) {
   const transient = ['query_busy','unavailable'].includes(status.code);
   const result = transient ? previous : status;
-  const waiting = transient || ['pending','launch_requested'].includes(status.code);
+  const waiting = transient || ['pending','launch_accepted','launch_requested'].includes(status.code);
   if (waiting && expired) {
-    return {result: {...result, code: result.code === 'launch_requested' ? 'window_unconfirmed' : 'outcome_unknown'}, waiting: false};
+    return {result: {...result, code: ['launch_accepted','launch_requested'].includes(result.code) ? 'window_unconfirmed' : 'outcome_unknown'}, waiting: false};
   }
   return {result, waiting};
 }
@@ -17,7 +17,7 @@ export function createAppOpenBridge(binding, storage) {
   function remember(v){
     if(!storage)return;
     try{
-      if(['pending','launch_requested'].includes(v.code)){
+      if(['pending','launch_accepted','launch_requested'].includes(v.code)){
         if(!storage.getItem(key(v.peer)))storage.setItem(key(v.peer),JSON.stringify({id:v.id,expires:Date.now()+70000}));
       }else if(!['query_busy','unavailable'].includes(v.code))storage.removeItem(key(v.peer));
     }catch{}
@@ -41,7 +41,7 @@ export function createAppOpenBridge(binding, storage) {
       const v = await binding.PeerAppOpen(peer, id);
       if (!v || v.schema !== schema || v.peer !== peer || !codes.has(v.code) || typeof v.id !== 'string' ||
           (id && v.id !== id) || (v.id !== '' && !/^[a-f0-9]{32}$/i.test(v.id)) ||
-          (v.code === 'pending' && !v.id) || (!id && ['launch_requested','window_ready','window_unconfirmed'].includes(v.code))) {
+          (v.code === 'pending' && !v.id) || (!id && ['launch_accepted','launch_requested','window_ready','window_unconfirmed'].includes(v.code))) {
         return failure(id ? 'unavailable' : 'outcome_unknown');
       }
       const result={schema,peer,code:v.code,id:v.id};

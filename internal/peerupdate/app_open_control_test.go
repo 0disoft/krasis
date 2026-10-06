@@ -33,9 +33,10 @@ func TestAppOpenControlDoesNotWaitForBulkResponse(t *testing.T) {
 	request.Header.Set("X-Krasis-Request-ID", id)
 	response := httptest.NewRecorder()
 	h.ServeHTTP(response, request)
-	if response.Code != 200 || response.Header().Get("X-Krasis-Result") != "launch_requested" {
+	if response.Code != 200 || response.Header().Get("X-Krasis-Result") != "launch_accepted" {
 		t.Fatal("bulk transfer blocked app launch", response.Code)
 	}
+	awaitAppOpenReceipt(t, m, peer, id, func() bool { return allowed })
 	allowed = false
 	response = httptest.NewRecorder()
 	h.ServeHTTP(response, request)

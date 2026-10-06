@@ -20,7 +20,7 @@ func (r *appOpenRequest) expire(now time.Time) {
 	if r.code == "pending" && !now.Before(r.respondBy) {
 		r.code = "peer_unresponsive"
 	}
-	if r.code == "launch_requested" && !now.Before(r.expires) {
+	if (r.code == "launch_requested" || r.code == "launch_accepted") && !now.Before(r.expires) {
 		r.code = "window_unconfirmed"
 	}
 }
@@ -46,7 +46,7 @@ func (m *Manager) QueueAppOpen(peer string) (string, error) {
 	now := time.Now()
 	if old := m.appOpen.out; old != nil {
 		old.expire(now)
-		if old.code == "pending" || old.code == "launch_requested" {
+		if old.code == "pending" || old.code == "launch_requested" || old.code == "launch_accepted" {
 			return "", ErrBusy
 		}
 	}
@@ -74,7 +74,7 @@ func (m *Manager) appOpenOffer(peer string) string {
 		return ""
 	}
 	r.expire(time.Now())
-	if r.code != "pending" && r.code != "launch_requested" {
+	if r.code != "pending" && r.code != "launch_requested" && r.code != "launch_accepted" {
 		return ""
 	}
 	return r.id
@@ -82,7 +82,7 @@ func (m *Manager) appOpenOffer(peer string) string {
 
 func validAppOpenCode(code string) bool {
 	switch code {
-	case "launch_requested", "window_ready", "launch_failed", "launch_record_missing", "launch_record_invalid", "rejected", "unsupported", "busy":
+	case "launch_accepted", "launch_requested", "window_ready", "launch_failed", "launch_record_missing", "launch_record_invalid", "rejected", "unsupported", "busy":
 		return true
 	}
 	return false
@@ -96,7 +96,7 @@ func (m *Manager) finishAppOpen(peer, id, code string) {
 	defer m.appOpen.mu.Unlock()
 	if r := m.appOpen.out; r != nil && r.peer == peer && r.id == id {
 		r.expire(time.Now())
-		if r.code == "pending" || r.code == "launch_requested" {
+		if r.code == "pending" || r.code == "launch_requested" || r.code == "launch_accepted" {
 			r.code = code
 		}
 	}
@@ -121,6 +121,9 @@ func (m *Manager) acceptAppOpen(peer, id string, authorized func() bool) string 
 			}
 			return old.code
 		}
+		if old.code == "launch_accepted" {
+			return "busy"
+		}
 		if now.Sub(old.at) < 3*time.Second {
 			return "busy"
 		}
@@ -139,12 +142,34 @@ func (m *Manager) acceptAppOpen(peer, id string, authorized func() bool) string 
 	if !authorized() {
 		return "rejected"
 	}
-	code := m.OpenUI(peer)
-	if !validAppOpenCode(code) {
-		code = "launch_failed"
+	m.mu.Lock()
+	if m.closed {
+		m.mu.Unlock()
+		return "rejected"
 	}
-	m.appOpen.received[peer] = appOpenReceipt{id, code, now}
-	return code
+	m.workers.Add(1)
+	m.mu.Unlock()
+	m.appOpen.received[peer] = appOpenReceipt{id, "launch_accepted", now}
+	go func() {
+		defer m.workers.Done()
+		code := "rejected"
+		if authorized() {
+			code = m.OpenUI(peer)
+		}
+		if !validAppOpenCode(code) || code == "launch_accepted" {
+			code = "launch_failed"
+		}
+		if !authorized() {
+			code = "rejected"
+		}
+		m.appOpen.mu.Lock()
+		defer m.appOpen.mu.Unlock()
+		if r := m.appOpen.received[peer]; r.id == id {
+			r.code = code
+			m.appOpen.received[peer] = r
+		}
+	}()
+	return "launch_accepted"
 }
 
 func (m *Manager) appOpenHTTP(w http.ResponseWriter, r *http.Request, peer string, authorized func() bool) {

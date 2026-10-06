@@ -16,7 +16,7 @@ func TestAppOpenDeduplicatesAndRechecksAuthorization(t *testing.T) {
 	m := &Manager{OpenUI: func(string) string { count++; return "launch_requested" }}
 	gate := func() bool { return allowed }
 	for i := 0; i < 2; i++ {
-		if code := m.acceptAppOpen(peer, id, gate); code != "launch_requested" {
+		if code := awaitAppOpenReceipt(t, m, peer, id, gate); code != "launch_requested" {
 			t.Fatal(code)
 		}
 	}
@@ -40,7 +40,7 @@ func TestAppOpenWaitsForWindowReportWithoutRepeatingLaunch(t *testing.T) {
 	launches, ready := 0, false
 	m := &Manager{OpenUI: func(string) string { launches++; return "launch_requested" }, UIReady: func(time.Time) bool { return ready }}
 	allowed := func() bool { return true }
-	if m.acceptAppOpen(peer, id, allowed) != "launch_requested" {
+	if awaitAppOpenReceipt(t, m, peer, id, allowed) != "launch_requested" {
 		t.Fatal("premature completion")
 	}
 	ready = true
@@ -77,6 +77,8 @@ func TestAppOpenBothManagementDirections(t *testing.T) {
 		}
 		server := httptest.NewTLSServer(listener.handler(peer, func() bool { return true }))
 		connector.pollAppOpen(context.Background(), server.Client(), strings.TrimPrefix(server.URL, "https://"), peer, func() bool { return true })
+		awaitAppOpenReceipt(t, receiver, peer, id, func() bool { return true })
+		connector.pollAppOpen(context.Background(), server.Client(), strings.TrimPrefix(server.URL, "https://"), peer, func() bool { return true })
 		server.Close()
 		if code := sender.AppOpenStatus(peer, id); code != "launch_requested" || count != 1 {
 			t.Fatalf("listener sender=%v code=%s count=%d", senderIsListener, code, count)
@@ -84,6 +86,38 @@ func TestAppOpenBothManagementDirections(t *testing.T) {
 		if code := sender.AppOpenStatus(strings.Repeat("d", 64), id); code != "unknown_request" {
 			t.Fatal("cross-peer receipt")
 		}
+	}
+}
+
+func awaitAppOpenReceipt(t *testing.T, m *Manager, peer, id string, authorized func() bool) string {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		code := m.acceptAppOpen(peer, id, authorized)
+		if code != "launch_accepted" {
+			return code
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatal("launch worker did not finish")
+	return ""
+}
+
+func TestAppOpenAcknowledgesBeforeSlowLauncherCompletes(t *testing.T) {
+	peer, id := strings.Repeat("a", 64), strings.Repeat("b", 32)
+	started, release := make(chan struct{}), make(chan struct{})
+	m := &Manager{OpenUI: func(string) string { close(started); <-release; return "launch_failed" }}
+	allowed := func() bool { return true }
+	if code := m.acceptAppOpen(peer, id, allowed); code != "launch_accepted" {
+		t.Fatal(code)
+	}
+	<-started
+	if code := m.acceptAppOpen(peer, id, allowed); code != "launch_accepted" {
+		t.Fatal("slow launcher blocked acknowledgement", code)
+	}
+	close(release)
+	if code := awaitAppOpenReceipt(t, m, peer, id, allowed); code != "launch_failed" {
+		t.Fatal("launcher failure was lost", code)
 	}
 }
 

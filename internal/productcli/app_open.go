@@ -59,7 +59,7 @@ func openPeerApp(ctx context.Context, client apiClient, args []string) (any, int
 				result.Code = "outcome_unknown"
 				return result, ExitUnsafeState, nil
 			}
-			if status.Code != "pending" {
+			if status.Code != "pending" && status.Code != "launch_accepted" {
 				return appOpenOutcome(result, status, nil)
 			}
 		}
