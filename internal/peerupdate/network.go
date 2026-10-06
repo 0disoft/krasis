@@ -63,8 +63,8 @@ func (m *Manager) Run(ctx context.Context, address, peer string, listener bool, 
 			if !statusOK {
 				continue
 			}
-			m.pollDiagnostic(ctx, client, address, peer, authorized)
 			m.pollAppOpen(ctx, client, address, peer, authorized)
+			m.pollDiagnostic(ctx, client, address, peer, authorized)
 			m.pushDiagnosticRequest(ctx, client, address, peer, authorized)
 			m.pollDiagnosticRequest(ctx, client, address, peer, authorized)
 			m.pollClipboard(ctx, client, address, peer, authorized)

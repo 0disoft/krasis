@@ -50,6 +50,11 @@ func TestAppOpenRequiresTrustAndPreservesRequestIdentity(t *testing.T) {
 	if b.AppOpen(peer, "").Code != "stale_peer" || len(c.requests) != 3 {
 		t.Fatal("revoked launch")
 	}
+	c.peers[0].Revoked = false
+	c.result = localapi.AppOpenResult{ID: id, Code: "peer_unresponsive"}
+	if b.AppOpen(peer, id).Code != "peer_unresponsive" {
+		t.Fatal("no-response result lost at the UI boundary")
+	}
 }
 
 func TestAppOpenDoesNotRetryUnknownLaunchOrExposeErrors(t *testing.T) {

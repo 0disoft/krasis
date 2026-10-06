@@ -9,6 +9,7 @@ export const nativeCatalogs = {
     "app_open_launch_record_missing": "상대 PC에서 Krasis를 한 번 실행해 주세요.",
     "app_open_launch_record_invalid": "상대 실행 파일을 확인할 수 없습니다.",
     "app_open_expired": "응답 없음 · 상대 PC 시작 메뉴에서 Krasis를 켜 주세요.",
+    "app_open_peer_unresponsive": "상대 에이전트 응답 없음 · 상대 PC에서 Krasis를 실행해 주세요.",
     "app_open_unknown_request": "열기 요청을 찾을 수 없습니다.",
     "app_open_rejected": "상대가 앱 열기를 허용하지 않았습니다.",
     "app_open_unsupported": "상대 앱 열기를 지원하지 않는 버전입니다.",
@@ -189,6 +190,7 @@ export const nativeCatalogs = {
   en: {
     "app_open": "Open peer app",
     "app_open_pending": "Requesting app launch…",
+    "app_open_peer_unresponsive": "Peer agent not responding. Open Krasis on the peer PC.",
     "app_open_launch_requested": "Opening the peer app…",
     "app_open_window_ready": "Peer app opened",
     "app_open_window_unconfirmed": "Launch requested; window not confirmed",

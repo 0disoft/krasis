@@ -9,7 +9,20 @@ import (
 
 type appOpenRequest struct {
 	peer, id, code string
+	respondBy      time.Time
 	expires        time.Time
+}
+
+// Stop advertising a request as soon as its response deadline passes, even
+// when the UI is closed and nobody is polling STATUS. An acknowledged launch
+// retains the longer window-readiness deadline.
+func (r *appOpenRequest) expire(now time.Time) {
+	if r.code == "pending" && !now.Before(r.respondBy) {
+		r.code = "peer_unresponsive"
+	}
+	if r.code == "launch_requested" && !now.Before(r.expires) {
+		r.code = "window_unconfirmed"
+	}
 }
 
 type appOpenReceipt struct {
@@ -30,11 +43,15 @@ func (m *Manager) QueueAppOpen(peer string) (string, error) {
 	}
 	m.appOpen.mu.Lock()
 	defer m.appOpen.mu.Unlock()
-	if old := m.appOpen.out; old != nil && (old.code == "pending" || old.code == "launch_requested") && time.Now().Before(old.expires) {
-		return "", ErrBusy
+	now := time.Now()
+	if old := m.appOpen.out; old != nil {
+		old.expire(now)
+		if old.code == "pending" || old.code == "launch_requested" {
+			return "", ErrBusy
+		}
 	}
 	id := randomID()
-	m.appOpen.out = &appOpenRequest{peer, id, "pending", time.Now().Add(time.Minute)}
+	m.appOpen.out = &appOpenRequest{peer: peer, id: id, code: "pending", respondBy: now.Add(20 * time.Second), expires: now.Add(time.Minute)}
 	return id, nil
 }
 
@@ -45,12 +62,7 @@ func (m *Manager) AppOpenStatus(peer, id string) string {
 	if r == nil || r.peer != peer || r.id != id {
 		return "unknown_request"
 	}
-	if r.code == "pending" && time.Now().After(r.expires) {
-		r.code = "expired"
-	}
-	if r.code == "launch_requested" && time.Now().After(r.expires) {
-		r.code = "window_unconfirmed"
-	}
+	r.expire(time.Now())
 	return r.code
 }
 
@@ -58,7 +70,11 @@ func (m *Manager) appOpenOffer(peer string) string {
 	m.appOpen.mu.Lock()
 	defer m.appOpen.mu.Unlock()
 	r := m.appOpen.out
-	if r == nil || r.peer != peer || (r.code != "pending" && r.code != "launch_requested") || time.Now().After(r.expires) {
+	if r == nil || r.peer != peer {
+		return ""
+	}
+	r.expire(time.Now())
+	if r.code != "pending" && r.code != "launch_requested" {
 		return ""
 	}
 	return r.id
@@ -78,8 +94,11 @@ func (m *Manager) finishAppOpen(peer, id, code string) {
 	}
 	m.appOpen.mu.Lock()
 	defer m.appOpen.mu.Unlock()
-	if r := m.appOpen.out; r != nil && r.peer == peer && r.id == id && (r.code == "pending" || r.code == "launch_requested") && time.Now().Before(r.expires) {
-		r.code = code
+	if r := m.appOpen.out; r != nil && r.peer == peer && r.id == id {
+		r.expire(time.Now())
+		if r.code == "pending" || r.code == "launch_requested" {
+			r.code = code
+		}
 	}
 }
 

@@ -1,6 +1,7 @@
 <script>
   import { onDestroy } from 'svelte';
   import { nativeText } from './native-i18n.js';
+  import { appOpenProgress } from './app-open-bridge.js';
   let { bridge, peer, locale } = $props();
   let busy = $state(false);
   let result = $state();
@@ -32,10 +33,9 @@
       if (disposed) return;
       const status = await bridge.status(fingerprint, next.id);
       if (disposed) return;
-      if (['pending','launch_requested','busy','unavailable'].includes(status.code)) {
-        if (Date.now() < deadline) { timer = setTimeout(poll,1500); return; }
-        result = {...next,code:'outcome_unknown'};
-      } else result = status;
+      const progress = appOpenProgress(result, status, Date.now() >= deadline);
+      result = progress.result;
+      if (progress.waiting) { timer = setTimeout(poll,1500); return; }
       busy = false;
     }
     timer = setTimeout(poll,1500);

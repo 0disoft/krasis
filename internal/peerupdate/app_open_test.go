@@ -103,3 +103,50 @@ func TestAppOpenRejectsPayloadAndArbitraryResult(t *testing.T) {
 		}
 	}
 }
+
+func TestAppOpenNoResponseStopsLateDeliveryWithoutStatusPolling(t *testing.T) {
+	peer := strings.Repeat("a", 64)
+	for _, check := range []string{"offer", "reply", "queue"} {
+		t.Run(check, func(t *testing.T) {
+			m := &Manager{}
+			id, _ := m.QueueAppOpen(peer)
+			m.appOpen.out.respondBy = time.Now().Add(-time.Second)
+			switch check {
+			case "offer":
+				if m.appOpenOffer(peer) != "" {
+					t.Fatal("late request was advertised")
+				}
+			case "reply":
+				m.finishAppOpen(peer, id, "launch_requested")
+			case "queue":
+				if next, err := m.QueueAppOpen(peer); err != nil || next == id {
+					t.Fatal("expired request blocked a new attempt", err)
+				}
+				m.finishAppOpen(peer, id, "window_ready")
+				if m.appOpen.out.code != "pending" {
+					t.Fatal("old receipt changed a new request")
+				}
+				return
+			}
+			if m.AppOpenStatus(peer, id) != "peer_unresponsive" {
+				t.Fatal("late reply changed the terminal result")
+			}
+		})
+	}
+}
+
+func TestAppOpenAcknowledgedLaunchKeepsWindowDeadline(t *testing.T) {
+	peer := strings.Repeat("a", 64)
+	m := &Manager{}
+	id, _ := m.QueueAppOpen(peer)
+	m.finishAppOpen(peer, id, "launch_requested")
+	m.appOpen.out.respondBy = time.Now().Add(-time.Second)
+	if m.appOpenOffer(peer) != id || m.AppOpenStatus(peer, id) != "launch_requested" {
+		t.Fatal("acknowledged launch lost the window-readiness interval")
+	}
+	m.appOpen.out.expires = time.Now().Add(-time.Second)
+	m.finishAppOpen(peer, id, "window_ready")
+	if m.appOpenOffer(peer) != "" || m.AppOpenStatus(peer, id) != "window_unconfirmed" {
+		t.Fatal("window deadline was not enforced")
+	}
+}

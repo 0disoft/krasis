@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAppOpenBridge } from './app-open-bridge.js';
+import { createAppOpenBridge, appOpenProgress } from './app-open-bridge.js';
 const peer='a'.repeat(64), id='b'.repeat(32);
 const value={schema:'krasis.app-open/v1',peer,id,code:'pending'};
 test('peer launch sends once and polls the same receipt without exposing native fields',async()=>{
@@ -34,4 +34,25 @@ test('lost replies are not retried and mismatched or premature success is reject
     assert.equal((await createAppOpenBridge({PeerAppOpen:async()=>v}).open(peer)).code,'outcome_unknown');
   }
   assert.equal((await createAppOpenBridge({PeerAppOpen:async()=>({...value,id:'c'.repeat(32)})}).status(peer,id)).code,'unavailable');
+});
+
+test('launch acknowledgement becomes visible while awaiting window readiness',()=>{
+  const launch={...value,code:'launch_requested'};
+  assert.deepEqual(appOpenProgress(value,launch,false),{result:launch,waiting:true});
+  assert.deepEqual(appOpenProgress(launch,{...value,code:'unavailable'},false),{result:launch,waiting:true});
+  assert.equal(appOpenProgress(launch,{...value,code:'busy'},true).result.code,'window_unconfirmed');
+  const failed={...value,code:'peer_unresponsive'};
+  assert.deepEqual(appOpenProgress(value,failed,false),{result:failed,waiting:false});
+});
+
+test('no-response receipt clears the saved request without sending a new launch',async()=>{
+  const values=new Map();const storage={getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
+  const calls=[];
+  const bridge=createAppOpenBridge({PeerAppOpen:async(p,r)=>{
+    calls.push([p,r]);return {...value,code:r?'peer_unresponsive':'pending'};
+  }},storage);
+  await bridge.open(peer);
+  assert.equal((await bridge.status(peer,id)).code,'peer_unresponsive');
+  assert.equal(bridge.resume(peer),undefined);
+  assert.deepEqual(calls,[[peer,''],[peer,id]]);
 });

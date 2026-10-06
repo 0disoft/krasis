@@ -86,7 +86,7 @@ func (b *UpdateSettingsBridge) AppOpen(peer, id string) AppOpenSnapshot {
 		return v
 	}
 	switch r.Code {
-	case "pending", "launch_requested", "window_ready", "window_unconfirmed", "launch_failed", "launch_record_missing", "launch_record_invalid", "expired", "unknown_request":
+	case "pending", "launch_requested", "window_ready", "window_unconfirmed", "launch_failed", "launch_record_missing", "launch_record_invalid", "expired", "peer_unresponsive", "unknown_request":
 		if action == "STATUS" {
 			v.Code = r.Code
 		}

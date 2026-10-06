@@ -45,7 +45,7 @@ func openPeerApp(ctx context.Context, client apiClient, args []string) (any, int
 		return appOpenOutcome(result, started, nil)
 	}
 	result.ID, result.Code = started.ID, "pending"
-	await, cancel := context.WithTimeout(ctx, 15*time.Second)
+	await, cancel := context.WithTimeout(ctx, 25*time.Second)
 	defer cancel()
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()

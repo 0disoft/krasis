@@ -52,8 +52,10 @@ g109의 `/v1/app-open`은 `{action: "START", peer: FINGERPRINT}` 또는
 `{action: "STATUS", peer: FINGERPRINT, id: REQUEST_ID}`만 받는다. 경로나 실행 인자를
 받지 않는다. 관리 채널의 `/v1/app-open`은 등록된 TLS 상대에게만 동일 요청 ID를 전달한다.
 수신자는 매 요청에서 신뢰와 inbound-control 권한을 확인하고, 자신의 보호된 실행 기록과
-SHA-256을 검증한 후 일반 사용자 세션에서 UI를 연다. 요청은 1분 후 만료되며 반복 요청은
-2분간 중복 실행하지 않는다. `launch_requested`는 실행 요청 성공만 의미한다.
+SHA-256을 검증한 후 일반 사용자 세션에서 UI를 연다. g189부터 수락 응답이 없는 요청은
+20초 후 `peer_unresponsive`로 끝나며 늦은 응답으로 상태를 되돌리지 않는다. 수락된 요청은
+시작부터 1분까지 창 준비를 확인한다. 반복 요청은 2분간 중복 실행하지 않는다.
+`launch_requested`는 실행 요청 성공만 의미하며 실제 창 준비는 `window_ready`로 구분한다.
 
 connection과 upgrade-stop을 제외한 mutation body schema는 `krasis.agent.operation/v1`, 결과는
 `krasis.agent.operation-result/v1`이다. 모든 body는 64KiB 이하 strict JSON이다. `connect`는 alias만,

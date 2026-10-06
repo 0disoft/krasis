@@ -1,6 +1,16 @@
 const schema = 'krasis.app-open/v1';
 const codes = new Set(['pending','launch_requested','window_ready','window_unconfirmed','launch_failed','launch_record_missing','launch_record_invalid',
-  'expired','unknown_request','rejected','unsupported','busy','invalid_peer','stale_peer','unavailable','outcome_unknown']);
+  'expired','peer_unresponsive','unknown_request','rejected','unsupported','busy','invalid_peer','stale_peer','unavailable','outcome_unknown']);
+
+export function appOpenProgress(previous, status, expired) {
+  const transient = ['busy','unavailable'].includes(status.code);
+  const result = transient ? previous : status;
+  const waiting = transient || ['pending','launch_requested'].includes(status.code);
+  if (waiting && expired) {
+    return {result: {...result, code: result.code === 'launch_requested' ? 'window_unconfirmed' : 'outcome_unknown'}, waiting: false};
+  }
+  return {result, waiting};
+}
 export function createAppOpenBridge(binding, storage) {
   if(!storage){try{storage=globalThis.sessionStorage;}catch{}}
   const key=peer=>'krasis.app-open.'+peer;
