@@ -141,11 +141,18 @@ func (s *WorkspaceService) runReleaseUpdater() {
 			directory, revision := s.release.directory, s.release.revision
 			s.release.gate.Unlock()
 			launchFailed := false
-			applied = s.managed.ApplyReleaseUpdate(func() error {
+			s.settingsGate.Lock()
+			settings, err = appsettings.Load(os.Getenv("LOCALAPPDATA"))
+			if err != nil || !settings.AutoUpdate {
+				s.settingsGate.Unlock()
+				continue
+			}
+			applied = s.managed.ApplyReleaseUpdate(s.ReleaseStatus().Generation, revision, func() error {
 				err := productpanel.LaunchReleaseWorkspaceUpdate(directory, revision)
 				launchFailed = err != nil
 				return err
 			})
+			s.settingsGate.Unlock()
 			if launchFailed {
 				s.setRelease("FAILED", s.ReleaseStatus().Generation)
 			}

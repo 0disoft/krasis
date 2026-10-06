@@ -220,6 +220,8 @@ func (handler *handler) ServeHTTP(response http.ResponseWriter, request *http.Re
 		writeJSON(response, http.StatusOK, handler.runtime)
 	case "/v1/upgrade-stop":
 		handler.upgradeStop(response, request)
+	case "/v1/release-claim":
+		handler.releaseClaim(response, request)
 	case "/v1/update":
 		handler.update(response, request)
 	case "/v1/credential":

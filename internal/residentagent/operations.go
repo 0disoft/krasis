@@ -43,6 +43,7 @@ type Operations struct {
 	updateApplying         bool
 	updateTargetGeneration int
 	updateTargetRevision   string
+	releaseClaimID         string
 	log                    *productlog.Logger
 	root                   context.Context
 	stopAgent              context.CancelCauseFunc

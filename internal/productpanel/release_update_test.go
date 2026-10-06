@@ -3,26 +3,56 @@ package productpanel
 import (
 	"context"
 	"errors"
+	"github.com/0disoft/krasis/internal/localapi"
 	"strings"
 	"testing"
 )
 
+type releaseClient struct {
+	*fakeClient
+	refuse   bool
+	claimed  bool
+	releases int
+}
+
+func (c *releaseClient) Runtime(context.Context) (localapi.RuntimeInfo, error) {
+	return localapi.RuntimeInfo{Instance: strings.Repeat("a", 32)}, nil
+}
+func (c *releaseClient) ReleaseClaim(_ context.Context, _, _ string, _ int, _ string, claim bool) (localapi.OperationResult, error) {
+	if claim && c.refuse {
+		return localapi.OperationResult{Status: "REJECTED", Code: "agent_busy"}, nil
+	}
+	c.claimed = claim
+	code := "release_claimed"
+	if !claim {
+		c.releases++
+		code = "release_released"
+	}
+	return localapi.OperationResult{Status: "COMPLETED", Code: code}, nil
+}
+
 func TestPublicUpdateWaitsForDisconnectedInputAndOnlyLaunchesOnce(t *testing.T) {
-	client := &fakeClient{state: "CONNECTED"}
+	client := &releaseClient{fakeClient: &fakeClient{state: "CONNECTED"}}
 	b := NewDesktopLifecycle(context.Background(), func() (Client, error) { return client, nil }, nil, nil)
 	launches := 0
 	launch := func() error { launches++; return nil }
-	if b.ApplyReleaseUpdate(launch) || launches != 0 {
+	revision := strings.Repeat("b", 40)
+	if b.ApplyReleaseUpdate(999, revision, launch) || launches != 0 {
 		t.Fatal("interrupted active session")
 	}
 	client.state = "LOCAL"
-	if b.ApplyReleaseUpdate(func() error { return errors.New("launch failed") }) || b.updateHandedOff {
+	if b.ApplyReleaseUpdate(999, revision, func() error { return errors.New("launch failed") }) || b.updateHandedOff || client.claimed || client.releases != 1 {
 		t.Fatal("failed launch consumed replacement")
 	}
-	if !b.ApplyReleaseUpdate(launch) || launches != 1 || !b.stopped.Load() {
+	client.refuse = true
+	if b.ApplyReleaseUpdate(999, revision, launch) || launches != 0 {
+		t.Fatal("connected through CLI during idle check")
+	}
+	client.refuse = false
+	if !b.ApplyReleaseUpdate(999, revision, launch) || launches != 1 || !b.stopped.Load() || !client.claimed {
 		t.Fatal("idle replacement failed")
 	}
-	if b.ApplyReleaseUpdate(launch) || launches != 1 {
+	if b.ApplyReleaseUpdate(999, revision, launch) || launches != 1 {
 		t.Fatal("duplicate public replacement")
 	}
 }

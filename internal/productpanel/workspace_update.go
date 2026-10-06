@@ -2,6 +2,7 @@ package productpanel
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/hex"
 	"errors"
 	"strconv"
@@ -208,7 +209,7 @@ func (b *DesktopLifecycle) ApplyReceivedUpdate(receiver *WorkspaceUpdateReceiver
 
 // Public release replacement waits for disconnected input and shares the same
 // gate as connect, recovery and peer-update application.
-func (b *DesktopLifecycle) ApplyReleaseUpdate(launch func() error) bool {
+func (b *DesktopLifecycle) ApplyReleaseUpdate(generation int, revision string, launch func() error) bool {
 	if launch == nil || !b.gate.TryLock() {
 		return false
 	}
@@ -222,7 +223,41 @@ func (b *DesktopLifecycle) ApplyReleaseUpdate(launch func() error) bool {
 	if view.Code != "ok" || view.State != "LOCAL" {
 		return false
 	}
+	c, err := b.open()
+	if err != nil {
+		return false
+	}
+	api, ok := c.(interface {
+		Runtime(context.Context) (localapi.RuntimeInfo, error)
+		ReleaseClaim(context.Context, string, string, int, string, bool) (localapi.OperationResult, error)
+	})
+	if !ok {
+		return false
+	}
+	info, err := api.Runtime(ctx)
+	if err != nil {
+		return false
+	}
+	var nonce [16]byte
+	if _, err = rand.Read(nonce[:]); err != nil {
+		return false
+	}
+	id := hex.EncodeToString(nonce[:])
+	result, err := api.ReleaseClaim(ctx, info.Instance, id, generation, revision, true)
+	rollback := func() {
+		cleanup, done := context.WithTimeout(context.Background(), 5*time.Second)
+		defer done()
+		_, _ = api.ReleaseClaim(cleanup, info.Instance, id, generation, revision, false)
+	}
+	if err != nil {
+		rollback()
+		return false
+	}
+	if result.Status != "COMPLETED" || result.Code != "release_claimed" {
+		return false
+	}
 	if err := launch(); err != nil {
+		rollback()
 		return false
 	}
 	b.updateHandedOff = true
