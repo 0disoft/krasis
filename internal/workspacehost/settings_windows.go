@@ -38,7 +38,7 @@ func (s *WorkspaceService) appSettings() AppSettingsSnapshot {
 	if s.startMenuFailed.Load() {
 		result.Code = "start_menu_failed"
 	}
-	if s.recoveryFailed.Load() {
+	if s.launchRecordFailed.Load() || s.recoveryFailed.Load() {
 		result.Code = "recovery_failed"
 	}
 	active, err := appsettings.RecoveryTaskEnabled(os.Getenv("LOCALAPPDATA"))
@@ -66,6 +66,7 @@ func (s *WorkspaceService) SetAppSettings(startAtLogin, autoUpdate bool) AppSett
 		if err = appsettings.SetRecoveryTask(base, startAtLogin); err != nil {
 			_ = appsettings.SetStartup(base, old.StartAtLogin)
 			s.recoveryFailed.Store(true)
+			s.recoverySettingsReady = false
 			result := s.appSettings()
 			result.Code = "recovery_failed"
 			return result
@@ -78,6 +79,8 @@ func (s *WorkspaceService) SetAppSettings(startAtLogin, autoUpdate bool) AppSett
 			rollback = appsettings.SetStartup(base, old.StartAtLogin)
 			if err := appsettings.SetRecoveryTask(base, old.StartAtLogin); err != nil {
 				rollback = err
+				s.recoveryFailed.Store(true)
+				s.recoverySettingsReady = false
 			}
 		}
 		result := s.appSettings()
@@ -97,7 +100,7 @@ func (s *WorkspaceService) SetAppSettings(startAtLogin, autoUpdate bool) AppSett
 		}
 		s.release.gate.Unlock()
 	}
-	if startupChanged {
+	if startupChanged && (s.prepareSettings == nil || s.recoverySettingsReady) {
 		s.recoveryFailed.Store(false)
 	}
 	return s.appSettings()

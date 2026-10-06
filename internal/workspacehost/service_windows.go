@@ -16,15 +16,20 @@ import (
 )
 
 type WorkspaceService struct {
-	uiReplacement    uiReplacement
-	visibleWindow    atomic.Pointer[application.WebviewWindow]
-	uiReadyEpoch     atomic.Uint64
-	release          releaseState
-	settingsGate     sync.Mutex
-	startAtLogin     bool
-	startMenuFailed  atomic.Bool
-	recoveryFailed   atomic.Bool
-	recoveryPromoted bool
+	uiReplacement uiReplacement
+	visibleWindow atomic.Pointer[application.WebviewWindow]
+	uiReadyEpoch  atomic.Uint64
+	release       releaseState
+	settingsGate  sync.Mutex
+	startAtLogin  bool
+
+	startMenuFailed       atomic.Bool
+	launchRecordFailed    atomic.Bool
+	recoveryFailed        atomic.Bool
+	recoveryRecordReady   bool
+	recoveryMenuReady     bool
+	recoverySettingsReady bool
+
 	ctx              context.Context
 	control          string
 	title            string
@@ -50,29 +55,35 @@ type WorkspaceService struct {
 func (s *WorkspaceService) promoteRecovery() {
 	s.settingsGate.Lock()
 	defer s.settingsGate.Unlock()
-	if s.recoveryPromoted {
+	if !s.recoveryRecordReady && s.prepareRecovery != nil {
+		if err := s.prepareRecovery(); err != nil {
+			s.launchRecordFailed.Store(true)
+			s.log.Event("launch_record_" + launchrecord.RegistrationStage(err) + "_failed")
+			return
+		}
+		s.launchRecordFailed.Store(false)
+		s.recoveryRecordReady = true
+		s.log.Event("launch_record_ready")
+	}
+	if !s.recoveryRecordReady {
 		return
 	}
-	if s.prepareRecovery != nil {
-		if err := s.prepareRecovery(); err != nil {
-			s.recoveryFailed.Store(true)
-			s.log.Event("launch_record_" + launchrecord.RegistrationStage(err) + "_failed")
-		} else {
-			s.recoveryFailed.Store(false)
-			s.recoveryPromoted = true
-			s.log.Event("launch_record_ready")
-			if s.prepareStartMenu != nil {
-				if err := s.prepareStartMenu(); err != nil {
-					s.startMenuFailed.Store(true)
-					s.log.Event("start_menu_registration_failed")
-				}
-			}
-			if s.prepareSettings != nil {
-				if err := s.prepareSettings(); err != nil {
-					s.recoveryFailed.Store(true)
-					s.log.Event("app_settings_startup_failed")
-				}
-			}
+	// Keep successful stages; retry failures only on an existing startup/recovery
+	// attempt, never from renderer polling or an additional recovery loop.
+	if !s.recoveryMenuReady && s.prepareStartMenu != nil {
+		err := s.prepareStartMenu()
+		s.startMenuFailed.Store(err != nil)
+		s.recoveryMenuReady = err == nil
+		if err != nil {
+			s.log.Event("start_menu_registration_failed")
+		}
+	}
+	if !s.recoverySettingsReady && s.prepareSettings != nil {
+		err := s.prepareSettings()
+		s.recoveryFailed.Store(err != nil)
+		s.recoverySettingsReady = err == nil
+		if err != nil {
+			s.log.Event("app_settings_startup_failed")
 		}
 	}
 }

@@ -14,10 +14,11 @@ func TestAutoUpdatePreferenceSavesDespiteBrokenRecoveryRegistration(t *testing.T
 		t.Fatal(err)
 	}
 	s := &WorkspaceService{}
+	s.launchRecordFailed.Store(true)
 	s.recoveryFailed.Store(true)
 	_ = s.SetAppSettings(false, false)
 	v, err := appsettings.Load(base)
-	if err != nil || v.AutoUpdate || v.StartAtLogin || !s.recoveryFailed.Load() {
+	if err != nil || v.AutoUpdate || v.StartAtLogin || !s.launchRecordFailed.Load() || !s.recoveryFailed.Load() {
 		t.Fatal("unrelated recovery failure blocked update preference or was erased", v, err)
 	}
 }

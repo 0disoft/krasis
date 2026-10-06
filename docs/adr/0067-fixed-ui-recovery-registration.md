@@ -25,6 +25,14 @@ missing CLI, preservation of the previous record, invalid bundles and CLI
 arguments, build mismatch and successful fixed-entrypoint creation. Live
 two-device recovery remains a separate deployment check.
 
+Registration completion is tracked separately for the launch record, Start menu
+shortcut and startup/recovery settings. A later existing startup/recovery attempt
+retries only failed stages, after the launch record has been registered. A shortcut
+failure does not prevent recovery settings registration. Each failure is cleared
+only by success in its owning stage; changing startup preferences cannot erase a
+launch-record failure or a pending settings preparation failure. No renderer poll,
+additional retry loop or larger automatic recovery budget is introduced.
+
 ## g136: Inspect live directories without delete access
 
 A g135 running UI recorded `launch_record_image_failed`. A read-only probe of
