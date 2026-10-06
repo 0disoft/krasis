@@ -29,6 +29,10 @@ five-second session deadline instead of discarding it after one second.
 Revocation, certificate expiry, guard exit and the hard timeout still stop input.
 The three-attempt automatic recovery limit is unchanged.
 
+Generation 195 serializes layout status, exit-edge and reentry-distance changes
+with connection actions. Results for a previously selected peer are discarded;
+queued edits recheck LOCAL state before calling the native layout writer.
+
 ## Native Windows Workspace
 
 The optional Wails v3 host ships as a complete, unpacked distribution under

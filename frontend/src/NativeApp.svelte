@@ -12,6 +12,7 @@
   import { createClipboardBridge } from './clipboard-bridge.js';
   import { createPairingBridge } from './pairing-bridge.js';
   import { createLayoutBridge } from './layout-bridge.js';
+  import { createLayoutController } from './layout-controller.js';
   import { createDiagnosticsBridge } from './diagnostics-bridge.js';
   import { resolveLocale } from './i18n.js';
   import { nativeText } from './native-i18n.js';
@@ -28,6 +29,7 @@
   let clipboardBridge;
   let pairingBridge;
   let layoutBridge;
+  let layoutController;
   let diagnosticsBridge = $state.raw();
   let diagnostics = $state({code:'unavailable',saved:false,received:false,transfer:'UNKNOWN'});
   let diagBusy = $state(false);
@@ -132,12 +134,12 @@
     }
   }
   async function swap() {
-    if (!layoutBridge || !selectedPeer || !canPlace) return;
-    layout = await layoutBridge.set(selectedPeer.fingerprint, layout.edge === 'LEFT' ? 'RIGHT' : 'LEFT');
+    if (!layoutController || !selectedPeer || !canPlace) return;
+    await layoutController.set(selectedPeer.fingerprint, layout.edge === 'LEFT' ? 'RIGHT' : 'LEFT');
   }
   async function setRearm(distance) {
-    if (!layoutBridge || !selectedPeer || !canPlace) return;
-    layout = await layoutBridge.rearm(selectedPeer.fingerprint, distance);
+    if (!layoutController || !selectedPeer || !canPlace) return;
+    await layoutController.rearm(selectedPeer.fingerprint, distance);
   }
   async function run(action, background = false) {
     if (busy || !bridge || disposed) return;
@@ -182,10 +184,7 @@
       if (!pairBusy && !disposed && pairingBridge) {
         await runPair('status', true);
       }
-      if (!disposed && layoutBridge && selected) {
-        const value = await layoutBridge.status(selected);
-        if (!disposed) layout = value;
-      }
+      if (!disposed && layoutController && selected) await layoutController.status(selected);
       if (!disposed && !diagBusy && diagnosticsBridge) await runDiagnostics('status', '', true);
       if (!disposed) timer = setTimeout(poll, 1500);
     }
@@ -216,6 +215,11 @@
           LayoutStatus:(fp)=>Call.ByName(name+'LayoutStatus',fp),
           LayoutSet:(fp,edge)=>Call.ByName(name+'LayoutSet',fp,edge),
           LayoutRearm:(fp,distance)=>Call.ByName(name+'LayoutRearm',fp,distance),
+        });
+        layoutController=createLayoutController(layoutBridge, workspaceOperation, {
+          currentPeer: () => disposed ? '' : selected,
+          canChange: () => snapshot.state === 'LOCAL' && !pairing.job && !inputBusy,
+          apply: value => { layout = value; },
         });
         diagnosticsBridge=createDiagnosticsBridge({
           DiagnosticsStatus:()=>Call.ByName(name+'DiagnosticsStatus'),
