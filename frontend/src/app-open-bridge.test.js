@@ -40,7 +40,9 @@ test('launch acknowledgement becomes visible while awaiting window readiness',()
   const launch={...value,code:'launch_requested'};
   assert.deepEqual(appOpenProgress(value,launch,false),{result:launch,waiting:true});
   assert.deepEqual(appOpenProgress(launch,{...value,code:'unavailable'},false),{result:launch,waiting:true});
-  assert.equal(appOpenProgress(launch,{...value,code:'busy'},true).result.code,'window_unconfirmed');
+  assert.equal(appOpenProgress(launch,{...value,code:'query_busy'},true).result.code,'window_unconfirmed');
+  const rejected={...value,code:'busy'};
+  assert.deepEqual(appOpenProgress(value,rejected,false),{result:rejected,waiting:false});
   const failed={...value,code:'peer_unresponsive'};
   assert.deepEqual(appOpenProgress(value,failed,false),{result:failed,waiting:false});
 });

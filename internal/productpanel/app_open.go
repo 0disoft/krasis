@@ -31,7 +31,7 @@ func (b *UpdateSettingsBridge) AppOpen(peer, id string) AppOpenSnapshot {
 		return v
 	}
 	if !b.mu.TryLock() {
-		v.Code = "busy"
+		v.Code = "query_busy"
 		return v
 	}
 	defer b.mu.Unlock()

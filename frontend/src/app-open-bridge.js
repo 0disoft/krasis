@@ -1,9 +1,9 @@
 const schema = 'krasis.app-open/v1';
 const codes = new Set(['pending','launch_requested','window_ready','window_unconfirmed','launch_failed','launch_record_missing','launch_record_invalid',
-  'expired','peer_unresponsive','unknown_request','rejected','unsupported','busy','invalid_peer','stale_peer','unavailable','outcome_unknown']);
+  'expired','peer_unresponsive','unknown_request','rejected','unsupported','busy','query_busy','invalid_peer','stale_peer','unavailable','outcome_unknown']);
 
 export function appOpenProgress(previous, status, expired) {
-  const transient = ['busy','unavailable'].includes(status.code);
+  const transient = ['query_busy','unavailable'].includes(status.code);
   const result = transient ? previous : status;
   const waiting = transient || ['pending','launch_requested'].includes(status.code);
   if (waiting && expired) {
@@ -19,7 +19,7 @@ export function createAppOpenBridge(binding, storage) {
     try{
       if(['pending','launch_requested'].includes(v.code)){
         if(!storage.getItem(key(v.peer)))storage.setItem(key(v.peer),JSON.stringify({id:v.id,expires:Date.now()+70000}));
-      }else if(!['busy','unavailable'].includes(v.code))storage.removeItem(key(v.peer));
+      }else if(!['query_busy','unavailable'].includes(v.code))storage.removeItem(key(v.peer));
     }catch{}
   }
   function resume(peer){
@@ -35,7 +35,7 @@ export function createAppOpenBridge(binding, storage) {
     const failure = code => ({schema,peer,id,code});
     if (!/^[a-f0-9]{64}$/i.test(peer ?? '') || typeof peer !== 'string' ||
         typeof id !== 'string' || (id !== '' && !/^[a-f0-9]{32}$/i.test(id))) return failure('invalid_peer');
-    if (busy) return failure('busy');
+    if (busy) return failure('query_busy');
     busy = true;
     try {
       const v = await binding.PeerAppOpen(peer, id);
