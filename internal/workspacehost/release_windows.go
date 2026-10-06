@@ -45,7 +45,17 @@ func (s *WorkspaceService) setRelease(state string, generation int) {
 	s.release.value = ReleaseSnapshot{state, generation}
 	s.release.gate.Unlock()
 }
-func (s *WorkspaceService) checkRelease() {
+func (s *WorkspaceService) checkRelease() bool {
+	previous := s.ReleaseStatus()
+	fail := func(generation int) bool {
+		if previous.State == "READY" {
+			s.setRelease("READY", previous.Generation)
+		} else {
+			s.setRelease("FAILED", generation)
+		}
+		s.log.Event("release_check_failed")
+		return false
+	}
 	parent, cancel := context.WithTimeout(s.ctx, 3*time.Minute)
 	defer cancel()
 	s.release.gate.Lock()
@@ -57,35 +67,36 @@ func (s *WorkspaceService) checkRelease() {
 	if err != nil {
 		if errors.Is(err, releaseupdate.ErrUnconfigured) {
 			s.setRelease("UNCONFIGURED", 0)
-		} else {
-			s.setRelease("FAILED", 0)
+			return true
 		}
-		return
+		return fail(0)
+	}
+	if previous.State == "READY" && m.Generation <= previous.Generation {
+		s.setRelease("READY", previous.Generation)
+		return true
 	}
 	if m.Generation <= localapi.AgentGeneration {
 		s.setRelease("CURRENT", 0)
-		return
+		return true
 	}
 	s.setRelease("AVAILABLE", m.Generation)
 	settings, err := appsettings.Load(os.Getenv("LOCALAPPDATA"))
 	if err != nil || !settings.AutoUpdate {
-		return
+		return true
 	}
 	s.setRelease("DOWNLOADING", m.Generation)
 	_, archive, err := releaseupdate.DownloadArchive(parent, releaseupdate.Client(), m)
 	if err != nil {
-		s.setRelease("FAILED", m.Generation)
-		return
+		return fail(m.Generation)
 	}
 	settings, err = appsettings.Load(os.Getenv("LOCALAPPDATA"))
 	if parent.Err() != nil || err != nil || !settings.AutoUpdate {
 		s.setRelease("AVAILABLE", m.Generation)
-		return
+		return true
 	}
 	directory, _, err := releaseupdate.SaveReady(os.Getenv("LOCALAPPDATA"), envelope, archive, releaseupdate.PublicKey)
 	if err != nil {
-		s.setRelease("FAILED", m.Generation)
-		return
+		return fail(m.Generation)
 	}
 	s.release.gate.Lock()
 	s.release.directory, s.release.revision = directory, m.Revision
@@ -94,6 +105,7 @@ func (s *WorkspaceService) checkRelease() {
 	if err := releaseupdate.PruneReady(os.Getenv("LOCALAPPDATA"), releaseupdate.PublicKey); err != nil {
 		s.log.Event("release_cache_cleanup_failed")
 	}
+	return true
 }
 func (s *WorkspaceService) runReleaseUpdater() {
 	applied := false
@@ -114,6 +126,7 @@ func (s *WorkspaceService) runReleaseUpdater() {
 		s.log.Event("release_cache_cleanup_failed")
 	}
 	check := time.NewTimer(time.Minute)
+	failures := 0
 	defer check.Stop()
 	tick := time.NewTicker(2 * time.Second)
 	defer tick.Stop()
@@ -123,13 +136,18 @@ func (s *WorkspaceService) runReleaseUpdater() {
 			return
 		case <-check.C:
 			settings, err := appsettings.Load(os.Getenv("LOCALAPPDATA"))
-			if err == nil && settings.AutoUpdate && s.ReleaseStatus().State != "READY" {
-				s.checkRelease()
+			if err == nil && settings.AutoUpdate {
+				if s.checkRelease() {
+					failures = 0
+				} else {
+					failures++
+				}
 			}
-			check.Reset(6 * time.Hour)
+			check.Reset(releaseCheckDelay(failures))
 		case <-s.release.wake:
-			if s.ReleaseStatus().State != "READY" {
-				s.checkRelease()
+			failures = 0
+			if !s.checkRelease() {
+				failures = 1
 			}
 			if !check.Stop() {
 				select {
@@ -137,7 +155,7 @@ func (s *WorkspaceService) runReleaseUpdater() {
 				default:
 				}
 			}
-			check.Reset(6 * time.Hour)
+			check.Reset(releaseCheckDelay(failures))
 		case <-tick.C:
 			if s.ReleaseStatus().State != "READY" {
 				continue
