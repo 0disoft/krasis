@@ -82,8 +82,11 @@ func dismissBoundaryMenu(ctx context.Context, info sourceGUIThreadInfo) (sourceG
 // Some custom context menus hold mouse capture without entering the native
 // Win32 menu loop. Cancel only an idle capture, then prove that the same
 // foreground window released it before allowing the boundary crossing.
-func dismissBoundaryCapture(ctx context.Context, info sourceGUIThreadInfo) (sourceGUIThreadInfo, bool, error) {
+func dismissBoundaryCapture(ctx context.Context, info sourceGUIThreadInfo, contextOwner uintptr) (sourceGUIThreadInfo, bool, error) {
 	if info.Capture == 0 || info.Flags&(guiInMoveSize|guiMenuModeMask) != 0 || info.MoveSize != 0 || sourceAnyInputPressed() {
+		return info, false, nil
+	}
+	if contextOwner == 0 || contextOwner != info.Active || !sourceIsContextPopup(info.Capture, info.Active) {
 		return info, false, nil
 	}
 	if !sourceCancelMenu(ctx, info.Capture) {
@@ -188,7 +191,7 @@ func (hook *SourceHook) AdmitBoundary(ctx context.Context, _ control.BoundaryInt
 		info = updated
 	}
 	if info.Capture != 0 {
-		updated, released, err := dismissBoundaryCapture(ctx, info)
+		updated, released, err := dismissBoundaryCapture(ctx, info, hook.contextMenu.Load())
 		if err != nil {
 			return 0, boundaryInspectionUnavailable(ctx, "verify mouse capture dismissal", err)
 		}
@@ -199,6 +202,7 @@ func (hook *SourceHook) AdmitBoundary(ctx context.Context, _ control.BoundaryInt
 			return peer.BoundaryAdmissionBlockedMouseCapture, nil
 		}
 		info = updated
+		hook.contextMenu.Store(0)
 	}
 	if info.Flags&guiInMoveSize != 0 || info.MoveSize != 0 {
 		return peer.BoundaryAdmissionBlockedMoveSize, nil

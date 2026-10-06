@@ -24,6 +24,18 @@ Microsoft의 [`GetGUIThreadInfo`](https://learn.microsoft.com/en-us/windows/win3
 
 ## 결정
 
+### Current bounded dismissal policy
+
+The implementation now attempts one bounded cancellation of an idle native menu
+and rechecks the same foreground owner before crossing. An unknown mouse capture
+is not a menu: cancel it only after a local right-button release on that same
+foreground owner, when the captured HWND is a distinct owned tool/nonactivating
+popup. Any other mouse button or keyboard event clears that gesture evidence.
+Dragging, held input, an unowned overlay and an ordinary captured control remain
+blocked without a cancellation message. Unrecognized custom menus may require
+manual dismissal; they must not justify canceling another application's mode.
+These rules supersede the historical blanket no-dismiss policy below.
+
 - source boundary orchestrator는 outbound readiness 확인 뒤 identity 생성과 request write보다 먼저 Windows
   foreground GUI thread의 menu 상태를 검사한다.
 - 세 menu flag 중 하나라도 켜져 있으면 해당 intent를 `blockedLocalMenu`로 분류하고 identity를 만들거나

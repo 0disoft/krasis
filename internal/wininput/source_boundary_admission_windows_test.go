@@ -71,8 +71,11 @@ func TestSourceBoundaryAdmissionClassifiesForegroundInteraction(t *testing.T) {
 
 func TestBoundaryDismissesIdleMouseCaptureBeforeCrossing(t *testing.T) {
 	oldInfo, oldPressed, oldCancel := sourceForegroundGUIThreadInfo, sourceAnyInputPressed, sourceCancelMenu
+	oldPopup := sourceIsContextPopup
+	sourceIsContextPopup = func(uintptr, uintptr) bool { return true }
 	t.Cleanup(func() {
 		sourceForegroundGUIThreadInfo, sourceAnyInputPressed, sourceCancelMenu = oldInfo, oldPressed, oldCancel
+		sourceIsContextPopup = oldPopup
 	})
 	for _, test := range []struct {
 		name      string
@@ -108,11 +111,35 @@ func TestBoundaryDismissesIdleMouseCaptureBeforeCrossing(t *testing.T) {
 				}
 				return test.delivered
 			}
-			decision, err := (&SourceHook{}).AdmitBoundary(context.Background(), control.BoundaryIntent{Edge: control.ScreenEdgeRight})
+			hook := &SourceHook{}
+			hook.contextMenu.Store(7)
+			decision, err := hook.AdmitBoundary(context.Background(), control.BoundaryIntent{Edge: control.ScreenEdgeRight})
 			if err != nil || decision != test.want || (test.held && sends != 0) {
 				t.Fatalf("decision=%v err=%v sends=%d", decision, err, sends)
 			}
 		})
+	}
+}
+
+func TestBoundaryDoesNotCancelUnknownOrNonPopupCapture(t *testing.T) {
+	oldInfo, oldPressed, oldCancel, oldPopup := sourceForegroundGUIThreadInfo, sourceAnyInputPressed, sourceCancelMenu, sourceIsContextPopup
+	t.Cleanup(func() {
+		sourceForegroundGUIThreadInfo, sourceAnyInputPressed, sourceCancelMenu, sourceIsContextPopup = oldInfo, oldPressed, oldCancel, oldPopup
+	})
+	sourceForegroundGUIThreadInfo = func(info *sourceGUIThreadInfo) error { *info = sourceGUIThreadInfo{Active: 7, Capture: 42}; return nil }
+	sourceAnyInputPressed = func() bool { return false }
+	sourceCancelMenu = func(context.Context, uintptr) bool { t.Fatal("unrelated capture canceled"); return true }
+	for _, test := range []struct {
+		gesture uintptr
+		popup   bool
+	}{{0, true}, {8, true}, {7, false}} {
+		sourceIsContextPopup = func(uintptr, uintptr) bool { return test.popup }
+		hook := &SourceHook{}
+		hook.contextMenu.Store(test.gesture)
+		decision, err := hook.AdmitBoundary(context.Background(), control.BoundaryIntent{})
+		if err != nil || decision != peer.BoundaryAdmissionBlockedMouseCapture {
+			t.Fatal(decision, err)
+		}
 	}
 }
 

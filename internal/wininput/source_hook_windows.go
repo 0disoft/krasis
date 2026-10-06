@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -17,6 +18,7 @@ import (
 const wmSourceReady = 0x8002
 
 type SourceHook struct {
+	contextMenu   atomic.Uintptr // Foreground owner of the most recent local right-click release.
 	boundaryGuard func() error
 	timing        HookTimingObserver
 	observer      SourcePipelineObserver
@@ -112,7 +114,7 @@ func (hook *SourceHook) RunWithBoundary(
 	startSourceInputThread(results, "low-level-hook", func() error {
 		return runSourceLowLevelHookThread(runCtx, session, boundary, hook.observer, hook.capture, pointerState, hook.timing, func() {
 			readySignals <- struct{}{}
-		}, &hook.returnCursor)
+		}, &hook.contextMenu, &hook.returnCursor)
 	})
 	startSourceInputThread(results, "raw-mouse", func() error {
 		return runSourceRawMouseThread(runCtx, session, boundary, pointerState, hook.timing, func() {
@@ -244,6 +246,7 @@ func runSourceLowLevelHookThread(
 	pointerState *sourcePointerState,
 	timing HookTimingObserver,
 	ready func(),
+	contextMenu *atomic.Uintptr,
 	shields ...*returnCursorShield,
 ) (resultErr error) {
 	var shield *returnCursorShield
@@ -265,6 +268,9 @@ func runSourceLowLevelHookThread(
 			if routeMappedPhysicalAction(session, boundary, func() (control.InputAction, bool, int32, error) {
 				data := *(*keyboardHookData)(unsafe.Pointer(lParam))
 				action, emitted, err := mapper.keyboard(uint32(wParam), data)
+				if emitted && contextMenu != nil {
+					contextMenu.Store(0)
+				}
 				return action, emitted, 0, err
 			}) {
 				return 1
@@ -281,6 +287,13 @@ func runSourceLowLevelHookThread(
 			data := *(*mouseHookData)(unsafe.Pointer(lParam))
 			message := uint32(wParam)
 			if action, button := mapSourceHookButton(message, data); button {
+				if contextMenu != nil {
+					owner := uintptr(0)
+					if action.Kind == control.InputButtonUp && action.Code == MouseButtonRight && !session.Active() {
+						owner = sourceWheelCaptureGetForeground()
+					}
+					contextMenu.Store(owner)
+				}
 				if routePhysicalAction(session, boundary, action, data.Point.X) {
 					return 1
 				}
