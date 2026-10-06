@@ -52,6 +52,18 @@ func (connection *disconnectConnection) DiagnosticID() string {
 	return ""
 }
 
+// Product sessions add this wrapper before the supervisor. Preserve the
+// transport's optional, connection-local diagnostic capability through both.
+func (connection *disconnectConnection) DiagnosticExchangeTag(sessionID, epoch string) string {
+	if connection == nil {
+		return ""
+	}
+	if source, ok := connection.Connection.(interface{ DiagnosticExchangeTag(string, string) string }); ok {
+		return source.DiagnosticExchangeTag(sessionID, epoch)
+	}
+	return ""
+}
+
 func (connection *disconnectConnection) SetReadProgressObserver(observer func(int, time.Time)) {
 	if source, ok := connection.Connection.(interface{ SetReadProgressObserver(func(int, time.Time)) }); ok {
 		source.SetReadProgressObserver(observer)
