@@ -83,10 +83,14 @@ g186부터 관리 앱을 시작하면 현재 사용자의 시작 메뉴에 `Kras
 `app open B`는 등록된 B의 관리 채널로 앱 열기를 요청한다. 상대의 에이전트가 살아 있고,
 상대가 이 기기의 입력 제어를 허용한 경우에만 마지막 UI를 실행한다. 두 기기 모두 g109 이상이
 필요하다. 입력 연결 해제 상태에서도 관리 채널은 사용할 수 있다. 경로나 명령어는 전송하지 않는다.
-g189는 최대 25초간 수락 응답을 기다린다. 20초간 응답이 없으면 `peer_unresponsive`로
-끝낸다. 구버전 에이전트에서 여전히 `pending`이면 요청 ID를 반환하고, 재전송 대신
-`app open-status B REQUEST_ID`로 확인한다. 수락 이후 창 준비 확인은 요청 시작부터 1분까지
-이어진다. B의 에이전트까지 완전히 종료된 경우 B에서 고정 복구 명령을 실행해야 한다.
+`app open B`는 초기 조회를 포함해 최대 70초 동안 기다린다. 실행 요청은 한 번만 보내고,
+`pending`, `launch_accepted`, `launch_requested`에서는 같은 요청 ID를 계속 조회한다.
+일치하는 `window_ready`를 확인해야 exit `0`이다. 응답이 없으면 상대 에이전트는
+`peer_unresponsive`를 반환한다. CLI 대기 한도가 끝나면 수락 이후에는 `window_unconfirmed`,
+수락 확인 전에는 `outcome_unknown`과 exit `7`을 반환하며, 받은 요청 ID를 유지한다.
+`app open-status B REQUEST_ID`는 한 번 조회하며 `window_ready`에서만 exit `0`이다.
+대기 취소는 `canceled`와 exit `7`이며 상대 실행 작업을 취소하거나 다시 보내지 않는다.
+B의 에이전트까지 완전히 종료된 경우 B에서 고정 복구 명령을 실행해야 한다.
 g190의 `launch_accepted`는 느린 실행 작업의 수락 응답이다. `launch_requested`와 함께
 동일 요청 조회를 계속한다. 상대 `busy`는 최종 거부이고 로컬 `query_busy`는 다시 조회한다.
 앱 열기 조회는 파일·진단·클립보드 전송과 독립된 관리 경로를 사용한다.

@@ -19,6 +19,14 @@ g190 앱 열기 결과의 `launch_accepted`는 작업 수락이고 최종 결과
 `launch_requested`와 함께 같은 ID를 계속 조회한다. peer의 `busy`는 거부 결과이며
 로컬 조회 경합인 `query_busy`만 재조회한다.
 
+`app open`은 최대 70초 동안 같은 요청을 조회하며 `window_ready`에서만 exit `0`이다.
+`app open-status`도 `pending`, `launch_accepted`, `launch_requested`에는 exit `7`을 반환한다.
+대기 한도 만료는 수락 확인 뒤 `window_unconfirmed`, 수락 미확인 시 `outcome_unknown`이다.
+요청 전 초기 조회의 한도 만료는 `timeout`, 대기 취소는 `canceled`이며 모두 exit `7`이다.
+응답 소실·다른 요청 ID·알 수 없는 응답 코드도 `outcome_unknown`과 exit `7`이다.
+받은 요청 ID는 보존한다. 시간 초과와 취소는 상대 실행 작업의 취소를 뜻하지 않으며,
+CLI가 실행 요청을 다시 보내지 않는다.
+
 `app repair --json`의 schema는 `krasis.cli.app-repair/v1`이다. 성공은
 `code:recovery_ready`, `generation`과 exit `0`이다. 묶음 누락·검증 실패·CLI 빌드
 불일치는 `bundle_missing`, `bundle_invalid`, `bundle_version_mismatch`와 exit `7`이다.
