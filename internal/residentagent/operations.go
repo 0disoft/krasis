@@ -58,19 +58,21 @@ type Operations struct {
 	trust                  trustStore
 	now                    func() time.Time
 
-	mu             sync.Mutex
-	sessionStop    context.CancelCauseFunc
-	sessionDone    chan struct{}
-	guardExitDone  <-chan struct{}
-	sessionState   string
-	inputBackend   string
-	sessionFaulted bool
-	sessionOutcome *sessionOutcome
-	peerAlias      string
-	lastStopReason string
-	manualStop     bool
-	lastCode       string
-	counters       map[string]uint64
+	mu                sync.Mutex
+	sessionStop       context.CancelCauseFunc
+	sessionDone       chan struct{}
+	guardExitDone     <-chan struct{}
+	sessionState      string
+	inputBackend      string
+	boundaryBlocked   string
+	boundaryBlockedAt time.Time
+	sessionFaulted    bool
+	sessionOutcome    *sessionOutcome
+	peerAlias         string
+	lastStopReason    string
+	manualStop        bool
+	lastCode          string
+	counters          map[string]uint64
 }
 
 func New(parent context.Context, identity productidentity.PublicIdentity, runner SessionRunner, pairing PairWorkflow, trust trustStore) (*Operations, error) {
@@ -200,6 +202,7 @@ func (operations *Operations) Status(context.Context) (localapi.Status, error) {
 		SchemaVersion:      localapi.StatusSchemaVersion,
 		State:              state,
 		InputBackend:       operations.inputBackend,
+		BoundaryBlocked:    operations.boundaryNoticeLocked(),
 		PeerAlias:          operations.peerAlias,
 		StopReason:         operations.lastStopReason,
 		Actions:            actions,
@@ -258,6 +261,7 @@ func (operations *Operations) Connect(requestContext context.Context, request lo
 	operations.sessionDone = done
 	operations.sessionState = "CONNECTING"
 	operations.inputBackend = "UNKNOWN"
+	operations.boundaryBlocked, operations.boundaryBlockedAt = "", time.Time{}
 	operations.peerAlias = request.PeerAlias
 	operations.lastStopReason = ""
 	operations.manualStop = false
@@ -422,6 +426,7 @@ func (operations *Operations) finishSession(done chan struct{}, outcome *session
 		operations.sessionOutcome = nil
 		operations.sessionState = ""
 		operations.inputBackend = "UNKNOWN"
+		operations.boundaryBlocked, operations.boundaryBlockedAt = "", time.Time{}
 		operations.sessionFaulted = operations.sessionFaulted || outcome.failed
 		if displayChanged && !outcome.failed {
 			operations.lastStopReason = "display_change"

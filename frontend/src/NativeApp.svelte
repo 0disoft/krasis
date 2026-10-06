@@ -266,6 +266,7 @@
   {#if inputNeedsAction || inputBusy || inputNotice === 'UPDATING' || inputNotice === 'PENDING' || snapshot.inputBackend === 'PORTABLE'}
     <p class="fault-banner" role="status">{t(inputNoticeKey)} <button disabled={busy || !bridge || inputNotice === 'UPDATING' || inputNotice === 'PENDING'} onclick={refreshInput}>{t(inputNotice === 'NOT_INSTALLED' ? 'input_setup' : 'input_refresh')}</button></p>
   {/if}
+  {#if snapshot.boundaryBlocked}<p class="placement-hint" role="status">{t(`boundary_${snapshot.boundaryBlocked}`)}</p>{/if}
   <label class="peer-select">{t('peer')}<select bind:value={selected} disabled={busy || snapshot.state !== 'LOCAL'}><option value="">{t('choose')}</option>{#each snapshot.peers as peer (peer.fingerprint)}<option value={peer.fingerprint}>{peer.alias}</option>{/each}</select></label>
   <PeerAppButton bridge={appOpenBridge} peer={selectedPeer} {locale} />
   <section class="canvas" aria-label={t('devices')}>

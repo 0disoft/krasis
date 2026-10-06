@@ -1,5 +1,9 @@
 export const nativeCatalogs = {
   ko: {
+    boundary_LOCAL_MENU: '메뉴를 닫고 다시 이동하세요.',
+    boundary_MOUSE_CAPTURE: '현재 앱의 마우스 조작을 끝내고 다시 이동하세요.',
+    boundary_PRESSED_INPUT: '누른 키나 마우스 버튼을 놓고 다시 이동하세요.',
+    boundary_MOVE_SIZE: '창 이동이나 크기 변경을 끝내고 다시 이동하세요.',
     "app_open": "상대 앱 열기",
     "app_open_pending": "열기 요청 중…",
     "app_open_launch_requested": "상대 앱을 여는 중…",
@@ -190,6 +194,10 @@ export const nativeCatalogs = {
     recovery_required:'입력 제어가 중단되었습니다. 진단을 자동 저장하고, 이전 연결은 최대 3회 복구합니다.',
   },
   en: {
+    boundary_LOCAL_MENU: 'Close the menu, then cross again.',
+    boundary_MOUSE_CAPTURE: 'Finish the current mouse interaction, then cross again.',
+    boundary_PRESSED_INPUT: 'Release held keys or mouse buttons, then cross again.',
+    boundary_MOVE_SIZE: 'Finish moving or resizing the window, then cross again.',
     "app_open": "Open peer app",
     "app_open_pending": "Requesting app launch…",
     "app_open_launch_accepted": "Preparing the peer app…",

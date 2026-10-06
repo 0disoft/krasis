@@ -227,6 +227,9 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 		log.Boundary(boundary.snapshot(false))
 		defer func() { log.Boundary(boundary.snapshot(true)) }()
 		config.SourceObserver = boundary
+		if flow, ok := observer.(peer.ControlFlowObserver); ok {
+			config.ControlObserver = flow
+		}
 		config.HandoffProfiles = profiles
 		progress := newRuntimeDiagnostics()
 		config.LivenessObserver = progress

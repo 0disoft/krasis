@@ -78,3 +78,11 @@ test('protected input refresh keeps cancellation and pending outcomes explicit',
   assert.equal((await bridge.inputRefresh()).inputSetup,'UNKNOWN');
   assert.equal(calls,3);
 });
+
+
+test('boundary reasons are allowlisted and only visible while connected', async () => {
+  for (const [state, reason, expected] of [['CONNECTED', 'LOCAL_MENU', 'LOCAL_MENU'], ['CONNECTED', '/private/path', ''], ['LOCAL', 'PRESSED_INPUT', '']]) {
+    const bridge = createBridge({ Refresh: async () => ({...snapshot(state), boundaryBlocked:reason}), Connect() {}, Disconnect() {} });
+    assert.equal((await bridge.refresh()).boundaryBlocked, expected);
+  }
+});

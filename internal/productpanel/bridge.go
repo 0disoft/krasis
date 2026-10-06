@@ -16,16 +16,17 @@ const BridgeSchema = "krasis.desktop/v1"
 // Notice is legacy localized panel copy; native integration must map it to catalog
 // codes before advertising complete localization of agent failures.
 type BridgeSnapshot struct {
-	InputSetup   string       `json:"inputSetup,omitempty"`
-	InputBackend string       `json:"inputBackend"`
-	Revision     uint64       `json:"revision,omitempty"`
-	Schema       string       `json:"schema"`
-	State        string       `json:"state"`
-	PeerAlias    string       `json:"peerAlias"`
-	StopReason   string       `json:"stopReason,omitempty"`
-	Peers        []BridgePeer `json:"peers"`
-	Code         string       `json:"code"`
-	Notice       string       `json:"notice"`
+	BoundaryBlocked string       `json:"boundaryBlocked,omitempty"`
+	InputSetup      string       `json:"inputSetup,omitempty"`
+	InputBackend    string       `json:"inputBackend"`
+	Revision        uint64       `json:"revision,omitempty"`
+	Schema          string       `json:"schema"`
+	State           string       `json:"state"`
+	PeerAlias       string       `json:"peerAlias"`
+	StopReason      string       `json:"stopReason,omitempty"`
+	Peers           []BridgePeer `json:"peers"`
+	Code            string       `json:"code"`
+	Notice          string       `json:"notice"`
 }
 
 type BridgePeer struct {
@@ -87,8 +88,8 @@ func (b *DesktopBridge) execute(action, alias, fingerprint string) BridgeSnapsho
 		return bridgeFailure("stale_peer")
 	}
 	result := BridgeSnapshot{Schema: BridgeSchema, State: view.State, PeerAlias: view.PeerAlias, StopReason: view.StopReason,
-		InputBackend: guard.inputBackend,
-		Peers:        []BridgePeer{}, Code: "ok", Notice: view.Notice}
+		InputBackend: guard.inputBackend, BoundaryBlocked: guard.boundaryBlocked,
+		Peers: []BridgePeer{}, Code: "ok", Notice: view.Notice}
 	if action != "refresh" && (!guard.attempted || guard.rejected) {
 		result.Code = "rejected"
 	}
@@ -113,6 +114,7 @@ func (b *DesktopBridge) execute(action, alias, fingerprint string) BridgeSnapsho
 type bridgeClient struct {
 	Client
 	inputBackend                   string
+	boundaryBlocked                string
 	fingerprint                    string
 	stale                          bool
 	attempted, rejected, uncertain bool
@@ -121,6 +123,13 @@ type bridgeClient struct {
 func (c *bridgeClient) Status(ctx context.Context) (localapi.Status, error) {
 	v, err := c.Client.Status(ctx)
 	c.inputBackend = "UNKNOWN"
+	c.boundaryBlocked = ""
+	if err == nil {
+		switch v.BoundaryBlocked {
+		case "LOCAL_MENU", "MOUSE_CAPTURE", "PRESSED_INPUT", "MOVE_SIZE":
+			c.boundaryBlocked = v.BoundaryBlocked
+		}
+	}
 	if err == nil && (v.InputBackend == "PROTECTED" || v.InputBackend == "PORTABLE") {
 		c.inputBackend = v.InputBackend
 	}
