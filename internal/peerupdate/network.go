@@ -44,6 +44,18 @@ func (m *Manager) Run(ctx context.Context, address, peer string, listener bool, 
 	t := &http.Transport{TLSClientConfig: cfg, DisableKeepAlives: true, DisableCompression: true, MaxConnsPerHost: 1, ResponseHeaderTimeout: 5 * time.Second, TLSHandshakeTimeout: 5 * time.Second, Proxy: nil}
 	defer t.CloseIdleConnections()
 	client := &http.Client{Transport: t, Timeout: 90 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	// Launch/status use a separate connection and worker. A file transfer must
+	// never consume a launch request's response deadline.
+	controlTransport := t.Clone()
+	defer controlTransport.CloseIdleConnections()
+	controlClient := &http.Client{Transport: controlTransport, Timeout: 30 * time.Second, CheckRedirect: client.CheckRedirect}
+	controlCtx, stopControl := context.WithCancel(ctx)
+	controlDone := make(chan struct{})
+	go func() {
+		defer close(controlDone)
+		m.runAppOpenControl(controlCtx, controlClient, address, peer, authorized)
+	}()
+	defer func() { stopControl(); <-controlDone }()
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 	for {
@@ -63,7 +75,6 @@ func (m *Manager) Run(ctx context.Context, address, peer string, listener bool, 
 			if !statusOK {
 				continue
 			}
-			m.pollAppOpen(ctx, client, address, peer, authorized)
 			m.pollDiagnostic(ctx, client, address, peer, authorized)
 			m.pushDiagnosticRequest(ctx, client, address, peer, authorized)
 			m.pollDiagnosticRequest(ctx, client, address, peer, authorized)
@@ -141,6 +152,7 @@ func (m *Manager) Run(ctx context.Context, address, peer string, listener bool, 
 
 func (m *Manager) handler(peer string, authorized func() bool) http.Handler {
 	gate := make(chan struct{}, 1)
+	controlGate := make(chan struct{}, 1)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		// TLS config verifies the one pinned certificate. Recheck current trust
@@ -149,9 +161,13 @@ func (m *Manager) handler(peer string, authorized func() bool) http.Handler {
 			w.WriteHeader(http.StatusForbidden)
 			return
 		}
+		requestGate := gate
+		if r.URL.Path == "/v1/app-open" || r.URL.Path == "/v2/status" {
+			requestGate = controlGate
+		}
 		select {
-		case gate <- struct{}{}:
-			defer func() { <-gate }()
+		case requestGate <- struct{}{}:
+			defer func() { <-requestGate }()
 		default:
 			w.WriteHeader(http.StatusTooManyRequests)
 			return
