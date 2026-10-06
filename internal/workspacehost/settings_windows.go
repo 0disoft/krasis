@@ -41,6 +41,10 @@ func (s *WorkspaceService) appSettings() AppSettingsSnapshot {
 	if s.recoveryFailed.Load() {
 		result.Code = "recovery_failed"
 	}
+	active, err := appsettings.RecoveryTaskEnabled(os.Getenv("LOCALAPPDATA"))
+	if err != nil || active != v.StartAtLogin {
+		result.Code = "recovery_failed"
+	}
 	return result
 }
 func (s *WorkspaceService) SetAppSettings(startAtLogin, autoUpdate bool) AppSettingsSnapshot {

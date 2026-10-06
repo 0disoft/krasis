@@ -53,10 +53,14 @@ try {
         $krasisDefinition.Actions.Count -ne 1 -or
         $krasisDefinition.Actions.Item(1).Path -ne $env:KRASIS_RECOVERY_TARGET -or
         $krasisDefinition.Actions.Item(1).Arguments -ne 'app ensure --json') { exit 3 }
+    if ($env:KRASIS_RECOVERY_CHECK -eq '1') {
+      if ($krasisTask.Enabled) { exit 0 } else { exit 4 }
+    }
     if ($env:KRASIS_RECOVERY_ENABLED -eq '0') { $krasisFolder.DeleteTask($krasisName,0);exit 0 }
     if (-not $krasisTask.Enabled) { $krasisTask.Enabled=$true }
     exit 0
   }
+  if ($env:KRASIS_RECOVERY_CHECK -eq '1') { exit 4 }
   if ($env:KRASIS_RECOVERY_ENABLED -eq '0') { exit 0 }
   if (-not (Test-Path -LiteralPath $env:KRASIS_RECOVERY_TARGET -PathType Leaf)) { exit 2 }
   $krasisDefinition=$krasisService.NewTask(0)
@@ -93,6 +97,20 @@ func SetRecoveryTask(base string, enabled bool) error {
 	return setRecoveryTask(base, "", enabled)
 }
 func setRecoveryTask(base, suffix string, enabled bool) error {
+	return runRecoveryTask(base, suffix, enabled, false)
+}
+
+var errRecoveryTaskInactive = errors.New("recovery task not active")
+
+func RecoveryTaskEnabled(base string) (bool, error) {
+	err := runRecoveryTask(base, "", false, true)
+	if errors.Is(err, errRecoveryTaskInactive) {
+		return false, nil
+	}
+	return err == nil, err
+}
+
+func runRecoveryTask(base, suffix string, enabled, inspect bool) error {
 	if !filepath.IsAbs(base) || strings.ContainsAny(base, "\x00\r\n\"") {
 		return errors.New("invalid recovery root")
 	}
@@ -121,9 +139,17 @@ func setRecoveryTask(base, suffix string, enabled bool) error {
 	if enabled {
 		flag = "1"
 	}
-	cmd.Env = append(os.Environ(), "KRASIS_RECOVERY_TARGET="+filepath.Join(base, "Krasis", "launch", "krasis-cli.exe"), "KRASIS_RECOVERY_ENABLED="+flag, "KRASIS_RECOVERY_SUFFIX="+suffix)
+	check := "0"
+	if inspect {
+		check = "1"
+	}
+	cmd.Env = append(os.Environ(), "KRASIS_RECOVERY_TARGET="+filepath.Join(base, "Krasis", "launch", "krasis-cli.exe"), "KRASIS_RECOVERY_ENABLED="+flag, "KRASIS_RECOVERY_SUFFIX="+suffix, "KRASIS_RECOVERY_CHECK="+check)
 	output, runErr := cmd.CombinedOutput()
 	if runErr != nil {
+		var exitErr *exec.ExitError
+		if inspect && errors.As(runErr, &exitErr) && exitErr.ExitCode() == 4 {
+			return errRecoveryTaskInactive
+		}
 		if suffix != "" {
 			return fmt.Errorf("recovery task registration failed: %v %s", runErr, strings.TrimSpace(string(output)))
 		}

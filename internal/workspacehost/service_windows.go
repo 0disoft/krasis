@@ -54,8 +54,10 @@ func (s *WorkspaceService) promoteRecovery() {
 	}
 	if s.prepareRecovery != nil {
 		if err := s.prepareRecovery(); err != nil {
+			s.recoveryFailed.Store(true)
 			s.log.Event("launch_record_" + launchrecord.RegistrationStage(err) + "_failed")
 		} else {
+			s.recoveryFailed.Store(false)
 			s.recoveryPromoted = true
 			s.log.Event("launch_record_ready")
 			if s.prepareStartMenu != nil {

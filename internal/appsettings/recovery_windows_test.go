@@ -5,6 +5,7 @@ package appsettings
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -35,8 +36,14 @@ func TestRecoveryTaskRegistrationIsUserScopedAndReversible(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	if err := runRecoveryTask(base, suffix, false, true); err != nil {
+		t.Fatal("read-only query did not find registered task", err)
+	}
 	if err := setRecoveryTask(base, suffix, false); err != nil {
 		t.Fatal(err)
+	}
+	if err := runRecoveryTask(base, suffix, false, true); !errors.Is(err, errRecoveryTaskInactive) {
+		t.Fatal("absent recovery task was reported as active", err)
 	}
 	if err := setRecoveryTask(base, suffix, false); err != nil {
 		t.Fatal("absence not idempotent", err)
