@@ -1,11 +1,50 @@
 package peerupdate
 
 import (
+	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestBusyDiagnosticReceiverKeepsSameOutgoingTransfer(t *testing.T) {
+	m := testManager(t)
+	peer := strings.Repeat("a", 64)
+	if err := m.QueueDiagnostic(peer, []byte(`{}`)); err != nil {
+		t.Fatal(err)
+	}
+	first := m.diagnosticOffer(peer)
+	sent := 0
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			sent++
+			if r.Header.Get("X-Krasis-ID") != first.id {
+				t.Error("busy retry changed transfer identity")
+			}
+			if sent == 1 {
+				w.WriteHeader(http.StatusServiceUnavailable)
+			} else {
+				w.WriteHeader(http.StatusOK)
+			}
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+	address := strings.TrimPrefix(server.URL, "https://")
+	m.pollDiagnostic(context.Background(), server.Client(), address, peer, func() bool { return true })
+	current := m.diagnosticOffer(peer)
+	if current == nil || current.id != first.id || !current.expires.Equal(first.expires) {
+		t.Fatal("busy receiver discarded or extended transfer")
+	}
+	m.pollDiagnostic(context.Background(), server.Client(), address, peer, func() bool { return true })
+	if sent != 2 || m.Status().Diagnostic != "SENT" {
+		t.Fatal(sent, m.Status().Diagnostic)
+	}
+}
 
 func TestDiagnosticReceiveSaveLeavesStatusResponsive(t *testing.T) {
 	m := testManager(t)
