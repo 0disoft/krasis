@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -172,8 +173,12 @@ func Run() {
 	}
 	var window *application.WebviewWindow
 	instance := &application.SingleInstanceOptions{
-		UniqueID: "0disoft-krasis-workspace-preview-v1",
-		OnSecondInstanceLaunch: func(application.SecondInstanceData) {
+		UniqueID:       "0disoft-krasis-workspace-preview-v1",
+		AdditionalData: map[string]string{"generation": strconv.Itoa(localapi.AgentGeneration), "revision": buildinfo.Read().Revision},
+		OnSecondInstanceLaunch: func(data application.SecondInstanceData) {
+			if service.requestUIReplacement(data.Args, data.AdditionalData) {
+				return
+			}
 			if window != nil {
 				window.Restore()
 				window.Show()

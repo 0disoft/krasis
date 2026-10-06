@@ -16,6 +16,7 @@ import (
 )
 
 type WorkspaceService struct {
+	uiReplacement    uiReplacement
 	visibleWindow    atomic.Pointer[application.WebviewWindow]
 	uiReadyEpoch     atomic.Uint64
 	release          releaseState
@@ -93,6 +94,17 @@ func (s *WorkspaceService) ServiceStartup(context.Context, application.ServiceOp
 			go s.runUpdateReceiver()
 		}
 		if s.quit != nil {
+			s.jobs.Add(1)
+			go func() {
+				handoff := false
+				defer func() {
+					s.jobs.Done()
+					if handoff {
+						s.quit()
+					}
+				}()
+				handoff = s.runUIReplacement()
+			}()
 			s.release.wake = make(chan struct{}, 1)
 			s.release.value = ReleaseSnapshot{State: "IDLE"}
 			s.jobs.Add(1)
