@@ -55,24 +55,30 @@ func (s *WorkspaceService) SetAppSettings(startAtLogin, autoUpdate bool) AppSett
 	if err != nil {
 		return s.appSettings()
 	}
-	if err = appsettings.SetStartup(base, startAtLogin); err != nil {
-		_ = appsettings.SetStartup(base, old.StartAtLogin)
-		result := s.appSettings()
-		result.Code = "startup_failed"
-		return result
+	startupChanged := startAtLogin != old.StartAtLogin
+	if startupChanged {
+		if err = appsettings.SetStartup(base, startAtLogin); err != nil {
+			_ = appsettings.SetStartup(base, old.StartAtLogin)
+			result := s.appSettings()
+			result.Code = "startup_failed"
+			return result
+		}
+		if err = appsettings.SetRecoveryTask(base, startAtLogin); err != nil {
+			_ = appsettings.SetStartup(base, old.StartAtLogin)
+			s.recoveryFailed.Store(true)
+			result := s.appSettings()
+			result.Code = "recovery_failed"
+			return result
+		}
 	}
 	value := appsettings.Settings{Schema: appsettings.Schema, StartAtLogin: startAtLogin, AutoUpdate: autoUpdate}
-	if err = appsettings.SetRecoveryTask(base, startAtLogin); err != nil {
-		_ = appsettings.SetStartup(base, old.StartAtLogin)
-		s.recoveryFailed.Store(true)
-		result := s.appSettings()
-		result.Code = "recovery_failed"
-		return result
-	}
 	if err = appsettings.Save(base, value); err != nil {
-		rollback := appsettings.SetStartup(base, old.StartAtLogin)
-		if err := appsettings.SetRecoveryTask(base, old.StartAtLogin); err != nil {
-			rollback = err
+		var rollback error
+		if startupChanged {
+			rollback = appsettings.SetStartup(base, old.StartAtLogin)
+			if err := appsettings.SetRecoveryTask(base, old.StartAtLogin); err != nil {
+				rollback = err
+			}
 		}
 		result := s.appSettings()
 		result.Code = "save_failed"
@@ -91,7 +97,9 @@ func (s *WorkspaceService) SetAppSettings(startAtLogin, autoUpdate bool) AppSett
 		}
 		s.release.gate.Unlock()
 	}
-	s.recoveryFailed.Store(false)
+	if startupChanged {
+		s.recoveryFailed.Store(false)
+	}
 	return s.appSettings()
 }
 func (s *WorkspaceService) prepareAppSettings() error {
