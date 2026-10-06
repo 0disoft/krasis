@@ -48,6 +48,7 @@
   let clipboard = $state({peer:'',code:'unavailable'});
   let pairing = $state({schema:'krasis.pairing/v1',code:'ok',pin:'',job:'',alias:'',candidates:[]});
   let layout = $state({edge:'RIGHT',rearm:32,code:'unavailable'});
+  let layoutPeer = $state('');
   let candidate = $state('');
   let pinInput = $state('');
   let clipBusy = $state(false);
@@ -74,7 +75,8 @@
 	const fileTransfer = $derived(clipboardEnabled ? clipboard.transfer : null);
 	const fileTransferLabel = $derived(fileTransfer ? t('clipboard_files_' + (fileTransfer.state === 'FAILED' && fileTransfer.code ? fileTransfer.code : fileTransfer.state.toLowerCase())) : '');
   const canDisconnect = $derived(['CONNECTING','CONNECTED','RECONNECTING'].includes(snapshot.state));
-  const canPlace = $derived(snapshot.state === 'LOCAL' && !!selectedPeer && !pairing.job && !busy);
+  const shownEdge = $derived(layoutPeer && layoutPeer === selected ? layout.edge : null);
+  const canPlace = $derived(snapshot.state === 'LOCAL' && !!selectedPeer && layoutPeer === selected && ['ok','unconfigured'].includes(layout.code) && !pairing.job && !busy);
   const canPair = $derived(snapshot.state === 'LOCAL' && !pairing.job && !busy && !pairBusy);
   async function runDiagnostics(action, peer = '', background = false) {
     if (!diagnosticsBridge || diagBusy || disposed) return;
@@ -218,8 +220,8 @@
         });
         layoutController=createLayoutController(layoutBridge, workspaceOperation, {
           currentPeer: () => disposed ? '' : selected,
-          canChange: () => snapshot.state === 'LOCAL' && !pairing.job && !inputBusy,
-          apply: value => { layout = value; },
+          canChange: () => snapshot.state === 'LOCAL' && layoutPeer === selected && ['ok','unconfigured'].includes(layout.code) && !pairing.job && !inputBusy,
+          apply: (value, peer) => { layout = value; layoutPeer = peer; },
         });
         diagnosticsBridge=createDiagnosticsBridge({
           DiagnosticsStatus:()=>Call.ByName(name+'DiagnosticsStatus'),
@@ -267,15 +269,16 @@
   <label class="peer-select">{t('peer')}<select bind:value={selected} disabled={busy || snapshot.state !== 'LOCAL'}><option value="">{t('choose')}</option>{#each snapshot.peers as peer (peer.fingerprint)}<option value={peer.fingerprint}>{peer.alias}</option>{/each}</select></label>
   <PeerAppButton bridge={appOpenBridge} peer={selectedPeer} {locale} />
   <section class="canvas" aria-label={t('devices')}>
-    <div class="screens" class:reversed={layout.edge === 'LEFT'}>
-      <div class="screen"><img class="monitor-art" src={monitor} alt="" /><div class="screen-content"><strong>{t('local')}</strong><span>{t('thisPC')}</span><small>{t(layout.edge === 'LEFT' ? 'right' : 'left')}</small></div></div>
-      <div class="screen peer"><img class="monitor-art" src={monitor} alt="" /><div class="screen-content"><strong class="peer-name" dir="auto">{snapshot.peerAlias || selectedPeer?.alias || '—'}</strong><span>{t('otherPC')}</span><small>{t(layout.edge === 'LEFT' ? 'left' : 'right')}</small></div></div>
+    <div class="screens" class:reversed={shownEdge === 'LEFT'}>
+      <div class="screen"><img class="monitor-art" src={monitor} alt="" /><div class="screen-content"><strong>{t('local')}</strong><span>{t('thisPC')}</span><small>{shownEdge ? t(shownEdge === 'LEFT' ? 'right' : 'left') : '—'}</small></div></div>
+      <div class="screen peer"><img class="monitor-art" src={monitor} alt="" /><div class="screen-content"><strong class="peer-name" dir="auto">{snapshot.peerAlias || selectedPeer?.alias || '—'}</strong><span>{t('otherPC')}</span><small>{shownEdge ? t(shownEdge === 'LEFT' ? 'left' : 'right') : '—'}</small></div></div>
     </div>
     <p class="placement-hint"><Icon name="info" size={20} />{t(snapshot.state === 'LOCAL' ? 'placementReady' : 'placementLocked')}</p>
     <div class="canvas-actions">
       <button disabled={!canPlace} onclick={swap}><Icon name="arrows-left-right" size={18} />{t('swap')}</button>
       <label class="rearm-field">{t('rearm')}
-        <select disabled={!canPlace} value={layout.rearm || 32} onchange={e => setRearm(Number(e.currentTarget.value))}>
+        <select disabled={!canPlace} value={layoutPeer === selected ? layout.rearm ?? '' : ''} onchange={e => setRearm(Number(e.currentTarget.value))}>
+          <option value="" disabled>—</option>
           {#each [32,64,128] as value}<option {value}>{value}px</option>{/each}
         </select>
       </label>
@@ -297,7 +300,7 @@
     <button class="utility utility-button" aria-haspopup="dialog" onclick={() => openDialog(pairingDlg)}><Icon name="plus" /><div><h2>{t('pair')}</h2></div></button>
     <button class="utility utility-button" aria-haspopup="dialog" onclick={() => openDialog(diagnosticsDlg)}><Icon name="info" /><div><h2>{t('diag_title')}</h2></div></button>
   </section>
-  {#if layout.code !== 'ok' && layout.code !== 'unavailable' && layout.code !== 'unconfigured'}
+  {#if selectedPeer && layoutPeer === selected && layout.code !== 'ok' && layout.code !== 'unconfigured'}
     <p role="status">{t(layout.code)}</p>
   {/if}
 </main>

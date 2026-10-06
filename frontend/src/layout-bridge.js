@@ -1,9 +1,10 @@
 const fp = /^[a-f0-9]{64}$/i;
 const edges = new Set(['LEFT', 'RIGHT']);
 const rearms = new Set([32, 64, 128]);
+const codes = new Set(['ok', 'unavailable', 'unconfigured', 'invalid_peer', 'not_local', 'rejected']);
 
 function empty(code) {
-  return {edge: 'RIGHT', rearm: 32, code};
+  return {code};
 }
 
 export function createLayoutBridge(binding) {
@@ -13,10 +14,11 @@ export function createLayoutBridge(binding) {
   async function call(method, args) {
     try {
       const value = await binding[method](...args);
-      if (!value || typeof value.code !== 'string') return empty('unavailable');
-      const edge = edges.has(value.edge) ? value.edge : 'RIGHT';
-      const rearm = rearms.has(value.rearm) ? value.rearm : 32;
-      return {edge, rearm, code: value.code};
+      if (!value || !codes.has(value.code)) return empty('unavailable');
+      if (value.code === 'unconfigured') return {edge:'RIGHT', rearm:32, code:'unconfigured'};
+      if (value.code !== 'ok') return empty(value.code);
+      if (!edges.has(value.edge) || !rearms.has(value.rearm)) return empty('unavailable');
+      return {edge:value.edge, rearm:value.rearm, code:'ok'};
     } catch {
       return empty('unavailable');
     }

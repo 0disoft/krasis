@@ -34,6 +34,36 @@ test('slow layout poll completes before a queued edit and cannot undo it', async
   assert.deepEqual(f.busy,[true,false]);
 });
 
+test('failed polling and edits preserve the last accepted placement for that peer', async () => {
+  const f = fixture();
+  let read = f.controller.status(peer);
+  f.finish({edge:'LEFT',rearm:128,code:'ok'});
+  await read;
+  read = f.controller.status(peer);
+  f.finish({edge:'INVALID',rearm:999,code:'ok'});
+  await read;
+  assert.deepEqual(f.applied.at(-1),{edge:'LEFT',rearm:128,code:'unavailable'});
+  f.select(other);
+  read = f.controller.status(other);
+  f.finish({code:'unavailable'});
+  await read;
+  assert.deepEqual(f.applied.at(-1),{edge:null,rearm:null,code:'unavailable'});
+});
+
+test('a rejected edit cannot replace an accepted layout with native defaults', async () => {
+  let next = {code:'ok',edge:'LEFT',rearm:64};
+  const bridge = createLayoutBridge({LayoutStatus:async()=>next, LayoutSet:async()=>({code:'rejected',edge:'RIGHT',rearm:32}), LayoutRearm:async()=>{throw Error('private');}});
+  const applied = [];
+  const controller = createLayoutController(bridge,createOperationGate(()=>{}),{currentPeer:()=>peer,canChange:()=>true,apply:v=>applied.push(v)});
+  await controller.status(peer);
+  await controller.set(peer,'RIGHT');
+  assert.deepEqual(applied.at(-1),{edge:'LEFT',rearm:64,code:'rejected'});
+  await controller.rearm(peer,128);
+  assert.deepEqual(applied.at(-1),{edge:'LEFT',rearm:64,code:'unavailable'});
+  await controller.status(peer);
+  assert.deepEqual(applied.at(-1),next);
+});
+
 test('changing the selected peer discards the old poll and queued edit', async () => {
   const f = fixture();
   const read = f.controller.status(peer);
