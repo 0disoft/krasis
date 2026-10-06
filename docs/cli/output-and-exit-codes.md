@@ -84,11 +84,15 @@ g125부터 같은 세션의 UI 프로세스가 관측되지만 실행 기록이 
 이 PC에 저장한다. JSON `krasis.cli.diagnostics-collection/v1`의 `saved`와 exit `0`은
 `localPath`, `peerPath`가 모두 확인된 때만 반환한다. `pending`은 완료가 아니며 exit `7`이다.
 `id`로 `diagnostics collect-status ALIAS ID`를 조회한다. 인증된 상대 기기 외에는
-원격 요청을 보내지 않고, 응답 유실 시 START를 자동 재실행하지 않는다. 각 기기의
+원격 요청을 보내지 않고, 응답 유실 시 START를 자동 재실행하지 않는다.
 g198부터 수집 결과는 `support-request-<id>-local.json`과
 `support-request-<id>-peer-<fingerprint>.json`에 보존한다. 다음 일반 내보내기·수집은
 기존 요청의 파일을 교체하지 않는다. 같은 요청의 재전송도 최초 파일을 유지한다.
 일반 내보내기·전송은 기존 `support-latest.json`·`support-peer-<fingerprint>.json`을 사용한다.
+g201부터 수신 확인 응답이 유실되면 이미 저장한 같은 상대·요청 ID·전송 ID·내용의
+재전송에 성공 응답을 다시 보낸다. 파일을 다시 저장하거나 새 요청으로 처리하지 않는다.
+확인 기록은 에이전트 메모리에 최대 32개 상대, 2분 동안 유지하며 재시작하면 사라진다.
+내용·식별자가 다르거나 상대의 권한이 취소됐으면 성공 응답을 재사용하지 않는다.
 
 g128부터 `diagnostics wait ALIAS ID [--timeout DURATION]`은 기존 수집 요청의 양쪽 파일이
 확인될 때까지 기다린다. 기본 2분, 허용 범위 1초~10분이다. JSON은 같은

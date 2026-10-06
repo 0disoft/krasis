@@ -3,6 +3,7 @@ package peerupdate
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"io"
 	"net/http"
 	"sync"
@@ -11,13 +12,21 @@ import (
 
 const MaxDiagnosticBytes = 5 << 20
 const diagnosticPollTimeout = 15 * time.Second
+const diagnosticReceiptRetention = 2 * time.Minute
+
+// Keep identity and content certainty without retaining another payload copy.
+type diagnosticReceipt struct {
+	id, requestID string
+	digest        [sha256.Size]byte
+	expires       time.Time
+}
 
 type diagnosticTransfer struct {
 	mu              sync.Mutex
 	out             *diagnosticOffer
 	request         *diagnosticRequest
 	state, received string
-	last            map[string]string
+	last            map[string]diagnosticReceipt
 	handled         map[string]string
 }
 type diagnosticOffer struct {
@@ -171,7 +180,7 @@ func (m *Manager) diagnosticDone(id, state string) {
 	}
 }
 func (m *Manager) receiveDiagnostic(peer, id, requestID string, r io.Reader, authorized func() bool) error {
-	if !validID(id, 32) || !authorized() || (m.ReceiveDiagnostic == nil && (requestID == "" || m.ReceiveCollection == nil)) {
+	if !validID(peer, 64) || !validID(id, 32) || (requestID != "" && !validID(requestID, 32)) || !authorized() || (m.ReceiveDiagnostic == nil && (requestID == "" || m.ReceiveCollection == nil)) {
 		return ErrDenied
 	}
 	data, err := io.ReadAll(io.LimitReader(r, MaxDiagnosticBytes+1))
@@ -183,17 +192,29 @@ func (m *Manager) receiveDiagnostic(peer, id, requestID string, r io.Reader, aut
 	}
 	m.diagnostic.mu.Lock()
 	defer m.diagnostic.mu.Unlock()
+	now := time.Now()
+	for peer, receipt := range m.diagnostic.last {
+		if !now.Before(receipt.expires) {
+			delete(m.diagnostic.last, peer)
+		}
+	}
+	digest := sha256.Sum256(data)
+	if receipt, ok := m.diagnostic.last[peer]; ok && receipt.id == id {
+		// The original request is already RECEIVED (or has since been replaced).
+		// Only its exact saved response may receive another acknowledgement.
+		if receipt.requestID == requestID && receipt.digest == digest {
+			return nil
+		}
+		return ErrDenied
+	}
 	if requestID != "" {
 		request := m.diagnostic.request
 		if !validID(requestID, 32) || request == nil || request.peer != peer || request.id != requestID || request.state != "PENDING" || time.Now().After(request.expires) {
 			return ErrDenied
 		}
 	}
-	if m.diagnostic.last[peer] == "" && len(m.diagnostic.last) >= 32 {
+	if _, known := m.diagnostic.last[peer]; !known && len(m.diagnostic.last) >= 32 {
 		return ErrBusy
-	}
-	if m.diagnostic.last[peer] == id {
-		return nil
 	}
 	var path string
 	if requestID != "" && m.ReceiveCollection != nil {
@@ -204,10 +225,13 @@ func (m *Manager) receiveDiagnostic(peer, id, requestID string, r io.Reader, aut
 	if err != nil {
 		return err
 	}
-	if m.diagnostic.last == nil {
-		m.diagnostic.last = map[string]string{}
+	if path == "" {
+		return ErrDenied
 	}
-	m.diagnostic.last[peer] = id
+	if m.diagnostic.last == nil {
+		m.diagnostic.last = map[string]diagnosticReceipt{}
+	}
+	m.diagnostic.last[peer] = diagnosticReceipt{id: id, requestID: requestID, digest: digest, expires: time.Now().Add(diagnosticReceiptRetention)}
 	m.diagnostic.received = path
 	if requestID != "" {
 		m.diagnostic.request.state = "RECEIVED"
