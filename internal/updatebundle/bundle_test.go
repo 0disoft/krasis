@@ -73,6 +73,37 @@ func TestBundleAcceptsBothExclusiveExecutableLayouts(t *testing.T) {
 	}
 }
 
+func TestSignedArchiveBytesMustMatchStagedDirectory(t *testing.T) {
+	data := fixtureLayout(t, currentNames)
+	b, err := read(bytes.NewReader(data), int64(len(data)), func(string, []byte, string) error { return nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent, err := os.OpenRoot(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer parent.Close()
+	id := strings.Repeat("a", 32)
+	if err = b.Stage(parent, id); err != nil {
+		t.Fatal(err)
+	}
+	dir, err := parent.OpenRoot(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dir.Close()
+	if err = b.MatchDirectory(dir); err != nil {
+		t.Fatal(err)
+	}
+	if err = dir.WriteFile("krasis.exe", []byte("modified"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if b.MatchDirectory(dir) == nil {
+		t.Fatal("tampered stage accepted")
+	}
+}
+
 func fixtureLayout(t *testing.T, selected []string, generation ...int) []byte {
 	t.Helper()
 	files := map[string][]byte{}

@@ -53,7 +53,7 @@ func (s *WorkspaceService) checkRelease() {
 	s.release.gate.Unlock()
 	defer func() { s.release.gate.Lock(); s.release.cancel = nil; s.release.gate.Unlock() }()
 	s.setRelease("CHECKING", 0)
-	m, err := releaseupdate.Check(parent, releaseupdate.Client(), releaseupdate.PublicKey)
+	m, envelope, err := releaseupdate.CheckSigned(parent, releaseupdate.Client(), releaseupdate.PublicKey)
 	if err != nil {
 		if errors.Is(err, releaseupdate.ErrUnconfigured) {
 			s.setRelease("UNCONFIGURED", 0)
@@ -72,7 +72,7 @@ func (s *WorkspaceService) checkRelease() {
 		return
 	}
 	s.setRelease("DOWNLOADING", m.Generation)
-	bundle, err := releaseupdate.Download(parent, releaseupdate.Client(), m)
+	_, archive, err := releaseupdate.DownloadArchive(parent, releaseupdate.Client(), m)
 	if err != nil {
 		s.setRelease("FAILED", m.Generation)
 		return
@@ -82,7 +82,7 @@ func (s *WorkspaceService) checkRelease() {
 		s.setRelease("AVAILABLE", m.Generation)
 		return
 	}
-	directory, err := releaseupdate.Stage(os.Getenv("LOCALAPPDATA"), bundle)
+	directory, _, err := releaseupdate.SaveReady(os.Getenv("LOCALAPPDATA"), envelope, archive, releaseupdate.PublicKey)
 	if err != nil {
 		s.setRelease("FAILED", m.Generation)
 		return
@@ -91,6 +91,9 @@ func (s *WorkspaceService) checkRelease() {
 	s.release.directory, s.release.revision = directory, m.Revision
 	s.release.value = ReleaseSnapshot{"READY", m.Generation}
 	s.release.gate.Unlock()
+	if err := releaseupdate.PruneReady(os.Getenv("LOCALAPPDATA"), releaseupdate.PublicKey); err != nil {
+		s.log.Event("release_cache_cleanup_failed")
+	}
 }
 func (s *WorkspaceService) runReleaseUpdater() {
 	applied := false
@@ -100,6 +103,16 @@ func (s *WorkspaceService) runReleaseUpdater() {
 			s.quit()
 		}
 	}()
+	base := os.Getenv("LOCALAPPDATA")
+	if directory, m, err := releaseupdate.RestoreReady(base, releaseupdate.PublicKey, localapi.AgentGeneration); err == nil {
+		s.release.gate.Lock()
+		s.release.directory, s.release.revision = directory, m.Revision
+		s.release.value = ReleaseSnapshot{"READY", m.Generation}
+		s.release.gate.Unlock()
+	}
+	if err := releaseupdate.PruneReady(base, releaseupdate.PublicKey); err != nil && !errors.Is(err, os.ErrNotExist) {
+		s.log.Event("release_cache_cleanup_failed")
+	}
 	check := time.NewTimer(time.Minute)
 	defer check.Stop()
 	tick := time.NewTicker(2 * time.Second)

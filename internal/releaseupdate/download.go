@@ -54,21 +54,34 @@ func fetch(ctx context.Context, c *http.Client, url string, limit int64) ([]byte
 	return data, nil
 }
 func Check(ctx context.Context, c *http.Client, key string) (Manifest, error) {
+	m, _, err := CheckSigned(ctx, c, key)
+	return m, err
+}
+func CheckSigned(ctx context.Context, c *http.Client, key string) (Manifest, []byte, error) {
 	// Validate configuration before any network request.
 	if _, err := Verify(nil, key); errors.Is(err, ErrUnconfigured) {
-		return Manifest{}, err
+		return Manifest{}, nil, err
 	}
 	data, err := fetch(ctx, c, FeedURL, 16384)
 	if err != nil {
-		return Manifest{}, err
+		return Manifest{}, nil, err
 	}
-	return Verify(data, key)
+	m, err := Verify(data, key)
+	return m, data, err
 }
 func Download(ctx context.Context, c *http.Client, m Manifest) (*updatebundle.Bundle, error) {
+	b, _, err := DownloadArchive(ctx, c, m)
+	return b, err
+}
+func DownloadArchive(ctx context.Context, c *http.Client, m Manifest) (*updatebundle.Bundle, []byte, error) {
 	data, err := fetch(ctx, c, m.URL, m.Size)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+	b, err := verifyArchive(data, m)
+	return b, data, err
+}
+func verifyArchive(data []byte, m Manifest) (*updatebundle.Bundle, error) {
 	hash := sha256.Sum256(data)
 	if int64(len(data)) != m.Size || hex.EncodeToString(hash[:]) != m.SHA256 {
 		return nil, ErrInvalid
@@ -84,6 +97,13 @@ func Download(ctx context.Context, c *http.Client, m Manifest) (*updatebundle.Bu
 	return bundle, nil
 }
 func Stage(base string, bundle *updatebundle.Bundle) (string, error) {
+	var id [16]byte
+	if _, err := rand.Read(id[:]); err != nil {
+		return "", err
+	}
+	return stage(base, bundle, hex.EncodeToString(id[:]))
+}
+func stage(base string, bundle *updatebundle.Bundle, name string) (string, error) {
 	if bundle == nil {
 		return "", ErrInvalid
 	}
@@ -114,11 +134,6 @@ func Stage(base string, bundle *updatebundle.Bundle) (string, error) {
 		return "", err
 	}
 	defer root.Close()
-	var id [16]byte
-	if _, err = rand.Read(id[:]); err != nil {
-		return "", err
-	}
-	name := hex.EncodeToString(id[:])
 	if err = bundle.Stage(root, name); err != nil {
 		return "", err
 	}

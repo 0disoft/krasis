@@ -89,6 +89,35 @@ func (b *Bundle) UIExecutable() string {
 	return "krasis-control.exe"
 }
 
+// MatchDirectory binds staged files back to an authenticated archive's bytes.
+// Local checksum metadata alone cannot restore publisher authentication.
+func (b *Bundle) MatchDirectory(root interface {
+	Open(string) (*os.File, error)
+}) error {
+	if b == nil {
+		return ErrInvalid
+	}
+	for name, want := range b.files {
+		f, err := root.Open(name)
+		if err != nil {
+			return err
+		}
+		info, err := f.Stat()
+		if err != nil || !info.Mode().IsRegular() || info.Size() != int64(len(want)) {
+			f.Close()
+			return ErrInvalid
+		}
+		h := sha256.New()
+		_, err = io.Copy(h, io.LimitReader(f, int64(len(want))+1))
+		closeErr := f.Close()
+		expected := sha256.Sum256(want)
+		if err != nil || closeErr != nil || !bytes.Equal(h.Sum(nil), expected[:]) {
+			return ErrInvalid
+		}
+	}
+	return nil
+}
+
 func Read(source io.ReaderAt, size int64) (*Bundle, error) {
 	return read(source, size, verifyExecutable)
 }
