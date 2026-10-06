@@ -53,3 +53,11 @@ Windows 사용자나 원격 peer는 token file을 읽을 수 없어야 한다.
 - request cancellation 뒤 shared session 생존, disconnect와 safe stop cancellation
 - Windows lifecycle event 뒤 API, session, monitor와 instance의 bounded cleanup
 - Windows CI에서 `krasis.exe`와 `krasis-agent.exe` build
+
+Generation 195 bounds crash-guard Close to two IPC budgets (normally four
+seconds), including the disarm request. Termination errors are retained rather
+than discarded. If process exit is still unconfirmed, the close failure carries
+the actual exit acknowledgement. The resident agent keeps its fault latch and
+rejects managed safe-stop and upgrade-stop with `guard_exit_pending` until that
+acknowledgement arrives. A timeout does not count as release of ownership or
+permit a replacement session. Normal guard exit and recovery behavior is unchanged.

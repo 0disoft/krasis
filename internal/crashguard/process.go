@@ -29,12 +29,14 @@ func StartProduct(executable string) (*Process, error) {
 var processIPCTimeout = 2 * time.Second
 
 type Process struct {
-	client  *Client
-	stdin   io.WriteCloser
-	stdout  io.ReadCloser
-	process *os.Process
-	done    chan struct{}
-	abort   sync.Once
+	client   *Client
+	stdin    io.WriteCloser
+	stdout   io.ReadCloser
+	process  *os.Process
+	done     chan struct{}
+	abort    sync.Once
+	abortErr error
+	kill     func() error
 
 	mu      sync.Mutex
 	waitErr error
@@ -133,6 +135,7 @@ func (process *Process) Close() error {
 	if process == nil {
 		return nil
 	}
+	deadline := time.Now().Add(2 * processIPCTimeout)
 	disarmErr := process.invoke(process.client.Disarm)
 	closeErr := process.stdin.Close()
 	if errors.Is(closeErr, os.ErrClosed) {
@@ -141,9 +144,12 @@ func (process *Process) Close() error {
 	select {
 	case <-process.done:
 	case <-time.After(processIPCTimeout):
-		process.abortProcess()
-		<-process.done
-		disarmErr = errors.Join(disarmErr, ErrExitTimeout)
+		disarmErr = errors.Join(disarmErr, ErrExitTimeout, process.abortProcess())
+		select {
+		case <-process.done:
+		case <-time.After(max(0, time.Until(deadline))):
+			return operationFailure("close", &ExitPending{Done: process.done, Cause: errors.Join(disarmErr, closeErr)})
+		}
 	}
 	process.mu.Lock()
 	waitErr := process.waitErr
@@ -164,19 +170,24 @@ func (process *Process) invoke(operation func() error) error {
 	case err := <-result:
 		return err
 	case <-timer.C:
-		process.abortProcess()
-		return ErrIPCTimeout
+		return errors.Join(ErrIPCTimeout, process.abortProcess())
 	}
 }
 
-func (process *Process) abortProcess() {
+func (process *Process) abortProcess() error {
 	process.abort.Do(func() {
 		_ = process.stdin.Close()
 		_ = process.stdout.Close()
-		if process.process != nil {
-			_ = process.process.Kill()
+		if process.kill != nil {
+			process.abortErr = process.kill()
+		} else if process.process != nil {
+			process.abortErr = process.process.Kill()
+		}
+		if errors.Is(process.abortErr, os.ErrProcessDone) {
+			process.abortErr = nil
 		}
 	})
+	return process.abortErr
 }
 
 type limitedBuffer struct {

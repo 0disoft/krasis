@@ -19,10 +19,28 @@ func (operations *Operations) StopForUpgrade(ctx context.Context, generation int
 	if operations.sessionDone != nil {
 		return rejected("active_session_requires_disconnect"), nil
 	}
+	if operations.guardExitPendingLocked() {
+		return rejected("guard_exit_pending"), nil
+	}
 	if pairing, ok := operations.pairing.(interface{ Active() bool }); ok && pairing.Active() {
 		return rejected("pairing_already_active"), nil
 	}
 	operations.log.Event("upgrade_stop_requested")
 	operations.stopAgent(errors.New("idle agent upgrade requested"))
 	return completed("upgrade_stop_requested"), nil
+}
+
+// Only a real process-exit acknowledgement releases the replacement fence.
+// The fault latch still requires replacement even after the guard exits.
+func (operations *Operations) guardExitPendingLocked() bool {
+	if operations.guardExitDone == nil {
+		return false
+	}
+	select {
+	case <-operations.guardExitDone:
+		operations.guardExitDone = nil
+		return false
+	default:
+		return true
+	}
 }

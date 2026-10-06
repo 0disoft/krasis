@@ -9,6 +9,16 @@ var (
 	ErrRecoveryFailed = errors.New("crash guard input recovery failed")
 )
 
+// ExitPending retains the exit acknowledgement after Close's bounded wait.
+// A timeout is not proof that the guard process has released its ownership.
+type ExitPending struct {
+	Done  <-chan struct{}
+	Cause error
+}
+
+func (e *ExitPending) Error() string { return e.Cause.Error() }
+func (e *ExitPending) Unwrap() error { return e.Cause }
+
 type Failure struct {
 	Operation string
 	Cause     error

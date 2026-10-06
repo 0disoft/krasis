@@ -9,6 +9,7 @@ import (
 
 	"github.com/0disoft/krasis/internal/agent"
 	"github.com/0disoft/krasis/internal/appsettings"
+	"github.com/0disoft/krasis/internal/crashguard"
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/peerupdate"
 	"github.com/0disoft/krasis/internal/productidentity"
@@ -60,6 +61,7 @@ type Operations struct {
 	mu             sync.Mutex
 	sessionStop    context.CancelCauseFunc
 	sessionDone    chan struct{}
+	guardExitDone  <-chan struct{}
 	sessionState   string
 	inputBackend   string
 	sessionFaulted bool
@@ -357,6 +359,10 @@ func (operations *Operations) Diagnostics(context.Context) (localapi.Diagnostics
 
 func (operations *Operations) SafeStop(context.Context) (localapi.OperationResult, error) {
 	operations.mu.Lock()
+	if operations.guardExitPendingLocked() {
+		operations.mu.Unlock()
+		return rejected("guard_exit_pending"), nil
+	}
 	if operations.localAppData != "" {
 		if err := appsettings.PauseRecovery(operations.localAppData, true); err != nil {
 			operations.recordLocked("recovery_pause_failed")
@@ -394,6 +400,12 @@ func (operations *Operations) Close(ctx context.Context) error {
 func (operations *Operations) finishSession(done chan struct{}, outcome *sessionOutcome, err error, cancelled, displayChanged bool) {
 	operations.mu.Lock()
 	defer operations.mu.Unlock()
+	if operations.sessionDone == done {
+		var pending *crashguard.ExitPending
+		if errors.As(err, &pending) {
+			operations.guardExitDone = pending.Done
+		}
+	}
 	displayChanged = displayChanged && outcome.connected && !operations.manualStop && operations.root.Err() == nil
 	cancelled = cancelled || displayChanged
 	outcome.failed = !cancelled || operations.sessionFaulted
