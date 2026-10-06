@@ -120,6 +120,19 @@ foreground verification. Native hidden-window and lifecycle tests cover API
 acceptance, ordering, normal windows, scaled/negative monitor coordinates, and rollback.
 The reported YouTube fullscreen A-to-B behavior still requires a two-PC check.
 
+Shell requests now run on one process-owned serialized COM worker with one
+replaceable pending request. The capture owner waits at most 20ms per request;
+this limits the input-side wait, not the duration of the native COM call itself.
+Each owned capture HWND has a lifetime and request generation. Superseded results
+cannot acknowledge later state, queued retired-window work is discarded, and a
+new clear follows a late mark on the same worker. Native failure or timeout never
+weakens input authorization or aborts input merely for presentation failure.
+Even an unacknowledged mark must be followed by a clear at deactivation.
+
+Product diagnostics retain fixed `source_presentation` codes for geometry,
+client mark/clear waits and native mark/clear outcomes, with duration buckets.
+They contain no HWND, application identity, title, screen content or native text.
+
 - [MarkFullscreenWindow](https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-itaskbarlist2-markfullscreenwindow)
 
 ## 대안

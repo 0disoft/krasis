@@ -151,11 +151,12 @@ const (
 )
 
 type sourceWheelCapture struct {
-	observer SourcePipelineObserver
-	opOnce   sync.Once
-	opGate   chan struct{}
-	runMu    sync.RWMutex
-	run      *sourceWheelCaptureRun
+	presentationReport SourcePresentationReporter
+	observer           SourcePipelineObserver
+	opOnce             sync.Once
+	opGate             chan struct{}
+	runMu              sync.RWMutex
+	run                *sourceWheelCaptureRun
 }
 
 type sourceWheelCaptureRun struct {
@@ -171,6 +172,8 @@ type sourceWheelCaptureRun struct {
 	savedFocus                   uintptr
 	registered                   bool
 	fullscreenMarked             bool // Capture owner thread only; presentation, not input authority.
+	fullscreenAttempted          bool // Includes timed-out work that still needs a clear request.
+	presentationReport           SourcePresentationReporter
 	session                      *SourceSession
 	observer                     SourcePipelineObserver
 }
@@ -342,12 +345,13 @@ func (capture *sourceWheelCapture) runWindow(
 		return errors.Join(lab.ErrUnsupported, errors.New("RegisterTouchpadCapableWindow is unavailable"))
 	}
 	current := &sourceWheelCaptureRun{
-		shutdownEvidence: sourceShutdownFrom(ctx),
-		commands:         make(chan sourceWheelCaptureCommand, 1),
-		done:             make(chan struct{}),
-		registerProc:     registerProc,
-		session:          session,
-		observer:         capture.observer,
+		shutdownEvidence:   sourceShutdownFrom(ctx),
+		commands:           make(chan sourceWheelCaptureCommand, 1),
+		done:               make(chan struct{}),
+		registerProc:       registerProc,
+		session:            session,
+		observer:           capture.observer,
+		presentationReport: capture.presentationReport,
 	}
 	if err := capture.attach(current); err != nil {
 		return err
@@ -462,10 +466,14 @@ func (current *sourceWheelCaptureRun) run(ctx context.Context, ready func()) (re
 		return touchpadWin32Error("CreateWindowExW(source wheel capture)", callErr)
 	}
 	current.window = window
+	presentation := &sourcePresentationState{window: window, report: current.presentationReport}
+	sourcePresentationWindows.Store(window, presentation)
 	sourceWindowOwners.Store(window, wndProc)
 	defer sourceWindowOwners.Delete(window)
 	defer func() {
 		resultErr = errors.Join(resultErr, current.deactivateWindow())
+		presentation.retire()
+		sourcePresentationWindows.CompareAndDelete(window, presentation)
 		if !windowDestroyed {
 			if destroyed, _, destroyErr := procDestroyWindow.Call(window); destroyed == 0 {
 				resultErr = errors.Join(resultErr, touchpadWin32Error("DestroyWindow(source wheel capture)", destroyErr))

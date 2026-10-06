@@ -150,7 +150,7 @@ func TestFullscreenClearingRetriesAfterReturn(t *testing.T) {
 		clears++
 		return clears > 1
 	}
-	current := &sourceWheelCaptureRun{window: 10, fullscreenMarked: true}
+	current := &sourceWheelCaptureRun{window: 10, fullscreenMarked: true, fullscreenAttempted: true}
 	if err := current.deactivateWindow(); err != nil || !current.fullscreenMarked {
 		t.Fatal("failed clearing lost retry state", err)
 	}

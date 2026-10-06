@@ -4,7 +4,9 @@ package wininput
 
 import (
 	"errors"
+	"sync"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -24,8 +26,21 @@ var (
 	fullscreenGetMonitorInfo    = user32.NewProc("GetMonitorInfoW")
 	fullscreenIsIconic          = user32.NewProc("IsIconic")
 	sourceCaptureIsFullscreen   = sourceWindowFullscreen
-	sourceCaptureMarkFullscreen = markSourceCaptureFullscreen
+	sourceCaptureMarkFullscreen = requestSourceCaptureFullscreen
 )
+
+var sourcePresentationWindows sync.Map // Owned HWND -> lifetime-specific state.
+var sourcePresentationOnce sync.Once
+var sourceShellPresentation *sourcePresentationBroker
+
+func requestSourceCaptureFullscreen(window uintptr, fullscreen bool) bool {
+	value, owned := sourcePresentationWindows.Load(window)
+	if !owned {
+		return false
+	}
+	sourcePresentationOnce.Do(func() { sourceShellPresentation = newSourcePresentationBroker(markSourceCaptureFullscreen) })
+	return sourceShellPresentation.request(value.(*sourcePresentationState), fullscreen, sourcePresentationWait)
+}
 
 // Inspect geometry only: no titles, browser identity, URLs, or screen contents.
 // Client bounds distinguish a fullscreen surface from an ordinary maximized app.
@@ -80,7 +95,7 @@ var (
 	sourceTaskbarCreate = windows.NewLazySystemDLL("ole32.dll").NewProc("CoCreateInstance")
 )
 
-// Called only by the capture's locked owner thread. Mark our own window, never
+// Called only by the serialized Shell worker. Mark our own window, never
 // Explorer or the browser. Shell failures are visual degradation, not input loss.
 func markSourceCaptureFullscreen(window uintptr, fullscreen bool) bool {
 	err := windows.CoInitializeEx(0, windows.COINIT_APARTMENTTHREADED|windows.COINIT_DISABLE_OLE1DDE)
@@ -107,16 +122,28 @@ func markSourceCaptureFullscreen(window uintptr, fullscreen bool) bool {
 }
 
 func (current *sourceWheelCaptureRun) inheritFullscreenPresentation() {
-	if current.fullscreenMarked && sourceCaptureMarkFullscreen(current.window, false) {
+	if current.fullscreenAttempted && sourceCaptureMarkFullscreen(current.window, false) {
 		current.fullscreenMarked = false
+		current.fullscreenAttempted = false
 	}
-	if sourceCaptureIsFullscreen(current.savedFocus) && sourceCaptureMarkFullscreen(current.window, true) {
-		current.fullscreenMarked = true
+	started := time.Now()
+	fullscreen := sourceCaptureIsFullscreen(current.savedFocus)
+	if current.presentationReport != nil {
+		result := "normal"
+		if fullscreen {
+			result = "fullscreen"
+		}
+		current.presentationReport("geometry", result, time.Since(started))
+	}
+	if fullscreen {
+		current.fullscreenAttempted = true // A timeout may still apply later; always request clearing.
+		current.fullscreenMarked = sourceCaptureMarkFullscreen(current.window, true)
 	}
 }
 
 func (current *sourceWheelCaptureRun) releaseFullscreenPresentation() {
-	if current.fullscreenMarked && sourceCaptureMarkFullscreen(current.window, false) {
+	if current.fullscreenAttempted && sourceCaptureMarkFullscreen(current.window, false) {
 		current.fullscreenMarked = false
+		current.fullscreenAttempted = false
 	}
 }

@@ -11,6 +11,8 @@ type SourceHook struct{ boundaryGuard func() error }
 
 func NewSourceHook(...HookTimingObserver) *SourceHook { return &SourceHook{} }
 
+func (*SourceHook) SetPresentationReporter(SourcePresentationReporter) {}
+
 func (hook *SourceHook) Run(context.Context, *SourceSession, func()) error {
 	return fmt.Errorf("%w: source hook requires Windows", ErrUnsupportedInput)
 }
