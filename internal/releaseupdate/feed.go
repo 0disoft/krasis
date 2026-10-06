@@ -20,6 +20,13 @@ var PublicKey string
 var ErrUnconfigured = errors.New("release signing key not configured")
 var ErrInvalid = errors.New("invalid signed release")
 
+// MatchEmbeddedKey is a read-only packaging check. Build flags are omitted from
+// Go build metadata with -trimpath, so inspect the actual linked value instead.
+func MatchEmbeddedKey(key string) bool {
+	pub, err := base64.StdEncoding.DecodeString(key)
+	return err == nil && len(pub) == ed25519.PublicKeySize && key == PublicKey
+}
+
 type Manifest struct {
 	Schema     string `json:"schema"`
 	Generation int    `json:"generation"`

@@ -20,6 +20,7 @@ import (
 	"github.com/0disoft/krasis/internal/productidentity"
 	"github.com/0disoft/krasis/internal/productlog"
 	"github.com/0disoft/krasis/internal/productpanel"
+	"github.com/0disoft/krasis/internal/releaseupdate"
 	"github.com/0disoft/krasis/internal/wininput"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
@@ -43,6 +44,12 @@ func (s *WorkspaceSmoke) Report(schema, state, code string) {
 }
 
 func Run() {
+	if len(os.Args) == 3 && os.Args[1] == "--release-key-check" {
+		if !releaseupdate.MatchEmbeddedKey(os.Args[2]) {
+			os.Exit(2)
+		}
+		return
+	}
 	paths, err := productidentity.ResolveWindowsPaths(os.Getenv("LOCALAPPDATA"))
 	if err != nil {
 		os.Exit(1)

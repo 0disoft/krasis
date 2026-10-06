@@ -17,8 +17,9 @@ const pub=createPublicKey(privateKey);
 const rawPublic=pub.export({format:'der',type:'spki'}).subarray(-32).toString('base64');
 if(publicKey!==rawPublic)throw Error('Release signing key differs from embedded public key');
 execFileSync('node',['scripts/check-workspace-package.mjs',directory],{stdio:'inherit'});
-const built=execFileSync('go',['version','-m',path.join(directory,'krasis.exe')],{encoding:'utf8'});
-if(!built.includes(`github.com/0disoft/krasis/internal/releaseupdate.PublicKey=${publicKey}`))throw Error('UI does not embed this release public key');
+// Execute only the locally built, package-verified UI in its read-only check mode.
+// -trimpath intentionally omits -ldflags from Go's build metadata.
+execFileSync(path.join(directory,'krasis.exe'),['--release-key-check',publicKey],{timeout:10000,stdio:'pipe'});
 const output=path.resolve('dist/releases',`g${generation}`);
 if(fs.existsSync(output))throw Error('Release artifact already exists');
 fs.mkdirSync(output,{recursive:true});
