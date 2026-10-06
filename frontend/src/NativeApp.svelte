@@ -15,6 +15,7 @@
   import { createDiagnosticsBridge } from './diagnostics-bridge.js';
   import { resolveLocale } from './i18n.js';
   import { nativeText } from './native-i18n.js';
+  import { createOperationGate } from './operation-gate.js';
   let saved;
   try { saved = localStorage.getItem('krasis.workspace.locale'); } catch {}
   let locale = $state(resolveLocale(saved, navigator.languages));
@@ -56,6 +57,10 @@
   let pairingDlg;
   let consentPeer = '';
   let disposed = false;
+  const workspaceOperation = createOperationGate(value => { if (!disposed) busy = value; });
+  const clipboardOperation = createOperationGate(value => { if (!disposed) clipBusy = value; });
+  const pairingOperation = createOperationGate(value => { if (!disposed) pairBusy = value; });
+  const diagnosticsOperation = createOperationGate(value => { if (!disposed) diagBusy = value; });
   const t = key => nativeText(locale, key);
   const inputNotice = $derived(inputBusy ? 'UPDATING' : snapshot.inputSetup ?? 'UNKNOWN');
   const inputNeedsAction = $derived(['NOT_INSTALLED','UPDATE_REQUIRED','CANCELLED','FAILED'].includes(inputNotice));
@@ -69,23 +74,27 @@
   const canDisconnect = $derived(['CONNECTING','CONNECTED','RECONNECTING'].includes(snapshot.state));
   const canPlace = $derived(snapshot.state === 'LOCAL' && !!selectedPeer && !pairing.job && !busy);
   const canPair = $derived(snapshot.state === 'LOCAL' && !pairing.job && !busy && !pairBusy);
-  async function runDiagnostics(action, peer = '') {
+  async function runDiagnostics(action, peer = '', background = false) {
     if (!diagnosticsBridge || diagBusy || disposed) return;
-    diagBusy = true;
-    diagAction = action !== 'status';
-    try {
-      const value = await (action === 'status' ? diagnosticsBridge.status() :
-        action === 'open' ? diagnosticsBridge.open() : diagnosticsBridge.export(peer));
+    await diagnosticsOperation(async () => {
       if (disposed) return;
-      diagnostics = value;
-      if (action !== 'status') diagNotice = action === 'export' && value.code === 'ok' ? 'diag_saved' : 'diag_' + value.code;
-    } finally { if (!disposed) { diagBusy = false; diagAction = false; } }
+      diagAction = action !== 'status';
+      try {
+        const value = await (action === 'status' ? diagnosticsBridge.status() :
+          action === 'open' ? diagnosticsBridge.open() : diagnosticsBridge.export(peer));
+        if (disposed) return;
+        diagnostics = value;
+        if (action !== 'status') diagNotice = action === 'export' && value.code === 'ok' ? 'diag_saved' : 'diag_' + value.code;
+      } finally { if (!disposed) diagAction = false; }
+    }, background);
   }
   async function setClipboard(peer,enable) {
     if (!clipboardBridge || clipBusy || disposed) return;
-    clipBusy=true;
-    try { const value=await clipboardBridge.set(peer,enable); if(!disposed) {clipboard=value;clipNotice=value.code==='ok'?'':value.code==='rejected'?'clipboard_rejected':value.code; if(clipNotice) { await tick(); clipError?.focus(); }} }
-    finally {if(!disposed)clipBusy=false;}
+    await clipboardOperation(async () => {
+      if (disposed) return;
+      const value=await clipboardBridge.set(peer,enable);
+      if(!disposed) {clipboard=value;clipNotice=value.code==='ok'?'':value.code==='rejected'?'clipboard_rejected':value.code; if(clipNotice) { await tick(); clipError?.focus(); }}
+    });
   }
   function toggleClipboard() {
     if (!clipboardKnown) return;
@@ -94,22 +103,23 @@
     consentPeer=selectedPeer.fingerprint;
     openDialog(consent);
   }
-  async function runPair(action) {
+  async function runPair(action, background = false) {
     if (!pairingBridge || pairBusy || disposed) return;
-    pairBusy = true;
-    if (action !== 'status') pairNotice = '';
-    try {
+    const joinCandidate = candidate, joinPIN = pinInput;
+    await pairingOperation(async () => {
+      if (disposed) return;
+      if (action !== 'status') pairNotice = '';
       const value = action === 'invite' ? await pairingBridge.invite()
         : action === 'search' ? await pairingBridge.search()
         : action === 'cancel' ? await pairingBridge.cancel()
-        : action === 'join' ? await pairingBridge.join(candidate, pinInput)
+        : action === 'join' ? await pairingBridge.join(joinCandidate, joinPIN)
         : await pairingBridge.status();
       if (disposed) return;
       applyPair(value);
       if (value.candidates[0] && !value.candidates.some(c => c.id === candidate)) candidate = value.candidates[0].id;
       if (action === 'join') pinInput = '';
-      if (value.code === 'pairing_completed' || value.code === 'paired_connect_failed') await run('refresh');
-    } finally { if (!disposed) pairBusy = false; }
+      if (value.code === 'pairing_completed' || value.code === 'paired_connect_failed') await run('refresh', true);
+    }, background);
   }
   function applyPair(value) {
     if (value.code === 'busy') return;
@@ -129,20 +139,23 @@
     if (!layoutBridge || !selectedPeer || !canPlace) return;
     layout = await layoutBridge.rearm(selectedPeer.fingerprint, distance);
   }
-  async function run(action) {
+  async function run(action, background = false) {
     if (busy || !bridge || disposed) return;
-    busy = true;
-    try {
-      const value = await (action === 'input' ? bridge.inputRefresh() : action === 'connect' ? bridge.connect(selectedPeer) : action === 'disconnect' ? bridge.disconnect() : action === 'restart' ? bridge.restart() : bridge.refresh());
+    const peer = selectedPeer;
+    await workspaceOperation(async () => {
       if (disposed) return;
-      snapshot = value;
-      if (!value.peers.some(p => p.fingerprint === selected)) {
-        selected = (value.peers.find(p => p.alias === value.peerAlias) ?? value.peers[0])?.fingerprint ?? '';
+      try {
+        const value = await (action === 'input' ? bridge.inputRefresh() : action === 'connect' ? bridge.connect(peer) : action === 'disconnect' ? bridge.disconnect() : action === 'restart' ? bridge.restart() : bridge.refresh());
+        if (disposed) return;
+        snapshot = value;
+        if (!value.peers.some(p => p.fingerprint === selected)) {
+          selected = (value.peers.find(p => p.alias === value.peerAlias) ?? value.peers[0])?.fingerprint ?? '';
+        }
+        error = value.code === 'ok' || value.code.startsWith('input_refresh_') ? '' : value.code;
+      } catch {
+        if (!disposed) { snapshot = {state:'UNKNOWN', peerAlias:'', peers:[], code:'unavailable'}; error = 'unavailable'; }
       }
-      error = value.code === 'ok' || value.code.startsWith('input_refresh_') ? '' : value.code;
-    } catch {
-      if (!disposed) { snapshot = {state:'UNKNOWN', peerAlias:'', peers:[], code:'unavailable'}; error = 'unavailable'; }
-    } finally { if (!disposed) busy = false; }
+    }, background);
   }
   async function refreshInput() {
     if (busy || inputBusy || !bridge) return;
@@ -153,25 +166,27 @@
   onMount(() => {
     let timer;
     async function poll() {
-      await run('refresh');
+      await run('refresh', true);
       if (new URLSearchParams(location.search).get('smoke') === '1') {
         const { Call } = await import(/* @vite-ignore */ '/wails/runtime.js');
         await Call.ByName('github.com/0disoft/krasis/internal/workspacehost.WorkspaceSmoke.Report', snapshot.schema ?? '', snapshot.state, snapshot.code);
         return;
       }
       if (!clipBusy && !disposed && clipboardBridge) {
-        clipBusy=true;
-        const value=await clipboardBridge.status();
-        if(!disposed) {clipboard=value;clipBusy=false;}
+        await clipboardOperation(async () => {
+          if (disposed) return;
+          const value=await clipboardBridge.status();
+          if(!disposed) clipboard=value;
+        }, true);
       }
       if (!pairBusy && !disposed && pairingBridge) {
-        await runPair('status');
+        await runPair('status', true);
       }
       if (!disposed && layoutBridge && selected) {
         const value = await layoutBridge.status(selected);
         if (!disposed) layout = value;
       }
-      if (!disposed && !diagBusy && diagnosticsBridge) await runDiagnostics('status');
+      if (!disposed && !diagBusy && diagnosticsBridge) await runDiagnostics('status', '', true);
       if (!disposed) timer = setTimeout(poll, 1500);
     }
     void (async () => {

@@ -2,6 +2,7 @@
   import { onMount, tick } from 'svelte';
   import { emptyUpdateSettings, emptyUpdateTransfer, transferActive } from './update-settings-bridge.js';
   import { nativeText } from './native-i18n.js';
+  import { createOperationGate } from './operation-gate.js';
   let { bridge, peers, initialPeer = '', inputBackend = 'UNKNOWN', inputSetup = 'UNKNOWN', inputBusy = false, refreshInput, locale } = $props();
   let selected = $state('');
   let value = $state(emptyUpdateSettings());
@@ -20,10 +21,12 @@
   let transfer = $state(emptyUpdateTransfer());
   let consentPeer = $state('');
   let disposed = false;
+  const operation = createOperationGate(value => { if (!disposed) busy = value; });
   const t = key => nativeText(locale, key);
   const current = $derived(value.peer === selected ? value : emptyUpdateSettings(selected));
   const job = $derived(transfer.peer === selected ? transfer : emptyUpdateTransfer(selected));
-  const canSend = $derived(!!selected && !!bridge && !busy && !inputBusy && current.appGeneration > 0 && current.localGeneration === current.appGeneration && current.peerState === 'ONLINE' && current.remotePermission === 'ALLOWED' && !transferActive(job.state));
+  const sendReady = $derived(!!selected && !!bridge && !inputBusy && current.appGeneration > 0 && current.localGeneration === current.appGeneration && current.peerState === 'ONLINE' && current.remotePermission === 'ALLOWED' && !transferActive(job.state));
+  const canSend = $derived(sendReady && !busy);
   const inputState = $derived(inputBusy ? 'UPDATING' : inputSetup);
   const inputStatusKey = $derived(inputState === 'UNKNOWN' ? 'input_' + inputBackend.toLowerCase() : 'input_setup_' + inputState);
   const selectedName = $derived(peers.find(peer => peer.fingerprint === selected)?.alias ?? '');
@@ -40,11 +43,11 @@
   $effect(() => {
     if (!peers.some(peer => peer.fingerprint === selected)) selected = (peers.find(peer => peer.fingerprint === initialPeer) ?? peers[0])?.fingerprint ?? '';
   });
-  async function run(action = 'status', peer = selected) {
+  async function run(action = 'status', peer = selected, background = false) {
     if (!bridge || !peer || busy || inputBusy || disposed) return;
-    busy = true;
-    if (action !== 'status') notice = '';
-    try {
+    await operation(async () => {
+      if (disposed || selected !== peer || inputBusy) return;
+      if (action !== 'status') notice = '';
       const result = await (action === 'status' ? bridge.status(peer) : bridge.permit(peer, action === 'allow'));
       if (disposed || selected !== peer) return;
       value = result;
@@ -53,7 +56,7 @@
         if (!disposed && selected === peer) transfer = next;
       }
       if (action !== 'status') notice = 'upd_' + result.code;
-    } finally { if (!disposed) busy = false; }
+    }, background);
   }
   function choose() { confirmingSend = false; confirmingAllow = false; value = emptyUpdateSettings(selected); transfer = emptyUpdateTransfer(selected); notice = ''; void run(); }
   async function requestSend() { sendPeer = selected; confirmingAllow = false; confirmingSend = true; await tick(); sendConfirmation?.querySelector('button')?.focus(); }
@@ -62,10 +65,13 @@
     const peer = sendPeer;
     if (!canSend || selected !== peer || !peers.some(p => p.fingerprint === peer)) return;
     confirmingSend = false;
-    busy = true;
-    transfer = emptyUpdateTransfer(peer,'PREPARING');
-    try { const next = await bridge.send(peer); if (!disposed && selected === peer) transfer = next; }
-    finally { if (!disposed) { busy = false; await tick(); peerSelect?.focus(); } }
+    await operation(async () => {
+      if (disposed || selected !== peer || !sendReady) return;
+      transfer = emptyUpdateTransfer(peer,'PREPARING');
+      const next = await bridge.send(peer);
+      if (!disposed && selected === peer) transfer = next;
+    });
+    if (!disposed) { await tick(); peerSelect?.focus(); }
   }
   async function requestAllow() { consentPeer = selected; confirmingSend = false; confirmingAllow = true; await tick(); allowConfirmation?.querySelector('button')?.focus(); }
   async function cancelAllow() { confirmingAllow = false; await tick(); allowTrigger?.focus(); }
@@ -77,7 +83,7 @@
   }
   onMount(() => {
     let timer;
-    const poll = async () => { await run(); if (!disposed) timer = setTimeout(poll,1500); };
+    const poll = async () => { await run('status', selected, true); if (!disposed) timer = setTimeout(poll,1500); };
     void poll();
     return () => { disposed = true; clearTimeout(timer); };
   });

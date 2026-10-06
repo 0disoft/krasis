@@ -18,6 +18,12 @@ Do not package the browser preview as the working KVM management app.
 snapshot contract. NativeApp.svelte consumes it; simulated App.svelte does not.
 See ADR 0061 for its identity, concurrency and cancellation boundaries.
 
+Generation 193 separates background status polling from user-action busy states.
+Connection, clipboard, pairing, diagnostics and update controls keep their enabled
+appearance during a poll. A user action waits for an in-flight query before making
+its native call; duplicate actions remain blocked and stale queries cannot overwrite
+the action result. Actual state changes and unavailable results still update the UI.
+
 ## Native Windows Workspace
 
 The optional Wails v3 host ships as a complete, unpacked distribution under
