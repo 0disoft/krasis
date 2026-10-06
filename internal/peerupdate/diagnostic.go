@@ -33,7 +33,12 @@ type diagnosticRequest struct {
 // QueueDiagnosticRequest offers a one-minute, peer-bound request. Only a
 // matching response is allowed to complete it.
 func (m *Manager) QueueDiagnosticRequest(peer, localPath string) (string, error) {
-	if !validID(peer, 64) {
+	return m.PrepareDiagnosticRequest(peer, func(string) (string, error) { return localPath, nil })
+}
+
+// Publish only after the local snapshot is pinned to the allocated request ID.
+func (m *Manager) PrepareDiagnosticRequest(peer string, save func(string) (string, error)) (string, error) {
+	if !validID(peer, 64) || save == nil {
 		return "", ErrDenied
 	}
 	m.diagnostic.mu.Lock()
@@ -42,6 +47,13 @@ func (m *Manager) QueueDiagnosticRequest(peer, localPath string) (string, error)
 		return "", ErrBusy
 	}
 	id := randomID()
+	localPath, err := save(id)
+	if err != nil {
+		return "", err
+	}
+	if localPath == "" {
+		return "", ErrDenied
+	}
 	m.diagnostic.request = &diagnosticRequest{peer: peer, id: id, state: "PENDING", localPath: localPath, expires: time.Now().Add(time.Minute)}
 	return id, nil
 }
@@ -159,7 +171,7 @@ func (m *Manager) diagnosticDone(id, state string) {
 	}
 }
 func (m *Manager) receiveDiagnostic(peer, id, requestID string, r io.Reader, authorized func() bool) error {
-	if !validID(id, 32) || !authorized() || m.ReceiveDiagnostic == nil {
+	if !validID(id, 32) || !authorized() || (m.ReceiveDiagnostic == nil && (requestID == "" || m.ReceiveCollection == nil)) {
 		return ErrDenied
 	}
 	data, err := io.ReadAll(io.LimitReader(r, MaxDiagnosticBytes+1))
@@ -183,7 +195,12 @@ func (m *Manager) receiveDiagnostic(peer, id, requestID string, r io.Reader, aut
 	if m.diagnostic.last[peer] == id {
 		return nil
 	}
-	path, err := m.ReceiveDiagnostic(peer, data)
+	var path string
+	if requestID != "" && m.ReceiveCollection != nil {
+		path, err = m.ReceiveCollection(peer, requestID, data)
+	} else {
+		path, err = m.ReceiveDiagnostic(peer, data)
+	}
 	if err != nil {
 		return err
 	}

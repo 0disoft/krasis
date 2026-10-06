@@ -8,6 +8,7 @@ import (
 	"github.com/0disoft/krasis/internal/productidentity"
 	"github.com/0disoft/krasis/internal/productlog"
 	"io"
+	"path/filepath"
 )
 
 func (o *Operations) CollectDiagnostic(ctx context.Context, request localapi.DiagnosticCollectionRequest) (localapi.DiagnosticCollectionResult, error) {
@@ -20,17 +21,18 @@ func (o *Operations) CollectDiagnostic(ctx context.Context, request localapi.Dia
 		result.Code, result.ID, result.State, result.LocalPath, result.PeerPath = "ok", request.ID, state, localPath, peerPath
 		return result, nil
 	}
-	path, err := productlog.Export(o.localAppData)
-	if err != nil {
-		result.Code = "save_failed"
-		return result, nil
-	}
-	id, err := o.updates.QueueDiagnosticRequest(request.Peer, path)
+	var path string
+	id, err := o.updates.PrepareDiagnosticRequest(request.Peer, func(id string) (string, error) {
+		var err error
+		path, err = productlog.ExportForRequest(o.localAppData, id)
+		return path, err
+	})
 	if errors.Is(err, peerupdate.ErrBusy) {
 		result.Code = "busy"
 		return result, nil
 	}
 	if err != nil {
+		result.Code = "save_failed"
 		return result, nil
 	}
 	result.Code, result.State, result.ID, result.LocalPath = "queued", "PENDING", id, path
@@ -83,7 +85,8 @@ func (o *Operations) exportDiagnosticForRequest(peer, requestID string) error {
 	if o.updates.DiagnosticRequestHandled(peer, requestID) {
 		return nil
 	}
-	if _, err := productlog.Export(o.localAppData); err != nil {
+	path, err := productlog.ExportForRequest(o.localAppData, requestID)
+	if err != nil {
 		return err
 	}
 	dir, err := productidentity.PrepareDiagnostics(o.localAppData)
@@ -91,7 +94,7 @@ func (o *Operations) exportDiagnosticForRequest(peer, requestID string) error {
 		return err
 	}
 	defer dir.Close()
-	f, err := dir.Open(productlog.ExportName)
+	f, err := dir.Open(filepath.Base(path))
 	if err != nil {
 		return err
 	}

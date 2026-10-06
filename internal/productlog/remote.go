@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/0disoft/krasis/internal/installationdiag"
+	"github.com/0disoft/krasis/internal/peercredentials"
 	"github.com/0disoft/krasis/internal/productidentity"
+	"os"
 	"path/filepath"
 	"time"
 )
@@ -72,6 +74,17 @@ func SanitizeSupport(data []byte) ([]byte, error) {
 }
 
 func SaveRemoteSupport(base, peer string, data []byte) (string, error) {
+	return saveRemoteSupport(base, peer, "", data)
+}
+
+func SaveRemoteSupportForRequest(base, peer, id string, data []byte) (string, error) {
+	if !validRequestID(id) {
+		return "", errors.New("invalid diagnostic request")
+	}
+	return saveRemoteSupport(base, peer, id, data)
+}
+
+func saveRemoteSupport(base, peer, id string, data []byte) (string, error) {
 	decoded, err := hex.DecodeString(peer)
 	if err != nil || len(decoded) != 32 {
 		return "", errors.New("invalid peer")
@@ -85,12 +98,19 @@ func SaveRemoteSupport(base, peer string, data []byte) (string, error) {
 		return "", err
 	}
 	defer dir.Close()
+	name := "support-peer-" + peer + ".json"
+	if id != "" {
+		name = "support-request-" + id + "-peer-" + peer + ".json"
+	}
 	f, temp, err := dir.CreateTemporary(".peer-support-", 0600)
 	if err != nil {
 		return "", err
 	}
 	defer dir.Remove(temp)
 	defer f.Close()
+	if err = peercredentials.ProtectSecurityFileHandle(f); err != nil {
+		return "", err
+	}
 	if _, err = f.Write(clean); err != nil {
 		return "", err
 	}
@@ -100,8 +120,19 @@ func SaveRemoteSupport(base, peer string, data []byte) (string, error) {
 	if err = f.Close(); err != nil {
 		return "", err
 	}
-	name := "support-peer-" + peer + ".json"
-	if err = dir.Replace(temp, name); err != nil {
+	if id != "" {
+		err = dir.PromoteNoReplace(temp, name)
+		if errors.Is(err, os.ErrExist) {
+			var old []byte
+			old, err = readSupportSnapshot(dir, name)
+			if err == nil && !bytes.Equal(old, clean) {
+				err = errors.New("conflicting diagnostic snapshot")
+			}
+		}
+	} else {
+		err = dir.Replace(temp, name)
+	}
+	if err != nil {
 		return "", err
 	}
 	paths, err := productidentity.ResolveWindowsPaths(base)

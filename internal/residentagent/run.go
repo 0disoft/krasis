@@ -140,6 +140,9 @@ func run(ctx context.Context, localAppData string, dependencies runDependencies)
 				return productlog.SaveRemoteSupport(localAppData, peer, data)
 			}
 			updates.ExportDiagnostic = operations.exportDiagnosticForRequest
+			updates.ReceiveCollection = func(peer, id string, data []byte) (string, error) {
+				return productlog.SaveRemoteSupportForRequest(localAppData, peer, id, data)
+			}
 			updates.OpenUI = operations.openUIForPeer
 			updates.UIReady = operations.uiReadySince
 			defer updates.Close()

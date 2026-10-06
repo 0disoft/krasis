@@ -2,6 +2,7 @@ package peerupdate
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -49,8 +50,8 @@ func TestDiagnosticCollectionReturnsPeerExportInBothRoles(t *testing.T) {
 				exports++
 				return b.QueueDiagnosticForRequest(peer, requestID, []byte(`{}`))
 			}
-			a.ReceiveDiagnostic = func(peer string, data []byte) (string, error) {
-				if peer != fpB || string(data) != `{}` {
+			a.ReceiveCollection = func(peer, requestID string, data []byte) (string, error) {
+				if peer != fpB || requestID != id || string(data) != `{}` {
 					t.Fatal("response crossed peer")
 				}
 				receives++
@@ -76,6 +77,29 @@ func TestDiagnosticCollectionReturnsPeerExportInBothRoles(t *testing.T) {
 				t.Fatalf("state=%s local=%s remote=%s exports=%d receives=%d", state, local, remote, exports, receives)
 			}
 		})
+	}
+}
+
+func TestDiagnosticCollectionPublishesOnlyAfterSnapshotAndSkipsBusyExports(t *testing.T) {
+	m := testManager(t)
+	peer := strings.Repeat("a", 64)
+	fault := errors.New("snapshot save failed")
+	if _, err := m.PrepareDiagnosticRequest(peer, func(string) (string, error) { return "", fault }); !errors.Is(err, fault) {
+		t.Fatal(err)
+	}
+	if m.diagnosticRequestOffer(peer) != "" {
+		t.Fatal("failed snapshot advertised")
+	}
+	var savedID string
+	id, err := m.PrepareDiagnosticRequest(peer, func(id string) (string, error) { savedID = id; return id + ".json", nil })
+	if err != nil || id != savedID {
+		t.Fatal(id, savedID, err)
+	}
+	if state, local, _ := m.DiagnosticRequestStatus(peer, id); state != "PENDING" || local != id+".json" {
+		t.Fatal(state, local)
+	}
+	if _, err = m.PrepareDiagnosticRequest(peer, func(string) (string, error) { t.Fatal("busy request exported again"); return "", nil }); !errors.Is(err, ErrBusy) {
+		t.Fatal(err)
 	}
 }
 

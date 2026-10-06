@@ -58,6 +58,10 @@ func Export(localAppData string) (string, error) {
 }
 
 func exportTo(dir *securefs.Directory) error {
+	return exportToNamed(dir, ExportName, false)
+}
+
+func exportToNamed(dir *securefs.Directory, name string, immutable bool) error {
 	logs := make([]exportLog, 0, 4)
 	for _, name := range []string{"agent.previous.jsonl", "agent.jsonl", "control.previous.jsonl", "control.jsonl"} {
 		log := exportLog{Source: name, Incomplete: true, Events: []exportEvent{}}
@@ -102,7 +106,10 @@ func exportTo(dir *securefs.Directory) error {
 	if err = f.Close(); err != nil {
 		return err
 	}
-	return dir.Replace(temp, ExportName)
+	if immutable {
+		return dir.PromoteNoReplace(temp, name)
+	}
+	return dir.Replace(temp, name)
 }
 
 func sanitizeLog(name string, r io.Reader) exportLog {

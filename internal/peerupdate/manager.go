@@ -59,6 +59,7 @@ type Manager struct {
 	clipboard         clipboardState
 	diagnostic        diagnosticTransfer
 	ReceiveDiagnostic func(string, []byte) (string, error)
+	ReceiveCollection func(string, string, []byte) (string, error)
 	ExportDiagnostic  func(string, string) error
 	peers             map[string]peerObservation
 	deliveredUntil    time.Time

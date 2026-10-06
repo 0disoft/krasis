@@ -85,7 +85,10 @@ g125부터 같은 세션의 UI 프로세스가 관측되지만 실행 기록이 
 `localPath`, `peerPath`가 모두 확인된 때만 반환한다. `pending`은 완료가 아니며 exit `7`이다.
 `id`로 `diagnostics collect-status ALIAS ID`를 조회한다. 인증된 상대 기기 외에는
 원격 요청을 보내지 않고, 응답 유실 시 START를 자동 재실행하지 않는다. 각 기기의
-`support-latest.json`과 이 PC의 `support-peer-<fingerprint>.json`은 다음 내보내기로 교체될 수 있다.
+g198부터 수집 결과는 `support-request-<id>-local.json`과
+`support-request-<id>-peer-<fingerprint>.json`에 보존한다. 다음 일반 내보내기·수집은
+기존 요청의 파일을 교체하지 않는다. 같은 요청의 재전송도 최초 파일을 유지한다.
+일반 내보내기·전송은 기존 `support-latest.json`·`support-peer-<fingerprint>.json`을 사용한다.
 
 g128부터 `diagnostics wait ALIAS ID [--timeout DURATION]`은 기존 수집 요청의 양쪽 파일이
 확인될 때까지 기다린다. 기본 2분, 허용 범위 1초~10분이다. JSON은 같은
