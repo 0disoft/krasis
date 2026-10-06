@@ -503,6 +503,9 @@ func TestSourceWheelCaptureClassifiesForegroundFallbackRetryFailure(t *testing.T
 
 func stubSourceWheelCaptureActivation(t *testing.T) func() {
 	t.Helper()
+	previousFullscreen, previousMark := sourceCaptureIsFullscreen, sourceCaptureMarkFullscreen
+	sourceCaptureIsFullscreen = func(uintptr) bool { return false }
+	sourceCaptureMarkFullscreen = func(uintptr, bool) bool { return true }
 	previousRestoreEnabled := sourceRestoreWindowEnabled
 	sourceRestoreWindowEnabled = func(uintptr) bool { return false }
 	previousPrepare := sourceCapturePrepareActive
@@ -532,6 +535,7 @@ func stubSourceWheelCaptureActivation(t *testing.T) func() {
 	}
 	sourceWheelCaptureIsWindow = func(uintptr) bool { return true }
 	return func() {
+		sourceCaptureIsFullscreen, sourceCaptureMarkFullscreen = previousFullscreen, previousMark
 		sourceRestoreWindowEnabled = previousRestoreEnabled
 		sourceCapturePrepareActive = previousPrepare
 		sourceForegroundTransitionDispatch = previousDispatch

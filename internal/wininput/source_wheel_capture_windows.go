@@ -170,6 +170,7 @@ type sourceWheelCaptureRun struct {
 	registerProc                 uintptr
 	savedFocus                   uintptr
 	registered                   bool
+	fullscreenMarked             bool // Capture owner thread only; presentation, not input authority.
 	session                      *SourceSession
 	observer                     SourcePipelineObserver
 }
@@ -616,6 +617,7 @@ func (current *sourceWheelCaptureRun) activateWindowProfile(profile context.Cont
 	}
 	// Showing must not separately activate the popup and discard the foreground
 	// owner needed by the verified SetForegroundWindow/thread-attach path below.
+	current.inheritFullscreenPresentation()
 	stopShow := handoff.CaptureSpan(profile, handoff.CaptureShow)
 	sourceWheelCaptureShowWindow(current.window, swShowWithoutActivation)
 	stopShow()
@@ -758,6 +760,7 @@ func (current *sourceWheelCaptureRun) deactivateWindowProfile(profile context.Co
 	// Retry only the exact native pair we attached, never a newly discovered owner.
 	detachErr := current.detachForegroundThreads()
 	if !wasActive && !wasRegistered {
+		current.releaseFullscreenPresentation()
 		return detachErr
 	}
 	if current.observer != nil && wasActive {
@@ -782,6 +785,7 @@ func (current *sourceWheelCaptureRun) deactivateWindowProfile(profile context.Co
 	current.observeFocus(profile, handoff.FocusAfterRestore)
 	stopHide := handoff.FocusSpan(profile, 1)
 	hideErr := current.hideAfterFocusRestore()
+	current.releaseFullscreenPresentation()
 	stopHide()
 	if hideErr != nil {
 		cleanupErr = errors.Join(cleanupErr, hideErr, ErrSourceCaptureRollbackFailed)

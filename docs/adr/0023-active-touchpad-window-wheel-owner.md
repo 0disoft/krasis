@@ -101,6 +101,24 @@ capture window는 foreground를 가져가므로 Phase 0에서 눈에 보이는 �
 원격 제어 중 source의 일반 application focus를 유지하는 제품 UX는 아직 확정하지 않는다. Wails 설정 UI,
 tray, installer와 자동 시작은 이 ADR 범위 밖이다.
 
+### Fullscreen taskbar presentation
+
+When the previous foreground window's client surface covers its monitor, mark
+the capture window with `ITaskbarList2::MarkFullscreenWindow(TRUE)` before showing
+or activating it. This preserves Shell fullscreen presentation while retaining
+the verified touchpad wheel owner. A maximized work-area client is not fullscreen.
+Inspect only client and monitor geometry; do not read window titles or browser content.
+
+After restoring focus and hiding capture, clear its marking. Activation rollback
+and repeated deactivation also clear it. Only the Krasis capture HWND is marked;
+the browser HWND, Explorer taskbar windows, and global taskbar settings are not modified.
+Shell API failure degrades presentation without interrupting input or weakening
+foreground verification. Native hidden-window and lifecycle tests cover API
+acceptance, ordering, normal windows, scaled/negative monitor coordinates, and rollback.
+The reported YouTube fullscreen A-to-B behavior still requires a two-PC check.
+
+- [MarkFullscreenWindow](https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-itaskbarlist2-markfullscreenwindow)
+
 ## 대안
 
 - Raw pointer update로 직접 pan delta 계산: system gesture 설정과 inertia를 다시 구현해야 하므로 기각한다.
