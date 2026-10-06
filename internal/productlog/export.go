@@ -70,6 +70,7 @@ func exportTo(dir *securefs.Directory) error {
 		logs = append(logs, log)
 	}
 	installation, receiptErr := readInstallationReceipt(dir)
+	recovery, recoveryErr := readRecoveryReceipt(dir)
 	document := struct {
 		Schema                 string                    `json:"schema"`
 		Created                string                    `json:"created"`
@@ -77,7 +78,9 @@ func exportTo(dir *securefs.Directory) error {
 		Logs                   []exportLog               `json:"logs"`
 		Installation           *installationdiag.Summary `json:"installation,omitempty"`
 		InstallationIncomplete bool                      `json:"installationIncomplete,omitempty"`
-	}{"krasis.support/v1", time.Now().UTC().Format(time.RFC3339), "Event history only; not a live agent status or complete crash report.", logs, installation, receiptErr != nil}
+		Recovery               *RecoverySummary          `json:"recovery,omitempty"`
+		RecoveryIncomplete     bool                      `json:"recoveryIncomplete,omitempty"`
+	}{"krasis.support/v1", time.Now().UTC().Format(time.RFC3339), "Event history only; not a live agent status or complete crash report.", logs, installation, receiptErr != nil, recovery, recoveryErr != nil}
 	f, temp, err := dir.CreateTemporary(".support-", 0600)
 	if err != nil {
 		return err

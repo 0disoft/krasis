@@ -7,14 +7,19 @@ import (
 	"github.com/0disoft/krasis/internal/appsettings"
 	"github.com/0disoft/krasis/internal/launchrecord"
 	"github.com/0disoft/krasis/internal/localapi"
+	"github.com/0disoft/krasis/internal/productlog"
 	"time"
 )
 
 // A scheduled recovery never interrupts a responding or still-owned agent.
 // Startup preferences, explicit stop, image integrity and the instance lease
 // are rechecked locally; it opens no remote command channel.
-func ensureApp(ctx context.Context, deps dependencies) (relaunchResult, int) {
-	result := relaunchResult{SchemaVersion: "krasis.cli.relaunch/v1"}
+func ensureApp(ctx context.Context, deps dependencies) (result relaunchResult, exit int) {
+	result = relaunchResult{SchemaVersion: "krasis.cli.relaunch/v1"}
+	defer func() {
+		saved := productlog.SaveRecovery(deps.localAppData, productlog.RecoverySummary{Time: time.Now().UTC().Format(time.RFC3339Nano), Code: result.Code, Generation: result.Generation}) == nil
+		result.DiagnosticSaved = &saved
+	}()
 	settings, err := appsettings.Load(deps.localAppData)
 	if err != nil {
 		result.Code = "settings_unavailable"

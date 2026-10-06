@@ -112,6 +112,13 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, deps depe
 		value, code := ensureApp(ctx, deps)
 		return writeOutput(stdout, stderr, value, code, parsed.json)
 	}
+	if parsed.args[0] == "app" && parsed.args[1] == "recovery-status" {
+		if parsed.controlDir != "" {
+			return ExitUsage
+		}
+		value, code := recoveryStatus(deps.localAppData)
+		return writeOutput(stdout, stderr, value, code, parsed.json)
+	}
 	if parsed.args[0] == "app" && parsed.args[1] == "repair" {
 		if parsed.controlDir != "" {
 			writeUsageError(stderr, usageError("app repair does not use --control-dir"))
@@ -314,7 +321,7 @@ func parseGlobalOptions(args []string) (options, error) {
 func validateCommandArgs(args []string) error {
 	switch args[0] {
 	case "app":
-		if len(args) == 2 && (args[1] == "repair" || args[1] == "ensure") {
+		if len(args) == 2 && (args[1] == "repair" || args[1] == "ensure" || args[1] == "recovery-status") {
 			return nil
 		}
 		if len(args) == 3 && args[1] == "open" && validAlias(args[2]) || len(args) == 4 && args[1] == "open-status" && validAlias(args[2]) && validHex(args[3], 32) {

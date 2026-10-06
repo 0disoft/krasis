@@ -9,9 +9,10 @@ import (
 )
 
 type relaunchResult struct {
-	SchemaVersion string `json:"schemaVersion"`
-	Code          string `json:"code"`
-	Generation    int    `json:"generation,omitempty"`
+	DiagnosticSaved *bool  `json:"diagnosticSaved,omitempty"`
+	SchemaVersion   string `json:"schemaVersion"`
+	Code            string `json:"code"`
+	Generation      int    `json:"generation,omitempty"`
 }
 
 func relaunch(deps dependencies) (relaunchResult, int) {
