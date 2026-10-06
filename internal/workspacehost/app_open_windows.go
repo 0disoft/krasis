@@ -15,18 +15,33 @@ func (s *WorkspaceService) PeerAppOpen(peer, id string) productpanel.AppOpenSnap
 }
 
 func (s *WorkspaceService) reportUIReady() {
-	ctx, cancel := context.WithTimeout(s.ctx, 15*time.Second)
-	defer cancel()
+	s.uiReadyEpoch.Add(1)
+}
+
+// Re-report after each show request and after an agent replacement. Installation
+// delays never permanently consume the opportunity to confirm a visible UI.
+func (s *WorkspaceService) runUIReadyReporter() {
+	ctx := s.ctx
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
+	var reportedInstance string
+	var reportedEpoch uint64
 	for {
-		if c, err := localapi.OpenClient(s.control); err == nil {
+		window := s.visibleWindow.Load()
+		epoch := s.uiReadyEpoch.Load()
+		if window != nil && epoch != 0 && window.IsVisible() {
+			c, err := localapi.OpenClient(s.control)
 			attempt, done := context.WithTimeout(ctx, time.Second)
-			result, err := c.UIReady(attempt, uint32(os.Getpid()))
-			done()
-			if err == nil && result.Code == "ui_ready" {
-				return
+			if err == nil {
+				info, runtimeErr := c.Runtime(attempt)
+				if runtimeErr == nil && info.Instance != "" && (reportedInstance != info.Instance || reportedEpoch != epoch) {
+					result, readyErr := c.UIReady(attempt, uint32(os.Getpid()))
+					if readyErr == nil && result.Code == "ui_ready" {
+						reportedInstance, reportedEpoch = info.Instance, epoch
+					}
+				}
 			}
+			done()
 		}
 		select {
 		case <-ctx.Done():

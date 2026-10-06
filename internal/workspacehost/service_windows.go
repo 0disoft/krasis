@@ -16,6 +16,8 @@ import (
 )
 
 type WorkspaceService struct {
+	visibleWindow    atomic.Pointer[application.WebviewWindow]
+	uiReadyEpoch     atomic.Uint64
 	release          releaseState
 	settingsGate     sync.Mutex
 	startAtLogin     bool
@@ -64,6 +66,8 @@ func (s *WorkspaceService) ServiceStartup(context.Context, application.ServiceOp
 		}
 	}
 	if s.managed != nil {
+		s.jobs.Add(1)
+		go func() { defer s.jobs.Done(); s.runUIReadyReporter() }()
 		s.done = make(chan struct{})
 		go func() { defer close(s.done); s.managed.Run() }()
 		s.jobs.Add(1)

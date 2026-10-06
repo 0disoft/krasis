@@ -179,7 +179,7 @@ func Run() {
 				window.Show()
 				window.Focus()
 				if window.IsVisible() {
-					go service.reportUIReady()
+					service.reportUIReady()
 				}
 			}
 		},
@@ -221,6 +221,7 @@ func Run() {
 		URL:              url,
 		Hidden:           startAtLogin || (smoke && !visibleSmoke),
 	})
+	service.visibleWindow.Store(window)
 	shown := make(chan bool, 1)
 	if visibleSmoke || (!smoke && !startAtLogin) {
 		var showOnce sync.Once
@@ -234,7 +235,7 @@ func Run() {
 				window.Focus()
 				shown <- window.IsVisible()
 				if !smoke && window.IsVisible() {
-					go service.reportUIReady()
+					service.reportUIReady()
 				}
 			})
 		})
