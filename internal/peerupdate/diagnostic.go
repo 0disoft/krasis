@@ -23,6 +23,7 @@ type diagnosticReceipt struct {
 
 type diagnosticTransfer struct {
 	mu              sync.Mutex
+	preparing       bool
 	out             *diagnosticOffer
 	request         *diagnosticRequest
 	state, received string
@@ -51,10 +52,17 @@ func (m *Manager) PrepareDiagnosticRequest(peer string, save func(string) (strin
 		return "", ErrDenied
 	}
 	m.diagnostic.mu.Lock()
-	defer m.diagnostic.mu.Unlock()
-	if r := m.diagnostic.request; r != nil && r.state == "PENDING" && time.Now().Before(r.expires) {
+	if r := m.diagnostic.request; m.diagnostic.preparing || (r != nil && r.state == "PENDING" && time.Now().Before(r.expires)) {
+		m.diagnostic.mu.Unlock()
 		return "", ErrBusy
 	}
+	m.diagnostic.preparing = true
+	m.diagnostic.mu.Unlock()
+	defer func() {
+		m.diagnostic.mu.Lock()
+		m.diagnostic.preparing = false
+		m.diagnostic.mu.Unlock()
+	}()
 	id := randomID()
 	localPath, err := save(id)
 	if err != nil {
@@ -63,7 +71,9 @@ func (m *Manager) PrepareDiagnosticRequest(peer string, save func(string) (strin
 	if localPath == "" {
 		return "", ErrDenied
 	}
+	m.diagnostic.mu.Lock()
 	m.diagnostic.request = &diagnosticRequest{peer: peer, id: id, state: "PENDING", localPath: localPath, expires: time.Now().Add(time.Minute)}
+	m.diagnostic.mu.Unlock()
 	return id, nil
 }
 
