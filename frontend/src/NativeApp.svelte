@@ -2,6 +2,8 @@
   import { onMount, tick } from 'svelte';
   import UpdateSettings from './UpdateSettings.svelte';
   import AppSettings from './AppSettings.svelte';
+  import PeerAppButton from './PeerAppButton.svelte';
+  import { createAppOpenBridge } from './app-open-bridge.js';
   import { createUpdateSettingsBridge } from './update-settings-bridge.js';
   import Icon from './Icon.svelte';
   import logo from '../../assets/windows/krasis.ico';
@@ -32,6 +34,7 @@
   let diagNotice = $state('');
   let diagnosticsDlg;
   let updateSettingsBridge = $state.raw();
+  let appOpenBridge = $state.raw();
   let updatesDlg;
   let updatesOpen = $state(false);
   let opener = null;
@@ -210,6 +213,7 @@
           UpdateSettings:peer=>Call.ByName(name+'UpdateSettings',peer),
           UpdatePermission:(peer,allow)=>Call.ByName(name+'UpdatePermission',peer,allow),
         });
+        appOpenBridge=createAppOpenBridge({PeerAppOpen:(peer,id)=>Call.ByName(name+'PeerAppOpen',peer,id)});
         await poll();
       } catch { if (!disposed) error = 'unavailable'; }
     })();
@@ -242,6 +246,7 @@
     <p class="fault-banner" role="status">{t(inputNoticeKey)} <button disabled={busy || !bridge || inputNotice === 'UPDATING' || inputNotice === 'PENDING'} onclick={refreshInput}>{t(inputNotice === 'NOT_INSTALLED' ? 'input_setup' : 'input_refresh')}</button></p>
   {/if}
   <label class="peer-select">{t('peer')}<select bind:value={selected} disabled={busy || snapshot.state !== 'LOCAL'}><option value="">{t('choose')}</option>{#each snapshot.peers as peer (peer.fingerprint)}<option value={peer.fingerprint}>{peer.alias}</option>{/each}</select></label>
+  <PeerAppButton bridge={appOpenBridge} peer={selectedPeer} {locale} />
   <section class="canvas" aria-label={t('devices')}>
     <div class="screens" class:reversed={layout.edge === 'LEFT'}>
       <div class="screen"><img class="monitor-art" src={monitor} alt="" /><div class="screen-content"><strong>{t('local')}</strong><span>{t('thisPC')}</span><small>{t(layout.edge === 'LEFT' ? 'right' : 'left')}</small></div></div>
