@@ -694,6 +694,23 @@ func TestCaptureLossReturnsLocallyBeforeCleanupAndRejectsLateActivation(t *testi
 	}
 }
 
+func TestCaptureFocusLossDuringPeerReturnDoesNotFaultSession(t *testing.T) {
+	session, err := NewSourceSession(1, &recordingSourceSink{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	session.started.Store(true)
+	if err := session.Activate(); err != nil {
+		t.Fatal(err)
+	}
+	session.Deactivate()
+	current := &sourceWheelCaptureRun{session: session}
+	current.active.Store(true)
+	if current.loseForeground() || current.err() != nil || session.terminal.Load() {
+		t.Fatal("ordinary peer-return race became terminal")
+	}
+}
+
 func TestCaptureSerializationHasDeadline(t *testing.T) {
 	previous := sourceWheelCaptureTimeout
 	sourceWheelCaptureTimeout = 10 * time.Millisecond

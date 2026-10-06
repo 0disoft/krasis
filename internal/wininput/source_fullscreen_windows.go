@@ -33,6 +33,7 @@ var (
 var sourceNormalHintName, _ = syscall.UTF16PtrFromString("NonRudeHWND")
 var sourceSetNormalHint = user32.NewProc("SetPropW")
 var sourceRemoveNormalHint = user32.NewProc("RemovePropW")
+var sourceGetNormalHint = user32.NewProc("GetPropW")
 
 // Only set the Shell hint on our lifetime-registered HWND. This gives an ordinary
 // capture an explicit non-fullscreen policy even when COM clearing is delayed.
@@ -54,7 +55,8 @@ func setSourceCaptureNormalHint(window uintptr, normal bool) bool {
 	}
 	// Absence is already the desired result; only we own this property.
 	sourceRemoveNormalHint.Call(window, uintptr(unsafe.Pointer(sourceNormalHintName)))
-	return true
+	valueAfter, _, _ := sourceGetNormalHint.Call(window, uintptr(unsafe.Pointer(sourceNormalHintName)))
+	return valueAfter == 0
 }
 
 var sourcePresentationWindows sync.Map // Owned HWND -> lifetime-specific state.

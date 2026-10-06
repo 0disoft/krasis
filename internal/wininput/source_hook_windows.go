@@ -105,6 +105,7 @@ func (hook *SourceHook) RunWithBoundary(
 	if err != nil {
 		return sourceStage("pointer-snapshot", err)
 	}
+	hook.contextMenu.Store(0) // A gesture from an earlier connection is not popup evidence.
 	pointerState := newSourcePointerState(initialPosition)
 	session.physicalMu.Lock()
 	session.physicalCheck = sourceAnyInputPressed

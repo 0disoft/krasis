@@ -1015,6 +1015,10 @@ func (current *sourceWheelCaptureRun) loseForeground() bool {
 		current.active.Store(false)
 		return false // Keep the owner loop alive for cleanup and the next crossing.
 	}
+	if current.session != nil && !current.session.Active() && !current.session.terminal.Load() {
+		current.active.Store(false)
+		return false // A peer revoke may have stopped source before native cleanup arrived.
+	}
 	current.setError(ErrSourceCaptureLostForeground)
 	return true
 }
