@@ -589,6 +589,9 @@ func writeHuman(output io.Writer, value any) {
 		}
 	case diagnosticCollectionResult:
 		fmt.Fprintf(output, "Diagnostics: %s\nPeer: %s\n", item.Code, item.PeerAlias)
+		if item.Message != "" {
+			fmt.Fprintln(output, item.Message)
+		}
 		if item.ID != "" {
 			fmt.Fprintf(output, "Request: %s\n", item.ID)
 		}

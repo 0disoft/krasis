@@ -16,7 +16,9 @@ const maxRequestSupportBytes int64 = 128 << 20
 const requestSnapshotGrace = 2 * time.Minute // Longer than the peer request lifetime.
 
 var requestSnapshotGate sync.Mutex
-var errRequestRetention = errors.New("diagnostic request storage limit")
+
+// ErrRequestStorageLimit means active or recent requests fill the retention budget.
+var ErrRequestStorageLimit = errors.New("diagnostic request storage limit")
 
 type requestSnapshotGroup struct {
 	id       string
@@ -80,7 +82,7 @@ func reserveRequestSnapshot(dir *securefs.Directory, id, name string, size int64
 			return closeErr
 		}
 		if !info.Mode().IsRegular() || info.Size() < 0 {
-			return errRequestRetention
+			return errors.New("invalid diagnostic snapshot metadata")
 		}
 		group := groups[requestID]
 		if group == nil {
@@ -127,7 +129,7 @@ func reserveRequestSnapshot(dir *securefs.Directory, id, name string, size int64
 		total -= group.bytes
 	}
 	if count > maxSupportRequests || total+size > maxRequestSupportBytes {
-		return errRequestRetention
+		return ErrRequestStorageLimit
 	}
 	return nil
 }

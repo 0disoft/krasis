@@ -33,6 +33,9 @@ func (o *Operations) CollectDiagnostic(ctx context.Context, request localapi.Dia
 	}
 	if err != nil {
 		result.Code = "save_failed"
+		if errors.Is(err, productlog.ErrRequestStorageLimit) {
+			result.Code = "storage_limit"
+		}
 		return result, nil
 	}
 	result.Code, result.State, result.ID, result.LocalPath = "queued", "PENDING", id, path

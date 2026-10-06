@@ -12,6 +12,7 @@ const diagnosticCollectionSchema = "krasis.cli.diagnostics-collection/v1"
 type diagnosticCollectionResult struct {
 	SchemaVersion string `json:"schemaVersion"`
 	Code          string `json:"code"`
+	Message       string `json:"message,omitempty"`
 	PeerAlias     string `json:"peerAlias"`
 	ID            string `json:"id,omitempty"`
 	State         string `json:"state,omitempty"`
@@ -39,6 +40,10 @@ func collectDiagnostics(ctx context.Context, client apiClient, args []string) (a
 	}
 	if started.Code != "queued" || !validHex(started.ID, 32) {
 		result.Code = started.Code
+		if started.Code == "storage_limit" {
+			result.Message = "최근 진단 보관 한도에 도달했습니다. 잠시 후 다시 시도하세요."
+			return result, ExitUnsafeState, nil
+		}
 		if started.Code == "unsupported" {
 			return result, ExitPolicyDenied, nil
 		}

@@ -136,6 +136,36 @@ func TestDiagnosticCollectUncertainStartNeverRetries(t *testing.T) {
 	}
 }
 
+func TestDiagnosticCollectStorageLimitExplainsFailureWithoutRetrying(t *testing.T) {
+	peer := strings.Repeat("b", 64)
+	for _, asJSON := range []bool{true, false} {
+		client := updateFixture(peer, 202)
+		calls := 0
+		client.collectionFn = func(r localapi.DiagnosticCollectionRequest) (localapi.DiagnosticCollectionResult, error) {
+			calls++
+			if r.Action != "START" {
+				t.Fatal("failed collection was polled")
+			}
+			return localapi.DiagnosticCollectionResult{Code: "storage_limit"}, nil
+		}
+		args := []string{"diagnostics", "collect", "B"}
+		if asJSON {
+			args = append(args, "--json")
+		}
+		var out, errs bytes.Buffer
+		code := run(context.Background(), args, &out, &errs, testDependencies(client))
+		if code != ExitUnsafeState || calls != 1 || errs.Len() != 0 || !strings.Contains(out.String(), "진단 보관 한도") {
+			t.Fatal(code, calls, out.String(), errs.String())
+		}
+		if asJSON {
+			var result diagnosticCollectionResult
+			if err := json.Unmarshal(out.Bytes(), &result); err != nil || result.Code != "storage_limit" || result.ID != "" || result.LocalPath != "" || result.PeerPath != "" {
+				t.Fatal(result, err)
+			}
+		}
+	}
+}
+
 func TestDiagnosticCollectStatusDoesNotStartAnotherExport(t *testing.T) {
 	peer := strings.Repeat("b", 64)
 	client := updateFixture(peer, 95)

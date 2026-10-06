@@ -79,7 +79,7 @@ func TestRequestRetentionPrunesOldPairsAndKeepsActive(t *testing.T) {
 	if _, err := os.Stat(other); err != nil {
 		t.Fatal("unrelated snapshot pruned", err)
 	}
-	if _, err := ExportForRequest(base, strings.Repeat("b", 32)); !errors.Is(err, errRequestRetention) {
+	if _, err := ExportForRequest(base, strings.Repeat("b", 32)); !errors.Is(err, ErrRequestStorageLimit) {
 		t.Fatal("active requests should fill count budget", err)
 	}
 }
@@ -96,7 +96,7 @@ func TestRequestRetentionReservesByteBudget(t *testing.T) {
 			if _, err = os.Stat(path); !errors.Is(err, os.ErrNotExist) {
 				t.Fatal("old bytes not pruned", err)
 			}
-		} else if !errors.Is(err, errRequestRetention) {
+		} else if !errors.Is(err, ErrRequestStorageLimit) {
 			t.Fatal("active bytes pruned or budget exceeded", err)
 		}
 	}
