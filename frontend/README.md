@@ -114,7 +114,9 @@ Only the peer fingerprint and status cross the WebView boundary; content stays
 in the native Windows worker and authenticated local agent. Files and folders
 are limited to 64 MiB and 512 entries. The receiving PC temporarily stores
 their bytes in a private directory for Explorer paste, then removes them after
-24 hours while Krasis runs or at its next start.
+24 hours when cleanup runs. Files still referenced by the Windows clipboard
+remain available for paste. Cleanup skips deletion if the clipboard cannot be
+read and retries on the next file reception.
 
 The worker reuses the legacy controller's Unicode size limits, excluded-content
 formats, remote-write marker, exact sequence comparison and acknowledgment logic.

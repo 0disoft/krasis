@@ -72,31 +72,38 @@ func clipboardSelectedPaths(hwnd uintptr) ([]string, uintptr, bool, error) {
 	if !clipboardHasFormat(cfHDROP) {
 		return nil, sequence, false, nil
 	}
+	paths, err := clipboardDropPaths()
+	return paths, sequence, true, err
+}
+
+// Caller owns the open clipboard. Includes received Krasis paths so cleanup
+// protects them even though outbound monitoring intentionally ignores them.
+func clipboardDropPaths() ([]string, error) {
 	handle, _, _ := clipGet.Call(cfHDROP)
 	if handle == 0 {
-		return nil, sequence, true, errClipboardUnavailable
+		return nil, errClipboardUnavailable
 	}
 	count, _, _ := dragQueryFile.Call(handle, ^uintptr(0), 0, 0)
 	if count > 64 {
-		return nil, sequence, true, errClipboardFileCount
+		return nil, errClipboardFileCount
 	}
 	if count == 0 {
-		return nil, sequence, true, errClipboardUnavailable
+		return nil, errClipboardUnavailable
 	}
 	paths := make([]string, 0, count)
 	for i := uintptr(0); i < count; i++ {
 		n, _, _ := dragQueryFile.Call(handle, i, 0, 0)
 		if n == 0 || n > 32767 {
-			return nil, sequence, true, errClipboardUnavailable
+			return nil, errClipboardUnavailable
 		}
 		buf := make([]uint16, n+1)
 		got, _, _ := dragQueryFile.Call(handle, i, uintptr(unsafe.Pointer(&buf[0])), n+1)
 		if got != n {
-			return nil, sequence, true, errClipboardUnavailable
+			return nil, errClipboardUnavailable
 		}
 		paths = append(paths, syscall.UTF16ToString(buf))
 	}
-	return paths, sequence, true, nil
+	return paths, nil
 }
 
 func packClipboardFiles(paths []string) ([]byte, error) {
@@ -271,6 +278,37 @@ func extractClipboardFilesAt(base string, data []byte) (string, []string, error)
 }
 
 func cleanupClipboardFiles(base string) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	if !clipboardDesktopAvailable() {
+		return
+	}
+	if ok, _, _ := clipOpen.Call(0); ok == 0 {
+		return
+	}
+	defer clipClose.Call()
+	var referenced []string
+	if clipboardHasFormat(cfHDROP) {
+		var err error
+		referenced, err = clipboardDropPaths()
+		if err != nil {
+			return
+		}
+	}
+	// Keep the clipboard locked until cleanup completes; a snapshot followed by
+	// CloseClipboard would let a new file reference race with deletion.
+	cleanupClipboardFilesWithReferences(base, referenced)
+}
+
+func cleanupClipboardFilesWithReferences(base string, referenced []string) {
+	if !filepath.IsAbs(base) {
+		return
+	}
+	for _, path := range referenced {
+		if !filepath.IsAbs(path) {
+			return
+		}
+	}
 	items, err := os.ReadDir(base)
 	if err != nil {
 		return
@@ -279,9 +317,29 @@ func cleanupClipboardFiles(base string) {
 		if !item.IsDir() || !strings.HasPrefix(item.Name(), "copy-") {
 			continue
 		}
+		stage := filepath.Join(base, item.Name())
+		inUse := false
+		for _, path := range referenced {
+			clean := filepath.Clean(path)
+			if strings.EqualFold(clean, stage) || strings.HasPrefix(strings.ToLower(clean), strings.ToLower(stage+string(os.PathSeparator))) {
+				inUse = true
+				break
+			}
+		}
+		if inUse {
+			continue
+		}
+		wide, err := syscall.UTF16PtrFromString(stage)
+		if err != nil {
+			continue
+		}
+		attrs, err := syscall.GetFileAttributes(wide)
+		if err != nil || attrs&syscall.FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+			continue
+		}
 		info, err := item.Info()
 		if err == nil && time.Since(info.ModTime()) > 24*time.Hour {
-			_ = os.RemoveAll(filepath.Join(base, item.Name()))
+			_ = os.RemoveAll(stage)
 		}
 	}
 }
