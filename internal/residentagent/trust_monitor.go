@@ -130,7 +130,29 @@ func monitorProductSessionObserved(ctx context.Context, ticks <-chan time.Time, 
 	deadline := time.Now().Add(trustValidationMaxAge)
 	freshness := time.NewTimer(trustValidationMaxAge)
 	defer freshness.Stop()
+	soft := time.NewTimer(trustReadTimeout)
+	soft.Stop()
+	defer soft.Stop()
+	var softDone <-chan time.Time
+	type completion struct {
+		err      error
+		finished time.Time
+	}
+	var result <-chan completion
+	var trace *truststore.ReadTrace
+	var stopCheck context.CancelFunc
+	defer func() {
+		if stopCheck != nil {
+			stopCheck()
+		}
+	}()
 	deferred := false
+	markDeferred := func() {
+		if !deferred {
+			record("session_trust_read_deferred")
+			deferred = true
+		}
+	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -153,16 +175,74 @@ func monitorProductSessionObserved(ctx context.Context, ticks <-chan time.Time, 
 			}
 			return
 		case <-ticks:
-			var trace *truststore.ReadTrace
+			// Keep the same read after the one-second observation budget. Its
+			// result is useful only to this live session before the hard deadline.
+			if result != nil {
+				continue
+			}
+			if ctx.Err() != nil {
+				continue
+			}
+			trace = nil
+			select {
+			case trustReadSlot <- struct{}{}:
+			default:
+				markDeferred()
+				continue
+			}
 			if recordTrace != nil {
 				trace = truststore.NewReadTrace()
 			}
-			checkCtx, stopCheck := context.WithDeadline(ctx, deadline)
-			err := boundedMonitoredTrustObserved(checkCtx, guardDone, check, trace)
+			checkCtx, stop := context.WithDeadline(ctx, deadline)
+			stopCheck = stop
+			ready := make(chan completion, 1)
+			result = ready
+			go func(readTrace *truststore.ReadTrace) {
+				err := func() error {
+					defer func() { <-trustReadSlot }()
+					return checkMonitoredTrustObserved(checkCtx, func() error { return check(readTrace) }, agent.Wait, readTrace)
+				}()
+				ready <- completion{err: err, finished: time.Now()}
+			}(trace)
+			soft.Reset(trustReadTimeout)
+			softDone = soft.C
+		case <-softDone:
+			softDone = nil
+			if ctx.Err() != nil {
+				continue
+			}
+			if trace != nil {
+				recordTrace(trace.Snapshot())
+			}
+			markDeferred()
+		case completed := <-result:
+			result = nil
+			softDone = nil
+			soft.Stop()
 			stopCheck()
+			stopCheck = nil
+			if ctx.Err() != nil {
+				if ctx.Err() == context.DeadlineExceeded {
+					record("session_certificate_deadline")
+				}
+				return
+			}
+			select {
+			case <-guardDone:
+				record("session_guard_exited")
+				cancel()
+				return
+			default:
+			}
+			err := completed.err
 			if err == nil {
-				deadline = time.Now().Add(trustValidationMaxAge)
-				freshness.Reset(trustValidationMaxAge)
+				if !completed.finished.Before(deadline) || !time.Now().Before(deadline) {
+					record("session_trust_freshness_expired")
+					cancel()
+					return
+				}
+				deadline = completed.finished.Add(trustValidationMaxAge)
+				freshness.Reset(time.Until(deadline))
 				if deferred {
 					record("session_trust_read_recovered")
 					deferred = false
@@ -190,10 +270,7 @@ func monitorProductSessionObserved(ctx context.Context, ticks <-chan time.Time, 
 				return
 			}
 			if errors.Is(err, errTrustReadTimeout) || errors.Is(err, errTrustReadPending) || err == truststore.ErrStoreBusy {
-				if !deferred {
-					record("session_trust_read_deferred")
-					deferred = true
-				}
+				markDeferred()
 				continue
 			}
 			code := "session_trust_check_failed"

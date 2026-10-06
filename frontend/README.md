@@ -24,6 +24,11 @@ appearance during a poll. A user action waits for an in-flight query before maki
 its native call; duplicate actions remain blocked and stale queries cannot overwrite
 the action result. Actual state changes and unavailable results still update the UI.
 
+Generation 194 also keeps a slow, in-flight trust check within the existing
+five-second session deadline instead of discarding it after one second.
+Revocation, certificate expiry, guard exit and the hard timeout still stop input.
+The three-attempt automatic recovery limit is unchanged.
+
 ## Native Windows Workspace
 
 The optional Wails v3 host ships as a complete, unpacked distribution under

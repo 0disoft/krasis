@@ -75,3 +75,17 @@ querying the Windows ACL, or checking that ACL. The existing parent-ACL timing
 bucket remains the whole operation; the new fixed codes identify only the
 active call and contain no path, SID, certificate, or error text. A later
 two-device diagnostic is needed before changing the security check itself.
+
+Generation 194 retains one pending trust read within the existing five-second
+freshness deadline. The one-second budget reports a deferred read without
+cancelling it. The monitor consumes completion directly, even without another
+sampling tick. A successful read must complete and be consumed before the old
+deadline; the next deadline starts at completion, not at delayed consumption.
+Further ticks do not start competing reads. The process-wide single-worker slot
+still bounds a blocked read after cancellation. A negative verdict, guard exit,
+certificate expiry or freshness expiry stops the session; a result belonging to
+a stopped session cannot refresh or restart it. Lock retries, ACL checks and
+certificate validation remain unchanged. This prevents a valid 1-4 second read
+from being discarded solely because it exceeded the observation budget.
+The g192 paired evidence and remaining uncertainty are recorded in
+`docs/experiments/g192-trust-recovery-observations.md`.
