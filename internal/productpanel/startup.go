@@ -70,6 +70,9 @@ func (s Startup) Ensure(ctx context.Context) error {
 				// Older product agents implement the same status/control v1 API.
 				// Missing lifecycle metadata is not permission to stop an unknown process.
 				if errors.Is(err, localapi.ErrNotFound) {
+					if s.Revision != "" {
+						return ErrAgentIncompatible
+					}
 					return nil
 				}
 				if err != nil {
@@ -80,6 +83,9 @@ func (s Startup) Ensure(ctx context.Context) error {
 				}
 				faulted := status.State == "FAULTED"
 				if info.Generation >= s.Generation && !faulted {
+					if s.Revision != "" && (info.Generation != s.Generation || info.Build != s.Revision) {
+						return ErrAgentIncompatible
+					}
 					return nil
 				}
 				// A fault latch belongs to this process. Never clear it in place or
