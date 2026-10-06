@@ -1,6 +1,7 @@
 <script>
   import { onMount, tick } from 'svelte';
   import UpdateSettings from './UpdateSettings.svelte';
+  import AppSettings from './AppSettings.svelte';
   import { createUpdateSettingsBridge } from './update-settings-bridge.js';
   import Icon from './Icon.svelte';
   import logo from '../../assets/windows/krasis.ico';
@@ -319,7 +320,7 @@
   </div>
   <div class="dlg-foot"><button class="primary" onclick={() => pairingDlg.close()}>{t('close')}</button></div>
 </dialog>
-<footer><span>{t('closeHelp')}</span><select aria-label={t('language')} bind:value={locale}><option value="ko">한국어</option><option value="en">English</option></select></footer>
+<footer><AppSettings {locale} /><select aria-label={t('language')} bind:value={locale}><option value="ko">한국어</option><option value="en">English</option></select></footer>
 <style>
   .peer-select { display:flex; align-items:center; gap:20px; margin:20px 0; flex-wrap:wrap; }
   .peer-select select, .peer-select input { min-width:min(220px,100%); max-width:100%; }

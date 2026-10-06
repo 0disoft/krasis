@@ -12,6 +12,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/0disoft/krasis/internal/launchrecord"
 	"github.com/0disoft/krasis/internal/localapi"
 )
 
@@ -92,6 +93,9 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, deps depe
 		return writeOutput(stdout, stderr, version(ctx, client), ExitOK, parsed.json)
 	}
 	if parsed.args[0] == "relaunch" {
+		if len(parsed.args) == 2 && deps.launch == nil {
+			deps.launch = launchrecord.StartAtLogin
+		}
 		if parsed.controlDir != "" {
 			writeUsageError(stderr, usageError("relaunch does not use --control-dir"))
 			return ExitUsage
@@ -280,7 +284,7 @@ func parseGlobalOptions(args []string) (options, error) {
 			}
 			index++
 			result.controlDir = args[index]
-		case "--allow-inbound-control", "--deny-inbound-control", "--replace":
+		case "--allow-inbound-control", "--deny-inbound-control", "--replace", "--startup":
 			result.args = append(result.args, args[index])
 		case "--timeout":
 			if index+1 >= len(args) || strings.HasPrefix(args[index+1], "--") {
@@ -309,8 +313,8 @@ func validateCommandArgs(args []string) error {
 		}
 		return usageError("app requires repair, open ALIAS or open-status ALIAS ID")
 	case "relaunch":
-		if len(args) != 1 {
-			return usageError("relaunch accepts no arguments")
+		if len(args) != 1 && (len(args) != 2 || args[1] != "--startup") {
+			return usageError("relaunch accepts only --startup")
 		}
 	case "credential":
 		_, err := parseCredential(args[1:])

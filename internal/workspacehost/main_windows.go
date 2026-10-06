@@ -68,7 +68,8 @@ func Run() {
 	visibleSmoke := len(os.Args) == 2 && os.Args[1] == "--smoke-update-window"
 	smoke := visibleSmoke || (len(os.Args) == 2 && os.Args[1] == "--smoke")
 	var updated productpanel.WorkspaceUpdateLaunch
-	if len(os.Args) != 1 && !smoke {
+	startAtLogin := len(os.Args) == 2 && os.Args[1] == "--startup"
+	if len(os.Args) != 1 && !smoke && !startAtLogin {
 		updated, err = productpanel.ParseWorkspaceUpdateLaunch(os.Args[1:])
 		if err != nil {
 			os.Exit(1)
@@ -79,6 +80,7 @@ func Run() {
 		os.Exit(1)
 	}
 	service := &WorkspaceService{raw: bridge, ctx: ctx, control: paths.Control, title: fmt.Sprintf("Krasis · g%d", localapi.AgentGeneration)}
+	service.startAtLogin = startAtLogin
 	if !smoke {
 		startup, startupErr := productpanel.NewStartup(paths.Control)
 		if startupErr != nil {
@@ -109,6 +111,7 @@ func Run() {
 			return time.Since(stableSince) >= 2*time.Second
 		}
 		service.managed = productpanel.NewDesktopLifecycle(ctx, func() (productpanel.Client, error) { return localapi.OpenClient(paths.Control) }, startup.Ensure, diagnose(os.Getenv("LOCALAPPDATA"), paths.Control), displayReady)
+		service.managed.StartupResume = service.resumeAtStartup
 		base := os.Getenv("LOCALAPPDATA")
 		self, executableErr := os.Executable()
 		if executableErr != nil {
@@ -179,7 +182,7 @@ func Run() {
 		Width: 1180, Height: 850, MinWidth: 720, MinHeight: 620,
 		BackgroundColour: application.NewRGB(24, 27, 33),
 		URL:              url,
-		Hidden:           smoke && !visibleSmoke,
+		Hidden:           startAtLogin || (smoke && !visibleSmoke),
 	})
 	shown := make(chan bool, 1)
 	if visibleSmoke || (!smoke && updated.Revision != "") {

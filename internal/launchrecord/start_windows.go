@@ -10,7 +10,11 @@ import (
 )
 
 func Start(path string) error {
-	command := exec.Command(path)
+	return startWithArgs(path)
+}
+func StartAtLogin(path string) error { return startWithArgs(path, "--startup") }
+func startWithArgs(path string, args ...string) error {
+	command := exec.Command(path, args...)
 	command.Dir = filepath.Dir(path)
 	command.SysProcAttr = &syscall.SysProcAttr{CreationFlags: 0x00000208}
 	for _, key := range []string{"SystemRoot", "WINDIR", "LOCALAPPDATA", "TEMP", "TMP", "USERPROFILE"} {

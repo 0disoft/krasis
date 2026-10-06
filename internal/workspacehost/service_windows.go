@@ -4,18 +4,22 @@ package workspacehost
 
 import (
 	"context"
+	"github.com/0disoft/krasis/internal/appsettings"
 	"github.com/0disoft/krasis/internal/launcherui"
 	"github.com/0disoft/krasis/internal/launchrecord"
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/productlog"
 	"github.com/0disoft/krasis/internal/productpanel"
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
 )
 
 type WorkspaceService struct {
+	settingsGate    sync.Mutex
+	startAtLogin    bool
 	ctx             context.Context
 	control         string
 	title           string
@@ -42,6 +46,9 @@ func (s *WorkspaceService) ServiceStartup(context.Context, application.ServiceOp
 			s.log.Event("launch_record_" + launchrecord.RegistrationStage(err) + "_failed")
 		} else {
 			s.log.Event("launch_record_ready")
+			if err := s.prepareAppSettings(); err != nil {
+				s.log.Event("app_settings_startup_failed")
+			}
 		}
 	}
 	if s.managed != nil {
@@ -93,11 +100,16 @@ func (s *WorkspaceService) InputRefresh() productpanel.BridgeSnapshot {
 }
 func (s *WorkspaceService) Connect(alias, fingerprint string) productpanel.BridgeSnapshot {
 	if s.managed != nil {
-		return s.withInputSetup(s.managed.Connect(alias, fingerprint))
+		value := s.withInputSetup(s.managed.Connect(alias, fingerprint))
+		s.rememberConnection(value)
+		return value
 	}
-	return s.withInputSetup(s.raw.Connect(alias, fingerprint))
+	value := s.withInputSetup(s.raw.Connect(alias, fingerprint))
+	s.rememberConnection(value)
+	return value
 }
 func (s *WorkspaceService) Disconnect() productpanel.BridgeSnapshot {
+	_ = appsettings.SaveResume(os.Getenv("LOCALAPPDATA"), appsettings.Resume{})
 	if s.managed != nil {
 		return s.withInputSetup(s.managed.Disconnect())
 	}

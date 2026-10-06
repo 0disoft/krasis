@@ -37,4 +37,13 @@ func TestRelaunchDoesNotNeedAgentOrAllowPathArguments(t *testing.T) {
 			t.Fatalf("unexpected launch: %v", args)
 		}
 	}
+	if code := run(context.Background(), []string{"relaunch", "--startup", "--json"}, &out, &errOut, deps); code != ExitOK || count != 2 {
+		t.Fatalf("startup launch: %d", code)
+	}
+	if _, err := parseGlobalOptions([]string{"status", "--startup"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateCommandArgs([]string{"status", "--startup"}); err == nil {
+		t.Fatal("startup flag accepted for status")
+	}
 }
