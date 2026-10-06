@@ -17,14 +17,20 @@ type RecoverySummary struct {
 	Time       string `json:"time"`
 	Code       string `json:"code"`
 	Generation int    `json:"generation,omitempty"`
+	AgentState string `json:"agentState,omitempty"`
 }
 
 func (v RecoverySummary) valid() bool {
 	if _, err := time.Parse(time.RFC3339Nano, v.Time); err != nil || v.Generation < 0 || v.Generation > 1000000 {
 		return false
 	}
+	switch v.AgentState {
+	case "", "LOCAL", "CONNECTED", "CONNECTING", "RECONNECTING", "DISCONNECTING", "FAULTED", "UNKNOWN":
+	default:
+		return false
+	}
 	switch v.Code {
-	case "settings_unavailable", "recovery_disabled", "agent_unavailable", "agent_present", "agent_unverified", "launch_record_invalid", "launch_requested", "launch_failed", "launch_record_missing":
+	case "settings_unavailable", "recovery_disabled", "agent_unavailable", "agent_present", "agent_faulted", "agent_unverified", "launch_record_invalid", "launch_requested", "launch_failed", "launch_record_missing":
 		return true
 	}
 	return false

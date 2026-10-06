@@ -5,6 +5,12 @@
 `app recovery-status --json`은 `krasis.cli.recovery-status/v1`이다. `task`는
 `ENABLED|DISABLED|UNKNOWN`, `code`는 `recorded|not_recorded|receipt_unavailable`이다.
 유효한 마지막 기록은 `lastRun`의 시간·고정 코드·generation으로 표시한다.
+g195 기록에는 조회 당시 `agentState`도 포함한다. 상태는
+`LOCAL|CONNECTED|CONNECTING|RECONNECTING|DISCONNECTING|FAULTED|UNKNOWN`이며
+구버전 기록에는 없을 수 있다. `app ensure`가 `FAULTED`를 관측하면
+`agent_faulted`와 exit `7`을 반환하고 재시작하지 않는다. `agent_present`는
+프로세스 존재이며, 응답 없이 소유권만 확인한 경우 `agentState:UNKNOWN`이다.
+마지막 예약 실행 당시의 기록이므로 현재 연결 상태와 구분한다.
 receipt 읽기 실패는 exit `7`, 성공은 exit `0`이다. task의 조회 실패는 `UNKNOWN`으로
 유지한다. `doctor`의 `update_stage_cleanup` check는 `COMPLETED|FAILED|UNKNOWN`이며
 정리 실패만으로 기존 입력 상태나 종료 코드를 바꾸지 않는다.

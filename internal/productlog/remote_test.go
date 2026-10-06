@@ -78,3 +78,27 @@ func TestRemoteSupportAcceptsTwoExtendedLogs(t *testing.T) {
 		t.Fatalf("extended history lost: %v", err)
 	}
 }
+
+func TestRemoteRecoveryAgentStateIsBoundedAndLegacyReceiptsRemainReadable(t *testing.T) {
+	for _, state := range []string{"", "FAULTED", "CONNECTED", "UNKNOWN", "SECRET"} {
+		raw := fmt.Sprintf(`{"schema":"krasis.support/v1","created":"2026-10-07T00:00:00Z","logs":[],"recovery":{"time":"2026-10-07T00:00:00Z","code":"agent_faulted","agentState":%q,"path":"SECRET"}}`, state)
+		clean, err := SanitizeSupport([]byte(raw))
+		if err != nil || strings.Contains(string(clean), "SECRET") {
+			t.Fatal(string(clean), err)
+		}
+		var doc struct {
+			Recovery   *RecoverySummary `json:"recovery"`
+			Incomplete bool             `json:"recoveryIncomplete"`
+		}
+		if err := json.Unmarshal(clean, &doc); err != nil {
+			t.Fatal(err)
+		}
+		if state == "SECRET" {
+			if doc.Recovery != nil || !doc.Incomplete {
+				t.Fatal("unbounded state retained")
+			}
+		} else if doc.Recovery == nil || doc.Incomplete || doc.Recovery.AgentState != state {
+			t.Fatal("bounded or legacy state lost", doc)
+		}
+	}
+}

@@ -17,7 +17,7 @@ import (
 func ensureApp(ctx context.Context, deps dependencies) (result relaunchResult, exit int) {
 	result = relaunchResult{SchemaVersion: "krasis.cli.relaunch/v1"}
 	defer func() {
-		saved := productlog.SaveRecovery(deps.localAppData, productlog.RecoverySummary{Time: time.Now().UTC().Format(time.RFC3339Nano), Code: result.Code, Generation: result.Generation}) == nil
+		saved := productlog.SaveRecovery(deps.localAppData, productlog.RecoverySummary{Time: time.Now().UTC().Format(time.RFC3339Nano), Code: result.Code, Generation: result.Generation, AgentState: result.AgentState}) == nil
 		result.DiagnosticSaved = &saved
 	}()
 	settings, err := appsettings.Load(deps.localAppData)
@@ -41,11 +41,22 @@ func ensureApp(ctx context.Context, deps dependencies) (result relaunchResult, e
 	}
 	probe, done := context.WithTimeout(ctx, 2*time.Second)
 	c, err := deps.openClient(control)
+	var status localapi.Status
 	if err == nil {
-		_, err = c.Status(probe)
+		status, err = c.Status(probe)
 	}
 	done()
 	if err == nil {
+		result.AgentState = status.State
+		switch status.State {
+		case "FAULTED":
+			result.Code = "agent_faulted"
+			return result, ExitUnsafeState
+		case "LOCAL", "CONNECTED", "CONNECTING", "RECONNECTING", "DISCONNECTING":
+		default:
+			result.AgentState, result.Code = "UNKNOWN", "agent_unverified"
+			return result, ExitUnsafeState
+		}
 		result.Code = "agent_present"
 		return result, ExitOK
 	}
@@ -73,6 +84,7 @@ func ensureApp(ctx context.Context, deps dependencies) (result relaunchResult, e
 	}
 	if !free {
 		result.Code = "agent_present"
+		result.AgentState = "UNKNOWN"
 		return result, ExitOK
 	}
 	if _, err = launchrecord.Inspect(deps.localAppData); err != nil {

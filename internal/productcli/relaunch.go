@@ -13,6 +13,7 @@ type relaunchResult struct {
 	SchemaVersion   string `json:"schemaVersion"`
 	Code            string `json:"code"`
 	Generation      int    `json:"generation,omitempty"`
+	AgentState      string `json:"agentState,omitempty"`
 }
 
 func relaunch(deps dependencies) (relaunchResult, int) {
