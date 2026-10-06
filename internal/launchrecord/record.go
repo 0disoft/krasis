@@ -111,6 +111,15 @@ func Register(localAppData, executable string, generation int, revision string) 
 	if err != nil {
 		return registrationFailure("metadata", err)
 	}
+	if previous.Schema == schema && previous.Executable != executable {
+		backup, err := json.Marshal(previous)
+		if err != nil {
+			return registrationFailure("record", err)
+		}
+		if err = replace(dir, "previous.json", backup); err != nil {
+			return registrationFailure("record", err)
+		}
+	}
 	// Publish the current record only after both fixed recovery entrypoints exist.
 	if err = copyCLI(dir, filepath.Dir(executable)); err != nil {
 		return registrationFailure("cli", err)

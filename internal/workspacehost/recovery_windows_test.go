@@ -14,9 +14,10 @@ func TestRecoveryRegistrationDoesNotDependOnRendererOrLogger(t *testing.T) {
 	for _, failure := range []error{nil, errors.New("registration refused")} {
 		calls, menus := 0, 0
 		service := WorkspaceService{prepareRecovery: func() error { calls++; return failure }, prepareStartMenu: func() error { menus++; return errors.New("shortcut refused") }}
-		if err := service.ServiceStartup(context.Background(), application.ServiceOptions{}); err != nil || calls != 1 {
+		if err := service.ServiceStartup(context.Background(), application.ServiceOptions{}); err != nil || calls != 0 {
 			t.Fatal("recovery registration did not run at startup", err)
 		}
+		service.promoteRecovery()
 		wantMenus := 0
 		if failure == nil {
 			wantMenus = 1

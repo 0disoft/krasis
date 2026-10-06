@@ -23,6 +23,7 @@ type WorkspaceService struct {
 	startAtLogin     bool
 	startMenuFailed  atomic.Bool
 	recoveryFailed   atomic.Bool
+	recoveryPromoted bool
 	ctx              context.Context
 	control          string
 	title            string
@@ -45,11 +46,17 @@ type WorkspaceService struct {
 	log              *productlog.Logger
 }
 
-func (s *WorkspaceService) ServiceStartup(context.Context, application.ServiceOptions) error {
+func (s *WorkspaceService) promoteRecovery() {
+	s.settingsGate.Lock()
+	defer s.settingsGate.Unlock()
+	if s.recoveryPromoted {
+		return
+	}
 	if s.prepareRecovery != nil {
 		if err := s.prepareRecovery(); err != nil {
 			s.log.Event("launch_record_" + launchrecord.RegistrationStage(err) + "_failed")
 		} else {
+			s.recoveryPromoted = true
 			s.log.Event("launch_record_ready")
 			if s.prepareStartMenu != nil {
 				if err := s.prepareStartMenu(); err != nil {
@@ -65,7 +72,11 @@ func (s *WorkspaceService) ServiceStartup(context.Context, application.ServiceOp
 			}
 		}
 	}
+}
+
+func (s *WorkspaceService) ServiceStartup(context.Context, application.ServiceOptions) error {
 	if s.managed != nil {
+		s.managed.StartupReady = s.promoteRecovery
 		s.jobs.Add(1)
 		go func() { defer s.jobs.Done(); s.runUIReadyReporter() }()
 		s.done = make(chan struct{})

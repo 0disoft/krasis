@@ -11,6 +11,7 @@ import (
 // DesktopLifecycle owns recovery independently of renderer timers. All process
 // operations are serialized; Disconnect cancels an in-flight recovery first.
 type DesktopLifecycle struct {
+	StartupReady     func()
 	StartupResume    func(context.Context, BridgeSnapshot) BridgeSnapshot
 	updateHandedOff  bool
 	ctx              context.Context
@@ -77,7 +78,13 @@ func (b *DesktopLifecycle) startup(ctx context.Context) error {
 	if b.ensure == nil {
 		return ErrAgentNotReady
 	}
-	return b.ensure(ctx)
+	if err := b.ensure(ctx); err != nil {
+		return err
+	}
+	if b.StartupReady != nil && ctx.Err() == nil {
+		b.StartupReady()
+	}
+	return ctx.Err()
 }
 
 func (b *DesktopLifecycle) failedStartup(ctx context.Context, err error) BridgeSnapshot {
