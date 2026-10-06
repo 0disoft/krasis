@@ -2,6 +2,17 @@
 
 ## 제품 CLI
 
+`app recovery-status --json`은 `krasis.cli.recovery-status/v1`이다. `task`는
+`ENABLED|DISABLED|UNKNOWN`, `code`는 `recorded|not_recorded|receipt_unavailable`이다.
+유효한 마지막 기록은 `lastRun`의 시간·고정 코드·generation으로 표시한다.
+receipt 읽기 실패는 exit `7`, 성공은 exit `0`이다. task의 조회 실패는 `UNKNOWN`으로
+유지한다. `doctor`의 `update_stage_cleanup` check는 `COMPLETED|FAILED|UNKNOWN`이며
+정리 실패만으로 기존 입력 상태나 종료 코드를 바꾸지 않는다.
+
+g190 앱 열기 결과의 `launch_accepted`는 작업 수락이고 최종 결과가 아니다.
+`launch_requested`와 함께 같은 ID를 계속 조회한다. peer의 `busy`는 거부 결과이며
+로컬 조회 경합인 `query_busy`만 재조회한다.
+
 `app repair --json`의 schema는 `krasis.cli.app-repair/v1`이다. 성공은
 `code:recovery_ready`, `generation`과 exit `0`이다. 묶음 누락·검증 실패·CLI 빌드
 불일치는 `bundle_missing`, `bundle_invalid`, `bundle_version_mismatch`와 exit `7`이다.

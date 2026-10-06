@@ -16,6 +16,7 @@ krasis-cli [--json] help
 krasis-cli --help
 krasis-cli [--json] relaunch
 krasis-cli [--json] app repair
+krasis-cli [--json] app recovery-status
 krasis-cli [--json] [--control-dir DIR] app open ALIAS
 krasis-cli [--json] [--control-dir DIR] app open-status ALIAS REQUEST_ID
 krasis-cli [--json] [--control-dir DIR] status
@@ -63,9 +64,10 @@ session 전체를 안전 종료하므로 일반 연결 해제에는 `disconnect`
 `relaunch`는 마지막으로 창을 연 `krasis.exe`를 다시 실행한다. 실행 중이면 기존 창을 앞으로
 가져온다. 에이전트가 종료돼 있어도 사용할 수 있으며 `--control-dir`와 실행 경로 인자는 받지 않는다.
 UI 시작 후 `%LOCALAPPDATA%\Krasis\launch\krasis-cli.exe`가 고정 복구 명령으로 준비된다.
-g135부터 renderer 준비 이벤트와 별개로 서비스 시작 때 실제 빌드 revision을 기록한다.
+g190부터 에이전트 시작 확인 뒤 실제 빌드 revision을 기록한다.
 CLI와 `Krasis.cmd` 준비에 성공한 뒤 실행 기록을 교체한다. 등록 실패는 경로나 원본 오류 없이
 고정 단계 코드 `launch_record_<stage>_failed`로 진단에 남으며 기존 실행 기록은 유지한다.
+다른 실행 폴더로 갱신하면 이전 기록을 `previous.json`에 보존한다.
 g136부터 실행 파일·원본 CLI·실행 기록의 폴더를 읽을 때 삭제 권한을 요청하지 않는다.
 실행 중인 폴더의 공유 충돌을 피하면서 링크 검사와 EXE 해시 검증은 유지한다.
 같은 폴더의 `Krasis.cmd`를 더블클릭해도 앱을 열 수 있다.
@@ -85,6 +87,14 @@ g189는 최대 25초간 수락 응답을 기다린다. 20초간 응답이 없으
 끝낸다. 구버전 에이전트에서 여전히 `pending`이면 요청 ID를 반환하고, 재전송 대신
 `app open-status B REQUEST_ID`로 확인한다. 수락 이후 창 준비 확인은 요청 시작부터 1분까지
 이어진다. B의 에이전트까지 완전히 종료된 경우 B에서 고정 복구 명령을 실행해야 한다.
+g190의 `launch_accepted`는 느린 실행 작업의 수락 응답이다. `launch_requested`와 함께
+동일 요청 조회를 계속한다. 상대 `busy`는 최종 거부이고 로컬 `query_busy`는 다시 조회한다.
+앱 열기 조회는 파일·진단·클립보드 전송과 독립된 관리 경로를 사용한다.
+
+`app recovery-status`는 마지막 예약 복구 receipt와 현재 예약 작업 등록 상태를 조회한다.
+`--control-dir`와 추가 인자를 받지 않으며 에이전트 없이 사용할 수 있다. receipt의
+존재와 현재 task 조회 성공을 구분한다. `doctor`의 `update_stage_cleanup`은 마지막
+폴더 정리 결과이며 입력 연결의 정상 여부와 별개다. 실패 시 안내만 추가하고 실행하지 않는다.
 
 `app repair`는 명령을 실행한 CLI와 같은 폴더의 배포 묶음을 검증한 뒤 고정 복구 경로를
 다시 만든다. 묶음의 generation·revision이 실행 CLI와 일치해야 한다. 경로 인자와

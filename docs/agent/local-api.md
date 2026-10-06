@@ -1,5 +1,21 @@
 # Resident agent local API
 
+g190의 peer 관리 채널은 앱 열기·상태 조회와 대용량 전송의 HTTP client/worker 및
+서버 gate를 분리한다. mTLS·현재 trust·입력 제어 허용 검사는 유지한다. 아래 loopback
+API의 인증 방식이나 주소 노출 범위는 변경하지 않는다.
+
+앱 열기의 `launch_accepted`는 비동기 실행 작업 수락이다. `launch_requested`는 실행
+요청 성공, `window_ready`는 같은 요청 이후 검증된 UI의 창 준비 보고다. UI의 재표시와
+agent instance 변경 때도 준비를 다시 보고한다. 상대의 `busy`는 최종 거부이며 로컬
+조회 경합 `query_busy`는 아직 결과를 읽지 못한 상태다. 동일 ID 조회는 실행을 재전송하지 않는다.
+peer APPLYING 잠금은 5분 후 같은 ID·peer의 예약에만 만료를 적용한다. 공개 release
+예약은 기존 3분 타이머를 유지한다.
+
+지원 파일의 선택 필드 `recovery`/`recoveryIncomplete`, `cleanup`/`cleanupIncomplete`는
+자동 복구와 업데이트 폴더 정리 receipt를 담는다. 상대 진단 수신 시 시간·고정 코드·
+generation 또는 삭제 개수만 재검증·투영한다. 잘못된 receipt는 제거하고 incomplete를
+표시한다. 진단에는 실행 경로·원본 오류·입력 내용을 담지 않는다.
+
 - 상태: Active contract
 - 결정: `docs/adr/0036-resident-agent-and-local-api-ownership.md`
 - transport: IPv4 loopback HTTP with protected per-process bearer token
