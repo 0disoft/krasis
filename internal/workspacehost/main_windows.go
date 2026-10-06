@@ -120,6 +120,7 @@ func Run() {
 		service.prepareRecovery = func() error {
 			return launchrecord.Register(base, self, localapi.AgentGeneration, buildinfo.Read().Revision)
 		}
+		service.prepareStartMenu = func() error { return launchrecord.RegisterStartMenu(base) }
 		service.updates = productpanel.NewUpdateTransferBridge(ctx, func() (productpanel.UpdateSettingsClient, error) { return localapi.OpenClient(paths.Control) }, updateBundleDirectory(self), transitionBundleDirectory(self), probeTransitionBundleDirectory(self), installerTransitionBundleDirectory(self))
 		service.receiver = productpanel.NewWorkspaceUpdateReceiver(ctx, func() (productpanel.UpdateSettingsClient, error) { return localapi.OpenClient(paths.Control) }, productpanel.LaunchReceivedWorkspaceUpdate)
 		service.diagnostics = productpanel.NewDiagnosticsBridge(ctx,

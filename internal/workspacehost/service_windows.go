@@ -18,27 +18,28 @@ import (
 )
 
 type WorkspaceService struct {
-	release         releaseState
-	settingsGate    sync.Mutex
-	startAtLogin    bool
-	ctx             context.Context
-	control         string
-	title           string
-	clipGate        sync.Mutex
-	clipEpoch       atomic.Uint64
-	raw             *productpanel.DesktopBridge
-	managed         *productpanel.DesktopLifecycle
-	pairs           *productpanel.PairingBridge
-	diagnostics     *productpanel.DiagnosticsBridge
-	updates         *productpanel.UpdateSettingsBridge
-	receiver        *productpanel.WorkspaceUpdateReceiver
-	quit            func()
-	done            chan struct{}
-	jobs            sync.WaitGroup
-	prepareRecovery func() error
-	inputRefresh    func(context.Context) error
-	inputSetup      func() string
-	log             *productlog.Logger
+	release          releaseState
+	settingsGate     sync.Mutex
+	startAtLogin     bool
+	ctx              context.Context
+	control          string
+	title            string
+	clipGate         sync.Mutex
+	clipEpoch        atomic.Uint64
+	raw              *productpanel.DesktopBridge
+	managed          *productpanel.DesktopLifecycle
+	pairs            *productpanel.PairingBridge
+	diagnostics      *productpanel.DiagnosticsBridge
+	updates          *productpanel.UpdateSettingsBridge
+	receiver         *productpanel.WorkspaceUpdateReceiver
+	quit             func()
+	done             chan struct{}
+	jobs             sync.WaitGroup
+	prepareRecovery  func() error
+	prepareStartMenu func() error
+	inputRefresh     func(context.Context) error
+	inputSetup       func() string
+	log              *productlog.Logger
 }
 
 func (s *WorkspaceService) ServiceStartup(context.Context, application.ServiceOptions) error {
@@ -47,6 +48,11 @@ func (s *WorkspaceService) ServiceStartup(context.Context, application.ServiceOp
 			s.log.Event("launch_record_" + launchrecord.RegistrationStage(err) + "_failed")
 		} else {
 			s.log.Event("launch_record_ready")
+			if s.prepareStartMenu != nil {
+				if err := s.prepareStartMenu(); err != nil {
+					s.log.Event("start_menu_registration_failed")
+				}
+			}
 			if err := s.prepareAppSettings(); err != nil {
 				s.log.Event("app_settings_startup_failed")
 			}
