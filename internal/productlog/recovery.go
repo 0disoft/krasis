@@ -10,17 +10,47 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
 type RecoverySummary struct {
+	Time        string           `json:"time"`
+	Code        string           `json:"code"`
+	Generation  int              `json:"generation,omitempty"`
+	AgentState  string           `json:"agentState,omitempty"`
+	LastFailure *RecoveryFailure `json:"lastFailure,omitempty"`
+}
+
+// A separate non-recursive shape keeps received diagnostic metadata bounded.
+type RecoveryFailure struct {
 	Time       string `json:"time"`
 	Code       string `json:"code"`
 	Generation int    `json:"generation,omitempty"`
 	AgentState string `json:"agentState,omitempty"`
 }
 
+var recoveryGate sync.Mutex
+
+func (v RecoverySummary) failed() bool {
+	switch v.Code {
+	case "settings_unavailable", "agent_unavailable", "agent_faulted", "agent_unverified", "launch_record_invalid", "launch_failed", "launch_record_missing":
+		return true
+	}
+	return false
+}
+
+func (v RecoverySummary) failure() *RecoveryFailure {
+	return &RecoveryFailure{Time: v.Time, Code: v.Code, Generation: v.Generation, AgentState: v.AgentState}
+}
+
 func (v RecoverySummary) valid() bool {
+	if f := v.LastFailure; f != nil {
+		event := RecoverySummary{Time: f.Time, Code: f.Code, Generation: f.Generation, AgentState: f.AgentState}
+		if !event.valid() || !event.failed() {
+			return false
+		}
+	}
 	if _, err := time.Parse(time.RFC3339Nano, v.Time); err != nil || v.Generation < 0 || v.Generation > 1000000 {
 		return false
 	}
@@ -40,11 +70,26 @@ func SaveRecovery(base string, value RecoverySummary) error {
 	if !value.valid() {
 		return errors.New("invalid recovery receipt")
 	}
+	recoveryGate.Lock()
+	defer recoveryGate.Unlock()
 	dir, err := productidentity.PrepareDiagnostics(base)
 	if err != nil {
 		return err
 	}
 	defer dir.Close()
+	previous, err := readRecoveryReceipt(dir)
+	if err != nil {
+		return err
+	}
+	value.LastFailure = nil
+	if value.failed() {
+		value.LastFailure = value.failure()
+	} else if previous != nil {
+		value.LastFailure = previous.LastFailure
+		if value.LastFailure == nil && previous.failed() {
+			value.LastFailure = previous.failure()
+		}
+	}
 	f, name, err := dir.CreateTemporary(".recovery-", 0600)
 	if err != nil {
 		return err
