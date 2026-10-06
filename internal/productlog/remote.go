@@ -26,6 +26,10 @@ func SanitizeSupport(data []byte) ([]byte, error) {
 		Logs                   []exportLog               `json:"logs"`
 		Installation           *installationdiag.Summary `json:"installation,omitempty"`
 		InstallationIncomplete bool                      `json:"installationIncomplete,omitempty"`
+		Recovery               *RecoverySummary          `json:"recovery,omitempty"`
+		RecoveryIncomplete     bool                      `json:"recoveryIncomplete,omitempty"`
+		Cleanup                *CleanupSummary           `json:"cleanup,omitempty"`
+		CleanupIncomplete      bool                      `json:"cleanupIncomplete,omitempty"`
 	}
 	if json.Unmarshal(data, &doc) != nil || doc.Schema != "krasis.support/v1" || len(doc.Logs) > 4 {
 		return nil, errors.New("invalid support document")
@@ -39,6 +43,14 @@ func SanitizeSupport(data []byte) ([]byte, error) {
 	if doc.Installation != nil && !doc.Installation.Valid() {
 		doc.Installation = nil
 		doc.InstallationIncomplete = true
+	}
+	if doc.Recovery != nil && !doc.Recovery.valid() {
+		doc.Recovery = nil
+		doc.RecoveryIncomplete = true
+	}
+	if doc.Cleanup != nil && !doc.Cleanup.valid() {
+		doc.Cleanup = nil
+		doc.CleanupIncomplete = true
 	}
 	seen := map[string]bool{}
 	for i, l := range doc.Logs {

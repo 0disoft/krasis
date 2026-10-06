@@ -2,6 +2,7 @@ package productlog
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -15,6 +16,37 @@ func TestRemoteSupportReprojectsPrivateFields(t *testing.T) {
 	for _, bad := range []string{`{}`, strings.Repeat("x", MaxSupportBytes+1), `{"schema":"krasis.support/v1","created":"2026-09-16T00:00:00Z","logs":[{"source":"../file"}]}`} {
 		if _, err := SanitizeSupport([]byte(bad)); err == nil {
 			t.Fatal("invalid support accepted")
+		}
+	}
+}
+
+func TestRemoteSupportRetainsOnlyValidRecoveryAndCleanupReceipts(t *testing.T) {
+	for _, invalid := range []bool{false, true} {
+		code := "launch_requested"
+		cleanup := "completed"
+		if invalid {
+			code, cleanup = "SECRET", "SECRET"
+		}
+		raw := fmt.Sprintf(`{"schema":"krasis.support/v1","created":"2026-10-06T00:00:00Z","logs":[],"recovery":{"time":"2026-10-06T00:00:00Z","code":%q,"generation":190,"private":"SECRET"},"cleanup":{"time":"2026-10-06T00:00:00Z","code":%q,"removed":3,"path":"SECRET"}}`, code, cleanup)
+		clean, err := SanitizeSupport([]byte(raw))
+		if err != nil || strings.Contains(string(clean), "SECRET") {
+			t.Fatal(string(clean), err)
+		}
+		var doc struct {
+			Recovery           *RecoverySummary `json:"recovery"`
+			RecoveryIncomplete bool             `json:"recoveryIncomplete"`
+			Cleanup            *CleanupSummary  `json:"cleanup"`
+			CleanupIncomplete  bool             `json:"cleanupIncomplete"`
+		}
+		if err := json.Unmarshal(clean, &doc); err != nil {
+			t.Fatal(err)
+		}
+		if invalid {
+			if doc.Recovery != nil || doc.Cleanup != nil || !doc.RecoveryIncomplete || !doc.CleanupIncomplete {
+				t.Fatal("invalid receipts not marked incomplete")
+			}
+		} else if doc.Recovery == nil || doc.Recovery.Generation != 190 || doc.Cleanup == nil || doc.Cleanup.Removed != 3 {
+			t.Fatal("valid receipts lost")
 		}
 	}
 }
