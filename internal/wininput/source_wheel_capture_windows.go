@@ -1003,6 +1003,10 @@ func (current *sourceWheelCaptureRun) loseForeground() bool {
 	if !current.active.Load() {
 		return false
 	}
+	if current.session != nil && current.session.RequestLocalReturn() {
+		current.active.Store(false)
+		return false // Keep the owner loop alive for cleanup and the next crossing.
+	}
 	current.setError(ErrSourceCaptureLostForeground)
 	return true
 }

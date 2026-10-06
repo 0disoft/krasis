@@ -146,6 +146,8 @@ type SourceSession struct {
 	queueMu       sync.Mutex
 	pendingMove   *queuedAction
 	faults        chan error
+	yields        chan uint64
+	yieldPending  uint64 // stateMu; prevents a new lease until local-return cleanup finishes.
 	now           func() time.Time
 	started       atomic.Bool
 	terminal      atomic.Bool
@@ -180,6 +182,7 @@ func NewSourceSessionWithObservers(capacity int, sink SourceSink, observer Sourc
 		cleanup:       SourceCleanupTimeout,
 		queue:         make(chan *queuedAction, capacity),
 		faults:        make(chan error, 1),
+		yields:        make(chan uint64, 1),
 		now:           time.Now,
 	}, nil
 }
@@ -197,6 +200,9 @@ func (session *SourceSession) Activate() error {
 	defer session.stateMu.Unlock()
 	if session.terminal.Load() || !session.started.Load() {
 		return errors.New("source session worker has stopped")
+	}
+	if session.yieldPending != 0 {
+		return errors.New("source local return is pending")
 	}
 	if session.active {
 		return errors.New("source session is already active")

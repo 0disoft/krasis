@@ -206,6 +206,9 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	sourceReady := make(chan struct{})
 	hookReady := make(chan struct{})
 	components := []component{
+		{name: "source-local-return", wait: hookReady, run: func() error {
+			return runSourceLocalReturns(runContext, source, outbound)
+		}},
 		{name: "source-session", run: func() error {
 			return source.RunWithReady(runContext, func() { close(sourceReady) })
 		}},
@@ -525,6 +528,9 @@ func (activation *combinedSourceActivation) deactivateCapture(profile context.Co
 func (activation *combinedSourceActivation) Active() bool {
 	if activation == nil {
 		return false
+	}
+	if source, ok := activation.source.(interface{ LocalReturnPending() bool }); ok && source.LocalReturnPending() {
+		return true // Block another boundary until the exact revoked generation is cleaned.
 	}
 	return activation.source != nil && activation.source.Active() ||
 		activation.capture != nil && activation.capture.Active()

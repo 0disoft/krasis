@@ -653,7 +653,7 @@ func TestTerminalCaptureCommandCannotActivate(t *testing.T) {
 	}
 }
 
-func TestCaptureLossStopsSuppressionBeforeCleanupAndRejectsLateActivation(t *testing.T) {
+func TestCaptureLossReturnsLocallyBeforeCleanupAndRejectsLateActivation(t *testing.T) {
 	session, err := NewSourceSession(1, &recordingSourceSink{})
 	if err != nil {
 		t.Fatal(err)
@@ -665,8 +665,8 @@ func TestCaptureLossStopsSuppressionBeforeCleanupAndRejectsLateActivation(t *tes
 	}
 	current := &sourceWheelCaptureRun{session: session}
 	current.active.Store(true)
-	if !current.loseForeground() {
-		t.Fatal("active loss not reported")
+	if current.loseForeground() {
+		t.Fatal("ordinary focus loss stopped the reusable capture owner")
 	}
 	if session.Active() || session.Offer(control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}) {
 		t.Fatal("lost capture retained suppression")
@@ -674,11 +674,20 @@ func TestCaptureLossStopsSuppressionBeforeCleanupAndRejectsLateActivation(t *tes
 	if err = session.Activate(); err == nil {
 		t.Fatal("late activation revived lost capture")
 	}
-	if cause := <-session.faults; !errors.Is(cause, ErrSourceCaptureLostForeground) {
-		t.Fatal(cause)
+	if current.err() != nil || len(session.faults) != 0 || !session.LocalReturnPending() {
+		t.Fatal("local return became a terminal failure")
 	}
 	if current.loseForeground() {
 		t.Fatal("normal inactive notification escalated")
+	}
+	generation := <-session.LocalReturns()
+	session.CompleteLocalReturn(generation + 1)
+	if !session.LocalReturnPending() {
+		t.Fatal("stale completion cleared pending cleanup")
+	}
+	session.CompleteLocalReturn(generation)
+	if err = session.Activate(); err != nil {
+		t.Fatal("source could not be reused after cleanup", err)
 	}
 }
 

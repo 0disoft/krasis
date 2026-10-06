@@ -47,8 +47,11 @@ Windows 11은 touchpad-capable window가 두 손가락 gesture의 `WM_POINTER`�
   복구할 수 없으므로, capture가 아직 foreground일 때만 복원을 시도하고 성공·실패와 무관하게 숨긴다.
   capture window가 더 이상 foreground가 아니거나 이전 handle이 유효하지 않으면 복원을 건너뛴다.
   실제 복원 시도 실패는 source hook failure로 승격한다.
-- active capture가 `WM_ACTIVATE/WA_INACTIVE`를 받으면 local wheel 유출을 허용하지 않고 source hook
-  component를 실패시켜 전체 session을 `LOCAL` cleanup으로 보낸다.
+- active capture가 `WM_ACTIVATE/WA_INACTIVE`를 받으면 즉시 source suppression을 해제하고
+  queued input generation을 폐기한다. agent는 write coordinator에서 현재 outbound lease를
+  해제하고 기존 revoke frame으로 peer에 통지한다. cleanup이 끝나기 전에는 새 outbound
+  activation을 막고, 정상 해제 뒤에는 owner thread와 인증된 연결을 재사용한다.
+  native cleanup·peer 통지 실패는 기존 terminal failure 경로를 따른다.
 - source hook cancellation 중 unregister, focus restore 또는 window cleanup 오류는 상위 cancellation에
   가려지지 않고 함께 반환한다.
 
