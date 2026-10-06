@@ -116,7 +116,8 @@ are limited to 64 MiB and 512 entries. The receiving PC temporarily stores
 their bytes in a private directory for Explorer paste, then removes them after
 24 hours when cleanup runs. Files still referenced by the Windows clipboard
 remain available for paste. Cleanup skips deletion if the clipboard cannot be
-read and retries on the next file reception.
+read and retries at startup, hourly, or on file reception. Each sweep separates
+at most four old directories, closes the clipboard, then deletes their contents.
 
 The worker reuses the legacy controller's Unicode size limits, excluded-content
 formats, remote-write marker, exact sequence comparison and acknowledgment logic.

@@ -54,10 +54,13 @@ Both archive size and total extracted bytes obey the 64 MiB bound. Transfers
 above the former 40 MiB bound require generation 72 on both devices, including
 when compression makes the archive itself smaller than 40 MiB.
 File contents are unpacked into a private local clipboard directory on the
-receiving PC and eligible for removal after 24 hours on the next file reception.
+receiving PC and eligible for removal after 24 hours at startup, hourly, or on file reception.
 Current clipboard file and folder references protect their entire staging
-directory. Cleanup holds the clipboard open through deletion and skips cleanup
-if it cannot read the clipboard. Text and image clipboard content is
+directory. Cleanup scans at most 512 entries and quarantines at most four
+unreferenced directories per sweep. It checks a 20ms budget between quarantine
+operations, closes the clipboard before recursive deletion, and retries failed
+delete-* directories on a later sweep. It skips cleanup if it cannot read the
+clipboard. Text and image clipboard content is
 never persisted or logged by Krasis; file content is never logged.
 
 The authenticated local `/v1/clipboard` API provides ENABLE, DISABLE and SYNC.

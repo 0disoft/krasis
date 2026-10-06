@@ -13,7 +13,6 @@ import (
 	"runtime"
 	"strings"
 	"syscall"
-	"time"
 	"unsafe"
 
 	"github.com/0disoft/krasis/internal/peercredentials"
@@ -275,73 +274,6 @@ func extractClipboardFilesAt(base string, data []byte) (string, []string, error)
 	}
 	keep = true
 	return stage, roots, nil
-}
-
-func cleanupClipboardFiles(base string) {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
-	if !clipboardDesktopAvailable() {
-		return
-	}
-	if ok, _, _ := clipOpen.Call(0); ok == 0 {
-		return
-	}
-	defer clipClose.Call()
-	var referenced []string
-	if clipboardHasFormat(cfHDROP) {
-		var err error
-		referenced, err = clipboardDropPaths()
-		if err != nil {
-			return
-		}
-	}
-	// Keep the clipboard locked until cleanup completes; a snapshot followed by
-	// CloseClipboard would let a new file reference race with deletion.
-	cleanupClipboardFilesWithReferences(base, referenced)
-}
-
-func cleanupClipboardFilesWithReferences(base string, referenced []string) {
-	if !filepath.IsAbs(base) {
-		return
-	}
-	for _, path := range referenced {
-		if !filepath.IsAbs(path) {
-			return
-		}
-	}
-	items, err := os.ReadDir(base)
-	if err != nil {
-		return
-	}
-	for _, item := range items {
-		if !item.IsDir() || !strings.HasPrefix(item.Name(), "copy-") {
-			continue
-		}
-		stage := filepath.Join(base, item.Name())
-		inUse := false
-		for _, path := range referenced {
-			clean := filepath.Clean(path)
-			if strings.EqualFold(clean, stage) || strings.HasPrefix(strings.ToLower(clean), strings.ToLower(stage+string(os.PathSeparator))) {
-				inUse = true
-				break
-			}
-		}
-		if inUse {
-			continue
-		}
-		wide, err := syscall.UTF16PtrFromString(stage)
-		if err != nil {
-			continue
-		}
-		attrs, err := syscall.GetFileAttributes(wide)
-		if err != nil || attrs&syscall.FILE_ATTRIBUTE_REPARSE_POINT != 0 {
-			continue
-		}
-		info, err := item.Info()
-		if err == nil && time.Since(info.ModTime()) > 24*time.Hour {
-			_ = os.RemoveAll(stage)
-		}
-	}
 }
 
 func hdropBytes(paths []string) ([]byte, error) {
