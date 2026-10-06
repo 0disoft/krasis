@@ -5,6 +5,8 @@
 `app recovery-status --json`은 `krasis.cli.recovery-status/v1`이다. `task`는
 `ENABLED|DISABLED|UNKNOWN`, `code`는 `recorded|not_recorded|receipt_unavailable`이다.
 유효한 마지막 기록은 `lastRun`의 시간·고정 코드·generation으로 표시한다.
+`lastRun.historyIncomplete:true`면 이전 복구 기록이 손상되어 실패 이력이
+일부 빠졌을 수 있다. 손상 원본은 로컬에 최근 4개까지 보존하고 전송하지 않는다.
 g195 기록에는 조회 당시 `agentState`도 포함한다. 상태는
 `LOCAL|CONNECTED|CONNECTING|RECONNECTING|DISCONNECTING|FAULTED|UNKNOWN`이며
 구버전 기록에는 없을 수 있다. `app ensure`가 `FAULTED`를 관측하면

@@ -15,11 +15,12 @@ import (
 )
 
 type RecoverySummary struct {
-	Time        string           `json:"time"`
-	Code        string           `json:"code"`
-	Generation  int              `json:"generation,omitempty"`
-	AgentState  string           `json:"agentState,omitempty"`
-	LastFailure *RecoveryFailure `json:"lastFailure,omitempty"`
+	Time              string           `json:"time"`
+	Code              string           `json:"code"`
+	Generation        int              `json:"generation,omitempty"`
+	AgentState        string           `json:"agentState,omitempty"`
+	LastFailure       *RecoveryFailure `json:"lastFailure,omitempty"`
+	HistoryIncomplete bool             `json:"historyIncomplete,omitempty"`
 }
 
 // A separate non-recursive shape keeps received diagnostic metadata bounded.
@@ -31,6 +32,7 @@ type RecoveryFailure struct {
 }
 
 var recoveryGate sync.Mutex
+var errInvalidRecoveryReceipt = errors.New("invalid recovery receipt")
 
 func (v RecoverySummary) failed() bool {
 	switch v.Code {
@@ -78,9 +80,11 @@ func SaveRecovery(base string, value RecoverySummary) error {
 	}
 	defer dir.Close()
 	previous, err := readRecoveryReceipt(dir)
-	if err != nil {
+	corrupt := errors.Is(err, errInvalidRecoveryReceipt)
+	if err != nil && !corrupt {
 		return err
 	}
+	value.HistoryIncomplete = corrupt || (previous != nil && previous.HistoryIncomplete)
 	value.LastFailure = nil
 	if value.failed() {
 		value.LastFailure = value.failure()
@@ -107,6 +111,11 @@ func SaveRecovery(base string, value RecoverySummary) error {
 	}
 	if err = f.Close(); err != nil {
 		return err
+	}
+	if corrupt {
+		if err = archiveCorruptRecovery(dir); err != nil {
+			return err
+		}
 	}
 	return dir.Replace(name, "recovery-latest.json")
 }
@@ -143,14 +152,17 @@ func readRecoveryReceipt(dir *securefs.Directory) (*RecoverySummary, error) {
 		return nil, err
 	}
 	data, err := io.ReadAll(io.LimitReader(f, 1025))
-	if err != nil || len(data) > 1024 {
-		return nil, errors.New("invalid recovery receipt")
+	if err != nil {
+		return nil, err
+	}
+	if len(data) > 1024 {
+		return nil, errInvalidRecoveryReceipt
 	}
 	d := json.NewDecoder(bytes.NewReader(data))
 	d.DisallowUnknownFields()
 	var value RecoverySummary
 	if d.Decode(&value) != nil || !value.valid() || d.Decode(new(any)) != io.EOF {
-		return nil, errors.New("invalid recovery receipt")
+		return nil, errInvalidRecoveryReceipt
 	}
 	return &value, nil
 }
