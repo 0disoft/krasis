@@ -186,6 +186,10 @@ func replace(dir *securefs.Directory, name string, data []byte) error {
 }
 
 func Load(localAppData string) (Record, error) {
+	return loadNamed(localAppData, "current.json")
+}
+
+func loadNamed(localAppData, name string) (Record, error) {
 	path, err := Directory(localAppData)
 	if err != nil {
 		return Record{}, err
@@ -201,7 +205,7 @@ func Load(localAppData string) (Record, error) {
 		return Record{}, err
 	}
 	defer dir.Close()
-	file, err := dir.Open("current.json")
+	file, err := dir.Open(name)
 	if errors.Is(err, os.ErrNotExist) {
 		return Record{}, ErrMissing
 	}
@@ -228,6 +232,23 @@ func Load(localAppData string) (Record, error) {
 		return Record{}, ErrInvalid
 	}
 	return record, nil
+}
+
+// RecoveryDirectories preserves both successful launch generations. An unreadable
+// record prevents cleanup rather than making its image eligible for deletion.
+func RecoveryDirectories(base string) ([]string, error) {
+	var paths []string
+	for _, name := range []string{"current.json", "previous.json"} {
+		record, err := loadNamed(base, name)
+		if errors.Is(err, ErrMissing) || errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		paths = append(paths, filepath.Dir(record.Executable))
+	}
+	return paths, nil
 }
 
 // Inspect verifies the remembered image without launching or modifying it.

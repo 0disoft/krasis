@@ -7,6 +7,34 @@ import (
 	"testing"
 )
 
+func TestRecoveryDirectoriesPreservesPreviousAndBlocksUnknownRecord(t *testing.T) {
+	base := t.TempDir()
+	var want []string
+	for i := 1; i <= 2; i++ {
+		bundle := t.TempDir()
+		want = append(want, bundle)
+		for _, name := range []string{"krasis.exe", "krasis-cli.exe"} {
+			if err := os.WriteFile(filepath.Join(bundle, name), []byte("MZ-test"), 0600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := Register(base, filepath.Join(bundle, "krasis.exe"), i, "test"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := RecoveryDirectories(base)
+	if err != nil || len(got) != 2 || got[0] != want[1] || got[1] != want[0] {
+		t.Fatal(got, err)
+	}
+	path, _ := Directory(base)
+	if err := os.WriteFile(filepath.Join(path, "previous.json"), []byte("broken"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := RecoveryDirectories(base); err == nil {
+		t.Fatal("corrupt backup allowed pruning")
+	}
+}
+
 func TestInspectChecksImageWithoutChangingLaunchRecord(t *testing.T) {
 	base, bundle := t.TempDir(), t.TempDir()
 	self := filepath.Join(bundle, "krasis.exe")

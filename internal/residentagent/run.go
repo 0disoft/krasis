@@ -124,6 +124,17 @@ func run(ctx context.Context, localAppData string, dependencies runDependencies)
 		updates, updateErr := peerupdate.Open(paths.Root, localapi.AgentGeneration)
 		if updateErr == nil {
 			updates.Observe = dependencies.log.Event
+			removed, pruneErr := updates.Prune(localAppData)
+			cleanupCode := "completed"
+			if pruneErr != nil {
+				cleanupCode = "failed"
+				dependencies.log.Event("peer_stage_cleanup_failed")
+			} else {
+				dependencies.log.Event("peer_stage_cleanup_completed")
+			}
+			if productlog.SaveCleanup(localAppData, productlog.CleanupSummary{Time: time.Now().UTC().Format(time.RFC3339Nano), Code: cleanupCode, Removed: removed}) != nil {
+				dependencies.log.Event("peer_stage_cleanup_failed")
+			}
 			operations.updates = updates
 			updates.ReceiveDiagnostic = func(peer string, data []byte) (string, error) {
 				return productlog.SaveRemoteSupport(localAppData, peer, data)

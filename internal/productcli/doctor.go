@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/0disoft/krasis/internal/localapi"
+	"github.com/0disoft/krasis/internal/productlog"
 )
 
 type doctorComponent struct {
@@ -91,6 +92,17 @@ func runDoctor(ctx context.Context, parsed options, deps dependencies) (doctorRe
 	v.addCheck("launch_record", v.LaunchRecord.State)
 	v.addCheck("installed_agent", v.InstalledAgent.State)
 	v.addCheck("service", v.Service.State)
+	if cleanup, err := productlog.CleanupReceipt(deps.localAppData); err != nil {
+		v.addCheck("update_stage_cleanup", "UNKNOWN")
+		v.action("inspect_update_cleanup", "업데이트 폴더 정리 결과를 읽지 못했습니다. 진단을 확인하세요.")
+	} else if cleanup != nil {
+		if cleanup.Code == "failed" {
+			v.addCheck("update_stage_cleanup", "FAILED")
+			v.action("inspect_update_cleanup", "일부 업데이트 폴더 정리를 보류하거나 실패했습니다. 파일을 수동 삭제하기 전에 진단을 확인하세요.")
+		} else {
+			v.addCheck("update_stage_cleanup", "COMPLETED")
+		}
+	}
 	if v.UI.State == "NOT_RUNNING" && v.LaunchRecord.State == "VERIFIED" {
 		v.action("open_ui", "앱 창이 닫혀 있습니다. krasis-cli relaunch로 열 수 있습니다.")
 	}

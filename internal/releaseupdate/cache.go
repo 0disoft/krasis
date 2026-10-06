@@ -23,6 +23,42 @@ type readyReceipt struct {
 
 const maxReceiptBytes = 2 << 20 // 64 bounded signed envelopes, base64 encoded.
 
+// CachedDirectories lets peer-stage cleanup preserve every public-release stage.
+// This is a retention hint only; it never authorizes execution of a release.
+func CachedDirectories(base string) ([]string, error) {
+	path, err := launchrecord.Directory(base)
+	if err != nil {
+		return nil, err
+	}
+	if _, err = os.Lstat(path); errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if _, err = peercredentials.ValidateSecurityDirectory(path); err != nil {
+		return nil, err
+	}
+	dir, err := securefs.OpenReadDirectory(path)
+	if err != nil {
+		return nil, err
+	}
+	defer dir.Close()
+	r, err := loadReady(dir)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	paths, err := productidentity.ResolveWindowsPaths(base)
+	if err != nil {
+		return nil, err
+	}
+	var folders []string
+	for _, id := range r.Folders {
+		folders = append(folders, filepath.Join(paths.Root, "updates", id))
+	}
+	return folders, nil
+}
+
 func readCache(dir *securefs.Directory, name string, limit int64) ([]byte, error) {
 	f, err := dir.Open(name)
 	if err != nil {
@@ -198,8 +234,12 @@ func PruneReady(base, key string) error {
 	if err != nil {
 		return err
 	}
-	latest, _ := launchrecord.Load(base)
+	recovery, err := launchrecord.RecoveryDirectories(base)
+	if err != nil {
+		return err
+	}
 	kept := []string{}
+	var failures error
 	for i, id := range r.Folders {
 		m, e := Verify(r.History[id], key)
 		if e != nil || m.SHA256[:32] != id {
@@ -208,7 +248,7 @@ func PruneReady(base, key string) error {
 		}
 		folder := filepath.Join(parent, id)
 		active := slices.ContainsFunc(live, func(path string) bool { return strings.EqualFold(path, folder) })
-		if i < 2 || active || strings.EqualFold(filepath.Dir(latest.Executable), folder) {
+		if i < 2 || active || slices.ContainsFunc(recovery, func(path string) bool { return strings.EqualFold(path, folder) }) {
 			kept = append(kept, id)
 			continue
 		}
@@ -217,11 +257,16 @@ func PruneReady(base, key string) error {
 			continue
 		}
 		if e != nil {
+			failures = errors.Join(failures, e)
 			kept = append(kept, id)
 			continue
 		}
-		guard.Close()
-		if e = root.RemoveAll(id); e != nil {
+		e = guard.Close()
+		if e == nil {
+			e = root.RemoveAll(id)
+		}
+		if e != nil {
+			failures = errors.Join(failures, e)
 			kept = append(kept, id)
 		}
 	}
@@ -232,5 +277,5 @@ func PruneReady(base, key string) error {
 		}
 	}
 	data, _ := json.Marshal(r)
-	return writeCache(dir, "release-ready.json", data)
+	return errors.Join(failures, writeCache(dir, "release-ready.json", data))
 }
