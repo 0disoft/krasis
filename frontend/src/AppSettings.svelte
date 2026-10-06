@@ -38,6 +38,7 @@
   <button disabled={!bridge || ['CHECKING','DOWNLOADING'].includes(release.state)} onclick={async()=>{release=await bridge.check();}}>{ko?'업데이트 확인':'Check for updates'}</button>
   {#if release.state !== 'IDLE'}<span role="status">{notices[ko?'ko':'en'][release.state]}</span>{/if}
   {#if value.code === 'start_menu_failed'}<span role="status">{ko?'시작 메뉴 등록 실패':'Start menu registration failed'}</span>
+  {:else if value.code === 'recovery_failed'}<span role="status">{ko?'앱 자동 복구 등록 실패':'App recovery registration failed'}</span>
   {:else if value.code !== 'ok'}<span role="status">{ko?'설정을 확인하지 못했습니다.':'Could not verify settings.'}</span>{/if}
 </div>
 <style>.app-settings{display:flex;flex-wrap:wrap;gap:16px}.app-settings label{display:flex;align-items:center;gap:8px;font-size:14px}.app-settings input{accent-color:var(--purple,#8751cd);width:16px;height:16px}.app-settings span{font-size:13px}</style>

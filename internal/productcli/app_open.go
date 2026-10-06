@@ -71,7 +71,7 @@ func appOpenOutcome(result appOpenResult, status localapi.AppOpenResult, err err
 	if err != nil {
 		result.Code = "outcome_unknown"
 	}
-	if result.Code == "launch_requested" {
+	if result.Code == "launch_requested" || result.Code == "window_ready" {
 		return result, ExitOK, nil
 	}
 	if result.Code == "unsupported" || result.Code == "rejected" {

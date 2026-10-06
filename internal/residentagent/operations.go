@@ -357,6 +357,11 @@ func (operations *Operations) Diagnostics(context.Context) (localapi.Diagnostics
 
 func (operations *Operations) SafeStop(context.Context) (localapi.OperationResult, error) {
 	operations.mu.Lock()
+	if operations.localAppData != "" {
+		if err := appsettings.PauseRecovery(operations.localAppData, true); err != nil {
+			operations.recordLocked("recovery_pause_failed")
+		}
+	}
 	operations.recordLocked("safe_stop_requested")
 	if operations.sessionDone != nil {
 		operations.sessionState = "DISCONNECTING"

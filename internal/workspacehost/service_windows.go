@@ -20,6 +20,7 @@ type WorkspaceService struct {
 	settingsGate     sync.Mutex
 	startAtLogin     bool
 	startMenuFailed  atomic.Bool
+	recoveryFailed   atomic.Bool
 	ctx              context.Context
 	control          string
 	title            string
@@ -36,6 +37,7 @@ type WorkspaceService struct {
 	jobs             sync.WaitGroup
 	prepareRecovery  func() error
 	prepareStartMenu func() error
+	prepareSettings  func() error
 	inputRefresh     func(context.Context) error
 	inputSetup       func() string
 	log              *productlog.Logger
@@ -53,8 +55,11 @@ func (s *WorkspaceService) ServiceStartup(context.Context, application.ServiceOp
 					s.log.Event("start_menu_registration_failed")
 				}
 			}
-			if err := s.prepareAppSettings(); err != nil {
-				s.log.Event("app_settings_startup_failed")
+			if s.prepareSettings != nil {
+				if err := s.prepareSettings(); err != nil {
+					s.recoveryFailed.Store(true)
+					s.log.Event("app_settings_startup_failed")
+				}
 			}
 		}
 	}

@@ -15,6 +15,7 @@ import (
 
 	windowsassets "github.com/0disoft/krasis/assets/windows"
 	"github.com/0disoft/krasis/frontend"
+	"github.com/0disoft/krasis/internal/appsettings"
 	"github.com/0disoft/krasis/internal/buildinfo"
 	"github.com/0disoft/krasis/internal/launchrecord"
 	"github.com/0disoft/krasis/internal/localapi"
@@ -147,6 +148,12 @@ func Run() {
 			return launchrecord.Register(base, self, localapi.AgentGeneration, buildinfo.Read().Revision)
 		}
 		service.prepareStartMenu = func() error { return launchrecord.RegisterStartMenu(base) }
+		service.prepareSettings = func() error {
+			if err := appsettings.PauseRecovery(base, false); err != nil {
+				return err
+			}
+			return service.prepareAppSettings()
+		}
 		service.updates = productpanel.NewUpdateTransferBridge(ctx, func() (productpanel.UpdateSettingsClient, error) { return localapi.OpenClient(paths.Control) }, updateBundleDirectory(self), transitionBundleDirectory(self), probeTransitionBundleDirectory(self), installerTransitionBundleDirectory(self))
 		service.receiver = productpanel.NewWorkspaceUpdateReceiver(ctx, func() (productpanel.UpdateSettingsClient, error) { return localapi.OpenClient(paths.Control) }, productpanel.LaunchReceivedWorkspaceUpdate)
 		service.diagnostics = productpanel.NewDiagnosticsBridge(ctx,

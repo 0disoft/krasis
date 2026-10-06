@@ -45,11 +45,12 @@ type apiClient interface {
 }
 
 type dependencies struct {
-	localAppData string
-	openClient   func(string) (apiClient, error)
-	executable   string
-	launch       func(string) error
-	inspectHost  func(context.Context, string, string) doctorHost
+	localAppData   string
+	openClient     func(string) (apiClient, error)
+	executable     string
+	launch         func(string) error
+	inspectHost    func(context.Context, string, string) doctorHost
+	agentAvailable func() (bool, error)
 }
 
 type options struct {
@@ -101,6 +102,14 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, deps depe
 			return ExitUsage
 		}
 		value, code := relaunch(deps)
+		return writeOutput(stdout, stderr, value, code, parsed.json)
+	}
+	if parsed.args[0] == "app" && parsed.args[1] == "ensure" {
+		if parsed.controlDir != "" {
+			writeUsageError(stderr, usageError("app ensure does not use --control-dir"))
+			return ExitUsage
+		}
+		value, code := ensureApp(ctx, deps)
 		return writeOutput(stdout, stderr, value, code, parsed.json)
 	}
 	if parsed.args[0] == "app" && parsed.args[1] == "repair" {
@@ -305,13 +314,13 @@ func parseGlobalOptions(args []string) (options, error) {
 func validateCommandArgs(args []string) error {
 	switch args[0] {
 	case "app":
-		if len(args) == 2 && args[1] == "repair" {
+		if len(args) == 2 && (args[1] == "repair" || args[1] == "ensure") {
 			return nil
 		}
 		if len(args) == 3 && args[1] == "open" && validAlias(args[2]) || len(args) == 4 && args[1] == "open-status" && validAlias(args[2]) && validHex(args[3], 32) {
 			return nil
 		}
-		return usageError("app requires repair, open ALIAS or open-status ALIAS ID")
+		return usageError("app requires ensure, repair, open ALIAS or open-status ALIAS ID")
 	case "relaunch":
 		if len(args) != 1 && (len(args) != 2 || args[1] != "--startup") {
 			return usageError("relaunch accepts only --startup")
