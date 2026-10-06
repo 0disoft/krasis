@@ -5,6 +5,7 @@ package wininput
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"runtime"
 	"syscall"
 	"unsafe"
 )
@@ -28,6 +29,7 @@ var sourceFocusProperty = func(window uintptr, name []uint16, operation string) 
 		args = append(args, 1)
 	}
 	value, _, _ := user32.NewProc(operation).Call(args...)
+	runtime.KeepAlive(name)
 	return value
 }
 var sourceFocusRemember = func(window uintptr) sourceFocusIdentity {
