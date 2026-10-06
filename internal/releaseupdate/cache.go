@@ -21,6 +21,8 @@ type readyReceipt struct {
 	History  map[string][]byte `json:"history"`
 }
 
+const maxReceiptBytes = 2 << 20 // 64 bounded signed envelopes, base64 encoded.
+
 func readCache(dir *securefs.Directory, name string, limit int64) ([]byte, error) {
 	f, err := dir.Open(name)
 	if err != nil {
@@ -60,7 +62,7 @@ func writeCache(dir *securefs.Directory, name string, data []byte) error {
 }
 
 func loadReady(dir *securefs.Directory) (readyReceipt, error) {
-	data, err := readCache(dir, "release-ready.json", 32768)
+	data, err := readCache(dir, "release-ready.json", maxReceiptBytes)
 	if err != nil {
 		return readyReceipt{}, err
 	}
@@ -192,7 +194,10 @@ func PruneReady(base, key string) error {
 		return err
 	}
 	defer root.Close()
-	self, _ := os.Executable()
+	live, err := launchrecord.LiveDirectories()
+	if err != nil {
+		return err
+	}
 	latest, _ := launchrecord.Load(base)
 	kept := []string{}
 	for i, id := range r.Folders {
@@ -202,7 +207,8 @@ func PruneReady(base, key string) error {
 			continue
 		}
 		folder := filepath.Join(parent, id)
-		if i < 2 || strings.EqualFold(filepath.Dir(self), folder) || strings.EqualFold(filepath.Dir(latest.Executable), folder) {
+		active := slices.ContainsFunc(live, func(path string) bool { return strings.EqualFold(path, folder) })
+		if i < 2 || active || strings.EqualFold(filepath.Dir(latest.Executable), folder) {
 			kept = append(kept, id)
 			continue
 		}

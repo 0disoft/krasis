@@ -161,7 +161,12 @@ func (s *WorkspaceService) runReleaseUpdater() {
 				continue
 			}
 			applied = s.managed.ApplyReleaseUpdate(s.ReleaseStatus().Generation, revision, func() error {
-				err := productpanel.LaunchReleaseWorkspaceUpdate(directory, revision)
+				ready, m, err := releaseupdate.RestoreReady(base, releaseupdate.PublicKey, localapi.AgentGeneration)
+				if err != nil || ready != directory || m.Revision != revision || m.Generation != s.ReleaseStatus().Generation {
+					launchFailed = true
+					return releaseupdate.ErrInvalid
+				}
+				err = productpanel.LaunchReleaseWorkspaceUpdate(directory, revision)
 				launchFailed = err != nil
 				return err
 			})
