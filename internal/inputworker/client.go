@@ -100,6 +100,7 @@ func (client *Client) performResponse(ctx context.Context, command request, obse
 		}
 	} else {
 		if err := client.mu.LockContext(ctx); err != nil {
+			handoff.Record(ctx, handoff.ClientLock, time.Since(start))
 			return notSent(errors.Join(ErrAuthority, err))
 		}
 	}

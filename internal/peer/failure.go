@@ -70,7 +70,14 @@ func failRuntimeCoordinatedWithin(
 
 func failRuntimeWithRecoveryRetry(ctx context.Context, runtime *application.SessionRuntime, cause error) error {
 	firstErr := runtime.Fail(ctx, cause)
-	if runtime.Snapshot().Control.State != control.StateFault || ctx.Err() != nil {
+	if ctx.Err() != nil {
+		return firstErr
+	}
+	snapshot, snapshotErr := runtime.SnapshotContext(ctx)
+	if snapshotErr != nil {
+		return errors.Join(firstErr, snapshotErr)
+	}
+	if snapshot.Control.State != control.StateFault {
 		return firstErr
 	}
 	return errors.Join(firstErr, runtime.Fail(ctx, cause))

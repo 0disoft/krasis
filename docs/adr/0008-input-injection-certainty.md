@@ -55,6 +55,24 @@ accepted as a liveness receipt. A native call that ignores context cannot be
 preempted by this budget; it remains synchronously owned until it returns.
 Two-PC input, protected-window reentry and latency still require device checks.
 
+## g208: Admission and release-plan cancellation
+
+The same input budget now starts before the peer write-coordinator gate and
+runtime lock. A canceled runtime waiter does not advance the input stream and
+still records a rejected disposition. Runtime failure and recovery-state queries
+honor the cleanup caller's deadline; an unavailable snapshot is not guessed as
+LOCAL. Service-client and protected-lease waiters likewise cancel before sending
+input, with elapsed lock waits retained in the existing duration-only profile.
+
+ReleaseAll stops submitting the remaining plan after context expiry. Its report
+keeps the existing plan-based Attempted count and conservation with Released and
+Remaining. Every unsubmitted or unconfirmed token stays in the pressed ledger.
+Ordinary release failures still allow other tokens to be released within the
+budget. Tests cover a slow key-up followed by fresh recovery, failed cleanup
+followed by a later successful recovery, and cancellation between two releases.
+These changes do not preempt a native call that ignores its context or authorize
+another backend to replay uncertain input.
+
 ## 대안
 
 - 모든 실패에서 journal 유지: stuck input에는 안전하지만 확실한 무주입에도 불필요한 up을 만든다.

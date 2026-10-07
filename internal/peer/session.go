@@ -144,6 +144,7 @@ func runSession(
 			}
 		case transport.MessageInput:
 			inputCtx, complete := handoff.Input(ctx, "receiver")
+			inputCtx, stopInput := context.WithTimeout(inputCtx, application.InputInjectionTimeout)
 			queued := time.Now()
 			recorded := false
 			err = coordinateDispatch(inputCtx, coordinator, func() (dispatchErr error) {
@@ -154,6 +155,7 @@ func runSession(
 			if !recorded {
 				complete(err)
 			}
+			stopInput()
 			if err != nil {
 				err = errors.Join(ErrPeerInputDispatch, err)
 			}

@@ -69,6 +69,7 @@ func (input *privilegedLeaseInput) open(ctx context.Context, identity applicatio
 	}
 	started := time.Now()
 	if err := input.mu.LockContext(ctx); err != nil {
+		handoff.Record(ctx, handoff.OpenLock, time.Since(started))
 		return errors.Join(errPrivilegedInput, err)
 	}
 	defer input.mu.Unlock()
@@ -181,6 +182,7 @@ func (input *privilegedLeaseInput) perform(ctx context.Context, operation func(p
 	}
 	started := time.Now()
 	if err := input.mu.LockContext(ctx); err != nil {
+		handoff.Record(ctx, handoff.OuterLock, time.Since(started))
 		return &application.InjectionError{Certainty: application.InjectionNotApplied, Cause: errors.Join(errPrivilegedInput, err)}
 	}
 	defer input.mu.Unlock()

@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/syncgate"
 )
 
 var (
@@ -49,6 +49,8 @@ const (
 	InputDispositionRejected
 )
 
+// Admission can be rejected before acquiring the runtime lock. These observers
+// must be concurrency-safe, nonblocking counters rather than mutable I/O sinks.
 type InputDispositionObserver interface {
 	ObserveDestinationInputReceived()
 	ObserveDestinationInputDisposition(InputDisposition)
@@ -65,7 +67,7 @@ type InputInjectionObserver interface {
 // control, ordering, liveness, and pressed-input state.
 type SessionRuntime struct {
 	watch          atomic.Pointer[LeaseWatch]
-	mu             sync.Mutex
+	mu             syncgate.Mutex
 	control        control.Snapshot
 	stream         control.InputStream
 	retiredInbound control.InputStream
@@ -106,6 +108,16 @@ func (runtime *SessionRuntime) Snapshot() RuntimeSnapshot {
 	runtime.mu.Lock()
 	defer runtime.mu.Unlock()
 	return runtime.snapshotLocked()
+}
+
+// SnapshotContext never reports a guessed state when another operation owns
+// the runtime beyond this caller's recovery budget.
+func (runtime *SessionRuntime) SnapshotContext(ctx context.Context) (RuntimeSnapshot, error) {
+	if err := runtime.mu.LockContext(ctx); err != nil {
+		return RuntimeSnapshot{}, err
+	}
+	defer runtime.mu.Unlock()
+	return runtime.snapshotLocked(), nil
 }
 
 func (runtime *SessionRuntime) Dispatch(
@@ -463,8 +475,6 @@ func (runtime *SessionRuntime) HandleInputAction(
 	envelope control.InputEnvelope,
 	action control.InputAction,
 ) (returnErr error) {
-	runtime.mu.Lock()
-	defer runtime.mu.Unlock()
 	disposition := InputDispositionRejected
 	if runtime.inputObserver != nil {
 		runtime.inputObserver.ObserveDestinationInputReceived()
@@ -472,6 +482,14 @@ func (runtime *SessionRuntime) HandleInputAction(
 			runtime.inputObserver.ObserveDestinationInputDisposition(disposition)
 		}()
 	}
+	// Admission and adapter work share one budget. A canceled lock waiter
+	// cannot consume a stream sequence or call an input adapter later.
+	injectionCtx, stopInjection := context.WithTimeout(ctx, InputInjectionTimeout)
+	defer stopInjection()
+	if err := runtime.mu.LockContext(injectionCtx); err != nil {
+		return err
+	}
+	defer runtime.mu.Unlock()
 
 	if runtime.control.State != control.StateInboundActive || runtime.stream.SessionID == "" {
 		if runtime.canDrainRetiredLocked() {
@@ -512,7 +530,6 @@ func (runtime *SessionRuntime) HandleInputAction(
 	}
 	runtime.stream = next
 
-	injectionCtx, stopInjection := context.WithTimeout(ctx, InputInjectionTimeout)
 	err = runtime.injectAction(injectionCtx, action)
 	if expired := injectionCtx.Err(); expired != nil {
 		// A late successful return cannot turn an expired operation into a
@@ -618,7 +635,9 @@ func (runtime *SessionRuntime) Fail(ctx context.Context, cause error) error {
 	if cause == nil {
 		cause = errors.New("peer session failed")
 	}
-	runtime.mu.Lock()
+	if err := runtime.mu.LockContext(ctx); err != nil {
+		return errors.Join(cause, err)
+	}
 	defer runtime.mu.Unlock()
 	if runtime.control.State == control.StateLocal {
 		return cause

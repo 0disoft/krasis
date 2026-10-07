@@ -43,6 +43,12 @@ func ReleaseAll(ctx context.Context, state *control.PressedState, port ReleasePo
 	report := ReleaseReport{Attempted: len(plan), Remaining: state.Count()}
 	failures := make([]error, 0)
 	for _, token := range plan {
+		if err := ctx.Err(); err != nil {
+			// Attempted counts the release plan, as in existing recovery
+			// reports. Unsubmitted tokens remain owned by this journal.
+			failures = append(failures, err)
+			break
+		}
 		if err := port.Release(ctx, token); err != nil {
 			failures = append(failures, TokenReleaseError{Token: token, Err: err})
 			continue
