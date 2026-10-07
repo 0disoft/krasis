@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { createAppSettingsBridge, emptyAppSettings } from './app-settings-bridge.js';
-  let { locale = 'ko' } = $props();
+  let { locale = 'ko', onStatus } = $props();
   let value = $state(emptyAppSettings());
   let busy = $state(true);
   let bridge = $state.raw();
@@ -9,6 +9,7 @@
   let release = $state({state:'IDLE',generation:0});
   const notices = {ko:{IDLE:'',CHECKING:'업데이트 확인 중',UNCONFIGURED:'공개 배포 준비 중',FAILED:'업데이트 확인 실패',CURRENT:'최신 버전',AVAILABLE:'새 버전 있음',DOWNLOADING:'업데이트 다운로드 중',READY:'연결 해제 후 자동 적용'},en:{IDLE:'',CHECKING:'Checking for updates',UNCONFIGURED:'Public releases not configured',FAILED:'Update check failed',CURRENT:'Up to date',AVAILABLE:'Update available',DOWNLOADING:'Downloading update',READY:'Will apply after disconnecting'}};
   const ko = $derived(locale === 'ko');
+  $effect(() => { if (!busy) onStatus?.(value.code, release.state); });
   async function change(startup, update) {
     if (!bridge || busy || disposed) return;
     busy = true;

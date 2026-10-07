@@ -14,8 +14,8 @@
   const block = $derived(keyboardMatchBlock(value, peer, busy));
   const canMatch = $derived(block === '');
   const explanations = {
-    ko: {no_peer:'상대 기기를 선택하세요.',busy:'맞추는 중입니다.',waiting:'키보드 상태를 확인하는 중입니다.',unsupported:'상대 Krasis를 업데이트하세요.',remote_unknown:'상대 PC에서 Krasis 창을 전면에 열어 주세요. 위의 상대 앱 열기를 누르면 됩니다.',local_unknown:'이 PC의 Krasis 창을 클릭해 전면에 두세요.'},
-    en: {no_peer:'Select a device.',busy:'Matching keyboard state.',waiting:'Waiting for keyboard state.',unsupported:'Update Krasis on the other PC.',remote_unknown:'Bring Krasis to the foreground on the other PC using Open other app above.',local_unknown:'Click this Krasis window to bring it to the foreground.'}
+    ko: {no_peer:'상대 기기를 선택하세요.',busy:'맞추는 중입니다.',waiting:'키보드 상태를 확인하는 중입니다.',unsupported:'상대 Krasis를 업데이트하세요.',remote_unknown:'상대 PC의 Krasis 창을 열어 주세요. 연결 화면의 앱 열기를 사용할 수 있습니다.',local_unknown:'이 PC의 Krasis 창을 클릭해 전면에 두세요.'},
+    en: {no_peer:'Select a device.',busy:'Matching keyboard state.',waiting:'Waiting for keyboard state.',unsupported:'Update Krasis on the other PC.',remote_unknown:'Bring Krasis to the foreground on the other PC using Open other app in the connection toolbar.',local_unknown:'Click this Krasis window to bring it to the foreground.'}
   };
   async function match() {
     if (!bridge || !canMatch) return;

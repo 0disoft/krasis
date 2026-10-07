@@ -45,3 +45,21 @@ dialog focus skips window controls. Closing retains the existing native
 WindowClosing hook: hide to tray, keep the agent/session alive. WindowVersion
 exposes display-only generation metadata, never an executable path or command.
 Input, trust, transport and privileged installation contracts are unchanged.
+
+## g212: Compact workspace and progressive settings
+
+The default workspace combines peer selection, app-open, registration and
+connection controls into one toolbar. Device illustrations show their names
+and known relative placement; the fixed input-role captions are removed.
+Clipboard sharing stays directly visible beside update, diagnostics and
+settings actions. Duplicate registration, a static navigation tab, recurring
+help and always-disabled placement controls no longer take default-page rows.
+
+Settings contains arrangement/re-entry controls, keyboard lock/IME details,
+startup/automatic-update preferences and language. Native generation remains
+in Settings and the titlebar tooltip. Safety warnings, app-setting failures,
+active public updates and active/failed clipboard transfers stay on the main
+page. Unknown status is never turned into success to simplify the layout.
+Consent, trust, connection operations and persistence remain unchanged.
+Initial dialog focus selects a visible control or disclosure, skipping both
+window controls and controls inside a collapsed settings section.

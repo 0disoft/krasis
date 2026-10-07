@@ -2,7 +2,8 @@
   import { onDestroy } from 'svelte';
   import { nativeText } from './native-i18n.js';
   import { appOpenProgress } from './app-open-bridge.js';
-  let { bridge, peer, locale } = $props();
+  import Icon from './Icon.svelte';
+  let { bridge, peer, locale, compact = false } = $props();
   let busy = $state(false);
   let result = $state();
   let disposed = false;
@@ -43,11 +44,16 @@
   onDestroy(() => { disposed = true; clearTimeout(timer); });
 </script>
 
-<div class="peer-app-action">
-  <button type="button" disabled={!bridge || !peer || busy} onclick={open}>{t('app_open')}{peer ? ' · ' + peer.alias : ''}</button>
-  {#if visible}<span role="status">{t('app_open_' + visible.code)}</span>{/if}
+<div class="peer-app-action" class:compact>
+  <button type="button" disabled={!bridge || !peer || busy} aria-label={t('app_open') + (peer ? ' · ' + peer.alias : '')} title={t('app_open') + (peer ? ' · ' + peer.alias : '')} onclick={open}>
+    {#if compact}<Icon name="monitor" size={18} />{:else}{t('app_open')}{peer ? ' · ' + peer.alias : ''}{/if}
+  </button>
+  {#if visible && (!compact || visible.code !== 'window_ready')}<span role="status">{t('app_open_' + visible.code)}</span>{/if}
 </div>
 <style>
   .peer-app-action { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin:12px 0; }
   span { color:var(--muted, #b5bac8); }
+  .compact { margin:0; gap:8px; font-size:12px; min-width:0; }
+  .compact button { width:36px; height:36px; padding:0; flex-shrink:0; }
+  .compact span { flex-basis:100%; max-width:240px; overflow-wrap:anywhere; }
 </style>
