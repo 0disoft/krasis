@@ -96,3 +96,18 @@ test('boundary reasons are allowlisted and only visible while connected', async 
     assert.equal((await bridge.refresh()).boundaryBlocked, expected);
   }
 });
+
+test('maintenance projections preserve separate outcomes and narrow unknown details', async () => {
+  for (const [inputRefreshCode,reconnectCode,expectedRefresh,expectedReconnect] of [
+    ['input_refresh_failed','outcome_unknown','input_refresh_failed','outcome_unknown'],
+    ['ok','stale_peer','ok','stale_peer'],
+    ['input_refresh_pending','not_attempted','input_refresh_pending','not_attempted'],
+    ['/private/path',{error:'private'},'unknown','unknown'],
+    [undefined,undefined,'',''],
+  ]) {
+    const bridge = createBridge({Refresh:async () => ({...snapshot('LOCAL'),inputRefreshCode,reconnectCode}),Connect() {},Disconnect() {}});
+    const value = await bridge.refresh();
+    assert.equal(value.inputRefreshCode,expectedRefresh);
+    assert.equal(value.reconnectCode,expectedReconnect);
+  }
+});

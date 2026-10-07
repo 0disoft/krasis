@@ -415,3 +415,13 @@ shows persistence separately from connection status, and CLI output discourages
 repeating an accepted CONNECT. Resume persistence checks the admitted pin before
 saving so a later alias replacement cannot save a different peer. No new endpoint
 or database, hygiene or task-runner change is introduced.
+
+Protected-input maintenance projects inputRefreshCode and reconnectCode as
+separate bounded outcomes. Reconnect uncertainty, manual-stop cancellation and
+changed identity retain their command code even when installation also fails.
+Periodic lifecycle observations preserve both outcomes without replaying the
+maintenance connection request. A new maintenance operation or explicit
+connect/disconnect/restart clears them. The renderer allowlists their values and
+shows a localized combined notice only for non-success outcomes; an accepted
+reconnect request is not described as an established session. No new endpoint,
+database, repository hygiene or task-runner change is introduced.

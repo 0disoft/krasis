@@ -51,10 +51,19 @@ func (b *DesktopLifecycle) Refresh() BridgeSnapshot {
 func (b *DesktopLifecycle) save(value BridgeSnapshot) BridgeSnapshot {
 	b.stateMu.Lock()
 	// Native projection revision, independent of HTTP response arrival order.
+	if value.InputRefreshCode == "" && value.ReconnectCode == "" {
+		value.InputRefreshCode, value.ReconnectCode = b.state.InputRefreshCode, b.state.ReconnectCode
+	}
 	value.Revision = b.state.Revision + 1
 	b.state = value
 	b.stateMu.Unlock()
 	return value
+}
+
+func (b *DesktopLifecycle) clearMaintenanceOutcome() {
+	b.stateMu.Lock()
+	b.state.InputRefreshCode, b.state.ReconnectCode = "", ""
+	b.stateMu.Unlock()
 }
 
 func (b *DesktopLifecycle) operation() (context.Context, func()) {
@@ -122,6 +131,7 @@ func (b *DesktopLifecycle) Connect(alias, fingerprint string) BridgeSnapshot {
 	b.stopped.Store(false)
 	b.updatedResume = nil
 	b.recovery.Reset()
+	b.clearMaintenanceOutcome()
 	if err := b.startup(ctx); err != nil {
 		return b.failedStartup(ctx, err)
 	}
@@ -139,6 +149,7 @@ func (b *DesktopLifecycle) Disconnect() BridgeSnapshot {
 	defer b.gate.Unlock()
 	b.updatedResume = nil
 	b.recovery.Stop()
+	b.clearMaintenanceOutcome()
 	ctx, done := b.operation()
 	defer done()
 	return b.save(NewDesktopBridge(ctx, b.open).Disconnect())
@@ -167,6 +178,7 @@ func (b *DesktopLifecycle) Restart() BridgeSnapshot {
 	b.recovery.Reset()
 	b.updatedResume = nil
 	b.stopped.Store(false)
+	b.clearMaintenanceOutcome()
 	if err := b.startup(ctx); err != nil {
 		return b.failedStartup(ctx, err)
 	}

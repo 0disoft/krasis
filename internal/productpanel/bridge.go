@@ -16,18 +16,20 @@ const BridgeSchema = "krasis.desktop/v1"
 // Notice is legacy localized panel copy; native integration must map it to catalog
 // codes before advertising complete localization of agent failures.
 type BridgeSnapshot struct {
-	ResumeState     string       `json:"resumeState,omitempty"`
-	BoundaryBlocked string       `json:"boundaryBlocked,omitempty"`
-	InputSetup      string       `json:"inputSetup,omitempty"`
-	InputBackend    string       `json:"inputBackend"`
-	Revision        uint64       `json:"revision,omitempty"`
-	Schema          string       `json:"schema"`
-	State           string       `json:"state"`
-	PeerAlias       string       `json:"peerAlias"`
-	StopReason      string       `json:"stopReason,omitempty"`
-	Peers           []BridgePeer `json:"peers"`
-	Code            string       `json:"code"`
-	Notice          string       `json:"notice"`
+	InputRefreshCode string       `json:"inputRefreshCode,omitempty"`
+	ReconnectCode    string       `json:"reconnectCode,omitempty"`
+	ResumeState      string       `json:"resumeState,omitempty"`
+	BoundaryBlocked  string       `json:"boundaryBlocked,omitempty"`
+	InputSetup       string       `json:"inputSetup,omitempty"`
+	InputBackend     string       `json:"inputBackend"`
+	Revision         uint64       `json:"revision,omitempty"`
+	Schema           string       `json:"schema"`
+	State            string       `json:"state"`
+	PeerAlias        string       `json:"peerAlias"`
+	StopReason       string       `json:"stopReason,omitempty"`
+	Peers            []BridgePeer `json:"peers"`
+	Code             string       `json:"code"`
+	Notice           string       `json:"notice"`
 }
 
 type BridgePeer struct {

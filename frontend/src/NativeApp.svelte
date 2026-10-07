@@ -1,5 +1,6 @@
 <script>
   import { onMount, tick } from 'svelte';
+  import { inputMaintenanceNotice } from './input-maintenance-notice.js';
   import UpdateSettings from './UpdateSettings.svelte';
   import AppSettings from './AppSettings.svelte';
   import { appReleaseNotice, emptyAppSettings } from './app-settings-bridge.js';
@@ -125,6 +126,7 @@
     finally { windowBusy = false; }
   }
   const inputNotice = $derived(inputBusy ? 'UPDATING' : snapshot.inputSetup ?? 'UNKNOWN');
+  const maintenanceNotice = $derived(inputMaintenanceNotice(snapshot, locale));
   const inputNeedsAction = $derived(['NOT_INSTALLED','UPDATE_REQUIRED','CANCELLED','FAILED'].includes(inputNotice));
   const inputNoticeKey = $derived(inputNotice === 'UNKNOWN' || inputNotice === 'READY' ? 'input_portable' : 'input_setup_' + inputNotice);
   const selectedPeer = $derived(snapshot.peers.find(p => p.fingerprint === selected));
@@ -219,6 +221,7 @@
           selected = (value.peers.find(p => p.alias === value.peerAlias) ?? value.peers[0])?.fingerprint ?? '';
         }
         error = value.code === 'ok' || value.code.startsWith('input_refresh_') ? '' : value.code;
+        if (action === 'input' && (value.code === value.inputRefreshCode || value.code === value.reconnectCode)) error = '';
       } catch {
         if (!disposed) { snapshot = {state:'UNKNOWN', peerAlias:'', peers:[], code:'unavailable'}; error = 'unavailable'; }
       }
@@ -347,6 +350,7 @@
       <p class="fault-banner" role="alert">{t(error)}</p>
     {/if}
 	{#if snapshot.resumeState === 'FAILED'}<p class="release-notice" role="status">{t('resume_save_failed')}</p>{/if}
+    {#if maintenanceNotice}<p class="release-notice" role="status">{maintenanceNotice}</p>{/if}
   {#if ['PREPARING','PENDING','APPLYING','APPLIED','FAILED'].includes(uiReplacement.state)}
     <p class="release-notice" role="status">{#if !uiReplacement.fresh}{t('ui_replacement_stale')} · {/if}{t('ui_replacement_' + uiReplacement.state)} · g{uiReplacement.generation}
       {#if uiReplacement.canRetry}<button disabled={uiReplacementBusy} onclick={retryUIReplacement}>{t('ui_replacement_retry')}</button>{/if}

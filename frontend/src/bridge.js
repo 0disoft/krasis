@@ -1,5 +1,7 @@
 const states = new Set(['LOCAL', 'CONNECTING', 'CONNECTED', 'RECONNECTING', 'DISCONNECTING', 'FAULTED', 'UNKNOWN']);
 const inputSetupStates = new Set(['NOT_INSTALLED','UPDATE_REQUIRED','READY','UPDATING','CANCELLED','FAILED','PENDING','UNKNOWN']);
+const refreshCodes = new Set(['ok','input_refresh_cancelled','input_refresh_pending','input_refresh_failed','busy']);
+const reconnectCodes = new Set(['not_attempted','ok','unavailable','outcome_unknown','cancelled','stale_peer','invalid_peer','rejected','recovery_required','agent_incompatible','busy']);
 
 // Only a native-owned binding is accepted. This module never discovers endpoint
 // files, makes HTTP calls, stores tokens, or silently falls back to mock success.
@@ -27,6 +29,8 @@ export function createBridge(binding) {
       const result = { schema: value.schema, state: value.state, peerAlias: value.peerAlias,
         code: value.code, notice: value.notice,
 		resumeState: ['SAVED','FAILED'].includes(value.resumeState) ? value.resumeState : 'UNKNOWN',
+		inputRefreshCode: value.inputRefreshCode === undefined ? '' : refreshCodes.has(value.inputRefreshCode) ? value.inputRefreshCode : 'unknown',
+		reconnectCode: value.reconnectCode === undefined ? '' : reconnectCodes.has(value.reconnectCode) ? value.reconnectCode : 'unknown',
         boundaryBlocked: value.state === 'CONNECTED' && ['LOCAL_MENU','MOUSE_CAPTURE','PRESSED_INPUT','MOVE_SIZE'].includes(value.boundaryBlocked) ? value.boundaryBlocked : '',
 		inputBackend: ['PROTECTED','PORTABLE'].includes(value.inputBackend) ? value.inputBackend : 'UNKNOWN',
         inputSetup: inputSetupStates.has(value.inputSetup) ? value.inputSetup : 'UNKNOWN',

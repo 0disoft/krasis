@@ -101,6 +101,8 @@ func (b *DesktopLifecycle) RefreshProtectedInput(refresh func(context.Context) e
 // Caller owns gate and the operation context; startup and the button share the
 // same disconnect/reconnect transaction rather than nesting locks.
 func (b *DesktopLifecycle) refreshProtectedInput(ctx context.Context, before BridgeSnapshot, refresh func(context.Context) error) BridgeSnapshot {
+	b.clearMaintenanceOutcome()
+	before.InputRefreshCode, before.ReconnectCode = "", ""
 	bridge := NewDesktopBridge(ctx, b.open)
 	alias, fingerprint := before.PeerAlias, ""
 	matches := 0
@@ -139,20 +141,29 @@ func (b *DesktopLifecycle) refreshProtectedInput(ctx context.Context, before Bri
 	defer cancel()
 	bridge = NewDesktopBridge(reconnect, b.open)
 	value := bridge.Refresh()
+	reconnectCode := "not_attempted"
 	if b.ctx.Err() == nil && ctx.Err() == nil && alias != "" && fingerprint != "" && !errors.Is(err, ErrInputRefreshPending) && !errors.Is(err, ErrStartupBusy) {
 		value = b.recoveryResume(bridge, alias, fingerprint)
+		reconnectCode = value.Code
 	}
+	refreshCode := "ok"
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrInputRefreshCancelled):
-			value.Code = "input_refresh_cancelled"
+			refreshCode = "input_refresh_cancelled"
 		case errors.Is(err, ErrInputRefreshPending):
-			value.Code = "input_refresh_pending"
+			refreshCode = "input_refresh_pending"
 		case errors.Is(err, ErrStartupBusy), errors.Is(err, ErrAgentBusy):
-			value.Code = "busy"
+			refreshCode = "busy"
 		default:
-			value.Code = "input_refresh_failed"
+			refreshCode = "input_refresh_failed"
 		}
+	}
+	value.InputRefreshCode, value.ReconnectCode = refreshCode, reconnectCode
+	// A failed/uncertain reconnect retains its safety notice; maintenance cannot
+	// replace it with a less specific installer result.
+	if refreshCode != "ok" && (reconnectCode == "not_attempted" || value.Code == "ok") {
+		value.Code = refreshCode
 	}
 	return b.save(value)
 }

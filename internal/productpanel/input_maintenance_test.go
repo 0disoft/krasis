@@ -159,3 +159,56 @@ func TestInputMaintenanceReconnectsOnlyTheSameTrustedPeerAfterTerminalOutcome(t 
 		})
 	}
 }
+
+func TestInputMaintenanceKeepsRefreshAndReconnectOutcomesSeparate(t *testing.T) {
+	for _, tc := range []struct {
+		name, refreshCode, reconnectCode, code string
+		outcome                                error
+		uncertain, manualStop, changed         bool
+		connects                               int
+	}{
+		{"success", "ok", "ok", "ok", nil, false, false, false, 1},
+		{"cancelled with accepted resume", "input_refresh_cancelled", "ok", "input_refresh_cancelled", ErrInputRefreshCancelled, false, false, false, 1},
+		{"failed with lost response", "input_refresh_failed", "outcome_unknown", "outcome_unknown", ErrInputRefreshFailed, true, false, false, 1},
+		{"cancelled with manual stop", "input_refresh_cancelled", "cancelled", "cancelled", ErrInputRefreshCancelled, false, true, false, 0},
+		{"failed with changed peer", "input_refresh_failed", "stale_peer", "stale_peer", ErrInputRefreshFailed, false, false, true, 0},
+		{"pending without resume", "input_refresh_pending", "not_attempted", "input_refresh_pending", ErrInputRefreshPending, false, false, false, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			b, c, now := newResumeTest(t, nil)
+			b.updatedResume = nil
+			c.state = "CONNECTED"
+			value := b.RefreshProtectedInput(func(context.Context) error {
+				c.uncertain, c.manualStop = tc.uncertain, tc.manualStop
+				if tc.changed {
+					c.peers[0].Fingerprint = strings.Repeat("c", 64)
+				}
+				return tc.outcome
+			})
+			if value.InputRefreshCode != tc.refreshCode || value.ReconnectCode != tc.reconnectCode || value.Code != tc.code || c.connects != tc.connects {
+				t.Fatal("maintenance overwrote reconnect outcome", value, c.connects)
+			}
+			b.tick(now)
+			value = b.Refresh()
+			if value.InputRefreshCode != tc.refreshCode || value.ReconnectCode != tc.reconnectCode || c.connects != tc.connects {
+				t.Fatal("poll erased outcome or repeated connect", value, c.connects)
+			}
+			value = b.Disconnect()
+			if value.InputRefreshCode != "" || value.ReconnectCode != "" {
+				t.Fatal("explicit disconnect retained old maintenance outcome", value)
+			}
+		})
+	}
+}
+
+func TestExplicitConnectionClearsPreviousMaintenanceOutcome(t *testing.T) {
+	b, c, _ := newResumeTest(t, nil)
+	b.updatedResume = nil
+	c.state = "CONNECTED"
+	b.RefreshProtectedInput(func(context.Context) error { return ErrInputRefreshFailed })
+	c.state = "LOCAL" // A subsequent CLI disconnect does not clear the UI outcome.
+	value := b.Connect("B", c.peers[0].Fingerprint)
+	if value.Code != "ok" || value.InputRefreshCode != "" || value.ReconnectCode != "" {
+		t.Fatal("explicit connect retained old maintenance outcome", value)
+	}
+}
