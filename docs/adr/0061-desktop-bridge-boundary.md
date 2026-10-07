@@ -425,3 +425,11 @@ connect/disconnect/restart clears them. The renderer allowlists their values and
 shows a localized combined notice only for non-success outcomes; an accepted
 reconnect request is not described as an established session. No new endpoint,
 database, repository hygiene or task-runner change is introduced.
+
+## g229: Keep automatic installation failures separate from fallback startup
+
+Automatic input refresh returns terminal cancellation or failure to maintenance.
+Startup permits these two terminal results to fall back to an ordinary agent,
+while pending work and other ownership/startup errors still prevent a launch.
+The one-attempt latch prevents consent replay during that fallback. Maintenance
+retains the installer result even when the ordinary agent and reconnect succeed.

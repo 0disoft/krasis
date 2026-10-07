@@ -106,6 +106,9 @@ func TestLaunchMaintenanceDisconnectsRefreshesAndRestoresSamePeerOnce(t *testing
 			if tc.outcome == ErrInputRefreshPending && value.Code != "input_refresh_pending" {
 				t.Fatal(value)
 			}
+			if tc.outcome == ErrInputRefreshCancelled && value.InputRefreshCode != "input_refresh_cancelled" || tc.outcome == ErrInputRefreshFailed && value.InputRefreshCode != "input_refresh_failed" {
+				t.Fatal("ordinary input recovery erased installation failure", value)
+			}
 			if !tc.cancel {
 				b.tick(time.Now())
 				if installs != 1 {

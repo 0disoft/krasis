@@ -137,7 +137,7 @@ func (s Startup) Ensure(ctx context.Context) error {
 
 func (s Startup) start(ctx context.Context) error {
 	if s.BeforeStart != nil {
-		if err := s.BeforeStart(ctx); err != nil {
+		if err := s.BeforeStart(ctx); err != nil && !errors.Is(err, ErrInputRefreshCancelled) && !errors.Is(err, ErrInputRefreshFailed) {
 			return err
 		}
 	}

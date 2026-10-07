@@ -93,16 +93,16 @@ func (b *inputRefresh) apply(ctx context.Context, explicit bool) error {
 		b.setState("CANCELLED")
 	case err != nil:
 		b.setState("FAILED")
+		if !errors.Is(err, ErrInputRefreshFailed) {
+			err = errors.Join(ErrInputRefreshFailed, err)
+		}
 	case b.inspect() != "READY":
 		b.setState("FAILED")
 		err = ErrInputRefreshFailed
 	default:
 		b.setState("READY")
 	}
-	// Cancellation/failure preserves ordinary input. Recovery and polling do
-	// not repeat the consent prompt; retry requires a local button click.
-	if explicit {
-		return err
-	}
-	return nil
+	// Preserve the installer result. Startup may restore ordinary input without
+	// treating this result as successful or repeating the consent prompt.
+	return err
 }
