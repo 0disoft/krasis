@@ -10,7 +10,7 @@
   let checking = $state(false);
   let releaseEpoch = 0;
   const ko = $derived(locale === 'ko');
-  $effect(() => { if (!busy) onStatus?.(value.code, release.state); });
+  $effect(() => { onStatus?.(value.code, release.state, busy ? null : value); });
   $effect(() => { if (active && bridge) void untrack(refreshSettings); });
   async function refreshSettings() {
     if (!bridge || busy || disposed) return;

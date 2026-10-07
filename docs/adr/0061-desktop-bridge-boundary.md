@@ -247,3 +247,9 @@ from OS registration/restoration outcomes. Unreadable values stay unknown even
 with rollback_failed. Checkboxes are indeterminate and disabled until a fresh
 read succeeds. Failed-write reconciliation never reuses stale known values if
 its subsequent read fails. Legacy error responses cannot prove preferences.
+
+Both the workspace banner and settings notice use appReleaseNotice with the
+same preference snapshot. A pending settings read or write projects unknown
+preferences to both surfaces, so neither announces automatic application from
+stale values. Duplicate release strings are removed from the native catalog.
+No endpoint, database, repository hygiene or runner changes are introduced.
