@@ -26,7 +26,7 @@
   const t = key => nativeText(locale, key);
   const current = $derived(value.peer === selected ? value : emptyUpdateSettings(selected));
   const job = $derived(transfer.peer === selected ? transfer : emptyUpdateTransfer(selected));
-  const sendReady = $derived(!!selected && !!bridge && !inputBusy && current.appGeneration > 0 && current.localGeneration === current.appGeneration && current.peerState === 'ONLINE' && current.remotePermission === 'ALLOWED' && !transferActive(job.state));
+  const sendReady = $derived(!!selected && !!bridge && !inputBusy && current.appGeneration > 0 && current.localGeneration === current.appGeneration && current.peerState === 'ONLINE' && current.comparison === 'LOCAL_NEWER' && current.remotePermission === 'ALLOWED' && !transferActive(job.state));
   const canSend = $derived(sendReady && !busy);
   const selectedName = $derived(peers.find(peer => peer.fingerprint === selected)?.alias ?? '');
   const permissionText = permission => t(permission === 'ALLOWED' ? 'upd_allowed' : permission === 'DENIED' ? 'upd_denied' : 'upd_permission_unknown');
@@ -112,7 +112,7 @@
     {#if current.peerState === 'ONLINE' && current.peerGeneration === 75}<p>{t('upd_transition_next')}</p>{/if}
     {#if !confirmingSend}
       <div class="upd-send-row">
-        <button bind:this={sendTrigger} class="primary" disabled={!canSend || confirmingAllow} onclick={requestSend}>{t('upd_send')}</button>
+        <button bind:this={sendTrigger} class="primary" disabled={!canSend || confirmingAllow} onclick={requestSend}>{t(current.peerState === 'ONLINE' && current.comparison === 'SAME_BUILD' ? 'upd_current' : 'upd_send')}</button>
       </div>
     {/if}
     {#if confirmingSend}

@@ -158,3 +158,9 @@ reads the actual native settings again, replacing stale failure indicators
 only with the returned status. Initial background loading still supplies
 workspace notices. Reads do not overlap an active settings write and closing
 the dialog does not cancel or retry a write. No preference defaults change.
+
+Peer update sending is enabled only for a freshly observed LOCAL_NEWER
+comparison in addition to the existing permission and generation checks.
+Matching builds show a disabled Up to date action. Newer peers, conflicting
+builds and unknown comparisons remain explained and cannot initiate a send.
+Native version, trust and permission checks remain authoritative.
