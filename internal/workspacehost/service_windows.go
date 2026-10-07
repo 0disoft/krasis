@@ -95,6 +95,8 @@ func (s *WorkspaceService) ServiceStartup(context.Context, application.ServiceOp
 		s.managed.StartupReady = s.promoteRecovery
 		s.jobs.Add(1)
 		go func() { defer s.jobs.Done(); s.runUIReadyReporter() }()
+		s.jobs.Add(1)
+		go s.runKeyboardReporter()
 		s.done = make(chan struct{})
 		go func() { defer close(s.done); s.managed.Run() }()
 		s.jobs.Add(1)

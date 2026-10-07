@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { createKeyboardBridge, emptyKeyboard } from './keyboard-bridge.js';
+  import { createKeyboardBridge, emptyKeyboard, keyboardMatchBlock } from './keyboard-bridge.js';
   let { peer = '', locale = 'ko' } = $props();
   let value = $state(emptyKeyboard(''));
   let busy = $state(false);
@@ -8,10 +8,15 @@
   let bridge;
   let disposed = false;
   const ko = $derived(locale === 'ko');
-  const modes = {ko:{ON:'켜짐',OFF:'꺼짐',UNKNOWN:'확인 전'},en:{ON:'On',OFF:'Off',UNKNOWN:'Unknown'}};
+  const modes = {ko:{ON:'켜짐',OFF:'꺼짐',UNKNOWN:'확인 불가'},en:{ON:'On',OFF:'Off',UNKNOWN:'Unavailable'}};
   const local = $derived(value.local);
   const remote = $derived(value.peer === peer ? value.remote : {caps:'UNKNOWN',num:'UNKNOWN',hangul:'UNKNOWN'});
-  const canMatch = $derived(!busy && value.code === 'ok' && peer && remote.caps !== 'UNKNOWN' && remote.num !== 'UNKNOWN');
+  const block = $derived(keyboardMatchBlock(value, peer, busy));
+  const canMatch = $derived(block === '');
+  const explanations = {
+    ko: {no_peer:'상대 기기를 선택하세요.',busy:'맞추는 중입니다.',waiting:'키보드 상태를 확인하는 중입니다.',unsupported:'상대 Krasis를 업데이트하세요.',remote_unknown:'상대 PC에서 Krasis 창을 전면에 열어 주세요. 위의 상대 앱 열기를 누르면 됩니다.',local_unknown:'이 PC의 Krasis 창을 클릭해 전면에 두세요.'},
+    en: {no_peer:'Select a device.',busy:'Matching keyboard state.',waiting:'Waiting for keyboard state.',unsupported:'Update Krasis on the other PC.',remote_unknown:'Bring Krasis to the foreground on the other PC using Open other app above.',local_unknown:'Click this Krasis window to bring it to the foreground.'}
+  };
   async function match() {
     if (!bridge || !canMatch) return;
     const target = peer;
@@ -55,8 +60,9 @@
       <tr><th>{ko ? '상대 PC' : 'Other PC'}</th>{#each ['caps','num','hangul'] as key}<td>{modes[ko?'ko':'en'][remote[key]]}</td>{/each}</tr>
     </tbody>
   </table>
-  <p>{ko ? 'Caps·Num 확인과 맞추기는 양쪽 Krasis 창을 전면에 두고 사용하세요. 한/영 상태는 앱마다 다릅니다.' : 'Keep both Krasis windows in the foreground to observe and match Caps/Num. IME mode is specific to each app.'}</p>
-  <button disabled={!canMatch} onclick={match}>{ko ? '이 PC의 Caps·Num을 상대와 맞추기' : 'Match this PC’s Caps and Num to the other PC'}</button>
+  <p id="keyboard-match-help">{block ? explanations[ko?'ko':'en'][block] : (ko ? '맞추기를 누르면 이 PC의 Caps·Num을 상대와 같게 바꿉니다.' : 'Matching changes this PC’s Caps and Num to the other PC’s states.')}</p>
+  <p>{ko ? '한/영 상태는 현재 앱 기준이며 맞추기에 포함되지 않습니다.' : 'IME mode belongs to the current app and is not included in matching.'}</p>
+  <button disabled={!canMatch} aria-describedby="keyboard-match-help" onclick={match}>{ko ? '이 PC의 Caps·Num을 상대와 맞추기' : 'Match this PC’s Caps and Num to the other PC'}</button>
   {#if notice}<p role="status">{notice}</p>{/if}
 </details>
 <style>

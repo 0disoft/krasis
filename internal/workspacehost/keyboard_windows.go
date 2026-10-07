@@ -37,6 +37,37 @@ func keyboardOnUI[T any](ctx context.Context, operation func() T) (T, bool) {
 	}
 }
 
+// Reporting belongs to the native host, not the renderer. A hidden or suspended
+// WebView must not stop publishing safe UNKNOWN observations or fresh samples
+// after the user brings Krasis forward. This never opens or focuses a window.
+func (s *WorkspaceService) runKeyboardReporter() {
+	defer s.jobs.Done()
+	runKeyboardReports(s.ctx, func(ctx context.Context) (keyboardstate.State, bool) {
+		return keyboardOnUI(ctx, func() keyboardstate.State { return wininput.ReadLockState(s.clipboardWindow.Load()) })
+	}, func(ctx context.Context, local keyboardstate.State) {
+		if client, err := localapi.OpenClient(s.control); err == nil {
+			_, _ = client.Keyboard(ctx, localapi.KeyboardRequest{Schema: localapi.KeyboardSchema, Local: local})
+		}
+	})
+}
+
+func runKeyboardReports(ctx context.Context, sample func(context.Context) (keyboardstate.State, bool), report func(context.Context, keyboardstate.State)) {
+	tick := time.NewTicker(time.Second)
+	defer tick.Stop()
+	for ctx.Err() == nil {
+		attempt, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+		if local, ok := sample(attempt); ok && attempt.Err() == nil {
+			report(attempt, local)
+		}
+		cancel()
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+		}
+	}
+}
+
 func (s *WorkspaceService) KeyboardRefresh(peer string) KeyboardSnapshot {
 	v := KeyboardSnapshot{Schema: localapi.KeyboardSchema, Code: "unavailable", Peer: peer, Local: keyboardstate.Unknown(), Remote: keyboardstate.Unknown()}
 	ctx, cancel := context.WithTimeout(s.ctx, 500*time.Millisecond)

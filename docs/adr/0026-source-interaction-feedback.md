@@ -19,8 +19,11 @@ on successful admission/activation. Retired runners and non-connected states
 cannot publish a current notice. No key, button, window identity or content is
 included in that status.
 
-The desktop GUI samples Caps Lock, Num Lock and, when available, the foreground
-Korean IME's open state on its message thread. Caps/Num are known only while
+The native desktop host samples Caps Lock, Num Lock and, when available, the foreground
+Korean IME's open state on its message thread. From g209 a joined, cancellation-aware
+host worker publishes once per second with a 500ms observation/report deadline,
+independently of renderer timers, visibility or the expanded keyboard panel.
+It never brings a window forward or changes a mode. Caps/Num are known only while
 the Krasis GUI owns foreground: GetKeyState is queue-relative, so a background
 GUI must not advertise its old queue state as current global state. The IME query is limited to 20ms.
 An authenticated management-channel extension publishes these observations;
@@ -36,7 +39,12 @@ GUI operation. It never issues a remote input command, changes modes on boundary
 crossing or persists an enabled synchronization setting. Partial/uncertain
 submission attempts only releases; it never repeats a potentially applied toggle.
 The GUI reports a request, then subsequent observations show the resulting state.
-Hangul mode is per application and is excluded from matching.
+Hangul mode is per application and is excluded from matching. Unknown values are
+displayed as unavailable rather than an unfulfilled initial check. A disabled
+match button explains whether a device must be selected, an observation is
+pending/unsupported, or the local/remote Krasis window needs foreground. Both
+local and peer Caps/Num observations must be known before enabling the button;
+unknown Hangul alone does not disable lock-key matching.
 
 ## Validation and remaining checks
 
