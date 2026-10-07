@@ -4,10 +4,12 @@ package workspacehost
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -25,6 +27,7 @@ type uiReplacement struct {
 	source              string
 	state               string
 	prepare             func(string, string, int)
+	stagedDigest        [32]byte
 }
 
 type UIReplacementSnapshot struct {
@@ -50,7 +53,7 @@ func (s *WorkspaceService) uiReplacementStatus() UIReplacementSnapshot {
 }
 
 // Retry uses only the last locally opened image, never renderer-supplied paths.
-// The source bundle is verified again before it can become an apply candidate.
+// The retained stage or original source is verified before becoming a candidate.
 func (s *WorkspaceService) RetryUIReplacement() UIReplacementSnapshot {
 	s.uiReplacement.gate.Lock()
 	if s.uiReplacement.state != "FAILED" || s.uiReplacement.source == "" || s.ctx.Err() != nil {
@@ -89,8 +92,11 @@ func (s *WorkspaceService) requestUIReplacement(args []string, data map[string]s
 		s.uiReplacement.gate.Unlock()
 		return true
 	}
+	if s.uiReplacement.generation != generation || s.uiReplacement.revision != data["revision"] || !strings.EqualFold(filepath.Clean(s.uiReplacement.source), filepath.Clean(args[0])) {
+		s.uiReplacement.directory, s.uiReplacement.stagedDigest = "", [32]byte{}
+	}
 	s.uiReplacement.source, s.uiReplacement.revision, s.uiReplacement.generation = args[0], data["revision"], generation
-	s.uiReplacement.directory, s.uiReplacement.state = "", "PREPARING"
+	s.uiReplacement.state = "PREPARING"
 	s.queueUIReplacementPreparation()
 	s.uiReplacement.gate.Unlock()
 	return true
@@ -100,14 +106,21 @@ func (s *WorkspaceService) stageUIReplacement(source, revision string, generatio
 	fail := func(code string) {
 		s.log.Event(code)
 		s.uiReplacement.gate.Lock()
-		s.uiReplacement.directory, s.uiReplacement.state = "", "FAILED"
+		s.uiReplacement.state = "FAILED"
 		s.uiReplacement.gate.Unlock()
 	}
 	if s.ctx.Err() != nil {
 		fail("ui_replacement_stage_failed")
 		return
 	}
-	guard, err := securefs.OpenReadDirectory(filepath.Dir(source))
+	s.uiReplacement.gate.Lock()
+	directory, expectedDigest := s.uiReplacement.directory, s.uiReplacement.stagedDigest
+	s.uiReplacement.gate.Unlock()
+	input := filepath.Dir(source)
+	if directory != "" {
+		input = directory
+	}
+	guard, err := securefs.OpenReadDirectory(input)
 	if err != nil {
 		fail("ui_replacement_bundle_failed")
 		return
@@ -115,6 +128,11 @@ func (s *WorkspaceService) stageUIReplacement(source, revision string, generatio
 	defer guard.Close()
 	archive, err := updatebundle.Pack(guard)
 	if err != nil {
+		fail("ui_replacement_bundle_failed")
+		return
+	}
+	digest := sha256.Sum256(archive)
+	if directory != "" && (expectedDigest == ([32]byte{}) || digest != expectedDigest) {
 		fail("ui_replacement_bundle_failed")
 		return
 	}
@@ -127,10 +145,12 @@ func (s *WorkspaceService) stageUIReplacement(source, revision string, generatio
 		fail("ui_replacement_stage_failed")
 		return
 	}
-	directory, err := releaseupdate.Stage(os.Getenv("LOCALAPPDATA"), bundle)
-	if err != nil {
-		fail("ui_replacement_stage_failed")
-		return
+	if directory == "" {
+		directory, err = releaseupdate.Stage(os.Getenv("LOCALAPPDATA"), bundle)
+		if err != nil {
+			fail("ui_replacement_stage_failed")
+			return
+		}
 	}
 	if s.ctx.Err() != nil {
 		fail("ui_replacement_stage_failed")
@@ -138,6 +158,7 @@ func (s *WorkspaceService) stageUIReplacement(source, revision string, generatio
 	}
 	s.uiReplacement.gate.Lock()
 	s.uiReplacement.directory, s.uiReplacement.revision, s.uiReplacement.generation = directory, bundle.Metadata().Revision, generation
+	s.uiReplacement.stagedDigest = digest
 	s.uiReplacement.state = "PENDING"
 	s.uiReplacement.gate.Unlock()
 	s.log.Event("ui_replacement_requested")
@@ -158,7 +179,7 @@ func (s *WorkspaceService) finishUIReplacement(handedOff bool, err error) {
 		return
 	}
 	s.log.Event("ui_replacement_launch_failed")
-	s.uiReplacement.directory, s.uiReplacement.state = "", "FAILED"
+	s.uiReplacement.state = "FAILED"
 }
 
 func (s *WorkspaceService) runUIReplacement() bool {

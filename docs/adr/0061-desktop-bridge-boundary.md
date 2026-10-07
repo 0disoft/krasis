@@ -289,3 +289,11 @@ validation failure, marks it stale, and disables retry until a fresh native
 read succeeds. A lost retry acknowledgement follows the same rule. Old reads
 cannot restore freshness across a newer retry epoch. Paths and raw errors stay
 native-only; freshness is renderer metadata, not a new native response field.
+
+Failed launches retain their staged directory and original packed-archive
+SHA-256. Explicit retry repacks the retained directory, compares that digest,
+and validates its complete bundle identity before reusing it. A changed or
+unreadable stage remains failed; it is never overwritten or silently restaged.
+A repeat launch of the same source/build also keeps its existing stage. The
+worker gate still prevents automatic application of failed candidates. No
+native API, database, repository hygiene or runner changes are introduced.
