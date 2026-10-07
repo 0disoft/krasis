@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/0disoft/krasis/internal/productidentity"
@@ -42,6 +43,12 @@ func diagnosticFiles(base string) (bool, bool, error) {
 		return false, false, err
 	}
 	defer dir.Close()
+	// Prefer this collection's native-derived files, not an older export.
+	if receipt, err := productlog.LoadCollectionReceipt(base); err != nil {
+		return false, false, err
+	} else if receipt != nil {
+		return receipt.LocalSaved, receipt.PeerSaved, nil
+	}
 	exists := func(name string) bool {
 		f, err := dir.Open(name)
 		if err != nil {
@@ -93,6 +100,20 @@ func openDiagnosticsFolder(base string) error {
 		return err
 	}
 	defer dir.Close()
+	// Even a corrupt collection pointer must leave the folder accessible for
+	// diagnosis. Selection is optional; only a validated native file is used.
+	if selected, err := productlog.CollectionLocalPath(base); err == nil && selected != "" {
+		verb, _ := windows.UTF16PtrFromString("open")
+		explorer, err := windows.UTF16PtrFromString(filepath.Join(os.Getenv("WINDIR"), "explorer.exe"))
+		if err != nil {
+			return err
+		}
+		args, err := windows.UTF16PtrFromString(`/select,"` + selected + `"`)
+		if err != nil {
+			return err
+		}
+		return windows.ShellExecute(0, verb, explorer, args, nil, windows.SW_SHOWNORMAL)
+	}
 	verb, _ := windows.UTF16PtrFromString("open")
 	path, err := windows.UTF16PtrFromString(paths.Diagnostics)
 	if err != nil {

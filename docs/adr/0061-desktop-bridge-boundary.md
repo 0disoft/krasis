@@ -98,3 +98,15 @@ request-specific local export is the only export on the happy path. A local
 fallback is written when START has not confirmed that snapshot. Legacy export
 bindings remain synchronous. A blocked filesystem operation may outlive the
 RPC budget, but cannot block renderer status or create unbounded workers.
+
+The native diagnostic-collection-latest.json receipt persists request identity,
+deadline and narrow status. An atomic SAVING intent precedes START to invalidate
+an older collection; a crash before the returned ID is persisted restores an
+unknown outcome and never retries START. Pending requests resume STATUS for the
+same peer and ID. Restored saved indicators require their actual sanitized
+snapshot files; missing, corrupt or unreadable records stay visible as failure.
+Receipt errors do not turn collection success into durable success, and an
+unwritable intent prevents remote collection while retaining a local fallback.
+IDs stay outside the WebView. Open folder selects the validated local snapshot
+of the current collection in Explorer, with folder access retained when the
+receipt cannot be validated. No new network endpoint or database is introduced.

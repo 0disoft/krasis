@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/0disoft/krasis/internal/localapi"
+	"github.com/0disoft/krasis/internal/productlog"
 )
 
 const DiagnosticsSchema = "krasis.diagnostics/v1"
@@ -31,15 +32,16 @@ type DiagnosticClient interface {
 // Native-owned hooks cannot be supplied by the renderer. Local saving works
 // without a live agent; peer delivery uses the existing management channel.
 type DiagnosticsBridge struct {
-	lifetime   context.Context
-	open       func() (DiagnosticClient, error)
-	export     func() error
-	files      func() (bool, bool, error)
-	showFolder func() error
-	mu         sync.Mutex
-	collection *diagnosticCollection
-	async      bool
-	working    bool
+	lifetime       context.Context
+	open           func() (DiagnosticClient, error)
+	export         func() error
+	files          func() (bool, bool, error)
+	showFolder     func() error
+	mu             sync.Mutex
+	collection     *diagnosticCollection
+	async          bool
+	working        bool
+	saveCollection func(productlog.CollectionReceipt) error
 }
 
 func NewDiagnosticsBridge(ctx context.Context, open func() (DiagnosticClient, error), export func() error, files func() (bool, bool, error), showFolder func() error) *DiagnosticsBridge {

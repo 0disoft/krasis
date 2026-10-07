@@ -174,6 +174,9 @@ func Run() {
 			func() error { _, err := productlog.Export(base); return err },
 			func() (bool, bool, error) { return diagnosticFiles(base) },
 			func() error { return openDiagnosticsFolder(base) })
+		service.diagnostics.ConfigureCollectionStorage(
+			func() (*productlog.CollectionReceipt, error) { return productlog.LoadCollectionReceipt(base) },
+			func(r productlog.CollectionReceipt) error { return productlog.SaveCollectionReceipt(base, r) })
 	}
 	service.pairs = productpanel.NewPairingBridge(ctx, func() (productpanel.PairingClient, error) {
 		return localapi.OpenClient(paths.Control)

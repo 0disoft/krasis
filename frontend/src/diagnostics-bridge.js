@@ -1,7 +1,7 @@
 const schema = 'krasis.diagnostics/v1';
 const codes = new Set(['ok', 'busy', 'cancelled', 'unavailable', 'invalid_peer', 'stale_peer',
   'save_failed', 'send_failed', 'rejected', 'unsupported', 'queued', 'outcome_unknown', 'open_failed',
-  'saving', 'pending', 'collected', 'partial', 'local_only', 'storage_limit']);
+  'saving', 'pending', 'collected', 'partial', 'local_only', 'storage_limit', 'state_save_failed']);
 const transfers = new Set(['NONE', 'QUEUED', 'SENT', 'EXPIRED', 'UNSUPPORTED', 'REJECTED', 'UNKNOWN']);
 const collectionStates = new Set(['SAVING', 'PENDING', 'RECEIVED', 'LOCAL_ONLY', 'EXPIRED', 'FAILED', 'UNKNOWN']);
 const failure = code => ({ schema, code, saved: false, received: false, transfer: 'UNKNOWN' });
