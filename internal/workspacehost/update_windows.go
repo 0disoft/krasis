@@ -123,12 +123,8 @@ func prepareUpdatedWorkspaceWithRevision(ctx context.Context, control string, st
 		// recovery. Its managed startup will show the same failure to the user.
 		return nil
 	}
-	c, err := localapi.OpenClient(control)
-	if err != nil {
-		return err
-	}
-	// Reconnect is best-effort: a temporary peer outage must not hide the new UI.
-	_ = productpanel.ResumeUpdatedWorkspace(ctx, c, launch)
+	// The native lifecycle retains the launch identity and owns bounded reconnect
+	// attempts after the management window opens, including a busy first startup.
 	return nil
 }
 

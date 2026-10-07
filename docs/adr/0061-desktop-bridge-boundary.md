@@ -297,3 +297,23 @@ unreadable stage remains failed; it is never overwritten or silently restaged.
 A repeat launch of the same source/build also keeps its existing stage. The
 worker gate still prevents automatic application of failed candidates. No
 native API, database, repository hygiene or runner changes are introduced.
+
+## g224: Retain bounded update reconnect intent
+
+Updated launches no longer make a one-shot reconnect before showing the UI.
+DesktopLifecycle owns an in-memory resume intent driven by its existing native
+loop, serialized with connect, disconnect, startup and update handoff. It permits
+at most three attempts within ninety seconds, with five seconds between attempts.
+Each attempt verifies the exact agent protocol, generation and revision, then
+rechecks the saved peer fingerprint before CONNECT. Received update handoffs now
+carry their already-verified peer fingerprint into the replacement process;
+legacy launch arguments pin identity on their first complete trust read.
+
+An accepted CONNECT is observed while the supervisor connects or reconnects;
+it is not resent during those states. An uncertain reply permits only status
+observation until confirmation or expiry. Successful CONNECTED observation returns
+ownership to ordinary connection recovery. User connect/disconnect/restart, owner
+shutdown, trust changes, incompatible builds and permanent startup failures stop
+the intent. Pairing and faulted sessions are never interrupted by this path.
+Public-release launches from idle do not create a connection intent. No renderer
+API, database, repository hygiene or runner changes are introduced.

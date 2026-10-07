@@ -131,12 +131,12 @@ func ReportFailedUpdatedWorkspace(ctx context.Context, c UpdateSettingsClient, v
 type WorkspaceUpdateReceiver struct {
 	ctx       context.Context
 	open      func() (UpdateSettingsClient, error)
-	launch    func(string, string, string) error
+	launch    func(string, string, string, string) error
 	mu        sync.Mutex
 	attempted string
 }
 
-func NewWorkspaceUpdateReceiver(ctx context.Context, open func() (UpdateSettingsClient, error), launch func(string, string, string) error) *WorkspaceUpdateReceiver {
+func NewWorkspaceUpdateReceiver(ctx context.Context, open func() (UpdateSettingsClient, error), launch func(string, string, string, string) error) *WorkspaceUpdateReceiver {
 	return &WorkspaceUpdateReceiver{ctx: ctx, open: open, launch: launch}
 }
 func (b *WorkspaceUpdateReceiver) Poll() bool {
@@ -196,7 +196,7 @@ func (b *WorkspaceUpdateReceiver) Poll() bool {
 		fail()
 		return false
 	}
-	if err := b.launch(r.Directory, s.Revision, alias); err != nil {
+	if err := b.launch(r.Directory, s.Revision, alias, s.Peer); err != nil {
 		fail()
 		return false
 	}

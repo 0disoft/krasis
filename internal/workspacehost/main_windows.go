@@ -160,6 +160,9 @@ func Run() {
 		}
 		service.managed = productpanel.NewDesktopLifecycle(ctx, func() (productpanel.Client, error) { return localapi.OpenClient(paths.Control) }, startup.Ensure, diagnose(os.Getenv("LOCALAPPDATA"), paths.Control), displayReady)
 		service.managed.StartupResume = service.resumeAtStartup
+		if err := service.managed.SetUpdatedWorkspaceResume(updated); err != nil {
+			os.Exit(1)
+		}
 		service.managed.StartupMaintenanceNeeded = startup.LaunchMaintenanceNeeded
 		service.managed.StartupMaintenance = startup.RefreshProtectedInputAtLaunch
 		base := os.Getenv("LOCALAPPDATA")
@@ -178,7 +181,7 @@ func Run() {
 			return service.prepareAppSettings()
 		}
 		service.updates = productpanel.NewUpdateTransferBridge(ctx, func() (productpanel.UpdateSettingsClient, error) { return localapi.OpenClient(paths.Control) }, updateBundleDirectory(self), transitionBundleDirectory(self), probeTransitionBundleDirectory(self), installerTransitionBundleDirectory(self))
-		service.receiver = productpanel.NewWorkspaceUpdateReceiver(ctx, func() (productpanel.UpdateSettingsClient, error) { return localapi.OpenClient(paths.Control) }, productpanel.LaunchReceivedWorkspaceUpdate)
+		service.receiver = productpanel.NewWorkspaceUpdateReceiver(ctx, func() (productpanel.UpdateSettingsClient, error) { return localapi.OpenClient(paths.Control) }, productpanel.LaunchRequestedWorkspaceUpdate)
 		service.diagnostics = productpanel.NewDiagnosticsBridge(ctx,
 			func() (productpanel.DiagnosticClient, error) { return localapi.OpenClient(paths.Control) },
 			func() error { _, err := productlog.Export(base); return err },

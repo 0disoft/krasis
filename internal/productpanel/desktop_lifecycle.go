@@ -27,6 +27,7 @@ type DesktopLifecycle struct {
 	cancel                   context.CancelFunc
 	stopped                  atomic.Bool
 	recovery                 AutomaticRecovery
+	updatedResume            *updatedWorkspaceResume
 	stateMu                  sync.RWMutex
 	state                    BridgeSnapshot
 }
@@ -90,6 +91,9 @@ func (b *DesktopLifecycle) startup(ctx context.Context) error {
 }
 
 func (b *DesktopLifecycle) failedStartup(ctx context.Context, err error) BridgeSnapshot {
+	if !transientUpdateStartup(err) {
+		b.updatedResume = nil
+	}
 	value := NewDesktopBridge(ctx, b.open).Refresh()
 	value.Code = "startup_failed"
 	switch {
@@ -116,6 +120,7 @@ func (b *DesktopLifecycle) Connect(alias, fingerprint string) BridgeSnapshot {
 	ctx, done := b.operationBudget(3 * time.Minute)
 	defer done()
 	b.stopped.Store(false)
+	b.updatedResume = nil
 	b.recovery.Reset()
 	if err := b.startup(ctx); err != nil {
 		return b.failedStartup(ctx, err)
@@ -132,6 +137,7 @@ func (b *DesktopLifecycle) Disconnect() BridgeSnapshot {
 	b.cancelMu.Unlock()
 	b.gate.Lock()
 	defer b.gate.Unlock()
+	b.updatedResume = nil
 	b.recovery.Stop()
 	ctx, done := b.operation()
 	defer done()
@@ -159,6 +165,7 @@ func (b *DesktopLifecycle) Restart() BridgeSnapshot {
 		diagnosticErr = b.diagnoseBounded(ctx, b.recovery.Fingerprint)
 	}
 	b.recovery.Reset()
+	b.updatedResume = nil
 	b.stopped.Store(false)
 	if err := b.startup(ctx); err != nil {
 		return b.failedStartup(ctx, err)
@@ -210,6 +217,10 @@ func (b *DesktopLifecycle) tick(now time.Time) {
 	}
 	b.save(value)
 	if b.stopped.Load() {
+		return
+	}
+	if next, handled := b.resumeUpdatedConnection(ctx, now, value); handled {
+		b.save(next)
 		return
 	}
 	view := View{State: value.State, PeerAlias: value.PeerAlias, StopReason: value.StopReason, DisplayReady: true, Fingerprints: map[string]string{}}

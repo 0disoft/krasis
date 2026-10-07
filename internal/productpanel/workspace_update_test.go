@@ -81,9 +81,9 @@ func TestWorkspaceReceiverClaimsOnceAndReportsLaunchFailure(t *testing.T) {
 			case "staged":
 				c.status.State = "STAGED"
 			}
-			b := NewWorkspaceUpdateReceiver(context.Background(), func() (UpdateSettingsClient, error) { return c, nil }, func(dir, rev, alias string) error {
+			b := NewWorkspaceUpdateReceiver(context.Background(), func() (UpdateSettingsClient, error) { return c, nil }, func(dir, rev, alias, fingerprint string) error {
 				launches++
-				if dir != "native/staged" || rev != c.status.Revision || alias != "B" {
+				if dir != "native/staged" || rev != c.status.Revision || alias != "B" || fingerprint != c.status.Peer {
 					t.Fatal("launch mismatch")
 				}
 				if mode == "failed" {
@@ -161,7 +161,7 @@ func TestFailedUpdatedWorkspaceReleasesOnlyExactClaim(t *testing.T) {
 func TestWorkspaceUpdateHandoffSerializesRecovery(t *testing.T) {
 	c := newReceiverClient()
 	b := NewDesktopLifecycle(context.Background(), nil, nil, nil)
-	receiver := NewWorkspaceUpdateReceiver(context.Background(), func() (UpdateSettingsClient, error) { return c, nil }, func(string, string, string) error {
+	receiver := NewWorkspaceUpdateReceiver(context.Background(), func() (UpdateSettingsClient, error) { return c, nil }, func(string, string, string, string) error {
 		if b.gate.TryLock() {
 			b.gate.Unlock()
 			t.Fatal("unserialized update")
