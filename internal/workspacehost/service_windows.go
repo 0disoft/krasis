@@ -27,12 +27,13 @@ type WorkspaceService struct {
 	startAtLogin     bool
 	updateTrayLabels func([4]string)
 
-	startMenuFailed       atomic.Bool
-	launchRecordFailed    atomic.Bool
-	recoveryFailed        atomic.Bool
-	recoveryRecordReady   bool
-	recoveryMenuReady     bool
-	recoverySettingsReady bool
+	startMenuFailed        atomic.Bool
+	launchRecordFailed     atomic.Bool
+	recoveryFailed         atomic.Bool
+	settingsRestorePending atomic.Bool
+	recoveryRecordReady    bool
+	recoveryMenuReady      bool
+	recoverySettingsReady  bool
 
 	ctx              context.Context
 	control          string

@@ -58,11 +58,50 @@ func TestFailedRecoveryRegistrationRestoresAndVerifiesBothSettings(t *testing.T)
 			if mode == "query_error" && restoreWrites != 0 {
 				t.Fatal("unknown task state triggered a blind write")
 			}
+			if mode != "restored" && s.AppSettings().Code != "rollback_failed" {
+				t.Fatal("next settings query erased unverified restoration")
+			}
 			actual, err := appsettings.Load(base)
 			if err != nil || actual != old {
 				t.Fatal("failed change rewrote saved preferences", actual, err)
 			}
 		})
+	}
+}
+
+func TestUnverifiedRestorationClearsOnlyAfterBothStatesAreKnownAndMatched(t *testing.T) {
+	base := t.TempDir()
+	t.Setenv("LOCALAPPDATA", base)
+	if err := appsettings.Save(base, appsettings.Settings{Schema: appsettings.Schema}); err != nil {
+		t.Fatal(err)
+	}
+	startup, recovery, queryFailed := true, true, false
+	s := &WorkspaceService{startupOps: &startupSettingsOps{
+		startupRead: func(string) (bool, error) {
+			if queryFailed {
+				return false, errors.New("injected query failure")
+			}
+			return startup, nil
+		},
+		recoveryRead: func(string) (bool, error) { return recovery, nil },
+	}}
+	s.settingsRestorePending.Store(true)
+	s.recoveryFailed.Store(true)
+	if s.AppSettings().Code != "rollback_failed" {
+		t.Fatal("startup mismatch erased restoration state")
+	}
+	startup = false
+	if s.AppSettings().Code != "rollback_failed" {
+		t.Fatal("one matched setting accepted as full restoration")
+	}
+	recovery = false
+	queryFailed = true
+	if s.AppSettings().Code != "rollback_failed" {
+		t.Fatal("unknown read accepted as restoration")
+	}
+	queryFailed = false
+	if got := s.AppSettings(); got.Code != "ok" || s.settingsRestorePending.Load() || s.recoveryFailed.Load() {
+		t.Fatal("verified restoration remained a false failure", got)
 	}
 }
 

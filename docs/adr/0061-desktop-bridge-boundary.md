@@ -219,3 +219,10 @@ native status query before it receives one bounded observation window.
 Neither wall-clock correction nor local timeout discards the ID or sends
 START. An explicit replacement first requires native expired/unknown_request
 confirmation. Further pending polls never renew an established window.
+
+The running service retains unverified settings restoration separately from
+generic registration failure. Subsequent reads keep rollback_failed while
+settings, startup registration or the recovery task remain unreadable or
+mismatched. Only a fresh read confirming both OS states against the saved
+preferences clears that marker, with a fixed settings_restore_all_verified
+event. This reconciliation never writes registry or task settings.

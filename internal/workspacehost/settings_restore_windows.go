@@ -52,6 +52,7 @@ func (s *WorkspaceService) restoreStartupSettings(base string, expected, recover
 		recoveryOK = restore("recovery", ops.recoveryRead, ops.recoveryWrite)
 	}
 	if !startupOK || !recoveryOK {
+		s.settingsRestorePending.Store(true)
 		s.recoveryFailed.Store(true)
 		s.recoverySettingsReady = false
 	}
