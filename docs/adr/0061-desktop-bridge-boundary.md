@@ -151,7 +151,7 @@ different builds remain a conflict rather than claiming the latest version.
 Confirmation, permissions, polling and transfer verification are unchanged.
 No network API, database, repository hygiene or runner changes are introduced.
 
-## g218: Refresh settings when opened
+## g218: Refresh settings and bound utility actions
 
 The settings dialog reports its open state to AppSettings. Each reopening
 reads the actual native settings again, replacing stale failure indicators
@@ -177,3 +177,8 @@ staged READY release remains stored for recovery if checking fails. Status
 projects pending work until the worker starts. The renderer disables repeat
 clicks immediately and discards pre-click polling responses using an epoch.
 No release schema, new endpoint, signing policy or download policy changes.
+
+The pairing dialog explains that a connecting, connected or reconnecting
+session must be disconnected before registering another device. Opening
+the dialog itself does not change the connection or start a pairing job.
+No API schema, database, repository hygiene or runner changes are introduced.

@@ -404,6 +404,7 @@
   <WindowTitlebar {locale} version={windowVersion} maximised={windowMaximised} focused={windowFocused} ready={!!windowRuntime} action={windowAction} />
   <div class="dlg-head"><h2 id="pair-title">{t('pairingTitle')}</h2><p>{t('pairingHelp')}</p></div>
   <div class="dlg-body">
+  {#if canDisconnect}<p role="status">{t('pairingLocked')}</p>{/if}
   {#if pairing.pin}<p class="pin-display" role="status">{pairing.pin}</p>{/if}
   <div class="pair-actions">
     <button disabled={!canPair} onclick={() => runPair('invite')}>{t('createPIN')}</button>
