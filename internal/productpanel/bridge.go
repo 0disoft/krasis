@@ -93,6 +93,9 @@ func (b *DesktopBridge) execute(action, alias, fingerprint string) BridgeSnapsho
 	if action != "refresh" && (!guard.attempted || guard.rejected) {
 		result.Code = "rejected"
 	}
+	if guard.trustFailed {
+		result.Code = "unavailable"
+	}
 	if guard.uncertain {
 		result.Code = "outcome_unknown"
 	}
@@ -117,7 +120,16 @@ type bridgeClient struct {
 	boundaryBlocked                string
 	fingerprint                    string
 	stale                          bool
+	trustFailed                    bool
 	attempted, rejected, uncertain bool
+}
+
+func (c *bridgeClient) Trust(ctx context.Context) (localapi.Trust, error) {
+	v, err := c.Client.Trust(ctx)
+	if err != nil {
+		c.trustFailed = true
+	}
+	return v, err
 }
 
 func (c *bridgeClient) Status(ctx context.Context) (localapi.Status, error) {
@@ -139,7 +151,7 @@ func (c *bridgeClient) Status(ctx context.Context) (localapi.Status, error) {
 // Recheck the selected identity immediately before handing the alias to the
 // existing agent API. The agent remains the final trust/permission authority.
 func (c *bridgeClient) Connect(ctx context.Context, alias string) (result localapi.OperationResult, err error) {
-	trust, err := c.Client.Trust(ctx)
+	trust, err := c.Trust(ctx)
 	if err != nil {
 		return result, err
 	}

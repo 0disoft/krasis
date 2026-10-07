@@ -79,7 +79,7 @@ func (b *DesktopLifecycle) resumeUpdatedConnection(ctx context.Context, now time
 	}
 	switch value.State {
 	case "CONNECTED", "CONNECTING", "RECONNECTING":
-		if value.PeerAlias != r.launch.Alias {
+		if (value.Code == "ok" || value.PeerAlias != "") && value.PeerAlias != r.launch.Alias {
 			return stop("stale_peer")
 		}
 		if value.State == "CONNECTED" && verifiedPeer {

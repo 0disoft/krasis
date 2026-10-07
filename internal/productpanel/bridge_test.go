@@ -33,6 +33,18 @@ func TestDesktopBridgeReadsFreshStateAndIdentity(t *testing.T) {
 	}
 }
 
+func TestDesktopBridgeReportsTrustFailureWithoutLosingSessionMetadata(t *testing.T) {
+	client := &resumeTestClient{fakeClient: &fakeClient{state: "CONNECTED", stopReason: "display_change", trustErr: errors.New("private trust path")}}
+	b := NewDesktopBridge(context.Background(), func() (Client, error) { return client, nil })
+	v := b.Refresh()
+	if v.State != "CONNECTED" || v.PeerAlias != "B" || v.StopReason != "display_change" || v.Code != "unavailable" || len(v.Peers) != 0 {
+		t.Fatal(v)
+	}
+	if v = b.Connect("B", strings.Repeat("b", 64)); v.Code != "unavailable" || client.connects != 0 {
+		t.Fatal(v, client.connects)
+	}
+}
+
 func TestDesktopBridgeDoesNotRetainProtectedModeAfterFallback(t *testing.T) {
 	c := &fakeClient{state: "CONNECTED", inputBackend: "PROTECTED"}
 	b := NewDesktopBridge(context.Background(), func() (Client, error) { return c, nil })

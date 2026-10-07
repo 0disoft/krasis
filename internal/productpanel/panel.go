@@ -61,9 +61,9 @@ func Execute(ctx context.Context, open func() (Client, error), action, alias str
 	trust, err := client.Trust(ctx)
 	if err != nil {
 		if status.State == "FAULTED" {
-			return View{State: status.State, Notice: faultNotice}
+			return View{State: status.State, PeerAlias: status.PeerAlias, StopReason: status.StopReason, Notice: faultNotice}
 		}
-		return View{State: status.State, Notice: "기기 목록을 읽지 못했습니다. 연결을 시작하지 않습니다."}
+		return View{State: status.State, PeerAlias: status.PeerAlias, StopReason: status.StopReason, Notice: "기기 목록을 읽지 못했습니다. 연결을 시작하지 않습니다."}
 	}
 	view := View{State: status.State, PeerAlias: status.PeerAlias, StopReason: status.StopReason, Fingerprints: map[string]string{}}
 	if status.State == "FAULTED" {

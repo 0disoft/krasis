@@ -317,3 +317,11 @@ shutdown, trust changes, incompatible builds and permanent startup failures stop
 the intent. Pairing and faulted sessions are never interrupted by this path.
 Public-release launches from idle do not create a connection intent. No renderer
 API, database, repository hygiene or runner changes are introduced.
+
+## g225: Distinguish unavailable observations from changed identity
+
+A failed trust read preserves authoritative session state, peer alias and stop
+reason, but projects an unavailable result with no selectable peer list. Update
+resume waits for a successful read instead of treating missing observation as a
+changed peer. Accepted connection attempts remain read-only during this wait;
+the existing attempt and time budgets still apply.

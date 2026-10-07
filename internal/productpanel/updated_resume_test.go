@@ -236,3 +236,24 @@ func TestUpdateResumePreservesLegacyPinnedIdentityAndTransientTrustFailures(t *t
 		t.Fatal("legacy peer was rebound during retry")
 	}
 }
+
+func TestUpdateResumeWaitsThroughTrustFailureDuringAcceptedConnection(t *testing.T) {
+	b, c, now := newResumeTest(t, nil)
+	b.tick(now)
+	if c.connects != 1 || c.state != "CONNECTING" {
+		t.Fatal("setup did not accept CONNECT")
+	}
+	c.trustErr = errors.New("temporarily unavailable")
+	for _, state := range []string{"CONNECTING", "RECONNECTING", "CONNECTED"} {
+		c.state = state
+		b.tick(now.Add(6 * time.Second))
+		if b.updatedResume == nil || c.connects != 1 || b.Refresh().PeerAlias != "B" || b.Refresh().Code != "unavailable" {
+			t.Fatal("trust read failure became a peer change", state, b.Refresh())
+		}
+	}
+	c.trustErr = nil
+	b.tick(now.Add(12 * time.Second))
+	if b.updatedResume != nil || b.recovery.Alias != "B" || c.connects != 1 {
+		t.Fatal("confirmation did not complete recovery")
+	}
+}
