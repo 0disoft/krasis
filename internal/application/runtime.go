@@ -18,6 +18,12 @@ var (
 	ErrStaleReturnIntent = errors.New("return intent does not match the active inbound session")
 )
 
+// Match the protected worker's two-second I/O budget. Cooperative adapters must
+// retire an operation before returning; no detached injection may outlive a
+// lease. A native call that ignores cancellation is still joined synchronously.
+const InputInjectionTimeout = 2 * time.Second
+const InputFailureCleanupTimeout = 2 * time.Second
+
 type LeaseIdentity struct {
 	SessionID string
 	LeaseID   string
@@ -506,12 +512,23 @@ func (runtime *SessionRuntime) HandleInputAction(
 	}
 	runtime.stream = next
 
-	err = runtime.injectAction(ctx, action)
+	injectionCtx, stopInjection := context.WithTimeout(ctx, InputInjectionTimeout)
+	err = runtime.injectAction(injectionCtx, action)
+	if expired := injectionCtx.Err(); expired != nil {
+		// A late successful return cannot turn an expired operation into a
+		// receipt. Keep its press ledger and recover instead of retrying input.
+		err = errors.Join(err, expired)
+	}
+	stopInjection()
 	if err == nil {
 		disposition = InputDispositionApplied
 		return nil
 	}
-	_, faultErr := runtime.faultLocked(ctx, err)
+	// An expired injection/session context must not prevent key-up recovery.
+	// The runtime remains the serialized owner until this cleanup completes.
+	cleanupCtx, stopCleanup := context.WithTimeout(context.WithoutCancel(ctx), InputFailureCleanupTimeout)
+	defer stopCleanup()
+	_, faultErr := runtime.faultLocked(cleanupCtx, err)
 	return faultErr
 }
 

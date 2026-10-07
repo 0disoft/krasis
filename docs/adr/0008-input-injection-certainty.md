@@ -36,6 +36,25 @@ Application과 crash guard는 key-down 또는 button-down 전에 token을 기록
 이 분류는 `SendInput` 반환 계약을 이용한 software certainty다. 전원 차단, guard와 agent의 동시
 종료, Windows 내부에서 반환 뒤 발생하는 문제와 실제 장비별 UIPI 동작까지 증명하지 않는다.
 
+## g207: bounded injection and independent cleanup
+
+The serialized runtime gives each admitted input action a two-second context,
+matching the protected worker's I/O budget. An earlier session deadline still
+wins. Adapters must finish or retire their operation before returning; the
+runtime does not detach injection into a goroutine or accept a queued heartbeat
+ahead of it. After an expired or canceled injection, key-up recovery gets a fresh
+two-second context that retains the original values without its cancellation.
+A late successful adapter return still faults the expired operation. Failed
+releases retain their ledger and fault state for the existing recovery owner.
+No uncertain operation is retried on another backend.
+
+Tests distinguish a stalled adapter from network delivery: a complete input
+frame is available before a heartbeat, injection waits until its deadline,
+cleanup releases the potentially applied key, and the heartbeat is never
+accepted as a liveness receipt. A native call that ignores context cannot be
+preempted by this budget; it remains synchronously owned until it returns.
+Two-PC input, protected-window reentry and latency still require device checks.
+
 ## 대안
 
 - 모든 실패에서 journal 유지: stuck input에는 안전하지만 확실한 무주입에도 불필요한 up을 만든다.
