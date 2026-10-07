@@ -13,6 +13,7 @@ import (
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/crashguard"
 	"github.com/0disoft/krasis/internal/handoff"
+	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/peer"
 	"github.com/0disoft/krasis/internal/peerdiscovery"
 	"github.com/0disoft/krasis/internal/productidentity"
@@ -29,10 +30,13 @@ type productConnection struct {
 	deadline time.Time
 }
 
-func prepareProductConnection(identities *productidentity.Store, trust *truststore.Store, alias string) (productConnection, error) {
+func prepareProductConnection(identities *productidentity.Store, trust *truststore.Store, alias string, selected ...string) (productConnection, error) {
 	profile, err := trust.Connection(alias)
 	if err != nil {
 		return productConnection{}, err
+	}
+	if len(selected) > 0 && selected[0] != "" && profile.Fingerprint != selected[0] {
+		return productConnection{}, errors.New("selected peer changed")
 	}
 	document, err := trust.List()
 	if err != nil {
@@ -90,7 +94,7 @@ func prepareProductConnection(identities *productidentity.Store, trust *truststo
 func productRunner(identities *productidentity.Store, trust *truststore.Store, log *productlog.Logger, auxiliary ...func(context.Context, string, productConnection)) SessionRunner {
 	profiles := handoff.New(log.Handoff)
 	return func(parent context.Context, alias string, observer agent.SupervisorObserver) (err error) {
-		prepared, err := prepareProductConnection(identities, trust, alias)
+		prepared, err := prepareProductConnection(identities, trust, alias, localapi.PeerFingerprint(parent))
 		if err != nil {
 			return err
 		}

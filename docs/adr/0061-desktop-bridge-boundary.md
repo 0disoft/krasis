@@ -390,3 +390,14 @@ pre-send cancellation remains cancelled. Interruption after an attempted,
 non-rejected command produces outcome_unknown, including post-command status
 timeouts. Update resume retains read-only observation and does not replay that
 mutation. An authoritative resume_cancelled refusal still stops recovery.
+
+## g228: Bind selected identity to the connection request and session
+
+Desktop connection requests carry the verified peer fingerprint in the existing
+CONNECT fingerprint field. The agent admits only a uniquely matched live alias
+with that fingerprint. The admitted session retains the selection in its native
+context; product connection preparation rejects an alias that has since rebound
+before configuring TLS or input. Protected-worker recovery retains that context.
+Alias-only CLI calls remain compatible. An older agent rejecting the pinned
+request is not retried without its identity. No new endpoint, database, hygiene
+or runner changes are introduced; CONNECT validation now accepts a valid pin.

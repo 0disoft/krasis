@@ -359,7 +359,7 @@ func validateOperationRequest(kind string, value OperationRequest) error {
 	}
 	switch kind {
 	case "connect":
-		if !validAlias(value.PeerAlias) || value.PairingAction != "" || value.PairingID != "" || value.ConfirmationCode != "" || value.AllowInboundControl != nil || value.Fingerprint != "" {
+		if !validAlias(value.PeerAlias) || value.PairingAction != "" || value.PairingID != "" || value.ConfirmationCode != "" || value.AllowInboundControl != nil || value.Fingerprint != "" && !validFingerprint(value.Fingerprint) {
 			return errors.New("connect request is invalid")
 		}
 	case "disconnect":

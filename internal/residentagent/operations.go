@@ -251,6 +251,27 @@ func (operations *Operations) Connect(requestContext context.Context, request lo
 		operations.recordLocked("already_active")
 		return rejected("already_active"), nil
 	}
+	if request.Fingerprint != "" {
+		if operations.trust == nil {
+			return rejected("selected_peer_changed"), nil
+		}
+		document, err := operations.trust.List()
+		if err != nil {
+			return rejected("credential_unavailable"), nil
+		}
+		matches := 0
+		for _, peer := range document.Peers {
+			if peer.Alias == request.PeerAlias && peer.RevokedAt == nil {
+				matches++
+				if peer.Fingerprint != request.Fingerprint {
+					return rejected("selected_peer_changed"), nil
+				}
+			}
+		}
+		if matches != 1 {
+			return rejected("selected_peer_changed"), nil
+		}
+	}
 	if operations.preflight != nil {
 		if err := operations.preflight(request.PeerAlias); err != nil {
 			code := "credential_unavailable"
@@ -268,6 +289,7 @@ func (operations *Operations) Connect(requestContext context.Context, request lo
 		}
 	}
 	ctx, cancel := context.WithCancelCause(operations.root)
+	ctx = localapi.WithPeerFingerprint(ctx, request.Fingerprint)
 	done := make(chan struct{})
 	outcome := &sessionOutcome{}
 	operations.sessionOutcome = outcome

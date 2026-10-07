@@ -75,12 +75,12 @@ func (client *Client) Topology(ctx context.Context) (Topology, error) {
 }
 
 func (client *Client) Connect(ctx context.Context, alias string) (OperationResult, error) {
-	return client.operation(ctx, "/v1/connect", OperationRequest{SchemaVersion: OperationSchemaVersion, PeerAlias: alias})
+	return client.operation(ctx, "/v1/connect", OperationRequest{SchemaVersion: OperationSchemaVersion, PeerAlias: alias, Fingerprint: PeerFingerprint(ctx)})
 }
 
 // Automatic reconnect must not override a manual stop that won the agent lock.
 func (client *Client) ResumeConnection(ctx context.Context, alias string) (OperationResult, error) {
-	return client.operation(ctx, "/v1/connect", OperationRequest{SchemaVersion: OperationSchemaVersion, PeerAlias: alias, AutomaticResume: true})
+	return client.operation(ctx, "/v1/connect", OperationRequest{SchemaVersion: OperationSchemaVersion, PeerAlias: alias, Fingerprint: PeerFingerprint(ctx), AutomaticResume: true})
 }
 
 func (client *Client) Disconnect(ctx context.Context) (OperationResult, error) {

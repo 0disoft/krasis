@@ -28,6 +28,39 @@ func TestResumeConnectionMarksOneAuthenticatedConnectRequest(t *testing.T) {
 	}
 }
 
+func TestConnectCarriesSelectedFingerprintInAuthenticatedRequest(t *testing.T) {
+	for _, automatic := range []bool{false, true} {
+		fp := strings.Repeat("b", 64)
+		client := &Client{credentials: ClientCredentials{Endpoint: Endpoint{Address: "127.0.0.1:1234"}, Token: strings.Repeat("a", 64)}, http: &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			var request OperationRequest
+			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+				t.Fatal(err)
+			}
+			if r.URL.Path != "/v1/connect" || r.Header.Get("Authorization") != "Bearer "+strings.Repeat("a", 64) || request.PeerAlias != "peer" || request.Fingerprint != fp || request.AutomaticResume != automatic {
+				t.Fatal("lost selected identity", request)
+			}
+			return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"schemaVersion":"krasis.agent.operation-result/v1","status":"REJECTED","code":"selected_peer_changed"}`))}, nil
+		})}}
+		ctx := WithPeerFingerprint(context.Background(), fp)
+		var result OperationResult
+		var err error
+		if automatic {
+			result, err = client.ResumeConnection(ctx, "peer")
+		} else {
+			result, err = client.Connect(ctx, "peer")
+		}
+		if err != nil || result.Code != "selected_peer_changed" {
+			t.Fatal(result, err)
+		}
+	}
+	for _, fingerprint := range []string{"", strings.Repeat("a", 64), "invalid"} {
+		err := validateOperationRequest("connect", OperationRequest{PeerAlias: "peer", Fingerprint: fingerprint})
+		if (err != nil) != (fingerprint == "invalid") {
+			t.Fatal(fingerprint, err)
+		}
+	}
+}
+
 func TestMaintenancePauseCompatibilityAndAuthentication(t *testing.T) {
 	for _, generation := range []int{225, 226} {
 		calls := 0

@@ -207,6 +207,7 @@ func (c *bridgeClient) Connect(ctx context.Context, alias string) (result locala
 		return result, errors.New("selected peer changed")
 	}
 	c.attempted = true
+	ctx = localapi.WithPeerFingerprint(ctx, c.fingerprint)
 	if c.automaticResume {
 		resume, ok := c.Client.(interface {
 			ResumeConnection(context.Context, string) (localapi.OperationResult, error)
@@ -223,6 +224,9 @@ func (c *bridgeClient) Connect(ctx context.Context, alias string) (result locala
 	}
 	c.uncertain = err != nil
 	c.rejected = err == nil && result.Status != "COMPLETED"
+	if err == nil && result.Code == "selected_peer_changed" {
+		c.stale = true
+	}
 	return result, err
 }
 
