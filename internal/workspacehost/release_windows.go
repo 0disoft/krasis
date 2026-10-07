@@ -26,12 +26,13 @@ type releaseState struct {
 	cancel              context.CancelFunc
 	checkPending        bool
 	cancelledByUser     bool
+	recheckAfterCancel  bool
 }
 
 func (s *WorkspaceService) ReleaseStatus() ReleaseSnapshot {
 	s.release.gate.Lock()
 	defer s.release.gate.Unlock()
-	if s.release.checkPending {
+	if s.release.checkPending || s.release.recheckAfterCancel {
 		return ReleaseSnapshot{State: "CHECKING"}
 	}
 	return s.release.value
@@ -41,6 +42,12 @@ func (s *WorkspaceService) CheckRelease() ReleaseSnapshot {
 	defer s.release.gate.Unlock()
 	if s.release.wake == nil {
 		return ReleaseSnapshot{State: "FAILED"}
+	}
+	if s.release.cancelledByUser && (s.release.checkPending || s.release.cancel != nil || s.release.value.State == "CHECKING" || s.release.value.State == "DOWNLOADING") {
+		// The canceled context cannot be revived. Keep one explicit follow-up
+		// until this worker finishes, instead of coalescing it into canceled work.
+		s.release.recheckAfterCancel = true
+		return ReleaseSnapshot{State: "CHECKING"}
 	}
 	if s.release.checkPending {
 		return ReleaseSnapshot{State: "CHECKING"}
@@ -83,7 +90,7 @@ func (s *WorkspaceService) checkRelease() bool {
 		cancel()
 	}
 	s.release.gate.Unlock()
-	defer func() { s.release.gate.Lock(); s.release.cancel = nil; s.release.gate.Unlock() }()
+	defer s.finishReleaseCheck()
 	if parent.Err() != nil {
 		return fail(parent.Err(), 0)
 	}
@@ -140,6 +147,25 @@ func (s *WorkspaceService) checkRelease() bool {
 		s.log.Event("release_cache_cleanup_failed")
 	}
 	return true
+}
+
+func (s *WorkspaceService) finishReleaseCheck() {
+	s.release.gate.Lock()
+	defer s.release.gate.Unlock()
+	s.release.cancel = nil
+	if !s.release.recheckAfterCancel {
+		return
+	}
+	s.release.recheckAfterCancel = false
+	if s.ctx.Err() != nil {
+		return
+	}
+	s.release.cancelledByUser = false
+	s.release.checkPending = true
+	select {
+	case s.release.wake <- struct{}{}:
+	default:
+	}
 }
 
 func (s *WorkspaceService) finishReleaseError(err error, previous ReleaseSnapshot, generation int) bool {

@@ -234,3 +234,10 @@ an unreadable or pending setting only asks for verification. Native application
 still requires successful settings reads both on the tick and under the
 settings gate immediately before application. No new manual-apply endpoint,
 release schema, database, repository hygiene or runner changes are introduced.
+
+## g221: Preserve update reenable requests and unknown settings
+
+An explicit check or reenable while a release check is being canceled retains
+one follow-up request. It is queued only after the canceled worker completes,
+using a fresh context. Further requests coalesce. Disabling again or shutting
+down discards the deferred request. An old canceled context is never revived.

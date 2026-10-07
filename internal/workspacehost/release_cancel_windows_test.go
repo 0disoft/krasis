@@ -73,3 +73,76 @@ func TestUnrelatedSettingsWriteDoesNotCancelManualCheck(t *testing.T) {
 		t.Fatal("unrelated settings canceled a manual check")
 	}
 }
+
+func TestUpdateReenableWaitsForCancellationAndCoalescesFollowup(t *testing.T) {
+	for _, active := range []bool{false, true} {
+		t.Run(fmt.Sprint("active=", active), func(t *testing.T) {
+			base := t.TempDir()
+			t.Setenv("LOCALAPPDATA", base)
+			if err := appsettings.Save(base, appsettings.Settings{Schema: appsettings.Schema, AutoUpdate: true}); err != nil {
+				t.Fatal(err)
+			}
+			s := &WorkspaceService{ctx: context.Background(), startupOps: &startupSettingsOps{
+				startupRead: func(string) (bool, error) { return false, nil }, recoveryRead: func(string) (bool, error) { return false, nil },
+			}}
+			s.release.wake = make(chan struct{}, 1)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if active {
+				s.release.value.State = "DOWNLOADING"
+				s.release.cancel = cancel
+			} else {
+				s.CheckRelease()
+			}
+			s.SetAppSettings(false, false)
+			s.SetAppSettings(false, true)
+			for i := 0; i < 3; i++ {
+				s.CheckRelease()
+			}
+			if !s.release.recheckAfterCancel || !s.release.cancelledByUser || s.ReleaseStatus().State != "CHECKING" {
+				t.Fatal("reenable was lost or revived canceled work")
+			}
+			if active {
+				if ctx.Err() != context.Canceled || len(s.release.wake) != 0 {
+					t.Fatal("canceled download restarted before completion")
+				}
+				s.finishReleaseError(ctx.Err(), ReleaseSnapshot{}, 900)
+				s.finishReleaseCheck()
+			} else if !s.checkRelease() {
+				t.Fatal("queued cancellation failed")
+			}
+			if !s.release.checkPending || s.release.recheckAfterCancel || s.release.cancelledByUser || len(s.release.wake) != 1 {
+				t.Fatal("completion did not queue exactly one fresh check")
+			}
+		})
+	}
+}
+
+func TestUpdateDisableAgainAndShutdownDiscardDeferredRecheck(t *testing.T) {
+	for _, shutdown := range []bool{false, true} {
+		base := t.TempDir()
+		t.Setenv("LOCALAPPDATA", base)
+		if err := appsettings.Save(base, appsettings.Settings{Schema: appsettings.Schema, AutoUpdate: true}); err != nil {
+			t.Fatal(err)
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		s := &WorkspaceService{ctx: ctx, startupOps: &startupSettingsOps{
+			startupRead: func(string) (bool, error) { return false, nil }, recoveryRead: func(string) (bool, error) { return false, nil },
+		}}
+		s.release.wake = make(chan struct{}, 1)
+		s.release.value.State = "DOWNLOADING"
+		s.release.cancel = func() {}
+		s.SetAppSettings(false, false)
+		s.SetAppSettings(false, true)
+		if shutdown {
+			cancel()
+		} else {
+			s.SetAppSettings(false, false)
+		}
+		s.finishReleaseCheck()
+		cancel()
+		if s.release.recheckAfterCancel || s.release.checkPending || len(s.release.wake) != 0 {
+			t.Fatal("obsolete follow-up survived cancellation or shutdown")
+		}
+	}
+}
