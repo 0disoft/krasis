@@ -1,6 +1,6 @@
 <script>
   import { onMount, tick } from 'svelte';
-  import { inputMaintenanceNotice } from './input-maintenance-notice.js';
+  import { inputMaintenanceNotice, inputSetupNotice } from './input-maintenance-notice.js';
   import UpdateSettings from './UpdateSettings.svelte';
   import AppSettings from './AppSettings.svelte';
   import { appReleaseNotice, emptyAppSettings } from './app-settings-bridge.js';
@@ -27,7 +27,7 @@
   let locale = $state(resolveLocale(saved, navigator.languages));
   let syncTrayLocale = $state.raw();
   let trayLocaleFailed = $state(false);
-  let snapshot = $state({state:'UNKNOWN', peerAlias:'', peers:[], code:'unavailable', inputSetup:'UNKNOWN'});
+  let snapshot = $state({state:'UNKNOWN', peerAlias:'', peers:[], code:'preparing', inputSetup:'UNKNOWN'});
   let selected = $state('');
   let busy = $state(false);
   let windowRuntime = $state.raw();
@@ -125,10 +125,8 @@
     catch { if (!disposed) error = 'window_control_failed'; }
     finally { windowBusy = false; }
   }
-  const inputNotice = $derived(inputBusy ? 'UPDATING' : snapshot.inputSetup ?? 'UNKNOWN');
   const maintenanceNotice = $derived(inputMaintenanceNotice(snapshot, locale));
-  const inputNeedsAction = $derived(['NOT_INSTALLED','UPDATE_REQUIRED','CANCELLED','FAILED'].includes(inputNotice));
-  const inputNoticeKey = $derived(inputNotice === 'UNKNOWN' || inputNotice === 'READY' ? 'input_portable' : 'input_setup_' + inputNotice);
+  const setupNotice = $derived(inputSetupNotice(snapshot, inputBusy));
   const selectedPeer = $derived(snapshot.peers.find(p => p.fingerprint === selected));
   const clipboardKnown = $derived(clipboard.code === 'ok');
   const clipboardEnabled = $derived(clipboardKnown && !!clipboard.peer);
@@ -356,8 +354,8 @@
       {#if uiReplacement.canRetry}<button disabled={uiReplacementBusy} onclick={retryUIReplacement}>{t('ui_replacement_retry')}</button>{/if}
     </p>
   {/if}
-  {#if inputNeedsAction || inputBusy || inputNotice === 'UPDATING' || inputNotice === 'PENDING' || snapshot.inputBackend === 'PORTABLE'}
-    <p class="fault-banner" role="status">{t(inputNoticeKey)} <button disabled={busy || !bridge || inputNotice === 'UPDATING' || inputNotice === 'PENDING'} onclick={refreshInput}>{t(inputNotice === 'NOT_INSTALLED' ? 'input_setup' : 'input_refresh')}</button></p>
+  {#if setupNotice.key}
+    <p class="fault-banner" role="status">{t(setupNotice.key)} {#if setupNotice.action}<button disabled={busy || !bridge} onclick={refreshInput}>{t(setupNotice.action)}</button>{/if}</p>
   {/if}
   {#if snapshot.boundaryBlocked}<p class="placement-hint" role="status">{t(`boundary_${snapshot.boundaryBlocked}`)}</p>{/if}
   {#if !['ok','checking'].includes(appSettingsCode)}<p class="fault-banner" role="alert">{t(['startup_failed','start_menu_failed','recovery_failed','save_failed','rollback_failed'].includes(appSettingsCode) ? `settings_${appSettingsCode}` : 'settings_failed')} <button onclick={() => openDialog(settingsDlg)}>{t('settings')}</button></p>{/if}

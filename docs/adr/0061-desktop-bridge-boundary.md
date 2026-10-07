@@ -469,3 +469,11 @@ agent observation and keeps its existing saved-identity/manual-stop checks.
 Rejected or uncertain reconnect results are never replaced by that observation.
 Both maintenance outcomes survive the startup-resume projection; pending work,
 unverified restoration and cancelled startup contexts do not promote readiness.
+
+Input-setup UNKNOWN is visible as checking during native preparing and as an
+unavailable observation otherwise. Neither case claims portable input nor offers
+installation. READY only shows the portable-input notice for an observed PORTABLE
+backend; healthy protected input stays quiet. Installation progress retains its
+notice without a retry action; confirmed installation failures retain explicit
+retry. The existing refresh and background health reader remain the observation
+paths, with no new binding or automatic installer invocation.

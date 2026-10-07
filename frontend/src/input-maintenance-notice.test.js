@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { inputMaintenanceNotice } from './input-maintenance-notice.js';
+import { inputMaintenanceNotice, inputSetupNotice } from './input-maintenance-notice.js';
 
 test('successful refreshes stay quiet and combined failures keep both outcomes', () => {
   assert.equal(inputMaintenanceNotice({},'ko'),'');
@@ -18,4 +18,27 @@ test('unconfirmed values never show raw details or claim success', () => {
   const value = {inputRefreshCode:'/private/path',reconnectCode:'private error'};
   assert.equal(inputMaintenanceNotice(value,'ko'),'갱신: 확인 필요 · 재연결: 확인 필요');
   assert.equal(inputMaintenanceNotice({inputRefreshCode:'ok',reconnectCode:'stale_peer'},'ko'),'갱신: 완료 · 재연결: 기기 다시 선택 필요');
+});
+
+test('unknown health is visible without offering installation or claiming ordinary input', () => {
+  for (const inputBackend of ['UNKNOWN','PORTABLE','PROTECTED']) {
+    assert.deepEqual(inputSetupNotice({inputSetup:'UNKNOWN',inputBackend,code:'preparing'}), {key:'input_setup_UNKNOWN',action:''});
+    for (const code of ['ok','unavailable','busy']) {
+      assert.deepEqual(inputSetupNotice({inputSetup:'UNKNOWN',inputBackend,code}), {key:'input_setup_unavailable',action:''});
+    }
+  }
+  assert.deepEqual(inputSetupNotice({}), {key:'input_setup_unavailable',action:''});
+  assert.deepEqual(inputSetupNotice({inputSetup:'/private/path',code:'ok'}), {key:'input_setup_unavailable',action:''});
+  assert.deepEqual(inputSetupNotice({inputSetup:'READY',inputBackend:'PORTABLE'}), {key:'input_portable',action:'input_refresh'});
+  assert.deepEqual(inputSetupNotice({inputSetup:'READY',inputBackend:'PROTECTED'}), {key:'',action:''});
+});
+
+test('installation progress has no retry action and confirmed failures retain theirs', () => {
+  assert.deepEqual(inputSetupNotice({inputSetup:'FAILED'},true), {key:'input_setup_UPDATING',action:''});
+  for (const inputSetup of ['UPDATING','PENDING']) {
+    assert.deepEqual(inputSetupNotice({inputSetup}), {key:'input_setup_' + inputSetup,action:''});
+  }
+  for (const inputSetup of ['NOT_INSTALLED','UPDATE_REQUIRED','CANCELLED','FAILED']) {
+    assert.deepEqual(inputSetupNotice({inputSetup}), {key:'input_setup_' + inputSetup,action:inputSetup === 'NOT_INSTALLED' ? 'input_setup' : 'input_refresh'});
+  }
 });
