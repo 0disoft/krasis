@@ -210,3 +210,12 @@ gates are per peer, so an outstanding query cannot lock another peer's action.
 Late responses stay with their peer and never replace the current control.
 Native trust and request gates remain unchanged. Settings/release codes gain
 rollback_failed/CANCELLED; no new endpoint, database, runner or hygiene changes.
+
+## g220: Keep utility state honest across clock and settings changes
+
+Peer-launch observation windows use elapsed time in the current renderer,
+shared across peer-control remounts. A reloaded stored ID is confirmed by a
+native status query before it receives one bounded observation window.
+Neither wall-clock correction nor local timeout discards the ID or sends
+START. An explicit replacement first requires native expired/unknown_request
+confirmation. Further pending polls never renew an established window.

@@ -11,24 +11,45 @@ export function appOpenProgress(previous, status, expired) {
   }
   return {result, waiting};
 }
-export function createAppOpenBridge(binding, storage) {
+export function createAppOpenBridge(binding, storage, clock = {wall:()=>Date.now(), elapsed:()=>performance.now()}) {
   if(!storage){try{storage=globalThis.sessionStorage;}catch{}}
   const key=peer=>'krasis.app-open.'+peer;
+  const budget = 70000;
+  const records = new Map();
+  const waiting = code => ['pending','launch_accepted','launch_requested'].includes(code);
   function remember(v, starting){
-    if(!storage)return;
     try{
       const saved = resume(v.peer);
-      if(['pending','launch_accepted','launch_requested'].includes(v.code)){
-        if(starting && !saved)storage.setItem(key(v.peer),JSON.stringify({id:v.id,expires:Date.now()+70000}));
-      }else if(!['query_busy','unavailable'].includes(v.code) && saved?.id === v.id)storage.removeItem(key(v.peer));
+      if(waiting(v.code)){
+        if(starting && !saved){
+          const expires=clock.wall()+budget;
+          records.set(v.peer,{id:v.id,expires,deadline:clock.elapsed()+budget,unconfirmed:false});
+          storage?.setItem(key(v.peer),JSON.stringify({id:v.id,expires}));
+        }else if(saved?.id===v.id && records.get(v.peer)?.unconfirmed){
+          // A reloaded receipt gets one bounded observation window only after
+          // native code confirms that the original request is still pending.
+          const record=records.get(v.peer);
+          record.deadline=clock.elapsed()+budget;
+          record.unconfirmed=false;
+        }
+      }else if(!['query_busy','unavailable'].includes(v.code) && saved?.id === v.id){
+        records.delete(v.peer);
+        const persisted=JSON.parse(storage?.getItem(key(v.peer))??'null');
+        if(persisted?.id===v.id)storage?.removeItem(key(v.peer));
+      }
     }catch{}
   }
   function resume(peer){
     try{
       if(!/^[a-f0-9]{64}$/i.test(peer??''))return;
-      const r=JSON.parse(storage?.getItem(key(peer))??'null');
-      if(r&&/^[a-f0-9]{32}$/i.test(r.id)&&Number.isSafeInteger(r.expires)&&r.expires>Date.now()&&r.expires<=Date.now()+70000)return {schema,peer,id:r.id,code:'pending',expires:r.expires};
-      storage?.removeItem(key(peer));
+      let r=records.get(peer);
+      if(!r){
+        const saved=JSON.parse(storage?.getItem(key(peer))??'null');
+        if(!saved||!/^[a-f0-9]{32}$/i.test(saved.id)||!Number.isSafeInteger(saved.expires)||saved.expires<=0){storage?.removeItem(key(peer));return;}
+        r={...saved,deadline:clock.elapsed()+Math.max(0,Math.min(budget,saved.expires-clock.wall())),unconfirmed:true};
+        records.set(peer,r);
+      }
+      return {schema,peer,id:r.id,code:'pending',expires:r.expires,remaining:Math.max(0,r.deadline-clock.elapsed())};
     }catch{}
   }
   const busyPeers = new Set();
@@ -51,9 +72,17 @@ export function createAppOpenBridge(binding, storage) {
     } catch { return failure(id ? 'unavailable' : 'outcome_unknown'); }
     finally { busyPeers.delete(peer); }
   }
-  return Object.freeze({resume,open: peer => {
+  return Object.freeze({resume,expired:(peer,id)=>{
+    const pending=resume(peer);
+    return !pending||pending.id!==id||pending.remaining===0;
+  },open: async peer => {
     const pending = resume(peer);
-    return pending ? Promise.resolve(pending) : call(peer, '');
+    if(!pending)return call(peer,'');
+    if(!records.get(peer).unconfirmed && pending.remaining>0)return pending;
+    const status=await call(peer,pending.id);
+    // A local timestamp is not proof that native work ended. Only an explicit
+    // new click and a native terminal receipt may start a replacement request.
+    return ['expired','unknown_request'].includes(status.code) ? call(peer,'') : status;
   }, status: (peer,id) => {
     if (!id) return Promise.resolve({schema,peer,id:'',code:'invalid_peer'});
     return call(peer,id);

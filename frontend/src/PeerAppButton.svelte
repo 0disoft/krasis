@@ -14,7 +14,7 @@
     const fingerprint=peer?.fingerprint;
     if(bridge&&fingerprint&&!busy&&!result){
       const pending=bridge.resume?.(fingerprint);
-      if(pending){busy=true;result=pending;follow(pending,pending.expires);}
+      if(pending){busy=true;result=pending;follow(pending);}
     }
   });
   async function open() {
@@ -25,16 +25,17 @@
     const next = await bridge.open(fingerprint);
     if (disposed) return;
     result = next;
-    if (next.code !== 'pending') { busy = false; return; }
-    follow(next,next.expires ?? bridge.resume?.(fingerprint)?.expires ?? Date.now()+70000);
+    if (!['pending','launch_accepted','launch_requested'].includes(next.code)) { busy = false; return; }
+    follow(next);
   }
-  function follow(next,deadline){
+  function follow(next){
     const fingerprint=next.peer;
+    const deadline=performance.now()+Math.min(70000,next.remaining??70000);
     async function poll() {
       if (disposed) return;
       const status = await bridge.status(fingerprint, next.id);
       if (disposed) return;
-      const progress = appOpenProgress(result, status, Date.now() >= deadline);
+      const progress = appOpenProgress(result, status, bridge.expired ? bridge.expired(fingerprint,next.id) : performance.now() >= deadline);
       result = progress.result;
       if (progress.waiting) { timer = setTimeout(poll,1500); return; }
       busy = false;
