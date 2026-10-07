@@ -170,3 +170,10 @@ are both open. Hiding either cancels the next poll and rejects a late result.
 Reopening or changing peers clears old observations before a fresh read.
 In-flight reads remain serialized with matching, and cannot restart a hidden
 poll loop or enable matching with another peer's observations.
+
+Manual release checks immediately return CHECKING once the existing native
+worker accepts the request. Pending and active checks coalesce, while a
+staged READY release remains stored for recovery if checking fails. Status
+projects pending work until the worker starts. The renderer disables repeat
+clicks immediately and discards pre-click polling responses using an epoch.
+No release schema, new endpoint, signing policy or download policy changes.

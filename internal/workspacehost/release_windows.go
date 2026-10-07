@@ -24,21 +24,35 @@ type releaseState struct {
 	directory, revision string
 	wake                chan struct{}
 	cancel              context.CancelFunc
+	checkPending        bool
 }
 
 func (s *WorkspaceService) ReleaseStatus() ReleaseSnapshot {
 	s.release.gate.Lock()
 	defer s.release.gate.Unlock()
+	if s.release.checkPending {
+		return ReleaseSnapshot{State: "CHECKING"}
+	}
 	return s.release.value
 }
 func (s *WorkspaceService) CheckRelease() ReleaseSnapshot {
-	if s.release.wake != nil {
-		select {
-		case s.release.wake <- struct{}{}:
-		default:
-		}
+	s.release.gate.Lock()
+	defer s.release.gate.Unlock()
+	if s.release.wake == nil {
+		return ReleaseSnapshot{State: "FAILED"}
 	}
-	return s.ReleaseStatus()
+	if s.release.checkPending {
+		return ReleaseSnapshot{State: "CHECKING"}
+	}
+	if s.release.value.State == "CHECKING" || s.release.value.State == "DOWNLOADING" {
+		return s.release.value
+	}
+	select {
+	case s.release.wake <- struct{}{}:
+	default:
+	}
+	s.release.checkPending = true
+	return ReleaseSnapshot{State: "CHECKING"}
 }
 func (s *WorkspaceService) setRelease(state string, generation int) {
 	s.release.gate.Lock()
@@ -46,7 +60,15 @@ func (s *WorkspaceService) setRelease(state string, generation int) {
 	s.release.gate.Unlock()
 }
 func (s *WorkspaceService) checkRelease() bool {
-	previous := s.ReleaseStatus()
+	s.release.gate.Lock()
+	previous := s.release.value
+	s.release.checkPending = false
+	select {
+	case <-s.release.wake:
+	default:
+	}
+	s.release.value = ReleaseSnapshot{State: "CHECKING"}
+	s.release.gate.Unlock()
 	fail := func(generation int) bool {
 		if previous.State == "READY" {
 			s.setRelease("READY", previous.Generation)
@@ -62,7 +84,6 @@ func (s *WorkspaceService) checkRelease() bool {
 	s.release.cancel = cancel
 	s.release.gate.Unlock()
 	defer func() { s.release.gate.Lock(); s.release.cancel = nil; s.release.gate.Unlock() }()
-	s.setRelease("CHECKING", 0)
 	m, envelope, err := releaseupdate.CheckSigned(parent, releaseupdate.Client(), releaseupdate.PublicKey)
 	if err != nil {
 		if errors.Is(err, releaseupdate.ErrUnconfigured) {
