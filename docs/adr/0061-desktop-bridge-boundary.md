@@ -126,3 +126,14 @@ so they are not scaled a second time. Tray/second-instance reopening clamps an
 off-screen normal window while preserving an already fitting user placement.
 Maximized/fullscreen windows retain OS sizing. No periodic resize or input,
 connection, API, database or preference-persistence change is introduced.
+
+## g216: Tray menu follows the selected UI language
+
+The existing workspace locale preference remains the source of truth. The
+renderer sends its resolved ko/en locale to SetTrayLocale at mount and after
+language changes. Native code owns all four menu labels, validates the locale,
+and updates the existing items on the UI thread without changing callbacks.
+Updates serialize so an older response cannot overwrite a newer selection.
+Only one language appears in each menu item. Failed application stays visible
+in language settings. No new preference file, network API, database, input or
+connection behavior is introduced.

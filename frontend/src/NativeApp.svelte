@@ -18,9 +18,12 @@
   import { resolveLocale } from './i18n.js';
   import { nativeText } from './native-i18n.js';
   import { createOperationGate } from './operation-gate.js';
+  import { createTrayLocaleSync } from './tray-locale.js';
   let saved;
   try { saved = localStorage.getItem('krasis.workspace.locale'); } catch {}
   let locale = $state(resolveLocale(saved, navigator.languages));
+  let syncTrayLocale = $state.raw();
+  let trayLocaleFailed = $state(false);
   let snapshot = $state({state:'UNKNOWN', peerAlias:'', peers:[], code:'unavailable', inputSetup:'UNKNOWN'});
   let selected = $state('');
   let busy = $state(false);
@@ -231,6 +234,7 @@
         const { Call, Window, Events } = await import(/* @vite-ignore */ '/wails/runtime.js');
         if (disposed) return;
         const name = 'github.com/0disoft/krasis/internal/workspacehost.WorkspaceService.';
+        syncTrayLocale = createTrayLocaleSync(value => Call.ByName(name+'SetTrayLocale', value), failed => { if (!disposed) trayLocaleFailed = failed; });
         windowRuntime = Window;
         for (const event of ['common:WindowMaximise','common:WindowUnMaximise','common:WindowFocus','common:WindowLostFocus']) {
           windowEvents.push(Events.On(event, refreshWindowState));
@@ -288,6 +292,7 @@
   $effect(() => {
     document.documentElement.lang = locale;
     try { localStorage.setItem('krasis.workspace.locale', locale); } catch {}
+    if (syncTrayLocale) void syncTrayLocale(locale);
   });
 </script>
 
@@ -366,7 +371,7 @@
     </section>
     <section class="settings-section"><KeyboardPanel peer={selected} {locale} /></section>
     <section class="settings-section"><h3>{t('app_settings')}</h3><AppSettings {locale} onStatus={(code, state) => { appSettingsCode = code; releaseState = state; }} /></section>
-    <section class="settings-section"><label class="language-setting">{t('language')}<select bind:value={locale}><option value="ko">한국어</option><option value="en">English</option></select></label></section>
+    <section class="settings-section"><label class="language-setting">{t('language')}<select bind:value={locale}><option value="ko">한국어</option><option value="en">English</option></select></label>{#if trayLocaleFailed}<p role="status">{t('tray_locale_failed')}</p>{/if}</section>
   </div>
   <div class="dlg-foot"><button class="primary" onclick={() => settingsDlg.close()}>{t('close')}</button></div>
 </dialog>

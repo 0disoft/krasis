@@ -312,22 +312,29 @@ func Run() {
 		tray.SetTooltip("Krasis")
 		tray.SetLabel("Krasis")
 		menu := app.NewMenu()
-		menu.Add("열기 / Open").OnClick(func(*application.Context) {
+		labels, _ := trayMenuLabels("ko")
+		openItem := menu.Add(labels[0]).OnClick(func(*application.Context) {
 			window.Restore()
 			fitWorkspaceWindow(window, false)
 			window.Show()
 			window.Focus()
 		})
-		menu.Add("연결 해제 / Disconnect").OnClick(func(*application.Context) {
+		disconnectItem := menu.Add(labels[1]).OnClick(func(*application.Context) {
 			service.disconnectAsync()
 		})
-		menu.Add("PIN 창 입력 시험").OnClick(func(*application.Context) {
+		probeItem := menu.Add(labels[2]).OnClick(func(*application.Context) {
 			if err := launchCredentialProbe(paths.Control); err != nil {
 				showCredentialProbeLaunchError()
 			}
 		})
 		menu.AddSeparator()
-		menu.Add("관리 앱 종료 · 에이전트 유지 / Quit UI").OnClick(func(*application.Context) { app.Quit() })
+		quitItem := menu.Add(labels[3]).OnClick(func(*application.Context) { app.Quit() })
+		service.updateTrayLabels = func(labels [4]string) {
+			openItem.SetLabel(labels[0])
+			disconnectItem.SetLabel(labels[1])
+			probeItem.SetLabel(labels[2])
+			quitItem.SetLabel(labels[3])
+		}
 		tray.SetMenu(menu)
 		window.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) { window.Hide(); e.Cancel() })
 	}

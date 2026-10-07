@@ -16,14 +16,15 @@ import (
 )
 
 type WorkspaceService struct {
-	uiReplacement   uiReplacement
-	visibleWindow   atomic.Pointer[application.WebviewWindow]
-	uiReadyEpoch    atomic.Uint64
-	clipboardWindow atomic.Uintptr
-	clipboardWake   chan struct{}
-	release         releaseState
-	settingsGate    sync.Mutex
-	startAtLogin    bool
+	uiReplacement    uiReplacement
+	visibleWindow    atomic.Pointer[application.WebviewWindow]
+	uiReadyEpoch     atomic.Uint64
+	clipboardWindow  atomic.Uintptr
+	clipboardWake    chan struct{}
+	release          releaseState
+	settingsGate     sync.Mutex
+	startAtLogin     bool
+	updateTrayLabels func([4]string)
 
 	startMenuFailed       atomic.Bool
 	launchRecordFailed    atomic.Bool
