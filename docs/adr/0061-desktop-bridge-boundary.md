@@ -275,3 +275,11 @@ epochs reject reads predating a retry; uncertain acknowledgements are queried,
 never automatically retried. No database, hygiene or runner changes are made.
 An explicit second-instance launch also brings the current management window
 forward, so pending or failed replacement is visible even from tray-only state.
+
+## g223: Show preparation early and retain replacement observations
+
+Initial second-instance requests and explicit retries use the same admitted
+preparation worker. The callback returns before bundle packing and staging,
+allowing the existing window-show path to run immediately. Active requests
+coalesce, status reads do not wait for file work, and shutdown waits for admitted
+workers. Canceled preparation cannot publish an applicable pending candidate.

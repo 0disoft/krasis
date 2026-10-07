@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/productpanel"
@@ -21,6 +22,7 @@ func TestUIReplacementFailureIsVisibleAndRetryRevalidatesOriginalSource(t *testi
 	if !s.requestUIReplacement([]string{source}, map[string]string{"generation": strconv.Itoa(generation), "revision": strings.Repeat("a", 40)}) {
 		t.Fatal("new version not handled")
 	}
+	s.jobs.Wait()
 	if got := s.UIReplacementStatus(); got.State != "FAILED" || got.Generation != generation || !got.CanRetry {
 		t.Fatal(got)
 	}
@@ -30,6 +32,35 @@ func TestUIReplacementFailureIsVisibleAndRetryRevalidatesOriginalSource(t *testi
 	s.jobs.Wait()
 	if got := s.UIReplacementStatus(); got.State != "FAILED" || !got.CanRetry || s.uiReplacement.directory != "" {
 		t.Fatal("missing source bypassed retry verification", got)
+	}
+}
+
+func TestUIReplacementRequestReturnsWhilePreparationIsStillBlocked(t *testing.T) {
+	s := &WorkspaceService{ctx: context.Background()}
+	started, unblock := make(chan struct{}), make(chan struct{})
+	s.uiReplacement.prepare = func(string, string, int) { close(started); <-unblock }
+	defer func() { close(unblock); s.jobs.Wait() }()
+	source := filepath.Join(t.TempDir(), "krasis.exe")
+	data := map[string]string{"generation": strconv.Itoa(localapi.AgentGeneration + 1), "revision": strings.Repeat("a", 40)}
+	returned := make(chan bool, 1)
+	go func() { returned <- s.requestUIReplacement([]string{source}, data) }()
+	select {
+	case got := <-returned:
+		if !got {
+			t.Fatal("request not admitted")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("window callback waits for file preparation")
+	}
+	<-started
+	if got := s.UIReplacementStatus(); got.State != "PREPARING" || got.CanRetry {
+		t.Fatal("preparation status blocked or retriable", got)
+	}
+	if !s.requestUIReplacement([]string{source}, data) {
+		t.Fatal("duplicate request not coalesced")
+	}
+	if got := s.RetryUIReplacement(); got.State != "PREPARING" {
+		t.Fatal("retry duplicated blocked preparation", got)
 	}
 }
 

@@ -24,6 +24,7 @@ type uiReplacement struct {
 	generation          int
 	source              string
 	state               string
+	prepare             func(string, string, int)
 }
 
 type UIReplacementSnapshot struct {
@@ -58,12 +59,22 @@ func (s *WorkspaceService) RetryUIReplacement() UIReplacementSnapshot {
 		return value
 	}
 	s.uiReplacement.state = "PREPARING"
-	source, revision, generation := s.uiReplacement.source, s.uiReplacement.revision, s.uiReplacement.generation
 	value := s.uiReplacementStatus()
-	s.jobs.Add(1)
+	s.queueUIReplacementPreparation()
 	s.uiReplacement.gate.Unlock()
-	go func() { defer s.jobs.Done(); s.stageUIReplacement(source, revision, generation) }()
 	return value
+}
+
+// Caller owns the request gate. Count the admitted worker before returning so
+// shutdown waits for preparation, without holding up the window-show callback.
+func (s *WorkspaceService) queueUIReplacementPreparation() {
+	source, revision, generation := s.uiReplacement.source, s.uiReplacement.revision, s.uiReplacement.generation
+	prepare := s.uiReplacement.prepare
+	if prepare == nil {
+		prepare = s.stageUIReplacement
+	}
+	s.jobs.Add(1)
+	go func() { defer s.jobs.Done(); prepare(source, revision, generation) }()
 }
 
 // Only a complete newer product bundle is staged. IPC arguments never become
@@ -80,8 +91,8 @@ func (s *WorkspaceService) requestUIReplacement(args []string, data map[string]s
 	}
 	s.uiReplacement.source, s.uiReplacement.revision, s.uiReplacement.generation = args[0], data["revision"], generation
 	s.uiReplacement.directory, s.uiReplacement.state = "", "PREPARING"
+	s.queueUIReplacementPreparation()
 	s.uiReplacement.gate.Unlock()
-	s.stageUIReplacement(args[0], data["revision"], generation)
 	return true
 }
 
@@ -118,6 +129,10 @@ func (s *WorkspaceService) stageUIReplacement(source, revision string, generatio
 	}
 	directory, err := releaseupdate.Stage(os.Getenv("LOCALAPPDATA"), bundle)
 	if err != nil {
+		fail("ui_replacement_stage_failed")
+		return
+	}
+	if s.ctx.Err() != nil {
 		fail("ui_replacement_stage_failed")
 		return
 	}
