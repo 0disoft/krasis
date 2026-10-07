@@ -14,12 +14,13 @@ export function appOpenProgress(previous, status, expired) {
 export function createAppOpenBridge(binding, storage) {
   if(!storage){try{storage=globalThis.sessionStorage;}catch{}}
   const key=peer=>'krasis.app-open.'+peer;
-  function remember(v){
+  function remember(v, starting){
     if(!storage)return;
     try{
+      const saved = resume(v.peer);
       if(['pending','launch_accepted','launch_requested'].includes(v.code)){
-        if(!storage.getItem(key(v.peer)))storage.setItem(key(v.peer),JSON.stringify({id:v.id,expires:Date.now()+70000}));
-      }else if(!['query_busy','unavailable'].includes(v.code))storage.removeItem(key(v.peer));
+        if(starting && !saved)storage.setItem(key(v.peer),JSON.stringify({id:v.id,expires:Date.now()+70000}));
+      }else if(!['query_busy','unavailable'].includes(v.code) && saved?.id === v.id)storage.removeItem(key(v.peer));
     }catch{}
   }
   function resume(peer){
@@ -45,12 +46,15 @@ export function createAppOpenBridge(binding, storage) {
         return failure(id ? 'unavailable' : 'outcome_unknown');
       }
       const result={schema,peer,code:v.code,id:v.id};
-      remember(result);
+      remember(result, id === '');
       return result;
     } catch { return failure(id ? 'unavailable' : 'outcome_unknown'); }
     finally { busy = false; }
   }
-  return Object.freeze({resume,open: peer => call(peer, ''), status: (peer,id) => {
+  return Object.freeze({resume,open: peer => {
+    const pending = resume(peer);
+    return pending ? Promise.resolve(pending) : call(peer, '');
+  }, status: (peer,id) => {
     if (!id) return Promise.resolve({schema,peer,id:'',code:'invalid_peer'});
     return call(peer,id);
   }});

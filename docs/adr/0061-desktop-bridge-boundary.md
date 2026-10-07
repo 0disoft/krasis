@@ -182,3 +182,10 @@ The pairing dialog explains that a connecting, connected or reconnecting
 session must be disconnected before registering another device. Opening
 the dialog itself does not change the connection or start a pairing job.
 No API schema, database, repository hygiene or runner changes are introduced.
+
+## g219: Bound peer launch receipts and recover settings failures
+
+Expired or invalid peer-launch storage cannot block a new explicit request.
+Only the initial acknowledged request creates a deadline; polling never
+renews it. Repeated opening resumes a valid saved ID without sending START
+again, and a terminal response clears only its matching saved receipt.

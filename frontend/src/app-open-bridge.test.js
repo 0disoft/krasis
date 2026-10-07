@@ -58,3 +58,31 @@ test('no-response receipt clears the saved request without sending a new launch'
   assert.equal(bridge.resume(peer),undefined);
   assert.deepEqual(calls,[[peer,''],[peer,id]]);
 });
+
+test('an expired receipt cannot hide a new request or be renewed by polling',async()=>{
+  const values=new Map(), key='krasis.app-open.'+peer;
+  const storage={getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
+  const nextID='c'.repeat(32);
+  let starts=0;
+  const bridge=createAppOpenBridge({PeerAppOpen:async(p,r)=>{
+    if (!r) starts++;
+    return {...value,id:r||nextID,code:'pending'};
+  }},storage);
+  values.set(key,JSON.stringify({id,expires:Date.now()-1}));
+  await bridge.status(peer,id);
+  assert.equal(bridge.resume(peer),undefined);
+  assert.equal(values.has(key),false);
+  assert.equal((await bridge.open(peer)).id,nextID);
+  assert.equal(bridge.resume(peer).id,nextID);
+  await bridge.open(peer);
+  assert.equal(starts,1);
+});
+
+test('an old terminal response cannot erase a newer saved request',async()=>{
+  const values=new Map(), key='krasis.app-open.'+peer, nextID='c'.repeat(32);
+  const storage={getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
+  values.set(key,JSON.stringify({id:nextID,expires:Date.now()+70000}));
+  const bridge=createAppOpenBridge({PeerAppOpen:async()=>({...value,code:'window_ready'})},storage);
+  await bridge.status(peer,id);
+  assert.equal(bridge.resume(peer).id,nextID);
+});
