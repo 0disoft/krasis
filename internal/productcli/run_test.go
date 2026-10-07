@@ -81,6 +81,18 @@ func TestPairRecoveryOutput(t *testing.T) {
 	}
 }
 
+func TestConnectSaveWarningRetainsSuccessfulRequestAndExplainsPersistence(t *testing.T) {
+	value := localapi.OperationResult{Status: "COMPLETED", Code: "connect_started_resume_save_failed"}
+	if _, code, err := operation(value, nil); err != nil || code != ExitOK {
+		t.Fatal("accepted connection became a failed operation", code, err)
+	}
+	var output bytes.Buffer
+	writeHuman(&output, value)
+	if !strings.Contains(output.String(), "automatic reconnect settings were not saved") || !strings.Contains(output.String(), "Do not repeat CONNECT") {
+		t.Fatal(output.String())
+	}
+}
+
 func TestRunMapsUnavailableAndOperationOutcomes(t *testing.T) {
 	tests := []struct {
 		name string

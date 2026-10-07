@@ -16,6 +16,7 @@ const BridgeSchema = "krasis.desktop/v1"
 // Notice is legacy localized panel copy; native integration must map it to catalog
 // codes before advertising complete localization of agent failures.
 type BridgeSnapshot struct {
+	ResumeState     string       `json:"resumeState,omitempty"`
 	BoundaryBlocked string       `json:"boundaryBlocked,omitempty"`
 	InputSetup      string       `json:"inputSetup,omitempty"`
 	InputBackend    string       `json:"inputBackend"`
@@ -103,6 +104,7 @@ func (b *DesktopBridge) execute(action, alias, fingerprint string) BridgeSnapsho
 		return bridgeFailure("stale_peer")
 	}
 	result := BridgeSnapshot{Schema: BridgeSchema, State: view.State, PeerAlias: view.PeerAlias, StopReason: view.StopReason,
+		ResumeState:  guard.resumeState,
 		InputBackend: guard.inputBackend, BoundaryBlocked: guard.boundaryBlocked,
 		Peers: []BridgePeer{}, Code: "ok", Notice: view.Notice}
 	if action != "refresh" && (!guard.attempted || guard.rejected) {
@@ -147,6 +149,7 @@ func bridgeInterruption(ctx context.Context, attempted, rejected bool) BridgeSna
 
 type bridgeClient struct {
 	Client
+	resumeState                                         string
 	inputBackend                                        string
 	boundaryBlocked                                     string
 	fingerprint                                         string
@@ -173,6 +176,10 @@ func (c *bridgeClient) Status(ctx context.Context) (localapi.Status, error) {
 		c.uncertain = true
 	}
 	c.inputBackend = "UNKNOWN"
+	c.resumeState = "UNKNOWN"
+	if err == nil && (v.ResumeState == "SAVED" || v.ResumeState == "FAILED") {
+		c.resumeState = v.ResumeState
+	}
 	c.boundaryBlocked = ""
 	if err == nil {
 		switch v.BoundaryBlocked {

@@ -34,6 +34,7 @@ const (
 )
 
 type Status struct {
+	ResumeState     string `json:"resumeState,omitempty"`
 	BoundaryBlocked string `json:"boundaryBlocked,omitempty"`
 	// InputBackend reports the selected runner path, not input authority or lease readiness.
 	InputBackend       string   `json:"inputBackend,omitempty"`

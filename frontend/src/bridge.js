@@ -26,6 +26,7 @@ export function createBridge(binding) {
       if (latest && value.revision > 0 && value.revision < latest.revision) return copy(latest);
       const result = { schema: value.schema, state: value.state, peerAlias: value.peerAlias,
         code: value.code, notice: value.notice,
+		resumeState: ['SAVED','FAILED'].includes(value.resumeState) ? value.resumeState : 'UNKNOWN',
         boundaryBlocked: value.state === 'CONNECTED' && ['LOCAL_MENU','MOUSE_CAPTURE','PRESSED_INPUT','MOVE_SIZE'].includes(value.boundaryBlocked) ? value.boundaryBlocked : '',
 		inputBackend: ['PROTECTED','PORTABLE'].includes(value.inputBackend) ? value.inputBackend : 'UNKNOWN',
         inputSetup: inputSetupStates.has(value.inputSetup) ? value.inputSetup : 'UNKNOWN',

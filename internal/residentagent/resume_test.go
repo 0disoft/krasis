@@ -122,3 +122,42 @@ func TestConnectionResumeSurvivesShutdownButNotManualDisconnect(t *testing.T) {
 		}
 	}
 }
+
+func TestConnectionSaveFailureIsReportedWithoutCancelingTheConnection(t *testing.T) {
+	started := make(chan struct{}, 2)
+	o := testOperations(t, func(ctx context.Context, _ string, _ agent.SupervisorObserver) error {
+		started <- struct{}{}
+		<-ctx.Done()
+		return context.Cause(ctx)
+	})
+	o.trust = &stubTrustStore{document: truststore.Document{Peers: []truststore.PeerRecord{{Alias: "peer", Fingerprint: strings.Repeat("b", 64)}}}}
+	occupied := filepath.Join(t.TempDir(), "not-a-directory")
+	if err := os.WriteFile(occupied, []byte("occupied"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	o.localAppData = occupied
+	result, err := o.Connect(context.Background(), localapi.OperationRequest{PeerAlias: "peer"})
+	if err != nil || result.Status != "COMPLETED" || result.Code != "connect_started_resume_save_failed" {
+		t.Fatal("connection or persistence result was lost", result, err)
+	}
+	<-started
+	for range 2 {
+		status, err := o.Status(context.Background())
+		if err != nil || status.ResumeState != "FAILED" || status.State != "CONNECTING" {
+			t.Fatal("status hid save failure or canceled connection", status, err)
+		}
+	}
+	o.Disconnect(context.Background(), localapi.OperationRequest{})
+	o.localAppData = t.TempDir()
+	result, err = o.Connect(context.Background(), localapi.OperationRequest{PeerAlias: "peer"})
+	if err != nil || result.Code != "connect_started" {
+		t.Fatal(result, err)
+	}
+	<-started
+	if status, _ := o.Status(context.Background()); status.ResumeState != "SAVED" {
+		t.Fatal("verified successful save did not clear warning", status)
+	}
+	if err := o.Close(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+}

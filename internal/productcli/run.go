@@ -620,6 +620,8 @@ func writeHuman(output io.Writer, value any) {
 			fmt.Fprintf(output, "Confirmation code: %s\n", item.Confirmation)
 		}
 		switch item.Code {
+		case "connect_started_resume_save_failed":
+			fmt.Fprintln(output, "Connection was started, but automatic reconnect settings were not saved. Do not repeat CONNECT while it is active.")
 		case "pairing_completed":
 			fmt.Fprintln(output, "Local trust commit succeeded; remote outcome is unknown. Check pair status on both devices before connecting.")
 		case "pairing_commit_uncertain":

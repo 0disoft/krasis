@@ -406,3 +406,12 @@ Resume decoding requires explicit alias and fingerprint strings even for idle
 state. Missing files remain the initial-install case. Empty objects, null fields
 and a null/non-boolean manualStop are rejected. Complete legacy records without
 manualStop remain supported. Reads do not rewrite or repair corrupt files.
+
+Connection admission remains COMPLETED when saving resume settings fails, with
+connect_started_resume_save_failed as its explicit result code. Status and the
+desktop snapshot expose bounded resumeState (SAVED/FAILED/unknown). The agent
+retains FAILED until a verified successful save; refresh never clears it. The UI
+shows persistence separately from connection status, and CLI output discourages
+repeating an accepted CONNECT. Resume persistence checks the admitted pin before
+saving so a later alias replacement cannot save a different peer. No new endpoint
+or database, hygiene or task-runner change is introduced.

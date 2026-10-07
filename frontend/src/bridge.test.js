@@ -14,6 +14,16 @@ test('native adapter preserves authoritative connecting state and narrows output
   assert.deepEqual(calls, [[peer.alias, peer.fingerprint]]);
   assert.equal((await bridge.disconnect()).state, 'LOCAL');
 });
+
+test('resume persistence warning stays separate from connection success and strips unknown values', async () => {
+	for (const state of ['FAILED','SAVED','private path',undefined]) {
+		const bridge = createBridge({Refresh: async () => ({...snapshot('CONNECTED'),resumeState:state}), Connect() {}, Disconnect() {}});
+		const value = await bridge.refresh();
+		assert.equal(value.state,'CONNECTED');
+		assert.equal(value.code,'ok');
+		assert.equal(value.resumeState,['FAILED','SAVED'].includes(state) ? state : 'UNKNOWN');
+	}
+});
 test('missing binding, malformed snapshot and native failures never become mock success', async () => {
   assert.throws(() => createBridge(undefined), /bridge_unavailable/);
   const binding = { Refresh: async () => ({ state: 'CONNECTED' }), Connect() {}, Disconnect() {} };

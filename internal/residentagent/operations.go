@@ -71,6 +71,7 @@ type Operations struct {
 	peerAlias         string
 	lastStopReason    string
 	manualStop        bool
+	resumeState       string
 	lastCode          string
 	counters          map[string]uint64
 }
@@ -201,6 +202,7 @@ func (operations *Operations) Status(context.Context) (localapi.Status, error) {
 	return localapi.Status{
 		SchemaVersion:      localapi.StatusSchemaVersion,
 		State:              state,
+		ResumeState:        operations.resumeState,
 		InputBackend:       operations.inputBackend,
 		BoundaryBlocked:    operations.boundaryNoticeLocked(),
 		PeerAlias:          operations.peerAlias,
@@ -302,13 +304,16 @@ func (operations *Operations) Connect(requestContext context.Context, request lo
 	operations.lastStopReason = ""
 	operations.manualStop = false
 	operations.recordLocked("connect_started")
-	operations.rememberConnectionLocked(request.PeerAlias)
+	resumeSaved := operations.rememberConnectionLocked(request.PeerAlias, request.Fingerprint)
 	go func(alias string) {
 		defer cancel(nil)
 		err := operations.runWithProtectedRecovery(ctx, alias, &sessionObserver{operations: operations, done: done}, wininput.ProtectedInputActive, agent.Wait)
 		displayChanged := ctx.Err() == nil && displayChangeOnly(err)
 		operations.finishSession(done, outcome, err, (ctx.Err() != nil && cancellationOnly(err, context.Cause(ctx))) || peerDisconnectOnly(err) || protectedInputOnly(err), displayChanged)
 	}(request.PeerAlias)
+	if !resumeSaved {
+		return completed("connect_started_resume_save_failed"), nil
+	}
 	return completed("connect_started"), nil
 }
 
@@ -325,7 +330,10 @@ func (operations *Operations) disconnect(ctx context.Context, forget bool) (loca
 	if forget && operations.localAppData != "" {
 		resumeErr = appsettings.SaveResume(operations.localAppData, appsettings.Resume{ManualStop: true})
 		if resumeErr != nil {
+			operations.resumeState = "FAILED"
 			operations.recordLocked("resume_save_failed")
+		} else {
+			operations.resumeState = "SAVED"
 		}
 	}
 	operations.lastStopReason = ""

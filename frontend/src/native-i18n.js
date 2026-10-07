@@ -229,6 +229,7 @@ export const nativeCatalogs = {
     invalid_peer:'유효한 기기를 선택하세요.', stale_peer:'기기 등록 정보가 바뀌었습니다. 새로고침 후 다시 선택하세요.',
     rejected:'요청이 거부되었습니다. 현재 상태를 확인하세요.',
     outcome_unknown:'요청 결과가 불명확합니다. 다시 실행하기 전에 새로고침하세요.',
+	resume_save_failed:'다음 실행을 위한 연결 설정을 저장하지 못했습니다. 현재 연결 상태와 별도로 확인이 필요합니다.',
     recovery_required:'입력 제어가 중단되었습니다. 진단을 자동 저장하고, 이전 연결은 최대 3회 복구합니다.',
   },
   en: {
@@ -461,6 +462,7 @@ export const nativeCatalogs = {
     invalid_peer:'Choose a valid device.', stale_peer:'Device identity changed. Refresh and select it again.',
     rejected:'The request was rejected. Check the current state.',
     outcome_unknown:'The outcome is unknown. Refresh before trying again.',
+	resume_save_failed:'Connection settings for the next launch could not be saved. Check this separately from the current connection state.',
     recovery_required:'Input control stopped. Diagnostics are saved automatically; a previous connection gets up to three recovery attempts.',
   },
 };
