@@ -8,13 +8,23 @@ import (
 	"github.com/0disoft/krasis/internal/localapi"
 )
 
-// Called only by the local maintenance button. Lifecycle has disconnected the
+// Called by local maintenance after lifecycle has disconnected the
 // session; startup ownership fences other UIs and verifies exit before writes.
 func (s Startup) RefreshProtectedInput(ctx context.Context) error {
-	if s.InputRefresh == nil {
+	return s.maintainProtectedInput(ctx, s.InputRefresh, false)
+}
+
+// A verified new app launch may replace an older agent after safe disconnect.
+// BeforeStart retains automatic consent's one-attempt and pending-result policy.
+func (s Startup) RefreshProtectedInputAtLaunch(ctx context.Context) error {
+	return s.maintainProtectedInput(ctx, s.BeforeStart, true)
+}
+
+func (s Startup) maintainProtectedInput(ctx context.Context, refresh func(context.Context) error, allowOlder bool) error {
+	if refresh == nil {
 		return ErrInputRefreshFailed
 	}
-	err := s.refreshProtectedInput(ctx)
+	err := s.refreshProtectedInput(ctx, refresh, allowOlder)
 	if err != nil && !errors.Is(err, ErrInputRefreshCancelled) && !errors.Is(err, ErrInputRefreshFailed) {
 		return err
 	}
@@ -28,7 +38,7 @@ func (s Startup) RefreshProtectedInput(ctx context.Context) error {
 	return err
 }
 
-func (s Startup) refreshProtectedInput(ctx context.Context) error {
+func (s Startup) refreshProtectedInput(ctx context.Context, refresh func(context.Context) error, allowOlder bool) error {
 	lease, err := s.Lock()
 	if err != nil {
 		return ErrStartupBusy
@@ -43,7 +53,7 @@ func (s Startup) refreshProtectedInput(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if info.Generation != s.Generation || info.Build != s.Revision || info.Protocol != localapi.AgentProtocol {
+		if !s.maintenanceCompatible(info, allowOlder) {
 			return ErrAgentIncompatible
 		}
 		result, err := client.StopForUpgrade(ctx, info.Instance, s.Generation, s.Revision)
@@ -65,7 +75,7 @@ func (s Startup) refreshProtectedInput(ctx context.Context) error {
 			return err
 		}
 		if available {
-			return s.InputRefresh(ctx)
+			return refresh(ctx)
 		}
 		if err := s.Pause(ctx); err != nil {
 			return err
@@ -84,6 +94,13 @@ func (b *DesktopLifecycle) RefreshProtectedInput(refresh func(context.Context) e
 	defer done()
 	bridge := NewDesktopBridge(ctx, b.open)
 	before := bridge.Refresh()
+	return b.refreshProtectedInput(ctx, before, refresh)
+}
+
+// Caller owns gate and the operation context; startup and the button share the
+// same disconnect/reconnect transaction rather than nesting locks.
+func (b *DesktopLifecycle) refreshProtectedInput(ctx context.Context, before BridgeSnapshot, refresh func(context.Context) error) BridgeSnapshot {
+	bridge := NewDesktopBridge(ctx, b.open)
 	alias, fingerprint := before.PeerAlias, ""
 	for _, peer := range before.Peers {
 		if peer.Alias == alias {

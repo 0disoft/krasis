@@ -11,22 +11,24 @@ import (
 // DesktopLifecycle owns recovery independently of renderer timers. All process
 // operations are serialized; Disconnect cancels an in-flight recovery first.
 type DesktopLifecycle struct {
-	StartupReady     func()
-	StartupResume    func(context.Context, BridgeSnapshot) BridgeSnapshot
-	updateHandedOff  bool
-	ctx              context.Context
-	open             func() (Client, error)
-	ensure           func(context.Context) error
-	diagnose         func(context.Context, string) error
-	displayReady     func() bool
-	diagnosticActive atomic.Bool
-	gate             sync.Mutex
-	cancelMu         sync.Mutex
-	cancel           context.CancelFunc
-	stopped          atomic.Bool
-	recovery         AutomaticRecovery
-	stateMu          sync.RWMutex
-	state            BridgeSnapshot
+	StartupReady             func()
+	StartupResume            func(context.Context, BridgeSnapshot) BridgeSnapshot
+	StartupMaintenanceNeeded func(context.Context) (bool, error)
+	StartupMaintenance       func(context.Context) error
+	updateHandedOff          bool
+	ctx                      context.Context
+	open                     func() (Client, error)
+	ensure                   func(context.Context) error
+	diagnose                 func(context.Context, string) error
+	displayReady             func() bool
+	diagnosticActive         atomic.Bool
+	gate                     sync.Mutex
+	cancelMu                 sync.Mutex
+	cancel                   context.CancelFunc
+	stopped                  atomic.Bool
+	recovery                 AutomaticRecovery
+	stateMu                  sync.RWMutex
+	state                    BridgeSnapshot
 }
 
 func NewDesktopLifecycle(ctx context.Context, open func() (Client, error), ensure func(context.Context) error, diagnose func(context.Context, string) error, displayReady ...func() bool) *DesktopLifecycle {
@@ -174,15 +176,8 @@ func (b *DesktopLifecycle) Run() {
 	if initial.State == "FAULTED" {
 		diagnosticErr = b.diagnoseBounded(ctx, "")
 	}
-	if err := b.startup(ctx); err != nil {
-		b.failedStartup(ctx, err)
-	} else {
-		value := NewDesktopBridge(ctx, b.open).Refresh()
-		if b.StartupResume != nil {
-			value = b.StartupResume(ctx, value)
-		}
-		b.save(withDiagnosticNotice(value, diagnosticErr))
-	}
+	value := b.initialize(ctx, initial)
+	b.save(withDiagnosticNotice(value, diagnosticErr))
 	done()
 	b.gate.Unlock()
 	timer := time.NewTicker(1500 * time.Millisecond)

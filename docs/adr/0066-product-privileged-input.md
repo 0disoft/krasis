@@ -211,6 +211,24 @@ installer outcome fences further installation and agent launch. Transaction
 recovery remains owned by the installer; no journal is deleted by the UI.
 Cancellation/failure never repeats the prompt through polling or recovery.
 
+## g210: Refresh an existing installation on a new local app launch
+
+The native lifecycle preflights the bundled images and authenticated agent
+metadata once at launch. An older agent, or a matching agent with an existing
+protected installation requiring an update, enters the same serialized local
+maintenance transaction as the button: remember the uniquely trusted peer,
+disconnect safely, wait for the exact agent's ownership to end, run the bundled
+installer once when required, and launch the current agent. Reconnect rechecks
+the saved alias and fingerprint. Initial optional installation, pairing, newer
+or incompatible agents and unverified bundles are not automatic maintenance.
+
+Administrator consent is retained. Terminal cancellation/failure restores
+ordinary input without repeating consent; a pending installer fences restart
+and reconnect. Renderer polling and automatic recovery do not invoke this
+launch-only transaction. Tests cover connected old/same-version agents,
+consent cancellation, failure, pending ownership, trust change and cancellation
+of reconnect. Two-device update/consent behavior requires an attended trial.
+
 The native UI publishes bounded installation-state codes independently of the
 selected session input backend. A ready installation is not proof of a working
 PIN session. Local tests cover ownership, cancellation, pending results, image
