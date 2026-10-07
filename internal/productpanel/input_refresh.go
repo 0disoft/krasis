@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 var (
@@ -18,26 +19,48 @@ var (
 type inputRefresh struct {
 	mu        sync.Mutex
 	attempted bool
+	checkedAt time.Time
 	state     atomic.Pointer[string]
 	inspect   func() string
 	run       func(context.Context) error
 }
 
 func (b *inputRefresh) status() string {
+	if b.state.Load() == nil && b.mu.TryLock() {
+		if b.state.Load() == nil {
+			b.setState(b.inspect())
+		}
+		b.mu.Unlock()
+	}
 	if state := b.state.Load(); state != nil {
 		if *state == "PENDING" && b.mu.TryLock() {
 			b.refreshPendingLocked()
 			b.mu.Unlock()
 			return *b.state.Load()
 		}
+		if (*state == "READY" || *state == "UNKNOWN" || *state == "NOT_INSTALLED" || *state == "UPDATE_REQUIRED") && b.mu.TryLock() {
+			if time.Since(b.checkedAt) >= 30*time.Second {
+				// Full installation checks include file hashes and SCM queries.
+				// Keep them off the renderer poll and serialize with installation.
+				b.checkedAt = time.Now()
+				go func() {
+					defer b.mu.Unlock()
+					b.setState(b.inspect())
+				}()
+			} else {
+				b.mu.Unlock()
+			}
+		}
 		return *state
 	}
-	state := b.inspect()
-	b.state.CompareAndSwap(nil, &state)
-	return *b.state.Load()
+	return "UNKNOWN"
 }
 
-func (b *inputRefresh) setState(state string) { b.state.Store(&state) }
+// Caller holds mu; checkedAt never races with a status/installation observer.
+func (b *inputRefresh) setState(state string) {
+	b.checkedAt = time.Now()
+	b.state.Store(&state)
+}
 
 func (b *inputRefresh) refreshPendingLocked() {
 	if state := b.state.Load(); state != nil && *state == "PENDING" {
