@@ -44,6 +44,20 @@ func TestDefaultsAndDisabledSurviveReload(t *testing.T) {
 	}
 }
 
+func TestPersistentManualStopCannotCarryAResumePeer(t *testing.T) {
+	base := t.TempDir()
+	stop := Resume{ManualStop: true}
+	if err := SaveResume(base, stop); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := LoadResume(base); err != nil || got != stop {
+		t.Fatal(got, err)
+	}
+	if err := SaveResume(base, Resume{ManualStop: true, Alias: "B", Fingerprint: strings.Repeat("a", 64)}); err == nil {
+		t.Fatal("stop and reconnect intent accepted together")
+	}
+}
+
 func TestIncompleteSettingsNeverEnableStartupOrUpdates(t *testing.T) {
 	for _, raw := range []string{"", "{}", "null", `{"schema":"krasis.app-settings/v1"}`, `{"schema":"krasis.app-settings/v1","startAtLogin":false}`, `{"schema":"krasis.app-settings/v1","autoUpdate":false}`, `{"schema":"krasis.app-settings/v1","startAtLogin":null,"autoUpdate":false}`, `{"schema":"krasis.app-settings/v1","startAtLogin":false,"autoUpdate":null}`} {
 		t.Run(raw, func(t *testing.T) {

@@ -223,6 +223,17 @@ func (operations *Operations) Connect(requestContext context.Context, request lo
 	if request.AutomaticResume && operations.manualStop {
 		return rejected("resume_cancelled"), nil
 	}
+	if request.AutomaticResume && operations.localAppData != "" {
+		resume, err := appsettings.LoadResume(operations.localAppData)
+		if err != nil {
+			operations.recordLocked("resume_read_failed")
+			return rejected("resume_unavailable"), nil
+		}
+		if resume.ManualStop {
+			operations.manualStop = true
+			return rejected("resume_cancelled"), nil
+		}
+	}
 	if operations.updateApplying {
 		return rejected("update_in_progress"), nil
 	}
@@ -288,8 +299,10 @@ func (operations *Operations) disconnect(ctx context.Context, forget bool) (loca
 		return rejected("invalid_request"), nil
 	}
 	operations.mu.Lock()
+	var resumeErr error
 	if forget && operations.localAppData != "" {
-		if err := appsettings.SaveResume(operations.localAppData, appsettings.Resume{}); err != nil {
+		resumeErr = appsettings.SaveResume(operations.localAppData, appsettings.Resume{ManualStop: true})
+		if resumeErr != nil {
 			operations.recordLocked("resume_save_failed")
 		}
 	}
@@ -300,6 +313,9 @@ func (operations *Operations) disconnect(ctx context.Context, forget bool) (loca
 	if stop == nil || done == nil {
 		operations.recordLocked("no_active_session")
 		operations.mu.Unlock()
+		if resumeErr != nil {
+			return failed("resume_save_failed"), nil
+		}
 		return rejected("no_active_session"), nil
 	}
 	operations.sessionState = "DISCONNECTING"
@@ -316,6 +332,9 @@ func (operations *Operations) disconnect(ctx context.Context, forget bool) (loca
 		operations.mu.Lock()
 		operations.recordLocked("disconnected")
 		operations.mu.Unlock()
+		if resumeErr != nil {
+			return failed("resume_save_failed"), nil
+		}
 		return completed("disconnected"), nil
 	case <-shutdown.Done():
 		operations.mu.Lock()

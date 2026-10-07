@@ -155,7 +155,7 @@ func (s *WorkspaceService) resumeAtStartup(ctx context.Context, v productpanel.B
 	}
 	for _, p := range v.Peers {
 		if p.Alias == peer.Alias && p.Fingerprint == peer.Fingerprint {
-			return productpanel.NewDesktopBridge(ctx, func() (productpanel.Client, error) { return localapi.OpenClient(s.control) }).Connect(peer.Alias, peer.Fingerprint)
+			return productpanel.NewDesktopBridge(ctx, func() (productpanel.Client, error) { return localapi.OpenClient(s.control) }).Resume(peer.Alias, peer.Fingerprint)
 		}
 	}
 	return v

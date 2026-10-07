@@ -361,3 +361,15 @@ existing update reconnect budget. Only outcome_unknown suppresses further
 requests. After an attempted command, response loss or failure to read its
 resulting status preserves outcome_unknown even when the projected state is
 UNKNOWN. A later LOCAL observation cannot establish that the command failed.
+
+## g227: Preserve manual stop across agent replacement
+
+resume.json gains an optional manualStop flag, with an empty peer identity.
+Authenticated explicit disconnect persists it before session cleanup. Failure
+to persist is reported as resume_save_failed even if session cleanup succeeds;
+the live agent retains its stop latch. Maintenance and shutdown preserve the
+file. An automatic connection rereads it under the agent operation mutex and
+rejects a persisted stop or unreadable state. An explicit user connection saves
+the new trusted identity and clears the persisted stop on successful write.
+Login recovery also uses Resume, so a disconnect racing its settings read is
+arbitrated by the agent. No endpoint, database, hygiene or runner changes occur.

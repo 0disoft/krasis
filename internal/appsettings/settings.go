@@ -27,6 +27,7 @@ type Settings struct {
 	AutoUpdate   bool   `json:"autoUpdate"`
 }
 type Resume struct {
+	ManualStop  bool   `json:"manualStop,omitempty"`
 	Alias       string `json:"alias"`
 	Fingerprint string `json:"fingerprint"`
 }
@@ -65,6 +66,9 @@ func LoadResume(base string) (Resume, error) {
 	if err != nil {
 		return Resume{}, err
 	}
+	if v.ManualStop && (v.Alias != "" || v.Fingerprint != "") {
+		return Resume{}, errors.New("manual stop contains a resume peer")
+	}
 	if v.Alias == "" && v.Fingerprint == "" {
 		return v, nil
 	}
@@ -77,6 +81,9 @@ func LoadResume(base string) (Resume, error) {
 	return v, nil
 }
 func SaveResume(base string, v Resume) error {
+	if v.ManualStop && (v.Alias != "" || v.Fingerprint != "") {
+		return errors.New("manual stop contains a resume peer")
+	}
 	if v.Alias == "" && v.Fingerprint != "" {
 		return errors.New("invalid resume peer")
 	}
