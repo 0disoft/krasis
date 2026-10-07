@@ -377,7 +377,7 @@
 </dialog>
 <dialog bind:this={updatesDlg} aria-labelledby="update-settings-title" onclose={() => { updatesOpen = false; restoreDialogFocus(); }}>
   <WindowTitlebar {locale} version={windowVersion} maximised={windowMaximised} focused={windowFocused} ready={!!windowRuntime} action={windowAction} />
-  {#if updatesOpen}<UpdateSettings bridge={updateSettingsBridge} peers={snapshot.peers} initialPeer={selected} inputBackend={snapshot.inputBackend ?? 'UNKNOWN'} inputSetup={snapshot.inputSetup ?? 'UNKNOWN'} {inputBusy} {refreshInput} {locale} />{/if}
+  {#if updatesOpen}<UpdateSettings bridge={updateSettingsBridge} peers={snapshot.peers} initialPeer={selected} {inputBusy} {locale} />{/if}
   <div class="dlg-foot"><button class="primary" onclick={() => updatesDlg.close()}>{t('close')}</button></div>
 </dialog>
 <dialog bind:this={diagnosticsDlg} aria-labelledby="diagnostics-title" onclose={restoreDialogFocus}>

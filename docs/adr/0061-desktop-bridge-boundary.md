@@ -137,3 +137,16 @@ Updates serialize so an older response cannot overwrite a newer selection.
 Only one language appears in each menu item. Failed application stays visible
 in language settings. No new preference file, network API, database, input or
 connection behavior is introduced.
+
+## g217: Keep device updates focused on the update
+
+The update dialog shows the two generation numbers, comparison, send action
+and transfer progress. Normal protected-input status is no longer repeated
+here; required input setup or recovery stays on the main workspace screen.
+Build identifiers and receive-permission controls remain available under
+collapsed Details. Denied or unknown peer permission stays visible beside
+the send action, so folding details never hides a reason for a blocked update.
+Unknown peer state does not claim offline, and equal generation numbers with
+different builds remain a conflict rather than claiming the latest version.
+Confirmation, permissions, polling and transfer verification are unchanged.
+No network API, database, repository hygiene or runner changes are introduced.

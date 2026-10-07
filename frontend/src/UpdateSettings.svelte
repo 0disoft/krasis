@@ -3,7 +3,7 @@
   import { emptyUpdateSettings, emptyUpdateTransfer, transferActive } from './update-settings-bridge.js';
   import { nativeText } from './native-i18n.js';
   import { createOperationGate } from './operation-gate.js';
-  let { bridge, peers, initialPeer = '', inputBackend = 'UNKNOWN', inputSetup = 'UNKNOWN', inputBusy = false, refreshInput, locale } = $props();
+  let { bridge, peers, initialPeer = '', inputBusy = false, locale } = $props();
   let selected = $state('');
   let value = $state(emptyUpdateSettings());
   let busy = $state(false);
@@ -11,6 +11,7 @@
   let sendTrigger = $state.raw();
   let allowTrigger;
   let refreshTrigger;
+  let detailsTrigger;
   let peerSelect = $state.raw();
   let initialFocusPending = true;
   let sendConfirmation = $state.raw();
@@ -27,11 +28,9 @@
   const job = $derived(transfer.peer === selected ? transfer : emptyUpdateTransfer(selected));
   const sendReady = $derived(!!selected && !!bridge && !inputBusy && current.appGeneration > 0 && current.localGeneration === current.appGeneration && current.peerState === 'ONLINE' && current.remotePermission === 'ALLOWED' && !transferActive(job.state));
   const canSend = $derived(sendReady && !busy);
-  const inputState = $derived(inputBusy ? 'UPDATING' : inputSetup);
-  const inputStatusKey = $derived(inputState === 'UNKNOWN' ? 'input_' + inputBackend.toLowerCase() : 'input_setup_' + inputState);
   const selectedName = $derived(peers.find(peer => peer.fingerprint === selected)?.alias ?? '');
   const permissionText = permission => t(permission === 'ALLOWED' ? 'upd_allowed' : permission === 'DENIED' ? 'upd_denied' : 'upd_permission_unknown');
-  const version = (generation, build) => generation ? `g${generation} · ${build ? build === 'development' ? build : build.slice(0,8) : t('upd_unknown')}` : t('upd_unknown');
+  const version = (generation, build) => generation ? `g${generation} · ${build ? build === 'development' ? build : build.slice(0,8) : t('upd_version_unknown')}` : t('upd_version_unknown');
   $effect(() => {
     if (busy || !initialFocusPending || !peerSelect) return;
     const dialog = peerSelect.closest('dialog');
@@ -79,7 +78,9 @@
     if (busy || consentPeer !== selected || !peers.some(peer => peer.fingerprint === consentPeer)) return;
     confirmingAllow = false;
     if (current.permission !== 'ALLOWED') await run('allow', consentPeer);
-    await tick(); refreshTrigger?.focus();
+    await tick();
+    if (refreshTrigger?.getClientRects().length) refreshTrigger.focus();
+    else detailsTrigger?.focus();
   }
   onMount(() => {
     let timer;
@@ -93,28 +94,20 @@
   <h2 id="update-settings-title">{t('upd_title')}</h2>
 </div>
 <div class="dlg-body">
-  <section class="upd-section" aria-label={t('input_title')}>
-    <h3>{t('input_title')}</h3>
-    <p role="status">{t(inputStatusKey)}</p>
-    {#if ['NOT_INSTALLED','UPDATE_REQUIRED','CANCELLED','FAILED'].includes(inputState) || inputBackend === 'PORTABLE' && inputState === 'READY'}
-      <p>{t('input_install_help')}</p>
-      <button disabled={busy || inputBusy || !refreshInput} onclick={refreshInput}>{t(inputState === 'NOT_INSTALLED' ? 'input_setup' : 'input_refresh')}</button>
-    {/if}
-  </section>
   <label>{t('peer')}
     <select bind:this={peerSelect} bind:value={selected} onchange={choose} disabled={busy || inputBusy}>
       <option value="">{t('choose')}</option>
       {#each peers as peer (peer.fingerprint)}<option value={peer.fingerprint}>{peer.alias}</option>{/each}
     </select>
   </label>
-  <section class="upd-section" aria-label={t('upd_send')}>
+  <section class="upd-send" aria-label={t('upd_send')}>
     <div class="upd-cards">
-      <div class="upd-card"><strong>{t('upd_local_version')}</strong>{version(current.localGeneration,current.localBuild)}</div>
-      <div class="upd-card"><strong>{t('upd_peer_version')}</strong>{version(current.peerGeneration,current.peerBuild)}</div>
+      <div class="upd-card"><strong>{t('upd_local_version')}</strong>{current.localGeneration ? `g${current.localGeneration}` : t('upd_version_unknown')}</div>
+      <div class="upd-card"><strong>{t('upd_peer_version')}</strong>{current.peerGeneration ? `g${current.peerGeneration}` : t('upd_version_unknown')}</div>
     </div>
     {#if current.appGeneration && current.localGeneration && current.appGeneration !== current.localGeneration}<p role="status">{t('upd_agent_mismatch')}</p>{/if}
-    <p>{t('upd_' + current.peerState.toLowerCase())} · {t('upd_comparison_' + current.comparison)}</p>
-    {#if current.peerState !== 'ONLINE'}<p>{t('upd_receiver_required')}</p>{/if}
+    <p role="status">{#if current.peerState === 'ONLINE'}{t('upd_comparison_' + current.comparison)}{:else}{t('upd_' + current.peerState.toLowerCase())} {t('upd_receiver_required')}{/if}</p>
+    {#if current.peerState === 'ONLINE' && current.remotePermission !== 'ALLOWED'}<p class="upd-blocked" role="status">{t(current.remotePermission === 'DENIED' ? 'upd_remote_denied' : 'upd_remote_unknown')}</p>{/if}
     {#if current.peerState === 'ONLINE' && current.peerGeneration < 75}<p>{t('upd_transition_first')}</p>{/if}
     {#if current.peerState === 'ONLINE' && current.peerGeneration === 75}<p>{t('upd_transition_next')}</p>{/if}
     {#if !confirmingSend}
@@ -130,12 +123,17 @@
       </section>
     {/if}
     {#if job.state !== 'IDLE'}<p class="upd-job" role="status" aria-live="polite">{t('upd_state_' + job.state)}{#if job.state === 'SENDING' && job.total > 0} · {Math.floor(job.bytes*100/job.total)}%{/if}</p>{/if}
-    {#if job.generation}<p class="upd-job">{t('upd_bundle_version')}: {version(job.generation,job.build)}</p>{/if}
     {#if job.state === 'SENDING' && job.total > 0}<div class="upd-job"><progress value={job.bytes} max={job.total} aria-label={t('upd_send')}>{Math.floor(job.bytes*100/job.total)}%</progress></div>{/if}
   </section>
-  <section class="upd-section" aria-label={t('upd_permission')}>
-    <h3>{t('upd_permission')}</h3>
-    <p>{permissionText(current.permission)}</p>
+  <details class="upd-details">
+    <summary bind:this={detailsTrigger}>{t('upd_details')}</summary>
+    <div class="upd-builds">
+      <p><strong>{t('upd_local_version')}</strong> {version(current.localGeneration,current.localBuild)}</p>
+      <p><strong>{t('upd_peer_version')}</strong> {version(current.peerGeneration,current.peerBuild)}</p>
+      {#if job.generation}<p>{t('upd_bundle_version')}: {version(job.generation,job.build)}</p>{/if}
+    </div>
+    <section aria-label={t('upd_permission')}>
+    <div class="upd-permission-head"><h3>{t('upd_permission')}</h3><span>{permissionText(current.permission)}</span></div>
     <p>{t('upd_remote_permission')}: {permissionText(current.remotePermission)}</p>
     <div class="pair-actions">
       <button bind:this={refreshTrigger} disabled={!selected || busy || inputBusy || !bridge} onclick={() => run()}>{t('upd_refresh')}</button>
@@ -150,11 +148,22 @@
       </section>
     {/if}
   </section>
+  </details>
   {#if notice || current.code !== 'ok'}<p role="status">{notice ? t(notice) : t('upd_' + current.code)}</p>{/if}
 </div>
 <style>
+  .upd-send { margin-top:16px; }
+  .upd-details { margin-top:20px; border-top:1px solid var(--line); padding-top:14px; }
+  .upd-details summary { cursor:pointer; color:var(--muted); font-size:13px; }
+  .upd-builds { padding:10px 0; font-size:12px; color:var(--muted); }
+  .upd-builds p { margin:6px 0; }
+  .upd-builds strong { font-weight:500; margin-right:8px; }
+  .upd-permission-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .upd-permission-head h3 { font-size:14px; margin:0; }
+  .upd-permission-head span { color:var(--muted); font-size:12px; }
+  .upd-blocked { color:var(--warning, #f4bd70); }
   .upd-confirm { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
-  @media (max-width: 700px) {
+  @media (max-width: 420px) {
     .upd-cards { grid-template-columns: 1fr; }
   }
 </style>
