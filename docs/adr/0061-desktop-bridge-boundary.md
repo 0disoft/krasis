@@ -261,3 +261,7 @@ readyGeneration field retains a verified download across cancellation and
 network failures. Each new check restores and verifies the disk receipt before
 network work; application revalidates the package and current settings. Failed
 handoffs suppress repeated application until another check verifies the cache.
+
+Settings checking is renderer-local pending state, distinct from unavailable.
+Neither startup nor subsequent pending reads render an error banner from an
+unresolved response. Once the read completes, genuine failures remain visible.

@@ -1,10 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { appReleaseNotice, createAppSettingsBridge, emptyAppSettings } from './app-settings-bridge.js';
+import { appReleaseNotice, appSettingsNoticeCode, createAppSettingsBridge, emptyAppSettings } from './app-settings-bridge.js';
 test('failed and malformed settings do not advertise defaults as applied',async()=>{
   for(const value of [null,{schema:'krasis.app-settings/v1',code:'ok',startAtLogin:'true',autoUpdate:true}]) {
     const b=createAppSettingsBridge({AppSettings:()=>value});assert.equal((await b.status()).code,'unavailable');
   }
+});
+
+test('pending settings reads do not become errors and completed failures stay visible',()=>{
+  const initial=emptyAppSettings();
+  assert.equal(appSettingsNoticeCode(initial,true),'checking');
+  assert.equal(appSettingsNoticeCode(initial,false),'unavailable');
+  assert.equal(appSettingsNoticeCode({...initial,code:'rollback_failed'},true),'checking');
+  assert.equal(appSettingsNoticeCode({...initial,code:'rollback_failed'},false),'rollback_failed');
+  assert.equal(appSettingsNoticeCode({...initial,code:'ok'},false),'ok');
 });
 test('settings toggle is a single explicit native boolean write',async()=>{
   const calls=[];const b=createAppSettingsBridge({SetAppSettings:(...args)=>{calls.push(args);return {schema:'krasis.app-settings/v1',code:'ok',startAtLogin:false,autoUpdate:true}}});

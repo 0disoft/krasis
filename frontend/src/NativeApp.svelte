@@ -54,7 +54,7 @@
   let updatesDlg;
   let settingsDlg;
   let settingsOpen = $state(false);
-  let appSettingsCode = $state('ok');
+  let appSettingsCode = $state('checking');
   let releaseState = $state('IDLE');
   let releasePreferences = $state(emptyAppSettings());
   let readyReleaseGeneration = $state(0);
@@ -328,7 +328,7 @@
     <p class="fault-banner" role="status">{t(inputNoticeKey)} <button disabled={busy || !bridge || inputNotice === 'UPDATING' || inputNotice === 'PENDING'} onclick={refreshInput}>{t(inputNotice === 'NOT_INSTALLED' ? 'input_setup' : 'input_refresh')}</button></p>
   {/if}
   {#if snapshot.boundaryBlocked}<p class="placement-hint" role="status">{t(`boundary_${snapshot.boundaryBlocked}`)}</p>{/if}
-  {#if appSettingsCode !== 'ok'}<p class="fault-banner" role="alert">{t(['startup_failed','start_menu_failed','recovery_failed','save_failed','rollback_failed'].includes(appSettingsCode) ? `settings_${appSettingsCode}` : 'settings_failed')} <button onclick={() => openDialog(settingsDlg)}>{t('settings')}</button></p>{/if}
+  {#if !['ok','checking'].includes(appSettingsCode)}<p class="fault-banner" role="alert">{t(['startup_failed','start_menu_failed','recovery_failed','save_failed','rollback_failed'].includes(appSettingsCode) ? `settings_${appSettingsCode}` : 'settings_failed')} <button onclick={() => openDialog(settingsDlg)}>{t('settings')}</button></p>{/if}
   {#if ['CHECKING','AVAILABLE','DOWNLOADING','READY','FAILED','CANCELLED'].includes(releaseState)}<p class="release-notice" role="status">{appReleaseNotice(releaseState, releasePreferences, locale, readyReleaseGeneration)}</p>{/if}
   <section class="canvas workspace-canvas" aria-label={t('devices')}>
     {#if snapshot.state === 'LOCAL' && snapshot.peers.length === 0}
