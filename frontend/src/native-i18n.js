@@ -1,5 +1,10 @@
 export const nativeCatalogs = {
   ko: {
+    window_minimise: '최소화',
+    window_maximise: '최대화',
+    window_restore: '이전 크기로',
+    window_close: '트레이로 닫기',
+    window_control_failed: '창을 조작하지 못했습니다. 다시 눌러 주세요.',
     boundary_LOCAL_MENU: '메뉴를 닫고 다시 이동하세요.',
     boundary_MOUSE_CAPTURE: '현재 앱의 마우스 조작을 끝내고 다시 이동하세요.',
     boundary_PRESSED_INPUT: '누른 키나 마우스 버튼을 놓고 다시 이동하세요.',
@@ -194,6 +199,11 @@ export const nativeCatalogs = {
     recovery_required:'입력 제어가 중단되었습니다. 진단을 자동 저장하고, 이전 연결은 최대 3회 복구합니다.',
   },
   en: {
+    window_minimise: 'Minimise',
+    window_maximise: 'Maximise',
+    window_restore: 'Restore',
+    window_close: 'Hide to tray',
+    window_control_failed: 'Window control failed. Please try again.',
     boundary_LOCAL_MENU: 'Close the menu, then cross again.',
     boundary_MOUSE_CAPTURE: 'Finish the current mouse interaction, then cross again.',
     boundary_PRESSED_INPUT: 'Release held keys or mouse buttons, then cross again.',

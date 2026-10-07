@@ -54,6 +54,9 @@ type WorkspaceService struct {
 	log              *productlog.Logger
 }
 
+// Display metadata only; window controls use the host's existing Wails runtime.
+func (s *WorkspaceService) WindowVersion() int { return localapi.AgentGeneration }
+
 func (s *WorkspaceService) promoteRecovery() {
 	s.settingsGate.Lock()
 	defer s.settingsGate.Unlock()

@@ -7,7 +7,7 @@
   import { createAppOpenBridge } from './app-open-bridge.js';
   import { createUpdateSettingsBridge } from './update-settings-bridge.js';
   import Icon from './Icon.svelte';
-  import logo from '../../assets/windows/krasis.ico';
+  import WindowTitlebar from './WindowTitlebar.svelte';
   import monitor from './assets/monitor.png';
   import { createBridge } from './bridge.js';
   import { createClipboardBridge } from './clipboard-bridge.js';
@@ -24,6 +24,13 @@
   let snapshot = $state({state:'UNKNOWN', peerAlias:'', peers:[], code:'unavailable', inputSetup:'UNKNOWN'});
   let selected = $state('');
   let busy = $state(false);
+  let windowRuntime = $state.raw();
+  let windowVersion = $state('');
+  let windowMaximised = $state(false);
+  let windowFocused = $state(true);
+  let windowBusy = false;
+  let windowStateEpoch = 0;
+  let windowEvents = [];
   let inputBusy = $state(false);
   let error = $state('');
   let bridge = $state.raw();
@@ -42,7 +49,7 @@
   let updatesDlg;
   let updatesOpen = $state(false);
   let opener = null;
-  function focusFirstControl(dlg) { dlg?.querySelector('select:not([disabled]), input:not([disabled]), button:not([disabled])')?.focus(); }
+  function focusFirstControl(dlg) { dlg?.querySelector('select:not([disabled]), input:not([disabled]), button:not([disabled]):not([data-window-control])')?.focus(); }
   function openDialog(dlg) { if (!dlg || dlg.open) return; opener = document.activeElement; dlg.showModal(); focusFirstControl(dlg); }
   function restoreDialogFocus() { if (opener && opener.focus) opener.focus(); opener = null; }
   async function openUpdates() { if (!updatesDlg || updatesDlg.open) return; opener = document.activeElement; updatesOpen = true; await tick(); if (updatesDlg.open) { focusFirstControl(updatesDlg); return; } updatesDlg.showModal(); await tick(); focusFirstControl(updatesDlg); }
@@ -66,6 +73,23 @@
   const pairingOperation = createOperationGate(value => { if (!disposed) pairBusy = value; });
   const diagnosticsOperation = createOperationGate(value => { if (!disposed) diagBusy = value; });
   const t = key => nativeText(locale, key);
+  async function refreshWindowState() {
+    if (!windowRuntime || disposed) return;
+    const epoch = ++windowStateEpoch;
+    try {
+      const [maximised, focused] = await Promise.all([windowRuntime.IsMaximised(), windowRuntime.IsFocused()]);
+      if (!disposed && epoch === windowStateEpoch) { windowMaximised = maximised === true; windowFocused = focused === true; }
+    } catch { /* Window state is optional; never refresh or restart the renderer. */ }
+  }
+  async function windowAction(action) {
+    if (!windowRuntime || windowBusy || disposed) return;
+    const method = {minimise:'Minimise',maximise:'ToggleMaximise',close:'Close'}[action];
+    if (!method) return;
+    windowBusy = true;
+    try { await windowRuntime[method](); await refreshWindowState(); }
+    catch { if (!disposed) error = 'window_control_failed'; }
+    finally { windowBusy = false; }
+  }
   const inputNotice = $derived(inputBusy ? 'UPDATING' : snapshot.inputSetup ?? 'UNKNOWN');
   const inputNeedsAction = $derived(['NOT_INSTALLED','UPDATE_REQUIRED','CANCELLED','FAILED'].includes(inputNotice));
   const inputNoticeKey = $derived(inputNotice === 'UNKNOWN' || inputNotice === 'READY' ? 'input_portable' : 'input_setup_' + inputNotice);
@@ -193,9 +217,17 @@
     }
     void (async () => {
       try {
-        const { Call } = await import(/* @vite-ignore */ '/wails/runtime.js');
+        const { Call, Window, Events } = await import(/* @vite-ignore */ '/wails/runtime.js');
         if (disposed) return;
         const name = 'github.com/0disoft/krasis/internal/workspacehost.WorkspaceService.';
+        windowRuntime = Window;
+        for (const event of ['common:WindowMaximise','common:WindowUnMaximise','common:WindowFocus','common:WindowLostFocus']) {
+          windowEvents.push(Events.On(event, refreshWindowState));
+        }
+        void refreshWindowState();
+        void Call.ByName(name+'WindowVersion').then(version => {
+          if (!disposed && Number.isSafeInteger(version) && version > 0) windowVersion = 'g'+version;
+        }).catch(() => {});
         bridge = createBridge({
           Refresh: () => Call.ByName(name + 'Refresh'),
           Connect: (alias, fingerprint) => Call.ByName(name + 'Connect', alias, fingerprint),
@@ -239,7 +271,7 @@
         await poll();
       } catch { if (!disposed) error = 'unavailable'; }
     })();
-    return () => { disposed = true; clearTimeout(timer); };
+    return () => { disposed = true; clearTimeout(timer); windowEvents.forEach(off => off()); };
   });
   $effect(() => {
     document.documentElement.lang = locale;
@@ -247,7 +279,7 @@
   });
 </script>
 
-<header><span class="brand"><img src={logo} alt="" />Krasis</span><nav aria-label="Krasis"><button class="active" aria-current="page"><Icon name="monitor" />{t('workspace')}</button></nav><span class="preview-label">{t('integration')}</span></header>
+<WindowTitlebar {locale} version={windowVersion} maximised={windowMaximised} focused={windowFocused} ready={!!windowRuntime} action={windowAction} />
 <main>
   <div class="connection-bar">
     <span class="connection" class:fault={snapshot.state !== 'CONNECTED'} role="status" aria-atomic="true"><span class="status-dot"></span>{t(snapshot.state)}</span>
@@ -308,10 +340,12 @@
   {/if}
 </main>
 <dialog bind:this={updatesDlg} aria-labelledby="update-settings-title" onclose={() => { updatesOpen = false; restoreDialogFocus(); }}>
+  <WindowTitlebar {locale} version={windowVersion} maximised={windowMaximised} focused={windowFocused} ready={!!windowRuntime} action={windowAction} />
   {#if updatesOpen}<UpdateSettings bridge={updateSettingsBridge} peers={snapshot.peers} initialPeer={selected} inputBackend={snapshot.inputBackend ?? 'UNKNOWN'} inputSetup={snapshot.inputSetup ?? 'UNKNOWN'} {inputBusy} {refreshInput} {locale} />{/if}
   <div class="dlg-foot"><button class="primary" onclick={() => updatesDlg.close()}>{t('close')}</button></div>
 </dialog>
 <dialog bind:this={diagnosticsDlg} aria-labelledby="diagnostics-title" onclose={restoreDialogFocus}>
+  <WindowTitlebar {locale} version={windowVersion} maximised={windowMaximised} focused={windowFocused} ready={!!windowRuntime} action={windowAction} />
   <div class="dlg-head"><h2 id="diagnostics-title">{t('diag_title')}</h2><p>{t('diag_help')}</p></div>
   <div class="dlg-body">
     <p>{t('diag_local')}: {t(diagnostics.saved ? 'diag_available' : diagnostics.code === 'unavailable' ? 'diag_unavailable' : 'diag_none')}</p>
@@ -328,11 +362,13 @@
   <div class="dlg-foot"><button class="primary" onclick={() => diagnosticsDlg.close()}>{t('close')}</button></div>
 </dialog>
 <dialog bind:this={consent} aria-labelledby="clipboard-consent-title" onclose={restoreDialogFocus}>
+  <WindowTitlebar {locale} version={windowVersion} maximised={windowMaximised} focused={windowFocused} ready={!!windowRuntime} action={windowAction} />
   <div class="dlg-head"><h2 id="clipboard-consent-title">{t('clipboard')}</h2></div>
   <div class="dlg-body"><p>{t('clipboard_consent')}</p></div>
   <div class="dlg-foot"><button onclick={()=>consent.close()}>{t('cancel')}</button><button onclick={()=>{consent.close();void setClipboard(consentPeer,true);}}>{t('clipboard_enable')}</button></div>
 </dialog>
 <dialog bind:this={pairingDlg} aria-labelledby="pair-title" onclose={restoreDialogFocus}>
+  <WindowTitlebar {locale} version={windowVersion} maximised={windowMaximised} focused={windowFocused} ready={!!windowRuntime} action={windowAction} />
   <div class="dlg-head"><h2 id="pair-title">{t('pairingTitle')}</h2><p>{t('pairingHelp')}</p></div>
   <div class="dlg-body">
   {#if pairing.pin}<p class="pin-display" role="status">{pairing.pin}</p>{/if}
@@ -352,6 +388,7 @@
 </dialog>
 <footer><AppSettings {locale} /><select aria-label={t('language')} bind:value={locale}><option value="ko">한국어</option><option value="en">English</option></select></footer>
 <style>
+  :global(body) { padding-top:56px; }
   .peer-select { display:flex; align-items:center; gap:20px; margin:20px 0; flex-wrap:wrap; }
   .peer-select select, .peer-select input { min-width:min(220px,100%); max-width:100%; }
   .canvas { min-height: 0; }
@@ -359,6 +396,5 @@
   .screen-content strong { font-size:30px; }
   .peer-name { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .fault-banner { font-size:14px; }
-  .brand { white-space:nowrap; }
   .pin-display { font: 600 clamp(28px, 6vw, 42px)/1.2 ui-monospace, Consolas, monospace; letter-spacing: 0.3em; text-indent: 0.3em; text-align:center; margin: 12px 0 4px; max-width: 100%; overflow-wrap: anywhere; }
 </style>

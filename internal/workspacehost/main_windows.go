@@ -245,8 +245,9 @@ func Run() {
 		url = "/?smoke=1"
 	}
 	window = app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title: service.title,
-		Width: 1180, Height: 850, MinWidth: 720, MinHeight: 620,
+		Title:     service.title,
+		Frameless: true,
+		Width:     1180, Height: 850, MinWidth: 720, MinHeight: 620,
 		BackgroundColour: application.NewRGB(24, 27, 33),
 		URL:              url,
 		Hidden:           startAtLogin || (smoke && !visibleSmoke),
