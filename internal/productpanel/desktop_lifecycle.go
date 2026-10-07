@@ -184,6 +184,7 @@ func (b *DesktopLifecycle) Run() {
 		diagnosticErr = b.diagnoseBounded(ctx, "")
 	}
 	value := b.initialize(ctx, initial)
+	b.startUpdatedResumeWindow(time.Now())
 	b.save(withDiagnosticNotice(value, diagnosticErr))
 	done()
 	b.gate.Unlock()

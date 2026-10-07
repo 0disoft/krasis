@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/0disoft/krasis/internal/localapi"
@@ -56,7 +57,9 @@ func newResumeTest(t *testing.T, ensure func(context.Context) error) (*DesktopLi
 	if err := b.SetUpdatedWorkspaceResume(WorkspaceUpdateLaunch{Alias: "B", Fingerprint: fp, Revision: revision}); err != nil {
 		t.Fatal(err)
 	}
-	return b, c, time.Now()
+	now := time.Now()
+	b.startUpdatedResumeWindow(now)
+	return b, c, now
 }
 
 func TestUpdateResumeSurvivesBusyStartupAndHandsOffAcceptedConnection(t *testing.T) {
@@ -282,4 +285,60 @@ func TestUpdateResumeHonorsCLIStopAndStopBetweenReadAndConnect(t *testing.T) {
 			t.Fatal("manual stop was overwritten", racing, c.connects, b.Refresh())
 		}
 	}
+}
+
+func TestUpdateResumeWindowStartsOnlyAfterPreparationAndNeverRenews(t *testing.T) {
+	b, c, now := newResumeTest(t, nil)
+	launch := b.updatedResume.launch
+	if err := b.SetUpdatedWorkspaceResume(launch); err != nil {
+		t.Fatal(err)
+	}
+	if !b.updatedResume.deadline.IsZero() {
+		t.Fatal("configuration consumed reconnect budget")
+	}
+	b.tick(now.Add(2 * time.Minute))
+	if c.connects != 0 || b.updatedResume == nil {
+		t.Fatal("reconnect ran before initialization finished")
+	}
+	ready := now.Add(2 * time.Minute)
+	b.startUpdatedResumeWindow(ready)
+	deadline := b.updatedResume.deadline
+	b.tick(ready)
+	if c.connects != 1 || deadline != ready.Add(90*time.Second) {
+		t.Fatal("late preparation lost reconnect budget")
+	}
+	b.startUpdatedResumeWindow(ready.Add(time.Minute))
+	if b.updatedResume.deadline != deadline {
+		t.Fatal("reconnect window renewed")
+	}
+	b.tick(deadline.Add(time.Second))
+	if b.updatedResume != nil || b.Refresh().Code != "recovery_exhausted" {
+		t.Fatal("reconnect budget no longer expires")
+	}
+}
+
+func TestLifecycleResumesUpdateAfterLongInitialPreparation(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		starts := 0
+		b, c, _ := newResumeTest(t, func(context.Context) error {
+			starts++
+			if starts == 1 {
+				time.Sleep(2 * time.Minute)
+			}
+			return nil
+		})
+		if err := b.SetUpdatedWorkspaceResume(b.updatedResume.launch); err != nil {
+			t.Fatal(err)
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		b.ctx = ctx
+		done := make(chan struct{})
+		go func() { defer close(done); b.Run() }()
+		time.Sleep(2*time.Minute + 2*time.Second)
+		cancel()
+		<-done
+		if c.connects != 1 || b.Refresh().State != "CONNECTING" {
+			t.Fatal("initial preparation exhausted resume", c.connects, b.Refresh())
+		}
+	})
 }

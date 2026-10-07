@@ -334,3 +334,9 @@ request. DesktopLifecycle drops the pending intent on `resume_cancelled`.
 Explicit user CONNECT keeps its existing behavior and may clear the stop latch.
 The flag is rejected on non-CONNECT operations. This is an additive local API
 change; renderer bindings, database, repository hygiene and runners are unchanged.
+
+Configuration retains the intent without starting its deadline. The existing
+lifecycle starts the ninety-second reconnect window once initial preparation
+returns, including a transient startup refusal. Initial preparation retains its
+separate bounded startup deadline. Polling and subsequent attempts cannot start
+a connection before this checkpoint or renew the reconnect deadline afterwards.

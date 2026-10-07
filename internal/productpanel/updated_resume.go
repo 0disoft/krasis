@@ -34,8 +34,16 @@ func (b *DesktopLifecycle) SetUpdatedWorkspaceResume(v WorkspaceUpdateLaunch) er
 			return ErrAgentIncompatible
 		}
 	}
-	b.updatedResume = &updatedWorkspaceResume{launch: v, deadline: time.Now().Add(90 * time.Second)}
+	b.updatedResume = &updatedWorkspaceResume{launch: v}
 	return nil
+}
+
+// Caller owns the lifecycle gate. Initial preparation has its own startup
+// budget; polling and later retries must never renew the reconnect window.
+func (b *DesktopLifecycle) startUpdatedResumeWindow(now time.Time) {
+	if r := b.updatedResume; r != nil && r.deadline.IsZero() {
+		r.deadline = now.Add(90 * time.Second)
+	}
 }
 
 func transientUpdateStartup(err error) bool {
@@ -58,6 +66,9 @@ func (b *DesktopLifecycle) resumeUpdatedConnection(ctx context.Context, now time
 	}
 	if b.ctx.Err() != nil || ctx.Err() != nil || b.updateHandedOff {
 		return stop("cancelled")
+	}
+	if r.deadline.IsZero() {
+		return value, true
 	}
 	// Pin legacy received-update launches on their first complete trust read.
 	// New direct-launch requests already supply the pre-update fingerprint.
