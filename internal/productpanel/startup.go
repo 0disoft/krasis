@@ -37,6 +37,27 @@ type Startup struct {
 	Revision          string
 }
 
+// Read-only proof for clearing stale startup failures. A usable status alone
+// cannot identify the running build or validate this UI's complete bundle.
+func (s Startup) ObservedReady(ctx context.Context) bool {
+	if ctx.Err() != nil || s.Open == nil || s.Verify == nil || s.Revision == "" {
+		return false
+	}
+	client, err := s.Open()
+	if err != nil || client == nil {
+		return false
+	}
+	info, err := client.Runtime(ctx)
+	if err != nil || !s.maintenanceCompatible(info, false) {
+		return false
+	}
+	status, err := client.Status(ctx)
+	if err != nil || status.State != "LOCAL" && status.State != "CONNECTED" {
+		return false
+	}
+	return s.Verify() == nil && ctx.Err() == nil
+}
+
 // Ensure is a bounded, single-start operation. Timers in the GUI do not invoke it.
 func (s Startup) Ensure(ctx context.Context) error {
 	lease, err := s.Lock()

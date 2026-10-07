@@ -160,6 +160,7 @@ func Run() {
 		}
 		service.managed = productpanel.NewDesktopLifecycle(ctx, func() (productpanel.Client, error) { return localapi.OpenClient(paths.Control) }, startup.Ensure, diagnose(os.Getenv("LOCALAPPDATA"), paths.Control), displayReady)
 		service.managed.StartupResume = service.resumeAtStartup
+		service.managed.StartupObservedReady = startup.ObservedReady
 		service.managed.PendingInputSetup = startup.InputSetup
 		service.managed.PendingInputRestore = startup.RestoreProtectedInput
 		if err := service.managed.SetUpdatedWorkspaceResume(updated); err != nil {

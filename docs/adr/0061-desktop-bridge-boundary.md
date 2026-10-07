@@ -490,3 +490,10 @@ resume retains manual-stop/identity/uncertain-reply guards. Explicit operations,
 shutdown and update handoff cancel the continuation. Received-update reconnect
 budgets start only after this pending preparation completes. No persistent job,
 new endpoint, database or runner is introduced.
+
+Stale startup preparation notices clear only after a read-only observation of
+the matching runtime protocol/generation/revision, healthy LOCAL/CONNECTED
+status and verified UI bundle. Read failure, incompatible runtime or faulted
+state retains the notice. Verified preparation promotes recovery registration
+once; it neither restarts nor reconnects. Installation outcomes, login settings
+errors and diagnostic failures retain their independent notices.

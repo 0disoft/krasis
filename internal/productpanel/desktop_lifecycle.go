@@ -12,6 +12,7 @@ import (
 // operations are serialized; Disconnect cancels an in-flight recovery first.
 type DesktopLifecycle struct {
 	StartupReady             func()
+	StartupObservedReady     func(context.Context) bool
 	StartupResume            func(context.Context, BridgeSnapshot) BridgeSnapshot
 	StartupMaintenanceNeeded func(context.Context) (bool, error)
 	StartupMaintenance       func(context.Context) error
@@ -241,7 +242,15 @@ func (b *DesktopLifecycle) tick(now time.Time) {
 	previous := b.Refresh()
 	if previous.State == value.State {
 		switch previous.Code {
-		case "diagnostic_failed", "startup_failed", "startup_busy", "agent_busy", "agent_incompatible", "recovery_exhausted", "display_recovery_expired", "startup_resume_settings_invalid", "startup_resume_settings_unavailable":
+		case "startup_failed", "startup_busy", "agent_busy", "agent_incompatible":
+			if value.Code == "ok" && b.StartupObservedReady != nil && b.StartupObservedReady(ctx) && ctx.Err() == nil {
+				if b.StartupReady != nil {
+					b.StartupReady()
+				}
+			} else {
+				value.Code = previous.Code
+			}
+		case "diagnostic_failed", "recovery_exhausted", "display_recovery_expired", "startup_resume_settings_invalid", "startup_resume_settings_unavailable":
 			value.Code = previous.Code
 		}
 	}
