@@ -60,11 +60,20 @@ func (b *DesktopLifecycle) initialize(ctx context.Context, initial BridgeSnapsho
 		}
 		if needed {
 			value := b.refreshProtectedInput(ctx, initial, b.StartupMaintenance)
-			if value.Code == "ok" && ctx.Err() == nil && b.StartupReady != nil {
+			prepared := value.Code == "ok" || value.agentPrepared
+			if prepared && ctx.Err() == nil && b.StartupReady != nil {
 				b.StartupReady()
 			}
-			if value.Code == "ok" && b.StartupResume != nil {
-				value = b.StartupResume(ctx, value)
+			if prepared && ctx.Err() == nil && b.StartupResume != nil {
+				resumeValue := value
+				// Login resume requires a current ordinary-agent observation. Only
+				// replace an installer code, never a rejected/uncertain reconnect.
+				if value.agentPrepared && value.Code == value.InputRefreshCode && value.ReconnectCode == "not_attempted" {
+					resumeValue = NewDesktopBridge(ctx, b.open).Refresh()
+				}
+				resumed := b.StartupResume(ctx, resumeValue)
+				resumed.InputRefreshCode, resumed.ReconnectCode = value.InputRefreshCode, value.ReconnectCode
+				value = resumed
 			}
 			return value
 		}

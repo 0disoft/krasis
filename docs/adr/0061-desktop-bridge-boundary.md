@@ -461,3 +461,11 @@ without re-running BeforeStart or consent. Pending/running installation and
 unconfirmed owner exit remain fenced. A private native proof distinguishes
 verified restoration from pre-stop errors; only restored busy results can resume
 the same pinned peer. This proof is not part of the renderer/API schema.
+
+Startup readiness promotion and login resume preparation also accept verified
+agent restoration independently of the installer outcome. For an installer-only
+failure with no maintenance reconnect attempted, login resume receives a fresh
+agent observation and keeps its existing saved-identity/manual-stop checks.
+Rejected or uncertain reconnect results are never replaced by that observation.
+Both maintenance outcomes survive the startup-resume projection; pending work,
+unverified restoration and cancelled startup contexts do not promote readiness.

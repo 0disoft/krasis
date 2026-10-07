@@ -99,9 +99,25 @@ func TestLaunchMaintenanceDisconnectsRefreshesAndRestoresSamePeerOnce(t *testing
 				return client, nil
 			}, s.Ensure, nil)
 			b.StartupMaintenanceNeeded, b.StartupMaintenance = s.LaunchMaintenanceNeeded, s.RefreshProtectedInputAtLaunch
+			promotions, resumeCallbacks := 0, 0
+			b.StartupReady = func() { promotions++ }
+			b.StartupResume = func(ctx context.Context, value BridgeSnapshot) BridgeSnapshot {
+				resumeCallbacks++
+				if value.Code == "ok" && value.State == "LOCAL" {
+					t.Fatal("login resume could bypass a failed maintenance reconnect", value)
+				}
+				return value
+			}
 			value := b.initialize(ctx, NewDesktopBridge(ctx, b.open).Refresh())
 			if installs != 1 || starts != tc.wantStarts || client.connects != tc.wantConnects || locks != 0 {
 				t.Fatal(value, installs, starts, client.connects, locks)
+			}
+			wantPrepared := tc.wantStarts
+			if tc.cancel {
+				wantPrepared = 0
+			}
+			if promotions != wantPrepared || resumeCallbacks != wantPrepared {
+				t.Fatal("startup readiness tied to installation result", value, promotions, resumeCallbacks)
 			}
 			if tc.outcome == ErrInputRefreshPending && value.Code != "input_refresh_pending" {
 				t.Fatal(value)
