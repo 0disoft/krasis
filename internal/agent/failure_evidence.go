@@ -16,6 +16,10 @@ import (
 var (
 	ErrSourceSessionActivation = errors.New("source session activation failed")
 	ErrSourceCaptureActivation = errors.New("source capture activation failed")
+	ErrSessionTrustFreshness   = errors.New("session trust freshness expired")
+	ErrSessionTrustRevoked     = errors.New("session trust revoked")
+	ErrSessionTrustMissing     = errors.New("session trust missing")
+	ErrSessionTrustCheck       = errors.New("session trust check failed")
 )
 
 type FailureDescriptor struct {
@@ -25,6 +29,19 @@ type FailureDescriptor struct {
 }
 
 func DescribeSessionFailure(err error) FailureDescriptor {
+	for _, verdict := range []struct {
+		err  error
+		code string
+	}{
+		{ErrSessionTrustFreshness, "freshness_expired"},
+		{ErrSessionTrustRevoked, "revoked"},
+		{ErrSessionTrustMissing, "missing"},
+		{ErrSessionTrustCheck, "check_failed"},
+	} {
+		if errors.Is(err, verdict.err) {
+			return FailureDescriptor{Component: "session-trust", Phase: "validation", Code: verdict.code}
+		}
+	}
 	var guard *crashguard.Failure
 	if errors.As(err, &guard) || errors.Is(err, crashguard.ErrUnexpectedExit) {
 		phase, code := "lifecycle", "exited"

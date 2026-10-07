@@ -126,6 +126,9 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 			protectedActive = observedProtectedInput(wininput.InspectProtectedInput, log.Event)
 		}
 		defer func() {
+			if failure := agent.DescribeSessionFailure(context.Cause(ctx)); failure.Component == "session-trust" {
+				err = errors.Join(err, context.Cause(ctx))
+			}
 			if errors.Is(context.Cause(ctx), crashguard.ErrUnexpectedExit) {
 				err = errors.Join(err, crashguard.ErrUnexpectedExit)
 			}
@@ -194,6 +197,9 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 				return checkErr
 			}, cancel, func(code string) {
 				log.Event(code)
+				if cause := sessionTrustFailure(code); cause != nil {
+					cancelCause(cause)
+				}
 				if code == "session_guard_exited" {
 					cancelCause(crashguard.ErrUnexpectedExit)
 				}

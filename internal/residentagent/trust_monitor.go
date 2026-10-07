@@ -13,6 +13,20 @@ import (
 const trustReadTimeout = time.Second
 const trustValidationMaxAge = 5 * time.Second
 
+func sessionTrustFailure(code string) error {
+	switch code {
+	case "session_trust_freshness_expired":
+		return agent.ErrSessionTrustFreshness
+	case "session_trust_revoked":
+		return agent.ErrSessionTrustRevoked
+	case "session_trust_peer_missing", "session_trust_store_missing":
+		return agent.ErrSessionTrustMissing
+	case "session_trust_check_failed":
+		return agent.ErrSessionTrustCheck
+	}
+	return nil
+}
+
 var trustReadPhases = [...]string{
 	"prelock", "prelock_parent_acl", "prelock_parent_reparse", "prelock_parent_stat",
 	"prelock_parent_acl_query", "prelock_parent_acl_check", "prelock_directory_lstat", "prelock_directory_acl",

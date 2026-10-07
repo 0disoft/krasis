@@ -11,6 +11,8 @@ import (
 	"strings"
 	"syscall"
 	"unsafe"
+
+	"github.com/0disoft/krasis/internal/securefs"
 )
 
 const (
@@ -96,12 +98,35 @@ func ValidateSecurityDirectory(directory string) (string, error) {
 // ValidateSecurityDirectoryObserved reports only fixed operation names; the
 // verdict and path-security checks are identical to ValidateSecurityDirectory.
 func ValidateSecurityDirectoryObserved(directory string, observe func(string)) (string, error) {
-	absolute, err := validatePrivateKeyDirectoryObserved(directory, observe)
+	if directory == "" {
+		return "", errors.New("credential directory is required")
+	}
+	absolute, err := filepath.Abs(directory)
 	if err != nil {
 		return "", err
 	}
-	if err := validateExactCurrentUserDACLObserved(absolute, objectInheritACE|containerInheritACE, observe); err != nil {
+	if observe != nil {
+		observe("reparse")
+	}
+	// OBJ_DONT_REPARSE rejects reparses throughout the NT lookup. Validate
+	// metadata and ACL on that same handle instead of walking the path and
+	// reopening it for Lstat and GetNamedSecurityInfo on every trust tick.
+	dir, err := securefs.OpenReadDirectory(absolute)
+	if err != nil {
+		if errors.Is(err, securefs.ErrUnsafePath) {
+			return "", fmt.Errorf("%w: unsafe security directory", ErrInsecurePrivateKey)
+		}
+		return "", err
+	}
+	defer dir.Close()
+	if observe != nil {
+		observe("acl_query")
+	}
+	if err := ValidateSecurityDirectoryHandle(dir.Handle()); err != nil {
 		return "", fmt.Errorf("%w: security directory: %v", ErrInsecurePrivateKey, err)
+	}
+	if observe != nil {
+		observe("acl_check")
 	}
 	return absolute, nil
 }

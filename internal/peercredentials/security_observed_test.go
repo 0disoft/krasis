@@ -24,7 +24,7 @@ func TestObservedDirectoryValidationPreservesVerdict(t *testing.T) {
 	}
 	wantStages := []string{"stat"}
 	if runtime.GOOS == "windows" {
-		wantStages = []string{"reparse", "stat", "acl_query", "acl_check"}
+		wantStages = []string{"reparse", "acl_query", "acl_check"}
 	}
 	if !slices.Equal(stages, wantStages) {
 		t.Fatalf("fixed validation stages: %v", stages)

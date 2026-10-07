@@ -80,3 +80,13 @@ Pending, offline/local-only and partial results remain explicit. Lost start
 responses are never retried by polling. Pending polls may resume after transient
 errors but expire within a bounded wait. No new network endpoint, database or
 runner is introduced; the existing legacy export binding remains available.
+
+## g214: Trust validation uses one directory handle
+
+Windows directory-security validation opens a read-only securefs handle with
+OBJ_DONT_REPARSE and validates directory metadata and the canonical protected
+DACL on that handle. It avoids the repeated per-component attribute walk,
+Lstat and named ACL reopen. No trust verdict is cached and the one-second
+monitor and five-second freshness deadline remain unchanged. Revocation and
+missing/corrupt stores still stop the session. Terminal trust causes propagate
+through cancellation to fixed fault codes instead of fault_session_unknown.
