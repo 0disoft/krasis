@@ -4,6 +4,8 @@ package workspacehost
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/0disoft/krasis/internal/appsettings"
@@ -115,5 +117,35 @@ func TestFailedStartupWriteDoesNotTouchRecoveryTask(t *testing.T) {
 	}}
 	if !s.restoreStartupSettings("unused-test-root", false, false) || startup || recoveryWrites != 0 {
 		t.Fatal("untouched recovery task was changed")
+	}
+}
+
+func TestUnreadablePreferencesKeepRestorationFailureWithoutInventingChecks(t *testing.T) {
+	base := t.TempDir()
+	t.Setenv("LOCALAPPDATA", base)
+	if err := appsettings.Save(base, appsettings.Settings{Schema: appsettings.Schema, StartAtLogin: true, AutoUpdate: true}); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(base, "Krasis", "launch", "settings.json")
+	if err := os.WriteFile(path, []byte("{}"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	s := &WorkspaceService{}
+	s.settingsRestorePending.Store(true)
+	if got := s.AppSettings(); got.Code != "rollback_failed" || got.PreferencesKnown {
+		t.Fatal("unknown preferences advertised as read", got)
+	}
+	if got := s.SetAppSettings(false, false); got.Code != "rollback_failed" || got.PreferencesKnown {
+		t.Fatal("unreadable settings changed", got)
+	}
+	if data, err := os.ReadFile(path); err != nil || string(data) != "{}" {
+		t.Fatal("invalid preferences overwritten", err)
+	}
+	if err := appsettings.Save(base, appsettings.Settings{Schema: appsettings.Schema, StartAtLogin: true, AutoUpdate: true}); err != nil {
+		t.Fatal(err)
+	}
+	s.startupOps = &startupSettingsOps{startupRead: func(string) (bool, error) { return false, nil }, recoveryRead: func(string) (bool, error) { return false, nil }}
+	if got := s.AppSettings(); got.Code != "rollback_failed" || !got.PreferencesKnown || !got.StartAtLogin || !got.AutoUpdate {
+		t.Fatal("readable preferences conflated with OS restoration", got)
 	}
 }

@@ -52,8 +52,9 @@
   });
 </script>
 <div class="app-settings">
-  <label><input type="checkbox" checked={value.startAtLogin} disabled={busy || value.code === 'unavailable'} onchange={e=>change(e.currentTarget.checked,value.autoUpdate)} />{ko?'Windows 시작 시 실행':'Start with Windows'}</label>
-  <label><input type="checkbox" checked={value.autoUpdate} disabled={busy || value.code === 'unavailable'} onchange={e=>change(value.startAtLogin,e.currentTarget.checked)} />{ko?'자동 업데이트':'Automatic updates'}</label>
+  <label><input type="checkbox" checked={value.startAtLogin} indeterminate={!value.preferencesKnown} disabled={busy || !value.preferencesKnown} onchange={e=>change(e.currentTarget.checked,value.autoUpdate)} />{ko?'Windows 시작 시 실행':'Start with Windows'}</label>
+  <label><input type="checkbox" checked={value.autoUpdate} indeterminate={!value.preferencesKnown} disabled={busy || !value.preferencesKnown} onchange={e=>change(value.startAtLogin,e.currentTarget.checked)} />{ko?'자동 업데이트':'Automatic updates'}</label>
+  {#if !busy && !value.preferencesKnown}<span role="status">{ko?'설정값 확인 불가':'Preferences unavailable'}</span>{/if}
   <button disabled={!bridge || checking || ['CHECKING','DOWNLOADING'].includes(release.state)} onclick={checkRelease}>{ko?'업데이트 확인':'Check for updates'}</button>
   {#if release.state !== 'IDLE'}<span role="status">{appReleaseNotice(release.state, busy ? null : value, locale)}</span>{/if}
   {#if value.code === 'start_menu_failed'}<span role="status">{ko?'시작 메뉴 등록 실패':'Start menu registration failed'}</span>

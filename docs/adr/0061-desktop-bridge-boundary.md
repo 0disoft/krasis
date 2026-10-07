@@ -241,3 +241,9 @@ An explicit check or reenable while a release check is being canceled retains
 one follow-up request. It is queued only after the canceled worker completes,
 using a fresh context. Further requests coalesce. Disabling again or shutting
 down discards the deferred request. An old canceled context is never revived.
+
+The additive preferencesKnown field distinguishes readable saved preferences
+from OS registration/restoration outcomes. Unreadable values stay unknown even
+with rollback_failed. Checkboxes are indeterminate and disabled until a fresh
+read succeeds. Failed-write reconciliation never reuses stale known values if
+its subsequent read fails. Legacy error responses cannot prove preferences.

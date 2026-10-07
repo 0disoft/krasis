@@ -11,10 +11,11 @@ import (
 )
 
 type AppSettingsSnapshot struct {
-	Schema       string `json:"schema"`
-	Code         string `json:"code"`
-	StartAtLogin bool   `json:"startAtLogin"`
-	AutoUpdate   bool   `json:"autoUpdate"`
+	Schema           string `json:"schema"`
+	Code             string `json:"code"`
+	StartAtLogin     bool   `json:"startAtLogin"`
+	AutoUpdate       bool   `json:"autoUpdate"`
+	PreferencesKnown bool   `json:"preferencesKnown"`
 }
 
 func (s *WorkspaceService) AppSettings() AppSettingsSnapshot {
@@ -33,6 +34,7 @@ func (s *WorkspaceService) appSettings() AppSettingsSnapshot {
 		return result
 	}
 	result.StartAtLogin, result.AutoUpdate = v.StartAtLogin, v.AutoUpdate
+	result.PreferencesKnown = true
 	ops := s.startupSettings()
 	actual, err := ops.startupRead(os.Getenv("LOCALAPPDATA"))
 	if err != nil || actual != v.StartAtLogin {

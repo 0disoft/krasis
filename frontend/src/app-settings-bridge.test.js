@@ -16,15 +16,15 @@ test('failed write reloads persisted checks and retains the failure notice',asyn
     SetAppSettings:()=>({schema:'krasis.app-settings/v1',code:'startup_failed',startAtLogin:false,autoUpdate:false}),
     AppSettings:()=>({schema:'krasis.app-settings/v1',code:'ok',startAtLogin:true,autoUpdate:true})
   });
-  assert.deepEqual(await b.set(false,false),{schema:'krasis.app-settings/v1',code:'startup_failed',startAtLogin:true,autoUpdate:true});
+  assert.deepEqual(await b.set(false,false),{schema:'krasis.app-settings/v1',code:'startup_failed',startAtLogin:true,autoUpdate:true,preferencesKnown:true});
 });
 
 test('unverified restoration remains explicit after reloading saved checks',async()=>{
   const b=createAppSettingsBridge({
     SetAppSettings:()=>({schema:'krasis.app-settings/v1',code:'rollback_failed',startAtLogin:false,autoUpdate:false}),
-    AppSettings:()=>({schema:'krasis.app-settings/v1',code:'recovery_failed',startAtLogin:false,autoUpdate:true})
+    AppSettings:()=>({schema:'krasis.app-settings/v1',code:'recovery_failed',startAtLogin:false,autoUpdate:true,preferencesKnown:true})
   });
-  assert.deepEqual(await b.set(true,false),{schema:'krasis.app-settings/v1',code:'rollback_failed',startAtLogin:false,autoUpdate:true});
+  assert.deepEqual(await b.set(true,false),{schema:'krasis.app-settings/v1',code:'rollback_failed',startAtLogin:false,autoUpdate:true,preferencesKnown:true});
 });
 
 test('user cancellation is projected separately from a release failure',async()=>{
@@ -33,7 +33,7 @@ test('user cancellation is projected separately from a release failure',async()=
 });
 
 test('downloaded release guidance follows confirmed automatic update preferences',()=>{
-  const settings = {schema:'krasis.app-settings/v1',code:'ok',startAtLogin:true,autoUpdate:true};
+  const settings = {schema:'krasis.app-settings/v1',code:'ok',startAtLogin:true,autoUpdate:true,preferencesKnown:true};
   for (const locale of ['ko','en']) {
     const enabled = locale === 'ko' ? '연결 해제 후 자동 적용' : 'Will apply after disconnecting';
     const retained = locale === 'ko' ? '다운로드 완료 · 자동 업데이트를 켜면 적용' : 'Downloaded · Enable automatic updates to apply';
@@ -41,7 +41,7 @@ test('downloaded release guidance follows confirmed automatic update preferences
     assert.equal(appReleaseNotice('READY',settings,locale),enabled);
     assert.equal(appReleaseNotice('READY',{...settings,autoUpdate:false},locale),retained);
     assert.equal(appReleaseNotice('READY',settings,locale),enabled);
-    for (const value of [null,emptyAppSettings(),{...settings,code:'unavailable'},{...settings,autoUpdate:'true'}]) {
+    for (const value of [null,emptyAppSettings(),{...settings,code:'unavailable'},{...settings,autoUpdate:'true'},{...settings,code:'rollback_failed',preferencesKnown:false}]) {
       assert.equal(appReleaseNotice('READY',value,locale),unknown);
     }
     // OS startup restoration failure does not invalidate the loaded update preference.
@@ -49,4 +49,23 @@ test('downloaded release guidance follows confirmed automatic update preferences
     assert.equal(appReleaseNotice('IDLE',settings,locale),'');
     assert.equal(appReleaseNotice('FAILED',settings,locale),locale === 'ko' ? '업데이트 확인 실패' : 'Update check failed');
   }
+});
+
+test('unknown preferences stay unknown separately from restoration failures',async()=>{
+  for (const preferencesKnown of [false,undefined]) {
+    const b=createAppSettingsBridge({AppSettings:()=>({schema:'krasis.app-settings/v1',code:'rollback_failed',startAtLogin:true,autoUpdate:true,preferencesKnown})});
+    assert.deepEqual(await b.status(),{...emptyAppSettings(),code:'rollback_failed'});
+  }
+  for (const preferencesKnown of ['true',false]) {
+    const b=createAppSettingsBridge({AppSettings:()=>({schema:'krasis.app-settings/v1',code:'ok',startAtLogin:true,autoUpdate:true,preferencesKnown})});
+    assert.deepEqual(await b.status(),emptyAppSettings());
+  }
+});
+
+test('failed-write reloading never falls back to values that are no longer readable',async()=>{
+  const b=createAppSettingsBridge({
+    SetAppSettings:()=>({schema:'krasis.app-settings/v1',code:'rollback_failed',startAtLogin:true,autoUpdate:true,preferencesKnown:true}),
+    AppSettings:()=>({...emptyAppSettings(),code:'rollback_failed'})
+  });
+  assert.deepEqual(await b.set(false,false),{...emptyAppSettings(),code:'rollback_failed'});
 });
