@@ -265,3 +265,13 @@ handoffs suppress repeated application until another check verifies the cache.
 Settings checking is renderer-local pending state, distinct from unavailable.
 Neither startup nor subsequent pending reads render an error banner from an
 unresolved response. Once the read completes, genuine failures remain visible.
+
+UIReplacementStatus exposes bounded state/generation/canRetry only. Preparing,
+pending, applying and failed replacement requests appear in the workspace.
+RetryUIReplacement takes no arguments, retains the last explicitly opened local
+source, revalidates the whole bundle, and does not automatically replay failed
+launches. Busy handoffs keep the existing bounded polling cadence. Renderer
+epochs reject reads predating a retry; uncertain acknowledgements are queried,
+never automatically retried. No database, hygiene or runner changes are made.
+An explicit second-instance launch also brings the current management window
+forward, so pending or failed replacement is visible even from tray-only state.

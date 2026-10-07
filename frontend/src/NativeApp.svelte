@@ -6,6 +6,7 @@
   import KeyboardPanel from './KeyboardPanel.svelte';
   import PeerAppButton from './PeerAppButton.svelte';
   import { createAppOpenBridge } from './app-open-bridge.js';
+  import { createUIReplacementBridge, emptyUIReplacement } from './ui-replacement-bridge.js';
   import { createUpdateSettingsBridge } from './update-settings-bridge.js';
   import Icon from './Icon.svelte';
   import WindowTitlebar from './WindowTitlebar.svelte';
@@ -58,6 +59,25 @@
   let releaseState = $state('IDLE');
   let releasePreferences = $state(emptyAppSettings());
   let readyReleaseGeneration = $state(0);
+  let uiReplacementBridge;
+  let uiReplacement = $state(emptyUIReplacement());
+  let uiReplacementBusy = $state(false);
+  let uiReplacementEpoch = 0;
+  async function pollUIReplacement() {
+    if (!uiReplacementBridge || disposed || uiReplacementBusy) return;
+    const epoch = uiReplacementEpoch;
+    const next = await uiReplacementBridge.status();
+    if (!disposed && epoch === uiReplacementEpoch) uiReplacement = next;
+  }
+  async function retryUIReplacement() {
+    if (!uiReplacementBridge || disposed || uiReplacementBusy || !uiReplacement.canRetry) return;
+    uiReplacementBusy = true;
+    ++uiReplacementEpoch;
+    try {
+      const next = await uiReplacementBridge.retry();
+      if (!disposed) uiReplacement = next;
+    } finally { if (!disposed) uiReplacementBusy = false; }
+  }
   let updatesOpen = $state(false);
   let opener = null;
   function focusFirstControl(dlg) {
@@ -231,6 +251,7 @@
       }
       if (!disposed && layoutController && selected) await layoutController.status(selected);
       if (!disposed && !diagBusy && diagnosticsBridge) await runDiagnostics('status', true);
+      if (!disposed) await pollUIReplacement();
       if (!disposed) timer = setTimeout(poll, 1500);
     }
     void (async () => {
@@ -288,6 +309,7 @@
           UpdatePermission:(peer,allow)=>Call.ByName(name+'UpdatePermission',peer,allow),
         });
         appOpenBridge=createAppOpenBridge({PeerAppOpen:(peer,id)=>Call.ByName(name+'PeerAppOpen',peer,id)});
+        uiReplacementBridge=createUIReplacementBridge({UIReplacementStatus:()=>Call.ByName(name+'UIReplacementStatus'),RetryUIReplacement:()=>Call.ByName(name+'RetryUIReplacement')});
         await poll();
       } catch { if (!disposed) error = 'unavailable'; }
     })();
@@ -323,6 +345,11 @@
   </section>
   {#if error}
     <p class="fault-banner" role="alert">{t(error)}</p>
+  {/if}
+  {#if ['PREPARING','PENDING','APPLYING','APPLIED','FAILED'].includes(uiReplacement.state)}
+    <p class="release-notice" role="status">{t('ui_replacement_' + uiReplacement.state)} · g{uiReplacement.generation}
+      {#if uiReplacement.canRetry}<button disabled={uiReplacementBusy} onclick={retryUIReplacement}>{t('ui_replacement_retry')}</button>{/if}
+    </p>
   {/if}
   {#if inputNeedsAction || inputBusy || inputNotice === 'UPDATING' || inputNotice === 'PENDING' || snapshot.inputBackend === 'PORTABLE'}
     <p class="fault-banner" role="status">{t(inputNoticeKey)} <button disabled={busy || !bridge || inputNotice === 'UPDATING' || inputNotice === 'PENDING'} onclick={refreshInput}>{t(inputNotice === 'NOT_INSTALLED' ? 'input_setup' : 'input_refresh')}</button></p>

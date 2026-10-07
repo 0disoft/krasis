@@ -1,6 +1,12 @@
 export const nativeCatalogs = {
   ko: {
     settings: '설정',
+    ui_replacement_PREPARING: '새 버전 준비 중',
+    ui_replacement_PENDING: '새 버전 적용 대기 중',
+    ui_replacement_APPLYING: '새 버전 적용 중',
+    ui_replacement_APPLIED: '새 버전 실행 요청됨',
+    ui_replacement_FAILED: '새 버전을 실행하지 못했습니다.',
+    ui_replacement_retry: '다시 시도',
     placement_settings: '화면 배치',
     app_settings: '앱',
     workspace_actions: '공유 및 관리',
@@ -226,6 +232,12 @@ export const nativeCatalogs = {
   },
   en: {
     settings: 'Settings',
+    ui_replacement_PREPARING: 'Preparing the new version',
+    ui_replacement_PENDING: 'Waiting to apply the new version',
+    ui_replacement_APPLYING: 'Applying the new version',
+    ui_replacement_APPLIED: 'New version launch requested',
+    ui_replacement_FAILED: 'Could not launch the new version.',
+    ui_replacement_retry: 'Retry',
     placement_settings: 'Screen arrangement',
     app_settings: 'App',
     workspace_actions: 'Sharing and management',

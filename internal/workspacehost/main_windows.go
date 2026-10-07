@@ -201,9 +201,7 @@ func Run() {
 		UniqueID:       "0disoft-krasis-workspace-preview-v1",
 		AdditionalData: map[string]string{"generation": strconv.Itoa(localapi.AgentGeneration), "revision": buildinfo.Read().Revision},
 		OnSecondInstanceLaunch: func(data application.SecondInstanceData) {
-			if service.requestUIReplacement(data.Args, data.AdditionalData) {
-				return
-			}
+			service.requestUIReplacement(data.Args, data.AdditionalData)
 			if window != nil {
 				window.Restore()
 				fitWorkspaceWindow(window, false)
