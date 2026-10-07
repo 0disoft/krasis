@@ -14,11 +14,12 @@ const DiagnosticsSchema = "krasis.diagnostics/v1"
 // DiagnosticsSnapshot exposes neither paths nor log contents. Transfer is the
 // agent's most recent transfer, not the currently selected device's status.
 type DiagnosticsSnapshot struct {
-	Schema   string `json:"schema"`
-	Code     string `json:"code"`
-	Saved    bool   `json:"saved"`
-	Received bool   `json:"received"`
-	Transfer string `json:"transfer"`
+	Schema     string                        `json:"schema"`
+	Code       string                        `json:"code"`
+	Saved      bool                          `json:"saved"`
+	Received   bool                          `json:"received"`
+	Transfer   string                        `json:"transfer"`
+	Collection *DiagnosticCollectionSnapshot `json:"collection,omitempty"`
 }
 
 type DiagnosticClient interface {
@@ -36,6 +37,7 @@ type DiagnosticsBridge struct {
 	files      func() (bool, bool, error)
 	showFolder func() error
 	mu         sync.Mutex
+	collection *diagnosticCollection
 }
 
 func NewDiagnosticsBridge(ctx context.Context, open func() (DiagnosticClient, error), export func() error, files func() (bool, bool, error), showFolder func() error) *DiagnosticsBridge {
@@ -45,6 +47,7 @@ func NewDiagnosticsBridge(ctx context.Context, open func() (DiagnosticClient, er
 func (b *DiagnosticsBridge) Status() DiagnosticsSnapshot            { return b.execute("status", "") }
 func (b *DiagnosticsBridge) Export(peer string) DiagnosticsSnapshot { return b.execute("export", peer) }
 func (b *DiagnosticsBridge) OpenFolder() DiagnosticsSnapshot        { return b.execute("open", "") }
+func (b *DiagnosticsBridge) Collect() DiagnosticsSnapshot           { return b.execute("collect", "") }
 
 func (b *DiagnosticsBridge) execute(action, peer string) DiagnosticsSnapshot {
 	v := DiagnosticsSnapshot{Schema: DiagnosticsSchema, Code: "unavailable", Transfer: "UNKNOWN"}
@@ -65,6 +68,12 @@ func (b *DiagnosticsBridge) execute(action, peer string) DiagnosticsSnapshot {
 	if ctx.Err() != nil {
 		v.Code = "cancelled"
 		return v
+	}
+	if action == "collect" {
+		return b.collectConnected(ctx)
+	}
+	if action == "status" && b.collection != nil {
+		return b.pollCollection(ctx)
 	}
 	saved, received, err := b.files()
 	v.Saved, v.Received = saved, received

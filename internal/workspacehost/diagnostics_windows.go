@@ -22,6 +22,9 @@ func (s *WorkspaceService) DiagnosticsStatus() productpanel.DiagnosticsSnapshot 
 func (s *WorkspaceService) DiagnosticsExport(peer string) productpanel.DiagnosticsSnapshot {
 	return s.diagnostics.Export(peer)
 }
+func (s *WorkspaceService) DiagnosticsCollect() productpanel.DiagnosticsSnapshot {
+	return s.diagnostics.Collect()
+}
 func (s *WorkspaceService) DiagnosticsOpen() productpanel.DiagnosticsSnapshot {
 	return s.diagnostics.OpenFolder()
 }

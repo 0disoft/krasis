@@ -42,3 +42,20 @@ test('diagnostics adapter does not queue overlapping export behind a status requ
   assert.equal((await bridge.export('')).code, 'ok');
   assert.equal(sends, 1);
 });
+
+test('one-click collection has no caller target and completion requires fresh files', async () => {
+  let args;
+  const pending = { ...value, code: 'pending', transfer: 'NONE', collection: {state:'PENDING',localSaved:true,peerSaved:false} };
+  const complete = { ...pending, code:'collected', received:true, collection:{state:'RECEIVED',localSaved:true,peerSaved:true} };
+  const bridge = createDiagnosticsBridge({DiagnosticsCollect:async (...input) => {args=input;return {...pending,path:'private',id:'private'};},DiagnosticsStatus:async()=>complete});
+  assert.deepEqual(await bridge.collect('untrusted target'), pending);
+  assert.deepEqual(args, []);
+  assert.deepEqual(await bridge.status(), complete);
+  for (const malformed of [
+    {...complete,collection:undefined}, {...complete,collection:{...complete.collection,peerSaved:false}},
+    {...complete,collection:{...complete.collection,state:'PENDING'}}, {...pending,received:true},
+    {...pending,collection:{...pending.collection,state:'private'}}, value,
+  ]) assert.equal((await createDiagnosticsBridge({DiagnosticsCollect:async()=>malformed}).collect()).code,'unavailable');
+  const partial = {...pending,code:'partial',collection:{state:'EXPIRED',localSaved:true,peerSaved:false}};
+  assert.deepEqual(await createDiagnosticsBridge({DiagnosticsStatus:async()=>partial}).status(),partial);
+});

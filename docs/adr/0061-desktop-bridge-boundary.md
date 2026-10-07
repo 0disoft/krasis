@@ -63,3 +63,20 @@ page. Unknown status is never turned into success to simplify the layout.
 Consent, trust, connection operations and persistence remain unchanged.
 Initial dialog focus selects a visible control or disclosure, skipping both
 window controls and controls inside a collapsed settings section.
+
+## g213: One-click diagnostic collection
+
+DiagnosticsCollect accepts no renderer argument. The native bridge saves local
+fallback evidence, resolves the active session alias against current non-revoked
+trust, and starts the existing peer-bound diagnostic collection once. It retains
+that request ID and observes it through DiagnosticsStatus. This reuses the CLI's
+management API, authentication, sanitized exports and request-specific files.
+
+The renderer exposes a single Save diagnostics action and an Open folder action.
+Collection status describes fresh files for this request, separately from older
+exports on disk. Complete requires the exact request ID, RECEIVED state and both
+file paths in the native response; paths and IDs never cross into the WebView.
+Pending, offline/local-only and partial results remain explicit. Lost start
+responses are never retried by polling. Pending polls may resume after transient
+errors but expire within a bounded wait. No new network endpoint, database or
+runner is introduced; the existing legacy export binding remains available.

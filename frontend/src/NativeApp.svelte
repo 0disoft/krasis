@@ -43,6 +43,7 @@
   let diagBusy = $state(false);
   let diagAction = $state(false);
   let diagNotice = $state('');
+  let diagFolderFailed = $state(false);
   let diagnosticsDlg;
   let updateSettingsBridge = $state.raw();
   let appOpenBridge = $state.raw();
@@ -109,17 +110,21 @@
   const shownEdge = $derived(layoutPeer && layoutPeer === selected ? layout.edge : null);
   const canPlace = $derived(snapshot.state === 'LOCAL' && !!selectedPeer && layoutPeer === selected && ['ok','unconfigured'].includes(layout.code) && !pairing.job && !busy);
   const canPair = $derived(snapshot.state === 'LOCAL' && !pairing.job && !busy && !pairBusy);
-  async function runDiagnostics(action, peer = '', background = false) {
+  async function runDiagnostics(action, background = false) {
     if (!diagnosticsBridge || diagBusy || disposed) return;
     await diagnosticsOperation(async () => {
       if (disposed) return;
       diagAction = action !== 'status';
       try {
         const value = await (action === 'status' ? diagnosticsBridge.status() :
-          action === 'open' ? diagnosticsBridge.open() : diagnosticsBridge.export(peer));
+          action === 'open' ? diagnosticsBridge.open() : diagnosticsBridge.collect());
         if (disposed) return;
         diagnostics = value;
-        if (action !== 'status') diagNotice = action === 'export' && value.code === 'ok' ? 'diag_saved' : 'diag_' + value.code;
+        if (action === 'open') diagFolderFailed = value.code !== 'ok';
+        else if (action === 'collect' || action === 'status' && value.collection) {
+          diagNotice = 'diag_' + value.code;
+          if (action === 'collect') diagFolderFailed = false;
+        }
       } finally { if (!disposed) diagAction = false; }
     }, background);
   }
@@ -218,7 +223,7 @@
         await runPair('status', true);
       }
       if (!disposed && layoutController && selected) await layoutController.status(selected);
-      if (!disposed && !diagBusy && diagnosticsBridge) await runDiagnostics('status', '', true);
+      if (!disposed && !diagBusy && diagnosticsBridge) await runDiagnostics('status', true);
       if (!disposed) timer = setTimeout(poll, 1500);
     }
     void (async () => {
@@ -264,6 +269,7 @@
         });
         diagnosticsBridge=createDiagnosticsBridge({
           DiagnosticsStatus:()=>Call.ByName(name+'DiagnosticsStatus'),
+          DiagnosticsCollect:()=>Call.ByName(name+'DiagnosticsCollect'),
           DiagnosticsExport:peer=>Call.ByName(name+'DiagnosticsExport',peer),
           DiagnosticsOpen:()=>Call.ByName(name+'DiagnosticsOpen'),
         });
@@ -373,16 +379,12 @@
   <WindowTitlebar {locale} version={windowVersion} maximised={windowMaximised} focused={windowFocused} ready={!!windowRuntime} action={windowAction} />
   <div class="dlg-head"><h2 id="diagnostics-title">{t('diag_title')}</h2><p>{t('diag_help')}</p></div>
   <div class="dlg-body">
-    <p>{t('diag_local')}: {t(diagnostics.saved ? 'diag_available' : diagnostics.code === 'unavailable' ? 'diag_unavailable' : 'diag_none')}</p>
-    <p>{t('diag_received')}: {t(diagnostics.received ? 'diag_available' : diagnostics.code === 'unavailable' ? 'diag_unavailable' : 'diag_none')}</p>
-    <p>{t('diag_latest')}: {t('diag_transfer_' + diagnostics.transfer)}</p>
-    <p>{t('diag_global')}</p>
     <div class="pair-actions">
-      <button disabled={diagBusy || !diagnosticsBridge} onclick={() => runDiagnostics('export')}>{t('diag_save')}</button>
-      <button disabled={diagBusy || !diagnosticsBridge || !selectedPeer} onclick={() => runDiagnostics('export', selectedPeer.fingerprint)}>{t('diag_send')}{selectedPeer ? ' · ' + selectedPeer.alias : ''}</button>
+      <button class="primary" disabled={diagBusy || !diagnosticsBridge || diagnostics.collection?.state === 'PENDING'} onclick={() => runDiagnostics('collect')}>{t(diagnostics.collection?.state === 'PENDING' ? 'diag_collecting' : 'diag_save')}</button>
       <button disabled={diagBusy || !diagnosticsBridge} onclick={() => runDiagnostics('open')}>{t('diag_open')}</button>
     </div>
-    <p role="status">{diagAction ? t('diag_busy') : diagNotice ? t(diagNotice) : diagnostics.code !== 'ok' ? t('diag_' + diagnostics.code) : ''}</p>
+    <p role="status">{#if !diagAction && diagnostics.collection?.localSaved && !['pending','collected','local_only','partial'].includes(diagnostics.code)}{t('diag_local_saved')} {/if}{diagAction ? t('diag_busy') : diagNotice ? t(diagNotice) : diagnostics.code !== 'ok' ? t('diag_' + diagnostics.code) : ''}</p>
+    {#if diagFolderFailed}<p role="alert">{t('diag_open_failed')}</p>{/if}
   </div>
   <div class="dlg-foot"><button class="primary" onclick={() => diagnosticsDlg.close()}>{t('close')}</button></div>
 </dialog>
