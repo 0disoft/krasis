@@ -29,7 +29,8 @@ func (s *WorkspaceService) appSettings() AppSettingsSnapshot {
 		return result
 	}
 	result.StartAtLogin, result.AutoUpdate = v.StartAtLogin, v.AutoUpdate
-	actual, err := appsettings.StartupEnabled(os.Getenv("LOCALAPPDATA"))
+	ops := s.startupSettings()
+	actual, err := ops.startupRead(os.Getenv("LOCALAPPDATA"))
 	if err != nil || actual != v.StartAtLogin {
 		result.Code = "startup_failed"
 		return result
@@ -41,7 +42,7 @@ func (s *WorkspaceService) appSettings() AppSettingsSnapshot {
 	if s.launchRecordFailed.Load() || s.recoveryFailed.Load() {
 		result.Code = "recovery_failed"
 	}
-	active, err := appsettings.RecoveryTaskEnabled(os.Getenv("LOCALAPPDATA"))
+	active, err := ops.recoveryRead(os.Getenv("LOCALAPPDATA"))
 	if err != nil || active != v.StartAtLogin {
 		result.Code = "recovery_failed"
 	}
@@ -56,37 +57,42 @@ func (s *WorkspaceService) SetAppSettings(startAtLogin, autoUpdate bool) AppSett
 		return s.appSettings()
 	}
 	startupChanged := startAtLogin != old.StartAtLogin
+	ops := s.startupSettings()
 	if startupChanged {
-		if err = appsettings.SetStartup(base, startAtLogin); err != nil {
-			_ = appsettings.SetStartup(base, old.StartAtLogin)
+		if err = ops.startupWrite(base, startAtLogin); err != nil {
+			s.log.Event("settings_change_startup_failed")
+			restored := s.restoreStartupSettings(base, old.StartAtLogin, false)
 			result := s.appSettings()
 			result.Code = "startup_failed"
+			if !restored {
+				result.Code = "rollback_failed"
+			}
 			return result
 		}
-		if err = appsettings.SetRecoveryTask(base, startAtLogin); err != nil {
-			_ = appsettings.SetStartup(base, old.StartAtLogin)
+		if err = ops.recoveryWrite(base, startAtLogin); err != nil {
+			s.log.Event("settings_change_recovery_failed")
+			restored := s.restoreStartupSettings(base, old.StartAtLogin, true)
 			s.recoveryFailed.Store(true)
 			s.recoverySettingsReady = false
 			result := s.appSettings()
 			result.Code = "recovery_failed"
+			if !restored {
+				result.Code = "rollback_failed"
+			}
 			return result
 		}
 	}
 	value := appsettings.Settings{Schema: appsettings.Schema, StartAtLogin: startAtLogin, AutoUpdate: autoUpdate}
 	if err = appsettings.Save(base, value); err != nil {
-		var rollback error
+		s.log.Event("settings_change_save_failed")
+		restored := true
 		if startupChanged {
-			rollback = appsettings.SetStartup(base, old.StartAtLogin)
-			if err := appsettings.SetRecoveryTask(base, old.StartAtLogin); err != nil {
-				rollback = err
-				s.recoveryFailed.Store(true)
-				s.recoverySettingsReady = false
-			}
+			restored = s.restoreStartupSettings(base, old.StartAtLogin, true)
 		}
 		result := s.appSettings()
 		result.Code = "save_failed"
-		if rollback != nil {
-			result.Code = "startup_failed"
+		if !restored {
+			result.Code = "rollback_failed"
 		}
 		return result
 	}

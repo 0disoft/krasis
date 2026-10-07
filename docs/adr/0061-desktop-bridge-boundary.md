@@ -189,3 +189,10 @@ Expired or invalid peer-launch storage cannot block a new explicit request.
 Only the initial acknowledged request creates a deadline; polling never
 renews it. Repeated opening resumes a valid saved ID without sending START
 again, and a terminal response clears only its matching saved receipt.
+
+Startup change failures inspect and compensate every affected OS setting,
+including a partially changed recovery task. Both writes and subsequent
+reads must succeed before restoration is verified. Unknown reads never
+authorize blind rewrites. Fixed settings_change/settings_restore events
+retain the failed stage and compensation outcome without raw error text.
+The additive rollback_failed settings code stays explicit in the renderer.

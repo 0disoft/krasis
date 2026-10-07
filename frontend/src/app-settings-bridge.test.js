@@ -18,3 +18,11 @@ test('failed write reloads persisted checks and retains the failure notice',asyn
   });
   assert.deepEqual(await b.set(false,false),{schema:'krasis.app-settings/v1',code:'startup_failed',startAtLogin:true,autoUpdate:true});
 });
+
+test('unverified restoration remains explicit after reloading saved checks',async()=>{
+  const b=createAppSettingsBridge({
+    SetAppSettings:()=>({schema:'krasis.app-settings/v1',code:'rollback_failed',startAtLogin:false,autoUpdate:false}),
+    AppSettings:()=>({schema:'krasis.app-settings/v1',code:'recovery_failed',startAtLogin:false,autoUpdate:true})
+  });
+  assert.deepEqual(await b.set(true,false),{schema:'krasis.app-settings/v1',code:'rollback_failed',startAtLogin:false,autoUpdate:true});
+});

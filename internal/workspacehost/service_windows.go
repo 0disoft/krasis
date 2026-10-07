@@ -23,6 +23,7 @@ type WorkspaceService struct {
 	clipboardWake    chan struct{}
 	release          releaseState
 	settingsGate     sync.Mutex
+	startupOps       *startupSettingsOps
 	startAtLogin     bool
 	updateTrayLabels func([4]string)
 
