@@ -110,3 +110,8 @@ unwritable intent prevents remote collection while retaining a local fallback.
 IDs stay outside the WebView. Open folder selects the validated local snapshot
 of the current collection in Explorer, with folder access retained when the
 receipt cannot be validated. No new network endpoint or database is introduced.
+
+Hidden-window smoke reports rendererAgentRoundtrip separately from agentHealthy,
+agentState and agentCode. A real FAULTED/recovery_required response proves the
+bridge roundtrip but fails the overall smoke with exit 2. Unknown or malformed
+responses never count as a roundtrip. Smoke does not recover or replace agents.

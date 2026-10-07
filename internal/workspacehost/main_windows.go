@@ -34,17 +34,27 @@ import (
 
 // WorkspaceSmoke exists only in the bounded hidden-window check. It accepts no
 // commands and proves the renderer received a validated, real agent snapshot.
-type WorkspaceSmoke struct{ result chan bool }
+type workspaceSmokeResult struct {
+	Roundtrip bool
+	Healthy   bool
+	State     string
+	Code      string
+}
+type WorkspaceSmoke struct{ result chan workspaceSmokeResult }
 
 func (s *WorkspaceSmoke) Report(schema, state, code string) {
-	ok := schema == productpanel.BridgeSchema && code == "ok"
+	ok := schema == productpanel.BridgeSchema && (code == "ok" || code == "recovery_required" && state == "FAULTED")
 	switch state {
 	case "LOCAL", "CONNECTING", "CONNECTED", "RECONNECTING", "DISCONNECTING", "FAULTED":
 	default:
 		ok = false
 	}
+	result := workspaceSmokeResult{Roundtrip: ok, Healthy: ok && code == "ok" && state != "FAULTED", State: "UNKNOWN", Code: "unavailable"}
+	if ok {
+		result.State, result.Code = state, code
+	}
 	select {
-	case s.result <- ok:
+	case s.result <- result:
 	default:
 	}
 }
@@ -182,7 +192,7 @@ func Run() {
 		return localapi.OpenClient(paths.Control)
 	}, nil)
 	services := []application.Service{application.NewService(service)}
-	check := &WorkspaceSmoke{result: make(chan bool, 1)}
+	check := &WorkspaceSmoke{result: make(chan workspaceSmokeResult, 1)}
 	if smoke {
 		services = append(services, application.NewService(check))
 	}
@@ -308,18 +318,19 @@ func Run() {
 		window.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) { window.Hide(); e.Cancel() })
 	}
 	done := make(chan bool, 1)
-	var rendererOK, windowVisible bool
+	var windowVisible bool
+	observed := workspaceSmokeResult{State: "UNKNOWN", Code: "unavailable"}
 	if smoke {
 		go func() {
 			timer := time.NewTimer(25 * time.Second)
 			defer timer.Stop()
 			ok := false
 			select {
-			case ok = <-check.result:
+			case observed = <-check.result:
+				ok = observed.Roundtrip
 			case <-timer.C:
 			case <-ctx.Done():
 			}
-			rendererOK = ok
 			if visibleSmoke && ok {
 				select {
 				case ok = <-shown:
@@ -330,7 +341,7 @@ func Run() {
 					ok = false
 				}
 			}
-			done <- ok
+			done <- ok && observed.Healthy
 			app.Quit()
 		}()
 	}
@@ -339,9 +350,12 @@ func Run() {
 		cancel()
 		ok := <-done
 		_ = json.NewEncoder(os.Stdout).Encode(struct {
-			RendererAgentRoundtrip bool `json:"rendererAgentRoundtrip"`
-			UpdatedWindowVisible   bool `json:"updatedWindowVisible,omitempty"`
-		}{rendererOK, visibleSmoke && windowVisible})
+			RendererAgentRoundtrip bool   `json:"rendererAgentRoundtrip"`
+			AgentHealthy           bool   `json:"agentHealthy"`
+			AgentState             string `json:"agentState"`
+			AgentCode              string `json:"agentCode"`
+			UpdatedWindowVisible   bool   `json:"updatedWindowVisible,omitempty"`
+		}{observed.Roundtrip, observed.Healthy, observed.State, observed.Code, visibleSmoke && windowVisible})
 		if !ok {
 			os.Exit(2)
 		}
