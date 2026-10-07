@@ -209,6 +209,7 @@ func (b *DesktopLifecycle) tick(now time.Time) {
 	defer done()
 	bridge := NewDesktopBridge(ctx, b.open)
 	value := bridge.Refresh()
+	observationKnown := value.Code == "ok" || value.Code == "recovery_required"
 	previous := b.Refresh()
 	if previous.State == value.State {
 		switch previous.Code {
@@ -222,6 +223,11 @@ func (b *DesktopLifecycle) tick(now time.Time) {
 	}
 	if next, handled := b.resumeUpdatedConnection(ctx, now, value); handled {
 		b.save(next)
+		return
+	}
+	// Missing trust is an unavailable observation, not a removed identity or
+	// permission to prepare another agent. Keep the recovery budget unchanged.
+	if !observationKnown {
 		return
 	}
 	view := View{State: value.State, PeerAlias: value.PeerAlias, StopReason: value.StopReason, DisplayReady: true, Fingerprints: map[string]string{}}

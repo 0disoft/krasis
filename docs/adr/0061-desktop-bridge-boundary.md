@@ -373,3 +373,9 @@ rejects a persisted stop or unreadable state. An explicit user connection saves
 the new trusted identity and clears the persisted stop on successful write.
 Login recovery also uses Resume, so a disconnect racing its settings read is
 arbitrated by the agent. No endpoint, database, hygiene or runner changes occur.
+
+Ordinary recovery skips state-machine transitions on an unavailable status or
+trust observation. Its retained peer identity, attempt count and original
+display-recovery window remain intact. A later successful read can continue
+within that window, while a confirmed changed or revoked identity still stops
+display reconnect. Unavailable reads do not restart the agent or renew budgets.

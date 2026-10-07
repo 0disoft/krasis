@@ -121,7 +121,7 @@ func (b *DesktopBridge) execute(action, alias, fingerprint string) BridgeSnapsho
 	if guard.resumeUnsupported {
 		result.Code = "agent_incompatible"
 	}
-	if result.State == "FAULTED" {
+	if result.State == "FAULTED" && result.Code != "unavailable" && result.Code != "outcome_unknown" {
 		result.Code = "recovery_required"
 	}
 	for _, name := range view.Peers {

@@ -136,6 +136,49 @@ func TestRecoveryHonorsCLIStopDuringPreparation(t *testing.T) {
 	}
 }
 
+func TestDisplayRecoveryPreservesIdentityAndDeadlineDuringTrustFailure(t *testing.T) {
+	for _, expired := range []bool{false, true} {
+		fp := strings.Repeat("a", 64)
+		c := &fakeClient{state: "LOCAL", stopReason: "display_change", peers: []localapi.TrustedPeer{{Alias: "B", Fingerprint: fp}}}
+		starts := 0
+		b := NewDesktopLifecycle(context.Background(), func() (Client, error) { return c, nil }, func(context.Context) error { starts++; return nil }, nil)
+		b.recovery.Alias, b.recovery.Fingerprint = "B", fp
+		now := time.Now()
+		b.tick(now)
+		deadlineStart := b.recovery.displaySince
+		c.trustErr = errors.New("temporarily unreadable trust")
+		b.tick(now.Add(4 * time.Second))
+		if b.recovery.Alias != "B" || b.recovery.Fingerprint != fp || b.recovery.displaySince != deadlineStart || starts != 0 || c.connects != 0 {
+			t.Fatal("unavailable read destroyed or executed recovery", b.recovery, starts, c.connects)
+		}
+		c.trustErr = nil
+		elapsed := 5 * time.Second
+		if expired {
+			elapsed = 31 * time.Second
+		}
+		b.tick(now.Add(elapsed))
+		if expired {
+			if c.connects != 0 || b.Refresh().Code != "display_recovery_expired" {
+				t.Fatal("unavailable reads renewed display budget", b.Refresh())
+			}
+		} else if c.connects != 1 || starts != 1 {
+			t.Fatal("recovered read failed to resume", b.Refresh(), c.connects, starts)
+		}
+	}
+}
+
+func TestDisplayRecoveryStillDropsVerifiedChangedIdentity(t *testing.T) {
+	fp := strings.Repeat("a", 64)
+	c := &fakeClient{state: "LOCAL", stopReason: "display_change", peers: []localapi.TrustedPeer{{Alias: "B", Fingerprint: fp}}}
+	b := NewDesktopLifecycle(context.Background(), func() (Client, error) { return c, nil }, func(context.Context) error { t.Fatal("prepared changed peer"); return nil }, nil)
+	b.recovery.Alias, b.recovery.Fingerprint = "B", fp
+	c.peers[0].Fingerprint = strings.Repeat("b", 64)
+	b.tick(time.Now())
+	if b.recovery.Alias != "" || c.connects != 0 {
+		t.Fatal("verified identity change retained", b.recovery)
+	}
+}
+
 func TestDesktopLifecycleRetriesDisplayChangeAfterGeometrySettles(t *testing.T) {
 	fp := strings.Repeat("a", 64)
 	client := &fakeClient{state: "LOCAL", stopReason: "display_change", peers: []localapi.TrustedPeer{{Alias: "B", Fingerprint: fp}}}
