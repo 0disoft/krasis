@@ -193,7 +193,7 @@ func readRecoveryReceiptNamed(dir *securefs.Directory, name string) (*RecoverySu
 }
 
 func init() {
-	for _, code := range []string{"peer_update_apply_timeout", "release_check_failed", "ui_replacement_bundle_failed", "ui_replacement_stage_failed", "ui_replacement_waiting_for_idle", "ui_replacement_launch_failed", "peer_stage_cleanup_failed", "peer_stage_cleanup_completed"} {
+	for _, code := range []string{"peer_update_apply_timeout", "release_check_failed", "ui_replacement_bundle_failed", "ui_replacement_stage_failed", "ui_replacement_waiting_for_idle", "ui_replacement_requested", "ui_replacement_launch_failed", "peer_stage_cleanup_failed", "peer_stage_cleanup_completed"} {
 		allowed[code] = true
 	}
 }

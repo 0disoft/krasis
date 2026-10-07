@@ -4,6 +4,7 @@ package workspacehost
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -58,7 +59,7 @@ func (s *WorkspaceService) requestUIReplacement(args []string, data map[string]s
 		return true
 	}
 	s.uiReplacement.directory, s.uiReplacement.revision, s.uiReplacement.generation = directory, bundle.Metadata().Revision, generation
-	s.log.Event("ui_replacement_waiting_for_idle")
+	s.log.Event("ui_replacement_requested")
 	if window := s.visibleWindow.Load(); window != nil {
 		window.SetTitle("Krasis · g" + strconv.Itoa(localapi.AgentGeneration) + " · 새 버전 대기")
 	}
@@ -79,19 +80,20 @@ func (s *WorkspaceService) runUIReplacement() bool {
 			if directory == "" {
 				continue
 			}
-			failed := false
-			if s.managed.ApplyReleaseUpdate(generation, revision, func() error {
-				err := productpanel.LaunchReleaseWorkspaceUpdate(directory, revision)
-				failed = err != nil
-				return err
-			}) {
+			handedOff, err := s.managed.ApplyRequestedUpdate(generation, revision, func(alias, fingerprint string) error {
+				return productpanel.LaunchRequestedWorkspaceUpdate(directory, revision, alias, fingerprint)
+			})
+			if handedOff {
 				return true
 			}
-			if failed {
+			if err != nil && !errors.Is(err, productpanel.ErrStartupBusy) && !errors.Is(err, productpanel.ErrAgentBusy) {
 				s.log.Event("ui_replacement_launch_failed")
 				s.uiReplacement.gate.Lock()
 				s.uiReplacement.directory = ""
 				s.uiReplacement.gate.Unlock()
+				if window := s.visibleWindow.Load(); window != nil {
+					window.SetTitle(s.title)
+				}
 			}
 		}
 	}

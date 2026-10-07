@@ -15,12 +15,21 @@ import (
 
 type WorkspaceUpdateLaunch struct {
 	Alias, Revision string
+	Fingerprint     string
 	WaitPID         uint32
 }
 
 // Only the verified updater supplies these arguments. Paths and commands are
 // never accepted, and the expected build is checked again before reconnecting.
 func ParseWorkspaceUpdateLaunch(args []string) (WorkspaceUpdateLaunch, error) {
+	fingerprint := ""
+	if len(args) == 8 && args[6] == "--peer-fingerprint" {
+		fingerprint = args[7]
+		if decoded, err := hex.DecodeString(fingerprint); err != nil || len(decoded) != 32 {
+			return WorkspaceUpdateLaunch{}, errors.New("invalid update fingerprint")
+		}
+		args = args[:6]
+	}
 	if len(args) == 4 && args[0] == "--release-build" && args[2] == "--wait-pid" {
 		value, err := ParseWorkspaceUpdateLaunch([]string{"--updated-peer", "release", "--expected-build", args[1], "--wait-pid", args[3]})
 		value.Alias = ""
@@ -31,6 +40,7 @@ func ParseWorkspaceUpdateLaunch(args []string) (WorkspaceUpdateLaunch, error) {
 		return v, errors.New("invalid update arguments")
 	}
 	v.Alias, v.Revision = args[1], args[3]
+	v.Fingerprint = fingerprint
 	if v.Alias == "" || len(v.Alias) > 256 || strings.ContainsRune(v.Alias, 0) || len(v.Revision) != 40 {
 		return WorkspaceUpdateLaunch{}, errors.New("invalid update identity")
 	}
@@ -65,13 +75,16 @@ func ResumeUpdatedWorkspace(ctx context.Context, c UpdatedWorkspaceClient, v Wor
 	if err != nil {
 		return err
 	}
-	trusted := false
+	trusted := 0
 	for _, p := range trust.Peers {
 		if p.Alias == v.Alias && !p.Revoked {
-			trusted = true
+			trusted++
+			if v.Fingerprint != "" && p.Fingerprint != v.Fingerprint {
+				return errors.New("updated peer identity changed")
+			}
 		}
 	}
-	if !trusted {
+	if trusted != 1 {
 		return errors.New("updated peer no longer trusted")
 	}
 	result, err := c.Connect(ctx, v.Alias)
@@ -219,6 +232,11 @@ func (b *DesktopLifecycle) ApplyReleaseUpdate(generation int, revision string, l
 	}
 	ctx, cancel := b.operation()
 	defer cancel()
+	return b.applyReleaseUpdate(ctx, generation, revision, launch)
+}
+
+// Caller owns gate. The agent-side claim still fences CLI/pairing races.
+func (b *DesktopLifecycle) applyReleaseUpdate(ctx context.Context, generation int, revision string, launch func() error) bool {
 	view := NewDesktopBridge(ctx, b.open).Refresh()
 	if view.Code != "ok" || view.State != "LOCAL" {
 		return false
@@ -254,6 +272,10 @@ func (b *DesktopLifecycle) ApplyReleaseUpdate(generation int, revision string, l
 		return false
 	}
 	if result.Status != "COMPLETED" || result.Code != "release_claimed" {
+		return false
+	}
+	if ctx.Err() != nil {
+		rollback()
 		return false
 	}
 	if err := launch(); err != nil {

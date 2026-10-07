@@ -229,6 +229,16 @@ launch-only transaction. Tests cover connected old/same-version agents,
 consent cancellation, failure, pending ownership, trust change and cancellation
 of reconnect. Two-device update/consent behavior requires an attended trial.
 
+Opening a verified newer local EXE while the old UI remains open now requests
+a safe disconnect before the existing agent-side release claim and UI handoff.
+The replacement arguments carry the saved peer fingerprint; both build and
+current trust are rechecked before reconnect. A failed launch releases the
+claim and restores only that identity. Pairing/other native operations wait,
+and terminal handoff errors stop the request rather than repeating disconnects.
+Unattended public release checks remain idle-only. The first upgrade from an
+older UI that lacks this behavior still uses that UI's idle-only handoff;
+subsequent launches from g210 use the explicit replacement transaction.
+
 The native UI publishes bounded installation-state codes independently of the
 selected session input backend. A ready installation is not proof of a working
 PIN session. Local tests cover ownership, cancellation, pending results, image

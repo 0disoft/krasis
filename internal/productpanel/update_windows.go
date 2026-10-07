@@ -32,6 +32,19 @@ func LaunchReleaseWorkspaceUpdate(directory, revision string) error {
 	})
 }
 
+func LaunchRequestedWorkspaceUpdate(directory, revision, alias, fingerprint string) error {
+	if alias == "" {
+		return LaunchReleaseWorkspaceUpdate(directory, revision)
+	}
+	return launchReceivedUpdate(directory, revision, alias, localapi.AgentGeneration, func(command *exec.Cmd) error {
+		command.Args = append(command.Args, "--wait-pid", strconv.Itoa(os.Getpid()), "--peer-fingerprint", fingerprint)
+		if _, err := ParseWorkspaceUpdateLaunch(command.Args[1:]); err != nil {
+			return err
+		}
+		return launchrecord.StartIndependent(command)
+	})
+}
+
 func LaunchReceivedUpdate(directory, revision, alias string) error {
 	return launchReceivedUpdate(directory, revision, alias, localapi.AgentGeneration, func(command *exec.Cmd) error {
 		return launchrecord.StartIndependent(command)
