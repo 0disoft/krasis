@@ -18,6 +18,7 @@ var (
 // privileged writes, fixed paths, validation and rollback.
 type inputRefresh struct {
 	mu        sync.Mutex
+	reader    atomic.Pointer[inputHealthReader]
 	attempted bool
 	checkedAt time.Time
 	state     atomic.Pointer[string]
@@ -25,42 +26,90 @@ type inputRefresh struct {
 	run       func(context.Context) error
 }
 
+type inputHealthReader struct{ done chan struct{} }
+
 func (b *inputRefresh) status() string {
-	if b.state.Load() == nil && b.mu.TryLock() {
-		if b.state.Load() == nil {
-			b.setState(b.inspect())
+	state := b.state.Load()
+	if b.mu.TryLock() {
+		current := b.state.Load()
+		interval := 30 * time.Second
+		if current != nil && *current == "PENDING" {
+			interval = time.Second
 		}
-		b.mu.Unlock()
-	}
-	if state := b.state.Load(); state != nil {
-		if *state == "PENDING" && b.mu.TryLock() {
-			b.refreshPendingLocked()
-			b.mu.Unlock()
-			return *b.state.Load()
-		}
-		if (*state == "READY" || *state == "UNKNOWN" || *state == "NOT_INSTALLED" || *state == "UPDATE_REQUIRED") && b.mu.TryLock() {
-			if time.Since(b.checkedAt) >= 30*time.Second {
-				// Full installation checks include file hashes and SCM queries.
-				// Keep them off the renderer poll and serialize with installation.
-				b.checkedAt = time.Now()
-				go func() {
-					defer b.mu.Unlock()
-					b.setState(b.inspect())
-				}()
-			} else {
+		eligible := current == nil || *current == "PENDING" || *current == "READY" || *current == "UNKNOWN" || *current == "NOT_INSTALLED" || *current == "UPDATE_REQUIRED"
+		if eligible && (current == nil || time.Since(b.checkedAt) >= interval) {
+			b.checkedAt = time.Now()
+			reader := &inputHealthReader{done: make(chan struct{})}
+			b.reader.Store(reader)
+			go func() {
+				b.inspectLocked()
 				b.mu.Unlock()
-			}
+				b.reader.CompareAndSwap(reader, nil)
+				close(reader.done)
+			}()
+		} else {
+			b.mu.Unlock()
 		}
-		return *state
+	}
+	if state != nil {
+		return *state // Initial and pending reads never block the renderer.
 	}
 	return "UNKNOWN"
+}
+
+// Native startup needs a completed observation before deciding whether to
+// pause an existing session. Waiting for a read never repeats installation.
+func (b *inputRefresh) probe(ctx context.Context) string {
+	if !b.lock(ctx, false) {
+		if state := b.state.Load(); state != nil {
+			return *state
+		}
+		return "UNKNOWN"
+	}
+	defer b.mu.Unlock()
+	return b.inspectLocked()
+}
+
+func (b *inputRefresh) inspectLocked() string {
+	if state := b.state.Load(); state != nil && *state == "PENDING" {
+		b.attempted = true
+	}
+	state := b.inspect()
+	if state == "PENDING" {
+		b.attempted = true
+	}
+	b.setState(state)
+	return state
+}
+
+// Automatic preparation may await a read-only health worker. An installer or
+// explicit request still returns busy immediately, preserving ownership fences.
+func (b *inputRefresh) lock(ctx context.Context, explicit bool) bool {
+	if ctx.Err() != nil {
+		return false
+	}
+	for !b.mu.TryLock() {
+		if explicit {
+			return false
+		}
+		reader := b.reader.Load()
+		if reader == nil {
+			return b.mu.TryLock() // The reader may just have released the gate.
+		}
+		select {
+		case <-ctx.Done():
+			return false
+		case <-reader.done:
+		}
+	}
+	return true
 }
 
 // An explicit read requests fresh health without installation. Concurrent
 // requests coalesce into the reader already holding the installation gate.
 func (b *inputRefresh) recheck() string {
 	if b.mu.TryLock() {
-		if state := b.state.Load(); state == nil || *state != "UPDATING" && *state != "PENDING" {
+		if state := b.state.Load(); state == nil || *state != "UPDATING" {
 			if state != nil && (*state == "FAILED" || *state == "CANCELLED") {
 				b.setState("UNKNOWN") // Maintenance outcome is retained separately by lifecycle.
 			}
@@ -80,8 +129,7 @@ func (b *inputRefresh) setState(state string) {
 func (b *inputRefresh) refreshPendingLocked() {
 	if state := b.state.Load(); state != nil && *state == "PENDING" {
 		// Observe completion; never automatically start a second installer.
-		b.attempted = true
-		b.setState(b.inspect())
+		b.inspectLocked()
 	}
 }
 
@@ -103,7 +151,10 @@ func (b *inputRefresh) restoreCheck() error {
 }
 
 func (b *inputRefresh) apply(ctx context.Context, explicit bool) error {
-	if !b.mu.TryLock() {
+	if !b.lock(ctx, explicit) {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		return ErrStartupBusy
 	}
 	defer b.mu.Unlock()

@@ -14,7 +14,15 @@ func (s Startup) maintenanceCompatible(info localapi.RuntimeInfo, allowOlder boo
 // Preflight happens before disconnect: never interrupt a session for an invalid
 // bundle, an unknown/newer agent, pairing, or an initial optional installation.
 func (s Startup) LaunchMaintenanceNeeded(ctx context.Context) (bool, error) {
-	inputUpdate := s.InputSetup != nil && s.InputSetup() == "UPDATE_REQUIRED"
+	inputUpdate := false
+	if s.InputProbe != nil {
+		inputUpdate = s.InputProbe(ctx) == "UPDATE_REQUIRED"
+	} else if s.InputSetup != nil {
+		inputUpdate = s.InputSetup() == "UPDATE_REQUIRED"
+	}
+	if ctx.Err() != nil {
+		return false, ctx.Err()
+	}
 	client, err := s.Open()
 	if errors.Is(err, localapi.ErrUnavailable) || errors.Is(err, localapi.ErrTransport) {
 		if !inputUpdate {

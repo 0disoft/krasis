@@ -3,6 +3,7 @@ package productpanel
 import (
 	"context"
 	"testing"
+	"time"
 )
 
 func TestPendingInstallationCanCompleteWithoutAnotherConsent(t *testing.T) {
@@ -13,6 +14,12 @@ func TestPendingInstallationCanCompleteWithoutAnotherConsent(t *testing.T) {
 			t.Fatal("unfinished transaction was not fenced")
 		}
 		state = final
+		b.mu.Lock()
+		b.checkedAt = time.Now().Add(-2 * time.Second)
+		b.mu.Unlock()
+		b.status() // Completion observation is asynchronous.
+		b.mu.Lock()
+		b.mu.Unlock()
 		if b.status() != final {
 			t.Fatal("installation outcome remained stuck pending")
 		}

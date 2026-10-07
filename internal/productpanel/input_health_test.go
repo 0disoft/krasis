@@ -17,8 +17,8 @@ func TestInputHealthRechecksWithoutBlockingPollOrStartingInstaller(t *testing.T)
 		}
 		return state
 	}, run: func(context.Context) error { installs++; return nil }}
-	if b.status() != "READY" {
-		t.Fatal("initial ready installation not observed")
+	if b.probe(context.Background()) != "READY" {
+		t.Fatal("native startup did not observe ready installation")
 	}
 	for range 3 {
 		b.status()

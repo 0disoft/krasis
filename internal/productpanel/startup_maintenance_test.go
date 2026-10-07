@@ -76,7 +76,7 @@ func TestLaunchMaintenanceDisconnectsRefreshesAndRestoresSamePeerOnce(t *testing
 				}
 				return tc.outcome
 			}}
-			s := Startup{Generation: 5, Revision: "current", InputSetup: refresh.status, BeforeStart: refresh.automatic,
+			s := Startup{Generation: 5, Revision: "current", InputSetup: refresh.status, InputProbe: refresh.probe, BeforeStart: refresh.automatic,
 				Lock:   func() (io.Closer, error) { locks++; return closeLaunchLease(func() { locks-- }), nil },
 				Verify: func() error { return nil }, Available: func() (bool, error) { return client.missing, nil }, Pause: func(context.Context) error { return nil },
 				Open: func() (RuntimeClient, error) {

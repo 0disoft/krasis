@@ -41,6 +41,7 @@ func NewStartup(control string) (Startup, error) {
 		InputRefresh:      refresh.explicit,
 		InputSetup:        refresh.status,
 		InputRecheck:      refresh.recheck,
+		InputProbe:        refresh.probe,
 		InputRestoreCheck: refresh.restoreCheck,
 		Open:              func() (RuntimeClient, error) { return localapi.OpenClient(control) },
 		Lock:              func() (io.Closer, error) { return agentinstance.AcquireControlStartup() },

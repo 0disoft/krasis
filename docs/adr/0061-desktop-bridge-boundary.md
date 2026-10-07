@@ -505,3 +505,13 @@ Repeated manual queries coalesce while the installation gate is held. Explicit
 health rechecking may replace a historical FAILED/CANCELLED health projection,
 while lifecycle's separate installation/reconnect outcome remains intact. No
 installation, consent, restart or reconnect is authorized by this binding.
+
+Initial and PENDING installation observations now use the same single background
+reader as steady health. PENDING polls are throttled to one second; explicit
+recheck bypasses the throttle but coalesces active work. Native startup preflight
+has a separate synchronous probe, and automatic preparation may await only a
+registered read-only worker under its cancelable context. Installer contention
+and explicit maintenance still return busy instead of waiting or repeating
+consent. This prevents renderer initialization from stealing the installation
+gate and leaving the first agent launch unprepared. Read-only workers publish
+health only; the existing lifecycle owns any pending restoration side effects.
