@@ -401,3 +401,8 @@ before configuring TLS or input. Protected-worker recovery retains that context.
 Alias-only CLI calls remain compatible. An older agent rejecting the pinned
 request is not retried without its identity. No new endpoint, database, hygiene
 or runner changes are introduced; CONNECT validation now accepts a valid pin.
+
+Resume decoding requires explicit alias and fingerprint strings even for idle
+state. Missing files remain the initial-install case. Empty objects, null fields
+and a null/non-boolean manualStop are rejected. Complete legacy records without
+manualStop remain supported. Reads do not rewrite or repair corrupt files.

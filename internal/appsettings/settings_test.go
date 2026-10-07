@@ -58,6 +58,28 @@ func TestPersistentManualStopCannotCarryAResumePeer(t *testing.T) {
 	}
 }
 
+func TestIncompleteResumeIsNotANewInstallationOrAnAllowedResume(t *testing.T) {
+	for _, raw := range []string{"{}", "null", `{"manualStop":true}`, `{"alias":""}`, `{"alias":null,"fingerprint":""}`, `{"alias":"","fingerprint":null}`, `{"alias":"","fingerprint":"","manualStop":null}`, `{"alias":"","fingerprint":"","manualStop":"false"}`} {
+		t.Run(raw, func(t *testing.T) {
+			base := t.TempDir()
+			writeRawSettings(t, base, "resume.json", raw)
+			if _, err := LoadResume(base); err == nil {
+				t.Fatal("incomplete saved resume accepted")
+			}
+		})
+	}
+	for _, raw := range []string{`{"alias":"","fingerprint":""}`, `{"alias":"B","fingerprint":"` + strings.Repeat("a", 64) + `"}`} {
+		base := t.TempDir()
+		writeRawSettings(t, base, "resume.json", raw)
+		if _, err := LoadResume(base); err != nil {
+			t.Fatal("legacy complete resume rejected", err)
+		}
+	}
+	if value, err := LoadResume(t.TempDir()); err != nil || value != (Resume{}) {
+		t.Fatal("absent initial file rejected", value, err)
+	}
+}
+
 func TestIncompleteSettingsNeverEnableStartupOrUpdates(t *testing.T) {
 	for _, raw := range []string{"", "{}", "null", `{"schema":"krasis.app-settings/v1"}`, `{"schema":"krasis.app-settings/v1","startAtLogin":false}`, `{"schema":"krasis.app-settings/v1","autoUpdate":false}`, `{"schema":"krasis.app-settings/v1","startAtLogin":null,"autoUpdate":false}`, `{"schema":"krasis.app-settings/v1","startAtLogin":false,"autoUpdate":null}`} {
 		t.Run(raw, func(t *testing.T) {

@@ -58,13 +58,28 @@ func Save(base string, value Settings) error {
 	return write(base, "settings.json", value)
 }
 func LoadResume(base string) (Resume, error) {
-	var v Resume
-	err := read(base, "resume.json", &v)
+	var wire struct {
+		Alias       *string         `json:"alias"`
+		Fingerprint *string         `json:"fingerprint"`
+		ManualStop  json.RawMessage `json:"manualStop"`
+	}
+	err := read(base, "resume.json", &wire)
 	if errors.Is(err, os.ErrNotExist) {
-		return v, nil
+		return Resume{}, nil
 	}
 	if err != nil {
 		return Resume{}, err
+	}
+	if wire.Alias == nil || wire.Fingerprint == nil {
+		return Resume{}, errors.New("incomplete resume settings")
+	}
+	v := Resume{Alias: *wire.Alias, Fingerprint: *wire.Fingerprint}
+	if len(wire.ManualStop) > 0 {
+		var stop *bool
+		if err := json.Unmarshal(wire.ManualStop, &stop); err != nil || stop == nil {
+			return Resume{}, errors.New("invalid manual stop")
+		}
+		v.ManualStop = *stop
 	}
 	if v.ManualStop && (v.Alias != "" || v.Fingerprint != "") {
 		return Resume{}, errors.New("manual stop contains a resume peer")
