@@ -73,6 +73,20 @@ func (b *inputRefresh) refreshPendingLocked() {
 func (b *inputRefresh) automatic(ctx context.Context) error { return b.apply(ctx, false) }
 func (b *inputRefresh) explicit(ctx context.Context) error  { return b.apply(ctx, true) }
 
+// Read fresh health under the installation gate; never repeats consent.
+func (b *inputRefresh) restoreCheck() error {
+	if !b.mu.TryLock() {
+		return ErrInputRefreshPending
+	}
+	defer b.mu.Unlock()
+	state := b.inspect()
+	b.setState(state)
+	if state != "READY" && state != "UPDATE_REQUIRED" && state != "NOT_INSTALLED" {
+		return ErrInputRefreshPending
+	}
+	return nil
+}
+
 func (b *inputRefresh) apply(ctx context.Context, explicit bool) error {
 	if !b.mu.TryLock() {
 		return ErrStartupBusy

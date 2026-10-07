@@ -60,6 +60,9 @@ func (b *DesktopLifecycle) initialize(ctx context.Context, initial BridgeSnapsho
 		}
 		if needed {
 			value := b.refreshProtectedInput(ctx, initial, b.StartupMaintenance)
+			if b.pendingInput != nil {
+				b.pendingInput.startup = true
+			}
 			prepared := value.Code == "ok" || value.agentPrepared
 			if prepared && ctx.Err() == nil && b.StartupReady != nil {
 				b.StartupReady()

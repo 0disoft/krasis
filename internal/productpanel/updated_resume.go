@@ -41,6 +41,9 @@ func (b *DesktopLifecycle) SetUpdatedWorkspaceResume(v WorkspaceUpdateLaunch) er
 // Caller owns the lifecycle gate. Initial preparation has its own startup
 // budget; polling and later retries must never renew the reconnect window.
 func (b *DesktopLifecycle) startUpdatedResumeWindow(now time.Time) {
+	if b.pendingInput != nil {
+		return // The reconnect budget starts after verified installation completion.
+	}
 	if r := b.updatedResume; r != nil && r.deadline.IsZero() {
 		r.deadline = now.Add(90 * time.Second)
 	}

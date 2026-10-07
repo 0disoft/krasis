@@ -477,3 +477,16 @@ backend; healthy protected input stays quiet. Installation progress retains its
 notice without a retry action; confirmed installation failures retain explicit
 retry. The existing refresh and background health reader remain the observation
 paths, with no new binding or automatic installer invocation.
+
+## g231: Continue verified post-exit pending installation
+
+A native-only pending marker is issued after confirmed instance-lease release.
+The existing lifecycle loop observes completion for up to five minutes, then
+consumes one continuation before restoring the agent and readiness registration.
+Restoration rechecks installation under its gate and cannot run consent again.
+UNKNOWN/running installation stays fenced; known mismatched completion can
+restore ordinary input but never reports installation success. A pinned peer's
+resume retains manual-stop/identity/uncertain-reply guards. Explicit operations,
+shutdown and update handoff cancel the continuation. Received-update reconnect
+budgets start only after this pending preparation completes. No persistent job,
+new endpoint, database or runner is introduced.

@@ -15,6 +15,9 @@ type DesktopLifecycle struct {
 	StartupResume            func(context.Context, BridgeSnapshot) BridgeSnapshot
 	StartupMaintenanceNeeded func(context.Context) (bool, error)
 	StartupMaintenance       func(context.Context) error
+	PendingInputSetup        func() string
+	PendingInputRestore      func(context.Context) error
+	pendingInput             *pendingInputRecovery
 	updateHandedOff          bool
 	ctx                      context.Context
 	open                     func() (Client, error)
@@ -100,11 +103,17 @@ func (b *DesktopLifecycle) startup(ctx context.Context) error {
 }
 
 func (b *DesktopLifecycle) failedStartup(ctx context.Context, err error) BridgeSnapshot {
-	if !transientUpdateStartup(err) {
+	if pendingInputAgent(err) && b.ctx.Err() == nil && !b.stopped.Load() && !errors.Is(ctx.Err(), context.Canceled) {
+		b.pendingInput = &pendingInputRecovery{startup: true, deadline: time.Now().Add(5 * time.Minute)}
+	}
+	if !transientUpdateStartup(err) && !pendingInputAgent(err) {
 		b.updatedResume = nil
 	}
 	value := NewDesktopBridge(ctx, b.open).Refresh()
 	value.Code = "startup_failed"
+	if pendingInputAgent(err) {
+		value.Code, value.InputRefreshCode, value.ReconnectCode = "input_refresh_pending", "input_refresh_pending", "not_attempted"
+	}
 	switch {
 	case errors.Is(err, ErrAgentBusy):
 		value.Code = "agent_busy"
@@ -129,6 +138,7 @@ func (b *DesktopLifecycle) Connect(alias, fingerprint string) BridgeSnapshot {
 	ctx, done := b.operationBudget(3 * time.Minute)
 	defer done()
 	b.stopped.Store(false)
+	b.pendingInput = nil
 	b.updatedResume = nil
 	b.recovery.Reset()
 	b.clearMaintenanceOutcome()
@@ -149,6 +159,7 @@ func (b *DesktopLifecycle) Disconnect() BridgeSnapshot {
 	defer b.gate.Unlock()
 	b.updatedResume = nil
 	b.recovery.Stop()
+	b.pendingInput = nil
 	b.clearMaintenanceOutcome()
 	ctx, done := b.operation()
 	defer done()
@@ -177,6 +188,7 @@ func (b *DesktopLifecycle) Restart() BridgeSnapshot {
 	}
 	b.recovery.Reset()
 	b.updatedResume = nil
+	b.pendingInput = nil
 	b.stopped.Store(false)
 	b.clearMaintenanceOutcome()
 	if err := b.startup(ctx); err != nil {
@@ -221,6 +233,10 @@ func (b *DesktopLifecycle) tick(now time.Time) {
 	defer done()
 	bridge := NewDesktopBridge(ctx, b.open)
 	value := bridge.Refresh()
+	if next, handled := b.continuePendingInput(ctx, now, value); handled {
+		b.save(next)
+		return
+	}
 	observationKnown := value.Code == "ok" || value.Code == "recovery_required"
 	previous := b.Refresh()
 	if previous.State == value.State {

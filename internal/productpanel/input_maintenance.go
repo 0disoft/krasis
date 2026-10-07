@@ -13,6 +13,17 @@ import (
 // session; startup ownership fences other UIs and verifies exit before writes.
 type inputMaintenanceRestored struct{ cause error }
 
+// Native proof that installation was deferred after verified agent exit.
+type inputMaintenancePending struct{}
+
+func (*inputMaintenancePending) Error() string { return ErrInputRefreshPending.Error() }
+func (*inputMaintenancePending) Unwrap() error { return ErrInputRefreshPending }
+
+func pendingInputAgent(err error) bool {
+	var pending *inputMaintenancePending
+	return errors.As(err, &pending)
+}
+
 func (e *inputMaintenanceRestored) Error() string { return e.cause.Error() }
 func (e *inputMaintenanceRestored) Unwrap() error { return e.cause }
 
@@ -36,12 +47,15 @@ func (s Startup) maintainProtectedInput(ctx context.Context, refresh func(contex
 		return ErrInputRefreshFailed
 	}
 	err, exited := s.refreshProtectedInput(ctx, refresh, allowOlder)
-	if !exited || errors.Is(err, ErrInputRefreshPending) {
+	if !exited {
 		return err
+	}
+	if errors.Is(err, ErrInputRefreshPending) {
+		return &inputMaintenancePending{}
 	}
 	if s.InputSetup != nil {
 		if state := s.InputSetup(); state == "UPDATING" || state == "PENDING" {
-			return ErrInputRefreshPending
+			return &inputMaintenancePending{}
 		}
 	}
 	// Restore an ordinary or protected agent after terminal cancellation/failure.
@@ -121,6 +135,7 @@ func (b *DesktopLifecycle) RefreshProtectedInput(refresh func(context.Context) e
 // Caller owns gate and the operation context; startup and the button share the
 // same disconnect/reconnect transaction rather than nesting locks.
 func (b *DesktopLifecycle) refreshProtectedInput(ctx context.Context, before BridgeSnapshot, refresh func(context.Context) error) BridgeSnapshot {
+	b.pendingInput = nil
 	b.clearMaintenanceOutcome()
 	before.InputRefreshCode, before.ReconnectCode = "", ""
 	bridge := NewDesktopBridge(ctx, b.open)
@@ -155,6 +170,9 @@ func (b *DesktopLifecycle) refreshProtectedInput(ctx context.Context, before Bri
 	}
 	b.recovery.Reset()
 	err := refresh(ctx)
+	if pendingInputAgent(err) && b.ctx.Err() == nil && !b.stopped.Load() && !errors.Is(ctx.Err(), context.Canceled) {
+		b.pendingInput = &pendingInputRecovery{alias: alias, fingerprint: fingerprint, deadline: time.Now().Add(5 * time.Minute)}
+	}
 	// Even if the installer takes the whole budget, restore the saved trusted
 	// identity only while the UI is alive and the user has not cancelled it.
 	reconnect, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)

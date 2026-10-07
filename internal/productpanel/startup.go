@@ -23,17 +23,18 @@ type RuntimeClient interface {
 }
 
 type Startup struct {
-	Open         func() (RuntimeClient, error)
-	Lock         func() (io.Closer, error)
-	Available    func() (bool, error)
-	Verify       func() error
-	Start        func() error
-	BeforeStart  func(context.Context) error
-	InputRefresh func(context.Context) error
-	InputSetup   func() string
-	Pause        func(context.Context) error
-	Generation   int
-	Revision     string
+	Open              func() (RuntimeClient, error)
+	Lock              func() (io.Closer, error)
+	Available         func() (bool, error)
+	Verify            func() error
+	Start             func() error
+	BeforeStart       func(context.Context) error
+	InputRefresh      func(context.Context) error
+	InputSetup        func() string
+	InputRestoreCheck func() error
+	Pause             func(context.Context) error
+	Generation        int
+	Revision          string
 }
 
 // Ensure is a bounded, single-start operation. Timers in the GUI do not invoke it.
@@ -137,8 +138,13 @@ func (s Startup) Ensure(ctx context.Context) error {
 
 func (s Startup) start(ctx context.Context) error {
 	if s.BeforeStart != nil {
-		if err := s.BeforeStart(ctx); err != nil && !errors.Is(err, ErrInputRefreshCancelled) && !errors.Is(err, ErrInputRefreshFailed) {
-			return err
+		if err := s.BeforeStart(ctx); err != nil {
+			if errors.Is(err, ErrInputRefreshPending) {
+				return &inputMaintenancePending{} // Ensure verified the instance lease before start.
+			}
+			if !errors.Is(err, ErrInputRefreshCancelled) && !errors.Is(err, ErrInputRefreshFailed) {
+				return err
+			}
 		}
 	}
 	if err := ctx.Err(); err != nil {
