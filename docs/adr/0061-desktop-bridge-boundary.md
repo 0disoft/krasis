@@ -283,3 +283,9 @@ preparation worker. The callback returns before bundle packing and staging,
 allowing the existing window-show path to run immediately. Active requests
 coalesce, status reads do not wait for file work, and shutdown waits for admitted
 workers. Canceled preparation cannot publish an applicable pending candidate.
+
+The renderer retains the last valid replacement observation on transport or
+validation failure, marks it stale, and disables retry until a fresh native
+read succeeds. A lost retry acknowledgement follows the same rule. Old reads
+cannot restore freshness across a newer retry epoch. Paths and raw errors stay
+native-only; freshness is renderer metadata, not a new native response field.

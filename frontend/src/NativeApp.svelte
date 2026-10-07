@@ -347,7 +347,7 @@
     <p class="fault-banner" role="alert">{t(error)}</p>
   {/if}
   {#if ['PREPARING','PENDING','APPLYING','APPLIED','FAILED'].includes(uiReplacement.state)}
-    <p class="release-notice" role="status">{t('ui_replacement_' + uiReplacement.state)} · g{uiReplacement.generation}
+    <p class="release-notice" role="status">{#if !uiReplacement.fresh}{t('ui_replacement_stale')} · {/if}{t('ui_replacement_' + uiReplacement.state)} · g{uiReplacement.generation}
       {#if uiReplacement.canRetry}<button disabled={uiReplacementBusy} onclick={retryUIReplacement}>{t('ui_replacement_retry')}</button>{/if}
     </p>
   {/if}
