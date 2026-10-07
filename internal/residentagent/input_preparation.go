@@ -60,7 +60,9 @@ func (a privilegedAuthorizer) PrepareInput(ctx context.Context, p transport.Auth
 func (input *privilegedLeaseInput) prepareIdle(ctx context.Context) (bool, error) {
 	// This also joins preparation before shutdown releases installation pins,
 	// and prevents preparation from competing with an approved active lease.
-	input.mu.Lock()
+	if err := input.mu.LockContext(ctx); err != nil {
+		return false, err
+	}
 	lockedAt := time.Now()
 	defer input.mu.Unlock()
 	if input.stopped || input.client != nil || input.prepare == nil || !input.expires.After(time.Now()) || ctx.Err() != nil {

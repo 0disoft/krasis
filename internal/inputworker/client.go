@@ -2,14 +2,15 @@ package inputworker
 
 import (
 	"context"
+	"errors"
 	"io"
 	"math"
-	"sync"
 	"time"
 
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/handoff"
+	"github.com/0disoft/krasis/internal/syncgate"
 )
 
 // Client implements InputPort only over an authenticated service channel and
@@ -17,7 +18,7 @@ import (
 // and expiry before construction; this constructor does not authorize a peer.
 // A lost acknowledgement is never retried or sent to another input backend.
 type Client struct {
-	mu               sync.Mutex
+	mu               syncgate.Mutex
 	channel          *Channel
 	lease            Lease
 	sequence         uint64
@@ -89,13 +90,18 @@ func (client *Client) performResponse(ctx context.Context, command request, obse
 	if client == nil || ctx == nil || ctx.Err() != nil {
 		return notSent(ErrAuthority)
 	}
+	// The budget includes admission and authority work, not just pipe I/O.
+	ctx, cancel := context.WithTimeout(ctx, IdleTimeout)
+	defer cancel()
 	start := time.Now()
 	if command.op == opHeartbeat {
 		if !client.mu.TryLock() {
 			return nil
 		}
 	} else {
-		client.mu.Lock()
+		if err := client.mu.LockContext(ctx); err != nil {
+			return notSent(errors.Join(ErrAuthority, err))
+		}
 	}
 	var sample [7]byte
 	wasFailed := client.failed
@@ -119,7 +125,7 @@ func (client *Client) performResponse(ctx context.Context, command request, obse
 		client.mu.Unlock()
 	}()
 	if client.failed || client.channel == nil || ctx.Err() != nil {
-		return notSent(ErrAuthority)
+		return notSent(errors.Join(ErrAuthority, ctx.Err()))
 	}
 	if !time.Now().Before(client.lease.ExpiresAt) || client.sequence == math.MaxUint64 {
 		client.fail()

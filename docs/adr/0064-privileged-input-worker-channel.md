@@ -570,3 +570,14 @@ rollback ownership, uncertainty and protected lease retirement remain unchanged.
 
 Physical-coordinate API contract:
 [GetPhysicalCursorPos](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getphysicalcursorpos).
+
+## g208: Cancellation while waiting for input ownership
+
+Client request serialization and the resident protected-lease gate now use a
+zero-value cancellation-aware mutex. No polling loop or detached lock waiter is
+created. The client starts its existing two-second budget before lock acquisition,
+so lock, authority and pipe I/O share one deadline. A canceled waiter sends no
+request, consumes no sequence and is classified NOT_APPLIED. It does not close
+the channel owned by an earlier in-flight operation. Heartbeat still uses
+nonblocking TryLock. Protected admission and preparation honor their caller's
+deadline without changing lease identity, approval, retirement or image pins.

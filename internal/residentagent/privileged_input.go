@@ -11,6 +11,7 @@ import (
 	"github.com/0disoft/krasis/internal/handoff"
 	"github.com/0disoft/krasis/internal/inputworker"
 	"github.com/0disoft/krasis/internal/peer"
+	"github.com/0disoft/krasis/internal/syncgate"
 	"github.com/0disoft/krasis/internal/transport"
 )
 
@@ -23,7 +24,7 @@ type privilegedClient interface {
 }
 
 type privilegedLeaseInput struct {
-	mu                                      sync.Mutex
+	mu                                      syncgate.Mutex
 	client                                  privilegedClient
 	identity                                application.LeaseIdentity
 	cancel                                  context.CancelFunc
@@ -67,7 +68,9 @@ func (input *privilegedLeaseInput) open(ctx context.Context, identity applicatio
 		return errPrivilegedInput
 	}
 	started := time.Now()
-	input.mu.Lock()
+	if err := input.mu.LockContext(ctx); err != nil {
+		return errors.Join(errPrivilegedInput, err)
+	}
 	defer input.mu.Unlock()
 	acquired := time.Now()
 	handoff.Record(ctx, handoff.OpenLock, acquired.Sub(started))
@@ -173,12 +176,17 @@ func (input *privilegedLeaseInput) shutdown() error {
 }
 
 func (input *privilegedLeaseInput) perform(ctx context.Context, operation func(privilegedClient) error) error {
+	if ctx == nil {
+		return &application.InjectionError{Certainty: application.InjectionNotApplied, Cause: errPrivilegedInput}
+	}
 	started := time.Now()
-	input.mu.Lock()
+	if err := input.mu.LockContext(ctx); err != nil {
+		return &application.InjectionError{Certainty: application.InjectionNotApplied, Cause: errors.Join(errPrivilegedInput, err)}
+	}
 	defer input.mu.Unlock()
 	handoff.Record(ctx, handoff.OuterLock, time.Since(started))
-	if input.client == nil {
-		return &application.InjectionError{Certainty: application.InjectionNotApplied, Cause: errPrivilegedInput}
+	if input.client == nil || ctx.Err() != nil {
+		return &application.InjectionError{Certainty: application.InjectionNotApplied, Cause: errors.Join(errPrivilegedInput, ctx.Err())}
 	}
 	started = time.Now()
 	err := operation(input.client)
