@@ -38,6 +38,8 @@ type DiagnosticsBridge struct {
 	showFolder func() error
 	mu         sync.Mutex
 	collection *diagnosticCollection
+	async      bool
+	working    bool
 }
 
 func NewDiagnosticsBridge(ctx context.Context, open func() (DiagnosticClient, error), export func() error, files func() (bool, bool, error), showFolder func() error) *DiagnosticsBridge {
@@ -59,6 +61,14 @@ func (b *DiagnosticsBridge) execute(action, peer string) DiagnosticsSnapshot {
 		return v
 	}
 	defer b.mu.Unlock()
+	if b.async && b.collection != nil && (action == "status" || action == "collect") {
+		b.startCollectionWorker(false)
+		return b.collection.snapshot()
+	}
+	if b.working {
+		v.Code = "busy"
+		return v
+	}
 	budget := 10 * time.Second
 	if action == "status" {
 		budget = 3 * time.Second

@@ -90,3 +90,11 @@ Lstat and named ACL reopen. No trust verdict is cached and the one-second
 monitor and five-second freshness deadline remain unchanged. Revocation and
 missing/corrupt stores still stop the session. Terminal trust causes propagate
 through cancellation to fixed fault codes instead of fault_session_unknown.
+
+Diagnostic saving and status RPCs run on one native worker per bridge. The
+desktop binding returns a copy of SAVING/PENDING immediately; polling and
+repeat clicks cannot start overlapping workers or repeat START. The agent's
+request-specific local export is the only export on the happy path. A local
+fallback is written when START has not confirmed that snapshot. Legacy export
+bindings remain synchronous. A blocked filesystem operation may outlive the
+RPC budget, but cannot block renderer status or create unbounded workers.

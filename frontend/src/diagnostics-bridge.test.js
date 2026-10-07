@@ -59,3 +59,12 @@ test('one-click collection has no caller target and completion requires fresh fi
   const partial = {...pending,code:'partial',collection:{state:'EXPIRED',localSaved:true,peerSaved:false}};
   assert.deepEqual(await createDiagnosticsBridge({DiagnosticsStatus:async()=>partial}).status(),partial);
 });
+
+test('background save is pending work and never advertises an unwritten local file', async () => {
+  const saving = {...value,code:'saving',saved:false,collection:{state:'SAVING',localSaved:false,peerSaved:false}};
+  assert.deepEqual(await createDiagnosticsBridge({DiagnosticsCollect:async()=>saving}).collect(),saving);
+  for (const malformed of [{...saving,saved:true,collection:{...saving.collection,localSaved:true}},
+    {...saving,collection:{...saving.collection,state:'PENDING'}}]) {
+    assert.equal((await createDiagnosticsBridge({DiagnosticsCollect:async()=>malformed}).collect()).code,'unavailable');
+  }
+});

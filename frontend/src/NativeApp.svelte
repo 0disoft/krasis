@@ -380,7 +380,7 @@
   <div class="dlg-head"><h2 id="diagnostics-title">{t('diag_title')}</h2><p>{t('diag_help')}</p></div>
   <div class="dlg-body">
     <div class="pair-actions">
-      <button class="primary" disabled={diagBusy || !diagnosticsBridge || diagnostics.collection?.state === 'PENDING'} onclick={() => runDiagnostics('collect')}>{t(diagnostics.collection?.state === 'PENDING' ? 'diag_collecting' : 'diag_save')}</button>
+      <button class="primary" disabled={diagBusy || !diagnosticsBridge || ['SAVING','PENDING'].includes(diagnostics.collection?.state)} onclick={() => runDiagnostics('collect')}>{t(['SAVING','PENDING'].includes(diagnostics.collection?.state) ? 'diag_collecting' : 'diag_save')}</button>
       <button disabled={diagBusy || !diagnosticsBridge} onclick={() => runDiagnostics('open')}>{t('diag_open')}</button>
     </div>
     <p role="status">{#if !diagAction && diagnostics.collection?.localSaved && !['pending','collected','local_only','partial'].includes(diagnostics.code)}{t('diag_local_saved')} {/if}{diagAction ? t('diag_busy') : diagNotice ? t(diagNotice) : diagnostics.code !== 'ok' ? t('diag_' + diagnostics.code) : ''}</p>

@@ -34,18 +34,24 @@ func (r *diagnosticCollection) snapshot() DiagnosticsSnapshot {
 
 // The native agent chooses the active peer; the renderer supplies no identity,
 // paths or command. Retain the exact request ID and never retry START on a poll.
-func (b *DiagnosticsBridge) collectConnected(ctx context.Context) DiagnosticsSnapshot {
+func (b *DiagnosticsBridge) collectConnected(ctx context.Context) (snapshot DiagnosticsSnapshot) {
 	if b.collection != nil && b.collection.view.State == "PENDING" {
 		return b.pollCollection(ctx)
 	}
-	r := &diagnosticCollection{code: "save_failed", view: DiagnosticCollectionSnapshot{State: "FAILED"}}
+	r := &diagnosticCollection{code: "partial", view: DiagnosticCollectionSnapshot{State: "FAILED"}}
 	b.collection = r
-	// Keep a local fallback even if the agent is unavailable or cannot collect.
-	if b.export() != nil {
-		return r.snapshot()
-	}
-	r.view.LocalSaved = true
-	r.code = "partial"
+	// START writes the immutable local snapshot itself. Export a fallback only
+	// when that write was not confirmed; never write the logs twice on success.
+	defer func() {
+		if !r.view.LocalSaved {
+			if b.export() != nil {
+				r.code, r.view.State = "save_failed", "FAILED"
+			} else {
+				r.view.LocalSaved = true
+			}
+		}
+		snapshot = r.snapshot()
+	}()
 	if ctx.Err() != nil {
 		r.code = "cancelled"
 		return r.snapshot()
@@ -112,6 +118,7 @@ func (b *DiagnosticsBridge) collectConnected(ctx context.Context) DiagnosticsSna
 		return r.snapshot()
 	}
 	r.id, r.code, r.view.State = started.ID, "pending", "PENDING"
+	r.view.LocalSaved = true
 	r.expires = time.Now().Add(65 * time.Second)
 	return r.snapshot()
 }

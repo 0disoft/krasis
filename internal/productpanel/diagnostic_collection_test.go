@@ -64,7 +64,7 @@ func TestDiagnosticCollectionPinsActivePeerAndNeverConfusesOlderFiles(t *testing
 	if first.Code != "pending" || !first.Saved || first.Received || first.Collection.State != "PENDING" {
 		t.Fatal("old peer file was mistaken for fresh evidence", first)
 	}
-	if second := b.Collect(); second.Code != "pending" || saves != 1 {
+	if second := b.Collect(); second.Code != "pending" || saves != 0 {
 		t.Fatal("repeat click started a second collection", second, saves)
 	}
 	ready = true
@@ -138,6 +138,7 @@ func TestDiagnosticCollectionKeepsLocalFallbackAndRejectsUnsafeTargets(t *testin
 					return localapi.DiagnosticCollectionResult{Code: "queued", ID: strings.Repeat("c", 32)}, nil
 				}
 			case "save_failure":
+				client = nil
 				exportErr, want = errors.New("private path"), "save_failed"
 			}
 			b := collectionBridge(client, func() error { return exportErr })

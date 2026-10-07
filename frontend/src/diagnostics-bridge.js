@@ -1,9 +1,9 @@
 const schema = 'krasis.diagnostics/v1';
 const codes = new Set(['ok', 'busy', 'cancelled', 'unavailable', 'invalid_peer', 'stale_peer',
   'save_failed', 'send_failed', 'rejected', 'unsupported', 'queued', 'outcome_unknown', 'open_failed',
-  'pending', 'collected', 'partial', 'local_only', 'storage_limit']);
+  'saving', 'pending', 'collected', 'partial', 'local_only', 'storage_limit']);
 const transfers = new Set(['NONE', 'QUEUED', 'SENT', 'EXPIRED', 'UNSUPPORTED', 'REJECTED', 'UNKNOWN']);
-const collectionStates = new Set(['PENDING', 'RECEIVED', 'LOCAL_ONLY', 'EXPIRED', 'FAILED', 'UNKNOWN']);
+const collectionStates = new Set(['SAVING', 'PENDING', 'RECEIVED', 'LOCAL_ONLY', 'EXPIRED', 'FAILED', 'UNKNOWN']);
 const failure = code => ({ schema, code, saved: false, received: false, transfer: 'UNKNOWN' });
 
 // Collection and folder access have no caller arguments. Native code chooses
@@ -31,6 +31,7 @@ export function createDiagnosticsBridge(binding) {
       if ((method === 'DiagnosticsCollect' && !collection) ||
           (value.code === 'collected' && collection?.state !== 'RECEIVED') ||
           (value.code === 'pending' && collection?.state !== 'PENDING') ||
+          (value.code === 'saving' && (collection?.state !== 'SAVING' || value.saved || value.received)) ||
           (value.code === 'local_only' && collection?.state !== 'LOCAL_ONLY') ||
           (value.code === 'partial' && (!collection?.localSaved || !['EXPIRED', 'FAILED', 'UNKNOWN'].includes(collection.state)))) return failure('unavailable');
       return { schema, code: value.code, saved: value.saved, received: value.received, transfer: value.transfer,
