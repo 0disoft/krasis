@@ -1,6 +1,8 @@
 package productlog
 
 func init() {
+	allowed["startup_resume_settings_invalid"] = true
+	allowed["startup_resume_settings_unavailable"] = true
 	allowed["settings_restore_all_verified"] = true
 	for _, stage := range []string{"startup", "recovery", "save"} {
 		allowed["settings_change_"+stage+"_failed"] = true

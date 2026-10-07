@@ -445,3 +445,10 @@ revalidates the installation and service under the existing installation gate;
 renderer polling does not wait for file hashing and never starts an installer or
 service. CANCELLED/FAILED/UPDATING remain operation outcomes, while READY,
 UNKNOWN, NOT_INSTALLED and UPDATE_REQUIRED can track subsequent external changes.
+
+Login resume distinguishes invalid saved data from missing/idle/manual-stop
+settings and filesystem read errors. Invalid data stops immediately; read errors
+get at most three reads with 250ms/500ms waits under the native startup context.
+Only one connection request can follow a valid uniquely matched identity. Errors
+are projected as bounded localized codes and retained across idle polling; no
+settings repair, raw error/path display, endpoint or runner change is introduced.

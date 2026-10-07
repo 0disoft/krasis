@@ -149,14 +149,13 @@ func (s *WorkspaceService) resumeAtStartup(ctx context.Context, v productpanel.B
 	if !s.startAtLogin || v.State != "LOCAL" || v.Code != "ok" {
 		return v
 	}
-	peer, err := appsettings.LoadResume(os.Getenv("LOCALAPPDATA"))
-	if err != nil || peer.Alias == "" {
-		return v
-	}
-	for _, p := range v.Peers {
-		if p.Alias == peer.Alias && p.Fingerprint == peer.Fingerprint {
-			return productpanel.NewDesktopBridge(ctx, func() (productpanel.Client, error) { return localapi.OpenClient(s.control) }).Resume(peer.Alias, peer.Fingerprint)
-		}
+	v = productpanel.ResumeAtLogin(ctx, v,
+		func() (appsettings.Resume, error) { return appsettings.LoadResume(os.Getenv("LOCALAPPDATA")) },
+		func(alias, fingerprint string) productpanel.BridgeSnapshot {
+			return productpanel.NewDesktopBridge(ctx, func() (productpanel.Client, error) { return localapi.OpenClient(s.control) }).Resume(alias, fingerprint)
+		})
+	if v.Code == "startup_resume_settings_invalid" || v.Code == "startup_resume_settings_unavailable" {
+		s.log.Event(v.Code)
 	}
 	return v
 }

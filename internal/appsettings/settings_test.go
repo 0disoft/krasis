@@ -1,6 +1,7 @@
 package appsettings
 
 import (
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -59,11 +60,11 @@ func TestPersistentManualStopCannotCarryAResumePeer(t *testing.T) {
 }
 
 func TestIncompleteResumeIsNotANewInstallationOrAnAllowedResume(t *testing.T) {
-	for _, raw := range []string{"{}", "null", `{"manualStop":true}`, `{"alias":""}`, `{"alias":null,"fingerprint":""}`, `{"alias":"","fingerprint":null}`, `{"alias":"","fingerprint":"","manualStop":null}`, `{"alias":"","fingerprint":"","manualStop":"false"}`} {
+	for _, raw := range []string{"{}", "null", "{", `{"manualStop":true}`, `{"alias":""}`, `{"alias":null,"fingerprint":""}`, `{"alias":"","fingerprint":null}`, `{"alias":"","fingerprint":"","manualStop":null}`, `{"alias":"","fingerprint":"","manualStop":"false"}`} {
 		t.Run(raw, func(t *testing.T) {
 			base := t.TempDir()
 			writeRawSettings(t, base, "resume.json", raw)
-			if _, err := LoadResume(base); err == nil {
+			if _, err := LoadResume(base); !errors.Is(err, ErrInvalidResume) {
 				t.Fatal("incomplete saved resume accepted")
 			}
 		})

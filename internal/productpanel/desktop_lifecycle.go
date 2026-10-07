@@ -225,7 +225,7 @@ func (b *DesktopLifecycle) tick(now time.Time) {
 	previous := b.Refresh()
 	if previous.State == value.State {
 		switch previous.Code {
-		case "diagnostic_failed", "startup_failed", "startup_busy", "agent_busy", "agent_incompatible", "recovery_exhausted", "display_recovery_expired":
+		case "diagnostic_failed", "startup_failed", "startup_busy", "agent_busy", "agent_incompatible", "recovery_exhausted", "display_recovery_expired", "startup_resume_settings_invalid", "startup_resume_settings_unavailable":
 			value.Code = previous.Code
 		}
 	}

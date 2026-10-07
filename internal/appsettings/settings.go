@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -32,7 +33,11 @@ type Resume struct {
 	Fingerprint string `json:"fingerprint"`
 }
 
-var gate sync.Mutex
+var (
+	gate               sync.Mutex
+	ErrInvalidResume   = errors.New("invalid resume settings")
+	errInvalidDocument = errors.New("invalid settings document")
+)
 
 func Load(base string) (Settings, error) {
 	var value struct {
@@ -68,30 +73,33 @@ func LoadResume(base string) (Resume, error) {
 		return Resume{}, nil
 	}
 	if err != nil {
+		if errors.Is(err, errInvalidDocument) {
+			return Resume{}, errors.Join(ErrInvalidResume, err)
+		}
 		return Resume{}, err
 	}
 	if wire.Alias == nil || wire.Fingerprint == nil {
-		return Resume{}, errors.New("incomplete resume settings")
+		return Resume{}, fmt.Errorf("%w: missing peer fields", ErrInvalidResume)
 	}
 	v := Resume{Alias: *wire.Alias, Fingerprint: *wire.Fingerprint}
 	if len(wire.ManualStop) > 0 {
 		var stop *bool
 		if err := json.Unmarshal(wire.ManualStop, &stop); err != nil || stop == nil {
-			return Resume{}, errors.New("invalid manual stop")
+			return Resume{}, fmt.Errorf("%w: invalid manual stop", ErrInvalidResume)
 		}
 		v.ManualStop = *stop
 	}
 	if v.ManualStop && (v.Alias != "" || v.Fingerprint != "") {
-		return Resume{}, errors.New("manual stop contains a resume peer")
+		return Resume{}, fmt.Errorf("%w: manual stop contains a resume peer", ErrInvalidResume)
 	}
 	if v.Alias == "" && v.Fingerprint == "" {
 		return v, nil
 	}
 	if len(v.Alias) > 256 || v.Alias == "" || len(v.Fingerprint) != 64 {
-		return Resume{}, errors.New("invalid resume peer")
+		return Resume{}, fmt.Errorf("%w: invalid resume peer", ErrInvalidResume)
 	}
 	if _, err = hex.DecodeString(v.Fingerprint); err != nil {
-		return Resume{}, err
+		return Resume{}, errors.Join(ErrInvalidResume, err)
 	}
 	return v, nil
 }
@@ -146,15 +154,15 @@ func read(base, name string, value any) error {
 		return err
 	}
 	if len(data) > 4096 {
-		return errors.New("settings too large")
+		return fmt.Errorf("%w: settings too large", errInvalidDocument)
 	}
 	d := json.NewDecoder(bytes.NewReader(data))
 	d.DisallowUnknownFields()
 	if err = d.Decode(value); err != nil {
-		return err
+		return errors.Join(errInvalidDocument, err)
 	}
 	if d.Decode(new(any)) != io.EOF {
-		return errors.New("extra settings data")
+		return fmt.Errorf("%w: extra settings data", errInvalidDocument)
 	}
 	return nil
 }
