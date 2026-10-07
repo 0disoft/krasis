@@ -6,9 +6,85 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"testing/synctest"
+	"time"
 
 	"github.com/0disoft/krasis/internal/localapi"
 )
+
+type interruptedBridgeClient struct {
+	*resumeTestClient
+	phase string
+	stop  context.CancelFunc
+}
+
+func (c *interruptedBridgeClient) interrupt(ctx context.Context) error {
+	if c.stop != nil {
+		c.stop()
+	}
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func (c *interruptedBridgeClient) Status(ctx context.Context) (localapi.Status, error) {
+	if c.phase == "before" || c.phase == "after" && c.connects > 0 {
+		return localapi.Status{}, c.interrupt(ctx)
+	}
+	return c.resumeTestClient.Status(ctx)
+}
+
+func (c *interruptedBridgeClient) ResumeConnection(ctx context.Context, alias string) (localapi.OperationResult, error) {
+	result, err := c.resumeTestClient.ResumeConnection(ctx, alias)
+	if c.phase == "command" {
+		return localapi.OperationResult{}, c.interrupt(ctx)
+	}
+	return result, err
+}
+
+func TestBridgeDistinguishesTimeoutCancellationAndUnknownMutation(t *testing.T) {
+	for _, phase := range []string{"before", "command", "after"} {
+		for _, userCancel := range []bool{false, true} {
+			synctest.Test(t, func(t *testing.T) {
+				_, base, _ := newResumeTest(t, nil)
+				c := &interruptedBridgeClient{resumeTestClient: base, phase: phase}
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				if userCancel {
+					c.stop = cancel
+				}
+				b := NewDesktopBridge(ctx, func() (Client, error) { return c, nil })
+				value := b.Resume("B", base.peers[0].Fingerprint)
+				want, calls := "outcome_unknown", 1
+				if phase == "before" {
+					want, calls = "unavailable", 0
+					if userCancel {
+						want = "cancelled"
+					}
+				}
+				if value.Code != want || base.connects != calls {
+					t.Fatal(phase, userCancel, value, base.connects)
+				}
+			})
+		}
+	}
+}
+
+func TestUpdateResumeObservesTimedOutMutationWithoutReplayingIt(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		b, base, now := newResumeTest(t, nil)
+		c := &interruptedBridgeClient{resumeTestClient: base, phase: "command"}
+		b.open = func() (Client, error) { return c, nil }
+		b.tick(now)
+		if b.Refresh().Code != "outcome_unknown" || b.updatedResume == nil || !b.updatedResume.uncertain || base.connects != 1 {
+			t.Fatal("timeout lost mutation uncertainty", b.Refresh(), base.connects)
+		}
+		base.state = "LOCAL"
+		b.tick(now.Add(16 * time.Second))
+		if base.connects != 1 || b.Refresh().Code != "outcome_unknown" {
+			t.Fatal("timeout replayed connection", b.Refresh(), base.connects)
+		}
+	})
+}
 
 func TestDesktopBridgeReadsFreshStateAndIdentity(t *testing.T) {
 	fp := strings.Repeat("a", 64)

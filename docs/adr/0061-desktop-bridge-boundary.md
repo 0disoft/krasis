@@ -384,3 +384,9 @@ Input maintenance checks a complete, uniquely matched peer fingerprint before
 pausing an active session. Unavailable trust, missing/invalid identity or pairing
 returns before disconnect, recovery reset or installation. Idle/absent/faulted
 startup retains its existing verified agent-ownership and installer checks.
+
+Bridge deadlines before sending a command produce unavailable, while explicit
+pre-send cancellation remains cancelled. Interruption after an attempted,
+non-rejected command produces outcome_unknown, including post-command status
+timeouts. Update resume retains read-only observation and does not replay that
+mutation. An authoritative resume_cancelled refusal still stops recovery.

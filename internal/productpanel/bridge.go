@@ -75,7 +75,7 @@ func (b *DesktopBridge) execute(action, alias, fingerprint string) BridgeSnapsho
 	ctx, cancel := context.WithTimeout(b.lifetime, 10*time.Second)
 	defer cancel()
 	if ctx.Err() != nil {
-		return bridgeFailure("cancelled")
+		return bridgeInterruption(ctx, false, false)
 	}
 	client, err := b.open()
 	if err != nil || client == nil {
@@ -94,7 +94,10 @@ func (b *DesktopBridge) execute(action, alias, fingerprint string) BridgeSnapsho
 	}
 	view := Execute(ctx, func() (Client, error) { return guard, nil }, action, alias)
 	if ctx.Err() != nil {
-		return bridgeFailure("cancelled")
+		if guard.resumeCancelled {
+			return bridgeFailure("cancelled") // Authoritative manual-stop refusal.
+		}
+		return bridgeInterruption(ctx, guard.attempted, guard.rejected)
 	}
 	if guard.stale {
 		return bridgeFailure("stale_peer")
@@ -130,6 +133,16 @@ func (b *DesktopBridge) execute(action, alias, fingerprint string) BridgeSnapsho
 		}
 	}
 	return result
+}
+
+func bridgeInterruption(ctx context.Context, attempted, rejected bool) BridgeSnapshot {
+	if attempted && !rejected {
+		return bridgeFailure("outcome_unknown")
+	}
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return bridgeFailure("unavailable")
+	}
+	return bridgeFailure("cancelled")
 }
 
 type bridgeClient struct {
