@@ -57,6 +57,7 @@
   let appSettingsCode = $state('ok');
   let releaseState = $state('IDLE');
   let releasePreferences = $state(emptyAppSettings());
+  let readyReleaseGeneration = $state(0);
   let updatesOpen = $state(false);
   let opener = null;
   function focusFirstControl(dlg) {
@@ -328,7 +329,7 @@
   {/if}
   {#if snapshot.boundaryBlocked}<p class="placement-hint" role="status">{t(`boundary_${snapshot.boundaryBlocked}`)}</p>{/if}
   {#if appSettingsCode !== 'ok'}<p class="fault-banner" role="alert">{t(['startup_failed','start_menu_failed','recovery_failed','save_failed','rollback_failed'].includes(appSettingsCode) ? `settings_${appSettingsCode}` : 'settings_failed')} <button onclick={() => openDialog(settingsDlg)}>{t('settings')}</button></p>{/if}
-  {#if ['CHECKING','AVAILABLE','DOWNLOADING','READY','FAILED','CANCELLED'].includes(releaseState)}<p class="release-notice" role="status">{appReleaseNotice(releaseState, releasePreferences, locale)}</p>{/if}
+  {#if ['CHECKING','AVAILABLE','DOWNLOADING','READY','FAILED','CANCELLED'].includes(releaseState)}<p class="release-notice" role="status">{appReleaseNotice(releaseState, releasePreferences, locale, readyReleaseGeneration)}</p>{/if}
   <section class="canvas workspace-canvas" aria-label={t('devices')}>
     {#if snapshot.state === 'LOCAL' && snapshot.peers.length === 0}
       <div class="empty-workspace"><Icon name="laptop" size={40} /><h2>{t('pair')}</h2><p>{t('pairHelp')}</p><button class="primary" aria-haspopup="dialog" onclick={() => openDialog(pairingDlg)}><Icon name="plus" size={18} />{t('addDevice')}</button></div>
@@ -373,7 +374,7 @@
       {#if snapshot.state !== 'LOCAL'}<p>{t('placementLocked')}</p>{/if}
     </section>
     <section class="settings-section"><KeyboardPanel peer={selected} {locale} active={settingsOpen} /></section>
-    <section class="settings-section"><h3>{t('app_settings')}</h3><AppSettings {locale} active={settingsOpen} onStatus={(code, state, preferences) => { appSettingsCode = code; releaseState = state; releasePreferences = preferences; }} /></section>
+    <section class="settings-section"><h3>{t('app_settings')}</h3><AppSettings {locale} active={settingsOpen} onStatus={(code, state, preferences, readyGeneration) => { appSettingsCode = code; releaseState = state; releasePreferences = preferences; readyReleaseGeneration = readyGeneration; }} /></section>
     <section class="settings-section"><label class="language-setting">{t('language')}<select bind:value={locale}><option value="ko">한국어</option><option value="en">English</option></select></label>{#if trayLocaleFailed}<p role="status">{t('tray_locale_failed')}</p>{/if}</section>
   </div>
   <div class="dlg-foot"><button class="primary" onclick={() => settingsDlg.close()}>{t('close')}</button></div>

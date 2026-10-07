@@ -5,8 +5,12 @@ const releaseNotices = {
   ko: {IDLE:'',CHECKING:'업데이트 확인 중',UNCONFIGURED:'공개 배포 준비 중',FAILED:'업데이트 확인 실패',CANCELLED:'자동 업데이트 중지됨',CURRENT:'최신 버전',AVAILABLE:'새 버전 있음',DOWNLOADING:'업데이트 다운로드 중'},
   en: {IDLE:'',CHECKING:'Checking for updates',UNCONFIGURED:'Public releases not configured',FAILED:'Update check failed',CANCELLED:'Automatic updating stopped',CURRENT:'Up to date',AVAILABLE:'Update available',DOWNLOADING:'Downloading update'}
 };
-export function appReleaseNotice(state, settings, locale = 'ko') {
+export function appReleaseNotice(state, settings, locale = 'ko', readyGeneration = 0) {
   const ko = locale === 'ko';
+  if (state !== 'READY' && readyGeneration > 0) {
+    const retained = ko ? '다운로드한 업데이트 보관 중' : 'Downloaded update retained';
+    return `${releaseNotices[ko ? 'ko' : 'en'][state] ?? ''} · ${retained}`;
+  }
   if (state !== 'READY') return releaseNotices[ko ? 'ko' : 'en'][state] ?? '';
   if (!settings || !settings.preferencesKnown || settings.code === 'unavailable' || typeof settings.autoUpdate !== 'boolean') {
     return ko ? '다운로드 완료 · 자동 업데이트 설정 확인 필요' : 'Downloaded · Verify automatic update settings';
@@ -37,7 +41,9 @@ export function createAppSettingsBridge(binding) {
     try {
       const value=await binding[method]();
       if(!value || !releaseStates.has(value.state) || !Number.isInteger(value.generation) || value.generation<0 || value.generation>1000000) return {state:'FAILED',generation:0};
-      return {state:value.state,generation:value.generation};
+      const readyGeneration = value.readyGeneration ?? 0;
+      if (!Number.isInteger(readyGeneration) || readyGeneration < 0 || readyGeneration > 1000000) return {state:'FAILED',generation:0,readyGeneration:0};
+      return {state:value.state,generation:value.generation,readyGeneration};
     } catch { return {state:'FAILED',generation:0}; }
   }
   async function set(startup,update) {

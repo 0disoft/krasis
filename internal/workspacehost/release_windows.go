@@ -15,13 +15,15 @@ import (
 )
 
 type ReleaseSnapshot struct {
-	State      string `json:"state"`
-	Generation int    `json:"generation"`
+	State           string `json:"state"`
+	Generation      int    `json:"generation"`
+	ReadyGeneration int    `json:"readyGeneration"`
 }
 type releaseState struct {
 	gate                sync.Mutex
 	value               ReleaseSnapshot
 	directory, revision string
+	readyGeneration     int
 	wake                chan struct{}
 	cancel              context.CancelFunc
 	checkPending        bool
@@ -33,9 +35,11 @@ func (s *WorkspaceService) ReleaseStatus() ReleaseSnapshot {
 	s.release.gate.Lock()
 	defer s.release.gate.Unlock()
 	if s.release.checkPending || s.release.recheckAfterCancel {
-		return ReleaseSnapshot{State: "CHECKING"}
+		return ReleaseSnapshot{State: "CHECKING", ReadyGeneration: s.release.readyGeneration}
 	}
-	return s.release.value
+	value := s.release.value
+	value.ReadyGeneration = s.release.readyGeneration
+	return value
 }
 func (s *WorkspaceService) CheckRelease() ReleaseSnapshot {
 	s.release.gate.Lock()
@@ -47,13 +51,15 @@ func (s *WorkspaceService) CheckRelease() ReleaseSnapshot {
 		// The canceled context cannot be revived. Keep one explicit follow-up
 		// until this worker finishes, instead of coalescing it into canceled work.
 		s.release.recheckAfterCancel = true
-		return ReleaseSnapshot{State: "CHECKING"}
+		return ReleaseSnapshot{State: "CHECKING", ReadyGeneration: s.release.readyGeneration}
 	}
 	if s.release.checkPending {
-		return ReleaseSnapshot{State: "CHECKING"}
+		return ReleaseSnapshot{State: "CHECKING", ReadyGeneration: s.release.readyGeneration}
 	}
 	if s.release.value.State == "CHECKING" || s.release.value.State == "DOWNLOADING" {
-		return s.release.value
+		value := s.release.value
+		value.ReadyGeneration = s.release.readyGeneration
+		return value
 	}
 	select {
 	case s.release.wake <- struct{}{}:
@@ -61,16 +67,15 @@ func (s *WorkspaceService) CheckRelease() ReleaseSnapshot {
 	}
 	s.release.checkPending = true
 	s.release.cancelledByUser = false
-	return ReleaseSnapshot{State: "CHECKING"}
+	return ReleaseSnapshot{State: "CHECKING", ReadyGeneration: s.release.readyGeneration}
 }
 func (s *WorkspaceService) setRelease(state string, generation int) {
 	s.release.gate.Lock()
-	s.release.value = ReleaseSnapshot{state, generation}
+	s.release.value = ReleaseSnapshot{State: state, Generation: generation}
 	s.release.gate.Unlock()
 }
 func (s *WorkspaceService) checkRelease() bool {
 	s.release.gate.Lock()
-	previous := s.release.value
 	if !s.release.checkPending {
 		s.release.cancelledByUser = false
 	}
@@ -81,7 +86,7 @@ func (s *WorkspaceService) checkRelease() bool {
 	}
 	s.release.value = ReleaseSnapshot{State: "CHECKING"}
 	s.release.gate.Unlock()
-	fail := func(err error, generation int) bool { return s.finishReleaseError(err, previous, generation) }
+	fail := func(err error, generation int) bool { return s.finishReleaseError(err, generation) }
 	parent, cancel := context.WithTimeout(s.ctx, 3*time.Minute)
 	defer cancel()
 	s.release.gate.Lock()
@@ -94,6 +99,7 @@ func (s *WorkspaceService) checkRelease() bool {
 	if parent.Err() != nil {
 		return fail(parent.Err(), 0)
 	}
+	s.restoreReleaseReady()
 	m, envelope, err := releaseupdate.CheckSigned(parent, releaseupdate.Client(), releaseupdate.PublicKey)
 	if err != nil {
 		if errors.Is(err, releaseupdate.ErrUnconfigured) {
@@ -102,8 +108,9 @@ func (s *WorkspaceService) checkRelease() bool {
 		}
 		return fail(err, 0)
 	}
-	if previous.State == "READY" && m.Generation <= previous.Generation {
-		s.setRelease("READY", previous.Generation)
+	_, _, readyGeneration := s.readyRelease()
+	if readyGeneration > 0 && m.Generation <= readyGeneration {
+		s.setRelease("READY", readyGeneration)
 		return true
 	}
 	if m.Generation <= localapi.AgentGeneration {
@@ -134,7 +141,8 @@ func (s *WorkspaceService) checkRelease() bool {
 	}
 	s.release.gate.Lock()
 	s.release.directory, s.release.revision = directory, m.Revision
-	s.release.value = ReleaseSnapshot{"READY", m.Generation}
+	s.release.readyGeneration = m.Generation
+	s.release.value = ReleaseSnapshot{State: "READY", Generation: m.Generation}
 	cancelled := s.release.cancelledByUser
 	if cancelled {
 		s.release.value.State = "CANCELLED"
@@ -168,7 +176,7 @@ func (s *WorkspaceService) finishReleaseCheck() {
 	}
 }
 
-func (s *WorkspaceService) finishReleaseError(err error, previous ReleaseSnapshot, generation int) bool {
+func (s *WorkspaceService) finishReleaseError(err error, generation int) bool {
 	s.release.gate.Lock()
 	userCancelled := s.release.cancelledByUser
 	s.release.gate.Unlock()
@@ -177,13 +185,26 @@ func (s *WorkspaceService) finishReleaseError(err error, previous ReleaseSnapsho
 		s.log.Event("release_check_cancelled")
 		return true
 	}
-	if previous.State == "READY" {
-		s.setRelease("READY", previous.Generation)
-	} else {
-		s.setRelease("FAILED", generation)
-	}
+	s.setRelease("FAILED", generation)
 	s.log.Event("release_check_failed")
 	return false
+}
+
+func (s *WorkspaceService) restoreReleaseReady() {
+	directory, m, err := releaseupdate.RestoreReady(os.Getenv("LOCALAPPDATA"), releaseupdate.PublicKey, localapi.AgentGeneration)
+	s.release.gate.Lock()
+	defer s.release.gate.Unlock()
+	if err != nil {
+		s.release.directory, s.release.revision, s.release.readyGeneration = "", "", 0
+		return
+	}
+	s.release.directory, s.release.revision, s.release.readyGeneration = directory, m.Revision, m.Generation
+}
+
+func (s *WorkspaceService) readyRelease() (string, string, int) {
+	s.release.gate.Lock()
+	defer s.release.gate.Unlock()
+	return s.release.directory, s.release.revision, s.release.readyGeneration
 }
 func (s *WorkspaceService) runReleaseUpdater() {
 	applied := false
@@ -194,11 +215,9 @@ func (s *WorkspaceService) runReleaseUpdater() {
 		}
 	}()
 	base := os.Getenv("LOCALAPPDATA")
-	if directory, m, err := releaseupdate.RestoreReady(base, releaseupdate.PublicKey, localapi.AgentGeneration); err == nil {
-		s.release.gate.Lock()
-		s.release.directory, s.release.revision = directory, m.Revision
-		s.release.value = ReleaseSnapshot{"READY", m.Generation}
-		s.release.gate.Unlock()
+	s.restoreReleaseReady()
+	if _, _, generation := s.readyRelease(); generation > 0 {
+		s.setRelease("READY", generation)
 	}
 	if err := releaseupdate.PruneReady(base, releaseupdate.PublicKey); err != nil && !errors.Is(err, os.ErrNotExist) {
 		s.log.Event("release_cache_cleanup_failed")
@@ -235,7 +254,8 @@ func (s *WorkspaceService) runReleaseUpdater() {
 			}
 			check.Reset(releaseCheckDelay(failures))
 		case <-tick.C:
-			if s.ReleaseStatus().State != "READY" {
+			status := s.ReleaseStatus()
+			if status.State == "CHECKING" || status.State == "DOWNLOADING" || status.ReadyGeneration == 0 {
 				continue
 			}
 			settings, err := appsettings.Load(os.Getenv("LOCALAPPDATA"))
@@ -246,9 +266,7 @@ func (s *WorkspaceService) runReleaseUpdater() {
 			if pairing.Code != "ok" || pairing.Job != "" {
 				continue
 			}
-			s.release.gate.Lock()
-			directory, revision := s.release.directory, s.release.revision
-			s.release.gate.Unlock()
+			directory, revision, generation := s.readyRelease()
 			launchFailed := false
 			s.settingsGate.Lock()
 			settings, err = appsettings.Load(os.Getenv("LOCALAPPDATA"))
@@ -256,9 +274,9 @@ func (s *WorkspaceService) runReleaseUpdater() {
 				s.settingsGate.Unlock()
 				continue
 			}
-			applied = s.managed.ApplyReleaseUpdate(s.ReleaseStatus().Generation, revision, func() error {
+			applied = s.managed.ApplyReleaseUpdate(generation, revision, func() error {
 				ready, m, err := releaseupdate.RestoreReady(base, releaseupdate.PublicKey, localapi.AgentGeneration)
-				if err != nil || ready != directory || m.Revision != revision || m.Generation != s.ReleaseStatus().Generation {
+				if err != nil || ready != directory || m.Revision != revision || m.Generation != generation {
 					launchFailed = true
 					return releaseupdate.ErrInvalid
 				}
@@ -268,7 +286,12 @@ func (s *WorkspaceService) runReleaseUpdater() {
 			})
 			s.settingsGate.Unlock()
 			if launchFailed {
-				s.setRelease("FAILED", s.ReleaseStatus().Generation)
+				// Preserve disk evidence, but require a fresh explicit/periodic
+				// verification before retrying a failed handoff.
+				s.release.gate.Lock()
+				s.release.readyGeneration = 0
+				s.release.gate.Unlock()
+				s.setRelease("FAILED", generation)
 			}
 			if applied {
 				return

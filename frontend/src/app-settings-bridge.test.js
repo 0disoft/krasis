@@ -29,7 +29,18 @@ test('unverified restoration remains explicit after reloading saved checks',asyn
 
 test('user cancellation is projected separately from a release failure',async()=>{
   const b=createAppSettingsBridge({ReleaseStatus:()=>({state:'CANCELLED',generation:219})});
-  assert.deepEqual(await b.release(),{state:'CANCELLED',generation:219});
+  assert.deepEqual(await b.release(),{state:'CANCELLED',generation:219,readyGeneration:0});
+});
+
+test('cancellation and check failure retain a separately validated download',async()=>{
+  for (const state of ['CANCELLED','FAILED','CHECKING']) {
+    const b=createAppSettingsBridge({ReleaseStatus:()=>({state,generation:223,readyGeneration:222})});
+    assert.deepEqual(await b.release(),{state,generation:223,readyGeneration:222});
+    assert.match(appReleaseNotice(state,null,'ko',222),/보관 중/);
+    assert.match(appReleaseNotice(state,null,'en',222),/retained/);
+  }
+  const b=createAppSettingsBridge({ReleaseStatus:()=>({state:'FAILED',generation:223,readyGeneration:'222'})});
+  assert.deepEqual(await b.release(),{state:'FAILED',generation:0,readyGeneration:0});
 });
 
 test('downloaded release guidance follows confirmed automatic update preferences',()=>{

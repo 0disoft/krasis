@@ -24,13 +24,36 @@ func TestReleaseCancellationRequiresUserIntentAndContextCancellation(t *testing.
 	} {
 		s := &WorkspaceService{}
 		s.release.cancelledByUser = tc.user
-		if s.finishReleaseError(tc.err, ReleaseSnapshot{}, 900) != tc.completed || s.ReleaseStatus().State != tc.state {
+		if s.finishReleaseError(tc.err, 900) != tc.completed || s.ReleaseStatus().State != tc.state {
 			t.Fatal("failure and user cancellation confused", tc, s.ReleaseStatus())
 		}
 	}
 	s := &WorkspaceService{}
-	if s.finishReleaseError(context.DeadlineExceeded, ReleaseSnapshot{State: "READY", Generation: 899}, 900) || s.ReleaseStatus() != (ReleaseSnapshot{State: "READY", Generation: 899}) {
+	s.release.readyGeneration = 899
+	if s.finishReleaseError(context.DeadlineExceeded, 900) || s.ReleaseStatus() != (ReleaseSnapshot{State: "FAILED", Generation: 900, ReadyGeneration: 899}) {
 		t.Fatal("failed checking discarded staged update")
+	}
+}
+
+func TestDownloadedReleaseSurvivesCancelThenOfflineRecheck(t *testing.T) {
+	s := &WorkspaceService{}
+	s.release.wake = make(chan struct{}, 1)
+	s.release.directory, s.release.revision, s.release.readyGeneration = "retained", "verified-revision", 899
+	s.release.cancelledByUser = true
+	s.finishReleaseError(context.Canceled, 900)
+	if got := s.ReleaseStatus(); got.State != "CANCELLED" || got.ReadyGeneration != 899 {
+		t.Fatal("cancel discarded download", got)
+	}
+	if got := s.CheckRelease(); got.State != "CHECKING" || got.ReadyGeneration != 899 {
+		t.Fatal("check acknowledgement lost download", got)
+	}
+	s.release.checkPending = false
+	s.finishReleaseError(fmt.Errorf("offline"), 900)
+	if got := s.ReleaseStatus(); got.State != "FAILED" || got.ReadyGeneration != 899 {
+		t.Fatal("offline retry discarded download", got)
+	}
+	if directory, revision, generation := s.readyRelease(); directory != "retained" || revision != "verified-revision" || generation != 899 {
+		t.Fatal("work state replaced cached application identity")
 	}
 }
 
@@ -106,7 +129,7 @@ func TestUpdateReenableWaitsForCancellationAndCoalescesFollowup(t *testing.T) {
 				if ctx.Err() != context.Canceled || len(s.release.wake) != 0 {
 					t.Fatal("canceled download restarted before completion")
 				}
-				s.finishReleaseError(ctx.Err(), ReleaseSnapshot{}, 900)
+				s.finishReleaseError(ctx.Err(), 900)
 				s.finishReleaseCheck()
 			} else if !s.checkRelease() {
 				t.Fatal("queued cancellation failed")

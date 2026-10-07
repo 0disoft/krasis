@@ -10,7 +10,7 @@
   let checking = $state(false);
   let releaseEpoch = 0;
   const ko = $derived(locale === 'ko');
-  $effect(() => { onStatus?.(value.code, release.state, busy ? null : value); });
+  $effect(() => { onStatus?.(value.code, release.state, busy ? null : value, release.readyGeneration ?? 0); });
   $effect(() => { if (active && bridge) void untrack(refreshSettings); });
   async function refreshSettings() {
     if (!bridge || busy || disposed) return;
@@ -28,7 +28,7 @@
     if (!bridge || checking || disposed || ['CHECKING','DOWNLOADING'].includes(release.state)) return;
     checking = true;
     const epoch = ++releaseEpoch;
-    release = {state:'CHECKING',generation:0};
+    release = {state:'CHECKING',generation:0,readyGeneration:release.readyGeneration ?? 0};
     try {
       const next = await bridge.check();
       if (!disposed && epoch === releaseEpoch) release = next;
@@ -56,7 +56,7 @@
   <label><input type="checkbox" checked={value.autoUpdate} indeterminate={!value.preferencesKnown} disabled={busy || !value.preferencesKnown} onchange={e=>change(value.startAtLogin,e.currentTarget.checked)} />{ko?'자동 업데이트':'Automatic updates'}</label>
   {#if !busy && !value.preferencesKnown}<span role="status">{ko?'설정값 확인 불가':'Preferences unavailable'}</span>{/if}
   <button disabled={!bridge || checking || ['CHECKING','DOWNLOADING'].includes(release.state)} onclick={checkRelease}>{ko?'업데이트 확인':'Check for updates'}</button>
-  {#if release.state !== 'IDLE'}<span role="status">{appReleaseNotice(release.state, busy ? null : value, locale)}</span>{/if}
+  {#if release.state !== 'IDLE'}<span role="status">{appReleaseNotice(release.state, busy ? null : value, locale, release.readyGeneration)}</span>{/if}
   {#if value.code === 'start_menu_failed'}<span role="status">{ko?'시작 메뉴 등록 실패':'Start menu registration failed'}</span>
   {:else if value.code === 'recovery_failed'}<span role="status">{ko?'앱 자동 복구 등록 실패':'App recovery registration failed'}</span>
   {:else if value.code === 'rollback_failed'}<span role="alert">{ko?'자동 시작 설정 복원을 확인하지 못했습니다. 진단을 저장해 주세요.':'Could not verify startup settings restoration. Save diagnostics.'}</span>

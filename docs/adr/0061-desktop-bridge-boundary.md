@@ -253,3 +253,11 @@ same preference snapshot. A pending settings read or write projects unknown
 preferences to both surfaces, so neither announces automatic application from
 stale values. Duplicate release strings are removed from the native catalog.
 No endpoint, database, repository hygiene or runner changes are introduced.
+
+## g222: Retain downloads, separate loading, and expose UI replacement
+
+Release checking state is independent of the staged generation. The additive
+readyGeneration field retains a verified download across cancellation and
+network failures. Each new check restores and verifies the disk receipt before
+network work; application revalidates the package and current settings. Failed
+handoffs suppress repeated application until another check verifies the cache.
