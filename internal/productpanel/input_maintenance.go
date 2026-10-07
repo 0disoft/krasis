@@ -108,7 +108,7 @@ func (b *DesktopLifecycle) refreshProtectedInput(ctx context.Context, before Bri
 		}
 	}
 	if before.State != "LOCAL" && before.State != "FAULTED" && before.State != "UNKNOWN" {
-		stopped := bridge.Disconnect()
+		stopped := bridge.PauseForMaintenance()
 		if stopped.Code != "ok" || stopped.State != "LOCAL" {
 			return b.save(stopped)
 		}
@@ -122,7 +122,7 @@ func (b *DesktopLifecycle) refreshProtectedInput(ctx context.Context, before Bri
 	bridge = NewDesktopBridge(reconnect, b.open)
 	value := bridge.Refresh()
 	if b.ctx.Err() == nil && ctx.Err() == nil && alias != "" && fingerprint != "" && !errors.Is(err, ErrInputRefreshPending) && !errors.Is(err, ErrStartupBusy) {
-		value = bridge.Connect(alias, fingerprint)
+		value = b.recoveryResume(bridge, alias, fingerprint)
 	}
 	if err != nil {
 		switch {

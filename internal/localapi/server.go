@@ -47,6 +47,7 @@ type Status struct {
 }
 
 type OperationRequest struct {
+	MaintenanceStop     bool   `json:"maintenanceStop,omitempty"`
 	AutomaticResume     bool   `json:"automaticResume,omitempty"`
 	SchemaVersion       string `json:"schemaVersion"`
 	PeerAlias           string `json:"peerAlias,omitempty"`
@@ -332,6 +333,9 @@ func (handler *handler) operation(response http.ResponseWriter, request *http.Re
 }
 
 func validateOperationRequest(kind string, value OperationRequest) error {
+	if value.MaintenanceStop && kind != "disconnect" {
+		return errors.New("unexpected maintenance stop")
+	}
 	if value.AutomaticResume && kind != "connect" {
 		return errors.New("unexpected automatic resume")
 	}

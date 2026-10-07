@@ -340,3 +340,18 @@ lifecycle starts the ninety-second reconnect window once initial preparation
 returns, including a transient startup refusal. Initial preparation retains its
 separate bounded startup deadline. Polling and subsequent attempts cannot start
 a connection before this checkpoint or renew the reconnect deadline afterwards.
+
+## g226: Respect manual stops across every native recovery path
+
+Ordinary fault recovery, display recovery, input maintenance and failed update
+handoffs use automatic Resume instead of explicit user Connect. An agent refusal
+stops native recovery. Explicit user Connect remains the only way to clear the
+manual-stop latch on a live agent.
+
+The authenticated DISCONNECT request gains maintenanceStop, permitted only on
+that operation. A maintenance pause preserves both saved resume identity and
+any preexisting manual-stop latch. It never clears that latch or creates one.
+The client reads agent generation first; pre-g226 agents use their legacy stop
+for replacement. If that replacement fails, their manual latch can require an
+explicit connection. A current-agent rejection is never retried as a user stop.
+No renderer endpoint, database, repository hygiene or runner change is made.

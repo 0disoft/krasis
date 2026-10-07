@@ -55,6 +55,9 @@ func (b *DesktopBridge) Resume(alias, fingerprint string) BridgeSnapshot {
 	return b.execute("resume", alias, fingerprint)
 }
 func (b *DesktopBridge) Disconnect() BridgeSnapshot { return b.execute("disconnect", "", "") }
+func (b *DesktopBridge) PauseForMaintenance() BridgeSnapshot {
+	return b.execute("maintenance_stop", "", "")
+}
 
 func bridgeFailure(code string) BridgeSnapshot {
 	return BridgeSnapshot{Schema: BridgeSchema, State: "UNKNOWN", InputBackend: "UNKNOWN", Peers: []BridgePeer{}, Code: code}
@@ -82,7 +85,10 @@ func (b *DesktopBridge) execute(action, alias, fingerprint string) BridgeSnapsho
 	if (action == "connect" || action == "resume") && (alias == "" || len(alias) > 256 || len(fingerprint) != 64 || fingerprintErr != nil) {
 		return bridgeFailure("invalid_peer")
 	}
-	guard := &bridgeClient{Client: client, fingerprint: fingerprint, automaticResume: action == "resume"}
+	guard := &bridgeClient{Client: client, fingerprint: fingerprint, automaticResume: action == "resume", maintenanceStop: action == "maintenance_stop"}
+	if action == "maintenance_stop" {
+		action = "disconnect"
+	}
 	if action == "resume" {
 		action = "connect"
 	}
@@ -134,6 +140,7 @@ type bridgeClient struct {
 	stale                                               bool
 	trustFailed                                         bool
 	automaticResume, resumeCancelled, resumeUnsupported bool
+	maintenanceStop                                     bool
 	attempted, rejected, uncertain                      bool
 }
 
@@ -202,6 +209,20 @@ func (c *bridgeClient) Connect(ctx context.Context, alias string) (result locala
 }
 
 func (c *bridgeClient) Disconnect(ctx context.Context) (localapi.OperationResult, error) {
+	if c.maintenanceStop {
+		pause, ok := c.Client.(interface {
+			PauseForMaintenance(context.Context) (localapi.OperationResult, error)
+		})
+		if !ok {
+			c.resumeUnsupported = true
+			return localapi.OperationResult{}, ErrAgentIncompatible
+		}
+		c.attempted = true
+		result, err := pause.PauseForMaintenance(ctx)
+		c.uncertain = err != nil
+		c.rejected = err == nil && result.Status != "COMPLETED"
+		return result, err
+	}
 	c.attempted = true
 	result, err := c.Client.Disconnect(ctx)
 	c.uncertain = err != nil

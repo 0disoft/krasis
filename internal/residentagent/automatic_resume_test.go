@@ -8,6 +8,33 @@ import (
 	"github.com/0disoft/krasis/internal/localapi"
 )
 
+func TestMaintenancePausePreservesManualStopButDoesNotCreateOne(t *testing.T) {
+	for _, manual := range []bool{false, true} {
+		o := testOperations(t, func(ctx context.Context, _ string, _ agent.SupervisorObserver) error {
+			<-ctx.Done()
+			return context.Cause(ctx)
+		})
+		if result, err := o.Connect(context.Background(), localapi.OperationRequest{PeerAlias: "peer"}); err != nil || result.Status != "COMPLETED" {
+			t.Fatal(result, err)
+		}
+		if manual {
+			if result, err := o.Disconnect(context.Background(), localapi.OperationRequest{}); err != nil || result.Status != "COMPLETED" {
+				t.Fatal(result, err)
+			}
+		}
+		if _, err := o.Disconnect(context.Background(), localapi.OperationRequest{MaintenanceStop: true}); err != nil {
+			t.Fatal(err)
+		}
+		result, err := o.Connect(context.Background(), localapi.OperationRequest{PeerAlias: "peer", AutomaticResume: true})
+		if err != nil || manual && result.Code != "resume_cancelled" || !manual && result.Status != "COMPLETED" {
+			t.Fatal("pause changed manual-stop authority", manual, result, err)
+		}
+		if err := o.Close(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func TestManualDisconnectFencesAutomaticResumeButAllowsExplicitConnect(t *testing.T) {
 	for _, active := range []bool{false, true} {
 		o := testOperations(t, func(ctx context.Context, _ string, _ agent.SupervisorObserver) error {

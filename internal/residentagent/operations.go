@@ -279,8 +279,8 @@ func (operations *Operations) Connect(requestContext context.Context, request lo
 	return completed("connect_started"), nil
 }
 
-func (operations *Operations) Disconnect(ctx context.Context, _ localapi.OperationRequest) (localapi.OperationResult, error) {
-	return operations.disconnect(ctx, true)
+func (operations *Operations) Disconnect(ctx context.Context, request localapi.OperationRequest) (localapi.OperationResult, error) {
+	return operations.disconnect(ctx, !request.MaintenanceStop)
 }
 
 func (operations *Operations) disconnect(ctx context.Context, forget bool) (localapi.OperationResult, error) {
@@ -294,7 +294,7 @@ func (operations *Operations) disconnect(ctx context.Context, forget bool) (loca
 		}
 	}
 	operations.lastStopReason = ""
-	operations.manualStop = true
+	operations.manualStop = operations.manualStop || forget
 	stop, done := operations.sessionStop, operations.sessionDone
 	outcome := operations.sessionOutcome
 	if stop == nil || done == nil {

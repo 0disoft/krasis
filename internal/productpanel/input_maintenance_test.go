@@ -80,6 +80,19 @@ func (c *inputMaintenanceClient) Status(ctx context.Context) (localapi.Status, e
 	return v, e
 }
 
+func TestInputMaintenanceHonorsCLIStopBeforeResume(t *testing.T) {
+	b, c, _ := newResumeTest(t, nil)
+	b.updatedResume = nil
+	c.state = "CONNECTED"
+	value := b.RefreshProtectedInput(func(context.Context) error {
+		c.manualStop = true // CLI stop during installation, after the temporary pause.
+		return nil
+	})
+	if c.disconnects != 1 || c.connects != 0 || value.Code != "cancelled" || !b.recovery.blocked {
+		t.Fatal(value, c.connects, c.disconnects)
+	}
+}
+
 func TestInputMaintenanceReconnectsOnlyTheSameTrustedPeerAfterTerminalOutcome(t *testing.T) {
 	for _, tc := range []struct {
 		name     string

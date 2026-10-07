@@ -62,7 +62,7 @@ func (b *DesktopLifecycle) ApplyRequestedUpdate(generation int, revision string,
 		if alias == "" || fingerprint == "" {
 			return false, ErrAgentIncompatible
 		}
-		stopped := bridge.Disconnect()
+		stopped := bridge.PauseForMaintenance()
 		if stopped.Code != "ok" || stopped.State != "LOCAL" {
 			b.save(stopped)
 			return false, ErrAgentNotReady
@@ -79,7 +79,7 @@ func (b *DesktopLifecycle) ApplyRequestedUpdate(generation int, revision string,
 	// The existing claim rollback runs before restoring the previous session.
 	// A user disconnect or shutdown cancels this operation and suppresses resume.
 	if alias != "" && ctx.Err() == nil && b.ctx.Err() == nil {
-		b.save(bridge.Connect(alias, fingerprint))
+		b.save(b.recoveryResume(bridge, alias, fingerprint))
 	}
 	if launchErr != nil {
 		return false, launchErr

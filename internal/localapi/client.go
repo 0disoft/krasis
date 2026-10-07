@@ -87,6 +87,19 @@ func (client *Client) Disconnect(ctx context.Context) (OperationResult, error) {
 	return client.operation(ctx, "/v1/disconnect", OperationRequest{SchemaVersion: OperationSchemaVersion})
 }
 
+// Older agents can be safely stopped for replacement, but retain their manual
+// latch if replacement fails. Never downgrade a rejected current-agent pause.
+func (client *Client) PauseForMaintenance(ctx context.Context) (OperationResult, error) {
+	info, err := client.Runtime(ctx)
+	if err != nil {
+		return OperationResult{}, err
+	}
+	if info.Generation < 226 {
+		return client.Disconnect(ctx)
+	}
+	return client.operation(ctx, "/v1/disconnect", OperationRequest{SchemaVersion: OperationSchemaVersion, MaintenanceStop: true})
+}
+
 func (client *Client) Pair(ctx context.Context, request OperationRequest) (OperationResult, error) {
 	request.SchemaVersion = OperationSchemaVersion
 	return client.operation(ctx, "/v1/pair", request)

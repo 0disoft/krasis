@@ -108,6 +108,34 @@ func TestDesktopLifecycleKeepsUpgradeBusyNoticeWhileAgentRemainsConnected(t *tes
 	}
 }
 
+func TestRecoveryHonorsCLIStopDuringPreparation(t *testing.T) {
+	for _, display := range []bool{false, true} {
+		b, c, now := newResumeTest(t, nil)
+		b.updatedResume = nil
+		b.recovery.Alias, b.recovery.Fingerprint = "B", c.peers[0].Fingerprint
+		c.state = "FAULTED"
+		if display {
+			c.state, c.stopReason = "LOCAL", "display_change"
+		}
+		b.ensure = func(context.Context) error {
+			c.state, c.stopReason, c.manualStop = "LOCAL", "", true
+			return nil
+		}
+		b.tick(now)
+		b.tick(now.Add(6 * time.Second))
+		if c.connects != 0 || b.Refresh().Code != "cancelled" || !b.recovery.blocked {
+			t.Fatal("automatic recovery undid CLI stop", display, b.Refresh(), c.connects)
+		}
+		b.tick(now.Add(12 * time.Second))
+		if c.connects != 0 {
+			t.Fatal("canceled recovery retried")
+		}
+		if value := b.Connect("B", c.peers[0].Fingerprint); value.Code != "ok" || c.connects != 1 {
+			t.Fatal("explicit connect blocked", value)
+		}
+	}
+}
+
 func TestDesktopLifecycleRetriesDisplayChangeAfterGeometrySettles(t *testing.T) {
 	fp := strings.Repeat("a", 64)
 	client := &fakeClient{state: "LOCAL", stopReason: "display_change", peers: []localapi.TrustedPeer{{Alias: "B", Fingerprint: fp}}}

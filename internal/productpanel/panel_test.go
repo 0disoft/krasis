@@ -40,6 +40,9 @@ func (c *fakeClient) Disconnect(context.Context) (localapi.OperationResult, erro
 	c.stopReason = ""
 	return localapi.OperationResult{Status: "COMPLETED"}, nil
 }
+func (c *fakeClient) PauseForMaintenance(ctx context.Context) (localapi.OperationResult, error) {
+	return c.Disconnect(ctx)
+}
 
 func TestPanelFiltersPeersAndUsesAgentState(t *testing.T) {
 	c := &fakeClient{state: "LOCAL", peers: []localapi.TrustedPeer{{Alias: "B"}, {Alias: "revoked", Revoked: true}, {Alias: "duplicate"}, {Alias: "duplicate"}}}

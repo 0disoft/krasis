@@ -252,7 +252,7 @@ func (b *DesktopLifecycle) tick(now time.Time) {
 			return
 		}
 		if !b.stopped.Load() && ctx.Err() == nil {
-			b.save(bridge.Connect(b.recovery.Alias, b.recovery.Fingerprint))
+			b.save(b.recoveryResume(bridge, b.recovery.Alias, b.recovery.Fingerprint))
 		}
 		return
 	}
@@ -274,5 +274,14 @@ func (b *DesktopLifecycle) tick(now time.Time) {
 		return
 	}
 	// DesktopBridge rechecks active trust and the exact saved fingerprint.
-	b.save(withDiagnosticNotice(bridge.Connect(b.recovery.Alias, b.recovery.Fingerprint), diagnosticErr))
+	b.save(withDiagnosticNotice(b.recoveryResume(bridge, b.recovery.Alias, b.recovery.Fingerprint), diagnosticErr))
+}
+
+// Agent-side arbitration also covers CLI disconnects during native preparation.
+func (b *DesktopLifecycle) recoveryResume(bridge *DesktopBridge, alias, fingerprint string) BridgeSnapshot {
+	value := bridge.Resume(alias, fingerprint)
+	if value.Code == "cancelled" {
+		b.recovery.Stop()
+	}
+	return value
 }
