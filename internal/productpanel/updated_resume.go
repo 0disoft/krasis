@@ -174,7 +174,7 @@ func (b *DesktopLifecycle) resumeUpdatedConnection(ctx context.Context, now time
 	}
 	value = bridge.Resume(r.launch.Alias, r.launch.Fingerprint)
 	switch value.Code {
-	case "outcome_unknown", "unavailable":
+	case "outcome_unknown":
 		r.uncertain = true
 	case "cancelled":
 		b.updatedResume = nil

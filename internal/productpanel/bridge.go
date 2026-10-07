@@ -105,6 +105,10 @@ func (b *DesktopBridge) execute(action, alias, fingerprint string) BridgeSnapsho
 	if action != "refresh" && (!guard.attempted || guard.rejected) {
 		result.Code = "rejected"
 	}
+	if result.State == "" {
+		result.State = "UNKNOWN"
+		result.Code = "unavailable"
+	}
 	if guard.trustFailed {
 		result.Code = "unavailable"
 	}
@@ -116,10 +120,6 @@ func (b *DesktopBridge) execute(action, alias, fingerprint string) BridgeSnapsho
 	}
 	if guard.resumeUnsupported {
 		result.Code = "agent_incompatible"
-	}
-	if result.State == "" {
-		result.State = "UNKNOWN"
-		result.Code = "unavailable"
 	}
 	if result.State == "FAULTED" {
 		result.Code = "recovery_required"
@@ -154,6 +154,11 @@ func (c *bridgeClient) Trust(ctx context.Context) (localapi.Trust, error) {
 
 func (c *bridgeClient) Status(ctx context.Context) (localapi.Status, error) {
 	v, err := c.Client.Status(ctx)
+	// A successful command followed by an unreadable status is not a safe
+	// pre-send failure. Retain uncertainty rather than invite another command.
+	if err != nil && c.attempted && !c.rejected {
+		c.uncertain = true
+	}
 	c.inputBackend = "UNKNOWN"
 	c.boundaryBlocked = ""
 	if err == nil {

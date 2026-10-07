@@ -355,3 +355,9 @@ The client reads agent generation first; pre-g226 agents use their legacy stop
 for replacement. If that replacement fails, their manual latch can require an
 explicit connection. A current-agent rejection is never retried as a user stop.
 No renderer endpoint, database, repository hygiene or runner change is made.
+
+Pre-send status or trust failures remain unavailable and may retry within the
+existing update reconnect budget. Only outcome_unknown suppresses further
+requests. After an attempted command, response loss or failure to read its
+resulting status preserves outcome_unknown even when the projected state is
+UNKNOWN. A later LOCAL observation cannot establish that the command failed.

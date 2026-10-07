@@ -19,6 +19,60 @@ type resumeTestClient struct {
 	manualStop bool
 }
 
+type stagedResumeClient struct {
+	*resumeTestClient
+	statusCalls, trustCalls int
+	failStatus, failTrust   int
+}
+
+func (c *stagedResumeClient) Status(ctx context.Context) (localapi.Status, error) {
+	c.statusCalls++
+	if c.statusCalls == c.failStatus {
+		return localapi.Status{}, errors.New("status unreadable")
+	}
+	return c.resumeTestClient.Status(ctx)
+}
+
+func (c *stagedResumeClient) Trust(ctx context.Context) (localapi.Trust, error) {
+	c.trustCalls++
+	if c.trustCalls == c.failTrust {
+		return localapi.Trust{}, errors.New("trust unreadable")
+	}
+	return c.resumeTestClient.Trust(ctx)
+}
+
+func TestUpdateResumeRetriesOnlyFailuresBeforeSending(t *testing.T) {
+	for _, phase := range []string{"status_before_send", "trust_before_send", "status_after_send"} {
+		t.Run(phase, func(t *testing.T) {
+			b, base, now := newResumeTest(t, nil)
+			c := &stagedResumeClient{resumeTestClient: base}
+			b.open = func() (Client, error) { return c, nil }
+			switch phase {
+			case "status_before_send":
+				c.failStatus = 3 // Tick, fresh observation, then Resume preflight.
+			case "trust_before_send":
+				c.failTrust = 5 // Last identity check immediately before Resume.
+			case "status_after_send":
+				c.failStatus = 4 // Successful command, then lost confirmation.
+			}
+			b.tick(now)
+			if phase == "status_after_send" {
+				if base.connects != 1 || b.Refresh().Code != "outcome_unknown" || !b.updatedResume.uncertain {
+					t.Fatal("post-send loss became retryable", b.Refresh(), base.connects)
+				}
+				base.state = "LOCAL" // A later idle observation does not prove rejection.
+			} else if base.connects != 0 || b.Refresh().Code != "unavailable" || b.updatedResume.uncertain {
+				t.Fatal("pre-send failure consumed the request", b.Refresh(), base.connects)
+			}
+			b.tick(now.Add(6 * time.Second))
+			b.tick(now.Add(12 * time.Second))
+			if base.connects != 1 {
+				t.Fatal("lost request or duplicate mutation", phase, base.connects)
+			}
+		})
+	}
+}
+
 func (c *resumeTestClient) Runtime(context.Context) (localapi.RuntimeInfo, error) { return c.info, nil }
 func (c *resumeTestClient) Status(ctx context.Context) (localapi.Status, error) {
 	v, err := c.fakeClient.Status(ctx)
