@@ -452,3 +452,12 @@ get at most three reads with 250ms/500ms waits under the native startup context.
 Only one connection request can follow a valid uniquely matched identity. Errors
 are projected as bounded localized codes and retained across idle polling; no
 settings repair, raw error/path display, endpoint or runner change is introduced.
+
+## g230: Restore agents after post-exit maintenance deferral
+
+Maintenance records whether the instance lease was available before invoking
+refresh. Post-exit busy, cancellation and terminal failures restore the agent
+without re-running BeforeStart or consent. Pending/running installation and
+unconfirmed owner exit remain fenced. A private native proof distinguishes
+verified restoration from pre-stop errors; only restored busy results can resume
+the same pinned peer. This proof is not part of the renderer/API schema.

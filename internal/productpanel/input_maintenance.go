@@ -11,6 +11,16 @@ import (
 
 // Called by local maintenance after lifecycle has disconnected the
 // session; startup ownership fences other UIs and verifies exit before writes.
+type inputMaintenanceRestored struct{ cause error }
+
+func (e *inputMaintenanceRestored) Error() string { return e.cause.Error() }
+func (e *inputMaintenanceRestored) Unwrap() error { return e.cause }
+
+func restoredInputAgent(err error) bool {
+	var restored *inputMaintenanceRestored
+	return errors.As(err, &restored)
+}
+
 func (s Startup) RefreshProtectedInput(ctx context.Context) error {
 	return s.maintainProtectedInput(ctx, s.InputRefresh, false)
 }
@@ -25,61 +35,71 @@ func (s Startup) maintainProtectedInput(ctx context.Context, refresh func(contex
 	if refresh == nil {
 		return ErrInputRefreshFailed
 	}
-	err := s.refreshProtectedInput(ctx, refresh, allowOlder)
-	if err != nil && !errors.Is(err, ErrInputRefreshCancelled) && !errors.Is(err, ErrInputRefreshFailed) {
+	err, exited := s.refreshProtectedInput(ctx, refresh, allowOlder)
+	if !exited || errors.Is(err, ErrInputRefreshPending) {
 		return err
+	}
+	if s.InputSetup != nil {
+		if state := s.InputSetup(); state == "UPDATING" || state == "PENDING" {
+			return ErrInputRefreshPending
+		}
 	}
 	// Restore an ordinary or protected agent after terminal cancellation/failure.
 	// An expired consent context cannot suppress this bounded recovery.
 	recoverCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 40*time.Second)
 	defer cancel()
-	if startErr := s.Ensure(recoverCtx); startErr != nil {
+	restore := s
+	restore.BeforeStart = nil // The callback already ran; fallback never retries consent.
+	if startErr := restore.Ensure(recoverCtx); startErr != nil {
 		return startErr
 	}
-	return err
+	if err != nil {
+		return &inputMaintenanceRestored{cause: err}
+	}
+	return nil
 }
 
-func (s Startup) refreshProtectedInput(ctx context.Context, refresh func(context.Context) error, allowOlder bool) error {
+func (s Startup) refreshProtectedInput(ctx context.Context, refresh func(context.Context) error, allowOlder bool) (error, bool) {
 	lease, err := s.Lock()
 	if err != nil {
-		return ErrStartupBusy
+		return ErrStartupBusy, false
 	}
 	defer lease.Close()
 	if err := s.Verify(); err != nil {
-		return err
+		return err, false
 	}
 	client, err := s.Open()
 	if err == nil {
 		info, err := client.Runtime(ctx)
 		if err != nil {
-			return err
+			return err, false
 		}
 		if !s.maintenanceCompatible(info, allowOlder) {
-			return ErrAgentIncompatible
+			return ErrAgentIncompatible, false
 		}
 		result, err := client.StopForUpgrade(ctx, info.Instance, s.Generation, s.Revision)
 		if err != nil {
-			return err
+			return err, false
 		}
 		if result.Status != "COMPLETED" || result.Code != "upgrade_stop_requested" {
-			return ErrAgentBusy
+			return ErrAgentBusy, false
 		}
 	} else if !errors.Is(err, localapi.ErrUnavailable) && !errors.Is(err, localapi.ErrTransport) {
-		return err
+		return err, false
 	}
 	for {
 		if err := ctx.Err(); err != nil {
-			return err
+			return err, false
 		}
 		available, err := s.Available()
 		if err != nil {
-			return err
+			return err, false
 		}
 		if available {
-			return refresh(ctx)
+			return refresh(ctx), true
 		}
 		if err := s.Pause(ctx); err != nil {
-			return err
+			return err, false
 		}
 	}
 }
@@ -142,7 +162,7 @@ func (b *DesktopLifecycle) refreshProtectedInput(ctx context.Context, before Bri
 	bridge = NewDesktopBridge(reconnect, b.open)
 	value := bridge.Refresh()
 	reconnectCode := "not_attempted"
-	if b.ctx.Err() == nil && ctx.Err() == nil && alias != "" && fingerprint != "" && !errors.Is(err, ErrInputRefreshPending) && !errors.Is(err, ErrStartupBusy) {
+	if b.ctx.Err() == nil && ctx.Err() == nil && alias != "" && fingerprint != "" && !errors.Is(err, ErrInputRefreshPending) && (!errors.Is(err, ErrStartupBusy) || restoredInputAgent(err)) {
 		value = b.recoveryResume(bridge, alias, fingerprint)
 		reconnectCode = value.Code
 	}
@@ -160,6 +180,7 @@ func (b *DesktopLifecycle) refreshProtectedInput(ctx context.Context, before Bri
 		}
 	}
 	value.InputRefreshCode, value.ReconnectCode = refreshCode, reconnectCode
+	value.agentPrepared = err == nil || restoredInputAgent(err)
 	// A failed/uncertain reconnect retains its safety notice; maintenance cannot
 	// replace it with a less specific installer result.
 	if refreshCode != "ok" && (reconnectCode == "not_attempted" || value.Code == "ok") {

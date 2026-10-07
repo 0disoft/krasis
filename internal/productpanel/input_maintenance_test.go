@@ -23,7 +23,7 @@ func (r *inputRuntimeStub) Runtime(ctx context.Context) (localapi.RuntimeInfo, e
 }
 
 func TestInputMaintenanceWaitsForExitAndRestartsAfterTerminalOutcome(t *testing.T) {
-	for _, outcome := range []error{nil, ErrInputRefreshCancelled, ErrInputRefreshFailed, ErrInputRefreshPending} {
+	for _, outcome := range []error{nil, ErrInputRefreshCancelled, ErrInputRefreshFailed, ErrStartupBusy, context.Canceled, ErrInputRefreshPending} {
 		t.Run(strings.ReplaceAll(fmt.Sprint(outcome), " ", "_"), func(t *testing.T) {
 			r := &inputRuntimeStub{runtimeStub: runtimeStub{generation: 4}, build: strings.Repeat("a", 40)}
 			starts, probes, installs := 0, 0, 0
@@ -55,8 +55,11 @@ func TestInputMaintenanceWaitsForExitAndRestartsAfterTerminalOutcome(t *testing.
 			if errors.Is(outcome, ErrInputRefreshPending) {
 				wantStarts = 0
 			}
-			if err != outcome || installs != 1 || starts != wantStarts {
+			if !errors.Is(err, outcome) || installs != 1 || starts != wantStarts {
 				t.Fatalf("err=%v installs=%d starts=%d", err, installs, starts)
+			}
+			if outcome != nil && wantStarts == 1 && !restoredInputAgent(err) {
+				t.Fatal("verified fallback not distinguished from a pre-stop failure", err)
 			}
 		})
 	}

@@ -16,6 +16,7 @@ const BridgeSchema = "krasis.desktop/v1"
 // Notice is legacy localized panel copy; native integration must map it to catalog
 // codes before advertising complete localization of agent failures.
 type BridgeSnapshot struct {
+	agentPrepared    bool         // Native lifecycle proof, never renderer input/output.
 	InputRefreshCode string       `json:"inputRefreshCode,omitempty"`
 	ReconnectCode    string       `json:"reconnectCode,omitempty"`
 	ResumeState      string       `json:"resumeState,omitempty"`
