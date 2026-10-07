@@ -17,7 +17,7 @@ import (
 // RunClipboardWorker uses this process's UI window as clipboard owner. No clipboard
 // text enters the renderer; this reuses the legacy sequence/marker protections.
 // The caller cancels ctx and joins the worker before exiting.
-func RunClipboardWorker(ctx context.Context, control string, owner *atomic.Uintptr, gate *sync.Mutex, revision *atomic.Uint64) {
+func RunClipboardWorker(ctx context.Context, control string, owner *atomic.Uintptr, gate *sync.Mutex, revision *atomic.Uint64, wake chan struct{}) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	timer := time.NewTicker(750 * time.Millisecond)
@@ -27,6 +27,13 @@ func RunClipboardWorker(ctx context.Context, control string, owner *atomic.Uintp
 	if base, err := clipboardFilesRoot(); err == nil {
 		cleanupClipboardFiles(base)
 	}
+	if wake == nil {
+		wake = make(chan struct{}, 1)
+	}
+	watchCtx, stopWatch := context.WithCancel(ctx)
+	watchDone := make(chan struct{})
+	go func() { defer close(watchDone); watchAgentClipboard(watchCtx, control, wake) }()
+	defer func() { stopWatch(); <-watchDone }()
 	var pump clipboardPump
 	var lastRevision uint64
 	var lastOwner uintptr
@@ -38,36 +45,41 @@ func RunClipboardWorker(ctx context.Context, control string, owner *atomic.Uintp
 			if base, err := clipboardFilesRoot(); err == nil {
 				cleanupClipboardFiles(base)
 			}
+			continue
 		case <-timer.C:
-			// The UI thread pumps owner-window notifications; a window on this
-			// network worker thread would stall other applications' clipboard writes.
-			hwnd := clipboardOwnerWindow(owner)
-			if hwnd == 0 {
-				pump = clipboardPump{}
-				lastOwner = 0
-				continue
-			}
-			// The legacy controller already owns a pump. On handover reset the baseline
-			// so pre-existing clipboard contents are not published by the new owner.
-			running, err := agentinstance.ControlRunning()
-			if err != nil || running {
-				pump = clipboardPump{}
-				continue
-			}
-			gate.Lock()
-			if hwnd != lastOwner {
-				pump = clipboardPump{}
-				lastOwner = hwnd
-			}
-			if currentRevision := revision.Load(); currentRevision != lastRevision {
-				pump = clipboardPump{}
-				lastRevision = currentRevision
-			}
-			tick, cancel := context.WithTimeout(ctx, 60*time.Second)
-			clipboardWorkerTick(tick, control, hwnd, &pump)
-			cancel()
-			gate.Unlock()
+		case <-wake:
 		}
+		if ctx.Err() != nil {
+			return
+		}
+		// The UI thread pumps owner-window notifications; a window on this
+		// network worker thread would stall other applications' clipboard writes.
+		hwnd := clipboardOwnerWindow(owner)
+		if hwnd == 0 {
+			pump = clipboardPump{}
+			lastOwner = 0
+			continue
+		}
+		// The legacy controller already owns a pump. On handover reset the baseline
+		// so pre-existing clipboard contents are not published by the new owner.
+		running, err := agentinstance.ControlRunning()
+		if err != nil || running {
+			pump = clipboardPump{}
+			continue
+		}
+		gate.Lock()
+		if hwnd != lastOwner {
+			pump = clipboardPump{}
+			lastOwner = hwnd
+		}
+		if currentRevision := revision.Load(); currentRevision != lastRevision {
+			pump = clipboardPump{}
+			lastRevision = currentRevision
+		}
+		tick, cancel := context.WithTimeout(ctx, 60*time.Second)
+		clipboardWorkerTick(tick, control, hwnd, &pump)
+		cancel()
+		gate.Unlock()
 	}
 }
 

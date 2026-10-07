@@ -87,7 +87,11 @@ func (m *Manager) observePeer(peer string, info PeerInfo) {
 	if m.peers == nil {
 		m.peers = map[string]peerObservation{}
 	}
+	previous := m.peers[peer].info
 	m.peers[peer] = peerObservation{info: info, at: time.Now()}
+	if previous.Clipboard != info.Clipboard || previous.ClipboardID != info.ClipboardID || previous.ClipboardFormat != info.ClipboardFormat || previous.ClipboardSize != info.ClipboardSize {
+		m.clipboardChanged()
+	}
 	if m.status.Peer != peer {
 		return
 	}

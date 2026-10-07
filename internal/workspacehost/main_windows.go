@@ -19,6 +19,7 @@ import (
 	"github.com/0disoft/krasis/frontend"
 	"github.com/0disoft/krasis/internal/appsettings"
 	"github.com/0disoft/krasis/internal/buildinfo"
+	"github.com/0disoft/krasis/internal/launcherui"
 	"github.com/0disoft/krasis/internal/launchrecord"
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/productcli"
@@ -116,6 +117,7 @@ func Run() {
 		os.Exit(1)
 	}
 	service := &WorkspaceService{raw: bridge, ctx: ctx, control: paths.Control, title: fmt.Sprintf("Krasis · g%d", localapi.AgentGeneration)}
+	service.clipboardWake = make(chan struct{}, 1)
 	service.startAtLogin = startAtLogin
 	if !smoke {
 		startup, startupErr := productpanel.NewStartup(paths.Control)
@@ -208,14 +210,27 @@ func Run() {
 		}
 	}
 	app := application.New(application.Options{
-		Name:           "Krasis",
-		Icon:           windowsassets.Icon,
-		OnShutdown:     func() { service.clipboardWindow.Store(0); cancel() },
+		Name: "Krasis",
+		Icon: windowsassets.Icon,
+		OnShutdown: func() {
+			if hwnd := service.clipboardWindow.Swap(0); hwnd != 0 {
+				launcherui.ListenClipboardChanges(hwnd, false)
+			}
+			cancel()
+		},
 		MarshalError:   func(error) []byte { return []byte(`"bridge_failed"`) },
 		Assets:         application.AssetOptions{Handler: application.AssetFileServerFS(assets)},
 		Services:       services,
 		SingleInstance: instance,
-		Windows:        application.WindowsOptions{WebviewUserDataPath: webviewPath},
+		Windows: application.WindowsOptions{
+			WebviewUserDataPath: webviewPath,
+			WndProcInterceptor: func(hwnd uintptr, msg uint32, _, _ uintptr) (uintptr, bool) {
+				if msg == launcherui.ClipboardUpdateMessage && hwnd == service.clipboardWindow.Load() {
+					launcherui.WakeClipboard(service.clipboardWake)
+				}
+				return 0, false
+			},
+		},
 	})
 	// application.New has already admitted this process as the primary instance.
 	// Service startup prepares recovery independently of renderer-ready events.
@@ -237,7 +252,15 @@ func Run() {
 	service.visibleWindow.Store(window)
 	if !smoke {
 		window.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) {
-			service.clipboardWindow.Store(uintptr(window.NativeWindow()))
+			hwnd := uintptr(window.NativeWindow())
+			previous := service.clipboardWindow.Swap(hwnd)
+			if previous != hwnd {
+				if previous != 0 {
+					launcherui.ListenClipboardChanges(previous, false)
+				}
+				launcherui.ListenClipboardChanges(hwnd, true)
+				launcherui.WakeClipboard(service.clipboardWake)
+			}
 		})
 	}
 	shown := make(chan bool, 1)

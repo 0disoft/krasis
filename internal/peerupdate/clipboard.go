@@ -102,6 +102,7 @@ func (m *Manager) setClipboardPeerLocked(peer string) error {
 	m.clipboard.seen = nil
 	m.clipboard.activeUntil = time.Time{}
 	m.clipboard.transfer, m.clipboard.transferID = ClipboardTransfer{}, ""
+	m.clipboardChanged()
 	return nil
 }
 
@@ -193,6 +194,7 @@ func (m *Manager) SyncClipboardPayload(peer string, local *ClipboardValue, ack s
 		m.clipboard.in = nil // A new local copy supersedes a pending remote copy.
 		m.clipboard.transferID = m.clipboard.out.ID
 		m.clipboard.transfer = ClipboardTransfer{State: "QUEUED", Format: local.Format, Direction: "SEND", Total: int64(len(local.Data) + len(local.Text))}
+		m.clipboardChanged()
 	}
 	if m.clipboard.in != nil && (m.clipboard.in.ID == ack || time.Now().After(m.clipboard.in.expires)) {
 		if m.clipboard.transferID == m.clipboard.in.ID {
@@ -230,6 +232,7 @@ func (m *Manager) clipboardSent(peer, id string) {
 			m.clipboard.transfer.Bytes = m.clipboard.transfer.Total
 		}
 		m.clipboard.out = nil
+		m.clipboardChanged()
 	}
 }
 func (m *Manager) clipboardReceive(peer, id string, r io.Reader, authorized func() bool) error {
@@ -279,6 +282,7 @@ func (m *Manager) clipboardReceivePayload(peer, id, format string, r io.Reader, 
 		value.Data = data
 	}
 	m.clipboard.in = value
+	m.clipboardChanged()
 	m.clipboard.transferID = id
 	m.clipboard.transfer = ClipboardTransfer{State: "READY", Format: format, Direction: "RECEIVE", Bytes: int64(len(data)), Total: int64(len(data))}
 	m.clipboard.seen = append(m.clipboard.seen, id)

@@ -20,6 +20,7 @@ type WorkspaceService struct {
 	visibleWindow   atomic.Pointer[application.WebviewWindow]
 	uiReadyEpoch    atomic.Uint64
 	clipboardWindow atomic.Uintptr
+	clipboardWake   chan struct{}
 	release         releaseState
 	settingsGate    sync.Mutex
 	startAtLogin    bool
@@ -99,7 +100,7 @@ func (s *WorkspaceService) ServiceStartup(context.Context, application.ServiceOp
 		s.jobs.Add(1)
 		go func() {
 			defer s.jobs.Done()
-			launcherui.RunClipboardWorker(s.ctx, s.control, &s.clipboardWindow, &s.clipGate, &s.clipEpoch)
+			launcherui.RunClipboardWorker(s.ctx, s.control, &s.clipboardWindow, &s.clipGate, &s.clipEpoch, s.clipboardWake)
 		}()
 		if s.receiver != nil && s.quit != nil {
 			s.jobs.Add(1)

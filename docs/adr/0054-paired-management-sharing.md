@@ -90,6 +90,19 @@ checks that the handle is live and belongs to this process. Window title changes
 sequence baseline. A missing or replaced owner resets the baseline before any
 new clipboard sampling; renderer data cannot select the owner.
 
+From g207 the native owner subscribes to WM_CLIPBOARDUPDATE and wakes a
+coalesced worker rather than waiting for its 750ms fallback. The authenticated
+local `/v1/clipboard/wait` API long-polls a counter for up to two seconds so a
+received payload wakes the destination owner. The counter contains no content
+or identity. The paired `/v3/clipboard-status` API waits up to one second;
+local copies interrupt the connector's wait. A dedicated TLS connection and
+separate server gates keep bundle and diagnostic transfers out of this path.
+Peers older than g207 use `/v2/status` with a bounded 200ms fallback. Missing
+agents retain the owner's periodic fallback; notifications never start or
+recover an agent. Shutdown cancels and joins the workers and removes the native
+listener. These notifications preserve the existing opt-in, size, sequence,
+desktop and echo checks.
+
 Only the unlocked Default input desktop is used. No clipboard read or write is
 attempted on lock/secure desktop. The GUI heartbeat permits transport for five
 seconds; an already-authorized text or image request has a twelve-second deadline,

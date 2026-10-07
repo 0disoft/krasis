@@ -56,6 +56,19 @@ func (m *Manager) Run(ctx context.Context, address, peer string, listener bool, 
 		m.runAppOpenControl(controlCtx, controlClient, address, peer, authorized)
 	}()
 	defer func() { stopControl(); <-controlDone }()
+	clipboardTransport := t.Clone()
+	clipboardTransport.DisableKeepAlives = false
+	clipboardTransport.MaxIdleConnsPerHost = 1
+	clipboardTransport.IdleConnTimeout = 15 * time.Second
+	defer clipboardTransport.CloseIdleConnections()
+	clipboardClient := &http.Client{Transport: clipboardTransport, Timeout: 75 * time.Second, CheckRedirect: client.CheckRedirect}
+	clipboardCtx, stopClipboard := context.WithCancel(ctx)
+	clipboardDone := make(chan struct{})
+	go func() {
+		defer close(clipboardDone)
+		m.runClipboardControl(clipboardCtx, clipboardClient, address, peer, authorized)
+	}()
+	defer func() { stopClipboard(); <-clipboardDone }()
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 	for {
@@ -78,7 +91,6 @@ func (m *Manager) Run(ctx context.Context, address, peer string, listener bool, 
 			m.pollDiagnostic(ctx, client, address, peer, authorized)
 			m.pushDiagnosticRequest(ctx, client, address, peer, authorized)
 			m.pollDiagnosticRequest(ctx, client, address, peer, authorized)
-			m.pollClipboard(ctx, client, address, peer, authorized)
 			if offer := m.offered(peer); offer != nil {
 				progress := &progressReader{Reader: bytes.NewReader(offer.data), update: func(n int64) { m.progress(peer, offer.id, "SENDING", n, int64(len(offer.data))) }}
 				req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://"+address+"/v1/bundle", progress)
@@ -153,6 +165,8 @@ func (m *Manager) Run(ctx context.Context, address, peer string, listener bool, 
 func (m *Manager) handler(peer string, authorized func() bool) http.Handler {
 	gate := make(chan struct{}, 1)
 	controlGate := make(chan struct{}, 1)
+	clipboardGate := make(chan struct{}, 1)
+	clipboardStatusGate := make(chan struct{}, 1)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		// TLS config verifies the one pinned certificate. Recheck current trust
@@ -164,6 +178,10 @@ func (m *Manager) handler(peer string, authorized func() bool) http.Handler {
 		requestGate := gate
 		if r.URL.Path == "/v1/app-open" || r.URL.Path == "/v2/status" {
 			requestGate = controlGate
+		} else if r.URL.Path == "/v1/clipboard" {
+			requestGate = clipboardGate
+		} else if r.URL.Path == clipboardStatusPath {
+			requestGate = clipboardStatusGate
 		}
 		select {
 		case requestGate <- struct{}{}:
@@ -177,6 +195,8 @@ func (m *Manager) handler(peer string, authorized func() bool) http.Handler {
 			return
 		}
 		switch {
+		case r.URL.Path == clipboardStatusPath:
+			m.clipboardStatusHTTP(w, r, peer, authorized)
 		case r.URL.Path == "/v1/app-open":
 			m.appOpenHTTP(w, r, peer, authorized)
 		case r.URL.Path == "/v1/clipboard":

@@ -209,6 +209,8 @@ func (handler *handler) ServeHTTP(response http.ResponseWriter, request *http.Re
 		handler.appOpen(response, request)
 	case "/v1/ui-ready":
 		handler.uiReady(response, request)
+	case "/v1/clipboard/wait":
+		handler.clipboardWait(response, request)
 	case "/v1/clipboard":
 		handler.clipboard(response, request)
 	case "/v1/diagnostic-transfer":
