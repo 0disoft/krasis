@@ -226,3 +226,11 @@ settings, startup registration or the recovery task remain unreadable or
 mismatched. Only a fresh read confirming both OS states against the saved
 preferences clears that marker, with a fixed settings_restore_all_verified
 event. This reconciliation never writes registry or task settings.
+
+READY describes a retained, verified download, not permission to auto-apply.
+Its renderer notice follows the confirmed automatic update preference: enabled
+waits for disconnection, disabled explains enabling the setting to apply, and
+an unreadable or pending setting only asks for verification. Native application
+still requires successful settings reads both on the tick and under the
+settings gate immediately before application. No new manual-apply endpoint,
+release schema, database, repository hygiene or runner changes are introduced.

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAppSettingsBridge } from './app-settings-bridge.js';
+import { appReleaseNotice, createAppSettingsBridge, emptyAppSettings } from './app-settings-bridge.js';
 test('failed and malformed settings do not advertise defaults as applied',async()=>{
   for(const value of [null,{schema:'krasis.app-settings/v1',code:'ok',startAtLogin:'true',autoUpdate:true}]) {
     const b=createAppSettingsBridge({AppSettings:()=>value});assert.equal((await b.status()).code,'unavailable');
@@ -30,4 +30,23 @@ test('unverified restoration remains explicit after reloading saved checks',asyn
 test('user cancellation is projected separately from a release failure',async()=>{
   const b=createAppSettingsBridge({ReleaseStatus:()=>({state:'CANCELLED',generation:219})});
   assert.deepEqual(await b.release(),{state:'CANCELLED',generation:219});
+});
+
+test('downloaded release guidance follows confirmed automatic update preferences',()=>{
+  const settings = {schema:'krasis.app-settings/v1',code:'ok',startAtLogin:true,autoUpdate:true};
+  for (const locale of ['ko','en']) {
+    const enabled = locale === 'ko' ? '연결 해제 후 자동 적용' : 'Will apply after disconnecting';
+    const retained = locale === 'ko' ? '다운로드 완료 · 자동 업데이트를 켜면 적용' : 'Downloaded · Enable automatic updates to apply';
+    const unknown = locale === 'ko' ? '다운로드 완료 · 자동 업데이트 설정 확인 필요' : 'Downloaded · Verify automatic update settings';
+    assert.equal(appReleaseNotice('READY',settings,locale),enabled);
+    assert.equal(appReleaseNotice('READY',{...settings,autoUpdate:false},locale),retained);
+    assert.equal(appReleaseNotice('READY',settings,locale),enabled);
+    for (const value of [null,emptyAppSettings(),{...settings,code:'unavailable'},{...settings,autoUpdate:'true'}]) {
+      assert.equal(appReleaseNotice('READY',value,locale),unknown);
+    }
+    // OS startup restoration failure does not invalidate the loaded update preference.
+    assert.equal(appReleaseNotice('READY',{...settings,code:'rollback_failed',autoUpdate:false},locale),retained);
+    assert.equal(appReleaseNotice('IDLE',settings,locale),'');
+    assert.equal(appReleaseNotice('FAILED',settings,locale),locale === 'ko' ? '업데이트 확인 실패' : 'Update check failed');
+  }
 });
