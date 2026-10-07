@@ -150,3 +150,11 @@ Unknown peer state does not claim offline, and equal generation numbers with
 different builds remain a conflict rather than claiming the latest version.
 Confirmation, permissions, polling and transfer verification are unchanged.
 No network API, database, repository hygiene or runner changes are introduced.
+
+## g218: Refresh settings when opened
+
+The settings dialog reports its open state to AppSettings. Each reopening
+reads the actual native settings again, replacing stale failure indicators
+only with the returned status. Initial background loading still supplies
+workspace notices. Reads do not overlap an active settings write and closing
+the dialog does not cancel or retry a write. No preference defaults change.

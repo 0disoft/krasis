@@ -52,6 +52,7 @@
   let appOpenBridge = $state.raw();
   let updatesDlg;
   let settingsDlg;
+  let settingsOpen = $state(false);
   let appSettingsCode = $state('ok');
   let releaseState = $state('IDLE');
   let updatesOpen = $state(false);
@@ -60,7 +61,7 @@
     const controls = dlg?.querySelectorAll('select:not([disabled]), input:not([disabled]), summary, button:not([disabled]):not([data-window-control])') ?? [];
     [...controls].find(control => control.getClientRects().length > 0)?.focus();
   }
-  function openDialog(dlg) { if (!dlg || dlg.open) return; opener = document.activeElement; dlg.showModal(); focusFirstControl(dlg); }
+  function openDialog(dlg) { if (!dlg || dlg.open) return; opener = document.activeElement; dlg.showModal(); if (dlg === settingsDlg) settingsOpen = true; focusFirstControl(dlg); }
   function restoreDialogFocus() { if (opener && opener.focus) opener.focus(); opener = null; }
   async function openUpdates() { if (!updatesDlg || updatesDlg.open) return; opener = document.activeElement; updatesOpen = true; await tick(); if (updatesDlg.open) { focusFirstControl(updatesDlg); return; } updatesDlg.showModal(); await tick(); focusFirstControl(updatesDlg); }
   let clipboard = $state({peer:'',code:'unavailable'});
@@ -357,7 +358,7 @@
     <p role="status">{t(layout.code)}</p>
   {/if}
 </main>
-<dialog class="workspace-settings" bind:this={settingsDlg} aria-labelledby="workspace-settings-title" onclose={restoreDialogFocus}>
+<dialog class="workspace-settings" bind:this={settingsDlg} aria-labelledby="workspace-settings-title" onclose={() => { settingsOpen = false; restoreDialogFocus(); }}>
   <WindowTitlebar {locale} version={windowVersion} maximised={windowMaximised} focused={windowFocused} ready={!!windowRuntime} action={windowAction} />
   <div class="dlg-head settings-heading"><h2 id="workspace-settings-title">{t('settings')}</h2><span>Krasis {windowVersion}</span></div>
   <div class="dlg-body settings-body">
@@ -370,7 +371,7 @@
       {#if snapshot.state !== 'LOCAL'}<p>{t('placementLocked')}</p>{/if}
     </section>
     <section class="settings-section"><KeyboardPanel peer={selected} {locale} /></section>
-    <section class="settings-section"><h3>{t('app_settings')}</h3><AppSettings {locale} onStatus={(code, state) => { appSettingsCode = code; releaseState = state; }} /></section>
+    <section class="settings-section"><h3>{t('app_settings')}</h3><AppSettings {locale} active={settingsOpen} onStatus={(code, state) => { appSettingsCode = code; releaseState = state; }} /></section>
     <section class="settings-section"><label class="language-setting">{t('language')}<select bind:value={locale}><option value="ko">한국어</option><option value="en">English</option></select></label>{#if trayLocaleFailed}<p role="status">{t('tray_locale_failed')}</p>{/if}</section>
   </div>
   <div class="dlg-foot"><button class="primary" onclick={() => settingsDlg.close()}>{t('close')}</button></div>
