@@ -47,6 +47,7 @@ type Status struct {
 }
 
 type OperationRequest struct {
+	AutomaticResume     bool   `json:"automaticResume,omitempty"`
 	SchemaVersion       string `json:"schemaVersion"`
 	PeerAlias           string `json:"peerAlias,omitempty"`
 	PairingAction       string `json:"pairingAction,omitempty"`
@@ -331,6 +332,9 @@ func (handler *handler) operation(response http.ResponseWriter, request *http.Re
 }
 
 func validateOperationRequest(kind string, value OperationRequest) error {
+	if value.AutomaticResume && kind != "connect" {
+		return errors.New("unexpected automatic resume")
+	}
 	if kind == "pair" && (value.PairingAction == "PIN_LISTEN" || value.PairingAction == "PIN_DIAL") {
 		if !validAlias(value.PeerAlias+"-00000000") || value.AllowInboundControl == nil || value.Fingerprint != "" {
 			return errors.New("invalid PIN request")

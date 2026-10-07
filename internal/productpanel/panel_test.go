@@ -31,6 +31,9 @@ func (c *fakeClient) Connect(context.Context, string) (localapi.OperationResult,
 	c.stopReason = ""
 	return localapi.OperationResult{Status: "COMPLETED"}, nil
 }
+func (c *fakeClient) ResumeConnection(ctx context.Context, alias string) (localapi.OperationResult, error) {
+	return c.Connect(ctx, alias)
+}
 func (c *fakeClient) Disconnect(context.Context) (localapi.OperationResult, error) {
 	c.disconnects++
 	c.state = "LOCAL"

@@ -325,3 +325,12 @@ reason, but projects an unavailable result with no selectable peer list. Update
 resume waits for a successful read instead of treating missing observation as a
 changed peer. Accepted connection attempts remain read-only during this wait;
 the existing attempt and time budgets still apply.
+
+Automatic update reconnect identifies itself with an optional `automaticResume`
+boolean on the authenticated local CONNECT request. The resident agent checks
+its manual-stop latch under the same mutex as CONNECT/DISCONNECT, so a CLI stop
+that completes between observation and reconnect also rejects the automatic
+request. DesktopLifecycle drops the pending intent on `resume_cancelled`.
+Explicit user CONNECT keeps its existing behavior and may clear the stop latch.
+The flag is rejected on non-CONNECT operations. This is an additive local API
+change; renderer bindings, database, repository hygiene and runners are unchanged.

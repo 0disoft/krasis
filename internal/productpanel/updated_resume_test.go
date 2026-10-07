@@ -12,9 +12,10 @@ import (
 
 type resumeTestClient struct {
 	*fakeClient
-	info      localapi.RuntimeInfo
-	rejects   int
-	uncertain bool
+	info       localapi.RuntimeInfo
+	rejects    int
+	uncertain  bool
+	manualStop bool
 }
 
 func (c *resumeTestClient) Runtime(context.Context) (localapi.RuntimeInfo, error) { return c.info, nil }
@@ -36,6 +37,12 @@ func (c *resumeTestClient) Connect(ctx context.Context, alias string) (localapi.
 		return localapi.OperationResult{Status: "REJECTED"}, nil
 	}
 	return c.fakeClient.Connect(ctx, alias)
+}
+func (c *resumeTestClient) ResumeConnection(ctx context.Context, alias string) (localapi.OperationResult, error) {
+	if c.manualStop {
+		return localapi.OperationResult{Status: "REJECTED", Code: "resume_cancelled"}, nil
+	}
+	return c.Connect(ctx, alias)
 }
 
 func newResumeTest(t *testing.T, ensure func(context.Context) error) (*DesktopLifecycle, *resumeTestClient, time.Time) {
@@ -255,5 +262,24 @@ func TestUpdateResumeWaitsThroughTrustFailureDuringAcceptedConnection(t *testing
 	b.tick(now.Add(12 * time.Second))
 	if b.updatedResume != nil || b.recovery.Alias != "B" || c.connects != 1 {
 		t.Fatal("confirmation did not complete recovery")
+	}
+}
+
+func TestUpdateResumeHonorsCLIStopAndStopBetweenReadAndConnect(t *testing.T) {
+	for _, racing := range []bool{false, true} {
+		b, c, now := newResumeTest(t, nil)
+		if racing {
+			b.ensure = func(context.Context) error { c.manualStop = true; return nil }
+		} else {
+			b.tick(now)
+			c.state = "LOCAL"
+			c.manualStop = true // CLI bypasses DesktopLifecycle.Disconnect.
+		}
+		before := c.connects
+		b.tick(now.Add(6 * time.Second))
+		b.tick(now.Add(12 * time.Second))
+		if c.connects != before || b.updatedResume != nil || !b.recovery.blocked {
+			t.Fatal("manual stop was overwritten", racing, c.connects, b.Refresh())
+		}
 	}
 }

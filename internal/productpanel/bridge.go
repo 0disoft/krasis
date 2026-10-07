@@ -51,6 +51,9 @@ func (b *DesktopBridge) Refresh() BridgeSnapshot { return b.execute("refresh", "
 func (b *DesktopBridge) Connect(alias, fingerprint string) BridgeSnapshot {
 	return b.execute("connect", alias, fingerprint)
 }
+func (b *DesktopBridge) Resume(alias, fingerprint string) BridgeSnapshot {
+	return b.execute("resume", alias, fingerprint)
+}
 func (b *DesktopBridge) Disconnect() BridgeSnapshot { return b.execute("disconnect", "", "") }
 
 func bridgeFailure(code string) BridgeSnapshot {
@@ -76,10 +79,13 @@ func (b *DesktopBridge) execute(action, alias, fingerprint string) BridgeSnapsho
 		return bridgeFailure("unavailable")
 	}
 	_, fingerprintErr := hex.DecodeString(fingerprint)
-	if action == "connect" && (alias == "" || len(alias) > 256 || len(fingerprint) != 64 || fingerprintErr != nil) {
+	if (action == "connect" || action == "resume") && (alias == "" || len(alias) > 256 || len(fingerprint) != 64 || fingerprintErr != nil) {
 		return bridgeFailure("invalid_peer")
 	}
-	guard := &bridgeClient{Client: client, fingerprint: fingerprint}
+	guard := &bridgeClient{Client: client, fingerprint: fingerprint, automaticResume: action == "resume"}
+	if action == "resume" {
+		action = "connect"
+	}
 	view := Execute(ctx, func() (Client, error) { return guard, nil }, action, alias)
 	if ctx.Err() != nil {
 		return bridgeFailure("cancelled")
@@ -99,6 +105,12 @@ func (b *DesktopBridge) execute(action, alias, fingerprint string) BridgeSnapsho
 	if guard.uncertain {
 		result.Code = "outcome_unknown"
 	}
+	if guard.resumeCancelled {
+		result.Code = "cancelled"
+	}
+	if guard.resumeUnsupported {
+		result.Code = "agent_incompatible"
+	}
 	if result.State == "" {
 		result.State = "UNKNOWN"
 		result.Code = "unavailable"
@@ -116,12 +128,13 @@ func (b *DesktopBridge) execute(action, alias, fingerprint string) BridgeSnapsho
 
 type bridgeClient struct {
 	Client
-	inputBackend                   string
-	boundaryBlocked                string
-	fingerprint                    string
-	stale                          bool
-	trustFailed                    bool
-	attempted, rejected, uncertain bool
+	inputBackend                                        string
+	boundaryBlocked                                     string
+	fingerprint                                         string
+	stale                                               bool
+	trustFailed                                         bool
+	automaticResume, resumeCancelled, resumeUnsupported bool
+	attempted, rejected, uncertain                      bool
 }
 
 func (c *bridgeClient) Trust(ctx context.Context) (localapi.Trust, error) {
@@ -169,7 +182,20 @@ func (c *bridgeClient) Connect(ctx context.Context, alias string) (result locala
 		return result, errors.New("selected peer changed")
 	}
 	c.attempted = true
-	result, err = c.Client.Connect(ctx, alias)
+	if c.automaticResume {
+		resume, ok := c.Client.(interface {
+			ResumeConnection(context.Context, string) (localapi.OperationResult, error)
+		})
+		if !ok {
+			c.attempted = false
+			c.resumeUnsupported = true
+			return result, ErrAgentIncompatible
+		}
+		result, err = resume.ResumeConnection(ctx, alias)
+		c.resumeCancelled = err == nil && result.Status == "REJECTED" && result.Code == "resume_cancelled"
+	} else {
+		result, err = c.Client.Connect(ctx, alias)
+	}
 	c.uncertain = err != nil
 	c.rejected = err == nil && result.Status != "COMPLETED"
 	return result, err

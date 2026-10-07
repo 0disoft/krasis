@@ -161,11 +161,14 @@ func (b *DesktopLifecycle) resumeUpdatedConnection(ctx context.Context, now time
 	if b.stopped.Load() || attempt.Err() != nil {
 		return stop("cancelled")
 	}
-	value = bridge.Connect(r.launch.Alias, r.launch.Fingerprint)
+	value = bridge.Resume(r.launch.Alias, r.launch.Fingerprint)
 	switch value.Code {
-	case "outcome_unknown", "cancelled", "unavailable":
+	case "outcome_unknown", "unavailable":
 		r.uncertain = true
-	case "stale_peer", "invalid_peer", "recovery_required":
+	case "cancelled":
+		b.updatedResume = nil
+		b.recovery.Stop()
+	case "stale_peer", "invalid_peer", "recovery_required", "agent_incompatible":
 		b.updatedResume = nil
 	}
 	return value, true

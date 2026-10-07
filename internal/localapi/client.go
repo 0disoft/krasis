@@ -78,6 +78,11 @@ func (client *Client) Connect(ctx context.Context, alias string) (OperationResul
 	return client.operation(ctx, "/v1/connect", OperationRequest{SchemaVersion: OperationSchemaVersion, PeerAlias: alias})
 }
 
+// Automatic reconnect must not override a manual stop that won the agent lock.
+func (client *Client) ResumeConnection(ctx context.Context, alias string) (OperationResult, error) {
+	return client.operation(ctx, "/v1/connect", OperationRequest{SchemaVersion: OperationSchemaVersion, PeerAlias: alias, AutomaticResume: true})
+}
+
 func (client *Client) Disconnect(ctx context.Context) (OperationResult, error) {
 	return client.operation(ctx, "/v1/disconnect", OperationRequest{SchemaVersion: OperationSchemaVersion})
 }

@@ -220,6 +220,9 @@ func (operations *Operations) Connect(requestContext context.Context, request lo
 	if requestContext.Err() != nil || operations.root.Err() != nil {
 		return rejected("operation_cancelled"), nil
 	}
+	if request.AutomaticResume && operations.manualStop {
+		return rejected("resume_cancelled"), nil
+	}
 	if operations.updateApplying {
 		return rejected("update_in_progress"), nil
 	}
