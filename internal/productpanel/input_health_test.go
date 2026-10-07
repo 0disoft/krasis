@@ -67,3 +67,29 @@ func TestHealthPollPreservesTerminalConsentResult(t *testing.T) {
 		}
 	}
 }
+
+func TestManualInputHealthRecheckBypassesCacheAndCoalescesReaders(t *testing.T) {
+	entered, finish := make(chan struct{}), make(chan struct{})
+	b := &inputRefresh{inspect: func() string { close(entered); <-finish; return "UNKNOWN" }, run: func(context.Context) error { t.Fatal("manual check installed"); return nil }}
+	b.mu.Lock()
+	b.setState("READY")
+	b.mu.Unlock()
+	if b.status() != "READY" {
+		t.Fatal("discarded cached health")
+	}
+	if b.recheck() != "READY" {
+		t.Fatal("manual check waited for reader")
+	}
+	<-entered
+	for range 3 {
+		if b.recheck() != "READY" {
+			t.Fatal("duplicate reader or discarded health")
+		}
+	}
+	close(finish)
+	b.mu.Lock()
+	b.mu.Unlock()
+	if b.status() != "UNKNOWN" {
+		t.Fatal("manual check did not publish new health")
+	}
+}

@@ -497,3 +497,11 @@ status and verified UI bundle. Read failure, incompatible runtime or faulted
 state retains the notice. Verified preparation promotes recovery registration
 once; it neither restarts nor reconnects. Installation outcomes, login settings
 errors and diagnostic failures retain their independent notices.
+
+The manual RefreshNow native binding requests an immediate health reader,
+independent of the 30-second steady polling cache. The renderer's periodic
+Refresh remains cached; the toolbar no longer maps LOCAL refresh to Restart.
+Repeated manual queries coalesce while the installation gate is held. Explicit
+health rechecking may replace a historical FAILED/CANCELLED health projection,
+while lifecycle's separate installation/reconnect outcome remains intact. No
+installation, consent, restart or reconnect is authorized by this binding.

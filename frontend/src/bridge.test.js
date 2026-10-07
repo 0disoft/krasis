@@ -4,6 +4,19 @@ import { createBridge } from './bridge.js';
 
 const peer = { alias: 'B', fingerprint: 'a'.repeat(64) };
 const snapshot = state => ({ schema: 'krasis.desktop/v1', state, peerAlias: '', peers: [peer], code: 'ok', notice: '' });
+test('manual refresh uses a dedicated read while periodic polling stays cached', async () => {
+  const calls = [];
+  const bridge = createBridge({
+    Refresh: async () => { calls.push('cached'); return snapshot('LOCAL'); },
+    RefreshNow: async () => { calls.push('fresh'); return {...snapshot('LOCAL'), inputRefreshCode:'input_refresh_cancelled', reconnectCode:'not_attempted'}; },
+    Connect() { assert.fail('refresh connected'); }, Disconnect() { assert.fail('refresh disconnected'); }, Restart() { assert.fail('refresh restarted'); },
+  });
+  await bridge.refresh();
+  const fresh = await bridge.refreshNow();
+  assert.deepEqual(calls,['cached','fresh']);
+  assert.equal(fresh.inputRefreshCode,'input_refresh_cancelled');
+  assert.equal(fresh.reconnectCode,'not_attempted');
+});
 test('native adapter preserves authoritative connecting state and narrows output', async () => {
   const calls = [];
   const bridge = createBridge({ Refresh: async () => ({ ...snapshot('LOCAL'), token: 'not-rendered' }),

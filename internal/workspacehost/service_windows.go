@@ -54,6 +54,7 @@ type WorkspaceService struct {
 	prepareSettings  func() error
 	inputRefresh     func(context.Context) error
 	inputSetup       func() string
+	inputRecheck     func() string
 	log              *productlog.Logger
 }
 
@@ -151,6 +152,16 @@ func (s *WorkspaceService) Refresh() productpanel.BridgeSnapshot {
 		return s.withInputSetup(s.managed.Refresh())
 	}
 	return s.withInputSetup(s.raw.Refresh())
+}
+
+// The manual button requests fresh installation health; ordinary renderer
+// polling stays cached. Neither binding installs or restarts anything.
+func (s *WorkspaceService) RefreshNow() productpanel.BridgeSnapshot {
+	value := s.Refresh()
+	if s.inputRecheck != nil {
+		value.InputSetup = s.inputRecheck()
+	}
+	return value
 }
 
 func (s *WorkspaceService) withInputSetup(value productpanel.BridgeSnapshot) productpanel.BridgeSnapshot {

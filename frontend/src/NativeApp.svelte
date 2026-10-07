@@ -212,7 +212,7 @@
     await workspaceOperation(async () => {
       if (disposed) return;
       try {
-        const value = await (action === 'input' ? bridge.inputRefresh() : action === 'connect' ? bridge.connect(peer) : action === 'disconnect' ? bridge.disconnect() : action === 'restart' ? bridge.restart() : bridge.refresh());
+        const value = await (action === 'input' ? bridge.inputRefresh() : action === 'connect' ? bridge.connect(peer) : action === 'disconnect' ? bridge.disconnect() : action === 'restart' ? bridge.restart() : action === 'recheck' ? bridge.refreshNow() : bridge.refresh());
         if (disposed) return;
         snapshot = value;
         if (!value.peers.some(p => p.fingerprint === selected)) {
@@ -334,7 +334,7 @@
     </div>
     <div class="connection-controls">
     <span class="connection" class:fault={snapshot.state !== 'CONNECTED'} role="status" aria-atomic="true"><span class="status-dot"></span>{t(snapshot.state)}</span>
-    <button class="icon-button" aria-label={t('refresh')} title={t('refresh')} disabled={busy || !bridge} onclick={() => run(snapshot.state === 'LOCAL' ? 'restart' : 'refresh')}><Icon name="arrows-clockwise" size={18} /></button>
+    <button class="icon-button" aria-label={t('refresh')} title={t('refresh')} disabled={busy || !bridge} onclick={() => run('recheck')}><Icon name="arrows-clockwise" size={18} /></button>
     {#if snapshot.state === 'LOCAL'}
       <button class="primary" disabled={busy || !selectedPeer || !!pairing.job} onclick={() => run('connect')}>{t('connect')}</button>
     {:else if snapshot.state === 'FAULTED' || snapshot.state === 'UNKNOWN'}

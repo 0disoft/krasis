@@ -46,6 +46,7 @@ export function createBridge(binding) {
   }
   return Object.freeze({
     refresh: () => call('Refresh'),
+    refreshNow: () => call('RefreshNow'),
     connect: peer => {
       if (!peer || typeof peer.alias !== 'string' || !peer.alias || peer.alias.length > 256 ||
           typeof peer.fingerprint !== 'string' || !/^[a-f0-9]{64}$/i.test(peer.fingerprint)) {

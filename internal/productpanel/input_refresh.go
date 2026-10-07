@@ -56,6 +56,21 @@ func (b *inputRefresh) status() string {
 	return "UNKNOWN"
 }
 
+// An explicit read requests fresh health without installation. Concurrent
+// requests coalesce into the reader already holding the installation gate.
+func (b *inputRefresh) recheck() string {
+	if b.mu.TryLock() {
+		if state := b.state.Load(); state == nil || *state != "UPDATING" && *state != "PENDING" {
+			if state != nil && (*state == "FAILED" || *state == "CANCELLED") {
+				b.setState("UNKNOWN") // Maintenance outcome is retained separately by lifecycle.
+			}
+			b.checkedAt = time.Time{}
+		}
+		b.mu.Unlock()
+	}
+	return b.status()
+}
+
 // Caller holds mu; checkedAt never races with a status/installation observer.
 func (b *inputRefresh) setState(state string) {
 	b.checkedAt = time.Now()

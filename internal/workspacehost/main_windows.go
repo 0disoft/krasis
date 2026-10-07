@@ -136,6 +136,7 @@ func Run() {
 		}
 		service.inputRefresh = startup.RefreshProtectedInput
 		service.inputSetup = startup.InputSetup
+		service.inputRecheck = startup.InputRecheck
 		if updated.Revision != "" {
 			updateCtx, done := context.WithTimeout(ctx, 3*time.Minute)
 			err = prepareUpdatedWorkspace(updateCtx, paths.Control, startup, updated)
