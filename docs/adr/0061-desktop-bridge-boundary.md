@@ -379,3 +379,8 @@ trust observation. Its retained peer identity, attempt count and original
 display-recovery window remain intact. A later successful read can continue
 within that window, while a confirmed changed or revoked identity still stops
 display reconnect. Unavailable reads do not restart the agent or renew budgets.
+
+Input maintenance checks a complete, uniquely matched peer fingerprint before
+pausing an active session. Unavailable trust, missing/invalid identity or pairing
+returns before disconnect, recovery reset or installation. Idle/absent/faulted
+startup retains its existing verified agent-ownership and installer checks.

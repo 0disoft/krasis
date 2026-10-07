@@ -2,6 +2,7 @@ package productpanel
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"time"
 
@@ -102,16 +103,33 @@ func (b *DesktopLifecycle) RefreshProtectedInput(refresh func(context.Context) e
 func (b *DesktopLifecycle) refreshProtectedInput(ctx context.Context, before BridgeSnapshot, refresh func(context.Context) error) BridgeSnapshot {
 	bridge := NewDesktopBridge(ctx, b.open)
 	alias, fingerprint := before.PeerAlias, ""
+	matches := 0
 	for _, peer := range before.Peers {
 		if peer.Alias == alias {
 			fingerprint = peer.Fingerprint
+			matches++
 		}
 	}
-	if before.State != "LOCAL" && before.State != "FAULTED" && before.State != "UNKNOWN" {
+	switch before.State {
+	case "LOCAL", "FAULTED", "UNKNOWN":
+		// Startup's verified ownership check still precedes stopping/installing
+		// an absent or faulted agent. No active session is intentionally paused.
+	case "CONNECTED", "CONNECTING", "RECONNECTING":
+		if before.Code != "ok" {
+			return b.save(before)
+		}
+		decoded, err := hex.DecodeString(fingerprint)
+		if alias == "" || len(alias) > 256 || matches != 1 || err != nil || len(decoded) != 32 {
+			before.Code = "stale_peer"
+			return b.save(before)
+		}
 		stopped := bridge.PauseForMaintenance()
 		if stopped.Code != "ok" || stopped.State != "LOCAL" {
 			return b.save(stopped)
 		}
+	default:
+		before.Code = "agent_busy"
+		return b.save(before)
 	}
 	b.recovery.Reset()
 	err := refresh(ctx)

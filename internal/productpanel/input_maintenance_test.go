@@ -80,6 +80,44 @@ func (c *inputMaintenanceClient) Status(ctx context.Context) (localapi.Status, e
 	return v, e
 }
 
+func TestInputMaintenancePreservesSessionWhenPeerCannotBeConfirmed(t *testing.T) {
+	for _, mode := range []string{"trust unavailable", "missing fingerprint", "duplicate", "revoked", "pairing"} {
+		t.Run(mode, func(t *testing.T) {
+			b, c, _ := newResumeTest(t, nil)
+			b.updatedResume = nil
+			c.state = "CONNECTED"
+			switch mode {
+			case "trust unavailable":
+				c.trustErr = errors.New("trust temporarily unreadable")
+			case "missing fingerprint":
+				c.peers[0].Fingerprint = ""
+			case "duplicate":
+				c.peers = append(c.peers, c.peers[0])
+			case "revoked":
+				c.peers[0].Revoked = true
+			case "pairing":
+				c.state = "PAIRING"
+			}
+			before := c.state
+			b.recovery.Alias = "B"
+			value := b.RefreshProtectedInput(func(context.Context) error { t.Fatal("installed without confirmed session identity"); return nil })
+			if c.disconnects != 0 || c.connects != 0 || c.state != before || value.Code == "ok" || b.recovery.Alias != "B" {
+				t.Fatal("preflight changed session or recovery", value, c.fakeClient, b.recovery)
+			}
+		})
+	}
+}
+
+func TestInputMaintenanceAllowsVerifiedIdleStartup(t *testing.T) {
+	c := &fakeClient{state: "LOCAL"}
+	b := NewDesktopLifecycle(context.Background(), func() (Client, error) { return c, nil }, nil, nil)
+	installs := 0
+	value := b.RefreshProtectedInput(func(context.Context) error { installs++; return nil })
+	if value.Code != "ok" || installs != 1 || c.disconnects != 0 || c.connects != 0 {
+		t.Fatal(value, installs, c)
+	}
+}
+
 func TestInputMaintenanceHonorsCLIStopBeforeResume(t *testing.T) {
 	b, c, _ := newResumeTest(t, nil)
 	b.updatedResume = nil
