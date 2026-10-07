@@ -26,7 +26,7 @@
     if (disposed) return;
     result = next;
     if (next.code !== 'pending') { busy = false; return; }
-    follow(next,Date.now()+70000);
+    follow(next,next.expires ?? bridge.resume?.(fingerprint)?.expires ?? Date.now()+70000);
   }
   function follow(next,deadline){
     const fingerprint=next.peer;

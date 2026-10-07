@@ -86,3 +86,19 @@ test('an old terminal response cannot erase a newer saved request',async()=>{
   await bridge.status(peer,id);
   assert.equal(bridge.resume(peer).id,nextID);
 });
+
+test('a delayed peer query does not block another peer or repeat the same peer request',async()=>{
+  const secondPeer='c'.repeat(64);
+  let release, starts=0;
+  const bridge=createAppOpenBridge({PeerAppOpen:async(p,r)=>{
+    if(p===peer) await new Promise(resolve=>release=resolve);
+    else starts++;
+    return {...value,peer:p};
+  }});
+  const pending=bridge.status(peer,id);
+  assert.equal((await bridge.status(peer,id)).code,'query_busy');
+  assert.equal((await bridge.open(secondPeer)).code,'pending');
+  assert.equal(starts,1);
+  release();
+  assert.equal((await pending).code,'pending');
+});

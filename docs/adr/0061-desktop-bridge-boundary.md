@@ -202,3 +202,11 @@ Only a marked context cancellation becomes CANCELLED with a fixed diagnostic
 event; timeout, validation and download failures remain failures. A pending
 cancel is honored before network work starts. Downloaded files are retained,
 and cancellation never applies them. Explicit new checks reset the marker.
+
+Peer-launch controls are keyed by the selected trusted fingerprint. Switching
+peers disposes the old visible polling loop without canceling its native
+request. Returning resumes the saved ID with its original deadline. Client
+gates are per peer, so an outstanding query cannot lock another peer's action.
+Late responses stay with their peer and never replace the current control.
+Native trust and request gates remain unchanged. Settings/release codes gain
+rollback_failed/CANCELLED; no new endpoint, database, runner or hygiene changes.

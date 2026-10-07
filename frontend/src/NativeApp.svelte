@@ -303,7 +303,7 @@
   <section class="workspace-toolbar" aria-label={t('devices')}>
     <div class="device-controls">
       <label class="device-select">{t('peer')}<select bind:value={selected} disabled={busy || snapshot.state !== 'LOCAL'}><option value="">{t('choose')}</option>{#each snapshot.peers as peer (peer.fingerprint)}<option value={peer.fingerprint}>{peer.alias}</option>{/each}</select></label>
-      <PeerAppButton bridge={appOpenBridge} peer={selectedPeer} {locale} compact />
+      {#key selectedPeer?.fingerprint}<PeerAppButton bridge={appOpenBridge} peer={selectedPeer} {locale} compact />{/key}
       {#if snapshot.peers.length}<button class="icon-button" aria-label={t('pair')} title={t('pair')} aria-haspopup="dialog" onclick={() => openDialog(pairingDlg)}><Icon name="plus" size={18} /></button>{/if}
     </div>
     <div class="connection-controls">
