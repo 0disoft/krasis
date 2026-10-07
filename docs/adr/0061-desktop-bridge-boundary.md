@@ -115,3 +115,14 @@ Hidden-window smoke reports rendererAgentRoundtrip separately from agentHealthy,
 agentState and agentCode. A real FAULTED/recovery_required response proves the
 bridge roundtrip but fails the overall smoke with exit 2. Unknown or malformed
 responses never count as a roundtrip. Smoke does not recover or replace agents.
+
+## g215: Fit startup windows to the monitor work area
+
+The normal workspace starts at up to 1000 by 640 DIP. It stays hidden until
+runtime-ready, then fits and centers in the window's actual monitor WorkArea
+before showing. Both minimum dimensions shrink on small or scaled displays;
+the taskbar and monitor offsets are respected. Wails provides DIP coordinates,
+so they are not scaled a second time. Tray/second-instance reopening clamps an
+off-screen normal window while preserving an already fitting user placement.
+Maximized/fullscreen windows retain OS sizing. No periodic resize or input,
+connection, API, database or preference-persistence change is introduced.

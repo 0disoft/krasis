@@ -206,6 +206,7 @@ func Run() {
 			}
 			if window != nil {
 				window.Restore()
+				fitWorkspaceWindow(window, false)
 				window.Show()
 				window.Focus()
 				if window.IsVisible() {
@@ -260,12 +261,19 @@ func Run() {
 	window = app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:     service.title,
 		Frameless: true,
-		Width:     1180, Height: 850, MinWidth: 720, MinHeight: 620,
+		Width:     1000, Height: 640, MinWidth: 720, MinHeight: 480,
 		BackgroundColour: application.NewRGB(24, 27, 33),
 		URL:              url,
-		Hidden:           startAtLogin || (smoke && !visibleSmoke),
+		// Fit to the actual monitor before the first Show, including startup
+		// launches whose window remains hidden in the tray.
+		Hidden: true,
 	})
 	service.visibleWindow.Store(window)
+	var initialWindowFit sync.Once
+	fitInitialWindow := func() { initialWindowFit.Do(func() { fitWorkspaceWindow(window, true) }) }
+	window.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) {
+		fitInitialWindow()
+	})
 	if !smoke {
 		window.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) {
 			hwnd := uintptr(window.NativeWindow())
@@ -284,11 +292,12 @@ func Run() {
 		var showOnce sync.Once
 		window.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) {
 			showOnce.Do(func() {
+				window.Restore()
+				fitInitialWindow()
 				// The first ShowWindow can consume an older sender's SW_HIDE,
 				// even at runtime-ready. The next call uses our explicit SW_SHOW.
 				window.Show()
 				window.Show()
-				window.Restore()
 				window.Focus()
 				shown <- window.IsVisible()
 				if !smoke && window.IsVisible() {
@@ -303,7 +312,12 @@ func Run() {
 		tray.SetTooltip("Krasis")
 		tray.SetLabel("Krasis")
 		menu := app.NewMenu()
-		menu.Add("열기 / Open").OnClick(func(*application.Context) { window.Show(); window.Restore(); window.Focus() })
+		menu.Add("열기 / Open").OnClick(func(*application.Context) {
+			window.Restore()
+			fitWorkspaceWindow(window, false)
+			window.Show()
+			window.Focus()
+		})
 		menu.Add("연결 해제 / Disconnect").OnClick(func(*application.Context) {
 			service.disconnectAsync()
 		})
@@ -318,7 +332,7 @@ func Run() {
 		window.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) { window.Hide(); e.Cancel() })
 	}
 	done := make(chan bool, 1)
-	var windowVisible bool
+	var windowVisible, windowFitsWorkArea bool
 	observed := workspaceSmokeResult{State: "UNKNOWN", Code: "unavailable"}
 	if smoke {
 		go func() {
@@ -331,6 +345,14 @@ func Run() {
 			case <-timer.C:
 			case <-ctx.Done():
 			}
+			if ok {
+				fitInitialWindow()
+				if screen, screenErr := window.GetScreen(); screenErr == nil && screen != nil {
+					bounds, work := window.Bounds(), screen.WorkArea
+					windowFitsWorkArea = bounds.Width > 0 && bounds.Height > 0 && bounds.X >= work.X && bounds.Y >= work.Y &&
+						bounds.X+bounds.Width <= work.X+work.Width && bounds.Y+bounds.Height <= work.Y+work.Height
+				}
+			}
 			if visibleSmoke && ok {
 				select {
 				case ok = <-shown:
@@ -341,7 +363,7 @@ func Run() {
 					ok = false
 				}
 			}
-			done <- ok && observed.Healthy
+			done <- ok && observed.Healthy && windowFitsWorkArea
 			app.Quit()
 		}()
 	}
@@ -354,8 +376,9 @@ func Run() {
 			AgentHealthy           bool   `json:"agentHealthy"`
 			AgentState             string `json:"agentState"`
 			AgentCode              string `json:"agentCode"`
+			WindowFitsWorkArea     bool   `json:"windowFitsWorkArea"`
 			UpdatedWindowVisible   bool   `json:"updatedWindowVisible,omitempty"`
-		}{observed.Roundtrip, observed.Healthy, observed.State, observed.Code, visibleSmoke && windowVisible})
+		}{observed.Roundtrip, observed.Healthy, observed.State, observed.Code, windowFitsWorkArea, visibleSmoke && windowVisible})
 		if !ok {
 			os.Exit(2)
 		}
