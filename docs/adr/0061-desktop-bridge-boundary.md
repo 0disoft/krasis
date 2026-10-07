@@ -164,3 +164,9 @@ comparison in addition to the existing permission and generation checks.
 Matching builds show a disabled Up to date action. Newer peers, conflicting
 builds and unknown comparisons remain explained and cannot initiate a send.
 Native version, trust and permission checks remain authoritative.
+
+Keyboard observations run only while the settings dialog and keyboard details
+are both open. Hiding either cancels the next poll and rejects a late result.
+Reopening or changing peers clears old observations before a fresh read.
+In-flight reads remain serialized with matching, and cannot restart a hidden
+poll loop or enable matching with another peer's observations.

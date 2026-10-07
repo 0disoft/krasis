@@ -1,17 +1,19 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { createKeyboardBridge, emptyKeyboard, keyboardMatchBlock } from './keyboard-bridge.js';
-  let { peer = '', locale = 'ko' } = $props();
+  let { peer = '', locale = 'ko', active = false } = $props();
   let value = $state(emptyKeyboard(''));
   let busy = $state(false);
   let notice = $state('');
-  let bridge;
+  let bridge = $state.raw();
+  let expanded = $state(false);
+  let refreshing = $state(false);
   let disposed = false;
   const ko = $derived(locale === 'ko');
   const modes = {ko:{ON:'켜짐',OFF:'꺼짐',UNKNOWN:'확인 불가'},en:{ON:'On',OFF:'Off',UNKNOWN:'Unavailable'}};
   const local = $derived(value.local);
   const remote = $derived(value.peer === peer ? value.remote : {caps:'UNKNOWN',num:'UNKNOWN',hangul:'UNKNOWN'});
-  const block = $derived(keyboardMatchBlock(value, peer, busy));
+  const block = $derived(refreshing ? 'waiting' : keyboardMatchBlock(value, peer, busy));
   const canMatch = $derived(block === '');
   const explanations = {
     ko: {no_peer:'상대 기기를 선택하세요.',busy:'맞추는 중입니다.',waiting:'키보드 상태를 확인하는 중입니다.',unsupported:'상대 Krasis를 업데이트하세요.',remote_unknown:'상대 PC의 Krasis 창을 열어 주세요. 연결 화면의 앱 열기를 사용할 수 있습니다.',local_unknown:'이 PC의 Krasis 창을 클릭해 전면에 두세요.'},
@@ -28,30 +30,39 @@
     }
     busy = false;
   }
-  $effect(() => { peer; notice = ''; });
-  onMount(() => {
+  $effect(() => {
+    const target = peer, enabled = active && expanded && !!bridge;
+    value = emptyKeyboard(target);
+    notice = '';
+    if (!enabled) return;
     let timer;
+    let cancelled = false;
     async function poll() {
-      if (disposed) return;
-      const target = peer;
-      if (!busy) {
-        const next = await bridge.refresh(target);
-        if (!disposed && target === peer) value = next;
+      if (disposed || cancelled) return;
+      if (!busy && !refreshing) {
+        refreshing = true;
+        try {
+          const next = await bridge.refresh(target);
+          if (!disposed && !cancelled && target === peer) value = next;
+        } finally { if (!disposed) refreshing = false; }
       }
-      if (!disposed) timer = setTimeout(poll, 2000);
+      if (!disposed && !cancelled) timer = setTimeout(poll, 2000);
     }
+    untrack(() => { void poll(); });
+    return () => { cancelled = true; clearTimeout(timer); };
+  });
+  onMount(() => {
     void (async () => {
       try {
         const { Call } = await import(/* @vite-ignore */ '/wails/runtime.js');
         const name = 'github.com/0disoft/krasis/internal/workspacehost.WorkspaceService.';
         bridge = createKeyboardBridge({KeyboardRefresh:peer=>Call.ByName(name+'KeyboardRefresh',peer),KeyboardMatch:peer=>Call.ByName(name+'KeyboardMatch',peer)});
-        if (!disposed) await poll();
       } catch { if (!disposed) value = emptyKeyboard(peer); }
     })();
-    return () => { disposed = true; clearTimeout(timer); };
+    return () => { disposed = true; };
   });
 </script>
-<details class="keyboard-panel">
+<details class="keyboard-panel" ontoggle={e => expanded = e.currentTarget.open}>
   <summary>{ko ? '키보드 상태' : 'Keyboard state'}</summary>
   <table>
     <thead><tr><th></th><th>Caps Lock</th><th>Num Lock</th><th>{ko ? '한/영' : 'Korean IME'}</th></tr></thead>

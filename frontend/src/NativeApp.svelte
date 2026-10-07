@@ -370,7 +370,7 @@
       </div>
       {#if snapshot.state !== 'LOCAL'}<p>{t('placementLocked')}</p>{/if}
     </section>
-    <section class="settings-section"><KeyboardPanel peer={selected} {locale} /></section>
+    <section class="settings-section"><KeyboardPanel peer={selected} {locale} active={settingsOpen} /></section>
     <section class="settings-section"><h3>{t('app_settings')}</h3><AppSettings {locale} active={settingsOpen} onStatus={(code, state) => { appSettingsCode = code; releaseState = state; }} /></section>
     <section class="settings-section"><label class="language-setting">{t('language')}<select bind:value={locale}><option value="ko">한국어</option><option value="en">English</option></select></label>{#if trayLocaleFailed}<p role="status">{t('tray_locale_failed')}</p>{/if}</section>
   </div>
