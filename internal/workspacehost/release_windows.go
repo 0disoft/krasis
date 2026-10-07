@@ -25,6 +25,7 @@ type releaseState struct {
 	wake                chan struct{}
 	cancel              context.CancelFunc
 	checkPending        bool
+	cancelledByUser     bool
 }
 
 func (s *WorkspaceService) ReleaseStatus() ReleaseSnapshot {
@@ -52,6 +53,7 @@ func (s *WorkspaceService) CheckRelease() ReleaseSnapshot {
 	default:
 	}
 	s.release.checkPending = true
+	s.release.cancelledByUser = false
 	return ReleaseSnapshot{State: "CHECKING"}
 }
 func (s *WorkspaceService) setRelease(state string, generation int) {
@@ -62,6 +64,9 @@ func (s *WorkspaceService) setRelease(state string, generation int) {
 func (s *WorkspaceService) checkRelease() bool {
 	s.release.gate.Lock()
 	previous := s.release.value
+	if !s.release.checkPending {
+		s.release.cancelledByUser = false
+	}
 	s.release.checkPending = false
 	select {
 	case <-s.release.wake:
@@ -69,28 +74,26 @@ func (s *WorkspaceService) checkRelease() bool {
 	}
 	s.release.value = ReleaseSnapshot{State: "CHECKING"}
 	s.release.gate.Unlock()
-	fail := func(generation int) bool {
-		if previous.State == "READY" {
-			s.setRelease("READY", previous.Generation)
-		} else {
-			s.setRelease("FAILED", generation)
-		}
-		s.log.Event("release_check_failed")
-		return false
-	}
+	fail := func(err error, generation int) bool { return s.finishReleaseError(err, previous, generation) }
 	parent, cancel := context.WithTimeout(s.ctx, 3*time.Minute)
 	defer cancel()
 	s.release.gate.Lock()
 	s.release.cancel = cancel
+	if s.release.cancelledByUser {
+		cancel()
+	}
 	s.release.gate.Unlock()
 	defer func() { s.release.gate.Lock(); s.release.cancel = nil; s.release.gate.Unlock() }()
+	if parent.Err() != nil {
+		return fail(parent.Err(), 0)
+	}
 	m, envelope, err := releaseupdate.CheckSigned(parent, releaseupdate.Client(), releaseupdate.PublicKey)
 	if err != nil {
 		if errors.Is(err, releaseupdate.ErrUnconfigured) {
 			s.setRelease("UNCONFIGURED", 0)
 			return true
 		}
-		return fail(0)
+		return fail(err, 0)
 	}
 	if previous.State == "READY" && m.Generation <= previous.Generation {
 		s.setRelease("READY", previous.Generation)
@@ -108,25 +111,53 @@ func (s *WorkspaceService) checkRelease() bool {
 	s.setRelease("DOWNLOADING", m.Generation)
 	_, archive, err := releaseupdate.DownloadArchive(parent, releaseupdate.Client(), m)
 	if err != nil {
-		return fail(m.Generation)
+		return fail(err, m.Generation)
+	}
+	if parent.Err() != nil {
+		return fail(parent.Err(), m.Generation)
 	}
 	settings, err = appsettings.Load(os.Getenv("LOCALAPPDATA"))
-	if parent.Err() != nil || err != nil || !settings.AutoUpdate {
+	if err != nil || !settings.AutoUpdate {
 		s.setRelease("AVAILABLE", m.Generation)
 		return true
 	}
 	directory, _, err := releaseupdate.SaveReady(os.Getenv("LOCALAPPDATA"), envelope, archive, releaseupdate.PublicKey)
 	if err != nil {
-		return fail(m.Generation)
+		return fail(err, m.Generation)
 	}
 	s.release.gate.Lock()
 	s.release.directory, s.release.revision = directory, m.Revision
 	s.release.value = ReleaseSnapshot{"READY", m.Generation}
+	cancelled := s.release.cancelledByUser
+	if cancelled {
+		s.release.value.State = "CANCELLED"
+	}
 	s.release.gate.Unlock()
+	if cancelled {
+		s.log.Event("release_check_cancelled")
+	}
 	if err := releaseupdate.PruneReady(os.Getenv("LOCALAPPDATA"), releaseupdate.PublicKey); err != nil {
 		s.log.Event("release_cache_cleanup_failed")
 	}
 	return true
+}
+
+func (s *WorkspaceService) finishReleaseError(err error, previous ReleaseSnapshot, generation int) bool {
+	s.release.gate.Lock()
+	userCancelled := s.release.cancelledByUser
+	s.release.gate.Unlock()
+	if userCancelled && errors.Is(err, context.Canceled) {
+		s.setRelease("CANCELLED", generation)
+		s.log.Event("release_check_cancelled")
+		return true
+	}
+	if previous.State == "READY" {
+		s.setRelease("READY", previous.Generation)
+	} else {
+		s.setRelease("FAILED", generation)
+	}
+	s.log.Event("release_check_failed")
+	return false
 }
 func (s *WorkspaceService) runReleaseUpdater() {
 	applied := false

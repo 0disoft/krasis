@@ -13,7 +13,7 @@ export function createAppSettingsBridge(binding) {
     } catch { return emptyAppSettings(); }
     finally { busy = false; }
   }
-  const releaseStates = new Set(['IDLE','CHECKING','UNCONFIGURED','FAILED','CURRENT','AVAILABLE','DOWNLOADING','READY']);
+  const releaseStates = new Set(['IDLE','CHECKING','UNCONFIGURED','FAILED','CANCELLED','CURRENT','AVAILABLE','DOWNLOADING','READY']);
   async function release(method) {
     try {
       const value=await binding[method]();

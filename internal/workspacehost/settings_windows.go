@@ -99,8 +99,11 @@ func (s *WorkspaceService) SetAppSettings(startAtLogin, autoUpdate bool) AppSett
 	if autoUpdate && !old.AutoUpdate {
 		s.CheckRelease()
 	}
-	if !autoUpdate {
+	if !autoUpdate && old.AutoUpdate {
 		s.release.gate.Lock()
+		if s.release.cancel != nil || s.release.checkPending || s.release.value.State == "CHECKING" || s.release.value.State == "DOWNLOADING" {
+			s.release.cancelledByUser = true
+		}
 		if s.release.cancel != nil {
 			s.release.cancel()
 		}

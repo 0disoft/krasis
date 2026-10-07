@@ -26,3 +26,8 @@ test('unverified restoration remains explicit after reloading saved checks',asyn
   });
   assert.deepEqual(await b.set(true,false),{schema:'krasis.app-settings/v1',code:'rollback_failed',startAtLogin:false,autoUpdate:true});
 });
+
+test('user cancellation is projected separately from a release failure',async()=>{
+  const b=createAppSettingsBridge({ReleaseStatus:()=>({state:'CANCELLED',generation:219})});
+  assert.deepEqual(await b.release(),{state:'CANCELLED',generation:219});
+});

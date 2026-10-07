@@ -196,3 +196,9 @@ reads must succeed before restoration is verified. Unknown reads never
 authorize blind rewrites. Fixed settings_change/settings_restore events
 retain the failed stage and compensation outcome without raw error text.
 The additive rollback_failed settings code stays explicit in the renderer.
+
+Disabling automatic updates marks cancellation of pending or active checks.
+Only a marked context cancellation becomes CANCELLED with a fixed diagnostic
+event; timeout, validation and download failures remain failures. A pending
+cancel is honored before network work starts. Downloaded files are retained,
+and cancellation never applies them. Explicit new checks reset the marker.
