@@ -240,6 +240,10 @@ func (b *DesktopLifecycle) tick(now time.Time) {
 	// Missing trust is an unavailable observation, not a removed identity or
 	// permission to prepare another agent. Keep the recovery budget unchanged.
 	if !observationKnown {
+		if b.recovery.uncertain {
+			value.Code = "outcome_unknown"
+			b.save(value)
+		}
 		return
 	}
 	view := View{State: value.State, PeerAlias: value.PeerAlias, StopReason: value.StopReason, DisplayReady: true, Fingerprints: map[string]string{}}
@@ -257,7 +261,7 @@ func (b *DesktopLifecycle) tick(now time.Time) {
 		}
 		return
 	}
-	if action == "display_recovery_expired" {
+	if action == "display_recovery_expired" || action == "outcome_unknown" || action == "stale_peer" {
 		value.Code = action
 		b.save(value)
 		return
@@ -300,6 +304,10 @@ func (b *DesktopLifecycle) recoveryResume(bridge *DesktopBridge, alias, fingerpr
 	value := bridge.Resume(alias, fingerprint)
 	if value.Code == "cancelled" {
 		b.recovery.Stop()
+	}
+	if value.Code == "outcome_unknown" {
+		b.recovery.Alias, b.recovery.Fingerprint = alias, fingerprint
+		b.recovery.uncertain = true
 	}
 	return value
 }

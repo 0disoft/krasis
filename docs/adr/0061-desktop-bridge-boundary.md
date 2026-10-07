@@ -433,3 +433,9 @@ Startup permits these two terminal results to fall back to an ordinary agent,
 while pending work and other ownership/startup errors still prevent a launch.
 The one-attempt latch prevents consent replay during that fallback. Maintenance
 retains the installer result even when the ordinary agent and reconnect succeed.
+
+Ordinary and display-change recovery also latch uncertain resume replies. A later
+idle/faulted observation or elapsed retry budget cannot replay that request or
+prepare another agent. Read failures keep the uncertainty notice. Only a verified
+CONNECTED observation for the pinned identity resolves it; a confirmed identity
+change stops recovery, and explicit user operations reset its latch.

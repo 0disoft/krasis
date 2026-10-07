@@ -211,3 +211,53 @@ func TestDesktopLifecycleRetriesDisplayChangeAfterGeometrySettles(t *testing.T) 
 		t.Fatal("failed to retry transient display reconnect", starts, client.connects)
 	}
 }
+
+func TestRecoveryObservesLostResumeReplyWithoutRepeatingStartupOrCommand(t *testing.T) {
+	for _, display := range []bool{false, true} {
+		for _, resolution := range []string{"connected", "changed", "explicit"} {
+			b, c, now := newResumeTest(t, nil)
+			b.updatedResume = nil
+			b.recovery.Alias, b.recovery.Fingerprint = "B", c.peers[0].Fingerprint
+			c.state, c.uncertain = "FAULTED", true
+			if display {
+				c.state, c.stopReason = "LOCAL", "display_change"
+			}
+			starts := 0
+			b.ensure = func(context.Context) error { starts++; c.state = "LOCAL"; return nil }
+			b.tick(now)
+			b.tick(now.Add(6 * time.Second))
+			if c.connects != 1 || starts != 1 || b.Refresh().Code != "outcome_unknown" {
+				t.Fatal(display, b.Refresh(), starts, c.connects)
+			}
+			c.trustErr = errors.New("temporary read failure")
+			b.tick(now.Add(10 * time.Second))
+			c.trustErr = nil
+			for _, elapsed := range []time.Duration{15, 35, 60} {
+				b.tick(now.Add(elapsed * time.Second))
+				if c.connects != 1 || starts != 1 || b.Refresh().Code != "outcome_unknown" {
+					t.Fatal("uncertain resume was replayed", display, b.Refresh(), starts, c.connects)
+				}
+			}
+			switch resolution {
+			case "connected":
+				c.state = "CONNECTED"
+				b.tick(now.Add(61 * time.Second))
+				if b.recovery.uncertain || b.Refresh().Code != "ok" {
+					t.Fatal("verified connection did not resolve uncertainty", b.Refresh())
+				}
+			case "changed":
+				c.peers[0].Fingerprint = strings.Repeat("c", 64)
+				b.tick(now.Add(61 * time.Second))
+				if !b.recovery.blocked || c.connects != 1 || b.Refresh().Code != "stale_peer" {
+					t.Fatal("changed identity was resumed", b.Refresh())
+				}
+			case "explicit":
+				c.uncertain = false
+				value := b.Connect("B", c.peers[0].Fingerprint)
+				if value.Code != "ok" || b.recovery.uncertain || c.connects != 2 {
+					t.Fatal("explicit connection did not reset uncertainty", value)
+				}
+			}
+		}
+	}
+}

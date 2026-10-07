@@ -8,6 +8,7 @@ type AutomaticRecovery struct {
 	Alias, Fingerprint string
 	Attempts           int
 	blocked, diagnosed bool
+	uncertain          bool
 	next               time.Time
 	displaySince       time.Time
 	displayReadySince  time.Time
@@ -22,6 +23,16 @@ func (r *AutomaticRecovery) Stop()  { *r = AutomaticRecovery{blocked: true} }
 func (r *AutomaticRecovery) Next(now time.Time, view View) string {
 	if r.blocked {
 		return ""
+	}
+	if r.uncertain {
+		if view.Fingerprints[r.Alias] != r.Fingerprint || view.State == "CONNECTED" && view.PeerAlias != r.Alias {
+			r.Stop()
+			return "stale_peer"
+		}
+		if view.State != "CONNECTED" || view.PeerAlias != r.Alias {
+			return "outcome_unknown"
+		}
+		r.uncertain = false // Only the pinned peer's connected state resolves it.
 	}
 	if view.State == "CONNECTED" {
 		if view.PeerAlias != "" && len(view.Fingerprints[view.PeerAlias]) == 64 {
