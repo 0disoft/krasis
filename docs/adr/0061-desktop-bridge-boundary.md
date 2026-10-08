@@ -561,3 +561,8 @@ Pending restoration retries only ErrStartupBusy, which Ensure returns before
 acquiring startup ownership or starting a process. A five-second backoff retains
 the original peer and deadline; cancellation and expiration still consume it.
 Other restoration errors remain terminal, and no installer is invoked again.
+
+Terminal restoration failure has its own bounded reconnect outcome,
+input_refresh_restore_failed. The original installer outcome is retained, while
+the renderer explains that agent restoration and automatic connection stopped.
+Subsequent cached reads keep the failure until an explicit lifecycle action.

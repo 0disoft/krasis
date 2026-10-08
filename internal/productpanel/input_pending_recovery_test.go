@@ -83,6 +83,9 @@ func TestPendingInputContinuationWaitsAndResumesOnce(t *testing.T) {
 			if mode == "mismatch" && b.Refresh().InputRefreshCode != "input_refresh_failed" {
 				t.Fatal("mismatch advertised as installed", b.Refresh())
 			}
+			if mode == "restore failed" && (b.Refresh().ReconnectCode != "input_refresh_restore_failed" || b.pendingInput != nil || b.Refresh().InputRefreshCode != "input_refresh_pending") {
+				t.Fatal("restoration failure erased installer outcome or kept waiting", b.Refresh())
+			}
 			if mode == "lost reply" && b.Refresh().Code != "outcome_unknown" {
 				t.Fatal("uncertain continuation lost", b.Refresh())
 			}

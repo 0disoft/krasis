@@ -82,7 +82,8 @@ func (b *DesktopLifecycle) continuePendingInput(ctx context.Context, now time.Ti
 		}
 		if err != nil {
 			b.pendingInput, b.updatedResume = nil, nil
-			value.Code = "startup_failed"
+			// Agent restoration failure cannot rewrite the installer outcome.
+			value.Code, value.ReconnectCode = "input_refresh_restore_failed", "input_refresh_restore_failed"
 			return value, true
 		}
 		p.restored, p.refreshCode = true, "ok"

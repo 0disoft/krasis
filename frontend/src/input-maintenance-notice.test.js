@@ -28,6 +28,13 @@ test('unconfirmed values never show raw details or claim success', () => {
   assert.equal(inputMaintenanceNotice({inputRefreshCode:'ok',reconnectCode:'stale_peer'},'ko'),'갱신: 완료 · 재연결: 기기 다시 선택 필요');
 });
 
+test('terminal restoration failure replaces waiting guidance without claiming an installation result', () => {
+  for (const inputRefreshCode of ['ok','input_refresh_pending','input_refresh_failed']) {
+    assert.equal(inputMaintenanceNotice({inputRefreshCode,reconnectCode:'input_refresh_restore_failed'},'ko'),
+      '에이전트 복구에 실패해 자동 연결을 중단했습니다. 진단을 저장한 뒤 연결 또는 에이전트 복구를 다시 시도하세요.');
+  }
+});
+
 test('expired automatic confirmation remains distinct from the installation outcome', () => {
   for (const inputRefreshCode of ['ok','input_refresh_pending','input_refresh_failed']) {
     const value = {inputRefreshCode,reconnectCode:'input_refresh_wait_expired'};
