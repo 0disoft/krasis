@@ -54,6 +54,7 @@ type WorkspaceService struct {
 	prepareSettings  func() error
 	inputRefresh     func(context.Context) error
 	inputSetup       func() string
+	inputAttempt     func() string
 	inputRecheck     func() string
 	log              *productlog.Logger
 }
@@ -167,6 +168,9 @@ func (s *WorkspaceService) RefreshNow() productpanel.BridgeSnapshot {
 func (s *WorkspaceService) withInputSetup(value productpanel.BridgeSnapshot) productpanel.BridgeSnapshot {
 	if s.inputSetup != nil {
 		value.InputSetup = s.inputSetup()
+	}
+	if s.inputAttempt != nil {
+		value.InputAttemptCode = s.inputAttempt()
 	}
 	return value
 }

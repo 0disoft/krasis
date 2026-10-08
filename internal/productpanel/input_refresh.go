@@ -17,13 +17,14 @@ var (
 // The runner presents Windows consent; the embedded installer owns all
 // privileged writes, fixed paths, validation and rollback.
 type inputRefresh struct {
-	mu        sync.Mutex
-	reader    atomic.Pointer[inputHealthReader]
-	attempted bool
-	checkedAt time.Time
-	state     atomic.Pointer[string]
-	inspect   func() string
-	run       func(context.Context) error
+	mu         sync.Mutex
+	reader     atomic.Pointer[inputHealthReader]
+	attempted  bool
+	checkedAt  time.Time
+	state      atomic.Pointer[string]
+	lastResult atomic.Pointer[string]
+	inspect    func() string
+	run        func(context.Context) error
 }
 
 type inputHealthReader struct{ done chan struct{} }
@@ -36,7 +37,7 @@ func (b *inputRefresh) status() string {
 		if current != nil && *current == "PENDING" {
 			interval = time.Second
 		}
-		eligible := current == nil || *current == "PENDING" || *current == "READY" || *current == "UNKNOWN" || *current == "NOT_INSTALLED" || *current == "UPDATE_REQUIRED"
+		eligible := current == nil || *current == "PENDING" || *current == "READY" || *current == "UNKNOWN" || *current == "NOT_INSTALLED" || *current == "UPDATE_REQUIRED" || b.lastResult.Load() != nil && (*current == "CANCELLED" || *current == "FAILED")
 		if eligible && (current == nil || time.Since(b.checkedAt) >= interval) {
 			b.checkedAt = time.Now()
 			reader := &inputHealthReader{done: make(chan struct{})}
@@ -79,8 +80,26 @@ func (b *inputRefresh) inspectLocked() string {
 		b.attempted = true
 	}
 	b.setState(state)
+	if b.attemptResult() == "input_refresh_pending" {
+		if state == "READY" {
+			b.setAttemptResult("ok")
+		}
+		if state == "UPDATE_REQUIRED" || state == "NOT_INSTALLED" {
+			b.setAttemptResult("input_refresh_failed")
+		}
+	}
 	return state
 }
+
+// Health observations may change; the last attempted operation is independent.
+func (b *inputRefresh) attemptResult() string {
+	if value := b.lastResult.Load(); value != nil {
+		return *value
+	}
+	return ""
+}
+
+func (b *inputRefresh) setAttemptResult(code string) { b.lastResult.Store(&code) }
 
 // Automatic preparation may await a read-only health worker. An installer or
 // explicit request still returns busy immediately, preserving ownership fences.
@@ -163,6 +182,14 @@ func (b *inputRefresh) apply(ctx context.Context, explicit bool) error {
 		return ErrInputRefreshPending
 	}
 	if !explicit && b.attempted {
+		switch b.attemptResult() {
+		case "input_refresh_cancelled":
+			return ErrInputRefreshCancelled
+		case "input_refresh_failed":
+			return ErrInputRefreshFailed
+		case "input_refresh_pending":
+			return ErrInputRefreshPending
+		}
 		return nil
 	}
 	state := b.inspect()
@@ -186,24 +213,30 @@ func (b *inputRefresh) apply(ctx context.Context, explicit bool) error {
 		return err
 	}
 	b.attempted = true
+	b.lastResult.Store(nil)
 	b.setState("UPDATING")
 	err := b.run(ctx)
 	switch {
 	case errors.Is(err, ErrInputRefreshPending):
 		b.setState("PENDING")
+		b.setAttemptResult("input_refresh_pending")
 		return err
 	case errors.Is(err, ErrInputRefreshCancelled):
 		b.setState("CANCELLED")
+		b.setAttemptResult("input_refresh_cancelled")
 	case err != nil:
 		b.setState("FAILED")
+		b.setAttemptResult("input_refresh_failed")
 		if !errors.Is(err, ErrInputRefreshFailed) {
 			err = errors.Join(ErrInputRefreshFailed, err)
 		}
 	case b.inspect() != "READY":
 		b.setState("FAILED")
+		b.setAttemptResult("input_refresh_failed")
 		err = ErrInputRefreshFailed
 	default:
 		b.setState("READY")
+		b.setAttemptResult("ok")
 	}
 	// Preserve the installer result. Startup may restore ordinary input without
 	// treating this result as successful or repeating the consent prompt.

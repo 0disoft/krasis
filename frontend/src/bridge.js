@@ -30,6 +30,7 @@ export function createBridge(binding) {
         code: value.code, notice: value.notice,
 		resumeState: ['SAVED','FAILED'].includes(value.resumeState) ? value.resumeState : 'UNKNOWN',
 		inputRefreshCode: value.inputRefreshCode === undefined ? '' : refreshCodes.has(value.inputRefreshCode) ? value.inputRefreshCode : 'unknown',
+		inputAttemptCode: value.inputAttemptCode === undefined ? '' : refreshCodes.has(value.inputAttemptCode) ? value.inputAttemptCode : 'unknown',
 		reconnectCode: value.reconnectCode === undefined ? '' : reconnectCodes.has(value.reconnectCode) ? value.reconnectCode : 'unknown',
         boundaryBlocked: value.state === 'CONNECTED' && ['LOCAL_MENU','MOUSE_CAPTURE','PRESSED_INPUT','MOVE_SIZE'].includes(value.boundaryBlocked) ? value.boundaryBlocked : '',
 		inputBackend: ['PROTECTED','PORTABLE'].includes(value.inputBackend) ? value.inputBackend : 'UNKNOWN',

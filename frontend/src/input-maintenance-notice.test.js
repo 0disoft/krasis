@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { inputMaintenanceNotice, inputSetupNotice } from './input-maintenance-notice.js';
+test('historical installation failures remain visible only where current health needs attention', () => {
+  assert.equal(inputMaintenanceNotice({inputAttemptCode:'input_refresh_cancelled',inputSetup:'UPDATE_REQUIRED'},'ko'),'최근 보호 입력 설치는 취소됐습니다.');
+  assert.equal(inputMaintenanceNotice({inputAttemptCode:'input_refresh_failed',inputSetup:'UNKNOWN'},'en'),'The last protected input installation failed.');
+  for (const inputSetup of ['READY','UPDATING','PENDING','FAILED','CANCELLED']) {
+    assert.equal(inputMaintenanceNotice({inputAttemptCode:'input_refresh_failed',inputSetup},'ko'),'');
+  }
+  assert.equal(inputMaintenanceNotice({inputAttemptCode:'private path',inputSetup:'UNKNOWN'},'ko'),'');
+});
 
 test('successful refreshes stay quiet and combined failures keep both outcomes', () => {
   assert.equal(inputMaintenanceNotice({},'ko'),'');

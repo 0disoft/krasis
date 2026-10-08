@@ -4,6 +4,14 @@ import { createBridge } from './bridge.js';
 
 const peer = { alias: 'B', fingerprint: 'a'.repeat(64) };
 const snapshot = state => ({ schema: 'krasis.desktop/v1', state, peerAlias: '', peers: [peer], code: 'ok', notice: '' });
+test('last installation result stays separate from healthy input and strips unknown details', async () => {
+  for (const code of ['input_refresh_cancelled','input_refresh_failed','ok',undefined,'private path']) {
+    const bridge = createBridge({Refresh: async () => ({...snapshot('LOCAL'),inputSetup:'READY',inputAttemptCode:code}),Connect(){},Disconnect(){}});
+    const value = await bridge.refresh();
+    assert.equal(value.inputSetup,'READY');
+    assert.equal(value.inputAttemptCode,code === undefined ? '' : code === 'private path' ? 'unknown' : code);
+  }
+});
 test('manual refresh uses a dedicated read while periodic polling stays cached', async () => {
   const calls = [];
   const bridge = createBridge({

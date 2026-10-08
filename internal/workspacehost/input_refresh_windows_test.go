@@ -37,3 +37,15 @@ func TestManualRefreshRequestsFreshHealthWithoutInstallingOrRestarting(t *testin
 		t.Fatal(v, checks)
 	}
 }
+
+func TestWorkspaceKeepsAttemptResultSeparateFromCurrentHealth(t *testing.T) {
+	s := &WorkspaceService{managed: productpanel.NewDesktopLifecycle(context.Background(), nil, nil, nil),
+		inputSetup: func() string { return "READY" }, inputAttempt: func() string { return "input_refresh_cancelled" },
+		inputRecheck: func() string { return "UNKNOWN" }}
+	if v := s.Refresh(); v.InputSetup != "READY" || v.InputAttemptCode != "input_refresh_cancelled" {
+		t.Fatal(v)
+	}
+	if v := s.RefreshNow(); v.InputSetup != "UNKNOWN" || v.InputAttemptCode != "input_refresh_cancelled" {
+		t.Fatal(v)
+	}
+}

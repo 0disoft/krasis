@@ -31,6 +31,7 @@ type Startup struct {
 	BeforeStart       func(context.Context) error
 	InputRefresh      func(context.Context) error
 	InputSetup        func() string
+	InputAttempt      func() string
 	InputRecheck      func() string
 	InputProbe        func(context.Context) string
 	InputRestoreCheck func() error

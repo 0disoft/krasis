@@ -40,9 +40,9 @@ func TestInputRefreshAutomaticConsentPolicy(t *testing.T) {
 				}
 				return tc.result
 			}}
-			for attempt := range 3 {
+			for range 3 {
 				err := b.automatic(context.Background())
-				wantError := tc.blocked || attempt == 0 && tc.want == "FAILED" || attempt == 0 && tc.want == "CANCELLED"
+				wantError := tc.blocked || tc.want == "FAILED" || tc.want == "CANCELLED"
 				if (err != nil) != wantError {
 					t.Fatalf("error %v", err)
 				}
@@ -67,7 +67,7 @@ func TestInputRefreshRequiresExplicitRetryAndReverification(t *testing.T) {
 	if !errors.Is(b.automatic(context.Background()), ErrInputRefreshCancelled) || b.status() != "CANCELLED" {
 		t.Fatal("cancel failed")
 	}
-	if b.automatic(context.Background()) != nil || calls != 1 {
+	if !errors.Is(b.automatic(context.Background()), ErrInputRefreshCancelled) || calls != 1 {
 		t.Fatal("automatic retry")
 	}
 	if b.explicit(context.Background()) != nil || b.status() != "READY" || calls != 2 {

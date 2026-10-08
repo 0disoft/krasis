@@ -40,6 +40,7 @@ func NewStartup(control string) (Startup, error) {
 		BeforeStart:       refresh.automatic,
 		InputRefresh:      refresh.explicit,
 		InputSetup:        refresh.status,
+		InputAttempt:      refresh.attemptResult,
 		InputRecheck:      refresh.recheck,
 		InputProbe:        refresh.probe,
 		InputRestoreCheck: refresh.restoreCheck,

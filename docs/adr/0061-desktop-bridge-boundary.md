@@ -532,3 +532,13 @@ promotion replay. Fresh trust changes stop the continuation; possibly sent
 commands transfer to the existing uncertainty latch instead of retrying. The
 restoration context cannot exceed the saved deadline. This remains native state,
 with no renderer-triggered recovery or new worker.
+
+Input health and the last attempted refresh result are separate atomic native
+projections. Startup probes and background health readers may replace health,
+but cannot erase terminal cancellation/failure. Repeated automatic preparation
+returns that stored terminal result without consent replay; ordinary agent start
+still permits the existing fallback policy. inputAttemptCode is a bounded optional
+desktop snapshot field, independently allowlisted by the renderer. Historical
+failure guidance is shown only when current health needs attention and no
+maintenance outcome already explains it. No new HTTP endpoint or stored input
+content is introduced.

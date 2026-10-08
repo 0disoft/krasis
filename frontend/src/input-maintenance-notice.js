@@ -18,7 +18,10 @@ export function inputSetupNotice(value, busy = false) {
 }
 
 export function inputMaintenanceNotice(value, locale) {
-  if (!value?.inputRefreshCode && !value?.reconnectCode) return '';
+  if (!value?.inputRefreshCode && !value?.reconnectCode) {
+    const key = {input_refresh_cancelled:'input_last_cancelled',input_refresh_failed:'input_last_failed'}[value?.inputAttemptCode];
+    return key && ['UPDATE_REQUIRED','NOT_INSTALLED','UNKNOWN'].includes(value?.inputSetup) ? nativeText(locale,key) : '';
+  }
   if (value.inputRefreshCode === 'ok' && ['ok','not_attempted'].includes(value.reconnectCode)) return '';
   return nativeText(locale,'maintenance_outcome')
     .replace('{refresh}',nativeText(locale,refreshKeys[value.inputRefreshCode] ?? 'maintenance_unknown'))
