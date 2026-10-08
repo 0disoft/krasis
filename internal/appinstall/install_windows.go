@@ -19,7 +19,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"slices"
 )
 
 func directory(base string) (*securefs.Directory, string, error) {
@@ -112,6 +111,9 @@ func InstallWithShutdown(ctx context.Context, base, self string, p Package) (str
 }
 
 func install(ctx context.Context, base, self string, p Package, before func() (io.Closer, error)) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 	if p.Bundle == nil {
 		return "", ErrInvalid
 	}
@@ -144,38 +146,19 @@ func install(ctx context.Context, base, self string, p Package, before func() (i
 	if err := appsettings.ValidateStartupRegistration(base); err != nil {
 		return "", err
 	}
-	if before != nil {
-		idle, err := before()
-		if err != nil {
-			return "", err
-		}
-		defer idle.Close()
-	}
 	dir, path, err := directory(base)
 	if err != nil {
 		return "", err
 	}
 	defer dir.Close()
-	r := Receipt{Schema: Schema, Generation: meta.Generation, Revision: meta.Revision, Folders: []string{p.ID}}
-	if data, e := read(dir, "installation.json", 8192); e == nil {
-		old, e := DecodeReceipt(data)
-		if e != nil {
-			return "", e
-		}
-		if old.Generation > meta.Generation {
-			return "", ErrOlder
-		}
-		for _, name := range old.Folders {
-			if !slices.Contains(r.Folders, name) {
-				r.Folders = append(r.Folders, name)
-			}
-		}
-	} else if !errors.Is(e, os.ErrNotExist) {
-		return "", e
+	plan, err := prepareInstallPlan(ctx, dir, self, Receipt{Schema: Schema, Generation: meta.Generation, Revision: meta.Revision, Folders: []string{p.ID}}, before)
+	if err != nil {
+		return "", err
 	}
-	if len(r.Folders) > 64 {
-		return "", ErrInvalid
+	if plan.idle != nil {
+		defer plan.idle.Close()
 	}
+	r := plan.receipt
 	root, err := os.OpenRoot(path)
 	if err != nil {
 		return "", err
@@ -223,16 +206,8 @@ func install(ctx context.Context, base, self string, p Package, before func() (i
 			return "", err
 		}
 	}
-	// Store the signed/unsigned self-contained setup, not a shell or remote path.
-	source, err := securefs.OpenReadDirectory(filepath.Dir(self))
-	if err != nil {
-		return "", err
-	}
-	data, err := read(source, filepath.Base(self), 64<<20)
-	source.Close()
-	if err != nil {
-		return "", err
-	}
+	// Self bytes were already read before stopping the running product.
+	data := plan.setup
 	if old, e := read(dir, "krasis-setup.exe", 64<<20); e != nil || sha256.Sum256(old) != sha256.Sum256(data) {
 		if err = replace(dir, "krasis-setup.exe", data); err != nil {
 			return "", err

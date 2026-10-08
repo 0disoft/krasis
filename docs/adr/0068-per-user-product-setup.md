@@ -70,7 +70,13 @@ installation automatically. Build verification never installs or launches the UI
 
 Interactive and JSON install/repair both stop the running product and launch the
 installed UI. Validated package, settings and registration preflight precede any
-shutdown. The installer holds the existing startup lease through publication and
+shutdown. Before requesting shutdown, setup also parses the existing installation
+receipt, rejects downgrade and merged-history overflow, and reads the complete
+self-contained setup image. These preflight failures leave the running UI and
+connection untouched. Publication uses those already-read bytes, never a second
+source-file read after shutdown. Cancelled requests stop before shutdown, and
+cancellation during confirmed shutdown releases the idle agent lease without
+staging application images. The installer holds the existing startup lease through publication and
 retains the idle agent lease after confirmed exit to fence automatic recovery.
 Only same-user, same-session UI processes matching the current/previous launch
 record and exact image hash can be closed. Retained process handles prevent PID
