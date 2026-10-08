@@ -205,7 +205,10 @@ func elevateInputInstallerAction(ctx context.Context, path, directory string, re
 	}
 	args, _ := windows.UTF16PtrFromString(action)
 	dir, _ := windows.UTF16PtrFromString(directory)
-	info := shellExecuteInfo{Mask: 0x40 | 0x100 | 0x400, Verb: verb, File: file, Parameters: args, Directory: dir, Show: windows.SW_SHOWNORMAL}
+	// Keep attended UAC consent, but do not expose the console of the local
+	// installer. Console Quick Edit can suspend its final JSON write after the
+	// transaction completes, leaving the caller with an uncertain timeout.
+	info := shellExecuteInfo{Mask: 0x40 | 0x100 | 0x400, Verb: verb, File: file, Parameters: args, Directory: dir, Show: windows.SW_HIDE}
 	info.Size = uint32(unsafe.Sizeof(info))
 	ok, _, callErr := windows.NewLazySystemDLL("shell32.dll").NewProc("ShellExecuteExW").Call(uintptr(unsafe.Pointer(&info)))
 	if ok == 0 {
