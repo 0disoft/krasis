@@ -42,6 +42,9 @@ func Remove(ctx context.Context, base string) error {
 	if err != nil {
 		return err
 	}
+	if err = validateUninstall(path); err != nil {
+		return err
+	}
 	// Preflight the entire bounded deletion set before changing registrations.
 	for _, name := range r.Folders {
 		guard, e := securefs.OpenDirectory(filepath.Join(path, name))

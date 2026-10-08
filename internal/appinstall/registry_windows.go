@@ -11,6 +11,26 @@ import (
 
 const uninstallKey = `Software\Microsoft\Windows\CurrentVersion\Uninstall\Krasis`
 
+// A receipt alone does not prove that this process can see the user's shell
+// registration. Refuse removal in an unrelated/isolated registry context before
+// deleting files, even when both processes report the same user SID.
+func validateUninstallAt(root registry.Key, key, path string) error {
+	k, err := registry.OpenKey(root, key, registry.QUERY_VALUE)
+	if err != nil {
+		return errors.Join(ErrInvalid, err)
+	}
+	defer k.Close()
+	value, _, err := k.GetStringValue("InstallLocation")
+	if err != nil || value != path {
+		return ErrInvalid
+	}
+	return nil
+}
+
+func validateUninstall(path string) error {
+	return validateUninstallAt(registry.CURRENT_USER, uninstallKey, path)
+}
+
 func registerUninstall(path string, generation int) error {
 	k, _, err := registry.CreateKey(registry.CURRENT_USER, uninstallKey, registry.SET_VALUE|registry.QUERY_VALUE)
 	if err != nil {

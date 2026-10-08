@@ -12,6 +12,9 @@ refuses active/unknown process ownership and unexpected files, and uses only a
 strict receipt's fixed child names. An independent temporary worker waits for the
 registered uninstaller to exit before deleting it. Protected input retains its
 attended, revision-verified administrator removal; the per-user setup is asInvoker.
+Before removal changes any files or service, the current registry context must
+also expose the owned Installed Apps entry for the receipt's fixed app root.
+A missing or foreign entry is a failed preflight, not an idempotent success.
 
 Setup and repair apply the saved startup preference. Before publishing another
 launch record, they migrate the owned recovery task to the current image while
