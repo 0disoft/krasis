@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/0disoft/krasis/internal/agentinstance"
+	"github.com/0disoft/krasis/internal/appsettings"
 	"github.com/0disoft/krasis/internal/launchrecord"
 	"github.com/0disoft/krasis/internal/peercredentials"
 	"github.com/0disoft/krasis/internal/productidentity"
@@ -99,6 +100,10 @@ func read(dir *securefs.Directory, name string, limit int64) ([]byte, error) {
 func Install(base, self string, p Package) (string, error) {
 	if p.Bundle == nil {
 		return "", ErrInvalid
+	}
+	settings, err := appsettings.Load(base)
+	if err != nil {
+		return "", err
 	}
 	lease, err := agentinstance.AcquireControlStartup()
 	if err != nil {
@@ -202,7 +207,7 @@ func Install(base, self string, p Package) (string, error) {
 		return "", err
 	}
 	ui := filepath.Join(installed, "krasis.exe")
-	if err = launchrecord.Register(base, ui, meta.Generation, meta.Revision); err != nil {
+	if err = registerInstalledLaunch(base, ui, meta.Generation, meta.Revision, settings.StartAtLogin, appsettings.SetRecoveryTask, appsettings.SetStartup); err != nil {
 		return "", err
 	}
 	if err = launchrecord.RegisterStartMenu(base); err != nil {

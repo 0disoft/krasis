@@ -13,6 +13,14 @@ strict receipt's fixed child names. An independent temporary worker waits for th
 registered uninstaller to exit before deleting it. Protected input retains its
 attended, revision-verified administrator removal; the per-user setup is asInvoker.
 
+Setup and repair apply the saved startup preference. Before publishing another
+launch record, they migrate the owned recovery task to the current image while
+its previous-image proof is still retained. After publication they move the task
+to the new image and register the fixed login CLI. Repeated repair cannot outrun
+task ownership history. A foreign or unreadable task blocks this registration;
+it is never silently deleted or adopted. A missing settings file keeps the
+first-install default, while malformed settings abort installation.
+
 Development setup remains unsigned. Production requires a configured Authenticode
 signing identity, exact signer thumbprint and timestamp verification, plus the
 existing Ed25519 release feed key. Neither trust stores nor security settings are
