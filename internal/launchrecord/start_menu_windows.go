@@ -6,8 +6,10 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -53,43 +55,18 @@ func UnregisterStartMenu(base string) error {
 		return err
 	}
 	defer dir.Close()
-	f, err := dir.Open("start-menu.json")
-	if errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
+	target, link, err := startMenuPaths(base)
 	if err != nil {
 		return err
 	}
-	var r menuReceipt
-	info, err := f.Stat()
-	if err != nil || info.Size() > 8192 {
-		f.Close()
-		return ErrInvalid
-	}
-	err = json.NewDecoder(f).Decode(&r)
-	f.Close()
-	if err != nil {
-		return ErrInvalid
-	}
-	programs, err := windows.KnownFolderPath(windows.FOLDERID_Programs, 0)
-	if err != nil {
+	r, exists, err := startMenuRemoval(dir, target, link)
+	if err != nil || r == nil {
 		return err
 	}
-	launch, err := Directory(base)
-	if err != nil {
-		return err
-	}
-	if r.Link != filepath.Join(programs, "Krasis.lnk") || r.Target != filepath.Join(launch, "krasis-cli.exe") {
-		return ErrInvalid
-	}
-	hash, err := linkDigest(r.Link)
-	if errors.Is(err, os.ErrNotExist) {
+	if !exists {
 		return dir.Remove("start-menu.json")
 	}
-	if err != nil || hash != r.SHA256 {
-		return ErrInvalid
-	}
-	links, err := securefs.OpenDirectory(programs)
+	links, err := securefs.OpenDirectory(filepath.Dir(link))
 	if err != nil {
 		return err
 	}
@@ -98,6 +75,81 @@ func UnregisterStartMenu(base string) error {
 		return err
 	}
 	return dir.Remove("start-menu.json")
+}
+
+// ValidateStartMenuRemoval uses the same receipt and byte checks as removal,
+// without creating directories, launching a shell helper or removing the link.
+func ValidateStartMenuRemoval(base string) error {
+	path, err := Directory(base)
+	if err != nil {
+		return err
+	}
+	dir, err := securefs.OpenReadDirectory(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer dir.Close()
+	target, link, err := startMenuPaths(base)
+	if err != nil {
+		return err
+	}
+	_, _, err = startMenuRemoval(dir, target, link)
+	return err
+}
+
+func startMenuPaths(base string) (string, string, error) {
+	programs, err := windows.KnownFolderPath(windows.FOLDERID_Programs, 0)
+	if err != nil {
+		return "", "", err
+	}
+	launch, err := Directory(base)
+	if err != nil {
+		return "", "", err
+	}
+	return filepath.Join(launch, "krasis-cli.exe"), filepath.Join(programs, "Krasis.lnk"), nil
+}
+
+func startMenuRemoval(dir *securefs.Directory, target, link string) (*menuReceipt, bool, error) {
+	f, err := dir.Open("start-menu.json")
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	var r menuReceipt
+	info, err := f.Stat()
+	if err != nil || info.Size() > 8192 {
+		f.Close()
+		return nil, false, ErrInvalid
+	}
+	decoder := json.NewDecoder(f)
+	decoder.DisallowUnknownFields()
+	err = decoder.Decode(&r)
+	if err == nil && decoder.Decode(new(any)) != io.EOF {
+		err = ErrInvalid
+	}
+	f.Close()
+	if err != nil {
+		return nil, false, ErrInvalid
+	}
+	if r.Link != link || r.Target != target || len(r.SHA256) != 64 {
+		return nil, false, ErrInvalid
+	}
+	if _, err := hex.DecodeString(r.SHA256); err != nil {
+		return nil, false, ErrInvalid
+	}
+	hash, err := linkDigest(r.Link)
+	if errors.Is(err, os.ErrNotExist) {
+		return &r, false, nil
+	}
+	if err != nil || hash != r.SHA256 {
+		return nil, false, ErrInvalid
+	}
+	return &r, true, nil
 }
 
 func linkDigest(link string) (string, error) {

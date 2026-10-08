@@ -15,6 +15,14 @@ attended, revision-verified administrator removal; the per-user setup is asInvok
 Before removal changes any files or service, the current registry context must
 also expose the owned Installed Apps entry for the receipt's fixed app root.
 A missing or foreign entry is a failed preflight, not an idempotent success.
+Removal validates saved preferences, startup/recovery registration, both launch
+records and the byte-verified Start Menu receipt before removing protected input.
+Already-cancelled removal stops before creating product state. Changed shortcuts and
+malformed receipts block removal; the actual mutation helpers recheck ownership.
+Only launch records for the receipt-listed installation directories are deleted.
+Current and previous portable records outside that set are preserved, including
+a newer portable launch published after preflight; cleanup rechecks both records
+under the same registration lock used by launch publication.
 Independent launches retain the Windows system, profile and ProgramData path
 variables required by shell/COM services. The bounded environment excludes
 unrelated caller values. Both ordinary login/relaunch and job-detached child

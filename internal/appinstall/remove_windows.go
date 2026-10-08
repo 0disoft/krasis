@@ -14,7 +14,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 )
 
 // Remove preserves pairing, credentials, preferences and diagnostics. Unknown
@@ -25,6 +24,9 @@ func Remove(ctx context.Context, base string) error {
 		return ErrBusy
 	}
 	defer lease.Close()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	live, err := launchrecord.LiveDirectories()
 	if err != nil || len(live) != 0 {
 		return ErrBusy
@@ -43,6 +45,13 @@ func Remove(ctx context.Context, base string) error {
 		return err
 	}
 	if err = validateUninstall(path); err != nil {
+		return err
+	}
+	var imageDirectories []string
+	for _, folder := range r.Folders {
+		imageDirectories = append(imageDirectories, filepath.Join(path, folder))
+	}
+	if err := launchrecord.ValidateRecordRemoval(base, imageDirectories); err != nil {
 		return err
 	}
 	// Preflight the entire bounded deletion set before changing registrations.
@@ -73,6 +82,23 @@ func Remove(ctx context.Context, base string) error {
 		if e != nil {
 			return e
 		}
+	}
+	// Check registration ownership and saved settings before protected-input
+	// removal. Recheck ownership again in the actual mutation helpers.
+	if _, err := appsettings.Load(base); err != nil {
+		return err
+	}
+	if err := appsettings.ValidateStartupRegistration(base); err != nil {
+		return err
+	}
+	if _, err := appsettings.RecoveryTaskEnabled(base); err != nil {
+		return err
+	}
+	if err := launchrecord.ValidateStartMenuRemoval(base); err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	programFiles, err := windows.KnownFolderPath(windows.FOLDERID_ProgramFiles, 0)
 	if err != nil {
@@ -132,29 +158,9 @@ func Remove(ctx context.Context, base string) error {
 			return e
 		}
 	}
-	launch, err := launchrecord.Directory(base)
-	if err != nil {
+	if err := launchrecord.RemoveRecordsInDirectories(base, imageDirectories); err != nil {
 		return err
 	}
-	guard, err := securefs.OpenDirectory(launch)
-	if err != nil {
-		return err
-	}
-	// Keep launch receipts for external portable versions rather than deleting
-	// arbitrary generation folders mentioned by them.
-	for _, leaf := range []string{"current.json", "previous.json"} {
-		if leaf == "current.json" {
-			current, e := launchrecord.Load(base)
-			if e == nil && !strings.HasPrefix(current.Executable, path+string(filepath.Separator)) {
-				continue
-			}
-		}
-		if e := guard.Remove(leaf); e != nil && !errors.Is(e, os.ErrNotExist) {
-			guard.Close()
-			return e
-		}
-	}
-	guard.Close()
 	if err = dir.Remove("krasis-setup.exe"); err != nil {
 		return err
 	}
