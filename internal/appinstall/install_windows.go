@@ -144,6 +144,9 @@ func install(ctx context.Context, base, self string, p Package, before func() (i
 	if err := appsettings.ValidateStartupRegistration(base); err != nil {
 		return "", err
 	}
+	if err := appsettings.ValidateRecoveryTaskRegistration(base); err != nil {
+		return "", err
+	}
 	dir, path, err := directory(base)
 	if err != nil {
 		return "", err

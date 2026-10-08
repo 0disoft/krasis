@@ -42,6 +42,12 @@ history records and the visible Installed Apps and startup registrations. Missin
 shell registrations remain repairable; foreign paths, unreadable values and
 malformed launch history stop installation without changing application images.
 A damaged executable with a valid launch record still permits image repair.
+Setup reads recovery-task ownership before requesting UI or agent shutdown,
+even when startup is disabled. Missing, disabled or owned stale tasks remain
+repairable. On first install, missing launch history permits read-only scheduler
+inspection, not skipping it: an existing task without matching ownership blocks
+setup. This check never creates, deletes, disables or migrates a task; publication
+still rechecks ownership when applying the saved preference.
 Startup enable/disable rechecks the fixed command before replacing or deleting
 it; a foreign registration is an error rather than a disabled preference.
 When repair finds a damaged current image, the owned task is disabled before

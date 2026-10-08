@@ -126,6 +126,13 @@ func RecoveryTaskEnabled(base string) (bool, error) {
 	return err == nil, err
 }
 
+// Setup checks ownership before stopping a usable app. Missing, disabled and
+// owned stale tasks are repairable; an unreadable or foreign task is not.
+func ValidateRecoveryTaskRegistration(base string) error {
+	_, err := RecoveryTaskEnabled(base)
+	return err
+}
+
 func runRecoveryTask(base, suffix string, enabled, inspect bool) error {
 	if !filepath.IsAbs(base) || strings.ContainsAny(base, "\x00\r\n\"") {
 		return errors.New("invalid recovery root")
@@ -139,7 +146,7 @@ func runRecoveryTask(base, suffix string, enabled, inspect bool) error {
 		}
 	}
 	record, err := launchrecord.Load(base)
-	if err != nil {
+	if err != nil && !(inspect && errors.Is(err, launchrecord.ErrMissing)) {
 		return errors.New("recovery launch record unavailable")
 	}
 	if enabled && !inspect {

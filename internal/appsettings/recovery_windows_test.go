@@ -94,3 +94,50 @@ func TestRecoveryTaskRegistrationIsUserScopedAndReversible(t *testing.T) {
 		t.Fatal("absence not idempotent", err)
 	}
 }
+
+func TestRecoveryTaskPreflightWithoutHistoryAllowsAbsenceButRejectsOrphan(t *testing.T) {
+	var nonce [16]byte
+	if _, err := rand.Read(nonce[:]); err != nil {
+		t.Fatal(err)
+	}
+	suffix := "-test-" + hex.EncodeToString(nonce[:])
+	base := t.TempDir()
+	// First install has neither launch history nor a task. Inspection must
+	// still query the scheduler, without publishing a synthetic launch record.
+	if err := runRecoveryTask(base, suffix, false, true); !errors.Is(err, errRecoveryTaskInactive) {
+		t.Fatal("first-install preflight rejected absent task", err)
+	}
+	bundle := t.TempDir()
+	for _, name := range []string{"krasis.exe", "krasis-cli.exe"} {
+		if err := os.WriteFile(filepath.Join(bundle, name), []byte("not executable; isolated task removed before trigger"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := launchrecord.Register(base, filepath.Join(bundle, "krasis.exe"), 252, strings.Repeat("a", 40)); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := setRecoveryTask(base, suffix, false); err != nil {
+			t.Error("temporary task cleanup failed", err)
+		}
+	})
+	if err := setRecoveryTask(base, suffix, true); err != nil {
+		t.Fatal(err)
+	}
+	current := filepath.Join(base, "Krasis", "launch", "current.json")
+	backup := current + ".test-backup"
+	if err := os.Rename(current, backup); err != nil {
+		t.Fatal(err)
+	}
+	err := runRecoveryTask(base, suffix, false, true)
+	// Restore history even when the assertion fails so cleanup retains proof.
+	if restoreErr := os.Rename(backup, current); restoreErr != nil {
+		t.Fatal(restoreErr)
+	}
+	if err == nil || errors.Is(err, errRecoveryTaskInactive) {
+		t.Fatal("orphan task accepted without launch ownership", err)
+	}
+	if err := runRecoveryTask(base, suffix, false, true); err != nil {
+		t.Fatal("failed preflight changed the previously owned task", err)
+	}
+}
