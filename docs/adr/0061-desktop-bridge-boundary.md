@@ -515,3 +515,12 @@ and explicit maintenance still return busy instead of waiting or repeating
 consent. This prevents renderer initialization from stealing the installation
 gate and leaving the first agent launch unprepared. Read-only workers publish
 health only; the existing lifecycle owns any pending restoration side effects.
+
+## g232: Preserve connection intent across pending preparation
+
+A user connection is syntactically validated before agent preparation. Verified
+pending preparation retains the exact requested alias/fingerprint and disables
+login-peer substitution. Deferred delivery uses the existing guarded resume
+operation, so the agent's current manual-stop state and fresh trust comparison
+remain authoritative. Explicit disconnect cancels the saved request; uncertain
+replies never replay it. No new local API or persistent queue is added.

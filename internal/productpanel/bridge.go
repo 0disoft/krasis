@@ -67,6 +67,11 @@ func bridgeFailure(code string) BridgeSnapshot {
 	return BridgeSnapshot{Schema: BridgeSchema, State: "UNKNOWN", InputBackend: "UNKNOWN", Peers: []BridgePeer{}, Code: code}
 }
 
+func validBridgePeer(alias, fingerprint string) bool {
+	_, err := hex.DecodeString(fingerprint)
+	return alias != "" && len(alias) <= 256 && len(fingerprint) == 64 && err == nil
+}
+
 func (b *DesktopBridge) execute(action, alias, fingerprint string) BridgeSnapshot {
 	if b == nil || b.lifetime == nil || b.open == nil {
 		return bridgeFailure("unavailable")
@@ -85,8 +90,7 @@ func (b *DesktopBridge) execute(action, alias, fingerprint string) BridgeSnapsho
 	if err != nil || client == nil {
 		return bridgeFailure("unavailable")
 	}
-	_, fingerprintErr := hex.DecodeString(fingerprint)
-	if (action == "connect" || action == "resume") && (alias == "" || len(alias) > 256 || len(fingerprint) != 64 || fingerprintErr != nil) {
+	if (action == "connect" || action == "resume") && !validBridgePeer(alias, fingerprint) {
 		return bridgeFailure("invalid_peer")
 	}
 	guard := &bridgeClient{Client: client, fingerprint: fingerprint, automaticResume: action == "resume", maintenanceStop: action == "maintenance_stop"}

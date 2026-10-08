@@ -129,6 +129,9 @@ func (b *DesktopLifecycle) failedStartup(ctx context.Context, err error) BridgeS
 }
 
 func (b *DesktopLifecycle) Connect(alias, fingerprint string) BridgeSnapshot {
+	if !validBridgePeer(alias, fingerprint) {
+		return bridgeFailure("invalid_peer")
+	}
 	if !b.gate.TryLock() {
 		return bridgeFailure("busy")
 	}
@@ -144,7 +147,12 @@ func (b *DesktopLifecycle) Connect(alias, fingerprint string) BridgeSnapshot {
 	b.recovery.Reset()
 	b.clearMaintenanceOutcome()
 	if err := b.startup(ctx); err != nil {
-		return b.failedStartup(ctx, err)
+		value := b.failedStartup(ctx, err)
+		if pendingInputAgent(err) && b.pendingInput != nil {
+			b.pendingInput.alias, b.pendingInput.fingerprint = alias, fingerprint
+			b.pendingInput.startup = false // Never substitute a saved login peer.
+		}
+		return value
 	}
 	return b.save(NewDesktopBridge(ctx, b.open).Connect(alias, fingerprint))
 }
