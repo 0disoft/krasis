@@ -3,6 +3,7 @@
 package appinstall
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -99,6 +100,18 @@ func read(dir *securefs.Directory, name string, limit int64) ([]byte, error) {
 // Install stages immutable, verified bytes before changing any launch pointer.
 // Existing binaries and user identity/settings are never overwritten or deleted.
 func Install(base, self string, p Package) (string, error) {
+	return install(context.Background(), base, self, p, nil)
+}
+
+// InstallWithShutdown holds the startup fence from preflight through publication.
+// Scheduled recovery and the old UI cannot start another agent during setup.
+func InstallWithShutdown(ctx context.Context, base, self string, p Package) (string, error) {
+	return install(ctx, base, self, p, func() (io.Closer, error) {
+		return stopForSetup(ctx, base, p.Bundle.Metadata().Generation, p.Bundle.Metadata().Revision)
+	})
+}
+
+func install(ctx context.Context, base, self string, p Package, before func() (io.Closer, error)) (string, error) {
 	if p.Bundle == nil {
 		return "", ErrInvalid
 	}
@@ -107,7 +120,13 @@ func Install(base, self string, p Package) (string, error) {
 		return "", err
 	}
 	lease, err := agentinstance.AcquireControlStartup()
+	if before != nil && errors.Is(err, agentinstance.ErrAlreadyRunning) {
+		lease, err = waitSetupStartup(ctx)
+	}
 	if err != nil {
+		if before != nil {
+			return "", &shutdownError{"startup_lock", err}
+		}
 		return "", ErrBusy
 	}
 	defer lease.Close()
@@ -124,6 +143,13 @@ func Install(base, self string, p Package) (string, error) {
 	}
 	if err := appsettings.ValidateStartupRegistration(base); err != nil {
 		return "", err
+	}
+	if before != nil {
+		idle, err := before()
+		if err != nil {
+			return "", err
+		}
+		defer idle.Close()
 	}
 	dir, path, err := directory(base)
 	if err != nil {

@@ -101,17 +101,15 @@ func run(args []string, out io.Writer) int {
 		err = appinstall.Remove(ctx, base)
 		return result(out, quiet, "removed", err)
 	}
-	if !quiet && !message("이 사용자 계정에 Krasis를 설치하고 시작 메뉴에 등록합니다. 기존 기기 등록 정보와 설정은 유지됩니다. 계속할까요?", true) {
+	if !quiet && !message("실행 중인 Krasis와 연결을 안전하게 종료한 뒤 설치하고 다시 엽니다. 시작 메뉴에 등록하며 기존 기기 등록 정보와 설정은 유지됩니다. 계속할까요?", true) {
 		return result(out, quiet, "cancelled", nil)
 	}
-	ui, err := appinstall.Install(base, self, p)
+	ui, err := appinstall.InstallWithShutdown(ctx, base, self, p)
 	if err != nil {
 		return result(out, quiet, "install_failed", err)
 	}
-	if !quiet {
-		if err = launchrecord.Start(ui); err != nil {
-			return result(out, quiet, "installed_launch_failed", err)
-		}
+	if err = launchrecord.StartAfterInstall(ui); err != nil {
+		return result(out, quiet, "installed_launch_failed", err)
 	}
 	return result(out, quiet, "installed", nil)
 }
@@ -120,7 +118,9 @@ func result(out io.Writer, quiet bool, state string, err error) int {
 	code := 0
 	if err != nil {
 		code = 1
-		if errors.Is(err, appinstall.ErrBusy) {
+		if errors.Is(err, appinstall.ErrShutdown) {
+			state = "shutdown_failed"
+		} else if errors.Is(err, appinstall.ErrBusy) {
 			state = "close_app_required"
 		} else if errors.Is(err, appinstall.ErrOlder) || errors.Is(err, launchrecord.ErrOlder) {
 			state = "newer_setup_required"
@@ -130,14 +130,17 @@ func result(out io.Writer, quiet bool, state string, err error) int {
 	}
 	if quiet {
 		if json.NewEncoder(out).Encode(struct {
-			Schema string `json:"schema"`
-			Code   int    `json:"code"`
-			State  string `json:"state"`
-		}{"krasis.setup-result/v1", code, state}) != nil {
+			Schema        string `json:"schema"`
+			Code          int    `json:"code"`
+			State         string `json:"state"`
+			ShutdownStage string `json:"shutdownStage,omitempty"`
+		}{"krasis.setup-result/v1", code, state, appinstall.ShutdownStage(err)}) != nil {
 			return 3
 		}
 	} else if state == "newer_setup_required" {
 		message("설치본보다 새로운 Krasis가 있습니다. 최신 버전의 설치본으로 설치하거나 복구해 주세요.", false)
+	} else if state == "shutdown_failed" {
+		message("실행 중인 Krasis의 안전한 종료를 확인하지 못해 설치를 중단했습니다. 기존 설치는 유지됩니다. 진단을 확인한 뒤 다시 시도해 주세요.", false)
 	} else if err != nil {
 		message("처리를 완료하지 못했습니다. Krasis 앱·에이전트를 종료한 뒤 다시 시도해 주세요. 기존 설정과 진단은 보존됩니다.", false)
 	} else if state == "removed" {

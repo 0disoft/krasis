@@ -67,3 +67,19 @@ Bundle verification remains offline and SEND still re-packs and validates all by
 The first-run screen reuses the pairing flow and explains same-network setup, PIN
 registration and screen-edge movement. It does not create peers or request input
 installation automatically. Build verification never installs or launches the UI.
+
+Interactive and JSON install/repair both stop the running product and launch the
+installed UI. Validated package, settings and registration preflight precede any
+shutdown. The installer holds the existing startup lease through publication and
+retains the idle agent lease after confirmed exit to fence automatic recovery.
+Only same-user, same-session UI processes matching the current/previous launch
+record and exact image hash can be closed. Retained process handles prevent PID
+reuse. For existing Wails images, a WM_QUIT request goes only to the verified
+process's hidden main-loop thread; WM_CLOSE would merely hide the tray window.
+No process is force-killed, and unknown ownership or an unconfirmed exit blocks
+installation. Agent shutdown uses authenticated, instance-bound maintenance and
+upgrade-stop requests, preserving saved connection intent and waiting for guard
+exit. A 30-second shutdown timeout yields shutdown_failed plus shutdownStage in
+JSON; no installation images or registrations are changed by failed shutdown.
+The installed UI opens visibly with --installed and uses the existing saved-
+connection resume logic, including manual-stop and current trust checks.

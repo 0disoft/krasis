@@ -98,7 +98,8 @@ func Run() {
 	smoke := visibleSmoke || (len(os.Args) == 2 && os.Args[1] == "--smoke")
 	var updated productpanel.WorkspaceUpdateLaunch
 	startAtLogin := len(os.Args) == 2 && os.Args[1] == "--startup"
-	if len(os.Args) != 1 && !smoke && !startAtLogin {
+	resumeAfterInstall := len(os.Args) == 2 && os.Args[1] == "--installed"
+	if len(os.Args) != 1 && !smoke && !startAtLogin && !resumeAfterInstall {
 		updated, err = productpanel.ParseWorkspaceUpdateLaunch(os.Args[1:])
 		if err != nil {
 			os.Exit(1)
@@ -128,7 +129,7 @@ func Run() {
 	}
 	service := &WorkspaceService{raw: bridge, ctx: ctx, control: paths.Control, title: fmt.Sprintf("Krasis · g%d", localapi.AgentGeneration)}
 	service.clipboardWake = make(chan struct{}, 1)
-	service.startAtLogin = startAtLogin
+	service.startAtLogin = startAtLogin || resumeAfterInstall
 	if !smoke {
 		startup, startupErr := productpanel.NewStartup(paths.Control)
 		if startupErr != nil {
