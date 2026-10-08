@@ -550,3 +550,9 @@ unresolved. Cached polls preserve the expiration notice even when later health
 reads recover. No agent preparation or connection is replayed after expiration;
 the UI directs the user to refresh status, then explicitly connect. Explicit
 connection, disconnect, recovery or maintenance clears the previous outcome.
+
+## g233: Preserve UI selection on native contention
+
+A busy action response is not a new device observation. The renderer retains
+its current projection and selected fingerprint, showing only the busy notice.
+The next successful read supplies current status; no action is queued or replayed.

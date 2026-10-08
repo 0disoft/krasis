@@ -214,6 +214,9 @@
       try {
         const value = await (action === 'input' ? bridge.inputRefresh() : action === 'connect' ? bridge.connect(peer) : action === 'disconnect' ? bridge.disconnect() : action === 'restart' ? bridge.restart() : action === 'recheck' ? bridge.refreshNow() : bridge.refresh());
         if (disposed) return;
+        // Native lifecycle contention is not a new device observation.
+        // Keep the selection and show the refusal without replaying the action.
+        if (value.code === 'busy') { error = 'busy'; return; }
         snapshot = value;
         if (!value.peers.some(p => p.fingerprint === selected)) {
           selected = (value.peers.find(p => p.alias === value.peerAlias) ?? value.peers[0])?.fingerprint ?? '';
