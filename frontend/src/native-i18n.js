@@ -1,5 +1,10 @@
 export const nativeCatalogs = {
   ko: {
+    welcome_title:'두 대의 PC를 연결해요',
+    welcome_network:'두 PC를 같은 네트워크에 연결해 주세요.',
+    welcome_pair:'한 PC에서 PIN을 만들고, 다른 PC에서 찾아 입력해 주세요.',
+    welcome_move:'연결되면 마우스가 화면 경계를 넘어 다른 PC로 이동해요.',
+    welcome_start:'시작하기',
     settings: '설정',
     ui_replacement_PREPARING: '새 버전 준비 중',
     ui_replacement_PENDING: '새 버전 적용 대기 중',
@@ -242,6 +247,11 @@ export const nativeCatalogs = {
     recovery_required:'입력 제어가 중단되었습니다. 진단을 자동 저장하고, 이전 연결은 최대 3회 복구합니다.',
   },
   en: {
+    welcome_title:'Connect your two PCs',
+    welcome_network:'Connect both PCs to the same network.',
+    welcome_pair:'Create a PIN on one PC, then find it and enter the PIN on the other.',
+    welcome_move:'Once connected, move your mouse past the screen edge to the other PC.',
+    welcome_start:'Get started',
     settings: 'Settings',
     ui_replacement_PREPARING: 'Preparing the new version',
     ui_replacement_PENDING: 'Waiting to apply the new version',

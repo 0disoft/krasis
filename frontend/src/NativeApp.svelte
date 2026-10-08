@@ -365,7 +365,10 @@
   {#if ['CHECKING','AVAILABLE','DOWNLOADING','READY','FAILED','CANCELLED'].includes(releaseState)}<p class="release-notice" role="status">{appReleaseNotice(releaseState, releasePreferences, locale, readyReleaseGeneration)}</p>{/if}
   <section class="canvas workspace-canvas" aria-label={t('devices')}>
     {#if snapshot.state === 'LOCAL' && snapshot.peers.length === 0}
-      <div class="empty-workspace"><Icon name="laptop" size={40} /><h2>{t('pair')}</h2><p>{t('pairHelp')}</p><button class="primary" aria-haspopup="dialog" onclick={() => openDialog(pairingDlg)}><Icon name="plus" size={18} />{t('addDevice')}</button></div>
+      <div class="empty-workspace"><Icon name="laptop" size={40} /><h2>{t('welcome_title')}</h2>
+        <ol><li>{t('welcome_network')}</li><li>{t('welcome_pair')}</li><li>{t('welcome_move')}</li></ol>
+        <button class="primary" aria-haspopup="dialog" onclick={() => openDialog(pairingDlg)}><Icon name="plus" size={18} />{t('welcome_start')}</button>
+      </div>
     {:else}
     <div class="screens" class:reversed={shownEdge === 'LEFT'}>
       <div class="screen"><img class="monitor-art" src={monitor} alt="" /><div class="screen-content"><strong>{t('local')}</strong>{#if shownEdge}<span>{t(shownEdge === 'LEFT' ? 'right' : 'left')}</span>{/if}</div></div>
