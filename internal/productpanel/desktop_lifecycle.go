@@ -258,7 +258,11 @@ func (b *DesktopLifecycle) tick(now time.Time) {
 			} else {
 				value.Code = previous.Code
 			}
-		case "diagnostic_failed", "recovery_exhausted", "display_recovery_expired", "startup_resume_settings_invalid", "startup_resume_settings_unavailable":
+		case "recovery_exhausted":
+			if value.Code != "ok" || (value.State != "CONNECTED" && value.State != "CONNECTING" && value.State != "RECONNECTING") {
+				value.Code = previous.Code
+			}
+		case "diagnostic_failed", "display_recovery_expired", "startup_resume_settings_invalid", "startup_resume_settings_unavailable":
 			value.Code = previous.Code
 		}
 	}

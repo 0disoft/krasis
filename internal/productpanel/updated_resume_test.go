@@ -366,7 +366,7 @@ func TestUpdateResumeWindowStartsOnlyAfterPreparationAndNeverRenews(t *testing.T
 		t.Fatal("reconnect window renewed")
 	}
 	b.tick(deadline.Add(time.Second))
-	if b.updatedResume != nil || b.Refresh().Code != "recovery_exhausted" {
+	if b.updatedResume != nil || b.Refresh().Code != "ok" || b.Refresh().State != "CONNECTING" || c.connects != 1 {
 		t.Fatal("reconnect budget no longer expires")
 	}
 }

@@ -107,6 +107,17 @@ func (b *DesktopLifecycle) resumeUpdatedConnection(ctx context.Context, now time
 		return stop("agent_busy") // Never interrupt pairing.
 	}
 	if !now.Before(r.deadline) {
+		if r.uncertain {
+			// Keep the no-replay fence when the bounded update monitor ends.
+			b.recovery.Alias, b.recovery.Fingerprint = r.launch.Alias, r.launch.Fingerprint
+			b.recovery.uncertain = true
+			return stop("outcome_unknown")
+		}
+		if value.Code == "ok" && verifiedPeer && (value.State == "CONNECTING" || value.State == "RECONNECTING") {
+			// Only management confirmation expired. The healthy supervisor is
+			// still connecting; never label that as exhausted agent recovery.
+			return stop("ok")
+		}
 		return stop("recovery_exhausted")
 	}
 	if value.State != "LOCAL" && value.State != "UNKNOWN" {
