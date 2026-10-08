@@ -129,12 +129,20 @@ func result(out io.Writer, quiet bool, state string, err error) int {
 		}
 	}
 	if quiet {
+		var nativeError *uint32
+		var errno syscall.Errno
+		if errors.As(err, &errno) && errno != 0 {
+			value := uint32(errno)
+			nativeError = &value
+		}
 		if json.NewEncoder(out).Encode(struct {
-			Schema        string `json:"schema"`
-			Code          int    `json:"code"`
-			State         string `json:"state"`
-			ShutdownStage string `json:"shutdownStage,omitempty"`
-		}{"krasis.setup-result/v1", code, state, appinstall.ShutdownStage(err)}) != nil {
+			Schema        string  `json:"schema"`
+			Code          int     `json:"code"`
+			State         string  `json:"state"`
+			ShutdownStage string  `json:"shutdownStage,omitempty"`
+			InstallStage  string  `json:"installStage,omitempty"`
+			Win32Error    *uint32 `json:"win32Error,omitempty"`
+		}{"krasis.setup-result/v1", code, state, appinstall.ShutdownStage(err), appinstall.InstallationStage(err), nativeError}) != nil {
 			return 3
 		}
 	} else if state == "newer_setup_required" {

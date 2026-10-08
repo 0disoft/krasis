@@ -88,7 +88,10 @@ func read(dir *securefs.Directory, name string, limit int64) ([]byte, error) {
 	}
 	defer f.Close()
 	data, err := io.ReadAll(io.LimitReader(f, limit+1))
-	if err != nil || int64(len(data)) > limit {
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > limit {
 		return nil, ErrInvalid
 	}
 	return data, nil
@@ -108,17 +111,21 @@ func InstallWithShutdown(ctx context.Context, base, self string, p Package) (str
 	})
 }
 
-func install(ctx context.Context, base, self string, p Package, before func() (io.Closer, error)) (string, error) {
+func install(ctx context.Context, base, self string, p Package, before func() (io.Closer, error)) (ui string, err error) {
+	stage := "preflight"
+	defer func() { err = installationFailure(stage, err) }()
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
 	if p.Bundle == nil {
 		return "", ErrInvalid
 	}
+	stage = "settings"
 	settings, err := appsettings.Load(base)
 	if err != nil {
 		return "", err
 	}
+	stage = "startup_lock"
 	lease, err := agentinstance.AcquireControlStartup()
 	if before != nil && errors.Is(err, agentinstance.ErrAlreadyRunning) {
 		lease, err = waitSetupStartup(ctx)
@@ -131,27 +138,34 @@ func install(ctx context.Context, base, self string, p Package, before func() (i
 	}
 	defer lease.Close()
 	meta := p.Bundle.Metadata()
+	stage = "launch_history"
 	if err := validateInstallHistory(base, meta.Generation); err != nil {
 		return "", err
 	}
+	stage = "product_paths"
 	paths, err := productidentity.ResolveWindowsPaths(base)
 	if err != nil {
 		return "", err
 	}
+	stage = "app_registration"
 	if err := validateInstallRegistrationAt(registry.CURRENT_USER, uninstallKey, filepath.Join(paths.Root, "app")); err != nil {
 		return "", err
 	}
+	stage = "startup_registration"
 	if err := appsettings.ValidateStartupRegistration(base); err != nil {
 		return "", err
 	}
+	stage = "recovery_registration"
 	if err := appsettings.ValidateRecoveryTaskRegistration(base); err != nil {
 		return "", err
 	}
+	stage = "install_directory"
 	dir, path, err := directory(base)
 	if err != nil {
 		return "", err
 	}
 	defer dir.Close()
+	stage = "install_plan"
 	plan, err := prepareInstallPlan(ctx, dir, self, Receipt{Schema: Schema, Generation: meta.Generation, Revision: meta.Revision, Folders: []string{p.ID}},
 		func(next Receipt) (Receipt, error) { return prepareInstallFolder(path, p, next) }, before)
 	if err != nil {
@@ -162,6 +176,7 @@ func install(ctx context.Context, base, self string, p Package, before func() (i
 	}
 	r := plan.receipt
 	p.ID = r.Folders[0]
+	stage = "stage_image"
 	root, err := os.OpenRoot(path)
 	if err != nil {
 		return "", err
@@ -172,6 +187,7 @@ func install(ctx context.Context, base, self string, p Package, before func() (i
 		return "", err
 	}
 	installed := filepath.Join(path, p.ID)
+	stage = "verify_image"
 	guard, err := securefs.OpenReadDirectory(installed)
 	if err != nil {
 		return "", err
@@ -184,6 +200,7 @@ func install(ctx context.Context, base, self string, p Package, before func() (i
 		return "", err
 	}
 	// Self bytes were already read before stopping the running product.
+	stage = "setup_image"
 	data := plan.setup
 	if old, e := read(dir, "krasis-setup.exe", 64<<20); e != nil || sha256.Sum256(old) != sha256.Sum256(data) {
 		if err = replace(dir, "krasis-setup.exe", data); err != nil {
@@ -192,16 +209,20 @@ func install(ctx context.Context, base, self string, p Package, before func() (i
 	}
 	body, _ := json.Marshal(r)
 	// Receipt precedes registrations, so interrupted setup remains repairable.
+	stage = "installation_receipt"
 	if err = replace(dir, "installation.json", body); err != nil {
 		return "", err
 	}
-	ui := filepath.Join(installed, "krasis.exe")
+	ui = filepath.Join(installed, "krasis.exe")
+	stage = "launch_registration"
 	if err = registerInstalledLaunch(base, ui, meta.Generation, meta.Revision, settings.StartAtLogin, appsettings.SetRecoveryTask, appsettings.SetStartup); err != nil {
 		return "", err
 	}
+	stage = "start_menu"
 	if err = launchrecord.RegisterStartMenu(base); err != nil {
 		return "", err
 	}
+	stage = "uninstall_registration"
 	if err = registerUninstall(path, meta.Generation); err != nil {
 		return "", err
 	}

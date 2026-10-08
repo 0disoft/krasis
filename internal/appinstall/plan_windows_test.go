@@ -63,6 +63,16 @@ func TestInstallPreflightDoesNotCloseProductOnBadReceiptSourceOrCancellation(t *
 			if err == nil || stops != 0 {
 				t.Fatal("preflight stopped usable product", scenario, err, stops)
 			}
+			wantStage := "receipt_preflight"
+			if scenario == "missing_source" {
+				wantStage = "source_preflight"
+				if !errors.Is(err, os.ErrNotExist) {
+					t.Fatal("lost missing-source error", err)
+				}
+			}
+			if InstallationStage(err) != wantStage {
+				t.Fatal("wrong preflight failure stage", InstallationStage(err), wantStage)
+			}
 			if previous != nil {
 				data, e := read(dir, "installation.json", 8193)
 				if e != nil || string(data) != string(previous) {

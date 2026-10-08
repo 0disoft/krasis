@@ -95,6 +95,13 @@ installation. Agent shutdown uses authenticated, instance-bound maintenance and
 upgrade-stop requests, preserving saved connection intent and waiting for guard
 exit. A 30-second shutdown timeout yields shutdown_failed plus shutdownStage in
 JSON; no installation images or registrations are changed by failed shutdown.
+Failed installation JSON also includes installStage: the first fixed operation
+name for preflight, shutdown, image staging/verification or shell publication.
+The original error remains available to ownership and cancellation checks.
+win32Error is emitted only when the error chain contains a nonzero native error;
+an unknown error has no number, and successful installation has neither field.
+Raw error text, executable paths and user data are not serialized. Installation
+failure, unconfirmed shutdown and installed-but-launch-failed remain distinct.
 The installed UI opens visibly with --installed and uses the existing saved-
 connection resume logic, including manual-stop and current trust checks.
 
