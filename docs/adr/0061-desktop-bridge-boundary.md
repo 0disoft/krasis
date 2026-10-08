@@ -556,3 +556,8 @@ connection, disconnect, recovery or maintenance clears the previous outcome.
 A busy action response is not a new device observation. The renderer retains
 its current projection and selected fingerprint, showing only the busy notice.
 The next successful read supplies current status; no action is queued or replayed.
+
+Pending restoration retries only ErrStartupBusy, which Ensure returns before
+acquiring startup ownership or starting a process. A five-second backoff retains
+the original peer and deadline; cancellation and expiration still consume it.
+Other restoration errors remain terminal, and no installer is invoked again.

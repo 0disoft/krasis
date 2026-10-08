@@ -10,6 +10,7 @@ type pendingInputRecovery struct {
 	alias, fingerprint string
 	startup            bool
 	deadline           time.Time
+	restoreAfter       time.Time
 	restored           bool
 	refreshCode        string
 }
@@ -53,6 +54,10 @@ func (b *DesktopLifecycle) continuePendingInput(ctx context.Context, now time.Ti
 		return value, true
 	}
 	if !p.restored {
+		if now.Before(p.restoreAfter) {
+			value.Code = "input_refresh_pending"
+			return value, true
+		}
 		if b.PendingInputSetup == nil || b.PendingInputRestore == nil {
 			return value, true
 		}
@@ -65,6 +70,13 @@ func (b *DesktopLifecycle) continuePendingInput(ctx context.Context, now time.Ti
 		err := b.PendingInputRestore(restoreCtx)
 		cancel()
 		if errors.Is(err, ErrInputRefreshPending) {
+			value.Code = "input_refresh_pending"
+			return value, true
+		}
+		if errors.Is(err, ErrStartupBusy) {
+			// Ensure did not acquire startup ownership or start an agent.
+			// Retain the same request/deadline and avoid retrying on every poll.
+			p.restoreAfter = now.Add(5 * time.Second)
 			value.Code = "input_refresh_pending"
 			return value, true
 		}

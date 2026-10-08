@@ -104,6 +104,49 @@ func TestDisconnectCancelsPendingInputContinuation(t *testing.T) {
 	}
 }
 
+func TestPendingRestoreRetriesOnlyStartupLockContentionWithinOriginalDeadline(t *testing.T) {
+	for _, mode := range []string{"available", "expired", "disconnect"} {
+		t.Run(mode, func(t *testing.T) {
+			b, c, now := newResumeTest(t, nil)
+			b.updatedResume = nil
+			c.state = "CONNECTED"
+			installs, restores := 0, 0
+			b.RefreshProtectedInput(func(context.Context) error { installs++; return &inputMaintenancePending{} })
+			b.pendingInput.deadline = now.Add(10 * time.Second)
+			pending := *b.pendingInput
+			b.PendingInputSetup = func() string { return "READY" }
+			b.PendingInputRestore = func(context.Context) error {
+				restores++
+				if restores == 1 {
+					return ErrStartupBusy
+				}
+				return nil
+			}
+			b.tick(now)
+			b.tick(now.Add(time.Second))
+			if restores != 1 || c.connects != 0 || b.pendingInput == nil || b.pendingInput.alias != pending.alias || b.pendingInput.fingerprint != pending.fingerprint || b.pendingInput.deadline != pending.deadline {
+				t.Fatal("contention lost identity, renewed deadline or ignored backoff", b.Refresh(), restores)
+			}
+			if mode == "disconnect" {
+				b.Disconnect()
+			}
+			next := now.Add(6 * time.Second)
+			if mode == "expired" {
+				next = pending.deadline
+			}
+			b.tick(next)
+			b.tick(next.Add(time.Second))
+			wantRestores, wantConnects := 1, 0
+			if mode == "available" {
+				wantRestores, wantConnects = 2, 1
+			}
+			if installs != 1 || restores != wantRestores || c.connects != wantConnects || b.pendingInput != nil {
+				t.Fatal("contention replayed installer or ignored stop", mode, installs, restores, c.connects)
+			}
+		})
+	}
+}
+
 func TestPendingInputDeadlineStopsContinuationAndPreservesNotice(t *testing.T) {
 	for _, restored := range []bool{false, true} {
 		t.Run(map[bool]string{false: "installation pending", true: "restored but observation unavailable"}[restored], func(t *testing.T) {
