@@ -58,6 +58,12 @@ The bundle's signed field is descriptive, never an authentication grant. Officia
 update authenticity still comes from the verified envelope and exact archive hash.
 Signed release bundles use windows-release purpose; manual bundles remain explicit.
 
+The fixed recovery CLI resolves update verification and sending through the current
+launch record. The remembered UI hash, bundle generation/revision and copied CLI
+bytes must still match before using that directory. Portable CLIs retain their
+adjacent bundle; missing or damaged registrations never fall back to another image.
+Bundle verification remains offline and SEND still re-packs and validates all bytes.
+
 The first-run screen reuses the pairing flow and explains same-network setup, PIN
 registration and screen-edge movement. It does not create peers or request input
 installation automatically. Build verification never installs or launches the UI.

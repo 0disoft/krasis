@@ -38,7 +38,7 @@ func commandHelp() helpResult {
 		{"trust list", "List trusted devices", true, false},
 		{"connection show ALIAS", "Read saved peer address and exit edge", true, false},
 		{"credential show LISTENER|CONNECTOR", "Read local credential status", true, false},
-		{"update verify", "Validate adjacent update bundle offline", false, false},
+		{"update verify", "Validate current update bundle offline", false, false},
 		{"update status", "Read local update transfer state", true, false},
 		{"update status ALIAS", "Read peer version and update permission", true, false},
 		{"update wait ALIAS ID [--timeout DURATION]", "Wait for one update's verified application; default 2m, maximum 10m", true, false},

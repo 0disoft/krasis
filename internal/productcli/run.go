@@ -136,6 +136,10 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, deps depe
 		if executable == "" {
 			executable, _ = os.Executable()
 		}
+		executable, err = updateBundleExecutable(deps.localAppData, executable)
+		if err != nil {
+			return writeOutput(stdout, stderr, updateVerifyResult{SchemaVersion: updateVerifySchema, Code: "bundle_source_invalid"}, ExitUnsafeState, parsed.json)
+		}
 		value, code := verifyCurrentBundle(executable)
 		return writeOutput(stdout, stderr, value, code, parsed.json)
 	}
@@ -159,6 +163,12 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, deps depe
 	executable := deps.executable
 	if executable == "" {
 		executable, _ = os.Executable()
+	}
+	if parsed.args[0] == "update" && parsed.args[1] == "send" {
+		executable, err = updateBundleExecutable(deps.localAppData, executable)
+		if err != nil {
+			return writeOutput(stdout, stderr, localapi.UpdateResult{Schema: localapi.UpdateSchema, Code: "bundle_source_invalid"}, ExitUnsafeState, parsed.json)
+		}
 	}
 	value, code, err := dispatch(ctx, client, parsed.args, executable)
 	if err != nil {
