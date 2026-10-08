@@ -542,3 +542,11 @@ desktop snapshot field, independently allowlisted by the renderer. Historical
 failure guidance is shown only when current health needs attention and no
 maintenance outcome already explains it. No new HTTP endpoint or stored input
 content is introduced.
+
+Expiration of the five-minute continuation records input_refresh_wait_expired
+as its bounded reconnect outcome, independently of the installation result.
+Verified restoration keeps its refresh result; unresolved installation remains
+unresolved. Cached polls preserve the expiration notice even when later health
+reads recover. No agent preparation or connection is replayed after expiration;
+the UI directs the user to refresh status, then explicitly connect. Explicit
+connection, disconnect, recovery or maintenance clears the previous outcome.

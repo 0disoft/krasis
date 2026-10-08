@@ -104,6 +104,40 @@ func TestDisconnectCancelsPendingInputContinuation(t *testing.T) {
 	}
 }
 
+func TestPendingInputDeadlineStopsContinuationAndPreservesNotice(t *testing.T) {
+	for _, restored := range []bool{false, true} {
+		t.Run(map[bool]string{false: "installation pending", true: "restored but observation unavailable"}[restored], func(t *testing.T) {
+			b, c, now := newResumeTest(t, nil)
+			c.state = "CONNECTED"
+			b.RefreshProtectedInput(func(context.Context) error { return &inputMaintenancePending{} })
+			b.pendingInput.deadline = now.Add(time.Minute)
+			b.PendingInputSetup = func() string { return "PENDING" }
+			b.PendingInputRestore = func(context.Context) error { t.Fatal("restored after deadline"); return nil }
+			wantRefresh := "input_refresh_pending"
+			if restored {
+				b.pendingInput.restored, b.pendingInput.refreshCode = true, "ok"
+				c.err = errors.New("temporary observation failure")
+				wantRefresh = "ok"
+			}
+			b.tick(now.Add(time.Minute))
+			if v := b.Refresh(); v.Code != "input_refresh_wait_expired" || v.InputRefreshCode != wantRefresh || v.ReconnectCode != "input_refresh_wait_expired" || b.pendingInput != nil || b.updatedResume != nil {
+				t.Fatal("expiration lost or confused with installation outcome", v)
+			}
+			// Later health is observable, but cannot restart the expired request.
+			c.err = nil
+			for i := 1; i <= 3; i++ {
+				b.tick(now.Add(time.Minute + time.Duration(i)*time.Second))
+				if v := b.Refresh(); v.InputRefreshCode != wantRefresh || v.ReconnectCode != "input_refresh_wait_expired" || c.connects != 0 {
+					t.Fatal("poll erased expiration or replayed connection", v, c.connects)
+				}
+			}
+			if v := b.Disconnect(); v.InputRefreshCode != "" || v.ReconnectCode != "" {
+				t.Fatal("manual action retained previous waiting outcome", v)
+			}
+		})
+	}
+}
+
 func TestPendingRestorationNeverInvokesInstallerAgain(t *testing.T) {
 	for _, setup := range []string{"READY", "PENDING", "UNKNOWN"} {
 		t.Run(setup, func(t *testing.T) {

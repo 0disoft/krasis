@@ -123,6 +123,7 @@ test('maintenance projections preserve separate outcomes and narrow unknown deta
     ['input_refresh_failed','outcome_unknown','input_refresh_failed','outcome_unknown'],
     ['ok','stale_peer','ok','stale_peer'],
     ['input_refresh_pending','not_attempted','input_refresh_pending','not_attempted'],
+    ['ok','input_refresh_wait_expired','ok','input_refresh_wait_expired'],
     ['/private/path',{error:'private'},'unknown','unknown'],
     [undefined,undefined,'',''],
   ]) {

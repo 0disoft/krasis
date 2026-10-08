@@ -44,7 +44,12 @@ func (b *DesktopLifecycle) continuePendingInput(ctx context.Context, now time.Ti
 	}
 	if !now.Before(p.deadline) {
 		b.pendingInput, b.updatedResume = nil, nil
-		value.Code = "input_refresh_pending"
+		if p.restored {
+			value.InputRefreshCode = p.refreshCode
+		}
+		// Expiring this continuation says nothing about installation success.
+		// Preserve its outcome separately from the completed health observation.
+		value.Code, value.ReconnectCode = "input_refresh_wait_expired", "input_refresh_wait_expired"
 		return value, true
 	}
 	if !p.restored {

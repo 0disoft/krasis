@@ -28,6 +28,14 @@ test('unconfirmed values never show raw details or claim success', () => {
   assert.equal(inputMaintenanceNotice({inputRefreshCode:'ok',reconnectCode:'stale_peer'},'ko'),'갱신: 완료 · 재연결: 기기 다시 선택 필요');
 });
 
+test('expired automatic confirmation remains distinct from the installation outcome', () => {
+  for (const inputRefreshCode of ['ok','input_refresh_pending','input_refresh_failed']) {
+    const value = {inputRefreshCode,reconnectCode:'input_refresh_wait_expired'};
+    assert.equal(inputMaintenanceNotice(value,'ko'),'자동 확인 시간이 끝났습니다. 새로고침으로 상태를 확인한 뒤 연결해 주세요.');
+    assert.equal(inputMaintenanceNotice(value,'en'),'Automatic checking has timed out. Refresh to check the status, then connect.');
+  }
+});
+
 test('unknown health is visible without offering installation or claiming ordinary input', () => {
   for (const inputBackend of ['UNKNOWN','PORTABLE','PROTECTED']) {
     assert.deepEqual(inputSetupNotice({inputSetup:'UNKNOWN',inputBackend,code:'preparing'}), {key:'input_setup_UNKNOWN',action:''});
