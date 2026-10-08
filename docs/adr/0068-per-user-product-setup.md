@@ -20,6 +20,9 @@ to the new image and register the fixed login CLI. Repeated repair cannot outrun
 task ownership history. A foreign or unreadable task blocks this registration;
 it is never silently deleted or adopted. A missing settings file keeps the
 first-install default, while malformed settings abort installation.
+When repair finds a damaged current image, the owned task is disabled before
+publication instead of re-arming that image. The saved startup preference is
+applied only to the verified replacement. This does not adopt a foreign task.
 
 Development setup remains unsigned. Production requires a configured Authenticode
 signing identity, exact signer thumbprint and timestamp verification, plus the

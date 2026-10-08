@@ -84,3 +84,40 @@ func TestFailedTaskPreflightPreservesLaunchHistoryAndDisabledPreference(t *testi
 		t.Fatal("failed task preflight replaced launch history", err)
 	}
 }
+
+func TestCorruptImageRepairDisablesOwnedTaskBeforeRegisteringReplacement(t *testing.T) {
+	base, old, next := t.TempDir(), registrationImage(t), registrationImage(t)
+	if err := launchrecord.Register(base, old, 234, strings.Repeat("a", 40)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(old, []byte("damaged installed image"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var states []bool
+	recovery := func(base string, enabled bool) error {
+		states = append(states, enabled)
+		r, err := launchrecord.Load(base)
+		if err != nil {
+			return err
+		}
+		if len(states) == 1 && r.Executable != old {
+			t.Fatal("lost task ownership history before disabling it")
+		}
+		if enabled {
+			_, err = launchrecord.Inspect(base)
+		}
+		return err
+	}
+	if err := registerInstalledLaunch(base, next, 238, strings.Repeat("b", 40), true, recovery,
+		func(_ string, enabled bool) error {
+			if !enabled {
+				t.Fatal("repair lost the user's startup preference")
+			}
+			return nil
+		}); err != nil {
+		t.Fatal("corrupt image prevented repair", err)
+	}
+	if !slices.Equal(states, []bool{false, true}) {
+		t.Fatal("damaged image task was re-armed", states)
+	}
+}

@@ -14,7 +14,15 @@ import (
 // the next attempt. Task ownership checks remain in appsettings.
 func registerInstalledLaunch(base, ui string, generation int, revision string, enabled bool, recovery, startup func(string, bool) error) error {
 	if _, err := launchrecord.Load(base); err == nil {
-		if err := recovery(base, enabled); err != nil {
+		preflightEnabled := enabled
+		if enabled {
+			// A damaged image is the reason for repair, not an executable we
+			// may re-arm. Disable its owned task while the path proof exists.
+			if _, err := launchrecord.Inspect(base); err != nil {
+				preflightEnabled = false
+			}
+		}
+		if err := recovery(base, preflightEnabled); err != nil {
 			return err
 		}
 	} else if !errors.Is(err, launchrecord.ErrMissing) {
