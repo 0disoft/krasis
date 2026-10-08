@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/peerupdate"
@@ -30,6 +31,7 @@ type receiverClient struct {
 	status                     peerupdate.Status
 	applied, failed, connected int
 	mismatch, transport        bool
+	busy                       bool
 }
 
 func (c *receiverClient) Update(_ context.Context, r localapi.UpdateRequest) (localapi.UpdateResult, error) {
@@ -38,6 +40,9 @@ func (c *receiverClient) Update(_ context.Context, r localapi.UpdateRequest) (lo
 	case "APPLY":
 		c.applied++
 		out.Code = "apply_ready"
+		if c.busy {
+			out.Code = "apply_busy"
+		}
 		if r.ID != c.status.ID || r.Peer != c.status.Peer {
 			panic("wrong update claim")
 		}
@@ -112,6 +117,32 @@ func TestWorkspaceReceiverClaimsOnceAndReportsLaunchFailure(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestWorkspaceReceiverRetriesOnlyExplicitBusyWithinBudget(t *testing.T) {
+	for _, recover := range []bool{true, false} {
+		c := newReceiverClient()
+		c.busy = true
+		launches := 0
+		b := NewWorkspaceUpdateReceiver(context.Background(), func() (UpdateSettingsClient, error) { return c, nil }, func(string, string, string, string) error { launches++; return nil })
+		if b.Poll() || b.Poll() || c.applied != 1 {
+			t.Fatal("busy claim launched or retried without backoff")
+		}
+		b.retryAt = time.Time{}
+		c.busy = !recover
+		if b.Poll() != recover {
+			t.Fatal("recovered ready job was not launched")
+		}
+		if !recover {
+			b.retryAt = time.Time{}
+			if b.Poll() || c.applied != 3 || c.failed != 1 {
+				t.Fatal("busy retry budget did not report failure")
+			}
+		}
+		if b.Poll() || (recover && (c.applied != 2 || launches != 1 || c.failed != 0)) {
+			t.Fatal("claim repeated after completion")
+		}
 	}
 }
 func TestUpdatedWorkspaceReconnectRequiresExactBuildAndTrust(t *testing.T) {

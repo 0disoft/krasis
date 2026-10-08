@@ -43,6 +43,13 @@ func (o *Operations) Update(ctx context.Context, r localapi.UpdateRequest) (loca
 		return result, nil
 	}
 	if r.Action != "DENY" && r.Action != "APPLY_FAILED" && (o.preflight == nil || o.preflight(p.Alias) != nil) {
+		if r.Action == "APPLY" {
+			o.updates.RejectReady(r.ID, r.Peer)
+			o.mu.Lock()
+			o.recordLocked("peer_update_apply_preflight_failed")
+			o.mu.Unlock()
+			result.Code, result.Status = "apply_preflight_failed", o.updates.Status()
+		}
 		return result, nil
 	}
 	switch r.Action {
@@ -54,6 +61,8 @@ func (o *Operations) Update(ctx context.Context, r localapi.UpdateRequest) (loca
 			o.updateApplying = false
 			o.updateTargetGeneration = 0
 			o.updateTargetRevision = ""
+			result.Code = "apply_failed"
+		} else if !o.updateApplying && o.updates.RejectReady(r.ID, r.Peer) {
 			result.Code = "apply_failed"
 		}
 		o.mu.Unlock()
@@ -76,13 +85,25 @@ func (o *Operations) Update(ctx context.Context, r localapi.UpdateRequest) (loca
 		}
 	case "APPLY":
 		o.mu.Lock()
-		if o.updateApplying || o.root.Err() != nil || (o.sessionDone != nil && o.peerAlias != p.Alias) {
+		if o.updateApplying {
+			o.recordLocked("peer_update_apply_busy")
 			o.mu.Unlock()
+			result.Code, result.Status = "apply_busy", o.updates.Status()
+			return result, nil
+		}
+		if o.root.Err() != nil || (o.sessionDone != nil && o.peerAlias != p.Alias) {
+			o.recordLocked("peer_update_apply_session_changed")
+			o.updates.RejectReady(r.ID, r.Peer)
+			o.mu.Unlock()
+			result.Code, result.Status = "apply_session_changed", o.updates.Status()
 			return result, nil
 		}
 		directory, revision, err := o.updates.Claim(r.ID, r.Peer)
 		if err != nil {
+			o.recordLocked("peer_update_apply_claim_failed")
+			o.updates.RejectReady(r.ID, r.Peer)
 			o.mu.Unlock()
+			result.Code, result.Status = "apply_claim_failed", o.updates.Status()
 			return result, nil
 		}
 		o.updateApplying = true

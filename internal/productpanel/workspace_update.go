@@ -134,6 +134,9 @@ type WorkspaceUpdateReceiver struct {
 	launch    func(string, string, string, string) error
 	mu        sync.Mutex
 	attempted string
+	retryID   string
+	retries   int
+	retryAt   time.Time
 }
 
 func NewWorkspaceUpdateReceiver(ctx context.Context, open func() (UpdateSettingsClient, error), launch func(string, string, string, string) error) *WorkspaceUpdateReceiver {
@@ -156,6 +159,9 @@ func (b *WorkspaceUpdateReceiver) Poll() bool {
 		return false
 	}
 	if updatePermission(s.Allowed, s.Peer) != "ALLOWED" {
+		return false
+	}
+	if s.ID == b.retryID && time.Now().Before(b.retryAt) {
 		return false
 	}
 	trust, err := c.Trust(ctx)
@@ -189,6 +195,20 @@ func (b *WorkspaceUpdateReceiver) Poll() bool {
 		return false
 	}
 	if r.Code != "apply_ready" {
+		// An explicit busy response proves no claim was taken. Retry only this
+		// outcome, with a bounded budget; lost responses remain one-shot.
+		if r.Code == "apply_busy" {
+			if b.retryID != s.ID {
+				b.retryID, b.retries = s.ID, 0
+			}
+			b.retries++
+			if b.retries < 3 {
+				b.attempted = ""
+				b.retryAt = time.Now().Add(5 * time.Second)
+			} else {
+				fail()
+			}
+		}
 		return false
 	}
 	after, err := c.Runtime(ctx)
