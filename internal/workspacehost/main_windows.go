@@ -127,7 +127,7 @@ func Run() {
 	if err != nil {
 		os.Exit(1)
 	}
-	service := &WorkspaceService{raw: bridge, ctx: ctx, control: paths.Control, title: fmt.Sprintf("Krasis · g%d", localapi.AgentGeneration)}
+	service := &WorkspaceService{raw: bridge, ctx: ctx, cancel: cancel, control: paths.Control, title: fmt.Sprintf("Krasis · g%d", localapi.AgentGeneration)}
 	service.clipboardWake = make(chan struct{}, 1)
 	service.startAtLogin = startAtLogin || resumeAfterInstall
 	if !smoke {

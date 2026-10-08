@@ -180,33 +180,34 @@ func (s *UIShutdown) Stop(ctx context.Context) error {
 	}
 }
 
-// Wails g242+ already has this hidden main-loop window. WM_CLOSE only hides
-// Krasis in the tray; WM_QUIT ends the application's existing message loop.
+// Wails g242+ already has this hidden main-loop window. WM_CLOSE on this
+// window invokes App.Quit and its shutdown callbacks. On the visible window it
+// merely hides Krasis; WM_QUIT skips callbacks and can strand service shutdown.
 // Do not broadcast to windows, inject callbacks, or terminate any process.
 func postUIQuit(pid uint32) error {
 	user32 := windows.NewLazySystemDLL("user32.dll")
 	getPID := user32.NewProc("GetWindowThreadProcessId")
 	getTitle := user32.NewProc("GetWindowTextW")
-	post := user32.NewProc("PostThreadMessageW")
-	var tid uint32
+	post := user32.NewProc("PostMessageW")
+	var target uintptr
 	callback := syscall.NewCallback(func(hwnd, _ uintptr) uintptr {
 		var windowPID uint32
-		thread, _, _ := getPID.Call(hwnd, uintptr(unsafe.Pointer(&windowPID)))
+		getPID.Call(hwnd, uintptr(unsafe.Pointer(&windowPID)))
 		if windowPID == pid {
 			var title [128]uint16
 			getTitle.Call(hwnd, uintptr(unsafe.Pointer(&title[0])), uintptr(len(title)))
 			if windows.UTF16ToString(title[:]) == "__wails_hidden_mainthread" {
-				tid = uint32(thread)
+				target = hwnd
 				return 0
 			}
 		}
 		return 1
 	})
 	user32.NewProc("EnumWindows").Call(callback, 0)
-	if tid == 0 {
+	if target == 0 {
 		return errors.New("Krasis main loop unavailable")
 	}
-	result, _, err := post.Call(uintptr(tid), 0x0012, 0, 0)
+	result, _, err := post.Call(target, 0x0010, 0, 0)
 	if result == 0 {
 		return err
 	}

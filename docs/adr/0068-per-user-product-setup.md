@@ -74,8 +74,10 @@ shutdown. The installer holds the existing startup lease through publication and
 retains the idle agent lease after confirmed exit to fence automatic recovery.
 Only same-user, same-session UI processes matching the current/previous launch
 record and exact image hash can be closed. Retained process handles prevent PID
-reuse. For existing Wails images, a WM_QUIT request goes only to the verified
-process's hidden main-loop thread; WM_CLOSE would merely hide the tray window.
+reuse. For existing Wails images, WM_CLOSE goes only to the verified process's
+hidden main-loop window, invoking App.Quit and its normal shutdown callbacks.
+WM_CLOSE on the visible window would merely hide the app; WM_QUIT would skip
+normal cleanup. The UI also cancels its workers before service shutdown waits.
 No process is force-killed, and unknown ownership or an unconfirmed exit blocks
 installation. Agent shutdown uses authenticated, instance-bound maintenance and
 upgrade-stop requests, preserving saved connection intent and waiting for guard

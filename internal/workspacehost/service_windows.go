@@ -36,6 +36,7 @@ type WorkspaceService struct {
 	recoverySettingsReady  bool
 
 	ctx              context.Context
+	cancel           context.CancelFunc
 	control          string
 	title            string
 	clipGate         sync.Mutex
@@ -137,6 +138,11 @@ func (s *WorkspaceService) ServiceStartup(context.Context, application.ServiceOp
 	return nil
 }
 func (s *WorkspaceService) ServiceShutdown() error {
+	// App.Run can shut services down even when normal OnShutdown hooks did not
+	// run. Cancel our own workers before waiting for them in either exit path.
+	if s.cancel != nil {
+		s.cancel()
+	}
 	if s.done != nil {
 		<-s.done
 	}
