@@ -28,6 +28,13 @@ to the new image and register the fixed login CLI. Repeated repair cannot outrun
 task ownership history. A foreign or unreadable task blocks this registration;
 it is never silently deleted or adopted. A missing settings file keeps the
 first-install default, while malformed settings abort installation.
+Before staging or replacing installation receipts, setup also checks both launch
+history records and the visible Installed Apps and startup registrations. Missing
+shell registrations remain repairable; foreign paths, unreadable values and
+malformed launch history stop installation without changing application images.
+A damaged executable with a valid launch record still permits image repair.
+Startup enable/disable rechecks the fixed command before replacing or deleting
+it; a foreign registration is an error rather than a disabled preference.
 When repair finds a damaged current image, the owned task is disabled before
 publication instead of re-arming that image. The saved startup preference is
 applied only to the verified replacement. This does not adopt a foreign task.

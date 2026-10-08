@@ -14,6 +14,7 @@ import (
 	"github.com/0disoft/krasis/internal/peercredentials"
 	"github.com/0disoft/krasis/internal/productidentity"
 	"github.com/0disoft/krasis/internal/securefs"
+	"golang.org/x/sys/windows/registry"
 	"io"
 	"os"
 	"path/filepath"
@@ -110,15 +111,25 @@ func Install(base, self string, p Package) (string, error) {
 		return "", ErrBusy
 	}
 	defer lease.Close()
+	meta := p.Bundle.Metadata()
+	if err := validateInstallHistory(base, meta.Generation); err != nil {
+		return "", err
+	}
+	paths, err := productidentity.ResolveWindowsPaths(base)
+	if err != nil {
+		return "", err
+	}
+	if err := validateInstallRegistrationAt(registry.CURRENT_USER, uninstallKey, filepath.Join(paths.Root, "app")); err != nil {
+		return "", err
+	}
+	if err := appsettings.ValidateStartupRegistration(base); err != nil {
+		return "", err
+	}
 	dir, path, err := directory(base)
 	if err != nil {
 		return "", err
 	}
 	defer dir.Close()
-	meta := p.Bundle.Metadata()
-	if current, e := launchrecord.Load(base); e == nil && current.Generation > meta.Generation {
-		return "", ErrOlder
-	}
 	r := Receipt{Schema: Schema, Generation: meta.Generation, Revision: meta.Revision, Folders: []string{p.ID}}
 	if data, e := read(dir, "installation.json", 8192); e == nil {
 		old, e := DecodeReceipt(data)
@@ -217,4 +228,18 @@ func Install(base, self string, p Package) (string, error) {
 		return "", err
 	}
 	return ui, nil
+}
+
+func validateInstallHistory(base string, generation int) error {
+	current, err := launchrecord.Load(base)
+	if err != nil && !errors.Is(err, launchrecord.ErrMissing) {
+		return err
+	}
+	if err == nil && current.Generation > generation {
+		return ErrOlder
+	}
+	// A bad previous record also prevents recovery-task migration. Check it
+	// before touching application images, while permitting image-only repair.
+	_, err = launchrecord.RecoveryDirectories(base)
+	return err
 }
