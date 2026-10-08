@@ -524,3 +524,11 @@ login-peer substitution. Deferred delivery uses the existing guarded resume
 operation, so the agent's current manual-stop state and fresh trust comparison
 remain authoritative. Explicit disconnect cancels the saved request; uncertain
 replies never replay it. No new local API or persistent queue is added.
+
+Pending preparation records verified restoration separately from read-only
+connection readiness. After restoration, transient status/trust/pre-send failures
+retain the original identity and five-minute deadline without Ensure or readiness
+promotion replay. Fresh trust changes stop the continuation; possibly sent
+commands transfer to the existing uncertainty latch instead of retrying. The
+restoration context cannot exceed the saved deadline. This remains native state,
+with no renderer-triggered recovery or new worker.

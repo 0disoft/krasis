@@ -10,6 +10,8 @@ type pendingInputRecovery struct {
 	alias, fingerprint string
 	startup            bool
 	deadline           time.Time
+	restored           bool
+	refreshCode        string
 }
 
 // Ensure runs under its normal startup ownership fence. The callback only
@@ -45,47 +47,93 @@ func (b *DesktopLifecycle) continuePendingInput(ctx context.Context, now time.Ti
 		value.Code = "input_refresh_pending"
 		return value, true
 	}
-	if b.PendingInputSetup == nil || b.PendingInputRestore == nil {
+	if !p.restored {
+		if b.PendingInputSetup == nil || b.PendingInputRestore == nil {
+			return value, true
+		}
+		setup := b.PendingInputSetup()
+		if setup != "READY" && setup != "UPDATE_REQUIRED" && setup != "NOT_INSTALLED" {
+			value.Code = "input_refresh_pending"
+			return value, true
+		}
+		restoreCtx, cancel := context.WithDeadline(ctx, p.deadline)
+		err := b.PendingInputRestore(restoreCtx)
+		cancel()
+		if errors.Is(err, ErrInputRefreshPending) {
+			value.Code = "input_refresh_pending"
+			return value, true
+		}
+		if err != nil {
+			b.pendingInput, b.updatedResume = nil, nil
+			value.Code = "startup_failed"
+			return value, true
+		}
+		p.restored, p.refreshCode = true, "ok"
+		if b.PendingInputSetup() != "READY" {
+			p.refreshCode = "input_refresh_failed"
+			b.updatedResume = nil
+		}
+		if b.stopped.Load() || b.ctx.Err() != nil || ctx.Err() != nil {
+			b.pendingInput = nil
+			value.Code = "cancelled"
+			return value, true
+		}
+		if b.StartupReady != nil {
+			b.StartupReady()
+		}
+		value = NewDesktopBridge(ctx, b.open).Refresh()
+	}
+	value.InputRefreshCode, value.ReconnectCode = p.refreshCode, "not_attempted"
+	// Read-only confirmation retains the same identity/deadline. Never prepare
+	// another agent because a status or trust read after restoration failed.
+	if value.Code != "ok" {
+		if value.Code == "recovery_required" {
+			b.pendingInput, b.updatedResume = nil, nil
+		}
 		return value, true
 	}
-	setup := b.PendingInputSetup()
-	if setup != "READY" && setup != "UPDATE_REQUIRED" && setup != "NOT_INSTALLED" {
-		value.Code = "input_refresh_pending"
+	if p.alias != "" {
+		matches := 0
+		changed := false
+		for _, peer := range value.Peers {
+			if peer.Alias == p.alias {
+				matches++
+				changed = changed || peer.Fingerprint != p.fingerprint
+			}
+		}
+		if matches != 1 || changed || value.PeerAlias != "" && value.PeerAlias != p.alias {
+			b.pendingInput, b.updatedResume = nil, nil
+			value.Code, value.ReconnectCode = "stale_peer", "stale_peer"
+			return value, true
+		}
+	}
+	switch value.State {
+	case "UNKNOWN", "CONNECTING", "RECONNECTING":
 		return value, true
+	case "LOCAL", "CONNECTED":
+	default:
+		b.pendingInput, b.updatedResume = nil, nil
+		value.Code = "agent_busy"
+		return value, true
+	}
+	if value.State == "LOCAL" {
+		if p.alias != "" {
+			value = b.recoveryResume(NewDesktopBridge(ctx, b.open), p.alias, p.fingerprint)
+			value.ReconnectCode = value.Code
+		} else if p.startup && b.StartupResume != nil {
+			value = b.StartupResume(ctx, value)
+		}
+		value.InputRefreshCode = p.refreshCode
+		if value.ReconnectCode == "" {
+			value.ReconnectCode = "not_attempted"
+		}
+		// The bridge reserves outcome_unknown for possibly sent commands.
+		// Only verified pre-send read failures can wait for another observation.
+		if value.Code == "unavailable" || value.Code == "busy" {
+			return value, true
+		}
 	}
 	b.pendingInput = nil
-	err := b.PendingInputRestore(ctx)
-	if errors.Is(err, ErrInputRefreshPending) {
-		b.pendingInput = p // A fresh check found another running/unconfirmed transaction.
-		value.Code = "input_refresh_pending"
-		return value, true
-	}
-	if err != nil {
-		b.updatedResume = nil
-		value.Code = "startup_failed"
-		return value, true
-	}
-	if b.stopped.Load() || b.ctx.Err() != nil || ctx.Err() != nil {
-		value.Code = "cancelled"
-		return value, true
-	}
-	if b.StartupReady != nil {
-		b.StartupReady()
-	}
-	bridge := NewDesktopBridge(ctx, b.open)
-	value = bridge.Refresh()
-	refreshCode, reconnectCode := "ok", "not_attempted"
-	if b.PendingInputSetup() != "READY" {
-		refreshCode = "input_refresh_failed"
-		b.updatedResume = nil
-	}
-	if p.alias != "" && value.Code == "ok" && value.State == "LOCAL" {
-		value = b.recoveryResume(bridge, p.alias, p.fingerprint)
-		reconnectCode = value.Code
-	} else if p.startup && p.alias == "" && b.StartupResume != nil {
-		value = b.StartupResume(ctx, value)
-	}
-	value.InputRefreshCode, value.ReconnectCode = refreshCode, reconnectCode
 	b.startUpdatedResumeWindow(now)
 	return value, true
 }
