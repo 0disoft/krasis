@@ -223,9 +223,15 @@ func (b *WorkspaceUpdateReceiver) Poll() bool {
 	return true
 }
 
-// Serialize the handoff with native connect/recovery operations.
+// Serialize the handoff with native connect/recovery operations. A bounded
+// queued acquisition prevents equal-period polling loops from starving it.
 func (b *DesktopLifecycle) ApplyReceivedUpdate(receiver *WorkspaceUpdateReceiver) bool {
-	if !b.gate.TryLock() {
+	if b.ctx == nil || receiver == nil {
+		return false
+	}
+	wait, cancel := context.WithTimeout(b.ctx, 15*time.Second)
+	defer cancel()
+	if !b.gate.LockContext(wait) {
 		return false
 	}
 	defer b.gate.Unlock()

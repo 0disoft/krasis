@@ -26,7 +26,7 @@ type DesktopLifecycle struct {
 	diagnose                 func(context.Context, string) error
 	displayReady             func() bool
 	diagnosticActive         atomic.Bool
-	gate                     sync.Mutex
+	gate                     lifecycleGate
 	cancelMu                 sync.Mutex
 	cancel                   context.CancelFunc
 	stopped                  atomic.Bool
