@@ -89,6 +89,15 @@ func pinRefreshFile(path string, directory bool) (*os.File, error) {
 }
 
 func runInputInstaller(ctx context.Context, base, revision string) error {
+	return runInputInstallerAction(ctx, base, revision, false)
+}
+
+// RemoveProtectedInput reuses the same pinned, revision-verified local installer
+// and attended Windows consent. Only its fixed remove action is exposed.
+func RemoveProtectedInput(ctx context.Context, base, revision string) error {
+	return runInputInstallerAction(ctx, base, revision, true)
+}
+func runInputInstallerAction(ctx context.Context, base, revision string, remove bool) error {
 	if ctx.Err() != nil || len(revision) != 40 {
 		return ErrInputRefreshFailed
 	}
@@ -159,7 +168,7 @@ func runInputInstaller(ctx context.Context, base, revision string) error {
 			return ErrInputRefreshFailed
 		}
 	}
-	return elevateInputInstaller(ctx, filepath.Join(base, "krasis-install.exe"), base)
+	return elevateInputInstallerAction(ctx, filepath.Join(base, "krasis-install.exe"), base, remove)
 }
 
 type shellExecuteInfo struct {
@@ -176,6 +185,9 @@ type shellExecuteInfo struct {
 }
 
 func elevateInputInstaller(ctx context.Context, path, directory string) error {
+	return elevateInputInstallerAction(ctx, path, directory, false)
+}
+func elevateInputInstallerAction(ctx context.Context, path, directory string, remove bool) error {
 	if ctx.Err() != nil {
 		return ErrInputRefreshFailed
 	}
@@ -187,7 +199,11 @@ func elevateInputInstaller(ctx context.Context, path, directory string) error {
 	defer windows.CoUninitialize()
 	verb, _ := windows.UTF16PtrFromString("runas")
 	file, _ := windows.UTF16PtrFromString(path)
-	args, _ := windows.UTF16PtrFromString("--install")
+	action := "--install"
+	if remove {
+		action = "--remove"
+	}
+	args, _ := windows.UTF16PtrFromString(action)
 	dir, _ := windows.UTF16PtrFromString(directory)
 	info := shellExecuteInfo{Mask: 0x40 | 0x100 | 0x400, Verb: verb, File: file, Parameters: args, Directory: dir, Show: windows.SW_SHOWNORMAL}
 	info.Size = uint32(unsafe.Sizeof(info))

@@ -45,6 +45,61 @@ func RegisterStartMenu(localAppData string) error {
 
 type menuReceipt struct{ Target, Link, SHA256 string }
 
+// Remove only the byte-verified shortcut registered by Krasis, never a shortcut
+// with a changed target or another application's name.
+func UnregisterStartMenu(base string) error {
+	dir, err := productidentity.PrepareLaunch(base)
+	if err != nil {
+		return err
+	}
+	defer dir.Close()
+	f, err := dir.Open("start-menu.json")
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var r menuReceipt
+	info, err := f.Stat()
+	if err != nil || info.Size() > 8192 {
+		f.Close()
+		return ErrInvalid
+	}
+	err = json.NewDecoder(f).Decode(&r)
+	f.Close()
+	if err != nil {
+		return ErrInvalid
+	}
+	programs, err := windows.KnownFolderPath(windows.FOLDERID_Programs, 0)
+	if err != nil {
+		return err
+	}
+	launch, err := Directory(base)
+	if err != nil {
+		return err
+	}
+	if r.Link != filepath.Join(programs, "Krasis.lnk") || r.Target != filepath.Join(launch, "krasis-cli.exe") {
+		return ErrInvalid
+	}
+	hash, err := linkDigest(r.Link)
+	if errors.Is(err, os.ErrNotExist) {
+		return dir.Remove("start-menu.json")
+	}
+	if err != nil || hash != r.SHA256 {
+		return ErrInvalid
+	}
+	links, err := securefs.OpenDirectory(programs)
+	if err != nil {
+		return err
+	}
+	defer links.Close()
+	if err = links.Remove("Krasis.lnk"); err != nil {
+		return err
+	}
+	return dir.Remove("start-menu.json")
+}
+
 func linkDigest(link string) (string, error) {
 	dir, err := securefs.OpenReadDirectory(filepath.Dir(link))
 	if err != nil {

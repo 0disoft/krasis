@@ -30,3 +30,5 @@ tmp/
 # Installer payloads/resources are generated from committed source only.
 /cmd/krasis-install/payload/
 /cmd/krasis-install/installer_windows_amd64.syso
+/cmd/krasis-setup/payload/
+/cmd/krasis-setup/setup_windows_amd64.syso
