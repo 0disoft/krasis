@@ -34,7 +34,8 @@ func TestIndependentProcessChild(t *testing.T) {
 		Independent bool
 		SystemDrive string
 		ProgramData string
-	}{inJob, session, windows.GetCurrentProcessId(), os.Getenv("KRASIS_INDEPENDENT_LAUNCH") == "1", os.Getenv("SystemDrive"), os.Getenv("ProgramData")})
+		CallerValue string
+	}{inJob, session, windows.GetCurrentProcessId(), os.Getenv("KRASIS_INDEPENDENT_LAUNCH") == "1", os.Getenv("SystemDrive"), os.Getenv("ProgramData"), os.Getenv("KRASIS_TEST_CALLER_VALUE")})
 	if err = os.WriteFile(args[len(args)-1], data, 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -44,6 +45,43 @@ func TestIndependentProcessChild(t *testing.T) {
 			return
 		}
 		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+func TestOrdinaryLaunchRetainsWindowsShellPathsWithoutCallerValues(t *testing.T) {
+	t.Setenv("KRASIS_TEST_CALLER_VALUE", "synthetic caller value")
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := filepath.Join(t.TempDir(), "ordinary launch.json")
+	if err := os.WriteFile(result+".done", []byte("done"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	// Execute the exact command constructed by Start/StartAtLogin without the
+	// WMI detachment branch, which previously rebuilt the environment itself.
+	command := launchCommand(self, "-test.run=^TestIndependentProcessChild$", "--", result)
+	if err := command.Run(); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		SystemDrive string
+		ProgramData string
+		CallerValue string
+	}
+	if json.Unmarshal(data, &got) != nil {
+		t.Fatal("ordinary child result malformed")
+	}
+	if got.SystemDrive == "" || !strings.EqualFold(got.SystemDrive, os.Getenv("SystemDrive")) ||
+		!filepath.IsAbs(got.ProgramData) || !strings.EqualFold(got.ProgramData, os.Getenv("ProgramData")) {
+		t.Fatal("Windows shell paths cannot resolve in ordinary child", got)
+	}
+	if got.CallerValue != "" {
+		t.Fatal("ordinary launch forwarded unrelated caller state")
 	}
 }
 

@@ -17,7 +17,8 @@ also expose the owned Installed Apps entry for the receipt's fixed app root.
 A missing or foreign entry is a failed preflight, not an idempotent success.
 Independent launches retain the Windows system, profile and ProgramData path
 variables required by shell/COM services. The bounded environment excludes
-unrelated caller values. Omitting SystemDrive can produce a literal
+unrelated caller values. Both ordinary login/relaunch and job-detached child
+creation share this allowlist. Omitting SystemDrive can produce a literal
 `%SystemDrive%` cache directory inside the immutable app image; that directory
 remains an unexpected file for removal, never an implicitly allowed exception.
 

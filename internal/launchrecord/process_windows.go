@@ -84,20 +84,7 @@ func startViaWMI(command *exec.Cmd) error {
 	defer cancel()
 	helper := exec.CommandContext(ctx, filepath.Join(system, "WindowsPowerShell", "v1.0", "powershell.exe"), "-NoProfile", "-NonInteractive", "-EncodedCommand", base64.StdEncoding.EncodeToString(encoded))
 	helper.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: windows.CREATE_NO_WINDOW}
-	childEnv := []string{"KRASIS_INDEPENDENT_LAUNCH=1"}
-	// This is a replacement environment, not an overlay on the parent's.
-	// Shell folders and COM caches expand SystemDrive/ProgramData themselves;
-	// missing them can create a literal %SystemDrive% under the app directory.
-	// Keep Windows profile paths, without forwarding arbitrary caller secrets.
-	for _, key := range []string{
-		"SystemRoot", "SystemDrive", "WINDIR", "LOCALAPPDATA", "APPDATA", "TEMP", "TMP", "USERPROFILE", "PATH",
-		"ProgramData", "ALLUSERSPROFILE", "PUBLIC", "HOMEDRIVE", "HOMEPATH", "USERNAME", "USERDOMAIN", "USERDOMAIN_ROAMINGPROFILE",
-		"ProgramFiles", "ProgramW6432", "ProgramFiles(x86)", "CommonProgramFiles", "CommonProgramW6432", "CommonProgramFiles(x86)", "COMSPEC", "PATHEXT",
-	} {
-		if value, ok := os.LookupEnv(key); ok {
-			childEnv = append(childEnv, key+"="+value)
-		}
-	}
+	childEnv := append(windowsLaunchEnvironment(), "KRASIS_INDEPENDENT_LAUNCH=1")
 	environment, _ := json.Marshal(childEnv)
 	helper.Env = append(os.Environ(), "KRASIS_LAUNCH_COMMAND="+strings.Join(args, " "), "KRASIS_LAUNCH_DIRECTORY="+command.Dir, "KRASIS_LAUNCH_ENVIRONMENT="+string(environment))
 	data, err := helper.Output()
@@ -112,4 +99,21 @@ func startViaWMI(command *exec.Cmd) error {
 		return errors.New("independent launch unconfirmed")
 	}
 	return nil
+}
+
+// Ordinary and job-detached launches need the same Windows shell paths.
+// Keep one allowlist so a launch mode cannot silently drop SystemDrive or
+// ProgramData, or forward arbitrary caller values.
+func windowsLaunchEnvironment() []string {
+	var environment []string
+	for _, key := range []string{
+		"SystemRoot", "SystemDrive", "WINDIR", "LOCALAPPDATA", "APPDATA", "TEMP", "TMP", "USERPROFILE", "PATH",
+		"ProgramData", "ALLUSERSPROFILE", "PUBLIC", "HOMEDRIVE", "HOMEPATH", "USERNAME", "USERDOMAIN", "USERDOMAIN_ROAMINGPROFILE",
+		"ProgramFiles", "ProgramW6432", "ProgramFiles(x86)", "CommonProgramFiles", "CommonProgramW6432", "CommonProgramFiles(x86)", "COMSPEC", "PATHEXT",
+	} {
+		if value, ok := os.LookupEnv(key); ok {
+			environment = append(environment, key+"="+value)
+		}
+	}
+	return environment
 }
