@@ -34,7 +34,7 @@ type Startup struct {
 	InputAttempt      func() string
 	InputRecheck      func() string
 	InputProbe        func(context.Context) string
-	InputRestoreCheck func() error
+	InputRestoreCheck func(context.Context) error
 	Pause             func(context.Context) error
 	Generation        int
 	Revision          string

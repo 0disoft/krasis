@@ -21,11 +21,11 @@ func (s Startup) RestoreProtectedInput(ctx context.Context) error {
 	if s.InputRestoreCheck == nil {
 		return ErrInputRefreshPending
 	}
-	if err := s.InputRestoreCheck(); err != nil {
+	if err := s.InputRestoreCheck(ctx); err != nil {
 		return err // Also fence an already running agent against stale completion health.
 	}
 	restore := s
-	restore.BeforeStart = func(context.Context) error { return s.InputRestoreCheck() }
+	restore.BeforeStart = s.InputRestoreCheck
 	return restore.Ensure(ctx)
 }
 

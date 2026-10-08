@@ -566,3 +566,10 @@ Terminal restoration failure has its own bounded reconnect outcome,
 input_refresh_restore_failed. The original installer outcome is retained, while
 the renderer explains that agent restoration and automatic connection stopped.
 Subsequent cached reads keep the failure until an explicit lifecycle action.
+
+Restoration health checks use the existing single background health reader and
+accept the caller's context. A cancelled or expired wait releases the lifecycle
+gate without waiting for a synchronous filesystem/service inspection. The worker
+remains the sole read-only owner until completion; subsequent waiters coalesce,
+and installer operations remain fenced. Its result belongs to that observation,
+not a later mutable health snapshot. Restoration never bypasses a pending install.
