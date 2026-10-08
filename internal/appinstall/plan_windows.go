@@ -21,7 +21,7 @@ type installPlan struct {
 
 // Receipt/history and source-image failures must not close a usable app. Keep
 // the validated bytes for publication rather than reopening the source later.
-func prepareInstallPlan(ctx context.Context, dir *securefs.Directory, self string, next Receipt, stop func() (io.Closer, error)) (installPlan, error) {
+func prepareInstallPlan(ctx context.Context, dir *securefs.Directory, self string, next Receipt, inspect func(Receipt) (Receipt, error), stop func() (io.Closer, error)) (installPlan, error) {
 	if err := ctx.Err(); err != nil {
 		return installPlan{}, err
 	}
@@ -44,6 +44,13 @@ func prepareInstallPlan(ctx context.Context, dir *securefs.Directory, self strin
 	// The package and old receipt own identity validation; bound merged history.
 	if next.Schema != Schema || len(next.Folders) > 64 {
 		return installPlan{}, ErrInvalid
+	}
+	if inspect != nil {
+		var err error
+		next, err = inspect(next)
+		if err != nil {
+			return installPlan{}, err
+		}
 	}
 	source, err := securefs.OpenReadDirectory(filepath.Dir(self))
 	if err != nil {

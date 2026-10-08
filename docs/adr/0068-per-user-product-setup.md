@@ -91,3 +91,12 @@ exit. A 30-second shutdown timeout yields shutdown_failed plus shutdownStage in
 JSON; no installation images or registrations are changed by failed shutdown.
 The installed UI opens visibly with --installed and uses the existing saved-
 connection resume logic, including manual-stop and current trust checks.
+
+Repair selects its immutable image directory during preflight. Missing image
+files or changed bytes select a fresh random directory; an unreadable directory
+or file blocks repair instead of being classified as damaged. The extra repair
+entry must fit the 64-folder receipt limit before stopping the product or staging
+any image. Random IDs cannot reuse a receipt entry or adopt an existing folder.
+Staging revalidates the chosen image and aborts on a later change rather than
+creating an unplanned second directory after shutdown. Existing damaged images
+and installation history remain preserved.

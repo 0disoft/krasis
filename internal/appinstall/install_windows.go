@@ -4,9 +4,7 @@ package appinstall
 
 import (
 	"context"
-	"crypto/rand"
 	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"github.com/0disoft/krasis/internal/agentinstance"
@@ -151,7 +149,8 @@ func install(ctx context.Context, base, self string, p Package, before func() (i
 		return "", err
 	}
 	defer dir.Close()
-	plan, err := prepareInstallPlan(ctx, dir, self, Receipt{Schema: Schema, Generation: meta.Generation, Revision: meta.Revision, Folders: []string{p.ID}}, before)
+	plan, err := prepareInstallPlan(ctx, dir, self, Receipt{Schema: Schema, Generation: meta.Generation, Revision: meta.Revision, Folders: []string{p.ID}},
+		func(next Receipt) (Receipt, error) { return prepareInstallFolder(path, p, next) }, before)
 	if err != nil {
 		return "", err
 	}
@@ -159,6 +158,7 @@ func install(ctx context.Context, base, self string, p Package, before func() (i
 		defer plan.idle.Close()
 	}
 	r := plan.receipt
+	p.ID = r.Folders[0]
 	root, err := os.OpenRoot(path)
 	if err != nil {
 		return "", err
@@ -174,37 +174,11 @@ func install(ctx context.Context, base, self string, p Package, before func() (i
 		return "", err
 	}
 	err = p.Bundle.MatchDirectory(guard)
-	guard.Close()
+	err = errors.Join(err, guard.Close())
 	if err != nil {
-		// Repair into a fresh folder. Never overwrite corrupt or running images.
-		var id [16]byte
-		if _, err = rand.Read(id[:]); err != nil {
-			return "", err
-		}
-		p.ID = hex.EncodeToString(id[:])
-		root, err = os.OpenRoot(path)
-		if err != nil {
-			return "", err
-		}
-		err = p.Bundle.Stage(root, p.ID)
-		root.Close()
-		if err != nil {
-			return "", err
-		}
-		r.Folders = append([]string{p.ID}, r.Folders...)
-		if len(r.Folders) > 64 {
-			return "", ErrInvalid
-		}
-		installed = filepath.Join(path, p.ID)
-		guard, err = securefs.OpenReadDirectory(installed)
-		if err != nil {
-			return "", err
-		}
-		err = p.Bundle.MatchDirectory(guard)
-		guard.Close()
-		if err != nil {
-			return "", err
-		}
+		// The repair location was fixed before shutdown. A later change is not
+		// permission to create another unplanned directory or overwrite bytes.
+		return "", err
 	}
 	// Self bytes were already read before stopping the running product.
 	data := plan.setup
