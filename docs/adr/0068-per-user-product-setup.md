@@ -15,6 +15,11 @@ attended, revision-verified administrator removal; the per-user setup is asInvok
 Before removal changes any files or service, the current registry context must
 also expose the owned Installed Apps entry for the receipt's fixed app root.
 A missing or foreign entry is a failed preflight, not an idempotent success.
+Independent launches retain the Windows system, profile and ProgramData path
+variables required by shell/COM services. The bounded environment excludes
+unrelated caller values. Omitting SystemDrive can produce a literal
+`%SystemDrive%` cache directory inside the immutable app image; that directory
+remains an unexpected file for removal, never an implicitly allowed exception.
 
 Setup and repair apply the saved startup preference. Before publishing another
 launch record, they migrate the owned recovery task to the current image while

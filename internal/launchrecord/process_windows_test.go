@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 	"unsafe"
@@ -31,7 +32,9 @@ func TestIndependentProcessChild(t *testing.T) {
 		Session     uint32
 		PID         uint32
 		Independent bool
-	}{inJob, session, windows.GetCurrentProcessId(), os.Getenv("KRASIS_INDEPENDENT_LAUNCH") == "1"})
+		SystemDrive string
+		ProgramData string
+	}{inJob, session, windows.GetCurrentProcessId(), os.Getenv("KRASIS_INDEPENDENT_LAUNCH") == "1", os.Getenv("SystemDrive"), os.Getenv("ProgramData")})
 	if err = os.WriteFile(args[len(args)-1], data, 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -64,6 +67,8 @@ func TestWMIChildIsOutsideCallerJobAndInCallerSession(t *testing.T) {
 				Session     uint32
 				PID         uint32
 				Independent bool
+				SystemDrive string
+				ProgramData string
 			}
 			if json.Unmarshal(data, &got) != nil {
 				t.Fatal("child result malformed")
@@ -74,6 +79,10 @@ func TestWMIChildIsOutsideCallerJobAndInCallerSession(t *testing.T) {
 			}
 			if got.Session != current || !got.Independent {
 				t.Fatal("child lifetime/session not independent", got, current)
+			}
+			if got.SystemDrive == "" || !strings.EqualFold(got.SystemDrive, os.Getenv("SystemDrive")) ||
+				!filepath.IsAbs(got.ProgramData) || !strings.EqualFold(got.ProgramData, os.Getenv("ProgramData")) {
+				t.Fatal("Windows shell paths cannot resolve in independent child")
 			}
 			inJob, _ := InJob()
 			if inJob {
