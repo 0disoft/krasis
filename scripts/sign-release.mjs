@@ -6,6 +6,7 @@ import { execFileSync } from 'node:child_process';
 // The private PEM is supplied by the release environment, never an artifact.
 const directory=path.resolve(process.argv[2]??'');
 const metadata=JSON.parse(fs.readFileSync(path.join(directory,'BUILD.json'),'utf8'));
+if(metadata.signed!==true||metadata.purpose!=='windows-release')throw Error('Official releases require a publisher-signed payload');
 const generation=metadata.generation;
 if(!Number.isSafeInteger(generation)||generation<21||generation>1000000||directory!==path.resolve('dist/workspace',`g${generation}`)||!/^[a-f0-9]{40}$/u.test(metadata.revision))throw Error('Invalid release bundle');
 if(execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim()!==metadata.revision || execFileSync('git',['status','--porcelain','--untracked-files=no'],{encoding:'utf8'}).trim())throw Error('Release source differs from bundle');

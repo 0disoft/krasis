@@ -7,6 +7,16 @@
 
 ## Release classes
 
+g234 adds a self-contained application setup asset alongside the signed ZIP feed.
+Local setup candidates are unsigned and cannot be published by sign-release.mjs.
+The release environment must configure KRASIS_RELEASE_PUBLIC_KEY and its existing
+private-key secret, plus KRASIS_SIGN_CERT_BASE64, KRASIS_SIGN_CERT_PASSWORD,
+KRASIS_SIGN_CERT_THUMBPRINT and an HTTPS KRASIS_SIGN_TIMESTAMP_URL. The certificate
+is loaded ephemerally, its image signatures and timestamps are checked, and its
+temporary CI file is removed even after failure. No certificate is trusted or
+installed on customer machines by the build. Configuring and activating publisher
+credentials remains a release-owner action, separate from local implementation.
+
 ### Phase 0 probe kit
 
 A revision-addressed diagnostic artifact used only by the named target devices and experiment runbook. It is not installed, supported, auto-updated, or represented as a product release.

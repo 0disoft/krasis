@@ -12,11 +12,16 @@ import (
 const uninstallKey = `Software\Microsoft\Windows\CurrentVersion\Uninstall\Krasis`
 
 func registerUninstall(path string, generation int) error {
-	k, _, err := registry.CreateKey(registry.CURRENT_USER, uninstallKey, registry.SET_VALUE)
+	k, _, err := registry.CreateKey(registry.CURRENT_USER, uninstallKey, registry.SET_VALUE|registry.QUERY_VALUE)
 	if err != nil {
 		return err
 	}
 	defer k.Close()
+	if previous, _, e := k.GetStringValue("InstallLocation"); e == nil && previous != path {
+		return ErrInvalid
+	} else if e != nil && !errors.Is(e, registry.ErrNotExist) {
+		return e
+	}
 	setup := filepath.Join(path, "krasis-setup.exe")
 	for name, value := range map[string]string{"DisplayName": "Krasis", "DisplayVersion": fmt.Sprintf("g%d", generation), "Publisher": "Rodisoft", "InstallLocation": path, "UninstallString": `"` + setup + `" --remove`, "ModifyPath": `"` + setup + `" --repair`, "DisplayIcon": setup + ",0"} {
 		if err = k.SetStringValue(name, value); err != nil {

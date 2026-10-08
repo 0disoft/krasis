@@ -3,6 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { verifyExecutableIcon } from './check-windows-icon.mjs';
+import { signExecutable, signingEnabled } from './authenticode.mjs';
 
 // The experimental probe is an optional, atomic pair. A normal product update
 // must not require new test-signing evidence for a probe that is not deployed.
@@ -22,10 +23,11 @@ for (const name of ['krasis','krasis-agent','krasis-cli']) {
   const ldflags = (name === 'krasis-cli' ? '-s -w' : '-s -w -H=windowsgui') + (publicKey ? ` -X=github.com/0disoft/krasis/internal/releaseupdate.PublicKey=${publicKey}` : '');
   execFileSync('go',['build','-trimpath','-buildvcs=true',...tags,`-ldflags=${ldflags}`,'-o',path.join(directory,`${name}.exe`),`./cmd/${name}`],{stdio:'inherit',env:{...process.env,GOFLAGS:'',GOOS:'windows',GOARCH:'amd64',CGO_ENABLED:'0',GOPROXY:'off',GOSUMDB:'off'}});
   verifyExecutableIcon(fs.readFileSync(path.join(directory,`${name}.exe`)));
+  if(name!=='krasis-agent')signExecutable(path.join(directory,`${name}.exe`));
 }
 fs.copyFileSync('frontend/README.md',path.join(directory,'START-HERE.md'));
 fs.copyFileSync(path.join(bundleRoot,'THIRD-PARTY-NOTICES.txt'),path.join(directory,'THIRD-PARTY-NOTICES.txt'));
-fs.writeFileSync(path.join(directory,'BUILD.json'),JSON.stringify({revision,generation,platform:'windows/amd64',cgo:false,purpose:'manual-two-pc-smoke',signed:false},null,2)+'\n');
+fs.writeFileSync(path.join(directory,'BUILD.json'),JSON.stringify({revision,generation,platform:'windows/amd64',cgo:false,purpose:signingEnabled()?'windows-release':'manual-two-pc-smoke',signed:signingEnabled()},null,2)+'\n');
 const names=['krasis.exe','krasis-agent.exe','krasis-cli.exe','START-HERE.md','BUILD.json','THIRD-PARTY-NOTICES.txt'];
 // g105 is an installer-free compatibility bridge. Newer bundles carry the
 // installer, but neither the builder nor update receipt elevates or runs it.
@@ -35,11 +37,14 @@ if (generation >= 106) {
     execFileSync('node', ['scripts/build-input-installer.mjs'], { stdio: 'inherit' });
   }
   const evidence = JSON.parse(fs.readFileSync(path.join(installerRoot, 'BUILD.json'), 'utf8'));
+  // Authenticode timestamps need not be byte-identical across signing calls.
+  // Publish the exact signed agent embedded in the protected-input installer.
+  if(signingEnabled())fs.copyFileSync('cmd/krasis-install/payload/krasis-agent.exe',path.join(directory,'krasis-agent.exe'));
   const executable = fs.readFileSync(path.join(installerRoot, 'krasis-install.exe'));
   const digest = data => crypto.createHash('sha256').update(data).digest('hex');
   if (evidence.schemaVersion !== 'krasis.input.installer-build/v1' || evidence.revision !== revision ||
       evidence.platform !== 'windows/amd64' || evidence.executionLevel !== 'requireAdministrator' ||
-      evidence.signed !== false || evidence.installed !== false || evidence.sha256 !== digest(executable) ||
+      evidence.signed !== signingEnabled() || evidence.installed !== false || evidence.sha256 !== digest(executable) ||
       evidence.agentSha256 !== digest(fs.readFileSync(path.join(directory, 'krasis-agent.exe')))) {
     throw Error('Installer provenance or embedded agent differs from this update build');
   }

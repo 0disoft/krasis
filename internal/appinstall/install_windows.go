@@ -101,6 +101,9 @@ func Install(base, self string, p Package) (string, error) {
 	}
 	defer dir.Close()
 	meta := p.Bundle.Metadata()
+	if current, e := launchrecord.Load(base); e == nil && current.Generation > meta.Generation {
+		return "", ErrOlder
+	}
 	r := Receipt{Schema: Schema, Generation: meta.Generation, Revision: meta.Revision, Folders: []string{p.ID}}
 	if data, e := read(dir, "installation.json", 8192); e == nil {
 		old, e := DecodeReceipt(data)
@@ -108,7 +111,7 @@ func Install(base, self string, p Package) (string, error) {
 			return "", e
 		}
 		if old.Generation > meta.Generation {
-			return "", ErrInvalid
+			return "", ErrOlder
 		}
 		for _, name := range old.Folders {
 			if !slices.Contains(r.Folders, name) {

@@ -198,7 +198,7 @@ func read(source io.ReaderAt, size int64, executable func(string, []byte, string
 	var metadata Metadata
 	decoder := json.NewDecoder(bytes.NewReader(files["BUILD.json"]))
 	decoder.DisallowUnknownFields()
-	if decoder.Decode(&metadata) != nil || decoder.Decode(new(any)) != io.EOF || !validHex(metadata.Revision, 40) || metadata.Platform != "windows/amd64" || metadata.CGO || metadata.Purpose != "manual-two-pc-smoke" || metadata.Signed || metadata.Generation < 21 {
+	if decoder.Decode(&metadata) != nil || decoder.Decode(new(any)) != io.EOF || !validHex(metadata.Revision, 40) || metadata.Platform != "windows/amd64" || metadata.CGO || !(metadata.Purpose == "manual-two-pc-smoke" && !metadata.Signed || metadata.Purpose == "windows-release" && metadata.Signed) || metadata.Generation < 21 {
 		return nil, ErrInvalid
 	}
 	for _, name := range base[:3] {

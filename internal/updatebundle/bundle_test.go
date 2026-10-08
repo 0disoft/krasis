@@ -73,6 +73,26 @@ func TestBundleAcceptsBothExclusiveExecutableLayouts(t *testing.T) {
 	}
 }
 
+func TestReleaseMetadataDoesNotAcceptSignedClaimsInDevelopmentBundles(t *testing.T) {
+	for _, tc := range []struct {
+		purpose          string
+		signed, accepted bool
+	}{{"windows-release", true, true}, {"manual-two-pc-smoke", true, false}, {"windows-release", false, false}, {"untrusted", true, false}} {
+		data := fixture(t, func(files map[string][]byte) {
+			files["BUILD.json"], _ = json.Marshal(Metadata{Revision: strings.Repeat("a", 40), Platform: "windows/amd64", Generation: 234, Purpose: tc.purpose, Signed: tc.signed})
+			var sums strings.Builder
+			for _, name := range legacyNames[:len(legacyNames)-1] {
+				fmt.Fprintf(&sums, "%x  %s\n", sha256.Sum256(files[name]), name)
+			}
+			files["SHA256SUMS.txt"] = []byte(sums.String())
+		}, "")
+		_, err := read(bytes.NewReader(data), int64(len(data)), func(string, []byte, string) error { return nil })
+		if (err == nil) != tc.accepted {
+			t.Fatal(tc, err)
+		}
+	}
+}
+
 func TestSignedArchiveBytesMustMatchStagedDirectory(t *testing.T) {
 	data := fixtureLayout(t, currentNames)
 	b, err := read(bytes.NewReader(data), int64(len(data)), func(string, []byte, string) error { return nil })

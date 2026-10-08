@@ -495,7 +495,7 @@
   .transfer-notice, .release-notice { font-size:13px; margin-top:8px; }
   .empty-workspace { display:flex; align-items:center; justify-content:center; flex-direction:column; gap:12px; min-height:200px; text-align:center; }
   .empty-workspace h2 { font-size:20px; margin:0; }
-  .empty-workspace p { font-size:14px; }
+  .empty-workspace ol { margin:0; padding-left:20px; font-size:14px; line-height:1.8; text-align:left; max-width:440px; }
   .workspace-settings { width:min(560px,calc(100vw - 32px)); max-height:calc(100dvh - 80px); }
   .settings-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; }
   .settings-heading span { font-size:12px; color:var(--muted); }

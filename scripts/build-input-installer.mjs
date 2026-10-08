@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { verifyExecutableIcon } from './check-windows-icon.mjs';
+import { signExecutable, signingEnabled } from './authenticode.mjs';
 
 // Build only: no elevation, SCM changes, installer execution or certificates.
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -35,6 +36,8 @@ const build = (name, destination, tags = []) => execFileSync('go', [
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 build('krasis-agent', path.join(payload, 'krasis-agent.exe'));
 build('krasis-input', path.join(payload, 'krasis-input.exe'));
+signExecutable(path.join(payload,'krasis-agent.exe'));
+signExecutable(path.join(payload,'krasis-input.exe'));
 const pins = {
   agent: hash(fs.readFileSync(path.join(payload, 'krasis-agent.exe'))),
   input: hash(fs.readFileSync(path.join(payload, 'krasis-input.exe'))),
@@ -52,6 +55,7 @@ try {
   ], { stdio: 'inherit' });
   const executable = path.join(output, 'krasis-install.exe');
   build('krasis-install', executable, ['-tags', 'inputinstaller']);
+  signExecutable(executable);
   const bytes = fs.readFileSync(executable);
   verifyExecutableIcon(bytes);
   assert.deepEqual(readManifest(bytes), fs.readFileSync(path.join(root, 'assets/windows/krasis-install.manifest')));
@@ -59,7 +63,7 @@ try {
   fs.writeFileSync(path.join(output, 'BUILD.json'), JSON.stringify({
     schemaVersion: 'krasis.input.installer-build/v1', revision, platform: 'windows/amd64',
     sha256: hash(bytes), agentSha256: pins.agent, inputSha256: pins.input,
-    executionLevel: 'requireAdministrator', signed: false, installed: false,
+    executionLevel: 'requireAdministrator', signed: signingEnabled(), installed: false,
   }, null, 2) + '\n', { flag: 'wx' });
   process.stdout.write(`Input installer built; not installed: ${output}\n`);
 } finally {

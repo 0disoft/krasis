@@ -16,6 +16,7 @@ import (
 
 var ErrInvalid = errors.New("invalid application installation")
 var ErrBusy = errors.New("close Krasis before uninstalling")
+var ErrOlder = errors.New("use the latest application setup")
 
 const Schema = "krasis.app-install/v1"
 

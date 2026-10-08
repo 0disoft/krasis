@@ -21,6 +21,9 @@ jobs:
     env:
       RELEASE_TAG: ${{ inputs.tag }}
       KRASIS_RELEASE_PUBLIC_KEY: ${{ vars.KRASIS_RELEASE_PUBLIC_KEY }}
+      KRASIS_SIGN_CERT_THUMBPRINT: ${{ vars.KRASIS_SIGN_CERT_THUMBPRINT }}
+      KRASIS_SIGN_TIMESTAMP_URL: ${{ vars.KRASIS_SIGN_TIMESTAMP_URL }}
+      KRASIS_SIGN_CERT_PASSWORD: ${{ secrets.KRASIS_SIGN_CERT_PASSWORD }}
     steps:
       - name: Checkout approved tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -53,13 +56,22 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: Verify and build release folder
         shell: pwsh
+        env:
+          KRASIS_SIGN_CERT_BASE64: ${{ secrets.KRASIS_SIGN_CERT_BASE64 }}
         run: |
+          if ([string]::IsNullOrWhiteSpace($env:KRASIS_SIGN_CERT_BASE64) -or [string]::IsNullOrWhiteSpace($env:KRASIS_SIGN_CERT_THUMBPRINT) -or [string]::IsNullOrWhiteSpace($env:KRASIS_SIGN_TIMESTAMP_URL)) { throw 'Publisher signing identity is not configured' }
+          $krasisCertFile = Join-Path $env:RUNNER_TEMP 'krasis-release.pfx'
+          [IO.File]::WriteAllBytes($krasisCertFile,[Convert]::FromBase64String($env:KRASIS_SIGN_CERT_BASE64))
+          $env:KRASIS_SIGN_CERT_FILE = $krasisCertFile
+          "KRASIS_SIGN_CERT_FILE=$krasisCertFile" >> $env:GITHUB_ENV
           $env:GOMODCACHE = Join-Path (Get-Location) '.cache/go-mod'
           $env:GOCACHE = Join-Path (Get-Location) '.cache/go-build'
           $env:GOPROXY = 'off'
-          go test -timeout 90s ./internal/appsettings ./internal/releaseupdate ./internal/productpanel ./internal/launchrecord ./internal/productcli
+          go test -timeout 90s ./internal/appinstall ./cmd/krasis-setup ./internal/appsettings ./internal/releaseupdate ./internal/productpanel ./internal/launchrecord ./internal/productcli
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           ./scripts/build-workspace.ps1
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          node scripts/build-app-setup.mjs
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: Sign immutable update feed
         shell: pwsh
@@ -75,5 +87,13 @@ jobs:
         run: |
           $archive = "dist/releases/$env:RELEASE_TAG/krasis-$env:RELEASE_TAG-windows-amd64.zip"
           $feed = "dist/releases/$env:RELEASE_TAG/latest.json"
-          gh release create $env:RELEASE_TAG $archive $feed --verify-tag --title "Krasis $env:RELEASE_TAG" --generate-notes --latest
+          $setup = "dist/app-setup/$env:RELEASE_TAG/KrasisSetup-$env:RELEASE_TAG.exe"
+          $setupHashes = "dist/app-setup/$env:RELEASE_TAG/SHA256SUMS.txt"
+          gh release create $env:RELEASE_TAG $archive $feed $setup $setupHashes --verify-tag --title "Krasis $env:RELEASE_TAG" --generate-notes --latest
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Remove ephemeral signing identity
+        if: always()
+        shell: pwsh
+        run: |
+          $krasisCertFile = Join-Path $env:RUNNER_TEMP 'krasis-release.pfx'
+          if (Test-Path -LiteralPath $krasisCertFile) { Remove-Item -LiteralPath $krasisCertFile -Force }

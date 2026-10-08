@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/0disoft/krasis/internal/appinstall"
 	"github.com/0disoft/krasis/internal/launchrecord"
 	"golang.org/x/sys/windows"
@@ -14,6 +15,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 	"unsafe"
@@ -34,14 +37,24 @@ func main() { os.Exit(run(os.Args[1:], os.Stdout)) }
 func run(args []string, out io.Writer) int {
 	action := "--install"
 	quiet := false
+	var parent uint64
 	for _, arg := range args {
-		if arg == "--json" {
+		if strings.HasPrefix(arg, "--parent-pid=") {
+			var parseErr error
+			parent, parseErr = strconv.ParseUint(strings.TrimPrefix(arg, "--parent-pid="), 10, 32)
+			if parseErr != nil || parent == 0 {
+				return 2
+			}
+		} else if arg == "--json" {
 			quiet = true
 		} else if action == "--install" && (arg == "--install" || arg == "--repair" || arg == "--remove" || arg == "--remove-worker" || arg == "--verify") {
 			action = arg
 		} else {
 			return 2
 		}
+	}
+	if parent != 0 && action != "--remove-worker" {
+		return 2
 	}
 	data, err := payload()
 	if err != nil {
@@ -73,6 +86,18 @@ func run(args []string, out io.Writer) int {
 		return result(out, quiet, "removal_requested", nil)
 	}
 	if action == "--remove-worker" {
+		if parent != 0 {
+			h, e := windows.OpenProcess(windows.SYNCHRONIZE, false, uint32(parent))
+			if e == nil {
+				status, e := windows.WaitForSingleObject(h, 10000)
+				windows.CloseHandle(h)
+				if e != nil || status != windows.WAIT_OBJECT_0 {
+					return result(out, quiet, "remove_failed", appinstall.ErrBusy)
+				}
+			} else if !errors.Is(e, windows.ERROR_INVALID_PARAMETER) {
+				return result(out, quiet, "remove_failed", e)
+			}
+		}
 		err = appinstall.Remove(ctx, base)
 		return result(out, quiet, "removed", err)
 	}
@@ -97,6 +122,8 @@ func result(out io.Writer, quiet bool, state string, err error) int {
 		code = 1
 		if errors.Is(err, appinstall.ErrBusy) {
 			state = "close_app_required"
+		} else if errors.Is(err, appinstall.ErrOlder) || errors.Is(err, launchrecord.ErrOlder) {
+			state = "newer_setup_required"
 		} else if state == "removed" {
 			state = "remove_failed"
 		}
@@ -109,8 +136,12 @@ func result(out io.Writer, quiet bool, state string, err error) int {
 		}{"krasis.setup-result/v1", code, state}) != nil {
 			return 3
 		}
+	} else if state == "newer_setup_required" {
+		message("설치본보다 새로운 Krasis가 있습니다. 최신 버전의 설치본으로 설치하거나 복구해 주세요.", false)
 	} else if err != nil {
 		message("처리를 완료하지 못했습니다. Krasis 앱·에이전트를 종료한 뒤 다시 시도해 주세요. 기존 설정과 진단은 보존됩니다.", false)
+	} else if state == "removed" {
+		message("Krasis를 제거했습니다. 기기 등록 정보·설정·진단은 보존했습니다.", false)
 	}
 	return code
 }
@@ -132,7 +163,7 @@ func spawnRemoval(self string, quiet bool) error {
 	if err != nil || sha256.Sum256(data) != sha256.Sum256(check) {
 		return appinstall.ErrInvalid
 	}
-	args := []string{"--remove-worker"}
+	args := []string{"--remove-worker", fmt.Sprintf("--parent-pid=%d", os.Getpid())}
 	if quiet {
 		args = append(args, "--json")
 	}
