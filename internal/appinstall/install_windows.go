@@ -40,9 +40,19 @@ func directory(base string) (*securefs.Directory, string, error) {
 		if _, err = peercredentials.ValidateSecurityDirectory(path); err != nil {
 			return nil, "", err
 		}
-		dir, err = securefs.OpenDirectory(path)
+		dir, err = securefs.OpenReadDirectory(path)
 	} else if err == nil {
 		err = peercredentials.ProtectSecurityDirectoryHandle(dir.Handle())
+		// os.OpenRoot does not share DELETE on Windows. Keep a verified
+		// read handle after setting the ACL so staging does not conflict with
+		// our own DELETE-capable creation handle. Child writes/removals still
+		// use securefs handles relative to this directory.
+		if err == nil {
+			err = dir.Close()
+			if err == nil {
+				dir, err = securefs.OpenReadDirectory(path)
+			}
+		}
 	}
 	if err != nil {
 		if dir != nil {

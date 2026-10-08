@@ -70,6 +70,11 @@ Windows 관리자 확인을 받아 제거한다. 실행·파일 소유권이 불
 설치본 빌드는 `scripts/build-app-setup.mjs`에서 수행하며, 실행한 시험은 내장 묶음의
 읽기 전용 `--verify --json`이다. 실제 사용자 계정 설치·복구·제거는 별도 검증한다.
 
+g234의 실제 설치에서는 설치 폴더의 DELETE 권한 핸들과 Go `os.OpenRoot` 사이의
+Windows 공유 충돌이 재현됐다. g235는 폴더 ACL을 설정한 뒤 삭제 권한이 없는
+검증용 핸들을 유지해 staging과 병행한다. 최초 생성·기존 폴더 복구에서 보호 ACL,
+staging과 receipt 교체를 함께 확인하는 Windows 회귀 시험을 추가했다.
+
 ## #16에 남은 작업
 
 - 배포자 Authenticode 서명·검증과 재현 가능한 서명 후보, SBOM, checksum 출처
