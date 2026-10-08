@@ -33,6 +33,7 @@ func (m *Manager) info(peer string) PeerInfo {
 	info := PeerInfo{Protocol: 2, Generation: m.generation, Revision: m.revision, Allowed: m.permitted(peer), Clipboard: allowed, ClipboardID: id, ClipboardSize: size, ClipboardFormat: format}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.expireStagedLocked(time.Now())
 	age := time.Since(m.keyboard.at)
 	if !m.keyboard.at.IsZero() && age >= 0 && age < keyboardLifetime && m.keyboard.state.Valid() {
 		state := m.keyboard.state

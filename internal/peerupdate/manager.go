@@ -233,12 +233,7 @@ func (m *Manager) Status() Status {
 	if m.status.State == "DELIVERED" && !m.deliveredUntil.IsZero() && time.Now().After(m.deliveredUntil) {
 		m.status.State = "RESTART_UNCONFIRMED"
 	}
-	if m.status.State == "STAGED" && !m.stagedUntil.IsZero() && time.Now().After(m.stagedUntil) {
-		m.status.State = "RECEIVE_FAILED"
-	}
-	if m.status.State == "READY" && (m.stagedUntil.IsZero() || time.Now().After(m.stagedUntil)) {
-		m.status.State = "EXPIRED"
-	}
+	m.expireStagedLocked(time.Now())
 	if m.out != nil && time.Now().After(m.out.expires) {
 		m.out = nil
 		m.status.State = "EXPIRED"
@@ -317,6 +312,7 @@ func (m *Manager) permitted(peer string) bool {
 // a source path. A failed or expired offer needs another explicit user click.
 func (m *Manager) Prepare(peer, directory string) error {
 	m.mu.Lock()
+	m.expireStagedLocked(time.Now())
 	if !validID(peer, 64) || m.packing || m.receiving || m.out != nil || m.status.State == "READY" || m.status.State == "STAGED" || m.status.State == "APPLYING" {
 		m.mu.Unlock()
 		return ErrBusy
@@ -387,6 +383,7 @@ func (m *Manager) receive(peer, id, expected string, reader io.Reader, authorize
 		m.mu.Unlock()
 		return ErrDenied
 	}
+	m.expireStagedLocked(time.Now())
 	if m.status.ID == id && m.status.Peer == peer && (m.status.State == "READY" || m.status.State == "STAGED") {
 		m.mu.Unlock()
 		return nil
@@ -458,10 +455,7 @@ func (m *Manager) receive(peer, id, expected string, reader io.Reader, authorize
 func (m *Manager) Claim(id, peer string) (string, string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.status.State == "READY" && (m.stagedUntil.IsZero() || time.Now().After(m.stagedUntil)) {
-		m.status.State = "EXPIRED"
-		return "", "", ErrDenied
-	}
+	m.expireStagedLocked(time.Now())
 	if m.status.State != "READY" || m.status.ID != id || m.status.Peer != peer || !m.allowed[peer] {
 		return "", "", ErrDenied
 	}
@@ -485,9 +479,7 @@ func (m *Manager) event(code string) {
 func (m *Manager) ready(id string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.status.State == "STAGED" && !m.stagedUntil.IsZero() && time.Now().After(m.stagedUntil) {
-		m.status.State = "RECEIVE_FAILED"
-	}
+	m.expireStagedLocked(time.Now())
 	if m.status.ID == id && m.status.State == "STAGED" && m.allowed[m.status.Peer] {
 		m.status.State = "READY"
 		m.event("peer_update_ready")
