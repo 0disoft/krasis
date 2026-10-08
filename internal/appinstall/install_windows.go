@@ -167,7 +167,8 @@ func install(ctx context.Context, base, self string, p Package, before func() (i
 	defer dir.Close()
 	stage = "install_plan"
 	plan, err := prepareInstallPlan(ctx, dir, self, Receipt{Schema: Schema, Generation: meta.Generation, Revision: meta.Revision, Folders: []string{p.ID}},
-		func(next Receipt) (Receipt, error) { return prepareInstallFolder(path, p, next) }, before)
+		func(next Receipt) (Receipt, error) { return prepareInstallFolder(path, p, next) },
+		func(next Receipt) error { return stageInstallImage(path, p, next.Folders[0]) }, before)
 	if err != nil {
 		return "", err
 	}
@@ -176,25 +177,9 @@ func install(ctx context.Context, base, self string, p Package, before func() (i
 	}
 	r := plan.receipt
 	p.ID = r.Folders[0]
-	stage = "stage_image"
-	root, err := os.OpenRoot(path)
-	if err != nil {
-		return "", err
-	}
-	err = p.Bundle.Stage(root, p.ID)
-	root.Close()
-	if err != nil && !errors.Is(err, os.ErrExist) {
-		return "", err
-	}
 	installed := filepath.Join(path, p.ID)
 	stage = "verify_image"
-	guard, err := securefs.OpenReadDirectory(installed)
-	if err != nil {
-		return "", err
-	}
-	err = p.Bundle.MatchDirectory(guard)
-	err = errors.Join(err, guard.Close())
-	if err != nil {
+	if err = verifyInstallImage(installed, p); err != nil {
 		// The repair location was fixed before shutdown. A later change is not
 		// permission to create another unplanned directory or overwrite bytes.
 		return "", err

@@ -59,7 +59,7 @@ func TestInstallPreflightDoesNotCloseProductOnBadReceiptSourceOrCancellation(t *
 				}
 			}
 			stops := 0
-			_, err = prepareInstallPlan(ctx, dir, source, next, nil, func() (io.Closer, error) { stops++; return &shutdownLease{}, nil })
+			_, err = prepareInstallPlan(ctx, dir, source, next, nil, nil, func() (io.Closer, error) { stops++; return &shutdownLease{}, nil })
 			if err == nil || stops != 0 {
 				t.Fatal("preflight stopped usable product", scenario, err, stops)
 			}
@@ -96,7 +96,7 @@ func TestInstallUsesPreflightSourceSnapshotAndReleasesCancelledShutdownLease(t *
 		ctx, cancel := context.WithCancel(context.Background())
 		lease := &shutdownLease{}
 		next := Receipt{Schema: Schema, Generation: 251, Revision: strings.Repeat("a", 40), Folders: []string{strings.Repeat("b", 32)}}
-		plan, err := prepareInstallPlan(ctx, dir, source, next, nil, func() (io.Closer, error) {
+		plan, err := prepareInstallPlan(ctx, dir, source, next, nil, nil, func() (io.Closer, error) {
 			if e := os.Remove(source); e != nil {
 				t.Fatal(e)
 			}

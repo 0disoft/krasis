@@ -79,7 +79,7 @@ func TestRepairPreflightAtHistoryLimitLeavesProductAndFilesUntouched(t *testing.
 			return selectInstallFolder(r, installFolderOps{
 				match: func(string) error { return errDamagedInstallFolder }, newID: func() (string, error) { generated++; return strings.Repeat("d", 32), nil },
 			})
-		}, func() (io.Closer, error) { stops++; return &shutdownLease{}, nil })
+		}, nil, func() (io.Closer, error) { stops++; return &shutdownLease{}, nil })
 	if !errors.Is(err, ErrInvalid) || stops != 0 || generated != 0 {
 		t.Fatal("exhausted repair interrupted product", err, stops, generated)
 	}

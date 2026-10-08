@@ -21,7 +21,7 @@ type installPlan struct {
 
 // Receipt/history and source-image failures must not close a usable app. Keep
 // the validated bytes for publication rather than reopening the source later.
-func prepareInstallPlan(ctx context.Context, dir *securefs.Directory, self string, next Receipt, inspect func(Receipt) (Receipt, error), stop func() (io.Closer, error)) (_ installPlan, err error) {
+func prepareInstallPlan(ctx context.Context, dir *securefs.Directory, self string, next Receipt, inspect func(Receipt) (Receipt, error), prepareImage func(Receipt) error, stop func() (io.Closer, error)) (_ installPlan, err error) {
 	stage := "receipt_preflight"
 	defer func() { err = installationFailure(stage, err) }()
 	if err := ctx.Err(); err != nil {
@@ -69,6 +69,15 @@ func prepareInstallPlan(ctx context.Context, dir *securefs.Directory, self strin
 		return installPlan{}, err
 	}
 	plan := installPlan{receipt: next, setup: data}
+	if prepareImage != nil {
+		stage = "stage_image"
+		if err := prepareImage(next); err != nil {
+			return installPlan{}, err
+		}
+		if err := ctx.Err(); err != nil {
+			return installPlan{}, err
+		}
+	}
 	if stop != nil {
 		stage = "shutdown"
 		plan.idle, err = stop()

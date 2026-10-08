@@ -82,7 +82,7 @@ self-contained setup image. These preflight failures leave the running UI and
 connection untouched. Publication uses those already-read bytes, never a second
 source-file read after shutdown. Cancelled requests stop before shutdown, and
 cancellation during confirmed shutdown releases the idle agent lease without
-staging application images. The installer holds the existing startup lease through publication and
+publishing launch state. The installer holds the existing startup lease through publication and
 retains the idle agent lease after confirmed exit to fence automatic recovery.
 Only same-user, same-session UI processes matching the current/previous launch
 record and exact image hash can be closed. Retained process handles prevent PID
@@ -94,7 +94,8 @@ No process is force-killed, and unknown ownership or an unconfirmed exit blocks
 installation. Agent shutdown uses authenticated, instance-bound maintenance and
 upgrade-stop requests, preserving saved connection intent and waiting for guard
 exit. A 30-second shutdown timeout yields shutdown_failed plus shutdownStage in
-JSON; no installation images or registrations are changed by failed shutdown.
+JSON; existing images, launch pointers and registrations remain unchanged by
+failed shutdown. A newly prepared immutable image may remain unactivated.
 Failed installation JSON also includes installStage: the first fixed operation
 name for preflight, shutdown, image staging/verification or shell publication.
 The original error remains available to ownership and cancellation checks.
@@ -113,3 +114,12 @@ any image. Random IDs cannot reuse a receipt entry or adopt an existing folder.
 Staging revalidates the chosen image and aborts on a later change rather than
 creating an unplanned second directory after shutdown. Existing damaged images
 and installation history remain preserved.
+
+After source/receipt/folder preflight, setup stages and verifies the selected
+immutable image before asking the running UI and agent to stop. Disk-full,
+write, sync, close and byte-verification failures therefore leave the usable
+product running. Cancellation after staging also prevents shutdown. No launch
+pointer, shell registration or installation receipt is published in this step.
+After confirmed shutdown, setup verifies the image again before publication;
+a later byte change fails instead of activating an unverified image. Existing
+matching images are verified and reused, never overwritten.
