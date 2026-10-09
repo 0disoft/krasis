@@ -56,6 +56,14 @@ sharing epoch, cancels its process on a changed copy or shutdown, and discards
 late results. The parent joins cancellation; no file I/O task survives UI exit.
 This also interrupts native opens that cannot cooperatively inspect a context.
 
+Network transfers bind their cancellation to copy ID and local selection/copy
+epoch. Notifications cancel only after the binding actually changes; progress
+and acknowledgements alone do not interrupt a transfer. A newer local copy
+cancels older file traffic so short text cannot wait behind its 60-second budget.
+Receive completion rechecks the advertised remote ID/format/size and local epoch
+before publishing. A local change also suppresses the already-advertised old
+remote ID so an ignored transfer cannot be fetched again and overwrite it.
+
 Clipboard sharing is independently opt-in, persisted for one selected paired
 certificate on each device. Update permission never grants clipboard access.
 The GUI explicitly warns about secrets; applications marking clipboard content

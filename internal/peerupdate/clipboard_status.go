@@ -99,6 +99,8 @@ func (m *Manager) ReportClipboard(peer, id, format, code string) error {
 	m.clipboard.transferID = ""
 	// A new local copy supersedes previously queued content even if preparation fails.
 	m.clipboard.out, m.clipboard.in = nil, nil
+	m.clipboard.localEpoch++
 	m.clipboard.transfer = ClipboardTransfer{State: state, Format: format, Direction: "SEND", Code: code}
+	m.clipboardChanged()
 	return nil
 }

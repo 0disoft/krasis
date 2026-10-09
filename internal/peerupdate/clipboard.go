@@ -96,6 +96,7 @@ func (m *Manager) setClipboardPeerLocked(peer string) error {
 		}
 	}
 	m.clipboard.peer = peer
+	m.clipboard.localEpoch++
 	m.clipboard.imageAllowed = peer != "" && m.generation >= 69
 	m.clipboard.filesAllowed = peer != "" && m.generation >= 70
 	m.clipboard.in = nil
@@ -176,6 +177,10 @@ func (m *Manager) SyncClipboardPayload(peer string, local *ClipboardValue, ack s
 
 // Local copy order is independent of whether its content is shareable.
 func (m *Manager) SyncClipboardLocalChange(peer string, local *ClipboardValue, ack string, changed bool) (ClipboardValue, error) {
+	if changed || local != nil {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+	}
 	m.clipboard.mu.Lock()
 	defer m.clipboard.mu.Unlock()
 	if peer == "" || m.clipboard.peer != peer {
@@ -183,6 +188,12 @@ func (m *Manager) SyncClipboardLocalChange(peer string, local *ClipboardValue, a
 	}
 	m.clipboard.activeUntil = time.Now().Add(5 * time.Second)
 	if changed || local != nil {
+		if remoteID := m.peers[peer].info.ClipboardID; remoteID != "" {
+			m.clipboard.seen = append(m.clipboard.seen, remoteID)
+			if len(m.clipboard.seen) > 64 {
+				m.clipboard.seen = m.clipboard.seen[1:]
+			}
+		}
 		m.clipboard.localEpoch++
 		m.clipboard.out, m.clipboard.in = nil, nil
 		m.clipboardChanged()
@@ -250,6 +261,10 @@ func (m *Manager) clipboardReceive(peer, id string, r io.Reader, authorized func
 	return m.clipboardReceivePayload(peer, id, "", r, authorized)
 }
 func (m *Manager) clipboardReceivePayload(peer, id, format string, r io.Reader, authorized func() bool) error {
+	return m.receiveClipboardPayload(peer, id, format, r, authorized, false)
+}
+
+func (m *Manager) receiveClipboardPayload(peer, id, format string, r io.Reader, authorized func() bool, advertised bool) error {
 	defer m.clipboardReceiveFailed(peer, id)
 	if !validID(id, 32) || !authorized() {
 		return ErrDenied
@@ -268,6 +283,14 @@ func (m *Manager) clipboardReceivePayload(peer, id, format string, r io.Reader, 
 	if err != nil || !authorized() || format == "" && !validClipboardText(string(data)) ||
 		format != "" && !ValidClipboardPayload(format, data) {
 		return ErrDenied
+	}
+	if advertised {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		remote := m.peers[peer].info
+		if !remote.Clipboard || remote.ClipboardID != id || remote.ClipboardFormat != format || remote.ClipboardSize != len(data) {
+			return ErrDenied
+		}
 	}
 	m.clipboard.mu.Lock()
 	defer m.clipboard.mu.Unlock()

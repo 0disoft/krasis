@@ -57,7 +57,11 @@ func (m *Manager) clipboardHTTP(w http.ResponseWriter, r *http.Request, peer str
 			w.WriteHeader(400)
 			return
 		}
-		if err := m.clipboardReceivePayload(peer, id, remote.ClipboardFormat, r.Body, authorized); err != nil {
+		transfer, stop, current := m.clipboardTransferContext(r.Context(), peer, id, remote.ClipboardFormat, remote.ClipboardSize, false)
+		defer stop()
+		interrupt := context.AfterFunc(transfer, func() { _ = http.NewResponseController(w).SetReadDeadline(time.Now()) })
+		defer interrupt()
+		if err := m.receiveClipboardPayload(peer, id, remote.ClipboardFormat, r.Body, func() bool { return transfer.Err() == nil && current() && authorized() }, true); err != nil {
 			w.WriteHeader(409)
 			return
 		}
@@ -81,37 +85,21 @@ func (m *Manager) pollClipboard(ctx context.Context, c *http.Client, address, pe
 	}
 	_, id, _ := m.ClipboardInfo(peer)
 	outgoing := m.clipboardOutgoing(peer, id)
-	deadline := 12 * time.Second
-	if remote.ClipboardFormat == "files" || outgoing != nil && outgoing.Format == "files" {
-		deadline = 60 * time.Second
-	}
-	ctx, cancel := context.WithTimeout(ctx, deadline)
-	defer cancel()
 	url := "https://" + address + "/v1/clipboard"
 	if value := outgoing; value != nil &&
 		(value.Format == "" || remote.Generation >= 69) &&
 		(value.Format != "files" || remote.Generation >= 70 &&
 			(remote.Generation >= 72 || value.legacyFiles)) {
-		var body io.Reader = strings.NewReader(value.Text)
-		if value.Format != "" {
-			body = bytes.NewReader(value.Data)
-		}
-		body = &progressReader{Reader: body, update: func(n int64) {
-			m.clipboardProgress(peer, id, "SEND", value.Format, n, int64(len(value.Data)+len(value.Text)))
-		}}
-		req, _ := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
-		req.Header.Set("Content-Type", clipboardContentType(value.Format))
-		req.Header.Set("X-Krasis-ID", id)
-		if resp, err := c.Do(req); err == nil {
-			resp.Body.Close()
-			if resp.StatusCode == 200 {
-				m.clipboardSent(peer, id)
-			}
-		}
+		m.sendClipboard(ctx, c, url, peer, value, authorized)
 	}
-	if remote.ClipboardID == "" || !authorized() {
+	remote, ok = m.remoteClipboard(peer)
+	if !ok || remote.ClipboardID == "" || !authorized() || ctx.Err() != nil {
 		return
 	}
+	ctx, timeout := context.WithTimeout(ctx, clipboardTransferTimeout(remote.ClipboardFormat))
+	defer timeout()
+	ctx, stop, current := m.clipboardTransferContext(ctx, peer, remote.ClipboardID, remote.ClipboardFormat, remote.ClipboardSize, false)
+	defer stop()
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	req.Header.Set("X-Krasis-ID", remote.ClipboardID)
 	resp, err := c.Do(req)
@@ -120,7 +108,7 @@ func (m *Manager) pollClipboard(ctx context.Context, c *http.Client, address, pe
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 || resp.Header.Get("Content-Type") != clipboardContentType(remote.ClipboardFormat) ||
-		!authorized() || m.clipboardReceivePayload(peer, remote.ClipboardID, remote.ClipboardFormat, resp.Body, authorized) != nil {
+		!authorized() || m.receiveClipboardPayload(peer, remote.ClipboardID, remote.ClipboardFormat, resp.Body, func() bool { return ctx.Err() == nil && current() && authorized() }, true) != nil {
 		return
 	}
 	resp.Body.Close()
@@ -128,5 +116,38 @@ func (m *Manager) pollClipboard(ctx context.Context, c *http.Client, address, pe
 	ack.Header.Set("X-Krasis-ID", remote.ClipboardID)
 	if resp, err := c.Do(ack); err == nil {
 		resp.Body.Close()
+	}
+}
+
+func clipboardTransferTimeout(format string) time.Duration {
+	if format == "files" {
+		return 60 * time.Second
+	}
+	return 12 * time.Second
+}
+
+func (m *Manager) sendClipboard(ctx context.Context, c *http.Client, url, peer string, value *ClipboardValue, authorized func() bool) {
+	ctx, timeout := context.WithTimeout(ctx, clipboardTransferTimeout(value.Format))
+	defer timeout()
+	ctx, stop, current := m.clipboardTransferContext(ctx, peer, value.ID, value.Format, len(value.Data)+len(value.Text), true)
+	defer stop()
+	if !current() || !authorized() {
+		return
+	}
+	var body io.Reader = strings.NewReader(value.Text)
+	if value.Format != "" {
+		body = bytes.NewReader(value.Data)
+	}
+	body = &progressReader{Reader: body, update: func(n int64) {
+		m.clipboardProgress(peer, value.ID, "SEND", value.Format, n, int64(len(value.Data)+len(value.Text)))
+	}}
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
+	req.Header.Set("Content-Type", clipboardContentType(value.Format))
+	req.Header.Set("X-Krasis-ID", value.ID)
+	if resp, err := c.Do(req); err == nil {
+		resp.Body.Close()
+		if resp.StatusCode == 200 && ctx.Err() == nil && current() && authorized() {
+			m.clipboardSent(peer, value.ID)
+		}
 	}
 }
