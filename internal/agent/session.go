@@ -246,6 +246,13 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 			}},
 		)
 	}
+	if retirement, ok := dependencies.Authorizer.(interface {
+		RunLeaseRetirement(context.Context, *peer.ReturnController) error
+	}); ok {
+		components = append(components, component{name: "planned-lease-return", run: func() error {
+			return retirement.RunLeaseRetirement(runContext, returns)
+		}})
+	}
 	if config.Liveness != nil {
 		policy := *config.Liveness
 		components = append(components, component{name: "lease-watchdog", run: func() error {

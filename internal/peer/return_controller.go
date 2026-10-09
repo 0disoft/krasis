@@ -47,6 +47,14 @@ func NewReturnControllerObserved(
 }
 
 func (controller *ReturnController) Revoke(ctx context.Context, intent control.ReturnIntent) error {
+	return controller.revoke(ctx, intent, nil)
+}
+
+func (controller *ReturnController) Retire(ctx context.Context, identity application.LeaseIdentity) error {
+	return controller.revoke(ctx, control.ReturnIntent{SessionID: identity.SessionID, Epoch: identity.Epoch}, &identity)
+}
+
+func (controller *ReturnController) revoke(ctx context.Context, intent control.ReturnIntent, planned *application.LeaseIdentity) error {
 	if controller == nil || controller.Coordinator == nil || controller.Runtime == nil || controller.Returns == nil {
 		return errors.New("return controller is not initialized")
 	}
@@ -61,7 +69,13 @@ func (controller *ReturnController) Revoke(ctx context.Context, intent control.R
 		if controller.Cursor != nil {
 			present = controller.Cursor.PrepareReturnCursor()
 		}
-		identity, _, revokeErr := controller.Runtime.RevokeLocalReturn(ctx, intent)
+		var identity application.LeaseIdentity
+		var revokeErr error
+		if planned == nil {
+			identity, _, revokeErr = controller.Runtime.RevokeLocalReturn(ctx, intent)
+		} else {
+			identity, _, revokeErr = controller.Runtime.RetireInbound(ctx, *planned)
+		}
 		if revokeErr != nil {
 			return revokeErr
 		}

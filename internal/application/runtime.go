@@ -307,6 +307,19 @@ func (runtime *SessionRuntime) RevokeLocalReturn(
 	ctx context.Context,
 	intent control.ReturnIntent,
 ) (LeaseIdentity, ControlOutcome, error) {
+	return runtime.revokeReturn(ctx, intent, "")
+}
+
+// A planned retirement releases held inputs under the same runtime lock before
+// revoking the exact lease. A failed release keeps the runtime faulted.
+func (runtime *SessionRuntime) RetireInbound(ctx context.Context, identity LeaseIdentity) (LeaseIdentity, ControlOutcome, error) {
+	if identity.LeaseID == "" {
+		return LeaseIdentity{}, ControlOutcome{}, ErrStaleReturnIntent
+	}
+	return runtime.revokeReturn(ctx, control.ReturnIntent{SessionID: identity.SessionID, Epoch: identity.Epoch}, identity.LeaseID)
+}
+
+func (runtime *SessionRuntime) revokeReturn(ctx context.Context, intent control.ReturnIntent, leaseID string) (LeaseIdentity, ControlOutcome, error) {
 	runtime.mu.Lock()
 	defer runtime.mu.Unlock()
 	if err := intent.Validate(); err != nil {
@@ -315,10 +328,10 @@ func (runtime *SessionRuntime) RevokeLocalReturn(
 	if runtime.control.State != control.StateInboundActive || runtime.stream.SessionID == "" {
 		return LeaseIdentity{}, ControlOutcome{}, ErrRuntimeNotInbound
 	}
-	if runtime.control.SessionID != intent.SessionID || runtime.stream.Epoch != intent.Epoch {
+	if runtime.control.SessionID != intent.SessionID || runtime.stream.Epoch != intent.Epoch || (leaseID != "" && runtime.control.LeaseID != leaseID) {
 		return LeaseIdentity{}, ControlOutcome{}, ErrStaleReturnIntent
 	}
-	if runtime.pressed.Count() != 0 {
+	if leaseID == "" && runtime.pressed.Count() != 0 {
 		return LeaseIdentity{}, ControlOutcome{}, ErrRuntimeInputHeld
 	}
 	identity := LeaseIdentity{

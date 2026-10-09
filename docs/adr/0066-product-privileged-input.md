@@ -333,3 +333,12 @@ unexplained staging artifacts and malformed journals refuse startup. A committed
 cleanly stopped target can regain readiness during installer recovery. Agent
 startup briefly waits for an already-starting service without starting or
 repairing it. Physical reboot and PIN checks remain separate device verification.
+
+## Planned lease retirement
+
+Ten seconds before the immutable worker lease deadline, a native session task
+requests an exact session/epoch/lease return. Runtime serialization releases held
+inputs and sends the normal peer revoke before closing the worker channel. The
+transport connection remains available for a fresh boundary grant. Release or
+revoke failures still fault; expired operations and authority failures are never
+replayed or renewed. Device verification remains pending.

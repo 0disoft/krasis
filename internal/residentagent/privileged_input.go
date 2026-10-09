@@ -34,6 +34,7 @@ type privilegedLeaseInput struct {
 	failed                                  func(error)
 	event                                   func(string)
 	expires                                 time.Time
+	leaseExpires                            time.Time
 	profile                                 context.Context
 	dispose                                 func() error
 	shutdownOnce                            sync.Once
@@ -110,6 +111,7 @@ func (input *privilegedLeaseInput) open(ctx context.Context, identity applicatio
 	run, cancel := context.WithCancel(ctx)
 	done := make(chan struct{})
 	input.client, input.identity, input.cancel, input.done = client, identity, cancel, done
+	input.leaseExpires = expires
 	input.profile = ctx
 	go func() {
 		defer close(done)
