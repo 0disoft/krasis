@@ -123,3 +123,19 @@ pointer, shell registration or installation receipt is published in this step.
 After confirmed shutdown, setup verifies the image again before publication;
 a later byte change fails instead of activating an unverified image. Existing
 matching images are verified and reused, never overwritten.
+
+When the resident agent already matches a replacement UI's exact generation,
+revision and protocol, explicit UI handoff preserves the agent and its active
+input session. It does not claim another agent upgrade or pause input. Failed
+launch keeps the old UI available, and a different agent build remains rejected.
+The incoming UI also handles predecessors that cannot perform this handoff:
+before joining the single-instance window, it verifies its complete adjacent
+bundle and closes only byte-verified older current/previous UI images owned by
+the same user in the same session. Its own process and equal/newer images are
+excluded. The authenticated agent instance is rechecked after bundle validation;
+changed identity, unknown UI ownership, cancellation and unconfirmed UI exit
+block takeover. No agent stop is sent. A 30-second budget bounds this path.
+After becoming the primary UI, ui_takeover_completed records completion. A
+standalone takeover resumes only existing saved intent, with the same manual-stop
+and peer-trust checks as startup; received-update reconnects retain their pinned
+peer identity. Agent update acknowledgement alone is not UI completion evidence.

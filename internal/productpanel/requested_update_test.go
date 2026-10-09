@@ -9,10 +9,76 @@ import (
 	"github.com/0disoft/krasis/internal/localapi"
 )
 
-type requestedUpdateClient struct{ releaseClient }
+type requestedUpdateClient struct {
+	releaseClient
+	info *localapi.RuntimeInfo
+}
 
 func (c *requestedUpdateClient) Runtime(context.Context) (localapi.RuntimeInfo, error) {
+	if c.info != nil {
+		return *c.info, nil
+	}
 	return localapi.RuntimeInfo{Instance: strings.Repeat("a", 32), Protocol: localapi.AgentProtocol, Generation: localapi.AgentGeneration}, nil
+}
+
+func TestRequestedUpdateWithAlreadyUpdatedAgentOnlyReplacesUI(t *testing.T) {
+	for _, state := range []string{"LOCAL", "CONNECTED", "RECONNECTING"} {
+		t.Run(state, func(t *testing.T) {
+			revision := strings.Repeat("b", 40)
+			info := &localapi.RuntimeInfo{Protocol: localapi.AgentProtocol, Generation: localapi.AgentGeneration + 1, Build: revision, Instance: strings.Repeat("a", 32)}
+			client := &requestedUpdateClient{info: info, releaseClient: releaseClient{fakeClient: &fakeClient{state: state, peers: []localapi.TrustedPeer{{Alias: "B", Fingerprint: strings.Repeat("a", 64)}}}}}
+			b := NewDesktopLifecycle(context.Background(), func() (Client, error) { return client, nil }, nil, nil)
+			launches := 0
+			launch := func(alias, fingerprint string) error {
+				launches++
+				if client.state != state || client.disconnects != 0 || client.claimed {
+					t.Fatal("UI replacement interrupted upgraded agent", client)
+				}
+				if state != "LOCAL" && (alias != "B" || fingerprint != strings.Repeat("a", 64)) {
+					t.Fatal("lost active peer identity")
+				}
+				return nil
+			}
+			if applied, err := b.ApplyRequestedUpdate(info.Generation, revision, launch); !applied || err != nil {
+				t.Fatal("already updated agent blocked UI replacement", applied, err)
+			}
+			b.ApplyRequestedUpdate(info.Generation, revision, launch)
+			if launches != 1 || !b.updateHandedOff || !b.stopped.Load() {
+				t.Fatal("handoff was repeated or unconfirmed")
+			}
+		})
+	}
+}
+
+func TestAlreadyUpdatedUIHandoffRefusesOtherBuildAndPreservesSessionOnFailure(t *testing.T) {
+	for _, scenario := range []string{"launch_failed", "other_build", "newer_agent", "wrong_protocol"} {
+		revision := strings.Repeat("b", 40)
+		info := &localapi.RuntimeInfo{Protocol: localapi.AgentProtocol, Generation: localapi.AgentGeneration + 1, Build: revision, Instance: strings.Repeat("a", 32)}
+		if scenario == "other_build" {
+			info.Build = strings.Repeat("c", 40)
+		}
+		if scenario == "newer_agent" {
+			info.Generation++
+		}
+		if scenario == "wrong_protocol" {
+			info.Protocol++
+		}
+		client := &requestedUpdateClient{info: info, releaseClient: releaseClient{fakeClient: &fakeClient{state: "CONNECTED", peers: []localapi.TrustedPeer{{Alias: "B", Fingerprint: strings.Repeat("a", 64)}}}}}
+		b := NewDesktopLifecycle(context.Background(), func() (Client, error) { return client, nil }, nil, nil)
+		launchErr := errors.New("launch failed")
+		applied, err := b.ApplyRequestedUpdate(localapi.AgentGeneration+1, revision, func(string, string) error {
+			if scenario != "launch_failed" {
+				t.Fatal("unmatched runtime launched")
+			}
+			return launchErr
+		})
+		if applied || err == nil || client.disconnects != 0 || client.claimed || client.releases != 0 || b.updateHandedOff || b.stopped.Load() {
+			t.Fatal("failed UI-only handoff changed the running agent", scenario, err)
+		}
+		if scenario == "launch_failed" && !errors.Is(err, launchErr) {
+			t.Fatal(err)
+		}
+	}
 }
 
 func (c *requestedUpdateClient) Status(ctx context.Context) (localapi.Status, error) {

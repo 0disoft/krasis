@@ -22,6 +22,21 @@ type uiShutdownProcess struct {
 }
 
 func PrepareUIShutdown(base string) (*UIShutdown, error) {
+	return prepareUIShutdown(base, 0)
+}
+
+// A verified replacement may close only older management windows. The current
+// process, same-generation windows and newer windows remain untouched.
+func PrepareOlderUIShutdown(base string, generation int) (*UIShutdown, error) {
+	if generation <= 0 {
+		return nil, ErrInvalid
+	}
+	return prepareUIShutdown(base, generation)
+}
+
+func (s *UIShutdown) HasProcesses() bool { return len(s.processes) != 0 }
+
+func prepareUIShutdown(base string, beforeGeneration int) (*UIShutdown, error) {
 	plan := &UIShutdown{}
 	snapshot, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
 	if err != nil {
@@ -39,14 +54,14 @@ func PrepareUIShutdown(base string) (*UIShutdown, error) {
 	entry := windows.ProcessEntry32{Size: uint32(unsafe.Sizeof(windows.ProcessEntry32{}))}
 	err = windows.Process32First(snapshot, &entry)
 	for err == nil {
-		if strings.EqualFold(windows.UTF16ToString(entry.ExeFile[:]), "krasis.exe") {
+		if entry.ProcessID != windows.GetCurrentProcessId() && strings.EqualFold(windows.UTF16ToString(entry.ExeFile[:]), "krasis.exe") {
 			var targetSession uint32
 			if e := windows.ProcessIdToSessionId(entry.ProcessID, &targetSession); e != nil {
 				plan.Close()
 				return nil, e
 			}
 			if targetSession == session {
-				p, e := prepareShutdownProcess(base, entry.ProcessID, me.User.Sid)
+				p, e := prepareShutdownProcess(base, entry.ProcessID, me.User.Sid, beforeGeneration)
 				if e != nil {
 					plan.Close()
 					return nil, e
@@ -65,7 +80,7 @@ func PrepareUIShutdown(base string) (*UIShutdown, error) {
 	return plan, nil
 }
 
-func prepareShutdownProcess(base string, pid uint32, owner *windows.SID) (uiShutdownProcess, error) {
+func prepareShutdownProcess(base string, pid uint32, owner *windows.SID, beforeGeneration int) (uiShutdownProcess, error) {
 	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION|windows.SYNCHRONIZE, false, pid)
 	if err != nil {
 		return uiShutdownProcess{}, err
@@ -99,36 +114,45 @@ func prepareShutdownProcess(base string, pid uint32, owner *windows.SID) (uiShut
 		return uiShutdownProcess{}, err
 	}
 	image := windows.UTF16ToString(path[:n])
-	if err = verifyShutdownImage(base, image); err != nil {
+	record, err := verifiedShutdownImage(base, image)
+	if err != nil {
 		return uiShutdownProcess{}, err
+	}
+	if beforeGeneration != 0 && record.Generation >= beforeGeneration {
+		return uiShutdownProcess{}, nil
 	}
 	keep = true
 	return uiShutdownProcess{pid, h}, nil
 }
 
 func verifyShutdownImage(base, image string) error {
+	_, err := verifiedShutdownImage(base, image)
+	return err
+}
+
+func verifiedShutdownImage(base, image string) (Record, error) {
 	for _, name := range []string{"current.json", "previous.json"} {
 		r, err := loadNamed(base, name)
 		if errors.Is(err, ErrMissing) {
 			continue
 		}
 		if err != nil {
-			return err
+			return Record{}, err
 		}
 		if !strings.EqualFold(image, r.Executable) {
 			continue
 		}
 		f, hash, err := openExecutable(image)
 		if err != nil {
-			return err
+			return Record{}, err
 		}
 		closeErr := f.Close()
 		if hash != r.SHA256 {
-			return ErrInvalid
+			return Record{}, ErrInvalid
 		}
-		return closeErr
+		return r, closeErr
 	}
-	return ErrInvalid
+	return Record{}, ErrInvalid
 }
 
 func (s *UIShutdown) Close() error {

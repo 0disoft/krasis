@@ -48,7 +48,8 @@ func (b *DesktopLifecycle) ApplyRequestedUpdate(generation int, revision string,
 	if err != nil {
 		return false, err
 	}
-	if info.Protocol != localapi.AgentProtocol || info.Generation != localapi.AgentGeneration {
+	alreadyUpdated := info.Generation == generation && info.Build == revision && info.Instance != ""
+	if info.Protocol != localapi.AgentProtocol || (!alreadyUpdated && info.Generation != localapi.AgentGeneration) {
 		return false, ErrAgentIncompatible
 	}
 	alias, fingerprint := "", ""
@@ -62,6 +63,18 @@ func (b *DesktopLifecycle) ApplyRequestedUpdate(generation int, revision string,
 		if alias == "" || fingerprint == "" {
 			return false, ErrAgentIncompatible
 		}
+	}
+	// The authenticated runtime already matches the verified replacement. The
+	// resident agent and its session must survive this management-window handoff.
+	if alreadyUpdated {
+		if err := launch(alias, fingerprint); err != nil {
+			return false, err
+		}
+		b.updateHandedOff = true
+		b.stopped.Store(true)
+		return true, nil
+	}
+	if alias != "" {
 		stopped := bridge.PauseForMaintenance()
 		if stopped.Code != "ok" || stopped.State != "LOCAL" {
 			b.save(stopped)

@@ -130,7 +130,12 @@ func Run() {
 	service := &WorkspaceService{raw: bridge, ctx: ctx, cancel: cancel, control: paths.Control, title: fmt.Sprintf("Krasis · g%d", localapi.AgentGeneration)}
 	service.clipboardWake = make(chan struct{}, 1)
 	service.startAtLogin = startAtLogin || resumeAfterInstall
+	matchedUITakeover := false
 	if !smoke {
+		self, selfErr := os.Executable()
+		if selfErr != nil {
+			os.Exit(1)
+		}
 		startup, startupErr := productpanel.NewStartup(paths.Control)
 		if startupErr != nil {
 			os.Exit(1)
@@ -146,6 +151,16 @@ func Run() {
 			if err != nil {
 				os.Exit(1)
 			}
+		}
+		takeoverCtx, takeoverDone := context.WithTimeout(ctx, 30*time.Second)
+		replaced, takeoverErr := prepareMatchedUI(takeoverCtx, os.Getenv("LOCALAPPDATA"), paths.Control, self, localapi.AgentGeneration, buildinfo.Read().Revision)
+		takeoverDone()
+		if takeoverErr != nil {
+			os.Exit(1)
+		}
+		matchedUITakeover = replaced
+		if replaced && updated.Revision == "" {
+			service.startAtLogin = true
 		}
 		var lastGeometry wininput.DisplayGeometry
 		var stableSince time.Time
@@ -259,6 +274,9 @@ func Run() {
 	// Service startup prepares recovery independently of renderer-ready events.
 	if !smoke {
 		service.log, _ = productlog.Open(os.Getenv("LOCALAPPDATA"), "control")
+		if matchedUITakeover {
+			service.log.Event("ui_takeover_completed")
+		}
 	}
 	service.quit = app.Quit
 	url := "/"
