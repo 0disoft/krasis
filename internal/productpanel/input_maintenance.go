@@ -83,11 +83,11 @@ func (s Startup) refreshProtectedInput(ctx context.Context, refresh func(context
 		return err, false
 	}
 	client, err := s.Open()
+	var info localapi.RuntimeInfo
 	if err == nil {
-		info, err := client.Runtime(ctx)
-		if err != nil {
-			return err, false
-		}
+		info, err = client.Runtime(ctx)
+	}
+	if err == nil {
 		if !s.maintenanceCompatible(info, allowOlder) {
 			return ErrAgentIncompatible, false
 		}

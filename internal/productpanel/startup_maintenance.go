@@ -34,6 +34,14 @@ func (s Startup) LaunchMaintenanceNeeded(ctx context.Context) (bool, error) {
 		return false, err
 	}
 	info, err := client.Runtime(ctx)
+	// A saved endpoint outlives a normally stopped agent. Opening its client
+	// is not proof of a live owner; Ensure/maintenance still check the lease.
+	if errors.Is(err, localapi.ErrUnavailable) || errors.Is(err, localapi.ErrTransport) {
+		if !inputUpdate {
+			return false, nil
+		}
+		return true, s.Verify()
+	}
 	if err != nil {
 		return false, err
 	}

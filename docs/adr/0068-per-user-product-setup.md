@@ -139,3 +139,10 @@ After becoming the primary UI, ui_takeover_completed records completion. A
 standalone takeover resumes only existing saved intent, with the same manual-stop
 and peer-trust checks as startup; received-update reconnects retain their pinned
 peer identity. Agent update acknowledgement alone is not UI completion evidence.
+
+A saved local API endpoint may remain after setup stops its agent. A readable
+endpoint is not a live-process observation: unavailable/transport runtime
+responses follow the existing absent-agent branch in launch preflight and input
+maintenance. Bundle verification and the startup/agent ownership leases still
+precede installation or launch. Authentication and protocol failures block this
+path, and an occupied agent lease cannot authorize an installer.
