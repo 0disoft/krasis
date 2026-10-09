@@ -98,6 +98,8 @@ func Run() {
 	smoke := visibleSmoke || (len(os.Args) == 2 && os.Args[1] == "--smoke")
 	var updated productpanel.WorkspaceUpdateLaunch
 	startAtLogin := len(os.Args) == 2 && os.Args[1] == "--startup"
+	recoverAtStartup := len(os.Args) == 2 && os.Args[1] == "--recover"
+	startAtLogin = startAtLogin || recoverAtStartup
 	resumeAfterInstall := len(os.Args) == 2 && os.Args[1] == "--installed"
 	if len(os.Args) != 1 && !smoke && !startAtLogin && !resumeAfterInstall {
 		updated, err = productpanel.ParseWorkspaceUpdateLaunch(os.Args[1:])
@@ -225,6 +227,10 @@ func Run() {
 		UniqueID:       "0disoft-krasis-workspace-preview-v1",
 		AdditionalData: map[string]string{"generation": strconv.Itoa(localapi.AgentGeneration), "revision": buildinfo.Read().Revision},
 		OnSecondInstanceLaunch: func(data application.SecondInstanceData) {
+			if len(data.Args) == 2 && data.Args[1] == "--recover" {
+				service.scheduledRecoverAsync()
+				return
+			}
 			service.requestUIReplacement(data.Args, data.AdditionalData)
 			if window != nil {
 				window.Restore()

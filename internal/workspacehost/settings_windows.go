@@ -149,6 +149,13 @@ func (s *WorkspaceService) resumeAtStartup(ctx context.Context, v productpanel.B
 	if !s.startAtLogin || v.State != "LOCAL" || v.Code != "ok" {
 		return v
 	}
+	return s.resumeSavedConnection(ctx, v)
+}
+
+func (s *WorkspaceService) resumeSavedConnection(ctx context.Context, v productpanel.BridgeSnapshot) productpanel.BridgeSnapshot {
+	if v.State != "LOCAL" || v.Code != "ok" {
+		return v
+	}
 	v = productpanel.ResumeAtLogin(ctx, v,
 		func() (appsettings.Resume, error) { return appsettings.LoadResume(os.Getenv("LOCALAPPDATA")) },
 		func(alias, fingerprint string) productpanel.BridgeSnapshot {

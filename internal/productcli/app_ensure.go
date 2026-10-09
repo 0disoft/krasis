@@ -92,7 +92,7 @@ func ensureApp(ctx context.Context, deps dependencies) (result relaunchResult, e
 		return result, ExitUnsafeState
 	}
 	if deps.launch == nil {
-		deps.launch = launchrecord.StartAtLogin
+		deps.launch = launchrecord.StartRecovery
 	}
 	return relaunch(deps)
 }
