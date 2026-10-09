@@ -274,6 +274,7 @@
         }).catch(() => {});
         bridge = createBridge({
           Refresh: () => Call.ByName(name + 'Refresh'),
+          RefreshNow: () => Call.ByName(name + 'RefreshNow'),
           Connect: (alias, fingerprint) => Call.ByName(name + 'Connect', alias, fingerprint),
           Disconnect: () => Call.ByName(name + 'Disconnect'),
           Restart: () => Call.ByName(name + 'Restart'),
