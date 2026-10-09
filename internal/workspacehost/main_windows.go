@@ -98,8 +98,22 @@ func Run() {
 	smoke := visibleSmoke || (len(os.Args) == 2 && os.Args[1] == "--smoke")
 	var updated productpanel.WorkspaceUpdateLaunch
 	startAtLogin := len(os.Args) == 2 && os.Args[1] == "--startup"
-	recoverAtStartup := len(os.Args) == 2 && os.Args[1] == "--recover"
+	recoverAtStartup := len(os.Args) == 3 && os.Args[1] == "--recover"
+	var recovery []string
+	if recoverAtStartup {
+		recovery = []string{os.Args[2]}
+	}
+	if startAtLogin {
+		token, tokenErr := appsettings.RecoveryToken(os.Getenv("LOCALAPPDATA"))
+		if tokenErr != nil {
+			return
+		}
+		recovery = []string{token}
+	}
 	startAtLogin = startAtLogin || recoverAtStartup
+	if startAtLogin && !appsettings.RecoveryCurrent(os.Getenv("LOCALAPPDATA"), recovery[0]) {
+		return
+	}
 	resumeAfterInstall := len(os.Args) == 2 && os.Args[1] == "--installed"
 	if len(os.Args) != 1 && !smoke && !startAtLogin && !resumeAfterInstall {
 		updated, err = productpanel.ParseWorkspaceUpdateLaunch(os.Args[1:])
@@ -138,9 +152,14 @@ func Run() {
 		if selfErr != nil {
 			os.Exit(1)
 		}
-		startup, startupErr := productpanel.NewStartup(paths.Control)
+		startup, startupErr := productpanel.NewStartup(paths.Control, recovery...)
 		if startupErr != nil {
 			os.Exit(1)
+		}
+		if !startAtLogin {
+			if err := appsettings.PauseRecovery(os.Getenv("LOCALAPPDATA"), false); err != nil {
+				return
+			}
 		}
 		service.inputRefresh = startup.RefreshProtectedInput
 		service.inputSetup = startup.InputSetup
@@ -180,6 +199,14 @@ func Run() {
 		}
 		service.managed = productpanel.NewDesktopLifecycle(ctx, func() (productpanel.Client, error) { return localapi.OpenClient(paths.Control) }, startup.Ensure, diagnose(os.Getenv("LOCALAPPDATA"), paths.Control), displayReady)
 		service.managed.StartupResume = service.resumeAtStartup
+		if startAtLogin {
+			service.managed.StartupResume = func(ctx context.Context, value productpanel.BridgeSnapshot) productpanel.BridgeSnapshot {
+				if !appsettings.RecoveryCurrent(os.Getenv("LOCALAPPDATA"), recovery[0]) {
+					return value
+				}
+				return service.resumeAtStartup(ctx, value)
+			}
+		}
 		service.managed.StartupObservedReady = startup.ObservedReady
 		service.managed.PendingInputSetup = startup.InputSetup
 		service.managed.PendingInputRestore = startup.RestoreProtectedInput
@@ -198,9 +225,6 @@ func Run() {
 		}
 		service.prepareStartMenu = func() error { return launchrecord.RegisterStartMenu(base) }
 		service.prepareSettings = func() error {
-			if err := appsettings.PauseRecovery(base, false); err != nil {
-				return err
-			}
 			return service.prepareAppSettings()
 		}
 		service.updates = productpanel.NewUpdateTransferBridge(ctx, func() (productpanel.UpdateSettingsClient, error) { return localapi.OpenClient(paths.Control) }, updateBundleDirectory(self), transitionBundleDirectory(self), probeTransitionBundleDirectory(self), installerTransitionBundleDirectory(self))
@@ -227,8 +251,8 @@ func Run() {
 		UniqueID:       "0disoft-krasis-workspace-preview-v1",
 		AdditionalData: map[string]string{"generation": strconv.Itoa(localapi.AgentGeneration), "revision": buildinfo.Read().Revision},
 		OnSecondInstanceLaunch: func(data application.SecondInstanceData) {
-			if len(data.Args) == 2 && data.Args[1] == "--recover" {
-				service.scheduledRecoverAsync()
+			if len(data.Args) == 3 && data.Args[1] == "--recover" {
+				service.scheduledRecoverAsync(data.Args[2])
 				return
 			}
 			service.requestUIReplacement(data.Args, data.AdditionalData)

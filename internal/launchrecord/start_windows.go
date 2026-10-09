@@ -11,9 +11,9 @@ import (
 func Start(path string) error {
 	return startWithArgs(path)
 }
-func StartAtLogin(path string) error      { return startWithArgs(path, "--startup") }
-func StartRecovery(path string) error     { return startWithArgs(path, "--recover") }
-func StartAfterInstall(path string) error { return startWithArgs(path, "--installed") }
+func StartAtLogin(path string) error         { return startWithArgs(path, "--startup") }
+func StartRecovery(path, token string) error { return startWithArgs(path, "--recover", token) }
+func StartAfterInstall(path string) error    { return startWithArgs(path, "--installed") }
 func startWithArgs(path string, args ...string) error {
 	return StartIndependent(launchCommand(path, args...))
 }

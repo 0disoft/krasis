@@ -8,6 +8,7 @@ import (
 
 	"github.com/0disoft/krasis/internal/agentinstance"
 	"github.com/0disoft/krasis/internal/agentlifecycle"
+	"github.com/0disoft/krasis/internal/appsettings"
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/peerupdate"
 	"github.com/0disoft/krasis/internal/productidentity"
@@ -24,6 +25,7 @@ type apiServer interface {
 }
 
 type runDependencies struct {
+	checkStart      func() error
 	acquire         func() (instanceLease, error)
 	bootstrap       func(string, time.Time) (productidentity.Paths, *productidentity.Identity, bool, error)
 	startMonitor    agentlifecycle.StartMonitor
@@ -35,7 +37,7 @@ type runDependencies struct {
 	log             *productlog.Logger
 }
 
-func Run(ctx context.Context, localAppData string) (err error) {
+func Run(ctx context.Context, localAppData string, recovery ...string) (err error) {
 	log, err := productlog.Open(localAppData, "agent")
 	if err != nil {
 		return fmt.Errorf("initialize diagnostics: %w", err)
@@ -60,6 +62,14 @@ func Run(ctx context.Context, localAppData string) (err error) {
 		now:             time.Now,
 		productAdapters: true,
 	}
+	if len(recovery) != 0 {
+		dependencies.checkStart = func() error {
+			if !appsettings.RecoveryCurrent(localAppData, recovery[0]) {
+				return errors.New("automatic recovery superseded")
+			}
+			return nil
+		}
+	}
 	return run(ctx, localAppData, dependencies)
 }
 
@@ -71,6 +81,11 @@ func run(ctx context.Context, localAppData string, dependencies runDependencies)
 	instance, err := dependencies.acquire()
 	if err != nil {
 		return err
+	}
+	if dependencies.checkStart != nil {
+		if err := dependencies.checkStart(); err != nil {
+			return errors.Join(err, instance.Close())
+		}
 	}
 	defer func() {
 		// Drain logs before releasing agent ownership so an upgrade cannot race

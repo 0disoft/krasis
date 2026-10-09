@@ -17,15 +17,15 @@ func TestScheduledRecoveryStartsMissingAgentInExistingUI(t *testing.T) {
 		return &fakeClient{state: "LOCAL"}, nil
 	}, func(context.Context) error { starts++; missing = false; return nil }, nil)
 	resume := func(_ context.Context, v BridgeSnapshot) BridgeSnapshot { resumes++; return v }
-	b.ScheduledRecover(func() bool { return false }, resume)
+	b.ScheduledRecover(func() bool { return false }, nil, resume)
 	if starts != 0 {
 		t.Fatal("paused recovery started")
 	}
-	b.ScheduledRecover(func() bool { return true }, resume)
+	b.ScheduledRecover(func() bool { return true }, nil, resume)
 	if starts != 1 || resumes != 1 || b.Refresh().State != "LOCAL" {
 		t.Fatal(starts, resumes, b.Refresh())
 	}
-	b.ScheduledRecover(func() bool { return true }, resume)
+	b.ScheduledRecover(func() bool { return true }, nil, resume)
 	if starts != 1 || resumes != 1 {
 		t.Fatal("responding agent restarted")
 	}

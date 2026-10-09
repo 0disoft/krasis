@@ -26,13 +26,17 @@ func main() {
 		}
 		return
 	}
-	if len(os.Args) != 1 {
+	var recovery []string
+	if len(os.Args) == 3 && os.Args[1] == "--recovery" {
+		recovery = []string{os.Args[2]}
+	}
+	if len(os.Args) != 1 && len(recovery) == 0 {
 		fmt.Fprintln(os.Stderr, "invalid agent arguments")
 		os.Exit(2)
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
-	if err := residentagent.Run(ctx, os.Getenv("LOCALAPPDATA")); err != nil {
+	if err := residentagent.Run(ctx, os.Getenv("LOCALAPPDATA"), recovery...); err != nil {
 		fmt.Fprintln(os.Stderr, "agent_error: resident agent stopped")
 		os.Exit(1)
 	}

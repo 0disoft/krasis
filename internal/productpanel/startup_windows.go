@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"github.com/0disoft/krasis/internal/agentinstance"
+	"github.com/0disoft/krasis/internal/appsettings"
 	"github.com/0disoft/krasis/internal/inputworker"
 	"github.com/0disoft/krasis/internal/launchrecord"
 	"github.com/0disoft/krasis/internal/localapi"
@@ -19,7 +20,7 @@ import (
 	"syscall"
 )
 
-func NewStartup(control string) (Startup, error) {
+func NewStartup(control string, recovery ...string) (Startup, error) {
 	self, err := os.Executable()
 	if err != nil {
 		return Startup{}, err
@@ -36,7 +37,20 @@ func NewStartup(control string) (Startup, error) {
 		}
 	}
 	refresh := newInputRefresh(base, revision)
+	var checkStart func() error
+	var agentArgs []string
+	if len(recovery) != 0 {
+		token := recovery[0]
+		checkStart = func() error {
+			if !appsettings.RecoveryCurrent(os.Getenv("LOCALAPPDATA"), token) {
+				return errors.New("automatic recovery superseded")
+			}
+			return nil
+		}
+		agentArgs = []string{"--recovery", token}
+	}
 	return Startup{
+		CheckStart:        checkStart,
 		BeforeStart:       refresh.automatic,
 		InputRefresh:      refresh.explicit,
 		InputSetup:        refresh.status,
@@ -71,7 +85,7 @@ func NewStartup(control string) (Startup, error) {
 				defer installed.Close()
 				agentPath = installed.Path()
 			}
-			command := exec.Command(agentPath)
+			command := exec.Command(agentPath, agentArgs...)
 			command.Dir = base
 			command.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
 			for _, key := range []string{"SystemRoot", "WINDIR", "LOCALAPPDATA", "TEMP", "TMP", "USERPROFILE"} {

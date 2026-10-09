@@ -23,6 +23,7 @@ type RuntimeClient interface {
 }
 
 type Startup struct {
+	CheckStart        func() error
 	Open              func() (RuntimeClient, error)
 	Lock              func() (io.Closer, error)
 	Available         func() (bool, error)
@@ -68,6 +69,11 @@ func (s Startup) Ensure(ctx context.Context) error {
 		return ErrStartupBusy
 	}
 	defer lease.Close()
+	if s.CheckStart != nil {
+		if err := s.CheckStart(); err != nil {
+			return err
+		}
+	}
 	started, stopping := false, false
 	for ctx.Err() == nil {
 		if stopping {
@@ -161,6 +167,11 @@ func (s Startup) Ensure(ctx context.Context) error {
 }
 
 func (s Startup) start(ctx context.Context) error {
+	if s.CheckStart != nil {
+		if err := s.CheckStart(); err != nil {
+			return err
+		}
+	}
 	if s.BeforeStart != nil {
 		if err := s.BeforeStart(ctx); err != nil {
 			if errors.Is(err, ErrInputRefreshPending) {
@@ -173,6 +184,11 @@ func (s Startup) start(ctx context.Context) error {
 	}
 	if err := ctx.Err(); err != nil {
 		return err
+	}
+	if s.CheckStart != nil {
+		if err := s.CheckStart(); err != nil {
+			return err
+		}
 	}
 	return s.Start()
 }

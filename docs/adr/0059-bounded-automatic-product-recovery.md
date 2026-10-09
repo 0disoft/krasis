@@ -37,3 +37,13 @@ reconnect-only exports. Temporary-file IO is not forcibly cancelled; a late
 export result is ignored for lifecycle decisions while completed file handling
 follows the existing path. Native two-PC crash/recovery testing remains a user
 hardware acceptance check.
+
+Scheduled recovery uses a hidden `--recover` request distinct from UI open.
+An existing UI routes it through its lifecycle gate, verifies absence and starts
+the agent once; saved-peer resume retains trust and fingerprint checks. Each
+automatic request captures a persistent recovery epoch. Preferences and epoch
+are rechecked before launch, under startup ownership, after preparation, and
+after the agent acquires its instance lease. Safe-stop advances the epoch;
+even a later explicit restart cannot revive an older request. Automatic startup
+never clears pause. Only an explicit app launch resets it. Two-PC scheduled
+recovery and reboot remain hardware acceptance checks.

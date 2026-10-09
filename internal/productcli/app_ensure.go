@@ -34,6 +34,11 @@ func ensureApp(ctx context.Context, deps dependencies) (result relaunchResult, e
 		result.Code = "recovery_disabled"
 		return result, ExitOK
 	}
+	token, err := appsettings.RecoveryToken(deps.localAppData)
+	if err != nil {
+		result.Code = "settings_unavailable"
+		return result, ExitUnsafeState
+	}
 	control, err := ResolveControlDirectory(deps.localAppData, "")
 	if err != nil {
 		result.Code = "agent_unavailable"
@@ -92,7 +97,11 @@ func ensureApp(ctx context.Context, deps dependencies) (result relaunchResult, e
 		return result, ExitUnsafeState
 	}
 	if deps.launch == nil {
-		deps.launch = launchrecord.StartRecovery
+		deps.launch = func(path string) error { return launchrecord.StartRecovery(path, token) }
+	}
+	if ctx.Err() != nil || !appsettings.RecoveryCurrent(deps.localAppData, token) {
+		result.Code = "recovery_disabled"
+		return result, ExitOK
 	}
 	return relaunch(deps)
 }
