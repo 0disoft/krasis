@@ -373,16 +373,21 @@ func (store *Store) openLocked(create bool) (Document, *securefs.Directory, func
 
 func (store *Store) openLockedMode(create, shared bool, trace *ReadTrace) (Document, *securefs.Directory, func(), error) {
 	trace.enter("prelock")
-	if err := store.prepareDirectoryTraced(create, trace); err != nil {
-		return Document{}, nil, nil, err
+	var directory *securefs.Directory
+	var err error
+	if shared {
+		directory, err = store.openReadDirectory(trace)
+	} else {
+		if err = store.prepareDirectoryTraced(create, trace); err == nil {
+			trace.enterStep("prelock_directory_open")
+			directory, err = securefs.OpenDirectory(store.directory)
+		}
 	}
-	trace.enterStep("prelock_directory_open")
-	directory, err := securefs.OpenDirectory(store.directory)
 	if err != nil {
 		return Document{}, nil, nil, fmt.Errorf("open trust store directory handle: %w", err)
 	}
 	trace.enterStep("prelock_lockfile_open")
-	lockFile, created, err := openLockFile(directory)
+	lockFile, created, err := openLockFileMode(directory, shared)
 	if err != nil {
 		_ = directory.Close()
 		return Document{}, nil, nil, err
@@ -553,14 +558,31 @@ func ensureJSONEOF(decoder *json.Decoder) error {
 }
 
 func openLockFile(directory *securefs.Directory) (*os.File, bool, error) {
-	file, err := directory.CreateExclusive(lockFilename, 0o600)
+	return openLockFileMode(directory, false)
+}
+
+func openLockFileMode(directory *securefs.Directory, shared bool) (*os.File, bool, error) {
+	open := directory.OpenReadWrite
+	if shared {
+		open = directory.Open
+	}
+	// Existing stores need neither a create attempt nor write/delete rights
+	// for observation. The returned handle is still ACL-checked and locked.
+	file, err := open(lockFilename)
+	if err == nil {
+		return file, false, nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return nil, false, fmt.Errorf("open trust store lock: %w", err)
+	}
+	file, err = directory.CreateExclusive(lockFilename, 0o600)
 	if err == nil {
 		return file, true, nil
 	}
 	if !errors.Is(err, os.ErrExist) {
 		return nil, false, fmt.Errorf("create trust store lock: %w", err)
 	}
-	file, err = directory.OpenReadWrite(lockFilename)
+	file, err = open(lockFilename)
 	if err != nil {
 		return nil, false, fmt.Errorf("open trust store lock: %w", err)
 	}

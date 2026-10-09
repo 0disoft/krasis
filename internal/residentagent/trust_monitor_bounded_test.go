@@ -126,13 +126,10 @@ func TestTrustReadTimeoutReportsCurrentPhaseAndKeepsSessionStopped(t *testing.T)
 		}()
 		<-entered
 		<-finished
-		if ctx.Err() != context.Canceled || len(codes) != 4 || codes[0] != "trust_timing_retry_wait_ge1s" || codes[1] != "trust_active_retry_wait" || codes[2] != "session_trust_read_deferred" || codes[3] != "session_trust_freshness_expired" {
-			t.Fatalf("timeout evidence and fail-closed stop: %v, %v", codes, ctx.Err())
-		}
 		close(release)
 		synctest.Wait()
-		if len(codes) != 4 {
-			t.Fatalf("late success altered stopped session: %v", codes)
+		if ctx.Err() != context.Canceled || len(codes) != 6 || codes[0] != "trust_timing_retry_wait_ge1s" || codes[1] != "trust_active_retry_wait" || codes[2] != "session_trust_read_deferred" || codes[3] != "trust_timing_retry_wait_ge1s" || codes[4] != "trust_active_retry_wait" || codes[5] != "session_trust_freshness_expired" {
+			t.Fatalf("timeout evidence and fail-closed stop: %v, %v", codes, ctx.Err())
 		}
 	})
 }

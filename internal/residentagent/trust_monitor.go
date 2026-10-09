@@ -176,6 +176,9 @@ func monitorProductSessionObserved(ctx context.Context, ticks <-chan time.Time, 
 			return
 		case <-freshness.C:
 			if ctx.Err() == nil {
+				if trace != nil {
+					recordTrace(trace.Snapshot())
+				}
 				record("session_trust_freshness_expired")
 				cancel()
 			} else if ctx.Err() == context.DeadlineExceeded {
