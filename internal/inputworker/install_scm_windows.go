@@ -39,7 +39,7 @@ func (manager *installSCM) command() string {
 }
 
 func validInstallServiceConfig(config installServiceConfig, command string) bool {
-	return config.typeID == windows.SERVICE_WIN32_OWN_PROCESS && config.start == windows.SERVICE_DEMAND_START &&
+	return config.typeID == windows.SERVICE_WIN32_OWN_PROCESS && (config.start == windows.SERVICE_DEMAND_START || config.start == windows.SERVICE_AUTO_START) &&
 		config.errorControl == windows.SERVICE_ERROR_NORMAL && config.binary == command &&
 		strings.EqualFold(config.account, "LocalSystem") && config.group == "" && config.deps == "" && config.tag == 0
 }
@@ -273,7 +273,7 @@ func (manager *installSCM) ready(status windows.SERVICE_STATUS_PROCESS, digest [
 	return nil
 }
 
-func (manager *installSCM) start(ctx context.Context, digest [32]byte) error {
+func (manager *installSCM) start(ctx context.Context, digest [32]byte, transaction bool) error {
 	if ctx == nil {
 		return ErrAuthority
 	}
@@ -289,7 +289,16 @@ func (manager *installSCM) start(ctx context.Context, digest [32]byte) error {
 		return err
 	}
 	if status.CurrentState == windows.SERVICE_STOPPED {
-		if err := windows.StartService(handle, 0, nil); err != nil {
+		var args []*uint16
+		if transaction {
+			arg, _ := windows.UTF16PtrFromString(installServiceStartArgument)
+			args = []*uint16{arg}
+		}
+		var vector **uint16
+		if len(args) != 0 {
+			vector = &args[0]
+		}
+		if err := windows.StartService(handle, uint32(len(args)), vector); err != nil {
 			return installNativeError("service_start", ErrAuthority, err)
 		}
 	} else if status.CurrentState != windows.SERVICE_RUNNING && status.CurrentState != windows.SERVICE_START_PENDING {

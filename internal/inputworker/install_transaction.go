@@ -226,6 +226,19 @@ func recoverInputInstallation(backend installBackend) error {
 	}
 	if journal.Phase == installCommit {
 		state := installSnapshot{Present: journal.Target.valid(), Running: journal.Target.valid(), Images: journal.Target}
+		// A committed service can be cleanly stopped by a reboot before Finish.
+		// Revalidate its images and release proof before restoring readiness.
+		if state.Running {
+			actual, err := backend.Snapshot(ctx)
+			stopped := state
+			stopped.Running = false
+			if err != nil {
+				return errInstallRecovery
+			}
+			if actual == stopped && backend.Start(ctx) != nil {
+				return errInstallRecovery
+			}
+		}
 		if backend.Verify(ctx, state) != nil || backend.Finish(ctx) != nil {
 			return errInstallRecovery
 		}

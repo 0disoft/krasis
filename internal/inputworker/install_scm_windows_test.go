@@ -24,7 +24,7 @@ func TestInstallServiceConfigRejectsOtherPathAccountAndLifecycle(t *testing.T) {
 		func(c *installServiceConfig) { c.binary = `C:\Users\Public\krasis-input.exe --service` },
 		func(c *installServiceConfig) { c.account = "LocalService" },
 		func(c *installServiceConfig) { c.typeID |= windows.SERVICE_INTERACTIVE_PROCESS },
-		func(c *installServiceConfig) { c.start = windows.SERVICE_AUTO_START },
+		func(c *installServiceConfig) { c.start = windows.SERVICE_DISABLED },
 		func(c *installServiceConfig) { c.group = "custom" },
 		func(c *installServiceConfig) { c.deps = "other-service" },
 		func(c *installServiceConfig) { c.tag = 1 },

@@ -66,7 +66,7 @@ func NewStartup(control string) (Startup, error) {
 			if err != nil {
 				return err
 			}
-			installed, installErr := inputworker.OpenAgentLaunch(sha256.Sum256(data))
+			installed, installErr := inputworker.OpenAgentLaunchForStartup(sha256.Sum256(data))
 			if installErr == nil && installed != nil {
 				defer installed.Close()
 				agentPath = installed.Path()

@@ -209,7 +209,12 @@ func (backend *windowsInstallBackend) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return backend.scm.start(ctx, images.Service)
+	journal, err := backend.files.load(ctx)
+	if err != nil {
+		return err
+	}
+	transaction := journal != nil && journal.Phase == installStart && backend.files.payload != nil && images == backend.files.payload.images
+	return backend.scm.start(ctx, images.Service, transaction)
 }
 
 func (backend *windowsInstallBackend) Verify(ctx context.Context, expected installSnapshot) error {
@@ -232,6 +237,17 @@ func (backend *windowsInstallBackend) Verify(ctx context.Context, expected insta
 func (backend *windowsInstallBackend) Finish(ctx context.Context) error {
 	if err := backend.check(ctx); err != nil {
 		return err
+	}
+	journal, err := backend.files.load(ctx)
+	if err != nil {
+		return err
+	}
+	// Only the new embedded service knows the startup transaction policy.
+	// Legacy recovery/rollback keeps its existing SCM start configuration.
+	if journal != nil && journal.Phase == installCommit && journal.Target.valid() && backend.files.payload != nil && journal.Target == backend.files.payload.images {
+		if err := backend.scm.enableAutomatic(ctx); err != nil {
+			return err
+		}
 	}
 	if missingInstallPath(backend.files.directory(installActive)) {
 		_, present, err := backend.scm.query(ctx)

@@ -319,3 +319,17 @@ Retired or backup selection additionally requires a valid protected transaction
 journal whose previous or target image pair matches. Unknown, starting, ready,
 failed or unrelated receipts cannot authorize restoration. SCM stop rechecks
 state, process identity and the clean record before any file restoration.
+
+## Service startup after reboot
+
+Successful installation enables SCM automatic start only after the new embedded
+service reaches durable commit. Legacy manual-start configuration remains valid
+for migration and rollback; ordinary users retain query-only service permissions.
+Service startup verifies the protected journal and pinned image pair before
+running input. Boot accepts a journal-free installation, a committed target, or
+a restored previous image in rollback-start/commit. An uncommitted install-start
+target additionally requires the installer's fixed SCM argument. Other phases,
+unexplained staging artifacts and malformed journals refuse startup. A committed
+cleanly stopped target can regain readiness during installer recovery. Agent
+startup briefly waits for an already-starting service without starting or
+repairing it. Physical reboot and PIN checks remain separate device verification.

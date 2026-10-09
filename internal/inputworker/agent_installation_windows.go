@@ -73,6 +73,16 @@ func InstallationMatchesAgent(expected [sha256.Size]byte) (bool, error) {
 }
 
 func OpenAgentLaunch(expected [sha256.Size]byte) (*AgentLaunch, error) {
+	return openAgentLaunch(expected, 0)
+}
+
+// Only startup waits for the already-starting service. Health reads stay cheap;
+// neither path starts a service or changes its installed configuration.
+func OpenAgentLaunchForStartup(expected [sha256.Size]byte) (*AgentLaunch, error) {
+	return openAgentLaunch(expected, 5*time.Second)
+}
+
+func openAgentLaunch(expected [sha256.Size]byte, wait time.Duration) (*AgentLaunch, error) {
 	if expected == ([sha256.Size]byte{}) {
 		return nil, ErrAuthority
 	}
@@ -93,7 +103,7 @@ func OpenAgentLaunch(expected [sha256.Size]byte) (*AgentLaunch, error) {
 		_ = installation.Close()
 		return nil, ErrAuthority
 	}
-	if !installedServiceLaunchReady(filepath.Join(root, "Krasis"), service) {
+	if !installedServiceLaunchReadyWithin(filepath.Join(root, "Krasis"), service, wait) {
 		_ = installation.Close()
 		return nil, ErrAuthority
 	}
@@ -105,20 +115,32 @@ func OpenAgentLaunch(expected [sha256.Size]byte) (*AgentLaunch, error) {
 // portable-agent path usable. The installed agent still authenticates each
 // privileged lease independently after launch.
 func installedServiceLaunchReady(root string, digest [sha256.Size]byte) bool {
+	return installedServiceLaunchReadyWithin(root, digest, 0)
+}
+
+func installedServiceLaunchReadyWithin(root string, digest [sha256.Size]byte, wait time.Duration) bool {
 	manager, err := windows.OpenSCManager(nil, nil, windows.SC_MANAGER_CONNECT)
 	if err != nil {
 		return false
 	}
 	defer windows.CloseServiceHandle(manager)
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second+wait)
 	defer cancel()
 	scm := &installSCM{manager: manager, root: root}
-	status, present, err := scm.query(ctx)
-	if err != nil || !present {
-		return false
+	deadline := time.Now().Add(wait)
+	for {
+		status, present, err := scm.query(ctx)
+		if err != nil || !present || status.CurrentState != windows.SERVICE_RUNNING && status.CurrentState != windows.SERVICE_START_PENDING {
+			return false
+		}
+		record, err := readServiceRecord(root)
+		if err == nil && readyInstalledServiceStatus(status, record, digest) {
+			return true
+		}
+		if wait == 0 || !time.Now().Before(deadline) || waitInstallService(ctx) != nil {
+			return false
+		}
 	}
-	record, err := readServiceRecord(root)
-	return err == nil && readyInstalledServiceStatus(status, record, digest)
 }
 
 func readyInstalledServiceStatus(status windows.SERVICE_STATUS_PROCESS, record serviceRecord, digest [sha256.Size]byte) bool {

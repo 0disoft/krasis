@@ -17,7 +17,7 @@ import (
 // RunService starts only through SCM with a protected installation. It neither
 // installs itself nor elevates a portable agent.
 func RunService(installation *Installation) error {
-	_, service, err := installation.digests()
+	agent, service, err := installation.digests()
 	if err != nil || !fixedInputProcess(service, false) {
 		return ErrAuthority
 	}
@@ -25,7 +25,13 @@ func RunService(installation *Installation) error {
 	if err != nil || !managed {
 		return ErrAuthority
 	}
-	if svc.Run(ServiceName, &serviceHandler{run: func(ctx context.Context) error { return runInstalledService(ctx, installation, service) }}) != nil {
+	root, err := windows.KnownFolderPath(windows.FOLDERID_ProgramFiles, 0)
+	if err != nil {
+		return ErrAuthority
+	}
+	if svc.Run(ServiceName, &serviceHandler{check: func(args []string) error {
+		return checkServiceStart(filepath.Join(root, "Krasis"), installImages{Agent: agent, Service: service}, args)
+	}, run: func(ctx context.Context) error { return runInstalledService(ctx, installation, service) }}) != nil {
 		return ErrAuthority
 	}
 	return nil
@@ -178,11 +184,17 @@ func runServiceLoop(ctx context.Context, installation *Installation, ready func(
 	return nil
 }
 
-type serviceHandler struct{ run func(context.Context) error }
+type serviceHandler struct {
+	check func([]string) error
+	run   func(context.Context) error
+}
 
 func (handler *serviceHandler) Execute(args []string, changes <-chan svc.ChangeRequest, updates chan<- svc.Status) (bool, uint32) {
 	updates <- svc.Status{State: svc.StartPending, CheckPoint: 1, WaitHint: 10000}
-	if len(args) != 1 || handler.run == nil {
+	if handler.run == nil || handler.check == nil && len(args) != 1 {
+		return true, 1
+	}
+	if handler.check != nil && handler.check(args) != nil {
 		return true, 1
 	}
 	ctx, cancel := context.WithCancel(context.Background())
