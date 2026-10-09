@@ -309,3 +309,13 @@ within the existing input scope: application and cursor snapshot. A bounded
 diagnostic flag/ACK extension carries only numeric timing, with original worker
 timings retained and legacy traffic unchanged. Measurements do not alter input
 order, authority, cursor outcomes or recovery. See the [split measurement contract](../experiments/worker-apply-split.md).
+
+## Interrupted image replacement recovery
+
+After a clean service stop, replacing the active image does not replace its
+last-run receipt. Rollback selects the stopped generation from a clean protected
+service record and independently verified active/retired/backup image pair.
+Retired or backup selection additionally requires a valid protected transaction
+journal whose previous or target image pair matches. Unknown, starting, ready,
+failed or unrelated receipts cannot authorize restoration. SCM stop rechecks
+state, process identity and the clean record before any file restoration.

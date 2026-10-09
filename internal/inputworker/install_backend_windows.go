@@ -139,9 +139,32 @@ func (backend *windowsInstallBackend) Stop(ctx context.Context) error {
 	if err := backend.check(ctx); err != nil {
 		return err
 	}
-	_, present, err := backend.scm.query(ctx)
+	status, present, err := backend.scm.query(ctx)
 	if err != nil || !present {
 		return err
+	}
+	if status.CurrentState == windows.SERVICE_STOPPED && status.Win32ExitCode != uint32(windows.ERROR_SERVICE_NEVER_STARTED) {
+		journal, err := backend.files.load(ctx)
+		if err != nil {
+			return err
+		}
+		record, err := readServiceRecord(backend.files.root)
+		if err != nil {
+			return err
+		}
+		digest, err := stoppedInstallDigest(ctx, journal, record, func(kind installDirectory) (installImages, bool, error) {
+			if missingInstallPath(backend.files.directory(kind)) {
+				return installImages{}, false, nil
+			}
+			images, err := backend.images(ctx, kind)
+			return images, true, err
+		})
+		if err != nil {
+			return err
+		}
+		// stop re-queries SCM and the clean receipt. A concurrent start still
+		// requires the actual running process to match this verified image.
+		return backend.scm.stop(ctx, digest)
 	}
 	// Replacement can be interrupted between the two directory renames. The
 	// stopped service still belongs to the pinned retired/rollback image then.
