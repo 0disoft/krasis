@@ -266,7 +266,7 @@ func (session *SourceSession) Offer(action control.InputAction) bool {
 		pending := session.pendingMove
 		dx := int64(pending.action.DeltaX) + int64(action.DeltaX)
 		dy := int64(pending.action.DeltaY) + int64(action.DeltaY)
-		if dx >= -1<<31 && dx <= 1<<31-1 && dy >= -1<<31 && dy <= 1<<31-1 {
+		if (dx != 0 || dy != 0) && dx >= -control.MaxInputDelta && dx <= control.MaxInputDelta && dy >= -control.MaxInputDelta && dy <= control.MaxInputDelta {
 			pending.action.DeltaX = int32(dx)
 			pending.action.DeltaY = int32(dy)
 			session.queueMu.Unlock()
@@ -277,14 +277,27 @@ func (session *SourceSession) Offer(action control.InputAction) bool {
 			return true
 		}
 	}
-	item := &queuedAction{generation: generation, action: action, queuedAt: queuedAt}
-	depth := session.queueDepth.Add(1)
-	select {
-	case session.queue <- item:
-		if action.Kind == control.InputPointerMove {
-			session.pendingMove = item
-		} else {
-			session.pendingMove = nil
+	// Reserve capacity before splitting: no partial frame may be admitted on
+	// overload. Each axis retains its total and discrete inputs keep their order.
+	count := deltaFrames(action)
+	if count <= cap(session.queue)-len(session.queue) {
+		var depth int64
+		for i := 0; i < count; i++ {
+			part := action
+			if action.Kind == control.InputPointerMove || action.Kind == control.InputWheel {
+				part.DeltaX = max(-control.MaxInputDelta, min(control.MaxInputDelta, action.DeltaX))
+				part.DeltaY = max(-control.MaxInputDelta, min(control.MaxInputDelta, action.DeltaY))
+				action.DeltaX -= part.DeltaX
+				action.DeltaY -= part.DeltaY
+			}
+			item := &queuedAction{generation: generation, action: part, queuedAt: queuedAt}
+			depth = session.queueDepth.Add(1)
+			session.queue <- item
+			if action.Kind == control.InputPointerMove {
+				session.pendingMove = item
+			} else {
+				session.pendingMove = nil
+			}
 		}
 		session.queueMu.Unlock()
 		session.stateMu.RUnlock()
@@ -296,14 +309,27 @@ func (session *SourceSession) Offer(action control.InputAction) bool {
 		}
 		session.observeWheelQueue(action, SourceQueueAccepted)
 		return true
-	default:
-		session.queueDepth.Add(-1)
+	} else {
 		session.queueMu.Unlock()
 		session.stateMu.RUnlock()
 		session.abort(ErrSourceQueueOverflow)
 		session.observeWheelQueue(action, SourceQueueRejectedOverflow)
 		return false
 	}
+}
+
+func deltaFrames(action control.InputAction) int {
+	if action.Kind != control.InputPointerMove && action.Kind != control.InputWheel {
+		return 1
+	}
+	x, y := int64(action.DeltaX), int64(action.DeltaY)
+	if x < 0 {
+		x = -x
+	}
+	if y < 0 {
+		y = -y
+	}
+	return int((max(x, y) + control.MaxInputDelta - 1) / control.MaxInputDelta)
 }
 
 func (session *SourceSession) observeWheelQueue(action control.InputAction, result SourceQueueOfferResult) {

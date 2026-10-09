@@ -7,6 +7,9 @@ import (
 
 type InputActionKind string
 
+// Relative frames share the protected worker's signed delta contract.
+const MaxInputDelta = 32767
+
 const (
 	InputKeyDown     InputActionKind = "KEY_DOWN"
 	InputKeyUp       InputActionKind = "KEY_UP"

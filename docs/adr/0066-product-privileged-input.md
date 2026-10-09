@@ -342,3 +342,8 @@ inputs and sends the normal peer revoke before closing the worker channel. The
 transport connection remains available for a fresh boundary grant. Release or
 revoke failures still fault; expired operations and authority failures are never
 replayed or renewed. Device verification remains pending.
+
+Source relative frames share the worker's +/-32767 delta bound. Pending moves
+coalesce only within that bound; larger individual moves are split with total
+movement and button ordering preserved. Admission reserves the complete split
+or takes the existing overflow safety path.

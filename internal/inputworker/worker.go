@@ -20,7 +20,7 @@ const (
 	IdleTimeout     = 2 * time.Second
 	RecoveryTimeout = 2 * time.Second
 	maxPressed      = 256
-	maxDelta        = 32767
+	maxDelta        = control.MaxInputDelta
 )
 
 var (
