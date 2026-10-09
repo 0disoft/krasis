@@ -15,13 +15,14 @@ const maxClipboardJSONBytes = ((peerupdate.MaxClipboardFileBytes + 2) / 3 * 4) +
 const clipboardRequestTimeout = 60 * time.Second
 
 type ClipboardRequest struct {
-	Report string  `json:"report,omitempty"`
-	Action string  `json:"action"`
-	Peer   string  `json:"peer"`
-	Text   *string `json:"text,omitempty"`
-	Format string  `json:"format,omitempty"`
-	Data   []byte  `json:"data,omitempty"`
-	Ack    string  `json:"ack,omitempty"`
+	LocalChanged bool    `json:"localChanged,omitempty"`
+	Report       string  `json:"report,omitempty"`
+	Action       string  `json:"action"`
+	Peer         string  `json:"peer"`
+	Text         *string `json:"text,omitempty"`
+	Format       string  `json:"format,omitempty"`
+	Data         []byte  `json:"data,omitempty"`
+	Ack          string  `json:"ack,omitempty"`
 }
 type ClipboardResult struct {
 	Code  string                    `json:"code"`
@@ -29,6 +30,9 @@ type ClipboardResult struct {
 }
 
 func (r ClipboardRequest) Valid() bool {
+	if r.LocalChanged && (r.Action != "SYNC" || r.Ack != "") {
+		return false
+	}
 	if !validFingerprint(r.Peer) {
 		return false
 	}

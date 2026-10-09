@@ -31,6 +31,7 @@ type ClipboardValue struct {
 	legacyFiles bool
 }
 type clipboardState struct {
+	localEpoch   uint64
 	transfer     ClipboardTransfer
 	transferID   string
 	mu           sync.Mutex
@@ -170,12 +171,22 @@ func (m *Manager) SyncClipboard(peer string, text *string, ack string) (Clipboar
 	return m.SyncClipboardPayload(peer, local, ack)
 }
 func (m *Manager) SyncClipboardPayload(peer string, local *ClipboardValue, ack string) (ClipboardValue, error) {
+	return m.SyncClipboardLocalChange(peer, local, ack, false)
+}
+
+// Local copy order is independent of whether its content is shareable.
+func (m *Manager) SyncClipboardLocalChange(peer string, local *ClipboardValue, ack string, changed bool) (ClipboardValue, error) {
 	m.clipboard.mu.Lock()
 	defer m.clipboard.mu.Unlock()
 	if peer == "" || m.clipboard.peer != peer {
 		return ClipboardValue{}, ErrDenied
 	}
 	m.clipboard.activeUntil = time.Now().Add(5 * time.Second)
+	if changed || local != nil {
+		m.clipboard.localEpoch++
+		m.clipboard.out, m.clipboard.in = nil, nil
+		m.clipboardChanged()
+	}
 	if local != nil {
 		if local.Format != "" && !m.clipboard.imageAllowed || local.Format == "files" && !m.clipboard.filesAllowed {
 			return ClipboardValue{}, ErrDenied
@@ -247,6 +258,7 @@ func (m *Manager) clipboardReceivePayload(peer, id, format string, r io.Reader, 
 	m.clipboard.mu.Lock()
 	active := m.clipboard.peer == peer && time.Now().Before(m.clipboard.activeUntil) &&
 		(format == "" || m.clipboard.imageAllowed) && (format != "files" || m.clipboard.filesAllowed)
+	epoch := m.clipboard.localEpoch
 	m.clipboard.mu.Unlock()
 	if !active {
 		return ErrDenied
@@ -259,7 +271,7 @@ func (m *Manager) clipboardReceivePayload(peer, id, format string, r io.Reader, 
 	}
 	m.clipboard.mu.Lock()
 	defer m.clipboard.mu.Unlock()
-	if m.clipboard.peer != peer ||
+	if m.clipboard.peer != peer || m.clipboard.localEpoch != epoch ||
 		format != "" && !m.clipboard.imageAllowed || format == "files" && !m.clipboard.filesAllowed {
 		return ErrDenied
 	}

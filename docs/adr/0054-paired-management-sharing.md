@@ -42,6 +42,13 @@ receiver still rejects snapshots above its 1 MiB limit until it is updated.
 
 ## Clipboard
 
+Local copy notification is separate from shareable payload. Excluded, unsupported
+and oversized copies advance the local epoch and discard older pending remote
+values without sending content. An in-flight remote receive checks that epoch
+again before publishing. Agent acknowledgement consumes the notification; a
+failed local API request retains it for retry. Remote-marked writes do not become
+new local copies.
+
 Clipboard sharing is independently opt-in, persisted for one selected paired
 certificate on each device. Update permission never grants clipboard access.
 The GUI explicitly warns about secrets; applications marking clipboard content

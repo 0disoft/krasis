@@ -232,8 +232,9 @@ func writeRemoteClipboardText(hwnd, expected uintptr, text, id string) (uintptr,
 // Only the serialized GUI operation worker touches this state. Remote writes
 // record their exact native sequence, so they never become a new outbound copy.
 type clipboardPump struct {
-	peer     string
-	sequence uintptr
+	localChanged bool
+	peer         string
+	sequence     uintptr
 }
 
 func (a *productWindow) syncClipboard(ctx context.Context) {
@@ -274,6 +275,9 @@ func (p *clipboardPump) sync(ctx context.Context, hwnd uintptr, control, peer st
 	}
 	request := localapi.ClipboardRequest{Action: "SYNC", Peer: peer}
 	if current != p.sequence {
+		if !clipboardHasFormat(clipboardFormat("Krasis.RemoteClipboard.v1")) {
+			p.localChanged = true
+		}
 		fileCandidate := clipboardHasFormat(cfHDROP) && !clipboardHasFormat(clipboardFormat("Krasis.RemoteClipboard.v1")) && !clipboardHasFormat(clipboardFormat("ExcludeClipboardContentFromMonitorProcessing"))
 		if fileCandidate {
 			report("", "preparing")
@@ -304,7 +308,11 @@ func (p *clipboardPump) sync(ctx context.Context, hwnd uintptr, control, peer st
 			}
 		}
 	}
+	request.LocalChanged = p.localChanged
 	result, err := client.Clipboard(ctx, request)
+	if err == nil && result.Code == "ok" {
+		p.localChanged = false
+	}
 	if err != nil || result.Code != "ok" || result.Value.ID == "" {
 		return
 	}

@@ -39,7 +39,7 @@ func (o *Operations) Clipboard(ctx context.Context, r localapi.ClipboardRequest)
 			local.Text = *r.Text
 		}
 	}
-	value, err := o.updates.SyncClipboardPayload(r.Peer, local, r.Ack)
+	value, err := o.updates.SyncClipboardLocalChange(r.Peer, local, r.Ack, r.LocalChanged)
 	if err == nil {
 		v.Code = "ok"
 		v.Value = value
