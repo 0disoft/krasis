@@ -60,6 +60,9 @@ func (s *WorkspaceSmoke) Report(schema, state, code string) {
 }
 
 func Run() {
+	if len(os.Args) == 2 && os.Args[1] == launcherui.ClipboardPackArgument {
+		os.Exit(launcherui.RunClipboardFilePacker(os.Stdin, os.Stdout))
+	}
 	if len(os.Args) == 2 && os.Args[1] == appsettings.RecoveryArgument {
 		ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
 		code := productcli.Run(ctx, []string{"app", "ensure", "--json"}, io.Discard, io.Discard, os.Getenv("LOCALAPPDATA"))

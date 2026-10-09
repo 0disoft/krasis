@@ -282,7 +282,7 @@ func (p *clipboardPump) sync(ctx context.Context, hwnd uintptr, control, peer st
 		if fileCandidate {
 			report("", "preparing")
 		}
-		format, data, sequence, present, err := readClipboardFiles(hwnd)
+		format, data, sequence, present, err := readClipboardFiles(ctx, hwnd)
 		if fileCandidate && err != nil {
 			report("", clipboardFileFailure(err))
 		}
@@ -309,6 +309,9 @@ func (p *clipboardPump) sync(ctx context.Context, hwnd uintptr, control, peer st
 		}
 	}
 	request.LocalChanged = p.localChanged
+	if ctx.Err() != nil {
+		return
+	}
 	result, err := client.Clipboard(ctx, request)
 	if err == nil && result.Code == "ok" {
 		p.localChanged = false
@@ -317,6 +320,9 @@ func (p *clipboardPump) sync(ctx context.Context, hwnd uintptr, control, peer st
 		return
 	}
 	var sequence uintptr
+	if ctx.Err() != nil {
+		return
+	}
 	if result.Value.Format == "" {
 		sequence, err = writeRemoteClipboardText(hwnd, current, result.Value.Text, result.Value.ID)
 	} else if result.Value.Format == "files" {

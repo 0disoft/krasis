@@ -8,7 +8,6 @@ import (
 	"github.com/0disoft/krasis/internal/localapi"
 	"os"
 	"runtime"
-	"sync"
 	"sync/atomic"
 	"time"
 	"unsafe"
@@ -17,7 +16,7 @@ import (
 // RunClipboardWorker uses this process's UI window as clipboard owner. No clipboard
 // text enters the renderer; this reuses the legacy sequence/marker protections.
 // The caller cancels ctx and joins the worker before exiting.
-func RunClipboardWorker(ctx context.Context, control string, owner *atomic.Uintptr, gate *sync.Mutex, revision *atomic.Uint64, wake chan struct{}) {
+func RunClipboardWorker(ctx context.Context, control string, owner *atomic.Uintptr, revision *atomic.Uint64, wake chan struct{}) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	timer := time.NewTicker(750 * time.Millisecond)
@@ -67,7 +66,6 @@ func RunClipboardWorker(ctx context.Context, control string, owner *atomic.Uintp
 			pump = clipboardPump{}
 			continue
 		}
-		gate.Lock()
 		if hwnd != lastOwner {
 			pump = clipboardPump{}
 			lastOwner = hwnd
@@ -77,9 +75,10 @@ func RunClipboardWorker(ctx context.Context, control string, owner *atomic.Uintp
 			lastRevision = currentRevision
 		}
 		tick, cancel := context.WithTimeout(ctx, 60*time.Second)
+		stopRevision := cancelClipboardRevision(tick, cancel, func() bool { return revision.Load() == lastRevision && owner.Load() == hwnd })
 		clipboardWorkerTick(tick, control, hwnd, &pump)
 		cancel()
-		gate.Unlock()
+		stopRevision()
 	}
 }
 

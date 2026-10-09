@@ -5,6 +5,7 @@ package launcherui
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"encoding/binary"
 	"errors"
 	"io"
@@ -38,12 +39,14 @@ func clipboardFileFailure(err error) string {
 	return "prepare_failed"
 }
 
-func readClipboardFiles(hwnd uintptr) (string, []byte, uintptr, bool, error) {
+func readClipboardFiles(ctx context.Context, hwnd uintptr) (string, []byte, uintptr, bool, error) {
 	paths, sequence, present, err := clipboardSelectedPaths(hwnd)
 	if err != nil || !present {
 		return "", nil, sequence, present, err
 	}
-	data, err := packClipboardFiles(paths)
+	data, err := prepareClipboardFiles(ctx, func() bool { return clipboardSequence() == sequence }, func(ctx context.Context) ([]byte, error) {
+		return packClipboardFilesProcess(ctx, paths)
+	})
 	if err != nil {
 		return "", nil, sequence, true, err
 	}

@@ -49,6 +49,13 @@ again before publishing. Agent acknowledgement consumes the notification; a
 failed local API request retains it for retry. Remote-marked writes do not become
 new local copies.
 
+File preparation runs in a hidden, disposable invocation of the same executable.
+Selected paths use closed stdin and archive output is size-bounded. Settings
+changes do not wait for traversal/read/compression: the worker observes the
+sharing epoch, cancels its process on a changed copy or shutdown, and discards
+late results. The parent joins cancellation; no file I/O task survives UI exit.
+This also interrupts native opens that cannot cooperatively inspect a context.
+
 Clipboard sharing is independently opt-in, persisted for one selected paired
 certificate on each device. Update permission never grants clipboard access.
 The GUI explicitly warns about secrets; applications marking clipboard content
