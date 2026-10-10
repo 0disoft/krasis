@@ -48,6 +48,8 @@ owner는 검증된 기계별 grant 식별자와 로그인 전 콘솔이 모두 �
 파일의 관리자/SYSTEM 소유·DACL·실제 핸들·reparse/hardlink 검증을 재사용한다.
 해제 명령은 동일 잠금 아래 해당 기록만 삭제하고 부재를 확인한다.
 쓰기 이후 검증·닫기 결과가 불명확하면 성공으로 표시하지 않는다.
+부팅 조회에서 pending 파일이 남아 있으면 이전 승인 기록도 사용하지 않는다.
+명시적 설정 해제는 승인 기록과 이 pending 파일만 제거하고 양쪽 부재를 확인한다.
 
 서비스의 프로필 위치는 보호된 Windows ProfileList에서 결정한다. 최초 준비는
 현재 계정의 KnownFolder LocalAppData와 일치해야 하며, 리디렉션된 LocalAppData는

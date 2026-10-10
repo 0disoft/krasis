@@ -15,13 +15,16 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-const loginGrantName = "LOGIN-GRANT.json"
+const (
+	loginGrantName    = "LOGIN-GRANT.json"
+	loginGrantPending = "LOGIN-GRANT.pending"
+)
 
 var ErrLoginConfigurationUnconfirmed = errors.New("login configuration change is unconfirmed")
 
 // ReadLoginGrant trusts only the fixed, administrator-owned file object. It
 // cannot create/repair a directory or import configuration supplied over IPC.
-func ReadLoginGrant(now time.Time) (loginagent.Grant, bool, error) {
+func ReadLoginGrant(now time.Time) (grant loginagent.Grant, present bool, result error) {
 	root, err := windows.KnownFolderPath(windows.FOLDERID_ProgramFiles, 0)
 	if err != nil {
 		return loginagent.Grant{}, false, ErrAuthority
@@ -34,7 +37,21 @@ func ReadLoginGrant(now time.Time) (loginagent.Grant, bool, error) {
 	if err != nil {
 		return loginagent.Grant{}, false, err
 	}
-	defer parent.Close()
+	defer func() {
+		if err := parent.Close(); err != nil {
+			grant, result = loginagent.Grant{}, errors.Join(ErrLoginConfigurationUnconfirmed, result)
+		}
+	}()
+	// A crash before grant replacement must not silently resurrect an older
+	// committed policy. Only an explicit configure/disable can retire pending.
+	pending, err := openProtected(filepath.Join(root, loginGrantPending), false)
+	if pending != nil {
+		_ = pending.Close()
+		return loginagent.Grant{}, false, ErrLoginConfigurationUnconfirmed
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return loginagent.Grant{}, false, ErrLoginConfigurationUnconfirmed
+	}
 	file, err := openProtected(filepath.Join(root, loginGrantName), false)
 	if errors.Is(err, os.ErrNotExist) {
 		return loginagent.Grant{}, false, nil
@@ -77,11 +94,9 @@ func ConfigureLoginGrant(ctx context.Context, alias string) (result error) {
 		return err
 	}
 	defer func() { result = closeLoginConfiguration(result, files.close(), changed) }()
-	unlock, err := files.acquire(ctx)
-	if err != nil {
+	if err := files.lockLoginConfiguration(ctx); err != nil {
 		return err
 	}
-	defer unlock()
 	// Never repurpose or delete an installation transaction to configure boot.
 	journal, err := files.load(ctx)
 	if err != nil || journal != nil {
@@ -94,7 +109,7 @@ func ConfigureLoginGrant(ctx context.Context, alias string) (result error) {
 	if err != nil {
 		return err
 	}
-	pending := filepath.Join(files.root, "LOGIN-GRANT.pending")
+	pending := filepath.Join(files.root, loginGrantPending)
 	if err := writeInstallFile(ctx, pending, data); err != nil {
 		return err
 	}
@@ -128,11 +143,9 @@ func RemoveLoginGrant(ctx context.Context) (result error) {
 		return err
 	}
 	defer func() { result = closeLoginConfiguration(result, files.close(), changed) }()
-	unlock, err := files.acquire(ctx)
-	if err != nil {
+	if err := files.lockLoginConfiguration(ctx); err != nil {
 		return err
 	}
-	defer unlock()
 	dir, err := securefs.OpenDirectory(files.root)
 	if err != nil {
 		return err
@@ -141,35 +154,53 @@ func RemoveLoginGrant(ctx context.Context) (result error) {
 	if protectedHandle(windows.Handle(dir.Handle())) != nil {
 		return ErrAuthority
 	}
-	file, err := dir.Open(loginGrantName)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil
+	for _, name := range []string{loginGrantName, loginGrantPending} {
+		file, err := dir.Open(name)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return loginConfigurationFailure(err, changed)
+		}
+		if err := protectedHandle(windows.Handle(file.Fd())); err != nil {
+			_ = file.Close()
+			return loginConfigurationFailure(err, changed)
+		}
+		if err := file.Close(); err != nil {
+			return loginConfigurationFailure(err, changed)
+		}
+		if ctx.Err() != nil {
+			return loginConfigurationFailure(ctx.Err(), changed)
+		}
+		changed = true
+		if err := dir.Remove(name); err != nil {
+			return errors.Join(ErrLoginConfigurationUnconfirmed, err)
+		}
 	}
+	for _, name := range []string{loginGrantName, loginGrantPending} {
+		remaining, err := dir.Open(name)
+		if remaining != nil {
+			_ = remaining.Close()
+			return ErrLoginConfigurationUnconfirmed
+		}
+		if !errors.Is(err, os.ErrNotExist) {
+			return ErrLoginConfigurationUnconfirmed
+		}
+	}
+	return nil
+}
+
+func (files *installFiles) lockLoginConfiguration(ctx context.Context) error {
+	if ctx == nil || ctx.Err() != nil || files == nil || files.pinned == nil || files.lock != nil {
+		return ErrAuthority
+	}
+	lock, err := openInstallWrite(filepath.Join(files.root, "INPUT-TRANSACTION.lock"))
 	if err != nil {
 		return err
 	}
-	if err := protectedHandle(windows.Handle(file.Fd())); err != nil {
-		_ = file.Close()
-		return err
-	}
-	if err := file.Close(); err != nil {
-		return err
-	}
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-	changed = true
-	if err := dir.Remove(loginGrantName); err != nil {
-		return errors.Join(ErrLoginConfigurationUnconfirmed, err)
-	}
-	remaining, err := dir.Open(loginGrantName)
-	if remaining != nil {
-		_ = remaining.Close()
-		return ErrLoginConfigurationUnconfirmed
-	}
-	if !errors.Is(err, os.ErrNotExist) {
-		return ErrLoginConfigurationUnconfirmed
-	}
+	// files.close owns and reports lock close too; the installer's void release
+	// callback would otherwise discard that failure after changing configuration.
+	files.lock = lock
 	return nil
 }
 
@@ -177,8 +208,12 @@ func closeLoginConfiguration(result, closeErr error, changed bool) error {
 	if closeErr == nil {
 		return result
 	}
+	return loginConfigurationFailure(errors.Join(result, closeErr), changed)
+}
+
+func loginConfigurationFailure(cause error, changed bool) error {
 	if changed {
-		return errors.Join(ErrLoginConfigurationUnconfirmed, result, closeErr)
+		return errors.Join(ErrLoginConfigurationUnconfirmed, cause)
 	}
-	return errors.Join(result, closeErr)
+	return cause
 }

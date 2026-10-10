@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/0disoft/krasis/internal/transport"
+	"github.com/0disoft/krasis/internal/truststore"
 )
 
 const GrantSchema = "krasis.login-grant/v1"
@@ -39,10 +40,9 @@ type Grant struct {
 }
 
 func (g Grant) Validate(now time.Time) error {
-	peer := transport.AuthenticatedPeerContext{CertificateSHA256: g.Peer, Role: g.Role}
+	peer := truststore.PeerRecord{Fingerprint: g.Peer, Role: g.Role, Alias: g.Alias, CreatedAt: g.CreatedAt}
 	if now.IsZero() || g.Schema != GrantSchema || !accountSID(g.Owner) || peer.Validate() != nil ||
 		!pin(g.ID) || !pin(g.Peer) || !pin(g.Identity) || !pin(g.LocalTransport) ||
-		g.Alias == "" || strings.TrimSpace(g.Alias) != g.Alias || len(g.Alias) > 256 || strings.ContainsAny(g.Alias, "\r\n\x00") ||
 		g.CreatedAt.IsZero() || g.CreatedAt.After(now) || !g.ExpiresAt.After(g.CreatedAt) || !now.Before(g.ExpiresAt) ||
 		g.ExpiresAt.Sub(g.CreatedAt) > 30*24*time.Hour {
 		return ErrGrant
