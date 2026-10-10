@@ -213,6 +213,10 @@ func (worker *ConsoleWorker) exited() bool {
 // Close is idempotent and waits for the exact owned child, never a PID lookup.
 // Job close also covers service crash and a child that has not resumed yet.
 func (worker *ConsoleWorker) Close() error {
+	return worker.closeWithin(5000)
+}
+
+func (worker *ConsoleWorker) closeWithin(waitMilliseconds uint32) error {
 	if worker == nil {
 		return nil
 	}
@@ -224,7 +228,7 @@ func (worker *ConsoleWorker) Close() error {
 			worker.err = ErrAuthority
 		}
 		if worker.process != 0 {
-			state, err := windows.WaitForSingleObject(worker.process, 5000)
+			state, err := windows.WaitForSingleObject(worker.process, waitMilliseconds)
 			if err != nil || state != windows.WAIT_OBJECT_0 {
 				worker.err = ErrAuthority
 			}

@@ -102,9 +102,30 @@ reader와 데스크톱 입력 port만 받는다. 보호된 grant의 전체 선�
 출처 확인, Winlogon 전용 입력 port, 로그인/충돌 시 입력 정리 확인을 다음
 bootstrap 작업에서 결합해야 하므로 현재 배포 동작과 준비 CLI 상태는 유지한다.
 
+## 서비스와 자식의 인증·정리 handshake
+
+로그인 전 실행에 전용 SYSTEM-only 파이프 `Krasis.Login.Worker.v1.<pid>`를 사용한다.
+서비스는 suspended 자식을 준비하며 파이프의 최초 인스턴스를 생성하고 실제
+kernel client PID가 소유한 자식과 같은지 확인한다. 자식은 어떠한 제어 프레임을
+읽기 전에 고정 설치 이미지, SCM 설정·PID와 실제 pipe server를 인증한다.
+서비스·자식 모두 활성 로그인 전 콘솔과 원래 정책을 activation 직전에 다시 확인한다.
+세션·승인 선택 지문·32바이트 난수 nonce를 고정 길이 프레임으로 서로 확인한다.
+패킷으로 키·인증 자료·경로·명령·입력 값은 전달하지 않는다.
+
+정리 요청은 runtime 취소를 전달한다. 자식은 runtime의 입력·네트워크 정리가
+반환되고 제어 reader까지 join한 뒤에만 clean receipt를 보낸다. 잘못된 stop,
+파이프 소실, runtime 실패와 정리 실패는 failed 또는 recovery 오류로 남는다.
+서비스도 clean receipt를 받는 것만으로 성공하지 않고 소유 Job·실제 프로세스·
+이미지 pin을 회수한다. 종료 응답은 3초, native 회수 대기는 1초로 제한한다.
+활성화 쓰기 이후 응답이 불명확하거나 이 정리가 실패하면 다음 owner를 차단한다.
+
+`RunInstalledLoginWorker`와 `launchLoginConnection`은 아직 EXE entry point와
+서비스 관측 루프에 연결하지 않았다. Winlogon 입력 port와 사용자 handoff를
+준비한 뒤 결합한다. 현재 일반 입력·설치·실행 중인 앱은 그대로 유지한다.
+
 ## 남은 커밋 단위
 
-1. 위 실행 primitive와 제한된 mTLS runner를 인증된 child bootstrap으로 연결한다.
+1. 인증된 child bootstrap에 Winlogon 입력 port와 제한된 mTLS runner를 결합한다.
    로그인 전에는 페어링·클립보드·업데이트·일반 관리 API를 제공하지 않는다.
 2. Winlogon 입력 데스크톱에 대한 별도 입력 경로를 검증한다. 기존 Default
    데스크톱 검증이나 WTS 사용자 토큰 검증을 전역적으로 완화하지 않는다.

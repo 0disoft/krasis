@@ -45,8 +45,9 @@ type Selection struct {
 }
 
 type Worker interface {
-	// Done closes after all owned input and network resources are retired.
-	// Stop reports the cleanup outcome. Process exit alone is insufficient.
+	// Done closes after the terminal cleanup attempt has joined all owned work.
+	// Stop must confirm its outcome before another owner is allowed. Process
+	// exit or this signal alone is never proof of successful input retirement.
 	Done() <-chan struct{}
 	Stop(context.Context) error
 }

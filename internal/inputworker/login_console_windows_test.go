@@ -78,3 +78,23 @@ func TestConsoleCleanupFailureNeverSignalsRetirement(t *testing.T) {
 	default:
 	}
 }
+
+func TestInstalledLoginChildRejectsUnpinnedCallerBeforeRuntime(t *testing.T) {
+	run := func(context.Context, uint32, [32]byte) error {
+		t.Fatal("untrusted process reached login connection runtime")
+		return nil
+	}
+	for _, installation := range []*Installation{nil, {}} {
+		if err := RunInstalledLoginWorker(context.Background(), installation, run); err != ErrAuthority {
+			t.Fatal("unpinned child accepted", err)
+		}
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := RunInstalledLoginWorker(ctx, &Installation{}, run); err != ErrAuthority {
+		t.Fatal(err)
+	}
+	if err := RunInstalledLoginWorker(nil, &Installation{}, run); err != ErrAuthority {
+		t.Fatal(err)
+	}
+}
