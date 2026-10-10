@@ -20,9 +20,28 @@ var (
 )
 
 type desktopBinding struct {
+	target         desktopTarget
 	original       uintptr // Borrowed: never close the GetThreadDesktop result.
 	owned          uintptr
-	verifiedHandle uintptr // The Default name belongs to this exact live handle.
+	verifiedHandle uintptr // The selected fixed name belongs to this exact handle.
+}
+
+type desktopTarget uint8
+
+const (
+	defaultTarget desktopTarget = iota
+	winlogonTarget
+)
+
+func desktopName(target desktopTarget) (string, error) {
+	switch target {
+	case defaultTarget:
+		return "Default", nil
+	case winlogonTarget:
+		return "Winlogon", nil
+	default:
+		return "", ErrUnavailable
+	}
 }
 
 func currentThreadID() uintptr {
@@ -31,6 +50,13 @@ func currentThreadID() uintptr {
 }
 
 func openDesktop() (binding, error) {
+	return openTargetDesktop(defaultTarget)
+}
+
+func openTargetDesktop(target desktopTarget) (binding, error) {
+	if _, err := desktopName(target); err != nil {
+		return nil, err
+	}
 	original, _, callErr := getThread.Call(currentThreadID())
 	if original == 0 {
 		return nil, errors.Join(ErrUnavailable, callErr)
@@ -39,7 +65,7 @@ func openDesktop() (binding, error) {
 	if handle == 0 {
 		return nil, errors.Join(ErrUnavailable, callErr)
 	}
-	desktop := &desktopBinding{original: original, owned: handle}
+	desktop := &desktopBinding{target: target, original: original, owned: handle}
 	if err := desktop.verifyName(); err != nil {
 		return nil, errors.Join(ErrUnavailable, err, closeUnbound(handle))
 	}
@@ -82,9 +108,10 @@ func (desktop *desktopBinding) verifyName() error {
 		return ErrClosed
 	}
 	desktop.verifiedHandle = 0
+	expected, targetErr := desktopName(desktop.target)
 	name, err := readDesktopName(desktop.owned)
-	if err != nil || name != "Default" {
-		return errors.Join(ErrInactive, err)
+	if err != nil || targetErr != nil || name != expected {
+		return errors.Join(ErrInactive, err, targetErr)
 	}
 	desktop.verifiedHandle = desktop.owned
 	return nil

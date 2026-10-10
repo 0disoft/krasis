@@ -123,12 +123,27 @@ kernel client PID가 소유한 자식과 같은지 확인한다. 자식은 어�
 서비스 관측 루프에 연결하지 않았다. Winlogon 입력 port와 사용자 handoff를
 준비한 뒤 결합한다. 현재 일반 입력·설치·실행 중인 앱은 그대로 유지한다.
 
+## Winlogon 전용 데스크톱 처리
+
+`inputdesktop.RunWinlogon`은 authenticated service-child가 별도로 고른 고정
+Winlogon 대상만 연다. 기존 `Run`의 Default 이름 검증은 유지한다. 일반 프로세스가
+권한을 주장하는 callback을 넘겨도 실제 SYSTEM·UIAccess·System 무결성·활성
+물리 콘솔 토큰이 아니면 scope를 열지 않는다. thread impersonation·restricted·
+AppContainer 토큰도 거절한다. 이 검사는 토큰·DACL·정책을 변경하지 않는다.
+
+소유 핸들의 고정 이름과 실제 입력을 받는지(UOI_IO)를 검증하고 전용 OS thread에
+연결한다. 다른 데스크톱이나 비활성 핸들로 대체하지 않는다. callback 종료 후
+원래 borrowed desktop을 복원하고 소유한 핸들만 닫는다. 잘못된 thread의 입력,
+scope 취소, desktop 비활성화와 복원 실패는 기존 scope 규칙대로 거절한다.
+이 API 자체는 입력 권한을 주지 않으며 서비스 인증·peer lease 검증·정리 확인을
+runtime과 결합해야 한다. 실제 Windows 로그인 화면 입력은 아직 시험하지 않았다.
+
 ## 남은 커밋 단위
 
 1. 인증된 child bootstrap에 Winlogon 입력 port와 제한된 mTLS runner를 결합한다.
    로그인 전에는 페어링·클립보드·업데이트·일반 관리 API를 제공하지 않는다.
-2. Winlogon 입력 데스크톱에 대한 별도 입력 경로를 검증한다. 기존 Default
-   데스크톱 검증이나 WTS 사용자 토큰 검증을 전역적으로 완화하지 않는다.
+2. Winlogon scope에 모든 입력/cursor 작업을 직렬화하는 port와 눌린 입력
+   복구를 결합한다. Default나 WTS 사용자 토큰 검증은 전역적으로 완화하지 않는다.
 3. 로그인 전 owner의 정리가 확인된 뒤 사용자 에이전트로 넘긴다. 양쪽 재부팅,
    로그인·로그아웃·잠금·사용자 전환·네트워크 지연과 PIN 입력을 실기기에서 확인한다.
 

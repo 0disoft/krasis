@@ -1,4 +1,4 @@
-// Package inputdesktop owns a Default desktop handle on one dedicated OS thread.
+// Package inputdesktop owns a fixed desktop handle on one dedicated OS thread.
 // It provides no privilege elevation, input injection, or authorization endpoint.
 package inputdesktop
 
@@ -11,7 +11,7 @@ import (
 
 var (
 	ErrUnavailable   = errors.New("input desktop is unavailable")
-	ErrInactive      = errors.New("owned desktop is not the active Default desktop")
+	ErrInactive      = errors.New("owned desktop is not the selected active input desktop")
 	ErrWrongThread   = errors.New("input desktop operation is on another OS thread")
 	ErrClosed        = errors.New("input desktop scope is closed")
 	ErrInvalid       = errors.New("input desktop context and operation are required")
