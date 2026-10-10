@@ -43,6 +43,23 @@ func Load(base string) (Settings, error) {
 	return loadSettings(func(v any) error { return read(base, "settings.json", v) }, true)
 }
 
+// Initialize is an explicit normal-app startup write. Privileged readers keep
+// requiring existing policy; read-only Load never creates it. No-replace
+// promotion preserves a concurrent user's settings, including disabled flags.
+func Initialize(base string) (Settings, error) {
+	gate.Lock()
+	defer gate.Unlock()
+	value, err := loadSettings(func(v any) error { return read(base, "settings.json", v) }, false)
+	if err == nil || !errors.Is(err, os.ErrNotExist) {
+		return value, err
+	}
+	value = Settings{Schema: Schema, StartAtLogin: true, AutoUpdate: true}
+	if err = writeMode(base, "settings.json", value, false); err != nil && !errors.Is(err, os.ErrExist) {
+		return Settings{}, err
+	}
+	return loadSettings(func(v any) error { return read(base, "settings.json", v) }, false)
+}
+
 func loadSettings(load func(any) error, allowMissing bool) (Settings, error) {
 	var value struct {
 		Schema       string `json:"schema"`
@@ -53,7 +70,10 @@ func loadSettings(load func(any) error, allowMissing bool) (Settings, error) {
 	if allowMissing && errors.Is(err, os.ErrNotExist) {
 		return Settings{Schema: Schema, StartAtLogin: true, AutoUpdate: true}, nil
 	}
-	if err != nil || value.Schema != Schema || value.StartAtLogin == nil || value.AutoUpdate == nil {
+	if err != nil {
+		return Settings{}, errors.Join(errors.New("invalid app settings"), err)
+	}
+	if value.Schema != Schema || value.StartAtLogin == nil || value.AutoUpdate == nil {
 		return Settings{}, errors.New("invalid app settings")
 	}
 	return Settings{Schema: value.Schema, StartAtLogin: *value.StartAtLogin, AutoUpdate: *value.AutoUpdate}, nil
@@ -179,6 +199,10 @@ func decodeSettings(data []byte, value any) error {
 	return nil
 }
 func write(base, name string, value any) error {
+	return writeMode(base, name, value, true)
+}
+
+func writeMode(base, name string, value any, replace bool) error {
 	dir, err := productidentity.PrepareLaunch(base)
 	if err != nil {
 		return err
@@ -206,5 +230,8 @@ func write(base, name string, value any) error {
 	if closeErr != nil {
 		return closeErr
 	}
-	return dir.Replace(temp, name)
+	if replace {
+		return dir.Replace(temp, name)
+	}
+	return dir.PromoteNoReplace(temp, name)
 }

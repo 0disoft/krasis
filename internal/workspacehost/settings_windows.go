@@ -136,7 +136,7 @@ func (s *WorkspaceService) SetAppSettings(startAtLogin, autoUpdate bool) AppSett
 }
 func (s *WorkspaceService) prepareAppSettings() error {
 	base := os.Getenv("LOCALAPPDATA")
-	v, err := appsettings.Load(base)
+	v, err := appsettings.Initialize(base)
 	if err != nil {
 		return err
 	}

@@ -6,6 +6,7 @@ import (
 	"io"
 	"path/filepath"
 
+	"github.com/0disoft/krasis/internal/logindiag"
 	"github.com/0disoft/krasis/internal/peercredentials"
 	"github.com/0disoft/krasis/internal/productidentity"
 )
@@ -23,12 +24,12 @@ func ReadOwnerStartup(base, owner string) (Settings, Resume, error) {
 	}
 	root, err := scope.OpenDirectory(paths.Root)
 	if err != nil {
-		return Settings{}, Resume{}, err
+		return Settings{}, Resume{}, logindiag.At("startup_root", err)
 	}
 	defer root.Close()
 	dir, err := scope.OpenDirectory(filepath.Join(paths.Root, "launch"))
 	if err != nil {
-		return Settings{}, Resume{}, err
+		return Settings{}, Resume{}, logindiag.At("startup_directory", err)
 	}
 	defer dir.Close()
 	load := func(name string, value any) error {
@@ -41,18 +42,21 @@ func ReadOwnerStartup(base, owner string) (Settings, Resume, error) {
 			return err
 		}
 		data, err := io.ReadAll(io.LimitReader(file, 4097))
-		if err != nil || len(data) > 4096 {
+		if err != nil {
+			return err
+		}
+		if len(data) > 4096 {
 			return errInvalidDocument
 		}
 		return decodeSettings(data, value)
 	}
 	settings, err := loadSettings(func(v any) error { return load("settings.json", v) }, false)
 	if err != nil {
-		return Settings{}, Resume{}, err
+		return Settings{}, Resume{}, logindiag.At("settings_read", err)
 	}
 	resume, err := loadResume(func(v any) error { return load("resume.json", v) }, false)
 	if err != nil {
-		return Settings{}, Resume{}, err
+		return Settings{}, Resume{}, logindiag.At("resume_read", err)
 	}
 	return settings, resume, nil
 }

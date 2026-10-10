@@ -3,6 +3,9 @@
 package appsettings
 
 import (
+	"errors"
+	"github.com/0disoft/krasis/internal/logindiag"
+	"os"
 	"strings"
 	"testing"
 
@@ -45,5 +48,33 @@ func TestOwnerStartupRequiresExistingPolicyAndReadsManualStop(t *testing.T) {
 	_, r, err = ReadOwnerStartup(base, owner)
 	if err != nil || !r.ManualStop || r.Alias != "" {
 		t.Fatal("manual stop lost", err)
+	}
+}
+
+func TestSavedResumeWithUnpersistedDefaultCannotApproveUntilNormalStartup(t *testing.T) {
+	user, err := windows.GetCurrentProcessToken().GetTokenUser()
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner := user.User.Sid.String()
+	base := t.TempDir()
+	resume := Resume{Alias: "A", Fingerprint: strings.Repeat("a", 64)}
+	if err := SaveResume(base, resume); err != nil {
+		t.Fatal(err)
+	}
+	if settings, err := Load(base); err != nil || !settings.StartAtLogin {
+		t.Fatal("normal app defaults unavailable", err)
+	}
+	_, _, err = ReadOwnerStartup(base, owner)
+	if !errors.Is(err, os.ErrNotExist) || logindiag.New("prepare", 3, err).Stage != "settings_read" {
+		t.Fatal("missing settings cause lost", err)
+	}
+	settings, err := Initialize(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, r, err := ReadOwnerStartup(base, owner)
+	if err != nil || s != settings || r != resume {
+		t.Fatal("normal startup did not persist exact boot policy", err)
 	}
 }

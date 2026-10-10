@@ -68,7 +68,7 @@ func (s Summary) Valid() bool {
 
 func validStage(s string) bool {
 	switch s {
-	case "complete", "arguments", "configuration", "owner_token", "owner_elevation", "owner_profile", "current_profile", "profile_mismatch", "startup_read", "resume_policy", "startup_policy", "peer_read", "local_credential", "local_key", "grant_id", "grant_validate", "prepare", "installation_read", "install_files", "install_lock", "transaction_read", "transaction_present", "policy_recheck", "grant_encode", "pending_write", "commit", "grant_verify", "committed_policy", "close", "remove":
+	case "complete", "arguments", "configuration", "owner_token", "owner_elevation", "owner_profile", "current_profile", "profile_mismatch", "startup_read", "startup_root", "startup_directory", "settings_read", "resume_read", "resume_policy", "startup_policy", "peer_read", "local_credential", "local_key", "grant_id", "grant_validate", "prepare", "installation_read", "install_files", "install_lock", "transaction_read", "transaction_present", "policy_recheck", "grant_encode", "pending_write", "commit", "grant_verify", "committed_policy", "close", "remove":
 		return true
 	}
 	return false
