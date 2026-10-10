@@ -52,6 +52,13 @@ func launchManagedConsole(ctx context.Context, agent *Authority, digest [sha256.
 // A service preparation path must supply its own protected service checks;
 // neither callback nor installation is supplied over IPC.
 func launchManagedConsoleChecked(ctx context.Context, digest [sha256.Size]byte, prepare func(windows.Handle, uint32) error, installation *Installation, authorized func() bool) (*ConsoleWorker, error) {
+	return launchManagedConsoleMode(ctx, digest, prepare, installation, ordinaryConsole, authorized)
+}
+
+func launchManagedConsoleMode(ctx context.Context, digest [sha256.Size]byte, prepare func(windows.Handle, uint32) error, installation *Installation, mode consoleMode, authorized func() bool) (*ConsoleWorker, error) {
+	if _, _, err := consoleLaunchMode(mode); err != nil {
+		return nil, err
+	}
 	if ctx == nil || ctx.Err() != nil || digest == ([sha256.Size]byte{}) || authorized == nil || !authorized() {
 		return nil, ErrAuthority
 	}
@@ -75,7 +82,7 @@ func launchManagedConsoleChecked(ctx context.Context, digest [sha256.Size]byte, 
 			ready <- result{err: ErrAuthority}
 			return
 		}
-		worker, err := launchConsole(ctx, digest, prepare, installation, authorized)
+		worker, err := launchConsoleMode(ctx, digest, prepare, installation, mode, authorized)
 		if undo() != nil {
 			clean = false
 			err = errors.Join(err, ErrAuthority)
@@ -105,6 +112,10 @@ func launchManagedConsoleChecked(ctx context.Context, digest [sha256.Size]byte, 
 }
 
 func launchConsole(ctx context.Context, digest [sha256.Size]byte, prepare func(windows.Handle, uint32) error, installation *Installation, authorized func() bool) (result *ConsoleWorker, resultErr error) {
+	return launchConsoleMode(ctx, digest, prepare, installation, ordinaryConsole, authorized)
+}
+
+func launchConsoleMode(ctx context.Context, digest [sha256.Size]byte, prepare func(windows.Handle, uint32) error, installation *Installation, mode consoleMode, authorized func() bool) (result *ConsoleWorker, resultErr error) {
 	self, err := inspectProcess(windows.GetCurrentProcessId())
 	if err != nil {
 		return nil, ErrAuthority
@@ -144,11 +155,11 @@ func launchConsole(ctx context.Context, digest [sha256.Size]byte, prepare func(w
 	if err != nil {
 		return nil, ErrAuthority
 	}
-	worker.process, err = createConsoleProcess(ctx, token, path, worker.job, func() bool {
+	worker.process, err = createManagedConsoleProcess(ctx, token, path, worker.job, mode, func() bool {
 		return windows.WTSGetActiveConsoleSessionId() == session && authorized()
 	}, prepare)
 	if err != nil {
-		return nil, ErrAuthority
+		return nil, err
 	}
 	accepted = true
 	return worker, nil
@@ -209,9 +220,6 @@ func (worker *ConsoleWorker) Close() error {
 		worker.mu.Lock()
 		defer worker.mu.Unlock()
 		worker.closed = true
-		if worker.done != nil {
-			close(worker.done)
-		}
 		if worker.job != 0 && windows.CloseHandle(worker.job) != nil {
 			worker.err = ErrAuthority
 		}
@@ -226,6 +234,10 @@ func (worker *ConsoleWorker) Close() error {
 		}
 		if worker.image != nil && worker.image.Close() != nil {
 			worker.err = ErrAuthority
+		}
+		// Never signal retirement before exact-process exit and pin cleanup.
+		if worker.err == nil && worker.done != nil {
+			close(worker.done)
 		}
 	})
 	return worker.err

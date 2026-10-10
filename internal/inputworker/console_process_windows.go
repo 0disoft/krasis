@@ -4,6 +4,7 @@ package inputworker
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -35,6 +36,33 @@ func makeWorkerJob() (windows.Handle, error) {
 }
 
 func createConsoleProcess(ctx context.Context, token windows.Token, path string, job windows.Handle, authorized func() bool, prepare func(windows.Handle, uint32) error) (windows.Handle, error) {
+	return createManagedConsoleProcess(ctx, token, path, job, ordinaryConsole, authorized, prepare)
+}
+
+// Closed choices owned by the service, never desktop/command strings from IPC.
+type consoleMode uint8
+
+const (
+	ordinaryConsole consoleMode = iota
+	loginConsole
+)
+
+func consoleLaunchMode(mode consoleMode) (arguments, desktop string, err error) {
+	switch mode {
+	case ordinaryConsole:
+		return workerArguments, `winsta0\default`, nil
+	case loginConsole:
+		return " --login-worker", `winsta0\Winlogon`, nil
+	default:
+		return "", "", ErrAuthority
+	}
+}
+
+func createManagedConsoleProcess(ctx context.Context, token windows.Token, path string, job windows.Handle, mode consoleMode, authorized func() bool, prepare func(windows.Handle, uint32) error) (result windows.Handle, resultErr error) {
+	arguments, desktopName, err := consoleLaunchMode(mode)
+	if err != nil || ctx == nil || ctx.Err() != nil || job == 0 || authorized == nil || !authorized() {
+		return 0, ErrAuthority
+	}
 	attributes, err := windows.NewProcThreadAttributeList(1)
 	if err != nil {
 		return 0, ErrAuthority
@@ -51,7 +79,7 @@ func createConsoleProcess(ctx context.Context, token windows.Token, path string,
 	if err != nil {
 		return 0, ErrAuthority
 	}
-	command, err := windows.UTF16PtrFromString(`"` + path + `"` + workerArguments)
+	command, err := windows.UTF16PtrFromString(`"` + path + `"` + arguments)
 	if err != nil {
 		return 0, ErrAuthority
 	}
@@ -59,7 +87,7 @@ func createConsoleProcess(ctx context.Context, token windows.Token, path string,
 	if err != nil {
 		return 0, ErrAuthority
 	}
-	desktop, _ := windows.UTF16PtrFromString(`winsta0\default`)
+	desktop, _ := windows.UTF16PtrFromString(desktopName)
 	startup := windows.StartupInfoEx{StartupInfo: windows.StartupInfo{Cb: uint32(unsafe.Sizeof(windows.StartupInfoEx{})), Desktop: desktop}, ProcThreadAttributeList: attributes.List()}
 	var environment [2]uint16 // Double-NUL: no inherited PATH, secrets or profile.
 	var child windows.ProcessInformation
@@ -73,13 +101,21 @@ func createConsoleProcess(ctx context.Context, token windows.Token, path string,
 	if err != nil {
 		return 0, ErrAuthority
 	}
-	defer windows.CloseHandle(child.Thread)
 	accepted := false
 	defer func() {
+		if windows.CloseHandle(child.Thread) != nil {
+			accepted = false
+			result, resultErr = 0, errors.Join(resultErr, ErrRecovery)
+		}
 		if !accepted {
-			_ = windows.TerminateProcess(child.Process, 1)
-			_, _ = windows.WaitForSingleObject(child.Process, 5000)
-			_ = windows.CloseHandle(child.Process)
+			// Retire the entire owned job, including a still-suspended child.
+			// An unconfirmed cleanup must fence the next launch.
+			terminateErr := windows.TerminateJobObject(job, 1)
+			state, waitErr := windows.WaitForSingleObject(child.Process, 5000)
+			closeErr := windows.CloseHandle(child.Process)
+			if terminateErr != nil || waitErr != nil || state != windows.WAIT_OBJECT_0 || closeErr != nil {
+				result, resultErr = 0, errors.Join(resultErr, ErrRecovery)
+			}
 		}
 	}()
 	// Verify the actual child's token while it is suspended. Arguments and a
@@ -91,8 +127,8 @@ func createConsoleProcess(ctx context.Context, token windows.Token, path string,
 	session := windows.WTSGetActiveConsoleSessionId()
 	valid := session != 0 && session != 0xffffffff && identity.system && identity.uiAccess && identity.integrity == 0x4000 &&
 		identity.session == session && !identity.restricted && !identity.appContainer && strings.EqualFold(identity.image, path)
-	_ = identity.close()
-	if !valid || ctx.Err() != nil || !authorized() {
+	identityCloseErr := identity.close()
+	if !valid || identityCloseErr != nil || ctx.Err() != nil || !authorized() {
 		return 0, ErrAuthority
 	}
 	if prepare != nil && prepare(child.Process, child.ProcessId) != nil {

@@ -67,9 +67,24 @@ owner는 검증된 기계별 grant 식별자와 로그인 전 콘솔이 모두 �
 설정 준비 CLI는 `prepared_runtime_pending`, `active:false`를 반환한다.
 현재 사용자 UI에는 아직 로그인 전 연결 옵션을 노출하지 않는다.
 
+## 로그인 전 실행 primitive
+
+서비스 전용 `launchLoginConsole`은 고정 설치·SCM 실행 여부·현재 물리 콘솔·
+보호된 승인 기록·원래 사용자 정책을 시작 전과 자식 resume 직전에 다시 읽는다.
+일반 worker는 계속 `--input-worker` / `winsta0\\default`를 사용한다. 로그인 전
+worker는 별도 고정 모드 `--login-worker` / `winsta0\\Winlogon`만 선택할 수 있고
+IPC로 실행 경로·명령·데스크톱을 선택할 수 없다. 아직 child entry point와
+서비스 루프에 연결하지 않아 현재 배포에서는 이 모드를 실행하지 않는다.
+
+두 경로 모두 자식을 suspended 상태로 생성하고 생성 시 Job에 넣는다. 자식의
+실제 SYSTEM·UIAccess·System 무결성·세션·이미지를 확인한 뒤 resume한다.
+시작 실패는 소유 Job을 종료하고 실제 프로세스 종료를 기다린다. 종료 또는
+핸들 정리가 미확인이면 recovery 오류를 보존한다. `ConsoleWorker.done`은
+Job·프로세스·이미지 pin 정리가 모두 성공한 후에만 닫는다.
+
 ## 남은 커밋 단위
 
-1. 서비스의 고정 이미지·Job·토큰 검증과 제한된 mTLS 연결 runner를 연결한다.
+1. 위 실행 primitive에 child bootstrap과 제한된 mTLS 연결 runner를 연결한다.
    로그인 전에는 페어링·클립보드·업데이트·일반 관리 API를 제공하지 않는다.
 2. Winlogon 입력 데스크톱에 대한 별도 입력 경로를 검증한다. 기존 Default
    데스크톱 검증이나 WTS 사용자 토큰 검증을 전역적으로 완화하지 않는다.
