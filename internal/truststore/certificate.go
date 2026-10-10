@@ -152,6 +152,10 @@ func validatePeerCertificate(peer transport.AuthenticatedPeerContext, der []byte
 func peerCertificateFilename(fingerprint string) string { return "certificate-" + fingerprint + ".der" }
 
 func readPeerCertificate(directory *securefs.Directory, fingerprint string) ([]byte, error) {
+	return readPeerCertificateVerified(directory, fingerprint, peercredentials.ValidateSecurityFileHandle)
+}
+
+func readPeerCertificateVerified(directory *securefs.Directory, fingerprint string, validate func(*os.File) error) ([]byte, error) {
 	file, err := directory.Open(peerCertificateFilename(fingerprint))
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, ErrPeerCertificateUnavailable
@@ -160,7 +164,7 @@ func readPeerCertificate(directory *securefs.Directory, fingerprint string) ([]b
 		return nil, err
 	}
 	defer file.Close()
-	if err := peercredentials.ValidateSecurityFileHandle(file); err != nil {
+	if err := validate(file); err != nil {
 		return nil, err
 	}
 	data, err := io.ReadAll(io.LimitReader(file, maxPeerCertificateBytes+1))

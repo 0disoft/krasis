@@ -266,6 +266,14 @@ func currentUserDACL(directory bool) (*windowsACL, unsafe.Pointer, error) {
 }
 
 func validateExactCurrentUserDACLHandle(handle uintptr, expectedFlags byte) error {
+	userSID, err := currentUserSIDString()
+	if err != nil {
+		return err
+	}
+	return validateExactOwnerDACLHandle(handle, expectedFlags, userSID)
+}
+
+func validateExactOwnerDACLHandle(handle uintptr, expectedFlags byte, userSID string) error {
 	var dacl *windowsACL
 	var descriptor unsafe.Pointer
 	status, _, _ := procGetSecurityInfo.Call(
@@ -282,7 +290,7 @@ func validateExactCurrentUserDACLHandle(handle uintptr, expectedFlags byte) erro
 		return syscall.Errno(status)
 	}
 	defer syscall.LocalFree(syscall.Handle(descriptor))
-	return validateCurrentUserDACL(dacl, descriptor, expectedFlags)
+	return validateOwnerDACL(dacl, descriptor, expectedFlags, userSID)
 }
 
 func validatePrivateKeyDirectory(directory string) (string, error) {
@@ -455,6 +463,14 @@ func validateExactCurrentUserDACLObserved(path string, expectedFlags byte, obser
 }
 
 func validateCurrentUserDACL(dacl *windowsACL, descriptor unsafe.Pointer, expectedFlags byte) error {
+	userSID, err := currentUserSIDString()
+	if err != nil {
+		return err
+	}
+	return validateOwnerDACL(dacl, descriptor, expectedFlags, userSID)
+}
+
+func validateOwnerDACL(dacl *windowsACL, descriptor unsafe.Pointer, expectedFlags byte, userSID string) error {
 	if dacl == nil {
 		return errors.New("DACL is missing")
 	}
@@ -468,10 +484,6 @@ func validateCurrentUserDACL(dacl *windowsACL, descriptor unsafe.Pointer, expect
 	}
 	if control&seDACLProtected == 0 {
 		return errors.New("DACL inheritance is enabled")
-	}
-	userSID, err := currentUserSIDString()
-	if err != nil {
-		return err
 	}
 	expected := map[string]bool{userSID: false}
 	if userSID != "S-1-5-18" {

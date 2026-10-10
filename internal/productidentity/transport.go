@@ -140,11 +140,15 @@ func (store *Store) OpenTransport(role transport.AuthenticatedPeerRole, now time
 }
 
 func readTransport(directory *securefs.Directory, name string) (transportDocument, error) {
+	return readTransportVerified(directory, name, peercredentials.ValidateSecurityFileHandle)
+}
+
+func readTransportVerified(directory *securefs.Directory, name string, validate func(*os.File) error) (transportDocument, error) {
 	var document transportDocument
 	file, err := directory.Open(name)
 	if err == nil {
 		defer file.Close()
-		if err = peercredentials.ValidateSecurityFileHandle(file); err != nil {
+		if err = validate(file); err != nil {
 			return document, err
 		}
 		data, readErr := io.ReadAll(io.LimitReader(file, maxStoreBytes+1))

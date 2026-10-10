@@ -40,13 +40,17 @@ var (
 )
 
 func Load(base string) (Settings, error) {
+	return loadSettings(func(v any) error { return read(base, "settings.json", v) }, true)
+}
+
+func loadSettings(load func(any) error, allowMissing bool) (Settings, error) {
 	var value struct {
 		Schema       string `json:"schema"`
 		StartAtLogin *bool  `json:"startAtLogin"`
 		AutoUpdate   *bool  `json:"autoUpdate"`
 	}
-	err := read(base, "settings.json", &value)
-	if errors.Is(err, os.ErrNotExist) {
+	err := load(&value)
+	if allowMissing && errors.Is(err, os.ErrNotExist) {
 		return Settings{Schema: Schema, StartAtLogin: true, AutoUpdate: true}, nil
 	}
 	if err != nil || value.Schema != Schema || value.StartAtLogin == nil || value.AutoUpdate == nil {
@@ -63,13 +67,17 @@ func Save(base string, value Settings) error {
 	return write(base, "settings.json", value)
 }
 func LoadResume(base string) (Resume, error) {
+	return loadResume(func(v any) error { return read(base, "resume.json", v) }, true)
+}
+
+func loadResume(load func(any) error, allowMissing bool) (Resume, error) {
 	var wire struct {
 		Alias       *string         `json:"alias"`
 		Fingerprint *string         `json:"fingerprint"`
 		ManualStop  json.RawMessage `json:"manualStop"`
 	}
-	err := read(base, "resume.json", &wire)
-	if errors.Is(err, os.ErrNotExist) {
+	err := load(&wire)
+	if allowMissing && errors.Is(err, os.ErrNotExist) {
 		return Resume{}, nil
 	}
 	if err != nil {
@@ -156,9 +164,13 @@ func read(base, name string, value any) error {
 	if len(data) > 4096 {
 		return fmt.Errorf("%w: settings too large", errInvalidDocument)
 	}
+	return decodeSettings(data, value)
+}
+
+func decodeSettings(data []byte, value any) error {
 	d := json.NewDecoder(bytes.NewReader(data))
 	d.DisallowUnknownFields()
-	if err = d.Decode(value); err != nil {
+	if err := d.Decode(value); err != nil {
 		return errors.Join(errInvalidDocument, err)
 	}
 	if d.Decode(new(any)) != io.EOF {

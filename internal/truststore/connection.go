@@ -210,6 +210,10 @@ func resolveConnectionPeer(document Document, alias string) (PeerRecord, error) 
 func connectionFilename(fingerprint string) string { return "connection-" + fingerprint + ".json" }
 
 func readConnection(directory *securefs.Directory, fingerprint string) (ConnectionProfile, error) {
+	return readConnectionVerified(directory, fingerprint, peercredentials.ValidateSecurityFileHandle)
+}
+
+func readConnectionVerified(directory *securefs.Directory, fingerprint string, validate func(*os.File) error) (ConnectionProfile, error) {
 	file, err := directory.Open(connectionFilename(fingerprint))
 	if errors.Is(err, os.ErrNotExist) {
 		return ConnectionProfile{}, ErrConnectionNotConfigured
@@ -218,7 +222,7 @@ func readConnection(directory *securefs.Directory, fingerprint string) (Connecti
 		return ConnectionProfile{}, err
 	}
 	defer file.Close()
-	if err := peercredentials.ValidateSecurityFileHandle(file); err != nil {
+	if err := validate(file); err != nil {
 		return ConnectionProfile{}, err
 	}
 	const maxConnectionBytes = 4096

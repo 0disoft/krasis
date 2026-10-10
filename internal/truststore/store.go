@@ -469,6 +469,10 @@ func (store *Store) prepareDirectoryTraced(create bool, trace *ReadTrace) error 
 }
 
 func (store *Store) read(directory *securefs.Directory, trace *ReadTrace) (Document, error) {
+	return readVerified(directory, trace, peercredentials.ValidateSecurityFileHandle)
+}
+
+func readVerified(directory *securefs.Directory, trace *ReadTrace, validate func(*os.File) error) (Document, error) {
 	trace.enterStep("store_read_open")
 	file, err := directory.Open(storeFilename)
 	if err != nil {
@@ -482,7 +486,7 @@ func (store *Store) read(directory *securefs.Directory, trace *ReadTrace) (Docum
 		_ = file.Close()
 	}()
 	trace.enterStep("store_read_acl")
-	if err := peercredentials.ValidateSecurityFileHandle(file); err != nil {
+	if err := validate(file); err != nil {
 		return Document{}, fmt.Errorf("validate trust store security: %w", err)
 	}
 	trace.enterStep("store_read_bytes")

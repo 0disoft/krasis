@@ -126,6 +126,10 @@ func (store *Store) Load() (*Identity, error) {
 }
 
 func loadFromDirectory(directory *securefs.Directory) (*Identity, error) {
+	return loadFromDirectoryVerified(directory, peercredentials.ValidateSecurityFileHandle)
+}
+
+func loadFromDirectoryVerified(directory *securefs.Directory, validate func(*os.File) error) (*Identity, error) {
 	file, err := directory.Open(identityFile)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -134,7 +138,7 @@ func loadFromDirectory(directory *securefs.Directory) (*Identity, error) {
 		return nil, fmt.Errorf("open product identity: %w", err)
 	}
 	defer file.Close()
-	if err := peercredentials.ValidateSecurityFileHandle(file); err != nil {
+	if err := validate(file); err != nil {
 		return nil, fmt.Errorf("validate product identity security: %w", err)
 	}
 	data, err := io.ReadAll(io.LimitReader(file, maxStoreBytes+1))
