@@ -164,7 +164,7 @@ func DescribeSessionFailure(err error) FailureDescriptor {
 	case errors.Is(err, peer.ErrPeerLivenessExpired):
 		return FailureDescriptor{Component: "liveness", Phase: "heartbeat", Code: "peer_timeout"}
 	case errors.Is(err, peer.ErrPeerControlDispatch):
-		return FailureDescriptor{Component: "peer-dispatch", Phase: "control", Code: "failed"}
+		return describeControlFailure(err)
 	case errors.Is(err, peer.ErrPeerInputDispatch):
 		return FailureDescriptor{Component: "peer-dispatch", Phase: "input", Code: "failed"}
 	case errors.Is(err, peer.ErrPeerHeartbeatDispatch):

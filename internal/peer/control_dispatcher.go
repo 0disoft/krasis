@@ -11,6 +11,16 @@ import (
 
 var ErrUnexpectedControlFrame = errors.New("unexpected frame on control dispatcher")
 
+// Retain only the decoded command kind alongside the existing error chain.
+// Session identifiers and payloads do not belong in failure diagnostics.
+type ControlDispatchFailure struct {
+	Kind  transport.ControlCommandKind
+	Cause error
+}
+
+func (e *ControlDispatchFailure) Error() string { return "control command dispatch failed" }
+func (e *ControlDispatchFailure) Unwrap() error { return e.Cause }
+
 type LeaseRequestHandler interface {
 	HandleLeaseRequest(context.Context, transport.ControlCommand, time.Time) error
 }
@@ -56,7 +66,13 @@ func dispatchControlFrame(
 	requests LeaseRequestHandler,
 	outbound OutboundLifecycle,
 	deferFailure bool,
-) error {
+) (returnErr error) {
+	var kind transport.ControlCommandKind
+	defer func() {
+		if returnErr != nil {
+			returnErr = &ControlDispatchFailure{Kind: kind, Cause: returnErr}
+		}
+	}()
 	if runtime == nil {
 		return errors.New("control runtime is required")
 	}
@@ -70,6 +86,7 @@ func dispatchControlFrame(
 	if err != nil {
 		return failControlDispatch(ctx, runtime, err, deferFailure)
 	}
+	kind = command.Kind
 	switch command.Kind {
 	case transport.ControlPrepareInput:
 		// The hint carries no lease and must never mutate the runtime or

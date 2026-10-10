@@ -294,6 +294,10 @@ func TestRunSessionClassifiesControlDispatchFailure(t *testing.T) {
 	if !errors.Is(err, transport.ErrInvalidControlPayload) || !errors.Is(err, ErrPeerControlDispatch) {
 		t.Fatalf("RunSession() error = %v, want control dispatch classification", err)
 	}
+	var failure *ControlDispatchFailure
+	if !errors.As(err, &failure) || failure.Kind != 0 {
+		t.Fatal("invalid command lost its decode-stage evidence", err)
+	}
 }
 
 func TestRunSessionWrongDirectionInputFailsOutboundRuntime(t *testing.T) {

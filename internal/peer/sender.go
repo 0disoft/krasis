@@ -16,6 +16,8 @@ type FrameWriter interface {
 	WriteFrameContext(context.Context, transport.Frame) error
 }
 
+var ErrInboundPendingMismatch = errors.New("control command does not match the prepared inbound lease")
+
 type OutboundActionSink struct {
 	Coordinator *SessionWriteCoordinator
 	Runtime     *application.SessionRuntime
@@ -374,7 +376,7 @@ func (responder *LeaseResponder) HandleLeaseCommit(
 		defer func() { handoff.Record(ctx, handoff.CommitApply, time.Since(started)) }()
 		observeControlFlow(responder.Observer, ControlFlowCommitReceived)
 		if !responder.matchesPending(command) {
-			return errors.New("lease commit does not match the prepared inbound lease")
+			return ErrInboundPendingMismatch
 		}
 		if validator, ok := responder.Entry.(CursorEntryValidator); ok {
 			if err := validator.ValidateEntry(ctx); err != nil {
@@ -406,7 +408,7 @@ func (responder *LeaseResponder) HandleLeaseAbort(
 	err := responder.Coordinator.Execute(ctx, func(FrameWriter) error {
 		observeControlFlow(responder.Observer, ControlFlowAbortReceived)
 		if !responder.matchesPending(command) {
-			return errors.New("lease abort does not match the prepared inbound lease")
+			return ErrInboundPendingMismatch
 		}
 		err := responder.abortPendingLocked(ctx, nil)
 		emitProfile = handoff.Retire(ctx, "error")
