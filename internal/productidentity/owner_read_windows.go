@@ -53,7 +53,11 @@ func readOwnerTransport(localAppData, owner string, role transport.Authenticated
 	if err := scope.ValidateFile(lock); err != nil {
 		return PublicIdentity{}, tls.Certificate{}, err
 	}
-	unlock, err := acquireFileLock(lock)
+	acquire := acquireFileLock
+	if keyAnchor {
+		acquire = acquireSharedFileLock
+	}
+	unlock, err := acquire(lock)
 	if err != nil {
 		return PublicIdentity{}, tls.Certificate{}, err
 	}

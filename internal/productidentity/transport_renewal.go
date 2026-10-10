@@ -62,7 +62,7 @@ func (store *Store) OpenTransportAnchor(role transport.AuthenticatedPeerRole) (t
 	if role != transport.AuthenticatedPeerListener && role != transport.AuthenticatedPeerConnector {
 		return tls.Certificate{}, ErrTransportRenewalRequired
 	}
-	dir, release, err := store.openLocked(false)
+	dir, release, err := store.openTransportReadLocked()
 	if err != nil {
 		return tls.Certificate{}, err
 	}
