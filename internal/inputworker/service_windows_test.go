@@ -12,7 +12,7 @@ import (
 
 func TestServiceRejectsZeroInstallationWithoutSCMOrInput(t *testing.T) {
 	var installation Installation
-	if RunService(&installation) != ErrAuthority || RunInstalledWorker(context.Background(), &installation) != ErrAuthority {
+	if RunService(&installation) != ErrAuthority || RunInstalledWorker(context.Background(), &installation) != ErrAuthority || RunInstalledLoginConnection(context.Background(), &installation) != ErrAuthority {
 		t.Fatal("uninstalled entry point accepted")
 	}
 }

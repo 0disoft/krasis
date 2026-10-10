@@ -60,6 +60,9 @@ func TestLoginConfigurationArgumentsAndHonestInactiveReceipt(t *testing.T) {
 		if code != want || json.Unmarshal(out.Bytes(), &result) != nil || result.Code != code || result.Active || result.State == "" {
 			t.Fatal("receipt claimed active login support")
 		}
+		if called && tc.args[0] == "--prepare-login" && result.State != "configured" {
+			t.Fatal("runtime-enabled configuration still reports pending", result.State)
+		}
 	}
 }
 

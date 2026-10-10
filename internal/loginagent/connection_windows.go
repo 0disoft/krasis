@@ -118,8 +118,8 @@ func (p *connectionPolicy) AuthorizeLease(ctx context.Context, remote transport.
 // RunConnection exposes only the existing input session protocol for one pinned
 // peer. No management registry, trust mutation, clipboard, update, discovery,
 // credential rotation, user API or diagnostic content collection is installed.
-// It remains unwired until service-child authentication and desktop cleanup
-// acknowledgement are implemented; supplying ports is not process authority.
+// The installed login child supplies authenticated ports and joins their cleanup;
+// supplying ports alone is not process authority.
 func RunConnection(ctx context.Context, session uint32, profile [32]byte, deps ConnectionDependencies) (result error) {
 	if ctx == nil || ctx.Err() != nil || session == 0 || session == ^uint32(0) || profile == ([32]byte{}) || deps.ReadGrant == nil || deps.Hook == nil || deps.Input == nil || !deps.Geometry.Valid() {
 		return ErrInvalid
@@ -174,10 +174,13 @@ func RunConnection(ctx context.Context, session uint32, profile [32]byte, deps C
 	backoff.Jitter = true
 	result = agent.RunSupervisor(owned, agent.SupervisorConfig{Session: config, Backoff: backoff, Now: time.Now, Wait: agent.Wait}, agent.SupervisorDependencies{
 		Source: &checkedConnectionSource{source: source, check: p.check}, Hook: deps.Hook, Input: deps.Input,
-		Effects: agent.RuntimeEffects{}, Authorizer: p, RunSession: agent.RunSession,
+		Effects: agent.RuntimeEffects{}, Authorizer: p, RunSession: runLoginSession,
 	})
 	if cause := context.Cause(owned); cause != nil && !errors.Is(cause, context.Canceled) {
 		result = errors.Join(result, cause)
+	}
+	if owned.Err() != nil && loginStopOnly(result) {
+		result = nil
 	}
 	return result
 }

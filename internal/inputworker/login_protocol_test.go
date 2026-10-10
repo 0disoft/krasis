@@ -227,3 +227,28 @@ func TestLoginOwnerFencesFailedTerminalReceipt(t *testing.T) {
 		t.Fatal("native cleanup failure lost", err)
 	}
 }
+
+func TestLoginRuntimeCanRetireBeforeNextParentConsoleTick(t *testing.T) {
+	left, right := net.Pipe()
+	defer left.Close()
+	defer right.Close()
+	b := loginTestBinding(t)
+	runtimeEnded := make(chan struct{})
+	childDone := make(chan error, 1)
+	go func() {
+		childDone <- serveLoginControl(context.Background(), right, b, func() error { return nil }, func(context.Context) error {
+			close(runtimeEnded)
+			return nil
+		})
+	}()
+	worker := startLoginControlWorker(context.Background(), left, b, func() error { return nil })
+	<-runtimeEnded
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := worker.Stop(ctx); err != nil {
+		t.Fatal("parent tick lost a completed clean retirement", err)
+	}
+	if err := <-childDone; err != nil {
+		t.Fatal(err)
+	}
+}

@@ -3,6 +3,7 @@
 package wininput
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -19,12 +20,13 @@ const (
 // The window and low-level hooks share one OS thread. Physical input hides the
 // passive shield synchronously before CallNextHookEx, without swallowing input.
 type returnCursorShield struct {
-	window     atomic.Uintptr
-	generation atomic.Uint64
-	mu         sync.Mutex
-	position   point
-	visible    bool // accessed only on the owning hook thread
-	failure    atomic.Pointer[returnCursorFailure]
+	loginContext context.Context // Only inspected on the native owner thread.
+	window       atomic.Uintptr
+	generation   atomic.Uint64
+	mu           sync.Mutex
+	position     point
+	visible      bool // accessed only on the owning hook thread
+	failure      atomic.Pointer[returnCursorFailure]
 }
 
 type returnCursorFailure struct{ err error }
@@ -126,6 +128,9 @@ func (shield *returnCursorShield) prepare() func() {
 }
 
 func (shield *returnCursorShield) show(generation uint64) {
+	if sourceLoginDesktopCheck(shield.loginContext) != nil {
+		return
+	}
 	shield.mu.Lock()
 	defer shield.mu.Unlock()
 	if shield.generation.Load() != generation {

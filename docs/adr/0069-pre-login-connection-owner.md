@@ -1,14 +1,14 @@
 # ADR 0069: 로그인 전 연결의 서비스 소유권
 
-- 상태: Accepted for lifetime gate and grant provisioning; runtime integration pending
+- 상태: Accepted; runtime integrated in g261, physical reboot acceptance pending
 - 결정일: 2026-10-10
 - 관련: ADR 0036, ADR 0038, ADR 0064, ADR 0066, ADR 0068
 
 ## 문제
 
-현재 Windows 자동 시작은 HKCU Run의 사용자 로그인 자동 시작이다. 부팅 시
-자동 시작하는 `KrasisInput` 서비스는 보호 입력만 담당하며 peer 연결을 만들지
-않는다. 로그인 뒤의 Chrome PIN 창 제어 성공과 재부팅 직후 LogonUI 입력은
+기존 Windows 자동 시작은 HKCU Run의 사용자 로그인 자동 시작이었다. 부팅 시
+자동 시작하는 `KrasisInput` 서비스도 보호 입력만 담당하며 peer 연결을 만들지
+않았다. 로그인 뒤의 Chrome PIN 창 제어 성공과 재부팅 직후 LogonUI 입력은
 서로 다른 수용 기준이다.
 
 [Deskflow Windows watchdog](https://github.com/deskflow/deskflow/blob/master/src/lib/platform/MSWindowsWatchdog.cpp)은
@@ -64,7 +64,8 @@ owner는 검증된 기계별 grant 식별자와 로그인 전 콘솔이 모두 �
 철회·키 교체·만료는 부팅 연결을 중단시키며 현재 inbound 허용을 기록의 상한과
 교차한다. 이 검사는 실제 runner가 연결·lease 승인과 관측 루프에 연결해야 한다.
 
-설정 준비 CLI는 `prepared_runtime_pending`, `active:false`를 반환한다.
+설정 준비 CLI는 `configured`, `active:false`를 반환한다. 설정 저장 결과를
+현재 연결 성공으로 표시하지 않는다. g261부터 서비스가 이 설정을 사용한다.
 현재 사용자 UI에는 아직 로그인 전 연결 옵션을 노출하지 않는다.
 
 ## 로그인 전 실행 primitive
@@ -73,8 +74,10 @@ owner는 검증된 기계별 grant 식별자와 로그인 전 콘솔이 모두 �
 보호된 승인 기록·원래 사용자 정책을 시작 전과 자식 resume 직전에 다시 읽는다.
 일반 worker는 계속 `--input-worker` / `winsta0\default`를 사용한다. 로그인 전
 worker는 별도 고정 모드 `--login-worker` / `winsta0\Winlogon`만 선택할 수 있고
-IPC로 실행 경로·명령·데스크톱을 선택할 수 없다. 아직 child entry point와
-서비스 루프에 연결하지 않아 현재 배포에서는 이 모드를 실행하지 않는다.
+IPC로 실행 경로·명령·데스크톱을 선택할 수 없다. child entry point와 서비스
+루프에 연결했으며 명령 직접 실행만으로 genuine service 인증을 통과할 수 없다.
+로그인 전 child는 전체 고정 설치를 읽어 두 이미지 pin을 독립 확인하고, 일반
+입력 child의 부분 설치 로딩/agent-image 전달 경로와 구분한다.
 
 두 경로 모두 자식을 suspended 상태로 생성하고 생성 시 Job에 넣는다. 자식의
 실제 SYSTEM·UIAccess·System 무결성·세션·이미지를 확인한 뒤 resume한다.
@@ -98,9 +101,9 @@ reader와 데스크톱 입력 port만 받는다. 보호된 grant의 전체 선�
 연결을 중단한다. pairing·clipboard·update·discovery·사용자 관리 API·trust 수정·
 인증서 갱신을 등록하지 않는다. TLS 키를 진단이나 JSON으로 반환하지 않는다.
 
-이 runner는 아직 서비스나 EXE entry point에 연결하지 않았다. 실행 프로세스의
-출처 확인, Winlogon 전용 입력 port, 로그인/충돌 시 입력 정리 확인을 다음
-bootstrap 작업에서 결합해야 하므로 현재 배포 동작과 준비 CLI 상태는 유지한다.
+`RunInstalledLoginConnection`이 genuine service bootstrap의 session·승인 지문·
+실제 service proof로 Winlogon 입력 port와 source hook을 만들고 이 runner에
+연결한다. 시작·source hook 생성·경계 활성화에서 원래 승인/콘솔을 다시 확인한다.
 
 ## 서비스와 자식의 인증·정리 handshake
 
@@ -119,9 +122,11 @@ kernel client PID가 소유한 자식과 같은지 확인한다. 자식은 어�
 이미지 pin을 회수한다. 종료 응답은 3초, native 회수 대기는 1초로 제한한다.
 활성화 쓰기 이후 응답이 불명확하거나 이 정리가 실패하면 다음 owner를 차단한다.
 
-`RunInstalledLoginWorker`와 `launchLoginConnection`은 아직 EXE entry point와
-서비스 관측 루프에 연결하지 않았다. Winlogon 입력 port와 사용자 handoff를
-준비한 뒤 결합한다. 현재 일반 입력·설치·실행 중인 앱은 그대로 유지한다.
+`launchLoginConnection`은 서비스 owner의 Start backend이며 EXE의 고정
+`--login-worker` 진입점은 `RunInstalledLoginConnection`에 연결된다. runtime
+종료와 parent 콘솔 관측이 경합해도 정확한 parent가 최대 1초 안에 Stop을
+보내면 정리 receipt를 받을 수 있다. Stop 부재·잘못된 바인딩·파이프 소실은
+실패이며, 자발적 runtime 종료만으로 clean receipt를 보내지 않는다.
 
 ## 서비스 자동 시작과 사용자 입력 handoff
 
@@ -138,7 +143,7 @@ kernel client PID가 소유한 자식과 같은지 확인한다. 자식은 어�
 차단하고 서비스 failed receipt로 이어진다. 서비스 종료도 monitor를 join하고
 owner 정리를 기다린다. 승인 없음은 로그인 전 실행을 허용하지 않는다.
 
-이 서비스 결합의 child EXE 진입점은 다음 단계에서 연결한다.
+child EXE 진입점은 service bootstrap·Winlogon port·제한된 mTLS runner에 연결한다.
 
 ## Winlogon 전용 데스크톱 처리
 
@@ -182,18 +187,29 @@ Winlogon scope에 묶는다. 키·마우스 callback, raw packet, wheel 전달�
 thread attach만 회수하고 이전 foreground 창을 다시 활성화하지 않는다.
 로그인 전에는 사용자 Shell fullscreen COM broker를 시작하지 않는다.
 
-입력 port와 hook은 인증된 child runner와 service owner에 결합해야 한다.
+입력 port와 hook은 인증된 child runner와 service owner에 결합했다.
 
-## 남은 커밋 단위
+## 정상 취소와 정리 실패의 구분
 
-1. 인증된 child bootstrap에 Winlogon 입력 port와 제한된 mTLS runner를 결합한다.
-   로그인 전에는 페어링·클립보드·업데이트·일반 관리 API를 제공하지 않는다.
-2. 서비스 관측 루프와 일반 입력 handoff gate를 연결한다. Default나 WTS
-   사용자 토큰 검증은 전역적으로 완화하지 않는다.
-3. 로그인 전 owner의 정리가 확인된 뒤 사용자 에이전트로 넘긴다. 양쪽 재부팅,
-   로그인·로그아웃·잠금·사용자 전환·네트워크 지연과 PIN 입력을 실기기에서 확인한다.
+취소된 session이 LOCAL이며 forwarding·worker join·native owner 정리·pressed
+ledger 비움이 모두 확인되고 deadline 초과나 ErrRecoveryUnverified가 없어야
+session의 연결 종료 원인을 정상 취소로 처리한다. 이후 supervisor의 connection/
+source close 오류, Winlogon journal 잔여 입력, desktop 복원 오류와 parent Job
+회수 실패는 계속 보존한다. 단순 errors.Is(Canceled) 검사는 joined cleanup
+실패를 숨길 수 있어 쓰지 않는다. 서비스 StopPending도 기존 파이프의 Stop
+수신을 막지 않으며, 새 입력이나 새 권한을 부여하는 동작은 허용하지 않는다.
 
-현재 이 모듈은 서비스 entry point나 UI 옵션에 연결하지 않았다. CLI의 관리자
-준비·해제 작업은 구현했지만 실제 설치 파일에는 적용하지 않았다. 자동 시작 설정,
-입력 서비스, 인증 자료와 실행 중인 연결은 변경하지 않았다. generation도 유지한다.
-로그인 전 연결·입력 지원은 아직 완료되지 않았으며 실제 부팅 시험도 하지 않았다.
+## 배포와 실기기 수용 기준
+
+g261에 runtime과 고정 child 진입점을 포함한다. UI/사용자 agent는 로그인 후
+기존 자동 시작 경로를 사용한다. 로그인 전에 GUI·관리 API를 열지 않는다.
+사용자 설정의 자동 시작 허용과 관리자 승인 기록이 모두 필요하다. 양쪽에서
+기존 연결을 정상 확인하고 최신 보호 입력 설치를 적용한 뒤, 각 PC의 현재
+상대 별칭으로 `krasis-install --prepare-login PEER`를 관리자 실행해 승인한다.
+해제는 `--disable-login`이며 설정의 기존 만료·철회 규칙을 유지한다.
+
+양쪽 재부팅, 한쪽만 재부팅, 실제 LogonUI 입력, 로그인 후 일반 agent handoff,
+로그아웃·잠금·사용자 전환·네트워크 지연과 grant 만료/철회를 실기기에서
+확인해야 한다. 현재 코드/모의 실패 경로 검증은 완료했지만 실제 부팅 입력
+시험은 아직 하지 않았다. 실제 설치 서비스·승인·인증 자료·실행 중 연결은
+이 구현 작업에서 변경하지 않는다.

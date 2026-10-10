@@ -157,7 +157,10 @@ func serveLoginControl(ctx context.Context, stream net.Conn, binding loginBindin
 	}()
 	result = run(lifetime)
 	// Joining the reader prevents a late command from acting on a new owner.
-	if err := stream.SetReadDeadline(time.Now()); err != nil {
+	// Desktop/policy observation can stop the runtime just before the parent's
+	// next console tick. Allow that exact authenticated parent a bounded chance
+	// to revoke and confirm cleanup; an absent or wrong stop remains a failure.
+	if err := stream.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
 		_ = stream.Close()
 	}
 	<-done

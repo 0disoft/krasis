@@ -274,6 +274,10 @@ func runSourceLowLevelHookThread(
 	var shield *returnCursorShield
 	if len(shields) != 0 {
 		shield = shields[0]
+		shield.loginContext = nil
+		if sourceLoginScope(ctx) != nil {
+			shield.loginContext = ctx
+		}
 		shield.open()
 		defer func() { resultErr = errors.Join(resultErr, shield.close()) }()
 	}

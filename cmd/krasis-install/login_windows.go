@@ -34,7 +34,7 @@ func runLoginConfiguration(args []string, out io.Writer, configure func(context.
 			code, state = 5, "configuration_unconfirmed"
 		}
 		if err == nil {
-			code, state = 0, "prepared_runtime_pending"
+			code, state = 0, "configured"
 			if args[0] == "--disable-login" {
 				state = "disabled"
 			}

@@ -141,6 +141,15 @@ func launchLoginConnection(ctx context.Context, installation *Installation, sess
 // SYSTEM session-0 caller, or worker without the genuine SCM pipe cannot call
 // run. The callback must join input and network cleanup before returning.
 func RunInstalledLoginWorker(ctx context.Context, installation *Installation, run func(context.Context, uint32, [32]byte) error) (result error) {
+	if run == nil {
+		return ErrAuthority
+	}
+	return runInstalledLoginWorker(ctx, installation, func(lifetime context.Context, session uint32, profile [32]byte, _ func() error) error {
+		return run(lifetime, session, profile)
+	})
+}
+
+func runInstalledLoginWorker(ctx context.Context, installation *Installation, run func(context.Context, uint32, [32]byte, func() error) error) (result error) {
 	if ctx == nil || ctx.Err() != nil || installation == nil || run == nil {
 		return ErrAuthority
 	}
@@ -178,6 +187,6 @@ func RunInstalledLoginWorker(ctx context.Context, installation *Installation, ru
 		return ErrRecovery
 	}
 	return serveLoginControl(ctx, control, binding, func() error { return proof.check(false) }, func(lifetime context.Context) error {
-		return run(lifetime, binding.session, binding.profile)
+		return run(lifetime, binding.session, binding.profile, func() error { return proof.check(false) })
 	})
 }

@@ -4,12 +4,14 @@
 
 `krasis-install --prepare-login PEER`와 `--disable-login`은 JSON
 `schemaVersion:krasis.login-configuration-result/v1`, `code`, `state`,
-`active:false`를 반환한다. 이 빌드의 로그인 전 실행 경로는 아직 미연결이다.
+`active:false`를 반환한다. `configured`는 보호된 승인 설정의 저장 결과이며
+현재 로그인 전 연결의 실행·접속 결과가 아니다. g261부터 설치된 서비스가
+승인된 설정과 로그인 전 물리 콘솔을 관측하면 제한된 연결 worker를 시작한다.
 사용자 이름·SID·경로·개인키·원본 오류는 출력하지 않는다.
 
 | 종료 코드 | state | 의미 |
 |---|---|---|
-| 0 | prepared_runtime_pending | 보호된 설정 저장·재검증 완료, 로그인 전 연결은 아직 비활성 |
+| 0 | configured | 보호된 설정 저장·재검증 완료, 서비스가 로그인 전 콘솔에서 실행할 수 있음 |
 | 0 | disabled | 설정 제거·부재 확인 |
 | 2 | invalid_arguments | 잘못된 인자, 작업 미실행 |
 | 3 | configuration_failed | 준비·해제 작업 실패 |
