@@ -36,7 +36,7 @@ func (o *Operations) maintainUpdates(ctx context.Context, identities *productide
 				if workers[key] != nil {
 					continue
 				}
-				run, cancel := context.WithDeadline(ctx, prepared.deadline)
+				run, cancel := productConnectionContext(ctx, prepared.deadline)
 				workers[key] = cancel
 				o.runUpdates(run, p.Alias, prepared, trust)
 			}

@@ -267,8 +267,8 @@ func TestCredentialCLIInspectionRenewalAndGuards(t *testing.T) {
 	}
 	// Expiry is simulated at the agent clock; no wall-clock waiting is required.
 	node.operations.now = func() time.Time { return old.Leaf.NotAfter }
-	if expired := run(productcli.ExitOK, "credential", "show", "LISTENER"); expired.Info == nil || !expired.Info.Expired {
-		t.Fatal("expiry not visible")
+	if live := run(productcli.ExitOK, "credential", "show", "LISTENER"); live.Info == nil || live.Info.Expired || !live.Info.AutomaticRenewal || !live.Info.NotAfter.After(old.Leaf.NotAfter) {
+		t.Fatal("automatic certificate renewal not visible")
 	}
 	renewed := run(productcli.ExitOK, "credential", "renew", "LISTENER", peer.CertificateSHA256)
 	if renewed.Code != "credential_renewed_repair_required" || renewed.Info == nil || renewed.Info.Fingerprint == peer.CertificateSHA256 {
@@ -374,12 +374,12 @@ func productRenewalFlow(t *testing.T, both, allowInbound bool) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	source, err := agent.NewListenSource("127.0.0.1:0", serverConfig.tls)
+	source, err := agent.NewListenSource("127.0.0.1:0", serverConfig.tls, serverConfig.anchor)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer source.Close()
-	dial, err := agent.NewDialSource(source.Address(), clientConfig.tls, time.Second)
+	dial, err := agent.NewDialSource(source.Address(), clientConfig.tls, time.Second, clientConfig.anchor)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -487,13 +487,21 @@ func productRenewalFlow(t *testing.T, both, allowInbound bool) {
 	defer stopRenewal()
 	renewalServer := make(chan error, 1)
 	go func() {
-		actual, err := transport.AuthenticatePeerContext(renewalContext, tls.Server(left, serverConfig.tls))
+		connection, err := transport.NewPeerConnection(renewalContext, tls.Server(left, serverConfig.tls), serverConfig.anchor)
+		var actual transport.AuthenticatedPeerContext
+		if err == nil {
+			actual, err = connection.AuthenticatedPeer()
+		}
 		if err == nil && actual != serverConfig.peer {
 			err = errors.New("wrong renewed connector")
 		}
 		renewalServer <- err
 	}()
-	actual, renewedErr := transport.AuthenticatePeerContext(renewalContext, tls.Client(right, clientConfig.tls))
+	renewedConnection, renewedErr := transport.NewPeerConnection(renewalContext, tls.Client(right, clientConfig.tls), clientConfig.anchor)
+	var actual transport.AuthenticatedPeerContext
+	if renewedErr == nil {
+		actual, renewedErr = renewedConnection.AuthenticatedPeer()
+	}
 	serverErr := <-renewalServer
 	if renewedErr != nil || serverErr != nil || actual != clientConfig.peer {
 		t.Fatalf("renewed TLS: client=%v server=%v", renewedErr, serverErr)

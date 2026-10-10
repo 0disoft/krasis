@@ -59,6 +59,10 @@ func ResolveOwnerAppData(owner string) (string, error) {
 }
 
 func readLive(owner, base, alias, fingerprint string, now time.Time) (Prepared, error) {
+	return readLivePolicy(owner, base, alias, fingerprint, now, false)
+}
+
+func readLivePolicy(owner, base, alias, fingerprint string, now time.Time, persistent bool) (Prepared, error) {
 	settings, resume, err := appsettings.ReadOwnerStartup(base, owner)
 	if err != nil {
 		return Prepared{}, ErrGrant
@@ -66,7 +70,11 @@ func readLive(owner, base, alias, fingerprint string, now time.Time) (Prepared, 
 	if !settings.StartAtLogin || resume.ManualStop || resume.Alias != alias || resume.Fingerprint != fingerprint {
 		return Prepared{}, ErrSuspended
 	}
-	peer, profile, remote, err := truststore.ReadOwnerConnection(base, owner, alias, fingerprint, now)
+	readPeer := truststore.ReadOwnerConnection
+	if persistent {
+		readPeer = truststore.ReadOwnerKeyConnection
+	}
+	peer, profile, remote, err := readPeer(base, owner, alias, fingerprint, now)
 	if err != nil {
 		return Prepared{}, ErrGrant
 	}
@@ -74,13 +82,20 @@ func readLive(owner, base, alias, fingerprint string, now time.Time) (Prepared, 
 	if peer.Role == transport.AuthenticatedPeerListener {
 		role = transport.AuthenticatedPeerConnector
 	}
-	identity, local, err := productidentity.ReadOwnerTransport(base, owner, role, now)
+	readLocal := productidentity.ReadOwnerTransport
+	if persistent {
+		readLocal = productidentity.ReadOwnerTransportAnchor
+	}
+	identity, local, err := readLocal(base, owner, role, now)
 	if err != nil {
 		return Prepared{}, ErrGrant
 	}
 	expires := remote.NotAfter
 	if local.Leaf.NotAfter.Before(expires) {
 		expires = local.Leaf.NotAfter
+	}
+	if persistent {
+		expires = time.Time{}
 	}
 	return Prepared{Profile: profile, Peer: peer, Identity: identity, Local: local, Remote: remote, ExpiresAt: expires}, nil
 }
@@ -110,11 +125,11 @@ func PrepareCurrentGrant(alias string, now time.Time) (Grant, error) {
 	if err != nil || resume.ManualStop || resume.Alias != alias || resume.Fingerprint == "" {
 		return Grant{}, ErrSuspended
 	}
-	live, err := readLive(owner, base, alias, resume.Fingerprint, now)
+	live, err := readLivePolicy(owner, base, alias, resume.Fingerprint, now, true)
 	if err != nil {
 		return Grant{}, err
 	}
-	local, err := transport.AuthenticatedPeerFromCertificate(live.Local.Leaf)
+	localKey, err := transport.ProductKeyFingerprint(live.Local.Leaf)
 	if err != nil {
 		return Grant{}, ErrGrant
 	}
@@ -122,9 +137,9 @@ func PrepareCurrentGrant(alias string, now time.Time) (Grant, error) {
 	if _, err := rand.Read(id[:]); err != nil {
 		return Grant{}, ErrGrant
 	}
-	g := Grant{Schema: GrantSchema, ID: hex.EncodeToString(id[:]), Owner: owner, Alias: alias, Peer: resume.Fingerprint,
-		Role: live.Peer.Role, Identity: live.Identity.Fingerprint, LocalTransport: local.CertificateSHA256,
-		AllowInbound: live.Peer.AllowInboundControl, CreatedAt: now.UTC(), ExpiresAt: live.ExpiresAt}
+	g := Grant{Schema: PersistentGrantSchema, ID: hex.EncodeToString(id[:]), Owner: owner, Alias: alias, Peer: resume.Fingerprint,
+		Role: live.Peer.Role, Identity: live.Identity.Fingerprint, LocalTransport: localKey,
+		AllowInbound: live.Peer.AllowInboundControl, CreatedAt: now.UTC()}
 	return g, g.Validate(now)
 }
 
@@ -145,12 +160,16 @@ func readGrantConnectionAt(g Grant, base string, now time.Time) (Prepared, error
 	if g.Validate(now) != nil {
 		return Prepared{}, ErrGrant
 	}
-	live, err := readLive(g.Owner, base, g.Alias, g.Peer, now)
+	live, err := readLivePolicy(g.Owner, base, g.Alias, g.Peer, now, g.Schema == PersistentGrantSchema)
 	if err != nil {
 		return Prepared{}, err
 	}
 	actual, err := transport.AuthenticatedPeerFromCertificate(live.Local.Leaf)
-	if err != nil || live.Peer.Role != g.Role || live.Identity.Fingerprint != g.Identity || actual.CertificateSHA256 != g.LocalTransport || live.ExpiresAt.Before(g.ExpiresAt) {
+	localPin := actual.CertificateSHA256
+	if g.Schema == PersistentGrantSchema {
+		localPin, err = transport.ProductKeyFingerprint(live.Local.Leaf)
+	}
+	if err != nil || live.Peer.Role != g.Role || live.Identity.Fingerprint != g.Identity || localPin != g.LocalTransport || live.ExpiresAt.Before(g.ExpiresAt) {
 		return Prepared{}, ErrGrant
 	}
 	live.Peer.AllowInboundControl = g.AllowInbound && live.Peer.AllowInboundControl

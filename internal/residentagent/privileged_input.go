@@ -81,7 +81,7 @@ func (input *privilegedLeaseInput) open(ctx context.Context, identity applicatio
 		return errPrivilegedInput
 	}
 	expires := now.Add(55 * time.Minute)
-	if input.expires.Before(expires) {
+	if !input.expires.IsZero() && input.expires.Before(expires) {
 		expires = input.expires
 	}
 	if !expires.After(now) {

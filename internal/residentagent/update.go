@@ -163,7 +163,7 @@ func (o *Operations) runUpdates(ctx context.Context, alias string, prepared prod
 		return
 	}
 	o.updates.Start(ctx, prepared.profile.Address, prepared.peer.CertificateSHA256, string(prepared.peer.Role) == "CONNECTOR", prepared.tls, func() bool {
-		_, err := trust.PeerCertificate(prepared.peer, time.Now())
+		_, err := trust.PeerKeyAnchor(prepared.peer, time.Now())
 		profile, profileErr := trust.Connection(alias)
 		return err == nil && profileErr == nil && profile.Address == prepared.profile.Address && profile.Fingerprint == prepared.profile.Fingerprint && o.updateAuthorized(ctx, alias, prepared.peer.CertificateSHA256)
 	})

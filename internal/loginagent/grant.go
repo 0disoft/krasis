@@ -16,6 +16,7 @@ import (
 )
 
 const GrantSchema = "krasis.login-grant/v1"
+const PersistentGrantSchema = "krasis.login-grant/v2"
 
 var (
 	ErrGrant     = errors.New("login grant is not authorized")
@@ -36,15 +37,21 @@ type Grant struct {
 	LocalTransport string                          `json:"localTransportFingerprint"`
 	AllowInbound   bool                            `json:"allowInboundControl"`
 	CreatedAt      time.Time                       `json:"createdAt"`
-	ExpiresAt      time.Time                       `json:"expiresAt"`
+	ExpiresAt      time.Time                       `json:"expiresAt,omitzero"`
 }
 
 func (g Grant) Validate(now time.Time) error {
 	peer := truststore.PeerRecord{Fingerprint: g.Peer, Role: g.Role, Alias: g.Alias, CreatedAt: g.CreatedAt}
-	if now.IsZero() || g.Schema != GrantSchema || !accountSID(g.Owner) || peer.Validate() != nil ||
+	if now.IsZero() || (g.Schema != GrantSchema && g.Schema != PersistentGrantSchema) || !accountSID(g.Owner) || peer.Validate() != nil ||
 		!pin(g.ID) || !pin(g.Peer) || !pin(g.Identity) || !pin(g.LocalTransport) ||
-		g.CreatedAt.IsZero() || g.CreatedAt.After(now) || !g.ExpiresAt.After(g.CreatedAt) || !now.Before(g.ExpiresAt) ||
-		g.ExpiresAt.Sub(g.CreatedAt) > 30*24*time.Hour {
+		g.CreatedAt.IsZero() || g.CreatedAt.After(now) {
+		return ErrGrant
+	}
+	if g.Schema == PersistentGrantSchema {
+		if !g.ExpiresAt.IsZero() {
+			return ErrGrant
+		}
+	} else if !g.ExpiresAt.After(g.CreatedAt) || !now.Before(g.ExpiresAt) || g.ExpiresAt.Sub(g.CreatedAt) > 30*24*time.Hour {
 		return ErrGrant
 	}
 	return nil
@@ -123,7 +130,14 @@ func DecodeGrant(data []byte, now time.Time) (Grant, error) {
 	d = json.NewDecoder(bytes.NewReader(data))
 	d.DisallowUnknownFields()
 	var g Grant
-	if d.Decode(&g) != nil || len(seen) != 11 || g.Validate(now) != nil {
+	if d.Decode(&g) != nil || g.Validate(now) != nil {
+		return Grant{}, ErrGrant
+	}
+	wantFields := 11
+	if g.Schema == PersistentGrantSchema {
+		wantFields = 10
+	}
+	if len(seen) != wantFields {
 		return Grant{}, ErrGrant
 	}
 	return g, nil

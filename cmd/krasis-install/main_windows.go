@@ -45,7 +45,7 @@ func runDetailed(args []string, output io.Writer, load func() (installerPayload,
 	var diagnostic *installationdiag.Summary
 	var diagnosticSaved *bool
 	if len(args) == 1 && args[0] == "--help" {
-		code, state = 0, "usage: krasis-install.exe --install | --remove | --prepare-login PEER | --disable-login (login runtime pending)"
+		code, state = 0, "usage: krasis-install.exe --install | --remove | --prepare-login PEER | --disable-login (login approval persists until disabled)"
 	} else if len(args) == 1 && (args[0] == "--install" || args[0] == "--remove") {
 		code, state = 3, "installation_denied"
 		payload, err := load()

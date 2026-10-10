@@ -3,6 +3,7 @@ package residentagent
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"net"
 	"time"
@@ -20,6 +21,7 @@ type boundedProductDial struct {
 	lastDiscovery time.Time
 	fingerprint   string
 	tlsConfig     *tls.Config
+	anchor        *x509.Certificate
 }
 
 func (source *boundedProductDial) event(code string) {
@@ -41,7 +43,11 @@ func (source *boundedProductDial) Next(ctx context.Context) (agent.Connection, e
 	dial := func(address string, timeout time.Duration) (agent.Connection, error) {
 		attempt, stop := context.WithTimeout(bounded, timeout)
 		defer stop()
-		d, err := agent.NewDialSource(address, source.tlsConfig, timeout)
+		var anchors []*x509.Certificate
+		if source.anchor != nil {
+			anchors = []*x509.Certificate{source.anchor}
+		}
+		d, err := agent.NewDialSource(address, source.tlsConfig, timeout, anchors...)
 		if err != nil {
 			return nil, err
 		}

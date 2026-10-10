@@ -33,11 +33,13 @@ var ErrTransportFingerprintChanged = errors.New("transport fingerprint changed")
 
 // TransportInfo contains only public metadata, never certificate or key bytes.
 type TransportInfo struct {
-	Fingerprint string                          `json:"fingerprint"`
-	Role        transport.AuthenticatedPeerRole `json:"role"`
-	NotBefore   time.Time                       `json:"notBefore"`
-	NotAfter    time.Time                       `json:"notAfter"`
-	Expired     bool                            `json:"expired"`
+	Fingerprint      string                          `json:"fingerprint"`
+	Role             transport.AuthenticatedPeerRole `json:"role"`
+	NotBefore        time.Time                       `json:"notBefore"`
+	NotAfter         time.Time                       `json:"notAfter"`
+	Expired          bool                            `json:"expired"`
+	AutomaticRenewal bool                            `json:"automaticRenewal,omitempty"`
+	KeyFingerprint   string                          `json:"keyFingerprint,omitempty"`
 }
 
 func (store *Store) InspectTransport(role transport.AuthenticatedPeerRole, now time.Time) (TransportInfo, error) {

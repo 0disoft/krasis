@@ -98,7 +98,7 @@ func TestProductDiscoveryAuthenticatesBeforeSavingEndpoint(t *testing.T) {
 				}
 				return client.pairing.trust.Connection("server")
 			}
-			source := &boundedProductDial{fingerprint: serverPeer.CertificateSHA256, tlsConfig: prepared.tls, load: load, discover: func(context.Context) ([]string, error) { return []string{listener.Addr().String()}, nil }, save: func(before truststore.ConnectionProfile, address string) error {
+			source := &boundedProductDial{fingerprint: serverPeer.CertificateSHA256, tlsConfig: prepared.tls, anchor: prepared.anchor, load: load, discover: func(context.Context) ([]string, error) { return []string{listener.Addr().String()}, nil }, save: func(before truststore.ConnectionProfile, address string) error {
 				saved++
 				_, err := client.pairing.trust.SetConnectionAddress("server", before.Fingerprint, before.Address, address)
 				return err

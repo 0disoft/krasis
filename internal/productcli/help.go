@@ -48,7 +48,7 @@ func commandHelp() helpResult {
 		{"disconnect", "Disconnect the active peer", true, true},
 		{"safe-stop", "Stop agent and active session", true, true},
 		{"connection set ALIAS IP:PORT LEFT|RIGHT", "Save peer address and exit edge", true, true},
-		{"credential renew LISTENER|CONNECTOR EXPECTED_FINGERPRINT", "Renew local credential", true, true},
+		{"credential renew LISTENER|CONNECTOR EXPECTED_FINGERPRINT", "Replace the role key; requires pairing again (certificates renew automatically)", true, true},
 		{"clipboard on ALIAS", "Share future clipboard content", true, true},
 		{"clipboard off ALIAS", "Stop clipboard sharing", true, true},
 		{"update send ALIAS", "Queue current bundle to a trusted peer", true, true},

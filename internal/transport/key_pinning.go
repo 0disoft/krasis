@@ -27,7 +27,7 @@ func ValidateProductKeyAnchor(c *x509.Certificate) error {
 	if c == nil || len(c.Raw) == 0 || c.IsCA || c.KeyUsage != x509.KeyUsageDigitalSignature ||
 		!c.BasicConstraintsValid || c.NotBefore.IsZero() || !c.NotAfter.After(c.NotBefore) ||
 		c.NotAfter.Sub(c.NotBefore) > ProductCertificateLifetime+time.Minute ||
-		len(c.DNSNames) != 1 || c.DNSNames[0] != "krasis.invalid" || len(c.ExtKeyUsage) != 1 {
+		len(c.DNSNames) != 1 || c.DNSNames[0] != "krasis.invalid" || len(c.ExtKeyUsage) != 1 || len(c.UnhandledCriticalExtensions) != 0 {
 		return ErrPeerAuthentication
 	}
 	if _, ok := c.PublicKey.(ed25519.PublicKey); !ok {

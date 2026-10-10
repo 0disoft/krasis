@@ -20,6 +20,23 @@ type testPrivilegedClient struct {
 	observe func(string)
 }
 
+func TestRenewableConnectionStillUsesBoundedInputLease(t *testing.T) {
+	now := time.Now()
+	client := &testPrivilegedClient{}
+	var expires time.Time
+	input := &privilegedLeaseInput{connect: func(_ context.Context, _ application.LeaseIdentity, end time.Time) (privilegedClient, error) {
+		expires = end
+		return client, nil
+	}}
+	if err := input.open(context.Background(), application.LeaseIdentity{SessionID: "s", LeaseID: "l", Epoch: "e"}, now); err != nil {
+		t.Fatal(err)
+	}
+	defer input.close(nil)
+	if !expires.Equal(now.Add(55 * time.Minute)) {
+		t.Fatal("persistent consent made input lease unbounded", expires)
+	}
+}
+
 func (p *testPrivilegedClient) SetTimingObserver(emit func(string)) { p.observe = emit }
 
 func TestPrivilegedInputRoutesTimingThroughFixedEventSink(t *testing.T) {

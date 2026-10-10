@@ -77,3 +77,24 @@ func (store *Store) OpenTransportAnchor(role transport.AuthenticatedPeerRole) (t
 	}
 	return validateTransportMaterial(doc, identity.Public(), role)
 }
+
+func (store *Store) InspectRenewableTransport(role transport.AuthenticatedPeerRole, now time.Time) (TransportInfo, error) {
+	anchor, err := store.OpenTransportAnchor(role)
+	if err != nil {
+		return TransportInfo{}, err
+	}
+	live, err := RenewableTransport(anchor, now)
+	if err != nil {
+		return TransportInfo{}, err
+	}
+	paired, err := transport.AuthenticatedPeerFromCertificate(anchor.Leaf)
+	if err != nil {
+		return TransportInfo{}, err
+	}
+	key, err := transport.ProductKeyFingerprint(anchor.Leaf)
+	if err != nil {
+		return TransportInfo{}, err
+	}
+	return TransportInfo{Fingerprint: paired.CertificateSHA256, Role: role, NotBefore: live.Leaf.NotBefore, NotAfter: live.Leaf.NotAfter,
+		Expired: !now.Before(live.Leaf.NotAfter), AutomaticRenewal: true, KeyFingerprint: key}, nil
+}

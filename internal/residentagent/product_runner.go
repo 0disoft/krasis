@@ -1,6 +1,7 @@
 package residentagent
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -28,6 +29,7 @@ type productConnection struct {
 	peer     transport.AuthenticatedPeerContext
 	tls      *tls.Config
 	deadline time.Time
+	anchor   *x509.Certificate
 }
 
 func prepareProductConnection(identities *productidentity.Store, trust *truststore.Store, alias string, selected ...string) (productConnection, error) {
@@ -48,7 +50,7 @@ func prepareProductConnection(identities *productidentity.Store, trust *truststo
 			peer = transport.AuthenticatedPeerContext{CertificateSHA256: record.Fingerprint, Role: record.Role}
 		}
 	}
-	leaf, err := trust.PeerCertificate(peer, time.Now())
+	leaf, err := trust.PeerKeyAnchor(peer, time.Now())
 	if err != nil {
 		return productConnection{}, err
 	}
@@ -56,39 +58,43 @@ func prepareProductConnection(identities *productidentity.Store, trust *truststo
 	if peer.Role == transport.AuthenticatedPeerListener {
 		role = transport.AuthenticatedPeerConnector
 	}
-	identity, err := identities.OpenTransport(role, time.Now())
-	if err != nil {
-		return productConnection{}, err
-	}
-	roots := x509.NewCertPool()
-	roots.AddCert(leaf)
-	var config *tls.Config
-	if role == transport.AuthenticatedPeerListener {
-		config, err = transport.NewServerTLSConfig(identity, roots)
-	} else {
-		config, err = transport.NewClientTLSConfig(identity, roots, productidentity.TransportServerName)
+	identity, err := identities.OpenTransportAnchor(role)
+	if errors.Is(err, os.ErrNotExist) {
+		identity, err = identities.OpenTransport(role, time.Now())
 	}
 	if err != nil {
 		return productConnection{}, err
 	}
-	config.SessionTicketsDisabled = true
+	localKey, err := transport.ProductKeyFingerprint(identity.Leaf)
+	if err != nil {
+		return productConnection{}, err
+	}
+	local := func() (tls.Certificate, error) {
+		current, err := identities.OpenTransportAnchor(role)
+		if err != nil {
+			return tls.Certificate{}, err
+		}
+		key, err := transport.ProductKeyFingerprint(current.Leaf)
+		if err != nil || key != localKey {
+			return tls.Certificate{}, errors.New("local paired key changed")
+		}
+		return productidentity.RenewableTransport(current, time.Now())
+	}
+	config, err := transport.NewProductKeyTLSConfig(local, leaf, role == transport.AuthenticatedPeerListener, func() error {
+		current, err := trust.PeerKeyAnchor(peer, time.Now())
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(current.Raw, leaf.Raw) {
+			return errors.New("paired key anchor changed")
+		}
+		return nil
+	})
+	if err != nil {
+		return productConnection{}, err
+	}
 	transport.EnableInputPreparation(config)
-	config.VerifyConnection = func(state tls.ConnectionState) error {
-		if len(state.PeerCertificates) != 1 {
-			return errors.New("unexpected peer chain")
-		}
-		actual, err := transport.AuthenticatedPeerFromCertificate(state.PeerCertificates[0])
-		if err != nil || actual != peer {
-			return errors.New("wrong product peer")
-		}
-		_, err = trust.PeerCertificate(peer, time.Now())
-		return err
-	}
-	deadline := leaf.NotAfter
-	if identity.Leaf.NotAfter.Before(deadline) {
-		deadline = identity.Leaf.NotAfter
-	}
-	return productConnection{profile: profile, peer: peer, tls: config, deadline: deadline}, nil
+	return productConnection{profile: profile, peer: peer, tls: config, anchor: leaf}, nil
 }
 
 func productRunner(identities *productidentity.Store, trust *truststore.Store, log *productlog.Logger, auxiliary ...func(context.Context, string, productConnection)) SessionRunner {
@@ -105,7 +111,7 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 		if diagnostics.Display.MonitorCount != 1 {
 			return errors.New("one active display is required")
 		}
-		deadlineCtx, cancel := context.WithDeadline(parent, prepared.deadline)
+		deadlineCtx, cancel := productConnectionContext(parent, prepared.deadline)
 		defer cancel()
 		ctx, cancelCause := context.WithCancelCause(deadlineCtx)
 		defer cancelCause(context.Canceled)
@@ -154,12 +160,13 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 			source, err = newProductListen(ctx, prepared.profile, prepared.tls, func() (truststore.ConnectionProfile, error) { return trust.Connection(alias) }, func(p truststore.ConnectionProfile, address string) error {
 				_, err := trust.SetConnectionAddress(alias, p.Fingerprint, p.Address, address)
 				return err
-			}, log.Event)
+			}, log.Event, prepared.anchor)
 		} else {
 			source = &boundedProductDial{
 				load:        func() (truststore.ConnectionProfile, error) { return trust.Connection(alias) },
 				fingerprint: prepared.peer.CertificateSHA256,
 				tlsConfig:   prepared.tls,
+				anchor:      prepared.anchor,
 				discover:    peerdiscovery.Discover,
 				save: func(p truststore.ConnectionProfile, address string) error {
 					_, err := trust.SetConnectionAddress(alias, p.Fingerprint, p.Address, address)
@@ -197,7 +204,7 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 			ticker := time.NewTicker(time.Second)
 			defer ticker.Stop()
 			monitorProductSessionObserved(ctx, ticker.C, guard.Done(), func(trace *truststore.ReadTrace) error {
-				_, checkErr := trust.PeerCertificateTraced(prepared.peer, time.Now(), trace)
+				_, checkErr := trust.PeerKeyAnchorTraced(prepared.peer, time.Now(), trace)
 				return checkErr
 			}, cancel, func(code string) {
 				log.Event(code)
@@ -287,7 +294,7 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 type productAuthorizer struct{ trust *truststore.Store }
 
 func (authorizer productAuthorizer) AuthorizeLease(ctx context.Context, peer transport.AuthenticatedPeerContext, session, epoch string, now time.Time) (string, bool, error) {
-	if _, err := authorizer.trust.PeerCertificate(peer, now); err != nil {
+	if _, err := authorizer.trust.PeerKeyAnchor(peer, now); err != nil {
 		return "", false, err
 	}
 	document, err := authorizer.trust.List()

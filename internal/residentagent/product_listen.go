@@ -3,6 +3,7 @@ package residentagent
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"io"
 	"net"
@@ -93,6 +94,7 @@ type productListen struct {
 	address, fingerprint string
 	index                int
 	tls                  *tls.Config
+	anchors              []*x509.Certificate
 	load                 func() (truststore.ConnectionProfile, error)
 	save                 func(truststore.ConnectionProfile, string) error
 	resolve              func(string, int) (string, error)
@@ -104,13 +106,14 @@ type productListen struct {
 	invalidated          bool
 }
 
-func newProductListen(ctx context.Context, p truststore.ConnectionProfile, config *tls.Config, load func() (truststore.ConnectionProfile, error), save func(truststore.ConnectionProfile, string) error, observe func(string)) (*productListen, error) {
-	listener, err := agent.NewListenSource(p.Address, config)
+func newProductListen(ctx context.Context, p truststore.ConnectionProfile, config *tls.Config, load func() (truststore.ConnectionProfile, error), save func(truststore.ConnectionProfile, string) error, observe func(string), anchors ...*x509.Certificate) (*productListen, error) {
+	listener, err := agent.NewListenSource(p.Address, config, anchors...)
 	if err != nil {
 		return nil, err
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	s := &productListen{listener: listener, address: p.Address, fingerprint: p.Fingerprint, index: interfaceForAddress(p.Address), tls: config, load: load, save: save, resolve: resolveInterfaceAddress, observe: observe, ctx: ctx, cancel: cancel, done: make(chan struct{})}
+	s.anchors = anchors
 	s.installObserver(listener)
 	s.advertisement, err = peerdiscovery.Advertise(ctx, p.Address)
 	if err != nil {
@@ -186,7 +189,7 @@ func (s *productListen) Next(ctx context.Context) (agent.Connection, error) {
 		if s.invalidated {
 			_ = s.listener.Close()
 		}
-		listener, err := agent.NewListenSource(address, s.tls)
+		listener, err := agent.NewListenSource(address, s.tls, s.anchors...)
 		if err != nil {
 			s.mu.Unlock()
 			return nil, err

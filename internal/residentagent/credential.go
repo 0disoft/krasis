@@ -39,7 +39,7 @@ func (operations *Operations) Credential(ctx context.Context, request localapi.C
 	if request.Action == "RENEW" {
 		info, err = operations.credentials.RenewTransport(request.Role, request.ExpectedFingerprint, operations.now())
 	} else {
-		info, err = operations.credentials.InspectTransport(request.Role, operations.now())
+		info, err = operations.credentials.InspectRenewableTransport(request.Role, operations.now())
 	}
 	if err != nil {
 		switch {

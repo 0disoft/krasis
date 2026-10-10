@@ -17,7 +17,7 @@ func (a productAuthorizer) AuthorizePreparation(ctx context.Context, p transport
 	if ctx == nil || ctx.Err() != nil {
 		return false, errPrivilegedInput
 	}
-	if _, err := a.trust.PeerCertificate(p, now); err != nil {
+	if _, err := a.trust.PeerKeyAnchor(p, now); err != nil {
 		return false, err
 	}
 	document, err := a.trust.List()
@@ -65,7 +65,7 @@ func (input *privilegedLeaseInput) prepareIdle(ctx context.Context) (bool, error
 	}
 	lockedAt := time.Now()
 	defer input.mu.Unlock()
-	if input.stopped || input.client != nil || input.prepare == nil || !input.expires.After(time.Now()) || ctx.Err() != nil {
+	if input.stopped || input.client != nil || input.prepare == nil || (!input.expires.IsZero() && !input.expires.After(time.Now())) || ctx.Err() != nil {
 		return false, nil
 	}
 	input.preparationStarted = lockedAt

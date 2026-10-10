@@ -35,7 +35,7 @@ queued edits recheck LOCAL state before calling the native layout writer.
 
 ## Native Windows Workspace
 
-### Connection before Windows sign-in (g262)
+### Connection before Windows sign-in (g263)
 
 After applying this generation's protected-input installation on both PCs,
 confirm their ordinary connection and enable Windows startup in settings.
@@ -51,8 +51,13 @@ protected approval was saved; it does not confirm a current connection.
 The existing automatically started `KrasisInput` service can then own a limited
 connection on the physical Windows sign-in desktop. The GUI starts after sign-in.
 Before sign-in, pairing, clipboard, updates and management APIs are unavailable.
-The approval respects current trust and user settings and expires no later than
-the existing certificates or 30 days. Revoke it with `--disable-login`.
+New g263 approvals persist until disabled; certificates renew automatically with
+the already paired role key. Revocation, a different role/device key, manual
+disconnect and disabled startup still stop this connection. Revoke the approval
+with `--disable-login`. Existing g262 bounded approvals keep their original
+deadline: run `--prepare-login PEER` once after upgrading to opt into the new
+persistent approval. Both PCs need g263 before using renewed certificates.
+No re-pairing or monthly administrator approval is needed for routine renewal.
 
 Physical reboot and sign-in acceptance is still pending. After sign-in the
 service requires confirmed input/network cleanup before admitting a user agent.

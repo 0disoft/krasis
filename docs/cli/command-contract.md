@@ -13,9 +13,17 @@ krasis-install.exe --disable-login
 해제는 만료·손상된 설정에도 사용할 수 있다. 두 명령은 사용자 설정이나
 입력 서비스를 재시작하지 않는다.
 
-현재 로그인 전 runtime은 미연결이므로 준비 성공이 부팅 연결 성공을 뜻하지 않는다.
+g263의 준비는 만료 없는 `krasis.login-grant/v2`를 저장한다. 기존 v1 승인은
+한 번 명시적으로 전환해야 하며 자동 연장하지 않는다. 기존 역할 키로 인증서를
+자동 갱신하고, 신뢰 철회·수동 해제·자동 시작 해제·키 교체를 계속 확인한다.
+실제 재부팅 연결은 별도 검증한다.
 관리 앱에는 아직 이 옵션을 노출하지 않는다. 결과 schema와 종료 코드는
 `output-and-exit-codes.md`가 소유한다.
+
+`credential show`는 `automaticRenewal:true`와 역할 키의 `keyFingerprint`를
+추가로 표시한다. `fingerprint`는 기존 pairing principal이며 notBefore/notAfter는
+현재 제시할 인증서의 유효 기간이다. `credential renew`는 역할 키 교체 명령이므로
+자동 인증서 갱신 목적으로 실행하지 않는다. 키 교체 후에는 재페어링이 필요하다.
 
 ## 제품 CLI `krasis-cli`
 

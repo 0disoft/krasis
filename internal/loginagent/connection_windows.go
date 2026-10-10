@@ -73,6 +73,18 @@ func (p *connectionPolicy) tlsConfig() (*tls.Config, error) {
 	if _, err := p.check(time.Now().UTC()); err != nil {
 		return nil, err
 	}
+	if p.grant.Schema == PersistentGrantSchema {
+		return transport.NewProductKeyTLSConfig(func() (tls.Certificate, error) {
+			live, err := p.check(time.Now().UTC())
+			if err != nil {
+				return tls.Certificate{}, err
+			}
+			return productidentity.RenewableTransport(live.Local, time.Now().UTC())
+		}, p.live.Remote, p.grant.Role == transport.AuthenticatedPeerConnector, func() error {
+			_, err := p.check(time.Now().UTC())
+			return err
+		})
+	}
 	roots := x509.NewCertPool()
 	roots.AddCert(p.live.Remote)
 	var config *tls.Config
@@ -141,15 +153,23 @@ func RunConnection(ctx context.Context, session uint32, profile [32]byte, deps C
 	if err != nil {
 		return err
 	}
-	deadline, cancelDeadline := context.WithDeadline(ctx, live.ExpiresAt)
+	deadline, cancelDeadline := context.WithCancel(ctx)
+	if !live.ExpiresAt.IsZero() {
+		cancelDeadline()
+		deadline, cancelDeadline = context.WithDeadline(ctx, live.ExpiresAt)
+	}
 	defer cancelDeadline()
 	owned, cancel := context.WithCancelCause(deadline)
 	defer cancel(context.Canceled)
 	var source agent.ConnectionSource
+	var anchors []*x509.Certificate
+	if g.Schema == PersistentGrantSchema {
+		anchors = []*x509.Certificate{live.Remote}
+	}
 	if g.Role == transport.AuthenticatedPeerConnector {
-		source, err = agent.NewListenSource(live.Profile.Address, tlsConfig)
+		source, err = agent.NewListenSource(live.Profile.Address, tlsConfig, anchors...)
 	} else {
-		source, err = agent.NewDialSource(live.Profile.Address, tlsConfig, 2*time.Second)
+		source, err = agent.NewDialSource(live.Profile.Address, tlsConfig, 2*time.Second, anchors...)
 	}
 	if err != nil {
 		return err
