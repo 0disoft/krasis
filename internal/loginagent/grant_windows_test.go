@@ -3,6 +3,7 @@
 package loginagent
 
 import (
+	"crypto/tls"
 	"errors"
 	"strings"
 	"testing"
@@ -16,6 +17,11 @@ import (
 )
 
 func liveGrantFixture(t *testing.T) (Grant, string, *truststore.Store, *productidentity.Store) {
+	g, base, trust, store, _ := liveGrantFixtureWithRemote(t)
+	return g, base, trust, store
+}
+
+func liveGrantFixtureWithRemote(t *testing.T) (Grant, string, *truststore.Store, *productidentity.Store, tls.Certificate) {
 	t.Helper()
 	now := time.Now().UTC()
 	base := t.TempDir()
@@ -72,7 +78,7 @@ func liveGrantFixture(t *testing.T) (Grant, string, *truststore.Store, *producti
 	g.Peer = peer.CertificateSHA256
 	g.Identity = identity.Public().Fingerprint
 	g.LocalTransport = localPeer.CertificateSHA256
-	return g, base, trust, store
+	return g, base, trust, store, remote
 }
 
 func TestLiveGrantHonorsManualStopStartupAndRevocation(t *testing.T) {

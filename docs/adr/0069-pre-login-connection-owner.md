@@ -71,8 +71,8 @@ owner는 검증된 기계별 grant 식별자와 로그인 전 콘솔이 모두 �
 
 서비스 전용 `launchLoginConsole`은 고정 설치·SCM 실행 여부·현재 물리 콘솔·
 보호된 승인 기록·원래 사용자 정책을 시작 전과 자식 resume 직전에 다시 읽는다.
-일반 worker는 계속 `--input-worker` / `winsta0\\default`를 사용한다. 로그인 전
-worker는 별도 고정 모드 `--login-worker` / `winsta0\\Winlogon`만 선택할 수 있고
+일반 worker는 계속 `--input-worker` / `winsta0\default`를 사용한다. 로그인 전
+worker는 별도 고정 모드 `--login-worker` / `winsta0\Winlogon`만 선택할 수 있고
 IPC로 실행 경로·명령·데스크톱을 선택할 수 없다. 아직 child entry point와
 서비스 루프에 연결하지 않아 현재 배포에서는 이 모드를 실행하지 않는다.
 
@@ -82,9 +82,29 @@ IPC로 실행 경로·명령·데스크톱을 선택할 수 없다. 아직 child
 핸들 정리가 미확인이면 recovery 오류를 보존한다. `ConsoleWorker.done`은
 Job·프로세스·이미지 pin 정리가 모두 성공한 후에만 닫는다.
 
+## 제한된 연결 runner
+
+`loginagent.RunConnection`은 service-child bootstrap이 제공하는 보호된 grant
+reader와 데스크톱 입력 port만 받는다. 보호된 grant의 전체 선택 지문과 활성
+로그인 전 콘솔을 확인하고, 기존 프로필에서 읽은 단일 상대와 TLS 1.3 mTLS를
+사용한다. handshake마다 상대 인증서·역할·일반 입력 ALPN·현재 grant·프로필을
+검사하며 session ticket 재개는 허용하지 않는다. 양쪽 역할에 맞는 listener/dial
+경로를 선택한다. 주소는 현재 private/loopback 연결 프로필의 검증을 재사용한다.
+
+수동 해제·승인 삭제/미확인·로그인·세션 변경·신뢰 철회·인증서 변경/만료·
+주소/배치/입력 허용 변경은 새 handshake와 lease를 차단한다. 연결 중에는 1초
+정책 관측으로 세션을 취소하고 supervisor의 기존 입력 정리와 listener 종료를
+기다린다. 정책 파일 읽기는 입력 이벤트마다 수행하지 않는다. 화면 크기 변경도
+연결을 중단한다. pairing·clipboard·update·discovery·사용자 관리 API·trust 수정·
+인증서 갱신을 등록하지 않는다. TLS 키를 진단이나 JSON으로 반환하지 않는다.
+
+이 runner는 아직 서비스나 EXE entry point에 연결하지 않았다. 실행 프로세스의
+출처 확인, Winlogon 전용 입력 port, 로그인/충돌 시 입력 정리 확인을 다음
+bootstrap 작업에서 결합해야 하므로 현재 배포 동작과 준비 CLI 상태는 유지한다.
+
 ## 남은 커밋 단위
 
-1. 위 실행 primitive에 child bootstrap과 제한된 mTLS 연결 runner를 연결한다.
+1. 위 실행 primitive와 제한된 mTLS runner를 인증된 child bootstrap으로 연결한다.
    로그인 전에는 페어링·클립보드·업데이트·일반 관리 API를 제공하지 않는다.
 2. Winlogon 입력 데스크톱에 대한 별도 입력 경로를 검증한다. 기존 Default
    데스크톱 검증이나 WTS 사용자 토큰 검증을 전역적으로 완화하지 않는다.
