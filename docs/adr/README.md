@@ -43,4 +43,6 @@
 - `0036-resident-agent-and-local-api-ownership.md`: single owner, protected local API와 bounded shutdown
 - `0037-product-cli-and-local-api-projection.md`: 제품 CLI, local API projection, config와 exit code
 
+- `0069-pre-login-connection-owner.md`: 로그인 전 서비스 연결의 수명 관리 기반과 단계별 통합 계획
+
 새 결정은 `0000-template.md`를 복사해 다음 번호로 추가한다. 이미 Accepted인 결정의 의미를 바꿀 때는 기존 문서를 조용히 덮어쓰지 말고 새 ADR에서 대체 관계와 migration 영향을 기록한다.
