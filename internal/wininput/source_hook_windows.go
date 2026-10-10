@@ -18,12 +18,13 @@ import (
 const wmSourceReady = 0x8002
 
 type SourceHook struct {
-	contextMenu   atomic.Uintptr // Foreground owner of the most recent local right-click release.
-	boundaryGuard func() error
-	timing        HookTimingObserver
-	observer      SourcePipelineObserver
-	capture       *sourceWheelCapture
-	returnCursor  returnCursorShield
+	loginAuthorize func() error   // Fixed service-child Winlogon mode only.
+	contextMenu    atomic.Uintptr // Foreground owner of the most recent local right-click release.
+	boundaryGuard  func() error
+	timing         HookTimingObserver
+	observer       SourcePipelineObserver
+	capture        *sourceWheelCapture
+	returnCursor   returnCursorShield
 }
 
 type sourceInputThreadResult struct {
@@ -79,6 +80,15 @@ func (hook *SourceHook) RunWithBoundary(
 	boundary BoundaryObserver,
 	ready func(),
 ) (resultErr error) {
+	if hook != nil && hook.loginAuthorize != nil {
+		return hook.onDesktop(ctx, func(owned context.Context) error {
+			return hook.runWithBoundary(owned, session, boundary, ready)
+		})
+	}
+	return hook.runWithBoundary(ctx, session, boundary, ready)
+}
+
+func (hook *SourceHook) runWithBoundary(ctx context.Context, session *SourceSession, boundary BoundaryObserver, ready func()) (resultErr error) {
 	if hook == nil || hook.capture == nil || session == nil {
 		return errors.New("source hook and session are required")
 	}
@@ -118,18 +128,24 @@ func (hook *SourceHook) RunWithBoundary(
 	readySignals := make(chan struct{}, 3)
 	results := make(chan sourceInputThreadResult, 3)
 	startSourceInputThread(results, "low-level-hook", func() error {
-		return runSourceLowLevelHookThread(runCtx, session, boundary, hook.observer, hook.capture, pointerState, hook.timing, func() {
-			readySignals <- struct{}{}
-		}, &hook.contextMenu, &hook.returnCursor)
+		return hook.onDesktop(runCtx, func(owned context.Context) error {
+			return runSourceLowLevelHookThread(owned, session, boundary, hook.observer, hook.capture, pointerState, hook.timing, func() {
+				readySignals <- struct{}{}
+			}, &hook.contextMenu, &hook.returnCursor)
+		})
 	})
 	startSourceInputThread(results, "raw-mouse", func() error {
-		return runSourceRawMouseThread(runCtx, session, boundary, pointerState, hook.timing, func() {
-			readySignals <- struct{}{}
+		return hook.onDesktop(runCtx, func(owned context.Context) error {
+			return runSourceRawMouseThread(owned, session, boundary, pointerState, hook.timing, func() {
+				readySignals <- struct{}{}
+			})
 		})
 	})
 	startSourceInputThread(results, "wheel-capture", func() error {
-		return hook.capture.runWindow(runCtx, session, func() {
-			readySignals <- struct{}{}
+		return hook.onDesktop(runCtx, func(owned context.Context) error {
+			return hook.capture.runWindow(owned, session, func() {
+				readySignals <- struct{}{}
+			})
 		})
 	})
 
@@ -267,6 +283,10 @@ func runSourceLowLevelHookThread(
 	mapper := &sourceKeyboardMapper{}
 	keyboardCallback := func(code int, wParam uintptr, lParam uintptr) uintptr {
 		if code == hcAction && lParam != 0 {
+			if err := sourceLoginDesktopCheck(ctx); err != nil {
+				session.Abort(err)
+				return callNextHook(code, wParam, lParam)
+			}
 			if err := shield.beforeInput(); err != nil {
 				session.Abort(err)
 				return callNextHook(code, wParam, lParam)
@@ -286,6 +306,10 @@ func runSourceLowLevelHookThread(
 	}
 	mouseCallback := func(code int, wParam uintptr, lParam uintptr) uintptr {
 		if code == hcAction && lParam != 0 {
+			if err := sourceLoginDesktopCheck(ctx); err != nil {
+				session.Abort(err)
+				return callNextHook(code, wParam, lParam)
+			}
 			if err := shield.beforeInput(); err != nil {
 				session.Abort(err)
 				return callNextHook(code, wParam, lParam)
@@ -419,6 +443,9 @@ func runSourceRawMouseThread(
 		return err
 	}
 	visitRawMouse := func(header rawInputHeader, mouse rawMouse) error {
+		if err := sourceLoginDesktopCheck(ctx); err != nil {
+			return err
+		}
 		if timing != nil {
 			timing.ObserveRawInput(time.Now())
 		}

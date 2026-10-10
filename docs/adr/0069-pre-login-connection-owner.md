@@ -157,14 +157,21 @@ release recovery를 수행한다. 비활성화된 desktop의 남은 입력은 Er
 Remaining으로 남기며 Default로 우회하거나 clean handoff로 표시하지 않는다.
 scope 닫기 실패와 callback 실패도 최종 결과에서 보존한다.
 
-이 port는 아직 제품 runtime에 연결하지 않았다. source hook의 각 native
-thread도 Winlogon에 묶고, 인증된 child runner와 service owner에 결합해야 한다.
+`wininput.NewLoginSourceHook`은 별도의 고정 Winlogon 모드다. 시작 관측 thread와
+low-level hook·raw mouse·wheel capture thread 각각을 창/hook 생성 전에
+Winlogon scope에 묶는다. 키·마우스 callback, raw packet, wheel 전달과 capture
+활성화는 현재 thread/desktop을 다시 확인한다. 다른 desktop이면 전달을 중단한다.
+로그인 뒤 비활성 capture를 정리할 때는 소유한 window·touchpad 등록·정확한
+thread attach만 회수하고 이전 foreground 창을 다시 활성화하지 않는다.
+로그인 전에는 사용자 Shell fullscreen COM broker를 시작하지 않는다.
+
+입력 port와 hook은 인증된 child runner와 service owner에 결합해야 한다.
 
 ## 남은 커밋 단위
 
 1. 인증된 child bootstrap에 Winlogon 입력 port와 제한된 mTLS runner를 결합한다.
    로그인 전에는 페어링·클립보드·업데이트·일반 관리 API를 제공하지 않는다.
-2. source hook의 모든 thread를 Winlogon scope에 묶는다. Default나 WTS
+2. 서비스 관측 루프와 일반 입력 handoff gate를 연결한다. Default나 WTS
    사용자 토큰 검증은 전역적으로 완화하지 않는다.
 3. 로그인 전 owner의 정리가 확인된 뒤 사용자 에이전트로 넘긴다. 양쪽 재부팅,
    로그인·로그아웃·잠금·사용자 전환·네트워크 지연과 PIN 입력을 실기기에서 확인한다.

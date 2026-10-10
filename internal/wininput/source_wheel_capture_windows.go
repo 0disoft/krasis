@@ -160,7 +160,8 @@ type sourceWheelCapture struct {
 }
 
 type sourceWheelCaptureRun struct {
-	attachedSource, attachedPeer uint32 // Native owner thread only; retained until detach succeeds.
+	loginContext                 context.Context // Native owner only; nil for ordinary desktop.
+	attachedSource, attachedPeer uint32          // Native owner thread only; retained until detach succeeds.
 	shutdownEvidence             *sourceShutdownEvidence
 	window                       uintptr
 	commands                     chan sourceWheelCaptureCommand
@@ -353,6 +354,9 @@ func (capture *sourceWheelCapture) runWindow(
 		session:            session,
 		observer:           capture.observer,
 		presentationReport: capture.presentationReport,
+	}
+	if sourceLoginScope(ctx) != nil {
+		current.loginContext = ctx
 	}
 	if err := capture.attach(current); err != nil {
 		return err
@@ -573,6 +577,9 @@ func (current *sourceWheelCaptureRun) activateWindow() (activationErr error) {
 }
 
 func (current *sourceWheelCaptureRun) activateWindowProfile(profile context.Context) (activationErr error) {
+	if err := sourceLoginDesktopCheck(current.loginContext); err != nil {
+		return err
+	}
 	if err := current.err(); err != nil {
 		return err
 	}
@@ -722,6 +729,9 @@ func (current *sourceWheelCaptureRun) activateWindowProfile(profile context.Cont
 // Run only on the capture window's owner thread. Inactive windows retain the
 // normal class cursor; no global cursor resource or ShowCursor count is changed.
 func (current *sourceWheelCaptureRun) hideActiveCursor() bool {
+	if sourceLoginDesktopCheck(current.loginContext) != nil {
+		return false
+	}
 	if !current.active.Load() {
 		return false
 	}
@@ -767,6 +777,11 @@ func (current *sourceWheelCaptureRun) deactivateWindow() error {
 }
 
 func (current *sourceWheelCaptureRun) deactivateWindowProfile(profile context.Context) error {
+	if scope := sourceLoginScope(current.loginContext); scope != nil {
+		if err := scope.Do(context.Background(), func() error { return nil }); err != nil {
+			return current.retireLoginCapture()
+		}
+	}
 	wasActive := current.active.Swap(false)
 	wasRegistered := current.registered
 	// Retry only the exact native pair we attached, never a newly discovered owner.
@@ -939,6 +954,10 @@ func (current *sourceWheelCaptureRun) restoreFocusFallbackProfile(profile contex
 }
 
 func (current *sourceWheelCaptureRun) routeWheel(message uint32, wParam uintptr) {
+	if err := sourceLoginDesktopCheck(current.loginContext); err != nil {
+		current.session.Abort(err)
+		return
+	}
 	action, emitted, err := mapWindowMouseWheel(message, wParam)
 	if err != nil {
 		current.session.Abort(err)

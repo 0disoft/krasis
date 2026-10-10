@@ -152,6 +152,9 @@ func markSourceCaptureFullscreen(window uintptr, fullscreen bool) bool {
 }
 
 func (current *sourceWheelCaptureRun) inheritFullscreenPresentation() {
+	if current.loginContext != nil {
+		return
+	} // No user Shell/COM broker before login.
 	if current.fullscreenAttempted && sourceCaptureMarkFullscreen(current.window, false) {
 		current.fullscreenMarked = false
 		current.fullscreenAttempted = false
@@ -173,6 +176,9 @@ func (current *sourceWheelCaptureRun) inheritFullscreenPresentation() {
 }
 
 func (current *sourceWheelCaptureRun) releaseFullscreenPresentation() {
+	if current.loginContext != nil {
+		return
+	}
 	if current.fullscreenAttempted {
 		current.setNormalPresentationHint(true)
 	}
@@ -183,6 +189,9 @@ func (current *sourceWheelCaptureRun) releaseFullscreenPresentation() {
 }
 
 func (current *sourceWheelCaptureRun) setNormalPresentationHint(normal bool) {
+	if current.loginContext != nil {
+		return
+	}
 	started := time.Now()
 	accepted := sourceCaptureNormalHint(current.window, normal)
 	if current.presentationReport != nil {
