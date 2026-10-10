@@ -31,7 +31,7 @@ func runInstalledService(ctx context.Context, installation *Installation, digest
 		return writeServiceRecord(writeCtx, root, record)
 	}
 	return runRecordedService(ctx, record, persist, func(ctx context.Context, ready func() error) error {
-		return runServiceLoop(ctx, installation, ready)
+		return runInstalledLoginService(ctx, installation, ready)
 	})
 }
 

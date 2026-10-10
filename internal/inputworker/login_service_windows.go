@@ -1,0 +1,48 @@
+//go:build windows
+
+package inputworker
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	"github.com/0disoft/krasis/internal/loginagent"
+)
+
+func runInstalledLoginService(ctx context.Context, installation *Installation, ready func() error) (result error) {
+	owner, err := loginagent.New(loginagent.Dependencies{
+		Read: loginagent.ReadConsole,
+		Start: func(lifetime context.Context, session uint32, profile [32]byte) (loginagent.Worker, error) {
+			return launchLoginConnection(lifetime, installation, session, profile)
+		},
+	})
+	if err != nil {
+		return err
+	}
+	// Reserve the genuine first normal pipe before publishing readiness. Keep
+	// it owned through login-child bootstrap and transfer it to the normal loop.
+	pipe, err := makePipe(pipeName)
+	if err != nil {
+		_ = owner.Close()
+		return err
+	}
+	defer func() { result = errors.Join(result, pipe.Close()) }()
+	// Child bootstrap authenticates this exact ready service record, even when
+	// no user agent has connected yet.
+	if ready == nil || ready() != nil {
+		_ = owner.Close()
+		return ErrAuthority
+	}
+	gate := &loginServiceGate{owner: owner, console: loginagent.ReadConsole, selection: func() (loginagent.Selection, error) {
+		now := time.Now().UTC()
+		grant, present, err := ReadLoginGrant(now)
+		if err != nil || !present {
+			return loginagent.Selection{}, err
+		}
+		return grant.Selection(now)
+	}}
+	return runLoginService(ctx, gate, func(lifetime context.Context, admit func(context.Context) error) error {
+		return runServiceLoopWithGate(lifetime, installation, nil, admit, pipe)
+	})
+}

@@ -26,6 +26,16 @@ func AcceptAgent(ctx context.Context, agentDigest [sha256.Size]byte) (*Channel, 
 }
 
 func acceptAgentReady(ctx context.Context, agentDigest [sha256.Size]byte, ready func() error, installation *Installation) (*Channel, error) {
+	return acceptAgentReadyOnPipe(ctx, agentDigest, ready, installation, nil)
+}
+
+func acceptAgentReadyOnPipe(ctx context.Context, agentDigest [sha256.Size]byte, ready func() error, installation *Installation, initial *pipeConn) (*Channel, error) {
+	accepted := false
+	defer func() {
+		if initial != nil && !accepted {
+			_ = initial.Close()
+		}
+	}()
 	if ctx == nil || ctx.Err() != nil || agentDigest == ([sha256.Size]byte{}) {
 		return nil, ErrAuthority
 	}
@@ -40,9 +50,12 @@ func acceptAgentReady(ctx context.Context, agentDigest [sha256.Size]byte, ready 
 	if !allowed {
 		return nil, ErrAuthority
 	}
-	pipe, err := makePipe(pipeName)
-	if err != nil {
-		return nil, ErrAuthority
+	pipe := initial
+	if pipe == nil {
+		pipe, err = makePipe(pipeName)
+		if err != nil {
+			return nil, ErrAuthority
+		}
 	}
 	// Persist readiness only after this service owns the first pipe instance,
 	// and before authenticating or consuming any agent lease/input.
@@ -59,6 +72,7 @@ func acceptAgentReady(ctx context.Context, agentDigest [sha256.Size]byte, ready 
 		_ = pipe.Close()
 		return nil, ErrAuthority
 	}
+	accepted = true
 	return &Channel{stream: pipe, authority: proof}, nil
 }
 

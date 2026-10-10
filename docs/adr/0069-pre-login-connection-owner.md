@@ -123,6 +123,23 @@ kernel client PID가 소유한 자식과 같은지 확인한다. 자식은 어�
 서비스 관측 루프에 연결하지 않았다. Winlogon 입력 port와 사용자 handoff를
 준비한 뒤 결합한다. 현재 일반 입력·설치·실행 중인 앱은 그대로 유지한다.
 
+## 서비스 자동 시작과 사용자 입력 handoff
+
+설치기의 기존 SERVICE_AUTO_START 설정을 유지하며 `runInstalledLoginService`를
+서비스 실행 루프에 연결한다. 서비스는 genuine normal pipe의 첫 인스턴스를
+먼저 소유하고 ready record를 저장한 뒤 login owner를 시작한다. 이 pipe는
+일반 accept 루프에 그대로 넘겨 readiness 저장과 endpoint 소유 사이에 틈을
+만들지 않는다. 기존 설치 이미지·실제 SCM 프로세스·child 인증 검사는 유지한다.
+
+250ms 콘솔/승인 관측과 일반 입력 lease의 admission은 같은 gate에서 직렬화한다.
+일반 agent 인증 이후 user session을 확인하고 pre-login worker의 Stop/Done·
+입력/네트워크/Job 회수를 확인한 뒤 콘솔을 재조회해야 일반 lease를 허용한다.
+관측/승인/start 실패는 로그인 전 실행만 중단하며, 정리 미확인은 일반 lease도
+차단하고 서비스 failed receipt로 이어진다. 서비스 종료도 monitor를 join하고
+owner 정리를 기다린다. 승인 없음은 로그인 전 실행을 허용하지 않는다.
+
+이 서비스 결합의 child EXE 진입점은 다음 단계에서 연결한다.
+
 ## Winlogon 전용 데스크톱 처리
 
 `inputdesktop.RunWinlogon`은 authenticated service-child가 별도로 고른 고정

@@ -82,6 +82,10 @@ func RunInstalledWorker(ctx context.Context, installation *Installation) error {
 }
 
 func runServiceLoop(ctx context.Context, installation *Installation, ready func() error) (result error) {
+	return runServiceLoopWithGate(ctx, installation, ready, nil)
+}
+
+func runServiceLoopWithGate(ctx context.Context, installation *Installation, ready func() error, admit func(context.Context) error, first ...*pipeConn) (result error) {
 	agent, service, err := installation.digests()
 	if err != nil {
 		return ErrAuthority
@@ -95,9 +99,14 @@ func runServiceLoop(ctx context.Context, installation *Installation, ready func(
 		}
 	}()
 	for ctx.Err() == nil {
+		var initial *pipeConn
+		if len(first) != 0 {
+			initial = first[0]
+			first = nil
+		}
 		readyFailed := false
 		var preparationErr error
-		channel, err := acceptAgentReady(ctx, agent, func() error {
+		channel, err := acceptAgentReadyOnPipe(ctx, agent, func() error {
 			if ready != nil && ready() != nil {
 				readyFailed = true
 				return ErrAuthority
@@ -114,7 +123,7 @@ func runServiceLoop(ctx context.Context, installation *Installation, ready func(
 				}
 			}
 			return nil
-		}, installation)
+		}, installation, initial)
 		if errors.Is(preparationErr, ErrRecovery) {
 			return ErrRecovery
 		}
@@ -122,6 +131,15 @@ func runServiceLoop(ctx context.Context, installation *Installation, ready func(
 			return ErrAuthority
 		}
 		if err == nil {
+			if admit != nil {
+				if err = admit(ctx); err != nil {
+					_ = channel.Close()
+					if errors.Is(err, ErrRecovery) {
+						return err
+					}
+					continue
+				}
+			}
 			lease, prepare, leaseErr := receiveAgentRequest(ctx, channel)
 			if leaseErr == nil && prepare {
 				// No lease is created and no agent handle is transferred. A

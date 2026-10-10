@@ -102,6 +102,9 @@ func (o *Owner) Reconcile(ctx context.Context, selection Selection) error {
 	if err := ctx.Err(); err != nil {
 		return errors.Join(err, o.retire())
 	}
+	if !selection.Enabled || selection.Profile == ([32]byte{}) {
+		return o.retire()
+	}
 	if o.done != nil {
 		select {
 		case <-o.done:
@@ -113,9 +116,6 @@ func (o *Owner) Reconcile(ctx context.Context, selection Selection) error {
 			return ErrStart
 		default:
 		}
-	}
-	if !selection.Enabled || selection.Profile == ([32]byte{}) {
-		return o.retire()
 	}
 	console, err := o.deps.Read()
 	if err != nil || console.State == Unknown || console.State > UserSession {
