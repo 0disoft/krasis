@@ -1,5 +1,21 @@
 # 출력과 exit code
 
+## 로그인 전 설정 준비 설치기
+
+`krasis-install --prepare-login PEER`와 `--disable-login`은 JSON
+`schemaVersion:krasis.login-configuration-result/v1`, `code`, `state`,
+`active:false`를 반환한다. 이 빌드의 로그인 전 실행 경로는 아직 미연결이다.
+사용자 이름·SID·경로·개인키·원본 오류는 출력하지 않는다.
+
+| 종료 코드 | state | 의미 |
+|---|---|---|
+| 0 | prepared_runtime_pending | 보호된 설정 저장·재검증 완료, 로그인 전 연결은 아직 비활성 |
+| 0 | disabled | 설정 제거·부재 확인 |
+| 2 | invalid_arguments | 잘못된 인자, 작업 미실행 |
+| 3 | configuration_failed | 준비·해제 작업 실패 |
+| 5 | configuration_unconfirmed | 변경 시도 후 결과·검증·닫기 미확정, 자동 재실행 금지 |
+| 6 | 해당 없음 | JSON 출력 실패, 성공 확인 불가 |
+
 ## 제품 CLI
 
 `app recovery-status --json`은 `krasis.cli.recovery-status/v1`이다. `task`는

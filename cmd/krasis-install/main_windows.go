@@ -15,6 +15,9 @@ import (
 )
 
 func main() {
+	if code, handled := runLoginConfiguration(os.Args[1:], os.Stdout, inputworker.ConfigureLoginGrant, inputworker.RemoveLoginGrant); handled {
+		os.Exit(code)
+	}
 	save := func(s installationdiag.Summary) error {
 		return productlog.SaveInstallation(os.Getenv("LOCALAPPDATA"), s)
 	}
@@ -42,7 +45,7 @@ func runDetailed(args []string, output io.Writer, load func() (installerPayload,
 	var diagnostic *installationdiag.Summary
 	var diagnosticSaved *bool
 	if len(args) == 1 && args[0] == "--help" {
-		code, state = 0, "usage: krasis-install.exe --install | --remove"
+		code, state = 0, "usage: krasis-install.exe --install | --remove | --prepare-login PEER | --disable-login (login runtime pending)"
 	} else if len(args) == 1 && (args[0] == "--install" || args[0] == "--remove") {
 		code, state = 3, "installation_denied"
 		payload, err := load()

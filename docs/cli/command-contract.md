@@ -1,5 +1,22 @@
 # CLI 명령 계약
 
+## 보호 입력 설치기의 로그인 전 설정 준비
+
+```text
+krasis-install.exe --prepare-login PEER
+krasis-install.exe --disable-login
+```
+
+관리자 권한으로 실행한다. 준비는 해당 계정에 이미 저장된 재연결 상대만
+선택하며 보호 입력 설치가 필요하다. 파일·실행 경로·명령·키를 인자로 받지 않는다.
+설치 transaction이 진행 중이거나 미정리이면 준비하지 않는다.
+해제는 만료·손상된 설정에도 사용할 수 있다. 두 명령은 사용자 설정이나
+입력 서비스를 재시작하지 않는다.
+
+현재 로그인 전 runtime은 미연결이므로 준비 성공이 부팅 연결 성공을 뜻하지 않는다.
+관리 앱에는 아직 이 옵션을 노출하지 않는다. 결과 schema와 종료 코드는
+`output-and-exit-codes.md`가 소유한다.
+
 ## 제품 CLI `krasis-cli`
 
 `doctor`는 UI·agent·보호 설치·서비스를 읽기 전용으로 대조한다. agent가 없어도 JSON을
