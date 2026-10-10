@@ -138,12 +138,34 @@ scope 취소, desktop 비활성화와 복원 실패는 기존 scope 규칙대로
 이 API 자체는 입력 권한을 주지 않으며 서비스 인증·peer lease 검증·정리 확인을
 runtime과 결합해야 한다. 실제 Windows 로그인 화면 입력은 아직 시험하지 않았다.
 
+## Winlogon 입력 직렬화와 복구
+
+`inputworker.RunLoginInput`은 인증된 child가 `RunWinlogon`을 열고 제한된
+connection callback에 입력 port를 제공한다. callback은 별도 goroutine에서
+실행하며 모든 key/button·move·wheel·cursor 조회·배치·readback 요청은
+unbuffered mailbox를 통해 같은 데스크톱 소유 thread에서 순서대로 실행한다.
+각 요청의 실행 직전에 scope의 취소·thread·활성 desktop 검사를 수행한다.
+전달 전 취소는 NOT_APPLIED이며 전달 후 취소는 실제 결과를 기다린다. 실행
+중 panic으로 결과가 사라지면 OUTCOME_UNKNOWN이며 재시도 가능한 실패로 바꾸지 않는다.
+
+별도의 pressed journal은 실제 성공 또는 적용 여부 미확인인 press만 보존한다.
+알려진 NOT_APPLIED press는 journal에서 제거하며 소유하지 않은 release는
+native 입력을 보내지 않는다. connection 취소 후 새 press·move·cursor 작업은
+차단하되 소유 key/button release에는 독립 정리 문맥을 허용한다. callback
+종료·panic·Goexit 때도 callback을 join하고 같은 Winlogon scope에서 최대 2초
+release recovery를 수행한다. 비활성화된 desktop의 남은 입력은 ErrRecovery와
+Remaining으로 남기며 Default로 우회하거나 clean handoff로 표시하지 않는다.
+scope 닫기 실패와 callback 실패도 최종 결과에서 보존한다.
+
+이 port는 아직 제품 runtime에 연결하지 않았다. source hook의 각 native
+thread도 Winlogon에 묶고, 인증된 child runner와 service owner에 결합해야 한다.
+
 ## 남은 커밋 단위
 
 1. 인증된 child bootstrap에 Winlogon 입력 port와 제한된 mTLS runner를 결합한다.
    로그인 전에는 페어링·클립보드·업데이트·일반 관리 API를 제공하지 않는다.
-2. Winlogon scope에 모든 입력/cursor 작업을 직렬화하는 port와 눌린 입력
-   복구를 결합한다. Default나 WTS 사용자 토큰 검증은 전역적으로 완화하지 않는다.
+2. source hook의 모든 thread를 Winlogon scope에 묶는다. Default나 WTS
+   사용자 토큰 검증은 전역적으로 완화하지 않는다.
 3. 로그인 전 owner의 정리가 확인된 뒤 사용자 에이전트로 넘긴다. 양쪽 재부팅,
    로그인·로그아웃·잠금·사용자 전환·네트워크 지연과 PIN 입력을 실기기에서 확인한다.
 
