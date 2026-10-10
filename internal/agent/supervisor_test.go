@@ -85,7 +85,7 @@ func TestRunSupervisorRetriesAcquireAndRecoveredSession(t *testing.T) {
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("RunSupervisor() error = %v", err)
 	}
-	if runnerCalls != 1 || len(waits) != 2 || waits[0] != 10*time.Millisecond || waits[1] != 20*time.Millisecond {
+	if runnerCalls != 1 || len(waits) != 2 || waits[0] != 10*time.Millisecond || waits[1] != 10*time.Millisecond {
 		t.Fatalf("runner=%d waits=%v", runnerCalls, waits)
 	}
 	wantStates := []SupervisorState{

@@ -210,6 +210,7 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 	}()
 
 	var attempt uint32
+	var acquireAttempt uint32
 	for {
 		connection, acquireErr := dependencies.Source.Next(ctx)
 		if acquireErr != nil {
@@ -221,16 +222,16 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
-			attempt++
-			delay, err := config.Backoff.Delay(attempt)
+			acquireAttempt++
+			delay, err := config.Backoff.Delay(acquireAttempt)
 			if err != nil {
 				return err
 			}
 			failure := describeAcquisitionFailure(acquireErr)
-			if err := transition(SupervisorAcquireFailed, SupervisorSnapshot{Attempt: attempt, RetryAfter: delay, FailureKind: "acquire", FailureComponent: failure.Component, FailurePhase: failure.Phase, FailureCode: failure.Code}); err != nil {
+			if err := transition(SupervisorAcquireFailed, SupervisorSnapshot{Attempt: acquireAttempt, RetryAfter: delay, FailureKind: "acquire", FailureComponent: failure.Component, FailurePhase: failure.Phase, FailureCode: failure.Code}); err != nil {
 				return err
 			}
-			if err := waitForRetry(ctx, config, attempt, delay, transition); err != nil {
+			if err := waitForRetry(ctx, config, acquireAttempt, delay, transition); err != nil {
 				return err
 			}
 			continue
@@ -238,6 +239,10 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 		if connection == nil {
 			return supervisorExit("nil-connection", errors.New("connection source returned a nil connection"))
 		}
+		// A peer reboot can build up a long offline backoff. Once a connection
+		// is established it must not penalize the first session failure. Keep
+		// repeated brief session failures on their own escalating budget.
+		acquireAttempt = 0
 		if progress, ok := config.Session.LivenessObserver.(interface {
 			ObserveReadConnectionStarted()
 			ObserveReadBytes(int, time.Time)
