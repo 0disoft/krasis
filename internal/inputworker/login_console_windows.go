@@ -13,9 +13,9 @@ import (
 	"golang.org/x/sys/windows/svc"
 )
 
-// Launch primitive for the future restricted connection runner. It deliberately
-// stays private and unwired until the child bootstrap and input retirement
-// protocol are implemented. A scheduling hash alone is never launch authority.
+// Private launch primitive for the authenticated restricted connection runner.
+// A scheduling hash alone is never launch authority; fixed installation, SCM,
+// live profile and child token checks are required independently.
 func launchLoginConsole(ctx context.Context, installation *Installation, session uint32, profile [32]byte, prepare func(windows.Handle, uint32) error) (*ConsoleWorker, error) {
 	if ctx == nil || ctx.Err() != nil || installation == nil || session == 0 || session == ^uint32(0) || profile == ([32]byte{}) || prepare == nil {
 		return nil, ErrAuthority

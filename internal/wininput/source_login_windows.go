@@ -5,6 +5,7 @@ package wininput
 import (
 	"context"
 	"errors"
+	"runtime"
 
 	"github.com/0disoft/krasis/internal/inputdesktop"
 )
@@ -36,6 +37,10 @@ func (hook *SourceHook) onDesktop(ctx context.Context, run func(context.Context)
 	// Cancellation stops the native loop, while the scope survives until the
 	// loop has unregistered its hooks/windows and restored its owned desktop.
 	return inputdesktop.RunWinlogon(context.Background(), hook.loginAuthorize, func(scope *inputdesktop.Scope) error {
+		// RunWinlogon's own lock is released only after desktop restoration.
+		// Retain an extra lock so this goroutine's exit retires the native
+		// capture thread rather than pooling its old Win32 message queue.
+		runtime.LockOSThread()
 		owned := context.WithValue(ctx, sourceLoginDesktopKey{}, scope)
 		return run(owned)
 	})

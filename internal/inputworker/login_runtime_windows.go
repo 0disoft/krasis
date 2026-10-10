@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/0disoft/krasis/internal/application"
+	"github.com/0disoft/krasis/internal/inputdesktop"
 	"github.com/0disoft/krasis/internal/loginagent"
 	"github.com/0disoft/krasis/internal/wininput"
 )
@@ -16,7 +17,15 @@ import (
 // The protected service pipe supplies the immutable session and grant binding.
 // Before login it exposes only the pinned peer's ordinary input protocol.
 func RunInstalledLoginConnection(ctx context.Context, installation *Installation) error {
-	return runInstalledLoginWorker(ctx, installation, func(lifetime context.Context, session uint32, profile [32]byte, authenticate func() error) error {
+	return runInstalledLoginWorker(ctx, installation, func(lifetime context.Context, session uint32, profile [32]byte, authenticate func() error) (result error) {
+		callbackStarted := false
+		defer func() {
+			// Fast logon can revoke the grant between activation and binding.
+			// No connection/capture/input exists until the callback starts.
+			if !callbackStarted && result != nil && !errors.Is(result, inputdesktop.ErrCleanup) && !errors.Is(result, ErrRecovery) {
+				result = &loginPreparationError{cause: result}
+			}
+		}()
 		authorize := func() error {
 			if err := authenticate(); err != nil {
 				return err
@@ -49,6 +58,7 @@ func RunInstalledLoginConnection(ctx context.Context, installation *Installation
 			return authorize()
 		})
 		report, err := RunLoginInput(lifetime, authorize, func(owned context.Context, port application.InputPort) error {
+			callbackStarted = true
 			input, err := wininput.NewInputAdapterWithInjection(live.Profile.Rearm(), geometry.Width, port)
 			if err != nil {
 				return err

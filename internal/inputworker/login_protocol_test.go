@@ -252,3 +252,29 @@ func TestLoginRuntimeCanRetireBeforeNextParentConsoleTick(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestLoginFastLogonRetiresOnlyExplicitNoInputPreparation(t *testing.T) {
+	for _, noInput := range []bool{true, false} {
+		left, right := net.Pipe()
+		b := loginTestBinding(t)
+		done := make(chan error, 1)
+		go func() {
+			done <- serveLoginControl(context.Background(), right, b, func() error { return nil }, func(context.Context) error {
+				if noInput {
+					return &loginPreparationError{cause: ErrAuthority}
+				}
+				return ErrAuthority
+			})
+		}()
+		worker := startLoginControlWorker(context.Background(), left, b, func() error { return nil })
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		err := worker.Stop(ctx)
+		cancel()
+		if (err == nil) != noInput {
+			t.Fatalf("startup vs runtime retirement: noInput=%v err=%v", noInput, err)
+		}
+		_ = left.Close()
+		_ = right.Close()
+		<-done
+	}
+}

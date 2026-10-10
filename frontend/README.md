@@ -35,6 +35,30 @@ queued edits recheck LOCAL state before calling the native layout writer.
 
 ## Native Windows Workspace
 
+### Connection before Windows sign-in (g262)
+
+After applying this generation's protected-input installation on both PCs,
+confirm their ordinary connection and enable Windows startup in settings.
+In each PC's generation folder, run the following once with administrator
+confirmation, using that PC's existing peer alias:
+
+```powershell
+.\krasis-install.exe --prepare-login B
+```
+
+Use alias `A` on B when that is its saved peer. `configured` confirms the
+protected approval was saved; it does not confirm a current connection.
+The existing automatically started `KrasisInput` service can then own a limited
+connection on the physical Windows sign-in desktop. The GUI starts after sign-in.
+Before sign-in, pairing, clipboard, updates and management APIs are unavailable.
+The approval respects current trust and user settings and expires no later than
+the existing certificates or 30 days. Revoke it with `--disable-login`.
+
+Physical reboot and sign-in acceptance is still pending. After sign-in the
+service requires confirmed input/network cleanup before admitting a user agent.
+
+### Distribution contents
+
 The optional Wails v3 host ships as a complete, unpacked distribution under
 `dist/workspace/g<generation>/`.
 The four executables share one directory: `krasis.exe` is the Wails UI,

@@ -1,6 +1,6 @@
 # ADR 0069: 로그인 전 연결의 서비스 소유권
 
-- 상태: Accepted; runtime integrated in g261, physical reboot acceptance pending
+- 상태: Accepted; runtime integrated in g262, physical reboot acceptance pending
 - 결정일: 2026-10-10
 - 관련: ADR 0036, ADR 0038, ADR 0064, ADR 0066, ADR 0068
 
@@ -127,6 +127,11 @@ kernel client PID가 소유한 자식과 같은지 확인한다. 자식은 어�
 종료와 parent 콘솔 관측이 경합해도 정확한 parent가 최대 1초 안에 Stop을
 보내면 정리 receipt를 받을 수 있다. Stop 부재·잘못된 바인딩·파이프 소실은
 실패이며, 자발적 runtime 종료만으로 clean receipt를 보내지 않는다.
+activation 직후 빠른 사용자 로그인이 Winlogon 준비를 중단시킬 수 있다.
+입력/네트워크 callback이 한 번도 시작되지 않았고 desktop cleanup 실패도
+없었던 경우만 전용 no-input preparation 표시를 남긴다. 이 표시도 정확한
+parent의 Stop이 있어야 clean retirement로 처리한다. 실행 중 권한 오류나
+입력 결과 미확인에는 이 표시를 붙이지 않는다.
 
 ## 서비스 자동 시작과 사용자 입력 handoff
 
@@ -185,7 +190,10 @@ Winlogon scope에 묶는다. 키·마우스 callback, raw packet, wheel 전달�
 활성화는 현재 thread/desktop을 다시 확인한다. 다른 desktop이면 전달을 중단한다.
 로그인 뒤 비활성 capture를 정리할 때는 소유한 window·touchpad 등록·정확한
 thread attach만 회수하고 이전 foreground 창을 다시 활성화하지 않는다.
-로그인 전에는 사용자 Shell fullscreen COM broker를 시작하지 않는다.
+로그인 전에는 사용자 Shell fullscreen COM broker를 시작하지 않는다. native
+정리·desktop 복원 뒤에도 추가 OS-thread lock을 유지해 capture goroutine 종료가
+해당 OS thread를 폐기하게 한다. 이전 Win32 message queue가 다음 capture에
+재사용되지 않으며 일반 source hook의 thread 폐기 정책과 동일하다.
 
 입력 port와 hook은 인증된 child runner와 service owner에 결합했다.
 
@@ -201,7 +209,7 @@ source close 오류, Winlogon journal 잔여 입력, desktop 복원 오류와 pa
 
 ## 배포와 실기기 수용 기준
 
-g261에 runtime과 고정 child 진입점을 포함한다. UI/사용자 agent는 로그인 후
+g262에 runtime과 고정 child 진입점을 포함한다. UI/사용자 agent는 로그인 후
 기존 자동 시작 경로를 사용한다. 로그인 전에 GUI·관리 API를 열지 않는다.
 사용자 설정의 자동 시작 허용과 관리자 승인 기록이 모두 필요하다. 양쪽에서
 기존 연결을 정상 확인하고 최신 보호 입력 설치를 적용한 뒤, 각 PC의 현재

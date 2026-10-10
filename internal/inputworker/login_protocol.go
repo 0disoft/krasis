@@ -32,6 +32,14 @@ type loginBinding struct {
 	nonce   [32]byte
 }
 
+// Only the fixed runtime may use this marker before its input/network callback
+// starts. A requested Stop can safely retire such a no-input startup race;
+// ordinary runtime errors and desktop cleanup failures remain failures.
+type loginPreparationError struct{ cause error }
+
+func (e *loginPreparationError) Error() string { return "login input preparation stopped" }
+func (e *loginPreparationError) Unwrap() error { return e.cause }
+
 func newLoginBinding(session uint32, profile [32]byte) (loginBinding, error) {
 	b := loginBinding{session: session, profile: profile}
 	if session == 0 || session == ^uint32(0) || profile == ([32]byte{}) {
@@ -166,6 +174,8 @@ func serveLoginControl(ctx context.Context, stream net.Conn, binding loginBindin
 	<-done
 	if !requested {
 		result = errors.Join(result, readErr, ErrRecovery)
+	} else if _, noInput := result.(*loginPreparationError); noInput {
+		result = nil
 	}
 	if err := stream.SetWriteDeadline(time.Now().Add(time.Second)); err != nil {
 		return errors.Join(result, ErrRecovery)

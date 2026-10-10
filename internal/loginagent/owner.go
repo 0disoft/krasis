@@ -1,4 +1,4 @@
-// Package loginagent owns the lifetime gate for a future service-managed
+// Package loginagent owns the lifetime gate for a service-managed
 // pre-login connection. It does not grant trust, inject input or launch a binary.
 package loginagent
 
