@@ -11,6 +11,8 @@ import (
 	"testing"
 
 	"github.com/0disoft/krasis/internal/inputworker"
+	"github.com/0disoft/krasis/internal/logindiag"
+	"syscall"
 )
 
 func TestLoginConfigurationArgumentsAndHonestInactiveReceipt(t *testing.T) {
@@ -63,6 +65,21 @@ func TestLoginConfigurationArgumentsAndHonestInactiveReceipt(t *testing.T) {
 		if called && tc.args[0] == "--prepare-login" && result.State != "configured" {
 			t.Fatal("runtime-enabled configuration still reports pending", result.State)
 		}
+	}
+}
+
+func TestLoginConfigurationSavesFailureBeforeWritingStdout(t *testing.T) {
+	var saved logindiag.Summary
+	save := func(s logindiag.Summary) error { saved = s; return nil }
+	cause := logindiag.At("install_lock", syscall.Errno(32))
+	code, handled := runLoginConfigurationTracked([]string{"--prepare-login", "B"}, brokenWriter{}, func(context.Context, string) error { return cause }, func(context.Context) error { return nil }, save)
+	if !handled || code != 6 || saved.Result != 3 || saved.Stage != "install_lock" || !saved.Win32Known || saved.Win32Error != 32 {
+		t.Fatal("stdout failure lost original saved evidence", saved)
+	}
+	var out bytes.Buffer
+	code, _ = runLoginConfigurationTracked([]string{"--prepare-login", "B"}, &out, func(context.Context, string) error { return cause }, func(context.Context) error { return nil }, func(logindiag.Summary) error { return errors.New("save failed") })
+	if code != 3 || !strings.Contains(out.String(), `"diagnosticSaved":false`) {
+		t.Fatal("failed persistence claimed success", out.String())
 	}
 }
 

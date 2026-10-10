@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/0disoft/krasis/internal/loginagent"
+	"github.com/0disoft/krasis/internal/logindiag"
 	"github.com/0disoft/krasis/internal/securefs"
 	"golang.org/x/sys/windows"
 )
@@ -75,6 +76,8 @@ func ReadLoginGrant(now time.Time) (grant loginagent.Grant, present bool, result
 // connection. Runtime activation is a separate integration step. No SCM, peer
 // connection, executable or user-profile state is changed by this operation.
 func ConfigureLoginGrant(ctx context.Context, alias string) (result error) {
+	stage := "prepare"
+	defer func() { result = logindiag.At(stage, result) }()
 	changed := false
 	if ctx == nil || ctx.Err() != nil {
 		return ErrAuthority
@@ -84,32 +87,42 @@ func ConfigureLoginGrant(ctx context.Context, alias string) (result error) {
 	if err != nil {
 		return err
 	}
+	stage = "installation_read"
 	installation, err := LoadInstallation()
 	if err != nil {
 		return err
 	}
-	defer func() { result = closeLoginConfiguration(result, installation.Close(), changed) }()
+	defer func() { result = closeLoginConfiguration(logindiag.At(stage, result), installation.Close(), changed) }()
+	stage = "install_files"
 	files, err := newInstallFiles(nil)
 	if err != nil {
 		return err
 	}
-	defer func() { result = closeLoginConfiguration(result, files.close(), changed) }()
+	defer func() { result = closeLoginConfiguration(logindiag.At(stage, result), files.close(), changed) }()
+	stage = "install_lock"
 	if err := files.lockLoginConfiguration(ctx); err != nil {
 		return err
 	}
 	// Never repurpose or delete an installation transaction to configure boot.
+	stage = "transaction_read"
 	journal, err := files.load(ctx)
-	if err != nil || journal != nil {
-		return ErrRecovery
+	if err != nil {
+		return errors.Join(ErrRecovery, err)
 	}
+	if journal != nil {
+		return logindiag.At("transaction_present", ErrRecovery)
+	}
+	stage = "policy_recheck"
 	if _, err := loginagent.ReadGrantConnection(grant, now); err != nil {
 		return err
 	}
+	stage = "grant_encode"
 	data, err := loginagent.EncodeGrant(grant, now)
 	if err != nil {
 		return err
 	}
 	pending := filepath.Join(files.root, loginGrantPending)
+	stage = "pending_write"
 	if err := writeInstallFile(ctx, pending, data); err != nil {
 		return err
 	}
@@ -117,13 +130,16 @@ func ConfigureLoginGrant(ctx context.Context, alias string) (result error) {
 		return ctx.Err()
 	}
 	changed = true
+	stage = "commit"
 	if err := moveInstallPath(pending, filepath.Join(files.root, loginGrantName), true); err != nil {
 		return errors.Join(ErrLoginConfigurationUnconfirmed, err)
 	}
+	stage = "grant_verify"
 	actual, exists, err := ReadLoginGrant(time.Now().UTC())
 	if err != nil || !exists || actual.ID != grant.ID {
-		return ErrLoginConfigurationUnconfirmed
+		return errors.Join(ErrLoginConfigurationUnconfirmed, err)
 	}
+	stage = "committed_policy"
 	if _, err := loginagent.ReadGrantConnection(actual, time.Now().UTC()); err != nil {
 		return errors.Join(ErrLoginConfigurationUnconfirmed, err)
 	}
@@ -134,6 +150,7 @@ func ConfigureLoginGrant(ctx context.Context, alias string) (result error) {
 // It can therefore disable expired or malformed configuration without enabling
 // any repair. Administrator access and the installation lock remain required.
 func RemoveLoginGrant(ctx context.Context) (result error) {
+	defer func() { result = logindiag.At("remove", result) }()
 	changed := false
 	if ctx == nil || ctx.Err() != nil {
 		return ErrAuthority
@@ -208,7 +225,7 @@ func closeLoginConfiguration(result, closeErr error, changed bool) error {
 	if closeErr == nil {
 		return result
 	}
-	return loginConfigurationFailure(errors.Join(result, closeErr), changed)
+	return loginConfigurationFailure(errors.Join(result, logindiag.At("close", closeErr)), changed)
 }
 
 func loginConfigurationFailure(cause error, changed bool) error {

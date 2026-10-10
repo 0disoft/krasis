@@ -56,6 +56,13 @@ pin은 SPKI SHA-256이며 원래 사용자 identity·peer fingerprint·역할·i
 이후 인증서 갱신이나 버전 업데이트에는 반복 승인이 필요하지 않다.
 `--disable-login`은 두 승인 schema를 모두 해제한다.
 
+승인 실행은 설치 결과와 별도로 `login-configuration-latest.json`에 실패 단계,
+종료 결과와 확보한 Win32 숫자를 저장한다. stdout을 수집하지 못해도 새 support의
+`loginConfiguration`으로 전송할 수 있다. 사용자 SID·별칭·프로필 경로·개인키·
+원시 오류 문자열은 이 진단에 포함하지 않는다. 이전 설치 성공 receipt를 이번
+승인 성공으로 해석하지 않는다. 승인 저장 실패는 설정을 바꾸거나 설치 transaction을
+삭제해 우회하지 않고, 단계와 현재 정책을 확인한 다음 처리한다.
+
 ## 호환성과 검증
 
 g262는 새 leaf의 동일 키 증명을 처리하지 못하므로, 갱신이 시작되기 전에

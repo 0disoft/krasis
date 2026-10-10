@@ -11,11 +11,15 @@ import (
 
 	"github.com/0disoft/krasis/internal/inputworker"
 	"github.com/0disoft/krasis/internal/installationdiag"
+	"github.com/0disoft/krasis/internal/logindiag"
 	"github.com/0disoft/krasis/internal/productlog"
 )
 
 func main() {
-	if code, handled := runLoginConfiguration(os.Args[1:], os.Stdout, inputworker.ConfigureLoginGrant, inputworker.RemoveLoginGrant); handled {
+	saveLogin := func(s logindiag.Summary) error {
+		return productlog.SaveLoginConfiguration(os.Getenv("LOCALAPPDATA"), s)
+	}
+	if code, handled := runLoginConfigurationTracked(os.Args[1:], os.Stdout, inputworker.ConfigureLoginGrant, inputworker.RemoveLoginGrant, saveLogin); handled {
 		os.Exit(code)
 	}
 	save := func(s installationdiag.Summary) error {

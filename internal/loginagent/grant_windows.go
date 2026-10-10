@@ -7,11 +7,13 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/hex"
+	"errors"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/0disoft/krasis/internal/appsettings"
+	"github.com/0disoft/krasis/internal/logindiag"
 	"github.com/0disoft/krasis/internal/productidentity"
 	"github.com/0disoft/krasis/internal/transport"
 	"github.com/0disoft/krasis/internal/truststore"
@@ -35,25 +37,25 @@ type Prepared struct {
 // application data must be explicitly supported before provisioning it.
 func ResolveOwnerAppData(owner string) (string, error) {
 	if !accountSID(owner) {
-		return "", ErrGrant
+		return "", logindiag.At("owner_profile", ErrGrant)
 	}
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\`+owner, registry.QUERY_VALUE)
 	if err != nil {
-		return "", ErrGrant
+		return "", logindiag.At("owner_profile", errors.Join(ErrGrant, err))
 	}
 	defer key.Close()
 	path, kind, err := key.GetStringValue("ProfileImagePath")
 	if err != nil || kind != registry.SZ && kind != registry.EXPAND_SZ {
-		return "", ErrGrant
+		return "", logindiag.At("owner_profile", errors.Join(ErrGrant, err))
 	}
 	if kind == registry.EXPAND_SZ {
 		path, err = registry.ExpandString(path)
 		if err != nil {
-			return "", ErrGrant
+			return "", logindiag.At("owner_profile", errors.Join(ErrGrant, err))
 		}
 	}
 	if len(path) < 3 || path[1] != ':' || path[2] != '\\' || !filepath.IsAbs(path) || filepath.Clean(path) != path || strings.ContainsRune(path, '\x00') {
-		return "", ErrGrant
+		return "", logindiag.At("owner_profile", ErrGrant)
 	}
 	return filepath.Join(path, "AppData", "Local"), nil
 }
@@ -65,10 +67,10 @@ func readLive(owner, base, alias, fingerprint string, now time.Time) (Prepared, 
 func readLivePolicy(owner, base, alias, fingerprint string, now time.Time, persistent bool) (Prepared, error) {
 	settings, resume, err := appsettings.ReadOwnerStartup(base, owner)
 	if err != nil {
-		return Prepared{}, ErrGrant
+		return Prepared{}, logindiag.At("startup_read", errors.Join(ErrGrant, err))
 	}
 	if !settings.StartAtLogin || resume.ManualStop || resume.Alias != alias || resume.Fingerprint != fingerprint {
-		return Prepared{}, ErrSuspended
+		return Prepared{}, logindiag.At("startup_policy", ErrSuspended)
 	}
 	readPeer := truststore.ReadOwnerConnection
 	if persistent {
@@ -76,7 +78,7 @@ func readLivePolicy(owner, base, alias, fingerprint string, now time.Time, persi
 	}
 	peer, profile, remote, err := readPeer(base, owner, alias, fingerprint, now)
 	if err != nil {
-		return Prepared{}, ErrGrant
+		return Prepared{}, logindiag.At("peer_read", errors.Join(ErrGrant, err))
 	}
 	role := transport.AuthenticatedPeerListener
 	if peer.Role == transport.AuthenticatedPeerListener {
@@ -88,7 +90,7 @@ func readLivePolicy(owner, base, alias, fingerprint string, now time.Time, persi
 	}
 	identity, local, err := readLocal(base, owner, role, now)
 	if err != nil {
-		return Prepared{}, ErrGrant
+		return Prepared{}, logindiag.At("local_credential", errors.Join(ErrGrant, err))
 	}
 	expires := remote.NotAfter
 	if local.Leaf.NotAfter.Before(expires) {
@@ -104,26 +106,35 @@ func readLivePolicy(owner, base, alias, fingerprint string, now time.Time, persi
 // running the elevated configuration command. It never makes a new credential.
 func PrepareCurrentGrant(alias string, now time.Time) (Grant, error) {
 	var token windows.Token
-	if windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_QUERY, &token) != nil {
-		return Grant{}, ErrGrant
+	if err := windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_QUERY, &token); err != nil {
+		return Grant{}, logindiag.At("owner_token", errors.Join(ErrGrant, err))
 	}
 	defer token.Close()
 	user, err := token.GetTokenUser()
-	if err != nil || !token.IsElevated() {
-		return Grant{}, ErrGrant
+	if err != nil {
+		return Grant{}, logindiag.At("owner_token", errors.Join(ErrGrant, err))
+	}
+	if !token.IsElevated() {
+		return Grant{}, logindiag.At("owner_elevation", ErrGrant)
 	}
 	owner := user.User.Sid.String()
 	base, err := ResolveOwnerAppData(owner)
 	if err != nil {
-		return Grant{}, ErrGrant
+		return Grant{}, err
 	}
 	currentBase, err := windows.KnownFolderPath(windows.FOLDERID_LocalAppData, 0)
-	if err != nil || !strings.EqualFold(base, currentBase) {
-		return Grant{}, ErrGrant
+	if err != nil {
+		return Grant{}, logindiag.At("current_profile", errors.Join(ErrGrant, err))
+	}
+	if !strings.EqualFold(base, currentBase) {
+		return Grant{}, logindiag.At("profile_mismatch", ErrGrant)
 	}
 	_, resume, err := appsettings.ReadOwnerStartup(base, owner)
-	if err != nil || resume.ManualStop || resume.Alias != alias || resume.Fingerprint == "" {
-		return Grant{}, ErrSuspended
+	if err != nil {
+		return Grant{}, logindiag.At("startup_read", errors.Join(ErrSuspended, err))
+	}
+	if resume.ManualStop || resume.Alias != alias || resume.Fingerprint == "" {
+		return Grant{}, logindiag.At("resume_policy", ErrSuspended)
 	}
 	live, err := readLivePolicy(owner, base, alias, resume.Fingerprint, now, true)
 	if err != nil {
@@ -131,16 +142,16 @@ func PrepareCurrentGrant(alias string, now time.Time) (Grant, error) {
 	}
 	localKey, err := transport.ProductKeyFingerprint(live.Local.Leaf)
 	if err != nil {
-		return Grant{}, ErrGrant
+		return Grant{}, logindiag.At("local_key", errors.Join(ErrGrant, err))
 	}
 	var id [32]byte
 	if _, err := rand.Read(id[:]); err != nil {
-		return Grant{}, ErrGrant
+		return Grant{}, logindiag.At("grant_id", errors.Join(ErrGrant, err))
 	}
 	g := Grant{Schema: PersistentGrantSchema, ID: hex.EncodeToString(id[:]), Owner: owner, Alias: alias, Peer: resume.Fingerprint,
 		Role: live.Peer.Role, Identity: live.Identity.Fingerprint, LocalTransport: localKey,
 		AllowInbound: live.Peer.AllowInboundControl, CreatedAt: now.UTC()}
-	return g, g.Validate(now)
+	return g, logindiag.At("grant_validate", g.Validate(now))
 }
 
 // ReadGrantConnection reloads live revocation/manual-stop policy and both exact

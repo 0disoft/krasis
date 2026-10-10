@@ -10,6 +10,7 @@ import (
 
 	"github.com/0disoft/krasis/internal/handoff"
 	"github.com/0disoft/krasis/internal/installationdiag"
+	"github.com/0disoft/krasis/internal/logindiag"
 	"github.com/0disoft/krasis/internal/peercredentials"
 	"github.com/0disoft/krasis/internal/productidentity"
 	"github.com/0disoft/krasis/internal/securefs"
@@ -76,18 +77,21 @@ func exportToNamed(dir *securefs.Directory, name string, immutable bool) error {
 	installation, receiptErr := readInstallationReceipt(dir)
 	recovery, recoveryErr := readRecoveryReceipt(dir)
 	cleanup, cleanupErr := readCleanupReceipt(dir)
+	loginConfiguration, loginErr := readLoginConfigurationReceipt(dir)
 	document := struct {
-		Schema                 string                    `json:"schema"`
-		Created                string                    `json:"created"`
-		Scope                  string                    `json:"scope"`
-		Logs                   []exportLog               `json:"logs"`
-		Installation           *installationdiag.Summary `json:"installation,omitempty"`
-		InstallationIncomplete bool                      `json:"installationIncomplete,omitempty"`
-		Recovery               *RecoverySummary          `json:"recovery,omitempty"`
-		RecoveryIncomplete     bool                      `json:"recoveryIncomplete,omitempty"`
-		Cleanup                *CleanupSummary           `json:"cleanup,omitempty"`
-		CleanupIncomplete      bool                      `json:"cleanupIncomplete,omitempty"`
-	}{"krasis.support/v1", time.Now().UTC().Format(time.RFC3339), "Event history only; not a live agent status or complete crash report.", logs, installation, receiptErr != nil, recovery, recoveryErr != nil, cleanup, cleanupErr != nil}
+		Schema                       string                    `json:"schema"`
+		Created                      string                    `json:"created"`
+		Scope                        string                    `json:"scope"`
+		Logs                         []exportLog               `json:"logs"`
+		Installation                 *installationdiag.Summary `json:"installation,omitempty"`
+		InstallationIncomplete       bool                      `json:"installationIncomplete,omitempty"`
+		Recovery                     *RecoverySummary          `json:"recovery,omitempty"`
+		RecoveryIncomplete           bool                      `json:"recoveryIncomplete,omitempty"`
+		Cleanup                      *CleanupSummary           `json:"cleanup,omitempty"`
+		CleanupIncomplete            bool                      `json:"cleanupIncomplete,omitempty"`
+		LoginConfiguration           *logindiag.Summary        `json:"loginConfiguration,omitempty"`
+		LoginConfigurationIncomplete bool                      `json:"loginConfigurationIncomplete,omitempty"`
+	}{"krasis.support/v1", time.Now().UTC().Format(time.RFC3339), "Event history only; not a live agent status or complete crash report.", logs, installation, receiptErr != nil, recovery, recoveryErr != nil, cleanup, cleanupErr != nil, loginConfiguration, loginErr != nil}
 	f, temp, err := dir.CreateTemporary(".support-", 0600)
 	if err != nil {
 		return err
