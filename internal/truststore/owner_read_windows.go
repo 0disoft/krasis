@@ -15,6 +15,14 @@ import (
 // ReadOwnerConnection preserves the original profile ACL and shared trust lock.
 // It cannot import a peer, grant permission, update an address or create files.
 func ReadOwnerConnection(localAppData, owner, alias, fingerprint string, now time.Time) (PeerRecord, ConnectionProfile, *x509.Certificate, error) {
+	return readOwnerConnection(localAppData, owner, alias, fingerprint, now, false)
+}
+
+func ReadOwnerKeyConnection(localAppData, owner, alias, fingerprint string, now time.Time) (PeerRecord, ConnectionProfile, *x509.Certificate, error) {
+	return readOwnerConnection(localAppData, owner, alias, fingerprint, now, true)
+}
+
+func readOwnerConnection(localAppData, owner, alias, fingerprint string, now time.Time, keyAnchor bool) (PeerRecord, ConnectionProfile, *x509.Certificate, error) {
 	deny := func(err error) (PeerRecord, ConnectionProfile, *x509.Certificate, error) {
 		return PeerRecord{}, ConnectionProfile{}, nil, err
 	}
@@ -69,6 +77,9 @@ func ReadOwnerConnection(localAppData, owner, alias, fingerprint string, now tim
 		return deny(err)
 	}
 	certificate, err := validatePeerCertificate(transport.AuthenticatedPeerContext{CertificateSHA256: fingerprint, Role: peer.Role}, der, now)
+	if keyAnchor {
+		certificate, err = validatePeerKeyAnchor(transport.AuthenticatedPeerContext{CertificateSHA256: fingerprint, Role: peer.Role}, der, now)
+	}
 	if err != nil {
 		return deny(err)
 	}

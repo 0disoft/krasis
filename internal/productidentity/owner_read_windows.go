@@ -14,6 +14,16 @@ import (
 // ReadOwnerTransport reads existing credentials under their original profile
 // ACL and identity lock. It cannot create, rotate or repair any credential.
 func ReadOwnerTransport(localAppData, owner string, role transport.AuthenticatedPeerRole, now time.Time) (PublicIdentity, tls.Certificate, error) {
+	return readOwnerTransport(localAppData, owner, role, now, false)
+}
+
+// ReadOwnerTransportAnchor allows only in-memory reissuance of an existing
+// verified role key; it still never writes to the selected user's store.
+func ReadOwnerTransportAnchor(localAppData, owner string, role transport.AuthenticatedPeerRole, now time.Time) (PublicIdentity, tls.Certificate, error) {
+	return readOwnerTransport(localAppData, owner, role, now, true)
+}
+
+func readOwnerTransport(localAppData, owner string, role transport.AuthenticatedPeerRole, now time.Time, keyAnchor bool) (PublicIdentity, tls.Certificate, error) {
 	if now.IsZero() || role != transport.AuthenticatedPeerListener && role != transport.AuthenticatedPeerConnector {
 		return PublicIdentity{}, tls.Certificate{}, ErrTransportRenewalRequired
 	}
@@ -57,6 +67,9 @@ func ReadOwnerTransport(localAppData, owner string, role transport.Authenticated
 		return PublicIdentity{}, tls.Certificate{}, err
 	}
 	cert, err := validateTransport(doc, identity.Public(), role, now)
+	if keyAnchor {
+		cert, err = validateTransportMaterial(doc, identity.Public(), role)
+	}
 	if err != nil {
 		return PublicIdentity{}, tls.Certificate{}, err
 	}

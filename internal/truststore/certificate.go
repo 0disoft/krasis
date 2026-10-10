@@ -89,6 +89,20 @@ func (store *Store) PeerCertificate(peer transport.AuthenticatedPeerContext, now
 // PeerCertificateTraced has the same authorization behavior as PeerCertificate.
 // The optional trace contains phase timings only, never peer or path details.
 func (store *Store) PeerCertificateTraced(peer transport.AuthenticatedPeerContext, now time.Time, trace *ReadTrace) (*x509.Certificate, error) {
+	return store.peerCertificateTraced(peer, now, trace, false)
+}
+
+// PeerKeyAnchor keeps explicit pairing/revocation policy while permitting a
+// renewed on-wire leaf to prove this exact originally approved role key.
+func (store *Store) PeerKeyAnchor(peer transport.AuthenticatedPeerContext, now time.Time) (*x509.Certificate, error) {
+	return store.PeerKeyAnchorTraced(peer, now, nil)
+}
+
+func (store *Store) PeerKeyAnchorTraced(peer transport.AuthenticatedPeerContext, now time.Time, trace *ReadTrace) (*x509.Certificate, error) {
+	return store.peerCertificateTraced(peer, now, trace, true)
+}
+
+func (store *Store) peerCertificateTraced(peer transport.AuthenticatedPeerContext, now time.Time, trace *ReadTrace, keyAnchor bool) (*x509.Certificate, error) {
 	if store == nil {
 		return nil, errors.New("trust store is not initialized")
 	}
@@ -116,9 +130,29 @@ func (store *Store) PeerCertificateTraced(peer transport.AuthenticatedPeerContex
 		if err != nil {
 			return nil, err
 		}
+		if keyAnchor {
+			return validatePeerKeyAnchor(peer, der, now)
+		}
 		return validatePeerCertificate(peer, der, now)
 	}
 	return nil, ErrPeerNotFound
+}
+
+func validatePeerKeyAnchor(peer transport.AuthenticatedPeerContext, der []byte, now time.Time) (*x509.Certificate, error) {
+	if now.IsZero() || len(der) == 0 || len(der) > maxPeerCertificateBytes {
+		return nil, ErrPeerCertificateUnavailable
+	}
+	leaf, err := x509.ParseCertificate(der)
+	if err != nil {
+		return nil, err
+	}
+	// Reuse the exact stored fingerprint check and self-signature validation;
+	// validity of each live replacement is checked separately during TLS.
+	leaf, err = validatePeerCertificate(peer, der, leaf.NotBefore)
+	if err != nil || transport.ValidateProductKeyAnchor(leaf) != nil {
+		return nil, ErrPeerCertificateUnavailable
+	}
+	return leaf, nil
 }
 
 func validatePeerCertificate(peer transport.AuthenticatedPeerContext, der []byte, now time.Time) (*x509.Certificate, error) {

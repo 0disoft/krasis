@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"net"
 	"sync"
@@ -16,6 +17,7 @@ type ListenSource struct {
 	authenticationLast     map[string]time.Time
 	listener               net.Listener
 	tlsConfig              *tls.Config
+	keyAnchors             []*x509.Certificate
 	networkPolicy          ListenNetworkPolicy
 	handshakeTimeout       time.Duration
 	preAuthSlots           chan struct{}
@@ -48,12 +50,13 @@ type listenResult struct {
 	err        error
 }
 
-func NewListenSource(address string, tlsConfig *tls.Config) (*ListenSource, error) {
+func NewListenSource(address string, tlsConfig *tls.Config, anchors ...*x509.Certificate) (*ListenSource, error) {
 	return NewListenSourceWithPolicy(
 		address,
 		tlsConfig,
 		ListenNetworkTrustedPrivate,
 		DefaultPreAuthAdmissionConfig(),
+		anchors...,
 	)
 }
 
@@ -62,6 +65,7 @@ func NewListenSourceWithPolicy(
 	tlsConfig *tls.Config,
 	networkPolicy ListenNetworkPolicy,
 	admissionConfig PreAuthAdmissionConfig,
+	anchors ...*x509.Certificate,
 ) (*ListenSource, error) {
 	if address == "" || tlsConfig == nil {
 		return nil, errors.New("listen address and TLS config are required")
@@ -83,6 +87,7 @@ func NewListenSourceWithPolicy(
 		MaxConcurrentPreAuthHandshakes,
 		networkPolicy,
 		admissionConfig,
+		anchors...,
 	)
 	if err != nil {
 		return nil, errors.Join(err, listener.Close())
@@ -108,6 +113,7 @@ func newListenSourceWithPolicy(
 	maxPreAuth int,
 	networkPolicy ListenNetworkPolicy,
 	admissionConfig PreAuthAdmissionConfig,
+	anchors ...*x509.Certificate,
 ) (*ListenSource, error) {
 	if listener == nil || tlsConfig == nil || handshakeTimeout <= 0 || maxPreAuth <= 0 {
 		return nil, errors.New("listener, TLS config, positive handshake timeout, and pre-auth limit are required")
@@ -116,6 +122,10 @@ func newListenSourceWithPolicy(
 		return nil, err
 	}
 	admission, err := newPreAuthAdmission(admissionConfig)
+	if err != nil {
+		return nil, err
+	}
+	anchor, err := transport.CloneProductKeyAnchor(anchors...)
 	if err != nil {
 		return nil, err
 	}
@@ -129,6 +139,9 @@ func newListenSourceWithPolicy(
 		preAuthAdmission: admission,
 		shutdown:         shutdown,
 		cancel:           cancel,
+	}
+	if anchor != nil {
+		source.keyAnchors = []*x509.Certificate{anchor}
 	}
 	source.workers.Add(1)
 	go source.acceptLoop()
@@ -285,7 +298,7 @@ func (source *ListenSource) authenticate(round *listenRound, connection net.Conn
 	defer func() { <-source.preAuthSlots }()
 	handshakeCtx, cancel := context.WithTimeout(round.ctx, source.handshakeTimeout)
 	defer cancel()
-	peerConnection, err := transport.NewPeerConnection(handshakeCtx, tls.Server(connection, source.tlsConfig.Clone()))
+	peerConnection, err := transport.NewPeerConnection(handshakeCtx, tls.Server(connection, source.tlsConfig.Clone()), source.keyAnchors...)
 	if err != nil {
 		source.preAuthMetrics.handshakeFailed.Add(1)
 		source.observeAuthenticationFailure(err)
@@ -313,13 +326,22 @@ type DialSource struct {
 	address     string
 	tlsConfig   *tls.Config
 	dialTimeout time.Duration
+	keyAnchors  []*x509.Certificate
 }
 
-func NewDialSource(address string, tlsConfig *tls.Config, dialTimeout time.Duration) (*DialSource, error) {
+func NewDialSource(address string, tlsConfig *tls.Config, dialTimeout time.Duration, anchors ...*x509.Certificate) (*DialSource, error) {
 	if address == "" || tlsConfig == nil || dialTimeout <= 0 {
 		return nil, errors.New("dial address, TLS config, and positive timeout are required")
 	}
-	return &DialSource{address: address, tlsConfig: tlsConfig.Clone(), dialTimeout: dialTimeout}, nil
+	anchor, err := transport.CloneProductKeyAnchor(anchors...)
+	if err != nil {
+		return nil, err
+	}
+	source := &DialSource{address: address, tlsConfig: tlsConfig.Clone(), dialTimeout: dialTimeout}
+	if anchor != nil {
+		source.keyAnchors = []*x509.Certificate{anchor}
+	}
+	return source, nil
 }
 
 func (source *DialSource) Next(ctx context.Context) (Connection, error) {
@@ -331,7 +353,7 @@ func (source *DialSource) Next(ctx context.Context) (Connection, error) {
 	if err != nil {
 		return nil, err
 	}
-	peerConnection, err := transport.NewPeerConnection(ctx, tls.Client(connection, source.tlsConfig.Clone()))
+	peerConnection, err := transport.NewPeerConnection(ctx, tls.Client(connection, source.tlsConfig.Clone()), source.keyAnchors...)
 	if err != nil {
 		return nil, closeConnectionOnError(connection, err)
 	}

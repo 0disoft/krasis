@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/hex"
 	"errors"
 	"time"
@@ -25,11 +26,31 @@ func (connection *PeerConnection) SupportsInputPreparation() bool {
 	return connection != nil && connection.connection != nil && connection.connection.ConnectionState().NegotiatedProtocol == ALPNInputPreparation
 }
 
-func NewPeerConnection(ctx context.Context, connection *tls.Conn) (*PeerConnection, error) {
+func NewPeerConnection(ctx context.Context, connection *tls.Conn, anchors ...*x509.Certificate) (*PeerConnection, error) {
 	if connection == nil {
 		return nil, errors.New("TLS connection is required")
 	}
-	peer, err := AuthenticatePeerContext(ctx, connection)
+	anchor, err := productKeyAnchor(anchors)
+	if err != nil {
+		return nil, err
+	}
+	var peer AuthenticatedPeerContext
+	if anchor == nil {
+		peer, err = AuthenticatePeerContext(ctx, connection)
+	} else {
+		if ctx == nil {
+			return nil, ErrPeerAuthentication
+		}
+		err = connection.HandshakeContext(ctx)
+		if err == nil {
+			state := connection.ConnectionState()
+			if state.NegotiatedProtocol != ALPNProtocol && state.NegotiatedProtocol != ALPNInputPreparation {
+				err = ErrPeerALPN
+			} else {
+				peer, err = AuthenticateProductKey(state, anchor, time.Now())
+			}
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
