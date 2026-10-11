@@ -212,6 +212,13 @@ thread attach만 회수하고 이전 foreground 창을 다시 활성화하지 �
 해당 OS thread를 폐기하게 한다. 이전 Win32 message queue가 다음 capture에
 재사용되지 않으며 일반 source hook의 thread 폐기 정책과 동일하다.
 
+g269부터 destination 경계 복귀 때 커서 숨김의 준비 좌표도 shield window의
+native owner message queue에서 읽는다. 일반 peer worker는 Winlogon에 연결되지
+않았으므로 그 thread의 GetCursorPos를 사용하지 않는다. 조회 대기는 20ms로
+제한하고 요청 ID·local input generation·활성 desktop을 확인한다. 늦은 응답,
+로컬 입력, 새 entry는 오래된 숨김을 취소한다. 전역 cursor·ShowCursor count와
+foreground는 변경하지 않는다.
+
 입력 port와 hook은 인증된 child runner와 service owner에 결합했다.
 
 ## 정상 취소와 정리 실패의 구분

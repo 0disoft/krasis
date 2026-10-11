@@ -13,20 +13,23 @@ import (
 )
 
 const (
-	wmReturnCursorShow = 0x8040
-	wmReturnCursorHide = 0x8041
+	wmReturnCursorShow     = 0x8040
+	wmReturnCursorHide     = 0x8041
+	wmReturnCursorSnapshot = 0x8042
 )
 
 // The window and low-level hooks share one OS thread. Physical input hides the
 // passive shield synchronously before CallNextHookEx, without swallowing input.
 type returnCursorShield struct {
-	loginContext context.Context // Only inspected on the native owner thread.
-	window       atomic.Uintptr
-	generation   atomic.Uint64
-	mu           sync.Mutex
-	position     point
-	visible      bool // accessed only on the owning hook thread
-	failure      atomic.Pointer[returnCursorFailure]
+	loginContext    context.Context // Only inspected on the native owner thread.
+	window          atomic.Uintptr
+	generation      atomic.Uint64
+	snapshotID      atomic.Uint64
+	snapshotRequest atomic.Pointer[returnCursorSnapshotRequest]
+	mu              sync.Mutex
+	position        point
+	visible         bool // accessed only on the owning hook thread
+	failure         atomic.Pointer[returnCursorFailure]
 }
 
 type returnCursorFailure struct{ err error }
@@ -85,6 +88,9 @@ var (
 		if value, ok := returnCursorWindows.Load(window); ok {
 			shield := value.(*returnCursorShield)
 			switch message {
+			case wmReturnCursorSnapshot:
+				shield.snapshotPosition(uint64(wParam))
+				return 0
 			case wmReturnCursorShow:
 				shield.show(uint64(wParam))
 				return 0
@@ -110,8 +116,8 @@ func (hook *SourceHook) RestoreReturnCursor()        { hook.returnCursor.restore
 
 func (shield *returnCursorShield) prepare() func() {
 	generation := shield.generation.Load()
-	position, err := returnCursorPosition()
-	if err != nil {
+	position, ok := shield.requestPosition(generation)
+	if !ok {
 		return nil
 	}
 	return func() {

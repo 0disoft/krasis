@@ -18,14 +18,17 @@ func TestReturnCursorCancelsStalePresentationAndRestoresBeforeInput(t *testing.T
 	returnCursorShowWindow = func(uintptr, point) error { shown++; return nil }
 	returnCursorHideWindow = func(uintptr) error { hidden++; return nil }
 	var queued []uint64
+	shield := &returnCursorShield{}
+	shield.window.Store(1)
 	returnCursorPost = func(_ uintptr, message uint32, generation uint64) error {
+		if message == wmReturnCursorSnapshot {
+			shield.snapshotPosition(generation)
+		}
 		if message == wmReturnCursorShow {
 			queued = append(queued, generation)
 		}
 		return nil
 	}
-	shield := &returnCursorShield{}
-	shield.window.Store(1)
 	complete := shield.prepare()
 	shield.beforeInput()
 	complete()
