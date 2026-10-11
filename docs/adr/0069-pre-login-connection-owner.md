@@ -186,6 +186,15 @@ hook이 없다. 정리 실패는 worker를 차단하며 입력을 재실행하�
 key-up도 새로운 입력이 아닌 같은 journal의 해제로 처리한다. portable Run과
 login source hook의 고정 데스크톱 정책은 유지한다.
 
+g270의 실제 연결은 설치된 agent/service의 독립 인증을 통과한 일반 입력
+worker에만 이 primitive를 연결한다. portable 및 test Serve는 Default 전용이다.
+일반 agent가 secure desktop에서 source cursor를 읽을 수 없으면, 설치 backend가
+선택된 연결만 receive-only hook을 사용한다. 로컬 source hook·raw mouse·capture를
+설치하거나 active라고 표시하지 않고, 기존 mTLS/inbound 승인과 service lease로
+들어오는 원격 입력만 유지한다. 일반 source 활성화는 이 상태에서 거부한다.
+Chrome의 Default desktop PIN 경로는 그대로 유지한다. DesktopSwitch에 의한
+기존 agent 재시작은 남아 있어 현장에서 재연결 시간도 별도로 확인해야 한다.
+
 `inputdesktop.RunWinlogon`은 authenticated service-child가 별도로 고른 고정
 Winlogon 대상만 연다. 기존 `Run`의 Default 이름 검증은 유지한다. 일반 프로세스가
 권한을 주장하는 callback을 넘겨도 실제 SYSTEM·UIAccess·System 무결성·활성

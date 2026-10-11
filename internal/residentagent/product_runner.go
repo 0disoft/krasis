@@ -269,6 +269,10 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 		hook := wininput.NewSourceHook(progress)
 		hook.SetPresentationReporter(log.Presentation)
 		hook.SetBoundaryGuard(checkGeometry)
+		var sessionHook agent.SourceHook = hook
+		if worker != nil {
+			sessionHook = protectedSessionHook(hook, log.Event)
+		}
 		var inputGuard productInputGuard = guard
 		if worker != nil {
 			inputGuard = workerOwnedPressGuard{}
@@ -286,7 +290,7 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 			}
 		}
 		return agent.RunSupervisor(ctx, agent.SupervisorConfig{Session: config, Backoff: backoff, Now: time.Now, Wait: agent.Wait, Observer: observer}, agent.SupervisorDependencies{
-			Source: source, Hook: hook, Input: boundaryInput, Effects: agent.RuntimeEffects{}, Authorizer: authorizer, RunSession: runSession,
+			Source: source, Hook: sessionHook, Input: boundaryInput, Effects: agent.RuntimeEffects{}, Authorizer: authorizer, RunSession: runSession,
 		})
 	}
 }

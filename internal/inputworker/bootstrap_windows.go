@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/0disoft/krasis/internal/handoff"
+	"github.com/0disoft/krasis/internal/inputdesktop"
 	"github.com/0disoft/krasis/internal/wininput"
 	"golang.org/x/sys/windows"
 )
@@ -227,13 +228,24 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 		cancel()
 	}()
 	defer func() { _ = control.Close(); <-readerDone }()
-	report, result := serveReadyProfile(run, channel, wininput.NewInjectionPort(), lease, func() error {
+	desktop := desktopRunner(inputdesktop.Run)
+	if installation != nil {
+		desktop = func(ctx context.Context, callback func(*inputdesktop.Scope) error) error {
+			return inputdesktop.RunInteractive(ctx, func() error {
+				// Recovery still checks the pinned installation/console but may
+				// release journaled input after the agent has exited. Presses use
+				// the stricter authority.check(false) in the serving executor.
+				return authority.check(true)
+			}, callback)
+		}
+	}
+	report, result := serveReadyProfileOnDesktop(run, channel, wininput.NewInjectionPort(), lease, func() error {
 		if proof.check(false) != nil {
 			return ErrAuthority
 		}
 		_ = control.SetWriteDeadline(time.Now().Add(startupTimeout))
 		return writeStartupReady(control, profile)
-	}, &profile)
+	}, &profile, desktop)
 	if requested.Load() && errors.Is(result, context.Canceled) && report.Recovery.Remaining == 0 {
 		result = nil
 	}

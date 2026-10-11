@@ -69,7 +69,13 @@ func serveReady(ctx context.Context, channel *Channel, input application.InputPo
 }
 
 func serveReadyProfile(ctx context.Context, channel *Channel, input application.InputPort, lease Lease, ready func() error, profile *handoff.StartupProfile) (report Report, err error) {
-	if channel == nil {
+	return serveReadyProfileOnDesktop(ctx, channel, input, lease, ready, profile, inputdesktop.Run)
+}
+
+type desktopRunner func(context.Context, func(*inputdesktop.Scope) error) error
+
+func serveReadyProfileOnDesktop(ctx context.Context, channel *Channel, input application.InputPort, lease Lease, ready func() error, profile *handoff.StartupProfile, desktop desktopRunner) (report Report, err error) {
+	if channel == nil || desktop == nil {
 		return report, ErrAuthority
 	}
 	stream, authority := channel.stream, channel.authority
@@ -83,7 +89,7 @@ func serveReadyProfile(ctx context.Context, channel *Channel, input application.
 	// Root ownership stays alive during independent key-up recovery after ctx
 	// cancellation. The loop itself observes ctx and the immutable lease expiry.
 	desktopStarted := time.Now()
-	err = inputdesktop.Run(context.Background(), func(scope *inputdesktop.Scope) error {
+	err = desktop(context.Background(), func(scope *inputdesktop.Scope) error {
 		if ready != nil {
 			if err := scope.Do(ctx, func() error {
 				if authority.check(false) != nil {
