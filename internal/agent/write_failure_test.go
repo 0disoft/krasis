@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
+	productlog "github.com/0disoft/krasis/internal/failurecode"
 	"github.com/0disoft/krasis/internal/peer"
-	"github.com/0disoft/krasis/internal/productlog"
 	"github.com/0disoft/krasis/internal/transport"
 )
 

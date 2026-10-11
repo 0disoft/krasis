@@ -3,8 +3,8 @@ package agent
 import (
 	"errors"
 	"github.com/0disoft/krasis/internal/application"
+	productlog "github.com/0disoft/krasis/internal/failurecode"
 	"github.com/0disoft/krasis/internal/peer"
-	"github.com/0disoft/krasis/internal/productlog"
 	"testing"
 )
 

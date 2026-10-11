@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/0disoft/krasis/internal/failurecode"
 )
 
 func TestCaptureForegroundStageCodesSurviveExport(t *testing.T) {
@@ -21,7 +23,7 @@ func TestCaptureForegroundStageCodesSurviveExport(t *testing.T) {
 }
 
 func TestReconnectReasonsSurviveSanitizedExport(t *testing.T) {
-	for descriptor, code := range reconnectReasons {
+	for descriptor, code := range failurecode.Reasons() {
 		if got := ReconnectCode("session", descriptor[0], descriptor[1], descriptor[2]); got != code {
 			t.Fatalf("got %s want %s", got, code)
 		}
@@ -73,7 +75,7 @@ func TestSourceOperationFaultCodes(t *testing.T) {
 }
 
 func TestTerminalFaultReasonsAreSanitizedAndExportable(t *testing.T) {
-	for descriptor := range reconnectReasons {
+	for descriptor := range failurecode.Reasons() {
 		code := FaultCode(descriptor[0], descriptor[1], descriptor[2])
 		data, _ := json.Marshal(record{Time: "2026-09-16T00:00:00Z", Code: code})
 		exported := sanitizeLog("agent.jsonl", strings.NewReader(string(data)+"\n"))
@@ -87,7 +89,7 @@ func TestTerminalFaultReasonsAreSanitizedAndExportable(t *testing.T) {
 }
 
 func TestActivationReasonsAreSanitizedAndExportable(t *testing.T) {
-	for descriptor := range reconnectReasons {
+	for descriptor := range failurecode.Reasons() {
 		code := ActivationCode(descriptor[0], descriptor[1], descriptor[2])
 		data, _ := json.Marshal(record{Time: "2026-09-16T00:00:00Z", Code: code})
 		exported := sanitizeLog("agent.jsonl", strings.NewReader(string(data)+"\n"))

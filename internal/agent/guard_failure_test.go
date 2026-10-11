@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/0disoft/krasis/internal/crashguard"
-	"github.com/0disoft/krasis/internal/productlog"
+	productlog "github.com/0disoft/krasis/internal/failurecode"
 	"testing"
 )
 

@@ -7,7 +7,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/0disoft/krasis/internal/productlog"
+	productlog "github.com/0disoft/krasis/internal/failurecode"
 	"github.com/0disoft/krasis/internal/transport"
 )
 

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/0disoft/krasis/internal/control"
-	"github.com/0disoft/krasis/internal/productlog"
+	productlog "github.com/0disoft/krasis/internal/failurecode"
 	"github.com/0disoft/krasis/internal/transport"
 )
 
