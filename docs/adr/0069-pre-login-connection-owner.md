@@ -219,6 +219,13 @@ native owner message queue에서 읽는다. 일반 peer worker는 Winlogon에 �
 로컬 입력, 새 entry는 오래된 숨김을 취소한다. 전역 cursor·ShowCursor count와
 foreground는 변경하지 않는다.
 
+로그인 child의 종료 실패는 인증된 고정 control pipe에서 한정된 종류만 서비스로
+전달한다. desktop·policy·input·capture·connection·cleanup·unknown은 모두 실패
+receipt이며 clean retirement로 승격하지 않는다. 서비스가 Stop의 실제 결과를
+받은 후 LOGIN-RUNTIME.json의 worker 단계와 reason을 남긴다. launch·pipe·bootstrap·
+activation 시작 실패도 별도 reason을 보존한다. 숫자 native 오류를 확보하지 못한
+경우 known=false를 유지하며 화면·입력·창 이름·사용자 정보는 기록하지 않는다.
+
 입력 port와 hook은 인증된 child runner와 service owner에 결합했다.
 
 ## 정상 취소와 정리 실패의 구분

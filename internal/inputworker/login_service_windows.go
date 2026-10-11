@@ -44,6 +44,9 @@ func runInstalledLoginService(ctx context.Context, installation *Installation, r
 				state = "FAILED"
 			}
 			recorder.record("start", state, err)
+			if worker != nil {
+				worker = &observedLoginWorker{Worker: worker, recorder: recorder}
+			}
 			return worker, err
 		},
 	})

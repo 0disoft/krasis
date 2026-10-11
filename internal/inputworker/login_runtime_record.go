@@ -1,6 +1,7 @@
 package inputworker
 
 import (
+	"errors"
 	"github.com/0disoft/krasis/internal/logindiag"
 	"sync"
 	"time"
@@ -27,7 +28,7 @@ func (r *loginRuntimeRecorder) record(stage, value string, cause error) {
 		next.Console = value
 	case "grant":
 		next.Grant = value
-	case "start":
+	case "start", "worker":
 		next.LastWorker = value
 	case "service":
 		next.Service = value
@@ -35,13 +36,18 @@ func (r *loginRuntimeRecorder) record(stage, value string, cause error) {
 		return
 	}
 	failure := logindiag.New("prepare", 3, cause)
-	sameFailure := cause == nil || next.LastFailure != nil && next.LastFailure.Stage == stage && next.LastFailure.Win32Error == failure.Win32Error && next.LastFailure.Win32Known == failure.Win32Known
+	reason := ""
+	var classified interface{ LoginRuntimeReason() string }
+	if errors.As(cause, &classified) && logindiag.ValidRuntimeReason(classified.LoginRuntimeReason()) {
+		reason = classified.LoginRuntimeReason()
+	}
+	sameFailure := cause == nil || next.LastFailure != nil && next.LastFailure.Stage == stage && next.LastFailure.Reason == reason && next.LastFailure.Win32Error == failure.Win32Error && next.LastFailure.Win32Known == failure.Win32Known
 	if next == r.value && r.value.Time != "" && sameFailure {
 		return
 	}
 	next.Time = time.Now().UTC().Format(time.RFC3339Nano)
 	if cause != nil {
-		next.LastFailure = &logindiag.RuntimeFailure{Time: next.Time, Stage: stage, Win32Error: failure.Win32Error, Win32Known: failure.Win32Known}
+		next.LastFailure = &logindiag.RuntimeFailure{Time: next.Time, Stage: stage, Reason: reason, Win32Error: failure.Win32Error, Win32Known: failure.Win32Known}
 	}
 	if !next.Valid() || r.persist == nil {
 		return

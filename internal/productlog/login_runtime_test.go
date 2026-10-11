@@ -17,6 +17,19 @@ func TestRuntimeReceiptTransferRetainsFailureWithoutPrivateFields(t *testing.T) 
 	if err != nil || !strings.Contains(string(clean), `"lastWorker":"FAILED"`) || !strings.Contains(string(clean), `"win32Error":5`) {
 		t.Fatal("runtime evidence lost", err)
 	}
+	v.LastFailure.Stage, v.LastFailure.Reason = "worker", "desktop"
+	data, _ = json.Marshal(v)
+	clean, err = SanitizeSupport(envelope(data))
+	if err != nil || !strings.Contains(string(clean), `"reason":"desktop"`) {
+		t.Fatal("terminal reason lost", err)
+	}
+	v.LastFailure.Reason = "SECRET/window/input"
+	data, _ = json.Marshal(v)
+	clean, err = SanitizeSupport(envelope(data))
+	if err != nil || strings.Contains(string(clean), "SECRET") || !strings.Contains(string(clean), "loginRuntimeIncomplete") {
+		t.Fatal("private reason escaped", err)
+	}
+	v.LastFailure.Reason = "desktop"
 	v.Console = "SECRET/user"
 	data, _ = json.Marshal(v)
 	clean, err = SanitizeSupport(envelope(data))

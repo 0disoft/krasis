@@ -22,6 +22,12 @@ const (
 	loginStop
 	loginClean
 	loginFailed
+	loginFailedDesktop
+	loginFailedPolicy
+	loginFailedInput
+	loginFailedCapture
+	loginFailedCleanup
+	loginFailedConnection
 )
 
 // No paths, commands, credentials or input values travel on this channel.
@@ -53,7 +59,7 @@ func newLoginBinding(session uint32, profile [32]byte) (loginBinding, error) {
 
 func encodeLoginControl(b loginBinding, kind loginControlKind) ([loginControlSize]byte, error) {
 	var data [loginControlSize]byte
-	if b.session == 0 || b.session == ^uint32(0) || b.profile == ([32]byte{}) || b.nonce == ([32]byte{}) || kind < loginChallenge || kind > loginFailed {
+	if b.session == 0 || b.session == ^uint32(0) || b.profile == ([32]byte{}) || b.nonce == ([32]byte{}) || kind < loginChallenge || kind > loginFailedConnection {
 		return data, ErrProtocol
 	}
 	copy(data[:4], "KRL1")
@@ -164,6 +170,7 @@ func serveLoginControl(ctx context.Context, stream net.Conn, binding loginBindin
 		cancel()
 	}()
 	result = run(lifetime)
+	failureKind := loginFailureKind(result)
 	// Joining the reader prevents a late command from acting on a new owner.
 	// Desktop/policy observation can stop the runtime just before the parent's
 	// next console tick. Allow that exact authenticated parent a bounded chance
@@ -182,7 +189,7 @@ func serveLoginControl(ctx context.Context, stream net.Conn, binding loginBindin
 	}
 	kind := loginClean
 	if result != nil {
-		kind = loginFailed
+		kind = failureKind
 	}
 	if err := writeLoginControl(stream, binding, kind); err != nil {
 		return errors.Join(result, ErrRecovery)
@@ -221,6 +228,9 @@ func startLoginControlWorker(parent context.Context, stream net.Conn, binding lo
 		actual, kind, err := readLoginControl(stream)
 		if err != nil || actual != binding || kind != loginClean {
 			w.err = ErrRecovery
+			if err == nil && actual == binding && kind >= loginFailed && kind <= loginFailedConnection {
+				w.err = errors.Join(w.err, &loginRuntimeFailure{reason: loginFailureReason(kind), cause: ErrRecovery})
+			}
 		}
 		cancel()
 		if !stopCancellation() {

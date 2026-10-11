@@ -103,12 +103,12 @@ func launchLoginConnection(ctx context.Context, installation *Installation, sess
 		}
 	}()
 	if err != nil {
-		return nil, err
+		return nil, &loginRuntimeFailure{reason: "launch", cause: err}
 	}
 	startup, cancel := context.WithTimeout(ctx, startupTimeout)
 	defer cancel()
 	if err := control.connect(startup); err != nil {
-		return nil, err
+		return nil, &loginRuntimeFailure{reason: "pipe", cause: err}
 	}
 	if err := control.SetDeadline(time.Now().Add(startupTimeout)); err != nil {
 		return nil, err
@@ -123,11 +123,11 @@ func launchLoginConnection(ctx context.Context, installation *Installation, sess
 		return nil
 	}
 	if err := loginParentBootstrap(startup, control, binding, authenticate); err != nil {
-		return nil, err
+		return nil, &loginRuntimeFailure{reason: "bootstrap", cause: err}
 	}
 	activated = true
 	if startup.Err() != nil || !stopStartup() {
-		return nil, ErrAuthority
+		return nil, &loginRuntimeFailure{reason: "activation", cause: ErrAuthority}
 	}
 	if err := control.SetDeadline(time.Time{}); err != nil {
 		return nil, ErrRecovery

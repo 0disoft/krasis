@@ -16,6 +16,7 @@ type Runtime struct {
 type RuntimeFailure struct {
 	Time       string `json:"time"`
 	Stage      string `json:"stage"`
+	Reason     string `json:"reason,omitempty"`
 	Win32Error uint32 `json:"win32Error"`
 	Win32Known bool   `json:"win32Known"`
 }
@@ -38,14 +39,17 @@ func (v Runtime) Valid() bool {
 	if v.Grant != "UNKNOWN" && v.Grant != "PRESENT" && v.Grant != "MISSING" && v.Grant != "INVALID" {
 		return false
 	}
-	if v.LastWorker != "NONE" && v.LastWorker != "STARTING" && v.LastWorker != "STARTED" && v.LastWorker != "FAILED" {
+	if v.LastWorker != "NONE" && v.LastWorker != "STARTING" && v.LastWorker != "STARTED" && v.LastWorker != "FAILED" && v.LastWorker != "STOPPED" {
 		return false
 	}
 	if f := v.LastFailure; f != nil {
 		if _, err := time.Parse(time.RFC3339Nano, f.Time); err != nil {
 			return false
 		}
-		if f.Stage != "console" && f.Stage != "grant" && f.Stage != "start" && f.Stage != "service" {
+		if f.Stage != "console" && f.Stage != "grant" && f.Stage != "start" && f.Stage != "service" && f.Stage != "worker" {
+			return false
+		}
+		if !ValidRuntimeReason(f.Reason) {
 			return false
 		}
 		if !(f.Win32Known && f.Win32Error != 0 || !f.Win32Known && f.Win32Error == 0) {
@@ -53,4 +57,12 @@ func (v Runtime) Valid() bool {
 		}
 	}
 	return true
+}
+
+func ValidRuntimeReason(reason string) bool {
+	switch reason {
+	case "", "unknown", "desktop", "policy", "input", "capture", "cleanup", "connection", "launch", "pipe", "bootstrap", "activation":
+		return true
+	}
+	return false
 }
