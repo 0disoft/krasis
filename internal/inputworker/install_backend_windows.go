@@ -259,7 +259,7 @@ func (backend *windowsInstallBackend) Finish(ctx context.Context) error {
 		}
 		// Delete lifecycle evidence before the transaction journal, so an
 		// interrupted removal remains recoverable.
-		for _, name := range []string{"INPUT-SERVICE.pending", "INPUT-SERVICE.record"} {
+		for _, name := range []string{"INPUT-SERVICE.pending", "INPUT-SERVICE.record", "LOGIN-RUNTIME.pending", "LOGIN-RUNTIME.json"} {
 			if err := removeInstallFile(ctx, filepath.Join(backend.files.root, name)); err != nil {
 				return err
 			}

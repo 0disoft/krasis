@@ -11,10 +11,40 @@ import (
 )
 
 func runInstalledLoginService(ctx context.Context, installation *Installation, ready func() error) (result error) {
+	recorder := newLoginRuntimeRecorder(saveLoginRuntime)
+	recorder.record("service", "STARTING", nil)
+	defer func() {
+		state := "STOPPED"
+		if result != nil {
+			state = "FAILED"
+		}
+		recorder.record("service", state, result)
+	}()
+	readConsole := func() (loginagent.Console, error) {
+		console, err := loginagent.ReadConsole()
+		state := "UNKNOWN"
+		switch console.State {
+		case loginagent.BeforeLogin:
+			state = "BEFORE_LOGIN"
+		case loginagent.UserSession:
+			state = "USER_SESSION"
+		case loginagent.Unavailable:
+			state = "UNAVAILABLE"
+		}
+		recorder.record("console", state, err)
+		return console, err
+	}
 	owner, err := loginagent.New(loginagent.Dependencies{
-		Read: loginagent.ReadConsole,
+		Read: readConsole,
 		Start: func(lifetime context.Context, session uint32, profile [32]byte) (loginagent.Worker, error) {
-			return launchLoginConnection(lifetime, installation, session, profile)
+			recorder.record("start", "STARTING", nil)
+			worker, err := launchLoginConnection(lifetime, installation, session, profile)
+			state := "STARTED"
+			if err != nil {
+				state = "FAILED"
+			}
+			recorder.record("start", state, err)
+			return worker, err
 		},
 	})
 	if err != nil {
@@ -34,9 +64,18 @@ func runInstalledLoginService(ctx context.Context, installation *Installation, r
 		_ = owner.Close()
 		return ErrAuthority
 	}
-	gate := &loginServiceGate{owner: owner, console: loginagent.ReadConsole, selection: func() (loginagent.Selection, error) {
+	recorder.record("service", "READY", nil)
+	gate := &loginServiceGate{owner: owner, console: readConsole, selection: func() (loginagent.Selection, error) {
 		now := time.Now().UTC()
 		grant, present, err := ReadLoginGrant(now)
+		state := "PRESENT"
+		if !present {
+			state = "MISSING"
+		}
+		if err != nil {
+			state = "INVALID"
+		}
+		recorder.record("grant", state, err)
 		if err != nil || !present {
 			return loginagent.Selection{}, err
 		}
