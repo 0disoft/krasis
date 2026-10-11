@@ -30,6 +30,8 @@ Application coordinator는 transition이 반환한 effect를 순서대로 실행
 heartbeat deadline은 caller가 제공한다. 만료된 현재-session liveness는 위 coordinator에 `FAULT_DETECTED`를 전달하며, 아직 살아 있는 session에는 state나 effect를 만들지 않는다. session 불일치, 시간이 뒤로 이동함, 잘못된 timeout처럼 liveness 판정을 신뢰할 수 없는 경우도 active lease를 유지하지 않고 같은 cleanup 경로로 보낸다.
 수신 heartbeat는 coordinator를 획득한 뒤 읽은 local observation으로 기존 deadline을 먼저 검사한다. 이미 timeout에 도달한 session은 늦은 frame으로 갱신하거나 수신 evidence에 넣지 않고 held input을 해제한 뒤 `LOCAL`로 수렴한다.
 
+ADR 0071에 따라 현재 inbound 입력도 action·session·epoch·sequence 검증과 주입 성공 뒤 liveness를 갱신한다. runtime owner 획득 후 기존 deadline을 먼저 검사하고, 주입 시작 전의 로컬 관찰 시각을 보존해 느린 주입 완료로 새 예산을 얻지 않는다. atomic lease watchdog도 같은 주입 시작 전 monotonic 시각을 사용한다. invalid·expired·실패 입력과 retired drain은 생존 근거가 아니다.
+
 destination의 local return tombstone과 exact하게 일치하는 retired inbound session의 늦은 heartbeat는
 `LOCAL`에서 오류로 승격하지 않고 drain한다. 이 drain은 liveness를 다시 활성화하거나 observation을
 갱신하지 않으며 runtime은 `LOCAL`로 남는다. 다른 session의 heartbeat와 tombstone identity 불일치는

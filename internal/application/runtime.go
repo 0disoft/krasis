@@ -487,6 +487,16 @@ func (runtime *SessionRuntime) HandleInputAction(
 	ctx context.Context,
 	envelope control.InputEnvelope,
 	action control.InputAction,
+) error {
+	return runtime.handleInputAction(ctx, envelope, action, nil, 0)
+}
+
+func (runtime *SessionRuntime) handleInputAction(
+	ctx context.Context,
+	envelope control.InputEnvelope,
+	action control.InputAction,
+	now func() time.Time,
+	timeout time.Duration,
 ) (returnErr error) {
 	disposition := InputDispositionRejected
 	if runtime.inputObserver != nil {
@@ -542,6 +552,10 @@ func (runtime *SessionRuntime) HandleInputAction(
 		return errors.New("input envelope was not accepted")
 	}
 	runtime.stream = next
+	progress, admittedAt, err := runtime.inputLivenessLocked(injectionCtx, now, timeout)
+	if err != nil {
+		return err
+	}
 
 	err = runtime.injectAction(injectionCtx, action)
 	if expired := injectionCtx.Err(); expired != nil {
@@ -551,6 +565,10 @@ func (runtime *SessionRuntime) HandleInputAction(
 	}
 	stopInjection()
 	if err == nil {
+		if now != nil {
+			runtime.liveness = progress
+			runtime.watch.Store(&LeaseWatch{State: runtime.control.State, SessionID: runtime.control.SessionID, Progress: admittedAt})
+		}
 		disposition = InputDispositionApplied
 		return nil
 	}

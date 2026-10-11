@@ -150,7 +150,7 @@ func runSession(
 			err = coordinateDispatch(inputCtx, coordinator, func() (dispatchErr error) {
 				defer func() { complete(dispatchErr); recorded = true }()
 				handoff.Record(inputCtx, handoff.InputCoordinator, time.Since(queued))
-				return DispatchInputFrame(inputCtx, frame, runtime)
+				return DispatchInputFrame(inputCtx, frame, observedInputRuntime{runtime, now, peerTimeout})
 			})
 			if !recorded {
 				complete(err)

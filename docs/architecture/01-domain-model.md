@@ -114,7 +114,7 @@ Application은 action을 검증한 뒤 현재 session, epoch와 sequence를 승�
 
 ## Peer liveness
 
-`PeerLiveness`는 현재 `SessionID`와 마지막 heartbeat를 로컬에서 관찰한 시각만 가진다. timeout 값은
+`PeerLiveness`는 현재 `SessionID`와 마지막으로 승인한 heartbeat 또는 정상 처리한 현재 inbound 입력의 로컬 관찰 시각을 가진다(ADR 0071). timeout 값은
 domain 상수가 아니라 Application이 실측 또는 설정에서 전달하는 값이다. deadline에 도달하면
 `FAULT_DETECTED` event를 만들며, 이전 session의 heartbeat와 시간이 뒤로 이동한 관찰은 liveness를
 갱신하지 않는다.
