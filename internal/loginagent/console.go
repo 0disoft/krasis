@@ -8,6 +8,8 @@ const (
 	wtsUserName           = 5
 	wtsConnectState       = 8
 	wtsClientProtocolType = 16
+	wtsActive             = 0
+	wtsConnected          = 1
 )
 
 func readConsole(active func() uint32, query func(uint32, uint32) ([]byte, error)) (Console, error) {
@@ -40,7 +42,11 @@ func readConsole(active func() uint32, query func(uint32, uint32) ([]byte, error
 	if active() != session {
 		return Console{}, ErrObservation
 	}
-	if binary.LittleEndian.Uint32(state) != 0 || binary.LittleEndian.Uint16(protocol) != 0 {
+	connection := binary.LittleEndian.Uint32(state)
+	// WTSActive describes a signed-in active session; a physical console
+	// waiting at LogonUI can be WTSConnected. Require both the physical
+	// console protocol and an empty user before granting BeforeLogin below.
+	if (connection != wtsActive && connection != wtsConnected) || binary.LittleEndian.Uint16(protocol) != 0 {
 		return Console{Session: session, State: Unavailable}, nil
 	}
 	if len(name) > 2 {

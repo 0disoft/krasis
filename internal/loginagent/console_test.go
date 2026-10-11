@@ -18,6 +18,10 @@ func TestConsoleReaderRefusesAmbiguousAndNonConsoleStates(t *testing.T) {
 		wantErr       bool
 	}{
 		{name: "prelogin", session: 1, want: BeforeLogin},
+		{name: "connected prelogin console", session: 1, connection: []byte{1, 0, 0, 0}, want: BeforeLogin},
+		{name: "connected existing user", session: 1, connection: []byte{1, 0, 0, 0}, user: []byte{'u', 0, 0, 0}, want: UserSession},
+		{name: "connected RDP", session: 1, connection: []byte{1, 0, 0, 0}, protocol: []byte{2, 0}, want: Unavailable},
+		{name: "connecting prelogin", session: 1, connection: []byte{2, 0, 0, 0}, want: Unavailable},
 		{name: "locked user", session: 1, user: []byte{'u', 0, 0, 0}, want: UserSession},
 		{name: "session zero", want: Unavailable},
 		{name: "no console", session: ^uint32(0), want: Unavailable},
