@@ -169,6 +169,23 @@ child EXE 진입점은 service bootstrap·Winlogon port·제한된 mTLS runner�
 
 ## Winlogon 전용 데스크톱 처리
 
+### 사용자 세션이 이미 준비된 잠금 화면
+
+g269 현장 진단에서는 PIN을 입력하기 전에도 WTS가 `USER_SESSION`을
+보고했고 일반 agent가 연결을 소유했다. 잠금 커튼에서 PIN 화면으로 바뀌면
+`fault_source_pointer_snapshot_failed`와 `lifecycle_desktop_switch`가 기록됐다.
+사용자 값이 있다는 사실만으로 활성 입력 데스크톱을 Default로 간주할 수 없다.
+
+`RunInteractive`는 service/agent 인증을 받은 설치형 입력 전용 worker에만
+연결하는 별도 primitive다. SYSTEM·UIAccess·System 무결성·활성 콘솔 세션을
+검증하고 Windows가 선택한 정확한 Default 또는 Winlogon 핸들만 연다.
+입력마다 기존 scope의 활성 여부를 확인하고, 비활성이면 원래 thread desktop을
+복원하고 핸들을 닫은 다음 새 활성 데스크톱을 연다. 이 thread에는 window나
+hook이 없다. 정리 실패는 worker를 차단하며 입력을 재실행하지 않는다.
+입력 lease와 pressed journal은 한 worker가 계속 소유한다. 데스크톱 전환 뒤의
+key-up도 새로운 입력이 아닌 같은 journal의 해제로 처리한다. portable Run과
+login source hook의 고정 데스크톱 정책은 유지한다.
+
 `inputdesktop.RunWinlogon`은 authenticated service-child가 별도로 고른 고정
 Winlogon 대상만 연다. 기존 `Run`의 Default 이름 검증은 유지한다. 일반 프로세스가
 권한을 주장하는 callback을 넘겨도 실제 SYSTEM·UIAccess·System 무결성·활성
