@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"time"
+
+	"github.com/0disoft/krasis/internal/agentlifecycle"
 )
 
 const protectedRecoveryDelay = 250 * time.Millisecond
@@ -12,9 +14,28 @@ const protectedRecoveryDelay = 250 * time.Millisecond
 // keeps the user's connection request alive. The peer observes EOF and retries;
 // a manual disconnect still sends the explicit stop frame.
 func (operations *Operations) runWithProtectedRecovery(ctx context.Context, alias string, observer *sessionObserver, protectedActive func() bool, wait func(context.Context, time.Duration) error) error {
+	defer func() {
+		operations.mu.Lock()
+		defer operations.mu.Unlock()
+		if operations.sessionDone == observer.done {
+			operations.sessionTransition = nil
+			operations.desktopChanging = false
+		}
+	}()
 	for {
-		err := operations.runner(ctx, alias, observer)
-		if ctx.Err() != nil || !protectedInputOnly(err) {
+		// Only this runner's capture, transport and input lease are cancelled.
+		// The process/local API and the user's connection intent remain alive.
+		attempt, stop := context.WithCancelCause(ctx)
+		operations.mu.Lock()
+		operations.sessionTransition = stop
+		operations.desktopChanging = false
+		operations.mu.Unlock()
+		err := operations.runner(attempt, alias, observer)
+		cause := context.Cause(attempt)
+		stop(context.Canceled)
+		var transition *agentlifecycle.TransitionError
+		desktopChanged := errors.As(cause, &transition) && cancellationOnly(err, cause)
+		if ctx.Err() != nil || (!desktopChanged && !protectedInputOnly(err)) {
 			return err
 		}
 		operations.mu.Lock()
@@ -27,15 +48,32 @@ func (operations *Operations) runWithProtectedRecovery(ctx context.Context, alia
 		operations.recordLocked("protected_input_reconnecting")
 		operations.mu.Unlock()
 
-		// Keep local input available until the protected UI has gone. A short
-		// delay also prevents a rapidly changing foreground from spinning.
+		// Portable recovery waits until the protected UI has gone. A verified
+		// installed desktop transition can rebuild the receive-only session
+		// while it remains open. Both paths avoid a tight retry loop.
 		for {
 			if waitErr := wait(ctx, protectedRecoveryDelay); waitErr != nil {
 				return errors.Join(waitErr, context.Cause(ctx))
 			}
-			if !protectedActive() {
+			if desktopChanged || !protectedActive() {
 				break
 			}
 		}
 	}
+}
+
+func (operations *Operations) handleProtectedTransition(event agentlifecycle.Event) bool {
+	if event != agentlifecycle.EventSessionLock && event != agentlifecycle.EventDesktopSwitch {
+		return false
+	}
+	operations.mu.Lock()
+	defer operations.mu.Unlock()
+	if operations.root.Err() != nil || operations.sessionDone == nil || operations.sessionTransition == nil ||
+		operations.inputBackend != "PROTECTED" || operations.sessionFaulted || operations.manualStop || operations.updateApplying || (operations.sessionState == "DISCONNECTING" && !operations.desktopChanging) {
+		return false
+	}
+	operations.recordLocked("lifecycle_" + string(event))
+	operations.desktopChanging = true
+	operations.sessionTransition(&agentlifecycle.TransitionError{Event: event})
+	return true
 }

@@ -80,6 +80,56 @@ func TestOwnerRejectsInvalidMonitorAndCanceledParent(t *testing.T) {
 	}
 }
 
+func TestOwnerContinuesHandledDesktopTransitionsButStillStopsForLogoff(t *testing.T) {
+	monitor := newFakeMonitor()
+	owner, err := Start(context.Background(), func() (Monitor, error) { return monitor, nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer owner.Close()
+	handled := make(chan Event, 2)
+	owner.SetSessionTransitionHandler(func(event Event) bool { handled <- event; return true })
+	for _, event := range []Event{EventSessionLock, EventDesktopSwitch} {
+		monitor.events <- event
+		select {
+		case got := <-handled:
+			if got != event || owner.Context().Err() != nil {
+				t.Fatal("handled transition stopped the process", got)
+			}
+		case <-time.After(time.Second):
+			t.Fatal("missing transition")
+		}
+	}
+	monitor.events <- EventLogoff
+	select {
+	case <-owner.Context().Done():
+	case <-time.After(time.Second):
+		t.Fatal("handler suppressed logoff")
+	}
+	if owner.Event() != EventLogoff {
+		t.Fatal(owner.Event())
+	}
+}
+
+func TestOwnerStillStopsWhenSessionCannotHandleTransition(t *testing.T) {
+	monitor := newFakeMonitor()
+	owner, err := Start(context.Background(), func() (Monitor, error) { return monitor, nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer owner.Close()
+	owner.SetSessionTransitionHandler(func(Event) bool { return false })
+	monitor.events <- EventSessionLock
+	select {
+	case <-owner.Context().Done():
+	case <-time.After(time.Second):
+		t.Fatal("unverified transition continued")
+	}
+	if owner.Event() != EventSessionLock {
+		t.Fatal(owner.Event())
+	}
+}
+
 type fakeMonitor struct {
 	events     chan Event
 	done       chan struct{}

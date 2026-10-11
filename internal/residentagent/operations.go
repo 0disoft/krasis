@@ -60,6 +60,8 @@ type Operations struct {
 
 	mu                sync.Mutex
 	sessionStop       context.CancelCauseFunc
+	sessionTransition context.CancelCauseFunc
+	desktopChanging   bool
 	sessionDone       chan struct{}
 	guardExitDone     <-chan struct{}
 	sessionState      string

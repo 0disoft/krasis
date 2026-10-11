@@ -192,8 +192,21 @@ worker에만 이 primitive를 연결한다. portable 및 test Serve는 Default �
 선택된 연결만 receive-only hook을 사용한다. 로컬 source hook·raw mouse·capture를
 설치하거나 active라고 표시하지 않고, 기존 mTLS/inbound 승인과 service lease로
 들어오는 원격 입력만 유지한다. 일반 source 활성화는 이 상태에서 거부한다.
-Chrome의 Default desktop PIN 경로는 그대로 유지한다. DesktopSwitch에 의한
-기존 agent 재시작은 남아 있어 현장에서 재연결 시간도 별도로 확인해야 한다.
+Chrome의 Default desktop PIN 경로는 그대로 유지한다.
+
+g270 잠금 시험에서는 `lifecycle_session_lock` 뒤 일반 agent가 종료됐고,
+약 48초 뒤 재시작했다. 이 구간에는 입력 lease가 준비되지 않았다. g271은
+실제 설치 backend가 선택된 활성 연결에 한해 SessionLock/DesktopSwitch를
+프로세스 종료 대신 연결 runner 취소로 처리한다. source hook·입력 해제·worker·
+transport·guard 정리가 모두 반환된 뒤 250ms를 기다리고 현재 데스크톱으로
+새 runner를 준비한다. secure desktop이 유지돼도 receive-only 수신을 시작하며,
+Default로 돌아오면 같은 전환 경로로 로컬 capture를 다시 준비한다.
+
+중복 전환은 정리 중인 runner만 취소하며 별도 worker를 동시에 만들지 않는다.
+정리 오류·시간 초과는 기존 FAULTED 차단을 유지하며 자동 재시작하지 않는다.
+portable/미확인 backend, 수동 해제, 갱신 중에는 기존 프로세스 종료 정책을
+유지한다. 로그오프·세션 해제·절전·종료도 계속 프로세스를 중단한다.
+로그인 전 grant·서비스의 사용자 세션 admission 정책은 바꾸지 않는다.
 
 `inputdesktop.RunWinlogon`은 authenticated service-child가 별도로 고른 고정
 Winlogon 대상만 연다. 기존 `Run`의 Default 이름 검증은 유지한다. 일반 프로세스가

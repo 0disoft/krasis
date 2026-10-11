@@ -23,11 +23,12 @@ type Owner struct {
 	monitor Monitor
 	done    chan struct{}
 
-	closing  atomic.Bool
-	mu       sync.Mutex
-	event    Event
-	close    sync.Once
-	closeErr error
+	closing    atomic.Bool
+	mu         sync.Mutex
+	event      Event
+	close      sync.Once
+	closeErr   error
+	transition func(Event) bool
 }
 
 func Start(parent context.Context, start StartMonitor) (*Owner, error) {
@@ -72,6 +73,15 @@ func (owner *Owner) Event() Event {
 	return owner.event
 }
 
+// A product session can retire and rebuild its verified protected input path
+// without retiring the process. All other events still stop the process, and
+// an unhandled transition retains the default fail-closed behavior.
+func (owner *Owner) SetSessionTransitionHandler(handler func(Event) bool) {
+	owner.mu.Lock()
+	defer owner.mu.Unlock()
+	owner.transition = handler
+}
+
 func (owner *Owner) Close() error {
 	if owner == nil {
 		return nil
@@ -104,6 +114,12 @@ func (owner *Owner) watch(parent context.Context) {
 			if event.Validate() != nil {
 				owner.cancel(ErrMonitorStopped)
 				return
+			}
+			owner.mu.Lock()
+			handler := owner.transition
+			owner.mu.Unlock()
+			if (event == EventSessionLock || event == EventDesktopSwitch) && handler != nil && handler(event) {
+				continue
 			}
 			owner.mu.Lock()
 			if owner.event == "" {

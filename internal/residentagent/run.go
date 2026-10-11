@@ -130,6 +130,9 @@ func run(ctx context.Context, localAppData string, dependencies runDependencies)
 	operations.log = dependencies.log
 	operations.localAppData = localAppData
 	if dependencies.productAdapters {
+		lifecycle.SetSessionTransitionHandler(operations.handleProtectedTransition)
+	}
+	if dependencies.productAdapters {
 		identities, err := productidentity.New(paths.Identity)
 		if err != nil {
 			return err
