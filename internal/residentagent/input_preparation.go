@@ -68,6 +68,15 @@ func (input *privilegedLeaseInput) prepareIdle(ctx context.Context) (bool, error
 	if input.stopped || input.client != nil || input.prepare == nil || (!input.expires.IsZero() && !input.expires.After(time.Now())) || ctx.Err() != nil {
 		return false, nil
 	}
+	input.cursor.mu.Lock()
+	presenting := input.cursor.cancel != nil
+	input.cursor.mu.Unlock()
+	if presenting {
+		// The passive owner already uses the serial service endpoint. A hint
+		// must not wait behind it while holding the input admission mutex.
+		// Actual entry retires/join it before opening the next input lease.
+		return false, nil
+	}
 	input.preparationStarted = lockedAt
 	input.preparationFinished = time.Time{}
 	// Runs before the earlier Unlock defer. Only preparation and its receipt

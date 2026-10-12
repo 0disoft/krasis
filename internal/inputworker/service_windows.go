@@ -192,6 +192,7 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 				err = leaseErr
 			}
 			if closeErr := channel.Close(); closeErr != nil && err == nil {
+				returned = presentationReturn{}
 				err = closeErr
 			}
 		}

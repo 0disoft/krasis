@@ -282,6 +282,11 @@ pass-through hook은 첫 로컬 클릭·키를 Windows로 넘기기 전에 숨�
 전역 cursor 자원·ShowCursor count, PIN 입력 내용은 변경하거나 수집하지 않는다.
 커서의 실제 숨김·직접 입력 복원과 로그인 직후 지연 개선은 현장 시험 대상이다.
 
+g277은 passive owner가 서비스 endpoint를 사용하는 동안 선택적 준비 hint를
+생략하여 input admission mutex를 잡은 채 endpoint를 기다리지 않는다. 실제
+진입은 기존 passive open/close를 join한 뒤 승인한다. 입력 channel close가
+실패한 경우 반환 receipt도 폐기하며 그 반환을 숨김 권한으로 사용할 수 없다.
+
 `inputdesktop.RunWinlogon`은 authenticated service-child가 별도로 고른 고정
 Winlogon 대상만 연다. 기존 `Run`의 Default 이름 검증은 유지한다. 일반 프로세스가
 권한을 주장하는 callback을 넘겨도 실제 SYSTEM·UIAccess·System 무결성·활성

@@ -13,6 +13,19 @@ import (
 
 type preparationCapableConnection struct{ agent.Connection }
 
+func TestPreparationDoesNotQueueBehindPassiveCursorOwner(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	input := &privilegedLeaseInput{prepare: func(context.Context) error { t.Fatal("preparation queued behind passive service owner"); return nil }}
+	input.cursor.cancel = cancel
+	if prepared, err := input.prepareIdle(ctx); prepared || err != nil {
+		t.Fatal("passive presentation renewed preparation", prepared, err)
+	}
+	if input.cursor.cancel == nil {
+		t.Fatal("optional hint erased presentation")
+	}
+}
+
 func (preparationCapableConnection) SupportsInputPreparation() bool { return true }
 
 func TestProductDisconnectWrapperPreservesNegotiatedPreparation(t *testing.T) {
