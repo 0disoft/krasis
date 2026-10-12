@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/0disoft/krasis/internal/application"
+	"github.com/0disoft/krasis/internal/inputdesktop"
 )
 
 const (
@@ -155,7 +156,7 @@ func writeReport(writer io.Writer, report Report, result error) error {
 	if result != nil {
 		data[5] = 1
 	}
-	if errors.Is(result, ErrRecovery) || report.Recovery.Remaining != 0 {
+	if errors.Is(result, ErrRecovery) || errors.Is(result, inputdesktop.ErrCleanup) || report.Recovery.Remaining != 0 {
 		data[5] = 2
 	}
 	binary.BigEndian.PutUint64(data[8:16], report.Completed)
@@ -166,6 +167,30 @@ func writeReport(writer io.Writer, report Report, result error) error {
 		binary.BigEndian.PutUint32(data[16+i*4:20+i*4], uint32(value))
 	}
 	return writeFrame(writer, data[:])
+}
+
+// Only a requested, pure cancellation can become a clean stop. An empty
+// pressed journal does not prove that desktop restoration/handle cleanup worked.
+func normalizeWorkerStop(requested bool, report Report, result error) error {
+	if requested && report.Recovery.Remaining == 0 && errors.Is(result, context.Canceled) && workerCancellationOnly(result) {
+		return nil
+	}
+	return result
+}
+
+func workerCancellationOnly(err error) bool {
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		for _, child := range joined.Unwrap() {
+			if !workerCancellationOnly(child) {
+				return false
+			}
+		}
+		return true
+	}
+	if wrapped, ok := err.(interface{ Unwrap() error }); ok {
+		return workerCancellationOnly(wrapped.Unwrap())
+	}
+	return err == context.Canceled
 }
 
 func readReport(reader io.Reader) (Report, error) {

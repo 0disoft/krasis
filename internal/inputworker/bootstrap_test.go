@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/0disoft/krasis/internal/application"
+	"github.com/0disoft/krasis/internal/inputdesktop"
 )
 
 func TestLeaseBootstrapRejectsPaddingExpiredAndUnboundedLeases(t *testing.T) {
@@ -108,6 +109,39 @@ func TestSupervisorWaitsForRecoveryReceiptBeforeReturning(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("completed recovery remained blocked")
+	}
+}
+
+func TestWorkerStopPreservesDesktopCleanupAndRecoveryReceipt(t *testing.T) {
+	for _, cause := range []error{inputdesktop.ErrCleanup, errors.Join(context.Canceled, inputdesktop.ErrCleanup)} {
+		result := normalizeWorkerStop(true, Report{}, cause)
+		if !errors.Is(result, inputdesktop.ErrCleanup) {
+			t.Fatal("empty journal hid desktop cleanup failure")
+		}
+		var wire bytes.Buffer
+		if err := writeReport(&wire, Report{}, result); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := readReport(&wire); !errors.Is(err, ErrRecovery) {
+			t.Fatal("cleanup failure did not fence the next lease", err)
+		}
+	}
+	if normalizeWorkerStop(true, Report{}, errors.Join(context.Canceled, context.Canceled)) != nil {
+		t.Fatal("pure requested cancellation not normalized")
+	}
+	for _, tc := range []struct {
+		requested bool
+		report    Report
+		cause     error
+	}{
+		{false, Report{}, context.Canceled},
+		{true, Report{Recovery: application.ReleaseReport{Remaining: 1}}, context.Canceled},
+		{true, Report{}, errors.Join(context.Canceled, ErrAuthority)},
+		{true, Report{}, errors.Join(context.Canceled, context.DeadlineExceeded)},
+	} {
+		if normalizeWorkerStop(tc.requested, tc.report, tc.cause) == nil {
+			t.Fatal("non-clean stop normalized")
+		}
 	}
 }
 

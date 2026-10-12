@@ -246,9 +246,7 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 		_ = control.SetWriteDeadline(time.Now().Add(startupTimeout))
 		return writeStartupReady(control, profile)
 	}, &profile, desktop)
-	if requested.Load() && errors.Is(result, context.Canceled) && report.Recovery.Remaining == 0 {
-		result = nil
-	}
+	result = normalizeWorkerStop(requested.Load(), report, result)
 	_ = control.SetWriteDeadline(time.Now().Add(time.Second))
 	if writeReport(control, report, result) != nil {
 		return ErrRecovery

@@ -39,6 +39,7 @@ type privilegedLeaseInput struct {
 	dispose                                 func() error
 	shutdownOnce                            sync.Once
 	shutdownErr                             error
+	closeErr                                error
 	stopped                                 bool
 	preparationStarted, preparationFinished time.Time
 }
@@ -77,7 +78,10 @@ func (input *privilegedLeaseInput) open(ctx context.Context, identity applicatio
 	acquired := time.Now()
 	handoff.Record(ctx, handoff.OpenLock, acquired.Sub(started))
 	handoff.RecordPreparationLock(ctx, preparationLockOverlap(started, acquired, input.preparationStarted, input.preparationFinished))
-	if input.stopped || input.client != nil || input.connect == nil {
+	if input.stopped || input.client != nil || input.connect == nil || input.closeErr != nil {
+		if input.closeErr != nil {
+			return errors.Join(errPrivilegedInput, input.closeErr)
+		}
 		return errPrivilegedInput
 	}
 	expires := now.Add(55 * time.Minute)
@@ -93,12 +97,15 @@ func (input *privilegedLeaseInput) open(ctx context.Context, identity applicatio
 	handoff.Record(ctx, handoff.ConnectTotal, time.Since(started))
 	if err != nil || client == nil {
 		if client != nil {
-			_ = client.Close()
+			input.closeErr = errors.Join(input.closeErr, client.Close())
 		}
 		if input.event != nil {
 			input.event("installed_input_connect_failed")
 			input.event(inputworker.ConnectionFailureEvent(err))
 			input.event(inputworker.ConnectionNativeFailureEvent(err))
+		}
+		if input.closeErr != nil {
+			return errors.Join(errPrivilegedInput, input.closeErr)
 		}
 		return errPrivilegedInput
 	}
@@ -139,8 +146,8 @@ func (input *privilegedLeaseInput) open(ctx context.Context, identity applicatio
 
 func (input *privilegedLeaseInput) close(intent *control.ReturnIntent) {
 	input.mu.Lock()
+	defer input.mu.Unlock()
 	if intent != nil && (intent.SessionID != input.identity.SessionID || intent.Epoch != input.identity.Epoch) {
-		input.mu.Unlock()
 		return
 	}
 	client, cancel, done := input.client, input.cancel, input.done
@@ -148,14 +155,13 @@ func (input *privilegedLeaseInput) close(intent *control.ReturnIntent) {
 	input.profile = nil
 	input.client, input.cancel, input.done = nil, nil, nil
 	input.identity = application.LeaseIdentity{}
-	input.mu.Unlock()
 	started := time.Now()
 	defer func() { handoff.Record(profile, handoff.InputClose, time.Since(started)) }()
 	if cancel != nil {
 		cancel()
 	}
 	if client != nil {
-		_ = client.Close()
+		input.closeErr = errors.Join(input.closeErr, client.Close())
 	}
 	if done != nil {
 		<-done
@@ -171,8 +177,16 @@ func (input *privilegedLeaseInput) shutdown() error {
 		input.stopped = true
 		input.mu.Unlock()
 		input.close(nil)
+		input.mu.Lock()
+		input.shutdownErr = input.closeErr
+		input.mu.Unlock()
 		if input.dispose != nil {
-			input.shutdownErr = input.dispose()
+			disposeErr := input.dispose()
+			if input.shutdownErr == nil {
+				input.shutdownErr = disposeErr
+			} else {
+				input.shutdownErr = errors.Join(input.shutdownErr, disposeErr)
+			}
 		}
 	})
 	return input.shutdownErr
