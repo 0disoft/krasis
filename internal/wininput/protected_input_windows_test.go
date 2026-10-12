@@ -11,12 +11,26 @@ func TestProtectedCredentialReasonKeepsUnknownFailClosed(t *testing.T) {
 	}{
 		{credentialForegroundMissing, ProtectedInputClear},
 		{credentialForegroundOther, ProtectedInputClear},
+		{credentialForegroundLockScreen, ProtectedInputClear},
 		{credentialForegroundBroker, ProtectedInputCredentialBroker},
 		{credentialForegroundUnknown, ProtectedInputIdentityUnknown},
 		{credentialForegroundState(255), ProtectedInputIdentityUnknown},
 	} {
 		if got := protectedCredentialReason(test.state); got != test.want {
 			t.Fatalf("state=%d got=%d want=%d", test.state, got, test.want)
+		}
+	}
+}
+
+func TestLockScreenImageDoesNotMatchOtherExecutables(t *testing.T) {
+	for _, path := range []string{`C:\Windows\SystemApps\LockApp.exe`, `C:\Windows\SystemApps\LOCKAPP.EXE`} {
+		if !isLockScreenImage(path) {
+			t.Fatal("lock-screen image not recognized")
+		}
+	}
+	for _, path := range []string{`C:\LockApp.exe.bak`, `C:\LockApp.exe\chrome.exe`} {
+		if isLockScreenImage(path) {
+			t.Fatal("unrelated foreground selected protected presentation")
 		}
 	}
 }

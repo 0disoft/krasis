@@ -23,54 +23,68 @@ func RunInteractive(ctx context.Context, authorize func() error, callback func(*
 		}
 		return nil
 	}
-	open := func() (binding, error) {
-		if err := checked(); err != nil {
-			return nil, err
-		}
-		if !privilegedLoginToken() {
-			return nil, ErrUnavailable
-		}
-		original, _, callErr := getThread.Call(currentThreadID())
-		if original == 0 {
-			return nil, errors.Join(ErrUnavailable, callErr)
-		}
-		handle, _, callErr := openInput.Call(0, 0, uintptr(AccessMask))
-		if handle == 0 {
-			return nil, desktopPreparing(errors.Join(ErrUnavailable, callErr))
-		}
-		name, err := readDesktopName(handle)
-		if err != nil {
-			return nil, desktopPreparing(errors.Join(err, closeUnbound(handle)))
-		}
-		var target desktopTarget
-		switch name {
-		case "Default":
-			target = defaultTarget
-		case "Winlogon":
-			target = winlogonTarget
-		default:
-			err = errors.Join(err, ErrUnavailable)
-		}
-		if err != nil {
-			return nil, errors.Join(err, closeUnbound(handle))
-		}
-		desktop := &desktopBinding{target: target, original: original, owned: handle}
-		if err := desktop.verifyName(); err != nil {
-			return nil, errors.Join(err, closeUnbound(handle))
-		}
-		if err := desktop.active(); err != nil {
-			return nil, desktopPreparing(errors.Join(err, closeUnbound(handle)))
-		}
-		if err := checked(); err != nil {
-			return nil, errors.Join(err, closeUnbound(handle))
-		}
-		ok, _, callErr := setThread.Call(handle)
-		if ok == 0 {
-			return nil, errors.Join(ErrUnavailable, callErr, closeUnbound(handle))
-		}
-		return desktop, nil
-	}
+	open := func() (binding, error) { return openInteractiveDesktop(checked) }
 	return run(ctx, callback, func() (binding, error) {
 		return &interactiveBinding{open: open, authorize: checked}, nil
 	}, currentThreadID, runtime.LockOSThread, runtime.UnlockOSThread)
+}
+
+// RunPresentation binds once to the current Default or Winlogon desktop. A
+// window/hook owner must retire on a switch; it must never follow a new desktop
+// with its existing native objects. The same installed-worker token gate applies.
+func RunPresentation(ctx context.Context, authorize func() error, callback func(*Scope) error) error {
+	if ctx == nil || authorize == nil || callback == nil {
+		return ErrInvalid
+	}
+	return run(ctx, callback, func() (binding, error) {
+		return openInteractiveDesktop(authorize)
+	}, currentThreadID, runtime.LockOSThread, runtime.UnlockOSThread)
+}
+
+func openInteractiveDesktop(checked func() error) (binding, error) {
+	if err := checked(); err != nil {
+		return nil, err
+	}
+	if !privilegedLoginToken() {
+		return nil, ErrUnavailable
+	}
+	original, _, callErr := getThread.Call(currentThreadID())
+	if original == 0 {
+		return nil, errors.Join(ErrUnavailable, callErr)
+	}
+	handle, _, callErr := openInput.Call(0, 0, uintptr(AccessMask))
+	if handle == 0 {
+		return nil, desktopPreparing(errors.Join(ErrUnavailable, callErr))
+	}
+	name, err := readDesktopName(handle)
+	if err != nil {
+		return nil, desktopPreparing(errors.Join(err, closeUnbound(handle)))
+	}
+	var target desktopTarget
+	switch name {
+	case "Default":
+		target = defaultTarget
+	case "Winlogon":
+		target = winlogonTarget
+	default:
+		err = errors.Join(err, ErrUnavailable)
+	}
+	if err != nil {
+		return nil, errors.Join(err, closeUnbound(handle))
+	}
+	desktop := &desktopBinding{target: target, original: original, owned: handle}
+	if err := desktop.verifyName(); err != nil {
+		return nil, errors.Join(err, closeUnbound(handle))
+	}
+	if err := desktop.active(); err != nil {
+		return nil, desktopPreparing(errors.Join(err, closeUnbound(handle)))
+	}
+	if err := checked(); err != nil {
+		return nil, errors.Join(err, closeUnbound(handle))
+	}
+	ok, _, callErr := setThread.Call(handle)
+	if ok == 0 {
+		return nil, errors.Join(ErrUnavailable, callErr, closeUnbound(handle))
+	}
+	return desktop, nil
 }

@@ -9,6 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"syscall"
+	"time"
 	"unsafe"
 )
 
@@ -21,7 +22,8 @@ const (
 // The window and low-level hooks share one OS thread. Physical input hides the
 // passive shield synchronously before CallNextHookEx, without swallowing input.
 type returnCursorShield struct {
-	loginContext    context.Context // Only inspected on the native owner thread.
+	report          SourcePresentationReporter // Configured before the native owner starts.
+	loginContext    context.Context            // Only inspected on the native owner thread.
 	window          atomic.Uintptr
 	generation      atomic.Uint64
 	snapshotID      atomic.Uint64
@@ -134,31 +136,53 @@ func (shield *returnCursorShield) prepare() func() {
 }
 
 func (shield *returnCursorShield) show(generation uint64) {
+	started, result := time.Now(), "unavailable"
+	defer func() { shield.observe("return_show", result, started) }()
 	if sourceLoginDesktopCheck(shield.loginContext) != nil {
+		result = "inactive"
 		return
 	}
 	shield.mu.Lock()
 	defer shield.mu.Unlock()
 	if shield.generation.Load() != generation {
+		result = "superseded"
 		return
 	}
 	position, err := returnCursorPosition()
 	if err != nil || position != shield.position {
+		result = "moved"
+		if err != nil {
+			result = "failed"
+		}
 		return
 	}
 	if window := shield.window.Load(); window != 0 {
 		shield.visible = true
-		shield.record("cursor-present", returnCursorShowWindow(window, position))
+		err := returnCursorShowWindow(window, position)
+		shield.record("cursor-present", err)
+		result = "accepted"
+		if err != nil {
+			result = "failed"
+		}
+	}
+}
+
+func (shield *returnCursorShield) observe(operation, result string, started time.Time) {
+	if shield.report != nil {
+		shield.report(operation, result, time.Since(started))
 	}
 }
 
 func (shield *returnCursorShield) hide() {
 	if shield.visible {
+		started, result := time.Now(), "accepted"
 		if err := returnCursorHideWindow(shield.window.Load()); err != nil {
 			shield.record("cursor-restore", err)
+			result = "failed"
 		} else {
 			shield.visible = false
 		}
+		shield.observe("return_hide", result, started)
 	}
 }
 

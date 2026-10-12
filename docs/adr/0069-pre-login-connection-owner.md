@@ -287,6 +287,14 @@ g277은 passive owner가 서비스 endpoint를 사용하는 동안 선택적 준
 진입은 기존 passive open/close를 join한 뒤 승인한다. 입력 channel close가
 실패한 경우 반환 receipt도 폐기하며 그 반환을 숨김 권한으로 사용할 수 없다.
 
+잠금 화면의 LockApp은 Default desktop에 나타날 수 있으므로 커서 표시만
+별도로 서비스 소유 경로로 보낸다. LockApp 분류는 기존 입력 캡처·허용 정책을
+바꾸지 않는다. 서비스의 passive owner는 실제 활성 Default/Winlogon 중 하나에
+한 번만 연결하며 창·hook을 만든 뒤 다른 desktop으로 따라가지 않는다. 토큰·
+채널·반환 receipt 검증과 native 정리 오류 처리는 그대로 유지한다.
+일반 에이전트의 cursor snapshot·show·hide는 고정 결과와 시간 bucket만 기록한다.
+보호 cursor ready는 보조 owner의 준비 응답이며 실제 화면 숨김의 관측값은 아니다.
+
 `inputdesktop.RunWinlogon`은 authenticated service-child가 별도로 고른 고정
 Winlogon 대상만 연다. 기존 `Run`의 Default 이름 검증은 유지한다. 일반 프로세스가
 권한을 주장하는 callback을 넘겨도 실제 SYSTEM·UIAccess·System 무결성·활성

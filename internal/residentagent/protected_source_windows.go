@@ -22,6 +22,7 @@ import (
 type protectedSource struct {
 	*wininput.SourceHook
 	blocked         func() bool
+	cursorProtected func() bool
 	event           func(string)
 	native          agent.SourceHook
 	mu              sync.Mutex
@@ -35,7 +36,7 @@ type protectedSource struct {
 }
 
 func protectedSessionHook(hook *wininput.SourceHook, event func(string)) agent.SourceHook {
-	return &protectedSource{SourceHook: hook, native: hook, event: event, blocked: func() bool {
+	return &protectedSource{SourceHook: hook, native: hook, event: event, cursorProtected: wininput.ProtectedReturnCursorRequired, blocked: func() bool {
 		switch wininput.InspectProtectedInput() {
 		case wininput.ProtectedInputDesktopUnavailable, wininput.ProtectedInputNonDefaultDesktop:
 			return true
@@ -205,12 +206,14 @@ func (h *protectedSource) SourceCapture() wininput.SourceActivation {
 }
 
 func (h *protectedSource) PrepareReturnCursor() func() {
-	if !h.captureReady() || h.blocked() {
+	if !h.captureReady() || h.blocked() || h.cursorProtected != nil && h.cursorProtected() {
 		if h.protectedCursor != nil {
+			h.observe("installed_return_cursor_route_protected")
 			return h.protectedCursor.PrepareReturnCursor()
 		}
 		return nil
 	}
+	h.observe("installed_return_cursor_route_native")
 	return h.SourceHook.PrepareReturnCursor()
 }
 

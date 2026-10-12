@@ -20,3 +20,17 @@ func TestPresentationOutcomesSurviveSanitizedExportWithoutNativeData(t *testing.
 		t.Fatal("untrusted text entered presentation diagnostics")
 	}
 }
+
+func TestReturnCursorOutcomesSurviveExport(t *testing.T) {
+	l := &Logger{queue: make(chan record, 4)}
+	for _, outcome := range []struct{ operation, result string }{
+		{"return_snapshot", "timeout"}, {"return_show", "moved"}, {"return_show", "accepted"}, {"return_hide", "failed"},
+	} {
+		l.Presentation(outcome.operation, outcome.result, time.Millisecond)
+		raw, _ := json.Marshal(<-l.queue)
+		got := sanitizeLog("agent.jsonl", strings.NewReader(string(raw)+"\n"))
+		if len(got.Events) != 1 {
+			t.Fatal("return cursor outcome removed from export", outcome)
+		}
+	}
+}

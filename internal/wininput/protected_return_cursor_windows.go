@@ -12,14 +12,14 @@ import (
 	"github.com/0disoft/krasis/internal/inputdesktop"
 )
 
-// RunProtectedReturnCursor is a passive, fixed Winlogon window owned by an
+// RunProtectedReturnCursor is a passive, fixed active-desktop window owned by an
 // independently authenticated SYSTEM/UIAccess child. It has no input port,
 // capture, foreground activation or global cursor/display-count changes.
 func RunProtectedReturnCursor(ctx context.Context, authorize func() error, x, y int32, ready func() error) error {
 	if ctx == nil || authorize == nil || ready == nil || ctx.Err() != nil {
 		return inputdesktop.ErrInvalid
 	}
-	return inputdesktop.RunWinlogon(context.Background(), authorize, func(scope *inputdesktop.Scope) (result error) {
+	return inputdesktop.RunPresentation(context.Background(), authorize, func(scope *inputdesktop.Scope) (result error) {
 		// Discard this window/hook thread after desktop restoration, matching
 		// login capture owners; its old Win32 queue never enters Go's pool.
 		runtime.LockOSThread()

@@ -37,7 +37,7 @@ func protectedCredentialReason(state credentialForegroundState) ProtectedInputRe
 	switch state {
 	case credentialForegroundBroker:
 		return ProtectedInputCredentialBroker
-	case credentialForegroundMissing, credentialForegroundOther:
+	case credentialForegroundMissing, credentialForegroundOther, credentialForegroundLockScreen:
 		return ProtectedInputClear
 	default:
 		return ProtectedInputIdentityUnknown
@@ -79,7 +79,22 @@ const (
 	credentialForegroundUnknown
 	credentialForegroundOther
 	credentialForegroundBroker
+	credentialForegroundLockScreen
 )
+
+// Only presentation is routed here. LockApp remains an ordinary capture target;
+// choosing the installed cursor owner grants no new input authority.
+func ProtectedReturnCursorRequired() bool {
+	if inspectInputDesktop() != ProtectedInputClear {
+		return true
+	}
+	switch inspectCredentialForeground() {
+	case credentialForegroundLockScreen, credentialForegroundBroker, credentialForegroundUnknown:
+		return true
+	default:
+		return false
+	}
+}
 
 func inspectCredentialForeground() credentialForegroundState {
 	window, _, _ := procGetProtectedForeground.Call()
@@ -114,6 +129,9 @@ func inspectCredentialForeground() credentialForegroundState {
 	if isCredentialBrokerImage(syscall.UTF16ToString(image[:size])) {
 		return credentialForegroundBroker
 	}
+	if isLockScreenImage(syscall.UTF16ToString(image[:size])) {
+		return credentialForegroundLockScreen
+	}
 	return credentialForegroundOther
 }
 
@@ -126,7 +144,7 @@ func credentialProbeObservation() CredentialUIProbeResult {
 		return CredentialUIProbeBrokerObserved
 	case credentialForegroundUnknown:
 		return CredentialUIProbeIdentityUnknown
-	case credentialForegroundOther:
+	case credentialForegroundOther, credentialForegroundLockScreen:
 		return CredentialUIProbeOtherForeground
 	default:
 		return CredentialUIProbeNoForeground
@@ -141,4 +159,9 @@ func protectedWindowStillForeground(window uintptr) bool {
 func isCredentialBrokerImage(path string) bool {
 	index := strings.LastIndexAny(path, `\/`)
 	return strings.EqualFold(path[index+1:], "CredentialUIBroker.exe")
+}
+
+func isLockScreenImage(path string) bool {
+	index := strings.LastIndexAny(path, `\/`)
+	return strings.EqualFold(path[index+1:], "LockApp.exe")
 }

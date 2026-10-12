@@ -60,6 +60,7 @@ func NewSourceHookObserved(observer SourcePipelineObserver) *SourceHook {
 // Configure before Run; diagnostics contain fixed outcomes and durations only.
 func (hook *SourceHook) SetPresentationReporter(report SourcePresentationReporter) {
 	hook.capture.presentationReport = report
+	hook.returnCursor.report = report
 }
 
 // Configure before Run. Reports distinguish native-only from hook-observed

@@ -56,3 +56,27 @@ func TestProtectedSourceCannotActivateLocalCaptureOnSecureDesktop(t *testing.T) 
 		t.Fatal("secure local capture allowed")
 	}
 }
+
+type protectedCursorTest struct{ prepared bool }
+
+func (c *protectedCursorTest) PrepareReturnCursor() func() {
+	c.prepared = true
+	return func() {}
+}
+func (*protectedCursorTest) RestoreReturnCursor() {}
+
+func TestLockScreenUsesProtectedCursorWithoutBlockingNativeCapture(t *testing.T) {
+	cursor := &protectedCursorTest{}
+	h := &protectedSource{SourceHook: wininput.NewSourceHook(), prepared: true,
+		blocked: func() bool { return false }, cursorProtected: func() bool { return true },
+		protectedCursor: cursor}
+	if h.PrepareReturnCursor() == nil || !cursor.prepared || !h.captureReady() || h.blocked() {
+		t.Fatal("lock screen used medium cursor or changed capture readiness")
+	}
+	cursor.prepared = false
+	h.cursorProtected = func() bool { return false }
+	h.PrepareReturnCursor()
+	if cursor.prepared {
+		t.Fatal("ordinary desktop launched a privileged cursor owner")
+	}
+}

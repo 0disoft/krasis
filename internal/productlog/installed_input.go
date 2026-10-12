@@ -1,7 +1,7 @@
 package productlog
 
 func init() {
-	for _, code := range []string{"installed_return_cursor_failed", "installed_return_cursor_ready", "installed_return_cursor_close_failed"} {
+	for _, code := range []string{"installed_return_cursor_failed", "installed_return_cursor_ready", "installed_return_cursor_close_failed", "installed_return_cursor_route_native", "installed_return_cursor_route_protected"} {
 		allowed[code] = true
 	}
 	for _, code := range []string{"installed_input_failure_ack_unconfirmed", "installed_input_failure_before_apply", "installed_input_failure_after_dispatch", "installed_input_failure_stage_unknown"} {

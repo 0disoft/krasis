@@ -20,6 +20,8 @@ type returnCursorSnapshotResult struct {
 // owner. Snapshot through that owner's message queue on both desktop paths.
 // No Go pointer crosses Win32 and at most one replaceable request is retained.
 func (shield *returnCursorShield) requestPosition(generation uint64) (point, bool) {
+	started, outcome := time.Now(), "unavailable"
+	defer func() { shield.observe("return_snapshot", outcome, started) }()
 	window := shield.window.Load()
 	if window == 0 {
 		return point{}, false
@@ -28,6 +30,7 @@ func (shield *returnCursorShield) requestPosition(generation uint64) (point, boo
 	shield.snapshotRequest.Store(request)
 	defer shield.snapshotRequest.CompareAndSwap(request, nil)
 	if err := returnCursorPost(window, wmReturnCursorSnapshot, request.id); err != nil {
+		outcome = "failed"
 		shield.record("cursor-present", err)
 		return point{}, false
 	}
@@ -35,8 +38,14 @@ func (shield *returnCursorShield) requestPosition(generation uint64) (point, boo
 	defer timer.Stop()
 	select {
 	case result := <-request.result:
-		return result.position, result.valid && shield.generation.Load() == generation
+		valid := result.valid && shield.generation.Load() == generation
+		outcome = "superseded"
+		if valid {
+			outcome = "accepted"
+		}
+		return result.position, valid
 	case <-timer.C:
+		outcome = "timeout"
 		return point{}, false
 	}
 }
