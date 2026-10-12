@@ -37,6 +37,8 @@ func SanitizeSupport(data []byte) ([]byte, error) {
 		LoginConfigurationIncomplete bool                      `json:"loginConfigurationIncomplete,omitempty"`
 		LoginRuntime                 *logindiag.Runtime        `json:"loginRuntime,omitempty"`
 		LoginRuntimeIncomplete       bool                      `json:"loginRuntimeIncomplete,omitempty"`
+		InputHealth                  *InputHealthSummary       `json:"inputHealth,omitempty"`
+		InputHealthIncomplete        bool                      `json:"inputHealthIncomplete,omitempty"`
 	}
 	if json.Unmarshal(data, &doc) != nil || doc.Schema != "krasis.support/v1" || len(doc.Logs) > 4 {
 		return nil, errors.New("invalid support document")
@@ -47,6 +49,10 @@ func SanitizeSupport(data []byte) ([]byte, error) {
 	}
 	doc.Created = created.UTC().Format(time.RFC3339)
 	doc.Scope = "Event history only; received from a paired device; not a live status."
+	if doc.InputHealth != nil && !doc.InputHealth.valid() {
+		doc.InputHealth = nil
+		doc.InputHealthIncomplete = true
+	}
 	if doc.LoginRuntime != nil && !doc.LoginRuntime.Valid() {
 		doc.LoginRuntime = nil
 		doc.LoginRuntimeIncomplete = true

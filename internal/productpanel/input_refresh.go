@@ -55,7 +55,7 @@ func (b *inputRefresh) status() string {
 		if current != nil && *current == "PENDING" {
 			interval = time.Second
 		}
-		eligible := current == nil || *current == "PENDING" || *current == "READY" || *current == "UNKNOWN" || *current == "NOT_INSTALLED" || *current == "UPDATE_REQUIRED" || b.lastResult.Load() != nil && (*current == "CANCELLED" || *current == "FAILED")
+		eligible := current == nil || *current == "PENDING" || *current == "READY" || *current == "UNKNOWN" || *current == "SERVICE_STOPPED" || *current == "NOT_INSTALLED" || *current == "UPDATE_REQUIRED" || b.lastResult.Load() != nil && (*current == "CANCELLED" || *current == "FAILED")
 		if eligible && (current == nil || time.Since(b.checkedAt) >= interval) {
 			b.startHealthReaderLocked()
 		} else {
@@ -227,7 +227,7 @@ func (b *inputRefresh) apply(ctx context.Context, explicit bool) error {
 		b.setState(state)
 		return nil
 	}
-	if state != "UPDATE_REQUIRED" && state != "NOT_INSTALLED" {
+	if state != "UPDATE_REQUIRED" && state != "NOT_INSTALLED" && !(explicit && state == "SERVICE_STOPPED") {
 		b.setState("FAILED")
 		if explicit {
 			return ErrInputRefreshFailed

@@ -573,3 +573,12 @@ gate without waiting for a synchronous filesystem/service inspection. The worker
 remains the sole read-only owner until completion; subsequent waiters coalesce,
 and installer operations remain fenced. Its result belongs to that observation,
 not a later mutable health snapshot. Restoration never bypasses a pending install.
+
+## g281: Protected input health failures
+
+Read-only installation health retains a bounded stage and the original native
+error when available in inputHealth in support exports, including paired exports.
+SERVICE_STOPPED is emitted only after a validated SCM query reports a stopped
+service on a matching installation. Its explicit refresh action uses the existing
+attended maintenance transaction; observation and startup never silently repair
+it. UNKNOWN remains distinct and directs the user to save diagnostics.

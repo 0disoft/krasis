@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"golang.org/x/sys/windows"
@@ -103,9 +104,9 @@ func openAgentLaunch(expected [sha256.Size]byte, wait time.Duration) (*AgentLaun
 		_ = installation.Close()
 		return nil, ErrAuthority
 	}
-	if !installedServiceLaunchReadyWithin(filepath.Join(root, "Krasis"), service, wait) {
+	if err := installedServiceLaunchErrorWithin(filepath.Join(root, "Krasis"), service, wait); err != nil {
 		_ = installation.Close()
-		return nil, ErrAuthority
+		return nil, err
 	}
 	return &AgentLaunch{installation: installation, path: filepath.Join(root, "Krasis", "Input", "krasis-agent.exe")}, nil
 }
@@ -119,9 +120,13 @@ func installedServiceLaunchReady(root string, digest [sha256.Size]byte) bool {
 }
 
 func installedServiceLaunchReadyWithin(root string, digest [sha256.Size]byte, wait time.Duration) bool {
+	return installedServiceLaunchErrorWithin(root, digest, wait) == nil
+}
+
+func installedServiceLaunchErrorWithin(root string, digest [sha256.Size]byte, wait time.Duration) error {
 	manager, err := windows.OpenSCManager(nil, nil, windows.SC_MANAGER_CONNECT)
 	if err != nil {
-		return false
+		return &InstallationHealthError{Stage: "service_manager", Cause: err}
 	}
 	defer windows.CloseServiceHandle(manager)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second+wait)
@@ -130,15 +135,28 @@ func installedServiceLaunchReadyWithin(root string, digest [sha256.Size]byte, wa
 	deadline := time.Now().Add(wait)
 	for {
 		status, present, err := scm.query(ctx)
-		if err != nil || !present || status.CurrentState != windows.SERVICE_RUNNING && status.CurrentState != windows.SERVICE_START_PENDING {
-			return false
+		if err != nil {
+			return &InstallationHealthError{Stage: "service_query", Cause: err}
+		}
+		if !present {
+			return &InstallationHealthError{Stage: "service_missing", Cause: ErrAuthority}
+		}
+		if status.CurrentState != windows.SERVICE_RUNNING && status.CurrentState != windows.SERVICE_START_PENDING {
+			cause := error(ErrAuthority)
+			if status.Win32ExitCode != 0 {
+				cause = errors.Join(cause, syscall.Errno(status.Win32ExitCode))
+			}
+			return &InstallationHealthError{Stage: "service_state", Stopped: status.CurrentState == windows.SERVICE_STOPPED, Cause: cause}
 		}
 		record, err := readServiceRecord(root)
 		if err == nil && readyInstalledServiceStatus(status, record, digest) {
-			return true
+			return nil
 		}
 		if wait == 0 || !time.Now().Before(deadline) || waitInstallService(ctx) != nil {
-			return false
+			if err != nil {
+				return &InstallationHealthError{Stage: "service_record", Cause: err}
+			}
+			return &InstallationHealthError{Stage: "service_identity", Cause: ErrAuthority}
 		}
 	}
 }

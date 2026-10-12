@@ -79,6 +79,7 @@ func exportToNamed(dir *securefs.Directory, name string, immutable bool) error {
 	cleanup, cleanupErr := readCleanupReceipt(dir)
 	loginConfiguration, loginErr := readLoginConfigurationReceipt(dir)
 	loginRuntime, runtimeErr := readLoginRuntime()
+	inputHealth, healthErr := readInputHealth(dir)
 	document := struct {
 		Schema                       string                    `json:"schema"`
 		Created                      string                    `json:"created"`
@@ -94,7 +95,9 @@ func exportToNamed(dir *securefs.Directory, name string, immutable bool) error {
 		LoginConfigurationIncomplete bool                      `json:"loginConfigurationIncomplete,omitempty"`
 		LoginRuntime                 *logindiag.Runtime        `json:"loginRuntime,omitempty"`
 		LoginRuntimeIncomplete       bool                      `json:"loginRuntimeIncomplete,omitempty"`
-	}{"krasis.support/v1", time.Now().UTC().Format(time.RFC3339), "Event history only; not a live agent status or complete crash report.", logs, installation, receiptErr != nil, recovery, recoveryErr != nil, cleanup, cleanupErr != nil, loginConfiguration, loginErr != nil, loginRuntime, runtimeErr != nil}
+		InputHealth                  *InputHealthSummary       `json:"inputHealth,omitempty"`
+		InputHealthIncomplete        bool                      `json:"inputHealthIncomplete,omitempty"`
+	}{"krasis.support/v1", time.Now().UTC().Format(time.RFC3339), "Event history only; not a live agent status or complete crash report.", logs, installation, receiptErr != nil, recovery, recoveryErr != nil, cleanup, cleanupErr != nil, loginConfiguration, loginErr != nil, loginRuntime, runtimeErr != nil, inputHealth, healthErr != nil}
 	f, temp, err := dir.CreateTemporary(".support-", 0600)
 	if err != nil {
 		return err

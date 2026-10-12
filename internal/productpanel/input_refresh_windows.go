@@ -18,20 +18,31 @@ import (
 	"unsafe"
 
 	"github.com/0disoft/krasis/internal/inputworker"
+	"github.com/0disoft/krasis/internal/logindiag"
+	"github.com/0disoft/krasis/internal/productlog"
 	"github.com/0disoft/krasis/internal/securefs"
 	"golang.org/x/sys/windows"
 )
 
 func newInputRefresh(base, revision string) *inputRefresh {
+	observe := func(state, stage string, cause error) string {
+		var health *inputworker.InstallationHealthError
+		if errors.As(cause, &health) {
+			stage = health.Stage
+		}
+		native := logindiag.New("prepare", 3, cause)
+		_ = productlog.SaveInputHealth(os.Getenv("LOCALAPPDATA"), productlog.InputHealthSummary{Time: time.Now().UTC().Format(time.RFC3339Nano), State: state, Stage: stage, Win32Error: native.Win32Error, Win32Known: native.Win32Known})
+		return state
+	}
 	inspect := func() string {
 		if running, err := inputworker.InstallationRefreshRunning(); err != nil {
-			return "UNKNOWN"
+			return observe("UNKNOWN", "transaction", err)
 		} else if running {
-			return "PENDING"
+			return observe("PENDING", "transaction", nil)
 		}
 		data, err := os.ReadFile(filepath.Join(base, "krasis-agent.exe"))
 		if err != nil {
-			return "UNKNOWN"
+			return observe("UNKNOWN", "bundle_read", err)
 		}
 		expected := sha256.Sum256(data)
 		match, err := inputworker.InstallationMatchesAgent(expected)
@@ -39,23 +50,29 @@ func newInputRefresh(base, revision string) *inputRefresh {
 			root, folderErr := windows.KnownFolderPath(windows.FOLDERID_ProgramFiles, 0)
 			if folderErr == nil {
 				if _, statErr := os.Lstat(filepath.Join(root, "Krasis", "Input")); errors.Is(statErr, os.ErrNotExist) {
-					return "NOT_INSTALLED"
+					return observe("NOT_INSTALLED", "installation", err)
 				}
 			}
-			return "UNKNOWN"
+			return observe("UNKNOWN", "installation", err)
 		}
 		if match {
 			launch, err := inputworker.OpenAgentLaunch(expected)
 			if err == nil {
-				if launch.Close() == nil {
-					return "READY"
+				closeErr := launch.Close()
+				if closeErr == nil {
+					return observe("READY", "complete", nil)
 				}
+				return observe("UNKNOWN", "installation_close", closeErr)
+			}
+			var health *inputworker.InstallationHealthError
+			if errors.As(err, &health) && health.Stopped {
+				return observe("SERVICE_STOPPED", health.Stage, err)
 			}
 			// A stopped/unknown service on an otherwise matching installation is
 			// a diagnostic condition, not permission for an automatic repair.
-			return "UNKNOWN"
+			return observe("UNKNOWN", "agent_launch", err)
 		}
-		return "UPDATE_REQUIRED"
+		return observe("UPDATE_REQUIRED", "installation", nil)
 	}
 	return &inputRefresh{inspect: inspect, run: func(ctx context.Context) error {
 		return runInputInstaller(ctx, base, revision)
