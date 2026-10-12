@@ -20,6 +20,7 @@ func (operations *Operations) runWithProtectedRecovery(ctx context.Context, alia
 		defer operations.mu.Unlock()
 		if operations.sessionDone == observer.done {
 			operations.sessionTransition = nil
+			operations.sessionSourceRefresh = nil
 			operations.desktopChanging = false
 		}
 	}()
@@ -28,8 +29,11 @@ func (operations *Operations) runWithProtectedRecovery(ctx context.Context, alia
 		// The process/local API and the user's connection intent remain alive.
 		attempt, stop := context.WithCancelCause(ctx)
 		attempt = inputworker.WithDesktopTransitionDrain(attempt, ctx)
+		refresh := &sourceRefreshSlot{}
+		attempt = context.WithValue(attempt, sourceRefreshKey{}, refresh)
 		operations.mu.Lock()
 		operations.sessionTransition = stop
+		operations.sessionSourceRefresh = refresh
 		operations.desktopChanging = false
 		operations.mu.Unlock()
 		err := operations.runner(attempt, alias, observer)
@@ -75,6 +79,10 @@ func (operations *Operations) handleProtectedTransition(event agentlifecycle.Eve
 		return false
 	}
 	operations.recordLocked("lifecycle_" + string(event))
+	if operations.sessionSourceRefresh.handle(event) {
+		operations.recordLocked("installed_source_refresh_requested")
+		return true
+	}
 	operations.desktopChanging = true
 	operations.sessionTransition(&agentlifecycle.TransitionError{Event: event})
 	return true

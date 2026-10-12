@@ -58,24 +58,25 @@ type Operations struct {
 	trust                  trustStore
 	now                    func() time.Time
 
-	mu                sync.Mutex
-	sessionStop       context.CancelCauseFunc
-	sessionTransition context.CancelCauseFunc
-	desktopChanging   bool
-	sessionDone       chan struct{}
-	guardExitDone     <-chan struct{}
-	sessionState      string
-	inputBackend      string
-	boundaryBlocked   string
-	boundaryBlockedAt time.Time
-	sessionFaulted    bool
-	sessionOutcome    *sessionOutcome
-	peerAlias         string
-	lastStopReason    string
-	manualStop        bool
-	resumeState       string
-	lastCode          string
-	counters          map[string]uint64
+	mu                   sync.Mutex
+	sessionStop          context.CancelCauseFunc
+	sessionTransition    context.CancelCauseFunc
+	sessionSourceRefresh *sourceRefreshSlot
+	desktopChanging      bool
+	sessionDone          chan struct{}
+	guardExitDone        <-chan struct{}
+	sessionState         string
+	inputBackend         string
+	boundaryBlocked      string
+	boundaryBlockedAt    time.Time
+	sessionFaulted       bool
+	sessionOutcome       *sessionOutcome
+	peerAlias            string
+	lastStopReason       string
+	manualStop           bool
+	resumeState          string
+	lastCode             string
+	counters             map[string]uint64
 }
 
 func New(parent context.Context, identity productidentity.PublicIdentity, runner SessionRunner, pairing PairWorkflow, trust trustStore) (*Operations, error) {

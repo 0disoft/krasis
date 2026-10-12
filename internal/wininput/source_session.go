@@ -155,6 +155,7 @@ type SourceSession struct {
 	physicalMu    sync.Mutex
 	physicalHeld  map[physicalPress]struct{}
 	physicalCheck func() bool
+	capturePaused bool // physicalMu; native owner replacement fences new grants.
 	active        bool
 	generation    uint64
 	faultOnce     sync.Once
@@ -193,6 +194,9 @@ func (session *SourceSession) Activate() error {
 	}
 	session.physicalMu.Lock()
 	defer session.physicalMu.Unlock()
+	if session.capturePaused {
+		return errors.New("source capture is being prepared")
+	}
 	if len(session.physicalHeld) != 0 || session.physicalCheck != nil && session.physicalCheck() {
 		return errors.New("physical input is held during source activation")
 	}
