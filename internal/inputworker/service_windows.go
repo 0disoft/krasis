@@ -152,6 +152,10 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 				continue
 			}
 			if leaseErr == nil {
+				if lease.Capture {
+					_ = channel.Close()
+					continue
+				}
 				var agentPID uint32
 				pipe, ok := channel.stream.(*pipeConn)
 				if !ok || windows.GetNamedPipeClientProcessId(pipe.handle, &agentPID) != nil ||

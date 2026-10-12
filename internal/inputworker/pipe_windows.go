@@ -30,6 +30,10 @@ func acceptAgentReady(ctx context.Context, agentDigest [sha256.Size]byte, ready 
 }
 
 func acceptAgentReadyOnPipe(ctx context.Context, agentDigest [sha256.Size]byte, ready func() error, installation *Installation, initial *pipeConn) (*Channel, error) {
+	return acceptAgentNamed(ctx, agentDigest, ready, installation, initial, pipeName)
+}
+
+func acceptAgentNamed(ctx context.Context, agentDigest [sha256.Size]byte, ready func() error, installation *Installation, initial *pipeConn, name string) (*Channel, error) {
 	accepted := false
 	defer func() {
 		if initial != nil && !accepted {
@@ -52,7 +56,7 @@ func acceptAgentReadyOnPipe(ctx context.Context, agentDigest [sha256.Size]byte, 
 	}
 	pipe := initial
 	if pipe == nil {
-		pipe, err = makePipe(pipeName)
+		pipe, err = makePipe(name)
 		if err != nil {
 			return nil, ErrAuthority
 		}
@@ -83,13 +87,17 @@ func ConnectService(ctx context.Context, serviceDigest [sha256.Size]byte) (*Chan
 }
 
 func connectInstalledService(ctx context.Context, serviceDigest [sha256.Size]byte, installation *Installation) (*Channel, error) {
+	return connectInstalledNamed(ctx, serviceDigest, installation, pipeName)
+}
+
+func connectInstalledNamed(ctx context.Context, serviceDigest [sha256.Size]byte, installation *Installation, name string) (*Channel, error) {
 	if ctx == nil || ctx.Err() != nil || serviceDigest == ([sha256.Size]byte{}) {
 		return nil, ErrAuthority
 	}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 	started := time.Now()
-	pipe, err := openServicePipe(ctx)
+	pipe, err := openPipeWaiting(ctx, name, servicePipeMissingGrace)
 	handoff.Record(ctx, handoff.PipeOpen, time.Since(started))
 	if err != nil {
 		return nil, connectionFailed("pipe_open", err)

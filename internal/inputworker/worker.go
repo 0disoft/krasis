@@ -50,6 +50,7 @@ type Lease struct {
 	// Presentation permits only a passive Winlogon cursor shield after a clean
 	// lease return. It never admits input requests or a desktop selector.
 	Presentation     bool
+	Capture          bool // Separate authenticated source-only endpoint; no injection decoder.
 	CursorX, CursorY int32
 }
 

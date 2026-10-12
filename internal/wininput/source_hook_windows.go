@@ -18,15 +18,16 @@ import (
 const wmSourceReady = 0x8002
 
 type SourceHook struct {
-	loginAuthorize  func() error   // Fixed service-child Winlogon mode only.
-	contextMenu     atomic.Uintptr // Foreground owner of the most recent local right-click release.
-	boundaryGuard   func() error
-	timing          HookTimingObserver
-	observer        SourcePipelineObserver
-	admissionReport func(string)
-	physicalSession atomic.Pointer[SourceSession]
-	capture         *sourceWheelCapture
-	returnCursor    returnCursorShield
+	loginAuthorize    func() error   // Fixed service-child Winlogon mode only.
+	interactiveSource bool           // Fixed current interactive desktop, never follows with live owners.
+	contextMenu       atomic.Uintptr // Foreground owner of the most recent local right-click release.
+	boundaryGuard     func() error
+	timing            HookTimingObserver
+	observer          SourcePipelineObserver
+	admissionReport   func(string)
+	physicalSession   atomic.Pointer[SourceSession]
+	capture           *sourceWheelCapture
+	returnCursor      returnCursorShield
 }
 
 type sourceInputThreadResult struct {

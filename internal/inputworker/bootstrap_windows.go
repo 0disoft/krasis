@@ -233,6 +233,16 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 		cancel()
 	}()
 	defer func() { _ = control.Close(); <-readerDone }()
+	if lease.Capture {
+		result := runSourceCapture(run, channel, proof, lease, func() error {
+			_ = control.SetWriteDeadline(time.Now().Add(startupTimeout))
+			return writeStartupReady(control, profile)
+		})
+		if writeReport(control, Report{}, result) != nil {
+			return ErrRecovery
+		}
+		return result
+	}
 	if lease.Presentation {
 		desktopStarted := time.Now()
 		result := runCursorPresentation(run, channel, proof, lease, func() error {

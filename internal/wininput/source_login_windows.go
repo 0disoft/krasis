@@ -24,6 +24,27 @@ func NewLoginSourceHook(authorize func() error) (*SourceHook, error) {
 	return hook, nil
 }
 
+// The installed source-only child may bind Default or Winlogon. Each native
+// owner retires before a new desktop is selected; no caller chooses its name.
+func NewProtectedSourceHook(authorize func() error) (*SourceHook, error) {
+	hook, err := NewLoginSourceHook(authorize)
+	if err == nil {
+		hook.interactiveSource = true
+	}
+	return hook, err
+}
+
+// Admission/native pressed-state queries run on the same authenticated desktop
+// policy as capture. A medium process cannot use this to gain a token or scope.
+func (hook *SourceHook) ExecuteSourceDesktop(ctx context.Context, callback func() error) error {
+	return hook.onDesktop(ctx, func(owned context.Context) error {
+		if err := sourceLoginDesktopCheck(owned); err != nil {
+			return err
+		}
+		return callback()
+	})
+}
+
 func (hook *SourceHook) onDesktop(ctx context.Context, run func(context.Context) error) error {
 	if hook.loginAuthorize == nil {
 		return run(ctx)
@@ -36,7 +57,11 @@ func (hook *SourceHook) onDesktop(ctx context.Context, run func(context.Context)
 	}
 	// Cancellation stops the native loop, while the scope survives until the
 	// loop has unregistered its hooks/windows and restored its owned desktop.
-	return inputdesktop.RunWinlogon(context.Background(), hook.loginAuthorize, func(scope *inputdesktop.Scope) error {
+	bind := inputdesktop.RunWinlogon
+	if hook.interactiveSource {
+		bind = inputdesktop.RunPresentation
+	}
+	return bind(context.Background(), hook.loginAuthorize, func(scope *inputdesktop.Scope) error {
 		// RunWinlogon's own lock is released only after desktop restoration.
 		// Retain an extra lock so this goroutine's exit retires the native
 		// capture thread rather than pooling its old Win32 message queue.
