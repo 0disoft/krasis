@@ -498,7 +498,7 @@ func (current *sourceWheelCaptureRun) run(ctx context.Context, ready func()) (re
 		defer close(stopWatcherDone)
 		select {
 		case <-ctx.Done():
-			current.fail(ctx.Err())
+			current.stopForContext(ctx)
 		case <-stopWatcher:
 		}
 	}()
@@ -1021,6 +1021,10 @@ func sourceWheelCapturePosition(position point) (int32, int32) {
 }
 
 func (current *sourceWheelCaptureRun) setError(err error) {
+	current.recordError(err, true)
+}
+
+func (current *sourceWheelCaptureRun) recordError(err error, retireSender bool) {
 	if err == nil {
 		return
 	}
@@ -1028,7 +1032,7 @@ func (current *sourceWheelCaptureRun) setError(err error) {
 	current.terminalErr = errors.Join(current.terminalErr, err)
 	current.active.Store(false)
 	current.terminalMu.Unlock()
-	if current.session != nil {
+	if retireSender && current.session != nil {
 		current.session.Abort(err)
 	}
 }
@@ -1051,6 +1055,16 @@ func (current *sourceWheelCaptureRun) loseForeground() bool {
 
 func (current *sourceWheelCaptureRun) fail(err error) {
 	current.setError(err)
+	current.postStop()
+}
+
+func (current *sourceWheelCaptureRun) stopForContext(ctx context.Context) {
+	idleRefresh := errors.Is(context.Cause(ctx), ErrSourceCaptureRefresh) && current.session.captureRefreshPending()
+	current.recordError(ctx.Err(), !idleRefresh)
+	current.postStop() // Failure to post still retires the sender and joins evidence.
+}
+
+func (current *sourceWheelCaptureRun) postStop() {
 	if current.window != 0 {
 		postErr := postSourceShutdown(current.shutdownEvidence, func() error {
 			posted, _, err := procPostMessageWTouchpad.Call(current.window, wmSourceWheelCaptureStop, 0, 0)

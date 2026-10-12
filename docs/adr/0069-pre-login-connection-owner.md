@@ -229,6 +229,26 @@ g273은 경계 후보 이후 not-ready·메뉴·mouse capture·키 눌림·move/
 내용·포인터 좌표·창 식별자는 이 코드에 포함하지 않는다. Windows의 키 눌림
 관측을 임의로 무시하거나 모든 키를 자동 해제하는 동작은 추가하지 않는다.
 
+g274는 설치된 보호 입력 경로의 검증된 SessionLock/DesktopSwitch에서 로컬
+source가 유휴이고 물리 입력·local return을 소유하지 않을 때 연결 runner를
+취소하지 않고 native hook·raw mouse·capture 창만 재준비한다. 새 grant는
+물리 입력과 같은 잠금에서 먼저 차단하며 기존 owner의 스레드·창 정리가
+모두 끝난 뒤에만 새 owner를 연다. 수신·heartbeat·입력 worker lease는 같은
+연결에서 유지한다. source가 활성 상태거나 로컬 press가 있으면 기존 전체
+session 정리·재연결을 사용하며, cleanup 오류를 유휴 교체 성공으로 바꾸지 않는다.
+
+보호 데스크톱에서 일반 권한 source는 receive-only 상태를 유지한다. 250ms
+간격으로 읽기 전용 데스크톱 상태를 확인하고 Default로 돌아오면 같은 session의
+source를 다시 준비한다. receiver readiness는 한 번만 알리며 늦은 이전 owner의
+ready는 generation으로 차단한다. 단순 cursor snapshot 실패만 startup race로
+처리하며 함께 발생한 복원·close 실패는 전달한다. 수동 해제·종료·신뢰 변경·
+정리 실패와 활성 source의 전환은 기존 취소·ACK drain 정책을 유지한다.
+
+경계 차단에는 native-only·hook-only·native-and-hook 눌림 여부를 고정 코드로
+추가 기록한다. 키 식별자·입력 내용은 내보내지 않으며, 이 관측만으로 키를
+자동 해제하거나 Windows 눌림 검사를 무시하지 않는다. g274의 연결 유지와
+로그인/PIN 전환 후 로컬 캡처 복귀는 아직 실기기 확인 대상이다.
+
 `inputdesktop.RunWinlogon`은 authenticated service-child가 별도로 고른 고정
 Winlogon 대상만 연다. 기존 `Run`의 Default 이름 검증은 유지한다. 일반 프로세스가
 권한을 주장하는 callback을 넘겨도 실제 SYSTEM·UIAccess·System 무결성·활성

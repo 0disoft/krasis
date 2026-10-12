@@ -18,13 +18,15 @@ import (
 const wmSourceReady = 0x8002
 
 type SourceHook struct {
-	loginAuthorize func() error   // Fixed service-child Winlogon mode only.
-	contextMenu    atomic.Uintptr // Foreground owner of the most recent local right-click release.
-	boundaryGuard  func() error
-	timing         HookTimingObserver
-	observer       SourcePipelineObserver
-	capture        *sourceWheelCapture
-	returnCursor   returnCursorShield
+	loginAuthorize  func() error   // Fixed service-child Winlogon mode only.
+	contextMenu     atomic.Uintptr // Foreground owner of the most recent local right-click release.
+	boundaryGuard   func() error
+	timing          HookTimingObserver
+	observer        SourcePipelineObserver
+	admissionReport func(string)
+	physicalSession atomic.Pointer[SourceSession]
+	capture         *sourceWheelCapture
+	returnCursor    returnCursorShield
 }
 
 type sourceInputThreadResult struct {
@@ -59,6 +61,10 @@ func NewSourceHookObserved(observer SourcePipelineObserver) *SourceHook {
 func (hook *SourceHook) SetPresentationReporter(report SourcePresentationReporter) {
 	hook.capture.presentationReport = report
 }
+
+// Configure before Run. Reports distinguish native-only from hook-observed
+// held state with fixed labels; no key/button identity or input content escapes.
+func (hook *SourceHook) SetAdmissionReporter(report func(string)) { hook.admissionReport = report }
 
 func (hook *SourceHook) SourceCapture() SourceActivation {
 	if hook == nil {
@@ -106,6 +112,8 @@ func (hook *SourceHook) runWithBoundary(ctx context.Context, session *SourceSess
 		return err
 	}
 	releaseAllowed := true
+	hook.physicalSession.Store(session)
+	defer hook.physicalSession.CompareAndSwap(session, nil)
 	defer func() {
 		if releaseAllowed {
 			releaseHookSession()

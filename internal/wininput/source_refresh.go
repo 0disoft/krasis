@@ -1,5 +1,22 @@
 package wininput
 
+import "errors"
+
+// Only a verified idle native-owner replacement uses this cancellation cause.
+// Ordinary shutdown and failures still retire the source sender.
+var ErrSourceCaptureRefresh = errors.New("idle source capture replacement")
+
+func (session *SourceSession) captureRefreshPending() bool {
+	if session == nil {
+		return false
+	}
+	session.physicalMu.Lock()
+	defer session.physicalMu.Unlock()
+	session.stateMu.RLock()
+	defer session.stateMu.RUnlock()
+	return session.capturePaused && !session.active && !session.terminal.Load()
+}
+
 // PauseCapture fences grant activation under the same gate as physical presses.
 // Replacing an idle native owner does not retire the sender or its connection.
 // A live outbound generation, local press, or pending local return must use the

@@ -7,7 +7,7 @@ import (
 )
 
 func TestBoundaryPhaseExportRetainsResultWithoutInputDetails(t *testing.T) {
-	for _, phase := range []string{"dropped_not_ready", "blocked_menu", "blocked_capture", "blocked_pressed", "blocked_move_size", "admission_failed", "admitted", "request_written", "request_unknown"} {
+	for _, phase := range []string{"dropped_not_ready", "blocked_menu", "blocked_capture", "blocked_pressed", "blocked_move_size", "admission_failed", "admitted", "request_written", "request_unknown", "pressed_native_only", "pressed_hook_only", "pressed_native_and_hook"} {
 		code := "boundary_" + phase
 		input := `{"time":"2026-10-12T00:00:00Z","code":"` + code + `","key":"private-marker","window":"private-marker"}` + "\n"
 		result := sanitizeLog("agent.jsonl", strings.NewReader(input))

@@ -268,6 +268,7 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 		checkGeometry := displayGeometryGuard(ctx, geometry, wininput.CurrentDisplayGeometry, func() { log.Event("lifecycle_display_change"); cancelCause(wininput.ErrDisplayGeometryChanged) })
 		hook := wininput.NewSourceHook(progress)
 		hook.SetPresentationReporter(log.Presentation)
+		hook.SetAdmissionReporter(log.Event)
 		hook.SetBoundaryGuard(checkGeometry)
 		var sessionHook agent.SourceHook = hook
 		if worker != nil {

@@ -1,6 +1,9 @@
 package productlog
 
 func init() {
+	for _, code := range []string{"installed_source_refresh_requested", "installed_source_refresh_joined", "installed_source_refresh_failed", "installed_source_capture_ready", "boundary_pressed_native_only", "boundary_pressed_hook_only", "boundary_pressed_native_and_hook"} {
+		allowed[code] = true
+	}
 	for _, stage := range []string{"client_lock", "client_authority", "client_write", "client_response", "worker_authority", "worker_scope", "worker_apply"} {
 		for _, bucket := range []string{"lt1ms", "lt10ms", "lt100ms", "lt1s", "ge1s"} {
 			allowed["installed_input_timing_"+stage+"_"+bucket] = true

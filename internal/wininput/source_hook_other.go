@@ -13,6 +13,8 @@ func NewSourceHook(...HookTimingObserver) *SourceHook { return &SourceHook{} }
 
 func (*SourceHook) SetPresentationReporter(SourcePresentationReporter) {}
 
+func (*SourceHook) SetAdmissionReporter(func(string)) {}
+
 func (hook *SourceHook) Run(context.Context, *SourceSession, func()) error {
 	return fmt.Errorf("%w: source hook requires Windows", ErrUnsupportedInput)
 }

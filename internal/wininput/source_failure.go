@@ -40,6 +40,30 @@ func SourceFailureStage(err error) string {
 	return ""
 }
 
+// A cursor snapshot fails before native hook/window owners are constructed.
+// A joined restore/close error must never be hidden as that harmless startup race.
+func SourcePointerSnapshotFailureOnly(err error) bool {
+	if stage, ok := err.(*sourceStageError); ok {
+		return stage.stage == "pointer-snapshot"
+	}
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		children := joined.Unwrap()
+		if len(children) == 0 {
+			return false
+		}
+		for _, child := range children {
+			if !SourcePointerSnapshotFailureOnly(child) {
+				return false
+			}
+		}
+		return true
+	}
+	if wrapped, ok := err.(interface{ Unwrap() error }); ok {
+		return SourcePointerSnapshotFailureOnly(wrapped.Unwrap())
+	}
+	return false
+}
+
 func sourceWorkerStage(component string, err error) error {
 	// Sibling cancellation must not obscure the worker that actually failed.
 	if err == context.Canceled || err == context.DeadlineExceeded {

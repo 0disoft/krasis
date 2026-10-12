@@ -207,7 +207,19 @@ func (hook *SourceHook) AdmitBoundary(ctx context.Context, _ control.BoundaryInt
 	if info.Flags&guiInMoveSize != 0 || info.MoveSize != 0 {
 		return peer.BoundaryAdmissionBlockedMoveSize, nil
 	}
-	if sourceAnyInputPressed() {
+	nativePressed := sourceAnyInputPressed()
+	hookPressed := hook.physicalSession.Load().PhysicalPressCount() != 0
+	if nativePressed || hookPressed {
+		if hook.admissionReport != nil {
+			code := "boundary_pressed_native_only"
+			if hookPressed {
+				code = "boundary_pressed_hook_only"
+				if nativePressed {
+					code = "boundary_pressed_native_and_hook"
+				}
+			}
+			hook.admissionReport(code)
+		}
 		return peer.BoundaryAdmissionBlockedPressedInput, nil
 	}
 	if hook.boundaryGuard != nil {
