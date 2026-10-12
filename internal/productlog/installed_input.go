@@ -7,6 +7,14 @@ func init() {
 		}
 	}
 	allowed["installed_return_cursor_cancelled"] = true
+	for _, stage := range []string{"prepare", "show", "restore"} {
+		for _, bucket := range []string{"lt1ms", "lt10ms", "lt100ms", "lt1s", "ge1s"} {
+			allowed["installed_return_cursor_capture_"+stage+"_"+bucket] = true
+		}
+	}
+	for _, code := range []string{"installed_return_cursor_route_capture", "installed_return_cursor_capture_queued", "installed_return_cursor_capture_failed"} {
+		allowed[code] = true
+	}
 	for _, stage := range []string{"admission", "cursor_open", "cursor_retire"} {
 		for _, bucket := range []string{"lt1ms", "lt10ms", "lt100ms", "lt1s", "ge1s"} {
 			allowed["installed_input_handoff_timing_"+stage+"_"+bucket] = true

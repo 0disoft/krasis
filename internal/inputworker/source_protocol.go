@@ -15,6 +15,7 @@ const (
 	sourceBoundary
 	sourceAction
 	sourceReturn
+	sourceRetired
 )
 const (
 	sourceStart byte = iota + 1
@@ -23,6 +24,9 @@ const (
 	sourceDeactivate
 	sourceHeartbeat
 	sourceStop
+	sourceCursorPrepare
+	sourceCursorShow
+	sourceCursorRestore
 )
 
 // Private, authenticated local stream only. Idle observations carry pointer
@@ -43,15 +47,17 @@ func (p sourcePacket) valid() bool {
 	}
 	switch p.kind {
 	case sourceCommand:
-		return p.op >= sourceStart && p.op <= sourceStop && p.status == 0 && p.reply == 0 && p.action == (control.InputAction{}) && p.x == 0 && p.decision == 0
+		return p.op >= sourceStart && p.op <= sourceCursorRestore && p.status == 0 && ((p.op == sourceCursorShow && p.reply != 0) || (p.op != sourceCursorShow && p.reply == 0)) && p.action == (control.InputAction{}) && p.x == 0 && p.decision == 0
 	case sourceReply:
-		return p.op >= sourceStart && p.op <= sourceStop && p.reply != 0 && p.action == (control.InputAction{}) && p.x == 0 && (p.op == sourceAdmit && p.decision.Valid() || p.decision == 0)
+		return p.op >= sourceStart && p.op <= sourceCursorRestore && p.reply != 0 && p.action == (control.InputAction{}) && p.x == 0 && (p.op == sourceAdmit && p.decision.Valid() || p.decision == 0)
 	case sourceBoundary:
 		return p.op == 0 && p.status == 0 && p.reply == 0 && p.decision == 0 && p.action.Kind == control.InputPointerMove && p.action.Validate() == nil
 	case sourceAction:
 		return p.op == 0 && p.status == 0 && p.reply != 0 && p.x == 0 && p.decision == 0 && p.action.Validate() == nil
 	case sourceReturn:
 		return p.op == 0 && p.status == 0 && p.reply != 0 && p.action == (control.InputAction{}) && p.x == 0 && p.decision == 0
+	case sourceRetired:
+		return (p.op == 0 || p.op == 1 && p.status == 0) && p.reply == 0 && p.action == (control.InputAction{}) && p.x == 0 && p.decision == 0
 	}
 	return false
 }

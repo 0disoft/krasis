@@ -20,15 +20,24 @@ type sourceWriter struct {
 	binding  Binding
 	sequence uint64
 	epoch    atomic.Uint64
+	started  atomic.Bool
 }
 
 func (w *sourceWriter) send(p sourcePacket, current func() bool) error {
+	return w.write(p, current, false)
+}
+func (w *sourceWriter) write(p sourcePacket, current func() bool, retirement bool) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	if !w.started.Load() && (p.kind == sourceAction || p.kind == sourceBoundary || p.kind == sourceReturn) {
+		return nil
+	}
 	if current != nil && !current() {
 		return nil
 	}
-	if w.channel.authority.check(false) != nil {
+	// Retirement grants no authority. It is sent only after native/sender join
+	// on the exact already authenticated channel, even if logon authority changed.
+	if !retirement && w.channel.authority.check(false) != nil {
 		return ErrAuthority
 	}
 	w.sequence++
@@ -63,7 +72,7 @@ func (q *sourcePointerQueue) Observe(a control.InputAction, x int32) error {
 		q.session.Abort(wininput.ErrEmergencyRelease)
 		return wininput.ErrEmergencyRelease
 	}
-	if a.Kind == control.InputPointerMove && !q.session.Active() {
+	if a.Kind == control.InputPointerMove {
 		select {
 		case q.events <- sourcePacket{kind: sourceBoundary, action: a, x: x}:
 		default:
@@ -115,7 +124,8 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 	defer func() {
 		cancel()
 		result = errors.Join(result, <-hookDone, <-sourceDone)
-		if errors.Is(result, context.Canceled) && workerCancellationOnly(result) {
+		emergency := errors.Is(result, wininput.ErrEmergencyRelease)
+		if sourceTransitionOnly(result, run.Err() == context.DeadlineExceeded) {
 			result = nil
 		} else if result != nil {
 			result = errors.Join(result, ErrRecovery)
@@ -125,9 +135,18 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 			if result != nil {
 				response.status = 1
 			}
-			if writer.send(response, nil) != nil {
+			if writer.write(response, nil, true) != nil {
 				result = errors.Join(result, ErrRecovery)
 			}
+		} else {
+			response := sourcePacket{kind: sourceRetired}
+			if result != nil {
+				response.status = 1
+			}
+			if emergency && result == nil {
+				response.op = 1
+			}
+			_ = writer.write(response, nil, true)
 		}
 		_ = channel.Close()
 	}()
@@ -159,6 +178,7 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 	if writer.send(sourcePacket{kind: sourceReply, op: sourceStart, reply: first.sequence}, nil) != nil {
 		return ErrAuthority
 	}
+	writer.started.Store(true)
 	requests := make(chan sourcePacket, 1)
 	readDone := make(chan struct{})
 	go func() {
@@ -183,11 +203,13 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 	defer func() {
 		cancel()
 		if stopping == nil {
-			_ = channel.Close()
+			_ = channel.stream.SetReadDeadline(time.Now())
 		}
 		<-readDone
 	}()
 	var pendingReturn uint64
+	var cursorPrepared func()
+	var cursorSequence uint64
 	for {
 		select {
 		case <-run.Done():
@@ -207,7 +229,7 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 				return nil
 			}
 			response := sourcePacket{kind: sourceReply, op: p.op, reply: p.sequence}
-			err := hook.ExecuteSourceDesktop(run, func() error {
+			operation := func() error {
 				switch p.op {
 				case sourceAdmit:
 					decision, failure := hook.AdmitBoundary(run, control.BoundaryIntent{})
@@ -234,13 +256,38 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 					session.CompleteLocalReturn(pendingReturn)
 					pendingReturn = 0
 				case sourceHeartbeat:
+				case sourceCursorPrepare:
+					hook.RestoreReturnCursor()
+					cursorPrepared = hook.PrepareReturnCursor()
+					cursorSequence = p.sequence
+					if cursorPrepared == nil {
+						return ErrAuthority
+					}
+				case sourceCursorShow:
+					if cursorPrepared == nil || p.reply != cursorSequence {
+						return ErrProtocol
+					}
+					cursorPrepared()
+					cursorPrepared = nil
+				case sourceCursorRestore:
+					cursorPrepared = nil
+					cursorSequence = 0
+					hook.RestoreReturnCursor()
 				case sourceStart:
 					return ErrProtocol
 				default:
 					return ErrProtocol
 				}
 				return nil
-			})
+			}
+			// State retirement operates on the existing native owner. It must
+			// remain available while the desktop is between Default/Winlogon.
+			var err error
+			if p.op == sourceDeactivate || p.op == sourceHeartbeat || p.op == sourceCursorRestore {
+				err = operation()
+			} else {
+				err = hook.ExecuteSourceDesktop(run, operation)
+			}
 			if err != nil {
 				response.status = 1
 				response.decision = 0

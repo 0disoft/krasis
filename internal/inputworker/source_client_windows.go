@@ -22,6 +22,7 @@ type CaptureSource struct {
 	service *AgentService
 	mu      sync.Mutex
 	current *sourceClient
+	observe func(string) // configured before Run; fixed timing/route codes only.
 }
 type sourceClient struct {
 	channel  *Channel
@@ -29,6 +30,7 @@ type sourceClient struct {
 	mu       sync.Mutex
 	sequence uint64
 	epoch    atomic.Uint64
+	retired  atomic.Bool
 	replies  chan sourcePacket
 	done     chan struct{}
 	err      error
@@ -77,7 +79,7 @@ func (c *CaptureSource) AdmitBoundary(ctx context.Context, _ control.BoundaryInt
 	return p.decision, nil
 }
 
-func (c *sourceClient) call(ctx context.Context, op byte) (sourcePacket, error) {
+func (c *sourceClient) call(ctx context.Context, op byte, reference ...uint64) (sourcePacket, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	accepted := false
@@ -88,6 +90,7 @@ func (c *sourceClient) call(ctx context.Context, op byte) (sourcePacket, error) 
 		}
 	}()
 	if ctx == nil || ctx.Err() != nil {
+		accepted = true // No request was started; a cancelled optional query cannot retire this owner.
 		return sourcePacket{}, ErrAuthority
 	}
 	if c.channel.authority.check(false) != nil {
@@ -106,6 +109,9 @@ func (c *sourceClient) call(ctx context.Context, op byte) (sourcePacket, error) 
 		c.epoch.Store(0)
 	}
 	p := sourcePacket{kind: sourceCommand, op: op, sequence: c.sequence, binding: c.binding}
+	if op == sourceCursorShow && len(reference) == 1 {
+		p.reply = reference[0]
+	}
 	data, err := encodeSourcePacket(p)
 	if err != nil {
 		return sourcePacket{}, err
@@ -134,6 +140,7 @@ func (c *sourceClient) call(ctx context.Context, op byte) (sourcePacket, error) 
 			if op == sourceActivate {
 				c.epoch.Store(0)
 			}
+			accepted = true // Explicit rejection is known; do not discard the capture owner for an optional cursor request.
 			return reply, ErrAuthority
 		}
 		accepted = true
@@ -184,13 +191,20 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 		stopStartup()
 		return ErrAuthority
 	}
-	_, err = readStartupReady(channel.stream)
+	_, retired, readyErr := readSourceStartup(channel.stream, binding)
+	err = readyErr
 	if !stopPipe() {
 		err = ErrAuthority
 	}
 	stopStartup()
+	if err == wininput.ErrEmergencyRelease {
+		return err
+	}
 	if err != nil || ctx.Err() != nil || channel.stream.SetDeadline(time.Time{}) != nil {
 		return ErrAuthority
+	}
+	if retired {
+		return wininput.ErrProtectedInput
 	}
 	live := &sourceClient{channel: channel, binding: binding, replies: make(chan sourcePacket, 1), done: make(chan struct{})}
 	go func() {
@@ -230,6 +244,16 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 				if ctx.Err() == nil && p.reply == live.epoch.Load() {
 					session.RequestLocalReturn()
 				}
+			case sourceRetired:
+				if p.status == 0 {
+					if p.op == 1 {
+						live.err = wininput.ErrEmergencyRelease
+					}
+					live.retired.Store(true)
+				} else {
+					live.err = ErrRecovery
+				}
+				return
 			default:
 				live.err = ErrProtocol
 				return
@@ -256,20 +280,37 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 		case <-ctx.Done():
 			// Native owners must acknowledge retirement before the resident may
 			// start ordinary desktop hooks. Missing proof forces full recovery.
+			if live.retired.Load() {
+				return ctx.Err()
+			}
 			cleanup, cancel := context.WithTimeout(context.Background(), RecoveryTimeout+time.Second)
 			_, err := live.call(cleanup, sourceStop)
 			cancel()
-			if err != nil {
+			if err != nil && !live.retired.Load() {
 				return errors.Join(ctx.Err(), ErrRecovery)
 			}
 			return ctx.Err()
 		case <-live.done:
+			if live.retired.Load() {
+				if live.err != nil {
+					return live.err
+				}
+				return wininput.ErrProtectedInput
+			}
 			return errors.Join(live.err, ErrRecovery)
 		case <-ticker.C:
-			check, cancel := context.WithTimeout(ctx, time.Second)
+			// Finish the already bounded heartbeat before explicit retirement.
+			// Cancelling a source refresh must not cut the ACK stream mid-frame.
+			check, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
 			_, err := live.call(check, sourceHeartbeat)
 			cancel()
-			if err != nil {
+			if err != nil && ctx.Err() == nil {
+				if live.retired.Load() {
+					if live.err != nil {
+						return live.err
+					}
+					return wininput.ErrProtectedInput
+				}
 				return errors.Join(err, ErrRecovery)
 			}
 		}

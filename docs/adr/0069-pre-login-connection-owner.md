@@ -413,6 +413,14 @@ native owner 종료 ACK는 후크·창·sender 정리가 끝난 후 보낸다. A
 endpoint를 정지한다. idle 교체는 기존 연결을 유지하며 활성 전환은 기존 전체
 세션 복구 규칙을 따른다. 실기기 A 잠금→B 전환·PIN·해제 확인은 배포 후 필요하다.
 
+보호 capture owner가 준비돼 있으면 같은 hook thread의 return cursor shield를
+재사용한다. snapshot command의 sequence를 show command가 정확히 참조하고
+한 번만 실행한다. 별도 passive worker와 동시에 소유하지 않는다. 교체·취소·
+restore 후에는 이전 snapshot을 쓸 수 없다. 이 경로가 없으면 기존 passive
+worker fallback을 유지한다. timing은 snapshot/show/restore RPC 왕복이며
+queued는 native 창에 show를 요청했다는 뜻이다. 실제 커서가 화면에서 사라진
+시각으로 해석하지 않는다. 명시적 cursor 거부는 capture 연결을 종료하지 않는다.
+
 g262에 runtime과 고정 child 진입점을 포함한다. UI/사용자 agent는 로그인 후
 기존 자동 시작 경로를 사용한다. 로그인 전에 GUI·관리 API를 열지 않는다.
 사용자 설정의 자동 시작 허용과 관리자 승인 기록이 모두 필요하다. 양쪽에서

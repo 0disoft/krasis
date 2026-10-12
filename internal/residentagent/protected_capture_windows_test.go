@@ -16,7 +16,11 @@ import (
 type secureCaptureTest struct {
 	active  atomic.Bool
 	stopped chan struct{}
+	cursor  atomic.Bool
 }
+
+func (c *secureCaptureTest) PrepareReturnCursor() func() { c.cursor.Store(true); return func() {} }
+func (c *secureCaptureTest) RestoreReturnCursor()        { c.cursor.Store(false) }
 
 func (c *secureCaptureTest) SourceCapture() wininput.SourceActivation { return c }
 func (c *secureCaptureTest) Active() bool                             { return c.active.Load() }
@@ -45,6 +49,9 @@ func TestLockedSourceUsesProtectedCaptureInSameSessionAndFencesActiveRefresh(t *
 	session := &wininput.SourceSession{}
 	go func() { done <- h.RunWithBoundary(ctx, session, nil, func() { close(ready) }) }()
 	<-ready
+	if h.PrepareReturnCursor() == nil || !secure.cursor.Load() {
+		t.Fatal("ready protected cursor started a second passive worker")
+	}
 	decision, err := h.AdmitBoundary(ctx, control.BoundaryIntent{})
 	if err != nil || decision != peer.BoundaryAdmissionAllowed {
 		t.Fatal("secure native admission unavailable", err)

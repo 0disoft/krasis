@@ -25,6 +25,12 @@ func installedProductInput(expires time.Time, failed func(error)) *privilegedLea
 	input.cursor.open = func(ctx context.Context, lease inputworker.Lease) (func() error, error) {
 		return service.PresentReturnCursorObserved(ctx, lease, input.event)
 	}
-	input.source = service.NewSourceCapture()
+	source := service.NewSourceCapture()
+	source.SetObserver(func(code string) {
+		if input.event != nil {
+			input.event(code)
+		}
+	})
+	input.source = source
 	return input
 }

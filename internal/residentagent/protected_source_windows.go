@@ -308,6 +308,15 @@ func (c *selectedCapture) Active() bool {
 }
 
 func (h *protectedSource) PrepareReturnCursor() func() {
+	h.mu.Lock()
+	owner, remote, prepared := h.owner, h.remoteOwner, h.prepared
+	h.mu.Unlock()
+	if remote && prepared {
+		if presenter, ok := owner.(peer.ReturnCursorPresentation); ok {
+			h.observe("installed_return_cursor_route_capture")
+			return presenter.PrepareReturnCursor()
+		}
+	}
 	if !h.captureReady() || h.blocked() || h.cursorProtected != nil && h.cursorProtected() {
 		if h.protectedCursor != nil {
 			h.observe("installed_return_cursor_route_protected")
@@ -324,6 +333,9 @@ func (h *protectedSource) SetProtectedReturnCursor(cursor peer.ReturnCursorPrese
 }
 func (h *protectedSource) RestoreReturnCursor() {
 	h.SourceHook.RestoreReturnCursor()
+	if presenter, ok := h.secure.(peer.ReturnCursorPresentation); ok {
+		presenter.RestoreReturnCursor()
+	}
 	if h.protectedCursor != nil {
 		h.protectedCursor.RestoreReturnCursor()
 	}

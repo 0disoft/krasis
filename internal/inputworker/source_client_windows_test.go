@@ -54,3 +54,18 @@ func TestSourceClientRetirementRequiresMatchingAckEvenWithImmediateEOF(t *testin
 		_ = c.channel.Close()
 	}
 }
+
+func TestSourceClientKnownCursorRejectionKeepsCaptureOwner(t *testing.T) {
+	server, conn := net.Pipe()
+	defer server.Close()
+	c := &sourceClient{channel: clientChannel(conn, authorityService), binding: Binding{1}, replies: make(chan sourcePacket, 1), done: make(chan struct{})}
+	defer c.channel.Close()
+	c.epoch.Store(42)
+	go func() {
+		p, _ := readSourcePacket(server)
+		c.replies <- sourcePacket{kind: sourceReply, op: sourceCursorPrepare, reply: p.sequence, status: 1}
+	}()
+	if _, err := c.call(context.Background(), sourceCursorPrepare); err == nil || c.epoch.Load() != 42 || c.channel.authority.check(false) != nil {
+		t.Fatal("optional cursor rejection retired capture", err)
+	}
+}

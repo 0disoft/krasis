@@ -17,6 +17,8 @@ func TestSourcePacketsRejectIdleKeysAndMalformedAuthority(t *testing.T) {
 		{kind: sourceBoundary, sequence: 1, binding: binding, action: control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}, x: 300},
 		{kind: sourceAction, sequence: 1, binding: binding, reply: 2, action: control.InputAction{Kind: control.InputKeyDown, Code: 0x1e}},
 		{kind: sourceReturn, sequence: 1, binding: binding, reply: 2},
+		{kind: sourceRetired, sequence: 1, binding: binding, status: 1},
+		{kind: sourceCommand, op: sourceCursorShow, sequence: 1, binding: binding, reply: 7},
 	}
 	for _, p := range packets {
 		data, err := encodeSourcePacket(p)
@@ -41,6 +43,8 @@ func TestSourcePacketsRejectIdleKeysAndMalformedAuthority(t *testing.T) {
 		{kind: sourceCommand, op: sourceActivate, sequence: 1, binding: binding, reply: 1},
 		{kind: sourceCommand, op: sourceActivate, binding: binding},
 		{kind: sourceCommand, op: sourceActivate, sequence: 1},
+		{kind: sourceCommand, op: sourceCursorShow, sequence: 1, binding: binding},
+		{kind: sourceCommand, op: sourceCursorRestore, sequence: 1, binding: binding, reply: 1},
 	} {
 		if _, err := encodeSourcePacket(p); err == nil {
 			t.Fatal("idle key, unbound action, unsolicited operation or absent authority accepted")
