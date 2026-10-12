@@ -59,8 +59,16 @@ func (scope *Scope) Do(ctx context.Context, operation func() error) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := scope.desktop.active(); err != nil {
-		return errors.Join(ErrInactive, err)
+	var activeErr error
+	if interactive, ok := scope.desktop.(interface {
+		activeContext(context.Context, context.Context) error
+	}); ok {
+		activeErr = interactive.activeContext(ctx, scope.root)
+	} else {
+		activeErr = scope.desktop.active()
+	}
+	if activeErr != nil {
+		return errors.Join(ErrInactive, activeErr)
 	}
 	// Desktop queries can yield. Recheck cancellation before invoking the caller.
 	if err := scope.root.Err(); err != nil {

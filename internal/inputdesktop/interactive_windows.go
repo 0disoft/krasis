@@ -36,9 +36,12 @@ func RunInteractive(ctx context.Context, authorize func() error, callback func(*
 		}
 		handle, _, callErr := openInput.Call(0, 0, uintptr(AccessMask))
 		if handle == 0 {
-			return nil, errors.Join(ErrUnavailable, callErr)
+			return nil, desktopPreparing(errors.Join(ErrUnavailable, callErr))
 		}
 		name, err := readDesktopName(handle)
+		if err != nil {
+			return nil, desktopPreparing(errors.Join(err, closeUnbound(handle)))
+		}
 		var target desktopTarget
 		switch name {
 		case "Default":
@@ -56,7 +59,7 @@ func RunInteractive(ctx context.Context, authorize func() error, callback func(*
 			return nil, errors.Join(err, closeUnbound(handle))
 		}
 		if err := desktop.active(); err != nil {
-			return nil, errors.Join(err, closeUnbound(handle))
+			return nil, desktopPreparing(errors.Join(err, closeUnbound(handle)))
 		}
 		if err := checked(); err != nil {
 			return nil, errors.Join(err, closeUnbound(handle))

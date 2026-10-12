@@ -249,6 +249,18 @@ ready는 generation으로 차단한다. 단순 cursor snapshot 실패만 startup
 자동 해제하거나 Windows 눌림 검사를 무시하지 않는다. g274의 연결 유지와
 로그인/PIN 전환 후 로컬 캡처 복귀는 아직 실기기 확인 대상이다.
 
+g275는 worker의 권한·desktop 검사에서 실제 입력 callback을 호출하기 전에
+실패한 결과를 NOT_APPLIED로 보존한다. callback에 진입한 뒤의 partial·unknown
+결과와 정리 오류는 그대로 전달한다. ACK의 기존 timing으로 before-apply,
+after-dispatch, stage-unknown, ACK-unconfirmed를 고정 코드로 구분한다.
+
+설치된 interactive worker는 고정 Default/Winlogon 획득·활성 검사에서만 최대
+100ms 동안 10ms 간격으로 준비를 다시 확인한다. 매번 기존 lease 권한을 재검사하고
+요청의 기존 deadline·scope 종료·권한 철회·cleanup 실패를 존중한다. 다른 desktop,
+토큰 부족, 이름 검증 실패, 실제 입력 실패는 이 대기에 포함하지 않는다. 입력
+callback은 한 번만 실행하며 SendInput을 재전송하지 않는다. PIN 전환 때의 실제
+연결 유지 효과는 양쪽 업데이트 후 현장 시험으로 확인한다.
+
 `inputdesktop.RunWinlogon`은 authenticated service-child가 별도로 고른 고정
 Winlogon 대상만 연다. 기존 `Run`의 Default 이름 검증은 유지한다. 일반 프로세스가
 권한을 주장하는 callback을 넘겨도 실제 SYSTEM·UIAccess·System 무결성·활성

@@ -40,7 +40,11 @@ func (b *interactiveBinding) active() error {
 	if err := b.authorize(); err != nil {
 		return err
 	}
-	return next.active()
+	err = next.active()
+	if errors.Is(err, ErrInactive) {
+		return desktopPreparing(err)
+	}
+	return err
 }
 
 func (b *interactiveBinding) close() error {
