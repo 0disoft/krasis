@@ -82,6 +82,15 @@ func (c *CaptureSource) AdmitBoundary(ctx context.Context, _ control.BoundaryInt
 func (c *sourceClient) call(ctx context.Context, op byte, reference ...uint64) (sourcePacket, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if op == sourceStop {
+		select {
+		case <-c.done:
+			if c.retired.Load() && c.err == nil {
+				return sourcePacket{}, nil
+			}
+		default:
+		}
+	}
 	accepted := false
 	defer func() {
 		if !accepted {
@@ -148,6 +157,10 @@ func (c *sourceClient) call(ctx context.Context, op byte, reference ...uint64) (
 	case <-ctx.Done():
 	case <-timer.C:
 	case <-c.done:
+		if op == sourceStop && c.retired.Load() && c.err == nil {
+			accepted = true // The exact child has already acknowledged native retirement.
+			return sourcePacket{}, nil
+		}
 		// A final retirement ACK can immediately precede EOF. Consume it even
 		// when both signals became ready before the caller was scheduled.
 		select {
@@ -291,11 +304,11 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 			}
 			return ctx.Err()
 		case <-live.done:
+			if result, confirmed := sourceRetirementResult(ctx, live.retired.Load(), live.err); confirmed {
+				return result
+			}
 			if live.retired.Load() {
-				if live.err != nil {
-					return live.err
-				}
-				return wininput.ErrProtectedInput
+				return live.err
 			}
 			return errors.Join(live.err, ErrRecovery)
 		case <-ticker.C:

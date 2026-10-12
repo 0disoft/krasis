@@ -47,8 +47,12 @@ func runServiceWithSource(ctx context.Context, installation *Installation, admit
 	run, cancel := context.WithCancel(ctx)
 	defer cancel()
 	done := make(chan error, 1)
-	go func() { err := runSourceService(run, installation, admit); cancel(); done <- err }()
-	err := regular(run)
+	go func() {
+		err := runSourceService(run, installation, admit)
+		cancel()
+		done <- serviceEndpointFailure(err, "capture")
+	}()
+	err := serviceEndpointFailure(regular(run), "input")
 	cancel()
 	return errors.Join(err, <-done)
 }

@@ -1,6 +1,7 @@
 package inputworker
 
 import (
+	"context"
 	"errors"
 	"github.com/0disoft/krasis/internal/logindiag"
 	"syscall"
@@ -37,5 +38,13 @@ func TestFailedDecisionPersistenceNeverMarksSaved(t *testing.T) {
 	r.record("service", "STARTING", nil)
 	if calls != 2 || r.value.Time != "" {
 		t.Fatal("unwritten receipt suppressed future save")
+	}
+}
+
+func TestServiceEndpointFailureKeepsClassificationAndNativeCause(t *testing.T) {
+	r := newLoginRuntimeRecorder(func(logindiag.Runtime) error { return nil })
+	r.record("service", "FAILED", errors.Join(serviceEndpointFailure(errors.Join(ErrRecovery, syscall.Errno(5)), "capture"), context.Canceled))
+	if r.value.LastFailure == nil || r.value.LastFailure.Reason != "capture" || !r.value.LastFailure.Win32Known || r.value.LastFailure.Win32Error != 5 {
+		t.Fatal("service lost exact endpoint/native failure", r.value)
 	}
 }

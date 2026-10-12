@@ -7,6 +7,18 @@ import (
 	"github.com/0disoft/krasis/internal/wininput"
 )
 
+// A final authenticated retirement proves native owners joined. Cancellation
+// and EOF may become ready together; select order must not change that proof.
+func sourceRetirementResult(ctx context.Context, retired bool, cause error) (error, bool) {
+	if !retired || cause != nil {
+		return cause, false
+	}
+	if ctx.Err() != nil {
+		return ctx.Err(), true
+	}
+	return wininput.ErrProtectedInput, true
+}
+
 // A known inactive desktop is normal only after all native owners have joined.
 // Joined cleanup/close failures must not inherit its normal classification.
 func sourceTransitionOnly(err error, ownExpiry ...bool) bool {
