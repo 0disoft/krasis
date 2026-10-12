@@ -11,8 +11,10 @@ import (
 	"github.com/0disoft/krasis/internal/agent"
 	"github.com/0disoft/krasis/internal/agentlifecycle"
 	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/inputworker"
 	"github.com/0disoft/krasis/internal/peer"
 	"github.com/0disoft/krasis/internal/wininput"
+	"github.com/0disoft/krasis/internal/winlifecycle"
 )
 
 // The medium-integrity agent cannot capture local devices or read the cursor on
@@ -23,6 +25,7 @@ type protectedSource struct {
 	*wininput.SourceHook
 	blocked         func() bool
 	cursorProtected func() bool
+	sessionLocked   func() bool
 	event           func(string)
 	native          agent.SourceHook
 	secure          agent.SourceHook
@@ -39,7 +42,7 @@ type protectedSource struct {
 }
 
 func protectedSessionHook(hook *wininput.SourceHook, event func(string)) agent.SourceHook {
-	return &protectedSource{SourceHook: hook, native: hook, event: event, cursorProtected: wininput.ProtectedReturnCursorRequired, blocked: func() bool {
+	return &protectedSource{SourceHook: hook, native: hook, event: event, sessionLocked: winlifecycle.SessionLocked, cursorProtected: wininput.ProtectedReturnCursorRequired, blocked: func() bool {
 		switch wininput.InspectProtectedInput() {
 		case wininput.ProtectedInputDesktopUnavailable, wininput.ProtectedInputNonDefaultDesktop:
 			return true
@@ -76,7 +79,7 @@ func (h *protectedSource) RunWithBoundary(ctx context.Context, session *wininput
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		protected := h.blocked() || h.cursorProtected != nil && h.cursorProtected()
+		protected := h.blocked() || h.sessionLocked != nil && h.sessionLocked() || h.cursorProtected != nil && h.cursorProtected()
 		selected := h.native
 		usingSecure := protected && h.secure != nil
 		if usingSecure {
@@ -138,11 +141,19 @@ func (h *protectedSource) RunWithBoundary(ctx context.Context, session *wininput
 		}
 		// Native Run must join every hook/window owner before returning. Only
 		// our idle-owner cancellation may continue; cleanup failures stay fatal.
-		if !refresh || !errors.Is(err, context.Canceled) || !cancellationOnly(err, context.Canceled) {
+		cleanRetirement := usingSecure && inputworker.CleanSourceRetirement(err)
+		if cleanRetirement && session.Active() {
+			return wininput.ErrProtectedInput
+		}
+		retired := cleanRetirement && !session.Active()
+		if (!refresh || !errors.Is(err, context.Canceled) || !cancellationOnly(err, context.Canceled)) && !retired {
 			if refresh {
 				h.observe("installed_source_refresh_failed")
 			}
 			return err
+		}
+		if retired && !session.PauseCapture() {
+			return wininput.ErrProtectedInput
 		}
 		if session.PhysicalPressCount() != 0 {
 			// A local press raced owner shutdown. Rebuild the full session using

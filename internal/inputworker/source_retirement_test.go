@@ -15,7 +15,7 @@ func TestSourceRetirementAndCancellationRacePreservesConfirmedJoin(t *testing.T)
 	if err, confirmed := sourceRetirementResult(ctx, true, nil); !confirmed || err != context.Canceled {
 		t.Fatal("confirmed idle refresh became a protected-session restart", err)
 	}
-	if err, confirmed := sourceRetirementResult(context.Background(), true, nil); !confirmed || err != wininput.ErrProtectedInput {
+	if err, confirmed := sourceRetirementResult(context.Background(), true, nil); !confirmed || !errors.Is(err, wininput.ErrProtectedInput) || !CleanSourceRetirement(err) {
 		t.Fatal("spontaneous retirement lost its transition", err)
 	}
 	for _, failure := range []error{ErrRecovery, wininput.ErrEmergencyRelease} {
@@ -25,6 +25,21 @@ func TestSourceRetirementAndCancellationRacePreservesConfirmedJoin(t *testing.T)
 	}
 	if _, confirmed := sourceRetirementResult(ctx, false, nil); confirmed {
 		t.Fatal("missing retirement accepted")
+	}
+}
+
+func TestCleanSourceRetirementCannotHideCleanupOrProtocolFailure(t *testing.T) {
+	clean := errors.Join(ErrSourceCaptureRetired, wininput.ErrProtectedInput)
+	if !CleanSourceRetirement(clean) {
+		t.Fatal("clean native proof rejected")
+	}
+	for _, failure := range []error{ErrRecovery, ErrProtocol, inputdesktop.ErrCleanup, context.DeadlineExceeded, ErrAuthority} {
+		if CleanSourceRetirement(errors.Join(clean, failure)) {
+			t.Fatal("uncertain retirement accepted", failure)
+		}
+	}
+	if CleanSourceRetirement(wininput.ErrProtectedInput) {
+		t.Fatal("ordinary protected error invented proof")
 	}
 }
 

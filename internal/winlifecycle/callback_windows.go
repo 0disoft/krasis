@@ -15,6 +15,7 @@ var lifecycleWindowCallback = syscall.NewCallback(dispatchLifecycleWindow)
 func dispatchLifecycleWindow(window uintptr, message uint32, wParam, lParam uintptr) uintptr {
 	if owner, ok := lifecycleWindowOwners.Load(window); ok {
 		monitor := owner.(*Monitor)
+		observeSessionState(message, wParam)
 		if event, ok := eventFromMessage(message, wParam); ok {
 			monitor.publish(event)
 		}

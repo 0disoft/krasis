@@ -16,6 +16,7 @@ func TestEventFromMessageMapsSafetyRelevantTransitions(t *testing.T) {
 		{name: "suspend", message: wmPowerBroadcast, wParam: pbtAPMSuspend, want: agentlifecycle.EventSuspend},
 		{name: "automatic resume", message: wmPowerBroadcast, wParam: pbtAPMResumeAutomatic, want: agentlifecycle.EventResume},
 		{name: "session lock", message: wmWTSSessionChange, wParam: wtsSessionLock, want: agentlifecycle.EventSessionLock},
+		{name: "session unlock", message: wmWTSSessionChange, wParam: wtsSessionUnlock, want: agentlifecycle.EventDesktopSwitch},
 		{name: "remote disconnect", message: wmWTSSessionChange, wParam: wtsRemoteDisconnect, want: agentlifecycle.EventSessionDisconnect},
 		{name: "logoff", message: wmWTSSessionChange, wParam: wtsSessionLogoff, want: agentlifecycle.EventLogoff},
 		{name: "query shutdown", message: wmQueryEndSession, want: agentlifecycle.EventShutdown},

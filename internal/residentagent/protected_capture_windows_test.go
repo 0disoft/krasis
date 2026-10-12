@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/inputworker"
 	"github.com/0disoft/krasis/internal/peer"
 	"github.com/0disoft/krasis/internal/wininput"
 )
@@ -72,4 +73,57 @@ func TestLockedSourceUsesProtectedCaptureInSameSessionAndFencesActiveRefresh(t *
 	default:
 		t.Fatal("owner was not joined")
 	}
+}
+
+func TestLockNotificationSelectsReusableCaptureBeforeForegroundUpdates(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	secure := &secureCaptureTest{stopped: make(chan struct{})}
+	h := &protectedSource{blocked: func() bool { return false }, cursorProtected: func() bool { return false }, sessionLocked: func() bool { return true }, native: protectedTestHook(func(context.Context, *wininput.SourceSession, wininput.BoundaryObserver, func()) error {
+		t.Error("stale foreground selected medium source")
+		return errors.New("wrong owner")
+	})}
+	h.SetProtectedSource(secure)
+	ready, done := make(chan struct{}), make(chan error, 1)
+	go func() { done <- h.RunWithBoundary(ctx, &wininput.SourceSession{}, nil, func() { close(ready) }) }()
+	awaitTransitionSignal(t, ready)
+	if h.PrepareReturnCursor() == nil || !secure.cursor.Load() {
+		t.Fatal("lock return launched a second cursor owner")
+	}
+	cancel()
+	if err := awaitTransitionSignal(t, done); !errors.Is(err, context.Canceled) {
+		t.Fatal(err)
+	}
+}
+
+func TestCleanIdleProtectedDesktopRetirementDoesNotRestartConnection(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var calls, ready atomic.Int32
+	session := &wininput.SourceSession{}
+	h := &protectedSource{blocked: func() bool { return true }}
+	h.SetProtectedSource(&retiringSecureTest{run: protectedTestHook(func(attempt context.Context, received *wininput.SourceSession, _ wininput.BoundaryObserver, signal func()) error {
+		if received != session {
+			t.Error("desktop retirement replaced source session")
+		}
+		signal()
+		if calls.Add(1) == 1 {
+			return errors.Join(wininput.ErrProtectedInput, inputworker.ErrSourceCaptureRetired)
+		}
+		cancel()
+		return attempt.Err()
+	})})
+	err := h.RunWithBoundary(ctx, session, nil, func() { ready.Add(1) })
+	if !errors.Is(err, context.Canceled) || calls.Load() != 2 || ready.Load() != 1 {
+		t.Fatal("idle desktop switch restarted peer runner", err, calls.Load(), ready.Load())
+	}
+}
+
+type retiringSecureTest struct {
+	secureCaptureTest
+	run protectedTestHook
+}
+
+func (s *retiringSecureTest) RunWithBoundary(ctx context.Context, session *wininput.SourceSession, boundary wininput.BoundaryObserver, ready func()) error {
+	return s.run(ctx, session, boundary, ready)
 }

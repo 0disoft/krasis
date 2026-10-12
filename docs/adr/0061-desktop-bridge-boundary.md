@@ -582,3 +582,12 @@ SERVICE_STOPPED is emitted only after a validated SCM query reports a stopped
 service on a matching installation. Its explicit refresh action uses the existing
 attended maintenance transaction; observation and startup never silently repair
 it. UNKNOWN remains distinct and directs the user to save diagnostics.
+The source-only IPC accepts an authenticated clean native-retirement receipt even
+when cancellation and EOF race. An idle source may rebuild its capture owner in
+the same peer connection only after that proof and with no physical presses.
+Active forwarding still uses full lease retirement; protocol, cleanup and unknown
+failures remain fenced. Service failure receipts identify capture versus input.
+Lock/unlock notifications select protected capture before foreground detection
+catches up, enabling the existing capture cursor shield on LockApp's Default
+desktop. This preference grants no authority and never transfers native objects
+between desktops. Unlock requests the existing desktop refresh path.

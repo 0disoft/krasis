@@ -217,7 +217,7 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 		return ErrAuthority
 	}
 	if retired {
-		return wininput.ErrProtectedInput
+		return errors.Join(wininput.ErrProtectedInput, ErrSourceCaptureRetired)
 	}
 	live := &sourceClient{channel: channel, binding: binding, replies: make(chan sourcePacket, 1), done: make(chan struct{})}
 	go func() {
@@ -322,7 +322,7 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 					if live.err != nil {
 						return live.err
 					}
-					return wininput.ErrProtectedInput
+					return errors.Join(wininput.ErrProtectedInput, ErrSourceCaptureRetired)
 				}
 				return errors.Join(err, ErrRecovery)
 			}

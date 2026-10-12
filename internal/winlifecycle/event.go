@@ -1,6 +1,26 @@
 package winlifecycle
 
-import "github.com/0disoft/krasis/internal/agentlifecycle"
+import (
+	"github.com/0disoft/krasis/internal/agentlifecycle"
+	"sync/atomic"
+)
+
+// Same-session Windows notifications are scheduling hints only. This cannot
+// authorize an input lease; the selected installed capture authenticates itself.
+var currentSessionLocked atomic.Bool
+
+func SessionLocked() bool { return currentSessionLocked.Load() }
+func observeSessionState(message uint32, wParam uintptr) {
+	if message != wmWTSSessionChange {
+		return
+	}
+	switch wParam {
+	case wtsSessionLock:
+		currentSessionLocked.Store(true)
+	case wtsSessionUnlock:
+		currentSessionLocked.Store(false)
+	}
+}
 
 const (
 	wmQueryEndSession     = 0x0011
@@ -20,6 +40,7 @@ const (
 	wtsRemoteDisconnect   = 0x0004
 	wtsSessionLogoff      = 0x0006
 	wtsSessionLock        = 0x0007
+	wtsSessionUnlock      = 0x0008
 )
 
 func eventFromMessage(message uint32, wParam uintptr) (agentlifecycle.Event, bool) {
@@ -35,6 +56,8 @@ func eventFromMessage(message uint32, wParam uintptr) (agentlifecycle.Event, boo
 		switch wParam {
 		case wtsSessionLock:
 			return agentlifecycle.EventSessionLock, true
+		case wtsSessionUnlock:
+			return agentlifecycle.EventDesktopSwitch, true
 		case wtsConsoleDisconnect, wtsRemoteDisconnect:
 			return agentlifecycle.EventSessionDisconnect, true
 		case wtsSessionLogoff:
