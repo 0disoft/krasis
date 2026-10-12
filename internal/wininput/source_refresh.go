@@ -2,6 +2,27 @@ package wininput
 
 import "errors"
 
+// The authenticated external native owner checks actual physical presses on its
+// bound desktop. Do not query the medium agent's obsolete desktop during grant
+// activation. Never erase a held journal or change this while forwarding.
+func (session *SourceSession) UseExternalPhysicalCapture() bool {
+	if session == nil {
+		return false
+	}
+	session.physicalMu.Lock()
+	defer session.physicalMu.Unlock()
+	if !session.capturePaused || len(session.physicalHeld) != 0 {
+		return false
+	}
+	session.stateMu.RLock()
+	defer session.stateMu.RUnlock()
+	if session.active || session.terminal.Load() || session.yieldPending != 0 {
+		return false
+	}
+	session.physicalCheck = nil
+	return true
+}
+
 // Only a verified idle native-owner replacement uses this cancellation cause.
 // Ordinary shutdown and failures still retire the source sender.
 var ErrSourceCaptureRefresh = errors.New("idle source capture replacement")

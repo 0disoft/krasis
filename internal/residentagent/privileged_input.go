@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/0disoft/krasis/internal/agent"
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/handoff"
@@ -42,6 +43,7 @@ type privilegedLeaseInput struct {
 	closeErr                                error
 	stopped                                 bool
 	cursor                                  protectedReturnPresentation
+	source                                  agent.SourceHook
 	preparationStarted, preparationFinished time.Time
 }
 

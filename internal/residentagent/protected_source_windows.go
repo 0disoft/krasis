@@ -25,6 +25,9 @@ type protectedSource struct {
 	cursorProtected func() bool
 	event           func(string)
 	native          agent.SourceHook
+	secure          agent.SourceHook
+	owner           agent.SourceHook
+	remoteOwner     bool
 	mu              sync.Mutex
 	session         *wininput.SourceSession
 	stop            context.CancelCauseFunc
@@ -62,7 +65,7 @@ func (h *protectedSource) RunWithBoundary(ctx context.Context, session *wininput
 	h.mu.Unlock()
 	defer func() {
 		h.mu.Lock()
-		h.session, h.stop, h.prepared = nil, nil, false
+		h.session, h.stop, h.prepared, h.owner = nil, nil, false, nil
 		h.mu.Unlock()
 	}()
 	unregister := registerSourceRefresh(ctx, h.refreshDesktop)
@@ -73,7 +76,13 @@ func (h *protectedSource) RunWithBoundary(ctx context.Context, session *wininput
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if h.blocked() {
+		protected := h.blocked() || h.cursorProtected != nil && h.cursorProtected()
+		selected := h.native
+		usingSecure := protected && h.secure != nil
+		if usingSecure {
+			selected = h.secure
+		}
+		if h.blocked() && !usingSecure {
 			if !standby {
 				h.observe("installed_source_receive_only")
 				standby = true
@@ -88,9 +97,15 @@ func (h *protectedSource) RunWithBoundary(ctx context.Context, session *wininput
 		attempt, stop := context.WithCancelCause(ctx)
 		h.mu.Lock()
 		epoch := h.epoch
+		h.owner = selected
+		h.remoteOwner = usingSecure
 		h.stop, h.refresh = stop, false
 		h.mu.Unlock()
-		err := h.native.RunWithBoundary(attempt, session, boundary, func() {
+		if usingSecure && !session.UseExternalPhysicalCapture() {
+			stop(context.Canceled)
+			return wininput.ErrProtectedInput
+		}
+		err := selected.RunWithBoundary(attempt, session, boundary, func() {
 			h.mu.Lock()
 			current := ctx.Err() == nil && attempt.Err() == nil && h.epoch == epoch && !h.refresh
 			if current {
@@ -99,14 +114,18 @@ func (h *protectedSource) RunWithBoundary(ctx context.Context, session *wininput
 			}
 			h.mu.Unlock()
 			if current {
-				h.observe("installed_source_capture_ready")
+				code := "installed_source_capture_ready"
+				if usingSecure {
+					code = "installed_source_capture_protected_ready"
+				}
+				h.observe(code)
 				initialReady.Do(ready)
 			}
 		})
 		stop(context.Canceled)
 		h.mu.Lock()
 		refresh := h.refresh
-		h.stop, h.prepared = nil, false
+		h.stop, h.prepared, h.owner = nil, false, nil
 		h.mu.Unlock()
 		if ctx.Err() != nil {
 			return err
@@ -145,7 +164,13 @@ func (h *protectedSource) refreshDesktop(event agentlifecycle.Event) bool {
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if h.SourceHook != nil && h.SourceHook.SourceCapture().Active() {
+	if h.owner != nil {
+		if capture, ok := h.owner.(interface {
+			SourceCapture() wininput.SourceActivation
+		}); ok && capture.SourceCapture().Active() {
+			return false
+		}
+	} else if h.SourceHook != nil && h.SourceHook.SourceCapture().Active() {
 		return false
 	}
 	if h.session == nil || !h.session.PauseCapture() {
@@ -195,14 +220,91 @@ func (h *protectedSource) AdmitBoundary(ctx context.Context, intent control.Boun
 	if err := ctx.Err(); err != nil {
 		return 0, err
 	}
-	if !h.captureReady() || h.blocked() {
+	h.mu.Lock()
+	owner, prepared, remote := h.owner, h.prepared, h.remoteOwner
+	h.mu.Unlock()
+	if prepared && owner != nil && remote {
+		return owner.(peer.BoundaryAdmissionGate).AdmitBoundary(ctx, intent)
+	}
+	if !prepared || h.blocked() {
 		return 0, peer.ErrBoundaryInspectionUnavailable
 	}
 	return h.SourceHook.AdmitBoundary(ctx, intent)
 }
 
 func (h *protectedSource) SourceCapture() wininput.SourceActivation {
-	return &protectedSourceCapture{SourceActivation: h.SourceHook.SourceCapture(), blocked: h.blocked, ready: h.captureReady}
+	return &protectedSourceCapture{SourceActivation: &selectedCapture{owner: h}, blocked: func() bool {
+		h.mu.Lock()
+		secure := h.owner != nil && h.remoteOwner
+		h.mu.Unlock()
+		return h.blocked() && !secure
+	}, ready: h.captureReady}
+}
+
+func (h *protectedSource) SetProtectedSource(source agent.SourceHook) {
+	if _, ok := source.(peer.BoundaryAdmissionGate); !ok {
+		return
+	}
+	if _, ok := source.(interface {
+		SourceCapture() wininput.SourceActivation
+	}); !ok {
+		return
+	}
+	h.secure = source
+}
+
+// Resolve after selection without holding the resident gate during IPC.
+type selectedCapture struct{ owner *protectedSource }
+
+func (c *selectedCapture) current() wininput.SourceActivation {
+	h := c.owner
+	h.mu.Lock()
+	owner := h.owner
+	h.mu.Unlock()
+	if provider, ok := owner.(interface {
+		SourceCapture() wininput.SourceActivation
+	}); ok {
+		return provider.SourceCapture()
+	}
+	if h.SourceHook != nil {
+		return h.SourceHook.SourceCapture()
+	}
+	return nil
+}
+func (c *selectedCapture) Activate() error {
+	if current := c.current(); current != nil {
+		return current.Activate()
+	}
+	return wininput.ErrProtectedInput
+}
+func (c *selectedCapture) ActivateProfile(ctx context.Context) error {
+	current := c.current()
+	if profiled, ok := current.(wininput.SourceProfiledActivation); ok {
+		return profiled.ActivateProfile(ctx)
+	}
+	if current != nil {
+		return current.Activate()
+	}
+	return wininput.ErrProtectedInput
+}
+func (c *selectedCapture) DeactivateProfile(ctx context.Context) {
+	current := c.current()
+	if profiled, ok := current.(wininput.SourceProfiledDeactivation); ok {
+		profiled.DeactivateProfile(ctx)
+		return
+	}
+	if current != nil {
+		current.Deactivate()
+	}
+}
+func (c *selectedCapture) Deactivate() {
+	if current := c.current(); current != nil {
+		current.Deactivate()
+	}
+}
+func (c *selectedCapture) Active() bool {
+	current := c.current()
+	return current != nil && current.Active()
 }
 
 func (h *protectedSource) PrepareReturnCursor() func() {

@@ -389,6 +389,30 @@ source close 오류, Winlogon journal 잔여 입력, desktop 복원 오류와 pa
 
 ## 배포와 실기기 수용 기준
 
+### g280: 로그인한 계정의 잠금 중 입력 캡처
+
+이미 로그인한 계정은 잠금 중에도 USER_SESSION이며 로그인 전 연결 owner를
+추가로 시작하지 않는다. 정상 resident 연결은 mTLS·상대 승인·lease 협상을
+계속 소유한다. Default의 LockApp 또는 Winlogon에서는 인증된 source-only
+child가 로컬 장치를 캡처하고 기존 resident SourceSession으로 전달한다.
+
+서비스는 고정 Source.v1 endpoint 하나를 직렬 소유한다. 입력 endpoint는 KRC1을
+거부하고 source endpoint는 일반 입력·presentation·preparation을 거부한다.
+기존 실제 PID·생성 시각·이미지 pin·SCM·콘솔 세션·SYSTEM/UIAccess 검증과
+Job 소유 bootstrap을 유지한다. child가 선택한 현재 Default/Winlogon에만 native
+후크·창을 만든다. 데스크톱 전환 때 기존 owner를 정리한 뒤 다시 선택한다.
+
+비활성 IPC에는 포인터 경계 관측만 허용하며 키/버튼 내용은 전달하지 않는다.
+활성 action은 별도 캡처 generation에 묶는다. 물리 눌림 검사와 억제는 child의
+실제 데스크톱에서 수행하고 resident의 이전 데스크톱 검사를 대신한다. 이미
+보유한 physical ledger는 지우지 않는다. 큐·쓰기·command ACK·heartbeat·수명은
+유한하며 채널/권위 실패는 세션 복구와 원격 pressed journal 해제를 요구한다.
+
+native owner 종료 ACK는 후크·창·sender 정리가 끝난 후 보낸다. ACK 유실·정리
+실패는 일반 capture로 조용히 전환하지 않는다. cleanup 불확실성은 양쪽 서비스
+endpoint를 정지한다. idle 교체는 기존 연결을 유지하며 활성 전환은 기존 전체
+세션 복구 규칙을 따른다. 실기기 A 잠금→B 전환·PIN·해제 확인은 배포 후 필요하다.
+
 g262에 runtime과 고정 child 진입점을 포함한다. UI/사용자 agent는 로그인 후
 기존 자동 시작 경로를 사용한다. 로그인 전에 GUI·관리 API를 열지 않는다.
 사용자 설정의 자동 시작 허용과 관리자 승인 기록이 모두 필요하다. 양쪽에서
