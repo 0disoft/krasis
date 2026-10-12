@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"math"
+	"sync/atomic"
 	"time"
 
 	"github.com/0disoft/krasis/internal/application"
@@ -175,12 +176,18 @@ func (client *Client) performResponse(ctx context.Context, command request, obse
 	if err != nil {
 		return notSent(ErrProtocol)
 	}
-	// Interrupt both read and write promptly, without waiting for the mutex.
-	stopCancel := context.AfterFunc(ctx, func() { _ = client.channel.Close() })
-	defer stopCancel()
+	// All writes and hard stops remain interruptible. A verified desktop
+	// transition can drain only this fully written input's matching ACK,
+	// bounded by the original request deadline and immutable lease expiry.
+	var submitted atomic.Bool
+	joinCancellation := requestCancellation(ctx, client.channel, deadline, command.op != opHeartbeat, &submitted)
+	defer joinCancellation()
 	client.sequence++
 	start = time.Now()
 	n, err := stream.Write(data[:])
+	if err == nil && n == len(data) {
+		submitted.Store(true)
+	}
 	elapsed2 := time.Since(start)
 	sample[2] = timingBucket(elapsed2)
 	if command.op != opHeartbeat {

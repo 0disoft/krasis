@@ -208,6 +208,21 @@ portable/미확인 backend, 수동 해제, 갱신 중에는 기존 프로세스 
 유지한다. 로그오프·세션 해제·절전·종료도 계속 프로세스를 중단한다.
 로그인 전 grant·서비스의 사용자 세션 admission 정책은 바꾸지 않는다.
 
+g272는 검증된 SessionLock/DesktopSwitch 취소에서 완전히 전송된 입력 요청
+한 건의 matching sequence/op 응답만 원래 요청 deadline·lease 만료 중 먼저
+도달하는 시각까지 회수한다. 새 요청, 재전송, heartbeat, 부분 전송에는 적용하지
+않는다. 독립적인 연결 의도 문맥의 수동 해제·종료는 즉시 채널을 닫으며, 실제
+응답이 없거나 잘못됐으면 OUTCOME_UNKNOWN을 유지한다. 취소 콜백까지 join한
+뒤 입력 mutex를 해제하므로 늦은 콜백이 다음 요청을 끊지 않는다.
+
+resident runner는 IPC client와 heartbeat의 정리 결과를 보존하며, 채널 정리
+실패 후 다음 lease open을 차단한다. SYSTEM worker의 최종 recovery receipt를
+확인하는 주체는 계속 서비스 supervisor다. 키 잔여 개수가 0이어도 취소와
+desktop cleanup 실패가 섞인 결과를 성공으로 바꾸지 않는다. ErrCleanup은
+recovery 실패 receipt로 전달하여 서비스의 다음 lease admission을 차단한다.
+채널을 여러 번 닫아도 첫 정리 결과를 보존한다. 로그인 후 경계 진입 차단의
+세부 원인은 별도 현장 관측 대상이며 이 ACK 수정만으로 해결됐다고 판단하지 않는다.
+
 `inputdesktop.RunWinlogon`은 authenticated service-child가 별도로 고른 고정
 Winlogon 대상만 연다. 기존 `Run`의 Default 이름 검증은 유지한다. 일반 프로세스가
 권한을 주장하는 callback을 넘겨도 실제 SYSTEM·UIAccess·System 무결성·활성

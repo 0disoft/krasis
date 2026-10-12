@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/0disoft/krasis/internal/agentlifecycle"
+	"github.com/0disoft/krasis/internal/inputworker"
 )
 
 const protectedRecoveryDelay = 250 * time.Millisecond
@@ -26,6 +27,7 @@ func (operations *Operations) runWithProtectedRecovery(ctx context.Context, alia
 		// Only this runner's capture, transport and input lease are cancelled.
 		// The process/local API and the user's connection intent remain alive.
 		attempt, stop := context.WithCancelCause(ctx)
+		attempt = inputworker.WithDesktopTransitionDrain(attempt, ctx)
 		operations.mu.Lock()
 		operations.sessionTransition = stop
 		operations.desktopChanging = false
