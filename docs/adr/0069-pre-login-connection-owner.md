@@ -266,6 +266,22 @@ g276은 receive-only 대기를 검증된 desktop 알림으로 즉시 깨우며 �
 재준비한다. 알림이 없거나 secure desktop이 유지되면 기존 250ms 상태 검사를
 유지한다. 실제 로그인 직후 지연 전체를 이 대기 하나의 원인으로 단정하지 않는다.
 
+일반 agent의 receive-only 상태에서는 기존 Default의 커서 숨김 창을 사용할 수
+없다. g276은 반환 직전 설치된 입력 worker에서 좌표를 읽고, 반환 완료 후 같은
+agent kernel PID·생성 시각·정확한 직전 lease identity의 일회용 receipt를 사용해
+고정 Winlogon의 passive cursor 창을 연다. receipt admission은 1초이며 숨김은
+최대 60초·원래 lease 만료 중 이른 시각으로 제한한다. KRS1 envelope는 KRL1 입력
+lease와 구분하며 InputPort/입력 decoder로 전달할 수 없다.
+
+좌표가 바뀌었거나 B의 직접 입력이 있으면 숨기지 않는다. 별도 native owner의
+pass-through hook은 첫 로컬 클릭·키를 Windows로 넘기기 전에 숨김 창을 회수하며
+키 내용·화면·좌표를 진단에 남기지 않는다. 새 진입·연결 종료는 이전 채널 open을
+취소하고 join한 뒤 진행한다. 서비스는 이전 child의 창·hook·desktop 정리 receipt를
+받기 전 다음 lease를 승인하지 않으며 ErrCleanup은 복구 실패로 보존한다.
+로그인 화면 종료·권한 철회·agent 종료·제한시간도 숨김을 끝낸다. foreground,
+전역 cursor 자원·ShowCursor count, PIN 입력 내용은 변경하거나 수집하지 않는다.
+커서의 실제 숨김·직접 입력 복원과 로그인 직후 지연 개선은 현장 시험 대상이다.
+
 `inputdesktop.RunWinlogon`은 authenticated service-child가 별도로 고른 고정
 Winlogon 대상만 연다. 기존 `Run`의 Default 이름 검증은 유지한다. 일반 프로세스가
 권한을 주장하는 callback을 넘겨도 실제 SYSTEM·UIAccess·System 무결성·활성

@@ -41,6 +41,12 @@ func (client *Client) SetTimingObserver(emit func(string)) {
 var _ application.InputPort = (*Client)(nil)
 
 func NewClient(ctx context.Context, channel *Channel, lease Lease) (*Client, error) {
+	if lease.Presentation {
+		if channel != nil {
+			_ = channel.Close()
+		}
+		return nil, ErrAuthority
+	}
 	client := &Client{channel: channel, lease: lease, sequence: 1}
 	if channel == nil {
 		return nil, ErrAuthority

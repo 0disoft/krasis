@@ -228,6 +228,17 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 		cancel()
 	}()
 	defer func() { _ = control.Close(); <-readerDone }()
+	if lease.Presentation {
+		result := runCursorPresentation(run, channel, proof, lease, func() error {
+			_ = control.SetWriteDeadline(time.Now().Add(startupTimeout))
+			return writeStartupReady(control, profile)
+		})
+		_ = control.SetWriteDeadline(time.Now().Add(time.Second))
+		if writeReport(control, Report{}, result) != nil {
+			return ErrRecovery
+		}
+		return result
+	}
 	desktop := desktopRunner(inputdesktop.Run)
 	if installation != nil {
 		desktop = func(ctx context.Context, callback func(*inputdesktop.Scope) error) error {

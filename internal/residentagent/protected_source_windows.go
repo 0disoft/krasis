@@ -21,16 +21,17 @@ import (
 // Only the SYSTEM/UIAccess worker chooses and validates the actual input target.
 type protectedSource struct {
 	*wininput.SourceHook
-	blocked  func() bool
-	event    func(string)
-	native   agent.SourceHook
-	mu       sync.Mutex
-	session  *wininput.SourceSession
-	stop     context.CancelCauseFunc
-	refresh  bool
-	prepared bool
-	epoch    uint64
-	wake     chan struct{}
+	blocked         func() bool
+	event           func(string)
+	native          agent.SourceHook
+	mu              sync.Mutex
+	session         *wininput.SourceSession
+	stop            context.CancelCauseFunc
+	refresh         bool
+	prepared        bool
+	epoch           uint64
+	wake            chan struct{}
+	protectedCursor peer.ReturnCursorPresentation
 }
 
 func protectedSessionHook(hook *wininput.SourceHook, event func(string)) agent.SourceHook {
@@ -205,9 +206,22 @@ func (h *protectedSource) SourceCapture() wininput.SourceActivation {
 
 func (h *protectedSource) PrepareReturnCursor() func() {
 	if !h.captureReady() || h.blocked() {
+		if h.protectedCursor != nil {
+			return h.protectedCursor.PrepareReturnCursor()
+		}
 		return nil
 	}
 	return h.SourceHook.PrepareReturnCursor()
+}
+
+func (h *protectedSource) SetProtectedReturnCursor(cursor peer.ReturnCursorPresentation) {
+	h.protectedCursor = cursor
+}
+func (h *protectedSource) RestoreReturnCursor() {
+	h.SourceHook.RestoreReturnCursor()
+	if h.protectedCursor != nil {
+		h.protectedCursor.RestoreReturnCursor()
+	}
 }
 
 type protectedSourceCapture struct {

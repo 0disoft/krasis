@@ -41,6 +41,7 @@ type privilegedLeaseInput struct {
 	shutdownErr                             error
 	closeErr                                error
 	stopped                                 bool
+	cursor                                  protectedReturnPresentation
 	preparationStarted, preparationFinished time.Time
 }
 
@@ -66,6 +67,7 @@ func (a privilegedAuthorizer) AuthorizeLease(ctx context.Context, p transport.Au
 }
 
 func (input *privilegedLeaseInput) open(ctx context.Context, identity application.LeaseIdentity, now time.Time) error {
+	input.RestoreReturnCursor()
 	if ctx == nil || ctx.Err() != nil || identity.SessionID == "" || identity.LeaseID == "" || identity.Epoch == "" {
 		return errPrivilegedInput
 	}
@@ -173,6 +175,7 @@ func (input *privilegedLeaseInput) close(intent *control.ReturnIntent) {
 // releasing the shared pins, so the next update can replace installed files.
 func (input *privilegedLeaseInput) shutdown() error {
 	input.shutdownOnce.Do(func() {
+		input.RestoreReturnCursor()
 		input.mu.Lock()
 		input.stopped = true
 		input.mu.Unlock()

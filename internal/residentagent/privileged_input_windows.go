@@ -15,7 +15,7 @@ func installedProductInput(expires time.Time, failed func(error)) *privilegedLea
 	if err != nil {
 		return nil
 	}
-	return &privilegedLeaseInput{expires: expires, failed: failed, dispose: service.Close, prepare: service.PrepareConsole, connect: func(ctx context.Context, id application.LeaseIdentity, expires time.Time) (privilegedClient, error) {
+	return &privilegedLeaseInput{cursor: protectedReturnPresentation{open: service.PresentReturnCursor}, expires: expires, failed: failed, dispose: service.Close, prepare: service.PrepareConsole, connect: func(ctx context.Context, id application.LeaseIdentity, expires time.Time) (privilegedClient, error) {
 		binding, err := inputworker.NewBinding()
 		if err != nil {
 			return nil, err

@@ -1,0 +1,66 @@
+//go:build windows
+
+package inputworker
+
+import (
+	"context"
+	"io"
+	"time"
+
+	"github.com/0disoft/krasis/internal/wininput"
+)
+
+// PresentReturnCursor uses the same installed image, SCM and pipe-owner proofs
+// as input. The returned channel is a cancellation handle, never an InputPort.
+func (service *AgentService) PresentReturnCursor(ctx context.Context, lease Lease) (func() error, error) {
+	if service == nil || service.installation == nil || ctx == nil || ctx.Err() != nil || !lease.Presentation {
+		return nil, ErrAuthority
+	}
+	data, err := encodeLease(lease, time.Now())
+	if err != nil {
+		return nil, err
+	}
+	channel, err := connectInstalledService(ctx, service.digest, service.installation)
+	if err != nil {
+		return nil, err
+	}
+	accepted := false
+	defer func() {
+		if !accepted {
+			_ = channel.Close()
+		}
+	}()
+	stop := context.AfterFunc(ctx, func() { _ = channel.Close() })
+	defer stop()
+	deadline := time.Now().Add(time.Second)
+	if limit, ok := ctx.Deadline(); ok && limit.Before(deadline) {
+		deadline = limit
+	}
+	if channel.stream.SetDeadline(deadline) != nil || writeFrame(channel.stream, data[:]) != nil {
+		return nil, ErrAuthority
+	}
+	if _, err := readStartupReady(channel.stream); err != nil || ctx.Err() != nil {
+		return nil, ErrAuthority
+	}
+	if channel.stream.SetDeadline(time.Time{}) != nil {
+		return nil, ErrAuthority
+	}
+	accepted = true
+	return channel.Close, nil
+}
+
+func runCursorPresentation(ctx context.Context, channel *Channel, proof *Authority, lease Lease, ready func() error) (result error) {
+	run, cancel := context.WithDeadline(ctx, lease.ExpiresAt)
+	defer cancel()
+	done := make(chan struct{})
+	// Presentation accepts EOF/cancellation only. Any request bytes retire it;
+	// there is no input decoder or InputPort in this branch.
+	go func() { defer close(done); var b [1]byte; _, _ = io.ReadFull(channel.stream, b[:]); cancel() }()
+	defer func() { _ = channel.Close(); <-done }()
+	return wininput.RunProtectedReturnCursor(run, func() error {
+		if channel.authority.check(false) != nil || proof.check(false) != nil {
+			return ErrAuthority
+		}
+		return nil
+	}, lease.CursorX, lease.CursorY, ready)
+}

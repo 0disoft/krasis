@@ -273,6 +273,12 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 		var sessionHook agent.SourceHook = hook
 		if worker != nil {
 			sessionHook = protectedSessionHook(hook, log.Event)
+			worker.cursor.root = ctx
+			if presenter, ok := sessionHook.(interface {
+				SetProtectedReturnCursor(peer.ReturnCursorPresentation)
+			}); ok {
+				presenter.SetProtectedReturnCursor(worker)
+			}
 		}
 		var inputGuard productInputGuard = guard
 		if worker != nil {

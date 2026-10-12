@@ -93,6 +93,7 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 	var next *preparedConsole
 	var lastPreparation time.Time
 	prepareNext := false
+	var returned presentationReturn
 	defer func() {
 		if next.close() != nil {
 			result = errors.Join(result, ErrRecovery)
@@ -167,9 +168,22 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 				continue
 			}
 			if leaseErr == nil {
+				var agentPID uint32
+				pipe, ok := channel.stream.(*pipeConn)
+				if !ok || windows.GetNamedPipeClientProcessId(pipe.handle, &agentPID) != nil ||
+					(lease.Presentation && !returned.take(lease, agentPID, channel.authority.agentStarted, time.Now())) {
+					_ = channel.Close()
+					continue
+				}
+				if !lease.Presentation {
+					returned = presentationReturn{}
+				}
 				candidate := next
 				next = nil
 				_, err = runPreparedAgentLease(ctx, channel, lease, agent, service, installation, candidate)
+				if err == nil && !lease.Presentation {
+					returned = presentationReturn{lease: lease, pid: agentPID, started: channel.authority.agentStarted, at: time.Now()}
+				}
 				if errors.Is(err, ErrRecovery) {
 					_ = channel.Close()
 					return ErrRecovery

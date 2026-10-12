@@ -90,6 +90,17 @@ func encodeLease(lease Lease, now time.Time) ([leaseSize]byte, error) {
 	data[4] = 1
 	binary.BigEndian.PutUint64(data[8:16], uint64(lease.ExpiresAt.UnixMilli()))
 	copy(data[16:32], lease.Binding[:])
+	if lease.Presentation {
+		if lease.ExpiresAt.After(now.Add(presentationWindow)) {
+			return [leaseSize]byte{}, ErrProtocol
+		}
+		copy(data[:4], "KRS1")
+		data[38] = 1
+		binary.BigEndian.PutUint32(data[424:428], uint32(lease.CursorX))
+		binary.BigEndian.PutUint32(data[428:432], uint32(lease.CursorY))
+	} else if lease.CursorX != 0 || lease.CursorY != 0 {
+		return [leaseSize]byte{}, ErrProtocol
+	}
 	for i, id := range []string{lease.Identity.SessionID, lease.Identity.LeaseID, lease.Identity.Epoch} {
 		if len(id) == 0 || len(id) > 128 || !utf8.ValidString(id) || strings.ContainsRune(id, '\x00') {
 			return [leaseSize]byte{}, ErrProtocol
@@ -101,10 +112,17 @@ func encodeLease(lease Lease, now time.Time) ([leaseSize]byte, error) {
 }
 
 func decodeLease(data [leaseSize]byte, now time.Time) (Lease, error) {
-	if string(data[:4]) != "KRL1" || data[4] != 1 || !zeroBytes(data[5:8]) || !zeroBytes(data[38:40]) || !zeroBytes(data[424:]) {
+	presentation := string(data[:4]) == "KRS1"
+	if (!presentation && string(data[:4]) != "KRL1") || data[4] != 1 || !zeroBytes(data[5:8]) || data[39] != 0 ||
+		(presentation && data[38] != 1) || (!presentation && (!zeroBytes(data[38:40]) || !zeroBytes(data[424:]))) {
 		return Lease{}, ErrProtocol
 	}
 	lease := Lease{ExpiresAt: time.UnixMilli(int64(binary.BigEndian.Uint64(data[8:16])))}
+	lease.Presentation = data[38] == 1
+	if lease.Presentation {
+		lease.CursorX = int32(binary.BigEndian.Uint32(data[424:428]))
+		lease.CursorY = int32(binary.BigEndian.Uint32(data[428:432]))
+	}
 	copy(lease.Binding[:], data[16:32])
 	ids := []*string{&lease.Identity.SessionID, &lease.Identity.LeaseID, &lease.Identity.Epoch}
 	for i, id := range ids {

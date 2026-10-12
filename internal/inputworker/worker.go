@@ -47,6 +47,10 @@ type Lease struct {
 	Identity  application.LeaseIdentity
 	Binding   Binding
 	ExpiresAt time.Time
+	// Presentation permits only a passive Winlogon cursor shield after a clean
+	// lease return. It never admits input requests or a desktop selector.
+	Presentation     bool
+	CursorX, CursorY int32
 }
 
 type Report struct {
@@ -117,6 +121,9 @@ func serveReadyProfileOnDesktop(ctx context.Context, channel *Channel, input app
 }
 
 func validLease(ctx context.Context, stream net.Conn, input application.InputPort, lease Lease, now time.Time) bool {
+	if lease.Presentation {
+		return false
+	}
 	if ctx == nil || stream == nil || input == nil || ctx.Err() != nil || !lease.ExpiresAt.After(now) || lease.Binding == (Binding{}) {
 		return false
 	}

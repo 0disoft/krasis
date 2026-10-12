@@ -58,6 +58,14 @@ func authenticateAgentInstalled(pipe uintptr, expected [sha256.Size]byte, instal
 			_ = identity.close()
 		}
 	}()
+	var created, exited, kernel, user windows.Filetime
+	if windows.GetProcessTimes(identity.handle, &created, &exited, &kernel, &user) != nil {
+		return nil, ErrAuthority
+	}
+	agentStarted := uint64(created.HighDateTime)<<32 | uint64(created.LowDateTime)
+	if agentStarted == 0 {
+		return nil, ErrAuthority
+	}
 	session := windows.WTSGetActiveConsoleSessionId()
 	root, rootErr := windows.KnownFolderPath(windows.FOLDERID_ProgramFiles, 0)
 	if !validAgentIdentity(identity, session) || rootErr != nil || !strings.EqualFold(identity.image, filepath.Join(root, "Krasis", "Input", "krasis-agent.exe")) {
@@ -99,7 +107,8 @@ func authenticateAgentInstalled(pipe uintptr, expected [sha256.Size]byte, instal
 	}
 	accepted = true
 	return &Authority{
-		kind: authorityAgent,
+		kind:         authorityAgent,
+		agentStarted: agentStarted,
 		checkInput: func() error {
 			state, err := windows.WaitForSingleObject(identity.handle, 0)
 			if err != nil || state != uint32(windows.WAIT_TIMEOUT) {

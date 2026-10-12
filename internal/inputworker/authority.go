@@ -20,6 +20,7 @@ const (
 // lifetime; client-provided PIDs and claims cannot create this proof.
 type Authority struct {
 	kind               authorityKind
+	agentStarted       uint64 // Kernel process creation time, immutable auth evidence.
 	mu                 sync.Mutex
 	closed             bool
 	checkInput         func() error
