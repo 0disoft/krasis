@@ -121,3 +121,27 @@ func TestPreparedConsoleClosesOnlyOwnedResourcesWithoutInput(t *testing.T) {
 		t.Fatal("nil preparation cleanup failed")
 	}
 }
+
+func TestPassivePresentationPreservesUnboundInputPreparation(t *testing.T) {
+	server, client := nativePair(t)
+	defer client.Close()
+	job, err := makeWorkerJob()
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := &preparedConsole{worker: &ConsoleWorker{job: job, done: make(chan struct{})}, control: server}
+	defer p.close()
+	next := p
+	if candidate := takeInputPreparation(&next, Lease{Presentation: true}); candidate != nil || next != p || p.worker.exited() || p.warmState.Load() != 0 {
+		t.Fatal("passive owner consumed or closed the next input child")
+	}
+	if candidate := takeInputPreparation(&next, Lease{}); candidate != p || next != nil {
+		t.Fatal("input admission lost preserved preparation")
+	}
+	if candidate := takeInputPreparation(&next, Lease{}); candidate != nil {
+		t.Fatal("preparation transferred more than once")
+	}
+	if p.expireUnbound() != nil || !p.worker.exited() || p.warmState.Load() != 3 {
+		t.Fatal("preserving preparation disabled its existing expiry")
+	}
+}

@@ -7,6 +7,16 @@ import (
 )
 
 func TestInputConnectionDiagnosticAllowlistRejectsDynamicStages(t *testing.T) {
+	for _, stage := range []string{"admission", "cursor_open", "cursor_retire"} {
+		for _, bucket := range []string{"lt1ms", "lt10ms", "lt100ms", "lt1s", "ge1s"} {
+			if !allowed["installed_input_handoff_timing_"+stage+"_"+bucket] {
+				t.Fatal("handoff timing missing from export")
+			}
+		}
+	}
+	if allowed["installed_input_handoff_timing_private-path_lt1ms"] || allowed["installed_input_handoff_timing_admission_123ms"] {
+		t.Fatal("dynamic handoff timing accepted")
+	}
 	for _, stage := range []string{"client_lock", "client_authority", "client_write", "client_response", "worker_authority", "worker_scope", "worker_apply"} {
 		for _, bucket := range []string{"lt1ms", "lt10ms", "lt100ms", "lt1s", "ge1s"} {
 			if !allowed["installed_input_timing_"+stage+"_"+bucket] || !allowed["installed_input_heartbeat_timing_"+stage+"_"+bucket] {

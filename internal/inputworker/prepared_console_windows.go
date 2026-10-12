@@ -26,6 +26,17 @@ type preparedConsole struct {
 	warmTimer  *time.Timer
 }
 
+// A passive presentation launches its own bounded owner. Keep the unbound input
+// child for the next lease; its existing expiry/session checks still apply.
+func takeInputPreparation(next **preparedConsole, lease Lease) *preparedConsole {
+	if lease.Presentation {
+		return nil
+	}
+	candidate := *next
+	*next = nil
+	return candidate
+}
+
 // Only the installed service can prepare an unbound child. It receives no
 // agent pipe, lease, image pin or input. The ordinary launch API stays agent-only.
 func prepareServiceConsole(ctx context.Context, installation *Installation, digest [sha256.Size]byte) (*preparedConsole, error) {

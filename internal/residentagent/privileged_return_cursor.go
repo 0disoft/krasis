@@ -62,8 +62,10 @@ func (input *privilegedLeaseInput) PrepareReturnCursor() func() {
 			}
 			lease := inputworker.Lease{Identity: identity, Binding: binding, ExpiresAt: limit, Presentation: true, CursorX: x, CursorY: y}
 			start, stop := context.WithTimeout(run, 750*time.Millisecond)
+			openedAt := time.Now()
 			closeChannel, err := p.open(start, lease)
 			stop()
+			input.observeHandoffTiming("cursor_open", openedAt)
 			if err != nil || closeChannel == nil {
 				if input.event != nil {
 					input.event("installed_return_cursor_failed")
@@ -87,6 +89,7 @@ func (input *privilegedLeaseInput) PrepareReturnCursor() func() {
 }
 
 func (input *privilegedLeaseInput) RestoreReturnCursor() {
+	started := time.Now()
 	p := &input.cursor
 	p.mu.Lock()
 	p.generation++
@@ -104,4 +107,31 @@ func (input *privilegedLeaseInput) RestoreReturnCursor() {
 		p.cancel, p.done = nil, nil
 	}
 	p.mu.Unlock()
+	if cancel != nil || done != nil {
+		input.observeHandoffTiming("cursor_retire", started)
+	}
+}
+
+// One process-local monotonic duration per attempted admission/open/retirement.
+// These independent observations survive the bounded detailed-profile window;
+// admission includes retirement and must not be added to it.
+func (input *privilegedLeaseInput) observeHandoffTiming(stage string, started time.Time) {
+	if input.event == nil {
+		return
+	}
+	if stage != "admission" && stage != "cursor_open" && stage != "cursor_retire" {
+		return
+	}
+	elapsed, bucket := time.Since(started), "ge1s"
+	switch {
+	case elapsed < time.Millisecond:
+		bucket = "lt1ms"
+	case elapsed < 10*time.Millisecond:
+		bucket = "lt10ms"
+	case elapsed < 100*time.Millisecond:
+		bucket = "lt100ms"
+	case elapsed < time.Second:
+		bucket = "lt1s"
+	}
+	input.event("installed_input_handoff_timing_" + stage + "_" + bucket)
 }

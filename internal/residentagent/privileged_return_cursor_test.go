@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/0disoft/krasis/internal/application"
@@ -38,6 +39,37 @@ func TestProtectedReturnCursorRestoreJoinsPendingOpenBeforeNewLease(t *testing.T
 	if input.cursor.cancel != nil || input.cursor.done != nil || opens.Load() != 1 {
 		t.Fatal("retirement retained or reopened passive owner")
 	}
+}
+
+func TestReturnCursorRetirementTimingIncludesJoinAfterProfileWindow(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		input := &privilegedLeaseInput{}
+		ctx, cancel := context.WithCancel(context.Background())
+		input.cursor.cancel, input.cursor.done = cancel, make(chan struct{})
+		go func() {
+			<-ctx.Done()
+			time.Sleep(150 * time.Millisecond)
+			close(input.cursor.done)
+		}()
+		var events []string
+		input.event = func(code string) {
+			if !input.cursor.mu.TryLock() {
+				t.Fatal("retirement observer retained cursor admission gate")
+			}
+			input.cursor.mu.Unlock()
+			events = append(events, code)
+		}
+		// No handoff collector or profile context is needed for this observation.
+		time.Sleep(3 * time.Minute)
+		input.RestoreReturnCursor()
+		if len(events) != 1 || events[0] != "installed_input_handoff_timing_cursor_retire_lt1s" {
+			t.Fatal("join wait disappeared or was measured before completion", events)
+		}
+		input.RestoreReturnCursor()
+		if len(events) != 1 {
+			t.Fatal("empty retirement emitted a false worker wait")
+		}
+	})
 }
 
 func TestProtectedReturnCursorStaleActionCannotHideNewEntry(t *testing.T) {

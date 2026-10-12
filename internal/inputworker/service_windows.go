@@ -114,6 +114,10 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 			}
 			if prepareNext {
 				prepareNext = false
+				if next.close() != nil {
+					return ErrRecovery
+				}
+				next = nil
 				lastPreparation = time.Now()
 				// The endpoint already exists: a quick next connection can wait
 				// in the pipe while one unbound child prepares. No extra accept
@@ -178,8 +182,7 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 				if !lease.Presentation {
 					returned = presentationReturn{}
 				}
-				candidate := next
-				next = nil
+				candidate := takeInputPreparation(&next, lease)
 				_, err = runPreparedAgentLease(ctx, channel, lease, agent, service, installation, candidate)
 				if err == nil && !lease.Presentation {
 					returned = presentationReturn{lease: lease, pid: agentPID, started: channel.authority.agentStarted, at: time.Now()}
@@ -199,7 +202,7 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 		// Recovery and the owned worker have already finished. A clean lease
 		// needs no retry backoff; the next accept still blocks awaiting a client.
 		if err == nil {
-			prepareNext = true
+			prepareNext = next == nil || next.retired()
 			continue
 		}
 		if next.close() != nil {

@@ -295,6 +295,15 @@ g277은 passive owner가 서비스 endpoint를 사용하는 동안 선택적 준
 일반 에이전트의 cursor snapshot·show·hide는 고정 결과와 시간 bucket만 기록한다.
 보호 cursor ready는 보조 owner의 준비 응답이며 실제 화면 숨김의 관측값은 아니다.
 
+g278에서 passive cursor owner는 준비된 입력 child를 소비하지 않는다. 서비스는
+아직 승인되지 않은 입력 child 하나와 passive owner 하나만 유지하며, 다음 입력
+lease는 cursor 정리 결과를 받은 뒤 기존 child의 세션·수명·토큰을 다시 검증한다.
+준비 수명은 연장하지 않으며 만료·정리 실패는 기존 거절 규칙을 따른다.
+`installed_input_handoff_timing_<admission|cursor_open|cursor_retire>_<bucket>`은
+각 시도의 프로세스 내 monotonic 경과 시간이다. admission에는 cursor_retire가
+포함되므로 두 값을 합산하지 않는다. 고정 결과와 bucket만 저장하고 입력·PIN·
+경로·좌표는 기록하지 않는다. 상세 profile 수집창 이후에도 이 기록은 남는다.
+
 `inputdesktop.RunWinlogon`은 authenticated service-child가 별도로 고른 고정
 Winlogon 대상만 연다. 기존 `Run`의 Default 이름 검증은 유지한다. 일반 프로세스가
 권한을 주장하는 callback을 넘겨도 실제 SYSTEM·UIAccess·System 무결성·활성

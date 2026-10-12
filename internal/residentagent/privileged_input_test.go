@@ -3,6 +3,7 @@ package residentagent
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -50,7 +51,7 @@ func TestPrivilegedInputRoutesTimingThroughFixedEventSink(t *testing.T) {
 	}
 	defer input.close(nil)
 	client.observe("installed_input_timing_client_authority_lt1ms")
-	if len(events) != 2 || events[0] != "installed_input_lease_ready" || events[1] != "installed_input_timing_client_authority_lt1ms" {
+	if len(events) != 3 || events[0] != "installed_input_lease_ready" || !strings.HasPrefix(events[1], "installed_input_handoff_timing_admission_") || events[2] != "installed_input_timing_client_authority_lt1ms" {
 		t.Fatal("diagnostic sink lost timing events or changed startup status")
 	}
 }
@@ -63,7 +64,7 @@ func TestPrivilegedInputFailedStartupLogsBoundedDiagnosticsWithoutGrant(t *testi
 	if input.open(context.Background(), application.LeaseIdentity{SessionID: "s", LeaseID: "l", Epoch: "e"}, time.Now()) != errPrivilegedInput || input.client != nil {
 		t.Fatal("failed privileged startup granted an input channel")
 	}
-	if len(events) != 3 || events[0] != "installed_input_connect_failed" || events[1] != inputworker.ConnectionFailureEvent(nil) || events[2] != inputworker.ConnectionNativeFailureEvent(nil) {
+	if len(events) != 4 || events[0] != "installed_input_connect_failed" || events[1] != inputworker.ConnectionFailureEvent(nil) || events[2] != inputworker.ConnectionNativeFailureEvent(nil) || !strings.HasPrefix(events[3], "installed_input_handoff_timing_admission_") {
 		t.Fatal("startup failure omitted bounded diagnostic events")
 	}
 }

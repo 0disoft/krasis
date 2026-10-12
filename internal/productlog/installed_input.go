@@ -1,6 +1,11 @@
 package productlog
 
 func init() {
+	for _, stage := range []string{"admission", "cursor_open", "cursor_retire"} {
+		for _, bucket := range []string{"lt1ms", "lt10ms", "lt100ms", "lt1s", "ge1s"} {
+			allowed["installed_input_handoff_timing_"+stage+"_"+bucket] = true
+		}
+	}
 	for _, code := range []string{"installed_return_cursor_failed", "installed_return_cursor_ready", "installed_return_cursor_close_failed", "installed_return_cursor_route_native", "installed_return_cursor_route_protected"} {
 		allowed[code] = true
 	}
