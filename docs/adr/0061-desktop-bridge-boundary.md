@@ -591,3 +591,12 @@ Lock/unlock notifications select protected capture before foreground detection
 catches up, enabling the existing capture cursor shield on LockApp's Default
 desktop. This preference grants no authority and never transfers native objects
 between desktops. Unlock requests the existing desktop refresh path.
+## g282: Failed service recovery is not a clean stop
+
+A stopped service with a verified non-clean service record is
+SERVICE_RECOVERY_REQUIRED, including when its installed images differ from a
+new portable bundle. The UI asks the user to save work and restart the PC; it
+never restarts the PC itself or retries installation against an unconfirmed
+input cleanup. A clean stopped receipt or a never-started service remains
+SERVICE_STOPPED and can use attended repair. Existing transaction/SCM stop proof
+requirements are unchanged; failed receipts and journals are not deleted.

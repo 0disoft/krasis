@@ -1,5 +1,5 @@
 const states = new Set(['LOCAL', 'CONNECTING', 'CONNECTED', 'RECONNECTING', 'DISCONNECTING', 'FAULTED', 'UNKNOWN']);
-const inputSetupStates = new Set(['NOT_INSTALLED','UPDATE_REQUIRED','READY','UPDATING','CANCELLED','FAILED','PENDING','UNKNOWN','SERVICE_STOPPED']);
+const inputSetupStates = new Set(['NOT_INSTALLED','UPDATE_REQUIRED','READY','UPDATING','CANCELLED','FAILED','PENDING','UNKNOWN','SERVICE_STOPPED','SERVICE_RECOVERY_REQUIRED']);
 const refreshCodes = new Set(['ok','input_refresh_cancelled','input_refresh_pending','input_refresh_failed','busy']);
 const reconnectCodes = new Set(['not_attempted','ok','unavailable','outcome_unknown','cancelled','stale_peer','invalid_peer','rejected','recovery_required','agent_incompatible','busy','input_refresh_wait_expired','input_refresh_restore_failed']);
 

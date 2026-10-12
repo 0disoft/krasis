@@ -55,7 +55,7 @@ func (b *inputRefresh) status() string {
 		if current != nil && *current == "PENDING" {
 			interval = time.Second
 		}
-		eligible := current == nil || *current == "PENDING" || *current == "READY" || *current == "UNKNOWN" || *current == "SERVICE_STOPPED" || *current == "NOT_INSTALLED" || *current == "UPDATE_REQUIRED" || b.lastResult.Load() != nil && (*current == "CANCELLED" || *current == "FAILED")
+		eligible := current == nil || *current == "PENDING" || *current == "READY" || *current == "UNKNOWN" || *current == "SERVICE_STOPPED" || *current == "SERVICE_RECOVERY_REQUIRED" || *current == "NOT_INSTALLED" || *current == "UPDATE_REQUIRED" || b.lastResult.Load() != nil && (*current == "CANCELLED" || *current == "FAILED")
 		if eligible && (current == nil || time.Since(b.checkedAt) >= interval) {
 			b.startHealthReaderLocked()
 		} else {

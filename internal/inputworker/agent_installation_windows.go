@@ -73,6 +73,25 @@ func InstallationMatchesAgent(expected [sha256.Size]byte) (bool, error) {
 	return expected != ([sha256.Size]byte{}) && agent == expected, nil
 }
 
+// Inspect the currently installed service even when a newer portable bundle
+// differs. This is a read-only observation, never permission to run old code.
+func InstallationServiceHealth() error {
+	installation, err := LoadInstallation()
+	if err != nil {
+		return err
+	}
+	_, digest, err := installation.digests()
+	if err == nil {
+		root, rootErr := windows.KnownFolderPath(windows.FOLDERID_ProgramFiles, 0)
+		if rootErr != nil {
+			err = rootErr
+		} else {
+			err = installedServiceLaunchErrorWithin(filepath.Join(root, "Krasis"), digest, 0)
+		}
+	}
+	return errors.Join(err, installation.Close())
+}
+
 func OpenAgentLaunch(expected [sha256.Size]byte) (*AgentLaunch, error) {
 	return openAgentLaunch(expected, 0)
 }
@@ -145,6 +164,18 @@ func installedServiceLaunchErrorWithin(root string, digest [sha256.Size]byte, wa
 			cause := error(ErrAuthority)
 			if status.Win32ExitCode != 0 {
 				cause = errors.Join(cause, syscall.Errno(status.Win32ExitCode))
+			}
+			if status.CurrentState == windows.SERVICE_STOPPED && status.Win32ExitCode != uint32(windows.ERROR_SERVICE_NEVER_STARTED) {
+				record, recordErr := readServiceRecord(root)
+				if recordErr != nil {
+					return &InstallationHealthError{Stage: "service_record", Cause: recordErr}
+				}
+				if record.Digest != digest {
+					return &InstallationHealthError{Stage: "service_identity", Cause: ErrAuthority}
+				}
+				if record.Phase != serviceClean {
+					return &InstallationHealthError{Stage: "service_recovery", RecoveryRequired: true, Cause: errors.Join(cause, ErrRecovery)}
+				}
 			}
 			return &InstallationHealthError{Stage: "service_state", Stopped: status.CurrentState == windows.SERVICE_STOPPED, Cause: cause}
 		}

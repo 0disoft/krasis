@@ -14,8 +14,13 @@ func TestStoppedServiceOffersOnlyExplicitVerifiedRepair(t *testing.T) {
 	if err := b.explicit(context.Background()); err != nil || calls != 1 || b.status() != "READY" {
 		t.Fatal("explicit stopped-service repair unavailable", err, calls)
 	}
-	state = "UNKNOWN"
-	if err := b.explicit(context.Background()); err == nil || calls != 1 {
-		t.Fatal("unknown identity allowed repair", err, calls)
+	for _, unconfirmed := range []string{"UNKNOWN", "SERVICE_RECOVERY_REQUIRED"} {
+		state = unconfirmed
+		if err := b.automatic(context.Background()); err != nil || calls != 1 {
+			t.Fatal("unconfirmed cleanup silently repaired", err, calls)
+		}
+		if err := b.explicit(context.Background()); err == nil || calls != 1 {
+			t.Fatal("unconfirmed identity/cleanup allowed repair", err, calls)
+		}
 	}
 }

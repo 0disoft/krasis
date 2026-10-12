@@ -45,6 +45,7 @@ test('expired automatic confirmation remains distinct from the installation outc
 
 test('unknown health is visible without offering installation or claiming ordinary input', () => {
   assert.deepEqual(inputSetupNotice({inputSetup:'SERVICE_STOPPED',inputBackend:'PROTECTED'}), {key:'input_setup_SERVICE_STOPPED',action:'input_refresh'});
+  assert.deepEqual(inputSetupNotice({inputSetup:'SERVICE_RECOVERY_REQUIRED',inputBackend:'PORTABLE'}), {key:'input_setup_SERVICE_RECOVERY_REQUIRED',action:''});
   for (const inputBackend of ['UNKNOWN','PORTABLE','PROTECTED']) {
     assert.deepEqual(inputSetupNotice({inputSetup:'UNKNOWN',inputBackend,code:'preparing'}), {key:'input_setup_UNKNOWN',action:''});
     for (const code of ['ok','unavailable','busy']) {

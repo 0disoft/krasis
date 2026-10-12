@@ -34,6 +34,18 @@ func newInputRefresh(base, revision string) *inputRefresh {
 		_ = productlog.SaveInputHealth(os.Getenv("LOCALAPPDATA"), productlog.InputHealthSummary{Time: time.Now().UTC().Format(time.RFC3339Nano), State: state, Stage: stage, Win32Error: native.Win32Error, Win32Known: native.Win32Known})
 		return state
 	}
+	serviceFailure := func(err error) string {
+		var health *inputworker.InstallationHealthError
+		if errors.As(err, &health) {
+			if health.RecoveryRequired {
+				return observe("SERVICE_RECOVERY_REQUIRED", health.Stage, err)
+			}
+			if health.Stopped {
+				return observe("SERVICE_STOPPED", health.Stage, err)
+			}
+		}
+		return observe("UNKNOWN", "agent_launch", err)
+	}
 	inspect := func() string {
 		if running, err := inputworker.InstallationRefreshRunning(); err != nil {
 			return observe("UNKNOWN", "transaction", err)
@@ -64,13 +76,12 @@ func newInputRefresh(base, revision string) *inputRefresh {
 				}
 				return observe("UNKNOWN", "installation_close", closeErr)
 			}
-			var health *inputworker.InstallationHealthError
-			if errors.As(err, &health) && health.Stopped {
-				return observe("SERVICE_STOPPED", health.Stage, err)
-			}
 			// A stopped/unknown service on an otherwise matching installation is
 			// a diagnostic condition, not permission for an automatic repair.
-			return observe("UNKNOWN", "agent_launch", err)
+			return serviceFailure(err)
+		}
+		if err := inputworker.InstallationServiceHealth(); err != nil {
+			return serviceFailure(err)
 		}
 		return observe("UPDATE_REQUIRED", "installation", nil)
 	}

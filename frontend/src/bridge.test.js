@@ -4,6 +4,12 @@ import { createBridge } from './bridge.js';
 
 const peer = { alias: 'B', fingerprint: 'a'.repeat(64) };
 const snapshot = state => ({ schema: 'krasis.desktop/v1', state, peerAlias: '', peers: [peer], code: 'ok', notice: '' });
+test('confirmed stopped and unconfirmed cleanup remain distinct health observations', async () => {
+  for (const inputSetup of ['SERVICE_STOPPED','SERVICE_RECOVERY_REQUIRED']) {
+    const bridge=createBridge({Refresh:async()=>({...snapshot('LOCAL'),inputSetup}),Connect(){},Disconnect(){}});
+    assert.equal((await bridge.refresh()).inputSetup,inputSetup);
+  }
+});
 test('last installation result stays separate from healthy input and strips unknown details', async () => {
   for (const code of ['input_refresh_cancelled','input_refresh_failed','ok',undefined,'private path']) {
     const bridge = createBridge({Refresh: async () => ({...snapshot('LOCAL'),inputSetup:'READY',inputAttemptCode:code}),Connect(){},Disconnect(){}});

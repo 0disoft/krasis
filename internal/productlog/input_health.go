@@ -29,12 +29,12 @@ func (v InputHealthSummary) valid() bool {
 		return false
 	}
 	switch v.State {
-	case "READY", "UNKNOWN", "PENDING", "NOT_INSTALLED", "UPDATE_REQUIRED", "SERVICE_STOPPED":
+	case "READY", "UNKNOWN", "PENDING", "NOT_INSTALLED", "UPDATE_REQUIRED", "SERVICE_STOPPED", "SERVICE_RECOVERY_REQUIRED":
 	default:
 		return false
 	}
 	switch v.Stage {
-	case "complete", "transaction", "bundle_read", "installation", "installation_close", "agent_launch", "service_manager", "service_query", "service_missing", "service_state", "service_record", "service_identity":
+	case "complete", "transaction", "bundle_read", "installation", "installation_close", "agent_launch", "service_manager", "service_query", "service_missing", "service_state", "service_record", "service_identity", "service_recovery":
 	default:
 		return false
 	}
