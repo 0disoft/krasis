@@ -223,6 +223,12 @@ recovery 실패 receipt로 전달하여 서비스의 다음 lease admission을 �
 채널을 여러 번 닫아도 첫 정리 결과를 보존한다. 로그인 후 경계 진입 차단의
 세부 원인은 별도 현장 관측 대상이며 이 ACK 수정만으로 해결됐다고 판단하지 않는다.
 
+g273은 경계 후보 이후 not-ready·메뉴·mouse capture·키 눌림·move/size·조회
+실패·승인·실제 REQUEST 송신 결과를 고정 코드로 보존한다. UI의 3초 안내가
+사라져도 진단에는 남으며 이전 runner의 늦은 관측은 기록하지 않는다. 키 종류나
+내용·포인터 좌표·창 식별자는 이 코드에 포함하지 않는다. Windows의 키 눌림
+관측을 임의로 무시하거나 모든 키를 자동 해제하는 동작은 추가하지 않는다.
+
 `inputdesktop.RunWinlogon`은 authenticated service-child가 별도로 고른 고정
 Winlogon 대상만 연다. 기존 `Run`의 Default 이름 검증은 유지한다. 일반 프로세스가
 권한을 주장하는 callback을 넘겨도 실제 SYSTEM·UIAccess·System 무결성·활성

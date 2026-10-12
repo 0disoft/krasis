@@ -49,6 +49,9 @@ func init() {
 		}
 	}
 	allowed["boundary_summary"] = true
+	for _, code := range []string{"dropped_not_ready", "blocked_menu", "blocked_capture", "blocked_pressed", "blocked_move_size", "admission_failed", "admitted", "request_written", "request_unknown"} {
+		allowed["boundary_"+code] = true
+	}
 	allowed["protected_input_detected"] = true
 	allowed["protected_input_reconnecting"] = true
 	for _, code := range []string{"protected_input_desktop_unavailable", "protected_input_non_default_desktop", "protected_input_credential_broker", "protected_input_identity_unknown"} {
