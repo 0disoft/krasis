@@ -103,7 +103,7 @@ func serveReadyProfileOnDesktop(ctx context.Context, channel *Channel, input app
 		}
 		var runErr error
 		timing := &workerTiming{}
-		inputDo := measureExecution(func() error { return authority.check(false) }, scope.Do, timing)
+		inputDo := beforeInputCertainty(measureExecution(func() error { return authority.check(false) }, scope.Do, timing))
 		recoveryDo := func(ctx context.Context, operation func() error) error {
 			if err := authority.check(true); err != nil {
 				return err

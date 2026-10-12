@@ -207,6 +207,7 @@ func (client *Client) performResponse(ctx context.Context, command request, obse
 		handoff.Record(ctx, handoff.ClientResponse, elapsed3)
 	}
 	if err != nil || ack.sequence != command.sequence || ack.op != command.op {
+		client.observeFailure("installed_input_failure_ack_unconfirmed")
 		client.fail()
 		return unknownInput(ErrProtocol)
 	}
@@ -224,6 +225,13 @@ func (client *Client) performResponse(ctx context.Context, command request, obse
 		}
 		return nil
 	}
+	if ack.timing[2] != 0 {
+		client.observeFailure("installed_input_failure_after_dispatch")
+	} else if ack.timing[0] != 0 {
+		client.observeFailure("installed_input_failure_before_apply")
+	} else {
+		client.observeFailure("installed_input_failure_stage_unknown")
+	}
 	client.fail()
 	certainty := application.InjectionOutcomeUnknown
 	if ack.certainty == 1 {
@@ -233,6 +241,13 @@ func (client *Client) performResponse(ctx context.Context, command request, obse
 		certainty = application.InjectionPartiallyApplied
 	}
 	return &application.InjectionError{Certainty: certainty, Requested: int(ack.requested), Inserted: int(ack.inserted)}
+}
+
+// Fixed phase evidence only; the existing observer contract forbids reentry.
+func (client *Client) observeFailure(code string) {
+	if client.timing.emit != nil {
+		client.timing.emit(code)
+	}
 }
 
 // Close interrupts pending I/O and triggers worker-owned recovery. A nil
