@@ -261,6 +261,11 @@ after-dispatch, stage-unknown, ACK-unconfirmed를 고정 코드로 구분한다.
 callback은 한 번만 실행하며 SendInput을 재전송하지 않는다. PIN 전환 때의 실제
 연결 유지 효과는 양쪽 업데이트 후 현장 시험으로 확인한다.
 
+g276은 receive-only 대기를 검증된 desktop 알림으로 즉시 깨우며 알림은 한 건으로
+합친다. 기존 hook 정리가 끝난 뒤 Default가 준비돼 있으면 고정 250ms 지연 없이
+재준비한다. 알림이 없거나 secure desktop이 유지되면 기존 250ms 상태 검사를
+유지한다. 실제 로그인 직후 지연 전체를 이 대기 하나의 원인으로 단정하지 않는다.
+
 `inputdesktop.RunWinlogon`은 authenticated service-child가 별도로 고른 고정
 Winlogon 대상만 연다. 기존 `Run`의 Default 이름 검증은 유지한다. 일반 프로세스가
 권한을 주장하는 callback을 넘겨도 실제 SYSTEM·UIAccess·System 무결성·활성

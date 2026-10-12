@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/0disoft/krasis/internal/agent"
 	"github.com/0disoft/krasis/internal/agentlifecycle"
@@ -29,6 +30,7 @@ type protectedSource struct {
 	refresh  bool
 	prepared bool
 	epoch    uint64
+	wake     chan struct{}
 }
 
 func protectedSessionHook(hook *wininput.SourceHook, event func(string)) agent.SourceHook {
@@ -54,6 +56,7 @@ func (h *protectedSource) RunWithBoundary(ctx context.Context, session *wininput
 	}
 	h.mu.Lock()
 	h.session, h.prepared, h.refresh = session, false, false
+	h.wake = make(chan struct{}, 1)
 	h.mu.Unlock()
 	defer func() {
 		h.mu.Lock()
@@ -74,7 +77,7 @@ func (h *protectedSource) RunWithBoundary(ctx context.Context, session *wininput
 				standby = true
 			}
 			initialReady.Do(ready) // Receiver/liveness readiness, not local capture.
-			if err := agent.Wait(ctx, protectedRecoveryDelay); err != nil {
+			if err := h.waitDesktop(ctx); err != nil {
 				return err
 			}
 			continue
@@ -126,9 +129,9 @@ func (h *protectedSource) RunWithBoundary(ctx context.Context, session *wininput
 			return wininput.ErrProtectedInput
 		}
 		h.observe("installed_source_refresh_joined")
-		if err := agent.Wait(ctx, protectedRecoveryDelay); err != nil {
-			return err
-		}
+		// Reinspect immediately after the old owners have joined. A secure
+		// desktop still uses bounded standby polling; a ready Default desktop
+		// does not need another unconditional recovery delay.
 	}
 }
 
@@ -148,10 +151,27 @@ func (h *protectedSource) refreshDesktop(event agentlifecycle.Event) bool {
 	}
 	h.epoch++
 	h.refresh, h.prepared = true, false
+	select {
+	case h.wake <- struct{}{}:
+	default:
+	}
 	if h.stop != nil {
 		h.stop(wininput.ErrSourceCaptureRefresh)
 	}
 	return true
+}
+
+func (h *protectedSource) waitDesktop(ctx context.Context) error {
+	timer := time.NewTimer(protectedRecoveryDelay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-h.wake:
+		return nil
+	case <-timer.C:
+		return nil
+	}
 }
 
 func (h *protectedSource) captureReady() bool {

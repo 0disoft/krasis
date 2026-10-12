@@ -108,10 +108,33 @@ func TestProtectedReceiveOnlyReacquiresCaptureWhenDesktopReturns(t *testing.T) {
 		t.Fatal("secure desktop pretended to capture")
 	}
 	blocked.Store(false)
+	if !h.refreshDesktop(agentlifecycle.EventDesktopSwitch) {
+		t.Fatal("standby desktop wake rejected")
+	}
 	awaitTransitionSignal(t, captured)
 	if !h.captureReady() || ready.Load() != 1 {
 		t.Fatal("desktop return did not restore same session capture")
 	}
 	cancel()
 	awaitTransitionSignal(t, done)
+}
+
+func TestProtectedStandbyWakeIsCoalescedAndCancelled(t *testing.T) {
+	h := &protectedSource{session: &wininput.SourceSession{}, wake: make(chan struct{}, 1)}
+	for i := 0; i < 10; i++ {
+		if !h.refreshDesktop(agentlifecycle.EventDesktopSwitch) {
+			t.Fatal("idle wake rejected")
+		}
+	}
+	if len(h.wake) != 1 {
+		t.Fatal("desktop wakes were queued without bound")
+	}
+	if err := h.waitDesktop(context.Background()); err != nil || len(h.wake) != 0 {
+		t.Fatal("ready desktop remained behind standby timer", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if !errors.Is(h.waitDesktop(ctx), context.Canceled) {
+		t.Fatal("standby ignored cancellation")
+	}
 }
