@@ -304,6 +304,12 @@ lease는 cursor 정리 결과를 받은 뒤 기존 child의 세션·수명·토�
 포함되므로 두 값을 합산하지 않는다. 고정 결과와 bucket만 저장하고 입력·PIN·
 경로·좌표는 기록하지 않는다. 상세 profile 수집창 이후에도 이 기록은 남는다.
 
+보호 커서 준비는 기존 KRD startup 응답의 service launch·child connect·bootstrap,
+worker 검증·인증·desktop/window 준비 시간을 고정 bucket으로 남긴다. 부모·자식
+각자의 경과 시간이며 bootstrap에 child 시간이 포함되므로 합산하지 않는다.
+빠른 재진입으로 아직 준비 중인 cursor 요청이 취소되면 cancelled로 구분한다.
+현재 요청이 살아 있는 동안의 실패·시간 초과는 기존 failed 기록을 유지한다.
+
 `inputdesktop.RunWinlogon`은 authenticated service-child가 별도로 고른 고정
 Winlogon 대상만 연다. 기존 `Run`의 Default 이름 검증은 유지한다. 일반 프로세스가
 권한을 주장하는 callback을 넘겨도 실제 SYSTEM·UIAccess·System 무결성·활성

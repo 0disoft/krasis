@@ -1,6 +1,12 @@
 package productlog
 
 func init() {
+	for _, stage := range []string{"pipe_connect", "service_launch", "service_child_connect", "service_bootstrap_ready", "worker_installed_validation", "worker_identity", "worker_service_auth", "worker_agent_auth", "worker_desktop_ready"} {
+		for _, bucket := range []string{"lt1ms", "lt10ms", "lt100ms", "lt1s", "ge1s"} {
+			allowed["installed_return_cursor_startup_"+stage+"_"+bucket] = true
+		}
+	}
+	allowed["installed_return_cursor_cancelled"] = true
 	for _, stage := range []string{"admission", "cursor_open", "cursor_retire"} {
 		for _, bucket := range []string{"lt1ms", "lt10ms", "lt100ms", "lt1s", "ge1s"} {
 			allowed["installed_input_handoff_timing_"+stage+"_"+bucket] = true

@@ -229,7 +229,9 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 	}()
 	defer func() { _ = control.Close(); <-readerDone }()
 	if lease.Presentation {
+		desktopStarted := time.Now()
 		result := runCursorPresentation(run, channel, proof, lease, func() error {
+			profile.Record(handoff.WorkerDesktopReady, time.Since(desktopStarted))
 			_ = control.SetWriteDeadline(time.Now().Add(startupTimeout))
 			return writeStartupReady(control, profile)
 		})

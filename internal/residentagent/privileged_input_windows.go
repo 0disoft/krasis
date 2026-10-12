@@ -15,11 +15,15 @@ func installedProductInput(expires time.Time, failed func(error)) *privilegedLea
 	if err != nil {
 		return nil
 	}
-	return &privilegedLeaseInput{cursor: protectedReturnPresentation{open: service.PresentReturnCursor}, expires: expires, failed: failed, dispose: service.Close, prepare: service.PrepareConsole, connect: func(ctx context.Context, id application.LeaseIdentity, expires time.Time) (privilegedClient, error) {
+	input := &privilegedLeaseInput{expires: expires, failed: failed, dispose: service.Close, prepare: service.PrepareConsole, connect: func(ctx context.Context, id application.LeaseIdentity, expires time.Time) (privilegedClient, error) {
 		binding, err := inputworker.NewBinding()
 		if err != nil {
 			return nil, err
 		}
 		return service.ConnectLease(ctx, inputworker.Lease{Identity: id, Binding: binding, ExpiresAt: expires})
 	}}
+	input.cursor.open = func(ctx context.Context, lease inputworker.Lease) (func() error, error) {
+		return service.PresentReturnCursorObserved(ctx, lease, input.event)
+	}
+	return input
 }

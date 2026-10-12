@@ -7,6 +7,12 @@ import (
 )
 
 func TestInputConnectionDiagnosticAllowlistRejectsDynamicStages(t *testing.T) {
+	if !allowed["installed_return_cursor_cancelled"] || !allowed["installed_return_cursor_startup_service_launch_lt1s"] || !allowed["installed_return_cursor_startup_worker_desktop_ready_lt1ms"] {
+		t.Fatal("cursor startup evidence missing from sanitized export")
+	}
+	if allowed["installed_return_cursor_startup_private-path_lt1ms"] || allowed["installed_return_cursor_startup_service_launch_123ms"] {
+		t.Fatal("unbounded cursor startup evidence accepted")
+	}
 	for _, stage := range []string{"admission", "cursor_open", "cursor_retire"} {
 		for _, bucket := range []string{"lt1ms", "lt10ms", "lt100ms", "lt1s", "ge1s"} {
 			if !allowed["installed_input_handoff_timing_"+stage+"_"+bucket] {

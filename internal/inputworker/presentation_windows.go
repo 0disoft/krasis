@@ -13,6 +13,10 @@ import (
 // PresentReturnCursor uses the same installed image, SCM and pipe-owner proofs
 // as input. The returned channel is a cancellation handle, never an InputPort.
 func (service *AgentService) PresentReturnCursor(ctx context.Context, lease Lease) (func() error, error) {
+	return service.PresentReturnCursorObserved(ctx, lease, nil)
+}
+
+func (service *AgentService) PresentReturnCursorObserved(ctx context.Context, lease Lease, emit func(string)) (func() error, error) {
 	if service == nil || service.installation == nil || ctx == nil || ctx.Err() != nil || !lease.Presentation {
 		return nil, ErrAuthority
 	}
@@ -20,7 +24,9 @@ func (service *AgentService) PresentReturnCursor(ctx context.Context, lease Leas
 	if err != nil {
 		return nil, err
 	}
+	started := time.Now()
 	channel, err := connectInstalledService(ctx, service.digest, service.installation)
+	observePresentationPhase(emit, "pipe_connect", time.Since(started))
 	if err != nil {
 		return nil, err
 	}
@@ -39,9 +45,11 @@ func (service *AgentService) PresentReturnCursor(ctx context.Context, lease Leas
 	if channel.stream.SetDeadline(deadline) != nil || writeFrame(channel.stream, data[:]) != nil {
 		return nil, ErrAuthority
 	}
-	if _, err := readStartupReady(channel.stream); err != nil || ctx.Err() != nil {
+	profile, err := readStartupReady(channel.stream)
+	if err != nil || ctx.Err() != nil {
 		return nil, ErrAuthority
 	}
+	observePresentationStartup(emit, profile)
 	if channel.stream.SetDeadline(time.Time{}) != nil {
 		return nil, ErrAuthority
 	}

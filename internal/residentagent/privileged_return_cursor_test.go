@@ -2,6 +2,7 @@ package residentagent
 
 import (
 	"context"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"testing/synctest"
@@ -87,5 +88,37 @@ func TestProtectedReturnCursorStaleActionCannotHideNewEntry(t *testing.T) {
 	action()
 	if input.cursor.cancel != nil {
 		t.Fatal("late return survived new entry")
+	}
+}
+
+func TestReentryCancellationDoesNotReportCursorStartupFailure(t *testing.T) {
+	started := make(chan struct{})
+	input := &privilegedLeaseInput{client: &testCursorClient{}, identity: application.LeaseIdentity{SessionID: "s", LeaseID: "l", Epoch: "e"}, leaseExpires: time.Now().Add(time.Minute)}
+	input.cursor.root = context.Background()
+	input.cursor.open = func(ctx context.Context, _ inputworker.Lease) (func() error, error) {
+		close(started)
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+	var cancelled atomic.Int32
+	input.event = func(code string) {
+		if code == "installed_return_cursor_failed" {
+			t.Error("reentry was classified as startup failure")
+		}
+		if code == "installed_return_cursor_cancelled" {
+			cancelled.Add(1)
+		} else if !strings.HasPrefix(code, "installed_input_handoff_timing_") {
+			t.Error("unexpected cursor event", code)
+		}
+	}
+	action := input.PrepareReturnCursor()
+	if action == nil {
+		t.Fatal("missing cursor action")
+	}
+	action()
+	<-started
+	input.RestoreReturnCursor()
+	if cancelled.Load() != 1 {
+		t.Fatal("cancelled owner was not joined/classified")
 	}
 }

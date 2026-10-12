@@ -68,7 +68,11 @@ func (input *privilegedLeaseInput) PrepareReturnCursor() func() {
 			input.observeHandoffTiming("cursor_open", openedAt)
 			if err != nil || closeChannel == nil {
 				if input.event != nil {
-					input.event("installed_return_cursor_failed")
+					code := "installed_return_cursor_failed"
+					if run.Err() != nil {
+						code = "installed_return_cursor_cancelled"
+					}
+					input.event(code)
 				}
 				return
 			}
