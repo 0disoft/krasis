@@ -310,6 +310,14 @@ worker 검증·인증·desktop/window 준비 시간을 고정 bucket으로 남�
 빠른 재진입으로 아직 준비 중인 cursor 요청이 취소되면 cancelled로 구분한다.
 현재 요청이 살아 있는 동안의 실패·시간 초과는 기존 failed 기록을 유지한다.
 
+g279는 서비스 accept에서 요청 종류를 읽기 전에 다음 입력 child를 생성하지
+않는다. 보호 cursor 준비 응답을 전달한 후에만 다음 입력 child 하나를 별도로
+준비한다. passive owner 종료 후 서비스가 이 준비 작업을 join하며, child 소유권은
+한 번만 이전한다. 서비스 취소·5초 준비 기한·native 정리 실패를 확인하고, 정리
+불확실성은 다음 입력 승인을 막는다. 기존 2초 unbound 수명·세션·토큰 검증은
+유지한다. cursor 준비와 입력 준비가 각각 끝났다는 뜻이며, 입력 준비 중 빠른
+재진입의 대기는 실기기 진단으로 별도 확인한다.
+
 `inputdesktop.RunWinlogon`은 authenticated service-child가 별도로 고른 고정
 Winlogon 대상만 연다. 기존 `Run`의 Default 이름 검증은 유지한다. 일반 프로세스가
 권한을 주장하는 callback을 넘겨도 실제 SYSTEM·UIAccess·System 무결성·활성

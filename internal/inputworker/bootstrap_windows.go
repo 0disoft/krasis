@@ -34,7 +34,7 @@ func runInstalledAgentLease(ctx context.Context, channel *Channel, lease Lease, 
 	return runPreparedAgentLease(ctx, channel, lease, agentDigest, serviceDigest, installation, nil)
 }
 
-func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, agentDigest, serviceDigest [sha256.Size]byte, installation *Installation, candidate *preparedConsole) (report Report, result error) {
+func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, agentDigest, serviceDigest [sha256.Size]byte, installation *Installation, candidate *preparedConsole, afterReady ...func()) (report Report, result error) {
 	if candidate != nil {
 		defer func() {
 			if candidate.close() != nil {
@@ -123,6 +123,11 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 		return supervise(stopped, control, func() error { return ErrAuthority }, worker.exited, lease.ExpiresAt)
 	}
 	_ = channel.stream.SetWriteDeadline(time.Time{})
+	for _, notify := range afterReady {
+		if notify != nil {
+			notify()
+		}
+	}
 	return supervise(ctx, control, func() error { return channel.authority.check(false) }, worker.exited, lease.ExpiresAt)
 }
 

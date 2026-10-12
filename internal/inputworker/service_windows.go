@@ -92,7 +92,6 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 	}
 	var next *preparedConsole
 	var lastPreparation time.Time
-	prepareNext := false
 	var returned presentationReturn
 	defer func() {
 		if next.close() != nil {
@@ -106,32 +105,13 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 			first = nil
 		}
 		readyFailed := false
-		var preparationErr error
 		channel, err := acceptAgentReadyOnPipe(ctx, agent, func() error {
 			if ready != nil && ready() != nil {
 				readyFailed = true
 				return ErrAuthority
 			}
-			if prepareNext {
-				prepareNext = false
-				if next.close() != nil {
-					return ErrRecovery
-				}
-				next = nil
-				lastPreparation = time.Now()
-				// The endpoint already exists: a quick next connection can wait
-				// in the pipe while one unbound child prepares. No extra accept
-				// failure or per-idle retry can create another warm child.
-				next, preparationErr = prepareServiceConsole(ctx, installation, service)
-				if errors.Is(preparationErr, ErrRecovery) {
-					return ErrRecovery
-				}
-			}
 			return nil
 		}, installation, initial)
-		if errors.Is(preparationErr, ErrRecovery) {
-			return ErrRecovery
-		}
 		if readyFailed {
 			return ErrAuthority
 		}
@@ -183,7 +163,31 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 					returned = presentationReturn{}
 				}
 				candidate := takeInputPreparation(&next, lease)
-				_, err = runPreparedAgentLease(ctx, channel, lease, agent, service, installation, candidate)
+				var warming *cursorInputPreparation
+				_, err = runPreparedAgentLease(ctx, channel, lease, agent, service, installation, candidate, func() {
+					if !lease.Presentation || next != nil && !next.retired() {
+						return
+					}
+					// Readiness has reached the agent before any next-input work.
+					// Neither a warm child nor its cleanup delays cursor hiding.
+					retiring := next
+					next = nil
+					lastPreparation = time.Now()
+					warming = startCursorInputPreparation(ctx, func(run context.Context) (*preparedConsole, error) {
+						if retiring.close() != nil {
+							return nil, ErrRecovery
+						}
+						return prepareServiceConsole(run, installation, service)
+					})
+				})
+				if warming != nil {
+					var preparationErr error
+					next, preparationErr = warming.join()
+					if errors.Is(preparationErr, ErrRecovery) {
+						_ = channel.Close()
+						return ErrRecovery
+					}
+				}
 				if err == nil && !lease.Presentation {
 					returned = presentationReturn{lease: lease, pid: agentPID, started: channel.authority.agentStarted, at: time.Now()}
 				}
@@ -202,7 +206,6 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 		// Recovery and the owned worker have already finished. A clean lease
 		// needs no retry backoff; the next accept still blocks awaiting a client.
 		if err == nil {
-			prepareNext = next == nil || next.retired()
 			continue
 		}
 		if next.close() != nil {
