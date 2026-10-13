@@ -7,6 +7,7 @@ import (
 	"errors"
 	"syscall"
 	"testing"
+	"time"
 	"unsafe"
 )
 
@@ -14,6 +15,7 @@ func TestRawReadBusyRecoversWithoutReplayingVisitor(t *testing.T) {
 	for _, busyAt := range []string{"size", "packet"} {
 		t.Run(busyAt, func(t *testing.T) {
 			r, err := newRawMouseReader()
+			r.busyPolicy = deterministicRawBusyPolicy()
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -66,6 +68,7 @@ func TestRawReadBusyCannotRetryVisitorOrHidePermanentFailure(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r, err := newRawMouseReader()
+			r.busyPolicy = deterministicRawBusyPolicy()
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -107,5 +110,27 @@ func TestRawReadBusyCannotRetryVisitorOrHidePermanentFailure(t *testing.T) {
 	})
 	if !errors.Is(err, syscall.Errno(170)) || SourceFailureStage(err) != "raw-desktop" || calls != 2 || visits != 1 {
 		t.Fatal("visitor error was replayed or misclassified", err, calls, visits)
+	}
+}
+
+func deterministicRawBusyPolicy() rawInputBusyPolicy {
+	return rawInputBusyPolicy{now: func() time.Time { return time.Unix(100, 0) }, wait: func(ctx context.Context) error { return ctx.Err() }}
+}
+
+func TestRawBusyWaitCannotExtendElapsedBudget(t *testing.T) {
+	now := time.Unix(100, 0)
+	waits, calls := 0, 0
+	policy := rawInputBusyPolicy{now: func() time.Time { return now }, wait: func(context.Context) error {
+		waits++
+		now = now.Add(11 * time.Millisecond) // Timer oversleep must not cause another read.
+		return nil
+	}}
+	size := uint32(0)
+	_, err := readRawInputData(context.Background(), func(uintptr, []byte, *uint32) (uint32, error) {
+		calls++
+		return ^uint32(0), syscall.Errno(170)
+	}, 123, nil, &size, policy)
+	if !errors.Is(err, syscall.Errno(170)) || waits != 1 || calls != 1 {
+		t.Fatal("busy timer extended budget", err, waits, calls)
 	}
 }
