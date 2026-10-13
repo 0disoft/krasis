@@ -31,6 +31,9 @@ type sourceClient struct {
 	sequence uint64
 	epoch    atomic.Uint64
 	retired  atomic.Bool
+	retiring atomic.Bool
+	pending  sourcePacket // Under mu; only the already fully written optional request.
+	failed   chan struct{}
 	replies  chan sourcePacket
 	done     chan struct{}
 	err      error
@@ -61,7 +64,9 @@ func (c *CaptureSource) Deactivate() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	if _, err := live.call(ctx, sourceDeactivate); err != nil {
-		_ = live.channel.Close()
+		if !live.retiring.Load() {
+			_ = live.channel.Close()
+		}
 	}
 }
 func (c *CaptureSource) AdmitBoundary(ctx context.Context, _ control.BoundaryIntent) (peer.BoundaryAdmissionDecision, error) {
@@ -101,6 +106,23 @@ func (c *sourceClient) call(ctx context.Context, op byte, reference ...uint64) (
 	if ctx == nil || ctx.Err() != nil {
 		accepted = true // No request was started; a cancelled optional query cannot retire this owner.
 		return sourcePacket{}, ErrAuthority
+	}
+	if c.retiring.Load() && op != sourceStop {
+		accepted = true // Only shutdown may follow an outcome still being drained.
+		return sourcePacket{}, ErrAuthority
+	}
+	if op == sourceStop && c.pending.sequence != 0 {
+		if err := c.drainPending(ctx); err != nil {
+			return sourcePacket{}, err
+		}
+		select {
+		case <-c.done:
+			if c.retired.Load() && c.err == nil {
+				accepted = true
+				return sourcePacket{}, nil
+			}
+		default:
+		}
 	}
 	if c.channel.authority.check(false) != nil {
 		return sourcePacket{}, ErrAuthority
@@ -172,6 +194,34 @@ func (c *sourceClient) call(ctx context.Context, op byte, reference ...uint64) (
 		default:
 		}
 	}
+	// A timeout may race an already buffered ACK. Observe that outcome before
+	// closing any channel, including a known optional-request rejection.
+	select {
+	case reply := <-c.replies:
+		if reply.reply != p.sequence || reply.op != op {
+			return sourcePacket{}, ErrProtocol
+		}
+		accepted = true
+		if reply.status != 0 {
+			if op == sourceActivate {
+				c.epoch.Store(0)
+			}
+			return reply, ErrAuthority
+		}
+		return reply, nil
+	default:
+	}
+	if optionalSourceCursor(op) && !time.Now().Before(limit) {
+		// No replay or further capture command is allowed. Keep the authenticated
+		// pipe solely to drain this exact reply and request native retirement.
+		c.pending = p
+		c.epoch.Store(0)
+		accepted = true
+		if !c.retiring.Swap(true) && c.failed != nil {
+			close(c.failed)
+		}
+		return sourcePacket{}, ErrAuthority
+	}
 	c.epoch.Store(0)
 	_ = c.channel.Close()
 	return sourcePacket{}, ErrAuthority
@@ -219,7 +269,7 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 	if retired {
 		return errors.Join(wininput.ErrProtectedInput, ErrSourceCaptureRetired)
 	}
-	live := &sourceClient{channel: channel, binding: binding, replies: make(chan sourcePacket, 1), done: make(chan struct{})}
+	live := &sourceClient{channel: channel, binding: binding, replies: make(chan sourcePacket, 1), done: make(chan struct{}), failed: make(chan struct{})}
 	go func() {
 		defer close(live.done)
 		var sequence uint64
@@ -290,6 +340,14 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 	defer ticker.Stop()
 	for {
 		select {
+		case <-live.failed:
+			cleanup, cancel := context.WithTimeout(context.Background(), RecoveryTimeout+time.Second)
+			_, err := live.call(cleanup, sourceStop)
+			cancel()
+			if err != nil {
+				return errors.Join(err, ErrRecovery)
+			}
+			return errors.Join(wininput.ErrProtectedInput, ErrSourceCaptureRetired)
 		case <-ctx.Done():
 			// Native owners must acknowledge retirement before the resident may
 			// start ordinary desktop hooks. Missing proof forces full recovery.
@@ -312,12 +370,18 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 			}
 			return errors.Join(live.err, ErrRecovery)
 		case <-ticker.C:
+			if live.retiring.Load() {
+				continue
+			} // The owner must drain/stop, not heartbeat.
 			// Finish the already bounded heartbeat before explicit retirement.
 			// Cancelling a source refresh must not cut the ACK stream mid-frame.
 			check, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
 			_, err := live.call(check, sourceHeartbeat)
 			cancel()
 			if err != nil && ctx.Err() == nil {
+				if live.retiring.Load() {
+					continue
+				} // Cursor timeout won the IPC mutex.
 				if live.retired.Load() {
 					if live.err != nil {
 						return live.err

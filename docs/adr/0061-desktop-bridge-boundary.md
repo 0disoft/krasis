@@ -595,8 +595,21 @@ between desktops. Unlock requests the existing desktop refresh path.
 
 A stopped service with a verified non-clean service record is
 SERVICE_RECOVERY_REQUIRED, including when its installed images differ from a
-new portable bundle. The UI asks the user to save work and restart the PC; it
+new portable bundle. The UI identifies the stopped protected-input service and
+asks for diagnostics; reboot alone is not presented as a sufficient remedy. It
 never restarts the PC itself or retries installation against an unconfirmed
 input cleanup. A clean stopped receipt or a never-started service remains
 SERVICE_STOPPED and can use attended repair. Existing transaction/SCM stop proof
 requirements are unchanged; failed receipts and journals are not deleted.
+
+## g283: Retire timed-out optional source cursor requests
+
+After a complete cursor prepare/show/restore frame times out, the source client
+stops admitting capture commands, clears its forwarding epoch and retains the
+authenticated pipe solely for cleanup. The owner drains the exact outstanding
+reply, including a known rejection, before issuing one stop command within the
+existing independent recovery budget. Only an exact clean retirement ACK allows
+an idle source owner to rebuild. A missing/malformed reply, failed stop, joined
+native cleanup error, or active forwarding still requires full recovery. No
+cursor request or input is retried, and no timeout is declared a successful
+presentation. This also drains an ACK already queued when its timeout fires.
