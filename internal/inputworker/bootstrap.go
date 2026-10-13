@@ -178,13 +178,16 @@ func readReady(reader io.Reader) error {
 func writeReport(writer io.Writer, report Report, result error) error {
 	var data [reportSize]byte
 	copy(data[:4], "KRR1")
-	data[4] = 1
+	data[4] = 2
 	if result != nil {
 		data[5] = 1
 	}
 	if errors.Is(result, ErrRecovery) || errors.Is(result, inputdesktop.ErrCleanup) || report.Recovery.Remaining != 0 {
 		data[5] = 2
 	}
+	operation, native := reportFailureDetails(result)
+	data[6] = operation
+	binary.BigEndian.PutUint32(data[28:32], native)
 	binary.BigEndian.PutUint64(data[8:16], report.Completed)
 	for i, value := range []int{report.Recovery.Attempted, report.Recovery.Released, report.Recovery.Remaining} {
 		if value < 0 || value > maxPressed {
@@ -221,7 +224,10 @@ func workerCancellationOnly(err error) bool {
 
 func readReport(reader io.Reader) (Report, error) {
 	var data [reportSize]byte
-	if _, err := io.ReadFull(reader, data[:]); err != nil || string(data[:4]) != "KRR1" || data[4] != 1 || data[5] > 2 || !zeroBytes(data[6:8]) || !zeroBytes(data[28:]) {
+	if _, err := io.ReadFull(reader, data[:]); err != nil || string(data[:4]) != "KRR1" || (data[4] != 1 && data[4] != 2) || data[5] > 2 || data[7] != 0 || !validReportOperation(data[6]) {
+		return Report{}, ErrProtocol
+	}
+	if data[4] == 1 && (!zeroBytes(data[6:8]) || !zeroBytes(data[28:])) || data[5] == 0 && (data[6] != 0 || !zeroBytes(data[28:])) {
 		return Report{}, ErrProtocol
 	}
 	values := [3]int{}
@@ -236,11 +242,5 @@ func readReport(reader io.Reader) (Report, error) {
 		return Report{}, ErrProtocol
 	}
 	report := Report{Completed: binary.BigEndian.Uint64(data[8:16]), Recovery: application.ReleaseReport{Attempted: values[0], Released: values[1], Remaining: values[2]}}
-	if data[5] == 2 {
-		return report, ErrRecovery
-	}
-	if data[5] == 1 {
-		return report, ErrAuthority
-	}
-	return report, nil
+	return report, reportFailure(data[5], data[6], binary.BigEndian.Uint32(data[28:32]))
 }

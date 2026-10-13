@@ -581,3 +581,13 @@ request, consumes no sequence and is classified NOT_APPLIED. It does not close
 the channel owned by an earlier in-flight operation. Heartbeat still uses
 nonblocking TryLock. Protected admission and preparation honor their caller's
 deadline without changing lease identity, approval, retirement or image pins.
+
+## g283: Preserve the failed capture operation
+
+The authenticated 32-byte worker report writes version 2, retaining a closed
+source-operation code and the original nonzero Win32 number when available.
+Readers also accept version 1 with its original zero padding. Success reports
+cannot contain failure metadata; unknown codes, invalid padding and uncertain
+release reports remain rejected. These fields are diagnostic, not cleanup proof.
+The service runtime's lastFailure.operation preserves the operation through
+endpoint joins without exposing input, window names, paths or error text.

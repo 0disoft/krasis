@@ -41,13 +41,18 @@ func (r *loginRuntimeRecorder) record(stage, value string, cause error) {
 	if errors.As(cause, &classified) && logindiag.ValidRuntimeReason(classified.LoginRuntimeReason()) {
 		reason = classified.LoginRuntimeReason()
 	}
-	sameFailure := cause == nil || next.LastFailure != nil && next.LastFailure.Stage == stage && next.LastFailure.Reason == reason && next.LastFailure.Win32Error == failure.Win32Error && next.LastFailure.Win32Known == failure.Win32Known
+	operation := ""
+	var detail interface{ LoginRuntimeOperation() string }
+	if errors.As(cause, &detail) && logindiag.ValidRuntimeOperation(detail.LoginRuntimeOperation()) {
+		operation = detail.LoginRuntimeOperation()
+	}
+	sameFailure := cause == nil || next.LastFailure != nil && next.LastFailure.Stage == stage && next.LastFailure.Reason == reason && next.LastFailure.Operation == operation && next.LastFailure.Win32Error == failure.Win32Error && next.LastFailure.Win32Known == failure.Win32Known
 	if next == r.value && r.value.Time != "" && sameFailure {
 		return
 	}
 	next.Time = time.Now().UTC().Format(time.RFC3339Nano)
 	if cause != nil {
-		next.LastFailure = &logindiag.RuntimeFailure{Time: next.Time, Stage: stage, Reason: reason, Win32Error: failure.Win32Error, Win32Known: failure.Win32Known}
+		next.LastFailure = &logindiag.RuntimeFailure{Time: next.Time, Stage: stage, Reason: reason, Operation: operation, Win32Error: failure.Win32Error, Win32Known: failure.Win32Known}
 	}
 	if !next.Valid() || r.persist == nil {
 		return

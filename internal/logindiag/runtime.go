@@ -17,6 +17,7 @@ type RuntimeFailure struct {
 	Time       string `json:"time"`
 	Stage      string `json:"stage"`
 	Reason     string `json:"reason,omitempty"`
+	Operation  string `json:"operation,omitempty"`
 	Win32Error uint32 `json:"win32Error"`
 	Win32Known bool   `json:"win32Known"`
 }
@@ -49,7 +50,7 @@ func (v Runtime) Valid() bool {
 		if f.Stage != "console" && f.Stage != "grant" && f.Stage != "start" && f.Stage != "service" && f.Stage != "worker" {
 			return false
 		}
-		if !ValidRuntimeReason(f.Reason) {
+		if !ValidRuntimeReason(f.Reason) || !ValidRuntimeOperation(f.Operation) {
 			return false
 		}
 		if !(f.Win32Known && f.Win32Error != 0 || !f.Win32Known && f.Win32Error == 0) {
@@ -57,6 +58,14 @@ func (v Runtime) Valid() bool {
 		}
 	}
 	return true
+}
+
+func ValidRuntimeOperation(operation string) bool {
+	switch operation {
+	case "", "low-level-hook", "raw-mouse", "wheel-capture", "thread-join", "hook-install", "hook-release", "raw-register", "raw-release", "raw-read", "raw-buffer", "raw-route", "message-loop", "pointer-snapshot", "cursor-present", "cursor-restore", "cursor-release":
+		return true
+	}
+	return false
 }
 
 func ValidRuntimeReason(reason string) bool {
