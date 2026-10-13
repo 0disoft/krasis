@@ -619,3 +619,27 @@ a received native failure. They do not change the worker wire format, extend
 deadlines, expose raw error text, or grant release proof. g284's reported B service
 failure remains unresolved until its original operation or missing-report cause
 can be observed; this diagnostic correction alone is not a runtime fix claim.
+
+## g286: Bound native Raw Input busy reads before routing
+
+B's g285 service recorded capture / raw-read / Win32 170 at
+2026-10-13T11:03:52.6759082Z. The raw-read label included both GetRawInputData
+and visitor desktop validation, so this receipt does not identify the exact API.
+Failures now retain raw-size, raw-packet, or raw-desktop through the authenticated
+worker report and service receipt. New numeric operation codes are appended;
+existing codes retain their values.
+
+Only GetRawInputData returning UINT(-1) with ERROR_BUSY may repeat the current
+undispatched message query. It is limited to three calls per query, a ten-ms
+elapsed budget and one-ms cancellation-aware waits. The in/out capacity is reset
+before each call. No packet is routed until a complete, validated read succeeds;
+the visitor is invoked once. Visitor, desktop validation, access denial, invalid
+handles, malformed packets, buffered reads, input actions and cleanup are never
+retried. Persistent busy reads still stop with the original stage/native cause.
+Cancellation ends read-only work and native owners must still join as before.
+
+The native wrapper retains the Go byte buffer across the syscall. Tests inject
+native query outcomes without operating Windows input: busy on either query then
+success delivers once, permanent/canceled failures never deliver, and a visitor's
+ERROR_BUSY is not replayed. B's real service persistence and login transitions
+remain an attended verification requirement.

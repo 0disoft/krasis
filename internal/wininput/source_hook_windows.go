@@ -458,7 +458,7 @@ func runSourceRawMouseThread(
 	}
 	visitRawMouse := func(header rawInputHeader, mouse rawMouse) error {
 		if err := sourceLoginDesktopCheck(ctx); err != nil {
-			return err
+			return sourceWorkerStage("raw-desktop", err)
 		}
 		if timing != nil {
 			timing.ObserveRawInput(time.Now())
@@ -499,7 +499,7 @@ func runSourceRawMessageLoop(
 		if msg.Message != wmInput {
 			return nil
 		}
-		if err := rawReader.readCurrent(msg.LParam, visitRawMouse); err != nil {
+		if err := rawReader.readCurrentContext(ctx, msg.LParam, visitRawMouse); err != nil {
 			return sourceStage("raw-read", err)
 		}
 		return sourceStage("raw-buffer", rawReader.drainBuffered(visitRawMouse))

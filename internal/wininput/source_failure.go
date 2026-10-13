@@ -34,7 +34,7 @@ func SourceFailureStage(err error) string {
 	switch stage.stage {
 	case "low-level-hook", "raw-mouse", "wheel-capture", "thread-join",
 		"hook-install", "hook-release", "raw-register", "raw-release",
-		"raw-read", "raw-buffer", "raw-route", "message-loop", "pointer-snapshot", "cursor-present", "cursor-restore", "cursor-release":
+		"raw-read", "raw-buffer", "raw-route", "message-loop", "pointer-snapshot", "cursor-present", "cursor-restore", "cursor-release", "raw-size", "raw-packet", "raw-desktop":
 		return stage.stage
 	}
 	return ""

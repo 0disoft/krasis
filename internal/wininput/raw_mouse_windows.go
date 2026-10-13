@@ -3,8 +3,12 @@
 package wininput
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"runtime"
 	"syscall"
+	"time"
 	"unsafe"
 )
 
@@ -79,8 +83,50 @@ func (buffer alignedRawInputBuffer) pointer() uintptr {
 }
 
 type rawMouseReader struct {
-	current alignedRawInputBuffer
-	batch   alignedRawInputBuffer
+	current  alignedRawInputBuffer
+	batch    alignedRawInputBuffer
+	dataCall rawInputDataCall
+}
+
+type rawInputDataCall func(uintptr, []byte, *uint32) (uint32, error)
+
+func getRawInputData(handle uintptr, data []byte, size *uint32) (uint32, error) {
+	var pointer unsafe.Pointer
+	if len(data) != 0 {
+		pointer = unsafe.Pointer(&data[0])
+	}
+	result, _, err := procGetRawInputData.Call(handle, ridInput,
+		uintptr(pointer), uintptr(unsafe.Pointer(size)), unsafe.Sizeof(rawInputHeader{}))
+	runtime.KeepAlive(data)
+	return uint32(result), err
+}
+
+// Retry only a native, read-only query that returned UINT(-1)/ERROR_BUSY.
+// The current WM_INPUT has not been dispatched or routed. Failed reads cannot
+// replay actions; visitor, layout, authority and cleanup errors never enter here.
+func readRawInputData(ctx context.Context, call rawInputDataCall, handle uintptr, data []byte, size *uint32) (uint32, error) {
+	initial := *size
+	deadline := time.Now().Add(10 * time.Millisecond)
+	for attempt := 0; ; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return ^uint32(0), err
+		}
+		*size = initial // A failed native call may have changed the in/out size.
+		result, err := call(handle, data, size)
+		if result != ^uint32(0) || !errors.Is(err, syscall.Errno(170)) || attempt == 2 || !time.Now().Before(deadline) {
+			return result, err
+		}
+		timer := time.NewTimer(time.Millisecond)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ^uint32(0), ctx.Err()
+		case <-timer.C:
+		}
+		if !time.Now().Before(deadline) {
+			return result, err
+		}
+	}
 }
 
 func newRawMouseReader() (*rawMouseReader, error) {
@@ -96,7 +142,7 @@ func newRawMouseReader() (*rawMouseReader, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &rawMouseReader{current: current, batch: batch}, nil
+	return &rawMouseReader{current: current, batch: batch, dataCall: getRawInputData}, nil
 }
 
 func createRawInputMessageWindow(name string) (uintptr, error) {
@@ -158,7 +204,11 @@ func unregisterRawMouseInput() error {
 }
 
 func (reader *rawMouseReader) readCurrent(handle uintptr, visit func(rawInputHeader, rawMouse) error) error {
-	if reader == nil || len(reader.current.data) == 0 {
+	return reader.readCurrentContext(context.Background(), handle, visit)
+}
+
+func (reader *rawMouseReader) readCurrentContext(ctx context.Context, handle uintptr, visit func(rawInputHeader, rawMouse) error) error {
+	if reader == nil || len(reader.current.data) == 0 || reader.dataCall == nil || ctx == nil {
 		return fmt.Errorf("raw input reader is not initialized")
 	}
 	if handle == 0 {
@@ -167,17 +217,10 @@ func (reader *rawMouseReader) readCurrent(handle uintptr, visit func(rawInputHea
 	if visit == nil {
 		return fmt.Errorf("raw input visitor is required")
 	}
-	headerSize := uint32(unsafe.Sizeof(rawInputHeader{}))
 	var required uint32
-	result, _, callErr := procGetRawInputData.Call(
-		handle,
-		ridInput,
-		0,
-		uintptr(unsafe.Pointer(&required)),
-		uintptr(headerSize),
-	)
-	if uint32(result) == ^uint32(0) {
-		return fmt.Errorf("GetRawInputData(size) failed: %w", callErr)
+	result, callErr := readRawInputData(ctx, reader.dataCall, handle, nil, &required)
+	if result == ^uint32(0) {
+		return sourceWorkerStage("raw-size", fmt.Errorf("GetRawInputData(size) failed: %w", callErr))
 	}
 	if required > maximumRawInputPacketBytes {
 		return fmt.Errorf("raw input packet exceeds %d bytes: %d", maximumRawInputPacketBytes, required)
@@ -190,19 +233,16 @@ func (reader *rawMouseReader) readCurrent(handle uintptr, visit func(rawInputHea
 		reader.current = buffer
 	}
 	provided := uint32(len(reader.current.data))
-	result, _, callErr = procGetRawInputData.Call(
-		handle,
-		ridInput,
-		reader.current.pointer(),
-		uintptr(unsafe.Pointer(&provided)),
-		uintptr(headerSize),
-	)
-	if uint32(result) == ^uint32(0) {
-		return fmt.Errorf("GetRawInputData(packet) failed: %w", callErr)
+	result, callErr = readRawInputData(ctx, reader.dataCall, handle, reader.current.data, &provided)
+	if result == ^uint32(0) {
+		return sourceWorkerStage("raw-packet", fmt.Errorf("GetRawInputData(packet) failed: %w", callErr))
 	}
 	read := uint32(result)
 	if read != required || provided != required {
 		return fmt.Errorf("GetRawInputData size mismatch: required=%d provided=%d read=%d", required, provided, read)
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	return visitRawInputBlocks(reader.current.data[:read], 1, visit)
 }

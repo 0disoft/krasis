@@ -13,27 +13,33 @@ import (
 func TestWorkerFailureReceiptPreservesOperationNativeCauseAndRecoveryFence(t *testing.T) {
 	// Construct the exact fixed operation code the writer obtains from a source
 	// stage. The arbitrary private error is never serialized.
-	for _, status := range []byte{1, 2} {
-		var buffer bytes.Buffer
-		if err := writeReport(&buffer, Report{}, ErrAuthority); err != nil {
-			t.Fatal(err)
-		}
-		data := buffer.Bytes()
-		data[5], data[6] = status, 15 // cursor-restore
-		binary.BigEndian.PutUint32(data[28:32], 5)
-		_, err := readReport(bytes.NewReader(data))
-		if !errors.Is(err, syscall.Errno(5)) || errors.Is(err, ErrRecovery) != (status == 2) {
-			t.Fatal("native cause or recovery status lost", err)
-		}
-		r := newLoginRuntimeRecorder(func(logindiag.Runtime) error { return nil })
-		r.record("service", "FAILED", serviceEndpointFailure(err, "capture"))
-		f := r.value.LastFailure
-		if f == nil || f.Reason != "capture" || f.Operation != "cursor-restore" || f.Win32Error != 5 || !f.Win32Known || !r.value.Valid() {
-			t.Fatal("child failure lost across service receipt", f)
-		}
-		r.record("service", "FAILED", &workerReportFailure{operation: "cursor-release", cause: err})
-		if r.value.LastFailure.Operation != "cursor-release" {
-			t.Fatal("operation-only change was deduplicated")
+	for _, operation := range []struct {
+		code   byte
+		name   string
+		native uint32
+	}{{15, "cursor-restore", 5}, {17, "raw-size", 170}, {18, "raw-packet", 170}, {19, "raw-desktop", 170}} {
+		for _, status := range []byte{1, 2} {
+			var buffer bytes.Buffer
+			if err := writeReport(&buffer, Report{}, ErrAuthority); err != nil {
+				t.Fatal(err)
+			}
+			data := buffer.Bytes()
+			data[5], data[6] = status, operation.code
+			binary.BigEndian.PutUint32(data[28:32], operation.native)
+			_, err := readReport(bytes.NewReader(data))
+			if !errors.Is(err, syscall.Errno(operation.native)) || errors.Is(err, ErrRecovery) != (status == 2) {
+				t.Fatal("native cause or recovery status lost", err)
+			}
+			r := newLoginRuntimeRecorder(func(logindiag.Runtime) error { return nil })
+			r.record("service", "FAILED", serviceEndpointFailure(err, "capture"))
+			f := r.value.LastFailure
+			if f == nil || f.Reason != "capture" || f.Operation != operation.name || f.Win32Error != operation.native || !f.Win32Known || !r.value.Valid() {
+				t.Fatal("child failure lost across service receipt", f)
+			}
+			r.record("service", "FAILED", &workerReportFailure{operation: "cursor-release", cause: err})
+			if r.value.LastFailure.Operation != "cursor-release" {
+				t.Fatal("operation-only change was deduplicated")
+			}
 		}
 	}
 }
