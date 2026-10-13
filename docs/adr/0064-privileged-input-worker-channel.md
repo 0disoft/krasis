@@ -604,3 +604,18 @@ setup or report delivery failure still requires recovery and retains the origina
 worker cause. Actual cleanup failures and missing receipts remain fenced.
 The regression uses an already expired net.Pipe write deadline without sleeps,
 Windows input, or service mutation; clean and failed reports must both arrive.
+
+## g285: Preserve failures through the service recovery fence
+
+Capture and regular input endpoints retain the authenticated worker failure and
+concurrent channel-close failure when recovery is required. A remaining pressed
+journal no longer erases the worker operation or original native error either.
+The service still stops on uncertainty; no failed cleanup becomes retryable.
+
+Missing/truncated/invalid final reports are classified as `worker-report-read`;
+expiration of the existing final-recovery deadline is `worker-report-timeout`.
+These service-local diagnostic labels distinguish absent recovery evidence from
+a received native failure. They do not change the worker wire format, extend
+deadlines, expose raw error text, or grant release proof. g284's reported B service
+failure remains unresolved until its original operation or missing-report cause
+can be observed; this diagnostic correction alone is not a runtime fix claim.

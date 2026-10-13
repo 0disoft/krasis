@@ -145,8 +145,8 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 					err = writeFrame(channel.stream, preparationReceipt[:])
 				}
 				closeErr := channel.Close()
-				if errors.Is(err, ErrRecovery) || closeErr != nil {
-					return ErrRecovery
+				if failure := serviceRecoveryFailure(err, closeErr); failure != nil {
+					return failure
 				}
 				// Preparation failures leave ordinary lease fallback usable.
 				continue
@@ -188,16 +188,14 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 					var preparationErr error
 					next, preparationErr = warming.join()
 					if errors.Is(preparationErr, ErrRecovery) {
-						_ = channel.Close()
-						return ErrRecovery
+						return serviceRecoveryFailure(errors.Join(err, preparationErr), channel.Close())
 					}
 				}
 				if err == nil && !lease.Presentation {
 					returned = presentationReturn{lease: lease, pid: agentPID, started: channel.authority.agentStarted, at: time.Now()}
 				}
 				if errors.Is(err, ErrRecovery) {
-					_ = channel.Close()
-					return ErrRecovery
+					return serviceRecoveryFailure(err, channel.Close())
 				}
 			} else {
 				err = leaseErr

@@ -149,8 +149,12 @@ func TestSupervisorMissingReceiptIsRecoveryUnknown(t *testing.T) {
 	server, client := net.Pipe()
 	_ = server.Close()
 	_, err := supervise(context.Background(), client, func() error { return nil }, func() bool { return true }, time.Now().Add(time.Minute))
-	if err != ErrRecovery {
+	if !errors.Is(err, ErrRecovery) || !errors.Is(err, ErrProtocol) {
 		t.Fatal("worker exit treated as successful recovery")
+	}
+	var detail *workerReportFailure
+	if !errors.As(err, &detail) || detail.operation != "worker-report-read" {
+		t.Fatal("missing receipt lost its failure operation", err)
 	}
 }
 
@@ -161,7 +165,7 @@ func TestSupervisorRejectsReceiptWithRemainingInput(t *testing.T) {
 		_ = writeReport(server, Report{Recovery: application.ReleaseReport{Remaining: 1}}, ErrRecovery)
 	}()
 	report, err := supervise(context.Background(), client, func() error { return nil }, func() bool { return false }, time.Now().Add(time.Minute))
-	if err != ErrRecovery || report.Recovery.Remaining != 1 {
+	if !errors.Is(err, ErrRecovery) || report.Recovery.Remaining != 1 {
 		t.Fatal("failed recovery hidden")
 	}
 }

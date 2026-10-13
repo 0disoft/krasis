@@ -224,7 +224,10 @@ func workerCancellationOnly(err error) bool {
 
 func readReport(reader io.Reader) (Report, error) {
 	var data [reportSize]byte
-	if _, err := io.ReadFull(reader, data[:]); err != nil || string(data[:4]) != "KRR1" || (data[4] != 1 && data[4] != 2) || data[5] > 2 || data[7] != 0 || !validReportOperation(data[6]) {
+	if _, err := io.ReadFull(reader, data[:]); err != nil {
+		return Report{}, &workerReportFailure{operation: "worker-report-read", cause: errors.Join(ErrProtocol, err)}
+	}
+	if string(data[:4]) != "KRR1" || (data[4] != 1 && data[4] != 2) || data[5] > 2 || data[7] != 0 || !validReportOperation(data[6]) {
 		return Report{}, ErrProtocol
 	}
 	if data[4] == 1 && (!zeroBytes(data[6:8]) || !zeroBytes(data[28:])) || data[5] == 0 && (data[6] != 0 || !zeroBytes(data[28:])) {

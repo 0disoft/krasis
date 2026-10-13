@@ -62,7 +62,7 @@ func (v Runtime) Valid() bool {
 
 func ValidRuntimeOperation(operation string) bool {
 	switch operation {
-	case "", "low-level-hook", "raw-mouse", "wheel-capture", "thread-join", "hook-install", "hook-release", "raw-register", "raw-release", "raw-read", "raw-buffer", "raw-route", "message-loop", "pointer-snapshot", "cursor-present", "cursor-restore", "cursor-release":
+	case "", "low-level-hook", "raw-mouse", "wheel-capture", "thread-join", "hook-install", "hook-release", "raw-register", "raw-release", "raw-read", "raw-buffer", "raw-route", "message-loop", "pointer-snapshot", "cursor-present", "cursor-restore", "cursor-release", "worker-report-read", "worker-report-timeout":
 		return true
 	}
 	return false

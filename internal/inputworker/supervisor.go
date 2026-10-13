@@ -2,6 +2,7 @@ package inputworker
 
 import (
 	"context"
+	"errors"
 	"net"
 	"time"
 )
@@ -44,17 +45,17 @@ func supervise(ctx context.Context, control net.Conn, authorized func() error, e
 		case result := <-results:
 			return receipt(result.report, result.err)
 		case <-timer.C:
-			return Report{}, ErrRecovery
+			return Report{}, &workerReportFailure{operation: "worker-report-timeout", cause: ErrRecovery}
 		}
 	}
 }
 
 func receipt(report Report, err error) (Report, error) {
-	if err == ErrProtocol {
-		return Report{}, ErrRecovery
+	if errors.Is(err, ErrProtocol) {
+		return Report{}, &workerReportFailure{operation: "worker-report-read", cause: errors.Join(ErrRecovery, err)}
 	}
 	if report.Recovery.Remaining != 0 {
-		return report, ErrRecovery
+		return report, errors.Join(ErrRecovery, err)
 	}
 	return report, err
 }

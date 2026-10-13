@@ -30,8 +30,8 @@ func runSourceService(ctx context.Context, installation *Installation, admit fun
 				}
 			}
 			closeErr := channel.Close()
-			if errors.Is(err, ErrRecovery) || closeErr != nil {
-				return ErrRecovery
+			if failure := serviceRecoveryFailure(err, closeErr); failure != nil {
+				return failure
 			}
 		}
 		select {
