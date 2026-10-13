@@ -238,10 +238,7 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 			_ = control.SetWriteDeadline(time.Now().Add(startupTimeout))
 			return writeStartupReady(control, profile)
 		})
-		if writeReport(control, Report{}, result) != nil {
-			return ErrRecovery
-		}
-		return result
+		return finishWorkerReport(control, Report{}, result)
 	}
 	if lease.Presentation {
 		desktopStarted := time.Now()
@@ -250,11 +247,7 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 			_ = control.SetWriteDeadline(time.Now().Add(startupTimeout))
 			return writeStartupReady(control, profile)
 		})
-		_ = control.SetWriteDeadline(time.Now().Add(time.Second))
-		if writeReport(control, Report{}, result) != nil {
-			return ErrRecovery
-		}
-		return result
+		return finishWorkerReport(control, Report{}, result)
 	}
 	desktop := desktopRunner(inputdesktop.Run)
 	if installation != nil {
@@ -275,11 +268,7 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 		return writeStartupReady(control, profile)
 	}, &profile, desktop)
 	result = normalizeWorkerStop(requested.Load(), report, result)
-	_ = control.SetWriteDeadline(time.Now().Add(time.Second))
-	if writeReport(control, report, result) != nil {
-		return ErrRecovery
-	}
-	return result
+	return finishWorkerReport(control, report, result)
 }
 
 // No PID reopening: worker.process is the handle returned for the exact

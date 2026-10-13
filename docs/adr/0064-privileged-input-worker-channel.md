@@ -591,3 +591,16 @@ cannot contain failure metadata; unknown codes, invalid padding and uncertain
 release reports remain rejected. These fields are diagnostic, not cleanup proof.
 The service runtime's lastFailure.operation preserves the operation through
 endpoint joins without exposing input, window names, paths or error text.
+
+## g284: Final worker reports have their own write deadline
+
+Capture readiness previously left its five-second control write deadline in
+place. A source owner outliving that deadline could not deliver its final clean
+retirement or detailed failure report, causing the supervisor to require recovery.
+Capture, cursor-presentation and input workers now share final-report delivery:
+a fresh one-second write deadline is set only after native owners and release
+work have joined. It does not inherit caller cancellation or retry input. Deadline
+setup or report delivery failure still requires recovery and retains the original
+worker cause. Actual cleanup failures and missing receipts remain fenced.
+The regression uses an already expired net.Pipe write deadline without sleeps,
+Windows input, or service mutation; clean and failed reports must both arrive.
