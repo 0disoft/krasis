@@ -59,11 +59,11 @@ func openTargetDesktop(target desktopTarget) (binding, error) {
 	}
 	original, _, callErr := getThread.Call(currentThreadID())
 	if original == 0 {
-		return nil, errors.Join(ErrUnavailable, callErr)
+		return nil, errors.Join(ErrUnavailable, operationFailure("desktop-current", callErr))
 	}
 	handle, _, callErr := openInput.Call(0, 0, uintptr(AccessMask))
 	if handle == 0 {
-		return nil, errors.Join(ErrUnavailable, callErr)
+		return nil, errors.Join(ErrUnavailable, operationFailure("desktop-open", callErr))
 	}
 	desktop := &desktopBinding{target: target, original: original, owned: handle}
 	if err := desktop.verifyName(); err != nil {
@@ -85,7 +85,7 @@ var readDesktopName = func(handle uintptr) (string, error) {
 	ok, _, callErr := getInformation.Call(handle, 2, uintptr(unsafe.Pointer(&name[0])),
 		uintptr(len(name)*2), uintptr(unsafe.Pointer(&needed))) // UOI_NAME
 	if ok == 0 {
-		return "", errors.Join(ErrInactive, callErr)
+		return "", errors.Join(ErrInactive, operationFailure("desktop-name", callErr))
 	}
 	return syscall.UTF16ToString(name[:]), nil
 }
@@ -96,7 +96,7 @@ var readDesktopInput = func(handle uintptr) (bool, error) {
 	ok, _, callErr := getInformation.Call(handle, 6, uintptr(unsafe.Pointer(&receiving)),
 		unsafe.Sizeof(receiving), uintptr(unsafe.Pointer(&needed))) // UOI_IO
 	if ok == 0 {
-		return false, errors.Join(ErrInactive, callErr)
+		return false, errors.Join(ErrInactive, operationFailure("desktop-active", callErr))
 	}
 	return receiving != 0, nil
 }

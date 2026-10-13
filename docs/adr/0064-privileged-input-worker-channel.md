@@ -655,3 +655,31 @@ labels survive source-component wrapping and authenticated worker reports.
 Existing numeric codes retain their values; appended labels contain no desktop
 name, handle, path, input content or raw native message. Cleanup failures remain
 fatal and cannot become a successful desktop transition.
+
+## g287: Dispose capture threads before desktop handle release
+
+Installed source capture binds the same fixed, privileged Default/Winlogon
+desktop on a disposable locked OS thread. A retained, non-inheritable kernel
+thread handle is duplicated before desktop acquisition. After callback and native
+owner cleanup, the goroutine returns without unlocking the thread. Its exact
+kernel handle must signal termination within one second before the owned HDESK
+is closed by the waiting parent. SetThreadDesktop is not used to restore these
+terminated capture threads. Borrowed original handles are never closed.
+
+Unconfirmed thread exit retains the possibly attached desktop until process
+retirement and reports desktop-thread-exit/ErrCleanup. Native window/hook release,
+CloseDesktop and thread-handle close errors remain fatal; thread exit cannot erase
+callback, panic, Goexit or cleanup failures. Ordinary injection and presentation
+retain their restoration policy and token/installation/lease checks are unchanged.
+Native desktop current/open/name/activity/bind/restore/close operations have fixed
+diagnostic labels, so raw-mouse cannot hide the particular failing desktop call.
+
+Deterministic tests gate handle close on exact thread exit, retain all cleanup
+causes, and cover canceled, panicking and Goexit callbacks. A Windows test pins
+and joins a real disposable thread without creating windows, registering input,
+injecting input or changing desktop. Ordinary processes remain rejected from
+protected capture. B's actual service-maintenance result remains unverified.
+
+The raw-read busy tests now inject a clock and wait outcome: scheduler oversleep
+must retain the original busy failure and never extend the ten-ms elapsed budget.
+Production retry limits and delays are unchanged.

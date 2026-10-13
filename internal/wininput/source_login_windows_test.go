@@ -34,6 +34,10 @@ func TestLoginSourceHookRejectsOrdinaryProcessBeforeCapture(t *testing.T) {
 	if _, err := NewLoginSourceHook(nil); err == nil {
 		t.Fatal("missing authorization admitted")
 	}
+	protected, _ := NewProtectedSourceHook(func() error { return nil })
+	if err := protected.onDesktop(context.Background(), func(context.Context) error { ready = true; return nil }); err == nil || ready {
+		t.Fatal("ordinary process entered disposable protected capture", err)
+	}
 }
 
 func TestLoginCaptureDoesNotStartUserShellPresentation(t *testing.T) {

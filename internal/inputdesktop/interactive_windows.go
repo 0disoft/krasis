@@ -50,11 +50,11 @@ func openInteractiveDesktop(checked func() error) (binding, error) {
 	}
 	original, _, callErr := getThread.Call(currentThreadID())
 	if original == 0 {
-		return nil, errors.Join(ErrUnavailable, callErr)
+		return nil, errors.Join(ErrUnavailable, operationFailure("desktop-current", callErr))
 	}
 	handle, _, callErr := openInput.Call(0, 0, uintptr(AccessMask))
 	if handle == 0 {
-		return nil, desktopPreparing(errors.Join(ErrUnavailable, callErr))
+		return nil, desktopPreparing(errors.Join(ErrUnavailable, operationFailure("desktop-open", callErr)))
 	}
 	name, err := readDesktopName(handle)
 	if err != nil {

@@ -55,17 +55,18 @@ func (hook *SourceHook) onDesktop(ctx context.Context, run func(context.Context)
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	// Cancellation stops the native loop, while the scope survives until the
-	// loop has unregistered its hooks/windows and restored its owned desktop.
+	// Cancellation stops the native loop. Capture scope cleanup waits for native
+	// owner retirement; fixed Winlogon scopes still restore their borrowed desktop.
 	bind := inputdesktop.RunWinlogon
 	if hook.interactiveSource {
-		bind = inputdesktop.RunPresentation
+		bind = inputdesktop.RunCapture
 	}
 	return bind(context.Background(), hook.loginAuthorize, func(scope *inputdesktop.Scope) error {
-		// RunWinlogon's own lock is released only after desktop restoration.
-		// Retain an extra lock so this goroutine's exit retires the native
-		// capture thread rather than pooling its old Win32 message queue.
-		runtime.LockOSThread()
+		if !hook.interactiveSource {
+			// Fixed Winlogon mode still restores its desktop before returning.
+			// Retire its native message queue rather than pooling the thread.
+			runtime.LockOSThread()
+		}
 		owned := context.WithValue(ctx, sourceLoginDesktopKey{}, scope)
 		return run(owned)
 	})

@@ -26,7 +26,7 @@ func FailureOperation(err error) string {
 		return inner
 	}
 	switch operation.operation {
-	case "desktop-bind", "desktop-restore", "desktop-close", "desktop-thread-exit":
+	case "desktop-bind", "desktop-restore", "desktop-close", "desktop-thread-exit", "desktop-current", "desktop-open", "desktop-name", "desktop-active":
 		return operation.operation
 	}
 	return ""
