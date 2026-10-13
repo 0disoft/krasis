@@ -643,3 +643,15 @@ native query outcomes without operating Windows input: busy on either query then
 success delivers once, permanent/canceled failures never deliver, and a visitor's
 ERROR_BUSY is not replayed. B's real service persistence and login transitions
 remain an attended verification requirement.
+
+## Capture native cleanup diagnostics after g286
+
+B's g286 failure at 2026-10-13T11:44:43.2124663Z was capture / raw-mouse /
+Win32 170, following desktop-switch/source-refresh. It was outside the detailed
+raw-size/raw-packet/raw-desktop labels and is not evidence of a data-read failure.
+Raw-window destruction and early raw-device unregister failures are now retained
+in the native result. Fixed desktop bind/restore/close/thread-exit operation
+labels survive source-component wrapping and authenticated worker reports.
+Existing numeric codes retain their values; appended labels contain no desktop
+name, handle, path, input content or raw native message. Cleanup failures remain
+fatal and cannot become a successful desktop transition.

@@ -18,6 +18,14 @@ func TestAlignedRawInputBufferIsEightByteAligned(t *testing.T) {
 	}
 }
 
+func TestRawInputWindowCleanupReportsInvalidHandle(t *testing.T) {
+	// No window, hook, input registration or desktop mutation is created.
+	err := sourceStage("raw-window-destroy", destroyRawInputMessageWindow(0))
+	if err == nil || SourceFailureStage(err) != "raw-window-destroy" {
+		t.Fatal("failed raw window cleanup was hidden", err)
+	}
+}
+
 func TestVisitRawInputBlocksTraversesAlignedMousePackets(t *testing.T) {
 	headerSize := uintptr(unsafe.Sizeof(rawInputHeader{}))
 	packetSize := headerSize + unsafe.Sizeof(rawMouse{})

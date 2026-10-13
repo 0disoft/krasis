@@ -428,15 +428,17 @@ func runSourceRawMouseThread(
 	pointerState *sourcePointerState,
 	timing HookTimingObserver,
 	ready func(),
-) error {
+) (resultErr error) {
 	threadID, _, _ := procGetCurrentThreadID.Call()
 	var bootstrapMessage message
 	procPeekMessageW.Call(uintptr(unsafe.Pointer(&bootstrapMessage)), 0, 0, 0, pmNoRemove)
 	window, err := createRawInputMessageWindow("KrasisSourceRawMouse")
 	if err != nil {
-		return err
+		return sourceStage("raw-window-create", err)
 	}
-	defer procDestroyWindow.Call(window)
+	defer func() {
+		resultErr = errors.Join(resultErr, sourceStage("raw-window-destroy", destroyRawInputMessageWindow(window)))
+	}()
 	if err := registerRawMouseInput(window); err != nil {
 		return sourceStage("raw-register", err)
 	}
@@ -448,13 +450,13 @@ func runSourceRawMouseThread(
 		rawRegistered = false
 		return sourceStage("raw-release", unregisterRawMouseInput())
 	}
-	defer cleanupRawInput()
+	defer func() { resultErr = errors.Join(resultErr, cleanupRawInput()) }()
 	rawReader, err := newRawMouseReader()
 	if err != nil {
 		return err
 	}
 	if err := postSourceReady(threadID); err != nil {
-		return err
+		return sourceStage("raw-ready", err)
 	}
 	visitRawMouse := func(header rawInputHeader, mouse rawMouse) error {
 		if err := sourceLoginDesktopCheck(ctx); err != nil {

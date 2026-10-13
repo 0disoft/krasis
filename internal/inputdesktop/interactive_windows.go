@@ -84,7 +84,7 @@ func openInteractiveDesktop(checked func() error) (binding, error) {
 	}
 	ok, _, callErr := setThread.Call(handle)
 	if ok == 0 {
-		return nil, errors.Join(ErrUnavailable, callErr, closeUnbound(handle))
+		return nil, errors.Join(ErrUnavailable, operationFailure("desktop-bind", callErr), closeUnbound(handle))
 	}
 	return desktop, nil
 }

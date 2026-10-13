@@ -190,6 +190,14 @@ func registerRawMouseInput(window uintptr) error {
 	return nil
 }
 
+func destroyRawInputMessageWindow(window uintptr) error {
+	result, _, err := procDestroyWindow.Call(window)
+	if result == 0 {
+		return fmt.Errorf("DestroyWindow(raw input) failed: %w", err)
+	}
+	return nil
+}
+
 func unregisterRawMouseInput() error {
 	device := rawInputDevice{UsagePage: hidUsagePageGeneric, Usage: hidUsageMouse, Flags: ridevRemove}
 	result, _, callErr := procRegisterRawInputDevices.Call(

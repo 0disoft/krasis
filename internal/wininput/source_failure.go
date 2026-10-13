@@ -3,6 +3,8 @@ package wininput
 import (
 	"context"
 	"errors"
+
+	"github.com/0disoft/krasis/internal/inputdesktop"
 )
 
 // Source failures retain their original cause for recovery decisions. Only the
@@ -25,7 +27,7 @@ func sourceStage(stage string, err error) error {
 func SourceFailureStage(err error) string {
 	var stage *sourceStageError
 	if !errors.As(err, &stage) {
-		return ""
+		return inputdesktop.FailureOperation(err)
 	}
 	// Prefer the deepest operation over its containing worker.
 	if inner := SourceFailureStage(stage.cause); inner != "" {
@@ -34,7 +36,7 @@ func SourceFailureStage(err error) string {
 	switch stage.stage {
 	case "low-level-hook", "raw-mouse", "wheel-capture", "thread-join",
 		"hook-install", "hook-release", "raw-register", "raw-release",
-		"raw-read", "raw-buffer", "raw-route", "message-loop", "pointer-snapshot", "cursor-present", "cursor-restore", "cursor-release", "raw-size", "raw-packet", "raw-desktop":
+		"raw-read", "raw-buffer", "raw-route", "message-loop", "pointer-snapshot", "cursor-present", "cursor-restore", "cursor-release", "raw-size", "raw-packet", "raw-desktop", "raw-window-create", "raw-window-destroy", "raw-ready":
 		return stage.stage
 	}
 	return ""

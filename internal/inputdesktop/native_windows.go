@@ -74,7 +74,7 @@ func openTargetDesktop(target desktopTarget) (binding, error) {
 	}
 	ok, _, callErr := setThread.Call(handle)
 	if ok == 0 {
-		return nil, errors.Join(ErrUnavailable, callErr, closeUnbound(handle))
+		return nil, errors.Join(ErrUnavailable, operationFailure("desktop-bind", callErr), closeUnbound(handle))
 	}
 	return desktop, nil
 }
@@ -143,7 +143,7 @@ func (desktop *desktopBinding) close() error {
 	if ok == 0 {
 		// The worker must exit. Do not close a still-attached desktop or return
 		// the contaminated thread to the runtime pool.
-		return errors.Join(ErrCleanup, callErr)
+		return errors.Join(ErrCleanup, operationFailure("desktop-restore", callErr))
 	}
 	handle := desktop.owned
 	desktop.owned = 0
@@ -153,7 +153,7 @@ func (desktop *desktopBinding) close() error {
 func closeUnbound(handle uintptr) error {
 	ok, _, callErr := closeHandle.Call(handle)
 	if ok == 0 {
-		return errors.Join(ErrCleanup, callErr)
+		return errors.Join(ErrCleanup, operationFailure("desktop-close", callErr))
 	}
 	return nil
 }

@@ -17,7 +17,7 @@ func TestWorkerFailureReceiptPreservesOperationNativeCauseAndRecoveryFence(t *te
 		code   byte
 		name   string
 		native uint32
-	}{{15, "cursor-restore", 5}, {17, "raw-size", 170}, {18, "raw-packet", 170}, {19, "raw-desktop", 170}} {
+	}{{15, "cursor-restore", 5}, {17, "raw-size", 170}, {18, "raw-packet", 170}, {19, "raw-desktop", 170}, {21, "desktop-restore", 170}, {25, "raw-window-destroy", 1400}} {
 		for _, status := range []byte{1, 2} {
 			var buffer bytes.Buffer
 			if err := writeReport(&buffer, Report{}, ErrAuthority); err != nil {
