@@ -120,7 +120,8 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 		// request shutdown and consume recovery before killing the job.
 		stopped, stop := context.WithCancel(context.Background())
 		stop()
-		return supervise(stopped, control, func() error { return ErrAuthority }, worker.exited, lease.ExpiresAt)
+		report, result = supervise(stopped, control, func() error { return ErrAuthority }, worker.exited, lease.ExpiresAt)
+		return report, observeMissingWorkerReport(result, worker.reportExit)
 	}
 	_ = channel.stream.SetWriteDeadline(time.Time{})
 	for _, notify := range afterReady {
@@ -128,7 +129,8 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 			notify()
 		}
 	}
-	return supervise(ctx, control, func() error { return channel.authority.check(false) }, worker.exited, lease.ExpiresAt)
+	report, result = supervise(ctx, control, func() error { return channel.authority.check(false) }, worker.exited, lease.ExpiresAt)
+	return report, observeMissingWorkerReport(result, worker.reportExit)
 }
 
 // RunConsoleInput is reachable only from the fixed SYSTEM/UIAccess worker

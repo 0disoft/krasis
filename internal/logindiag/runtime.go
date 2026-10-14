@@ -14,12 +14,26 @@ type Runtime struct {
 	LastFailure *RuntimeFailure `json:"lastFailure,omitempty"`
 }
 type RuntimeFailure struct {
-	Time       string `json:"time"`
-	Stage      string `json:"stage"`
-	Reason     string `json:"reason,omitempty"`
-	Operation  string `json:"operation,omitempty"`
-	Win32Error uint32 `json:"win32Error"`
-	Win32Known bool   `json:"win32Known"`
+	Time       string      `json:"time"`
+	Stage      string      `json:"stage"`
+	Reason     string      `json:"reason,omitempty"`
+	Operation  string      `json:"operation,omitempty"`
+	Win32Error uint32      `json:"win32Error"`
+	Win32Known bool        `json:"win32Known"`
+	WorkerExit *WorkerExit `json:"workerExit,omitempty"`
+}
+
+// Process status is separate from an operation's Win32 error. An observed exit
+// (including code zero) does not acknowledge native cleanup or released inputs.
+type WorkerExit struct {
+	State string `json:"state"`
+	Code  uint32 `json:"code"`
+	Known bool   `json:"known"`
+}
+
+func (v WorkerExit) Valid() bool {
+	return (v.State == "RUNNING" || v.State == "UNAVAILABLE") && !v.Known && v.Code == 0 ||
+		v.State == "EXITED" && (v.Known || v.Code == 0)
 }
 
 func (v Runtime) Valid() bool {
@@ -54,6 +68,9 @@ func (v Runtime) Valid() bool {
 			return false
 		}
 		if !(f.Win32Known && f.Win32Error != 0 || !f.Win32Known && f.Win32Error == 0) {
+			return false
+		}
+		if f.WorkerExit != nil && !f.WorkerExit.Valid() {
 			return false
 		}
 	}

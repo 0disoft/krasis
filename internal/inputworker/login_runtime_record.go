@@ -46,13 +46,25 @@ func (r *loginRuntimeRecorder) record(stage, value string, cause error) {
 	if errors.As(cause, &detail) && logindiag.ValidRuntimeOperation(detail.LoginRuntimeOperation()) {
 		operation = detail.LoginRuntimeOperation()
 	}
+	var exit *logindiag.WorkerExit
+	var process interface{ LoginRuntimeWorkerExit() logindiag.WorkerExit }
+	if errors.As(cause, &process) {
+		value := process.LoginRuntimeWorkerExit()
+		if value.Valid() {
+			exit = &value
+		}
+	}
 	sameFailure := cause == nil || next.LastFailure != nil && next.LastFailure.Stage == stage && next.LastFailure.Reason == reason && next.LastFailure.Operation == operation && next.LastFailure.Win32Error == failure.Win32Error && next.LastFailure.Win32Known == failure.Win32Known
+	if sameFailure && cause != nil {
+		old := next.LastFailure.WorkerExit
+		sameFailure = old == nil && exit == nil || old != nil && exit != nil && *old == *exit
+	}
 	if next == r.value && r.value.Time != "" && sameFailure {
 		return
 	}
 	next.Time = time.Now().UTC().Format(time.RFC3339Nano)
 	if cause != nil {
-		next.LastFailure = &logindiag.RuntimeFailure{Time: next.Time, Stage: stage, Reason: reason, Operation: operation, Win32Error: failure.Win32Error, Win32Known: failure.Win32Known}
+		next.LastFailure = &logindiag.RuntimeFailure{Time: next.Time, Stage: stage, Reason: reason, Operation: operation, Win32Error: failure.Win32Error, Win32Known: failure.Win32Known, WorkerExit: exit}
 	}
 	if !next.Valid() || r.persist == nil {
 		return

@@ -2,6 +2,7 @@ package inputworker
 
 import (
 	"encoding/binary"
+	"errors"
 	"io"
 
 	"github.com/0disoft/krasis/internal/application"
@@ -50,7 +51,7 @@ func readResponseSuffix(reader io.Reader, version byte, value *response) error {
 		return nil
 	}
 	if _, err := io.ReadFull(reader, data[:size]); err != nil {
-		return ErrProtocol
+		return errors.Join(ErrProtocol, err)
 	}
 	offset := 0
 	if version >= 4 {

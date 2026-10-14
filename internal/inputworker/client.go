@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"math"
+	"net"
 	"sync/atomic"
 	"time"
 
@@ -213,6 +214,7 @@ func (client *Client) performResponse(ctx context.Context, command request, obse
 		handoff.Record(ctx, handoff.ClientResponse, elapsed3)
 	}
 	if err != nil || ack.sequence != command.sequence || ack.op != command.op {
+		client.observeFailure(ackFailureCode(err))
 		client.observeFailure("installed_input_failure_ack_unconfirmed")
 		client.fail()
 		return unknownInput(ErrProtocol)
@@ -285,7 +287,7 @@ func unknownInput(cause error) error {
 func readResponse(reader io.Reader) (response, error) {
 	var data [responseSize]byte
 	if _, err := io.ReadFull(reader, data[:]); err != nil {
-		return response{}, ErrProtocol
+		return response{}, errors.Join(ErrProtocol, err)
 	}
 	value, err := decodeResponse(data)
 	if err != nil {
@@ -295,4 +297,21 @@ func readResponse(reader io.Reader) (response, error) {
 		return response{}, err
 	}
 	return value, nil
+}
+
+func ackFailureCode(err error) string {
+	if err == nil {
+		return "installed_input_failure_ack_mismatch"
+	}
+	var timeout net.Error
+	switch {
+	case errors.As(err, &timeout) && timeout.Timeout():
+		return "installed_input_failure_ack_timeout"
+	case errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF):
+		return "installed_input_failure_ack_eof"
+	case errors.Is(err, net.ErrClosed), errors.Is(err, io.ErrClosedPipe):
+		return "installed_input_failure_ack_closed"
+	default:
+		return "installed_input_failure_ack_unclassified"
+	}
 }
