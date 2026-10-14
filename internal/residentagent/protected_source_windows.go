@@ -108,6 +108,7 @@ func (h *protectedSource) RunWithBoundary(ctx context.Context, session *wininput
 			stop(context.Canceled)
 			return wininput.ErrProtectedInput
 		}
+		joinCursorWatch := h.watchProtectedCursor(attempt, epoch, usingSecure)
 		err := selected.RunWithBoundary(attempt, session, boundary, func() {
 			h.mu.Lock()
 			current := ctx.Err() == nil && attempt.Err() == nil && h.epoch == epoch && !h.refresh
@@ -126,6 +127,7 @@ func (h *protectedSource) RunWithBoundary(ctx context.Context, session *wininput
 			}
 		})
 		stop(context.Canceled)
+		joinCursorWatch()
 		h.mu.Lock()
 		refresh := h.refresh
 		h.stop, h.prepared, h.owner = nil, false, nil
@@ -175,6 +177,11 @@ func (h *protectedSource) refreshDesktop(event agentlifecycle.Event) bool {
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	return h.refreshIdleOwnerLocked()
+}
+
+// Caller owns mu; no observer or IPC runs inside this admission gate.
+func (h *protectedSource) refreshIdleOwnerLocked() bool {
 	if h.owner != nil {
 		if capture, ok := h.owner.(interface {
 			SourceCapture() wininput.SourceActivation

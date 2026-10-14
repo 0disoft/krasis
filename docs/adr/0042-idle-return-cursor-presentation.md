@@ -37,3 +37,18 @@ The existing low-level-hook reliability constraints still apply. Generation 14.
 
 References: [WM_SETCURSOR](https://learn.microsoft.com/en-us/windows/win32/menurc/wm-setcursor),
 [layered hit testing](https://learn.microsoft.com/en-us/windows/win32/winmsg/window-features).
+
+## Credential UI without a desktop switch
+
+The installed backend watches cursor protection while its ordinary source owner
+is live. A credential broker on Default need not emit a desktop-switch event.
+When protection appears, idle-owner replacement joins the ordinary owner before
+starting authenticated protected capture. Subsequent returns reuse that owner's
+shield rather than starting a passive presentation child on every return.
+
+This promotion uses the existing activation, held-input and pending-return gate;
+it waits while that gate refuses replacement. Foreground changes do not demote a
+protected owner. Watchers are joined with their exact source attempt, and stale
+attempts cannot pause a successor. Actual desktop transitions retain their
+existing lifecycle policy. Device checks must still measure first-promotion and
+repeated-return latency separately.
