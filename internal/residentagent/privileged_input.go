@@ -185,6 +185,8 @@ func (input *privilegedLeaseInput) close(intent *control.ReturnIntent) {
 // releasing the shared pins, so the next update can replace installed files.
 func (input *privilegedLeaseInput) shutdown() error {
 	input.shutdownOnce.Do(func() {
+		input.entryWaiting.Add(1) // Fence new hints even before stopped owns mu.
+		defer input.entryWaiting.Add(-1)
 		input.cancelPreparation()
 		input.RestoreReturnCursor()
 		input.mu.Lock()

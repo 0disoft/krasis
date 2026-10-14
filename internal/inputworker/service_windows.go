@@ -137,7 +137,17 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 					next = nil
 					if preparationAllowed(lastPreparation, time.Now()) {
 						lastPreparation = time.Now()
-						next, err = prepareServiceConsole(ctx, installation, service)
+						err = watchPreparationPeer(ctx, channel.stream, func(run context.Context) error {
+							var preparationErr error
+							next, preparationErr = prepareServiceConsole(run, installation, service)
+							return preparationErr
+						})
+						if err != nil && next != nil {
+							if closeErr := next.close(); closeErr != nil {
+								err = errors.Join(err, ErrRecovery, closeErr)
+							}
+							next = nil
+						}
 					}
 				}
 				if err == nil && channel.authority.check(false) == nil {

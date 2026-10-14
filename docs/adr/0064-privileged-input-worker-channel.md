@@ -712,3 +712,28 @@ and passes the result through the independent report reader/service decision.
 Failed cleanup and sender joins still fence that same path. B's attended lock,
 PIN and login transitions remain required to establish whether g288 fixes the
 reported failure.
+
+## g289: Actual lease entry preempts optional preparation
+
+One matched g288 installed handoff retained 114982us of preparation overlap in
+its lease-admission mutex wait. Actual entry now publishes priority and cancels
+the current optional preparation before acquiring that same mutex. Preparation
+rechecks priority after publishing its cancellation owner, closing the race
+between the first check and entry. New hints cannot queue ahead of pending entry
+or shutdown. The mutex continues to join preparation and fence installation-pin
+disposal; cancellation never substitutes for cleanup completion.
+
+The authenticated service watches only the otherwise-unused preparation channel
+while constructing an unbound console. Peer EOF or unexpected extra data cancels
+that construction. Its native builder and the watcher are joined before another
+request is accepted. A completed candidate that lost cancellation is closed;
+close uncertainty remains ErrRecovery. The normal successful path interrupts and
+joins its watcher before writing the unchanged preparation receipt. No peer byte
+can choose a process, desktop or command, and no input/lease authority is added.
+
+Deterministic tests first reproduce entry waiting on optional work, then verify
+entry-triggered cancellation cannot bypass gated cleanup. Paired-pipe tests cover
+peer disconnect, extra bytes, success receipt and preserved recovery errors.
+The existing warm-child expiry, claim, trust, bootstrap and service fences stay
+unchanged. B's actual latency and lock/PIN continuity require an attended test;
+g288's separate native SendInput delay is not addressed by this scheduling change.
