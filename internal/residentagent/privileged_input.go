@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/0disoft/krasis/internal/agent"
@@ -45,6 +46,8 @@ type privilegedLeaseInput struct {
 	cursor                                  protectedReturnPresentation
 	source                                  agent.SourceHook
 	preparationStarted, preparationFinished time.Time
+	entryWaiting                            atomic.Int32
+	preparationCancel                       atomic.Pointer[preparationCancellation]
 }
 
 // Approval stays in the resident agent after the authenticated mTLS peer check.
@@ -71,10 +74,13 @@ func (a privilegedAuthorizer) AuthorizeLease(ctx context.Context, p transport.Au
 func (input *privilegedLeaseInput) open(ctx context.Context, identity application.LeaseIdentity, now time.Time) error {
 	admissionStarted := time.Now()
 	defer func() { input.observeHandoffTiming("admission", admissionStarted) }()
-	input.RestoreReturnCursor()
 	if ctx == nil || ctx.Err() != nil || identity.SessionID == "" || identity.LeaseID == "" || identity.Epoch == "" {
 		return errPrivilegedInput
 	}
+	input.entryWaiting.Add(1)
+	defer input.entryWaiting.Add(-1)
+	input.cancelPreparation()
+	input.RestoreReturnCursor()
 	started := time.Now()
 	if err := input.mu.LockContext(ctx); err != nil {
 		handoff.Record(ctx, handoff.OpenLock, time.Since(started))
@@ -179,6 +185,7 @@ func (input *privilegedLeaseInput) close(intent *control.ReturnIntent) {
 // releasing the shared pins, so the next update can replace installed files.
 func (input *privilegedLeaseInput) shutdown() error {
 	input.shutdownOnce.Do(func() {
+		input.cancelPreparation()
 		input.RestoreReturnCursor()
 		input.mu.Lock()
 		input.stopped = true

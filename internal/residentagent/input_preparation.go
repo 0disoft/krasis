@@ -11,6 +11,14 @@ type preparationPolicy interface {
 	AuthorizePreparation(context.Context, transport.AuthenticatedPeerContext, time.Time) (bool, error)
 }
 
+type preparationCancellation struct{ cancel context.CancelFunc }
+
+func (input *privilegedLeaseInput) cancelPreparation() {
+	if preparation := input.preparationCancel.Load(); preparation != nil {
+		preparation.cancel()
+	}
+}
+
 // A fresh trust/permission check permits only preparation. Actual lease
 // approval and bootstrap are repeated independently for every handoff.
 func (a productAuthorizer) AuthorizePreparation(ctx context.Context, p transport.AuthenticatedPeerContext, now time.Time) (bool, error) {
@@ -65,7 +73,7 @@ func (input *privilegedLeaseInput) prepareIdle(ctx context.Context) (bool, error
 	}
 	lockedAt := time.Now()
 	defer input.mu.Unlock()
-	if input.stopped || input.client != nil || input.prepare == nil || (!input.expires.IsZero() && !input.expires.After(time.Now())) || ctx.Err() != nil {
+	if input.stopped || input.client != nil || input.entryWaiting.Load() != 0 || input.prepare == nil || (!input.expires.IsZero() && !input.expires.After(time.Now())) || ctx.Err() != nil {
 		return false, nil
 	}
 	input.cursor.mu.Lock()
@@ -79,10 +87,19 @@ func (input *privilegedLeaseInput) prepareIdle(ctx context.Context) (bool, error
 	}
 	input.preparationStarted = lockedAt
 	input.preparationFinished = time.Time{}
+	run, cancel := context.WithCancel(ctx)
+	preparation := &preparationCancellation{cancel: cancel}
+	input.preparationCancel.Store(preparation)
+	defer func() { input.preparationCancel.CompareAndSwap(preparation, nil); cancel() }()
+	// Admission can arrive between the first priority check and publication.
+	// Cancel that race too; input.mu still fences native cleanup and pin disposal.
+	if input.entryWaiting.Load() != 0 {
+		cancel()
+	}
 	// Runs before the earlier Unlock defer. Only preparation and its receipt
 	// own input.mu; the diagnostic callback runs after this helper returns.
 	defer func() { input.preparationFinished = time.Now() }()
-	return true, input.prepare(ctx)
+	return true, input.prepare(run)
 }
 
 // Both intervals use local monotonic readings. Only the most recent completed
