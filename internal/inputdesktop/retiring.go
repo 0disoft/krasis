@@ -20,7 +20,7 @@ type retiringThread interface {
 // No window/hook-bearing thread is restored or returned to the runtime pool.
 func runRetiring(ctx context.Context, callback func(*Scope) error,
 	open func() (retiringBinding, error), thread func() uintptr,
-	pin func() (retiringThread, error), lock func()) error {
+	pin func() (retiringThread, error), startLocked func(func())) error {
 	if ctx == nil || callback == nil {
 		return ErrInvalid
 	}
@@ -33,8 +33,8 @@ func runRetiring(ctx context.Context, callback func(*Scope) error,
 		err     error
 	}
 	done := make(chan outcome, 1)
-	go func() {
-		lock() // Intentionally no UnlockOSThread, including acquisition failures.
+	startLocked(func() {
+		// The launcher owns the lock. No UnlockOSThread, including failures.
 		result := outcome{err: ErrCallbackExit}
 		var scope *Scope
 		defer func() {
@@ -64,7 +64,7 @@ func runRetiring(ctx context.Context, callback func(*Scope) error,
 			return
 		}
 		result.err = scope.Do(ctx, func() error { return invoke(callback, scope) })
-	}()
+	})
 	result := <-done
 	if result.owner == nil {
 		return result.err // No desktop acquisition could start without a thread pin.

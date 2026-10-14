@@ -35,7 +35,7 @@ func (t *testRetiringThread) close() error { t.closed.Add(1); return t.closeErr 
 
 func testRetiringRun(ctx context.Context, callback func(*Scope) error, desktop *testRetiringBinding, owner *testRetiringThread) error {
 	return runRetiring(ctx, callback, func() (retiringBinding, error) { return desktop, nil },
-		func() uintptr { return 1 }, func() (retiringThread, error) { return owner, nil }, func() {})
+		func() uintptr { return 1 }, func() (retiringThread, error) { return owner, nil }, func(run func()) { go run() })
 }
 
 func TestCaptureRetirementWaitsForNativeExitBeforeClosingDesktop(t *testing.T) {

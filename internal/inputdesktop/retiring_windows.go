@@ -23,7 +23,32 @@ func RunCapture(ctx context.Context, authorize func() error, callback func(*Scop
 			return nil, err
 		}
 		return b.(*desktopBinding), nil
-	}, currentThreadID, pinRetiringThread, runtime.LockOSThread)
+	}, currentThreadID, pinRetiringThread, startRetiringThread)
+}
+
+// Package initialization runs on Go's startup thread. Unlike other locked
+// threads, runtime.mexit parks m0 forever rather than terminating it. Capture
+// must never attach a desktop to that thread and wait for its kernel exit.
+var captureStartupThread = currentThreadID()
+
+func startRetiringThread(run func()) {
+	go func() {
+		runtime.LockOSThread()
+		if currentThreadID() != captureStartupThread {
+			run()
+			return // A disposable native owner exits with its lock held.
+		}
+		// Hold the startup thread until the replacement has locked another OS
+		// thread. This guard acquires no desktop, window, hook or input state.
+		locked := make(chan struct{})
+		go func() {
+			runtime.LockOSThread()
+			close(locked)
+			run()
+		}()
+		<-locked
+		runtime.UnlockOSThread()
+	}()
 }
 
 type nativeRetiringThread struct{ handle windows.Handle }
@@ -43,6 +68,9 @@ func (t *nativeRetiringThread) join() error {
 		return err
 	}
 	if state != windows.WAIT_OBJECT_0 {
+		if state == uint32(windows.WAIT_TIMEOUT) {
+			return windows.ERROR_TIMEOUT
+		}
 		return errors.New("capture native thread exit unconfirmed")
 	}
 	return nil

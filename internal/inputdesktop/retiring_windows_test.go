@@ -4,7 +4,6 @@ package inputdesktop
 
 import (
 	"context"
-	"runtime"
 	"testing"
 
 	"golang.org/x/sys/windows"
@@ -33,6 +32,9 @@ func TestCaptureRetirementWaitsForRealWindowsThreadWithoutInput(t *testing.T) {
 		if uintptr(thread) != scope.owner {
 			t.Error("capture scope changed native thread")
 		}
+		if uintptr(thread) == captureStartupThread {
+			t.Error("capture acquired Go's non-terminating startup thread")
+		}
 		return nil
 	}, func() (retiringBinding, error) { return desktop, nil }, currentThreadID,
 		func() (retiringThread, error) {
@@ -42,7 +44,7 @@ func TestCaptureRetirementWaitsForRealWindowsThreadWithoutInput(t *testing.T) {
 			}
 			owner = &observedRetiringThread{retiringThread: native}
 			return owner, nil
-		}, runtime.LockOSThread)
+		}, startRetiringThread)
 	if err != nil || owner == nil || !owner.verified || thread == 0 || desktop.retired.Load() != 1 || desktop.closed.Load() != 0 {
 		t.Fatal("native thread exit was not confirmed before desktop close", err)
 	}

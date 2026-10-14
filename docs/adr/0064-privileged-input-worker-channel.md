@@ -758,3 +758,24 @@ peer disconnect, extra bytes, success receipt and preserved recovery errors.
 The existing warm-child expiry, claim, trust, bootstrap and service fences stay
 unchanged. B's actual latency and lock/PIN continuity require an attended test;
 g288's separate native SendInput delay is not addressed by this scheduling change.
+
+## g292: Keep capture off Go's non-terminating startup thread
+
+B's g291 capture failure reported desktop-thread-exit without a native number.
+The existing real Windows retirement test reproduced the same one-second failure
+locally. Go runtime.mexit parks its initial OS thread (m0) instead of terminating
+it. Returning from a locked capture goroutine on m0 therefore cannot signal its
+retained kernel thread handle, even when capture cleanup has completed.
+
+Package initialization records the startup thread identity. The capture launcher
+locks its candidate thread before selecting it. If it is the startup thread, a
+guard retains that lock until a replacement goroutine has locked another native
+thread; the guard acquires no desktop, window, hook or input state, then unlocks.
+The replacement retains its lock through exit and the existing exact-handle
+termination proof still gates HDESK release. No timeout or cleanup fence is
+removed. WAIT_TIMEOUT now preserves ERROR_TIMEOUT instead of an unnumbered error.
+
+The original native-thread regression failed before this change and passed 100
+times afterwards. Tests assert that no capture scope uses the startup thread;
+they create no Windows input or capture windows. Actual A/B transitions remain
+an attended check after both failed services have been safely replaced.
