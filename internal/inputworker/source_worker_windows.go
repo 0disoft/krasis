@@ -123,21 +123,15 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 	var stopping *sourcePacket
 	defer func() {
 		cancel()
-		result = errors.Join(result, <-hookDone, <-sourceDone)
-		emergency := errors.Is(result, wininput.ErrEmergencyRelease)
-		if sourceTransitionOnly(result, run.Err() == context.DeadlineExceeded) {
-			result = nil
-		} else if result != nil {
-			result = errors.Join(result, ErrRecovery)
-		}
+		capture, sender := <-hookDone, <-sourceDone
+		emergency := errors.Is(errors.Join(result, capture, sender), wininput.ErrEmergencyRelease)
+		result = sourceCaptureFinal(result, capture, sender, run.Err() == context.DeadlineExceeded)
 		if stopping != nil {
 			response := sourcePacket{kind: sourceReply, op: sourceStop, reply: stopping.sequence}
 			if result != nil {
 				response.status = 1
 			}
-			if writer.write(response, nil, true) != nil {
-				result = errors.Join(result, ErrRecovery)
-			}
+			result = sourceRetirementDelivery(result, writer.write(response, nil, true))
 		} else {
 			response := sourcePacket{kind: sourceRetired}
 			if result != nil {
@@ -146,9 +140,11 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 			if emergency && result == nil {
 				response.op = 1
 			}
-			_ = writer.write(response, nil, true)
+			result = sourceRetirementDelivery(result, writer.write(response, nil, true))
 		}
-		_ = channel.Close()
+		if closeErr := channel.Close(); closeErr != nil {
+			result = errors.Join(result, ErrRecovery, &workerReportFailure{operation: "source-channel-close", cause: closeErr})
+		}
 	}()
 	select {
 	case <-hookReady:

@@ -683,3 +683,32 @@ protected capture. B's actual service-maintenance result remains unverified.
 The raw-read busy tests now inject a clock and wait outcome: scheduler oversleep
 must retain the original busy failure and never extend the ten-ms elapsed budget.
 Production retry limits and delays are unchanged.
+
+## g288: Separate agent retirement notification from native cleanup proof
+
+B's g287 service survived ordinary use for over six minutes, then failed during
+lock at 2026-10-14T07:14:19.3335601Z with capture and no operation/native number.
+The precise g287 branch remains unconfirmed. A reproducible source-worker path
+promoted a failed final sourceStop reply to ErrRecovery even after native capture
+and sender retirement succeeded. A disappearing agent pipe could thus stop the
+service despite its separate authenticated control channel remaining usable.
+
+Finalization now joins both capture and sender results before deciding recovery.
+Only a fully clean known transition may avoid ErrRecovery. A failed final agent
+notification is reported as source-retirement-write on the separate service
+control pipe, without inventing native cleanup uncertainty. The agent still
+fails its unacknowledged operation and may reconnect; no input is replayed and
+no new lease is authorized by this notification. The service's child report,
+owned-process retirement and channel-close requirements remain independent.
+Missing service reports, thread/join/native cleanup failure and close uncertainty
+remain fatal. Authorization and desktop gates are unchanged.
+
+Fixed source-capture-join/source-sender-join/source-command-loop/retirement-write/
+channel-close labels are appended to existing report codes. The actual report
+writer now accepts those fixed worker operation wrappers, retaining a deeper
+native source operation when present. No raw error text, keys or paths are saved.
+A real paired-pipe test disconnects the agent, exercises both final packet modes,
+and passes the result through the independent report reader/service decision.
+Failed cleanup and sender joins still fence that same path. B's attended lock,
+PIN and login transitions remain required to establish whether g288 fixes the
+reported failure.

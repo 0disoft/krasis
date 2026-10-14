@@ -10,7 +10,7 @@ import (
 
 // Numeric, closed operation codes on the authenticated child/service channel.
 // These are diagnostics only; status and release proof remain independent.
-var reportOperations = [...]string{"", "low-level-hook", "raw-mouse", "wheel-capture", "thread-join", "hook-install", "hook-release", "raw-register", "raw-release", "raw-read", "raw-buffer", "raw-route", "message-loop", "pointer-snapshot", "cursor-present", "cursor-restore", "cursor-release", "raw-size", "raw-packet", "raw-desktop", "desktop-bind", "desktop-restore", "desktop-close", "desktop-thread-exit", "raw-window-create", "raw-window-destroy", "raw-ready", "desktop-current", "desktop-open", "desktop-name", "desktop-active"}
+var reportOperations = [...]string{"", "low-level-hook", "raw-mouse", "wheel-capture", "thread-join", "hook-install", "hook-release", "raw-register", "raw-release", "raw-read", "raw-buffer", "raw-route", "message-loop", "pointer-snapshot", "cursor-present", "cursor-restore", "cursor-release", "raw-size", "raw-packet", "raw-desktop", "desktop-bind", "desktop-restore", "desktop-close", "desktop-thread-exit", "raw-window-create", "raw-window-destroy", "raw-ready", "desktop-current", "desktop-open", "desktop-name", "desktop-active", "source-capture-join", "source-sender-join", "source-command-loop", "source-retirement-write", "source-channel-close"}
 
 type workerReportFailure struct {
 	operation string
@@ -23,6 +23,12 @@ func (e *workerReportFailure) LoginRuntimeOperation() string { return e.operatio
 
 func reportFailureDetails(err error) (byte, uint32) {
 	operation := wininput.SourceFailureStage(err)
+	if operation == "" {
+		var failure interface{ LoginRuntimeOperation() string }
+		if errors.As(err, &failure) && logindiag.ValidRuntimeOperation(failure.LoginRuntimeOperation()) {
+			operation = failure.LoginRuntimeOperation()
+		}
+	}
 	var code byte
 	for index, name := range reportOperations {
 		if name == operation {
