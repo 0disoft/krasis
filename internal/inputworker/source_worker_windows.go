@@ -89,6 +89,10 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 	if !lease.Capture || lease.Presentation {
 		return ErrProtocol
 	}
+	pipe, ok := channel.stream.(*pipeConn)
+	if !ok {
+		return ErrProtocol
+	}
 	run, cancel := context.WithDeadline(ctx, lease.ExpiresAt)
 	defer cancel()
 	authorize := func() error {
@@ -123,9 +127,11 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 		cancel()
 	}()
 	var stopping *sourcePacket
+	var firstCommandFailure error
 	defer func() {
 		cancel()
 		capture, sender := <-hookDone, <-sourceDone
+		result = errors.Join(result, firstCommandFailure)
 		emergency := errors.Is(errors.Join(result, capture, sender), wininput.ErrEmergencyRelease)
 		result = sourceCaptureFinal(result, capture, sender, run.Err() == context.DeadlineExceeded)
 		if stopping != nil {
@@ -154,52 +160,40 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 	}
 	// Events cannot precede the service's readiness receipt on the shared pipe.
 	var sequence uint64
+	readContext, stopReads := context.WithCancel(context.Background())
+	defer stopReads()
+	interruptReads := context.AfterFunc(run, stopReads)
+	defer interruptReads()
+	reader := sourceContextReader{ctx: readContext, read: pipe.readContext}
 	read := func() (sourcePacket, error) {
-		if channel.stream.SetReadDeadline(time.Now().Add(IdleTimeout)) != nil {
-			return sourcePacket{}, ErrAuthority
+		if err := channel.stream.SetReadDeadline(time.Now().Add(IdleTimeout)); err != nil {
+			return sourcePacket{}, sourceTransportFailure(errors.Join(ErrAuthority, err))
 		}
-		p, err := readSourcePacket(channel.stream)
-		if err != nil || p.kind != sourceCommand || p.binding != lease.Binding || p.sequence != sequence+1 || authorize() != nil {
-			return sourcePacket{}, ErrProtocol
+		p, err := readSourceCommand(reader, readContext, lease.Binding, sequence, authorize)
+		if err == nil {
+			sequence = p.sequence
 		}
-		sequence = p.sequence
-		return p, nil
+		return p, err
 	}
 	first, err := read()
-	if err != nil || first.op != sourceStart {
+	if err != nil {
+		return err
+	}
+	if first.op != sourceStart {
 		return ErrProtocol
 	}
-	if writer.send(sourcePacket{kind: sourceReply, op: sourceStart, reply: first.sequence}, nil) != nil {
-		return ErrAuthority
+	if err := writer.send(sourcePacket{kind: sourceReply, op: sourceStart, reply: first.sequence}, nil); err != nil {
+		return err
 	}
 	writer.started.Store(true)
 	requests := make(chan sourcePacket, 1)
-	readDone := make(chan struct{})
-	go func() {
-		defer close(readDone)
-		for {
-			p, err := read()
-			if err != nil {
-				cancel()
-				return
-			}
-			select {
-			case requests <- p:
-			case <-run.Done():
-				return
-			}
-			if p.op == sourceStop {
-				return
-			}
-		}
-	}()
-	// Reader exits after the explicit stop; on other exits close it before join.
+	readDone := make(chan error, 1)
+	go func() { readDone <- pumpSourceCommands(run, read, requests, cancel) }()
+	// Retire only this read; the final native response still needs the writer.
 	defer func() {
 		cancel()
-		if stopping == nil {
-			_ = channel.stream.SetReadDeadline(time.Now())
-		}
-		<-readDone
+		stopReads()
+		result = errors.Join(result, <-readDone)
 	}()
 	var pendingReturn uint64
 	var cursorPrepared func()
@@ -209,13 +203,13 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 		case <-run.Done():
 			return run.Err()
 		case p := <-queue.events:
-			if writer.send(p, nil) != nil {
-				return ErrAuthority
+			if err := writer.send(p, nil); err != nil {
+				return err
 			}
 		case generation := <-session.LocalReturns():
 			pendingReturn = generation
-			if writer.send(sourcePacket{kind: sourceReturn, reply: writer.epoch.Load()}, nil) != nil {
-				return ErrAuthority
+			if err := writer.send(sourcePacket{kind: sourceReturn, reply: writer.epoch.Load()}, nil); err != nil {
+				return err
 			}
 		case p := <-requests:
 			if p.op == sourceStop {
@@ -282,7 +276,21 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 			} else {
 				err = hook.ExecuteSourceDesktop(run, operation)
 			}
+			if p.op == sourceAdmit && err != nil {
+				if !sourceRetryableInspection(err) {
+					// No generic negative query ACK: it would erase authority or
+					// cleanup failure before the worker's final report arrives.
+					if sourceCleanupUncertain(err) {
+						return errors.Join(ErrRecovery, err)
+					}
+					return err
+				}
+				err = &sourceInspectionRejected{cause: err}
+			}
 			if err != nil {
+				if firstCommandFailure == nil {
+					firstCommandFailure = err
+				}
 				response.status = 1
 				response.decision = 0
 			}

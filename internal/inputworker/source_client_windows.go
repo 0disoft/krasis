@@ -155,54 +155,20 @@ func (c *sourceClient) call(ctx context.Context, op byte, reference ...uint64) (
 	}
 	timer := time.NewTimer(time.Until(limit))
 	defer timer.Stop()
+	if reply, known := waitSourceReply(ctx, timer.C, c.replies, c.done); known {
+		result, err := sourceReplyResult(p, reply)
+		accepted = err != ErrProtocol
+		if err != nil && op == sourceActivate {
+			c.epoch.Store(0)
+		}
+		return result, err
+	}
 	select {
-	case reply := <-c.replies:
-		if reply.reply != p.sequence || reply.op != op {
-			_ = c.channel.Close()
-			return sourcePacket{}, ErrProtocol
-		}
-		if reply.status != 0 {
-			if op == sourceActivate {
-				c.epoch.Store(0)
-			}
-			accepted = true // Explicit rejection is known; do not discard the capture owner for an optional cursor request.
-			return reply, ErrAuthority
-		}
-		accepted = true
-		return reply, nil
-	case <-ctx.Done():
-	case <-timer.C:
 	case <-c.done:
 		if op == sourceStop && c.retired.Load() && c.err == nil {
-			accepted = true // The exact child has already acknowledged native retirement.
+			accepted = true // Independent authenticated native retirement proof.
 			return sourcePacket{}, nil
 		}
-		// A final retirement ACK can immediately precede EOF. Consume it even
-		// when both signals became ready before the caller was scheduled.
-		select {
-		case reply := <-c.replies:
-			if reply.reply == p.sequence && reply.op == op && reply.status == 0 {
-				accepted = true
-				return reply, nil
-			}
-		default:
-		}
-	}
-	// A timeout may race an already buffered ACK. Observe that outcome before
-	// closing any channel, including a known optional-request rejection.
-	select {
-	case reply := <-c.replies:
-		if reply.reply != p.sequence || reply.op != op {
-			return sourcePacket{}, ErrProtocol
-		}
-		accepted = true
-		if reply.status != 0 {
-			if op == sourceActivate {
-				c.epoch.Store(0)
-			}
-			return reply, ErrAuthority
-		}
-		return reply, nil
 	default:
 	}
 	if optionalSourceCursor(op) && !time.Now().Before(limit) {

@@ -89,6 +89,48 @@ func TestNativePipeReadDeadlineCancelsPendingIO(t *testing.T) {
 	}
 }
 
+func TestNativeSourceReadCancellationLeavesFinalWriterAndNextReadUsable(t *testing.T) {
+	server, client := nativePair(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		var data [1]byte
+		_, err := server.readContext(ctx, data[:])
+		done <- err
+	}()
+	cancel()
+	select {
+	case err := <-done:
+		if err != context.Canceled {
+			t.Fatal("local source read interruption lost", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("read cancellation did not join")
+	}
+	if err := server.SetDeadline(time.Now().Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.SetDeadline(time.Now().Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	go func() { _, err := server.Write([]byte{9}); done <- err }()
+	var data [1]byte
+	if _, err := io.ReadFull(client, data[:]); err != nil || data[0] != 9 {
+		t.Fatal("read cancellation cut final retirement writer", err)
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	go func() { _, err := client.Write([]byte{7}); done <- err }()
+	if _, err := io.ReadFull(server, data[:]); err != nil || data[0] != 7 {
+		t.Fatal("cancelled reader retained active IO", err)
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestNativePipeCloseDrainsPendingReadOnce(t *testing.T) {
 	server, _ := nativePair(t)
 	done := make(chan error, 1)

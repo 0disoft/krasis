@@ -301,6 +301,37 @@ func TestSourceSessionDropsOnlyExplicitlyUnsentRevokedGeneration(t *testing.T) {
 	}
 }
 
+func TestSourceSessionRevokedGenerationCannotEraseActualFailure(t *testing.T) {
+	for _, cause := range []error{errors.New("send failed"), ErrSourceCleanupIncomplete, errors.Join(control.ErrSourceActionDiscarded, ErrSourceCleanupIncomplete)} {
+		sink := &revokedGenerationSourceSink{firstStarted: make(chan struct{}), releaseFirst: make(chan struct{}), sent: make(chan control.InputAction, 1), failed: make(chan error, 1), firstError: cause}
+		session := startSourceSession(t, 2, sink)
+		if !session.Offer(control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}) {
+			t.Fatal("action not offered")
+		}
+		select {
+		case <-sink.firstStarted:
+		case <-time.After(time.Second):
+			t.Fatal("sender not started")
+		}
+		session.Deactivate()
+		if err := session.Activate(); err != nil {
+			t.Fatal(err)
+		}
+		close(sink.releaseFirst)
+		select {
+		case failure := <-sink.failed:
+			if !errors.Is(failure, cause) {
+				t.Fatal("actual revoked send failure erased", failure)
+			}
+		case <-time.After(time.Second):
+			t.Fatal("generation change discarded actual failure")
+		}
+		if session.Active() {
+			t.Fatal("failed sender retained suppression authority")
+		}
+	}
+}
+
 func TestSourceSessionInterruptsBlockedSendBeforeFaultCleanup(t *testing.T) {
 	sink := &interruptibleSourceSink{
 		started:     make(chan struct{}),

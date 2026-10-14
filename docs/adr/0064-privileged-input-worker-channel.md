@@ -850,3 +850,25 @@ past expiry, interrupt/failure callback past the independent cleanup deadline,
 and combine cancellation, discard and cleanup failures. Fixtures release and
 join their intentionally blocked work. Clean expiry and genuinely unsent stale
 actions remain normal; no timeout budget, journal or service fence is weakened.
+
+## Preserve source reader, command and negative reply outcomes
+
+The command reader now joins a terminal error channel before the native final
+report. Validation/authority failures and external EOF, truncation or timeout
+are retained independently of worker cancellation. Its private cancellation
+context interrupts only the exact overlapped read and leaves the duplex writer
+available for final retirement. A native-pipe test verifies cancellation, final
+writing and subsequent reading without replacing or closing the channel.
+
+Only the producer's actual GUI-inspection marker after a returned desktop scope
+can generate a retryable sourceAdmit rejection. Authority, protocol, cancellation,
+inactive desktop, callback and cleanup failures cannot inherit that meaning.
+Cleanup uncertainty retires the worker before a query rejection is written.
+The first safely rejected command is retained separately from continuation;
+reply delivery failures join rather than replace the executed operation error.
+
+Normal receive, EOF and deadline/cancellation races share one reply consumer and
+one matcher. A buffered negative reply remains a rejection, and a buffered wrong
+reply remains a protocol failure. Neither may be consumed and discarded before
+a second read. Tests cover all three races and the actual Windows sourceClient
+with an ordered write barrier, preserving zero activation epoch for queries.

@@ -30,6 +30,9 @@ func sourceTransportJoinedOnly(err error, ownExpiry bool, command bool) bool {
 	if _, ok := err.(*sourceTransportError); ok {
 		return true
 	}
+	if inspection, ok := err.(*sourceInspectionRejected); ok {
+		return command && sourceRetryableInspection(inspection.cause)
+	}
 	if joined, ok := err.(interface{ Unwrap() []error }); ok {
 		for _, cause := range joined.Unwrap() {
 			if !sourceTransportJoinedOnly(cause, ownExpiry, command) {
@@ -99,7 +102,10 @@ func sourceCommandCompletion(operation, delivery error) error {
 	if sourceCleanupUncertain(operation) {
 		return errors.Join(ErrRecovery, operation, delivery)
 	}
-	return delivery
+	if delivery != nil {
+		return errors.Join(operation, delivery)
+	}
+	return nil // Caller separately retains safely rejected command evidence.
 }
 
 func sourceCleanupUncertain(err error) bool {

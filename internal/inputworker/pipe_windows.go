@@ -213,6 +213,13 @@ func (pipe *pipeConn) connect(ctx context.Context) error {
 }
 
 func (pipe *pipeConn) Read(data []byte) (int, error) {
+	return pipe.readContext(context.Background(), data)
+}
+
+// Source command retirement cancels its exact read without closing the duplex
+// channel needed for the final native-retirement response. External EOF,
+// malformed frames and the ordinary idle deadline remain separate outcomes.
+func (pipe *pipeConn) readContext(ctx context.Context, data []byte) (int, error) {
 	pipe.readMu.Lock()
 	defer pipe.readMu.Unlock()
 	if err := pipe.start(); err != nil {
@@ -222,7 +229,7 @@ func (pipe *pipeConn) Read(data []byte) (int, error) {
 	if len(data) == 0 {
 		return 0, nil
 	}
-	n, err := pipe.overlapped(context.Background(), true, data, func(o *windows.Overlapped) error {
+	n, err := pipe.overlapped(ctx, true, data, func(o *windows.Overlapped) error {
 		// x/sys inspects this pointer when race instrumentation is enabled.
 		// Overlapped completion remains the authoritative transferred count.
 		var immediate uint32

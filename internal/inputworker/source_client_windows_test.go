@@ -13,6 +13,48 @@ import (
 	"github.com/0disoft/krasis/internal/peer"
 )
 
+type sourceWriteBarrier struct {
+	net.Conn
+	ready <-chan struct{}
+}
+
+func (c sourceWriteBarrier) Write(data []byte) (int, error) {
+	n, err := c.Conn.Write(data)
+	<-c.ready
+	return n, err
+}
+
+func TestSourceClientBufferedNegativeReplyAndEOFHaveOneOutcome(t *testing.T) {
+	for _, foreign := range []bool{false, true} {
+		server, conn := net.Pipe()
+		ready := make(chan struct{})
+		c := &sourceClient{channel: clientChannel(sourceWriteBarrier{Conn: conn, ready: ready}, authorityService), binding: Binding{1}, replies: make(chan sourcePacket, 1), done: make(chan struct{})}
+		go func() {
+			defer server.Close()
+			request, err := readSourcePacket(server)
+			if err == nil {
+				reply := sourcePacket{kind: sourceReply, op: sourceAdmit, reply: request.sequence, status: 1}
+				if foreign {
+					reply.reply++
+				}
+				c.replies <- reply
+			}
+			close(c.done)
+			close(ready) // Both signals are ready before call finishes its write.
+		}()
+		p, err := c.call(context.Background(), sourceAdmit)
+		decision, err := sourceAdmissionResult(p, err)
+		if foreign {
+			if err != ErrProtocol || c.channel.authority.check(false) == nil {
+				t.Fatal("foreign buffered reply accepted", err)
+			}
+		} else if decision != 0 || !errors.Is(err, peer.ErrBoundaryInspectionUnavailable) || c.channel.authority.check(false) != nil || c.epoch.Load() != 0 {
+			t.Fatal("EOF erased rejection or changed capture authority", decision, err)
+		}
+		_ = c.channel.Close()
+	}
+}
+
 func TestSourceClientWrongReplyClosesAuthorityWithoutReplayingActivation(t *testing.T) {
 	server, conn := net.Pipe()
 	defer server.Close()

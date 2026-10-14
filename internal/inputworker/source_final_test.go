@@ -102,6 +102,29 @@ func TestCommandReplyLossCannotEraseExecutedDesktopCleanupFailure(t *testing.T) 
 	}
 }
 
+func TestSourceExecutedCommandAndDeliveryFailuresRemainIndependent(t *testing.T) {
+	operation := ErrAuthority
+	delivery := sourceTransportFailure(io.ErrClosedPipe)
+	result := sourceCommandCompletion(operation, delivery)
+	if !errors.Is(result, operation) || !errors.Is(result, io.ErrClosedPipe) {
+		t.Fatal("reply failure erased command failure", result)
+	}
+	for _, failure := range []error{operation, result} {
+		final := sourceCaptureFinal(failure, inputdesktop.ErrInactive, context.Canceled, false)
+		var wire bytes.Buffer
+		if err := writeReport(&wire, Report{}, final); err != nil {
+			t.Fatal(err)
+		}
+		if wire.Bytes()[5] != 1 || sourceRetirementStatus(final) != 0 {
+			t.Fatal("command failure became success or incomplete retirement", final)
+		}
+		_, received := readReport(&wire)
+		if received == nil || serviceRecoveryFailure(received, nil) != nil {
+			t.Fatal("clean command failure erased or fenced service", received)
+		}
+	}
+}
+
 func TestFinalFailureMetadataActuallyTraversesWriterAndReader(t *testing.T) {
 	for _, label := range []string{"source-capture-join", "source-sender-join", "source-command-loop", "source-retirement-write", "source-channel-close"} {
 		var wire bytes.Buffer
