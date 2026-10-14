@@ -7,9 +7,12 @@ import (
 	"errors"
 	"net"
 	"testing"
+	"time"
 
+	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/inputdesktop"
 	"github.com/0disoft/krasis/internal/logindiag"
+	"github.com/0disoft/krasis/internal/wininput"
 )
 
 func TestSourceWriterCannotPreemptServiceReadinessWithEvents(t *testing.T) {
@@ -18,6 +21,55 @@ func TestSourceWriterCannotPreemptServiceReadinessWithEvents(t *testing.T) {
 		if err := w.send(sourcePacket{kind: kind}, nil); err != nil || w.sequence != 0 {
 			t.Fatal("event reached an unstarted stream", err)
 		}
+	}
+}
+
+func TestSourceSenderAuthorityLossJoinsBeforeCleanRetirement(t *testing.T) {
+	agent, conn := net.Pipe()
+	_ = agent.Close()
+	defer conn.Close()
+	writer := &sourceWriter{channel: &Channel{stream: conn}, binding: Binding{1}}
+	writer.started.Store(true)
+	session, err := wininput.NewSourceSession(4, writer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	ready, done := make(chan struct{}), make(chan error, 1)
+	go func() { done <- session.RunWithReady(ctx, func() { close(ready) }) }()
+	select {
+	case <-ready:
+	case <-ctx.Done():
+		t.Fatal("source sender did not start")
+	}
+	if session.Activate() != nil || !session.Offer(control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}) {
+		t.Fatal("source session did not accept synthetic queue item")
+	}
+	var sender error
+	select {
+	case sender = <-done:
+	case <-ctx.Done():
+		t.Fatal("source sender did not join")
+	}
+	if !errors.Is(sender, ErrAuthority) || session.Active() {
+		t.Fatal("lost authority or source suppression survived sender retirement", sender)
+	}
+	// Native join is independent; this synthetic queue test owns no Windows
+	// hook or input. Feed its actual joined sender result through the wire.
+	result := sourceCaptureFinal(ErrAuthority, context.Canceled, sender, false)
+	if result == nil || sourceRetirementStatus(result) != 0 {
+		t.Fatal("clean source owners became recovery-required", result)
+	}
+	service, child := net.Pipe()
+	defer service.Close()
+	finished := make(chan error, 1)
+	go func() { finished <- finishWorkerReport(child, Report{}, result); _ = child.Close() }()
+	report, received := readReport(service)
+	<-finished
+	_, received = receipt(report, received)
+	if received == nil || serviceRecoveryFailure(received, nil) != nil {
+		t.Fatal("joined pipe/authority failure stopped service or lost failed command", received)
 	}
 }
 

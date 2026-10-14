@@ -38,7 +38,7 @@ func (w *sourceWriter) write(p sourcePacket, current func() bool, retirement boo
 	// Retirement grants no authority. It is sent only after native/sender join
 	// on the exact already authenticated channel, even if logon authority changed.
 	if !retirement && w.channel.authority.check(false) != nil {
-		return ErrAuthority
+		return sourceTransportFailure(ErrAuthority)
 	}
 	w.sequence++
 	p.sequence, p.binding = w.sequence, w.binding
@@ -46,10 +46,10 @@ func (w *sourceWriter) write(p sourcePacket, current func() bool, retirement boo
 	if err != nil {
 		return err
 	}
-	if w.channel.stream.SetWriteDeadline(time.Now().Add(time.Second)) != nil {
-		return ErrAuthority
+	if err := w.channel.stream.SetWriteDeadline(time.Now().Add(time.Second)); err != nil {
+		return sourceTransportFailure(errors.Join(ErrAuthority, err))
 	}
-	return writeFrame(w.channel.stream, data[:])
+	return sourceTransportFailure(writeFrame(w.channel.stream, data[:]))
 }
 
 func (w *sourceWriter) SendAction(ctx context.Context, action control.InputAction, current func() bool) error {
@@ -58,7 +58,9 @@ func (w *sourceWriter) SendAction(ctx context.Context, action control.InputActio
 	}
 	return w.send(sourcePacket{kind: sourceAction, reply: w.epoch.Load(), action: action}, current)
 }
-func (w *sourceWriter) Interrupt(error) error             { return w.channel.stream.SetWriteDeadline(time.Now()) }
+func (w *sourceWriter) Interrupt(error) error {
+	return sourceTransportFailure(w.channel.stream.SetWriteDeadline(time.Now()))
+}
 func (w *sourceWriter) Fail(context.Context, error) error { return nil }
 
 type sourcePointerQueue struct {
@@ -128,15 +130,11 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 		result = sourceCaptureFinal(result, capture, sender, run.Err() == context.DeadlineExceeded)
 		if stopping != nil {
 			response := sourcePacket{kind: sourceReply, op: sourceStop, reply: stopping.sequence}
-			if result != nil {
-				response.status = 1
-			}
+			response.status = sourceRetirementStatus(result)
 			result = sourceRetirementDelivery(result, writer.write(response, nil, true))
 		} else {
 			response := sourcePacket{kind: sourceRetired}
-			if result != nil {
-				response.status = 1
-			}
+			response.status = sourceRetirementStatus(result)
 			if emergency && result == nil {
 				response.op = 1
 			}

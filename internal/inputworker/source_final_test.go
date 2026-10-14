@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"syscall"
 	"testing"
 
@@ -22,7 +23,11 @@ func TestCaptureFinalKeepsEveryNativeAndSenderFailureFenced(t *testing.T) {
 		{"native cleanup", nil, inputdesktop.ErrCleanup, context.Canceled, "source-capture-join"},
 		{"native join timeout", nil, context.DeadlineExceeded, context.Canceled, "source-capture-join"},
 		{"sender join timeout", context.Canceled, context.Canceled, context.DeadlineExceeded, "source-sender-join"},
-		{"command failure", ErrAuthority, context.Canceled, context.Canceled, "source-command-loop"},
+		{"uncertain command", ErrRecovery, context.Canceled, context.Canceled, "source-command-loop"},
+		{"unknown command", errors.New("unknown"), context.Canceled, context.Canceled, "source-command-loop"},
+		{"unmarked sender", context.Canceled, context.Canceled, ErrAuthority, "source-sender-join"},
+		{"transport with cleanup failure", nil, context.Canceled, sourceTransportFailure(inputdesktop.ErrCleanup), "source-sender-join"},
+		{"transport with join timeout", nil, context.Canceled, errors.Join(sourceTransportFailure(io.EOF), context.DeadlineExceeded), "source-sender-join"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			result := sourceCaptureFinal(tc.loop, tc.capture, tc.sender, false)
@@ -40,6 +45,42 @@ func TestCaptureFinalKeepsEveryNativeAndSenderFailureFenced(t *testing.T) {
 				t.Fatal("cleanup failure or original classification lost", failure)
 			}
 		})
+	}
+}
+
+func TestCaptureFinalKeepsCleanTransportFailureLocalToWorker(t *testing.T) {
+	for _, loop := range []error{ErrAuthority, ErrProtocol, sourceTransportFailure(io.ErrClosedPipe)} {
+		for _, sender := range []error{context.Canceled, sourceTransportFailure(io.EOF), errors.Join(context.Canceled, sourceTransportFailure(io.ErrClosedPipe))} {
+			result := sourceCaptureFinal(loop, inputdesktop.ErrInactive, sender, false)
+			if result == nil || !errors.Is(result, loop) || errors.Is(result, ErrRecovery) || sourceRetirementStatus(result) != 0 {
+				t.Fatal("joined transport failure became unknown native cleanup", result)
+			}
+			var wire bytes.Buffer
+			if err := writeReport(&wire, Report{}, result); err != nil {
+				t.Fatal(err)
+			}
+			report, received := readReport(&wire)
+			_, received = receipt(report, received)
+			if received == nil || serviceRecoveryFailure(received, nil) != nil {
+				t.Fatal("failed command erased or clean report stopped service", received)
+			}
+			if serviceRecoveryFailure(received, errors.New("channel close uncertain")) == nil {
+				t.Fatal("separate service-channel cleanup fence erased")
+			}
+		}
+	}
+}
+
+func TestRetirementProofCannotHideUnjoinedNativeOrSenderOwners(t *testing.T) {
+	for _, fault := range []error{ErrRecovery, inputdesktop.ErrCleanup, context.DeadlineExceeded, errors.New("unknown join failure")} {
+		for _, result := range []error{
+			sourceCaptureFinal(ErrAuthority, fault, context.Canceled, false),
+			sourceCaptureFinal(ErrProtocol, context.Canceled, fault, false),
+		} {
+			if sourceRetirementStatus(result) != 1 {
+				t.Fatal("failed native retirement became proof for agent", result)
+			}
+		}
 	}
 }
 

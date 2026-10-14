@@ -779,3 +779,30 @@ The original native-thread regression failed before this change and passed 100
 times afterwards. Tests assert that no capture scope uses the startup thread;
 they create no Windows input or capture windows. Actual A/B transitions remain
 an attended check after both failed services have been safely replaced.
+
+## g292: Distinguish retired capture from a failed forwarding command
+
+A's paired g291 receipt at 2026-10-14T10:39:56.1116272Z reported capture /
+source-command-loop. The finalizer previously added ErrRecovery to every command
+or forwarding failure, even after native capture and the sender had both joined.
+A source-only forwarding pipe owns no remote injection journal. Its failed
+command still fails, but is not evidence that the native owners remain active.
+
+Only the source writer marks its own forwarding/authority failures. The finalizer
+requires independently clean native retirement and a joined sender with only
+marked forwarding failures or known transition causes. It retains command-loop
+and sender failures in the authenticated service report without promoting them
+to native recovery uncertainty. Unknown sender failures, cleanup/join timeouts,
+ErrRecovery, native cleanup errors, missing reports, process retirement and channel
+close failures keep their existing service fence. No input is replayed.
+
+Final sourceStop/sourceRetired packets communicate native retirement proof rather
+than successful execution of a preceding command. The original command rejection
+and the separate failed service report remain intact. Such proof authorizes no
+input or desktop; the agent may refresh its source hook only under its existing
+peer/session/installation gates.
+
+Tests run the real source sender against a lost-authority/disconnected pipe,
+verify suppression is inactive after join, then pass its result through the
+worker report reader and service decision. They also verify that native/sender
+cleanup failures and an independent channel close failure still stop the service.
