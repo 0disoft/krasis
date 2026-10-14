@@ -27,6 +27,20 @@ reader는 한 개이며 새 요청은 무제한 queue에 쌓지 않습니다. re
 deadline이 있어 응답을 읽지 않는 client가 입력 복구를 무한히 막지 못합니다.
 취소 시 stream을 닫고 reader가 종료된 뒤 복구합니다.
 
+## 실패 단계 관측
+
+실패 응답의 v6/v7은 scope 진입, 입력 적용, 커서 readback, executor 완료 중
+실제로 실패한 단계 하나를 고정 값으로 전달합니다. 기존 apply/submission suffix를
+유지하고 헤더 bit 30으로 legacy bucket을 구분합니다. bucket을 측정된 millisecond로
+바꾸지 않습니다. 실패 suffix의 예약 바이트만 단계 값으로
+사용합니다. 성공 응답의 바이트와 실패의 certainty·수락 개수는 바꾸지 않습니다.
+입력 이동 후 readback이 실패하면 여전히 outcome-unknown이며 재전송하지 않습니다.
+이전 실패 응답도 읽으며 단계 값이 없으면 미확인으로 남깁니다.
+
+source 교체가 거부되면 현재 owner가 입력 전달 중인지, idle gate가 거부했는지,
+등록된 owner가 없었는지도 구분합니다. idle gate 거부를 특정 키나 버튼 때문이라고
+단정하지 않습니다. 이 고정 코드에는 입력값·커서 좌표·자격 증명 내용이 없습니다.
+
 ## Windows 전달 경계
 
 프로세스 인증 모듈은 아래 2·3의 기반을 구현합니다. 제품 활성화 전 전체 경계를

@@ -34,7 +34,10 @@ func (h *protectedSource) watchProtectedCursor(ctx context.Context, epoch uint64
 			}
 			h.mu.Lock()
 			current := ctx.Err() == nil && h.epoch == epoch && h.owner != nil && !h.remoteOwner && h.prepared && !h.refresh
-			refreshed := current && h.refreshIdleOwnerLocked()
+			refreshed := false
+			if current {
+				refreshed, _ = h.refreshIdleOwnerLocked()
+			}
 			h.mu.Unlock()
 			if refreshed {
 				h.observe("installed_source_cursor_promoted")

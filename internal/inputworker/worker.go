@@ -214,7 +214,9 @@ func serve(ctx context.Context, stream net.Conn, input application.InputPort, le
 		}
 		operationCtx, cancel := context.WithDeadline(ctx, deadline)
 		ack := response{sequence: command.sequence, op: command.op}
+		dispatched := false
 		operationErr := do(operationCtx, func() error {
+			dispatched = true
 			return applyCommand(operationCtx, input, &pressed, command, &ack)
 		})
 		cancel()
@@ -224,6 +226,12 @@ func serve(ctx context.Context, stream net.Conn, input application.InputPort, le
 		}
 		if operationErr != nil {
 			ack.status = 1
+			if ack.failureStage == failureStageUnknown {
+				ack.failureStage = failureStageBeforeDispatch
+				if dispatched {
+					ack.failureStage = failureStageExecutorCompletion
+				}
+			}
 			ack.certainty, ack.requested, ack.inserted = describeFailure(operationErr)
 		} else if command.op != opHeartbeat {
 			report.Completed++

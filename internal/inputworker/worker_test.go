@@ -81,6 +81,13 @@ func send(t *testing.T, conn net.Conn, command request) [responseSize]byte {
 		if _, err := io.ReadFull(conn, ack[:]); err != nil {
 			t.Fatal(err)
 		}
+		value, err := decodeResponse(ack)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := readResponseSuffix(conn, ack[4], &value); err != nil {
+			t.Fatal(err)
+		}
 	}
 	return ack
 }

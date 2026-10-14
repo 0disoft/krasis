@@ -60,7 +60,7 @@ func TestLockedSourceUsesProtectedCaptureInSameSessionAndFencesActiveRefresh(t *
 	if err := h.SourceCapture().Activate(); err != nil || !secure.Active() {
 		t.Fatal("protected activation failed", err)
 	}
-	if h.refreshDesktop("desktop_switch") {
+	if accepted, reason := h.refreshDesktopObserved("desktop_switch"); accepted || reason != sourceRefreshActiveOwner {
 		t.Fatal("active protected owner replaced")
 	}
 	h.SourceCapture().Deactivate()

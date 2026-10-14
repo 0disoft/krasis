@@ -61,3 +61,25 @@ func TestSourceRefreshLateUnregisterCannotRemoveNewOwner(t *testing.T) {
 		t.Fatal("retired native owner remained reachable")
 	}
 }
+
+func TestSourceRefreshRefusalBelongsToRegisteredOwner(t *testing.T) {
+	slot := &sourceRefreshSlot{}
+	ctx := context.WithValue(context.Background(), sourceRefreshKey{}, slot)
+	old := registerSourceRefreshObserved(ctx, func(agentlifecycle.Event) (bool, sourceRefreshRefusal) {
+		return false, sourceRefreshActiveOwner
+	})
+	if accepted, reason := slot.handleObserved(agentlifecycle.EventDesktopSwitch); accepted || reason != sourceRefreshActiveOwner {
+		t.Fatal("active-owner evidence lost", reason)
+	}
+	current := registerSourceRefreshObserved(ctx, func(agentlifecycle.Event) (bool, sourceRefreshRefusal) {
+		return false, sourceRefreshCaptureBusy
+	})
+	old()
+	if accepted, reason := slot.handleObserved(agentlifecycle.EventSessionLock); accepted || reason != sourceRefreshCaptureBusy {
+		t.Fatal("late cleanup retained old refusal", reason)
+	}
+	current()
+	if accepted, reason := slot.handleObserved(agentlifecycle.EventDesktopSwitch); accepted || reason != sourceRefreshUnavailable {
+		t.Fatal("retired owner refusal survived", reason)
+	}
+}

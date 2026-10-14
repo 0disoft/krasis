@@ -33,7 +33,7 @@ func readResponseSuffix(reader io.Reader, version byte, value *response) error {
 	if version >= 4 {
 		size = workerApplyDetailSize
 	}
-	if version == 5 {
+	if version == 5 || version == 7 {
 		size += workerSubmissionDetailSize
 	}
 	cursor := (value.op == opCursorRead || value.op == opMoveRead || value.op == opCursorPlace || value.op == opCursorPlaceProbe) && value.status == 0
@@ -54,12 +54,19 @@ func readResponseSuffix(reader io.Reader, version byte, value *response) error {
 	}
 	offset := 0
 	if version >= 4 {
-		if data[10] != 0 || data[11] != 0 || value.op == opHeartbeat || value.op == opClose {
+		if data[11] != 0 || version < 6 && data[10] != 0 || version < 6 && value.op == opHeartbeat || value.op == opClose {
 			return ErrProtocol
+		}
+		if version >= 6 {
+			stage := failureStage(data[10])
+			if value.status != 1 || !stage.valid() {
+				return ErrProtocol
+			}
+			value.failureStage = stage
 		}
 		p := handoff.WorkerApplyProfile{Micros: [2]uint32{binary.BigEndian.Uint32(data[:4]), binary.BigEndian.Uint32(data[4:8])}, Measured: data[8], Saturated: data[9]}
 		offset = workerApplyDetailSize
-		if version == 5 {
+		if version == 5 || version == 7 {
 			d := data[offset : offset+workerSubmissionDetailSize]
 			if d[5] > 1 || d[6] != 0 || d[7] != 0 {
 				return ErrProtocol
@@ -70,7 +77,7 @@ func readResponseSuffix(reader io.Reader, version byte, value *response) error {
 		}
 		// Consume structurally valid diagnostics even when numeric fields are
 		// invalid. Metadata cannot turn an acknowledged input into a failure.
-		if p.ValidForWorker(value.millis, value.measured) {
+		if p.ValidForWorker(value.millis, value.measured) && (version < 6 || p.Measured != 0) {
 			value.applyDetail = &p
 		}
 	}

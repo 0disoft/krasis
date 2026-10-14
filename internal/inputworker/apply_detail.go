@@ -21,11 +21,18 @@ func measureApplyPart(detail *handoff.WorkerApplyProfile, slot int, work func() 
 
 // Invoked only inside the existing authorized desktop scope. The flag changes
 // measurement and response metadata, never operation order or input authority.
-func applyCommand(ctx context.Context, input application.InputPort, pressed *control.PressedState, command request, ack *response) error {
+func applyCommand(ctx context.Context, input application.InputPort, pressed *control.PressedState, command request, ack *response) (result error) {
+	stage := failureStageApply
+	defer func() {
+		if result != nil {
+			ack.failureStage = stage
+		}
+	}()
 	if command.applyDetail {
 		ack.applyDetail = &handoff.WorkerApplyProfile{}
 	}
 	if command.op == opCursorRead {
+		stage = failureStageCursorReadback
 		return measureApplyPart(ack.applyDetail, 1, func() error { return readCursorResponse(ctx, input, ack) })
 	}
 	if command.op == opCursorPlace || command.op == opCursorPlaceProbe {
@@ -42,6 +49,7 @@ func applyCommand(ctx context.Context, input application.InputPort, pressed *con
 		return err
 	}
 	if command.op == opMoveRead {
+		stage = failureStageCursorReadback
 		if err := measureApplyPart(ack.applyDetail, 1, func() error { return readCursorResponse(ctx, input, ack) }); err != nil {
 			return unknownInput(err)
 		}

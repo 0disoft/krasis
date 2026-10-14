@@ -79,10 +79,12 @@ func (operations *Operations) handleProtectedTransition(event agentlifecycle.Eve
 		return false
 	}
 	operations.recordLocked("lifecycle_" + string(event))
-	if operations.sessionSourceRefresh.handle(event) {
+	refreshed, refusal := operations.sessionSourceRefresh.handleObserved(event)
+	if refreshed {
 		operations.recordLocked("installed_source_refresh_requested")
 		return true
 	}
+	operations.recordLocked(refusal.code())
 	operations.desktopChanging = true
 	operations.sessionTransition(&agentlifecycle.TransitionError{Event: event})
 	return true

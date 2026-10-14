@@ -231,6 +231,9 @@ func (client *Client) performResponse(ctx context.Context, command request, obse
 		}
 		return nil
 	}
+	if code := ack.failureStage.code(); code != "" {
+		client.observeFailure(code)
+	}
 	if ack.timing[2] != 0 {
 		client.observeFailure("installed_input_failure_after_dispatch")
 	} else if ack.timing[0] != 0 {

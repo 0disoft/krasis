@@ -71,7 +71,7 @@ func (h *protectedSource) RunWithBoundary(ctx context.Context, session *wininput
 		h.session, h.stop, h.prepared, h.owner = nil, nil, false, nil
 		h.mu.Unlock()
 	}()
-	unregister := registerSourceRefresh(ctx, h.refreshDesktop)
+	unregister := registerSourceRefreshObserved(ctx, h.refreshDesktopObserved)
 	defer unregister()
 	var initialReady sync.Once
 	standby := false
@@ -172,8 +172,13 @@ func (h *protectedSource) RunWithBoundary(ctx context.Context, session *wininput
 // Called only by the verified lifecycle event owner. No log callback runs while
 // holding this gate. Concurrent grant activation shares session.PauseCapture.
 func (h *protectedSource) refreshDesktop(event agentlifecycle.Event) bool {
+	accepted, _ := h.refreshDesktopObserved(event)
+	return accepted
+}
+
+func (h *protectedSource) refreshDesktopObserved(event agentlifecycle.Event) (bool, sourceRefreshRefusal) {
 	if event != agentlifecycle.EventSessionLock && event != agentlifecycle.EventDesktopSwitch {
-		return false
+		return false, sourceRefreshUnavailable
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -181,18 +186,21 @@ func (h *protectedSource) refreshDesktop(event agentlifecycle.Event) bool {
 }
 
 // Caller owns mu; no observer or IPC runs inside this admission gate.
-func (h *protectedSource) refreshIdleOwnerLocked() bool {
+func (h *protectedSource) refreshIdleOwnerLocked() (bool, sourceRefreshRefusal) {
 	if h.owner != nil {
 		if capture, ok := h.owner.(interface {
 			SourceCapture() wininput.SourceActivation
 		}); ok && capture.SourceCapture().Active() {
-			return false
+			return false, sourceRefreshActiveOwner
 		}
 	} else if h.SourceHook != nil && h.SourceHook.SourceCapture().Active() {
-		return false
+		return false, sourceRefreshActiveOwner
 	}
-	if h.session == nil || !h.session.PauseCapture() {
-		return false
+	if h.session == nil {
+		return false, sourceRefreshUnavailable
+	}
+	if !h.session.PauseCapture() {
+		return false, sourceRefreshCaptureBusy
 	}
 	h.epoch++
 	h.refresh, h.prepared = true, false
@@ -203,7 +211,7 @@ func (h *protectedSource) refreshIdleOwnerLocked() bool {
 	if h.stop != nil {
 		h.stop(wininput.ErrSourceCaptureRefresh)
 	}
-	return true
+	return true, sourceRefreshAccepted
 }
 
 func (h *protectedSource) waitDesktop(ctx context.Context) error {

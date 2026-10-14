@@ -149,6 +149,7 @@ type response struct {
 	millis              [3]uint16
 	measured            uint8
 	applyDetail         *handoff.WorkerApplyProfile
+	failureStage        failureStage
 }
 
 func writeResponse(writer io.Writer, value response) error {
@@ -194,6 +195,26 @@ func writeResponse(writer io.Writer, value response) error {
 			size += workerSubmissionDetailSize
 		}
 	}
+	if value.failureStage != failureStageUnknown {
+		if value.status != 1 || !value.failureStage.valid() {
+			return ErrProtocol
+		}
+		// Failed ACKs carry a fixed phase even outside the bounded profile
+		// window. Success bytes and input certainty remain unchanged. Versions
+		// 6/7 retain the apply/submission suffix; header bit 30 identifies the
+		// legacy bucket layout without inventing measured milliseconds.
+		if data[4] < 3 {
+			data[20] |= 0x40
+		}
+		if size == responseSize {
+			size += workerApplyDetailSize
+		}
+		data[4] = 6
+		if size > responseSize+workerApplyDetailSize {
+			data[4] = 7
+		}
+		data[responseSize+10] = byte(value.failureStage)
+	}
 	if (value.op == opCursorRead || value.op == opMoveRead || value.op == opCursorPlace || value.op == opCursorPlaceProbe) && value.status == 0 {
 		// Cursor snapshots add eight private bytes in the same pipe write.
 		// Other ACKs retain their existing size; coordinates never enter logs.
@@ -220,12 +241,21 @@ func writeResponse(writer io.Writer, value response) error {
 }
 
 func decodeResponse(data [responseSize]byte) (response, error) {
-	if string(data[:4]) != "KRA1" || data[4] < 1 || data[4] > 5 || (data[4] < 3 && data[23] != 0) {
+	if string(data[:4]) != "KRA1" || data[4] < 1 || data[4] > 7 || (data[4] < 3 && data[23] != 0) {
 		return response{}, ErrProtocol
 	}
 	value := response{op: operation(data[5]), status: data[6], certainty: data[7],
 		sequence: binary.BigEndian.Uint64(data[8:16]), requested: binary.BigEndian.Uint16(data[16:18]), inserted: binary.BigEndian.Uint16(data[18:20])}
-	if data[4] >= 3 {
+	if data[4] >= 6 && value.status != 1 {
+		return response{}, ErrProtocol
+	}
+	if data[4] >= 6 && data[20]&0x40 != 0 {
+		if data[20]&0x80 != 0 || data[23] != 0 {
+			return response{}, ErrProtocol
+		}
+		copy(value.timing[:], data[20:23])
+		value.timing[0] &^= 0x40
+	} else if data[4] >= 3 {
 		detail := binary.BigEndian.Uint32(data[20:24])
 		if data[4] == 3 && detail == 0 || detail>>30 != 0 {
 			return response{}, ErrProtocol
