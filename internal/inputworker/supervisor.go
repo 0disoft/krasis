@@ -52,7 +52,12 @@ func supervise(ctx context.Context, control net.Conn, authorized func() error, e
 
 func receipt(report Report, err error) (Report, error) {
 	if errors.Is(err, ErrProtocol) {
-		return Report{}, &workerReportFailure{operation: "worker-report-read", cause: errors.Join(ErrRecovery, err)}
+		operation := "worker-report-invalid"
+		var failure *workerReportFailure
+		if errors.As(err, &failure) && missingReportOperation(failure.operation) {
+			operation = failure.operation
+		}
+		return Report{}, &workerReportFailure{operation: operation, cause: errors.Join(ErrRecovery, err)}
 	}
 	if report.Recovery.Remaining != 0 {
 		return report, errors.Join(ErrRecovery, err)

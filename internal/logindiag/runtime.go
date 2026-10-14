@@ -79,6 +79,8 @@ func (v Runtime) Valid() bool {
 
 func ValidRuntimeOperation(operation string) bool {
 	switch operation {
+	case "source-reader-read", "source-reader-eof", "source-reader-truncated", "source-reader-timeout", "source-reader-closed", "source-reader-invalid", "source-reader-authority", "worker-report-eof", "worker-report-truncated", "worker-report-invalid":
+		return true
 	case "", "low-level-hook", "raw-mouse", "wheel-capture", "thread-join", "hook-install", "hook-release", "raw-register", "raw-release", "raw-read", "raw-buffer", "raw-route", "message-loop", "pointer-snapshot", "cursor-present", "cursor-restore", "cursor-release", "worker-report-read", "worker-report-timeout", "raw-size", "raw-packet", "raw-desktop", "desktop-bind", "desktop-restore", "desktop-close", "desktop-thread-exit", "raw-window-create", "raw-window-destroy", "raw-ready", "desktop-current", "desktop-open", "desktop-name", "desktop-active", "source-capture-join", "source-sender-join", "source-command-loop", "source-retirement-write", "source-channel-close":
 		return true
 	}

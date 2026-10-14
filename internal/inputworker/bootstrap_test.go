@@ -153,7 +153,7 @@ func TestSupervisorMissingReceiptIsRecoveryUnknown(t *testing.T) {
 		t.Fatal("worker exit treated as successful recovery")
 	}
 	var detail *workerReportFailure
-	if !errors.As(err, &detail) || detail.operation != "worker-report-read" {
+	if !errors.As(err, &detail) || detail.operation != "worker-report-eof" {
 		t.Fatal("missing receipt lost its failure operation", err)
 	}
 }

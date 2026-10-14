@@ -872,3 +872,11 @@ one matcher. A buffered negative reply remains a rejection, and a buffered wrong
 reply remains a protocol failure. Neither may be consumed and discarded before
 a second read. Tests cover all three races and the actual Windows sourceClient
 with an ordered write barrier, preserving zero activation epoch for queries.
+
+Reader diagnostics carry only closed operation codes: EOF, truncated, timeout,
+closed, invalid, authority or other read failure. They survive the authenticated
+final service report. Missing input reports likewise distinguish EOF, truncation
+and invalid data without changing the recovery fence; the exact owned process
+exit observation still occurs before job cleanup. Unknown numbers remain unknown,
+and no private exception text or input content is serialized. Numeric child
+report operation codes are appended so existing code values do not change.

@@ -69,7 +69,7 @@ func sourceCaptureFinal(loop, capture, sender error, ownExpiry bool) error {
 	}
 	if !sourceTransitionOnly(loop, ownExpiry) {
 		uncertain = uncertain || !sourceTransportJoinedOnly(loop, ownExpiry, true)
-		loop = &workerReportFailure{operation: "source-command-loop", cause: loop}
+		loop = &workerReportFailure{operation: sourceLoopOperation(loop), cause: loop}
 	}
 	if uncertain {
 		return errors.Join(loop, capture, sender, ErrRecovery)

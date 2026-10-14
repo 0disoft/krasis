@@ -1,14 +1,61 @@
 package inputworker
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
+	"os"
 	"strings"
 	"testing"
+	"testing/iotest"
 
 	"github.com/0disoft/krasis/internal/logindiag"
 )
+
+func TestMissingWorkerReportPreservesEOFTruncationAndInvalidKinds(t *testing.T) {
+	var encoded bytes.Buffer
+	if err := writeReport(&encoded, Report{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	invalid := append([]byte(nil), encoded.Bytes()...)
+	invalid[0] = 0
+	for _, tc := range []struct {
+		name      string
+		data      []byte
+		operation string
+	}{
+		{"eof", nil, "worker-report-eof"},
+		{"truncated", encoded.Bytes()[:3], "worker-report-truncated"},
+		{"invalid", invalid, "worker-report-invalid"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			report, err := readReport(bytes.NewReader(tc.data))
+			_, err = receipt(report, err)
+			calls := 0
+			err = observeMissingWorkerReport(err, func() logindiag.WorkerExit {
+				calls++
+				return logindiag.WorkerExit{State: "EXITED", Code: 0xc0000005, Known: true}
+			})
+			r := newLoginRuntimeRecorder(func(logindiag.Runtime) error { return nil })
+			r.record("service", "FAILED", serviceEndpointFailure(err, "input"))
+			f := r.value.LastFailure
+			if calls != 1 || !errors.Is(err, ErrRecovery) || f == nil || f.Operation != tc.operation || f.WorkerExit == nil || f.WorkerExit.Code != 0xc0000005 || f.Win32Known || !r.value.Valid() {
+				t.Fatal("missing report class or exit metadata erased", err, f)
+			}
+		})
+	}
+}
+
+func TestWorkerReportDeadlineRetainsTimeoutAndRecoveryFence(t *testing.T) {
+	report, err := readReport(iotest.ErrReader(os.ErrDeadlineExceeded))
+	_, err = receipt(report, err)
+	err = observeMissingWorkerReport(err, func() logindiag.WorkerExit { return logindiag.WorkerExit{State: "RUNNING"} })
+	var operation interface{ LoginRuntimeOperation() string }
+	if !errors.Is(err, ErrRecovery) || !errors.Is(err, os.ErrDeadlineExceeded) || !errors.As(err, &operation) || operation.LoginRuntimeOperation() != "worker-report-timeout" {
+		t.Fatal("read timeout mislabeled or unfenced", err)
+	}
+}
 
 func TestMissingWorkerReportKeepsExactProcessStatusSeparateFromWin32(t *testing.T) {
 	for _, observed := range []logindiag.WorkerExit{

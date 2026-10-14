@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"os"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -225,7 +226,17 @@ func workerCancellationOnly(err error) bool {
 func readReport(reader io.Reader) (Report, error) {
 	var data [reportSize]byte
 	if _, err := io.ReadFull(reader, data[:]); err != nil {
-		return Report{}, &workerReportFailure{operation: "worker-report-read", cause: errors.Join(ErrProtocol, err)}
+		operation := "worker-report-read"
+		if err == io.EOF {
+			operation = "worker-report-eof"
+		}
+		if err == io.ErrUnexpectedEOF {
+			operation = "worker-report-truncated"
+		}
+		if errors.Is(err, os.ErrDeadlineExceeded) || errors.Is(err, context.DeadlineExceeded) {
+			operation = "worker-report-timeout"
+		}
+		return Report{}, &workerReportFailure{operation: operation, cause: errors.Join(ErrProtocol, err)}
 	}
 	if string(data[:4]) != "KRR1" || (data[4] != 1 && data[4] != 2) || data[5] > 2 || data[7] != 0 || !validReportOperation(data[6]) {
 		return Report{}, ErrProtocol

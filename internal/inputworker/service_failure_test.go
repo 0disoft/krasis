@@ -47,7 +47,11 @@ func TestMissingWorkerReportIsDistinctFromUnknownNativeFailure(t *testing.T) {
 		r := newLoginRuntimeRecorder(func(logindiag.Runtime) error { return nil })
 		r.record("service", "FAILED", serviceEndpointFailure(serviceRecoveryFailure(failure, nil), "capture"))
 		f := r.value.LastFailure
-		if f == nil || f.Operation != "worker-report-read" || f.Win32Known || f.Win32Error != 0 || !r.value.Valid() {
+		operation := "worker-report-truncated"
+		if size == 0 {
+			operation = "worker-report-eof"
+		}
+		if f == nil || f.Operation != operation || f.Win32Known || f.Win32Error != 0 || !r.value.Valid() {
 			t.Fatal("missing report became unexplained native failure", f)
 		}
 	}

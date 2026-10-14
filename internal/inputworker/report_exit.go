@@ -20,7 +20,7 @@ func (e *workerExitFailure) LoginRuntimeWorkerExit() logindiag.WorkerExit { retu
 func observeMissingWorkerReport(result error, inspect func() logindiag.WorkerExit) error {
 	var failure *workerReportFailure
 	if inspect == nil || !errors.Is(result, ErrRecovery) || !errors.As(result, &failure) ||
-		(failure.operation != "worker-report-read" && failure.operation != "worker-report-timeout") {
+		!missingReportOperation(failure.operation) {
 		return result
 	}
 	exit := inspect()
@@ -28,4 +28,12 @@ func observeMissingWorkerReport(result error, inspect func() logindiag.WorkerExi
 		exit = logindiag.WorkerExit{State: "UNAVAILABLE"}
 	}
 	return &workerExitFailure{cause: result, exit: exit}
+}
+
+func missingReportOperation(operation string) bool {
+	switch operation {
+	case "worker-report-read", "worker-report-timeout", "worker-report-eof", "worker-report-truncated", "worker-report-invalid":
+		return true
+	}
+	return false
 }

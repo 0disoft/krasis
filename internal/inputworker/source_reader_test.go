@@ -41,7 +41,13 @@ func TestSourceReaderPreservesValidationAndExternalReadFailures(t *testing.T) {
 	}
 	local, cancel := context.WithCancel(context.Background())
 	cancel()
-	for _, cause := range []error{io.EOF, io.ErrUnexpectedEOF, os.ErrDeadlineExceeded, ErrProtocol} {
+	for _, tc := range []struct {
+		cause     error
+		operation string
+	}{
+		{io.EOF, "source-reader-eof"}, {io.ErrUnexpectedEOF, "source-reader-truncated"}, {os.ErrDeadlineExceeded, "source-reader-timeout"}, {ErrProtocol, "source-reader-invalid"},
+	} {
+		cause := tc.cause
 		_, result := readSourceCommand(sourceContextReader{ctx: local, read: func(context.Context, []byte) (int, error) { return 0, cause }}, local, binding, 1, func() error { return nil })
 		if !errors.Is(result, cause) || errors.Is(result, context.Canceled) {
 			t.Fatal("external failure became local stop", result)
@@ -57,6 +63,10 @@ func TestSourceReaderPreservesValidationAndExternalReadFailures(t *testing.T) {
 		_, received := readReport(&wire)
 		if received == nil || serviceRecoveryFailure(received, nil) != nil {
 			t.Fatal("source read failure lost or clean retirement fenced service", received)
+		}
+		var stage interface{ LoginRuntimeOperation() string }
+		if !errors.As(received, &stage) || stage.LoginRuntimeOperation() != tc.operation {
+			t.Fatal("reader failure class lost across final service report", received)
 		}
 	}
 	_, result := readSourceCommand(sourceContextReader{ctx: local, read: func(context.Context, []byte) (int, error) { return 0, context.Canceled }}, local, binding, 1, func() error { return nil })
