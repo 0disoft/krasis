@@ -123,7 +123,7 @@ func SendInputAction(
 	return sendInputAction(ctx, coordinator, runtime, action, nil)
 }
 
-var ErrStaleSourceAction = errors.New("source action belongs to a retired generation")
+var ErrStaleSourceAction = control.ErrSourceActionDiscarded
 
 func sendInputAction(
 	ctx context.Context,

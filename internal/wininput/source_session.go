@@ -17,8 +17,9 @@ const MaxSourceQueueCapacity = 65536
 const SourceCleanupTimeout = 2 * time.Second
 
 var (
-	ErrSourceQueueOverflow = errors.New("source input queue overflow")
-	ErrSourceSession       = errors.New("source input session failed")
+	ErrSourceQueueOverflow     = errors.New("source input queue overflow")
+	ErrSourceSession           = errors.New("source input session failed")
+	ErrSourceCleanupIncomplete = errors.New("source cleanup completion unconfirmed")
 )
 
 type SourceSink interface {
@@ -435,7 +436,7 @@ func (session *SourceSession) runSender(ctx context.Context) error {
 				continue
 			}
 			if err := session.sink.SendAction(handoff.Offered(ctx, item.queuedAt), item.action, func() bool { return session.current(item.generation) }); err != nil {
-				if !session.current(item.generation) {
+				if !session.current(item.generation) && sourceErrorsOnly(err, control.ErrSourceActionDiscarded) {
 					if session.observer != nil {
 						session.observer.ObserveSourceQueueDiscardedStale()
 					}
@@ -510,11 +511,11 @@ func (session *SourceSession) cleanupSession(
 			interruptDone = nil
 		case senderErr = <-senderDone:
 			senderDone = nil
-			if errors.Is(senderErr, context.Canceled) || (ctx.Err() != nil && errors.Is(senderErr, ctx.Err())) {
+			if sourceErrorsOnly(senderErr, context.Canceled, ctx.Err()) {
 				senderErr = nil
 			}
 		case <-cleanupCtx.Done():
-			return errors.Join(cause, interruptErr, senderErr, cleanupCtx.Err())
+			return errors.Join(cause, interruptErr, senderErr, ErrSourceCleanupIncomplete, cleanupCtx.Err())
 		}
 	}
 	if !fail {
@@ -526,6 +527,6 @@ func (session *SourceSession) cleanupSession(
 	case failErr := <-failDone:
 		return errors.Join(cause, interruptErr, senderErr, failErr)
 	case <-cleanupCtx.Done():
-		return errors.Join(cause, interruptErr, senderErr, cleanupCtx.Err())
+		return errors.Join(cause, interruptErr, senderErr, ErrSourceCleanupIncomplete, cleanupCtx.Err())
 	}
 }

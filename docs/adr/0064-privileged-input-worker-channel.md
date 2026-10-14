@@ -828,3 +828,25 @@ the actual packet codec and request gate, with zero activation epoch throughout.
 They retain the existing invalid-reply retirement and peer orchestrator recovery
 tests. The historical g291 query failure lacks native detail, so its exact native
 cause remains unknown; these fixes address the observed failure propagation.
+
+## Source cleanup proof after g293 review
+
+The full Windows/Go 1.26 repository reproduced two review failures: an internal
+source sender remained blocked after lease expiry yet retirement/report status
+was successful; a joined cancellation erased an independent cleanup error.
+SourceSession now marks every independent cleanup timeout with
+ErrSourceCleanupIncomplete, including interrupt, sender and failure callback
+join. That marker survives lease expiry and source transport wrappers and keeps
+retirement status failed and service report recovery-required.
+
+Only an error tree consisting entirely of expected cancellation is normalized.
+Generation changes no longer erase arbitrary errors: control's explicit unsent
+source-action marker is shared by peer and protected source writers, and only
+that pure marker may be discarded after the generation changes. No transport
+failure or joined sibling inherits the marker's safe-disposal meaning.
+
+Tests use actual SourceSession and final report writer/reader. They hold a sender
+past expiry, interrupt/failure callback past the independent cleanup deadline,
+and combine cancellation, discard and cleanup failures. Fixtures release and
+join their intentionally blocked work. Clean expiry and genuinely unsent stale
+actions remain normal; no timeout budget, journal or service fence is weakened.

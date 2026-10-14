@@ -21,6 +21,10 @@ const (
 
 var ErrInvalidInputAction = errors.New("invalid normalized input action")
 
+// The sink checked generation before starting its semantic write. This is a
+// known unsent action, never a failed or outcome-unknown transport write.
+var ErrSourceActionDiscarded = errors.New("source action belongs to a retired generation")
+
 type InputAction struct {
 	Kind   InputActionKind
 	Code   uint32

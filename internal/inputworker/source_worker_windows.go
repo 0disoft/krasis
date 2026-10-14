@@ -33,7 +33,7 @@ func (w *sourceWriter) write(p sourcePacket, current func() bool, retirement boo
 		return nil
 	}
 	if current != nil && !current() {
-		return nil
+		return control.ErrSourceActionDiscarded
 	}
 	// Retirement grants no authority. It is sent only after native/sender join
 	// on the exact already authenticated channel, even if logon authority changed.

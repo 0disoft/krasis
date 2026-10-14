@@ -265,7 +265,7 @@ func TestSourceSessionSendFailureDisablesSuppression(t *testing.T) {
 	}
 }
 
-func TestSourceSessionIgnoresSendFailureFromRevokedGeneration(t *testing.T) {
+func TestSourceSessionDropsOnlyExplicitlyUnsentRevokedGeneration(t *testing.T) {
 	sink := &revokedGenerationSourceSink{
 		firstStarted: make(chan struct{}),
 		releaseFirst: make(chan struct{}),
@@ -591,6 +591,7 @@ type revokedGenerationSourceSink struct {
 	releaseFirst chan struct{}
 	sent         chan control.InputAction
 	failed       chan error
+	firstError   error
 }
 
 func (sink *revokedGenerationSourceSink) SendAction(_ context.Context, action control.InputAction, isCurrent func() bool) error {
@@ -604,7 +605,10 @@ func (sink *revokedGenerationSourceSink) SendAction(_ context.Context, action co
 		if isCurrent() {
 			panic("retired generation was still current at send time")
 		}
-		return errors.New("revoked generation send failed")
+		if sink.firstError != nil {
+			return sink.firstError
+		}
+		return control.ErrSourceActionDiscarded
 	}
 	sink.sent <- action
 	return nil

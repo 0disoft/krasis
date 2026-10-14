@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/0disoft/krasis/internal/inputdesktop"
+	"github.com/0disoft/krasis/internal/wininput"
 )
 
 // Only the source writer may mark failure of its forwarding pipe. It owns no
@@ -23,7 +24,7 @@ func sourceTransportJoinedOnly(err error, ownExpiry bool, command bool) bool {
 	if sourceTransitionOnly(err, ownExpiry) {
 		return true
 	}
-	if errors.Is(err, ErrRecovery) || errors.Is(err, inputdesktop.ErrCleanup) {
+	if sourceCleanupUncertain(err) {
 		return false
 	}
 	if _, ok := err.(*sourceTransportError); ok {
@@ -86,7 +87,7 @@ func sourceRetirementDelivery(result, delivery error) error {
 // commands or new input authority. The separate service report retains the
 // original command failure. Called only after sourceCaptureFinal joined both.
 func sourceRetirementStatus(result error) byte {
-	if errors.Is(result, ErrRecovery) || errors.Is(result, inputdesktop.ErrCleanup) {
+	if sourceCleanupUncertain(result) {
 		return 1
 	}
 	return 0
@@ -95,8 +96,12 @@ func sourceRetirementStatus(result error) byte {
 // Delivery failure cannot replace cleanup failure in the operation that was
 // just executed. A safely rejected operation may continue after its reply.
 func sourceCommandCompletion(operation, delivery error) error {
-	if errors.Is(operation, ErrRecovery) || errors.Is(operation, inputdesktop.ErrCleanup) {
+	if sourceCleanupUncertain(operation) {
 		return errors.Join(ErrRecovery, operation, delivery)
 	}
 	return delivery
+}
+
+func sourceCleanupUncertain(err error) bool {
+	return errors.Is(err, ErrRecovery) || errors.Is(err, inputdesktop.ErrCleanup) || errors.Is(err, wininput.ErrSourceCleanupIncomplete)
 }
