@@ -286,11 +286,8 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 				response.status = 1
 				response.decision = 0
 			}
-			if writer.send(response, nil) != nil {
-				return ErrAuthority
-			}
-			if errors.Is(err, ErrRecovery) {
-				return err
+			if failure := sourceCommandCompletion(err, writer.send(response, nil)); failure != nil {
+				return failure
 			}
 		}
 	}

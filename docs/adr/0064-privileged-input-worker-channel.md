@@ -806,3 +806,25 @@ Tests run the real source sender against a lost-authority/disconnected pipe,
 verify suppression is inactive after join, then pass its result through the
 worker report reader and service decision. They also verify that native/sender
 cleanup failures and an independent channel close failure still stop the service.
+
+## g293: Keep authenticated negative boundary queries nonfatal
+
+A's paired incident shows boundary_admission_failed and network disconnection at
+2026-10-14T10:39:56.082Z before the service's source-command-loop failure. The
+source adapter erased the distinction between an explicit authenticated negative
+query response and lost authentication/transport. The ordinary boundary gate
+already keeps ErrBoundaryInspectionUnavailable nonfatal and grants no movement.
+
+Only the matching, validated sourceAdmit negative reply is mapped to that existing
+temporary query-unavailable result. Empty/lost replies, invalid sequences, wrong
+operations, transport/authorization failures before a response and recovery errors
+remain fatal. A fresh motion may request a fresh inspection; no query rejection
+is promoted to allowed and no activation or input is replayed. Native desktop
+cleanup failure during a source command explicitly retires the worker with
+ErrRecovery; rejection handling cannot leave an uncertain native owner serving.
+
+Tests cover negative and then successful queries on the same source owner using
+the actual packet codec and request gate, with zero activation epoch throughout.
+They retain the existing invalid-reply retirement and peer orchestrator recovery
+tests. The historical g291 query failure lacks native detail, so its exact native
+cause remains unknown; these fixes address the observed failure propagation.

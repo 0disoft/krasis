@@ -91,3 +91,12 @@ func sourceRetirementStatus(result error) byte {
 	}
 	return 0
 }
+
+// Delivery failure cannot replace cleanup failure in the operation that was
+// just executed. A safely rejected operation may continue after its reply.
+func sourceCommandCompletion(operation, delivery error) error {
+	if errors.Is(operation, ErrRecovery) || errors.Is(operation, inputdesktop.ErrCleanup) {
+		return errors.Join(ErrRecovery, operation, delivery)
+	}
+	return delivery
+}

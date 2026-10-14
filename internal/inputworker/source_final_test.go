@@ -84,6 +84,24 @@ func TestRetirementProofCannotHideUnjoinedNativeOrSenderOwners(t *testing.T) {
 	}
 }
 
+func TestCommandReplyLossCannotEraseExecutedDesktopCleanupFailure(t *testing.T) {
+	for _, operation := range []error{ErrRecovery, inputdesktop.ErrCleanup, errors.Join(inputdesktop.ErrCleanup, syscall.Errno(170))} {
+		for _, delivery := range []error{nil, sourceTransportFailure(io.ErrClosedPipe)} {
+			completion := sourceCommandCompletion(operation, delivery)
+			if !errors.Is(completion, operation) || delivery != nil && !errors.Is(completion, delivery) {
+				t.Fatal("reply replaced original operation failure", completion)
+			}
+			final := sourceCaptureFinal(completion, context.Canceled, context.Canceled, false)
+			if !errors.Is(final, ErrRecovery) || sourceRetirementStatus(final) != 1 {
+				t.Fatal("uncertain desktop cleanup was accepted after reply loss", final)
+			}
+		}
+	}
+	if sourceCommandCompletion(ErrAuthority, nil) != nil {
+		t.Fatal("confirmed command rejection stopped a clean owner")
+	}
+}
+
 func TestFinalFailureMetadataActuallyTraversesWriterAndReader(t *testing.T) {
 	for _, label := range []string{"source-capture-join", "source-sender-join", "source-command-loop", "source-retirement-write", "source-channel-close"} {
 		var wire bytes.Buffer

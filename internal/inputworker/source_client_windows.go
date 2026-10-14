@@ -75,13 +75,7 @@ func (c *CaptureSource) AdmitBoundary(ctx context.Context, _ control.BoundaryInt
 		return 0, peer.ErrBoundaryInspectionUnavailable
 	}
 	p, err := live.call(ctx, sourceAdmit)
-	if err != nil {
-		return 0, err
-	}
-	if !p.decision.Valid() {
-		return 0, ErrProtocol
-	}
-	return p.decision, nil
+	return sourceAdmissionResult(p, err)
 }
 
 func (c *sourceClient) call(ctx context.Context, op byte, reference ...uint64) (sourcePacket, error) {

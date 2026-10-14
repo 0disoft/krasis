@@ -3,9 +3,14 @@
 package inputworker
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"net"
 	"testing"
+	"time"
+
+	"github.com/0disoft/krasis/internal/peer"
 )
 
 func TestSourceClientWrongReplyClosesAuthorityWithoutReplayingActivation(t *testing.T) {
@@ -31,6 +36,59 @@ func TestSourceClientWrongReplyClosesAuthorityWithoutReplayingActivation(t *test
 	}
 	if c.epoch.Load() != 0 {
 		t.Fatal("failed activation retained suppression authority")
+	}
+}
+
+func TestSourceAdmissionRejectionAllowsAFreshQueryOnSameCaptureOwner(t *testing.T) {
+	server, conn := net.Pipe()
+	defer server.Close()
+	c := &sourceClient{channel: clientChannel(conn, authorityService), binding: Binding{1}, replies: make(chan sourcePacket, 1), done: make(chan struct{})}
+	defer c.channel.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	finished := make(chan error, 1)
+	go func() {
+		for i := 0; i < 2; i++ {
+			request, err := readSourcePacket(server)
+			if err != nil {
+				finished <- err
+				return
+			}
+			if request.op != sourceAdmit {
+				finished <- ErrProtocol
+				return
+			}
+			reply := sourcePacket{kind: sourceReply, op: sourceAdmit, reply: request.sequence, sequence: request.sequence, binding: request.binding, decision: peer.BoundaryAdmissionAllowed}
+			if i == 0 {
+				reply.status, reply.decision = 1, 0
+			}
+			data, err := encodeSourcePacket(reply)
+			if err != nil {
+				finished <- err
+				return
+			}
+			// Exercise the actual wire parser as well as the request/ACK gate.
+			parsed, err := readSourcePacket(bytes.NewReader(data[:]))
+			if err != nil {
+				finished <- err
+				return
+			}
+			c.replies <- parsed
+		}
+		finished <- nil
+	}()
+	p, err := c.call(ctx, sourceAdmit)
+	decision, err := sourceAdmissionResult(p, err)
+	if decision != 0 || !errors.Is(err, peer.ErrBoundaryInspectionUnavailable) || c.channel.authority.check(false) != nil || c.epoch.Load() != 0 {
+		t.Fatal("negative query changed authority or killed capture", decision, err)
+	}
+	p, err = c.call(ctx, sourceAdmit)
+	decision, err = sourceAdmissionResult(p, err)
+	if err != nil || decision != peer.BoundaryAdmissionAllowed || c.sequence != 2 || c.epoch.Load() != 0 {
+		t.Fatal("fresh query failed or activated/replayed capture", decision, err)
+	}
+	if err := <-finished; err != nil {
+		t.Fatal(err)
 	}
 }
 
