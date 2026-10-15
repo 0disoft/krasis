@@ -272,6 +272,8 @@ func TestTrustTraceOmitsFastCompletedSubsteps(t *testing.T) {
 			"prelock":                100 * time.Millisecond,
 			"prelock_parent_acl":     time.Millisecond,
 			"prelock_directory_open": 99 * time.Millisecond,
+			"certificate_match":      time.Millisecond,
+			"certificate_close":      time.Millisecond,
 		},
 	}
 	var codes []string

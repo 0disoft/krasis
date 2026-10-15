@@ -43,7 +43,7 @@ func recordTrustTrace(snapshot truststore.ReadTraceSnapshot, record func(string)
 		if !observed {
 			continue
 		}
-		if (strings.HasPrefix(phase, "prelock_") || strings.HasPrefix(phase, "store_read_")) &&
+		if (strings.HasPrefix(phase, "prelock_") || strings.HasPrefix(phase, "store_read_") || strings.HasPrefix(phase, "certificate_")) &&
 			duration < 10*time.Millisecond && snapshot.Phase != phase {
 			continue
 		}

@@ -59,3 +59,14 @@ func TestTrustExpiryObservationExportsOnlyClosedStates(t *testing.T) {
 		t.Fatal("unbounded trust expiry state exported")
 	}
 }
+
+func TestCertificateSubstepsExportOnlyFixedTimingCodes(t *testing.T) {
+	for _, phase := range []string{"open", "acl", "bytes", "close", "validate", "match"} {
+		code := "trust_timing_certificate_" + phase + "_ge1s"
+		result := sanitizeLog("agent.jsonl", strings.NewReader(`{"time":"2026-10-15T09:56:25Z","code":"`+code+`","certificate":"private"}`+"\n"))
+		encoded, _ := json.Marshal(result)
+		if result.Incomplete || len(result.Events) != 1 || strings.Contains(string(encoded), "private") {
+			t.Fatal("certificate timing lost or data escaped", phase)
+		}
+	}
+}
