@@ -216,7 +216,7 @@ func TestPreparationExpiryDoesNotMakeIneligibleInputRenew(t *testing.T) {
 		{"no_outward_delta", control.InputAction{Kind: control.InputPointerMove}, 850, 10 * time.Second},
 		{"non_pointer", control.InputAction{Kind: control.InputButtonDown, Code: 1}, 850, 10 * time.Second},
 		{"outside", control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}, 900, 10 * time.Second},
-		{"distant", control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}, 600, 10 * time.Second},
+		{"active_distant", control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}, 600, time.Second},
 		{"reversed_clock", control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}, 850, -time.Second},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

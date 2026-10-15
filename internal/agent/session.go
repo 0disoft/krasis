@@ -134,7 +134,7 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	}
 	if preparationSupported {
 		preparationHints = make(chan time.Time, 1)
-		boundaryObserver = &preparationBoundary{next: emitter, config: config.Boundary, hints: preparationHints}
+		boundaryObserver = &preparationBoundary{next: emitter, config: config.Boundary, hints: preparationHints, movementAt: time.Now()}
 	}
 	emergency, err := wininput.NewEmergencyBoundaryObserver(source, boundaryObserver)
 	if err != nil {

@@ -24,8 +24,22 @@ func (p *preparationBoundary) preview(action control.InputAction, x int32, now t
 	left, width := int64(p.config.ScreenLeft), int64(p.config.ScreenWidth)
 	if width <= 1 || int64(x) < left || int64(x) >= left+width {
 		p.sampleAt = time.Time{}
+		p.resumeUntil = time.Time{}
 		return false
 	}
+	if !p.movementAt.IsZero() {
+		gap := now.Sub(p.movementAt)
+		if gap < 0 {
+			return false
+		}
+		if gap >= preparationHintRenewal {
+			// Resume work on real movement, before a fresh velocity sample or
+			// entry into the edge band. Retain a short admission retry window
+			// if the nonblocking hook queue is full. Idle itself launches nothing.
+			p.resumeUntil = now.Add(preparationHintLifetime)
+		}
+	}
+	p.movementAt = now
 	distance := int64(x) - left
 	outward := action.DeltaX < 0
 	if p.config.Edge == control.ScreenEdgeRight {
@@ -39,8 +53,14 @@ func (p *preparationBoundary) preview(action control.InputAction, x int32, now t
 	if p.sent && (p.sentAt.IsZero() || now.Sub(p.sentAt) < preparationHintRenewal) {
 		return false
 	}
-	if !outward || distance > band {
+	resuming := !p.resumeUntil.IsZero() && now.Before(p.resumeUntil)
+	if !outward || distance > band && !resuming {
 		return false
+	}
+	if resuming {
+		// Suppress another hint on the same approach even when this first
+		// movement was outside the normal prediction band.
+		p.band = max(band, distance)
 	}
 	return true
 }
@@ -49,6 +69,7 @@ func (p *preparationBoundary) preview(action control.InputAction, x int32, now t
 func (p *preparationBoundary) preparationHintSent(now time.Time) {
 	p.sent = true
 	p.sentAt = now
+	p.resumeUntil = time.Time{}
 	// Keep the threshold chosen at emission, so a falling speed estimate
 	// cannot rearm the same outward approach. Retreat or a bounded expiry
 	// followed by fresh outward movement is required.

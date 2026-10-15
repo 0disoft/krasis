@@ -25,15 +25,17 @@ type inputPreparer interface {
 // Observe runs on serialized physical input threads. Only enqueue a timestamp;
 // network I/O and process creation never run under the hook's physical gate.
 type preparationBoundary struct {
-	next     wininput.BoundaryObserver
-	config   control.BoundaryConfig
-	hints    chan time.Time
-	sent     bool
-	sentAt   time.Time
-	rearmAt  int64
-	sampleX  int32
-	sampleAt time.Time
-	band     int64
+	next        wininput.BoundaryObserver
+	config      control.BoundaryConfig
+	hints       chan time.Time
+	sent        bool
+	sentAt      time.Time
+	rearmAt     int64
+	sampleX     int32
+	sampleAt    time.Time
+	band        int64
+	movementAt  time.Time
+	resumeUntil time.Time
 }
 
 func (p *preparationBoundary) Observe(action control.InputAction, x int32) error {
