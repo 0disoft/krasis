@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -68,20 +69,21 @@ func init() {
 }
 
 type record struct {
-	Time          string            `json:"time"`
-	Code          string            `json:"code"`
-	Build         string            `json:"build"`
-	BuildDirty    bool              `json:"buildDirty,omitempty"`
-	Run           string            `json:"run,omitempty"`
-	Connection    string            `json:"connection,omitempty"`
-	Sequence      uint64            `json:"sequence,omitempty"`
-	ElapsedMicros int64             `json:"elapsedMicros,omitempty"`
-	PID           int               `json:"pid"`
-	Boundary      *BoundarySummary  `json:"boundary,omitempty"`
-	Injection     *InjectionFailure `json:"injection,omitempty"`
-	Retry         *RetrySummary     `json:"retry,omitempty"`
-	Runtime       *RuntimeSummary   `json:"runtime,omitempty"`
-	Handoff       *handoff.Summary  `json:"handoff,omitempty"`
+	Time          string             `json:"time"`
+	Code          string             `json:"code"`
+	Build         string             `json:"build"`
+	BuildDirty    bool               `json:"buildDirty,omitempty"`
+	Run           string             `json:"run,omitempty"`
+	Connection    string             `json:"connection,omitempty"`
+	Sequence      uint64             `json:"sequence,omitempty"`
+	ElapsedMicros int64              `json:"elapsedMicros,omitempty"`
+	PID           int                `json:"pid"`
+	Boundary      *BoundarySummary   `json:"boundary,omitempty"`
+	Injection     *InjectionFailure  `json:"injection,omitempty"`
+	Retry         *RetrySummary      `json:"retry,omitempty"`
+	Runtime       *RuntimeSummary    `json:"runtime,omitempty"`
+	Handoff       *handoff.Summary   `json:"handoff,omitempty"`
+	SessionEnd    *SessionEndSummary `json:"sessionEnd,omitempty"`
 }
 type Logger struct {
 	mu              sync.Mutex
@@ -97,6 +99,9 @@ type Logger struct {
 	run, connection string
 	sequence        uint64
 	started         time.Time
+	lastLifecycle   string
+	lifecycleAt     time.Time
+	captureMode     string
 }
 
 func Open(localAppData, role string) (*Logger, error) {
@@ -160,6 +165,26 @@ func (l *Logger) enqueueRecord(r record) {
 	defer l.mu.Unlock()
 	if l.closed {
 		return
+	}
+	if strings.HasPrefix(code, "lifecycle_") {
+		l.lastLifecycle, l.lifecycleAt = strings.TrimPrefix(code, "lifecycle_"), time.Now()
+	}
+	switch code {
+	case "installed_source_capture_ready":
+		l.captureMode = "normal"
+	case "installed_source_capture_protected_ready":
+		l.captureMode = "protected"
+	case "installed_source_receive_only":
+		l.captureMode = "receive_only"
+	}
+	if code == "session_end_detail" && r.SessionEnd != nil {
+		if l.lastLifecycle != "" {
+			r.SessionEnd.LastLifecycle = l.lastLifecycle
+			r.SessionEnd.LifecycleAgeMicros = max(0, time.Since(l.lifecycleAt).Microseconds())
+		}
+		if l.captureMode != "" {
+			r.SessionEnd.CaptureMode = l.captureMode
+		}
 	}
 	r.Time = time.Now().UTC().Format(time.RFC3339Nano)
 	r.Build = l.build

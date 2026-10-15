@@ -260,6 +260,9 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 			failure := agent.DescribeSessionFailure(err)
 			log.Event(productlog.ActivationCode(failure.Component, failure.Phase, failure.Code))
 		}
+		config.TerminationObserver = func(v agent.SessionTermination) {
+			log.SessionEnd(productlog.SessionEndSummary{ObservedAt: v.ObservedAt.Format(time.RFC3339Nano), Trigger: v.Trigger, Component: v.Component, Fault: productlog.FaultCode(v.Failure.Component, v.Failure.Phase, v.Failure.Code), Canceled: v.Canceled, Timeout: v.Timeout, Closed: v.Closed, NativeError: v.NativeError, NativeKnown: v.NativeKnown})
+		}
 		// Initial conservative defaults, not a measured latency guarantee.
 		config.Liveness = &agent.LivenessPolicy{HeartbeatInterval: 250 * time.Millisecond, PeerTimeout: 2 * time.Second}
 		backoff := agent.DefaultBackoffPolicy()

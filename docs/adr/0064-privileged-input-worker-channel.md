@@ -959,3 +959,25 @@ report, independently stalled Interrupt, command/reader outcome separation,
 legacy reports, malformed source reports, immutable bounded persistence,
 failed saves and sanitized support. No key/PIN content, identifiers, coordinates
 or raw error strings are added. Device validation remains pending.
+
+## Session termination provenance
+
+The ordinary agent records `session_end_detail` once for the cancellation
+trigger before joining workers, then one result for each failed/canceled
+component after every worker joins. Each result retains its own observation
+timestamp, fixed component/fault code, cancellation/timeout/closed flags and
+original numeric native error when available. A later socket or cleanup error
+cannot overwrite the trigger record. The lease watchdog marks its local
+connection interruption and component explicitly. Recovery fences and error
+propagation are unchanged.
+
+The logger attaches the last local lifecycle event and its age plus the last
+announced normal/protected/receive-only capture mode. Existing build, run and
+connection correlation identifies the originating PC and session in paired
+diagnostics; host clocks are not assumed synchronized. Lifecycle metadata
+records observations, not an inferred PIN-screen phase. Unknown observations
+remain unknown. Export revalidates all fixed vocabularies and drops malformed
+details. No error text, desktop/window name, PIN, key or clipboard content is
+recorded. Tests cover a canceled session with late native cleanup failure and
+sanitized export of both valid and malformed summaries. A successful device
+test remains required before claiming the observed disconnection is fixed.

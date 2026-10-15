@@ -51,6 +51,7 @@ type Config struct {
 	DestinationObserver       application.InputDispositionObserver
 	RecoveryObserver          func(RecoveryReport)
 	ActivationFailureObserver func(error)
+	TerminationObserver       func(SessionTermination)
 	HandoffProfiles           *handoff.Collector
 }
 
@@ -259,7 +260,7 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 			return runLeaseWatchdog(runContext, runtime.LeaseWatch, policy, func(cause error) {
 				source.Retire()
 				cancel(cause)
-				_ = connection.Close()
+				_ = connection.InterruptLocal(cause)
 			})
 		}})
 		components = append(components, component{name: "peer-liveness", run: func() error {
@@ -294,6 +295,9 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 		}()
 	}
 	<-runContext.Done()
+	if config.TerminationObserver != nil {
+		config.TerminationObserver(describeSessionTermination(context.Cause(runContext), true))
+	}
 	source.Retire()
 	joined := make(chan struct{})
 	go func() { workers.Wait(); close(joined) }()
@@ -306,6 +310,9 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	// Wait establishes that every slot is final. Cancellation selects the first
 	// cause; it must not discard errors produced later by native/input cleanup.
 	for index, outcome := range outcomes {
+		if outcome != nil && config.TerminationObserver != nil {
+			config.TerminationObserver(describeSessionTermination(outcome, false))
+		}
 		if components[index].name == "lease-watchdog" && errors.Is(outcome, cause) {
 			continue
 		}

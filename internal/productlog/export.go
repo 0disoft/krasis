@@ -19,19 +19,20 @@ import (
 const ExportName = "support-latest.json"
 
 type exportEvent struct {
-	Time          string            `json:"time"`
-	Code          string            `json:"code"`
-	Build         string            `json:"build,omitempty"`
-	BuildDirty    bool              `json:"buildDirty,omitempty"`
-	Run           string            `json:"run,omitempty"`
-	Connection    string            `json:"connection,omitempty"`
-	Sequence      uint64            `json:"sequence,omitempty"`
-	ElapsedMicros int64             `json:"elapsedMicros,omitempty"`
-	Boundary      *BoundarySummary  `json:"boundary,omitempty"`
-	Injection     *InjectionFailure `json:"injection,omitempty"`
-	Retry         *RetrySummary     `json:"retry,omitempty"`
-	Runtime       *RuntimeSummary   `json:"runtime,omitempty"`
-	Handoff       *handoff.Summary  `json:"handoff,omitempty"`
+	Time          string             `json:"time"`
+	Code          string             `json:"code"`
+	Build         string             `json:"build,omitempty"`
+	BuildDirty    bool               `json:"buildDirty,omitempty"`
+	Run           string             `json:"run,omitempty"`
+	Connection    string             `json:"connection,omitempty"`
+	Sequence      uint64             `json:"sequence,omitempty"`
+	ElapsedMicros int64              `json:"elapsedMicros,omitempty"`
+	Boundary      *BoundarySummary   `json:"boundary,omitempty"`
+	Injection     *InjectionFailure  `json:"injection,omitempty"`
+	Retry         *RetrySummary      `json:"retry,omitempty"`
+	Runtime       *RuntimeSummary    `json:"runtime,omitempty"`
+	Handoff       *handoff.Summary   `json:"handoff,omitempty"`
+	SessionEnd    *SessionEndSummary `json:"sessionEnd,omitempty"`
 }
 
 type exportLog struct {
@@ -172,6 +173,13 @@ func sanitizeLog(name string, r io.Reader) exportLog {
 				continue
 			}
 			event.Injection = input.Injection
+		}
+		if input.Code == "session_end_detail" {
+			if input.SessionEnd == nil || !input.SessionEnd.valid() {
+				result.Incomplete = true
+				continue
+			}
+			event.SessionEnd = input.SessionEnd
 		}
 		if input.Code == "retry_policy" {
 			if input.Retry == nil || !input.Retry.valid() {
