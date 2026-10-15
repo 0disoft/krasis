@@ -318,8 +318,14 @@ func (pipe *pipeConn) overlapped(ctx context.Context, read bool, data []byte, be
 			_ = windows.CancelIoEx(pipe.handle, &overlap)
 			// Cancellation is asynchronous. Do not unpin or reuse the buffer
 			// until the kernel has completed the exact submitted operation.
-			_ = windows.GetOverlappedResult(pipe.handle, &overlap, &transferred, true)
-			return transferred, stop
+			completion := windows.GetOverlappedResult(pipe.handle, &overlap, &transferred, true)
+			// A late wakeup is not evidence that IO failed. Cancellation can
+			// lose to an already completed read/write; preserve its bytes and
+			// actual result instead of discarding a valid source command.
+			if completion == windows.ERROR_OPERATION_ABORTED {
+				return transferred, stop
+			}
+			return transferred, completion
 		}
 		state, err := windows.WaitForSingleObject(event, 20)
 		if err != nil || (state != uint32(windows.WAIT_TIMEOUT) && state != windows.WAIT_OBJECT_0) {
