@@ -1007,3 +1007,23 @@ exported. Tests cover every legacy ACK layout, one-byte reads, following-frame
 alignment, native handle provenance, scope rejection after a successful input,
 foreign ACKs, bounded observations and sanitized export. Runtime validation
 of actual lock/PIN transitions remains a separate device-test requirement.
+
+## Nonqueued source maintenance
+
+The protected source's periodic heartbeat used to start its one-second budget
+before acquiring the IPC mutex. A concurrent cursor/capture command could hold
+that mutex until the heartbeat context expired. No heartbeat frame or sequence
+was sent, yet the resulting authority error terminated the source and entered
+full recovery. A regression test reproduces this old behavior with sequence 0
+and no native input or service mutation.
+
+Heartbeat polling now tries the same mutex without waiting. A busy owner skips
+that poll without sending a frame, changing the epoch, or renewing any deadline.
+After acquisition the heartbeat gets its original one-second I/O budget and
+keeps the existing exact ACK, authority and cleanup checks. Actually attempted
+protocol/ACK failures remain fatal. Other capture/cursor/stop commands retain
+their existing serialization and retirement proof requirements. One fixed
+deferred event per owner and a failed event on terminal heartbeat failure make
+this decision observable. A canceled owner sends no maintenance; an already
+started heartbeat still finishes within its original bounded response policy.
+The device failure that motivated this fix remains unproven until retested.

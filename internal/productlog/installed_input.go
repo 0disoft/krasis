@@ -1,6 +1,8 @@
 package productlog
 
 func init() {
+	allowed["installed_source_heartbeat_deferred"] = true
+	allowed["installed_source_heartbeat_failed"] = true
 	for _, target := range []string{"default", "winlogon", "limit"} {
 		allowed["installed_input_desktop_"+target] = true
 	}

@@ -81,6 +81,11 @@ func (c *CaptureSource) AdmitBoundary(ctx context.Context, _ control.BoundaryInt
 func (c *sourceClient) call(ctx context.Context, op byte, reference ...uint64) (sourcePacket, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	return c.callLocked(ctx, op, reference...)
+}
+
+// Caller holds mu through the entire command and exact reply observation.
+func (c *sourceClient) callLocked(ctx context.Context, op byte, reference ...uint64) (sourcePacket, error) {
 	if op == sourceStop {
 		select {
 		case <-c.done:
@@ -298,6 +303,7 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 	ready()
 	ticker := time.NewTicker(250 * time.Millisecond)
 	defer ticker.Stop()
+	heartbeatDeferred := false
 	for {
 		select {
 		case <-live.failed:
@@ -335,9 +341,13 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 			} // The owner must drain/stop, not heartbeat.
 			// Finish the already bounded heartbeat before explicit retirement.
 			// Cancelling a source refresh must not cut the ACK stream mid-frame.
-			check, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
-			_, err := live.call(check, sourceHeartbeat)
-			cancel()
+			attempted, err := live.pollHeartbeat(ctx)
+			if !attempted && err == nil && !heartbeatDeferred {
+				heartbeatDeferred = true
+				if c.observe != nil {
+					emitTiming(c.observe, "installed_source_heartbeat_deferred")
+				}
+			}
 			if err != nil && ctx.Err() == nil {
 				if live.retiring.Load() {
 					continue
@@ -347,6 +357,9 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 						return live.err
 					}
 					return errors.Join(wininput.ErrProtectedInput, ErrSourceCaptureRetired)
+				}
+				if c.observe != nil {
+					emitTiming(c.observe, "installed_source_heartbeat_failed")
 				}
 				return errors.Join(err, ErrRecovery)
 			}

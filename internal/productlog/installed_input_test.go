@@ -8,6 +8,13 @@ import (
 )
 
 func TestInputConnectionDiagnosticAllowlistRejectsDynamicStages(t *testing.T) {
+	for _, result := range []string{"deferred", "failed"} {
+		line := `{"time":"2026-10-15T09:40:00Z","code":"installed_source_heartbeat_` + result + `","error":"PRIVATE"}` + "\n"
+		result := sanitizeLog("agent.jsonl", strings.NewReader(line))
+		if result.Incomplete || len(result.Events) != 1 {
+			t.Fatal("source heartbeat result dropped")
+		}
+	}
 	for _, target := range []string{"default", "winlogon", "limit"} {
 		line := `{"time":"2026-10-15T09:40:00Z","code":"installed_input_desktop_` + target + `","desktopName":"PRIVATE"}` + "\n"
 		result := sanitizeLog("agent.jsonl", strings.NewReader(line))
