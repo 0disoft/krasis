@@ -196,11 +196,14 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 	interruptReads := context.AfterFunc(run, stopReads)
 	defer interruptReads()
 	reader := sourceContextReader{ctx: readContext, read: pipe.readContext}
+	var cursorPending atomic.Bool
 	read := func() (sourcePacket, error) {
-		if err := channel.stream.SetReadDeadline(time.Now().Add(IdleTimeout)); err != nil {
+		deadline := time.Now().Add(sourceReadTimeout(writer.started.Load(), session.Active() || cursorPending.Load()))
+		if err := channel.stream.SetReadDeadline(deadline); err != nil {
 			return sourcePacket{}, sourceTransportFailure(errors.Join(ErrAuthority, err))
 		}
-		p, err := readSourceCommandAuthorized(reader, readContext, lease.Binding, sequence, authorizeCommand)
+		frame := &sourceFrameReader{Reader: reader, setDeadline: channel.stream.SetReadDeadline, deadline: deadline}
+		p, err := readSourceCommandAuthorized(frame, readContext, lease.Binding, sequence, authorizeCommand)
 		if err == nil {
 			sequence = p.sequence
 		}
@@ -220,6 +223,21 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 		return err
 	}
 	writer.started.Store(true)
+	presenceDone := make(chan error, 1)
+	go func() {
+		err := watchSourcePresence(run, func() error { return authorizeCommand(sourceHeartbeat) })
+		presenceDone <- err
+		if err != nil {
+			cancel()
+		}
+	}()
+	defer func() {
+		cancel()
+		if err := <-presenceDone; err != nil {
+			exit.Reader = "authority"
+			result = errors.Join(result, sourceTransportFailure(&sourceReaderFailure{operation: "source-reader-authority", cause: err}))
+		}
+	}()
 	exit.Command = "ok"
 	requests := make(chan sourcePacket, 1)
 	completed := make(chan struct{})
@@ -295,6 +313,7 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 						hook.RestoreReturnCursor()
 						cursorPrepared = hook.PrepareReturnCursor()
 						cursorSequence = p.sequence
+						cursorPending.Store(cursorPrepared != nil)
 						if cursorPrepared == nil {
 							return ErrAuthority
 						}
@@ -304,8 +323,10 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 						}
 						cursorPrepared()
 						cursorPrepared = nil
+						cursorPending.Store(false)
 					case sourceCursorRestore:
 						cursorPrepared = nil
+						cursorPending.Store(false)
 						cursorSequence = 0
 						hook.RestoreReturnCursor()
 					case sourceStart:

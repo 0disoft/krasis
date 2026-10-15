@@ -33,6 +33,7 @@ type sourceClient struct {
 	preflightExpired        atomic.Bool  // At most one fixed diagnostic per capture owner.
 	sequence                uint64
 	lastReplyRequestAt      time.Time // Under mu; request start, only after its exact successful reply.
+	cursorPrepared          bool      // Under mu; pending native cursor presentation retains the active idle bound.
 	epoch                   atomic.Uint64
 	retired                 atomic.Bool
 	retiring                atomic.Bool
@@ -253,6 +254,12 @@ func (c *sourceClient) callLockedChecked(ctx context.Context, op byte, heartbeat
 			// Use its request start, never a late reply's completion, so slow
 			// responses cannot postpone the worker's unchanged idle deadline.
 			c.lastReplyRequestAt = requestStarted
+			switch op {
+			case sourceCursorPrepare:
+				c.cursorPrepared = true
+			case sourceCursorShow, sourceCursorRestore:
+				c.cursorPrepared = false
+			}
 		}
 		if err != nil && op == sourceActivate {
 			c.epoch.Store(0)

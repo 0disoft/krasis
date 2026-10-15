@@ -100,10 +100,11 @@ func (c *sourceClient) pollHeartbeat(ctx context.Context) (bool, error) {
 	// Preflight is not a sent request. Give the actual request its own budget,
 	// capped by the conservative idle deadline from the last successful request
 	// start. A slow SCM check must neither consume the ACK budget nor extend the
-	// worker's unchanged two-second liveness limit.
+	// worker's state-specific idle limit. Standby has no suppressed input; the
+	// worker independently observes the pinned process while waiting for it.
 	deadline := time.Now().Add(time.Second)
 	if !c.lastReplyRequestAt.IsZero() {
-		idle := c.lastReplyRequestAt.Add(IdleTimeout)
+		idle := c.lastReplyRequestAt.Add(sourceReadTimeout(true, c.epoch.Load() != 0 || c.cursorPrepared))
 		if idle.Before(deadline) {
 			deadline = idle
 		}

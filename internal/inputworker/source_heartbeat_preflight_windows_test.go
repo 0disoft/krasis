@@ -136,6 +136,7 @@ func TestHeartbeatPreflightDoesNotConsumeReplyBudgetOrExtendWorkerIdle(t *testin
 				c := &sourceClient{channel: clientChannel(conn, authorityService), binding: Binding{1}, replies: make(chan sourcePacket, 1), done: make(chan struct{})}
 				defer c.channel.Close()
 				c.lastReplyRequestAt = time.Now().Add(-idleAge)
+				c.epoch.Store(1) // This assertion protects the active-capture 2s bound.
 				previous := c.lastReplyRequestAt
 				c.channel.authority.checkInput = func() error { time.Sleep(800 * time.Millisecond); return nil }
 				joined := make(chan struct{})
