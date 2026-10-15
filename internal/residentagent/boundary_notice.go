@@ -8,13 +8,20 @@ import (
 const boundaryNoticeLifetime = 3 * time.Second
 
 func (observer *sessionObserver) ObserveControlFlow(event peer.ControlFlowEvent) {
+	code := boundaryFlowCode(event)
+	if code == "" && event != peer.ControlFlowCaptureActivationSucceeded {
+		// Most lease progress notifications have no UI/counter effect here.
+		// Do not serialize grant authorization and frame dispatch behind an
+		// unrelated Operations owner just to return without changing state.
+		return
+	}
 	o := observer.operations
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	if o.sessionDone != observer.done || o.root.Err() != nil || o.sessionState != "CONNECTED" {
 		return
 	}
-	if code := boundaryFlowCode(event); code != "" {
+	if code != "" {
 		o.recordLocked(code)
 	}
 	var reason string
