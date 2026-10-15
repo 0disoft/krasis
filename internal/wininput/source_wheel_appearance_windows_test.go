@@ -31,8 +31,13 @@ func TestSourceWheelCaptureAppearanceFailureStopsSetup(t *testing.T) {
 		callSetLayeredSourceCapture = func(...uintptr) (uintptr, uintptr, error) {
 			return 0, 0, failure
 		}
-		if err := configureSourceWheelCaptureAppearance(42); !errors.Is(err, ErrSourceCaptureActivationSetup) {
+		err := configureSourceWheelCaptureAppearance(42)
+		if !errors.Is(err, ErrSourceCaptureActivationSetup) {
 			t.Fatalf("appearance failure = %v, want capture setup failure", err)
+		}
+		var native syscall.Errno
+		if failure != syscall.Errno(0) && (!errors.As(err, &native) || native != failure) {
+			t.Fatalf("original native failure was erased: %v", err)
 		}
 	}
 }

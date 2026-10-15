@@ -524,7 +524,7 @@ func configureSourceWheelCaptureAppearance(window uintptr) error {
 	// applications. Keep a nonzero alpha so touchpad wheel ownership is retained.
 	configured, _, callErr := callSetLayeredSourceCapture(window, 0, sourceWheelCaptureAlpha, sourceWheelCaptureAlphaFlag)
 	if configured == 0 {
-		return fmt.Errorf("%w: %v", ErrSourceCaptureActivationSetup, touchpadWin32Error("SetLayeredWindowAttributes(source wheel capture)", callErr))
+		return fmt.Errorf("%w: %w", ErrSourceCaptureActivationSetup, touchpadWin32Error("SetLayeredWindowAttributes(source wheel capture)", callErr))
 	}
 	return nil
 }
@@ -601,7 +601,7 @@ func (current *sourceWheelCaptureRun) activateWindowProfile(profile context.Cont
 	position, err := cursorPosition()
 	if err != nil {
 		stopPosition()
-		return fmt.Errorf("%w: position source wheel capture: %v", ErrSourceCaptureActivationSetup, err)
+		return fmt.Errorf("%w: position source wheel capture: %w", ErrSourceCaptureActivationSetup, err)
 	}
 	current.forgetSavedFocus()
 	current.savedFocus = sourceWheelCaptureGetForeground()
@@ -617,7 +617,7 @@ func (current *sourceWheelCaptureRun) activateWindowProfile(profile context.Cont
 	x, y := sourceWheelCapturePosition(position)
 	if positionErr := sourceWheelCaptureSetPosition(current.window, x, y); positionErr != nil {
 		stopPosition()
-		return fmt.Errorf("%w: %v", ErrSourceCaptureActivationSetup, positionErr)
+		return fmt.Errorf("%w: %w", ErrSourceCaptureActivationSetup, positionErr)
 	}
 	stopPosition()
 	if err := current.err(); err != nil {
@@ -629,7 +629,7 @@ func (current *sourceWheelCaptureRun) activateWindowProfile(profile context.Cont
 	stopRegister()
 	if registerErr != nil {
 		sourceWheelCaptureShowWindow(current.window, swHide)
-		return fmt.Errorf("%w: %v", ErrSourceCaptureActivationSetup, touchpadWin32Error("RegisterTouchpadCapableWindow(source TRUE)", registerErr))
+		return fmt.Errorf("%w: %w", ErrSourceCaptureActivationSetup, touchpadWin32Error("RegisterTouchpadCapableWindow(source TRUE)", registerErr))
 	}
 	if err := current.err(); err != nil {
 		return err
@@ -696,7 +696,7 @@ func (current *sourceWheelCaptureRun) activateWindowProfile(profile context.Cont
 		} else {
 			if foregroundErr != nil {
 				return errors.Join(
-					fmt.Errorf("%w: %v", ErrSourceCaptureActivationAPIRejected, foregroundErr),
+					fmt.Errorf("%w: %w", ErrSourceCaptureActivationAPIRejected, foregroundErr),
 					fallbackErr,
 				)
 			}
@@ -704,7 +704,7 @@ func (current *sourceWheelCaptureRun) activateWindowProfile(profile context.Cont
 		}
 	}
 	if foregroundErr != nil {
-		return fmt.Errorf("%w: %v", ErrSourceCaptureActivationAPIRejected, foregroundErr)
+		return fmt.Errorf("%w: %w", ErrSourceCaptureActivationAPIRejected, foregroundErr)
 	}
 	if verificationLost || sourceWheelCaptureGetForeground() != current.window {
 		return ErrSourceCaptureActivationVerificationLost
@@ -913,7 +913,7 @@ func (current *sourceWheelCaptureRun) restoreFocusProfile(profile context.Contex
 		}
 		if restoreErr != nil {
 			return SourceFocusRestoreAPIRejected, errors.Join(
-				fmt.Errorf("%w: %v", ErrSourceFocusRestoreAPIRejected, restoreErr),
+				fmt.Errorf("%w: %w", ErrSourceFocusRestoreAPIRejected, restoreErr),
 				fallbackErr,
 			)
 		}

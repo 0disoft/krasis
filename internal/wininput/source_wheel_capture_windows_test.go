@@ -7,6 +7,7 @@ import (
 	"errors"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -352,9 +353,10 @@ func TestSourceWheelCaptureClassifiesActivationSetupFailure(t *testing.T) {
 
 	sourceWheelCaptureRegisterWindow = func(uintptr, uintptr, bool) error { return nil }
 	sourceWheelCaptureShowWindow = func(uintptr, uintptr) {}
-	sourceWheelCaptureSetPosition = func(uintptr, int32, int32) error { return errors.New("position denied") }
+	positionDenied := errors.New("position denied")
+	sourceWheelCaptureSetPosition = func(uintptr, int32, int32) error { return positionDenied }
 	current := &sourceWheelCaptureRun{window: 10}
-	if err := current.activateWindow(); !errors.Is(err, ErrSourceCaptureActivationSetup) {
+	if err := current.activateWindow(); !errors.Is(err, ErrSourceCaptureActivationSetup) || !errors.Is(err, positionDenied) {
 		t.Fatalf("activateWindow() error = %v, want %v", err, ErrSourceCaptureActivationSetup)
 	}
 }
@@ -416,7 +418,8 @@ func TestSourceWheelCaptureAbortsWhenForegroundFallbackAttachFails(t *testing.T)
 		return nil
 	}
 	sourceWheelCaptureGetForeground = func() uintptr { return 20 }
-	sourceWheelCaptureSetForeground = func(uintptr) error { return errors.New("foreground denied") }
+	foregroundDenied := syscall.Errno(5)
+	sourceWheelCaptureSetForeground = func(uintptr) error { return foregroundDenied }
 	sourceWheelCaptureCurrentThread = func() uint32 { return 11 }
 	sourceWheelCaptureWindowThread = func(uintptr) (uint32, error) { return 22, nil }
 	sourceWheelCaptureAttachThreads = func(uint32, uint32, bool) error { return errors.New("attach denied") }
@@ -424,7 +427,7 @@ func TestSourceWheelCaptureAbortsWhenForegroundFallbackAttachFails(t *testing.T)
 	observer := &recordingSourcePipelineObserver{}
 	current := &sourceWheelCaptureRun{window: 10, observer: observer}
 	err := current.activateWindow()
-	if !errors.Is(err, ErrSourceCaptureActivationAPIRejected) || !errors.Is(err, ErrSourceCaptureThreadAttachFailed) {
+	if !errors.Is(err, ErrSourceCaptureActivationAPIRejected) || !errors.Is(err, ErrSourceCaptureThreadAttachFailed) || !errors.Is(err, foregroundDenied) {
 		t.Fatalf("activateWindow() error = %v", err)
 	}
 	if current.active.Load() || current.registered || !slices.Equal(registered, []bool{true, false}) {
@@ -432,6 +435,21 @@ func TestSourceWheelCaptureAbortsWhenForegroundFallbackAttachFails(t *testing.T)
 	}
 	if !slices.Equal(observer.foregroundFallbacks, []SourceForegroundFallbackResult{SourceForegroundFallbackAttachFailed}) {
 		t.Fatalf("foreground fallback results = %v", observer.foregroundFallbacks)
+	}
+}
+
+func TestSourceFocusRestoreKeepsOriginalNativeFailureBesideFallbackFailure(t *testing.T) {
+	restore := stubSourceWheelCaptureActivation(t)
+	defer restore()
+	native, attach := syscall.Errno(5), errors.New("synthetic attach failure")
+	sourceWheelCaptureGetForeground = func() uintptr { return 10 }
+	sourceWheelCaptureSetForeground = func(uintptr) error { return native }
+	sourceWheelCaptureCurrentThread = func() uint32 { return 11 }
+	sourceWheelCaptureWindowThread = func(uintptr) (uint32, error) { return 22, nil }
+	sourceWheelCaptureAttachThreads = func(uint32, uint32, bool) error { return attach }
+	result, err := (&sourceWheelCaptureRun{window: 10, savedFocus: 20}).restoreFocus()
+	if result != SourceFocusRestoreAPIRejected || !errors.Is(err, ErrSourceFocusRestoreAPIRejected) || !errors.Is(err, native) || !errors.Is(err, attach) {
+		t.Fatal("restore discarded original or fallback failure", result, err)
 	}
 }
 
