@@ -221,19 +221,21 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 	var cursorPrepared func()
 	var cursorSequence uint64
 	for {
-		select {
-		case <-run.Done():
-			return run.Err()
-		case p := <-queue.events:
+		work, err := nextSourceWork(run, requests, queue.events, session.LocalReturns())
+		if err != nil {
+			return err
+		}
+		switch p := work.packet; p.kind {
+		case sourceBoundary:
 			if err := writer.send(p, nil); err != nil {
 				return err
 			}
-		case generation := <-session.LocalReturns():
-			pendingReturn = generation
+		case sourceReturn:
+			pendingReturn = work.returnGeneration
 			if err := writer.send(sourcePacket{kind: sourceReturn, reply: writer.epoch.Load()}, nil); err != nil {
 				return err
 			}
-		case p := <-requests:
+		case sourceCommand:
 			if p.op == sourceStop {
 				stopping = &p
 				return nil
