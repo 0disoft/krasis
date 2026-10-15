@@ -106,12 +106,19 @@ func authenticateAgentInstalled(pipe uintptr, expected [sha256.Size]byte, instal
 		return nil
 	}
 	accepted = true
+	processPresent := func() error {
+		state, err := windows.WaitForSingleObject(identity.handle, 0)
+		if err != nil || state != uint32(windows.WAIT_TIMEOUT) || windows.WTSGetActiveConsoleSessionId() != session {
+			return ErrAuthority
+		}
+		return nil
+	}
 	return &Authority{
 		kind:         authorityAgent,
 		agentStarted: agentStarted,
+		checkPresent: processPresent,
 		checkInput: func() error {
-			state, err := windows.WaitForSingleObject(identity.handle, 0)
-			if err != nil || state != uint32(windows.WAIT_TIMEOUT) {
+			if processPresent() != nil {
 				return ErrAuthority
 			}
 			return consoleStillCurrent()
@@ -200,7 +207,14 @@ func authenticateServiceInstalled(ctx context.Context, pipe uintptr, expected [s
 		return nil, err
 	}
 	accepted = true
-	return &Authority{kind: authorityService, checkInput: check, checkInputObserved: checkObserved, checkRecovery: check, closeHandles: func() error {
+	present := func() error {
+		var current uint32
+		if windows.GetNamedPipeServerProcessId(windows.Handle(pipe), &current) != nil || current != pid {
+			return ErrAuthority
+		}
+		return nil
+	}
+	return &Authority{kind: authorityService, checkInput: check, checkInputObserved: checkObserved, checkRecovery: check, checkPresent: present, closeHandles: func() error {
 		imageErr := image.Close()
 		serviceErr := windows.CloseServiceHandle(service)
 		if imageErr != nil || serviceErr != nil {

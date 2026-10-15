@@ -38,8 +38,14 @@ func (w *sourceWriter) write(p sourcePacket, current func() bool, retirement boo
 	}
 	// Retirement grants no authority. It is sent only after native/sender join
 	// on the exact already authenticated channel, even if logon authority changed.
-	if !retirement && w.channel.authority.check(false) != nil {
-		return sourceTransportFailure(ErrAuthority)
+	if !retirement {
+		check := func() error { return w.channel.authority.check(false) }
+		if p.kind == sourceReply && p.op == sourceHeartbeat {
+			check = w.channel.authority.checkHeartbeat
+		}
+		if check() != nil {
+			return sourceTransportFailure(ErrAuthority)
+		}
 	}
 	w.sequence++
 	p.sequence, p.binding = w.sequence, w.binding
@@ -105,6 +111,15 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 			return ErrAuthority
 		}
 		return nil
+	}
+	authorizeCommand := func(op byte) error {
+		if op == sourceHeartbeat {
+			if proof.checkHeartbeat() != nil || channel.authority.checkHeartbeat() != nil {
+				return ErrAuthority
+			}
+			return nil
+		}
+		return authorize()
 	}
 	hook, err := wininput.NewProtectedSourceHook(authorize)
 	if err != nil {
@@ -185,7 +200,7 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 		if err := channel.stream.SetReadDeadline(time.Now().Add(IdleTimeout)); err != nil {
 			return sourcePacket{}, sourceTransportFailure(errors.Join(ErrAuthority, err))
 		}
-		p, err := readSourceCommand(reader, readContext, lease.Binding, sequence, authorize)
+		p, err := readSourceCommandAuthorized(reader, readContext, lease.Binding, sequence, authorizeCommand)
 		if err == nil {
 			sequence = p.sequence
 		}

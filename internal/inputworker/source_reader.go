@@ -52,6 +52,10 @@ func (r sourceContextReader) Read(data []byte) (int, error) { return r.read(r.ct
 // its own interrupted overlapped read. Do not replace external EOF/timeout or
 // a validation/authority failure with that context just because stop raced it.
 func readSourceCommand(reader io.Reader, local context.Context, binding Binding, previous uint64, authorize func() error) (sourcePacket, error) {
+	return readSourceCommandAuthorized(reader, local, binding, previous, func(byte) error { return authorize() })
+}
+
+func readSourceCommandAuthorized(reader io.Reader, local context.Context, binding Binding, previous uint64, authorize func(byte) error) (sourcePacket, error) {
 	p, err := readSourcePacket(reader)
 	if err != nil {
 		if err == context.Canceled && local.Err() == context.Canceled {
@@ -62,7 +66,7 @@ func readSourceCommand(reader io.Reader, local context.Context, binding Binding,
 	if p.kind != sourceCommand || p.binding != binding || p.sequence != previous+1 {
 		return sourcePacket{}, &sourceReaderFailure{operation: "source-reader-invalid", cause: ErrProtocol}
 	}
-	if err := authorize(); err != nil {
+	if err := authorize(p.op); err != nil {
 		return sourcePacket{}, &sourceReaderFailure{operation: "source-reader-authority", cause: err}
 	}
 	return p, nil

@@ -64,12 +64,14 @@ func (c *sourceClient) pollHeartbeat(ctx context.Context) (bool, error) {
 		}
 	}
 	c.mu.Unlock()
-	// SCM can block. Do not own the ordered IPC gate while querying it: an
-	// independently authenticated activation must be able to pass maintenance.
+	// Presence is not input authorization. SCM/WTS RPC belongs to the fresh
+	// command/input checks, not keepalive traffic that can otherwise starve its
+	// own two-second reader while waiting for a broker. Kernel-owner checks are
+	// still performed outside the gate, so capture commands can pass maintenance.
 	check, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
 	defer cancel()
 	started := time.Now()
-	if err := c.channel.authority.check(false); err != nil {
+	if err := c.channel.authority.checkHeartbeat(); err != nil {
 		return true, err
 	}
 	proof := &sourceHeartbeatCheck{owner: c, elapsed: time.Since(started)}

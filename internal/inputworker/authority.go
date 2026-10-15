@@ -26,7 +26,31 @@ type Authority struct {
 	checkInput         func() error
 	checkInputObserved func(context.Context) error
 	checkRecovery      func() error
+	checkPresent       func() error // Heartbeat only; never authorizes input or recovery.
 	closeHandles       func() error
+}
+
+// A keepalive does not grant capture, inject an action, or renew peer trust.
+// Native authenticators can check their pinned kernel owner without repeating
+// SCM/WTS RPC. All state-changing commands and input still use check(false).
+// Authorities without a separate presence proof retain the full check.
+func (authority *Authority) checkHeartbeat() error {
+	if authority == nil {
+		return ErrAuthority
+	}
+	authority.mu.RLock()
+	defer authority.mu.RUnlock()
+	if authority.closed || authority.checkInput == nil || authority.checkRecovery == nil || authority.closeHandles == nil {
+		return ErrAuthority
+	}
+	check := authority.checkPresent
+	if check == nil {
+		check = authority.checkInput
+	}
+	if check() != nil {
+		return ErrAuthority
+	}
+	return nil
 }
 
 func (authority *Authority) check(recovery bool) error {
