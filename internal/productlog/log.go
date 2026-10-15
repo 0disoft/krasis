@@ -25,6 +25,12 @@ const maxBytes = 1 << 20
 var allowed = map[string]bool{}
 
 func init() {
+	for _, state := range []string{"idle", "pending", "not_started", "finished_unpublished", "reading", "result_ok_before_deadline", "result_ok_late", "result_error_before_deadline", "result_error_late"} {
+		allowed["trust_expiry_"+state] = true
+	}
+	for _, bucket := range []string{"lt1ms", "lt10ms", "lt100ms", "lt1s", "ge1s"} {
+		allowed["trust_expiry_late_"+bucket] = true
+	}
 	for _, code := range []string{"suspend", "resume", "session_lock", "session_disconnect", "logoff", "shutdown", "display_change", "desktop_switch", "monitor_failed"} {
 		allowed["lifecycle_"+code] = true
 	}

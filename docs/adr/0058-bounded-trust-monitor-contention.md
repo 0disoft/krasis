@@ -89,3 +89,15 @@ certificate validation remain unchanged. This prevents a valid 1-4 second read
 from being discarded solely because it exceeded the observation budget.
 The g192 paired evidence and remaining uncertainty are recorded in
 `docs/experiments/g192-trust-recovery-observations.md`.
+
+Generation 302 adds a terminal, nonblocking observation at freshness expiry.
+It separates a pending read, a read not yet entered, a read whose trace finished
+before completion publication, and an already queued positive or negative
+result. Queued outcomes are classified by completion before or at/after the old
+deadline; they never renew an expired session. A coarse timer-lateness bucket
+distinguishes prompt expiry from delayed monitor scheduling. Only fixed codes
+are exported, with no certificate, peer, path, input or raw error data. The
+five-second freshness rule, one-reader limit and revocation handling remain
+unchanged. g301 A expired trust freshness while its source owners joined and its
+service remained Ready; the available trace did not identify the pending read
+state. This instrumentation does not establish the cause of that failure.

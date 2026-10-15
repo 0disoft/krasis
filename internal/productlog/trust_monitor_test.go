@@ -44,3 +44,18 @@ func TestProtectedInputReasonsSurviveExportWithoutPrivateDetails(t *testing.T) {
 		t.Fatal("arbitrary protection detail crossed support export")
 	}
 }
+
+func TestTrustExpiryObservationExportsOnlyClosedStates(t *testing.T) {
+	for _, state := range []string{"idle", "pending", "not_started", "finished_unpublished", "reading", "result_ok_before_deadline", "result_ok_late", "result_error_before_deadline", "result_error_late", "late_lt1ms", "late_lt10ms", "late_lt100ms", "late_lt1s", "late_ge1s"} {
+		code := "trust_expiry_" + state
+		result := sanitizeLog("agent.jsonl", strings.NewReader(`{"time":"2026-10-15T09:56:25Z","code":"`+code+`","error":"private certificate path"}`+"\n"))
+		data, _ := json.Marshal(result)
+		if result.Incomplete || len(result.Events) != 1 || strings.Contains(string(data), "private") {
+			t.Fatal("trust expiry evidence lost or leaked details", code)
+		}
+	}
+	result := sanitizeLog("agent.jsonl", strings.NewReader("{\"time\":\"2026-10-15T09:56:25Z\",\"code\":\"trust_expiry_private_error\"}\n"))
+	if !result.Incomplete || len(result.Events) != 0 {
+		t.Fatal("unbounded trust expiry state exported")
+	}
+}

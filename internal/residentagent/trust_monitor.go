@@ -148,11 +148,7 @@ func monitorProductSessionObserved(ctx context.Context, ticks <-chan time.Time, 
 	soft.Stop()
 	defer soft.Stop()
 	var softDone <-chan time.Time
-	type completion struct {
-		err      error
-		finished time.Time
-	}
-	var result <-chan completion
+	var result <-chan trustCheckCompletion
 	var trace *truststore.ReadTrace
 	var stopCheck context.CancelFunc
 	defer func() {
@@ -176,6 +172,9 @@ func monitorProductSessionObserved(ctx context.Context, ticks <-chan time.Time, 
 			return
 		case <-freshness.C:
 			if ctx.Err() == nil {
+				if recordTrace != nil {
+					recordTrustExpiry(deadline, result, trace, record)
+				}
 				if trace != nil {
 					recordTrace(trace.Snapshot())
 				}
@@ -212,14 +211,14 @@ func monitorProductSessionObserved(ctx context.Context, ticks <-chan time.Time, 
 			}
 			checkCtx, stop := context.WithDeadline(ctx, deadline)
 			stopCheck = stop
-			ready := make(chan completion, 1)
+			ready := make(chan trustCheckCompletion, 1)
 			result = ready
 			go func(readTrace *truststore.ReadTrace) {
 				err := func() error {
 					defer func() { <-trustReadSlot }()
 					return checkMonitoredTrustObserved(checkCtx, func() error { return check(readTrace) }, agent.Wait, readTrace)
 				}()
-				ready <- completion{err: err, finished: time.Now()}
+				ready <- trustCheckCompletion{err: err, finished: time.Now()}
 			}(trace)
 			soft.Reset(trustReadTimeout)
 			softDone = soft.C

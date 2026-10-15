@@ -28,7 +28,7 @@ func TestTrustExpiryCapturesPhaseAfterSoftObservation(t *testing.T) {
 		})
 		close(release)
 		synctest.Wait()
-		if ctx.Err() != context.Canceled || len(codes) != 2 || codes[1] != "session_trust_freshness_expired" {
+		if ctx.Err() != context.Canceled || len(codes) != 4 || codes[1] != "trust_expiry_reading" || codes[2] != "trust_expiry_late_lt1ms" || codes[3] != "session_trust_freshness_expired" {
 			t.Fatal("expiry or late-success policy changed", codes, ctx.Err())
 		}
 		if len(snapshots) != 2 || snapshots[0].Phase != "" || snapshots[1].Phase != "retry_wait" || snapshots[1].Elapsed != trustValidationMaxAge {
