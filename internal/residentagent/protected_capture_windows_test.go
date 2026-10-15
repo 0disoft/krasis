@@ -75,11 +75,11 @@ func TestLockedSourceUsesProtectedCaptureInSameSessionAndFencesActiveRefresh(t *
 	}
 }
 
-func TestLockNotificationSelectsReusableCaptureBeforeForegroundUpdates(t *testing.T) {
+func TestInstalledSourceSelectsReusableCaptureBeforeForegroundUpdates(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	secure := &secureCaptureTest{stopped: make(chan struct{})}
-	h := &protectedSource{blocked: func() bool { return false }, cursorProtected: func() bool { return false }, sessionLocked: func() bool { return true }, native: protectedTestHook(func(context.Context, *wininput.SourceSession, wininput.BoundaryObserver, func()) error {
+	h := &protectedSource{blocked: func() bool { return false }, cursorProtected: func() bool { return false }, native: protectedTestHook(func(context.Context, *wininput.SourceSession, wininput.BoundaryObserver, func()) error {
 		t.Error("stale foreground selected medium source")
 		return errors.New("wrong owner")
 	})}

@@ -1027,3 +1027,25 @@ deferred event per owner and a failed event on terminal heartbeat failure make
 this decision observable. A canceled owner sends no maintenance; an already
 started heartbeat still finishes within its original bounded response policy.
 The device failure that motivated this fix remains unproven until retested.
+
+## Persistent installed source selection
+
+Generation 303 selects the verified installed capture backend on Default as well
+as protected desktops. g302 B recorded `installed_source_refresh_capture_busy`
+at its lock transition while the medium native source was selected. The existing
+activation/physical-press gate refused replacement and the lifecycle owner
+restarted the connection. A subsequently recorded a medium-source shutdown-post
+failure and restarted its agent. This is separate from g301 trust freshness
+expiry; g302 did not record a trust expiry during that lock failure.
+
+The medium sender now has no duplicate native physical-input ledger when an
+installed capture backend is available. Native capture, physical-press admission,
+cursor ownership and desktop verification remain in the existing authenticated
+worker. Idle desktop replacement still requires native/sender retirement proof,
+and active forwarding and uncertain cleanup retain their existing refusal paths.
+Failure to start the installed owner does not fall back to medium capture.
+Without an installed source, the existing native/receive-only behavior remains.
+The now-unreachable foreground polling promotion loop is removed. The regression
+test starts with Default selected, refreshes the same sender across a simulated
+lock, and verifies that the worker's pressed-input rejection remains in force.
+Actual two-PC transition continuity and input latency require device validation.

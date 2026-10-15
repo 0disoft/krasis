@@ -14,7 +14,6 @@ import (
 	"github.com/0disoft/krasis/internal/inputworker"
 	"github.com/0disoft/krasis/internal/peer"
 	"github.com/0disoft/krasis/internal/wininput"
-	"github.com/0disoft/krasis/internal/winlifecycle"
 )
 
 // The medium-integrity agent cannot capture local devices or read the cursor on
@@ -25,7 +24,6 @@ type protectedSource struct {
 	*wininput.SourceHook
 	blocked         func() bool
 	cursorProtected func() bool
-	sessionLocked   func() bool
 	event           func(string)
 	native          agent.SourceHook
 	secure          agent.SourceHook
@@ -42,7 +40,7 @@ type protectedSource struct {
 }
 
 func protectedSessionHook(hook *wininput.SourceHook, event func(string)) agent.SourceHook {
-	return &protectedSource{SourceHook: hook, native: hook, event: event, sessionLocked: winlifecycle.SessionLocked, cursorProtected: wininput.ProtectedReturnCursorRequired, blocked: func() bool {
+	return &protectedSource{SourceHook: hook, native: hook, event: event, cursorProtected: wininput.ProtectedReturnCursorRequired, blocked: func() bool {
 		switch wininput.InspectProtectedInput() {
 		case wininput.ProtectedInputDesktopUnavailable, wininput.ProtectedInputNonDefaultDesktop:
 			return true
@@ -79,9 +77,12 @@ func (h *protectedSource) RunWithBoundary(ctx context.Context, session *wininput
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		protected := h.blocked() || h.sessionLocked != nil && h.sessionLocked() || h.cursorProtected != nil && h.cursorProtected()
 		selected := h.native
-		usingSecure := protected && h.secure != nil
+		// An installed capture owner validates its actual desktop on every native
+		// scope. Keep that owner on Default as well: a medium hook can retain the
+		// local Win+L down events after the release moves to another desktop.
+		// The medium sender then refuses PauseCapture and cancels the connection.
+		usingSecure := h.secure != nil
 		if usingSecure {
 			selected = h.secure
 		}
@@ -108,7 +109,6 @@ func (h *protectedSource) RunWithBoundary(ctx context.Context, session *wininput
 			stop(context.Canceled)
 			return wininput.ErrProtectedInput
 		}
-		joinCursorWatch := h.watchProtectedCursor(attempt, epoch, usingSecure)
 		err := selected.RunWithBoundary(attempt, session, boundary, func() {
 			h.mu.Lock()
 			current := ctx.Err() == nil && attempt.Err() == nil && h.epoch == epoch && !h.refresh
@@ -135,7 +135,6 @@ func (h *protectedSource) RunWithBoundary(ctx context.Context, session *wininput
 			}
 		})
 		stop(context.Canceled)
-		joinCursorWatch()
 		h.mu.Lock()
 		refresh := h.refresh
 		h.stop, h.prepared, h.owner = nil, false, nil
