@@ -220,114 +220,116 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 	var pendingReturn uint64
 	var cursorPrepared func()
 	var cursorSequence uint64
-	for {
-		work, err := nextSourceWork(run, requests, queue.events, session.LocalReturns())
-		if err != nil {
-			return err
-		}
-		switch p := work.packet; p.kind {
-		case sourceBoundary:
-			var batch [sourceBoundaryBatchLimit]sourcePacket
-			n := collectSourceBoundaries(p, queue.events, requests, &batch)
-			if err := writer.sendBoundaries(batch[:n]); err != nil {
+	return hook.WithSourceCommandDesktop(run, func(commandContext context.Context) error {
+		for {
+			work, err := nextSourceWork(run, requests, queue.events, session.LocalReturns())
+			if err != nil {
 				return err
 			}
-		case sourceReturn:
-			pendingReturn = work.returnGeneration
-			if err := writer.send(sourcePacket{kind: sourceReturn, reply: writer.epoch.Load()}, nil); err != nil {
-				return err
-			}
-		case sourceCommand:
-			if p.op == sourceStop {
-				stopping = &p
-				return nil
-			}
-			response := sourcePacket{kind: sourceReply, op: p.op, reply: p.sequence}
-			operation := func() error {
-				switch p.op {
-				case sourceAdmit:
-					decision, failure := hook.AdmitBoundary(run, control.BoundaryIntent{})
-					response.decision = decision
-					return failure
-				case sourceActivate:
-					writer.epoch.Store(p.sequence)
-					if err := session.Activate(); err != nil {
-						writer.epoch.Store(0)
-						return err
-					}
-					if err := hook.SourceCapture().Activate(); err != nil {
-						session.Deactivate()
-						writer.epoch.Store(0)
-						return err
-					}
-				case sourceDeactivate:
-					session.Deactivate()
-					writer.epoch.Store(0)
-					hook.SourceCapture().Deactivate()
-					if hook.SourceCapture().Active() {
-						return ErrRecovery
-					}
-					session.CompleteLocalReturn(pendingReturn)
-					pendingReturn = 0
-				case sourceHeartbeat:
-				case sourceCursorPrepare:
-					hook.RestoreReturnCursor()
-					cursorPrepared = hook.PrepareReturnCursor()
-					cursorSequence = p.sequence
-					if cursorPrepared == nil {
-						return ErrAuthority
-					}
-				case sourceCursorShow:
-					if cursorPrepared == nil || p.reply != cursorSequence {
-						return ErrProtocol
-					}
-					cursorPrepared()
-					cursorPrepared = nil
-				case sourceCursorRestore:
-					cursorPrepared = nil
-					cursorSequence = 0
-					hook.RestoreReturnCursor()
-				case sourceStart:
-					return ErrProtocol
-				default:
-					return ErrProtocol
-				}
-				return nil
-			}
-			// State retirement operates on the existing native owner. It must
-			// remain available while the desktop is between Default/Winlogon.
-			var err error
-			if p.op == sourceDeactivate || p.op == sourceHeartbeat || p.op == sourceCursorRestore {
-				err = operation()
-			} else {
-				err = hook.ExecuteSourceDesktop(run, operation)
-			}
-			if exit.Command == "not_started" || exit.Command == "ok" {
-				exit.Command = sourceCommandOutcome(err)
-			}
-			if p.op == sourceAdmit && err != nil {
-				if !sourceRetryableInspection(err) {
-					// No generic negative query ACK: it would erase authority or
-					// cleanup failure before the worker's final report arrives.
-					if sourceCleanupUncertain(err) {
-						return errors.Join(ErrRecovery, err)
-					}
+			switch p := work.packet; p.kind {
+			case sourceBoundary:
+				var batch [sourceBoundaryBatchLimit]sourcePacket
+				n := collectSourceBoundaries(p, queue.events, requests, &batch)
+				if err := writer.sendBoundaries(batch[:n]); err != nil {
 					return err
 				}
-				err = &sourceInspectionRejected{cause: err}
-			}
-			if err != nil {
-				if firstCommandFailure == nil {
-					firstCommandFailure = err
+			case sourceReturn:
+				pendingReturn = work.returnGeneration
+				if err := writer.send(sourcePacket{kind: sourceReturn, reply: writer.epoch.Load()}, nil); err != nil {
+					return err
 				}
-				response.status = 1
-				response.decision = 0
-			}
-			if failure := sourceCommandCompletion(err, writer.send(response, nil)); failure != nil {
-				return failure
+			case sourceCommand:
+				if p.op == sourceStop {
+					stopping = &p
+					return nil
+				}
+				response := sourcePacket{kind: sourceReply, op: p.op, reply: p.sequence}
+				operation := func() error {
+					switch p.op {
+					case sourceAdmit:
+						decision, failure := hook.AdmitBoundary(run, control.BoundaryIntent{})
+						response.decision = decision
+						return failure
+					case sourceActivate:
+						writer.epoch.Store(p.sequence)
+						if err := session.Activate(); err != nil {
+							writer.epoch.Store(0)
+							return err
+						}
+						if err := hook.SourceCapture().Activate(); err != nil {
+							session.Deactivate()
+							writer.epoch.Store(0)
+							return err
+						}
+					case sourceDeactivate:
+						session.Deactivate()
+						writer.epoch.Store(0)
+						hook.SourceCapture().Deactivate()
+						if hook.SourceCapture().Active() {
+							return ErrRecovery
+						}
+						session.CompleteLocalReturn(pendingReturn)
+						pendingReturn = 0
+					case sourceHeartbeat:
+					case sourceCursorPrepare:
+						hook.RestoreReturnCursor()
+						cursorPrepared = hook.PrepareReturnCursor()
+						cursorSequence = p.sequence
+						if cursorPrepared == nil {
+							return ErrAuthority
+						}
+					case sourceCursorShow:
+						if cursorPrepared == nil || p.reply != cursorSequence {
+							return ErrProtocol
+						}
+						cursorPrepared()
+						cursorPrepared = nil
+					case sourceCursorRestore:
+						cursorPrepared = nil
+						cursorSequence = 0
+						hook.RestoreReturnCursor()
+					case sourceStart:
+						return ErrProtocol
+					default:
+						return ErrProtocol
+					}
+					return nil
+				}
+				// State retirement operates on the existing native owner. It must
+				// remain available while the desktop is between Default/Winlogon.
+				var err error
+				if p.op == sourceDeactivate || p.op == sourceHeartbeat || p.op == sourceCursorRestore {
+					err = operation()
+				} else {
+					err = hook.ExecuteSourceDesktop(commandContext, operation)
+				}
+				if exit.Command == "not_started" || exit.Command == "ok" {
+					exit.Command = sourceCommandOutcome(err)
+				}
+				if p.op == sourceAdmit && err != nil {
+					if !sourceRetryableInspection(err) {
+						// No generic negative query ACK: it would erase authority or
+						// cleanup failure before the worker's final report arrives.
+						if sourceCleanupUncertain(err) {
+							return errors.Join(ErrRecovery, err)
+						}
+						return err
+					}
+					err = &sourceInspectionRejected{cause: err}
+				}
+				if err != nil {
+					if firstCommandFailure == nil {
+						firstCommandFailure = err
+					}
+					response.status = 1
+					response.decision = 0
+				}
+				if failure := sourceCommandCompletion(err, writer.send(response, nil)); failure != nil {
+					return failure
+				}
 			}
 		}
-	}
+	})
 }
 
 var _ peer.BoundaryAdmissionGate = (*CaptureSource)(nil)

@@ -11,6 +11,32 @@ import (
 )
 
 type sourceLoginDesktopKey struct{}
+type sourceCommandDesktopKey struct{}
+type sourceCommandScope struct {
+	owner *SourceHook
+	scope *inputdesktop.Scope
+}
+
+// WithSourceCommandDesktop keeps only the window-free command dispatcher on
+// one thread. Scope.Do reauthorizes every command and rebinds after a desktop
+// switch; native hook/window owners remain separate and are never migrated.
+func (hook *SourceHook) WithSourceCommandDesktop(ctx context.Context, callback func(context.Context) error) error {
+	if ctx == nil || callback == nil {
+		return inputdesktop.ErrInvalid
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if !hook.interactiveSource {
+		return callback(ctx)
+	}
+	return sourceCommandOwnerDesktop(context.Background(), hook.loginAuthorize, func(scope *inputdesktop.Scope) error {
+		owned := context.WithValue(ctx, sourceCommandDesktopKey{}, sourceCommandScope{owner: hook, scope: scope})
+		return callback(owned)
+	})
+}
+
+var sourceCommandOwnerDesktop = inputdesktop.RunInteractive
 
 // NewLoginSourceHook is a separate, fixed Winlogon mode for the authenticated
 // installed service child. Every native owner binds before creating a window or
@@ -42,6 +68,12 @@ func (hook *SourceHook) ExecuteSourceDesktop(ctx context.Context, callback func(
 	}
 	if err := ctx.Err(); err != nil {
 		return err
+	}
+	if command, ok := ctx.Value(sourceCommandDesktopKey{}).(sourceCommandScope); ok {
+		if command.owner != hook {
+			return inputdesktop.ErrInvalid
+		}
+		return command.scope.Do(ctx, callback)
 	}
 	if hook.interactiveSource {
 		// These commands create no windows or hooks: activation and cursor work

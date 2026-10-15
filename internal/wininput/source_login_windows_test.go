@@ -80,3 +80,42 @@ func TestLoginCaptureDoesNotStartUserShellPresentation(t *testing.T) {
 		t.Fatal("login capture entered user Shell broker")
 	}
 }
+
+func TestProtectedCommandOwnerReusesScopeWithoutFallbackOrAuthorityEscape(t *testing.T) {
+	oldOwner, oldCommand := sourceCommandOwnerDesktop, sourceCommandDesktop
+	defer func() { sourceCommandOwnerDesktop, sourceCommandDesktop = oldOwner, oldCommand }()
+	owners := 0
+	sourceCommandDesktop = func(context.Context, func() error, func(*inputdesktop.Scope) error) error {
+		t.Fatal("persistent command opened a second desktop")
+		return nil
+	}
+	sourceCommandOwnerDesktop = func(ctx context.Context, authorize func() error, callback func(*inputdesktop.Scope) error) error {
+		owners++
+		if authorize() != nil {
+			t.Fatal("authority missing")
+		}
+		err := callback(&inputdesktop.Scope{}) // Invalid owner must never reach native work.
+		return errors.Join(err, inputdesktop.ErrCleanup)
+	}
+	hook, _ := NewProtectedSourceHook(func() error { return nil })
+	other, _ := NewProtectedSourceHook(func() error { return nil })
+	err := hook.WithSourceCommandDesktop(context.Background(), func(ctx context.Context) error {
+		for range 2 {
+			if err := hook.ExecuteSourceDesktop(ctx, func() error { t.Fatal("invalid scope executed"); return nil }); !errors.Is(err, inputdesktop.ErrWrongThread) {
+				t.Fatal(err)
+			}
+		}
+		if err := other.ExecuteSourceDesktop(ctx, func() error { t.Fatal("scope escaped owner"); return nil }); err != inputdesktop.ErrInvalid {
+			t.Fatal(err)
+		}
+		return nil
+	})
+	if owners != 1 || !errors.Is(err, inputdesktop.ErrCleanup) {
+		t.Fatal("owner cleanup lost", owners, err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := hook.WithSourceCommandDesktop(ctx, func(context.Context) error { t.Fatal("cancelled owner started"); return nil }); err != context.Canceled || owners != 1 {
+		t.Fatal(err)
+	}
+}
