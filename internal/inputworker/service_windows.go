@@ -128,8 +128,9 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 			lease, prepare, leaseErr := receiveAgentRequest(ctx, channel)
 			if leaseErr == nil && prepare {
 				// No lease is created and no agent handle is transferred. A
-				// duplicate hint cannot extend expiry or replace a live child.
-				if next == nil || next.retired() {
+				// duplicate hint cannot extend expiry. A fresh, rate-limited hint
+				// may retire a nearly expired child before preparing a new one.
+				if next == nil || next.retired() || preparationRefreshDue(lastPreparation, next.preparedAt, time.Now()) {
 					if next.close() != nil {
 						_ = channel.Close()
 						return ErrRecovery

@@ -17,3 +17,13 @@ func isPreparation(data [leaseSize]byte) bool {
 func preparationAllowed(last, now time.Time) bool {
 	return !now.IsZero() && (last.IsZero() || now.Sub(last) >= 2*time.Second)
 }
+
+// Only a new authenticated hint after the unchanged launch cooldown may replace
+// a nearly expired unbound child. The original child's timer is never renewed.
+// A recent reentry preparation remains usable instead of being rebuilt again.
+func preparationRefreshDue(last, preparedAt, now time.Time) bool {
+	if preparedAt.IsZero() || !preparationAllowed(last, now) {
+		return false
+	}
+	return now.Sub(preparedAt) >= preparedConsoleWindow*3/4
+}

@@ -15,7 +15,7 @@ const (
 	preparationHintLifetime = 500 * time.Millisecond
 	// Keep margin beyond the independent two-second sender/receiver gates.
 	// Renewal is driven only by fresh physical movement, never a timer.
-	preparationHintRenewal = 2*time.Second + preparationHintLifetime
+	preparationHintRenewal = 2*time.Second + 100*time.Millisecond
 )
 
 type inputPreparer interface {
@@ -57,7 +57,7 @@ func (p *preparationBoundary) offerPreparation(action control.InputAction, x int
 		return true
 	default:
 		// A full queue has not accepted this renewal. Fresh movement may retry
-		// admission without consuming the 2.5-second local cooldown.
+		// admission without consuming the local cooldown.
 		return false
 	}
 }

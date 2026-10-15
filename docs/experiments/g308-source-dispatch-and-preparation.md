@@ -23,3 +23,26 @@ dispatches first without consuming boundary items, then verify all boundary item
 and a local return remain ordered. Cancellation retains queued work unexecuted.
 This proves dispatch ordering, not that backlog caused every measured tail or
 that device latency has already improved.
+
+## First entry after the approach preparation expires
+
+B acknowledged preparation at 15:36:10.5932667 UTC; its first input readiness was
+at 15:36:13.0671531, about 2.47s later. The first matching profile reports no warm
+candidate and 146745us ReadyWait. The child expires two seconds after preparation,
+but the same physical approach previously suppressed renewal hints for 2.5s.
+The timestamps bound a preparation gap; they do not expose the physical gesture.
+
+Fresh physical movement can now renew its hint after 2.1s, with 100ms beyond the
+unchanged independent 2s sender/receiver/service launch gates. A service hint may
+replace an unbound child with at most 500ms remaining. It first closes and joins
+the old child, then constructs at most one new child. Recent reentry preparations
+remain usable. A duplicate inside the cooldown does not launch or renew anything.
+No timer triggers rebuilding, extends an old deadline, or retries a lost request.
+Each new child still expires in 2s, claims only once, and independently verifies
+session, process, protected image and bootstrap authority before input.
+
+This removes the fixed 2.5s suppression gap for ongoing approaches, but an
+instantaneous first crossing or entry during cancelled construction can still
+fall back to a cold launch. Hint admission jitter can also defer preparation.
+The earlier renewal may cause slightly more bounded launches during sustained
+outward movement; it does not add a background process-creation loop.
