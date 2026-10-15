@@ -163,7 +163,24 @@ func monitorProductSessionObserved(ctx context.Context, ticks <-chan time.Time, 
 			deferred = true
 		}
 	}
+	expire := func() {
+		if ctx.Err() != nil {
+			return
+		}
+		if recordTrace != nil {
+			recordTrustExpiry(deadline, result, trace, record)
+		}
+		if trace != nil {
+			recordTrace(trace.Snapshot())
+		}
+		if ctx.Err() != nil {
+			return
+		}
+		record("session_trust_freshness_expired")
+		cancel()
+	}
 	for {
+		var completed trustCheckCompletion
 		select {
 		case <-ctx.Done():
 			if ctx.Err() == context.DeadlineExceeded {
@@ -171,19 +188,18 @@ func monitorProductSessionObserved(ctx context.Context, ticks <-chan time.Time, 
 			}
 			return
 		case <-freshness.C:
-			if ctx.Err() == nil {
-				if recordTrace != nil {
-					recordTrustExpiry(deadline, result, trace, record)
+			// A timely completed verdict and the old watchdog can become ready
+			// together after an observer stall. Consume the exact result first;
+			// neither select order nor delivery time defines validation freshness.
+			select {
+			case completed = <-result:
+			default:
+				expire()
+				if ctx.Err() == context.DeadlineExceeded {
+					record("session_certificate_deadline")
 				}
-				if trace != nil {
-					recordTrace(trace.Snapshot())
-				}
-				record("session_trust_freshness_expired")
-				cancel()
-			} else if ctx.Err() == context.DeadlineExceeded {
-				record("session_certificate_deadline")
+				return
 			}
-			return
 		case <-guardDone:
 			if ctx.Err() == nil {
 				record("session_guard_exited")
@@ -198,6 +214,10 @@ func monitorProductSessionObserved(ctx context.Context, ticks <-chan time.Time, 
 			}
 			if ctx.Err() != nil {
 				continue
+			}
+			if !time.Now().Before(deadline) {
+				expire()
+				return // Never enqueue a check with an already expired budget.
 			}
 			trace = nil
 			select {
@@ -222,6 +242,7 @@ func monitorProductSessionObserved(ctx context.Context, ticks <-chan time.Time, 
 			}(trace)
 			soft.Reset(trustReadTimeout)
 			softDone = soft.C
+			continue
 		case <-softDone:
 			softDone = nil
 			if ctx.Err() != nil {
@@ -231,78 +252,82 @@ func monitorProductSessionObserved(ctx context.Context, ticks <-chan time.Time, 
 				recordTrace(trace.Snapshot())
 			}
 			markDeferred()
-		case completed := <-result:
-			result = nil
-			softDone = nil
-			soft.Stop()
-			stopCheck()
-			stopCheck = nil
-			if ctx.Err() != nil {
-				if ctx.Err() == context.DeadlineExceeded {
-					record("session_certificate_deadline")
-				}
-				return
+			continue
+		case completed = <-result:
+		}
+		result = nil
+		softDone = nil
+		soft.Stop()
+		stopCheck()
+		stopCheck = nil
+		if ctx.Err() != nil {
+			if ctx.Err() == context.DeadlineExceeded {
+				record("session_certificate_deadline")
 			}
-			select {
-			case <-guardDone:
-				record("session_guard_exited")
-				cancel()
-				return
-			default:
-			}
-			err := completed.err
-			if err == nil {
-				if !completed.finished.Before(deadline) || !time.Now().Before(deadline) {
-					record("session_trust_freshness_expired")
-					cancel()
-					return
-				}
-				deadline = completed.finished.Add(trustValidationMaxAge)
-				freshness.Reset(time.Until(deadline))
-				if deferred {
-					record("session_trust_read_recovered")
-					deferred = false
-				}
-				if trace != nil {
-					snapshot := trace.Snapshot()
-					if snapshot.Elapsed >= 50*time.Millisecond {
-						recordTrace(snapshot)
-					}
-				}
-				continue
-			}
-			if ctx.Err() != nil {
-				if ctx.Err() == context.DeadlineExceeded {
-					record("session_certificate_deadline")
-				}
-				return
-			}
-			if trace != nil {
-				recordTrace(trace.Snapshot())
-			}
-			if errors.Is(err, context.DeadlineExceeded) {
+			return
+		}
+		select {
+		case <-guardDone:
+			record("session_guard_exited")
+			cancel()
+			return
+		default:
+		}
+		err := completed.err
+		if err == nil {
+			// Keep the unchanged five-second validity measured from actual
+			// validation completion. Late checks and already stale completions
+			// never revive a session or gain time from delayed observation.
+			if !completed.finished.Before(deadline) || !time.Now().Before(completed.finished.Add(trustValidationMaxAge)) {
 				record("session_trust_freshness_expired")
 				cancel()
 				return
 			}
-			if errors.Is(err, errTrustReadTimeout) || errors.Is(err, errTrustReadPending) || err == truststore.ErrStoreBusy {
-				markDeferred()
-				continue
+			deadline = completed.finished.Add(trustValidationMaxAge)
+			freshness.Reset(time.Until(deadline))
+			if deferred {
+				record("session_trust_read_recovered")
+				deferred = false
 			}
-			code := "session_trust_check_failed"
-			switch {
-			case errors.Is(err, errMonitorGuardExited):
-				code = "session_guard_exited"
-			case errors.Is(err, truststore.ErrPeerRevoked):
-				code = "session_trust_revoked"
-			case errors.Is(err, truststore.ErrPeerNotFound):
-				code = "session_trust_peer_missing"
-			case errors.Is(err, truststore.ErrStoreNotFound):
-				code = "session_trust_store_missing"
+			if trace != nil {
+				snapshot := trace.Snapshot()
+				if snapshot.Elapsed >= 50*time.Millisecond {
+					recordTrace(snapshot)
+				}
 			}
-			record(code)
+			continue
+		}
+		if ctx.Err() != nil {
+			if ctx.Err() == context.DeadlineExceeded {
+				record("session_certificate_deadline")
+			}
+			return
+		}
+		if trace != nil {
+			recordTrace(trace.Snapshot())
+		}
+		if errors.Is(err, context.DeadlineExceeded) {
+			record("session_trust_freshness_expired")
 			cancel()
 			return
 		}
+		if errors.Is(err, errTrustReadTimeout) || errors.Is(err, errTrustReadPending) || err == truststore.ErrStoreBusy {
+			markDeferred()
+			continue
+		}
+		code := "session_trust_check_failed"
+		switch {
+		case errors.Is(err, errMonitorGuardExited):
+			code = "session_guard_exited"
+		case errors.Is(err, truststore.ErrPeerRevoked):
+			code = "session_trust_revoked"
+		case errors.Is(err, truststore.ErrPeerNotFound):
+			code = "session_trust_peer_missing"
+		case errors.Is(err, truststore.ErrStoreNotFound):
+			code = "session_trust_store_missing"
+		}
+		record(code)
+		cancel()
+		return
 	}
 }
