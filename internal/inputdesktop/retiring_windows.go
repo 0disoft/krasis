@@ -51,32 +51,47 @@ func startRetiringThread(run func()) {
 	}()
 }
 
-type nativeRetiringThread struct{ handle windows.Handle }
+type nativeRetiringThread struct {
+	handle  windows.Handle
+	startup bool
+	wait    string
+}
 
 func pinRetiringThread() (retiringThread, error) {
 	var handle windows.Handle
+	startup := currentThreadID() == captureStartupThread
 	if err := windows.DuplicateHandle(windows.CurrentProcess(), windows.CurrentThread(),
 		windows.CurrentProcess(), &handle, windows.SYNCHRONIZE, false, 0); err != nil {
-		return nil, operationFailure("desktop-thread-exit", err)
+		return nil, captureThreadFailure("pin", startup, "", err)
 	}
-	return &nativeRetiringThread{handle: handle}, nil
+	return &nativeRetiringThread{handle: handle, startup: startup}, nil
 }
 
 func (t *nativeRetiringThread) join() error {
 	state, err := windows.WaitForSingleObject(t.handle, 1000)
+	t.wait, err = retiringWaitResult(state, err)
 	if err != nil {
-		return err
-	}
-	if state != windows.WAIT_OBJECT_0 {
-		if state == uint32(windows.WAIT_TIMEOUT) {
-			return windows.ERROR_TIMEOUT
-		}
-		return errors.New("capture native thread exit unconfirmed")
+		return captureThreadFailure("wait", t.startup, t.wait, err)
 	}
 	return nil
 }
 
-func (t *nativeRetiringThread) close() error { return windows.CloseHandle(t.handle) }
+func retiringWaitResult(state uint32, err error) (string, error) {
+	if err != nil {
+		return "failed", err
+	}
+	if state != windows.WAIT_OBJECT_0 {
+		if state == uint32(windows.WAIT_TIMEOUT) {
+			return "timeout", windows.ERROR_TIMEOUT
+		}
+		return "unexpected", errors.New("capture native thread exit unconfirmed")
+	}
+	return "signaled", nil
+}
+
+func (t *nativeRetiringThread) close() error {
+	return captureThreadFailure("close", t.startup, t.wait, windows.CloseHandle(t.handle))
+}
 
 // The caller has proved the exact bound OS thread terminated. CloseDesktop
 // cannot race its windows or attachment; the original desktop was only borrowed.

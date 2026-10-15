@@ -29,5 +29,8 @@ func FailureOperation(err error) string {
 	case "desktop-bind", "desktop-restore", "desktop-close", "desktop-thread-exit", "desktop-current", "desktop-open", "desktop-name", "desktop-active":
 		return operation.operation
 	}
+	if ValidCaptureThreadFailureOperation(operation.operation) {
+		return operation.operation
+	}
 	return ""
 }

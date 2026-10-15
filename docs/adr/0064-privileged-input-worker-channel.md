@@ -904,3 +904,22 @@ active-owner and physical-press fences remain unchanged. Fixed refresh refusal
 codes (active_owner, capture_busy, unavailable) now survive sanitized export;
 input contents and private error text are not added. Hosted tests do not establish
 whether the first observed lock reconnect is resolved on real machines.
+
+## Capture-thread failure evidence
+
+The original `desktop-thread-exit` fallback remains valid for old or unknown
+evidence. New native failures distinguish pin, wait and close in the existing
+operation field. The suffix `startup` means the owning thread matched the
+startup thread; `other` means it did not. Wait failures distinguish timeout,
+failed Win32 call and unexpected state. A handle-close failure also preserves
+the preceding wait result, including signaled. These are closed operation codes
+appended to the authenticated report vocabulary; existing numeric values and
+the 32-byte report layout do not change. Actual thread IDs and handle values
+are not serialized. Pin has no wait result because no wait occurred.
+
+Classification does not change exit proof, the one-second wait, desktop retention
+on unconfirmed exit or cleanup fencing. Native error numbers remain separate
+and are preserved through the worker report, service receipt and sanitized
+support. Tests cover actual invalid-handle wait/close, all bounded operation
+codes through report and export, plus successful real-thread retirement with
+one and multiple Go scheduler processors. No native input is generated.

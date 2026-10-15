@@ -4,6 +4,7 @@ package inputdesktop
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"golang.org/x/sys/windows"
@@ -12,6 +13,34 @@ import (
 type observedRetiringThread struct {
 	retiringThread
 	verified bool
+}
+
+func TestNativeRetiringWaitClassificationPreservesWin32AndNeverInfersExit(t *testing.T) {
+	for _, tc := range []struct {
+		state uint32
+		cause error
+		want  string
+	}{
+		{state: windows.WAIT_OBJECT_0, want: "signaled"},
+		{state: uint32(windows.WAIT_TIMEOUT), want: "timeout"},
+		{state: windows.WAIT_FAILED, cause: windows.ERROR_INVALID_HANDLE, want: "failed"},
+		{state: windows.WAIT_OBJECT_0, cause: windows.ERROR_ACCESS_DENIED, want: "failed"},
+		{state: 12345, want: "unexpected"},
+	} {
+		got, err := retiringWaitResult(tc.state, tc.cause)
+		if got != tc.want || (err == nil) != (got == "signaled") || tc.cause != nil && !errors.Is(err, tc.cause) {
+			t.Fatal("thread wait result changed its proof", got, err)
+		}
+	}
+	// Read-only invalid-handle operations verify native errors cross the actual
+	// join/close methods without creating a window, hook or input operation.
+	owner := &nativeRetiringThread{}
+	if err := owner.join(); !errors.Is(err, windows.ERROR_INVALID_HANDLE) || FailureOperation(err) != "desktop-thread-wait-other-failed" {
+		t.Fatal("native wait failure lost", err)
+	}
+	if err := owner.close(); !errors.Is(err, windows.ERROR_INVALID_HANDLE) || FailureOperation(err) != "desktop-thread-close-other-failed" {
+		t.Fatal("native close failure lost", err)
+	}
 }
 
 func (t *observedRetiringThread) join() error {

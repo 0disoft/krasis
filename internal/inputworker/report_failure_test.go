@@ -7,8 +7,29 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/0disoft/krasis/internal/inputdesktop"
 	"github.com/0disoft/krasis/internal/logindiag"
 )
+
+func TestCaptureThreadFailureDetailsSurviveReportAndSanitizedRuntimeReceipt(t *testing.T) {
+	for _, operation := range inputdesktop.CaptureThreadFailureOperations() {
+		var wire bytes.Buffer
+		failure := &workerReportFailure{operation: operation, cause: errors.Join(ErrRecovery, syscall.Errno(1460))}
+		if err := writeReport(&wire, Report{}, failure); err != nil {
+			t.Fatal(err)
+		}
+		_, received := readReport(&wire)
+		recorder := newLoginRuntimeRecorder(func(logindiag.Runtime) error { return nil })
+		recorder.record("service", "FAILED", serviceEndpointFailure(received, "capture"))
+		actual := recorder.value.LastFailure
+		if !errors.Is(received, ErrRecovery) || !errors.Is(received, syscall.Errno(1460)) || actual == nil || actual.Operation != operation || !actual.Win32Known || actual.Win32Error != 1460 || !recorder.value.Valid() {
+			t.Fatal("capture retirement evidence lost", operation, actual)
+		}
+	}
+	if len(reportOperations) > 256 {
+		t.Fatal("operation vocabulary exceeds its wire byte")
+	}
+}
 
 func TestWorkerFailureReceiptPreservesOperationNativeCauseAndRecoveryFence(t *testing.T) {
 	// Construct the exact fixed operation code the writer obtains from a source

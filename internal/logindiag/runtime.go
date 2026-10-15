@@ -1,6 +1,10 @@
 package logindiag
 
-import "time"
+import (
+	"time"
+
+	"github.com/0disoft/krasis/internal/inputdesktop"
+)
 
 // Runtime records service decisions, not live status or permission. It contains
 // no session/user identifier, endpoint, input value or raw native error text.
@@ -78,6 +82,9 @@ func (v Runtime) Valid() bool {
 }
 
 func ValidRuntimeOperation(operation string) bool {
+	if inputdesktop.ValidCaptureThreadFailureOperation(operation) {
+		return true
+	}
 	switch operation {
 	case "source-reader-read", "source-reader-eof", "source-reader-truncated", "source-reader-timeout", "source-reader-closed", "source-reader-invalid", "source-reader-authority", "worker-report-eof", "worker-report-truncated", "worker-report-invalid":
 		return true
