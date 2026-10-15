@@ -95,6 +95,22 @@ func (c *sourceClient) pollHeartbeat(ctx context.Context) (bool, error) {
 			return false, nil
 		}
 	}
-	_, err := c.callLockedChecked(check, sourceHeartbeat, proof)
+	// Preflight is not a sent request. Give the actual request its own budget,
+	// capped by the conservative idle deadline from the last successful request
+	// start. A slow SCM check must neither consume the ACK budget nor extend the
+	// worker's unchanged two-second liveness limit.
+	deadline := time.Now().Add(time.Second)
+	if !c.lastReplyRequestAt.IsZero() {
+		idle := c.lastReplyRequestAt.Add(IdleTimeout)
+		if idle.Before(deadline) {
+			deadline = idle
+		}
+	}
+	if !time.Now().Before(deadline) {
+		return false, nil
+	}
+	request, stopRequest := context.WithDeadline(context.WithoutCancel(ctx), deadline)
+	defer stopRequest()
+	_, err := c.callLockedChecked(request, sourceHeartbeat, proof)
 	return true, err
 }

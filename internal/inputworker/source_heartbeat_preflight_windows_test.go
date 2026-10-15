@@ -126,3 +126,43 @@ func TestSourceCommandExpiresDuringAuthenticationWithoutStartingRequest(t *testi
 		}
 	})
 }
+
+func TestHeartbeatPreflightDoesNotConsumeReplyBudgetOrExtendWorkerIdle(t *testing.T) {
+	for _, idleAge := range []time.Duration{500 * time.Millisecond, 1100 * time.Millisecond} {
+		t.Run(idleAge.String(), func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				server, conn := net.Pipe()
+				defer server.Close()
+				c := &sourceClient{channel: clientChannel(conn, authorityService), binding: Binding{1}, replies: make(chan sourcePacket, 1), done: make(chan struct{})}
+				defer c.channel.Close()
+				c.lastReplyRequestAt = time.Now().Add(-idleAge)
+				previous := c.lastReplyRequestAt
+				c.channel.authority.checkInput = func() error { time.Sleep(800 * time.Millisecond); return nil }
+				joined := make(chan struct{})
+				go func() {
+					defer close(joined)
+					p, err := readSourcePacket(server)
+					if err == nil {
+						time.Sleep(250 * time.Millisecond)
+						c.replies <- sourcePacket{kind: sourceReply, op: p.op, reply: p.sequence}
+					}
+				}()
+				attempted, err := c.pollHeartbeat(context.Background())
+				finished := time.Now()
+				<-joined
+				if !attempted || c.sequence != 1 {
+					t.Fatal("missing or replayed heartbeat", attempted, err)
+				}
+				if idleAge == 500*time.Millisecond {
+					if err != nil {
+						t.Fatal("preflight consumed the unsent request budget", err)
+					}
+				} else {
+					if err == nil || finished.After(previous.Add(IdleTimeout)) || !c.lastReplyRequestAt.Equal(previous) {
+						t.Fatal("heartbeat renewed expired liveness", err)
+					}
+				}
+			})
+		})
+	}
+}
