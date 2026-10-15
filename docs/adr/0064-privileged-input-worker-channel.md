@@ -923,3 +923,39 @@ and are preserved through the worker report, service receipt and sanitized
 support. Tests cover actual invalid-handle wait/close, all bounded operation
 codes through report and export, plus successful real-thread retirement with
 one and multiple Go scheduler processors. No native input is generated.
+
+## Bounded source lifetime summaries
+
+Each source child now reports command-result class, reader terminal cause,
+capture result, independent sender/Interrupt completion, retirement delivery
+and the final authenticated report status. Completion bits are set only when
+the cleanup owner actually consumes each operation's result; returning from
+SourceSession is not sender join proof. A timed-out Fail callback can still
+produce recovery-required with both sender and Interrupt joined. Safe command
+rejection, clean native retirement and a failed command report remain separate.
+
+The fixed 32-byte report uses version 3 and an explicit source-mode byte for
+these six bounded enum bytes. It never aliases source evidence with completed
+input counts or pressed-journal recovery counts. Versions 1/2 keep their
+original interpretation. Unknown enums, reserved bytes, contradictory successful
+reports with incomplete joins, and source metadata on an injection lease are
+rejected. The same-revision installed worker/service image checks are unchanged;
+old services cannot consume version 3. This internal report change requires a
+new protected-service build before device verification.
+
+The service stamps each received source summary once with its own time and
+publishes immutable history without taking the persistence mutex or doing disk
+I/O on the source endpoint. Existing policy observations (or the final service
+record) persist at most 16 summaries plus a saturating lifetime total in LOGIN-RUNTIME.
+The reader's maximum document size grows from 2 KiB to 16 KiB for that bounded
+history. State polls do not generate entries, persistence failure does not mark
+an unwritten entry saved, and later service decisions retain prior failure and
+source history. This is diagnostic history, never authorization or release
+proof. A missing/invalid report continues through the existing recovery fence
+and worker-exit observation rather than fabricating completion fields.
+
+Tests exercise the actual stalled-sender lease-expiry path through the new
+report, independently stalled Interrupt, command/reader outcome separation,
+legacy reports, malformed source reports, immutable bounded persistence,
+failed saves and sanitized support. No key/PIN content, identifiers, coordinates
+or raw error strings are added. Device validation remains pending.

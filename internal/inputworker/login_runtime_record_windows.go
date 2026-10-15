@@ -33,6 +33,9 @@ func saveLoginRuntime(v logindiag.Runtime) error {
 	if err != nil {
 		return err
 	}
+	if len(data) > maxLoginRuntimeBytes {
+		return ErrAuthority
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	pending := filepath.Join(root, "LOGIN-RUNTIME.pending")
@@ -76,8 +79,8 @@ func ReadLoginRuntime() (*logindiag.Runtime, error) {
 		return nil, err
 	}
 	defer file.Close()
-	data, err := io.ReadAll(io.LimitReader(file, 2049))
-	if err != nil || len(data) > 2048 {
+	data, err := io.ReadAll(io.LimitReader(file, maxLoginRuntimeBytes+1))
+	if err != nil || len(data) > maxLoginRuntimeBytes {
 		return nil, ErrAuthority
 	}
 	d := json.NewDecoder(bytes.NewReader(data))

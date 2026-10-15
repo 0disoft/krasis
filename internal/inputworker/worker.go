@@ -14,6 +14,7 @@ import (
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/handoff"
 	"github.com/0disoft/krasis/internal/inputdesktop"
+	"github.com/0disoft/krasis/internal/logindiag"
 )
 
 const (
@@ -57,6 +58,7 @@ type Lease struct {
 type Report struct {
 	Completed uint64
 	Recovery  application.ReleaseReport
+	Source    *logindiag.SourceExit
 }
 
 type executor func(context.Context, func() error) error

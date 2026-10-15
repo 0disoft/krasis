@@ -85,13 +85,23 @@ func TestLeaseExpiryCannotCertifyUnjoinedSourceSender(t *testing.T) {
 		t.Fatal("sender must remain blocked for reproduction")
 	}
 	result := sourceCaptureFinal(run.Err(), inputdesktop.ErrInactive, sender, true)
+	exit := cleanSourceExit()
+	started, senderJoined, interruptJoined := session.CleanupCompletion()
+	if !started || senderJoined || !interruptJoined {
+		t.Fatal("running sender classified as joined", started, senderJoined, interruptJoined)
+	}
+	exit.Sender, exit.Interrupt = joinedSourceState(senderJoined), joinedSourceState(interruptJoined)
+	exit.Retirement = "failed_sent"
 	var wire bytes.Buffer
-	if err := writeReport(&wire, Report{}, result); err != nil {
+	if err := writeReport(&wire, Report{Source: &exit}, result); err != nil {
 		t.Fatal(err)
 	}
 	status := wire.Bytes()[5]
 	report, received := readReport(&wire)
 	_, received = receipt(report, received)
+	if report.Source == nil || report.Source.Sender != "unjoined" || report.Source.Interrupt != "joined" || report.Source.Report != "recovery" {
+		t.Fatal("actual sender completion evidence lost across report", report.Source)
+	}
 	t.Logf("senderReturned=%v retirementStatus=%d reportStatus=%d serviceFence=%v", sink.returned.Load(), sourceRetirementStatus(result), status, serviceRecoveryFailure(received, nil))
 	if !errors.Is(result, ErrRecovery) || sourceRetirementStatus(result) != 1 || status != 2 || serviceRecoveryFailure(received, nil) == nil {
 		t.Fatal("running sender certified as clean retirement", result)

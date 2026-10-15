@@ -142,6 +142,7 @@ type SourceSession struct {
 	observer      SourcePipelineObserver
 	queueObserver SourceQueueObserver
 	cleanup       time.Duration
+	cleanupState  atomic.Uint32
 	queue         chan *queuedAction
 	queueDepth    atomic.Int64
 	queueMu       sync.Mutex
@@ -491,6 +492,11 @@ func (session *SourceSession) cleanupSession(
 	fail bool,
 ) error {
 	session.Deactivate()
+	state := uint32(1) // Cleanup entered; each join is observed independently.
+	if senderDone == nil {
+		state |= 2 // Caller already consumed the sender's result.
+	}
+	session.cleanupState.Store(state)
 	timeout := session.cleanup
 	if timeout <= 0 {
 		timeout = SourceCleanupTimeout
@@ -509,8 +515,10 @@ func (session *SourceSession) cleanupSession(
 		select {
 		case interruptErr = <-interruptDone:
 			interruptDone = nil
+			session.cleanupState.Or(4)
 		case senderErr = <-senderDone:
 			senderDone = nil
+			session.cleanupState.Or(2)
 			if sourceErrorsOnly(senderErr, context.Canceled, ctx.Err()) {
 				senderErr = nil
 			}

@@ -18,6 +18,30 @@ func TestThreadRetirementDetailsSurviveSupportWithoutThreadIdentity(t *testing.T
 	}
 }
 
+func TestSourceExitHistorySurvivesSupportAndRejectsPrivateOutcomes(t *testing.T) {
+	exit := logindiag.SourceExit{Time: "2026-10-15T08:01:00Z", Command: "inspection", Reader: "cancelled", Capture: "joined", Sender: "joined", Interrupt: "joined", Retirement: "clean_sent", Report: "failed"}
+	v := logindiag.Runtime{StartedAt: "2026-10-15T08:00:00Z", Time: "2026-10-15T08:01:00Z", Service: "READY", Console: "USER_SESSION", Grant: "PRESENT", LastWorker: "NONE", Source: &logindiag.SourceHistory{Total: 1, Exits: []logindiag.SourceExit{exit}}}
+	for _, private := range []bool{false, true} {
+		if private {
+			v.Source.Exits[0].Command = "SECRET/input"
+		}
+		data, _ := json.Marshal(v)
+		raw := append([]byte(`{"schema":"krasis.support/v1","created":"2026-10-15T08:02:00Z","logs":[],"loginRuntime":`), data...)
+		raw = append(raw, '}')
+		clean, err := SanitizeSupport(raw)
+		if err != nil || strings.Contains(string(clean), "SECRET") {
+			t.Fatal("source exit leaked private data", err)
+		}
+		if private {
+			if !strings.Contains(string(clean), "loginRuntimeIncomplete") {
+				t.Fatal("invalid source history became trustworthy")
+			}
+		} else if !strings.Contains(string(clean), `"command":"inspection"`) || !strings.Contains(string(clean), `"report":"failed"`) || !strings.Contains(string(clean), `"service":"READY"`) {
+			t.Fatal("failed command, clean retirement and live service collapsed")
+		}
+	}
+}
+
 func TestRuntimeReceiptTransferRetainsFailureWithoutPrivateFields(t *testing.T) {
 	v := logindiag.Runtime{StartedAt: "2026-10-11T00:00:00Z", Time: "2026-10-11T00:01:00Z", Service: "READY", Console: "USER_SESSION", Grant: "PRESENT", LastWorker: "FAILED", LastFailure: &logindiag.RuntimeFailure{Time: "2026-10-11T00:00:30Z", Stage: "start", Win32Error: 5, Win32Known: true}}
 	data, _ := json.Marshal(v)

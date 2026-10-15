@@ -15,6 +15,7 @@ import (
 
 	"github.com/0disoft/krasis/internal/handoff"
 	"github.com/0disoft/krasis/internal/inputdesktop"
+	"github.com/0disoft/krasis/internal/logindiag"
 	"github.com/0disoft/krasis/internal/wininput"
 	"golang.org/x/sys/windows"
 )
@@ -35,6 +36,7 @@ func runInstalledAgentLease(ctx context.Context, channel *Channel, lease Lease, 
 }
 
 func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, agentDigest, serviceDigest [sha256.Size]byte, installation *Installation, candidate *preparedConsole, afterReady ...func()) (report Report, result error) {
+	defer func() { result = validateSourceReportMode(lease.Capture, report, result) }()
 	if candidate != nil {
 		defer func() {
 			if candidate.close() != nil {
@@ -236,11 +238,12 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 	}()
 	defer func() { _ = control.Close(); <-readerDone }()
 	if lease.Capture {
+		var exit logindiag.SourceExit
 		result := runSourceCapture(run, channel, proof, lease, func() error {
 			_ = control.SetWriteDeadline(time.Now().Add(startupTimeout))
 			return writeStartupReady(control, profile)
-		})
-		return finishWorkerReport(control, Report{}, result)
+		}, &exit)
+		return finishWorkerReport(control, Report{Source: &exit}, result)
 	}
 	if lease.Presentation {
 		desktopStarted := time.Now()

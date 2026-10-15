@@ -85,6 +85,6 @@ func runInstalledLoginService(ctx context.Context, installation *Installation, r
 		return grant.Selection(now)
 	}}
 	return runLoginService(ctx, gate, func(lifetime context.Context, admit func(context.Context) error) error {
-		return runServiceWithSource(lifetime, installation, admit, func(run context.Context) error { return runServiceLoopWithGate(run, installation, nil, admit, pipe) })
+		return runServiceWithSource(lifetime, installation, admit, func(run context.Context) error { return runServiceLoopWithGate(run, installation, nil, admit, pipe) }, recorder.recordSourceExit)
 	})
 }

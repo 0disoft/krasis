@@ -81,6 +81,10 @@ func TestSourceCleanupTimeoutMarksUnjoinedInterruptAndFailure(t *testing.T) {
 			if !errors.Is(result, ErrSourceCleanupIncomplete) || !errors.Is(result, context.DeadlineExceeded) {
 				t.Fatal("independent cleanup timeout lost", result)
 			}
+			started, senderJoined, interruptJoined := session.CleanupCompletion()
+			if !started || !senderJoined || interruptJoined == interrupt {
+				t.Fatal("cleanup return confused with independent operation joins", started, senderJoined, interruptJoined)
+			}
 		})
 	}
 }

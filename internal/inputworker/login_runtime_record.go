@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/0disoft/krasis/internal/logindiag"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -11,6 +12,7 @@ type loginRuntimeRecorder struct {
 	mu      sync.Mutex
 	value   logindiag.Runtime
 	persist func(logindiag.Runtime) error
+	source  atomic.Pointer[logindiag.SourceHistory]
 }
 
 func newLoginRuntimeRecorder(persist func(logindiag.Runtime) error) *loginRuntimeRecorder {
@@ -23,6 +25,9 @@ func (r *loginRuntimeRecorder) record(stage, value string, cause error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	next := r.value
+	if source := r.source.Load(); source != nil {
+		next.Source = source
+	}
 	switch stage {
 	case "console":
 		next.Console = value

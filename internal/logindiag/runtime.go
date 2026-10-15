@@ -16,6 +16,7 @@ type Runtime struct {
 	Grant       string          `json:"grant"`
 	LastWorker  string          `json:"lastWorker"`
 	LastFailure *RuntimeFailure `json:"lastFailure,omitempty"`
+	Source      *SourceHistory  `json:"source,omitempty"`
 }
 type RuntimeFailure struct {
 	Time       string      `json:"time"`
@@ -59,6 +60,9 @@ func (v Runtime) Valid() bool {
 		return false
 	}
 	if v.LastWorker != "NONE" && v.LastWorker != "STARTING" && v.LastWorker != "STARTED" && v.LastWorker != "FAILED" && v.LastWorker != "STOPPED" {
+		return false
+	}
+	if v.Source != nil && !v.Source.Valid(started, stamp) {
 		return false
 	}
 	if f := v.LastFailure; f != nil {

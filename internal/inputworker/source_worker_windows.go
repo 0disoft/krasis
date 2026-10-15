@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/logindiag"
 	"github.com/0disoft/krasis/internal/peer"
 	"github.com/0disoft/krasis/internal/wininput"
 )
@@ -85,7 +86,11 @@ func (q *sourcePointerQueue) Observe(a control.InputAction, x int32) error {
 
 // The child owns native suppression and physical pressed state. The medium
 // agent keeps mTLS, outbound lease negotiation and the network action sender.
-func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, lease Lease, ready func() error) (result error) {
+func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, lease Lease, ready func() error, exit *logindiag.SourceExit) (result error) {
+	if exit == nil {
+		return ErrProtocol
+	}
+	*exit = emptySourceExit()
 	if !lease.Capture || lease.Presentation {
 		return ErrProtocol
 	}
@@ -131,20 +136,31 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 	defer func() {
 		cancel()
 		capture, sender := <-hookDone, <-sourceDone
+		exit.Capture = "joined"
+		if !sourceTransitionOnly(capture, run.Err() == context.DeadlineExceeded) {
+			exit.Capture = "failed"
+		}
+		if started, senderJoined, interruptJoined := session.CleanupCompletion(); started {
+			exit.Sender, exit.Interrupt = joinedSourceState(senderJoined), joinedSourceState(interruptJoined)
+		}
 		result = errors.Join(result, firstCommandFailure)
 		emergency := errors.Is(errors.Join(result, capture, sender), wininput.ErrEmergencyRelease)
 		result = sourceCaptureFinal(result, capture, sender, run.Err() == context.DeadlineExceeded)
 		if stopping != nil {
 			response := sourcePacket{kind: sourceReply, op: sourceStop, reply: stopping.sequence}
 			response.status = sourceRetirementStatus(result)
-			result = sourceRetirementDelivery(result, writer.write(response, nil, true))
+			delivery := writer.write(response, nil, true)
+			exit.Retirement = sourceRetirementOutcome(response.status, delivery)
+			result = sourceRetirementDelivery(result, delivery)
 		} else {
 			response := sourcePacket{kind: sourceRetired}
 			response.status = sourceRetirementStatus(result)
 			if emergency && result == nil {
 				response.op = 1
 			}
-			result = sourceRetirementDelivery(result, writer.write(response, nil, true))
+			delivery := writer.write(response, nil, true)
+			exit.Retirement = sourceRetirementOutcome(response.status, delivery)
+			result = sourceRetirementDelivery(result, delivery)
 		}
 		if closeErr := channel.Close(); closeErr != nil {
 			result = errors.Join(result, ErrRecovery, &workerReportFailure{operation: "source-channel-close", cause: closeErr})
@@ -177,15 +193,19 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 	}
 	first, err := read()
 	if err != nil {
+		exit.Reader = sourceReaderOutcome(err)
 		return err
 	}
+	exit.Reader = "stopped"
 	if first.op != sourceStart {
+		exit.Reader = "invalid"
 		return ErrProtocol
 	}
 	if err := writer.send(sourcePacket{kind: sourceReply, op: sourceStart, reply: first.sequence}, nil); err != nil {
 		return err
 	}
 	writer.started.Store(true)
+	exit.Command = "ok"
 	requests := make(chan sourcePacket, 1)
 	readDone := make(chan error, 1)
 	go func() { readDone <- pumpSourceCommands(run, read, requests, cancel) }()
@@ -193,7 +213,9 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 	defer func() {
 		cancel()
 		stopReads()
-		result = errors.Join(result, <-readDone)
+		readerErr := <-readDone
+		exit.Reader = sourceReaderOutcome(readerErr)
+		result = errors.Join(result, readerErr)
 	}()
 	var pendingReturn uint64
 	var cursorPrepared func()
@@ -275,6 +297,9 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 				err = operation()
 			} else {
 				err = hook.ExecuteSourceDesktop(run, operation)
+			}
+			if exit.Command == "not_started" || exit.Command == "ok" {
+				exit.Command = sourceCommandOutcome(err)
 			}
 			if p.op == sourceAdmit && err != nil {
 				if !sourceRetryableInspection(err) {
