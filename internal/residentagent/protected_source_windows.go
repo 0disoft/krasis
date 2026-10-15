@@ -116,7 +116,15 @@ func (h *protectedSource) RunWithBoundary(ctx context.Context, session *wininput
 				session.ResumeCapture()
 				h.prepared = true
 			}
+			// A secure owner must finish its bounded startup handshake before
+			// cancellation can request and verify native retirement. A lifecycle
+			// event received during startup is coalesced until this exact owner
+			// announces readiness; it cannot publish stale capture readiness.
+			retireStartup := usingSecure && h.refresh && attempt.Err() == nil
 			h.mu.Unlock()
+			if retireStartup {
+				stop(wininput.ErrSourceCaptureRefresh)
+			}
 			if current {
 				code := "installed_source_capture_ready"
 				if usingSecure {
@@ -202,6 +210,7 @@ func (h *protectedSource) refreshIdleOwnerLocked() (bool, sourceRefreshRefusal) 
 	if !h.session.PauseCapture() {
 		return false, sourceRefreshCaptureBusy
 	}
+	wasPrepared := h.prepared
 	h.epoch++
 	h.refresh, h.prepared = true, false
 	select {
@@ -209,7 +218,12 @@ func (h *protectedSource) refreshIdleOwnerLocked() (bool, sourceRefreshRefusal) 
 	default:
 	}
 	if h.stop != nil {
-		h.stop(wininput.ErrSourceCaptureRefresh)
+		// Interrupting the authenticated startup IPC discards its retirement
+		// proof. Its original startup timeout still bounds this wait. The
+		// readiness callback will retire it before any capture is resumed.
+		if !h.remoteOwner || wasPrepared {
+			h.stop(wininput.ErrSourceCaptureRefresh)
+		}
 	}
 	return true, sourceRefreshAccepted
 }

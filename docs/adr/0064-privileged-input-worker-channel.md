@@ -880,3 +880,27 @@ and invalid data without changing the recovery fence; the exact owned process
 exit observation still occurs before job cleanup. Unknown numbers remain unknown,
 and no private exception text or input content is serialized. Numeric child
 report operation codes are appended so existing code values do not change.
+
+## g297: Coalesce desktop refresh during protected capture startup
+
+The g296 paired collection `6261840b98e20a1cbee3939bdac89380` retained
+service READY on both machines but recorded B's desktop switch, full session
+reconnect, then a source refresh failure during the new owner's startup. The
+service start times did not change. The first full reconnect's refresh-refusal
+reason was absent because those fixed event codes were missing from productlog's
+allowlist; no specific refusal reason is inferred from that absence.
+
+A verified idle refresh now fences readiness immediately but coalesces events
+while a protected owner is still starting. The existing bounded startup finishes
+before the readiness callback requests native retirement, so cancellation does
+not sever the startup IPC before its sourceStop proof can be read. Only the
+replacement may resume capture. Ordinary shutdown still cancels immediately;
+startup failure, failed retirement and joined cleanup errors remain failures.
+
+Tests hold startup behind a barrier, deliver duplicate desktop-switch events,
+then verify exactly one replacement, one readiness notification and no readiness
+from the old owner. A joined cleanup failure prevents replacement. The existing
+active-owner and physical-press fences remain unchanged. Fixed refresh refusal
+codes (active_owner, capture_busy, unavailable) now survive sanitized export;
+input contents and private error text are not added. Hosted tests do not establish
+whether the first observed lock reconnect is resolved on real machines.

@@ -1,12 +1,20 @@
 package productlog
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/0disoft/krasis/internal/inputworker"
 )
 
 func TestInputConnectionDiagnosticAllowlistRejectsDynamicStages(t *testing.T) {
+	for _, reason := range []string{"active_owner", "capture_busy", "unavailable"} {
+		line := `{"time":"2026-10-15T08:37:44Z","code":"installed_source_refresh_` + reason + `","key":"private"}` + "\n"
+		result := sanitizeLog("agent.jsonl", strings.NewReader(line))
+		if len(result.Events) != 1 || result.Events[0].Code != "installed_source_refresh_"+reason {
+			t.Fatal("refresh refusal lost from exported diagnostics", reason)
+		}
+	}
 	if !allowed["installed_return_cursor_cancelled"] || !allowed["installed_return_cursor_startup_service_launch_lt1s"] || !allowed["installed_return_cursor_startup_worker_desktop_ready_lt1ms"] {
 		t.Fatal("cursor startup evidence missing from sanitized export")
 	}

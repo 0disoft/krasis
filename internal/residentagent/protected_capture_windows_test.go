@@ -127,3 +127,60 @@ type retiringSecureTest struct {
 func (s *retiringSecureTest) RunWithBoundary(ctx context.Context, session *wininput.SourceSession, boundary wininput.BoundaryObserver, ready func()) error {
 	return s.run(ctx, session, boundary, ready)
 }
+
+func TestProtectedRefreshDuringStartupWaitsForOwnershipBeforeRetirement(t *testing.T) {
+	for _, cleanupFailed := range []bool{false, true} {
+		t.Run(map[bool]string{false: "joined", true: "cleanup failed"}[cleanupFailed], func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			startup, release := make(chan context.Context, 1), make(chan struct{})
+			replacement, done := make(chan struct{}), make(chan error, 1)
+			var calls, ready atomic.Int32
+			failure := errors.New("native cleanup unconfirmed")
+			h := &protectedSource{blocked: func() bool { return true }}
+			h.SetProtectedSource(&retiringSecureTest{run: protectedTestHook(func(attempt context.Context, _ *wininput.SourceSession, _ wininput.BoundaryObserver, signal func()) error {
+				if calls.Add(1) == 1 {
+					startup <- attempt
+					<-release
+					// The real source client has verified sourceStart before this
+					// callback. Only then can cancellation obtain sourceStop ACK.
+					signal()
+					<-attempt.Done()
+					if cleanupFailed {
+						return errors.Join(attempt.Err(), failure)
+					}
+					return attempt.Err()
+				}
+				signal()
+				close(replacement)
+				<-attempt.Done()
+				return attempt.Err()
+			})})
+			go func() { done <- h.RunWithBoundary(ctx, &wininput.SourceSession{}, nil, func() { ready.Add(1) }) }()
+			attempt := awaitTransitionSignal(t, startup)
+			for i := 0; i < 2; i++ {
+				if !h.refreshDesktop("desktop_switch") {
+					t.Fatal("startup transition rejected")
+				}
+			}
+			if attempt.Err() != nil || h.captureReady() || ready.Load() != 0 {
+				t.Fatal("startup IPC interrupted or stale readiness published")
+			}
+			close(release)
+			if cleanupFailed {
+				if err := awaitTransitionSignal(t, done); !errors.Is(err, failure) || calls.Load() != 1 || ready.Load() != 0 {
+					t.Fatal("cleanup failure hidden by startup cancellation", err)
+				}
+				return
+			}
+			awaitTransitionSignal(t, replacement)
+			if calls.Load() != 2 || ready.Load() != 1 || !h.captureReady() {
+				t.Fatal("coalesced transition did not replace exactly one owner")
+			}
+			cancel()
+			if err := awaitTransitionSignal(t, done); !errors.Is(err, context.Canceled) {
+				t.Fatal(err)
+			}
+		})
+	}
+}

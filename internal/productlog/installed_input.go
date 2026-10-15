@@ -26,7 +26,7 @@ func init() {
 	for _, code := range []string{"installed_input_failure_ack_unconfirmed", "installed_input_failure_before_apply", "installed_input_failure_after_dispatch", "installed_input_failure_stage_unknown"} {
 		allowed[code] = true
 	}
-	for _, code := range []string{"installed_source_refresh_requested", "installed_source_refresh_joined", "installed_source_refresh_failed", "installed_source_capture_ready", "installed_source_capture_protected_ready", "boundary_pressed_native_only", "boundary_pressed_hook_only", "boundary_pressed_native_and_hook"} {
+	for _, code := range []string{"installed_source_refresh_requested", "installed_source_refresh_joined", "installed_source_refresh_failed", "installed_source_refresh_active_owner", "installed_source_refresh_capture_busy", "installed_source_refresh_unavailable", "installed_source_capture_ready", "installed_source_capture_protected_ready", "boundary_pressed_native_only", "boundary_pressed_hook_only", "boundary_pressed_native_and_hook"} {
 		allowed[code] = true
 	}
 	for _, stage := range []string{"client_lock", "client_authority", "client_write", "client_response", "worker_authority", "worker_scope", "worker_apply"} {
