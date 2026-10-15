@@ -207,8 +207,13 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 	writer.started.Store(true)
 	exit.Command = "ok"
 	requests := make(chan sourcePacket, 1)
+	completed := make(chan struct{})
 	readDone := make(chan error, 1)
-	go func() { readDone <- pumpSourceCommands(run, read, requests, cancel) }()
+	go func() {
+		readDone <- pumpSourceCommandsOrdered(run, read, requests, cancel, completed, func(p sourcePacket) error {
+			return writer.send(sourcePacket{kind: sourceReply, op: sourceHeartbeat, reply: p.sequence}, nil)
+		})
+	}()
 	// Retire only this read; the final native response still needs the writer.
 	defer func() {
 		cancel()
@@ -326,6 +331,11 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 				}
 				if failure := sourceCommandCompletion(err, writer.send(response, nil)); failure != nil {
 					return failure
+				}
+				select {
+				case completed <- struct{}{}:
+				case <-run.Done():
+					return run.Err()
 				}
 			}
 		}

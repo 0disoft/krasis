@@ -71,11 +71,28 @@ func readSourceCommand(reader io.Reader, local context.Context, binding Binding,
 // Its terminal result is joined independently of cancellation of the worker.
 // A read/authentication/validation failure therefore cannot become success.
 func pumpSourceCommands(run context.Context, read func() (sourcePacket, error), requests chan<- sourcePacket, cancel context.CancelFunc) error {
+	return pumpSourceCommandsOrdered(run, read, requests, cancel, nil, nil)
+}
+
+// Production commands are serial request/ACK operations. Do not let the next
+// reader idle timeout run while the previous command is still executing. An
+// authenticated heartbeat has no native operation and can reply directly here,
+// without waiting for the window-free dispatcher or advisory boundary traffic.
+// Waiting for completion prevents a pipelined heartbeat overtaking an earlier
+// native command. Real read/validation/write failures still cancel the owner.
+func pumpSourceCommandsOrdered(run context.Context, read func() (sourcePacket, error), requests chan<- sourcePacket, cancel context.CancelFunc, completed <-chan struct{}, heartbeat func(sourcePacket) error) error {
 	for {
 		p, err := read()
 		if err != nil {
 			cancel()
 			return err
+		}
+		if heartbeat != nil && p.op == sourceHeartbeat {
+			if err := heartbeat(p); err != nil {
+				cancel()
+				return err
+			}
+			continue
 		}
 		select {
 		case requests <- p:
@@ -84,6 +101,13 @@ func pumpSourceCommands(run context.Context, read func() (sourcePacket, error), 
 		}
 		if p.op == sourceStop {
 			return nil
+		}
+		if completed != nil {
+			select {
+			case <-completed:
+			case <-run.Done():
+				return run.Err()
+			}
 		}
 	}
 }
