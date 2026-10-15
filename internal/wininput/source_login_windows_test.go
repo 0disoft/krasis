@@ -4,8 +4,10 @@ package wininput
 
 import (
 	"context"
+	"errors"
 	"testing"
 
+	"github.com/0disoft/krasis/internal/inputdesktop"
 	"golang.org/x/sys/windows"
 )
 
@@ -37,6 +39,32 @@ func TestLoginSourceHookRejectsOrdinaryProcessBeforeCapture(t *testing.T) {
 	protected, _ := NewProtectedSourceHook(func() error { return nil })
 	if err := protected.onDesktop(context.Background(), func(context.Context) error { ready = true; return nil }); err == nil || ready {
 		t.Fatal("ordinary process entered disposable protected capture", err)
+	}
+	if err := protected.ExecuteSourceDesktop(context.Background(), func() error { ready = true; return nil }); err == nil || ready {
+		t.Fatal("ordinary process entered protected command desktop", err)
+	}
+}
+
+func TestProtectedSourceCommandPreservesCleanupFailureAndCancellation(t *testing.T) {
+	old := sourceCommandDesktop
+	defer func() { sourceCommandDesktop = old }()
+	var calls int
+	failure := errors.Join(inputdesktop.ErrCleanup, errors.New("synthetic restore failure"))
+	sourceCommandDesktop = func(ctx context.Context, authorize func() error, callback func(*inputdesktop.Scope) error) error {
+		calls++
+		if ctx.Err() != nil || authorize() != nil || callback == nil {
+			t.Fatal("missing live scope or authentication")
+		}
+		return failure
+	}
+	hook, _ := NewProtectedSourceHook(func() error { return nil })
+	if err := hook.ExecuteSourceDesktop(context.Background(), func() error { t.Fatal("callback escaped scope"); return nil }); !errors.Is(err, inputdesktop.ErrCleanup) {
+		t.Fatal("restore failure was erased", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := hook.ExecuteSourceDesktop(ctx, func() error { return nil }); err != context.Canceled || calls != 1 {
+		t.Fatal("cancelled command acquired another desktop", err, calls)
 	}
 }
 

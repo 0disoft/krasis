@@ -8,6 +8,16 @@ import (
 )
 
 func TestInputConnectionDiagnosticAllowlistRejectsDynamicStages(t *testing.T) {
+	for _, code := range []string{"installed_source_timing_client_response_lt1s", "installed_source_heartbeat_timing_client_authority_ge1s", "installed_source_failure_protocol"} {
+		line := `{"time":"2026-10-15T09:40:00Z","code":"` + code + `","error":"PRIVATE"}` + "\n"
+		result := sanitizeLog("agent.jsonl", strings.NewReader(line))
+		if result.Incomplete || len(result.Events) != 1 || result.Events[0].Code != code {
+			t.Fatal("source timing/phase lost from sanitized export", code)
+		}
+	}
+	if allowed["installed_source_failure_PRIVATE"] || allowed["installed_source_timing_client_response_123ms"] || allowed["installed_source_timing_worker_apply_lt1ms"] {
+		t.Fatal("dynamic or unmeasured source timing accepted")
+	}
 	for _, result := range []string{"deferred", "failed"} {
 		line := `{"time":"2026-10-15T09:40:00Z","code":"installed_source_heartbeat_` + result + `","error":"PRIVATE"}` + "\n"
 		result := sanitizeLog("agent.jsonl", strings.NewReader(line))

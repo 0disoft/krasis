@@ -1,6 +1,9 @@
 package productlog
 
 func init() {
+	for _, stage := range []string{"context", "authority", "write", "response", "protocol"} {
+		allowed["installed_source_failure_"+stage] = true
+	}
 	allowed["installed_source_heartbeat_deferred"] = true
 	allowed["installed_source_heartbeat_failed"] = true
 	for _, target := range []string{"default", "winlogon", "limit"} {
@@ -38,6 +41,10 @@ func init() {
 		for _, bucket := range []string{"lt1ms", "lt10ms", "lt100ms", "lt1s", "ge1s"} {
 			allowed["installed_input_timing_"+stage+"_"+bucket] = true
 			allowed["installed_input_heartbeat_timing_"+stage+"_"+bucket] = true
+			if stage == "client_lock" || stage == "client_authority" || stage == "client_write" || stage == "client_response" {
+				allowed["installed_source_timing_"+stage+"_"+bucket] = true
+				allowed["installed_source_heartbeat_timing_"+stage+"_"+bucket] = true
+			}
 		}
 	}
 	for _, code := range []string{"installed_input_selected", "installed_input_lease_ready", "installed_input_connect_failed", "installed_input_heartbeat_failed", "installed_input_preparation_acknowledged", "installed_input_preparation_missed", "installed_source_receive_only"} {

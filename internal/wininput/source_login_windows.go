@@ -37,6 +37,21 @@ func NewProtectedSourceHook(authorize func() error) (*SourceHook, error) {
 // Admission/native pressed-state queries run on the same authenticated desktop
 // policy as capture. A medium process cannot use this to gain a token or scope.
 func (hook *SourceHook) ExecuteSourceDesktop(ctx context.Context, callback func() error) error {
+	if ctx == nil || callback == nil {
+		return inputdesktop.ErrInvalid
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if hook.interactiveSource {
+		// These commands create no windows or hooks: activation and cursor work
+		// are posted to their existing native owners. Borrow/restore a desktop
+		// rather than creating and joining a disposable capture thread per call.
+		// The actual hook/window owners still use RunCapture below.
+		return sourceCommandDesktop(context.Background(), hook.loginAuthorize, func(scope *inputdesktop.Scope) error {
+			return scope.Do(ctx, callback)
+		})
+	}
 	return hook.onDesktop(ctx, func(owned context.Context) error {
 		if err := sourceLoginDesktopCheck(owned); err != nil {
 			return err
@@ -44,6 +59,8 @@ func (hook *SourceHook) ExecuteSourceDesktop(ctx context.Context, callback func(
 		return callback()
 	})
 }
+
+var sourceCommandDesktop = inputdesktop.RunPresentation
 
 func (hook *SourceHook) onDesktop(ctx context.Context, run func(context.Context) error) error {
 	if hook.loginAuthorize == nil {

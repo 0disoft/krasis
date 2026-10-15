@@ -41,6 +41,7 @@ func timingCode(stage int, bucket byte) string {
 type timingSampler struct {
 	emit      func(string)
 	heartbeat bool
+	source    bool
 	started   time.Time
 	maximum   [7]byte
 }
@@ -70,6 +71,9 @@ func (sampler *timingSampler) flush(now time.Time) {
 			if code := timingCode(stage, bucket); code != "" {
 				if sampler.heartbeat {
 					code = "installed_input_heartbeat_timing_" + code[len("installed_input_timing_"):]
+				}
+				if sampler.source {
+					code = "installed_source_" + code[len("installed_input_"):]
 				}
 				emitTiming(sampler.emit, code)
 			}

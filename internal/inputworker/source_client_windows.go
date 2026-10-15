@@ -25,18 +25,20 @@ type CaptureSource struct {
 	observe func(string) // configured before Run; fixed timing/route codes only.
 }
 type sourceClient struct {
-	channel  *Channel
-	binding  Binding
-	mu       sync.Mutex
-	sequence uint64
-	epoch    atomic.Uint64
-	retired  atomic.Bool
-	retiring atomic.Bool
-	pending  sourcePacket // Under mu; only the already fully written optional request.
-	failed   chan struct{}
-	replies  chan sourcePacket
-	done     chan struct{}
-	err      error
+	channel                 *Channel
+	binding                 Binding
+	mu                      sync.Mutex
+	sequence                uint64
+	epoch                   atomic.Uint64
+	retired                 atomic.Bool
+	retiring                atomic.Bool
+	pending                 sourcePacket // Under mu; only the already fully written optional request.
+	failed                  chan struct{}
+	replies                 chan sourcePacket
+	done                    chan struct{}
+	err                     error
+	timing, heartbeatTiming timingSampler // Protected by mu; no input payloads.
+	lockWait                time.Duration
 }
 
 func (s *AgentService) NewSourceCapture() *CaptureSource          { return &CaptureSource{service: s} }
@@ -79,13 +81,32 @@ func (c *CaptureSource) AdmitBoundary(ctx context.Context, _ control.BoundaryInt
 }
 
 func (c *sourceClient) call(ctx context.Context, op byte, reference ...uint64) (sourcePacket, error) {
+	started := time.Now()
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.lockWait = time.Since(started)
 	return c.callLocked(ctx, op, reference...)
 }
 
 // Caller holds mu through the entire command and exact reply observation.
-func (c *sourceClient) callLocked(ctx context.Context, op byte, reference ...uint64) (sourcePacket, error) {
+func (c *sourceClient) callLocked(ctx context.Context, op byte, reference ...uint64) (response sourcePacket, result error) {
+	sample := [7]byte{timingBucket(c.lockWait)}
+	c.lockWait = 0
+	sampler := &c.timing
+	if op == sourceHeartbeat {
+		sampler = &c.heartbeatTiming
+	}
+	stage := "context"
+	defer func() {
+		now := time.Now()
+		sampler.observe(sample, now)
+		if result != nil || op == sourceStop {
+			sampler.flush(now)
+		}
+		if result != nil && sampler.emit != nil {
+			emitTiming(sampler.emit, "installed_source_failure_"+stage)
+		}
+	}()
 	if op == sourceStop {
 		select {
 		case <-c.done:
@@ -123,7 +144,11 @@ func (c *sourceClient) callLocked(ctx context.Context, op byte, reference ...uin
 		default:
 		}
 	}
-	if c.channel.authority.check(false) != nil {
+	stage = "authority"
+	started := time.Now()
+	authorityErr := c.channel.authority.check(false)
+	sample[1] = timingBucket(time.Since(started))
+	if authorityErr != nil {
 		return sourcePacket{}, ErrAuthority
 	}
 	select {
@@ -153,15 +178,29 @@ func (c *sourceClient) callLocked(ctx context.Context, op byte, reference ...uin
 	if deadline, ok := ctx.Deadline(); ok && deadline.Before(limit) {
 		limit = deadline
 	}
-	if c.channel.stream.SetWriteDeadline(limit) != nil || writeFrame(c.channel.stream, data[:]) != nil {
+	stage = "write"
+	started = time.Now()
+	writeErr := c.channel.stream.SetWriteDeadline(limit)
+	if writeErr == nil {
+		writeErr = writeFrame(c.channel.stream, data[:])
+	}
+	sample[2] = timingBucket(time.Since(started))
+	if writeErr != nil {
 		c.epoch.Store(0)
 		_ = c.channel.Close()
 		return sourcePacket{}, ErrAuthority
 	}
 	timer := time.NewTimer(time.Until(limit))
 	defer timer.Stop()
-	if reply, known := waitSourceReply(ctx, timer.C, c.replies, c.done); known {
+	stage = "response"
+	started = time.Now()
+	reply, known := waitSourceReply(ctx, timer.C, c.replies, c.done)
+	sample[3] = timingBucket(time.Since(started))
+	if known {
 		result, err := sourceReplyResult(p, reply)
+		if err == ErrProtocol {
+			stage = "protocol"
+		}
 		accepted = err != ErrProtocol
 		if err != nil && op == sourceActivate {
 			c.epoch.Store(0)
@@ -235,6 +274,8 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 		return errors.Join(wininput.ErrProtectedInput, ErrSourceCaptureRetired)
 	}
 	live := &sourceClient{channel: channel, binding: binding, replies: make(chan sourcePacket, 1), done: make(chan struct{}), failed: make(chan struct{})}
+	live.timing = timingSampler{emit: c.observe, source: true}
+	live.heartbeatTiming = timingSampler{emit: c.observe, source: true, heartbeat: true}
 	go func() {
 		defer close(live.done)
 		var sequence uint64
