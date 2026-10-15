@@ -227,7 +227,9 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 		}
 		switch p := work.packet; p.kind {
 		case sourceBoundary:
-			if err := writer.send(p, nil); err != nil {
+			var batch [sourceBoundaryBatchLimit]sourcePacket
+			n := collectSourceBoundaries(p, queue.events, requests, &batch)
+			if err := writer.sendBoundaries(batch[:n]); err != nil {
 				return err
 			}
 		case sourceReturn:

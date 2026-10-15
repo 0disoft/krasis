@@ -30,6 +30,7 @@ type sourceClient struct {
 	binding                 Binding
 	mu                      sync.Mutex
 	commandWaiting          atomic.Int32 // Published before mu; idle maintenance yields to queued commands.
+	preflightExpired        atomic.Bool  // At most one fixed diagnostic per capture owner.
 	sequence                uint64
 	lastReplyRequestAt      time.Time // Under mu; request start, only after its exact successful reply.
 	epoch                   atomic.Uint64

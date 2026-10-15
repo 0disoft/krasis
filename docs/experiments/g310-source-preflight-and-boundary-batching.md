@@ -28,6 +28,8 @@ during preflight makes maintenance unnecessary. An expired *unsent* preflight
 does not consume a sequence, fabricate an ACK, renew liveness or close the owner.
 Failed authentication remains fatal. Already-written requests retain their exact
 reply, one-second budget and cleanup policy; the worker's 2s idle limit is unchanged.
+An expired unsent preflight emits one fixed `installed_source_heartbeat_preflight_expired`
+code per capture owner; it cannot spam input logs or be mistaken for a sent timeout.
 
 Capture commands also recheck their context after synchronous authentication,
 before publishing an epoch or writing. Authentication is not asynchronously
@@ -37,3 +39,23 @@ CaptureProfile appends four process-local spans: IPC lock, authority, write and
 reply wait. Existing indices stay unchanged. CaptureSource now forwards the
 current attempt context to those spans; no command contents or identities are
 added to diagnostics. Unmeasured worker/native subspans remain unmeasured.
+
+## Already-queued boundary notifications
+
+Only advisory local pointer notifications are drained in batches of at most 16
+64-byte packets. No collection timer is added. Pending authenticated commands
+stop draining. All edge, retreat, direction, binding and sequence samples are
+preserved, with no coalescing and no change to the remote input sender. One fresh
+authority check covers one bounded (<=1KiB) pipe write instead of up to 16 checks
+and writes. A single notification is still sent immediately. Invalid packets
+and authentication failures send nothing; partial delivery remains fatal.
+
+This reduces synchronous Windows queries and context switches competing with
+capture/peer dispatch, but does not establish the cause of the 223.616ms network
+grant wait. Already-written frames are never reprioritized or retried. No socket
+security/power policy, lease timeouts, SCM ACL, service startup or OS setting changes.
+
+Tests verify overlapping read-only proof checks plus joined exclusive close,
+activation while heartbeat authentication is blocked, unsent deadline expiry,
+one-use heartbeat-only proof, all packet samples/sequences, one check per batch,
+invalid/unauthorized batch rejection and bounded draining that yields to commands.

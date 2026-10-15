@@ -71,8 +71,15 @@ func TestExpiredHeartbeatPreflightSendsNothingAndPreservesOwner(t *testing.T) {
 		c := &sourceClient{channel: clientChannel(conn, authorityService), binding: Binding{1}, done: make(chan struct{})}
 		defer c.channel.Close()
 		c.channel.authority.checkInput = func() error { time.Sleep(1100 * time.Millisecond); return nil }
-		if attempted, err := c.pollHeartbeat(context.Background()); attempted || err != nil {
-			t.Fatal("expired unsent heartbeat became a transport failure", attempted, err)
+		var events []string
+		c.heartbeatTiming.emit = func(code string) { events = append(events, code) }
+		for range 2 {
+			if attempted, err := c.pollHeartbeat(context.Background()); attempted || err != nil {
+				t.Fatal("expired unsent heartbeat became a transport failure", attempted, err)
+			}
+		}
+		if len(events) != 1 || events[0] != "installed_source_heartbeat_preflight_expired" {
+			t.Fatal("expired preflight evidence missing or unbounded", events)
 		}
 		if c.sequence != 0 || !c.lastReplyRequestAt.IsZero() || c.channel.authority.closed {
 			t.Fatal("unsent preflight changed liveness, sequence or proof lifetime")

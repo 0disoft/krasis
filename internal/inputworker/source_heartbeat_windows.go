@@ -77,6 +77,9 @@ func (c *sourceClient) pollHeartbeat(ctx context.Context) (bool, error) {
 		return false, err
 	}
 	if check.Err() != nil {
+		if !c.preflightExpired.Swap(true) && c.heartbeatTiming.emit != nil {
+			emitTiming(c.heartbeatTiming.emit, "installed_source_heartbeat_preflight_expired")
+		}
 		return false, nil // Nothing sent; no sequence, ACK or liveness renewal.
 	}
 	if c.commandWaiting.Load() != 0 || !c.mu.TryLock() {
