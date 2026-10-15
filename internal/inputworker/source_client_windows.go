@@ -28,7 +28,9 @@ type sourceClient struct {
 	channel                 *Channel
 	binding                 Binding
 	mu                      sync.Mutex
+	commandWaiting          atomic.Int32 // Published before mu; idle maintenance yields to queued commands.
 	sequence                uint64
+	lastReplyRequestAt      time.Time // Under mu; request start, only after its exact successful reply.
 	epoch                   atomic.Uint64
 	retired                 atomic.Bool
 	retiring                atomic.Bool
@@ -81,6 +83,8 @@ func (c *CaptureSource) AdmitBoundary(ctx context.Context, _ control.BoundaryInt
 }
 
 func (c *sourceClient) call(ctx context.Context, op byte, reference ...uint64) (sourcePacket, error) {
+	c.commandWaiting.Add(1)
+	defer c.commandWaiting.Add(-1)
 	started := time.Now()
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -180,6 +184,7 @@ func (c *sourceClient) callLocked(ctx context.Context, op byte, reference ...uin
 	}
 	stage = "write"
 	started = time.Now()
+	requestStarted := started
 	writeErr := c.channel.stream.SetWriteDeadline(limit)
 	if writeErr == nil {
 		writeErr = writeFrame(c.channel.stream, data[:])
@@ -202,6 +207,12 @@ func (c *sourceClient) callLocked(ctx context.Context, op byte, reference ...uin
 			stage = "protocol"
 		}
 		accepted = err != ErrProtocol
+		if err == nil {
+			// A completed authenticated command already supplies liveness.
+			// Use its request start, never a late reply's completion, so slow
+			// responses cannot postpone the worker's unchanged idle deadline.
+			c.lastReplyRequestAt = requestStarted
+		}
 		if err != nil && op == sourceActivate {
 			c.epoch.Store(0)
 		}
