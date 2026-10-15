@@ -21,7 +21,7 @@ const (
 type Authority struct {
 	kind               authorityKind
 	agentStarted       uint64 // Kernel process creation time, immutable auth evidence.
-	mu                 sync.Mutex
+	mu                 sync.RWMutex
 	closed             bool
 	checkInput         func() error
 	checkInputObserved func(context.Context) error
@@ -43,8 +43,11 @@ func (authority *Authority) checkObserved(ctx context.Context, recovery bool) er
 	if ctx != nil && !recovery {
 		started = time.Now()
 	}
-	authority.mu.Lock()
-	defer authority.mu.Unlock()
+	// Checks only query immutable pinned handles; independent readers must not
+	// queue behind a slow SCM/WTS query. Close still joins every reader before
+	// releasing those handles.
+	authority.mu.RLock()
+	defer authority.mu.RUnlock()
 	if !started.IsZero() {
 		handoff.RecordAuthority(ctx, handoff.AuthorityLock, time.Since(started))
 	}

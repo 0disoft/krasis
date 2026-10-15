@@ -12,6 +12,7 @@ import (
 
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/handoff"
 	"github.com/0disoft/krasis/internal/peer"
 	"github.com/0disoft/krasis/internal/wininput"
 )
@@ -51,11 +52,17 @@ func (c *CaptureSource) Active() bool {
 	return live != nil && live.epoch.Load() != 0
 }
 func (c *CaptureSource) Activate() error {
+	return c.ActivateProfile(context.Background())
+}
+func (c *CaptureSource) ActivateProfile(profile context.Context) error {
+	if profile == nil {
+		profile = context.Background()
+	}
 	live := c.client()
 	if live == nil {
 		return ErrAuthority
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(profile, time.Second)
 	defer cancel()
 	_, err := live.call(ctx, sourceActivate)
 	return err
@@ -89,11 +96,20 @@ func (c *sourceClient) call(ctx context.Context, op byte, reference ...uint64) (
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.lockWait = time.Since(started)
+	if op == sourceActivate {
+		handoff.RecordCapture(ctx, handoff.CaptureIPCLock, c.lockWait)
+	}
 	return c.callLocked(ctx, op, reference...)
 }
 
 // Caller holds mu through the entire command and exact reply observation.
 func (c *sourceClient) callLocked(ctx context.Context, op byte, reference ...uint64) (response sourcePacket, result error) {
+	return c.callLockedChecked(ctx, op, nil, reference...)
+}
+
+// Only pollHeartbeat can supply a fresh check made immediately before TryLock.
+// It cannot authorize a capture/cursor command or survive a wait for the gate.
+func (c *sourceClient) callLockedChecked(ctx context.Context, op byte, heartbeat *sourceHeartbeatCheck, reference ...uint64) (response sourcePacket, result error) {
 	sample := [7]byte{timingBucket(c.lockWait)}
 	c.lockWait = 0
 	sampler := &c.timing
@@ -150,10 +166,28 @@ func (c *sourceClient) callLocked(ctx context.Context, op byte, reference ...uin
 	}
 	stage = "authority"
 	started := time.Now()
-	authorityErr := c.channel.authority.check(false)
-	sample[1] = timingBucket(time.Since(started))
+	var authorityErr error
+	var authorityElapsed time.Duration
+	if heartbeat == nil {
+		authorityErr = c.channel.authority.check(false)
+		authorityElapsed = time.Since(started)
+	} else {
+		authorityErr = heartbeat.validate(c, ctx, op)
+		authorityElapsed = heartbeat.elapsed
+	}
+	sample[1] = timingBucket(authorityElapsed)
+	if op == sourceActivate {
+		handoff.RecordCapture(ctx, handoff.CaptureIPCAuthority, authorityElapsed)
+	}
 	if authorityErr != nil {
 		return sourcePacket{}, ErrAuthority
+	}
+	if ctx.Err() != nil {
+		// A synchronous OS check can outlive the caller's budget. No command
+		// has been written: do not consume sequence, publish an epoch or close
+		// an otherwise authenticated owner as if a request had timed out.
+		accepted = true
+		return sourcePacket{}, ctx.Err()
 	}
 	select {
 	case <-c.done:
@@ -190,6 +224,9 @@ func (c *sourceClient) callLocked(ctx context.Context, op byte, reference ...uin
 		writeErr = writeFrame(c.channel.stream, data[:])
 	}
 	sample[2] = timingBucket(time.Since(started))
+	if op == sourceActivate {
+		handoff.RecordCapture(ctx, handoff.CaptureIPCWrite, time.Since(started))
+	}
 	if writeErr != nil {
 		c.epoch.Store(0)
 		_ = c.channel.Close()
@@ -201,6 +238,9 @@ func (c *sourceClient) callLocked(ctx context.Context, op byte, reference ...uin
 	started = time.Now()
 	reply, known := waitSourceReply(ctx, timer.C, c.replies, c.done)
 	sample[3] = timingBucket(time.Since(started))
+	if op == sourceActivate {
+		handoff.RecordCapture(ctx, handoff.CaptureIPCResponse, time.Since(started))
+	}
 	if known {
 		result, err := sourceReplyResult(p, reply)
 		if err == ErrProtocol {

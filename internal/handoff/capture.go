@@ -27,6 +27,10 @@ const (
 	CaptureTotal
 	CaptureBoundaryBefore
 	CaptureBoundaryAfter
+	CaptureIPCLock
+	CaptureIPCAuthority
+	CaptureIPCWrite
+	CaptureIPCResponse
 	CaptureStageCount
 )
 
