@@ -11,6 +11,7 @@ import (
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/handoff"
+	"github.com/0disoft/krasis/internal/inputdesktop"
 )
 
 const (
@@ -150,6 +151,7 @@ type response struct {
 	measured            uint8
 	applyDetail         *handoff.WorkerApplyProfile
 	failureStage        failureStage
+	desktop             inputdesktop.DesktopClass
 }
 
 func writeResponse(writer io.Writer, value response) error {
@@ -233,6 +235,7 @@ func writeResponse(writer io.Writer, value response) error {
 			size += 2
 		}
 	}
+	attachDesktopDiagnostic(data[:size], value.desktop)
 	n, err := writer.Write(data[:size])
 	if err == nil && n != size {
 		return io.ErrShortWrite
@@ -241,10 +244,12 @@ func writeResponse(writer io.Writer, value response) error {
 }
 
 func decodeResponse(data [responseSize]byte) (response, error) {
+	desktop := detachDesktopDiagnostic(&data)
 	if string(data[:4]) != "KRA1" || data[4] < 1 || data[4] > 7 || (data[4] < 3 && data[23] != 0) {
 		return response{}, ErrProtocol
 	}
 	value := response{op: operation(data[5]), status: data[6], certainty: data[7],
+		desktop:  desktop,
 		sequence: binary.BigEndian.Uint64(data[8:16]), requested: binary.BigEndian.Uint16(data[16:18]), inserted: binary.BigEndian.Uint16(data[18:20])}
 	if data[4] >= 6 && value.status != 1 {
 		return response{}, ErrProtocol

@@ -29,6 +29,7 @@ func encodeWorkerSubmission(data []byte, p handoff.WorkerApplyProfile) {
 // Read the diagnostic and private cursor suffix together. A profiled cursor
 // response retains two reads and one write, with no extra request or roundtrip.
 func readResponseSuffix(reader io.Reader, version byte, value *response) error {
+	version = legacyResponseVersion(version)
 	var data [workerApplyDetailSize + workerSubmissionDetailSize + 18]byte
 	size := 0
 	if version >= 4 {

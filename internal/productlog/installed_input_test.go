@@ -8,6 +8,16 @@ import (
 )
 
 func TestInputConnectionDiagnosticAllowlistRejectsDynamicStages(t *testing.T) {
+	for _, target := range []string{"default", "winlogon", "limit"} {
+		line := `{"time":"2026-10-15T09:40:00Z","code":"installed_input_desktop_` + target + `","desktopName":"PRIVATE"}` + "\n"
+		result := sanitizeLog("agent.jsonl", strings.NewReader(line))
+		if result.Incomplete || len(result.Events) != 1 || result.Events[0].Code != "installed_input_desktop_"+target {
+			t.Fatal("fixed desktop class lost", target)
+		}
+	}
+	if allowed["installed_input_desktop_PRIVATE"] {
+		t.Fatal("arbitrary desktop name admitted")
+	}
 	for _, reason := range []string{"active_owner", "capture_busy", "unavailable"} {
 		line := `{"time":"2026-10-15T08:37:44Z","code":"installed_source_refresh_` + reason + `","key":"private"}` + "\n"
 		result := sanitizeLog("agent.jsonl", strings.NewReader(line))

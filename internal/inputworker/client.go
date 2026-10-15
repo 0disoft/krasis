@@ -12,6 +12,7 @@ import (
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/handoff"
+	"github.com/0disoft/krasis/internal/inputdesktop"
 	"github.com/0disoft/krasis/internal/syncgate"
 )
 
@@ -20,14 +21,16 @@ import (
 // and expiry before construction; this constructor does not authorize a peer.
 // A lost acknowledgement is never retried or sent to another input backend.
 type Client struct {
-	mu               syncgate.Mutex
-	channel          *Channel
-	lease            Lease
-	sequence         uint64
-	failed           bool
-	timing           timingSampler
-	heartbeatTiming  timingSampler
-	lastAcknowledged time.Time
+	mu                  syncgate.Mutex
+	channel             *Channel
+	lease               Lease
+	sequence            uint64
+	failed              bool
+	timing              timingSampler
+	heartbeatTiming     timingSampler
+	lastAcknowledged    time.Time
+	lastDesktop         inputdesktop.DesktopClass
+	desktopObservations uint8
 }
 
 // SetTimingObserver enables bounded diagnostic summaries. The observer must
@@ -220,6 +223,7 @@ func (client *Client) performResponse(ctx context.Context, command request, obse
 		return unknownInput(ErrProtocol)
 	}
 	copy(sample[4:], ack.timing[:])
+	client.observeDesktop(ack.desktop)
 	if command.op != opHeartbeat {
 		handoff.WorkerDetail(ctx, ack.timing, ack.millis, ack.measured)
 		if command.applyDetail {

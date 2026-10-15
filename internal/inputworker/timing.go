@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/0disoft/krasis/internal/handoff"
+	"github.com/0disoft/krasis/internal/inputdesktop"
 )
 
 // Timing separates input from idle maintenance with coarse elapsed-time buckets,
@@ -85,6 +86,7 @@ func emitTiming(emit func(string), code string) {
 }
 
 type workerTiming struct {
+	desktop  inputdesktop.DesktopClass
 	buckets  [3]byte
 	millis   [3]uint16
 	measured uint8

@@ -110,7 +110,13 @@ func serveReadyProfileOnDesktop(ctx context.Context, channel *Channel, input app
 		}
 		var runErr error
 		timing := &workerTiming{}
-		inputDo := beforeInputCertainty(measureExecution(func() error { return authority.check(false) }, scope.Do, timing))
+		execute := func(ctx context.Context, operation func() error) error {
+			return scope.Do(ctx, func() error {
+				timing.desktop = scope.DiagnosticDesktop()
+				return operation()
+			})
+		}
+		inputDo := beforeInputCertainty(measureExecution(func() error { return authority.check(false) }, execute, timing))
 		recoveryDo := func(ctx context.Context, operation func() error) error {
 			if err := authority.check(true); err != nil {
 				return err
@@ -225,6 +231,7 @@ func serve(ctx context.Context, stream net.Conn, input application.InputPort, le
 		if len(timings) == 1 && timings[0] != nil {
 			ack.timing = timings[0].buckets
 			ack.millis, ack.measured = timings[0].millis, timings[0].measured
+			ack.desktop = timings[0].desktop
 		}
 		if operationErr != nil {
 			ack.status = 1

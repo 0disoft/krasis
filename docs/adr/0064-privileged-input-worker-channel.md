@@ -981,3 +981,29 @@ details. No error text, desktop/window name, PIN, key or clipboard content is
 recorded. Tests cover a canceled session with late native cleanup failure and
 sanitized export of both valid and malformed summaries. A successful device
 test remains required before claiming the observed disconnection is fixed.
+
+## Observed input desktop
+
+An installed input worker samples a fixed Default/Winlogon/unknown class only
+inside the authorized desktop callback, after native activity validation. The
+class comes from its exact verified bound handle, including the current binding
+after an interactive switch. It is cleared before each operation; a rejected
+scope cannot reuse the preceding operation's observation. It never selects a
+target, authorizes input, or infers desktop identity from a passkey dialog name.
+
+Internal ACK versions 8..14 mirror layouts 1..7 and use two high certainty-byte
+bits for this independent diagnostic class. Packet sizes, cursor suffixes,
+read/write counts and request bytes remain unchanged. Decoding removes the
+metadata before applying every existing status/certainty check. Unknown class
+values discard the observation without changing the input outcome. Installed
+agent/service image matching remains mandatory; old workers are not mixed with
+the new codec.
+
+Only matching authenticated responses emit fixed `installed_input_desktop_`
+default/winlogon events, once per observed transition, capped at 32 per lease
+plus one limit event. Existing run/connection correlation identifies the input
+worker route. No PIN, key/button value, arbitrary OS name, handle or path is
+exported. Tests cover every legacy ACK layout, one-byte reads, following-frame
+alignment, native handle provenance, scope rejection after a successful input,
+foreign ACKs, bounded observations and sanitized export. Runtime validation
+of actual lock/PIN transitions remains a separate device-test requirement.
