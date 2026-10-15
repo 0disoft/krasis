@@ -234,11 +234,12 @@ func loadNamed(localAppData, name string) (Record, error) {
 	return record, nil
 }
 
-// RecoveryDirectories preserves both successful launch generations. An unreadable
+// RecoveryDirectories preserves recent launches and the actual recovery task's
+// last successful target. An unreadable
 // record prevents cleanup rather than making its image eligible for deletion.
 func RecoveryDirectories(base string) ([]string, error) {
 	var paths []string
-	for _, name := range []string{"current.json", "previous.json"} {
+	for _, name := range []string{"current.json", "previous.json", recoveryTaskRecord} {
 		record, err := loadNamed(base, name)
 		if errors.Is(err, ErrMissing) || errors.Is(err, os.ErrNotExist) {
 			continue
@@ -246,7 +247,17 @@ func RecoveryDirectories(base string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		paths = append(paths, filepath.Dir(record.Executable))
+		path := filepath.Dir(record.Executable)
+		found := false
+		for _, prior := range paths {
+			if strings.EqualFold(prior, path) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			paths = append(paths, path)
+		}
 	}
 	return paths, nil
 }

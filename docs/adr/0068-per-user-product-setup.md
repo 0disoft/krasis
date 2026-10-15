@@ -37,6 +37,16 @@ to the new image and register the fixed login CLI. Repeated repair cannot outrun
 task ownership history. A foreign or unreadable task blocks this registration;
 it is never silently deleted or adopted. A missing settings file keeps the
 first-install default, while malformed settings abort installation.
+
+The verified last successful scheduler target is separately retained in
+`launch/recovery-task.json`. Ordinary UI registrations can rotate current and
+previous records twice (build directory, then immutable update copy) before the
+task migrates. Those rotations must not erase the still-installed task's ownership
+or let update cleanup remove its executable. Task mutation and this receipt are
+serialized under the launch-registration lock; failed scheduler writes retain
+the old receipt. Disabling the owned task removes its receipt. Inspection remains
+read-only and still rejects a task with no matching ownership evidence. Uninstall
+checks and removes this receipt only for its own image directories.
 Before staging or replacing installation receipts, setup also checks both launch
 history records and the visible Installed Apps and startup registrations. Missing
 shell registrations remain repairable; foreign paths, unreadable values and

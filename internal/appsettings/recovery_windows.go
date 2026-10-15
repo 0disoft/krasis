@@ -145,19 +145,23 @@ func runRecoveryTask(base, suffix string, enabled, inspect bool) error {
 			return errors.New("invalid recovery task suffix")
 		}
 	}
+	if !inspect {
+		return launchrecord.UpdateRecoveryTask(base, enabled, func(record launchrecord.Record, previous []string) error {
+			return runRecoveryScript(base, suffix, enabled, false, record, previous)
+		})
+	}
 	record, err := launchrecord.Load(base)
 	if err != nil && !(inspect && errors.Is(err, launchrecord.ErrMissing)) {
 		return errors.New("recovery launch record unavailable")
-	}
-	if enabled && !inspect {
-		if _, err = launchrecord.Inspect(base); err != nil {
-			return errors.New("recovery launch image invalid")
-		}
 	}
 	previous, err := launchrecord.RecoveryDirectories(base)
 	if err != nil {
 		return errors.New("recovery launch history unavailable")
 	}
+	return runRecoveryScript(base, suffix, enabled, inspect, record, previous)
+}
+
+func runRecoveryScript(base, suffix string, enabled, inspect bool, record launchrecord.Record, previous []string) error {
 	for i := range previous {
 		previous[i] = filepath.Join(previous[i], "krasis.exe")
 	}

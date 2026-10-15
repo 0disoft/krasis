@@ -11,7 +11,7 @@ import (
 	"github.com/0disoft/krasis/internal/securefs"
 )
 
-// ValidateRecordRemoval checks both records without inspecting their executable
+// ValidateRecordRemoval checks launch and recovery-task records without inspecting their executable
 // bytes: installation removal may include a damaged or already removed image.
 func ValidateRecordRemoval(base string, directories []string) error {
 	_, err := recordNamesInDirectories(base, directories)
@@ -25,7 +25,7 @@ func recordNamesInDirectories(base string, directories []string) ([]string, erro
 		}
 	}
 	var names []string
-	for _, name := range []string{"current.json", "previous.json"} {
+	for _, name := range []string{"current.json", "previous.json", recoveryTaskRecord} {
 		r, err := loadNamed(base, name)
 		if errors.Is(err, ErrMissing) {
 			continue

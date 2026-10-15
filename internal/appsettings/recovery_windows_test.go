@@ -64,6 +64,26 @@ func TestRecoveryTaskRegistrationIsUserScopedAndReversible(t *testing.T) {
 	if err := runRecoveryTask(base, suffix, false, true); err != nil {
 		t.Fatal("read-only query did not find registered task", err)
 	}
+	// Registration can rotate twice before the next successful scheduler update:
+	// first the portable CLI records a build folder, then the UI publishes its
+	// immutable copy. Keep the actual old action owned across both rotations.
+	for range 2 {
+		relocated := t.TempDir()
+		for _, name := range []string{"krasis.exe", "krasis-cli.exe"} {
+			if err := os.WriteFile(filepath.Join(relocated, name), []byte("not executable; isolated task"), 0600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := launchrecord.Register(base, filepath.Join(relocated, "krasis.exe"), 192, strings.Repeat("a", 40)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := runRecoveryTask(base, suffix, false, true); !errors.Is(err, errRecoveryTaskInactive) {
+		t.Fatal("previous task became foreign or current after double rotation", err)
+	}
+	if err := setRecoveryTask(base, suffix, true); err != nil {
+		t.Fatal("double-rotated owned task could not migrate", err)
+	}
 	// A new successful UI folder must update the same owned task, rather than
 	// pinning it forever to an old generation or replacing an unrelated task.
 	next := t.TempDir()
@@ -129,10 +149,24 @@ func TestRecoveryTaskPreflightWithoutHistoryAllowsAbsenceButRejectsOrphan(t *tes
 	if err := os.Rename(current, backup); err != nil {
 		t.Fatal(err)
 	}
+	// The durable scheduler receipt is also ownership proof. A missing UI record
+	// alone no longer makes this an orphan, but can never report it current.
+	ownedErr := runRecoveryTask(base, suffix, false, true)
+	receipt := filepath.Join(base, "Krasis", "launch", "recovery-task.json")
+	if err := os.Rename(receipt, receipt+".test-backup"); err != nil {
+		_ = os.Rename(backup, current)
+		t.Fatal(err)
+	}
 	err := runRecoveryTask(base, suffix, false, true)
 	// Restore history even when the assertion fails so cleanup retains proof.
+	if restoreErr := os.Rename(receipt+".test-backup", receipt); restoreErr != nil {
+		t.Fatal(restoreErr)
+	}
 	if restoreErr := os.Rename(backup, current); restoreErr != nil {
 		t.Fatal(restoreErr)
+	}
+	if !errors.Is(ownedErr, errRecoveryTaskInactive) {
+		t.Fatal("recorded old task became current or foreign without current UI record", ownedErr)
 	}
 	if err == nil || errors.Is(err, errRecoveryTaskInactive) {
 		t.Fatal("orphan task accepted without launch ownership", err)

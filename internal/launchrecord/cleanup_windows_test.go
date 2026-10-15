@@ -27,6 +27,11 @@ func TestRemovalPreservesExternalRecordsInBothLaunchOrders(t *testing.T) {
 			if err := Register(base, filepath.Join(image, "krasis.exe"), i+1, "test"); err != nil {
 				t.Fatal(err)
 			}
+			if image == installed {
+				if err := UpdateRecoveryTask(base, true, func(Record, []string) error { return nil }); err != nil {
+					t.Fatal(err)
+				}
+			}
 		}
 		launch, _ := Directory(base)
 		preserved, removed := "previous.json", "current.json"
@@ -52,6 +57,9 @@ func TestRemovalPreservesExternalRecordsInBothLaunchOrders(t *testing.T) {
 		}
 		if _, err := os.Stat(filepath.Join(launch, removed)); !os.IsNotExist(err) {
 			t.Fatal("installed launch history was retained", err)
+		}
+		if _, err := os.Stat(filepath.Join(launch, recoveryTaskRecord)); !os.IsNotExist(err) {
+			t.Fatal("removed installation retained scheduler ownership record", err)
 		}
 	}
 }
