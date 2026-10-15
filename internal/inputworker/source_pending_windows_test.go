@@ -11,11 +11,21 @@ import (
 )
 
 func TestOptionalSourceTimeoutDrainsExactReplyBeforeCleanStop(t *testing.T) {
+	for _, op := range []byte{sourceCursorPrepare, sourceHeartbeat} {
+		t.Run(map[byte]string{sourceCursorPrepare: "cursor", sourceHeartbeat: "idle-heartbeat"}[op], func(t *testing.T) {
+			testSourceTimeoutDrainsExactReplyBeforeCleanStop(t, op)
+		})
+	}
+}
+
+func testSourceTimeoutDrainsExactReplyBeforeCleanStop(t *testing.T, op byte) {
 	server, conn := net.Pipe()
 	defer server.Close()
 	c := &sourceClient{channel: clientChannel(conn, authorityService), binding: Binding{1}, replies: make(chan sourcePacket, 1), done: make(chan struct{}), failed: make(chan struct{})}
 	defer c.channel.Close()
-	c.epoch.Store(42)
+	if op != sourceHeartbeat {
+		c.epoch.Store(42)
+	}
 	sent, release, stopped := make(chan struct{}), make(chan struct{}), make(chan struct{})
 	go func() {
 		p, err := readSourcePacket(server)
@@ -24,7 +34,11 @@ func TestOptionalSourceTimeoutDrainsExactReplyBeforeCleanStop(t *testing.T) {
 		}
 		close(sent)
 		<-release
-		c.replies <- sourcePacket{kind: sourceReply, op: p.op, reply: p.sequence, status: 1}
+		status := byte(1)
+		if op == sourceHeartbeat {
+			status = 0
+		}
+		c.replies <- sourcePacket{kind: sourceReply, op: p.op, reply: p.sequence, status: status}
 		stop, err := readSourcePacket(server)
 		if err == nil && stop.op == sourceStop && stop.sequence == p.sequence+1 {
 			c.replies <- sourcePacket{kind: sourceReply, op: sourceStop, reply: stop.sequence}
@@ -33,7 +47,7 @@ func TestOptionalSourceTimeoutDrainsExactReplyBeforeCleanStop(t *testing.T) {
 	}()
 	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
 	defer cancel()
-	if _, err := c.call(ctx, sourceCursorPrepare); !errors.Is(err, ErrAuthority) {
+	if _, err := c.call(ctx, op); !errors.Is(err, ErrAuthority) {
 		t.Fatal("optional timeout unexpectedly succeeded", err)
 	}
 	<-sent
@@ -57,6 +71,47 @@ func TestOptionalSourceTimeoutDrainsExactReplyBeforeCleanStop(t *testing.T) {
 	<-stopped
 	if c.pending.sequence != 0 || c.sequence != 2 {
 		t.Fatal("request replayed or not drained")
+	}
+}
+
+func TestActiveSourceHeartbeatTimeoutCannotUseIdleRetirement(t *testing.T) {
+	server, conn := net.Pipe()
+	defer server.Close()
+	c := &sourceClient{channel: clientChannel(conn, authorityService), binding: Binding{1}, replies: make(chan sourcePacket, 1), done: make(chan struct{}), failed: make(chan struct{})}
+	defer c.channel.Close()
+	c.epoch.Store(42)
+	read := make(chan error, 1)
+	go func() { _, err := readSourcePacket(server); read <- err }()
+	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
+	defer cancel()
+	if _, err := c.call(ctx, sourceHeartbeat); err == nil {
+		t.Fatal("active heartbeat timeout succeeded")
+	}
+	if err := <-read; err != nil {
+		t.Fatal("synthetic heartbeat was not sent", err)
+	}
+	if c.retiring.Load() || c.pending.sequence != 0 || c.epoch.Load() != 0 || c.channel.authority.check(false) == nil {
+		t.Fatal("active input was normalized as an idle owner")
+	}
+}
+
+func TestIdleHeartbeatWithoutRetirementProofStillFences(t *testing.T) {
+	server, conn := net.Pipe()
+	defer server.Close()
+	c := &sourceClient{channel: clientChannel(conn, authorityService), binding: Binding{1}, replies: make(chan sourcePacket, 1), done: make(chan struct{}), failed: make(chan struct{})}
+	defer c.channel.Close()
+	read := make(chan error, 1)
+	go func() { _, err := readSourcePacket(server); read <- err }()
+	request, cancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
+	_, err := c.call(request, sourceHeartbeat)
+	cancel()
+	if err == nil || <-read != nil || !c.retiring.Load() {
+		t.Fatal("idle heartbeat did not enter bounded retirement", err)
+	}
+	cleanup, stop := context.WithTimeout(context.Background(), 25*time.Millisecond)
+	defer stop()
+	if _, err := c.call(cleanup, sourceStop); err == nil || c.channel.authority.check(false) == nil || c.sequence != 1 {
+		t.Fatal("missing reply certified retirement or replayed a command", err)
 	}
 }
 
@@ -87,5 +142,13 @@ func TestSourcePendingReplyCannotInventRetirementProof(t *testing.T) {
 		if optionalSourceCursor(op) {
 			t.Fatal("input or control was classified optional", op)
 		}
+	}
+	for _, op := range []byte{sourceStart, sourceAdmit, sourceActivate, sourceDeactivate, sourceStop} {
+		if drainableSourceResponse(op, 0) {
+			t.Fatal("input or state-changing command entered idle drain", op)
+		}
+	}
+	if !drainableSourceResponse(sourceHeartbeat, 0) || drainableSourceResponse(sourceHeartbeat, 42) {
+		t.Fatal("heartbeat drain ignored active input generation")
 	}
 }

@@ -11,6 +11,13 @@ func optionalSourceCursor(op byte) bool {
 	return op == sourceCursorPrepare || op == sourceCursorShow || op == sourceCursorRestore
 }
 
+// A heartbeat changes no native state. Only an idle capture may retain its
+// fully written request for exact-reply draining and proven retirement. Active
+// input cannot use this path, even if its heartbeat response is late.
+func drainableSourceResponse(op byte, epoch uint64) bool {
+	return optionalSourceCursor(op) || op == sourceHeartbeat && epoch == 0
+}
+
 // Caller owns the IPC mutex. This consumes only the exact request whose entire
 // frame was sent, never retries it, and cannot extend the cleanup deadline.
 func (c *sourceClient) drainPending(ctx context.Context) error {

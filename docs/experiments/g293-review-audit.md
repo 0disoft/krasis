@@ -37,7 +37,7 @@ follow-up to the deployed g304 bundle, not a claim that g304 contains this patch
 The user completed the g303 integrated scenario but reported frequent stutter.
 A's preserved g303 service failure at 10:29:39 UTC is capture/wheel-capture with
 no known native errno. That historical root cause cannot be inferred from the
-wrapper defect. Collection `64b87e182e082da48ab6196fb3920b39` confirms A still
+wrapper defect. Collection `64b87e182e082da48ab6196fb3920b39` confirmed A then
 requires service recovery while B's g304 service is READY. Both UI/agents are
 g304, but A is CONNECTED/PORTABLE and its installed agent remains g303. This does
 not meet the review's starting conditions for a protected-input device trial.
@@ -46,3 +46,14 @@ A reboot and automatic installation recovery remain necessary before checking
 installed image matches and a fresh continuous A/B lock, PIN login, boundary and
 passkey sequence. No service/manual restart, reboot, privilege-policy relaxation,
 input replay or raw-input collection was used to bypass this gate.
+
+## Post-reboot update
+
+After the user's reboot, A automatically installed g304 at 14:48:33 UTC and its
+new service started at 14:48:34 UTC. Doctor confirms exact g304 UI/agent/installed
+agent matching, RUNNING and PROTECTED. Collection
+`35e5b69e3c691d171cc406cded3becf9` confirms both services READY, resolving the
+earlier reboot gate. A nevertheless timed out awaiting an idle source heartbeat
+response at 14:49:49 UTC and reconnected. The continuous-device verification gate
+is still open; g305's narrowly guarded idle-source retirement is documented in
+`g305-idle-source-heartbeat-retirement.md` and requires device validation.

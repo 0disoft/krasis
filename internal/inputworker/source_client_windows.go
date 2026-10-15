@@ -32,7 +32,7 @@ type sourceClient struct {
 	epoch                   atomic.Uint64
 	retired                 atomic.Bool
 	retiring                atomic.Bool
-	pending                 sourcePacket // Under mu; only the already fully written optional request.
+	pending                 sourcePacket // Under mu; only the fully written request being retired.
 	failed                  chan struct{}
 	replies                 chan sourcePacket
 	done                    chan struct{}
@@ -215,9 +215,10 @@ func (c *sourceClient) callLocked(ctx context.Context, op byte, reference ...uin
 		}
 	default:
 	}
-	if optionalSourceCursor(op) && !time.Now().Before(limit) {
+	if drainableSourceResponse(op, c.epoch.Load()) && !time.Now().Before(limit) {
 		// No replay or further capture command is allowed. Keep the authenticated
 		// pipe solely to drain this exact reply and request native retirement.
+		// An idle heartbeat does not certify retirement or grant new authority.
 		c.pending = p
 		c.epoch.Store(0)
 		accepted = true
@@ -392,7 +393,7 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 			if err != nil && ctx.Err() == nil {
 				if live.retiring.Load() {
 					continue
-				} // Cursor timeout won the IPC mutex.
+				} // Idle heartbeat/cursor timeout won the IPC mutex.
 				if live.retired.Load() {
 					if live.err != nil {
 						return live.err
