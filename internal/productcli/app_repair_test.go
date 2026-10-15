@@ -3,6 +3,7 @@ package productcli
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,6 +35,43 @@ func TestAppRepairRejectsArgumentsAndInvalidBundleWithoutAgent(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(bundle, "BUILD.json"), []byte("{}"), 0600); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+func TestAppRepairPreparesTaskBeforeRotatingLaunchHistory(t *testing.T) {
+	base, old, next := t.TempDir(), t.TempDir(), t.TempDir()
+	for _, directory := range []string{old, next} {
+		for _, name := range []string{"krasis.exe", "krasis-cli.exe"} {
+			if err := os.WriteFile(filepath.Join(directory, name), []byte("fixture; not executed"), 0600); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if err := launchrecord.Register(base, filepath.Join(old, "krasis.exe"), 293, strings.Repeat("a", 40)); err != nil {
+		t.Fatal(err)
+	}
+	version := versionResult{CLIGeneration: 295, CLIBuild: strings.Repeat("b", 40)}
+	bundle := updateVerifyResult{Valid: true, Generation: 295, Revision: version.CLIBuild}
+	blocked := errors.New("task ownership unknown")
+	prepare := func(root string) error {
+		record, err := launchrecord.Load(root)
+		if err != nil || record.Executable != filepath.Join(old, "krasis.exe") {
+			t.Fatal("task preflight ran after history changed", record, err)
+		}
+		return blocked
+	}
+	for _, valid := range []bool{false, true} {
+		bundle.Valid = valid
+		called := false
+		result, code := registerAppRecovery(base, filepath.Join(next, "krasis-cli.exe"), bundle, version, func(root string) error { called = true; return prepare(root) })
+		if called != valid || code != ExitUnsafeState || valid && (result.Code != "registration_failed" || result.Stage != "task") {
+			t.Fatal("repair ignored failed ownership or touched task before bundle verification", result, code)
+		}
+	}
+	bundle.Valid = true
+	result, code := registerAppRecovery(base, filepath.Join(next, "krasis-cli.exe"), bundle, version, func(root string) error { blocked = nil; return prepare(root) })
+	if code != ExitOK || result.Code != "recovery_ready" {
+		t.Fatal("verified task prevented launch promotion", result)
 	}
 }
 

@@ -47,6 +47,10 @@ serialized under the launch-registration lock; failed scheduler writes retain
 the old receipt. Disabling the owned task removes its receipt. Inspection remains
 read-only and still rejects a task with no matching ownership evidence. Uninstall
 checks and removes this receipt only for its own image directories.
+The CLI's verified `app repair` also seeds this scheduler proof before rotating
+launch history, so existing installations without the new receipt can migrate.
+Unreadable or foreign tasks block promotion, and invalid bundles never change
+the task. This operation does not contact, stop or relaunch the input agent.
 Before staging or replacing installation receipts, setup also checks both launch
 history records and the visible Installed Apps and startup registrations. Missing
 shell registrations remain repairable; foreign paths, unreadable values and
