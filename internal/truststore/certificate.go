@@ -103,16 +103,33 @@ func (store *Store) PeerKeyAnchorTraced(peer transport.AuthenticatedPeerContext,
 }
 
 func (store *Store) peerCertificateTraced(peer transport.AuthenticatedPeerContext, now time.Time, trace *ReadTrace, keyAnchor bool) (*x509.Certificate, error) {
+	var leaf *x509.Certificate
+	err := store.withPeerCertificate(peer, trace, func(der []byte) (err error) {
+		trace.enterStep("certificate_validate")
+		if keyAnchor {
+			leaf, err = validatePeerKeyAnchor(peer, der, now)
+		} else {
+			leaf, err = validatePeerCertificate(peer, der, now)
+		}
+		return err
+	})
+	return leaf, err
+}
+
+// Keep the current trust verdict, exact certificate bytes and all file checks
+// in one shared-lock snapshot. Consumers may reuse immutable cryptographic work,
+// never a previous ACL, revocation, role, missing-file or corruption verdict.
+func (store *Store) withPeerCertificate(peer transport.AuthenticatedPeerContext, trace *ReadTrace, validate func([]byte) error) error {
 	if store == nil {
-		return nil, errors.New("trust store is not initialized")
+		return errors.New("trust store is not initialized")
 	}
 	if err := peer.Validate(); err != nil {
-		return nil, err
+		return err
 	}
 	defer trace.finish()
 	document, directory, release, err := store.openReadLockedTraced(trace)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer release()
 	trace.enter("certificate")
@@ -121,21 +138,18 @@ func (store *Store) peerCertificateTraced(peer transport.AuthenticatedPeerContex
 			continue
 		}
 		if record.RevokedAt != nil {
-			return nil, ErrPeerRevoked
+			return ErrPeerRevoked
 		}
 		if record.Role != peer.Role {
-			return nil, errors.New("trusted peer role mismatch")
+			return errors.New("trusted peer role mismatch")
 		}
-		der, err := readPeerCertificate(directory, peer.CertificateSHA256)
+		der, err := readPeerCertificateVerifiedTraced(directory, peer.CertificateSHA256, peercredentials.ValidateSecurityFileHandle, trace)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		if keyAnchor {
-			return validatePeerKeyAnchor(peer, der, now)
-		}
-		return validatePeerCertificate(peer, der, now)
+		return validate(der)
 	}
-	return nil, ErrPeerNotFound
+	return ErrPeerNotFound
 }
 
 func validatePeerKeyAnchor(peer transport.AuthenticatedPeerContext, der []byte, now time.Time) (*x509.Certificate, error) {
@@ -190,6 +204,11 @@ func readPeerCertificate(directory *securefs.Directory, fingerprint string) ([]b
 }
 
 func readPeerCertificateVerified(directory *securefs.Directory, fingerprint string, validate func(*os.File) error) ([]byte, error) {
+	return readPeerCertificateVerifiedTraced(directory, fingerprint, validate, nil)
+}
+
+func readPeerCertificateVerifiedTraced(directory *securefs.Directory, fingerprint string, validate func(*os.File) error, trace *ReadTrace) ([]byte, error) {
+	trace.enterStep("certificate_open")
 	file, err := directory.Open(peerCertificateFilename(fingerprint))
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, ErrPeerCertificateUnavailable
@@ -197,10 +216,12 @@ func readPeerCertificateVerified(directory *securefs.Directory, fingerprint stri
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() { trace.enterStep("certificate_close"); _ = file.Close() }()
+	trace.enterStep("certificate_acl")
 	if err := validate(file); err != nil {
 		return nil, err
 	}
+	trace.enterStep("certificate_bytes")
 	data, err := io.ReadAll(io.LimitReader(file, maxPeerCertificateBytes+1))
 	if err != nil {
 		return nil, err

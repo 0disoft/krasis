@@ -198,14 +198,17 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 			}
 			err = errors.Join(err, closeErr)
 		}()
+		checkAnchor, err := trust.NewKeyAnchorMonitor(prepared.peer, time.Now())
+		if err != nil {
+			return err
+		}
 		monitorDone := make(chan struct{})
 		go func() {
 			defer close(monitorDone)
 			ticker := time.NewTicker(time.Second)
 			defer ticker.Stop()
 			monitorProductSessionObserved(ctx, ticker.C, guard.Done(), func(trace *truststore.ReadTrace) error {
-				_, checkErr := trust.PeerKeyAnchorTraced(prepared.peer, time.Now(), trace)
-				return checkErr
+				return checkAnchor(time.Now(), trace)
 			}, cancel, func(code string) {
 				log.Event(code)
 				if cause := sessionTrustFailure(code); cause != nil {
