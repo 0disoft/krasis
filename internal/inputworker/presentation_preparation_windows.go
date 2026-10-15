@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"sync/atomic"
+	"time"
 )
 
 // At most one unbound input child prepares alongside one acknowledged passive
@@ -15,6 +16,16 @@ type cursorInputPreparation struct {
 	next   *preparedConsole
 	err    error
 	joined atomic.Bool
+}
+
+// A clean input return is a single preparation opportunity, independent of the
+// rate-limited movement hints. No lease or agent handle enters the warm child.
+// The service still joins construction before accepting its next request.
+func prepareInputReentry(ctx context.Context, lease Lease, result error, prepare func(context.Context) (*preparedConsole, error)) *cursorInputPreparation {
+	if ctx == nil || ctx.Err() != nil || result != nil || lease.Capture || lease.Presentation || !lease.ExpiresAt.After(time.Now()) {
+		return nil
+	}
+	return startCursorInputPreparation(ctx, prepare)
 }
 
 func startCursorInputPreparation(ctx context.Context, prepare func(context.Context) (*preparedConsole, error)) *cursorInputPreparation {

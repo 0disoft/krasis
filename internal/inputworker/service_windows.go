@@ -194,15 +194,24 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 						return prepareServiceConsole(run, installation, service)
 					})
 				})
+				if err == nil && !lease.Presentation {
+					returned = presentationReturn{lease: lease, pid: agentPID, started: channel.authority.agentStarted, at: time.Now()}
+				}
+				if !lease.Presentation {
+					// Capture-owned cursor hiding does not open a passive lease,
+					// so it cannot trigger the preparation callback above. Prepare
+					// once after clean recovery instead of cold-launching on every
+					// rapid reentry suppressed by the movement-hint cooldown.
+					warming = prepareInputReentry(ctx, lease, err, func(run context.Context) (*preparedConsole, error) {
+						return prepareServiceConsole(run, installation, service)
+					})
+				}
 				if warming != nil {
 					var preparationErr error
 					next, preparationErr = warming.join()
 					if errors.Is(preparationErr, ErrRecovery) {
 						return serviceRecoveryFailure(errors.Join(err, preparationErr), channel.Close())
 					}
-				}
-				if err == nil && !lease.Presentation {
-					returned = presentationReturn{lease: lease, pid: agentPID, started: channel.authority.agentStarted, at: time.Now()}
 				}
 				if errors.Is(err, ErrRecovery) {
 					return serviceRecoveryFailure(err, channel.Close())
