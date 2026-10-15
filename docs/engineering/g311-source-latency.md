@@ -32,3 +32,18 @@ command owner/cancellation/cleanup fencing, heartbeat budgets and unchanged trus
 checks after revocation, certificate removal or corruption. Device latency,
 idle-entry stability and lock/PIN transitions still require a g311 paired trace.
 No peer wire, database, dependency, runner or permission policy change.
+
+## g312 follow-up before device handoff
+
+The g311 unattended post-install observation still failed on A: source reader
+timeout at 17:11:38Z and heartbeat response timeout at 17:12:24Z on 2026-10-15.
+Native owners joined; the service stayed READY. g311 is not a stability success.
+
+g312 routes an authenticated heartbeat's reply through the serial reader rather
+than the native command queue. Other commands must finish their exact ACK before
+the reader starts another idle read, so a pipelined heartbeat cannot overtake a
+native command and the read timeout cannot cancel work already being processed.
+The existing command deadlines, lease expiration, authority checks, writer
+sequence, response authentication and native cleanup gates remain in force.
+Tests hold a pending activation, prove no next read/reply occurs before its ACK,
+and verify heartbeat write failures, cancellation and stop do not deadlock.
