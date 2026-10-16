@@ -129,6 +129,12 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 		if result != nil && sampler.emit != nil {
 			emitTiming(sampler.emit, "installed_source_failure_"+stage)
 			emitTiming(sampler.emit, sourceCommandFailureCode(op))
+			var write *sourceIOFailure
+			if errors.As(result, &write) {
+				emitTiming(sampler.emit, "installed_source_io_stage_"+write.stage)
+				emitTiming(sampler.emit, "installed_source_io_"+sourceIOFailureReason(write))
+				emitTiming(sampler.emit, connectionNativeFailureEvent(write, "installed_source_native_"))
+			}
 			if replyOutcome != "" {
 				emitTiming(sampler.emit, "installed_source_response_"+replyOutcome)
 			}
@@ -243,10 +249,7 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 	stage = "write"
 	started = time.Now()
 	requestStarted := started
-	writeErr := c.channel.stream.SetWriteDeadline(limit)
-	if writeErr == nil {
-		writeErr = writeFrame(c.channel.stream, data[:])
-	}
+	writeErr := writeSourceCommand(c.channel.stream, data[:], limit)
 	sample[2] = timingBucket(time.Since(started))
 	if op == sourceActivate {
 		handoff.RecordCapture(ctx, handoff.CaptureIPCWrite, time.Since(started))
@@ -254,7 +257,7 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 	if writeErr != nil {
 		c.epoch.Store(0)
 		_ = c.channel.Close()
-		return sourcePacket{}, ErrAuthority
+		return sourcePacket{}, writeErr
 	}
 	timer := time.NewTimer(time.Until(limit))
 	defer timer.Stop()
