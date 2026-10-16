@@ -28,4 +28,24 @@ closed authority, cleared epoch and no replay afterwards.
 The g327 snapshot does not contain the original write error. This change cannot
 identify its cause retroactively or establish that its trigger is repaired.
 
+## Receiver preparation and heartbeat dispatch
+
+Failed privileged connection setup now retains both its original connect error
+and a failed partial client's close error. No candidate is published on failure.
+Existing-owner, stopped-input, unconfigured-input and prior-cleanup rejections
+emit separate fixed codes without closing or reusing the existing owner.
+
+Lease request failures retain the original failing phase (coordinator,
+authorization, return arm, cursor entry, inbound preparation or grant write).
+Rollback errors stay joined to the original failure. Heartbeat dispatch errors
+distinguish no active liveness, stale session/time, invalid payload, cancellation
+and deadline. These classifications are allowlisted in exported fault records.
+
+No failed request becomes a rejection/success, no grant is fabricated and no
+cleanup error is swallowed. Failed native admission errors are no longer reduced
+to the generic protected-input sentinel when deciding subsequent recovery.
+Tests cover cause/cleanup preservation, no published lease, unchanged existing
+owner, request phase propagation and sanitized event export. Real desktop
+transition stability and the original transport trigger remain unverified.
+
 No public API, peer wire, database, dependency, ACL or runner change.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/0disoft/krasis/internal/application"
+	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/crashguard"
 	"net"
 	"sync"
@@ -168,6 +169,19 @@ func DescribeSessionFailure(err error) FailureDescriptor {
 	case errors.Is(err, peer.ErrPeerInputDispatch):
 		return FailureDescriptor{Component: "peer-dispatch", Phase: "input", Code: "failed"}
 	case errors.Is(err, peer.ErrPeerHeartbeatDispatch):
+		for _, reason := range []struct {
+			cause error
+			code  string
+		}{
+			{application.ErrRuntimeNoLiveness, "no_liveness"},
+			{control.ErrStaleHeartbeat, "stale"},
+			{context.DeadlineExceeded, "deadline"},
+			{context.Canceled, "canceled"},
+		} {
+			if errors.Is(err, reason.cause) {
+				return FailureDescriptor{Component: "peer-dispatch", Phase: "heartbeat", Code: reason.code}
+			}
+		}
 		return FailureDescriptor{Component: "peer-dispatch", Phase: "heartbeat", Code: "failed"}
 	}
 	if stage := wininput.SourceFailureStage(err); stage != "" {

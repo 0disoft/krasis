@@ -254,7 +254,11 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 	ctx = handoff.Begin(ctx, "receiver", command.SessionID, command.Epoch, time.Now())
 	handoff.RequestReceived(ctx, time.Now())
 	rejected := false
+	stage := "coordinator"
 	defer func() {
+		if resultErr != nil {
+			resultErr = &LeaseRequestFailure{Stage: stage, Cause: resultErr}
+		}
 		if resultErr != nil || rejected {
 			handoff.Finish(ctx, "error")
 		}
@@ -273,6 +277,7 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 		}
 		handoff.Activate(ctx)
 		started := time.Now()
+		stage = "authorize"
 		leaseID, accepted, err := responder.Authorizer.AuthorizeLease(ctx, responder.Peer, command.SessionID, command.Epoch, observedAt)
 		handoff.Record(ctx, handoff.AuthorizeTotal, time.Since(started))
 		if err != nil {
@@ -291,6 +296,7 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 		}
 		returnIntent := control.ReturnIntent{SessionID: command.SessionID, Epoch: command.Epoch}
 		started = time.Now()
+		stage = "return-arm"
 		armErr := responder.Returns.ArmReturn(returnIntent, command.Edge)
 		handoff.Record(ctx, handoff.ReturnArm, time.Since(started))
 		if err := armErr; err != nil {
@@ -312,6 +318,7 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 			responder.Cursor.RestoreReturnCursor()
 		}
 		started = time.Now()
+		stage = "entry"
 		entryCtx, completeEntry := handoff.Entry(ctx)
 		entryErr := responder.Entry.PrepareEntry(entryCtx, command.Edge)
 		completeEntry(entryErr)
@@ -321,6 +328,7 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 		}
 		observeControlFlow(responder.Observer, ControlFlowEntryPrepared)
 		started = time.Now()
+		stage = "inbound"
 		_, prepareErr := responder.Runtime.PrepareInbound(ctx, command.SessionID, leaseID, command.Epoch)
 		handoff.Record(ctx, handoff.PrepareInbound, time.Since(started))
 		if err := prepareErr; err != nil {
@@ -332,6 +340,7 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 			},
 			returnIntent: returnIntent,
 		}
+		stage = "grant"
 		payload, err := transport.EncodeControlPayload(transport.ControlCommand{
 			Kind:      transport.ControlLeaseGrant,
 			SessionID: command.SessionID,

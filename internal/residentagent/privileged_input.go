@@ -91,6 +91,18 @@ func (input *privilegedLeaseInput) open(ctx context.Context, identity applicatio
 	handoff.Record(ctx, handoff.OpenLock, acquired.Sub(started))
 	handoff.RecordPreparationLock(ctx, preparationLockOverlap(started, acquired, input.preparationStarted, input.preparationFinished))
 	if input.stopped || input.client != nil || input.connect == nil || input.closeErr != nil {
+		if input.event != nil {
+			reason := "unconfigured"
+			switch {
+			case input.closeErr != nil:
+				reason = "cleanup"
+			case input.stopped:
+				reason = "stopped"
+			case input.client != nil:
+				reason = "active"
+			}
+			input.event("installed_input_admission_blocked_" + reason)
+		}
 		if input.closeErr != nil {
 			return errors.Join(errPrivilegedInput, input.closeErr)
 		}
@@ -117,7 +129,10 @@ func (input *privilegedLeaseInput) open(ctx context.Context, identity applicatio
 			input.event(inputworker.ConnectionNativeFailureEvent(err))
 		}
 		if input.closeErr != nil {
-			return errors.Join(errPrivilegedInput, input.closeErr)
+			return errors.Join(errPrivilegedInput, err, input.closeErr)
+		}
+		if err != nil {
+			return errors.Join(errPrivilegedInput, err)
 		}
 		return errPrivilegedInput
 	}

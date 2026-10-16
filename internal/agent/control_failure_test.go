@@ -19,6 +19,9 @@ func TestControlFailureSeparatesCommandAndCauseWithoutPrivateDetails(t *testing.
 		{transport.ControlLeaseCommit, peer.ErrInboundPendingMismatch, "control-commit", "pending_mismatch"},
 		{transport.ControlLeaseRevoke, control.ErrInvalidTransition, "control-revoke", "invalid_transition"},
 		{transport.ControlLeaseRequest, context.DeadlineExceeded, "control-request", "deadline"},
+		{transport.ControlLeaseRequest, &peer.LeaseRequestFailure{Stage: "authorize", Cause: context.DeadlineExceeded}, "control-request-authorize", "deadline"},
+		{transport.ControlLeaseRequest, &peer.LeaseRequestFailure{Stage: "entry", Cause: control.ErrInvalidTransition}, "control-request-entry", "invalid_transition"},
+		{transport.ControlLeaseRequest, &peer.LeaseRequestFailure{Stage: "PRIVATE", Cause: context.Canceled}, "control-request", "canceled"},
 		{transport.ControlLeaseAbort, errors.New("private-session-and-path"), "control-abort", "failed"},
 		{255, peer.ErrInboundPendingMismatch, "control", "failed"},
 	} {

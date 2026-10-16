@@ -25,6 +25,13 @@ func describeControlFailure(err error) FailureDescriptor {
 		return value
 	}
 	value.Phase = "control-" + phase
+	var request *peer.LeaseRequestFailure
+	if failure.Kind == transport.ControlLeaseRequest && errors.As(failure.Cause, &request) {
+		switch request.Stage {
+		case "coordinator", "authorize", "return-arm", "entry", "inbound", "grant":
+			value.Phase += "-" + request.Stage
+		}
+	}
 	for _, reason := range []struct {
 		cause error
 		code  string

@@ -2,6 +2,9 @@ package productlog
 
 func init() {
 	allowed["installed_source_connect_failed"] = true
+	for _, reason := range []string{"cleanup", "stopped", "active", "unconfigured"} {
+		allowed["installed_input_admission_blocked_"+reason] = true
+	}
 	for _, stage := range []string{"deadline", "write"} {
 		allowed["installed_source_io_stage_"+stage] = true
 	}

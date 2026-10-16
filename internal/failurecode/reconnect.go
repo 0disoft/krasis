@@ -44,9 +44,12 @@ var reconnectReasons = map[[3]string]string{
 }
 
 func init() {
-	for _, phase := range []string{"decode", "request", "grant", "reject", "revoke", "commit", "abort", "prepare"} {
+	for _, code := range []string{"no_liveness", "stale", "deadline", "canceled"} {
+		reconnectReasons[[3]string{"peer-dispatch", "heartbeat", code}] = "reconnect_heartbeat_dispatch_" + code
+	}
+	for _, phase := range []string{"decode", "request", "grant", "reject", "revoke", "commit", "abort", "prepare", "request-coordinator", "request-authorize", "request-return-arm", "request-entry", "request-inbound", "request-grant"} {
 		for _, code := range []string{"pending_mismatch", "pending_expired", "invalid_transition", "invalid_event", "not_inbound", "input_held", "stale_return", "stale_session", "stale_epoch", "deadline", "canceled", "failed"} {
-			reconnectReasons[[3]string{"peer-dispatch", "control-" + phase, code}] = "reconnect_control_" + phase + "_" + code
+			reconnectReasons[[3]string{"peer-dispatch", "control-" + phase, code}] = "reconnect_control_" + strings.ReplaceAll(phase, "-", "_") + "_" + code
 		}
 	}
 	for _, code := range []string{"freshness_expired", "revoked", "missing", "check_failed"} {
