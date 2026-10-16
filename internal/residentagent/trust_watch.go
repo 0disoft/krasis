@@ -48,26 +48,30 @@ func monitorProductSessionObserved(ctx context.Context, ticks <-chan time.Time, 
 			cancel()
 		}
 	}
+	reobserve := false
 	for {
 		softObservation := false
-		select {
-		case <-ctx.Done():
-			if ctx.Err() == context.DeadlineExceeded {
-				record("session_certificate_deadline")
+		if !reobserve {
+			select {
+			case <-ctx.Done():
+				if ctx.Err() == context.DeadlineExceeded {
+					record("session_certificate_deadline")
+				}
+				return
+			case <-guardDone:
+				if ctx.Err() == nil {
+					record("session_guard_exited")
+					cancel()
+				}
+				return
+			case <-freshness.C:
+			case <-reader.wake:
+			case <-softDone:
+				softDone = nil
+				softObservation = true
 			}
-			return
-		case <-guardDone:
-			if ctx.Err() == nil {
-				record("session_guard_exited")
-				cancel()
-			}
-			return
-		case <-freshness.C:
-		case <-reader.wake:
-		case <-softDone:
-			softDone = nil
-			softObservation = true
 		}
+		reobserve = false
 		if ctx.Err() != nil {
 			continue
 		}
@@ -87,6 +91,10 @@ func monitorProductSessionObserved(ctx context.Context, ticks <-chan time.Time, 
 			err := completed.err
 			if err == nil {
 				if !time.Now().Before(completed.finished.Add(trustValidationMaxAge)) {
+					if reader.latest.Load() != current {
+						reobserve = true
+						continue
+					}
 					record("session_trust_freshness_expired")
 					cancel()
 					return
@@ -128,6 +136,13 @@ func monitorProductSessionObserved(ctx context.Context, ticks <-chan time.Time, 
 			}
 		}
 		if !time.Now().Before(deadline) {
+			// Diagnostic callbacks or scheduling can stall after the snapshot
+			// above. Reobserve an independently completed validation before
+			// expiring the old snapshot. No deadline is renewed from delivery.
+			if reader.latest.Load() != current {
+				reobserve = true
+				continue
+			}
 			expire(current)
 			return
 		}
