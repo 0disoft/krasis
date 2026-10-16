@@ -28,7 +28,26 @@ func (w *sourceWriter) send(p sourcePacket, current func() bool) error {
 	return w.write(p, current, false)
 }
 func (w *sourceWriter) write(p sourcePacket, current func() bool, retirement bool) error {
-	w.mu.Lock()
+	if !w.started.Load() && (p.kind == sourceAction || p.kind == sourceBoundary || p.kind == sourceReturn) {
+		return nil
+	}
+	if retirement || p.kind == sourceReply && p.op == sourceHeartbeat {
+		w.mu.Lock()
+	} else {
+		// Full WTS/SCM authorization may block. It must not own the wire gate
+		// needed by keepalive replies. Admit a fresh proof only with immediate
+		// TryLock success; after contention, wait without a proof and recheck.
+		for {
+			if w.channel.authority.check(false) != nil {
+				return sourceTransportFailure(ErrAuthority)
+			}
+			if w.mu.TryLock() {
+				break
+			}
+			w.mu.Lock()
+			w.mu.Unlock()
+		}
+	}
 	defer w.mu.Unlock()
 	if !w.started.Load() && (p.kind == sourceAction || p.kind == sourceBoundary || p.kind == sourceReturn) {
 		return nil
@@ -39,11 +58,9 @@ func (w *sourceWriter) write(p sourcePacket, current func() bool, retirement boo
 	// Retirement grants no authority. It is sent only after native/sender join
 	// on the exact already authenticated channel, even if logon authority changed.
 	if !retirement {
-		check := func() error { return w.channel.authority.check(false) }
-		if p.kind == sourceReply && p.op == sourceHeartbeat {
-			check = w.channel.authority.checkHeartbeat
-		}
-		if check() != nil {
+		// The full check above is mandatory for every non-heartbeat frame.
+		// Recheck the pinned owner's presence after admission and before bytes.
+		if w.channel.authority.checkHeartbeat() != nil {
 			return sourceTransportFailure(ErrAuthority)
 		}
 	}

@@ -1063,6 +1063,28 @@ The regression covers the real logger-to-export path and rejects dynamic codes.
 This repairs missing evidence; it does not establish which native call caused
 the observed disconnect or change input outcomes, retries or timeout policy.
 
+## Source writer authorization admission
+
+The g322 collection `39181c41af1ab2c6b69995912dcc036a` records B's desktop
+transitions without a negative input ACK, followed by A's source heartbeat
+response failure and B's remote EOF on the same connection. Both services remain
+READY. Earlier A source failures also occurred before the lock/PIN test.
+
+Source input, return and command-response writes previously held the shared
+writer mutex throughout their full WTS/SCM authorization query. A blocked query
+therefore prevented an independent authenticated heartbeat response from being
+written. The regression reproduces this for all three frame classes.
+
+Full authorization now precedes immediate TryLock admission. If another writer
+owns the gate, that proof is discarded: the caller waits for the gate to become
+available and repeats full authorization before trying admission again. Under
+the gate the pinned owner's presence and the original source generation callback
+are rechecked before assigning a sequence and making the single bounded write.
+No input frame is replayed, no heartbeat authorizes input, and request/lease
+deadlines and retirement proofs are unchanged. This removes a reproduced source
+of heartbeat head-of-line blocking; its role in the device incident still needs
+device observation.
+
 ## Batched receiver cursor entry
 
 The installed entry path takes the pre-write cursor snapshot, performs the
