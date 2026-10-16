@@ -18,8 +18,11 @@ type sourceHeartbeatCheck struct {
 }
 
 func (check *sourceHeartbeatCheck) validate(c *sourceClient, ctx context.Context, op byte) error {
-	if check.owner != c || check.used || op != sourceHeartbeat || ctx == nil || ctx.Err() != nil {
+	if check.owner != c || check.used || op != sourceHeartbeat || ctx == nil {
 		return ErrAuthority
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	check.used = true
 	// The full immutable-handle check just completed. Closing the channel or
@@ -114,6 +117,12 @@ func (c *sourceClient) pollHeartbeat(ctx context.Context) (bool, error) {
 	}
 	request, stopRequest := context.WithDeadline(context.WithoutCancel(ctx), deadline)
 	defer stopRequest()
+	sequence := c.sequence
 	_, err := c.callLockedChecked(request, sourceHeartbeat, proof)
+	if c.sequence == sequence && (err == context.DeadlineExceeded || err == context.Canceled) {
+		// Admission expired before any frame existed. Actual sent requests and
+		// failed owner checks still take the ordinary failure/retirement path.
+		return false, ctx.Err()
+	}
 	return true, err
 }

@@ -18,8 +18,11 @@ type sourceCommandCheck struct {
 }
 
 func (check *sourceCommandCheck) validate(c *sourceClient, ctx context.Context, op byte) error {
-	if check.owner != c || check.op != op || check.used || ctx == nil || ctx.Err() != nil {
+	if check.owner != c || check.op != op || check.used || ctx == nil {
 		return ErrAuthority
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	check.used = true
 	if check.err != nil {

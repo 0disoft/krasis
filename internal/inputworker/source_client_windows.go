@@ -150,9 +150,13 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 			_ = c.channel.Close()
 		}
 	}()
-	if ctx == nil || ctx.Err() != nil {
+	if ctx == nil {
 		accepted = true // No request was started; a cancelled optional query cannot retire this owner.
 		return sourcePacket{}, ErrAuthority
+	}
+	if err := ctx.Err(); err != nil {
+		accepted = true
+		return sourcePacket{}, err
 	}
 	if c.retiring.Load() && op != sourceStop {
 		accepted = true // Only shutdown may follow an outcome still being drained.
@@ -190,6 +194,12 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 		handoff.RecordCapture(ctx, handoff.CaptureIPCAuthority, authorityElapsed)
 	}
 	if authorityErr != nil {
+		if authorityErr == context.Canceled || authorityErr == context.DeadlineExceeded {
+			// Proof admission can race the entry check above. This is still an
+			// unsent request, not loss of authority or an unknown wire outcome.
+			accepted = true
+			return sourcePacket{}, authorityErr
+		}
 		if op == sourceStop && c.awaitRetirement(ctx) == nil {
 			accepted = true
 			return sourcePacket{}, nil
