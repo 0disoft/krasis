@@ -1,6 +1,9 @@
 package handoff
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 const PipeOwnerProbeLimit = 2048
 const MaxPipeOwnerCycles = uint64(1) << 48 // bounded, exactly representable JSON integer
@@ -14,7 +17,13 @@ func WantPipeOwnerCycles(ctx context.Context) bool {
 	}
 	v, _ := ctx.Value(sampleKey{}).(*sample)
 	s := getSession(ctx)
-	if v == nil || v.vector.AuthorityMeasured&(1<<AuthorityPipeOwner) != 0 || s == nil || s.collector == nil || s.collector.stopped.Load() {
+	a := getAttempt(ctx)
+	if v == nil || a == nil || v.vector.AuthorityMeasured&(1<<AuthorityPipeOwner) != 0 || s == nil || s.collector == nil || s.collector.stopped.Load() {
+		return false
+	}
+	s.collector.mu.Lock()
+	defer s.collector.mu.Unlock()
+	if a.finished || time.Since(s.collector.started) >= Window {
 		return false
 	}
 	for {

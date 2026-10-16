@@ -1,5 +1,20 @@
 # Bounded handoff profile
 
+## g319 later handoff windows
+
+The product runner uses `handoff.NewRolling`: at most 12 attempts in each
+120-second window. Expiry freezes and emits unfinished attempts. A later real
+handoff starts the next window; reconnects and rejected attempts within a window
+cannot replenish its budget. There is no periodic restart or background polling.
+The single-window `handoff.New` contract remains available for one-shot trials.
+
+Old timers and retained callbacks cannot expire or modify a later window. Attempt
+ordinals restart at 1; pair exported records only by their connection-local
+`exchangeTag`, never by ordinal. Native cycle, worker-apply and cursor-placement
+probe counters keep their collector-lifetime limits across all windows. No input
+content or additional wire fields are collected. This makes later trials visible;
+it does not establish a latency improvement.
+
 ## g182 optional per-exchange diagnostic tag
 
 `Summary` gains optional `exchangeTag`, exactly 64 lowercase hexadecimal

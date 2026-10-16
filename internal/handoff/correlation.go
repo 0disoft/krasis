@@ -7,7 +7,7 @@ import "context"
 // authority decisions. No mapper is a supported uncorrelated diagnostic mode.
 func ConfigureExchangeTags(ctx context.Context, tagger func(string, string) string) {
 	s := getSession(ctx)
-	if s == nil || s.collector.stopped.Load() {
+	if s == nil || (s.collector.stopped.Load() && !s.collector.rolling) {
 		return
 	}
 	s.collector.mu.Lock()

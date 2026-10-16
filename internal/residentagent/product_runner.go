@@ -98,7 +98,7 @@ func prepareProductConnection(identities *productidentity.Store, trust *truststo
 }
 
 func productRunner(identities *productidentity.Store, trust *truststore.Store, log *productlog.Logger, auxiliary ...func(context.Context, string, productConnection)) SessionRunner {
-	profiles := handoff.New(log.Handoff)
+	profiles := handoff.NewRolling(log.Handoff)
 	return func(parent context.Context, alias string, observer agent.SupervisorObserver) (err error) {
 		prepared, err := prepareProductConnection(identities, trust, alias, localapi.PeerFingerprint(parent))
 		if err != nil {

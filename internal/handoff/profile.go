@@ -164,6 +164,7 @@ func validOutcome(s string) bool { return s == "ok" || s == "error" || s == "inc
 type Collector struct {
 	mu                    sync.Mutex
 	emit                  func(Summary)
+	rolling               bool
 	started               time.Time
 	count                 uint8
 	active                [Limit]*attempt
@@ -222,14 +223,21 @@ func getSession(ctx context.Context) *session {
 
 // Begin consumes a slot even when preparation later fails. The window starts
 // on the first attempt, never restarts on reconnect, and expires without input.
+// Opt-in rolling collectors can start another bounded window on a later attempt.
 func Begin(ctx context.Context, role, sessionID, epoch string, start time.Time) context.Context {
 	s := getSession(ctx)
-	if s == nil || s.collector.stopped.Load() {
+	if s == nil || (s.collector.stopped.Load() && !s.collector.rolling) {
 		return ctx
 	}
 	c := s.collector
 	now := time.Now()
 	c.mu.Lock()
+	flushed := c.advanceWindowLocked(now)
+	defer emitProfiles(flushed)
+	if c.stopped.Load() {
+		c.mu.Unlock()
+		return ctx
+	}
 	if c.count == Limit || (!c.started.IsZero() && now.Sub(c.started) >= Window) {
 		// A new untracked lease must never inherit a still-live slot from a
 		// prior attempt. Freeze that role's old record before dropping it.
@@ -246,7 +254,8 @@ func Begin(ctx context.Context, role, sessionID, epoch string, start time.Time) 
 	}
 	if c.started.IsZero() {
 		c.started = now
-		c.timer = time.AfterFunc(Window, c.expire)
+		window := now
+		c.timer = time.AfterFunc(Window, func() { c.expireWindow(window) })
 	}
 	c.count++
 	if start.IsZero() {
@@ -569,11 +578,5 @@ func (c *Collector) retireLocked(a *attempt, outcome string) func() {
 }
 
 func (c *Collector) expire() {
-	c.stopped.Store(true)
-	c.mu.Lock()
-	active := c.active
-	c.mu.Unlock()
-	for _, a := range active {
-		c.finish(a, "incomplete")
-	}
+	c.expireWindow(time.Time{})
 }
