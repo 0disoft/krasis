@@ -187,7 +187,7 @@ func (c *sourceClient) callLockedChecked(ctx context.Context, op byte, heartbeat
 		handoff.RecordCapture(ctx, handoff.CaptureIPCAuthority, authorityElapsed)
 	}
 	if authorityErr != nil {
-		if op == sourceStop && c.retiring.Load() && c.awaitRetirement(ctx) == nil {
+		if op == sourceStop && c.awaitRetirement(ctx) == nil {
 			accepted = true
 			return sourcePacket{}, nil
 		}
