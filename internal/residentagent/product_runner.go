@@ -314,21 +314,13 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 type productAuthorizer struct{ trust *truststore.Store }
 
 func (authorizer productAuthorizer) AuthorizeLease(ctx context.Context, peer transport.AuthenticatedPeerContext, session, epoch string, now time.Time) (string, bool, error) {
-	if _, err := authorizer.trust.PeerKeyAnchor(peer, now); err != nil {
-		return "", false, err
-	}
-	document, err := authorizer.trust.List()
+	allowed, err := authorizer.trust.InboundControlAllowed(peer, now)
 	if err != nil {
 		return "", false, err
 	}
-	for _, record := range document.Peers {
-		if record.Fingerprint == peer.CertificateSHA256 {
-			delegate, err := agent.NewTrustedPeerAuthorizer([]agent.TrustedPeerGrant{{Peer: transport.AuthenticatedPeerContext{CertificateSHA256: record.Fingerprint, Role: record.Role}, AllowInboundControl: record.AllowInboundControl, Revoked: record.RevokedAt != nil}})
-			if err != nil {
-				return "", false, err
-			}
-			return delegate.AuthorizeLease(ctx, peer, session, epoch, now)
-		}
+	delegate, err := agent.NewTrustedPeerAuthorizer([]agent.TrustedPeerGrant{{Peer: peer, AllowInboundControl: allowed}})
+	if err != nil {
+		return "", false, err
 	}
-	return "", false, truststore.ErrPeerNotFound
+	return delegate.AuthorizeLease(ctx, peer, session, epoch, now)
 }

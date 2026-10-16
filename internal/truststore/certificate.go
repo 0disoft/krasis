@@ -120,6 +120,12 @@ func (store *Store) peerCertificateTraced(peer transport.AuthenticatedPeerContex
 // in one shared-lock snapshot. Consumers may reuse immutable cryptographic work,
 // never a previous ACL, revocation, role, missing-file or corruption verdict.
 func (store *Store) withPeerCertificate(peer transport.AuthenticatedPeerContext, trace *ReadTrace, validate func([]byte) error) error {
+	return store.withPeerRecordCertificate(peer, trace, func(_ PeerRecord, der []byte) error { return validate(der) })
+}
+
+// Certificate and current inbound policy must come from the same locked read.
+// Callers cannot combine an older certificate verdict with a later document.
+func (store *Store) withPeerRecordCertificate(peer transport.AuthenticatedPeerContext, trace *ReadTrace, validate func(PeerRecord, []byte) error) error {
 	if store == nil {
 		return errors.New("trust store is not initialized")
 	}
@@ -147,7 +153,7 @@ func (store *Store) withPeerCertificate(peer transport.AuthenticatedPeerContext,
 		if err != nil {
 			return err
 		}
-		return validate(der)
+		return validate(record, der)
 	}
 	return ErrPeerNotFound
 }
