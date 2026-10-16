@@ -13,7 +13,7 @@ func TestInputConnectionDiagnosticAllowlistRejectsDynamicStages(t *testing.T) {
 		values []string
 	}{
 		{"installed_source_command_failed_", []string{"start", "admit", "activate", "deactivate", "heartbeat", "stop", "cursor_prepare", "cursor_show", "cursor_restore", "unknown"}},
-		{"installed_source_response_", []string{"received", "cancelled", "timeout", "owner_exited", "protocol", "rejected"}},
+		{"installed_source_response_", []string{"received", "cancelled", "timeout", "reader_ended", "protocol", "rejected"}},
 	} {
 		for _, value := range family.values {
 			code := family.prefix + value

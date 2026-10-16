@@ -1122,7 +1122,9 @@ response failure at 2026-10-16T16:55:57.234Z and B's subsequent remote EOF.
 A's later source report says reader cancelled and retirement delivery failed;
 both services remain READY. The old phase-only diagnostic cannot identify
 which command was outstanding or whether its response was rejected, cancelled,
-timed out, malformed, or lost when the owner exited.
+timed out, malformed, or lost when the channel reader ended. Reader completion
+does not itself establish process exit; simultaneous signals identify the
+observed wait outcome, not an independently proven native cause.
 
 Failed calls now emit an allowlisted protocol-operation class and response
 observation beside the existing phase and timing samples. A buffered response
@@ -1130,6 +1132,34 @@ is still consumed once before a competing cancellation/timeout/EOF signal;
 matching negative replies remain distinct from missing or foreign replies.
 These events contain no input values, coordinates, arbitrary errors or paths.
 They do not change request budgets, outcome handling or retirement proof.
+
+## Independent source boundary sender
+
+The source worker's native command dispatcher also sent advisory boundary
+batches. Although writer authorization no longer held the wire mutex, a slow
+boundary WTS query still occupied the dispatcher before it could execute and
+acknowledge a queued activation/admission/cursor command. Command priority at
+queue selection could not preempt that synchronous query already in progress.
+
+A single source-owned sender now drains the same bounded 64-packet advisory
+queue in batches of at most 16. The native dispatcher handles only commands and
+local return requests. Every batch retains full authorization and the same
+shared binding/sequence/write mutex; observations within the queue and frames
+already written retain their order. A command ACK can overtake an unsent advisory
+batch. No key/button actions, native grants or command ACKs enter that batch.
+
+The sender cannot write before startup acknowledgement. Cancellation stops new
+batch admission; the worker joins its in-flight sender along with native capture
+and the action sender before transmitting final retirement. Real sender errors
+remain part of the final result. Synchronous native authorization remains
+uninterruptible, so an unfinished query cannot be reported as joined retirement.
+
+Tests hold real writer authorization behind a barrier and verify that the
+dispatcher still delivers an exactly sequenced activation ACK before releasing
+the advisory batch. Other tests cover batch order/size, queue closure, and
+cancellation without premature sender completion or later queue consumption.
+This removes an inspected blocking path; the g324 field incident's outstanding
+operation is unknown and still requires the new command-failure observations.
 
 ## Batched receiver cursor entry
 

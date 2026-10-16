@@ -14,7 +14,11 @@ func collectSourceBoundaries(first sourcePacket, events <-chan sourcePacket, com
 	n := 1
 	for n < len(batch) && len(commands) == 0 {
 		select {
-		case batch[n] = <-events:
+		case p, ok := <-events:
+			if !ok {
+				return n
+			}
+			batch[n] = p
 			n++
 		default:
 			return n

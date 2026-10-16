@@ -74,7 +74,7 @@ func TestSourceBufferedForeignReplyRemainsProtocolFailure(t *testing.T) {
 }
 
 func TestSourceReplyObservationSeparatesMissingOutcomeFromBufferedReply(t *testing.T) {
-	for _, signal := range []string{"cancelled", "timeout", "owner_exited"} {
+	for _, signal := range []string{"cancelled", "timeout", "reader_ended"} {
 		for _, buffered := range []bool{false, true} {
 			ctx, cancel := context.WithCancel(context.Background())
 			done, timeout := make(chan struct{}), make(chan time.Time, 1)
@@ -83,7 +83,7 @@ func TestSourceReplyObservationSeparatesMissingOutcomeFromBufferedReply(t *testi
 				cancel()
 			case "timeout":
 				timeout <- time.Now()
-			case "owner_exited":
+			case "reader_ended":
 				close(done)
 			}
 			replies := make(chan sourcePacket, 1)

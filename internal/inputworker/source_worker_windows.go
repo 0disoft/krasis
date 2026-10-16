@@ -151,6 +151,20 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 		return err
 	}
 	queue := &sourcePointerQueue{events: make(chan sourcePacket, 64), session: session}
+	boundaryStart, boundaryDone := make(chan struct{}), make(chan error, 1)
+	go func() {
+		var err error
+		select {
+		case <-boundaryStart:
+			err = pumpSourceBoundaries(run, queue.events, writer.sendBoundaries)
+		case <-run.Done():
+			err = run.Err()
+		}
+		boundaryDone <- err
+		if err != nil {
+			cancel()
+		}
+	}()
 	sourceReady := make(chan struct{})
 	hookReady := make(chan struct{})
 	sourceDone, hookDone := make(chan error, 1), make(chan error, 1)
@@ -170,6 +184,9 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 	defer func() {
 		cancel()
 		capture, sender := <-hookDone, <-sourceDone
+		// No advisory writer may survive the final retirement frame. Joining
+		// this sender also preserves a real preflight/write failure on cleanup.
+		boundary := <-boundaryDone
 		exit.Capture = "joined"
 		if !sourceTransitionOnly(capture, run.Err() == context.DeadlineExceeded) {
 			exit.Capture = "failed"
@@ -177,7 +194,7 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 		if started, senderJoined, interruptJoined := session.CleanupCompletion(); started {
 			exit.Sender, exit.Interrupt = joinedSourceState(senderJoined), joinedSourceState(interruptJoined)
 		}
-		result = errors.Join(result, firstCommandFailure)
+		result = errors.Join(result, firstCommandFailure, boundary)
 		emergency := errors.Is(errors.Join(result, capture, sender), wininput.ErrEmergencyRelease)
 		result = sourceCaptureFinal(result, capture, sender, run.Err() == context.DeadlineExceeded)
 		if stopping != nil {
@@ -242,6 +259,7 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 		return err
 	}
 	writer.started.Store(true)
+	close(boundaryStart)
 	presenceDone := make(chan error, 1)
 	go func() {
 		err := watchSourcePresence(run, func() error { return authorizeCommand(sourceHeartbeat) })
@@ -279,17 +297,11 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 	var cursorSequence uint64
 	return hook.WithSourceCommandDesktop(run, func(commandContext context.Context) error {
 		for {
-			work, err := nextSourceWork(run, requests, queue.events, session.LocalReturns())
+			work, err := nextSourceWork(run, requests, nil, session.LocalReturns())
 			if err != nil {
 				return err
 			}
 			switch p := work.packet; p.kind {
-			case sourceBoundary:
-				var batch [sourceBoundaryBatchLimit]sourcePacket
-				n := collectSourceBoundaries(p, queue.events, requests, &batch)
-				if err := writer.sendBoundaries(batch[:n]); err != nil {
-					return err
-				}
 			case sourceReturn:
 				pendingReturn = work.returnGeneration
 				if err := writer.send(sourcePacket{kind: sourceReturn, reply: writer.epoch.Load()}, nil); err != nil {

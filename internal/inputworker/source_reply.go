@@ -13,7 +13,7 @@ func waitSourceReply(ctx context.Context, timeout <-chan time.Time, replies <-ch
 }
 
 func waitSourceReplyObserved(ctx context.Context, timeout <-chan time.Time, replies <-chan sourcePacket, done <-chan struct{}) (sourcePacket, bool, string) {
-	outcome := "owner_exited"
+	outcome := "reader_ended"
 	select {
 	case reply := <-replies:
 		return reply, true, "received"
