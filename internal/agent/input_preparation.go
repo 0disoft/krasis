@@ -87,7 +87,10 @@ func runPreparationSender(ctx context.Context, hints <-chan time.Time, runtime *
 			writeCtx, cancel := context.WithTimeout(ctx, preparationHintLifetime)
 			attempted := false
 			err := coordinator.Execute(writeCtx, func(writer peer.FrameWriter) error {
-				if runtime.Snapshot().Control.State != control.StateLocal || !freshPreparationHint(at, time.Now()) {
+				// Preparation is only a hint. Never hold the network write gate
+				// behind an injection/cleanup operation owning the runtime mutex.
+				// Actual grants still use the serialized, authenticated runtime.
+				if runtime.LeaseWatch().State != control.StateLocal || !freshPreparationHint(at, time.Now()) {
 					return nil
 				}
 				attempted = true
@@ -111,7 +114,7 @@ func runPreparationReceiver(ctx context.Context, hints <-chan time.Time, runtime
 			return ctx.Err()
 		case at := <-hints:
 			now := time.Now()
-			if preparer == nil || !freshPreparationHint(at, now) || (!last.IsZero() && now.Sub(last) < 2*time.Second) || runtime.Snapshot().Control.State != control.StateLocal {
+			if preparer == nil || !freshPreparationHint(at, now) || (!last.IsZero() && now.Sub(last) < 2*time.Second) || runtime.LeaseWatch().State != control.StateLocal {
 				continue
 			}
 			last = now
