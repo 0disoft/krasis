@@ -1050,6 +1050,19 @@ test starts with Default selected, refreshes the same sender across a simulated
 lock, and verifies that the worker's pressed-input rejection remains in force.
 Actual two-PC transition continuity and input latency require device validation.
 
+## Input failure evidence persistence
+
+The g321 paired collection `1916e0711a2c227e59d5452ffa52d526` records a B
+desktop transition followed by a matching negative input response, an unknown
+move outcome and session termination. Both service snapshots remain READY.
+This is not an ACK read timeout: the client reached its negative-response path.
+The precise worker phase is unavailable because the product logger omitted the
+four worker phase codes and five ACK read failure codes from its allowlist.
+Those fixed codes now survive both persistence and sanitized support export.
+The regression covers the real logger-to-export path and rejects dynamic codes.
+This repairs missing evidence; it does not establish which native call caused
+the observed disconnect or change input outcomes, retries or timeout policy.
+
 ## Batched receiver cursor entry
 
 The installed entry path takes the pre-write cursor snapshot, performs the

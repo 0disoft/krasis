@@ -36,6 +36,9 @@ func init() {
 	for _, code := range []string{"installed_input_failure_ack_unconfirmed", "installed_input_failure_before_apply", "installed_input_failure_after_dispatch", "installed_input_failure_stage_unknown"} {
 		allowed[code] = true
 	}
+	for _, stage := range []string{"scope_admission", "apply", "cursor_readback", "scope_completion", "ack_mismatch", "ack_timeout", "ack_eof", "ack_closed", "ack_unclassified"} {
+		allowed["installed_input_failure_"+stage] = true
+	}
 	for _, code := range []string{"installed_source_refresh_requested", "installed_source_refresh_joined", "installed_source_refresh_failed", "installed_source_refresh_active_owner", "installed_source_refresh_capture_busy", "installed_source_refresh_unavailable", "installed_source_capture_ready", "installed_source_capture_protected_ready", "boundary_pressed_native_only", "boundary_pressed_hook_only", "boundary_pressed_native_and_hook"} {
 		allowed[code] = true
 	}
