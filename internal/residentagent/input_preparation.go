@@ -25,19 +25,10 @@ func (a productAuthorizer) AuthorizePreparation(ctx context.Context, p transport
 	if ctx == nil || ctx.Err() != nil {
 		return false, errPrivilegedInput
 	}
-	if _, err := a.trust.PeerKeyAnchor(p, now); err != nil {
-		return false, err
-	}
-	document, err := a.trust.List()
-	if err != nil {
-		return false, err
-	}
-	for _, record := range document.Peers {
-		if record.Fingerprint == p.CertificateSHA256 && record.Role == p.Role {
-			return record.AllowInboundControl && record.RevokedAt == nil, nil
-		}
-	}
-	return false, nil
+	// Read the current key, role, permission and revocation in one locked
+	// snapshot. Two separate reads repeat filesystem/ACL work and can combine
+	// a certificate verdict with a policy changed between the two snapshots.
+	return a.trust.InboundControlAllowed(p, now)
 }
 
 func (a privilegedAuthorizer) PrepareInput(ctx context.Context, p transport.AuthenticatedPeerContext, now time.Time) {
