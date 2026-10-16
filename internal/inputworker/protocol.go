@@ -35,6 +35,8 @@ const (
 	opMoveRead
 	opCursorPlace
 	opCursorPlaceProbe
+	opCursorEntry
+	opCursorEntryProbe
 )
 
 type request struct {
@@ -79,13 +81,13 @@ func readRequest(reader io.Reader) (request, error) {
 		if value.token.Validate() != nil {
 			return request{}, ErrProtocol
 		}
-	case opMove, opWheel, opCursorSet, opMoveRead, opCursorPlace, opCursorPlaceProbe:
+	case opMove, opWheel, opCursorSet, opMoveRead, opCursorPlace, opCursorPlaceProbe, opCursorEntry, opCursorEntryProbe:
 		if data[6] != 0 {
 			return request{}, ErrProtocol
 		}
 		value.x = int32(binary.BigEndian.Uint32(data[32:36]))
 		value.y = int32(binary.BigEndian.Uint32(data[36:40]))
-		if value.op != opCursorSet && value.op != opCursorPlace && value.op != opCursorPlaceProbe && value.x == 0 && value.y == 0 {
+		if value.op != opCursorSet && !cursorPlacementOperation(value.op) && value.x == 0 && value.y == 0 {
 			return request{}, ErrProtocol
 		}
 	case opHeartbeat, opClose, opCursorRead:
@@ -127,7 +129,7 @@ func encodeRequest(value request) ([requestSize]byte, error) {
 			return data, ErrProtocol
 		}
 		binary.BigEndian.PutUint32(data[32:36], value.token.Code)
-	case opMove, opWheel, opCursorSet, opMoveRead, opCursorPlace, opCursorPlaceProbe:
+	case opMove, opWheel, opCursorSet, opMoveRead, opCursorPlace, opCursorPlaceProbe, opCursorEntry, opCursorEntryProbe:
 		binary.BigEndian.PutUint32(data[32:36], uint32(value.x))
 		binary.BigEndian.PutUint32(data[36:40], uint32(value.y))
 	case opHeartbeat, opClose, opCursorRead:
@@ -138,6 +140,7 @@ func encodeRequest(value request) ([requestSize]byte, error) {
 }
 
 type response struct {
+	beforeX, beforeY    int32
 	observation         *application.CursorPlacementObservation
 	x, y                int32
 	targetX, targetY    int32
@@ -155,7 +158,7 @@ type response struct {
 }
 
 func writeResponse(writer io.Writer, value response) error {
-	var data [responseSize + workerApplyDetailSize + workerSubmissionDetailSize + 18]byte
+	var data [responseSize + workerApplyDetailSize + workerSubmissionDetailSize + 26]byte
 	size := responseSize
 	copy(data[:4], "KRA1")
 	data[4], data[5], data[6], data[7] = 1, byte(value.op), value.status, value.certainty
@@ -217,22 +220,27 @@ func writeResponse(writer io.Writer, value response) error {
 		}
 		data[responseSize+10] = byte(value.failureStage)
 	}
-	if (value.op == opCursorRead || value.op == opMoveRead || value.op == opCursorPlace || value.op == opCursorPlaceProbe) && value.status == 0 {
+	if cursorResponseOperation(value.op) && value.status == 0 {
 		// Cursor snapshots add eight private bytes in the same pipe write.
 		// Other ACKs retain their existing size; coordinates never enter logs.
 		binary.BigEndian.PutUint32(data[size:size+4], uint32(value.x))
 		binary.BigEndian.PutUint32(data[size+4:], uint32(value.y))
 		size += 8
-		if value.op == opCursorPlace || value.op == opCursorPlaceProbe {
+		if cursorPlacementOperation(value.op) {
 			binary.BigEndian.PutUint32(data[size:size+4], uint32(value.targetX))
 			binary.BigEndian.PutUint32(data[size+4:], uint32(value.targetY))
 			size += 8
 		}
-		if value.op == opCursorPlaceProbe {
+		if cursorProbeOperation(value.op) {
 			if value.observation != nil && value.observation.Valid() {
 				data[size], data[size+1] = value.observation.Known, value.observation.Flags
 			}
 			size += 2
+		}
+		if cursorEntryOperation(value.op) {
+			binary.BigEndian.PutUint32(data[size:size+4], uint32(value.beforeX))
+			binary.BigEndian.PutUint32(data[size+4:size+8], uint32(value.beforeY))
+			size += 8
 		}
 	}
 	attachDesktopDiagnostic(data[:size], value.desktop)
@@ -284,7 +292,7 @@ func decodeResponse(data [responseSize]byte) (response, error) {
 			return response{}, ErrProtocol
 		}
 	}
-	if value.sequence == 0 || value.op < opPress || value.op > opCursorPlaceProbe || value.op == opClose || value.status > 1 || value.inserted > value.requested {
+	if value.sequence == 0 || value.op < opPress || value.op > opCursorEntryProbe || value.op == opClose || value.status > 1 || value.inserted > value.requested {
 		return response{}, ErrProtocol
 	}
 	if value.status == 0 {

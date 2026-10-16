@@ -57,9 +57,13 @@ func (adapter *InputAdapter) PrepareEntry(ctx context.Context, sourceEdge contro
 		return fmt.Errorf("%w: another cursor entry is pending", ErrCursorEntryState)
 	}
 	stage = "snapshot"
-	before, err := adapter.readCursor(ctx)
-	if err != nil {
-		return fmt.Errorf("%w: snapshot cursor before entry: %w", ErrInputInjection, err)
+	entryPort, combined := adapter.injection.(application.CursorEntryPort)
+	var before point
+	if !combined {
+		before, err = adapter.readCursor(ctx)
+		if err != nil {
+			return fmt.Errorf("%w: snapshot cursor before entry: %w", ErrInputInjection, err)
+		}
 	}
 	stage = "geometry"
 	x, y, err := cursorEntryPoint(
@@ -80,7 +84,19 @@ func (adapter *InputAdapter) PrepareEntry(ctx context.Context, sourceEdge contro
 	}
 	stage = "set"
 	var position point
-	if port, ok := adapter.injection.(application.CursorPlacementPort); ok {
+	if combined {
+		entry, entryErr := entryPort.EnterCursor(ctx, x, y)
+		if entryErr != nil {
+			if certainty, known := application.InjectionCertaintyOf(entryErr); known && certainty == application.InjectionNotApplied {
+				state.clear()
+			}
+			return entryErr
+		}
+		before = point{X: entry.BeforeX, Y: entry.BeforeY}
+		x, y = entry.TargetX, entry.TargetY
+		position = point{X: entry.X, Y: entry.Y}
+		observation = entry.Observation
+	} else if port, ok := adapter.injection.(application.CursorPlacementPort); ok {
 		// Protected placement observes confinement and reads back on the same
 		// authorized worker thread. Its expected target is not the readback.
 		placement, placeErr := port.PlaceCursor(ctx, x, y)

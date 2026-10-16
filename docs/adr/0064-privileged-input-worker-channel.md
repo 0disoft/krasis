@@ -1049,3 +1049,20 @@ The now-unreachable foreground polling promotion loop is removed. The regression
 test starts with Default selected, refreshes the same sender across a simulated
 lock, and verifies that the worker's pressed-input rejection remains in force.
 Actual two-PC transition continuity and input latency require device validation.
+
+## Batched receiver cursor entry
+
+The installed entry path takes the pre-write cursor snapshot, performs the
+existing confined placement once, and reads back its effective target in one
+authenticated request. The worker checks the same sequence, lease, pressed
+ledger and desktop scope as other cursor operations. This removes one pipe
+roundtrip and one client admission without skipping live authority checks.
+The private response carries the snapshot, effective target and readback;
+coordinates are not diagnostic fields. Legacy standalone placement is retained.
+
+A failed snapshot is not-applied. Once placement might have begun, a missing
+ACK remains outcome-unknown: the caller retains an unverified pending entry,
+does not replay, and cannot restore a guessed previous position. A successful
+mismatch retains the actual snapshot/readback for the existing conditional
+rollback. Snapshot and placement may still wait in Windows; batching is not
+evidence that the observed multi-second tail has been eliminated.

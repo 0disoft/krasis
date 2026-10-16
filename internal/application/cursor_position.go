@@ -30,6 +30,18 @@ type CursorPlacementPort interface {
 	PlaceCursor(context.Context, int32, int32) (CursorPlacement, error)
 }
 
+// CursorEntry includes the pre-write snapshot for conditional rollback. The
+// installed backend returns it with placement in one authenticated transaction.
+// These coordinates stay private to the input channel, never diagnostics.
+type CursorEntry struct {
+	CursorPlacement
+	BeforeX, BeforeY int32
+}
+
+type CursorEntryPort interface {
+	EnterCursor(context.Context, int32, int32) (CursorEntry, error)
+}
+
 // CursorPlacementProbePort adds bounded, read-only mismatch classification to
 // the same placement operation. It never retries or changes placement policy.
 type CursorPlacementProbePort interface {

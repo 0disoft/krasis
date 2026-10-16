@@ -30,7 +30,7 @@ func encodeWorkerSubmission(data []byte, p handoff.WorkerApplyProfile) {
 // response retains two reads and one write, with no extra request or roundtrip.
 func readResponseSuffix(reader io.Reader, version byte, value *response) error {
 	version = legacyResponseVersion(version)
-	var data [workerApplyDetailSize + workerSubmissionDetailSize + 18]byte
+	var data [workerApplyDetailSize + workerSubmissionDetailSize + 26]byte
 	size := 0
 	if version >= 4 {
 		size = workerApplyDetailSize
@@ -38,14 +38,17 @@ func readResponseSuffix(reader io.Reader, version byte, value *response) error {
 	if version == 5 || version == 7 {
 		size += workerSubmissionDetailSize
 	}
-	cursor := (value.op == opCursorRead || value.op == opMoveRead || value.op == opCursorPlace || value.op == opCursorPlaceProbe) && value.status == 0
+	cursor := cursorResponseOperation(value.op) && value.status == 0
 	if cursor {
 		size += 8
-		if value.op == opCursorPlace || value.op == opCursorPlaceProbe {
+		if cursorPlacementOperation(value.op) {
 			size += 8
 		}
-		if value.op == opCursorPlaceProbe {
+		if cursorProbeOperation(value.op) {
 			size += 2
+		}
+		if cursorEntryOperation(value.op) {
+			size += 8
 		}
 	}
 	if size == 0 {
@@ -86,15 +89,23 @@ func readResponseSuffix(reader io.Reader, version byte, value *response) error {
 	if cursor {
 		value.x = int32(binary.BigEndian.Uint32(data[offset : offset+4]))
 		value.y = int32(binary.BigEndian.Uint32(data[offset+4 : offset+8]))
-		if value.op == opCursorPlace || value.op == opCursorPlaceProbe {
+		if cursorPlacementOperation(value.op) {
 			value.targetX = int32(binary.BigEndian.Uint32(data[offset+8 : offset+12]))
 			value.targetY = int32(binary.BigEndian.Uint32(data[offset+12 : offset+16]))
 		}
-		if value.op == opCursorPlaceProbe {
+		if cursorProbeOperation(value.op) {
 			p := application.CursorPlacementObservation{Known: data[offset+16], Flags: data[offset+17]}
 			if p.Valid() {
 				value.observation = &p
 			}
+		}
+		if cursorEntryOperation(value.op) {
+			snapshot := offset + 16
+			if cursorProbeOperation(value.op) {
+				snapshot += 2
+			}
+			value.beforeX = int32(binary.BigEndian.Uint32(data[snapshot : snapshot+4]))
+			value.beforeY = int32(binary.BigEndian.Uint32(data[snapshot+4 : snapshot+8]))
 		}
 	}
 	return nil

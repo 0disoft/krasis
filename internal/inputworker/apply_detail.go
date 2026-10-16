@@ -40,6 +40,11 @@ func applyCommand(ctx context.Context, input application.InputPort, pressed *con
 			return placeCursorResponse(ctx, input, pressed, command, ack)
 		})
 	}
+	if cursorEntryOperation(command.op) {
+		return measureApplyPart(ack.applyDetail, 0, func() error {
+			return enterCursorResponse(ctx, input, pressed, command, ack)
+		})
+	}
 	applyCtx := ctx
 	if command.submissionDetail {
 		applyCtx = handoff.WithWorkerApply(ctx, ack.applyDetail)
