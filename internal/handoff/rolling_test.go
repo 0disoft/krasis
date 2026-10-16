@@ -21,6 +21,7 @@ func TestRollingProfilesResumeAfterIdleAndRejectOldWindowCallbacks(t *testing.T)
 		oldWindow := c.started
 		x, complete := Input(ctx, "source")
 		time.Sleep(20 * time.Minute)
+		synctest.Wait() // Join the timer callback before inspecting its receipt.
 		if len(out) != 1 || !out[0].Incomplete {
 			t.Fatal("idle window did not flush", len(out))
 		}
@@ -50,6 +51,7 @@ func TestRollingReconnectRetainsExchangeTagConfiguration(t *testing.T) {
 		ctx := WithSession(context.Background(), c)
 		Finish(Begin(ctx, "source", "old", "e", time.Now()), "ok")
 		time.Sleep(Window)
+		synctest.Wait()
 		ctx = WithSession(context.Background(), c)
 		const tag = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 		ConfigureExchangeTags(ctx, func(string, string) string { return tag })
@@ -76,6 +78,7 @@ func TestRollingProfilesKeepWindowAndLifetimeProbeBudgets(t *testing.T) {
 		c.workerApplyProbes = WorkerApplyProbeLimit
 		c.cursorPlacementProbes = CursorPlacementProbeLimit
 		time.Sleep(Window)
+		synctest.Wait()
 		fresh := Begin(ctx, "source", "new", "e", time.Now())
 		if getAttempt(fresh) == nil || c.count != 1 {
 			t.Fatal("new window did not admit a bounded attempt")
