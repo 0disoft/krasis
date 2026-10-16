@@ -28,10 +28,14 @@ func (w *sourceWriter) send(p sourcePacket, current func() bool) error {
 	return w.write(p, current, false)
 }
 func (w *sourceWriter) write(p sourcePacket, current func() bool, retirement bool) error {
+	return w.writePacket(p, current, retirement, false)
+}
+
+func (w *sourceWriter) writePacket(p sourcePacket, current func() bool, retirement, completedReply bool) error {
 	if !w.started.Load() && (p.kind == sourceAction || p.kind == sourceBoundary || p.kind == sourceReturn) {
 		return nil
 	}
-	if retirement || p.kind == sourceReply && p.op == sourceHeartbeat {
+	if retirement || completedReply || p.kind == sourceReply && p.op == sourceHeartbeat {
 		w.mu.Lock()
 	} else {
 		// Full WTS/SCM authorization may block. It must not own the wire gate
@@ -58,7 +62,8 @@ func (w *sourceWriter) write(p sourcePacket, current func() bool, retirement boo
 	// Retirement grants no authority. It is sent only after native/sender join
 	// on the exact already authenticated channel, even if logon authority changed.
 	if !retirement {
-		// The full check above is mandatory for every non-heartbeat frame.
+		// Input and observations retain their full check above. A completed
+		// command reply reports an already known outcome, not new authority.
 		// Recheck the pinned owner's presence after admission and before bytes.
 		if w.channel.authority.checkHeartbeat() != nil {
 			return sourceTransportFailure(ErrAuthority)
@@ -255,7 +260,7 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 		exit.Reader = "invalid"
 		return ErrProtocol
 	}
-	if err := writer.send(sourcePacket{kind: sourceReply, op: sourceStart, reply: first.sequence}, nil); err != nil {
+	if err := writer.sendCompletedReply(first, sourcePacket{kind: sourceReply, op: sourceStart, reply: first.sequence}); err != nil {
 		return err
 	}
 	writer.started.Store(true)
@@ -281,7 +286,7 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 	readDone := make(chan error, 1)
 	go func() {
 		readDone <- pumpSourceCommandsOrdered(run, read, requests, cancel, completed, func(p sourcePacket) error {
-			return writer.send(sourcePacket{kind: sourceReply, op: sourceHeartbeat, reply: p.sequence}, nil)
+			return writer.sendCompletedReply(p, sourcePacket{kind: sourceReply, op: sourceHeartbeat, reply: p.sequence})
 		})
 	}()
 	// Retire only this read; the final native response still needs the writer.
@@ -401,7 +406,7 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 					response.decision = 0
 					response.pressedEvidence = 0
 				}
-				if failure := sourceCommandCompletion(err, writer.send(response, nil)); failure != nil {
+				if failure := sourceCommandCompletion(err, writer.sendCompletedReply(p, response)); failure != nil {
 					return failure
 				}
 				select {
