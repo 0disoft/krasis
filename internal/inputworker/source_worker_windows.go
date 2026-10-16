@@ -126,6 +126,8 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 		return err
 	}
 	hook.SetBoundaryGuard(authorize)
+	var pressedEvidence atomic.Uint32
+	hook.SetAdmissionReporter(func(code string) { pressedEvidence.Store(uint32(sourcePressedEvidence(code))) })
 	writer := &sourceWriter{channel: channel, binding: lease.Binding}
 	session, err := wininput.NewSourceSession(1024, writer)
 	if err != nil {
@@ -285,8 +287,12 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 				operation := func() error {
 					switch p.op {
 					case sourceAdmit:
+						pressedEvidence.Store(0)
 						decision, failure := hook.AdmitBoundary(run, control.BoundaryIntent{})
 						response.decision = decision
+						if failure == nil {
+							response.pressedEvidence = byte(pressedEvidence.Load())
+						}
 						return failure
 					case sourceActivate:
 						writer.epoch.Store(p.sequence)
@@ -364,6 +370,7 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 					}
 					response.status = 1
 					response.decision = 0
+					response.pressedEvidence = 0
 				}
 				if failure := sourceCommandCompletion(err, writer.send(response, nil)); failure != nil {
 					return failure

@@ -88,6 +88,11 @@ func (c *CaptureSource) AdmitBoundary(ctx context.Context, _ control.BoundaryInt
 		return 0, peer.ErrBoundaryInspectionUnavailable
 	}
 	p, err := live.call(ctx, sourceAdmit)
+	if err == nil && c.observe != nil {
+		if code := sourcePressedCode(p.pressedEvidence); code != "" {
+			c.observe(code)
+		}
+	}
 	return sourceAdmissionResult(p, err)
 }
 
