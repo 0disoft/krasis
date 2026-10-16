@@ -312,7 +312,9 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 			responder.Cursor.RestoreReturnCursor()
 		}
 		started = time.Now()
-		entryErr := responder.Entry.PrepareEntry(ctx, command.Edge)
+		entryCtx, completeEntry := handoff.Entry(ctx)
+		entryErr := responder.Entry.PrepareEntry(entryCtx, command.Edge)
+		completeEntry(entryErr)
 		handoff.Record(ctx, handoff.EntryPrepare, time.Since(started))
 		if err := entryErr; err != nil {
 			return rollbackEntry(err)

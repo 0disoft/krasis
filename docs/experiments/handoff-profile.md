@@ -467,3 +467,22 @@ Separately, g152 binds the desktop object name `Default` to the exact owned
 handle once at acquisition and still queries UOI_IO before every work; a replaced
 handle does not inherit the previous name proof. That is not a profile change and
 is measured in `docs/engineering/03-performance-budget.md`.
+
+## g320 installed cursor-entry vector
+
+`Summary.entry` is one optional receiver/installed `Vector` for the cursor entry
+transaction, separate from `preparation`, `first`, `worst` and the frame histogram.
+Its `Dispatch` duration covers the entire `PrepareEntry` call; `ClientResponse`
+and the matching ACK's worker authority, desktop and apply times are nested spans.
+They must not be added together or subtracted as a proven scheduler residual.
+The g319 `preparation` vector retained the first client command timing without
+the matching worker ACK details; it cannot isolate where its 1.94s wait occurred.
+
+The new batched transaction has one input IPC command. The ordinary matching
+worker-detail/submission probe budget also bounds this one entry sample per
+tracked attempt. Entry never consumes the first input, increments frames, or
+changes authority, request deadlines or uncertain-input policy. Completion is
+recorded once; retired/expired attempts drop late completions. An absent entry
+means unobserved, not zero latency. Numeric validation and the existing remote
+export projection strip arbitrary properties; no coordinates or input values
+are added to support files. Device latency remains to be measured.

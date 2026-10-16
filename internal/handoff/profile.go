@@ -82,6 +82,7 @@ type Summary struct {
 	Preparation             Vector                `json:"preparation"`
 	First                   Vector                `json:"first"`
 	Worst                   Vector                `json:"worst"`
+	Entry                   *Vector               `json:"entry,omitempty"`
 	Frames                  uint32                `json:"frames"`
 	Histogram               [5]uint32             `json:"histogram"`
 	End                     string                `json:"end"`
@@ -125,7 +126,14 @@ func (s Summary) Valid() bool {
 	if !validPreparationLock(s) {
 		return false
 	}
-	for _, v := range []Vector{s.Preparation, s.First, s.Worst} {
+	vectors := []Vector{s.Preparation, s.First, s.Worst}
+	if s.Entry != nil {
+		if s.Role != "receiver" || s.Backend != "installed" || s.Entry.Measured&(1<<Dispatch) == 0 || !validOutcome(s.Entry.Outcome) {
+			return false
+		}
+		vectors = append(vectors, *s.Entry)
+	}
+	for _, v := range vectors {
 		if v.Measured>>StageCount != 0 || (v.Outcome != "" && !validOutcome(v.Outcome)) {
 			return false
 		}
@@ -182,6 +190,7 @@ type attempt struct {
 	finished                  bool
 	cursorPlacementRequested  bool
 	firstStarted              bool
+	entryStarted              bool
 	progress                  *grantProgress
 }
 type session struct {

@@ -66,8 +66,8 @@ func (p *WorkerApplyProfile) Record(slot int, elapsed time.Duration) {
 	p.Measured |= 1 << slot
 }
 
-// One request per actual input sample, bounded across reentry and reconnect.
-// No bootstrap, heartbeat, recovery or untracked input requests this extension.
+// One request per actual input or cursor-entry sample, bounded across reentry
+// and reconnect. No bootstrap, heartbeat, recovery or untracked input requests it.
 func WantWorkerApply(ctx context.Context) bool {
 	if ctx == nil {
 		return false
