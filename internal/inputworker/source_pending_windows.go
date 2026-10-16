@@ -52,3 +52,25 @@ func (c *sourceClient) drainPending(ctx context.Context) error {
 	}
 	return ErrAuthority
 }
+
+// The child may have closed its inherited pipe after publishing retirement,
+// before our reader has consumed that final packet. A failed owner query must
+// not discard that proof. Read only on the original authenticated channel;
+// never send another command or infer a join from EOF/timeout alone.
+func (c *sourceClient) awaitRetirement(ctx context.Context) error {
+	limit := time.Now().Add(RecoveryTimeout + time.Second)
+	if deadline, ok := ctx.Deadline(); ok && deadline.Before(limit) {
+		limit = deadline
+	}
+	timer := time.NewTimer(time.Until(limit))
+	defer timer.Stop()
+	select {
+	case <-c.done:
+		if c.retired.Load() && c.err == nil {
+			return nil
+		}
+	case <-ctx.Done():
+	case <-timer.C:
+	}
+	return ErrAuthority
+}
