@@ -8,18 +8,29 @@ import (
 // A reply published before EOF/cancellation is still an observed outcome,
 // including rejection or a protocol violation. Consume it exactly once.
 func waitSourceReply(ctx context.Context, timeout <-chan time.Time, replies <-chan sourcePacket, done <-chan struct{}) (sourcePacket, bool) {
+	p, known, _ := waitSourceReplyObserved(ctx, timeout, replies, done)
+	return p, known
+}
+
+func waitSourceReplyObserved(ctx context.Context, timeout <-chan time.Time, replies <-chan sourcePacket, done <-chan struct{}) (sourcePacket, bool, string) {
+	outcome := "owner_exited"
 	select {
 	case reply := <-replies:
-		return reply, true
+		return reply, true, "received"
 	case <-ctx.Done():
+		outcome = "cancelled"
+		if ctx.Err() == context.DeadlineExceeded {
+			outcome = "timeout"
+		}
 	case <-timeout:
+		outcome = "timeout"
 	case <-done:
 	}
 	select {
 	case reply := <-replies:
-		return reply, true
+		return reply, true, "received"
 	default:
-		return sourcePacket{}, false
+		return sourcePacket{}, false, outcome
 	}
 }
 

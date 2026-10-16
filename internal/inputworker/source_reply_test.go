@@ -72,3 +72,34 @@ func TestSourceBufferedForeignReplyRemainsProtocolFailure(t *testing.T) {
 		t.Fatal("EOF invented a response")
 	}
 }
+
+func TestSourceReplyObservationSeparatesMissingOutcomeFromBufferedReply(t *testing.T) {
+	for _, signal := range []string{"cancelled", "timeout", "owner_exited"} {
+		for _, buffered := range []bool{false, true} {
+			ctx, cancel := context.WithCancel(context.Background())
+			done, timeout := make(chan struct{}), make(chan time.Time, 1)
+			switch signal {
+			case "cancelled":
+				cancel()
+			case "timeout":
+				timeout <- time.Now()
+			case "owner_exited":
+				close(done)
+			}
+			replies := make(chan sourcePacket, 1)
+			want := sourcePacket{kind: sourceReply, op: sourceAdmit, reply: 1, status: 1}
+			if buffered {
+				replies <- want
+			}
+			p, known, outcome := waitSourceReplyObserved(ctx, timeout, replies, done)
+			cancel()
+			if buffered {
+				if !known || p != want || outcome != "received" || len(replies) != 0 {
+					t.Fatal("signal erased matching buffered rejection", signal, p, known, outcome)
+				}
+			} else if known || outcome != signal {
+				t.Fatal("missing reply got the wrong terminal observation", signal, known, outcome)
+			}
+		}
+	}
+}

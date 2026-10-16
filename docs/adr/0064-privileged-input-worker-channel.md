@@ -1115,6 +1115,22 @@ exited owner rejection and canceled unsent commands. Existing request deadlines,
 worker idle bounds, trust freshness, negative ACKs and uncertain-input handling
 are unchanged. Actual two-PC recurrence and latency still require observation.
 
+## Source command failure identity
+
+The g324 collection `ff717e78fe862fc28cc637398fdbaff0` contains A's source
+response failure at 2026-10-16T16:55:57.234Z and B's subsequent remote EOF.
+A's later source report says reader cancelled and retirement delivery failed;
+both services remain READY. The old phase-only diagnostic cannot identify
+which command was outstanding or whether its response was rejected, cancelled,
+timed out, malformed, or lost when the owner exited.
+
+Failed calls now emit an allowlisted protocol-operation class and response
+observation beside the existing phase and timing samples. A buffered response
+is still consumed once before a competing cancellation/timeout/EOF signal;
+matching negative replies remain distinct from missing or foreign replies.
+These events contain no input values, coordinates, arbitrary errors or paths.
+They do not change request budgets, outcome handling or retirement proof.
+
 ## Batched receiver cursor entry
 
 The installed entry path takes the pre-write cursor snapshot, performs the

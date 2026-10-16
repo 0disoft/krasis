@@ -30,7 +30,7 @@ func TestSourceFailedReplyKeepsFailureAndFlushesBoundedTiming(t *testing.T) {
 	if err != ErrProtocol || c.epoch.Load() != 0 || c.sequence != 1 {
 		t.Fatal("timing changed fencing, reply identity or replay policy", err)
 	}
-	if len(events) != 5 || events[4] != "installed_source_failure_protocol" {
+	if len(events) != 7 || events[4] != "installed_source_failure_protocol" || events[5] != "installed_source_command_failed_activate" || events[6] != "installed_source_response_protocol" {
 		t.Fatal("failure lost phase or partial timings", events)
 	}
 	for _, code := range events[:4] {

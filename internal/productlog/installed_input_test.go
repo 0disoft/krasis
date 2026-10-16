@@ -8,6 +8,24 @@ import (
 )
 
 func TestInputConnectionDiagnosticAllowlistRejectsDynamicStages(t *testing.T) {
+	for _, family := range []struct {
+		prefix string
+		values []string
+	}{
+		{"installed_source_command_failed_", []string{"start", "admit", "activate", "deactivate", "heartbeat", "stop", "cursor_prepare", "cursor_show", "cursor_restore", "unknown"}},
+		{"installed_source_response_", []string{"received", "cancelled", "timeout", "owner_exited", "protocol", "rejected"}},
+	} {
+		for _, value := range family.values {
+			code := family.prefix + value
+			log := sanitizeLog("agent.jsonl", strings.NewReader(`{"time":"2026-10-17T01:55:57Z","code":"`+code+`","key":"PRIVATE"}`+"\n"))
+			if log.Incomplete || len(log.Events) != 1 || log.Events[0].Code != code {
+				t.Fatal("fixed source command/outcome evidence lost", code)
+			}
+		}
+		if allowed[family.prefix+"PRIVATE"] {
+			t.Fatal("dynamic source command/outcome admitted")
+		}
+	}
 	for _, code := range []string{"installed_source_timing_client_response_lt1s", "installed_source_heartbeat_timing_client_authority_ge1s", "installed_source_failure_protocol", "installed_source_command_preflight_expired"} {
 		line := `{"time":"2026-10-15T09:40:00Z","code":"` + code + `","error":"PRIVATE"}` + "\n"
 		result := sanitizeLog("agent.jsonl", strings.NewReader(line))

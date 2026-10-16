@@ -119,6 +119,7 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 		sampler = &c.heartbeatTiming
 	}
 	stage := "context"
+	replyOutcome := ""
 	defer func() {
 		now := time.Now()
 		sampler.observe(sample, now)
@@ -127,6 +128,10 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 		}
 		if result != nil && sampler.emit != nil {
 			emitTiming(sampler.emit, "installed_source_failure_"+stage)
+			emitTiming(sampler.emit, sourceCommandFailureCode(op))
+			if replyOutcome != "" {
+				emitTiming(sampler.emit, "installed_source_response_"+replyOutcome)
+			}
 		}
 	}()
 	if op == sourceStop {
@@ -245,7 +250,8 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 	defer timer.Stop()
 	stage = "response"
 	started = time.Now()
-	reply, known := waitSourceReply(ctx, timer.C, c.replies, c.done)
+	reply, known, observed := waitSourceReplyObserved(ctx, timer.C, c.replies, c.done)
+	replyOutcome = observed
 	sample[3] = timingBucket(time.Since(started))
 	if op == sourceActivate {
 		handoff.RecordCapture(ctx, handoff.CaptureIPCResponse, time.Since(started))
@@ -254,6 +260,9 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 		result, err := sourceReplyResult(p, reply)
 		if err == ErrProtocol {
 			stage = "protocol"
+			replyOutcome = "protocol"
+		} else if err != nil {
+			replyOutcome = "rejected"
 		}
 		accepted = err != ErrProtocol
 		if err == nil {

@@ -2,6 +2,12 @@ package productlog
 
 func init() {
 	allowed["installed_source_connect_failed"] = true
+	for _, op := range []string{"start", "admit", "activate", "deactivate", "heartbeat", "stop", "cursor_prepare", "cursor_show", "cursor_restore", "unknown"} {
+		allowed["installed_source_command_failed_"+op] = true
+	}
+	for _, outcome := range []string{"received", "cancelled", "timeout", "owner_exited", "protocol", "rejected"} {
+		allowed["installed_source_response_"+outcome] = true
+	}
 	for _, stage := range []string{"context", "authority", "write", "response", "protocol"} {
 		allowed["installed_source_failure_"+stage] = true
 	}
