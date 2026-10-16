@@ -255,7 +255,9 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 		config.LivenessObserver = progress
 		config.QueueObserver = progress
 		config.DestinationObserver = progress
-		progressCtx, stopProgress := context.WithCancel(ctx)
+		// Diagnostic sampling outlives cancellation until all session callbacks
+		// have joined; only this runner's explicit defer stops its goroutine.
+		progressCtx, stopProgress := context.WithCancel(context.WithoutCancel(ctx))
 		progressDone := make(chan struct{})
 		go func() { defer close(progressDone); progress.run(progressCtx, log) }()
 		defer func() { stopProgress(); <-progressDone }()
@@ -264,6 +266,9 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 			log.Event(productlog.ActivationCode(failure.Component, failure.Phase, failure.Code))
 		}
 		config.TerminationObserver = func(v agent.SessionTermination) {
+			if v.Trigger {
+				progress.ObserveFailure(v.ObservedAt, productlog.FaultCode(v.Failure.Component, v.Failure.Phase, v.Failure.Code))
+			}
 			log.SessionEnd(productlog.SessionEndSummary{ObservedAt: v.ObservedAt.Format(time.RFC3339Nano), Trigger: v.Trigger, Component: v.Component, Fault: productlog.FaultCode(v.Failure.Component, v.Failure.Phase, v.Failure.Code), Canceled: v.Canceled, Timeout: v.Timeout, Closed: v.Closed, NativeError: v.NativeError, NativeKnown: v.NativeKnown})
 		}
 		// Initial conservative defaults, not a measured latency guarantee.

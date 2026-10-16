@@ -27,6 +27,8 @@ type runtimeDiagnostics struct {
 	queueHigh, queueEnqueued, queueDequeued, queueCoalesced atomic.Uint64
 	queueStale                                              atomic.Uint64
 	queueResidenceMax                                       atomic.Int64
+	gcFailures                                              chan gcFailureTrigger
+	gcSkipped                                               atomic.Uint64
 }
 
 func (d *runtimeDiagnostics) ObserveHookStarted(t time.Time) { d.hookStart.Store(d.stamp(t)) }
@@ -41,7 +43,9 @@ func (d *runtimeDiagnostics) ObserveHookCompleted(t time.Time) {
 }
 func (d *runtimeDiagnostics) ObserveRawInput(time.Time) { d.rawInputs.Add(1) }
 
-func newRuntimeDiagnostics() *runtimeDiagnostics      { return &runtimeDiagnostics{started: time.Now()} }
+func newRuntimeDiagnostics() *runtimeDiagnostics {
+	return &runtimeDiagnostics{started: time.Now(), gcFailures: make(chan gcFailureTrigger, 1)}
+}
 func (d *runtimeDiagnostics) stamp(t time.Time) int64 { return max(1, t.Sub(d.started).Microseconds()) }
 func (d *runtimeDiagnostics) ObserveReadConnectionStarted() {
 	d.readStart.Store(0)
@@ -228,16 +232,57 @@ func (d *runtimeDiagnostics) sample(current, previous runtimeSample) productlog.
 	}
 	return s
 }
-func (d *runtimeDiagnostics) run(ctx context.Context, log *productlog.Logger) {
+
+type runtimeDiagnosticSink interface {
+	Runtime(productlog.RuntimeSummary)
+	GCTrail(productlog.GCTrail)
+	Event(string)
+}
+
+func (d *runtimeDiagnostics) run(ctx context.Context, log runtimeDiagnosticSink) {
 	read := newRuntimeSampler()
 	previous := read()
+	readGC := newGCSampler()
+	previousGC := readGC()
+	var ring gcEvidenceRing
+	trails := 0
+	sampleGC := func(late time.Duration) {
+		current := readGC()
+		ring.add(gcInterval(d.started, previousGC, current, late))
+		previousGC = current
+	}
+	flushFailure := func(t gcFailureTrigger) {
+		if trails >= gcTrailBudget {
+			d.gcSkipped.Add(1)
+			return
+		}
+		sampleGC(0)
+		log.GCTrail(ring.snapshot(t, d.gcSkipped.Load()))
+		trails++
+	}
+	gcTicker := time.NewTicker(gcSampleInterval)
+	defer gcTicker.Stop()
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
+			// The owning runner joins its callbacks before explicit stopProgress.
+			// Drain the failure notification even if shutdown won this select.
+			select {
+			case t := <-d.gcFailures:
+				flushFailure(t)
+			default:
+			}
+			if d.gcSkipped.Load() > 0 {
+				log.Event("runtime_gc_trail_limited")
+			}
 			log.Runtime(d.sample(read(), previous))
 			return
+		case t := <-d.gcFailures:
+			flushFailure(t)
+		case scheduled := <-gcTicker.C:
+			sampleGC(time.Since(scheduled))
 		case scheduled := <-ticker.C:
 			d.ObserveTimerLateness(time.Since(scheduled))
 			current := read()
