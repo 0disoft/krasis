@@ -31,6 +31,7 @@ type exportEvent struct {
 	Injection     *InjectionFailure  `json:"injection,omitempty"`
 	Retry         *RetrySummary      `json:"retry,omitempty"`
 	Runtime       *RuntimeSummary    `json:"runtime,omitempty"`
+	GCTrail       *GCTrail           `json:"gcTrail,omitempty"`
 	Handoff       *handoff.Summary   `json:"handoff,omitempty"`
 	SessionEnd    *SessionEndSummary `json:"sessionEnd,omitempty"`
 }
@@ -140,10 +141,16 @@ func sanitizeLog(name string, r io.Reader) exportLog {
 		}
 	}
 	scanner := bufio.NewScanner(bytes.NewReader(data))
-	scanner.Buffer(make([]byte, 1024), 4096)
+	// GC trails contain at most 64 numeric windows. Other record kinds keep
+	// their original 4 KiB limit; the outer file limit remains unchanged.
+	scanner.Buffer(make([]byte, 1024), 64*1024)
 	for scanner.Scan() {
 		var input record
 		if json.Unmarshal(scanner.Bytes(), &input) != nil || !allowed[input.Code] {
+			result.Incomplete = true
+			continue
+		}
+		if len(scanner.Bytes()) > 4096 && input.Code != "runtime_gc_trail" {
 			result.Incomplete = true
 			continue
 		}
@@ -194,6 +201,13 @@ func sanitizeLog(name string, r io.Reader) exportLog {
 				continue
 			}
 			event.Runtime = input.Runtime
+		}
+		if input.Code == "runtime_gc_trail" {
+			if input.GCTrail == nil || !input.GCTrail.valid() {
+				result.Incomplete = true
+				continue
+			}
+			event.GCTrail = input.GCTrail
 		}
 		if input.Code == "handoff_profile" {
 			if input.Handoff == nil || !input.Handoff.Valid() {

@@ -89,6 +89,7 @@ type record struct {
 	Injection     *InjectionFailure  `json:"injection,omitempty"`
 	Retry         *RetrySummary      `json:"retry,omitempty"`
 	Runtime       *RuntimeSummary    `json:"runtime,omitempty"`
+	GCTrail       *GCTrail           `json:"gcTrail,omitempty"`
 	Handoff       *handoff.Summary   `json:"handoff,omitempty"`
 	SessionEnd    *SessionEndSummary `json:"sessionEnd,omitempty"`
 }
