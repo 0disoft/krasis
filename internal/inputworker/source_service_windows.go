@@ -26,8 +26,11 @@ func runSourceService(ctx context.Context, installation *Installation, admit fun
 			}
 			if err == nil {
 				lease, prepare, leaseErr := receiveAgentRequest(ctx, channel)
-				if leaseErr == nil && !prepare && lease.Capture && !lease.Presentation {
+				err = leaseErr
+				if err == nil && !prepare && lease.Capture && !lease.Presentation {
 					report, err = runPreparedAgentLease(ctx, channel, lease, agent, service, installation, nil)
+				} else if err == nil {
+					err = ErrProtocol
 				}
 			}
 			closeErr := channel.Close()
@@ -36,6 +39,12 @@ func runSourceService(ctx context.Context, installation *Installation, admit fun
 			}
 			if failure := serviceRecoveryFailure(err, closeErr); failure != nil {
 				return failure
+			}
+			// The worker, native owners and authenticated report have joined.
+			// Publish the next blocking endpoint immediately after clean recovery.
+			// Rejections/errors retain backoff; cleanup uncertainty still fences.
+			if err == nil {
+				continue
 			}
 		}
 		select {

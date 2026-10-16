@@ -1,6 +1,7 @@
 package productlog
 
 func init() {
+	allowed["installed_source_connect_failed"] = true
 	for _, stage := range []string{"context", "authority", "write", "response", "protocol"} {
 		allowed["installed_source_failure_"+stage] = true
 	}
@@ -53,8 +54,10 @@ func init() {
 	}
 	for _, stage := range []string{"lease_metadata", "pipe_open", "service_pid", "service_manager", "service_open", "service_config", "service_status", "service_process_open", "service_process_metadata", "service_image", "service_image_acl", "lease_deadline", "lease_write", "worker_ready", "client_validation", "unknown"} {
 		allowed["installed_input_stage_"+stage] = true
+		allowed["installed_source_stage_"+stage] = true
 	}
 	for _, number := range []string{"2", "5", "32", "231", "1314", "other", "unknown"} {
 		allowed["installed_input_native_"+number] = true
+		allowed["installed_source_native_"+number] = true
 	}
 }

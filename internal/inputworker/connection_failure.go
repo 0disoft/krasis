@@ -29,35 +29,43 @@ func connectionFailed(stage string, cause error) error {
 }
 
 func ConnectionFailureEvent(err error) string {
+	return connectionFailureEvent(err, "installed_input_stage_")
+}
+
+func connectionFailureEvent(err error, prefix string) string {
 	var failure *connectionFailure
 	if !errors.As(err, &failure) {
-		return "installed_input_stage_unknown"
+		return prefix + "unknown"
 	}
 	switch failure.stage {
 	case "lease_metadata", "pipe_open", "service_pid", "service_manager", "service_open", "service_config", "service_status", "service_process_open", "service_process_metadata", "service_image", "service_image_acl", "lease_deadline", "lease_write", "worker_ready", "client_validation":
-		return "installed_input_stage_" + failure.stage
+		return prefix + failure.stage
 	default:
-		return "installed_input_stage_unknown"
+		return prefix + "unknown"
 	}
 }
 
 func ConnectionNativeFailureEvent(err error) string {
+	return connectionNativeFailureEvent(err, "installed_input_native_")
+}
+
+func connectionNativeFailureEvent(err error, prefix string) string {
 	var number syscall.Errno
 	if !errors.As(err, &number) {
-		return "installed_input_native_unknown"
+		return prefix + "unknown"
 	}
 	switch number {
 	case 2:
-		return "installed_input_native_2"
+		return prefix + "2"
 	case 5:
-		return "installed_input_native_5"
+		return prefix + "5"
 	case 32:
-		return "installed_input_native_32"
+		return prefix + "32"
 	case 231:
-		return "installed_input_native_231"
+		return prefix + "231"
 	case 1314:
-		return "installed_input_native_1314"
+		return prefix + "1314"
 	default:
-		return "installed_input_native_other"
+		return prefix + "other"
 	}
 }

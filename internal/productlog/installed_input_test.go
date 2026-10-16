@@ -71,12 +71,12 @@ func TestInputConnectionDiagnosticAllowlistRejectsDynamicStages(t *testing.T) {
 	if !allowed[inputworker.ConnectionFailureEvent(nil)] || !allowed[inputworker.ConnectionNativeFailureEvent(nil)] {
 		t.Fatal("unknown input connection classification would be dropped")
 	}
-	for _, code := range []string{"installed_input_stage_pipe_open", "installed_input_stage_service_config", "installed_input_stage_worker_ready", "installed_input_native_5"} {
+	for _, code := range []string{"installed_input_stage_pipe_open", "installed_input_stage_service_config", "installed_input_stage_worker_ready", "installed_input_native_5", "installed_source_connect_failed", "installed_source_stage_pipe_open", "installed_source_stage_service_config", "installed_source_native_2"} {
 		if !allowed[code] {
 			t.Fatal("fixed input connection diagnostic omitted")
 		}
 	}
-	if allowed["installed_input_stage_private-path"] || allowed["installed_input_native_123456"] {
+	if allowed["installed_input_stage_private-path"] || allowed["installed_input_native_123456"] || allowed["installed_source_stage_private-path"] || allowed["installed_source_native_123456"] {
 		t.Fatal("unbounded input connection diagnostic accepted")
 	}
 }

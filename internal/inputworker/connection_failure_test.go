@@ -24,3 +24,16 @@ func TestConnectionFailurePreservesAuthorityAndRedactsNativeText(t *testing.T) {
 		t.Fatal("unbounded diagnostic text escaped")
 	}
 }
+
+func TestSourceConnectionFailureRetainsSeparateStageAndNativeCause(t *testing.T) {
+	failure := connectionFailed("pipe_open", syscall.Errno(2))
+	if connectionFailureEvent(failure, "installed_source_stage_") != "installed_source_stage_pipe_open" ||
+		connectionNativeFailureEvent(failure, "installed_source_native_") != "installed_source_native_2" {
+		t.Fatal("source rebind failure lost its exact operation/native classification")
+	}
+	private := errors.New("private-path")
+	if connectionFailureEvent(connectionFailed(private.Error(), private), "installed_source_stage_") != "installed_source_stage_unknown" ||
+		connectionNativeFailureEvent(private, "installed_source_native_") != "installed_source_native_unknown" {
+		t.Fatal("source diagnostics exposed unbounded error text")
+	}
+}

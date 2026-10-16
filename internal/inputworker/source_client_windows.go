@@ -307,6 +307,11 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 	}
 	channel, err := connectInstalledNamed(ctx, c.service.digest, c.service.installation, sourcePipeName)
 	if err != nil {
+		if c.observe != nil {
+			c.observe("installed_source_connect_failed")
+			c.observe(connectionFailureEvent(err, "installed_source_stage_"))
+			c.observe(connectionNativeFailureEvent(err, "installed_source_native_"))
+		}
 		return err
 	}
 	defer channel.Close()

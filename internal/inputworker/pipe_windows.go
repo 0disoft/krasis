@@ -94,10 +94,10 @@ func connectInstalledNamed(ctx context.Context, serviceDigest [sha256.Size]byte,
 	if ctx == nil || ctx.Err() != nil || serviceDigest == ([sha256.Size]byte{}) {
 		return nil, ErrAuthority
 	}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, serviceConnectTimeout)
 	defer cancel()
 	started := time.Now()
-	pipe, err := openPipeWaiting(ctx, name, servicePipeMissingGrace)
+	pipe, err := openPipeWaiting(ctx, name, installedPipeMissingGrace(name))
 	handoff.Record(ctx, handoff.PipeOpen, time.Since(started))
 	if err != nil {
 		return nil, connectionFailed("pipe_open", err)
@@ -157,6 +157,17 @@ func openPipe(ctx context.Context, name string) (*pipeConn, error) {
 // service connection may wait briefly for that name to reappear. No lease or
 // input has been sent yet; authentication still follows the successful open.
 const servicePipeMissingGrace = 250 * time.Millisecond
+const serviceConnectTimeout = 2 * time.Second
+
+func installedPipeMissingGrace(name string) time.Duration {
+	// A source retirement ACK precedes service-side worker/report/handle join.
+	// Rebinding this serial endpoint shares the existing connection deadline;
+	// it does not replay a lease or extend authentication after an open.
+	if name == sourcePipeName {
+		return serviceConnectTimeout
+	}
+	return servicePipeMissingGrace
+}
 
 func openServicePipe(ctx context.Context) (*pipeConn, error) {
 	return openPipeWaiting(ctx, pipeName, servicePipeMissingGrace)
