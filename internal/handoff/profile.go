@@ -71,6 +71,7 @@ type Vector struct {
 	PipeOwnerCycles         uint64              `json:"pipeOwnerCycles,omitempty"`
 	PipeOwnerCyclesMeasured bool                `json:"pipeOwnerCyclesMeasured,omitempty"`
 	WorkerApply             *WorkerApplyProfile `json:"workerApply,omitempty"`
+	ACKRead                 *ACKReadProfile     `json:"ackRead,omitempty"`
 	Outcome                 string              `json:"outcome"`
 }
 
@@ -159,6 +160,9 @@ func (s Summary) Valid() bool {
 		if v.WorkerApply != nil && (s.Role != "receiver" || s.Backend != "installed" || !v.WorkerApply.ValidForWorker(v.WorkerMillis, v.WorkerMeasured) || v.WorkerApply.Measured == 0) {
 			return false
 		}
+		if v.ACKRead != nil && (s.Role != "receiver" || s.Backend != "installed" || !v.ACKRead.validForResponse(v)) {
+			return false
+		}
 	}
 	var total uint64
 	for _, n := range s.Histogram {
@@ -207,6 +211,7 @@ type sample struct {
 	first                                     bool
 	workerRecorded                            bool
 	workerApplyRequested, workerApplyRecorded bool
+	ackReadRecorded                           bool
 }
 type sessionKey struct{}
 type attemptKey struct{}

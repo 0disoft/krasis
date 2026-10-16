@@ -486,3 +486,30 @@ recorded once; retired/expired attempts drop late completions. An absent entry
 means unobserved, not zero latency. Numeric validation and the existing remote
 export projection strip arbitrary properties; no coordinates or input values
 are added to support files. Device latency remains to be measured.
+
+## g321 ACK read progress
+
+Installed receiver vectors (`entry`, actual `first` and `worst`) may include
+`ackRead`: `micros [3]uint32`, three-bit `measured`/`saturated` masks and numeric
+`progress`. The three disjoint client-local spans are: read start to the first
+existing `Read` returning positive bytes; that return to completion of base
+24-byte header reading and decoding; header completion to suffix reading and
+decoding. They are inside `ClientResponse`, not additions to it. The first span
+measures the client's observation, not kernel arrival or a proven scheduler wait.
+
+Progress is 0 (no positive read), 1 (data returned, header not decoded), 2
+(header decoded, remainder not decoded), 3 (complete response decoded), or 4
+(sequence/op matched). A matching error ACK is also 4; the existing outcome
+records its failure. Failed reads retain the active span through error return;
+unentered stages have no measured bit. Partial/foreign ACKs retain client-only
+read progress, never matching worker detail or cursor coordinates. A positive
+Read with an error keeps the underlying `io.ReadFull` completion semantics.
+
+Only the existing selected `command.applyDetail` enables observation; it never
+calls `WantWorkerApply` twice. The wrapper delegates identical read sizes,
+counts, bytes and errors, without a probe read, goroutine, deadline change or
+wire extension. Unselected requests/heartbeats keep the original path. Metadata
+is copied once into its original sample and validated against presence, fixed
+progress, saturation and the containing unsaturated `ClientResponse`. Missing
+profiles are unobserved, never zero. No input values, coordinates or OS names
+are collected. This change locates stalls; it does not itself reduce latency.

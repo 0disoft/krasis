@@ -210,11 +210,21 @@ func (client *Client) performResponse(ctx context.Context, command request, obse
 		return unknownInput(ErrProtocol)
 	}
 	start = time.Now()
-	ack, err := readResponse(stream)
+	var ackRead *handoff.ACKReadProfile
+	if command.applyDetail {
+		ackRead = &handoff.ACKReadProfile{}
+	}
+	ack, err := readResponseObserved(stream, ackRead)
 	elapsed3 := time.Since(start)
 	sample[3] = timingBucket(elapsed3)
 	if command.op != opHeartbeat {
 		handoff.Record(ctx, handoff.ClientResponse, elapsed3)
+	}
+	if ackRead != nil {
+		if err == nil && ack.sequence == command.sequence && ack.op == command.op {
+			ackRead.Progress = handoff.ACKReadMatched
+		}
+		handoff.RecordACKRead(ctx, ackRead)
 	}
 	if err != nil || ack.sequence != command.sequence || ack.op != command.op {
 		client.observeFailure(ackFailureCode(err))
@@ -289,15 +299,28 @@ func unknownInput(cause error) error {
 }
 
 func readResponse(reader io.Reader) (response, error) {
+	return readResponseObserved(reader, nil)
+}
+
+func readResponseObserved(reader io.Reader, profile *handoff.ACKReadProfile) (response, error) {
+	var observer *ackReadObserver
+	if profile != nil {
+		observer = &ackReadObserver{reader: reader, profile: profile, started: time.Now()}
+		reader = observer
+	}
 	var data [responseSize]byte
 	if _, err := io.ReadFull(reader, data[:]); err != nil {
+		observer.headerResult(false)
 		return response{}, errors.Join(ErrProtocol, err)
 	}
 	value, err := decodeResponse(data)
+	observer.headerResult(err == nil)
 	if err != nil {
 		return response{}, err
 	}
-	if err := readResponseSuffix(reader, data[4], &value); err != nil {
+	err = readResponseSuffix(reader, data[4], &value)
+	observer.suffixResult(err == nil)
+	if err != nil {
 		return response{}, err
 	}
 	return value, nil
