@@ -1066,3 +1066,21 @@ does not replay, and cannot restore a guessed previous position. A successful
 mismatch retains the actual snapshot/readback for the existing conditional
 rollback. Snapshot and placement may still wait in Windows; batching is not
 evidence that the observed multi-second tail has been eliminated.
+
+The timeout constant is unchanged, but batching changes its unit: the snapshot,
+placement and ACK share one original request budget and the worker's remaining
+idle deadline. They do not each receive a new two-second budget as the two
+separate g319 requests did. A slow snapshot can exhaust the placement budget;
+the next native write still checks cancellation, and a write that completes
+after expiry may have an unconfirmed ACK. That case stays outcome-unknown, with
+no guessed rollback or replay. One authorized scope is not an OS-atomic desktop
+transaction: a desktop switch may occur while a native call is executing.
+
+Regression tests use a virtual clock to spend 1.95s in snapshot and cross the
+original deadline during placement, as well as exhaust the whole deadline in
+snapshot. They verify the same deadline at both operations, no renewal, and no
+published rollback snapshot on lost ACK. A separate worker test applies the
+placement once before dropping its ACK. Entry and entry-probe opcode tests also
+cover matching desktop-transition drains, foreign ACKs, incomplete writes,
+hard stop, manual cancellation and immutable caller/lease expiry. These checks
+do not substitute for installed-version matching and real lock/PIN testing.
