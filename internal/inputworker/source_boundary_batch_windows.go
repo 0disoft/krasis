@@ -30,12 +30,19 @@ func (w *sourceWriter) sendBoundaries(batch []sourcePacket) error {
 	if len(batch) == 0 || len(batch) > sourceBoundaryBatchLimit {
 		return ErrProtocol
 	}
-	w.mu.Lock()
-	defer w.mu.Unlock()
 	if !w.started.Load() {
 		return nil
 	}
+	// Slow SCM/WTS validation of advisory pointer observations must not hold
+	// the shared writer gate needed by heartbeat replies. No input/actions or
+	// capture decisions enter this batch. Validate fully before admission, then
+	// recheck the pinned owner's presence under the sequence/write gate.
 	if w.channel.authority.check(false) != nil {
+		return sourceTransportFailure(ErrAuthority)
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.channel.authority.checkHeartbeat() != nil {
 		return sourceTransportFailure(ErrAuthority)
 	}
 	var wire [sourceBoundaryBatchLimit * sourcePacketSize]byte
