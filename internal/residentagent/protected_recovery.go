@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/0disoft/krasis/internal/agent"
 	"github.com/0disoft/krasis/internal/agentlifecycle"
 	"github.com/0disoft/krasis/internal/inputworker"
 )
@@ -41,7 +42,12 @@ func (operations *Operations) runWithProtectedRecovery(ctx context.Context, alia
 		stop(context.Canceled)
 		var transition *agentlifecycle.TransitionError
 		desktopChanged := errors.As(cause, &transition) && cancellationOnly(err, cause)
-		if ctx.Err() != nil || (!desktopChanged && !protectedInputOnly(err)) {
+		// A freshness timeout is not a revocation verdict. Once this exact
+		// runner has joined all native owners, preserve the user's connection
+		// intent and rebuild from a fresh trust/TLS check. Joined cleanup errors
+		// or negative trust verdicts must never enter this retry path.
+		trustExpired := errors.Is(err, agent.ErrSessionTrustFreshness) && cancellationOnly(err, agent.ErrSessionTrustFreshness)
+		if ctx.Err() != nil || (!desktopChanged && !trustExpired && !protectedInputOnly(err)) {
 			return err
 		}
 		operations.mu.Lock()
@@ -51,7 +57,11 @@ func (operations *Operations) runWithProtectedRecovery(ctx context.Context, alia
 		}
 		observer.retrying = true
 		operations.sessionState = "RECONNECTING"
-		operations.recordLocked("protected_input_reconnecting")
+		code := "protected_input_reconnecting"
+		if trustExpired {
+			code = "session_trust_reconnecting"
+		}
+		operations.recordLocked(code)
 		operations.mu.Unlock()
 
 		// Portable recovery waits until the protected UI has gone. A verified
@@ -60,6 +70,18 @@ func (operations *Operations) runWithProtectedRecovery(ctx context.Context, alia
 		for {
 			if waitErr := wait(ctx, protectedRecoveryDelay); waitErr != nil {
 				return errors.Join(waitErr, context.Cause(ctx))
+			}
+			if trustExpired {
+				// An uninterruptible read can outlive cancellation. Wait for its
+				// existing global slot; do not spawn overlapping filesystem reads
+				// or use a late result to authorize the replacement connection.
+				select {
+				case trustReadSlot <- struct{}{}:
+					<-trustReadSlot
+				default:
+					continue
+				}
+				break
 			}
 			if desktopChanged || !protectedActive() {
 				break

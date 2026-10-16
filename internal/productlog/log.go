@@ -61,6 +61,7 @@ func init() {
 	}
 	allowed["protected_input_detected"] = true
 	allowed["protected_input_reconnecting"] = true
+	allowed["session_trust_reconnecting"] = true
 	for _, code := range []string{"protected_input_desktop_unavailable", "protected_input_non_default_desktop", "protected_input_credential_broker", "protected_input_identity_unknown"} {
 		allowed[code] = true
 	}
