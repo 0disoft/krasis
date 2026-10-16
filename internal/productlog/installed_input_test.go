@@ -8,7 +8,7 @@ import (
 )
 
 func TestInputConnectionDiagnosticAllowlistRejectsDynamicStages(t *testing.T) {
-	for _, code := range []string{"installed_source_timing_client_response_lt1s", "installed_source_heartbeat_timing_client_authority_ge1s", "installed_source_failure_protocol"} {
+	for _, code := range []string{"installed_source_timing_client_response_lt1s", "installed_source_heartbeat_timing_client_authority_ge1s", "installed_source_failure_protocol", "installed_source_command_preflight_expired"} {
 		line := `{"time":"2026-10-15T09:40:00Z","code":"` + code + `","error":"PRIVATE"}` + "\n"
 		result := sanitizeLog("agent.jsonl", strings.NewReader(line))
 		if result.Incomplete || len(result.Events) != 1 || result.Events[0].Code != code {

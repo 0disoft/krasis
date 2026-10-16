@@ -31,6 +31,7 @@ type sourceClient struct {
 	mu                      sync.Mutex
 	commandWaiting          atomic.Int32 // Published before mu; idle maintenance yields to queued commands.
 	preflightExpired        atomic.Bool  // At most one fixed diagnostic per capture owner.
+	commandPreflightExpired atomic.Bool  // Unsent command query exhausted its caller budget.
 	sequence                uint64
 	lastReplyRequestAt      time.Time // Under mu; request start, only after its exact successful reply.
 	cursorPrepared          bool      // Under mu; pending native cursor presentation retains the active idle bound.
@@ -96,19 +97,6 @@ func (c *CaptureSource) AdmitBoundary(ctx context.Context, _ control.BoundaryInt
 	return sourceAdmissionResult(p, err)
 }
 
-func (c *sourceClient) call(ctx context.Context, op byte, reference ...uint64) (sourcePacket, error) {
-	c.commandWaiting.Add(1)
-	defer c.commandWaiting.Add(-1)
-	started := time.Now()
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.lockWait = time.Since(started)
-	if op == sourceActivate {
-		handoff.RecordCapture(ctx, handoff.CaptureIPCLock, c.lockWait)
-	}
-	return c.callLocked(ctx, op, reference...)
-}
-
 // Caller holds mu through the entire command and exact reply observation.
 func (c *sourceClient) callLocked(ctx context.Context, op byte, reference ...uint64) (response sourcePacket, result error) {
 	return c.callLockedChecked(ctx, op, nil, reference...)
@@ -117,7 +105,14 @@ func (c *sourceClient) callLocked(ctx context.Context, op byte, reference ...uin
 // Only pollHeartbeat can supply a fresh check made immediately before TryLock.
 // It cannot authorize a capture/cursor command or survive a wait for the gate.
 func (c *sourceClient) callLockedChecked(ctx context.Context, op byte, heartbeat *sourceHeartbeatCheck, reference ...uint64) (response sourcePacket, result error) {
+	return c.callLockedAuthorized(ctx, op, heartbeat, nil, reference...)
+}
+
+func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartbeat *sourceHeartbeatCheck, command *sourceCommandCheck, reference ...uint64) (response sourcePacket, result error) {
 	sample := [7]byte{timingBucket(c.lockWait)}
+	if op == sourceActivate {
+		handoff.RecordCapture(ctx, handoff.CaptureIPCLock, c.lockWait)
+	}
 	c.lockWait = 0
 	sampler := &c.timing
 	if op == sourceHeartbeat {
@@ -175,7 +170,10 @@ func (c *sourceClient) callLockedChecked(ctx context.Context, op byte, heartbeat
 	started := time.Now()
 	var authorityErr error
 	var authorityElapsed time.Duration
-	if heartbeat == nil {
+	if command != nil {
+		authorityErr = command.validate(c, ctx, op)
+		authorityElapsed = command.elapsed
+	} else if heartbeat == nil {
 		authorityErr = c.channel.authority.check(false)
 		authorityElapsed = time.Since(started)
 	} else {

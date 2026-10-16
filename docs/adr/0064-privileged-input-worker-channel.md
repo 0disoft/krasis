@@ -1085,6 +1085,36 @@ deadlines and retirement proofs are unchanged. This removes a reproduced source
 of heartbeat head-of-line blocking; its role in the device incident still needs
 device observation.
 
+## Source command authorization admission
+
+The g323 snapshots created at 2026-10-16T16:39:11Z (A) and 16:38:48Z (B)
+record A's source reader timeout at 16:38:45.553Z, then B's lease heartbeat
+timeout at 16:38:47.737Z. A also records heartbeat dispatch failure and trust
+freshness expiry. Both service snapshots remain READY; A's agent is FAULTED.
+These snapshots do not prove what first delayed scheduling or native queries.
+
+A separate deterministic regression reproduces a remaining blocking path:
+the medium agent held the source command IPC mutex and published command demand
+while performing full service authorization. A slow unsent SCM/WTS query
+therefore suppressed every periodic heartbeat even though no request was in flight.
+
+Non-stop command authorization now runs before publishing wire demand or taking
+the IPC mutex. Admission requires immediate TryLock; contention discards the
+proof and requires full reauthorization outside the mutex after the existing
+request finishes. A local proof is single-use and bound to the exact owner/op;
+the pinned service owner is rechecked under the gate before writing. Stop keeps
+the existing pending-response drain and independently confirmed retirement path.
+An expired unsent query consumes no sequence or epoch and does not close the
+healthy owner; one fixed command-preflight-expired event per owner preserves
+that evidence without input values. Native checks cannot be interrupted, but
+no longer monopolize the wire while blocked.
+
+Regression tests verify heartbeat progress during slow authorization, fresh
+authorization after a contended request, exact owner/op and single-use proofs,
+exited owner rejection and canceled unsent commands. Existing request deadlines,
+worker idle bounds, trust freshness, negative ACKs and uncertain-input handling
+are unchanged. Actual two-PC recurrence and latency still require observation.
+
 ## Batched receiver cursor entry
 
 The installed entry path takes the pre-write cursor snapshot, performs the
