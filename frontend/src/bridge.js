@@ -10,11 +10,13 @@ export function createBridge(binding) {
     throw new Error('bridge_unavailable');
   }
   let busy = false;
+  let refreshing = false;
   let latest;
   const copy = value => ({ ...value, peers: value.peers.map(peer => ({ ...peer })) });
-  async function call(method, args = []) {
-    if (busy) throw new Error('bridge_busy');
-    busy = true;
+  async function call(method, args = [], readOnly = false) {
+    if (readOnly ? refreshing : busy) throw new Error('bridge_busy');
+    if (readOnly) refreshing = true;
+    else busy = true;
     try {
       const value = await binding[method](...args);
       if (!value || value.schema !== 'krasis.desktop/v1' || !states.has(value.state) ||
@@ -43,10 +45,15 @@ export function createBridge(binding) {
       // Native errors can contain transport details. Keep those out of the UI.
       if (error?.message === 'bridge_protocol') throw error;
       throw new Error('bridge_failed');
-    } finally { busy = false; }
+    } finally {
+      if (readOnly) refreshing = false;
+      else busy = false;
+    }
   }
+  // Only cached Refresh has an independent read lane. Fresh health checks and
+  // all explicit actions still share one mutation lane without automatic replay.
   return Object.freeze({
-    refresh: () => call('Refresh'),
+    refresh: () => call('Refresh', [], true),
     refreshNow: () => call('RefreshNow'),
     connect: peer => {
       if (!peer || typeof peer.alias !== 'string' || !peer.alias || peer.alias.length > 256 ||

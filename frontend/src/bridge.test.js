@@ -58,16 +58,30 @@ test('missing binding, malformed snapshot and native failures never become mock 
   binding.Refresh = async () => { throw new Error('private token'); };
   await assert.rejects(createBridge(binding).refresh(), { message: 'bridge_failed' });
 });
-test('overlapping calls are rejected and failed calls release the gate', async () => {
+test('overlapping mutations are rejected while cached reads remain independent', async () => {
   let finish;
-  const binding = { Refresh: () => new Promise(resolve => { finish = resolve; }),
-    Connect: async () => snapshot('CONNECTING'), Disconnect: async () => snapshot('LOCAL') };
+  const binding = { Refresh: async () => snapshot('CONNECTING'),
+    Connect: () => new Promise(resolve => { finish = resolve; }), Disconnect: async () => snapshot('LOCAL') };
   const bridge = createBridge(binding);
-  const pending = bridge.refresh();
+  const pending = bridge.connect(peer);
   await assert.rejects(bridge.disconnect(), /bridge_busy/);
-  finish(snapshot('LOCAL')); await pending;
+  assert.equal((await bridge.refresh()).state, 'CONNECTING');
+  finish(snapshot('CONNECTING')); await pending;
   await assert.rejects(bridge.connect({ alias: 'B' }), /bridge_invalid_peer/);
   assert.equal((await bridge.disconnect()).state, 'LOCAL');
+});
+
+test('a delayed cached read cannot replace the revision returned by an action', async () => {
+  let finish;
+  const bridge = createBridge({ Refresh: () => new Promise(resolve => { finish = resolve; }),
+    Connect() {}, Disconnect: async () => ({...snapshot('LOCAL'), revision:12}) });
+  const pending = bridge.refresh();
+  await assert.rejects(bridge.refresh(), /bridge_busy/);
+  assert.equal((await bridge.disconnect()).revision, 12);
+  finish({...snapshot('CONNECTED'), revision:11});
+  const stale = await pending;
+  assert.equal(stale.state, 'LOCAL');
+  assert.equal(stale.revision, 12);
 });
 
 test('older native projections cannot replace newer state or mutate the accepted cache', async () => {

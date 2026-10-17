@@ -21,6 +21,7 @@
   import { resolveLocale } from './i18n.js';
   import { nativeText } from './native-i18n.js';
   import { createOperationGate } from './operation-gate.js';
+  import { createWorkspacePoll, pollStatus } from './workspace-poll.js';
   import { createTrayLocaleSync } from './tray-locale.js';
   let saved;
   try { saved = localStorage.getItem('krasis.workspace.locale'); } catch {}
@@ -103,7 +104,18 @@
   let pairingDlg;
   let consentPeer = '';
   let disposed = false;
-  const workspaceOperation = createOperationGate(value => { if (!disposed) busy = value; });
+  const workspacePoll = createWorkspacePoll({
+    read: () => bridge.refresh(),
+    ready: () => !!bridge && !busy && !disposed,
+    apply: value => applyWorkspaceSnapshot(value),
+    failed: workspaceUnavailable,
+  });
+  const workspaceOperation = createOperationGate(value => {
+    if (!disposed) {
+      if (value) workspacePoll.invalidate();
+      busy = value;
+    }
+  });
   const clipboardOperation = createOperationGate(value => { if (!disposed) clipBusy = value; });
   const pairingOperation = createOperationGate(value => { if (!disposed) pairBusy = value; });
   const diagnosticsOperation = createOperationGate(value => { if (!disposed) diagBusy = value; });
@@ -207,6 +219,7 @@
     await layoutController.rearm(selectedPeer.fingerprint, distance);
   }
   async function run(action, background = false) {
+    if (action === 'refresh' && background) return workspacePoll.refresh();
     if (busy || !bridge || disposed) return;
     const peer = selectedPeer;
     await workspaceOperation(async () => {
@@ -214,19 +227,26 @@
       try {
         const value = await (action === 'input' ? bridge.inputRefresh() : action === 'connect' ? bridge.connect(peer) : action === 'disconnect' ? bridge.disconnect() : action === 'restart' ? bridge.restart() : action === 'recheck' ? bridge.refreshNow() : bridge.refresh());
         if (disposed) return;
-        // Native lifecycle contention is not a new device observation.
-        // Keep the selection and show the refusal without replaying the action.
-        if (value.code === 'busy') { error = 'busy'; return; }
-        snapshot = value;
-        if (!value.peers.some(p => p.fingerprint === selected)) {
-          selected = (value.peers.find(p => p.alias === value.peerAlias) ?? value.peers[0])?.fingerprint ?? '';
-        }
-        error = value.code === 'ok' || value.code.startsWith('input_refresh_') ? '' : value.code;
-        if (action === 'input' && (value.code === value.inputRefreshCode || value.code === value.reconnectCode)) error = '';
+        applyWorkspaceSnapshot(value, action);
       } catch {
-        if (!disposed) { snapshot = {state:'UNKNOWN', peerAlias:'', peers:[], code:'unavailable'}; error = 'unavailable'; }
+        if (!disposed) workspaceUnavailable();
       }
     }, background);
+  }
+  function workspaceUnavailable() {
+    snapshot = {state:'UNKNOWN', peerAlias:'', peers:[], code:'unavailable'};
+    error = 'unavailable';
+  }
+  function applyWorkspaceSnapshot(value, action = 'refresh') {
+    // Native lifecycle contention is not a new device observation.
+    // Keep the selection and show the refusal without replaying the action.
+    if (value.code === 'busy') { error = 'busy'; return; }
+    snapshot = value;
+    if (!value.peers.some(p => p.fingerprint === selected)) {
+      selected = (value.peers.find(p => p.alias === value.peerAlias) ?? value.peers[0])?.fingerprint ?? '';
+    }
+    error = value.code === 'ok' || value.code.startsWith('input_refresh_') ? '' : value.code;
+    if (action === 'input' && (value.code === value.inputRefreshCode || value.code === value.reconnectCode)) error = '';
   }
   async function refreshInput() {
     if (busy || inputBusy || !bridge) return;
@@ -237,25 +257,29 @@
   onMount(() => {
     let timer;
     async function poll() {
-      await run('refresh', true);
       if (new URLSearchParams(location.search).get('smoke') === '1') {
+        await run('refresh', true);
         const { Call } = await import(/* @vite-ignore */ '/wails/runtime.js');
         await Call.ByName('github.com/0disoft/krasis/internal/workspacehost.WorkspaceSmoke.Report', snapshot.schema ?? '', snapshot.state, snapshot.code);
         return;
       }
-      if (!clipBusy && !disposed && clipboardBridge) {
-        await clipboardOperation(async () => {
-          if (disposed) return;
-          const value=await clipboardBridge.status();
-          if(!disposed) clipboard=value;
-        }, true);
-      }
-      if (!pairBusy && !disposed && pairingBridge) {
-        await runPair('status', true);
-      }
-      if (!disposed && layoutController && selected) await layoutController.status(selected);
-      if (!disposed && !diagBusy && diagnosticsBridge) await runDiagnostics('status', true);
-      if (!disposed) await pollUIReplacement();
+      await pollStatus([
+        async () => {
+          await run('refresh', true);
+          if (!disposed && layoutController && selected) await layoutController.status(selected);
+        },
+        async () => {
+          if (clipBusy || disposed || !clipboardBridge) return;
+          await clipboardOperation(async () => {
+            if (disposed) return;
+            const value=await clipboardBridge.status();
+            if(!disposed) clipboard=value;
+          }, true);
+        },
+        async () => { if (!pairBusy && !disposed && pairingBridge) await runPair('status', true); },
+        async () => { if (!disposed && !diagBusy && diagnosticsBridge) await runDiagnostics('status', true); },
+        async () => { if (!disposed) await pollUIReplacement(); },
+      ]);
       if (!disposed) timer = setTimeout(poll, 1500);
     }
     void (async () => {
