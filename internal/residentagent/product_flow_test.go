@@ -511,7 +511,11 @@ func productRenewalFlow(t *testing.T, both, allowInbound bool) {
 			store *truststore.Store
 			peer  transport.AuthenticatedPeerContext
 		}{{first.pairing.trust, serverConfig.peer}, {second.pairing.trust, clientConfig.peer}} {
-			lease, allowed, err := (productAuthorizer{check.store}).AuthorizeLease(ctx, check.peer, "session", "epoch", time.Now())
+			policy, err := check.store.NewPeerPolicyMonitor(check.peer, time.Now())
+			if err != nil {
+				t.Fatal(err)
+			}
+			lease, allowed, err := (productAuthorizer{policy}).AuthorizeLease(ctx, check.peer, "session", "epoch", time.Now())
 			if err != nil || allowed || lease != "" {
 				t.Fatalf("deny option granted input: allowed=%t err=%v", allowed, err)
 			}

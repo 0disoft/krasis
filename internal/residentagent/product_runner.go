@@ -198,7 +198,7 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 			}
 			err = errors.Join(err, closeErr)
 		}()
-		checkAnchor, err := trust.NewKeyAnchorMonitor(prepared.peer, time.Now())
+		policy, err := trust.NewPeerPolicyMonitor(prepared.peer, time.Now())
 		if err != nil {
 			return err
 		}
@@ -208,7 +208,7 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 			ticker := time.NewTicker(time.Second)
 			defer ticker.Stop()
 			monitorProductSessionObserved(ctx, ticker.C, guard.Done(), func(trace *truststore.ReadTrace) error {
-				return checkAnchor(time.Now(), trace)
+				return policy.CheckAnchor(time.Now(), trace)
 			}, cancel, func(code string) {
 				log.Event(code)
 				if cause := sessionTrustFailure(code); cause != nil {
@@ -300,7 +300,7 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 		}
 		guarded := &guardedProductInput{InputBoundaryPort: input, guard: inputGuard, log: log, geometry: checkGeometry, protected: protectedActive, stopProtected: stopProtected}
 		var boundaryInput agent.InputBoundaryPort = guarded
-		var authorizer peer.LeaseAuthorizer = productAuthorizer{trust}
+		var authorizer peer.LeaseAuthorizer = productAuthorizer{policy}
 		runSession := agent.RunSession
 		if worker != nil {
 			boundaryInput = &privilegedBoundary{guardedProductInput: guarded, worker: worker}
@@ -316,16 +316,23 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 	}
 }
 
-type productAuthorizer struct{ trust *truststore.Store }
+type productAuthorizer struct{ policy *truststore.PeerPolicyMonitor }
 
 func (authorizer productAuthorizer) AuthorizeLease(ctx context.Context, peer transport.AuthenticatedPeerContext, session, epoch string, now time.Time) (string, bool, error) {
-	allowed, err := authorizer.trust.InboundControlAllowed(peer, now)
+	if err := ctx.Err(); err != nil {
+		return "", false, err
+	}
+	allowed, err := authorizer.policy.InboundControlAllowed(peer, now)
 	if err != nil {
 		return "", false, err
 	}
-	delegate, err := agent.NewTrustedPeerAuthorizer([]agent.TrustedPeerGrant{{Peer: peer, AllowInboundControl: allowed}})
-	if err != nil {
+	if err := ctx.Err(); err != nil {
 		return "", false, err
 	}
-	return delegate.AuthorizeLease(ctx, peer, session, epoch, now)
+	if !allowed {
+		return "", false, nil
+	}
+	// The current grant and exact paired identity were checked above; no
+	// temporary single-entry grant map is needed to create a random lease ID.
+	return (agent.AuthenticatedPeerAuthorizer{}).AuthorizeLease(ctx, peer, session, epoch, now)
 }

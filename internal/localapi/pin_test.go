@@ -29,3 +29,24 @@ func TestPINRequestsKeepConsentAndSecretsScoped(t *testing.T) {
 		t.Fatal("PIN leaked into legacy path")
 	}
 }
+
+func TestPINAliasPrefixValidation(t *testing.T) {
+	allow := true
+	for _, prefix := range []string{"", " ", "peer ", " peer", "peer\n", string([]byte{0xff}), strings.Repeat("가", 56)} {
+		for _, action := range []string{"PIN_LISTEN", "PIN_DIAL"} {
+			request := OperationRequest{PairingAction: action, PeerAlias: prefix, AllowInboundControl: &allow,
+				Address: "192.168.1.7:45871", PairingID: strings.Repeat("a", 32), ConfirmationCode: "012345"}
+			if action == "PIN_LISTEN" {
+				request.Address, request.PairingID, request.ConfirmationCode = "", "", ""
+			}
+			if validateOperationRequest("pair", request) == nil {
+				t.Fatalf("invalid prefix %q accepted for %s", prefix, action)
+			}
+		}
+	}
+	for _, prefix := range []string{"peer", "새 노트북", strings.Repeat("가", 55)} {
+		if !validPINAliasPrefix(prefix) {
+			t.Fatalf("valid prefix %q rejected", prefix)
+		}
+	}
+}

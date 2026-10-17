@@ -56,7 +56,7 @@ func (a productAuthorizer) AuthorizePreparation(ctx context.Context, p transport
 	// Read the current key, role, permission and revocation in one locked
 	// snapshot. Two separate reads repeat filesystem/ACL work and can combine
 	// a certificate verdict with a policy changed between the two snapshots.
-	return a.trust.InboundControlAllowed(p, now)
+	return a.policy.InboundControlAllowed(p, now)
 }
 
 func (a privilegedAuthorizer) PrepareInput(ctx context.Context, p transport.AuthenticatedPeerContext, now time.Time) {

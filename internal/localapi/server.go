@@ -341,7 +341,7 @@ func validateOperationRequest(kind string, value OperationRequest) error {
 		return errors.New("unexpected automatic resume")
 	}
 	if kind == "pair" && (value.PairingAction == "PIN_LISTEN" || value.PairingAction == "PIN_DIAL") {
-		if !validAlias(value.PeerAlias+"-00000000") || value.AllowInboundControl == nil || value.Fingerprint != "" {
+		if !validPINAliasPrefix(value.PeerAlias) || value.AllowInboundControl == nil || value.Fingerprint != "" {
 			return errors.New("invalid PIN request")
 		}
 		if value.PairingAction == "PIN_LISTEN" {
@@ -424,6 +424,11 @@ func validAlias(value string) bool {
 		}
 	}
 	return true
+}
+
+func validPINAliasPrefix(value string) bool {
+	// The pairing flow appends a hyphen and eight pairing-ID characters.
+	return validAlias(value) && utf8.RuneCountInString(value) <= 64-9
 }
 
 func validPairingID(value string) bool {
