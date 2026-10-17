@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -22,7 +23,7 @@ func TestExpiredReceiveDoesNotBlockNewBundleWithoutLocalPolling(t *testing.T) {
 					m.stagedUntil = time.Now().Add(-time.Minute)
 				}
 				bundle := &fakeBundle{generation: 22}
-				m.validate = func([]byte) (stagedBundle, error) { return bundle, nil }
+				m.validate = func(io.ReaderAt, int64) (stagedBundle, error) { return bundle, nil }
 				data := []byte("verified fixture")
 				if !expired {
 					if err := m.receive(peer, id, fmt.Sprintf("%x", sha256.Sum256(data)), panicReader{}, func() bool { return true }); err != ErrBusy {

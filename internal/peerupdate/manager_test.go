@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -122,12 +123,14 @@ func TestAuxiliaryRoutesRecheckAuthorization(t *testing.T) {
 type fakeBundle struct {
 	generation int
 	staged     bool
+	closed     int
 }
 
 func (b *fakeBundle) Metadata() updatebundle.Metadata {
 	return updatebundle.Metadata{Generation: b.generation, Revision: strings.Repeat("d", 40)}
 }
 func (b *fakeBundle) Stage(*os.Root, string) error { b.staged = true; return nil }
+func (b *fakeBundle) Close() error                 { b.closed++; return nil }
 func TestReceiveRechecksPermissionAndGenerationBeforeStaging(t *testing.T) {
 	for _, scenario := range []string{"success", "revoked", "stale", "connection_lost"} {
 		t.Run(scenario, func(t *testing.T) {
@@ -139,7 +142,7 @@ func TestReceiveRechecksPermissionAndGenerationBeforeStaging(t *testing.T) {
 			}
 			b := &fakeBundle{generation: 22}
 			connected := true
-			m.validate = func([]byte) (stagedBundle, error) {
+			m.validate = func(io.ReaderAt, int64) (stagedBundle, error) {
 				switch scenario {
 				case "revoked":
 					if err := m.Permit(peer, false); err != nil {
@@ -178,7 +181,7 @@ func TestUploadOnlyBecomesReadyAfterResponseFlush(t *testing.T) {
 		t.Fatal(err)
 	}
 	b := &fakeBundle{generation: 22}
-	m.validate = func([]byte) (stagedBundle, error) { return b, nil }
+	m.validate = func(io.ReaderAt, int64) (stagedBundle, error) { return b, nil }
 	data := []byte("bounded fixture")
 	r := httptest.NewRequest(http.MethodPost, "/v1/bundle", bytes.NewReader(data))
 	r.Header.Set("Content-Type", "application/zip")
@@ -195,7 +198,7 @@ func TestDownloadReceiptOnlyCompletesExactQueuedOffer(t *testing.T) {
 	m := testManager(t)
 	peer := strings.Repeat("a", 64)
 	id := strings.Repeat("b", 32)
-	m.out = &offer{id: id, peer: peer, data: []byte("fixture"), expires: time.Now().Add(time.Minute)}
+	m.out = &offer{id: id, peer: peer, expires: time.Now().Add(time.Minute)}
 	m.status = Status{State: "QUEUED", ID: id, Peer: peer}
 	for _, ack := range []string{strings.Repeat("c", 32), id} {
 		r := httptest.NewRequest(http.MethodPost, "/v1/receipt", nil)

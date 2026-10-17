@@ -115,22 +115,23 @@ func (m *Manager) observePeer(peer string, info PeerInfo) {
 		reason = FailureCode(err)
 	}
 	if reason != "" {
-		m.out = nil
-		m.status.State = reason
+		m.retireOfferLocked(reason)
 	}
 }
 func (m *Manager) failOffer(peer, reason string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.out != nil && m.out.peer == peer {
-		m.out = nil
-		m.status.State = reason
+		m.retireOfferLocked(reason)
 	}
 }
 func (m *Manager) progress(peer, id, state string, n, total int64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.status.Peer == peer && m.status.ID == id {
+		if state == "SENDING" && (m.out == nil || m.out.id != id) {
+			return
+		}
 		m.status.State = state
 		m.status.Bytes = n
 		m.status.Total = total

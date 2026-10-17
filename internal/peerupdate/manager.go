@@ -4,7 +4,6 @@
 package peerupdate
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -44,13 +43,19 @@ type Status struct {
 
 type offer struct {
 	id, hash, peer string
-	data           []byte
+	file           *os.File
+	name           string
+	size           int64
+	readers        int
+	retired        bool
+	timer          *time.Timer
 	expires        time.Time
 	created        time.Time
 }
 type stagedBundle interface {
 	Metadata() updatebundle.Metadata
 	Stage(*os.Root, string) error
+	Close() error
 }
 type Manager struct {
 	clipChanges       clipboardChanges
@@ -81,7 +86,7 @@ type Manager struct {
 	out               *offer
 	receiving         bool
 	packing           bool
-	validate          func([]byte) (stagedBundle, error)
+	validate          func(io.ReaderAt, int64) (stagedBundle, error)
 }
 
 func Open(productRoot string, generation int) (*Manager, error) {
@@ -104,9 +109,10 @@ func Open(productRoot string, generation int) (*Manager, error) {
 	if err != nil {
 		return nil, err
 	}
-	m := &Manager{root: root, path: path, generation: generation, allowed: map[string]bool{}, status: Status{State: "IDLE"}, validate: func(data []byte) (stagedBundle, error) {
-		return updatebundle.Read(bytes.NewReader(data), int64(len(data)))
-	}}
+	m := &Manager{root: root, path: path, generation: generation, allowed: map[string]bool{}, status: Status{State: "IDLE"}}
+	m.validate = func(source io.ReaderAt, size int64) (stagedBundle, error) {
+		return updatebundle.ReadStaged(source, size, m.root, randomID())
+	}
 	m.revision = buildRevision()
 	if f, e := root.Open("clipboard-peer.txt"); e == nil {
 		data, e := io.ReadAll(io.LimitReader(f, 65))
@@ -186,7 +192,10 @@ func (m *Manager) Close() error {
 	go func() { m.workers.Wait(); close(done) }()
 	select {
 	case <-done:
-		return m.root.Close()
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		cleanupErr := m.retireOfferLocked("CANCELLED")
+		return errors.Join(cleanupErr, m.root.Close())
 	case <-time.After(5 * time.Second):
 		return ErrBusy
 	}
@@ -227,16 +236,14 @@ func (m *Manager) Status() Status {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.out != nil && m.status.State == "QUEUED" && !m.out.created.IsZero() && time.Since(m.out.created) > 15*time.Second && m.peers[m.out.peer].at.Before(m.out.created) {
-		m.out = nil
-		m.status.State = "PEER_UNREACHABLE"
+		m.retireOfferLocked("PEER_UNREACHABLE")
 	}
 	if m.status.State == "DELIVERED" && !m.deliveredUntil.IsZero() && time.Now().After(m.deliveredUntil) {
 		m.status.State = "RESTART_UNCONFIRMED"
 	}
 	m.expireStagedLocked(time.Now())
 	if m.out != nil && time.Now().After(m.out.expires) {
-		m.out = nil
-		m.status.State = "EXPIRED"
+		m.retireOfferLocked("EXPIRED")
 	}
 	s := m.status
 	s.ClipboardPeer = m.ClipboardPeer()
@@ -313,73 +320,50 @@ func (m *Manager) permitted(peer string) bool {
 func (m *Manager) Prepare(peer, directory string) error {
 	m.mu.Lock()
 	m.expireStagedLocked(time.Now())
-	if !validID(peer, 64) || m.packing || m.receiving || m.out != nil || m.status.State == "READY" || m.status.State == "STAGED" || m.status.State == "APPLYING" {
+	if m.closed || !validID(peer, 64) || m.packing || m.receiving || m.out != nil || m.status.State == "READY" || m.status.State == "STAGED" || m.status.State == "APPLYING" {
 		m.mu.Unlock()
 		return ErrBusy
 	}
 	m.packing = true
+	m.workers.Add(1)
 	m.status = Status{State: "PREPARING", Peer: peer}
 	m.mu.Unlock()
-	root, err := os.OpenRoot(directory)
-	var data []byte
-	if err == nil {
-		data, err = updatebundle.Pack(root)
-		root.Close()
-	}
-	var metadata updatebundle.Metadata
-	if err == nil {
-		var bundle *updatebundle.Bundle
-		bundle, err = updatebundle.Read(bytes.NewReader(data), int64(len(data)))
-		if err == nil {
-			metadata = bundle.Metadata()
-		}
-	}
+	defer m.workers.Done()
+	archive, metadata, err := m.prepareArchive(directory)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.packing = false
+	if err == nil && m.closed {
+		err = errors.Join(ErrBusy, m.closeArchive(archive.file, archive.name))
+	}
 	if err != nil {
 		m.status.State = FailureCode(err)
 		return err
 	}
-	id := randomID()
-	hash := sha256.Sum256(data)
-	m.out = &offer{id: id, hash: hex.EncodeToString(hash[:]), peer: peer, data: data, created: time.Now(), expires: time.Now().Add(3 * time.Minute)}
-	m.status = Status{State: "QUEUED", Peer: peer, ID: id, Generation: metadata.Generation, Revision: metadata.Revision, Total: int64(len(data))}
+	archive.peer, archive.created, archive.expires = peer, time.Now(), time.Now().Add(3*time.Minute)
+	m.out = archive
+	m.armOfferExpiryLocked(archive)
+	m.status = Status{State: "QUEUED", Peer: peer, ID: archive.id, Generation: metadata.Generation, Revision: metadata.Revision, Total: archive.size}
 	m.event("peer_update_queued")
 	return nil
-}
-func (m *Manager) offered(peer string) *offer {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.out == nil || m.out.peer != peer {
-		return nil
-	}
-	if time.Now().After(m.out.expires) {
-		m.out = nil
-		m.status.State = "EXPIRED"
-		return nil
-	}
-	copy := *m.out
-	return &copy
 }
 func (m *Manager) sent(id, state string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.out != nil && m.out.id == id {
-		m.out = nil
-		m.status.State = state
+		m.retireOfferLocked(state)
 		if state == "DELIVERED" {
 			m.deliveredUntil = time.Now().Add(3 * time.Minute)
 		}
 	}
 }
 
-func (m *Manager) receive(peer, id, expected string, reader io.Reader, authorized func() bool) error {
+func (m *Manager) receive(peer, id, expected string, reader io.Reader, authorized func() bool) (failure error) {
 	if !validID(id, 32) || !validID(expected, 64) || !authorized() {
 		return ErrDenied
 	}
 	m.mu.Lock()
-	if !m.allowed[peer] {
+	if m.closed || !m.allowed[peer] {
 		m.mu.Unlock()
 		return ErrDenied
 	}
@@ -393,11 +377,23 @@ func (m *Manager) receive(peer, id, expected string, reader io.Reader, authorize
 		return ErrBusy
 	}
 	m.receiving = true
+	m.workers.Add(1)
 	m.status = Status{State: "RECEIVING", ID: id, Peer: peer}
 	m.mu.Unlock()
+	defer m.workers.Done()
 	var received stagedBundle
-	var failure error
+	var archive *os.File
+	var archiveName string
 	defer func() {
+		if received != nil {
+			if err := received.Close(); err != nil {
+				m.event("peer_stage_cleanup_failed")
+				failure = errors.Join(failure, ErrStorage, err)
+			}
+		}
+		if archive != nil {
+			failure = errors.Join(failure, m.closeArchive(archive, archiveName))
+		}
 		m.mu.Lock()
 		defer m.mu.Unlock()
 		m.receiving = false
@@ -406,23 +402,35 @@ func (m *Manager) receive(peer, id, expected string, reader io.Reader, authorize
 			m.event("peer_update_receive_failed")
 		}
 	}()
+	archiveName = archiveNameFor(randomID())
+	archive, failure = m.root.OpenFile(archiveName, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0600)
+	if failure != nil {
+		return errors.Join(ErrStorage, failure)
+	}
 	progress := &progressReader{Reader: reader, update: func(n int64) { m.progress(peer, id, "RECEIVING", n, 0) }}
-	data, err := io.ReadAll(io.LimitReader(progress, updatebundle.MaxArchiveBytes+1))
+	hash := sha256.New()
+	storage := &archiveStorageWriter{Writer: archive}
+	size, err := io.Copy(io.MultiWriter(storage, hash), io.LimitReader(progress, updatebundle.MaxArchiveBytes+1))
+	if storage.err != nil {
+		return errors.Join(ErrStorage, storage.err)
+	}
 	if err != nil {
 		failure = ErrTransfer
 		return failure
 	}
-	if int64(len(data)) > updatebundle.MaxArchiveBytes {
+	if size > updatebundle.MaxArchiveBytes {
 		failure = updatebundle.ErrInvalid
 		return failure
 	}
-	hash := sha256.Sum256(data)
-	if hex.EncodeToString(hash[:]) != expected {
+	if hex.EncodeToString(hash.Sum(nil)) != expected {
 		failure = ErrHashMismatch
 		return failure
 	}
-	m.progress(peer, id, "VERIFYING", int64(len(data)), int64(len(data)))
-	received, err = m.validate(data)
+	if err := archive.Sync(); err != nil {
+		return errors.Join(ErrStorage, err)
+	}
+	m.progress(peer, id, "VERIFYING", size, size)
+	received, err = m.validate(archive, size)
 	if err != nil {
 		failure = err
 		return err
@@ -437,7 +445,7 @@ func (m *Manager) receive(peer, id, expected string, reader io.Reader, authorize
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if !m.allowed[peer] {
+	if m.closed || !m.allowed[peer] {
 		failure = ErrDenied
 		return failure
 	}

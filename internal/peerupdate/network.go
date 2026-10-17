@@ -92,11 +92,13 @@ func (m *Manager) Run(ctx context.Context, address, peer string, listener bool, 
 			m.pushDiagnosticRequest(ctx, client, address, peer, authorized)
 			m.pollDiagnosticRequest(ctx, client, address, peer, authorized)
 			if offer := m.offered(peer); offer != nil {
-				progress := &progressReader{Reader: bytes.NewReader(offer.data), update: func(n int64) { m.progress(peer, offer.id, "SENDING", n, int64(len(offer.data))) }}
-				req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://"+address+"/v1/bundle", progress)
+				progress := &progressReader{Reader: offer.reader, update: func(n int64) { m.progress(peer, offer.id, "SENDING", n, offer.size) }}
+				req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://"+address+"/v1/bundle", &offerRequestBody{Reader: progress, lease: offer})
 				if err != nil {
+					offer.Close()
 					continue
 				}
+				req.ContentLength = offer.size
 				req.Header.Set("X-Krasis-ID", offer.id)
 				req.Header.Set("X-Krasis-SHA256", offer.hash)
 				req.Header.Set("Content-Type", "application/zip")
@@ -228,11 +230,12 @@ func (m *Manager) handler(peer string, authorized func() bool) http.Handler {
 				w.WriteHeader(http.StatusNoContent)
 				return
 			}
+			defer offer.Close()
 			w.Header().Set("Content-Type", "application/zip")
 			w.Header().Set("X-Krasis-ID", offer.id)
 			w.Header().Set("X-Krasis-SHA256", offer.hash)
-			w.Header().Set("Content-Length", strconv.Itoa(len(offer.data)))
-			progress := &progressReader{Reader: bytes.NewReader(offer.data), update: func(n int64) { m.progress(peer, offer.id, "SENDING", n, int64(len(offer.data))) }}
+			w.Header().Set("Content-Length", strconv.FormatInt(offer.size, 10))
+			progress := &progressReader{Reader: offer.reader, update: func(n int64) { m.progress(peer, offer.id, "SENDING", n, offer.size) }}
 			_, _ = io.Copy(w, progress)
 		case r.URL.Path == "/v1/bundle" && r.Method == http.MethodPost:
 			if r.Header.Get("Content-Type") != "application/zip" {

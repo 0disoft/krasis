@@ -33,7 +33,7 @@ func (m *Manager) Prune(base string) (int, error) {
 func (m *Manager) prune(now time.Time, protected func() ([]string, error)) (int, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.closed || m.receiving || m.packing {
+	if m.closed || m.receiving || m.packing || m.out != nil {
 		return 0, ErrBusy
 	}
 	keep, err := protected()
@@ -67,7 +67,25 @@ func (m *Manager) prune(now time.Time, protected func() ([]string, error)) (int,
 		at   time.Time
 	}
 	var folders []candidate
+	removed := 0
+	var failures error
 	for _, entry := range entries {
+		name := entry.Name()
+		if strings.HasPrefix(name, "archive-") && strings.HasSuffix(name, ".zip") && validID(strings.TrimSuffix(strings.TrimPrefix(name, "archive-"), ".zip"), 32) && entry.Type().IsRegular() {
+			info, err := entry.Info()
+			if err != nil {
+				failures = errors.Join(failures, err)
+				continue
+			}
+			if now.Sub(info.ModTime()) >= 24*time.Hour {
+				if err := m.root.Remove(name); err != nil {
+					failures = errors.Join(failures, err)
+				} else {
+					removed++
+				}
+			}
+			continue
+		}
 		if !validID(entry.Name(), 32) || !entry.IsDir() {
 			continue
 		}
@@ -83,8 +101,6 @@ func (m *Manager) prune(now time.Time, protected func() ([]string, error)) (int,
 		}
 		return strings.Compare(a.name, b.name)
 	})
-	removed := 0
-	var failures error
 	for i, folder := range folders {
 		path := filepath.Join(m.path, folder.name)
 		if i < 2 || now.Sub(folder.at) < 24*time.Hour || slices.ContainsFunc(keep, func(p string) bool { return strings.EqualFold(filepath.Clean(p), path) }) {

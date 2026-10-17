@@ -3,6 +3,7 @@ package peerupdate
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -21,7 +22,17 @@ func (w *stalledTransferWriter) Write(p []byte) (int, error) {
 
 func TestAppOpenControlDoesNotWaitForBulkResponse(t *testing.T) {
 	peer, id := strings.Repeat("a", 64), strings.Repeat("b", 32)
-	m := &Manager{OpenUI: func(string) string { return "launch_requested" }, out: &offer{peer: peer, id: id, data: []byte("bulk"), expires: time.Now().Add(time.Minute)}}
+	m := testManager(t)
+	m.OpenUI = func(string) string { return "launch_requested" }
+	name := archiveNameFor(id)
+	file, err := m.root.OpenFile(name, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := file.Write([]byte("bulk")); err != nil {
+		t.Fatal(err)
+	}
+	m.out = &offer{peer: peer, id: id, file: file, name: name, size: 4, expires: time.Now().Add(time.Minute)}
 	allowed := true
 	h := m.handler(peer, func() bool { return allowed })
 	w := &stalledTransferWriter{httptest.NewRecorder(), make(chan struct{}), make(chan struct{})}
