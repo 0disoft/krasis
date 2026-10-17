@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/0disoft/krasis/internal/agent"
 	"github.com/0disoft/krasis/internal/transport"
 )
 
@@ -11,11 +12,38 @@ type preparationPolicy interface {
 	AuthorizePreparation(context.Context, transport.AuthenticatedPeerContext, time.Time) (bool, error)
 }
 
-type preparationCancellation struct{ cancel context.CancelFunc }
+type preparationCancellation struct {
+	cancel   context.CancelFunc
+	done     chan struct{}
+	deadline time.Time
+}
 
 func (input *privilegedLeaseInput) cancelPreparation() {
 	if preparation := input.preparationCancel.Load(); preparation != nil {
 		preparation.cancel()
+	}
+}
+
+// Only an already-approved entry may finish existing authenticated preparation.
+// No new work is started and the hint's deadline is never renewed. Missing,
+// expired or unexpectedly long deadlines retain the old immediate cancellation.
+// Shutdown always uses cancelPreparation instead of joining optional work.
+func (input *privilegedLeaseInput) finishPreparationForEntry(ctx context.Context) bool {
+	p := input.preparationCancel.Load()
+	if p == nil {
+		return false
+	}
+	remaining := time.Until(p.deadline)
+	if p.done == nil || p.deadline.IsZero() || remaining <= 0 || remaining > agent.InputPreparationTimeout {
+		p.cancel()
+		return false
+	}
+	select {
+	case <-p.done:
+		return true
+	case <-ctx.Done():
+		p.cancel()
+		return false
 	}
 }
 
@@ -79,9 +107,14 @@ func (input *privilegedLeaseInput) prepareIdle(ctx context.Context) (bool, error
 	input.preparationStarted = lockedAt
 	input.preparationFinished = time.Time{}
 	run, cancel := context.WithCancel(ctx)
-	preparation := &preparationCancellation{cancel: cancel}
+	deadline, _ := run.Deadline()
+	preparation := &preparationCancellation{cancel: cancel, done: make(chan struct{}), deadline: deadline}
 	input.preparationCancel.Store(preparation)
-	defer func() { input.preparationCancel.CompareAndSwap(preparation, nil); cancel() }()
+	defer func() {
+		input.preparationCancel.CompareAndSwap(preparation, nil)
+		cancel()
+		close(preparation.done)
+	}()
 	// Admission can arrive between the first priority check and publication.
 	// Cancel that race too; input.mu still fences native cleanup and pin disposal.
 	if input.entryWaiting.Load() != 0 {

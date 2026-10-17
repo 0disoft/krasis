@@ -79,9 +79,9 @@ func (input *privilegedLeaseInput) open(ctx context.Context, identity applicatio
 	}
 	input.entryWaiting.Add(1)
 	defer input.entryWaiting.Add(-1)
-	input.cancelPreparation()
 	input.RestoreReturnCursor()
 	started := time.Now()
+	joined := input.finishPreparationForEntry(ctx)
 	if err := input.mu.LockContext(ctx); err != nil {
 		handoff.Record(ctx, handoff.OpenLock, time.Since(started))
 		return errors.Join(errPrivilegedInput, err)
@@ -114,6 +114,9 @@ func (input *privilegedLeaseInput) open(ctx context.Context, identity applicatio
 	}
 	if !expires.After(now) {
 		return errPrivilegedInput
+	}
+	if joined && input.event != nil {
+		input.event("installed_input_preparation_joined")
 	}
 	handoff.Backend(ctx, "installed")
 	started = time.Now()

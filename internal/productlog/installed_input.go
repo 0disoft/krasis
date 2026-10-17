@@ -68,7 +68,7 @@ func init() {
 			}
 		}
 	}
-	for _, code := range []string{"installed_input_selected", "installed_input_lease_ready", "installed_input_connect_failed", "installed_input_heartbeat_failed", "installed_input_preparation_acknowledged", "installed_input_preparation_missed", "installed_source_receive_only"} {
+	for _, code := range []string{"installed_input_selected", "installed_input_lease_ready", "installed_input_connect_failed", "installed_input_heartbeat_failed", "installed_input_preparation_acknowledged", "installed_input_preparation_missed", "installed_input_preparation_joined", "installed_source_receive_only"} {
 		allowed[code] = true
 	}
 	for _, stage := range []string{"lease_metadata", "pipe_open", "service_pid", "service_manager", "service_open", "service_config", "service_status", "service_process_open", "service_process_metadata", "service_image", "service_image_acl", "lease_deadline", "lease_write", "worker_ready", "client_validation", "unknown"} {

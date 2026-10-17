@@ -12,6 +12,9 @@ import (
 )
 
 const (
+	// Shared with approved entry admission: only this already bounded optional
+	// operation may finish before its candidate is claimed by a real lease.
+	InputPreparationTimeout = 300 * time.Millisecond
 	preparationHintLifetime = 500 * time.Millisecond
 	// Keep margin beyond the independent two-second sender/receiver gates.
 	// Renewal is driven only by fresh physical movement, never a timer.
@@ -118,7 +121,7 @@ func runPreparationReceiver(ctx context.Context, hints <-chan time.Time, runtime
 				continue
 			}
 			last = now
-			prepareCtx, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
+			prepareCtx, cancel := context.WithTimeout(ctx, InputPreparationTimeout)
 			preparer.PrepareInput(prepareCtx, authenticated, now)
 			cancel()
 		}

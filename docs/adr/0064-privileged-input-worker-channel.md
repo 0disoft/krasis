@@ -759,6 +759,21 @@ The existing warm-child expiry, claim, trust, bootstrap and service fences stay
 unchanged. B's actual latency and lock/PIN continuity require an attended test;
 g288's separate native SendInput delay is not addressed by this scheduling change.
 
+G331 narrows this cancellation policy for an already-approved entry. An existing
+authenticated preparation with at most the original 300ms budget remaining may
+finish without renewing its deadline; the entry then independently claims the
+service candidate through the ordinary lease bootstrap. This avoids destroying
+and restarting a child already being constructed. Missing/expired/long deadlines
+retain immediate cancellation. Shutdown and caller cancellation still cancel
+immediately, and pending entry still fences new hints. Native cleanup and image
+pins remain joined under the same admission mutex. A failed preparation still
+uses ordinary lease fallback; waiting for its remaining budget can cost up to
+300ms before that fallback. `OpenLock` includes this readiness wait because the
+same preparation still owns the admission mutex, and its preparation overlap
+remains a subset, not an additional duration. The fixed preparation-joined event
+records waiting for completion, not successful reuse; the service's startup
+decision owns the latter. See the g331 engineering evidence for reproduction.
+
 ## g292: Keep capture off Go's non-terminating startup thread
 
 B's g291 capture failure reported desktop-thread-exit without a native number.
