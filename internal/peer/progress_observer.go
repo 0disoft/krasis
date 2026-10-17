@@ -14,6 +14,13 @@ type SessionProgressObserver interface {
 	ObserveDispatchCompleted(time.Time)
 }
 
+// Optional timing only; callbacks must not wait, allocate or perform I/O.
+// Acquisition is observed only after the existing semantic gate admits work.
+type DispatchCoordinatorObserver interface {
+	ObserveDispatchCoordinatorWaiting(time.Time)
+	ObserveDispatchCoordinatorAcquired(time.Time)
+}
+
 type TimerObserver interface {
 	ObserveTimerLateness(time.Duration)
 }

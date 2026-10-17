@@ -29,6 +29,11 @@ type runtimeDiagnostics struct {
 	queueResidenceMax                                       atomic.Int64
 	gcFailures                                              chan gcFailureTrigger
 	gcSkipped                                               atomic.Uint64
+	dispatchRead, coordinatorQueued, coordinatorAcquired    atomic.Int64
+	dispatchInjected, dispatchInjectionMax                  atomic.Int64
+	dispatchInjections                                      atomic.Uint64
+	slowDispatch                                            chan productlog.DispatchSpan
+	slowDispatchDropped                                     atomic.Uint64
 }
 
 func (d *runtimeDiagnostics) ObserveHookStarted(t time.Time) { d.hookStart.Store(d.stamp(t)) }
@@ -44,7 +49,7 @@ func (d *runtimeDiagnostics) ObserveHookCompleted(t time.Time) {
 func (d *runtimeDiagnostics) ObserveRawInput(time.Time) { d.rawInputs.Add(1) }
 
 func newRuntimeDiagnostics() *runtimeDiagnostics {
-	return &runtimeDiagnostics{started: time.Now(), gcFailures: make(chan gcFailureTrigger, 1)}
+	return &runtimeDiagnostics{started: time.Now(), gcFailures: make(chan gcFailureTrigger, 1), slowDispatch: make(chan productlog.DispatchSpan, 32)}
 }
 func (d *runtimeDiagnostics) stamp(t time.Time) int64 { return max(1, t.Sub(d.started).Microseconds()) }
 func (d *runtimeDiagnostics) ObserveReadConnectionStarted() {
@@ -53,6 +58,7 @@ func (d *runtimeDiagnostics) ObserveReadConnectionStarted() {
 	d.dispatchStart.Store(0)
 	d.injectionStart.Store(0)
 	d.kind.Store(0)
+	d.dispatchRead.Store(0)
 }
 func (d *runtimeDiagnostics) ObserveReadBytes(count int, at time.Time) {
 	if count <= 0 {
@@ -62,8 +68,17 @@ func (d *runtimeDiagnostics) ObserveReadBytes(count int, at time.Time) {
 	d.lastReadByte.Store(d.stamp(at))
 }
 func (d *runtimeDiagnostics) ObserveReadStarted(t time.Time) { d.readStart.Store(d.stamp(t)) }
-func (d *runtimeDiagnostics) ObserveReadCompleted(time.Time) { d.readStart.Store(0); d.frames.Add(1) }
+func (d *runtimeDiagnostics) ObserveReadCompleted(t time.Time) {
+	d.readStart.Store(0)
+	d.dispatchRead.Store(d.stamp(t))
+	d.frames.Add(1)
+}
 func (d *runtimeDiagnostics) ObserveDispatchStarted(k transport.MessageKind, t time.Time) {
+	d.coordinatorQueued.Store(0)
+	d.coordinatorAcquired.Store(0)
+	d.dispatchInjected.Store(0)
+	d.dispatchInjectionMax.Store(0)
+	d.dispatchInjections.Store(0)
 	d.kind.Store(uint32(k))
 	d.dispatchStart.Store(d.stamp(t))
 }
@@ -71,6 +86,7 @@ func (d *runtimeDiagnostics) ObserveDispatchCompleted(t time.Time) {
 	start := d.dispatchStart.Swap(0)
 	if start > 0 {
 		observeMaximum(&d.dispatchMax, max(0, d.stamp(t)-start))
+		d.observeSlowDispatch(start, d.stamp(t))
 	}
 	d.dispatches.Add(1)
 }
@@ -89,8 +105,14 @@ func (d *runtimeDiagnostics) ObserveDestinationInjectionStarted(t time.Time) {
 func (d *runtimeDiagnostics) ObserveDestinationInjectionCompleted(t time.Time) {
 	start := d.injectionStart.Swap(0)
 	if start > 0 {
-		observeMaximum(&d.injectionMax, max(0, d.stamp(t)-start))
+		elapsed := max(0, d.stamp(t)-start)
+		observeMaximum(&d.injectionMax, elapsed)
 		d.injections.Add(1)
+		if dispatch := d.dispatchStart.Load(); dispatch > 0 && start >= dispatch {
+			d.dispatchInjected.Add(elapsed)
+			observeMaximum(&d.dispatchInjectionMax, elapsed)
+			d.dispatchInjections.Add(1)
+		}
 	}
 }
 func (d *runtimeDiagnostics) ObserveSourceQueueEnqueued(depth uint64) {
@@ -162,6 +184,7 @@ func (d *runtimeDiagnostics) snapshot(now time.Time) productlog.RuntimeSummary {
 	s.HeartbeatReceived = receive > 0
 	s.HeartbeatSendAgeMicros = age(send)
 	s.HeartbeatReceiveAgeMicros = age(receive)
+	d.drainSlowDispatch(&s)
 	return s
 }
 

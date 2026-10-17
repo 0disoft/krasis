@@ -96,6 +96,7 @@ func runSession(
 	}()
 
 	progress, _ := observer.(SessionProgressObserver)
+	coordinatorProgress, _ := observer.(DispatchCoordinatorObserver)
 	for {
 		readStarted := time.Now()
 		handoff.ReadProgress(ctx, handoff.ReadWaiting, readStarted, false)
@@ -147,7 +148,13 @@ func runSession(
 			inputCtx, stopInput := context.WithTimeout(inputCtx, application.InputInjectionTimeout)
 			queued := time.Now()
 			recorded := false
+			if coordinatorProgress != nil {
+				coordinatorProgress.ObserveDispatchCoordinatorWaiting(queued)
+			}
 			err = coordinateDispatch(inputCtx, coordinator, func() (dispatchErr error) {
+				if coordinatorProgress != nil {
+					coordinatorProgress.ObserveDispatchCoordinatorAcquired(time.Now())
+				}
 				defer func() { complete(dispatchErr); recorded = true }()
 				handoff.Record(inputCtx, handoff.InputCoordinator, time.Since(queued))
 				return DispatchInputFrame(inputCtx, frame, observedInputRuntime{runtime, now, peerTimeout})
@@ -160,7 +167,13 @@ func runSession(
 				err = errors.Join(ErrPeerInputDispatch, err)
 			}
 		case transport.MessageHeartbeat:
+			if coordinatorProgress != nil {
+				coordinatorProgress.ObserveDispatchCoordinatorWaiting(time.Now())
+			}
 			err = coordinateDispatch(ctx, coordinator, func() error {
+				if coordinatorProgress != nil {
+					coordinatorProgress.ObserveDispatchCoordinatorAcquired(time.Now())
+				}
 				observedAt = now()
 				// After normal return, the dispatcher must still validate and
 				// drain the exact retired heartbeat (ADR 0020). Only active

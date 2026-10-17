@@ -21,7 +21,10 @@ func (p *stalledProgressInput) Move(context.Context, int32, int32) error {
 	return nil
 }
 
-type progressTestObserver struct{ read, dispatch, complete, heartbeat atomic.Uint32 }
+type progressTestObserver struct{ read, dispatch, complete, heartbeat, waiting, acquired atomic.Uint32 }
+
+func (o *progressTestObserver) ObserveDispatchCoordinatorWaiting(time.Time)  { o.waiting.Add(1) }
+func (o *progressTestObserver) ObserveDispatchCoordinatorAcquired(time.Time) { o.acquired.Add(1) }
 
 func (o *progressTestObserver) ObserveReadStarted(time.Time)   {}
 func (o *progressTestObserver) ObserveReadCompleted(time.Time) { o.read.Add(1) }
@@ -63,7 +66,64 @@ func TestProgressSeparatesReceivedFrameFromStalledInjection(t *testing.T) {
 	if read != 1 || dispatch != 1 || complete != 0 || accepted != 0 {
 		t.Fatalf("stalled injection mislabeled: %d %d %d %d", read, dispatch, complete, accepted)
 	}
+	if observer.waiting.Load() != 2 || observer.acquired.Load() != 2 {
+		t.Fatal("input or heartbeat coordinator markers missing")
+	}
 	if observer.heartbeat.Load() != 1 || observer.complete.Load() != 2 || runtime.Snapshot().PressedCount != 0 || runtime.Snapshot().Control.State != control.StateLocal {
 		t.Fatal("ordered dispatch/cleanup changed")
+	}
+}
+
+type queuedDispatchObserver struct {
+	progressTestObserver
+	queued chan struct{}
+}
+
+func (o *queuedDispatchObserver) ObserveDispatchCoordinatorWaiting(at time.Time) {
+	o.progressTestObserver.ObserveDispatchCoordinatorWaiting(at)
+	o.queued <- struct{}{}
+}
+
+func TestDispatchTimingDistinguishesWaitingForGateFromAdmittedInjection(t *testing.T) {
+	input := &stalledProgressInput{entered: make(chan struct{}), release: make(chan struct{})}
+	runtime, _ := application.NewSessionRuntime(effectExecutor{}, input)
+	if _, err := runtime.GrantInbound(context.Background(), control.Event{Kind: control.EventInboundLeaseGranted, SessionID: "s", LeaseID: "l"}, "e", time.Unix(100, 0)); err != nil {
+		t.Fatal(err)
+	}
+	payload, _ := transport.EncodeInputPayload(control.InputEnvelope{SessionID: "s", Epoch: "e", Sequence: 1}, control.InputAction{Kind: control.InputPointerMove, DeltaX: 1})
+	connection := &scriptedConnection{frames: []transport.Frame{{Kind: transport.MessageInput, Payload: payload}}}
+	coordinator := testWriteCoordinator(t, &recordingFrameWriter{})
+	<-coordinator.permit
+	observer := &queuedDispatchObserver{queued: make(chan struct{}, 1)}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		done <- runSession(ctx, connection, coordinator, runtime, nil, nil, fixedClock(time.Unix(101, 0)), 3*time.Second, observer)
+	}()
+	select {
+	case <-observer.queued:
+	case <-time.After(time.Second):
+		coordinator.permit <- struct{}{}
+		close(input.release)
+		t.Fatal("reader did not reach gate")
+	}
+	acquiredBeforeRelease := observer.acquired.Load()
+	coordinator.permit <- struct{}{}
+	select {
+	case <-input.entered:
+	case <-time.After(time.Second):
+		close(input.release)
+		t.Fatal("admitted reader did not inject")
+	}
+	acquiredDuringInjection, completeDuringInjection := observer.acquired.Load(), observer.complete.Load()
+	close(input.release)
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("reader did not finish")
+	}
+	if acquiredBeforeRelease != 0 || acquiredDuringInjection != 1 || completeDuringInjection != 0 || observer.complete.Load() != 1 {
+		t.Fatal("gate wait, body and completion collapsed", acquiredBeforeRelease, acquiredDuringInjection, completeDuringInjection)
 	}
 }

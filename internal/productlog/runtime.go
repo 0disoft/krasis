@@ -5,48 +5,55 @@ package productlog
 // runnable histograms use upper-bound buckets <=100us,1ms,10ms,100ms,1s,>1s.
 // An idle socket can have a large read age without being faulty.
 type RuntimeSummary struct {
-	HookCalls                 uint64    `json:"hookCalls"`
-	RawInputs                 uint64    `json:"rawInputs"`
-	QueueHighWatermark        uint64    `json:"queueHighWatermark"`
-	QueueEnqueued             uint64    `json:"queueEnqueued"`
-	QueueDequeued             uint64    `json:"queueDequeued"`
-	QueueCoalesced            uint64    `json:"queueCoalesced"`
-	QueueStaleDiscards        uint64    `json:"queueStaleDiscards"`
-	QueueMaxResidenceMicros   int64     `json:"queueMaxResidenceMicros"`
-	FrameReadBytes            uint64    `json:"frameReadBytes"`
-	LastReadByteAgeMicros     int64     `json:"lastReadByteAgeMicros"`
-	ReadByteObserved          bool      `json:"readByteObserved"`
-	HookMaxMicros             int64     `json:"hookMaxMicros"`
-	HookActiveMicros          int64     `json:"hookActiveMicros"`
-	LastHookAgeMicros         int64     `json:"lastHookAgeMicros"`
-	HookObserved              bool      `json:"hookObserved"`
-	IntervalMicros            int64     `json:"intervalMicros"`
-	HeapBytes                 uint64    `json:"heapBytes"`
-	AllocatedBytes            uint64    `json:"allocatedBytes"`
-	GCPauses                  [6]uint64 `json:"gcPauses"`
-	RunnableDelays            [6]uint64 `json:"runnableDelays"`
-	WorkingSetBytes           uint64    `json:"workingSetBytes"`
-	WorkingSetKnown           bool      `json:"workingSetKnown"`
-	CPUMicros                 uint64    `json:"cpuMicros"`
-	CPUKnown                  bool      `json:"cpuKnown"`
-	TimerLateMicros           int64     `json:"timerLateMicros"`
-	ReadAgeMicros             int64     `json:"readAgeMicros"`
-	DispatchAgeMicros         int64     `json:"dispatchAgeMicros"`
-	DispatchKind              string    `json:"dispatchKind"`
-	FramesReceived            uint64    `json:"framesReceived"`
-	Dispatches                uint64    `json:"dispatches"`
-	DispatchMaxMicros         int64     `json:"dispatchMaxMicros"`
-	InjectionAgeMicros        int64     `json:"injectionAgeMicros"`
-	InjectionMaxMicros        int64     `json:"injectionMaxMicros"`
-	Injections                uint64    `json:"injections"`
-	HeartbeatSendAgeMicros    int64     `json:"heartbeatSendAgeMicros"`
-	HeartbeatReceiveAgeMicros int64     `json:"heartbeatReceiveAgeMicros"`
-	HeartbeatSent             bool      `json:"heartbeatSent"`
-	HeartbeatReceived         bool      `json:"heartbeatReceived"`
+	HookCalls                 uint64          `json:"hookCalls"`
+	RawInputs                 uint64          `json:"rawInputs"`
+	QueueHighWatermark        uint64          `json:"queueHighWatermark"`
+	QueueEnqueued             uint64          `json:"queueEnqueued"`
+	QueueDequeued             uint64          `json:"queueDequeued"`
+	QueueCoalesced            uint64          `json:"queueCoalesced"`
+	QueueStaleDiscards        uint64          `json:"queueStaleDiscards"`
+	QueueMaxResidenceMicros   int64           `json:"queueMaxResidenceMicros"`
+	FrameReadBytes            uint64          `json:"frameReadBytes"`
+	LastReadByteAgeMicros     int64           `json:"lastReadByteAgeMicros"`
+	ReadByteObserved          bool            `json:"readByteObserved"`
+	HookMaxMicros             int64           `json:"hookMaxMicros"`
+	HookActiveMicros          int64           `json:"hookActiveMicros"`
+	LastHookAgeMicros         int64           `json:"lastHookAgeMicros"`
+	HookObserved              bool            `json:"hookObserved"`
+	IntervalMicros            int64           `json:"intervalMicros"`
+	HeapBytes                 uint64          `json:"heapBytes"`
+	AllocatedBytes            uint64          `json:"allocatedBytes"`
+	GCPauses                  [6]uint64       `json:"gcPauses"`
+	RunnableDelays            [6]uint64       `json:"runnableDelays"`
+	WorkingSetBytes           uint64          `json:"workingSetBytes"`
+	WorkingSetKnown           bool            `json:"workingSetKnown"`
+	CPUMicros                 uint64          `json:"cpuMicros"`
+	CPUKnown                  bool            `json:"cpuKnown"`
+	TimerLateMicros           int64           `json:"timerLateMicros"`
+	ReadAgeMicros             int64           `json:"readAgeMicros"`
+	DispatchAgeMicros         int64           `json:"dispatchAgeMicros"`
+	DispatchKind              string          `json:"dispatchKind"`
+	FramesReceived            uint64          `json:"framesReceived"`
+	Dispatches                uint64          `json:"dispatches"`
+	DispatchMaxMicros         int64           `json:"dispatchMaxMicros"`
+	InjectionAgeMicros        int64           `json:"injectionAgeMicros"`
+	InjectionMaxMicros        int64           `json:"injectionMaxMicros"`
+	Injections                uint64          `json:"injections"`
+	HeartbeatSendAgeMicros    int64           `json:"heartbeatSendAgeMicros"`
+	HeartbeatReceiveAgeMicros int64           `json:"heartbeatReceiveAgeMicros"`
+	HeartbeatSent             bool            `json:"heartbeatSent"`
+	HeartbeatReceived         bool            `json:"heartbeatReceived"`
+	SlowDispatch              [5]DispatchSpan `json:"slowDispatch,omitzero"`
+	SlowDispatchDropped       uint64          `json:"slowDispatchDropped,omitempty"`
 }
 
 func init() { allowed["runtime_summary"] = true }
 func (s RuntimeSummary) valid() bool {
+	for i, span := range s.SlowDispatch {
+		if span != (DispatchSpan{}) && (!span.valid() || DispatchKindIndex(span.Kind) != i) {
+			return false
+		}
+	}
 	if s.HookMaxMicros < 0 || s.HookActiveMicros < 0 || s.LastHookAgeMicros < 0 || s.QueueMaxResidenceMicros < 0 {
 		return false
 	}
