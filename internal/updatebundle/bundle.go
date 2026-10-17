@@ -149,6 +149,15 @@ func read(source io.ReaderAt, size int64, executable func(string, []byte, string
 		}
 		files[entry.Name] = data
 	}
+	return validateFiles(files, func(name string) string {
+		hash := sha256.Sum256(files[name])
+		return hex.EncodeToString(hash[:])
+	}, executable)
+}
+
+// Disk-backed validation supplies only presence markers and small metadata
+// documents here. Both paths use identical layout, digest and executable rules.
+func validateFiles(files map[string][]byte, digest func(string) string, executable func(string, []byte, string) error) (*Bundle, error) {
 	base, err := layout(files)
 	if err != nil {
 		return nil, err
@@ -190,8 +199,7 @@ func read(source io.ReaderAt, size int64, executable func(string, []byte, string
 		if !ok {
 			return nil, ErrInvalid
 		}
-		hash := sha256.Sum256(files[name])
-		if hex.EncodeToString(hash[:]) != expected {
+		if digest(name) != expected {
 			return nil, ErrInvalid
 		}
 	}
@@ -261,7 +269,11 @@ func validHex(value string, length int) bool {
 }
 
 func verifyExecutable(name string, data []byte, revision string) error {
-	file, err := pe.NewFile(bytes.NewReader(data))
+	return verifyExecutableReader(name, bytes.NewReader(data), revision)
+}
+
+func verifyExecutableReader(name string, source io.ReaderAt, revision string) error {
+	file, err := pe.NewFile(source)
 	if err != nil {
 		return ErrInvalid
 	}
@@ -269,7 +281,7 @@ func verifyExecutable(name string, data []byte, revision string) error {
 	if file.Machine != pe.IMAGE_FILE_MACHINE_AMD64 {
 		return ErrInvalid
 	}
-	info, err := buildinfo.Read(bytes.NewReader(data))
+	info, err := buildinfo.Read(source)
 	if err != nil || info.Main.Path != "github.com/0disoft/krasis" || info.Path != "github.com/0disoft/krasis/cmd/"+strings.TrimSuffix(name, ".exe") {
 		return ErrInvalid
 	}
@@ -353,22 +365,37 @@ func Pack(root interface {
 	Open(string) (*os.File, error)
 }) ([]byte, error) {
 	var buffer bytes.Buffer
-	w := zip.NewWriter(&buffer)
+	if err := PackTo(root, &buffer); err != nil {
+		return nil, err
+	}
+	if _, err := Read(bytes.NewReader(buffer.Bytes()), int64(buffer.Len())); err != nil {
+		return nil, fmt.Errorf("verify local distribution: %w", err)
+	}
+	return buffer.Bytes(), nil
+}
+
+// PackTo streams a bounded ZIP. The caller must validate the resulting archive
+// before offering it; writing it is not proof of a valid distribution.
+func PackTo(root interface {
+	Open(string) (*os.File, error)
+}, destination io.Writer) (err error) {
+	w := zip.NewWriter(&archiveLimitWriter{writer: destination})
+	defer func() { err = errors.Join(err, w.Close()) }()
 	selected := legacyNames
 	legacy, err := root.Open("krasis-control.exe")
 	if err == nil {
 		legacy.Close()
 	} else if !errors.Is(err, os.ErrNotExist) {
-		return nil, err
+		return err
 	}
 	current, err := root.Open("krasis-cli.exe")
 	if err == nil {
 		current.Close()
 	} else if !errors.Is(err, os.ErrNotExist) {
-		return nil, err
+		return err
 	}
 	if (legacy == nil) == (current == nil) {
-		return nil, ErrInvalid
+		return ErrInvalid
 	}
 	if current != nil {
 		selected = currentNames
@@ -377,11 +404,11 @@ func Pack(root interface {
 	if err == nil {
 		installer.Close()
 		if current == nil {
-			return nil, ErrInvalid
+			return ErrInvalid
 		}
 		selected = installerNames
 	} else if !errors.Is(err, os.ErrNotExist) {
-		return nil, err
+		return err
 	}
 	var present int
 	for _, name := range probeNames {
@@ -390,11 +417,11 @@ func Pack(root interface {
 			present++
 			f.Close()
 		} else if !errors.Is(err, os.ErrNotExist) {
-			return nil, err
+			return err
 		}
 	}
 	if present == 1 {
-		return nil, ErrInvalid
+		return ErrInvalid
 	}
 	if present == len(probeNames) {
 		selected = selectedNames(selected, true, false)
@@ -406,11 +433,11 @@ func Pack(root interface {
 			uiAccessPresent++
 			f.Close()
 		} else if !errors.Is(err, os.ErrNotExist) {
-			return nil, err
+			return err
 		}
 	}
 	if uiAccessPresent != 0 && uiAccessPresent != len(uiAccessProbeNames) {
-		return nil, ErrInvalid
+		return ErrInvalid
 	}
 	if uiAccessPresent == len(uiAccessProbeNames) {
 		selected = selectedNames(selected, false, true)
@@ -418,31 +445,39 @@ func Pack(root interface {
 	for _, name := range selected {
 		f, err := root.Open(name)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		info, err := f.Stat()
 		if err != nil || !info.Mode().IsRegular() || info.Size() > fileLimit(name) {
 			f.Close()
-			return nil, ErrInvalid
-		}
-		data, err := io.ReadAll(io.LimitReader(f, fileLimit(name)+1))
-		closeErr := f.Close()
-		if err != nil || closeErr != nil || int64(len(data)) > fileLimit(name) {
-			return nil, ErrInvalid
+			return ErrInvalid
 		}
 		entry, err := w.Create(name)
 		if err != nil {
-			return nil, err
+			return errors.Join(err, f.Close())
 		}
-		if _, err := entry.Write(data); err != nil {
-			return nil, err
+		n, copyErr := io.Copy(entry, io.LimitReader(f, fileLimit(name)+1))
+		closeErr := f.Close()
+		if n != info.Size() || n > fileLimit(name) {
+			return errors.Join(ErrInvalid, copyErr, closeErr)
+		}
+		if err := errors.Join(copyErr, closeErr); err != nil {
+			return err
 		}
 	}
-	if err := w.Close(); err != nil {
-		return nil, err
+	return nil
+}
+
+type archiveLimitWriter struct {
+	writer  io.Writer
+	written int64
+}
+
+func (w *archiveLimitWriter) Write(data []byte) (int, error) {
+	if int64(len(data)) > MaxArchiveBytes-w.written {
+		return 0, ErrInvalid
 	}
-	if _, err := Read(bytes.NewReader(buffer.Bytes()), int64(buffer.Len())); err != nil {
-		return nil, fmt.Errorf("verify local distribution: %w", err)
-	}
-	return buffer.Bytes(), nil
+	n, err := w.writer.Write(data)
+	w.written += int64(n)
+	return n, err
 }
