@@ -62,8 +62,10 @@ func init() {
 		for _, bucket := range []string{"lt1ms", "lt10ms", "lt100ms", "lt1s", "ge1s"} {
 			allowed["installed_input_timing_"+stage+"_"+bucket] = true
 			allowed["installed_input_heartbeat_timing_"+stage+"_"+bucket] = true
-			if stage == "client_lock" || stage == "client_authority" || stage == "client_write" || stage == "client_response" {
+			if stage != "worker_authority" {
 				allowed["installed_source_timing_"+stage+"_"+bucket] = true
+			}
+			if stage == "client_lock" || stage == "client_authority" || stage == "client_write" || stage == "client_response" {
 				allowed["installed_source_heartbeat_timing_"+stage+"_"+bucket] = true
 			}
 		}

@@ -271,6 +271,9 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 	}
 	if known {
 		result, err := sourceReplyResult(p, reply)
+		if err != ErrProtocol {
+			copy(sample[4:], reply.timing[:])
+		}
 		if err == ErrProtocol {
 			stage = "protocol"
 			replyOutcome = "protocol"

@@ -1176,6 +1176,18 @@ cancellation without premature sender completion or later queue consumption.
 This removes an inspected blocking path; the g324 field incident's outstanding
 operation is unknown and still requires the new command-failure observations.
 
+## Source activation execution admission
+
+G332 activation frames retain pinned agent/service presence checks at read
+admission, then require the existing protected command desktop's full live
+authorization immediately before native work. This removes one repeated full
+WTS/SCM check from that single command's pre-queue path; native boundary guards
+and other commands' read-side checks remain. The private source reply's three
+reserved timing bytes are activation-only, bucket-validated observations;
+matching negative replies retain their outcome and foreign replies cannot
+publish worker timing. See `docs/engineering/g332-source-activation-admission.md`
+for the measured baseline, scope/apply boundaries and compatibility constraints.
+
 ## Batched receiver cursor entry
 
 The installed entry path takes the pre-write cursor snapshot, performs the

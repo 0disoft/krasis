@@ -134,14 +134,14 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 		}
 		return nil
 	}
-	authorizeCommand := func(op byte) error {
-		if op == sourceHeartbeat {
-			if proof.checkHeartbeat() != nil || channel.authority.checkHeartbeat() != nil {
-				return ErrAuthority
-			}
-			return nil
+	present := func() error {
+		if proof.checkHeartbeat() != nil || channel.authority.checkHeartbeat() != nil {
+			return ErrAuthority
 		}
-		return authorize()
+		return nil
+	}
+	authorizeCommand := func(op byte) error {
+		return sourceCommandReadAuthorization(op, authorize, present)
 	}
 	hook, err := wininput.NewProtectedSourceHook(authorize)
 	if err != nil {
@@ -378,12 +378,8 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 				}
 				// State retirement operates on the existing native owner. It must
 				// remain available while the desktop is between Default/Winlogon.
-				var err error
-				if p.op == sourceDeactivate || p.op == sourceHeartbeat || p.op == sourceCursorRestore {
-					err = operation()
-				} else {
-					err = hook.ExecuteSourceDesktop(commandContext, operation)
-				}
+				timing, err := executeSourceCommand(commandContext, p.op, hook.ExecuteSourceDesktop, operation)
+				response.timing = timing
 				if exit.Command == "not_started" || exit.Command == "ok" {
 					exit.Command = sourceCommandOutcome(err)
 				}

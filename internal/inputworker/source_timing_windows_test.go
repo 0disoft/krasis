@@ -59,3 +59,37 @@ func TestSourceHeartbeatTimingCannotContaminateCommands(t *testing.T) {
 		t.Fatal("source/heartbeat maximum buckets lost or mixed", events)
 	}
 }
+
+func TestSourceClientObservesWorkerTimingOnlyAfterMatchingReply(t *testing.T) {
+	for _, foreign := range []bool{false, true} {
+		server, conn := net.Pipe()
+		c := &sourceClient{channel: clientChannel(conn, authorityService), binding: Binding{1}, replies: make(chan sourcePacket, 1), done: make(chan struct{})}
+		var events []string
+		c.timing = timingSampler{source: true, emit: func(code string) { events = append(events, code) }}
+		joined := make(chan struct{})
+		go func() {
+			defer close(joined)
+			p, err := readSourcePacket(server)
+			if err == nil {
+				reply := sourcePacket{kind: sourceReply, op: p.op, reply: p.sequence, status: 1, timing: [3]byte{0, 3, 4}}
+				if foreign {
+					reply.reply++
+				}
+				c.replies <- reply
+			}
+		}()
+		_, err := c.call(context.Background(), sourceActivate)
+		<-joined
+		_ = server.Close()
+		_ = c.channel.Close()
+		seen := 0
+		for _, event := range events {
+			if strings.HasPrefix(event, "installed_source_timing_worker_") {
+				seen++
+			}
+		}
+		if foreign && (err != ErrProtocol || seen != 0) || !foreign && (err != ErrAuthority || seen != 2) {
+			t.Fatal("foreign timing accepted or rejection outcome changed", foreign, err, events)
+		}
+	}
+}

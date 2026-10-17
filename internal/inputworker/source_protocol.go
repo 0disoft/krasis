@@ -40,6 +40,7 @@ type sourcePacket struct {
 	x                int32
 	decision         peer.BoundaryAdmissionDecision
 	pressedEvidence  byte
+	timing           [3]byte // Activation reply only; fixed elapsed-time buckets.
 }
 
 func (p sourcePacket) valid() bool {
@@ -48,6 +49,17 @@ func (p sourcePacket) valid() bool {
 	}
 	if p.pressedEvidence != 0 && (p.pressedEvidence > 3 || p.kind != sourceReply || p.op != sourceAdmit || p.status != 0 || p.decision != peer.BoundaryAdmissionBlockedPressedInput) {
 		return false
+	}
+	if p.timing != ([3]byte{}) && (p.kind != sourceReply || p.op != sourceActivate) {
+		return false
+	}
+	if p.timing[0] != 0 { // Reader authorization has no dispatcher measurement.
+		return false
+	}
+	for _, bucket := range p.timing {
+		if bucket > 5 {
+			return false
+		}
 	}
 	switch p.kind {
 	case sourceCommand:
@@ -90,6 +102,7 @@ func encodeSourcePacket(p sourcePacket) ([sourcePacketSize]byte, error) {
 	binary.BigEndian.PutUint32(data[48:52], uint32(p.action.DeltaY))
 	binary.BigEndian.PutUint32(data[52:56], uint32(p.x))
 	data[56] = p.pressedEvidence
+	copy(data[57:60], p.timing[:])
 	return data, nil
 }
 
@@ -98,11 +111,12 @@ func readSourcePacket(r io.Reader) (sourcePacket, error) {
 	if _, err := io.ReadFull(r, data[:]); err != nil {
 		return sourcePacket{}, err
 	}
-	if string(data[:4]) != "KSC1" || !zeroBytes(data[57:]) || data[7] > 6 {
+	if string(data[:4]) != "KSC1" || !zeroBytes(data[60:]) || data[7] > 6 {
 		return sourcePacket{}, ErrProtocol
 	}
 	p := sourcePacket{kind: data[4], op: data[5], status: data[6], sequence: binary.BigEndian.Uint64(data[8:16]), reply: binary.BigEndian.Uint64(data[32:40]), x: int32(binary.BigEndian.Uint32(data[52:56]))}
 	p.pressedEvidence = data[56]
+	copy(p.timing[:], data[57:60])
 	copy(p.binding[:], data[16:32])
 	if data[7] != 0 {
 		p.action.Kind = []control.InputActionKind{control.InputKeyDown, control.InputKeyUp, control.InputButtonDown, control.InputButtonUp, control.InputPointerMove, control.InputWheel}[data[7]-1]

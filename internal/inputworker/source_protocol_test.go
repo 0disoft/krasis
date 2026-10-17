@@ -76,3 +76,39 @@ func TestSourceLeaseCannotBecomeInjectionOrPresentation(t *testing.T) {
 		t.Fatal("combined capture/presentation accepted")
 	}
 }
+
+func TestSourceTimingOnlySurvivesExactActivationReplies(t *testing.T) {
+	for _, status := range []byte{0, 1} {
+		p := sourcePacket{kind: sourceReply, op: sourceActivate, status: status, sequence: 3, reply: 2, binding: Binding{1}, timing: [3]byte{0, 3, 4}}
+		wire, err := encodeSourcePacket(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := readSourcePacket(bytes.NewReader(wire[:]))
+		if err != nil || got != p {
+			t.Fatal("same reply lost outcome or observed phases", got, err)
+		}
+		unmeasured := wire
+		unmeasured[57] = 1
+		if _, err := readSourcePacket(bytes.NewReader(unmeasured[:])); err != ErrProtocol {
+			t.Fatal("unmeasured authority phase accepted", err)
+		}
+		for _, offset := range []int{57, 58, 59, 60, 63} {
+			bad := wire
+			bad[offset] = 255
+			if _, err := readSourcePacket(bytes.NewReader(bad[:])); err != ErrProtocol {
+				t.Fatal("invalid bucket/reserved byte accepted", offset, err)
+			}
+		}
+		for op := sourceStart; op <= sourceCursorRestore; op++ {
+			if op == sourceActivate {
+				continue
+			}
+			bad := wire
+			bad[5] = op
+			if _, err := readSourcePacket(bytes.NewReader(bad[:])); err != ErrProtocol {
+				t.Fatal("activation timing escaped its fixed operation", op, err)
+			}
+		}
+	}
+}
