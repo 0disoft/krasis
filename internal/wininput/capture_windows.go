@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"runtime"
 	"sync/atomic"
-	"syscall"
 	"time"
 	"unsafe"
 
@@ -135,33 +134,23 @@ func captureOnDedicatedThread(ctx context.Context, options lab.CaptureOptions, r
 	procPeekMessageW.Call(uintptr(unsafe.Pointer(&bootstrapMessage)), 0, 0, 0, pmNoRemove)
 
 	counters := &captureCounters{}
-	keyboardCallback := syscall.NewCallback(func(code int, wParam uintptr, lParam uintptr) uintptr {
-		if code == hcAction && lParam != 0 {
-			data := (*keyboardHookData)(unsafe.Pointer(lParam))
-			counters.observeKeyboard(uint32(wParam), data.Flags&llkhfInjected != 0)
-		}
-		result, _, _ := procCallNextHookEx.Call(0, uintptr(code), wParam, lParam)
-		return result
-	})
-	mouseCallback := syscall.NewCallback(func(code int, wParam uintptr, lParam uintptr) uintptr {
-		if code == hcAction && lParam != 0 {
-			data := (*mouseHookData)(unsafe.Pointer(lParam))
-			counters.observeMouse(uint32(wParam), data.Flags&llmhfInjected != 0, data.ExtraInfo)
-		}
-		result, _, _ := procCallNextHookEx.Call(0, uintptr(code), wParam, lParam)
-		return result
-	})
+	releaseCallbacks, err := registerCaptureHookOwner(threadID, counters)
+	if err != nil {
+		return err
+	}
+	// Registered before either hook; removed after hook cleanup on every return.
+	defer releaseCallbacks()
 
 	module, _, callErr := procGetModuleHandleW.Call(0)
 	if module == 0 {
 		return fmt.Errorf("GetModuleHandleW failed: %w", callErr)
 	}
-	keyboardHook, _, callErr := procSetWindowsHookExW.Call(whKeyboardLL, keyboardCallback, module, 0)
+	keyboardHook, _, callErr := procSetWindowsHookExW.Call(whKeyboardLL, sourceKeyboardCallback, module, 0)
 	if keyboardHook == 0 {
 		return fmt.Errorf("SetWindowsHookExW(WH_KEYBOARD_LL) failed: %w", callErr)
 	}
 
-	mouseHook, _, callErr := procSetWindowsHookExW.Call(whMouseLL, mouseCallback, module, 0)
+	mouseHook, _, callErr := procSetWindowsHookExW.Call(whMouseLL, sourceMouseCallback, module, 0)
 	if mouseHook == 0 {
 		procUnhookWindowsHookEx.Call(keyboardHook)
 		return fmt.Errorf("SetWindowsHookExW(WH_MOUSE_LL) failed: %w", callErr)
