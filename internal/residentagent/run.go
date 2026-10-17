@@ -37,20 +37,11 @@ type runDependencies struct {
 	log             *productlog.Logger
 }
 
-func Run(ctx context.Context, localAppData string, recovery ...string) (err error) {
+func Run(ctx context.Context, localAppData string, recovery ...string) error {
 	log, err := productlog.Open(localAppData, "agent")
 	if err != nil {
 		return fmt.Errorf("initialize diagnostics: %w", err)
 	}
-	log.Event("process_started")
-	defer func() {
-		if err != nil {
-			log.Event("process_failed")
-		} else {
-			log.Event("process_stopped")
-		}
-		log.Close()
-	}()
 	dependencies := runDependencies{
 		log:          log,
 		acquire:      func() (instanceLease, error) { return agentinstance.Acquire() },
@@ -74,19 +65,9 @@ func Run(ctx context.Context, localAppData string, recovery ...string) (err erro
 }
 
 func run(ctx context.Context, localAppData string, dependencies runDependencies) (err error) {
-	if ctx == nil || localAppData == "" || dependencies.acquire == nil || dependencies.bootstrap == nil ||
-		dependencies.startMonitor == nil || dependencies.listen == nil || dependencies.now == nil {
-		return errors.New("resident agent dependencies and LOCALAPPDATA are required")
-	}
-	instance, err := dependencies.acquire()
-	if err != nil {
-		return err
-	}
-	if dependencies.checkStart != nil {
-		if err := dependencies.checkStart(); err != nil {
-			return errors.Join(err, instance.Close())
-		}
-	}
+	// This function owns the supplied logger, including failed startup paths.
+	var instance instanceLease
+	dependencies.log.Event("process_started")
 	defer func() {
 		// Drain logs before releasing agent ownership so an upgrade cannot race
 		// the previous process's log writer.
@@ -96,8 +77,23 @@ func run(ctx context.Context, localAppData string, dependencies runDependencies)
 			dependencies.log.Event("process_stopped")
 		}
 		dependencies.log.Close()
-		err = errors.Join(err, instance.Close())
+		if instance != nil {
+			err = errors.Join(err, instance.Close())
+		}
 	}()
+	if ctx == nil || localAppData == "" || dependencies.acquire == nil || dependencies.bootstrap == nil ||
+		dependencies.startMonitor == nil || dependencies.listen == nil || dependencies.now == nil {
+		return errors.New("resident agent dependencies and LOCALAPPDATA are required")
+	}
+	instance, err = dependencies.acquire()
+	if err != nil {
+		return err
+	}
+	if dependencies.checkStart != nil {
+		if err := dependencies.checkStart(); err != nil {
+			return err
+		}
+	}
 
 	paths, identity, _, err := dependencies.bootstrap(localAppData, dependencies.now().UTC())
 	if err != nil {
@@ -115,8 +111,9 @@ func run(ctx context.Context, localAppData string, dependencies runDependencies)
 	if err != nil {
 		return err
 	}
+	var identities *productidentity.Store
 	if dependencies.productAdapters {
-		identities, err := productidentity.New(paths.Identity)
+		identities, err = productidentity.New(paths.Identity)
 		if err != nil {
 			return err
 		}
@@ -131,12 +128,6 @@ func run(ctx context.Context, localAppData string, dependencies runDependencies)
 	operations.localAppData = localAppData
 	if dependencies.productAdapters {
 		lifecycle.SetSessionTransitionHandler(operations.handleProtectedTransition)
-	}
-	if dependencies.productAdapters {
-		identities, err := productidentity.New(paths.Identity)
-		if err != nil {
-			return err
-		}
 		operations.preflight = func(alias string) error { _, err := prepareProductConnection(identities, trust, alias); return err }
 		operations.credentials = identities
 		updates, updateErr := peerupdate.Open(paths.Root, localapi.AgentGeneration)
