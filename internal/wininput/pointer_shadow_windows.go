@@ -13,6 +13,7 @@ import (
 	"unsafe"
 
 	"github.com/0disoft/krasis/internal/lab"
+	"github.com/0disoft/krasis/internal/winmessage"
 )
 
 const (
@@ -278,7 +279,7 @@ func runPointerShadowMessageLoop(ready func(), counters *pointerShadowCounters, 
 		return nil
 	}
 	for {
-		result, _, callErr := procGetMessageW.Call(uintptr(unsafe.Pointer(&msg)), 0, 0, 0)
+		result, callErr := winmessage.Get((*winmessage.Message)(unsafe.Pointer(&msg)))
 		switch int32(result) {
 		case -1:
 			return fmt.Errorf("GetMessageW(pointer shadow) failed: %w", callErr)

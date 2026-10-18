@@ -11,6 +11,7 @@ import (
 	"unsafe"
 
 	"github.com/0disoft/krasis/internal/lab"
+	"github.com/0disoft/krasis/internal/winmessage"
 )
 
 const (
@@ -44,7 +45,6 @@ var (
 	procSetWindowsHookExW   = user32.NewProc("SetWindowsHookExW")
 	procUnhookWindowsHookEx = user32.NewProc("UnhookWindowsHookEx")
 	procCallNextHookEx      = user32.NewProc("CallNextHookEx")
-	procGetMessageW         = user32.NewProc("GetMessageW")
 	procTranslateMessage    = user32.NewProc("TranslateMessage")
 	procDispatchMessageW    = user32.NewProc("DispatchMessageW")
 	procPeekMessageW        = user32.NewProc("PeekMessageW")
@@ -229,7 +229,7 @@ func captureOnDedicatedThread(ctx context.Context, options lab.CaptureOptions, r
 func runMessageLoop(ready func()) error {
 	var msg message
 	for {
-		result, _, callErr := procGetMessageW.Call(uintptr(unsafe.Pointer(&msg)), 0, 0, 0)
+		result, callErr := winmessage.Get((*winmessage.Message)(unsafe.Pointer(&msg)))
 		signedResult := int32(result)
 		switch signedResult {
 		case -1:

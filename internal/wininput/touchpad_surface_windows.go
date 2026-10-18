@@ -14,6 +14,7 @@ import (
 	"unsafe"
 
 	"github.com/0disoft/krasis/internal/lab"
+	"github.com/0disoft/krasis/internal/winmessage"
 )
 
 const (
@@ -350,7 +351,7 @@ func (counters *touchpadSurfaceCounters) pointerSnapshot() lab.TouchpadSurfacePo
 func touchpadSurfaceMessageLoop() error {
 	var current message
 	for {
-		result, _, callErr := procGetMessageW.Call(uintptr(unsafe.Pointer(&current)), 0, 0, 0)
+		result, callErr := winmessage.Get((*winmessage.Message)(unsafe.Pointer(&current)))
 		switch int32(result) {
 		case -1:
 			return touchpadWin32Error("GetMessageW(touchpad surface)", callErr)

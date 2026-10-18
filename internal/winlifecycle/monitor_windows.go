@@ -13,6 +13,7 @@ import (
 	"unsafe"
 
 	"github.com/0disoft/krasis/internal/agentlifecycle"
+	"github.com/0disoft/krasis/internal/winmessage"
 )
 
 const notifyForThisSession = 0
@@ -28,7 +29,6 @@ var (
 	procCreateWindowExW                  = user32.NewProc("CreateWindowExW")
 	procDefWindowProcW                   = user32.NewProc("DefWindowProcW")
 	procDestroyWindow                    = user32.NewProc("DestroyWindow")
-	procGetMessageW                      = user32.NewProc("GetMessageW")
 	procTranslateMessage                 = user32.NewProc("TranslateMessage")
 	procDispatchMessageW                 = user32.NewProc("DispatchMessageW")
 	procPostMessageW                     = user32.NewProc("PostMessageW")
@@ -68,20 +68,7 @@ type windowClass struct {
 	className   *uint16
 }
 
-type point struct {
-	x int32
-	y int32
-}
-
-type windowMessage struct {
-	window  uintptr
-	message uint32
-	wParam  uintptr
-	lParam  uintptr
-	time    uint32
-	point   point
-	private uint32
-}
+type windowMessage = winmessage.Message
 
 func StartMonitor() (agentlifecycle.Monitor, error) {
 	monitor := &Monitor{
@@ -210,7 +197,7 @@ func (monitor *Monitor) run() {
 
 	var message windowMessage
 	for {
-		result, _, getErr := procGetMessageW.Call(uintptr(unsafe.Pointer(&message)), 0, 0, 0)
+		result, getErr := winmessage.Get(&message)
 		switch int32(result) {
 		case -1:
 			monitor.setRunError(win32Error("GetMessageW", getErr))

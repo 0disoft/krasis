@@ -9,13 +9,14 @@ import (
 	"runtime"
 	"unsafe"
 
+	"github.com/0disoft/krasis/internal/winmessage"
 	"golang.org/x/sys/windows"
 )
 
 var procSourceMessageWait = user32.NewProc("MsgWaitForMultipleObjectsEx")
 
 const (
-	sourceMessageCancelFallbackMillis = 250
+	sourceMessageCancelFallbackMillis = winmessage.MaximumWaitMillis
 	sourceMessageQueueAllInput        = 0x04ff
 	sourceMessageInputAvailable       = 0x0004
 	sourceMessageRemove               = 1
