@@ -1,5 +1,23 @@
 # ADR 0066: Product leases use the installed input service
 
+## g340: Renew a retreated approach before its edge band
+
+The paired g339 trial completed twelve handoffs. One receiver admission spent
+107.828ms in OpenLock while an already-started preparation completed; its total
+authorization was 131.007ms. This is a wait for optional construction, not evidence
+that the trust check itself took that time. Preparation remains joined so entry
+never bypasses native cleanup or discards useful in-flight construction.
+
+After a real retreat and expiry of the existing 2.1-second source cooldown,
+the next outward physical movement may send a fresh preparation hint before
+re-entering the predictive edge band. Continuous movement previously lacked
+the idle-resume exception and could start preparation too close to entry.
+The single-slot queue, receiver/sender rate limits, freshness and one-claim
+worker expiry remain unchanged. A full queue does not consume the renewal;
+inward motion, missing history and an approach without retreat do not use it.
+No timer starts preparation and no lease authority is carried by the hint.
+The device latency effect remains to be measured after deployment.
+
 ## g161: Preview the approach from recent pointer positions
 
 g160's first/idle attempts showed grants of 79–134ms with a preparation-mutex wait

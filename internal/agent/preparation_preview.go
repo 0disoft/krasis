@@ -54,10 +54,15 @@ func (p *preparationBoundary) preview(action control.InputAction, x int32, now t
 		return false
 	}
 	resuming := !p.resumeUntil.IsZero() && now.Before(p.resumeUntil)
-	if !outward || distance > band && !resuming {
+	// A completed retreat starts a new approach. If the last hint is already
+	// outside the sender/receiver launch cooldown, use its first outward motion
+	// even during continuous use. Waiting for another velocity sample/edge band
+	// can put child construction back on the approved entry's critical path.
+	renewing := !p.sent && !p.sentAt.IsZero() && now.Sub(p.sentAt) >= preparationHintRenewal
+	if !outward || distance > band && !resuming && !renewing {
 		return false
 	}
-	if resuming {
+	if resuming || renewing {
 		// Suppress another hint on the same approach even when this first
 		// movement was outside the normal prediction band.
 		p.band = max(band, distance)
