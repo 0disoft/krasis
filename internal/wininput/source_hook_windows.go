@@ -33,6 +33,7 @@ type SourceHook struct {
 type sourceInputThreadResult struct {
 	component string
 	err       error
+	finished  time.Time
 }
 
 type serializedBoundaryObserver struct {
@@ -192,7 +193,8 @@ func (hook *SourceHook) runWithBoundary(ctx context.Context, session *SourceSess
 func startSourceInputThread(results chan<- sourceInputThreadResult, component string, run func() error) {
 	go func() {
 		runtime.LockOSThread()
-		results <- sourceInputThreadResult{component: component, err: run()}
+		err := run()
+		results <- sourceInputThreadResult{component: component, err: err, finished: time.Now()}
 	}()
 }
 
@@ -206,19 +208,63 @@ func collectSourceInputThreads(
 	expected int,
 	timeout time.Duration,
 ) (error, bool) {
+	deadline := time.Now().Add(timeout)
 	cancel()
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
+	late := false
+	accept := func(result sourceInputThreadResult) {
+		late = late || (!result.finished.IsZero() && result.finished.After(deadline))
+		collected = append(collected, result)
+	}
+
+join:
 	for len(collected) < expected {
 		select {
 		case result := <-results:
-			collected = append(collected, result)
+			accept(result)
 		case <-timer.C:
-			collected = append(collected, sourceInputThreadResult{component: "thread-join", err: errSourceInputJoinTimeout})
-			return sourceInputThreadsError(parent, collected...), false
+			// Scheduling can deliver the timer alongside completions queued
+			// before its deadline. Drain those before declaring a live owner.
+			for len(collected) < expected {
+				select {
+				case result := <-results:
+					accept(result)
+				default:
+					break join
+				}
+			}
 		}
 	}
+	if len(collected) < expected || late {
+		stage := sourceThreadJoinStage(collected, expected)
+		collected = append(collected, sourceInputThreadResult{component: stage, err: errSourceInputJoinTimeout})
+		return sourceInputThreadsError(parent, collected...), false
+	}
 	return sourceInputThreadsError(parent, collected...), true
+}
+
+func sourceThreadJoinStage(collected []sourceInputThreadResult, expected int) string {
+	if expected != 3 {
+		return "thread-join"
+	}
+	missing := ""
+	for _, component := range []string{"low-level-hook", "raw-mouse", "wheel-capture"} {
+		found := false
+		for _, result := range collected {
+			found = found || result.component == component
+		}
+		if !found {
+			if missing != "" {
+				return "thread-join-multiple"
+			}
+			missing = "thread-join-" + component
+		}
+	}
+	if missing == "" {
+		return "thread-join" // All returned, but at least one missed its deadline.
+	}
+	return missing
 }
 
 func sourceInputThreadsError(parent context.Context, results ...sourceInputThreadResult) error {
@@ -410,7 +456,7 @@ func runSourceLowLevelHookThread(
 	if err := postSourceReady(threadID); err != nil {
 		return err
 	}
-	loopErr := runSourceHookMessageLoop(ctx, threadID, ready)
+	loopErr := runSourceHookMessageLoop(ctx, ready)
 	unhookErr := cleanupHooks()
 	if loopErr != nil {
 		return errors.Join(loopErr, unhookErr)
@@ -467,7 +513,7 @@ func runSourceRawMouseThread(
 		}
 		return sourceStage("raw-route", routeRawMouse(session, boundary, pointerState, header, mouse))
 	}
-	loopErr := runSourceRawMessageLoop(ctx, threadID, ready, rawReader, visitRawMouse)
+	loopErr := runSourceRawMessageLoop(ctx, ready, rawReader, visitRawMouse)
 	rawInputErr := cleanupRawInput()
 	if loopErr != nil {
 		return errors.Join(loopErr, rawInputErr)
@@ -486,18 +532,17 @@ func postSourceReady(threadID uintptr) error {
 	return nil
 }
 
-func runSourceHookMessageLoop(ctx context.Context, threadID uintptr, ready func()) error {
-	return runSourceThreadMessageLoop(ctx, threadID, ready, nil)
+func runSourceHookMessageLoop(ctx context.Context, ready func()) error {
+	return runSourceThreadMessageLoop(ctx, ready, nil)
 }
 
 func runSourceRawMessageLoop(
 	ctx context.Context,
-	threadID uintptr,
 	ready func(),
 	rawReader *rawMouseReader,
 	visitRawMouse func(rawInputHeader, rawMouse) error,
 ) error {
-	return runSourceThreadMessageLoop(ctx, threadID, ready, func(msg message) error {
+	return runSourceThreadMessageLoop(ctx, ready, func(msg message) error {
 		if msg.Message != wmInput {
 			return nil
 		}
@@ -510,56 +555,22 @@ func runSourceRawMessageLoop(
 
 func runSourceThreadMessageLoop(
 	ctx context.Context,
-	threadID uintptr,
 	ready func(),
 	visitMessage func(message) error,
 ) error {
-	stopMessageLoop := make(chan struct{})
-	stopMessageLoopDone := make(chan struct{})
-	go func() {
-		defer close(stopMessageLoopDone)
-		select {
-		case <-ctx.Done():
-			_ = postSourceShutdown(sourceShutdownFrom(ctx), func() error {
-				posted, _, err := procPostThreadMessageW.Call(threadID, wmQuit, 0, 0)
-				if posted == 0 {
-					return fmt.Errorf("PostThreadMessageW(quit): %w", err)
-				}
-				return nil
-			})
-		case <-stopMessageLoop:
-		}
-	}()
-	defer func() {
-		close(stopMessageLoop)
-		<-stopMessageLoopDone
-	}()
-
-	var msg message
-	for {
-		result, _, callErr := procGetMessageW.Call(uintptr(unsafe.Pointer(&msg)), 0, 0, 0)
-		switch int32(result) {
-		case -1:
-			return sourceStage("message-loop", fmt.Errorf("GetMessageW failed: %w", callErr))
-		case 0:
+	return sourceMessageLoop(ctx, func(msg message) error {
+		if msg.Message == wmSourceReady {
+			if ready != nil {
+				ready()
+				ready = nil
+			}
 			return nil
-		default:
-			if msg.Message == wmSourceReady {
-				if ready != nil {
-					ready()
-					ready = nil
-				}
-				continue
-			}
-			if visitMessage != nil {
-				if err := visitMessage(msg); err != nil {
-					return err
-				}
-			}
-			procTranslateMessage.Call(uintptr(unsafe.Pointer(&msg)))
-			procDispatchMessageW.Call(uintptr(unsafe.Pointer(&msg)))
 		}
-	}
+		if visitMessage != nil {
+			return visitMessage(msg)
+		}
+		return nil
+	})
 }
 
 func callNextHook(code int, wParam, lParam uintptr) uintptr {

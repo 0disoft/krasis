@@ -279,7 +279,7 @@ func runWheelSurfaceHookThread(ctx context.Context, counters *wheelSurfaceCounte
 	if err := postSourceReady(threadID); err != nil {
 		return err
 	}
-	loopErr := runSourceHookMessageLoop(ctx, threadID, ready)
+	loopErr := runSourceHookMessageLoop(ctx, ready)
 	unhookErr := cleanupHook()
 	if loopErr != nil && !errors.Is(loopErr, context.Canceled) {
 		return errors.Join(loopErr, unhookErr)
@@ -322,7 +322,7 @@ func runWheelSurfaceRawThread(ctx context.Context, counters *wheelSurfaceCounter
 		counters.observeRaw(header, mouse)
 		return nil
 	}
-	loopErr := runSourceRawMessageLoop(ctx, threadID, ready, rawReader, visit)
+	loopErr := runSourceRawMessageLoop(ctx, ready, rawReader, visit)
 	rawInputErr := cleanupRawInput()
 	if loopErr != nil && !errors.Is(loopErr, context.Canceled) {
 		return errors.Join(loopErr, rawInputErr)

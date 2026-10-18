@@ -86,6 +86,10 @@ func (v Runtime) Valid() bool {
 }
 
 func ValidRuntimeOperation(operation string) bool {
+	switch operation {
+	case "thread-join-low-level-hook", "thread-join-raw-mouse", "thread-join-wheel-capture", "thread-join-multiple":
+		return true
+	}
 	if inputdesktop.ValidCaptureThreadFailureOperation(operation) {
 		return true
 	}

@@ -492,24 +492,13 @@ func (current *sourceWheelCaptureRun) run(ctx context.Context, ready func()) (re
 		return err
 	}
 
-	stopWatcher := make(chan struct{})
-	stopWatcherDone := make(chan struct{})
-	go func() {
-		defer close(stopWatcherDone)
-		select {
-		case <-ctx.Done():
-			current.stopForContext(ctx)
-		case <-stopWatcher:
-		}
-	}()
-	defer func() {
-		close(stopWatcher)
-		<-stopWatcherDone
-	}()
 	if ready != nil {
 		ready()
 	}
-	loopErr := touchpadSurfaceMessageLoop()
+	loopErr := sourceMessageLoop(ctx, nil)
+	if ctx.Err() != nil {
+		current.recordContextStop(ctx)
+	}
 	if loopErr != nil {
 		return errors.Join(loopErr, current.err())
 	}
@@ -1058,10 +1047,9 @@ func (current *sourceWheelCaptureRun) fail(err error) {
 	current.postStop()
 }
 
-func (current *sourceWheelCaptureRun) stopForContext(ctx context.Context) {
+func (current *sourceWheelCaptureRun) recordContextStop(ctx context.Context) {
 	idleRefresh := errors.Is(context.Cause(ctx), ErrSourceCaptureRefresh) && current.session.captureRefreshPending()
 	current.recordError(ctx.Err(), !idleRefresh)
-	current.postStop() // Failure to post still retires the sender and joins evidence.
 }
 
 func (current *sourceWheelCaptureRun) postStop() {

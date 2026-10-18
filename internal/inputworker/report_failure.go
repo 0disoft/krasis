@@ -16,6 +16,7 @@ var reportOperations = []string{"", "low-level-hook", "raw-mouse", "wheel-captur
 func init() {
 	// Append only: existing operation bytes and the report layout stay stable.
 	reportOperations = append(reportOperations, inputdesktop.CaptureThreadFailureOperations()...)
+	reportOperations = append(reportOperations, "thread-join-low-level-hook", "thread-join-raw-mouse", "thread-join-wheel-capture", "thread-join-multiple")
 }
 
 type workerReportFailure struct {

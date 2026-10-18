@@ -27,7 +27,7 @@ func TestIdleCaptureCancellationDoesNotRetireSender(t *testing.T) {
 			ctx, cancel := context.WithCancelCause(context.Background())
 			cancel(tc.cause)
 			current := &sourceWheelCaptureRun{session: session}
-			current.stopForContext(ctx)
+			current.recordContextStop(ctx)
 			if session.terminal.Load() != tc.wantRetired || !errors.Is(current.err(), context.Canceled) {
 				t.Fatal("wrong sender cancellation policy", session.terminal.Load(), current.err())
 			}

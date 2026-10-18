@@ -10,6 +10,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/0disoft/krasis/internal/control"
@@ -96,6 +97,48 @@ func TestCollectSourceInputThreadsJoinsEveryChild(t *testing.T) {
 	if !joined || !errors.Is(err, context.Canceled) || !errors.Is(runCtx.Err(), context.Canceled) {
 		t.Fatalf("collectSourceInputThreads() joined=%t error=%v", joined, err)
 	}
+}
+
+func TestCollectSourceThreadsDrainsCompletedResultsAtDeadline(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		results := make(chan sourceInputThreadResult, 3)
+		for _, component := range []string{"low-level-hook", "raw-mouse", "wheel-capture"} {
+			results <- sourceInputThreadResult{component: component, err: context.Canceled, finished: time.Now()}
+		}
+		err, joined := collectSourceInputThreads(ctx, cancel, results, nil, 3, 0)
+		if !joined || !errors.Is(err, context.Canceled) || errors.Is(err, errSourceInputJoinTimeout) {
+			t.Fatalf("queued completion treated as live owner: %v %v", joined, err)
+		}
+	})
+}
+
+func TestCollectSourceThreadsRejectsLateCompletionAndNamesMissingOwner(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		results := make(chan sourceInputThreadResult, 3)
+		for _, component := range []string{"low-level-hook", "raw-mouse", "wheel-capture"} {
+			results <- sourceInputThreadResult{component: component, err: context.Canceled, finished: time.Now().Add(time.Second)}
+		}
+		err, joined := collectSourceInputThreads(ctx, cancel, results, nil, 3, 0)
+		if joined || !errors.Is(err, errSourceInputJoinTimeout) {
+			t.Fatal("late completion admitted", joined, err)
+		}
+		for _, missing := range []string{"low-level-hook", "raw-mouse", "wheel-capture"} {
+			results := make(chan sourceInputThreadResult, 3)
+			for _, component := range []string{"low-level-hook", "raw-mouse", "wheel-capture"} {
+				if component != missing {
+					results <- sourceInputThreadResult{component: component, err: context.Canceled}
+				}
+			}
+			err, joined := collectSourceInputThreads(ctx, cancel, results, nil, 3, 0)
+			if joined || SourceFailureStage(err) != "thread-join-"+missing {
+				t.Fatal("missing native owner lost", missing, joined, err)
+			}
+		}
+	})
 }
 
 func TestSerializedBoundaryObserverPreventsConcurrentDetectorCalls(t *testing.T) {
