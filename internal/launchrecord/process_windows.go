@@ -106,6 +106,9 @@ func startViaWMI(command *exec.Cmd) error {
 // ProgramData, or forward arbitrary caller values.
 func windowsLaunchEnvironment() []string {
 	var environment []string
+	if os.Getenv("KRASIS_RUNTIME_TRACE") == "1" {
+		environment = append(environment, "KRASIS_RUNTIME_TRACE=1")
+	}
 	for _, key := range []string{
 		"SystemRoot", "SystemDrive", "WINDIR", "LOCALAPPDATA", "APPDATA", "TEMP", "TMP", "USERPROFILE", "PATH",
 		"ProgramData", "ALLUSERSPROFILE", "PUBLIC", "HOMEDRIVE", "HOMEPATH", "USERNAME", "USERDOMAIN", "USERDOMAIN_ROAMINGPROFILE",

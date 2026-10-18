@@ -85,6 +85,21 @@ func TestOrdinaryLaunchRetainsWindowsShellPathsWithoutCallerValues(t *testing.T)
 	}
 }
 
+func TestRuntimeTraceEnvironmentRequiresExactOptIn(t *testing.T) {
+	for _, value := range []string{"", "true", "1"} {
+		t.Setenv("KRASIS_RUNTIME_TRACE", value)
+		found := false
+		for _, entry := range windowsLaunchEnvironment() {
+			if entry == "KRASIS_RUNTIME_TRACE=1" {
+				found = true
+			}
+		}
+		if found != (value == "1") {
+			t.Fatalf("opt-in %q forwarded=%v", value, found)
+		}
+	}
+}
+
 func TestWMIChildIsOutsideCallerJobAndInCallerSession(t *testing.T) {
 	self, err := os.Executable()
 	if err != nil {

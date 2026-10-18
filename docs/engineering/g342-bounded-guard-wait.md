@@ -1,8 +1,10 @@
 # g342: bound the crash guard's native process wait
 
 The paired g341 export `bed5f2d74002f032385da8f7e661a68e` has no new session
-failure, but A's second one-minute runtime summary still contains two GC pauses
-above one second and timer lateness of 1,718,129 microseconds. Bounding message
+failure, but A's second one-minute runtime summary still contains two observations
+in the final coarse GC-duration bucket and timer lateness of 1,718,129 microseconds.
+The upper-bound bucket aggregation does not prove either pause exceeded exactly
+one second, or that GC caused all timer lateness. Bounding message
 queues in g341 therefore did not remove every source of long runtime stalls.
 
 Each product session starts an independent recovery guard. Its waiter called

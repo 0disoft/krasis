@@ -15,6 +15,7 @@ import (
 // stay off input, reader and heartbeat paths. Counters are diagnostic hints, not
 // lease authority; snapshots across atomics are deliberately approximate.
 type runtimeDiagnostics struct {
+	captureTrace                                            func()
 	hookStart, hookLast, hookMax                            atomic.Int64
 	hookCalls, rawInputs                                    atomic.Uint64
 	started                                                 time.Time
@@ -96,6 +97,9 @@ func (d *runtimeDiagnostics) ObserveHeartbeatReceived(_ string, t time.Time) {
 }
 func (d *runtimeDiagnostics) ObserveTimerLateness(delay time.Duration) {
 	observeMaximum(&d.timerMax, max(0, delay.Microseconds()))
+	if delay >= time.Second && d.captureTrace != nil {
+		d.captureTrace()
+	}
 }
 func (*runtimeDiagnostics) ObserveDestinationInputReceived()                                {}
 func (*runtimeDiagnostics) ObserveDestinationInputDisposition(application.InputDisposition) {}
@@ -275,6 +279,9 @@ func (d *runtimeDiagnostics) run(ctx context.Context, log runtimeDiagnosticSink)
 		previousGC = current
 	}
 	flushFailure := func(t gcFailureTrigger) {
+		if d.captureTrace != nil {
+			d.captureTrace()
+		}
 		if trails >= gcTrailBudget {
 			d.gcSkipped.Add(1)
 			return
@@ -305,7 +312,9 @@ func (d *runtimeDiagnostics) run(ctx context.Context, log runtimeDiagnosticSink)
 		case t := <-d.gcFailures:
 			flushFailure(t)
 		case scheduled := <-gcTicker.C:
-			sampleGC(time.Since(scheduled))
+			late := time.Since(scheduled)
+			d.ObserveTimerLateness(late)
+			sampleGC(late)
 		case scheduled := <-ticker.C:
 			d.ObserveTimerLateness(time.Since(scheduled))
 			current := read()

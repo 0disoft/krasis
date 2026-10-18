@@ -13,6 +13,7 @@ import (
 	"github.com/0disoft/krasis/internal/peerupdate"
 	"github.com/0disoft/krasis/internal/productidentity"
 	"github.com/0disoft/krasis/internal/productlog"
+	"github.com/0disoft/krasis/internal/runtimestall"
 	"github.com/0disoft/krasis/internal/truststore"
 	"github.com/0disoft/krasis/internal/winlifecycle"
 )
@@ -113,12 +114,14 @@ func run(ctx context.Context, localAppData string, dependencies runDependencies)
 	}
 	var identities *productidentity.Store
 	if dependencies.productAdapters {
+		traceRecorder := runtimestall.Start(lifecycle.Context(), localAppData, dependencies.log.Event)
+		defer traceRecorder.Close()
 		identities, err = productidentity.New(paths.Identity)
 		if err != nil {
 			return err
 		}
 		dependencies.pairing = &networkPairing{root: lifecycle.Context(), identity: identity, identities: identities, trust: trust}
-		dependencies.runner = productRunner(identities, trust, dependencies.log)
+		dependencies.runner = productRunnerWithTrace(identities, trust, dependencies.log, traceRecorder.Request)
 	}
 	operations, err := New(lifecycle.Context(), identity.Public(), dependencies.runner, dependencies.pairing, trust)
 	if err != nil {

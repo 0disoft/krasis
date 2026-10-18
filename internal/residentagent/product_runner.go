@@ -98,6 +98,10 @@ func prepareProductConnection(identities *productidentity.Store, trust *truststo
 }
 
 func productRunner(identities *productidentity.Store, trust *truststore.Store, log *productlog.Logger, auxiliary ...func(context.Context, string, productConnection)) SessionRunner {
+	return productRunnerWithTrace(identities, trust, log, nil, auxiliary...)
+}
+
+func productRunnerWithTrace(identities *productidentity.Store, trust *truststore.Store, log *productlog.Logger, captureTrace func(), auxiliary ...func(context.Context, string, productConnection)) SessionRunner {
 	profiles := handoff.NewRolling(log.Handoff)
 	return func(parent context.Context, alias string, observer agent.SupervisorObserver) (err error) {
 		prepared, err := prepareProductConnection(identities, trust, alias, localapi.PeerFingerprint(parent))
@@ -252,6 +256,7 @@ func productRunner(identities *productidentity.Store, trust *truststore.Store, l
 		}
 		config.HandoffProfiles = profiles
 		progress := newRuntimeDiagnostics()
+		progress.captureTrace = captureTrace
 		config.LivenessObserver = progress
 		config.QueueObserver = progress
 		config.DestinationObserver = progress

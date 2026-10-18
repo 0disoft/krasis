@@ -45,6 +45,20 @@ func TestRuntimeDiagnosticsSeparatesReadDispatchAndValidatedHeartbeat(t *testing
 	}
 }
 
+func TestRuntimeTraceOnlyRequestedForLongTimerLateness(t *testing.T) {
+	d := newRuntimeDiagnostics()
+	requests := 0
+	d.captureTrace = func() { requests++ }
+	d.ObserveTimerLateness(999 * time.Millisecond)
+	if requests != 0 {
+		t.Fatal("ordinary delay triggered trace")
+	}
+	d.ObserveTimerLateness(time.Second)
+	if requests != 1 {
+		t.Fatal("stall did not request trace")
+	}
+}
+
 func TestRuntimeDiagnosticsReportsBoundedQueueAggregates(t *testing.T) {
 	d := newRuntimeDiagnostics()
 	d.ObserveSourceQueueEnqueued(1)

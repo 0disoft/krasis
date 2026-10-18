@@ -93,6 +93,9 @@ func NewStartup(control string, recovery ...string) (Startup, error) {
 					command.Env = append(command.Env, key+"="+value)
 				}
 			}
+			if os.Getenv("KRASIS_RUNTIME_TRACE") == "1" {
+				command.Env = append(command.Env, "KRASIS_RUNTIME_TRACE=1")
+			}
 			// Detached agent owns its own single-instance lease and safe-stop lifecycle.
 			return launchrecord.StartIndependent(command)
 		},
