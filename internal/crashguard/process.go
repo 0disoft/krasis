@@ -70,22 +70,33 @@ func startCommand(command *exec.Cmd) (*Process, error) {
 		return nil, fmt.Errorf("create crash guard output pipe: %w", err)
 	}
 	stderr := &limitedBuffer{remaining: maxStderrBytes}
-	command.Stderr = stderr
+	started, finishStderr, err := configureStderr(command, stderr)
+	if err != nil {
+		_ = stdin.Close()
+		_ = stdout.Close()
+		return nil, fmt.Errorf("create crash guard error pipe: %w", err)
+	}
 	client, err := NewClient(stdin, stdout)
 	if err != nil {
 		_ = stdin.Close()
+		started()
+		_ = finishStderr()
 		return nil, err
 	}
 	if err := command.Start(); err != nil {
 		_ = stdin.Close()
+		_ = stdout.Close()
+		started()
+		_ = finishStderr()
 		return nil, fmt.Errorf("start crash guard: %w", err)
 	}
+	started()
 	process := &Process{
 		client: client, stdin: stdin, stdout: stdout, process: command.Process,
 		done: make(chan struct{}), stderr: stderr,
 	}
 	go func() {
-		waitErr := command.Wait()
+		waitErr := errors.Join(waitProcess(command), finishStderr())
 		process.mu.Lock()
 		process.waitErr = waitErr
 		process.mu.Unlock()
