@@ -4,6 +4,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"os"
@@ -25,8 +27,24 @@ func main() {
 	save := func(s installationdiag.Summary) error {
 		return productlog.SaveInstallation(os.Getenv("LOCALAPPDATA"), s)
 	}
-	apply := func(ctx context.Context, remove bool, a, i []byte, ap, ip [32]byte) inputworker.InstallationReport {
-		return inputworker.ManageEmbeddedInstallationTracked(ctx, remove, a, i, ap, ip, func(s installationdiag.Summary) { _ = save(s) })
+	apply := func(ctx context.Context, action string, a, i []byte, ap, ip [32]byte) inputworker.InstallationReport {
+		report := func(s installationdiag.Summary) { _ = save(s) }
+		if action == "--repair" {
+			var id [16]byte
+			_, err := rand.Read(id[:])
+			if err == nil {
+				_, err = productlog.ExportForRequest(os.Getenv("LOCALAPPDATA"), hex.EncodeToString(id[:]))
+			}
+			if err != nil {
+				native := logindiag.New("prepare", 3, err)
+				return inputworker.InstallationReport{Result: inputworker.InstallationDenied, Diagnostic: installationdiag.Summary{
+					Time: time.Now().UTC().Format(time.RFC3339Nano), Action: "install", Result: 3, Stage: "validation", Recovery: "not_attempted",
+					Win32Error: native.Win32Error, Win32Known: native.Win32Known,
+				}}
+			}
+			return inputworker.RepairEmbeddedInstallationTracked(ctx, a, i, ap, ip, report)
+		}
+		return inputworker.ManageEmbeddedInstallationTracked(ctx, action == "--remove", a, i, ap, ip, report)
 	}
 	os.Exit(runDetailed(os.Args[1:], os.Stdout, loadEmbeddedPayload, apply, save))
 }
@@ -39,23 +57,23 @@ type installerPayload struct {
 type installerApply func(context.Context, bool, []byte, []byte, [32]byte, [32]byte) inputworker.InstallationResult
 
 func run(args []string, output io.Writer, load func() (installerPayload, error), apply installerApply) int {
-	return runDetailed(args, output, load, func(ctx context.Context, remove bool, a, i []byte, ap, ip [32]byte) inputworker.InstallationReport {
-		return inputworker.InstallationReport{Result: apply(ctx, remove, a, i, ap, ip)}
+	return runDetailed(args, output, load, func(ctx context.Context, action string, a, i []byte, ap, ip [32]byte) inputworker.InstallationReport {
+		return inputworker.InstallationReport{Result: apply(ctx, action == "--remove", a, i, ap, ip)}
 	}, nil)
 }
 
-func runDetailed(args []string, output io.Writer, load func() (installerPayload, error), apply func(context.Context, bool, []byte, []byte, [32]byte, [32]byte) inputworker.InstallationReport, save func(installationdiag.Summary) error) int {
+func runDetailed(args []string, output io.Writer, load func() (installerPayload, error), apply func(context.Context, string, []byte, []byte, [32]byte, [32]byte) inputworker.InstallationReport, save func(installationdiag.Summary) error) int {
 	code, state := 2, "invalid_arguments"
 	var diagnostic *installationdiag.Summary
 	var diagnosticSaved *bool
 	if len(args) == 1 && args[0] == "--help" {
-		code, state = 0, "usage: krasis-install.exe --install | --remove | --prepare-login PEER | --disable-login (login approval persists until disabled)"
-	} else if len(args) == 1 && (args[0] == "--install" || args[0] == "--remove") {
+		code, state = 0, "usage: krasis-install.exe --install | --repair | --remove | --prepare-login PEER | --disable-login (login approval persists until disabled)"
+	} else if len(args) == 1 && (args[0] == "--install" || args[0] == "--remove" || args[0] == "--repair") {
 		code, state = 3, "installation_denied"
 		payload, err := load()
 		if err == nil {
 			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-			report := apply(ctx, args[0] == "--remove", payload.agent, payload.input, payload.agentPin, payload.inputPin)
+			report := apply(ctx, args[0], payload.agent, payload.input, payload.agentPin, payload.inputPin)
 			cancel()
 			if report.Diagnostic.Valid() {
 				diagnostic = &report.Diagnostic

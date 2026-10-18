@@ -5,7 +5,7 @@ const reconnectKeys = {ok:'maintenance_requested',not_attempted:'maintenance_not
 
 export function inputSetupNotice(value, busy = false) {
   const state = busy ? 'UPDATING' : value?.inputSetup;
-  if (state === 'SERVICE_RECOVERY_REQUIRED') return {key:'input_setup_SERVICE_RECOVERY_REQUIRED',action:''};
+  if (['SERVICE_RECOVERY_REQUIRED','SERVICE_STOPPED'].includes(state)) return {key:'input_setup_' + state,action:'restart'};
   if (['UPDATING','PENDING'].includes(state)) return {key:'input_setup_' + state, action:''};
   if (['NOT_INSTALLED','UPDATE_REQUIRED','CANCELLED','FAILED','SERVICE_STOPPED'].includes(state)) {
     return {key:'input_setup_' + state, action:state === 'NOT_INSTALLED' ? 'input_setup' : 'input_refresh'};

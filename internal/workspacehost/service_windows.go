@@ -202,6 +202,12 @@ func (s *WorkspaceService) Disconnect() productpanel.BridgeSnapshot {
 	return s.withInputSetup(s.raw.Disconnect())
 }
 func (s *WorkspaceService) Restart() productpanel.BridgeSnapshot {
+	if s.inputSetup != nil {
+		state := s.inputSetup()
+		if state == "SERVICE_STOPPED" || state == "SERVICE_RECOVERY_REQUIRED" {
+			return s.InputRefresh()
+		}
+	}
 	if s.managed != nil {
 		return s.withInputSetup(s.managed.Restart())
 	}

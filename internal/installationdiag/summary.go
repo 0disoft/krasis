@@ -69,6 +69,8 @@ func stage(value string, optional bool) bool {
 }
 func operation(value string) bool {
 	switch value {
+	case "service_repair_retired", "service_repair_start", "service_repair_stop":
+		return true
 	case "", "file_open", "file_attributes", "file_security", "directory_create", "file_write", "file_sync", "file_close", "file_move", "directory_remove", "file_delete", "file_read", "known_folder", "scm_open", "scm_close", "service_open", "service_config", "service_status", "service_security", "service_ready", "service_start", "service_stop", "service_create", "service_delete":
 		return true
 	}

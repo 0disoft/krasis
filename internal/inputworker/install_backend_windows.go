@@ -12,8 +12,9 @@ import (
 // Only the attended embedded-payload installer connects this private backend.
 // Receiving an update bundle cannot elevate an ordinary agent into its service.
 type windowsInstallBackend struct {
-	files *installFiles
-	scm   *installSCM
+	files         *installFiles
+	scm           *installSCM
+	repairStopped bool
 }
 
 var _ installBackend = (*windowsInstallBackend)(nil)
@@ -101,7 +102,13 @@ func (backend *windowsInstallBackend) Snapshot(ctx context.Context) (installSnap
 		state.Running = true
 	case windows.SERVICE_STOPPED:
 		if backend.scm.cleanStopped(status, images.Service, 0) != nil {
-			return installSnapshot{}, ErrRecovery
+			if !backend.repairStopped {
+				return installSnapshot{}, ErrRecovery
+			}
+			backend.repairStopped = false
+			if err := backend.repairFailedService(ctx, images); err != nil {
+				return installSnapshot{}, err
+			}
 		}
 	default:
 		return installSnapshot{}, ErrAuthority

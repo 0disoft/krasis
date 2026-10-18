@@ -334,6 +334,25 @@ cleanly stopped target can regain readiness during installer recovery. Agent
 startup briefly waits for an already-starting service without starting or
 repairing it. Physical reboot and PIN checks remain separate device verification.
 
+## Attended service recovery without reboot
+
+The explicit recovery button uses the verified embedded installer `--repair`
+action after the existing lifecycle has paused the connection and confirmed the
+ordinary agent's exit. Before any service restart, the installer saves an
+immutable request-scoped sanitized diagnostic snapshot; a save failure stops
+recovery. Startup and polling do not invoke this action.
+
+Under the installer transaction lock, a failed stopped service may be started
+once only when no journal remains, the active protected image pair and SCM
+configuration verify, and the failed record's PID has exited. A live or reused
+PID, access-denied query, missing/mismatched record, or unresolved transaction
+refuses this recovery. The verified service must publish readiness, then stop
+with its own clean receipt and confirmed kernel process exit before the normal
+installation transaction can replace files. Failure at any step stops the
+attempt and retains the operation and available Win32 cause in the receipt.
+No failed record is relabeled clean by the installer. The lifecycle restores
+the agent and reconnects only the same trusted peer under its existing rules.
+
 ## Planned lease retirement
 
 Ten seconds before the immutable worker lease deadline, a native session task

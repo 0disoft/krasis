@@ -91,11 +91,33 @@ type brokenWriter struct{}
 
 func (brokenWriter) Write([]byte) (int, error) { return 0, io.ErrClosedPipe }
 
+func TestRepairDispatchKeepsActionAndRejectsAdditionalArguments(t *testing.T) {
+	loads, repairs := 0, 0
+	load := func() (installerPayload, error) { loads++; return installerPayload{}, nil }
+	apply := func(ctx context.Context, action string, _, _ []byte, _, _ [32]byte) inputworker.InstallationReport {
+		if action != "--repair" {
+			t.Fatal("repair became ordinary install")
+		}
+		if _, ok := ctx.Deadline(); !ok {
+			t.Fatal("unbounded repair")
+		}
+		repairs++
+		return inputworker.InstallationReport{Result: inputworker.InstallationOK}
+	}
+	var out bytes.Buffer
+	if runDetailed([]string{"--repair"}, &out, load, apply, nil) != 0 || !strings.Contains(out.String(), `"state":"installed"`) {
+		t.Fatal("missing repair result")
+	}
+	if runDetailed([]string{"--repair", "other.exe"}, &out, load, apply, nil) != 2 || loads != 1 || repairs != 1 {
+		t.Fatal("unbounded repair arguments dispatched")
+	}
+}
+
 func TestDetailedInstallerPrintsReceiptEvenIfDiagnosticSaveFails(t *testing.T) {
 	s := installationdiag.Summary{Time: "2026-10-02T00:00:00Z", Action: "install", Result: 5, Stage: "stage", Operation: "file_open", Win32Error: 5, Win32Known: true, Recovery: "required"}
 	var out bytes.Buffer
 	code := runDetailed([]string{"--install"}, &out, func() (installerPayload, error) { return installerPayload{}, nil },
-		func(context.Context, bool, []byte, []byte, [32]byte, [32]byte) inputworker.InstallationReport {
+		func(context.Context, string, []byte, []byte, [32]byte, [32]byte) inputworker.InstallationReport {
 			return inputworker.InstallationReport{Result: inputworker.InstallationRecoveryRequired, Diagnostic: s}
 		},
 		func(installationdiag.Summary) error { return errors.New("PRIVATE-PATH") })

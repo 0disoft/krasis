@@ -25,6 +25,7 @@ type inputRefresh struct {
 	lastResult atomic.Pointer[string]
 	inspect    func() string
 	run        func(context.Context) error
+	repair     func(context.Context) error
 }
 
 type inputHealthReader struct {
@@ -227,7 +228,8 @@ func (b *inputRefresh) apply(ctx context.Context, explicit bool) error {
 		b.setState(state)
 		return nil
 	}
-	if state != "UPDATE_REQUIRED" && state != "NOT_INSTALLED" && !(explicit && state == "SERVICE_STOPPED") {
+	repair := explicit && (state == "SERVICE_STOPPED" || state == "SERVICE_RECOVERY_REQUIRED")
+	if state != "UPDATE_REQUIRED" && state != "NOT_INSTALLED" && !repair {
 		b.setState("FAILED")
 		if explicit {
 			return ErrInputRefreshFailed
@@ -240,7 +242,16 @@ func (b *inputRefresh) apply(ctx context.Context, explicit bool) error {
 	b.attempted = true
 	b.lastResult.Store(nil)
 	b.setState("UPDATING")
-	err := b.run(ctx)
+	runner := b.run
+	if repair {
+		if b.repair == nil {
+			b.setState("FAILED")
+			b.setAttemptResult("input_refresh_failed")
+			return ErrInputRefreshFailed
+		}
+		runner = b.repair
+	}
+	err := runner(ctx)
 	switch {
 	case errors.Is(err, ErrInputRefreshPending):
 		b.setState("PENDING")

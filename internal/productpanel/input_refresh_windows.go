@@ -87,6 +87,8 @@ func newInputRefresh(base, revision string) *inputRefresh {
 	}
 	return &inputRefresh{inspect: inspect, run: func(ctx context.Context) error {
 		return runInputInstaller(ctx, base, revision)
+	}, repair: func(ctx context.Context) error {
+		return runInputInstallerMode(ctx, base, revision, "--repair")
 	}}
 }
 
@@ -126,6 +128,17 @@ func RemoveProtectedInput(ctx context.Context, base, revision string) error {
 	return runInputInstallerAction(ctx, base, revision, true)
 }
 func runInputInstallerAction(ctx context.Context, base, revision string, remove bool) error {
+	action := "--install"
+	if remove {
+		action = "--remove"
+	}
+	return runInputInstallerMode(ctx, base, revision, action)
+}
+
+func runInputInstallerMode(ctx context.Context, base, revision, action string) error {
+	if action != "--install" && action != "--remove" && action != "--repair" {
+		return ErrInputRefreshFailed
+	}
 	if ctx.Err() != nil || len(revision) != 40 {
 		return ErrInputRefreshFailed
 	}
@@ -196,7 +209,7 @@ func runInputInstallerAction(ctx context.Context, base, revision string, remove 
 			return ErrInputRefreshFailed
 		}
 	}
-	return elevateInputInstallerAction(ctx, filepath.Join(base, "krasis-install.exe"), base, remove)
+	return elevateInputInstallerMode(ctx, filepath.Join(base, "krasis-install.exe"), base, action)
 }
 
 type shellExecuteInfo struct {
@@ -216,6 +229,17 @@ func elevateInputInstaller(ctx context.Context, path, directory string) error {
 	return elevateInputInstallerAction(ctx, path, directory, false)
 }
 func elevateInputInstallerAction(ctx context.Context, path, directory string, remove bool) error {
+	action := "--install"
+	if remove {
+		action = "--remove"
+	}
+	return elevateInputInstallerMode(ctx, path, directory, action)
+}
+
+func elevateInputInstallerMode(ctx context.Context, path, directory, action string) error {
+	if action != "--install" && action != "--remove" && action != "--repair" {
+		return ErrInputRefreshFailed
+	}
 	if ctx.Err() != nil {
 		return ErrInputRefreshFailed
 	}
@@ -227,10 +251,6 @@ func elevateInputInstallerAction(ctx context.Context, path, directory string, re
 	defer windows.CoUninitialize()
 	verb, _ := windows.UTF16PtrFromString("runas")
 	file, _ := windows.UTF16PtrFromString(path)
-	action := "--install"
-	if remove {
-		action = "--remove"
-	}
 	args, _ := windows.UTF16PtrFromString(action)
 	dir, _ := windows.UTF16PtrFromString(directory)
 	// Keep attended UAC consent, but do not expose the console of the local

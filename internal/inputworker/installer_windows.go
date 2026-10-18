@@ -41,6 +41,16 @@ func ManageEmbeddedInstallationDetailed(ctx context.Context, remove bool, agent,
 // report persists an incomplete receipt before each native operation. It is
 // observational only: a failed write never changes installation or recovery.
 func ManageEmbeddedInstallationTracked(ctx context.Context, remove bool, agent, input []byte, agentPin, inputPin [sha256.Size]byte, report func(installationdiag.Summary)) InstallationReport {
+	return manageEmbeddedInstallation(ctx, remove, false, agent, input, agentPin, inputPin, report)
+}
+
+// RepairEmbeddedInstallationTracked permits one attended restart of a failed,
+// fully retired installed service before the normal installation transaction.
+func RepairEmbeddedInstallationTracked(ctx context.Context, agent, input []byte, agentPin, inputPin [sha256.Size]byte, report func(installationdiag.Summary)) InstallationReport {
+	return manageEmbeddedInstallation(ctx, false, true, agent, input, agentPin, inputPin, report)
+}
+
+func manageEmbeddedInstallation(ctx context.Context, remove, repair bool, agent, input []byte, agentPin, inputPin [sha256.Size]byte, report func(installationdiag.Summary)) InstallationReport {
 	action := "install"
 	if remove {
 		action = "remove"
@@ -65,6 +75,7 @@ func ManageEmbeddedInstallationTracked(ctx context.Context, remove bool, agent, 
 	if err != nil {
 		return rejected("backend", err)
 	}
+	backend.repairStopped = repair
 	target := payload.images
 	if remove {
 		target = installImages{}
