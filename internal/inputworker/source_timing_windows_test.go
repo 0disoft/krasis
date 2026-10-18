@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/0disoft/krasis/internal/handoff"
 )
 
 func TestSourceFailedReplyKeepsFailureAndFlushesBoundedTiming(t *testing.T) {
@@ -62,6 +64,9 @@ func TestSourceHeartbeatTimingCannotContaminateCommands(t *testing.T) {
 
 func TestSourceClientObservesWorkerTimingOnlyAfterMatchingReply(t *testing.T) {
 	for _, foreign := range []bool{false, true} {
+		var profile handoff.Summary
+		ctx := handoff.WithSession(context.Background(), handoff.New(func(s handoff.Summary) { profile = s }))
+		ctx = handoff.Begin(ctx, "source", "session", "epoch", time.Now())
 		server, conn := net.Pipe()
 		c := &sourceClient{channel: clientChannel(conn, authorityService), binding: Binding{1}, replies: make(chan sourcePacket, 1), done: make(chan struct{})}
 		var events []string
@@ -78,7 +83,8 @@ func TestSourceClientObservesWorkerTimingOnlyAfterMatchingReply(t *testing.T) {
 				c.replies <- reply
 			}
 		}()
-		_, err := c.call(context.Background(), sourceActivate)
+		_, err := c.call(ctx, sourceActivate)
+		handoff.Finish(ctx, "error")
 		<-joined
 		_ = server.Close()
 		_ = c.channel.Close()
@@ -90,6 +96,9 @@ func TestSourceClientObservesWorkerTimingOnlyAfterMatchingReply(t *testing.T) {
 		}
 		if foreign && (err != ErrProtocol || seen != 0) || !foreign && (err != ErrAuthority || seen != 2) {
 			t.Fatal("foreign timing accepted or rejection outcome changed", foreign, err, events)
+		}
+		if !profile.Valid() || profile.Capture == nil || foreign && profile.Capture.Worker != ([3]byte{}) || !foreign && profile.Capture.Worker != ([3]byte{0, 3, 4}) {
+			t.Fatal("matching rejection detail lost or foreign ACK contaminated attempt", profile)
 		}
 	}
 }

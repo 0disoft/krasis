@@ -409,12 +409,13 @@ claimed to fix the stutter, and PIN and hardware results remain pending.
 ## g150 source capture activation timing
 
 `Summary.Capture` is an optional `*CaptureProfile` (schema 1): a
-`micros [17]uint32` array and a `measured uint32` presence mask whose low 17 bits are used. The indices are
+`micros [21]uint32` array and a `measured uint32` presence mask whose low 21 bits are used. The indices are
 `CaptureSerializeWait`, `CaptureAdmission`, `CapturePost`, `CaptureQueueToHandle`,
 `CapturePosition`, `CaptureTouchpadRegister`, `CaptureShow`, `CaptureUpdate`,
 `CaptureForeground`, `CaptureFallback`, `CaptureActiveCommit`,
 `CaptureHandlerTotal`, `CaptureResultWait`, `CaptureRollback`, `CaptureTotal`, `CaptureBoundaryBefore` and `CaptureBoundaryAfter`
-(0..16). Values are elapsed microseconds clamped by the existing 120-second
+(0..16), followed by the installed-source IPC lock, authority, write and response
+spans (17..20). Values are elapsed microseconds clamped by the existing 120-second
 window; an absent bit is unobserved, and a present zero is a clock-reported zero,
 not proof that no wait happened.
 
@@ -432,6 +433,18 @@ The 39-stage vectors, the `KRA1` ACK and the startup schema are unchanged. Captu
 numerics are validated on the local schema and reprojected by the existing remote
 sanitization. No coordinates, window text, input, PID or paths are exported. This
 is instrumentation only, not a stutter-fix claim.
+
+g340 also projects the existing activation ACK's `worker [3]byte` into this
+same capture attempt. Index 0 remains unobserved; indices 1 and 2 are the command
+desktop scope/authorization and native apply buckets, respectively: 0 unobserved,
+1 below 1ms, 2 below 10ms, 3 below 100ms, 4 below 1s, 5 at least 1s. Scope excludes
+the nested native apply duration. The containing IPC response also includes
+queueing and delivery, so these buckets cannot be subtracted as exact times.
+Detail is accepted only after the full matching activation ACK, including a
+known rejection, and requires a measured CaptureIPCResponse span. A malformed
+or foreign ACK contributes no worker detail. The first recorded ACK is retained;
+retired and expired attempts reject late updates. There is no extra IPC, new
+wire field, change to authority checks, or claim of lower capture latency.
 
 ## g152 worker installation load detail
 

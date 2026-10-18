@@ -31,12 +31,35 @@ func TestCaptureDetailFreezesAndLateOwnerCannotPolluteNextAttempt(t *testing.T) 
 		func(p *CaptureProfile) { p.Measured |= 1 << CaptureStageCount },
 		func(p *CaptureProfile) { p.Micros[CapturePost] = 1 },
 		func(p *CaptureProfile) { p.Micros[CaptureShow] = uint32(Window.Microseconds() + 1) },
+		func(p *CaptureProfile) { p.Worker = [3]byte{0, 3, 4} }, // Missing matching response span.
+		func(p *CaptureProfile) { p.Worker[0] = 1 },
+		func(p *CaptureProfile) { p.Worker[2] = 6 },
 	} {
 		bad := before
 		mutate(&bad)
 		if bad.Valid() {
 			t.Fatal("invalid capture detail accepted")
 		}
+	}
+}
+
+func TestCaptureWorkerDetailKeepsOneMatchingAttempt(t *testing.T) {
+	c, ctx, out := collected(t)
+	p := Begin(ctx, "source", "first", "epoch", time.Now())
+	RecordCapture(p, CaptureIPCResponse, 117*time.Millisecond)
+	RecordCaptureWorker(p, [3]byte{1, 3, 4}) // Reader phase is not measured.
+	RecordCaptureWorker(p, [3]byte{0, 3, 4})
+	RecordCaptureWorker(p, [3]byte{0, 1, 1}) // Never replace a recorded ACK.
+	Finish(p, "ok")
+	before := *(*out)[0].Capture
+	next := Begin(ctx, "source", "second", "epoch", time.Now())
+	RecordCapture(next, CaptureIPCResponse, time.Millisecond)
+	RecordCaptureWorker(p, [3]byte{0, 5, 5}) // Late completion is fenced.
+	c.started = time.Now().Add(-Window)
+	RecordCaptureWorker(next, [3]byte{0, 2, 2})
+	Finish(next, "incomplete")
+	if !before.Valid() || before.Worker != ([3]byte{0, 3, 4}) || *(*out)[0].Capture != before || (*out)[1].Capture.Worker != ([3]byte{}) {
+		t.Fatal("ACK detail overwritten, crossed attempts or escaped expiry", *out)
 	}
 }
 

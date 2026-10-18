@@ -273,6 +273,9 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 		result, err := sourceReplyResult(p, reply)
 		if err != ErrProtocol {
 			copy(sample[4:], reply.timing[:])
+			if op == sourceActivate {
+				handoff.RecordCaptureWorker(ctx, reply.timing)
+			}
 		}
 		if err == ErrProtocol {
 			stage = "protocol"
