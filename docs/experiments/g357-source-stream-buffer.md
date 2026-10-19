@@ -85,3 +85,62 @@ added; the new reader is local to the already serial source goroutine and is
 never shared. Bugfix, desktop-app and memory-lifetime review procedures were
 applied, including the performance/security checklists. Device benefit remains
 unverified until a separately packaged build is applied and observed.
+
+## Packaged artifact
+
+Generation 357 at source revision `f567145670a3e532c29dd77921db53eeea8d8afd` passed
+the ordinary workspace build: 85 frontend tests, native assets/UI build,
+installer provenance, archive roundtrip and eight-file/icon bundle verification.
+Offline update verification returns valid/ok and archive size 27754823 bytes.
+Independent PowerShell SHA-256:
+
+| File | SHA-256 |
+| --- | --- |
+| krasis.exe | aef6b2732510b6c00b20ea1b19247ed4f3f07ecba27e881036f8f0dcda4455b6 |
+| krasis-agent.exe | 48d800a8f8caaba1837173cc33afb727325a3f72bb5685b0412a589e1aac91bf |
+| krasis-cli.exe | c61c734d73029aa60219e6c61f1f587fb68946bc5e20dd38007bade4b2ef5124 |
+| krasis-install.exe | a2fa17127a84b95d95fdf6171d43ab3c9deed55a2e257ce56cea860999304d6a |
+
+B transfer `c6a0b407240ef5f0341dfa9d197322f1` reached UPDATED at this exact
+generation/revision. A ordinary UI replacement was then requested. Device
+health and the attended movement result are separate from these build/transfer
+results; do not infer them from receipt of the archive.
+
+## Old-version failure and completed rollout
+
+While the local benchmark/build work continued, A's g356 baseline failed after
+the attended trial. Collection `36c243f011e8f7049614ed6e851bf110` preserves the
+old version before recovery. Its first trigger is source-hook /
+fault_source_hook_failed at 2026-10-19 14:22:36.9782177Z. The heartbeat reported
+installed_source_failure_authority just before it. The service itself remains
+READY with unchanged service start time, not a stopped-service failure.
+Source exit at 14:22:35.936769Z has command ok, reader cancelled, capture/sender/
+interrupt joined, retirement clean_sent, report failed. Original native error
+is unknown. Additional g356 source failures follow at 14:23 and 14:39. This
+occurred before g357's 16:19Z B rollout and is not caused by the buffered reader.
+The relationship between source lifetime, authorization, retirement and report
+failure still requires investigation; buffered reads are not a claimed fix.
+
+The old g356 UI's replacement request fails terminally at 16:20:06Z while its
+agent is FAULTED. After saving the paired diagnosis, CLI safe-stop completes
+and doctor confirms no responding agent. A second UI replacement request also
+cannot progress with that missing agent. The exact old management UI PID/path
+was checked and only that UI process was terminated; g357 was then opened
+normally. Its protected-input update finishes automatically. No process tree
+kill, manual service restart, security change or reboot was used.
+
+The existing B profile connects again. A doctor now reports healthy/CONNECTED/
+PROTECTED/CONFIGURED with matching g357 UI, agent, installed agent and launch
+record. B inspection is ONLINE/IDLE at the exact g357 revision. Paired collection
+`fab953111fc502b3e9156eb424a11133` is RECEIVED, both supports created at 16:22:49Z.
+Both service and input-health records are READY. A install receipt is
+16:22:27.9510022Z and B 16:19:33.5515601Z, both result 0 / complete /
+recovery not_needed. Automatic installer process exit/stdout were not captured
+separately from these receipts. No retained g357 fault/failed code or session-end
+trigger is present in this short baseline; older control.previous.jsonl remains
+incomplete on both PCs.
+
+Human movement benefit and longer service/source lifetime remain unverified.
+The next attended observation is the same short idle/continuous movement/returns
+comparison, keeping the old g356 failure as a separate reliability investigation.
+No further code, build, push, release or CI run is included in this evidence update.
