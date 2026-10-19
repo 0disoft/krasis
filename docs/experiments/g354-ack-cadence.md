@@ -96,3 +96,75 @@ The next attended comparison remains 15 seconds idle, A-to-B entry, about 20
 seconds continuous movement on B and three round trips. Source/receiver cadence,
 local dispatch costs and perceived jitter must be assessed separately. Acceptance
 of the option is confirmed on both PCs; its real movement benefit remains pending.
+
+## Attended movement result, 12:59:52Z
+
+The user completed the requested idle/continuous-movement/round-trip trial and
+reports that g354 clearly stutters less than g353. Complete elimination of stutter
+was not reported. Retain g354 as the current device build; this observation does
+not call for another deployment or another immediate user trial.
+
+Paired collection `d6f1eeda5ee5f4e711bcd36cf58bef53` contains A support created
+at 12:59:52Z and B at 12:59:53Z. Filter events by exact bundle revision
+`47772998cbfb2416127cae54e47840f246e8a57c`. Both supports retain installation
+result 0/stage complete/recovery not_needed, service READY and input-health READY.
+Both actual connections record the ACK option request being accepted. There are
+no retained session termination events, nested session-end triggers or top-level
+fault/failed events for this revision. B's acquire-network timeouts end at
+12:53:04Z, before the established baseline and movement trial. They belong to
+rollout reconnection, not the later movement observation. Both supports still
+flag the older control.previous.jsonl as incomplete. This is a bounded successful
+observation, not long-term stability evidence.
+
+All 13 source profiles have a corresponding receiver profile with the same
+exchange tag and end `ok`. The longest g354 movement tag is
+`31b76b659ccf8efe74372bab7967b6d28a3fdf7d30f1b2c16ff50d26263bbdda`.
+Compare it descriptively with the longest retained g353 tag above:
+
+| Build / local role | Intervals | <1ms | <4ms | <10ms | <25ms | <100ms | >=100ms | >=25ms share |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| g353 A source | 1645 | 10 | 30 | 1436 | 134 | 26 | 9 | 2.13% |
+| g353 B receiver | 1639 | 3 | 1136 | 153 | 220 | 106 | 21 | 7.75% |
+| g354 A source | 1620 | 0 | 4 | 1600 | 10 | 4 | 2 | 0.37% |
+| g354 B receiver | 1615 | 0 | 305 | 1004 | 279 | 24 | 3 | 1.67% |
+
+The receiver now has fewer long gaps and fewer compressed <4ms intervals. This
+agrees with the user's improvement report, but source cadence also changed.
+These are separate trial populations with intentional pauses and different
+sampling boundaries, not a controlled causal estimate of ACK policy benefit.
+Do not subtract host timestamps, match histogram entries as packets, infer lost
+input from count differences or interpret cadence as input-to-display latency.
+
+## Remaining local tails and next investigation
+
+For the long g354 tag, ordinary source dispatch maximum is 2186us and receiver
+dispatch maximum is 78778us. The receiver's selected worst operation retains
+ClientTotal 77434us, ClientAuthority 4552us and ClientResponse 72882us. Its ACK
+read waits 72882us until the first positive Read, then records zero floored
+microseconds for header/suffix decode and reaches matched progress. The matching
+worker reports a 27613us native submission call. These overlapping measurements
+must not be added or subtracted to manufacture a missing-stage duration. They
+point to the receiver's worker execution/response observation path; they do not
+attribute all of its wait to the pipe, scheduler or worker alone.
+
+That same entry has source request-to-grant 232392us, receiver request-read to
+grant-write 225271us, and receiver startup marked not prepared. Retained local
+startup spans include service child connect 154729us and worker installed
+validation 67817us (load 67232us within validation). These are a separate entry
+preparation cost from subsequent movement. Source capture activation is 9375us.
+Respect each span's nesting; do not sum overlapping service/worker work.
+
+Earlier g354 profiles also retain receiver ordinary dispatch 103852us, so the
+long movement tag is not the worst operation across the collection. Runtime
+summary maxima additionally include non-movement dispatch work. A's maximum
+retained source queue residence is 7669us. The next bounded code investigation
+should inspect receiver preparation reuse and worker response/native submission
+wait ownership before proposing another transport change. Preserve authority,
+input order, matched ACK requirements and existing timeout bounds.
+
+Validation for this result is read-only parsing of both immutable supports,
+exact-revision fault/session-end inspection, exchange-tag matching and histogram
+sum/percentage checks against the handoff schema. No product code, API, DB,
+runner or policy changed; no new build, restart, push, public release, CI run or
+additional PIN test was performed. Code tests are not rerun for this evidence-only
+documentation change.
