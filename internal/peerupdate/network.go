@@ -34,7 +34,7 @@ func (m *Manager) Run(ctx context.Context, address, peer string, listener bool, 
 		if err != nil {
 			return
 		}
-		s := &http.Server{Handler: m.handler(peer, authorized), ReadHeaderTimeout: 3 * time.Second, ReadTimeout: 90 * time.Second, WriteTimeout: 90 * time.Second, IdleTimeout: time.Second, MaxHeaderBytes: 4096}
+		s := &http.Server{Handler: m.handler(peer, authorized), ReadHeaderTimeout: 3 * time.Second, ReadTimeout: 90 * time.Second, WriteTimeout: 90 * time.Second, IdleTimeout: auxiliaryIdleTimeout, MaxHeaderBytes: 4096}
 		stop := context.AfterFunc(ctx, func() { _ = s.Close() })
 		defer stop()
 		defer ln.Close()
@@ -46,7 +46,7 @@ func (m *Manager) Run(ctx context.Context, address, peer string, listener bool, 
 	client := &http.Client{Transport: t, Timeout: 90 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	// Launch/status use a separate connection and worker. A file transfer must
 	// never consume a launch request's response deadline.
-	controlTransport := t.Clone()
+	controlTransport := newControlTransport(t)
 	defer controlTransport.CloseIdleConnections()
 	controlClient := &http.Client{Transport: controlTransport, Timeout: 30 * time.Second, CheckRedirect: client.CheckRedirect}
 	controlCtx, stopControl := context.WithCancel(ctx)

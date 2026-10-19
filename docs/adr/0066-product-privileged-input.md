@@ -1,5 +1,31 @@
 # ADR 0066: Product leases use the installed input service
 
+## g353: Reuse immediate auxiliary control exchanges without caching trust
+
+Inspection of the captured A syscall profile shows repeated trust/certificate
+file work under auxiliary HTTP handling. The client previously disabled HTTP
+keepalive for both bulk and control traffic, so a status request and its
+following app-open poll each repeated TLS authentication. This is avoidable
+background work, not proof that those handshakes caused the g352 trust expiry.
+
+Reuse one idle connection in the dedicated status/app-open transport, bounded
+by the existing one-second server idle policy. The two-second poll cadence,
+handler's fresh authorization on every request, TLS pinning/configuration,
+timeouts, separate bulk transport and independent clipboard lane remain intact.
+Only immediate exchanges can benefit; a long authorization check or idle gap
+can still require a new connection. Connection reuse is not a cached trust
+verdict or a liveness renewal. Retain ordinary unknown-result handling and do
+not add retries or idempotency headers to launch mutations.
+
+Real loopback TLS tests show three immediate control requests using one
+connection; two bulk requests still use two separate connections. Revocation
+on the reused socket rejects the next request, and explicit idle-pool closure
+forces a new TLS connection. A server that accepts a launch POST and closes
+before replying sees that POST exactly once. These are local connection and
+failure-policy checks, not evidence that real-device jitter or trust expiry
+has been fixed. The g353 bundle also includes the separately validated cadence
+and proven-unsubmitted heartbeat changes.
+
 ## g353: Skip maintenance only when the native pipe proves no submission
 
 Fresh g352 paired collection `e8d3d44cc5a176b80aa1a14599346460` supersedes the
