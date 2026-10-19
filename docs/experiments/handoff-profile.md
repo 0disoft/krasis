@@ -1,5 +1,39 @@
 # Bounded handoff profile
 
+## g353 local input cadence
+
+Optional `cadence` schema 1 summarizes successive local input-dispatch starts
+within one retained handoff. The source boundary is `sendInputAction` after
+source dequeue/validation and before write-coordinator admission. The receiver
+boundary is a completed input-frame read before dispatch-coordinator admission.
+It is neither physical-motion cadence nor a one-way network latency measurement.
+All input actions contribute, including keys/buttons; no kind, value, coordinate,
+frame sequence or absolute timestamp is exported.
+
+`intervals` counts observed start-to-start gaps. `histogram` has fixed buckets
+<1ms, <4ms, <10ms, <25ms, <100ms and >=100ms. `maxGapMicros` retains one gap;
+`previousDispatchMicros` and `betweenDispatchMicros` partition that same gap
+into the previous sampled operation and the interval from its completion to
+the next sampled start. The latter includes idle, other frame processing,
+transport, source queues and scheduling; do not label it pure network delay.
+Microsecond flooring can make the two parts one microsecond below the whole.
+Do not subtract opposite-PC durations or add independent maxima.
+
+Missing/overlapping/reversed/out-of-window boundaries increment `skipped`
+instead of inventing a zero. The first start establishes an anchor without an
+interval. Counters stop at uint32 limits; `saturated` marks an interval attempt
+after the interval counter is full. A skipped count at its limit means at least
+that many skipped boundaries. Snapshot copying happens once at retirement;
+late completions and later attempts cannot rewrite it. The collector keeps its
+existing 12-attempt/120-second bounds. There is no new per-frame allocation,
+lock, timer, packet or I/O, and the profile cannot affect authority or outcomes.
+
+A continuous-movement trial is needed to interpret arrival gaps and compressed
+bursts. Intentional pauses can dominate the maximum. Source/receiver histograms
+are independent populations, not matched per-input samples. Missing or saturated
+profiles remain limitations. g352 remains on both PCs while its requested trial
+is pending; this local addition has not been deployed or device-verified.
+
 ## g352 earlier preparation on an ongoing approach
 
 The physical-position velocity preview now projects 500ms ahead instead of

@@ -99,9 +99,13 @@ type Summary struct {
 	PreparationLockMeasured bool                    `json:"preparationLockMeasured,omitempty"`
 	ExchangeTag             string                  `json:"exchangeTag,omitempty"`
 	PipeOpen                *PipeOpenProfile        `json:"pipeOpen,omitempty"`
+	Cadence                 *CadenceProfile         `json:"cadence,omitempty"`
 }
 
 func (s Summary) Valid() bool {
+	if s.Cadence != nil && !s.Cadence.Valid() {
+		return false
+	}
 	if s.ExchangeTag != "" && !ValidExchangeTag(s.ExchangeTag) {
 		return false
 	}
@@ -206,6 +210,7 @@ type attempt struct {
 	entryStarted              bool
 	progress                  *grantProgress
 	tcpInfo                   tcpInfoAttempt
+	cadence                   inputCadence
 }
 type session struct {
 	exchangeTag      func(string, string) string
@@ -446,6 +451,7 @@ func Input(ctx context.Context, role string) (context.Context, func(error)) {
 		return ctx, func(error) {}
 	}
 	v := &sample{started: time.Now(), first: !a.firstStarted}
+	a.cadence.start(v)
 	a.firstStarted = true
 	s.collector.mu.Unlock()
 	if at, ok := ctx.Value(offeredKey{}).(time.Time); ok {
@@ -460,13 +466,15 @@ func Input(ctx context.Context, role string) (context.Context, func(error)) {
 	}
 	ctx = context.WithValue(ctx, sampleKey{}, v)
 	return ctx, func(err error) {
-		put(&v.vector, Dispatch, time.Since(v.started))
+		completed := time.Now()
+		put(&v.vector, Dispatch, completed.Sub(v.started))
 		v.vector.Outcome = Outcome(err)
 		s.collector.mu.Lock()
 		defer s.collector.mu.Unlock()
 		if a.finished {
 			return
 		}
+		a.cadence.complete(v, completed)
 		if v.first {
 			a.summary.First = v.vector
 			return
@@ -592,6 +600,8 @@ func (c *Collector) retireLocked(a *attempt, outcome string) func() {
 	a.summary.Preparation.Outcome = outcome
 	a.summary.Incomplete = a.summary.Incomplete || outcome == "incomplete" || a.summary.First.Outcome == ""
 	summary := a.summary
+	summary.Cadence = a.cadence.snapshot()
+	a.cadence.active = nil
 	if summary.Focus != nil {
 		focus := *summary.Focus
 		summary.Focus = &focus

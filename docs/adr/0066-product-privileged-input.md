@@ -1,5 +1,44 @@
 # ADR 0066: Product leases use the installed input service
 
+## g353: Distinguish input arrival cadence from dispatch cost
+
+The user reports jitter after entry as well as at entry. g352's independent
+peer/gateway probes expose round-trip variation, while its ordinary receiver
+input dispatch remains much shorter than the grant wait. Existing dispatch
+histograms cannot show gaps followed by compressed input delivery.
+
+Add an optional, fixed-size cadence profile to each retained source/receiver
+handoff. Existing input sampling records local start-to-start gap counts in six
+fixed buckets and one maximum gap with its matching preceding dispatch and
+between-dispatch spans. No input value, action kind, coordinates, endpoint,
+frame identifier or absolute timestamp is retained. The receiver boundary is
+before coordinator admission after a complete frame read; the source boundary
+is before coordinator admission after dequeue/validation. Intentional idle and
+other frame work remain in the gap, so it cannot be called pure network latency
+or a direct stutter count. Compare host-local distributions without subtracting
+opposite-PC clocks or independent maxima.
+
+Reuse the existing collector mutex and 12-attempt/120-second lifetime. First
+starts do not fabricate intervals. Missing completion, overlap, reversed times
+or out-of-window spans are counted as skipped. Counter overflow stops counting;
+retirement copies the fixed profile once. Late callbacks cannot change the
+frozen record or a newer attempt. No wire, input ordering, authority, timeout,
+dependency or runner change. g352 stays deployed while its physical trial is
+pending; g353 is a local diagnostic addition, not a claimed performance fix.
+
+Local validation: handoff, productlog, peer, agent, residentagent and localapi
+tests and vet pass. Focused handoff/productlog race checks pass, including
+retirement concurrent with eight in-flight completions. Tests cover bucket
+boundaries, matching maximum-gap parts, incomplete/reversed/expired samples,
+late and duplicate completion, saturation, immutable retirement, attempt reset
+and sanitization of unknown private fields. The cadence helper adds zero
+allocations per sampled input in AllocsPerRun. Focused cadence tests pass again
+after clearing the retained sample reference at retirement. Native packaging,
+UI tests and physical verification are deferred because this diagnostic-only
+addition is not being deployed during the pending g352 trial. A final live
+check still reports A g352 healthy/CONNECTED with RUNNING protected service,
+and B g352 ONLINE/IDLE. No g353 rollout, push or release has occurred.
+
 ## g352: Leave the preparation budget before a moderate approach reaches the edge
 
 The successful g351 lock/PIN/login trial still leaves user-observed jitter
