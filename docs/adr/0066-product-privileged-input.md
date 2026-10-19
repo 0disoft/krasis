@@ -32,7 +32,8 @@ decreases remain unknown. The collector's existing attempt/window budget limits
 query count. No traffic, peer frame, socket-option setting, authority decision,
 input ordering, timeout or failed-input classification changes. The numeric
 profile cannot by itself attribute retransmission or latency to a single frame.
-The running g350 pair is retained while this slice is validated locally.
+The running g350 pair was retained during local validation; application is
+recorded separately below.
 
 Local validation: transport, handoff, agent, productlog, localapi and
 residentagent tests and vet pass. A real authenticated loopback socket query
@@ -41,8 +42,25 @@ Windows control code and structure layout on this machine. Unit tests cover
 foreign grants, query failure, counter decrease, bounded source-only sampling,
 late results after retirement, both production wrappers across reconnect and
 sanitized numeric projection. Loopback validation does not establish the TCP
-behavior or latency benefit of the real two-PC connection. No g351 device
-deployment, lock/PIN trial or authority-policy change has occurred.
+behavior or latency benefit of the real two-PC connection. The g351 physical
+lock/PIN trial remains pending; authority policy is unchanged.
+
+Rollout verification: both PCs now report g351 revision
+`63004ece3b017c970dd79f801c7d67274064f875`. The workspace build, 85 frontend
+tests, native build and update-package check pass. The four independently
+hashed executables match SHA256SUMS, and offline update verify accepts the
+27788536-byte bundle. B transfer `88cc3e05b3b8d2b9a962b0ab53a427f7` reached
+UPDATED before A was replaced. Fresh paired collection
+`803382b9bfdb40229d287bb12a725cba` records successful install receipts and
+READY input/service states on both PCs. A doctor is healthy, CONNECTED,
+PROTECTED and CONFIGURED with matching UI, agent and installed builds; peer
+version query is ONLINE/IDLE at the same revision. Both sides record connection
+`b4a5e311f6a7d7b535f6523c5c60835f225c4b899f0757dc20fe9f7993137352`.
+B's network-acquisition timeouts precede its establishment during replacement.
+No new session failure or handoff profile is present after establishment in
+this initial snapshot, so real two-PC TCP observations and the physical trial
+are still unverified. Previous control logs are marked incomplete; agent logs
+are not. No further source, authority or timeout changes accompanied rollout.
 
 ## g350: Distinguish request handling from the preceding dispatch
 
