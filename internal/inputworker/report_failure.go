@@ -30,15 +30,23 @@ func (e *workerReportFailure) Unwrap() error                 { return e.cause }
 func (e *workerReportFailure) LoginRuntimeOperation() string { return e.operation }
 
 func reportFailureDetails(err error) (byte, uint32) {
-	operation := wininput.SourceFailureStage(err)
-	var authority *authorityCheckFailure
-	if errors.As(err, &authority) && validAuthorityOperation(authority.operation) {
-		operation = authority.operation // Preserve the failed check, not only its source-loop wrapper.
-	}
+	operation, selected := wininput.SourceFailureDetails(err)
 	if operation == "" {
-		var failure interface{ LoginRuntimeOperation() string }
+		var failure interface {
+			error
+			LoginRuntimeOperation() string
+		}
 		if errors.As(err, &failure) && logindiag.ValidRuntimeOperation(failure.LoginRuntimeOperation()) {
 			operation = failure.LoginRuntimeOperation()
+			selected = failure
+		}
+	}
+	var authority *authorityCheckFailure
+	if errors.As(err, &authority) && validAuthorityOperation(authority.operation) {
+		switch operation {
+		case "", "low-level-hook", "raw-mouse", "wheel-capture", "source-reader-authority", "source-command-loop", "source-capture-join", "source-sender-join":
+			// Refine generic containers, never a concrete native cleanup failure.
+			operation, selected = authority.operation, authority
 		}
 	}
 	var code byte
@@ -48,11 +56,14 @@ func reportFailureDetails(err error) (byte, uint32) {
 			break
 		}
 	}
-	if authority != nil && validAuthorityOperation(authority.operation) {
+	if selected == authority && authority != nil {
 		return code, authority.native
 	}
+	if selected == nil {
+		selected = err
+	}
 	var native syscall.Errno
-	if errors.As(err, &native) && native != 0 && uint64(native) <= 0xffffffff {
+	if errors.As(selected, &native) && native != 0 && uint64(native) <= 0xffffffff {
 		return code, uint32(native)
 	}
 	return code, 0

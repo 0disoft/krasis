@@ -25,22 +25,29 @@ func sourceStage(stage string, err error) error {
 }
 
 func SourceFailureStage(err error) string {
+	stage, _ := SourceFailureDetails(err)
+	return stage
+}
+
+// Keep the native cause attached to its deepest operation when sibling errors
+// are joined. Only operation codes/numeric native errors enter support output.
+func SourceFailureDetails(err error) (string, error) {
 	var stage *sourceStageError
 	if !errors.As(err, &stage) {
-		return inputdesktop.FailureOperation(err)
+		return inputdesktop.FailureDetails(err)
 	}
 	// Prefer the deepest operation over its containing worker.
-	if inner := SourceFailureStage(stage.cause); inner != "" {
-		return inner
+	if inner, cause := SourceFailureDetails(stage.cause); inner != "" {
+		return inner, cause
 	}
 	switch stage.stage {
 	case "low-level-hook", "raw-mouse", "wheel-capture", "thread-join",
 		"thread-join-low-level-hook", "thread-join-raw-mouse", "thread-join-wheel-capture", "thread-join-multiple",
 		"hook-install", "hook-release", "raw-register", "raw-release",
 		"raw-read", "raw-buffer", "raw-route", "message-loop", "pointer-snapshot", "cursor-present", "cursor-restore", "cursor-release", "raw-size", "raw-packet", "raw-desktop", "raw-window-create", "raw-window-destroy", "raw-ready":
-		return stage.stage
+		return stage.stage, stage.cause
 	}
-	return ""
+	return "", nil
 }
 
 // A cursor snapshot fails before native hook/window owners are constructed.

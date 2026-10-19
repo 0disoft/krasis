@@ -95,3 +95,30 @@ func TestWorkerFailureReceiptRejectsUnknownDiagnosticsAndKeepsLegacyReceipts(t *
 		t.Fatal("private operation accepted")
 	}
 }
+
+func TestReportDetailsKeepOperationAndNativeCauseFromSameBranch(t *testing.T) {
+	for _, operation := range []string{"source-reader-read", "source-retirement-write", "worker-report-timeout"} {
+		cause := errors.Join(syscall.Errno(5), &workerReportFailure{operation: operation, cause: syscall.Errno(170)})
+		op, native := reportFailureDetails(cause)
+		// Service-only report operations are deliberately not on the child wire.
+		if operation != "worker-report-timeout" && reportOperations[op] != operation || native != 170 {
+			t.Fatal("selected report operation used sibling native cause", operation, op, native)
+		}
+	}
+}
+
+func TestConcreteCleanupReportCannotBeReplacedByAuthorityDetail(t *testing.T) {
+	for _, operation := range []string{"hook-release", "raw-release", "cursor-restore", "desktop-close"} {
+		cleanup := &workerReportFailure{operation: operation, cause: errors.Join(ErrRecovery, syscall.Errno(170))}
+		combined := errors.Join(cleanup, authorityCheckFailed("authority-console-token", syscall.Errno(5)))
+		var wire bytes.Buffer
+		if err := writeReport(&wire, Report{}, combined); err != nil {
+			t.Fatal(err)
+		}
+		_, received := readReport(&wire)
+		op, native := reportFailureDetails(received)
+		if reportOperations[op] != operation || native != 170 || !errors.Is(received, ErrRecovery) || serviceRecoveryFailure(received, nil) == nil {
+			t.Fatal("authority diagnostic obscured concrete cleanup failure", operation, op, native, received)
+		}
+	}
+}

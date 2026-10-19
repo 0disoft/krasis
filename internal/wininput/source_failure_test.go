@@ -3,6 +3,7 @@ package wininput
 import (
 	"context"
 	"errors"
+	"syscall"
 	"testing"
 )
 
@@ -21,5 +22,16 @@ func TestSourceFailureStagePreservesCauseAndDeepestOperation(t *testing.T) {
 	err = errors.Join(sourceWorkerStage("low-level-hook", context.Canceled), err)
 	if SourceFailureStage(err) != "raw-route" {
 		t.Fatal("canceled sibling obscured failure")
+	}
+}
+
+func TestSourceFailureDetailsKeepSelectedOperationNativeCause(t *testing.T) {
+	for _, operation := range []string{"hook-release", "raw-release", "cursor-restore", "raw-window-destroy"} {
+		err := errors.Join(syscall.Errno(5), sourceWorkerStage("raw-mouse", sourceStage(operation, syscall.Errno(170))))
+		stage, cause := SourceFailureDetails(err)
+		var native syscall.Errno
+		if stage != operation || SourceFailureStage(err) != stage || !errors.As(cause, &native) || native != 170 {
+			t.Fatal("joined sibling supplied another operation's native cause", stage, cause)
+		}
 	}
 }

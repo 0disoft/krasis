@@ -62,3 +62,23 @@ verified g358 candidate remains available and is not overwritten. No public API,
 DB, runner, dependency or repository-hygiene change, push, public release, CI,
 service restart, installation, reboot or live profiling is included. Long-term
 stability and attended movement benefit remain unverified.
+
+## Packaging and rejected candidate
+
+G359 at revision `f00300f2c0c929b2499ed8e76c329c24028bad00` was subsequently
+packaged. Its 85 UI tests, native UI build, installer provenance, archive roundtrip
+and eight-file/icon verification pass. Offline update verification is valid/ok
+at 27894470 bytes. It was not sent or installed.
+
+Pre-rollout review found that the new authority-detail priority can hide a
+concurrent concrete cleanup operation. The focused regression test using a Go
+overlay of g359's actual report_failure.go fails with an authority code/native
+5 instead of hook-release/native 170. The correction is tracked as g360; keep
+this immutable g359 package unapplied. No existing device failure is attributed
+to the unapplied candidate.
+
+Fresh paired collection `5abfe453601c983f09f5da85fbae67cb` at
+2026-10-19 17:14:21-22Z retains READY service/input state and no g357
+fault/failed/session-end events. Its runtime windows still contain no counted
+hook calls or injections; attended movement evidence remains absent. Local
+doctor confirms healthy/CONNECTED/PROTECTED/CONFIGURED on unchanged g357.
