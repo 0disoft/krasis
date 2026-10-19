@@ -96,6 +96,7 @@ type Summary struct {
 	PreparationLockMicros   uint32                `json:"preparationLockMicros,omitempty"`
 	PreparationLockMeasured bool                  `json:"preparationLockMeasured,omitempty"`
 	ExchangeTag             string                `json:"exchangeTag,omitempty"`
+	PipeOpen                *PipeOpenProfile      `json:"pipeOpen,omitempty"`
 }
 
 func (s Summary) Valid() bool {
@@ -124,7 +125,7 @@ func (s Summary) Valid() bool {
 	if s.GrantProgress != nil && !s.GrantProgress.Valid(s.Role) {
 		return false
 	}
-	if !validPreparationLock(s) {
+	if !validPreparationLock(s) || !validPipeOpen(s) {
 		return false
 	}
 	vectors := []Vector{s.Preparation, s.First, s.Worst}
