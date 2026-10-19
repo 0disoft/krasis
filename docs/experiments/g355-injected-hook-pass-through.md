@@ -95,3 +95,16 @@ establish a movement-stutter improvement. Both supports retain an incomplete
 older control.previous.jsonl. A doctor remains healthy/CONNECTED/PROTECTED.
 The requested g355 user comparison is still pending. A separate local g356
 preparation-watcher patch has been committed without changing either live PC.
+
+## Continued retained observation, 14:04:12Z
+
+Collection `a72c61cbce7ac4472698a9cc587fd908` is RECEIVED (A support created
+14:04:12Z, B 14:04:11Z). Exact g355-revision records show service/input READY on
+both sides, no retained fault/session-end trigger, and 10 matching handoff tags.
+All profiles end ok; all 10 B startup records select a prepared worker. Maximum
+ordinary source dispatch is 8236us and receiver dispatch 21282us. Thus the earlier
+79..104ms receiver tail is not reproduced in this retained sample. The larger
+sample still lacks confirmation of the exact requested continuous-movement trial
+and its perceived result; it cannot establish an effect size or zero stutter.
+Both supports flag the older control.previous.jsonl as incomplete. A doctor
+remains healthy/CONNECTED/PROTECTED, and g356 is only built locally, not applied.

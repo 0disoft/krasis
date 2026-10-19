@@ -40,8 +40,33 @@ analyzer disabled pass. Race instrumentation was not run: no C compiler is
 available on this command environment's PATH. No UI or peer protocol changed.
 Localapi tests also pass after reserving source generation 356.
 
-This is a separate local change while the g355 attended movement comparison is
-pending. Generation 356 has not been built or applied to either PC. Keep the
+This was a separate local change while the g355 attended movement comparison
+was pending; at the initial commit generation 356 had not been built or applied.
+Keep the
 running g355 baseline until its result and fresh paired diagnostics are assessed.
 No new installer, reboot, service restart, push, public release or CI run occurred
 for this change. Device startup and movement benefit remain unverified.
+
+## Prepared bundle, not applied
+
+Generation 356 is now packaged at source revision
+`db25de6f7ecd1305fe8f4a85d608061f9c10e9a1`, which includes `7d634ea` but not
+the rejected event-reuse candidate. The ordinary workspace build passed all 85
+frontend tests, native UI build, installer provenance, package roundtrip and
+eight-file bundle checks. Offline update verification returns valid/ok, generation
+356, that exact revision and archive size 27747344 bytes. Agent, residentagent and
+inputdesktop tests additionally pass against this source. No live installer or
+new app has been run for this generation.
+
+Independent PowerShell SHA-256:
+
+| File | SHA-256 |
+| --- | --- |
+| krasis.exe | 50373d6411c641141c184facd2fa5619e0259f2f5a2c27b7143d162d082db9f8 |
+| krasis-agent.exe | 92b6562ac0f18fef3f9f8fab84df4e2312a7424b174d98044eb84585e1063262 |
+| krasis-cli.exe | d1a1dcdfaec506c521b85a17bdb15a542ff6689267bb41760d22479bbf4c7ee5 |
+| krasis-install.exe | 1cece25d088ee45683a8390d4a91a2ef4c8a1b101b2c55d242a835dcfebe9aff |
+
+Both devices still run g355. The pending user comparison is needed to separate
+g355 movement effects from a subsequent g356 startup change. No push, public
+release or CI run occurred. Authority and user-visible API contracts are unchanged.
