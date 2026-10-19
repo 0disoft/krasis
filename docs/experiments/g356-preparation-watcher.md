@@ -67,6 +67,42 @@ Independent PowerShell SHA-256:
 | krasis-cli.exe | d1a1dcdfaec506c521b85a17bdb15a542ff6689267bb41760d22479bbf4c7ee5 |
 | krasis-install.exe | 1cece25d088ee45683a8390d4a91a2ef4c8a1b101b2c55d242a835dcfebe9aff |
 
-Both devices still run g355. The pending user comparison is needed to separate
+At packaging time both devices still ran g355. The pending user comparison was needed to separate
 g355 movement effects from a subsequent g356 startup change. No push, public
 release or CI run occurred. Authority and user-visible API contracts are unchanged.
+
+## Paired rollout and baseline, 14:13:02Z
+
+The g355 comparison returned an inconclusive possible regression under concurrent
+work on A; collection `85698d6530b363c3fed5c4c440830853` is analyzed in the g355
+experiment. Its last 12 paired handoffs expose one unprepared receiver, with
+310024us source request-to-grant, but no retained trial fault/session-end trigger.
+This supports proceeding with the bounded preparation change without claiming
+a measured g355 movement improvement or regression.
+
+Offline bundle verification again returns valid/ok, generation 356, source
+revision `db25de6f7ecd1305fe8f4a85d608061f9c10e9a1`, size 27747344 bytes. All four
+independent SHA-256 values match the table above. B transfer
+`0f0e3ba5faa6b560d3f7759b9b4a803e` reaches UPDATED at that revision. Ordinary A UI
+replacement and automatic protected-input refresh then finish; connecting the
+existing B profile returns A to healthy/CONNECTED/PROTECTED/CONFIGURED. UI,
+agent, installed agent and launch record all match g356; the service is RUNNING
+at its expected path. B update inspection reports ONLINE/IDLE at the same build.
+No reboot or manual service start was used.
+
+Paired collection `3de6d9c329483574f37af6fb5c4a4ef4` is RECEIVED with both supports
+created at 2026-10-19 14:13:02Z. A install receipt time is 14:12:37.7379053Z and
+B is 14:12:04.3958474Z; both have result 0, stage complete and recovery not_needed.
+Both services and input-health records are READY. The retained exact-build
+events (A 8, B 32) have no fault, failed code or session-end trigger. This is a
+short rollout baseline, not attended input or long-term stability verification.
+Both exports flag the older control.previous.jsonl as incomplete. Automatic
+installer process exit and stdout were not captured separately from receipts.
+
+Next observation is the same 15-second idle, about 20 seconds of continuous B
+movement and three returns, when A's other work is quiet. Do not combine the
+earlier loaded-host feedback into a controlled effect-size claim. Existing local
+tests/build evidence remains applicable; only docs changed after packaging, so
+no rebuild, broad retest or CI run was performed. No push, public release, API,
+DB or runner change occurred. Desktop-app, ops-change and incident-triage review
+procedures were used.
