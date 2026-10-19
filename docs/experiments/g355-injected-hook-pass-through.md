@@ -108,3 +108,38 @@ sample still lacks confirmation of the exact requested continuous-movement trial
 and its perceived result; it cannot establish an effect size or zero stutter.
 Both supports flag the older control.previous.jsonl as incomplete. A doctor
 remains healthy/CONNECTED/PROTECTED, and g356 is only built locally, not applied.
+
+## Attended feedback and paired observation, 14:07:33Z
+
+The user completed movement and returns, reporting possibly more stutter than
+g354 but explicitly noting concurrent work on A. Treat this as inconclusive
+perceived regression, not a controlled g354/g355 comparison.
+
+Collection `85698d6530b363c3fed5c4c440830853` has both supports created at
+2026-10-19 14:07:33Z. Exact g355 revision records contain 22 matched handoff tags,
+all ending ok, with no retained fault or session-end trigger. Both services and
+input-health records are READY. B's eight reconnect_acquire_network_timeout
+records are at 13:46:38..13:47:48Z, during rollout, before the movement window;
+they must not be counted as attended-trial disconnects. Both exports flag the
+older control.previous.jsonl as incomplete.
+
+The last 12 matched handoffs, around 14:06:08..14:06:51Z, have ordinary dispatch
+maxima A 16286us and B 9584us. B reuses preparation in 11 of these 12; the
+998-frame receiver profile has preparationDecision 3 with no prepared worker,
+while its paired A request-to-grant is 310024us. This supports keeping cold-entry
+preparation as a separate concern. Across all 22 retained profiles the ordinary
+dispatch maxima are A 16286us and B 21282us.
+
+A's 14:06:12Z runtime interval retains timer lateness 509801us; the following
+interval retains queue residence 244128us and dispatch maximum 300692us, with
+that slow dispatch classified control. B's final interval maximum 157149us is
+also classified control. These maxima are separate observations, not additive,
+not ordinary movement dispatch measurements and not proof of another process's
+CPU use or a GC cause. Runtime histograms do not time-align an individual pause
+to the user's perceived stutter. Host load was not independently sampled.
+
+Current A doctor confirms healthy/CONNECTED/PROTECTED/CONFIGURED. g356 offline
+bundle verification again passes at the recorded revision and size. Proceed
+with the separately validated preparation-reader cancellation change, retaining
+this g355 evidence; a quiet-host attended comparison remains necessary. No
+additional source change, rebuild, public release or CI run is needed here.
