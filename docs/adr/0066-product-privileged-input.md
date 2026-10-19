@@ -1,5 +1,34 @@
 # ADR 0066: Product leases use the installed input service
 
+## Local follow-up: Attribute a blocked trust lock-file validation
+
+The g352 trust expiry identifies `prelock_lockfile_acl`, but that step includes
+file metadata, current-process identity, GetSecurityInfo and descriptor checks.
+It cannot by itself show that the ACL query, token lookup, GC or disk caused
+the delay. Retain the full enclosing duration and add only four fixed active
+details: `prelock_lockfile_info`, `prelock_lockfile_owner`,
+`prelock_lockfile_acl_query`, and `prelock_lockfile_acl_check`. They identify the
+call about to run, including any scheduling pause before it; they do not supply
+independent durations, raw Win32 errors or proof of a syscall's internal cause.
+
+The existing-file read branch passes an optional observer through the same
+file-handle validator. Metadata, reparse/hard-link refusal, fresh process owner,
+fresh handle ACL query and canonical descriptor checks remain in the same order.
+Creation/protection and unobserved callers are unchanged. No SID, descriptor,
+path, verdict cache, retry or extra native call is introduced. The observer does
+not alter trust freshness limits, lock acquisition, lease authority or cleanup.
+
+Local tests verify accepted handles, nil/closed handles, rejection of a changed
+noncanonical ACL and hard links, preservation of the enclosing trace interval,
+fixed active-code projection, and sanitized export with private fields removed.
+Peercredentials, truststore, productlog and residentagent package tests and vet
+pass, along with focused race/checkptr tests for the new validation, trace and
+export cases. Tests accept zero-duration samples on Windows rather than
+requiring its timer to advance within a synchronous call sequence.
+The local patch is not deployed: both PCs retain g353 for its pending movement
+trial. Neither this attribution change nor the prior short READY baseline
+establishes that movement jitter or trust-freshness expiry is solved.
+
 ## g353: Reuse immediate auxiliary control exchanges without caching trust
 
 Inspection of the captured A syscall profile shows repeated trust/certificate

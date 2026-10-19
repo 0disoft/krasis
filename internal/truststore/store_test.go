@@ -353,6 +353,30 @@ func TestReadTraceKeepsParentTimingAndActiveStep(t *testing.T) {
 	}
 }
 
+func TestReadTraceKeepsLockFileTimingWhileDetailChanges(t *testing.T) {
+	trace := NewReadTrace()
+	trace.enter("prelock")
+	trace.enterStep("prelock_lockfile_acl")
+	stepStart := trace.stepStart
+	for _, detail := range []string{"info", "owner", "acl_query", "acl_check"} {
+		phase := "prelock_lockfile_" + detail
+		trace.enterDetail(phase)
+		snapshot := trace.Snapshot()
+		_, enclosing := snapshot.Durations["prelock_lockfile_acl"]
+		if snapshot.Phase != phase || !enclosing || !trace.stepStart.Equal(stepStart) ||
+			snapshot.Durations["prelock"] < snapshot.Durations["prelock_lockfile_acl"] {
+			t.Fatalf("lost enclosing lock-file interval: %+v", snapshot)
+		}
+		if _, timed := snapshot.Durations[phase]; timed {
+			t.Fatal("detail invented an independent interval")
+		}
+	}
+	trace.enter("lock")
+	if trace.Snapshot().Phase != "lock" {
+		t.Fatal("active lock-file detail survived completion")
+	}
+}
+
 func TestPeerRecordRejectsUnsafeAlias(t *testing.T) {
 	record := PeerRecord{
 		Fingerprint: testPeer().CertificateSHA256, Role: transport.AuthenticatedPeerConnector,

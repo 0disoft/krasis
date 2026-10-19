@@ -402,9 +402,15 @@ func (store *Store) openLockedMode(create, shared bool, trace *ReadTrace) (Docum
 			closeLock()
 			return Document{}, nil, nil, err
 		}
-	} else if err := peercredentials.ValidateSecurityFileHandle(lockFile); err != nil {
-		closeLock()
-		return Document{}, nil, nil, err
+	} else {
+		var observe func(string)
+		if trace != nil {
+			observe = func(step string) { trace.enterDetail("prelock_lockfile_" + step) }
+		}
+		if err := peercredentials.ValidateSecurityFileHandleObserved(lockFile, observe); err != nil {
+			closeLock()
+			return Document{}, nil, nil, err
+		}
 	}
 	trace.enter("lock")
 	unlock, err := acquireFileLock(lockFile, shared)

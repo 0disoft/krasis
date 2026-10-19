@@ -50,6 +50,7 @@ func init() {
 		"prelock", "prelock_parent_acl", "prelock_parent_reparse", "prelock_parent_stat",
 		"prelock_parent_acl_query", "prelock_parent_acl_check", "prelock_directory_lstat", "prelock_directory_acl",
 		"prelock_directory_open", "prelock_lockfile_open", "prelock_lockfile_acl",
+		"prelock_lockfile_info", "prelock_lockfile_owner", "prelock_lockfile_acl_query", "prelock_lockfile_acl_check",
 		"lock", "store_read", "store_read_open", "store_read_acl", "store_read_bytes",
 		"store_read_decode", "store_read_close", "certificate", "certificate_open", "certificate_acl", "certificate_bytes", "certificate_close", "certificate_validate", "certificate_match", "retry_wait",
 	} {

@@ -118,12 +118,22 @@ func ValidateSecurityDirectoryHandle(handle uintptr) error {
 }
 
 func ValidateSecurityFileHandle(file *os.File) error {
+	return ValidateSecurityFileHandleObserved(file, nil)
+}
+
+func ValidateSecurityFileHandleObserved(file *os.File, observe func(string)) error {
 	if file == nil {
 		return errors.New("security file handle is required")
+	}
+	if observe != nil {
+		observe("info")
 	}
 	info, err := file.Stat()
 	if err != nil {
 		return err
+	}
+	if observe != nil {
+		observe("acl_check")
 	}
 	if !info.Mode().IsRegular() || info.Mode().Perm() != 0o600 {
 		return ErrInsecurePrivateKey

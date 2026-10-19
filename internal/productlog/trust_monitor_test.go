@@ -70,3 +70,18 @@ func TestCertificateSubstepsExportOnlyFixedTimingCodes(t *testing.T) {
 		}
 	}
 }
+
+func TestLockFileDetailsExportOnlyFixedProgressCodes(t *testing.T) {
+	for _, detail := range []string{"info", "owner", "acl_query", "acl_check"} {
+		code := "trust_active_prelock_lockfile_" + detail
+		result := sanitizeLog("agent.jsonl", strings.NewReader(`{"time":"2026-10-19T12:24:48Z","code":"`+code+`","path":"private","sid":"private"}`+"\n"))
+		encoded, _ := json.Marshal(result)
+		if result.Incomplete || len(result.Events) != 1 || strings.Contains(string(encoded), "private") {
+			t.Fatal("lock file evidence lost or data escaped", detail)
+		}
+	}
+	result := sanitizeLog("agent.jsonl", strings.NewReader("{\"time\":\"2026-10-19T12:24:48Z\",\"code\":\"trust_active_prelock_lockfile_private\"}\n"))
+	if !result.Incomplete || len(result.Events) != 0 {
+		t.Fatal("unknown lock file detail exported")
+	}
+}

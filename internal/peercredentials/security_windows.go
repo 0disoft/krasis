@@ -191,8 +191,17 @@ func ValidateSecurityDirectoryHandle(handle uintptr) error {
 }
 
 func ValidateSecurityFileHandle(file *os.File) error {
+	return ValidateSecurityFileHandleObserved(file, nil)
+}
+
+// Observations name the next synchronous validation call, never the file or SID.
+// They do not cache a verdict or change which security checks are required.
+func ValidateSecurityFileHandleObserved(file *os.File, observe func(string)) error {
 	if file == nil {
 		return errors.New("security file handle is required")
+	}
+	if observe != nil {
+		observe("info")
 	}
 	var info syscall.ByHandleFileInformation
 	if err := syscall.GetFileInformationByHandle(syscall.Handle(file.Fd()), &info); err != nil {
@@ -204,7 +213,7 @@ func ValidateSecurityFileHandle(file *os.File) error {
 	if info.NumberOfLinks != 1 {
 		return fmt.Errorf("%w: security file has multiple hard links", ErrInsecurePrivateKey)
 	}
-	return validateExactCurrentUserDACLHandle(file.Fd(), 0)
+	return validateExactCurrentUserDACLHandleObserved(file.Fd(), 0, observe)
 }
 
 func protectSecurityHandle(handle uintptr, directory bool) error {
@@ -266,16 +275,30 @@ func currentUserDACL(directory bool) (*windowsACL, unsafe.Pointer, error) {
 }
 
 func validateExactCurrentUserDACLHandle(handle uintptr, expectedFlags byte) error {
+	return validateExactCurrentUserDACLHandleObserved(handle, expectedFlags, nil)
+}
+
+func validateExactCurrentUserDACLHandleObserved(handle uintptr, expectedFlags byte, observe func(string)) error {
+	if observe != nil {
+		observe("owner")
+	}
 	userSID, err := currentUserSIDString()
 	if err != nil {
 		return err
 	}
-	return validateExactOwnerDACLHandle(handle, expectedFlags, userSID)
+	return validateExactOwnerDACLHandleObserved(handle, expectedFlags, userSID, observe)
 }
 
 func validateExactOwnerDACLHandle(handle uintptr, expectedFlags byte, userSID string) error {
+	return validateExactOwnerDACLHandleObserved(handle, expectedFlags, userSID, nil)
+}
+
+func validateExactOwnerDACLHandleObserved(handle uintptr, expectedFlags byte, userSID string, observe func(string)) error {
 	var dacl *windowsACL
 	var descriptor unsafe.Pointer
+	if observe != nil {
+		observe("acl_query")
+	}
 	status, _, _ := procGetSecurityInfo.Call(
 		handle,
 		seFileObject,
@@ -290,6 +313,9 @@ func validateExactOwnerDACLHandle(handle uintptr, expectedFlags byte, userSID st
 		return syscall.Errno(status)
 	}
 	defer syscall.LocalFree(syscall.Handle(descriptor))
+	if observe != nil {
+		observe("acl_check")
+	}
 	return validateOwnerDACL(dacl, descriptor, expectedFlags, userSID)
 }
 

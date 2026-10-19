@@ -283,3 +283,21 @@ func TestTrustTraceOmitsFastCompletedSubsteps(t *testing.T) {
 		t.Fatalf("slow substep codes: %v", codes)
 	}
 }
+
+func TestTrustTraceReportsActiveLockFileCallWithoutInventingDuration(t *testing.T) {
+	for _, detail := range []string{"info", "owner", "acl_query", "acl_check"} {
+		phase := "prelock_lockfile_" + detail
+		snapshot := truststore.ReadTraceSnapshot{
+			Phase: phase,
+			Durations: map[string]time.Duration{
+				"prelock": time.Second, "prelock_lockfile_acl": time.Second,
+			},
+		}
+		var codes []string
+		recordTrustTrace(snapshot, func(code string) { codes = append(codes, code) })
+		if len(codes) != 3 || codes[0] != "trust_timing_prelock_ge1s" ||
+			codes[1] != "trust_timing_prelock_lockfile_acl_ge1s" || codes[2] != "trust_active_"+phase {
+			t.Fatalf("active lock file call: %v", codes)
+		}
+	}
+}
