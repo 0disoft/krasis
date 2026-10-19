@@ -40,3 +40,25 @@ installation, process restart, reboot or live input injection is included.
 The original long-term source stall and human-visible movement latency remain
 unverified. The new helpers are internal package APIs for diagnostic selection;
 they return causes to the existing numeric projection, not to UI/CLI messages.
+
+## Packaged candidate
+
+G360 at source revision `7ab3a4aa77c90cd5bc519ff334cea61b58142a07` now passes
+the workspace build, including 85 frontend tests, native assets/UI compilation,
+installer provenance, archive roundtrip and eight-file/icon verification.
+Offline update verification returns valid/ok and archive size 27895442 bytes.
+Independent PowerShell SHA-256 values:
+
+| File | SHA-256 |
+| --- | --- |
+| krasis.exe | 82c34662734260aacdf1c5de955e515b11a7d07c150cb164245dd5a47984388b |
+| krasis-agent.exe | a84aed84c29a38070ecec820653ec7150dc0594cf4b6530e7c37f470cc9a4dbf |
+| krasis-cli.exe | 489f45fc6a56c9265db36e92f5904d27bee5e123f79aeb49e357e12265da1edc |
+| krasis-install.exe | 600e9a8feef10ae15caee916f063cec9f706cd315ab9002071af4b24ddb1b0d6 |
+
+The earlier "not built" statement describes the source-validation checkpoint;
+the candidate is now built but remains unapplied. G357 device state and its
+pending attended movement comparison are unchanged. No additional live trial,
+service restart, installation, push, release or CI run was performed. Build and
+artifact checks do not establish a human-visible movement improvement or
+resolution of the original long-term source-hook failure.
