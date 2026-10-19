@@ -94,3 +94,57 @@ The hot input performance changes under comparison remain those of g357.
 No reboot, manual service start, repeated installation, input replay, trust or
 security change, force kill, push, public release or CI was performed. Ops-change
 review applies to this rollout in addition to the source review procedures.
+
+## Resumed movement review
+
+The operator now reports that g360 is generally smooth. Keep that report as
+the attended result; it is not a timed measurement or a lock/PIN regression
+result. No new candidate or runtime change was made for this review.
+
+Current local doctor returns healthy / CONNECTED / PROTECTED / CONFIGURED,
+with the protected service RUNNING. Peer update status observes B ONLINE at
+the same generation 360 and source revision. Fresh paired collection
+`1a37109e4ed03cdd39ce5675e1647ff4` is RECEIVED; both support files were
+created at `2026-10-19T19:07:29Z`, with input-health READY observations at
+19:07:13.7679678Z (A) and 19:07:14.9182928Z (B). This is a remote support
+observation, not a remotely executed B doctor. Rotated logs retain different
+intervals, so use the earlier immutable collection below for the failures.
+
+Collection `e2e043ea7fb2cfdfc82797cf0d4bc337` narrows the two g360 connection
+terminations to distinct B admission failures:
+
+| B observation (UTC, 2026-10-19) | Corresponding A observation | Finding |
+| --- | --- | --- |
+| 17:47:38.8575066 `installed_input_admission_blocked_active`; 17:47:38.8601246 triggering `fault_control_request_authorize_failed` | 17:47:40.6015334 triggering `fault_remote_eof` | `privilegedLeaseInput.open` found a non-nil client under its mutex and rejected the new lease. Why that client remained active is unproven. |
+| 17:52:16.8447897 `installed_input_connect_failed`, `installed_input_stage_pipe_open`, `installed_input_native_2`; 17:52:17.0767191 triggering `fault_control_request_authorize_failed`, native 2 known | 17:52:18.5811811 triggering `fault_remote_eof` | The protected input named-pipe open failed; this is not evidence of a missing truststore file. Why the endpoint was unavailable is unproven. |
+
+The authorizer wrapper opens the privileged channel after the peer policy
+check. Consequently the broad request-authorize failure label covers channel
+admission as well as policy authorization. In this evidence, the adjacent
+fixed stage codes identify the narrower branches. Wall-clock timestamps from
+different machines do not establish network or propagation latency. Neither
+failure is classified as an intentional manual disconnect from these records;
+some control-log history is incomplete.
+
+Two latency interpretations also need to stay separate from observed defects:
+
+- `handoff.ReentryGap` measures from the preceding attempt's retirement to
+  the next attempt's creation (`Retire` to `Begin`), including time between
+  crossings. The reported roughly 2.47 seconds is not an entry processing
+  duration.
+- `boundary_dropped_not_ready` is emitted when outbound/bidirectional state
+  cannot admit another boundary request, including an already active source,
+  a pending transition, or a held-input reverse lease. Its 65 records do not
+  establish 65 missed physical crossings or 65 worker startup failures.
+
+Next causal work should correlate the first failure's existing lease identity,
+matching return/disarm and close completion, and the second failure's service
+pipe retirement/rebind interval. Do not clear an active lease or retry unknown
+input outcomes on the strength of these counters alone.
+
+Validation here consists of doctor, peer update status, paired collection,
+fixed-code log comparison and source-path inspection. `git diff --check`
+validates this documentation-only change. Source tests, builds, new rollout,
+service restart and attended lock/PIN testing are skipped because executable
+behavior is unchanged. No API, DB, runner, dependency, product policy or
+source-of-truth contract changed; no push, public release or CI run occurred.
