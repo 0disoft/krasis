@@ -87,3 +87,33 @@ Independent PowerShell SHA-256 values:
 | krasis-install.exe | 79215701f8f740b1be0dd16d8f22aac3d9e3ea103b80c603330b0cf8ca8bca4f |
 
 Generation 362 is packaged at this checkpoint; attended acceptance is pending.
+
+## Paired application and startup evidence
+
+B transfer `7845155ea0fe8a79ba6f104a55b1c42d` reaches UPDATED at the exact
+g362 revision. A opens the verified bundle through normal single-instance
+replacement; UI, agent, launch record and installed agent all match g362.
+The saved B connection is started once after A reaches LOCAL. Neither PC is
+rebooted; no manual service start or force kill is used.
+
+A doctor returns healthy / CONNECTED / PROTECTED / CONFIGURED, service
+RUNNING. Peer status observes B ONLINE at the same revision with transfer
+IDLE. Both automatic installation receipts show result 0 / complete /
+not_needed: A `2026-10-19T20:12:20.0864231Z`, B
+`2026-10-19T20:11:44.3793363Z`. Independent automatic installer process
+exit/stdout/stderr and a remotely executed B doctor are not available.
+
+Paired collection `588a3f8eaa5f9a72fd0f6c2b9cf38878` is RECEIVED, with
+A created at 20:13:40Z and B at 20:13:43Z. Both service/input-health states
+are READY, with no lastFailure. Service start observations remain A
+20:12:21.4094075Z and B 20:11:46.903026Z. New-revision source capture
+reaches protected-ready on both sides: A 20:13:05.0985567Z and
+B 20:13:05.7748155Z, after their matching CONNECTED observations.
+No triggering g362 session failure or input pipe-open failure is retained in
+this short connected window. B acquisition retries before A completed
+replacement are separate from the new movement trial.
+
+The operator was asked for B lock/PIN/login, returns and final ordinary-window
+typing. The human result and matching diagnostics remain pending. Startup
+readiness does not establish attended stability or completion of the goal.
+Ops-change review applies to application; no push, public release or CI run.
