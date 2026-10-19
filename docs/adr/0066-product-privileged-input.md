@@ -1,5 +1,36 @@
 # ADR 0066: Product leases use the installed input service
 
+## g348: Preserve source retirement before startup readiness
+
+Paired g347 collection `fe3ca2b31a96817da2fd8b4b063f8f44` shows B accepting
+the first idle source refresh at `2026-10-19T09:32:42.6799334Z`, then failing
+source refresh at `09:32:43.2330284Z` during another desktop transition. B's
+source-hook fault precedes A's remote EOF; both service receipts remain READY.
+There is no cursor-readback failure in this trial. The old startup error path
+does not retain enough detail to prove the underlying native failure.
+
+Inspection found two startup retirement races. A source child may finish and
+send its authenticated final KRR1 report before sending readiness. The service
+previously decoded it only as a readiness envelope, discarded its report and
+returned generic authority failure. Source bootstrap now distinguishes a full
+final report from readiness, applies the existing receipt cleanup fence, retains
+the source exit and original failure, and never publishes readiness for that
+child. Missing, truncated, invalid or wrong-mode reports cannot certify cleanup.
+The pinned worker/job still joins before the service rebinds its endpoint.
+
+On the agent's independently authenticated pipe, a complete clean retirement
+packet is terminal: it no longer requires clearing the live-channel deadline
+after the service may already have closed that channel. Failed startup,
+cancellation and expired startup budgets still fail. No input is replayed and
+no final report or retirement packet grants input authority. Remaining startup
+failures now record a fixed stage and classified native error; clean early
+retirement has its own fixed event. There are no key identities or input values.
+
+Focused stream tests cover pre-ready retirement, cleanup failure, malformed and
+wrong-mode reports, and readiness followed by an independently decoded report.
+These reproduce the code-level races; the recorded g347 incident still needs a
+new device trial to establish whether either race caused that specific failure.
+
 ## g347: Reauthorize one failed cursor observation without replaying movement
 
 Paired g346 collection `ca7047624f7632d90cb1ebcebb9a81cf` records B's first

@@ -350,14 +350,29 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 		return err
 	}
 	defer channel.Close()
+	startupStage := "lease_deadline"
+	defer func() {
+		if startupStage != "" && result != nil && c.observe != nil {
+			c.observe("installed_source_startup_failed")
+			c.observe("installed_source_stage_" + startupStage)
+			c.observe(connectionNativeFailureEvent(result, "installed_source_native_"))
+		}
+	}()
 	startup, stopStartup := context.WithTimeout(ctx, startupTimeout)
 	stopPipe := context.AfterFunc(startup, func() { _ = channel.Close() })
 	deadline, _ := startup.Deadline()
-	if channel.stream.SetDeadline(deadline) != nil || writeFrame(channel.stream, data[:]) != nil {
+	if err := channel.stream.SetDeadline(deadline); err != nil {
 		stopPipe()
 		stopStartup()
-		return ErrAuthority
+		return errors.Join(ErrAuthority, err)
 	}
+	startupStage = "lease_write"
+	if err := writeFrame(channel.stream, data[:]); err != nil {
+		stopPipe()
+		stopStartup()
+		return errors.Join(ErrAuthority, err)
+	}
+	startupStage = "worker_ready"
 	_, retired, readyErr := readSourceStartup(channel.stream, binding)
 	err = readyErr
 	if !stopPipe() {
@@ -367,12 +382,23 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 	if err == wininput.ErrEmergencyRelease {
 		return err
 	}
-	if err != nil || ctx.Err() != nil || channel.stream.SetDeadline(time.Time{}) != nil {
-		return ErrAuthority
+	if err != nil || ctx.Err() != nil {
+		return errors.Join(ErrAuthority, err, ctx.Err())
 	}
 	if retired {
+		// This terminal proof needs no live channel. The service may already
+		// have closed it after joining its independent final worker report.
+		startupStage = ""
+		if c.observe != nil {
+			c.observe("installed_source_startup_retired")
+		}
 		return errors.Join(wininput.ErrProtectedInput, ErrSourceCaptureRetired)
 	}
+	startupStage = "client_validation"
+	if err := channel.stream.SetDeadline(time.Time{}); err != nil {
+		return errors.Join(ErrAuthority, err)
+	}
+	startupStage = ""
 	live := &sourceClient{channel: channel, binding: binding, replies: make(chan sourcePacket, 1), done: make(chan struct{}), failed: make(chan struct{})}
 	live.timing = timingSampler{emit: c.observe, source: true}
 	live.heartbeatTiming = timingSampler{emit: c.observe, source: true, heartbeat: true}

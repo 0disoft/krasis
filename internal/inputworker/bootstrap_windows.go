@@ -104,12 +104,25 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 	writeErr := writeFrame(control, packet[:])
 	var childProfile *handoff.StartupProfile
 	var readyErr error
+	var finished bool
 	if writeErr == nil {
-		childProfile, readyErr = readStartupReady(control)
+		if lease.Capture {
+			childProfile, report, finished, readyErr = readSourceWorkerStartup(control)
+		} else {
+			childProfile, readyErr = readStartupReady(control)
+		}
 	}
 	profile.Record(handoff.ServiceBootstrapReady, time.Since(started))
+	if finished {
+		// No readiness is published. Native retirement reached the agent on
+		// its own authenticated pipe; retain the independent service report.
+		return report, observeMissingWorkerReport(readyErr, worker.reportExit)
+	}
 	if writeErr != nil || readyErr != nil || startup.Err() != nil {
 		stopStartup()
+		if lease.Capture && readyErr != nil {
+			return report, observeMissingWorkerReport(readyErr, worker.reportExit)
+		}
 		return Report{}, ErrAuthority
 	}
 	if !stopStartup() {
