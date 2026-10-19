@@ -1,5 +1,32 @@
 # Bounded handoff profile
 
+## g350 frozen heartbeat progress
+
+Optional `runtime_gc_trail.heartbeat` schema 1 freezes local progress at failure
+notification; `atMicros` equals the trail's `triggerMicros`. Timestamps are
+microseconds from this process's diagnostic origin, never cross-host clocks.
+`send.micros` is coordinator queue, acquire, TLS write start and terminal.
+`receive.micros` is complete frame read, coordinator queue, acquire and terminal.
+Each leg has a four-bit `measured` mask. Missing bits are unobserved, not zeros.
+An interrupted publication is omitted after three bounded snapshot attempts.
+
+`outcome` is 0 pending, 1 successful local write/dispatch, 2 inactive sender,
+3 failed. Success requires all four boundaries. A failed write does not prove
+whether any bytes reached the peer. `lastCompleteMicros` retains the last
+successful local completion even while a later attempt waits. Zero means no
+completion observed on this connection. A receiver can successfully drain an
+exact retired heartbeat, so receive completion alone never proves a live lease.
+`lastSentMicros` and `lastReceivedMicros` preserve the older policy-clock
+observations; the send value precedes the write and must not be used as its
+completion time. All heartbeat evidence resets on a new joined connection.
+
+The failure callback copies only fixed atomic scalars. It never waits, allocates,
+queries the OS or writes a log. Existing trail limits and projection apply;
+unknown private fields are not exported. Queue loss remains visible through
+`skippedTriggers`. Later cancellation/cleanup cannot rewrite a captured trail.
+This instrumentation preserves authority, ordering, two-second peer timeout
+and failed-input certainty. It does not classify network loss or fix that cause.
+
 ## g350 receiver request predecessor
 
 Optional `readPredecessor` schema 1 retains only the successful frame dispatch

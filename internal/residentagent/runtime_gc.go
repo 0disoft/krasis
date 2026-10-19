@@ -12,16 +12,20 @@ const gcSampleInterval = 100 * time.Millisecond
 const gcTrailBudget = 8
 
 type gcFailureTrigger struct {
-	at       time.Time
-	notified int64
-	fault    string
+	at        time.Time
+	notified  int64
+	fault     string
+	heartbeat productlog.HeartbeatProgress
 }
 
-// Observer callbacks enqueue only a scalar notification. No runtime/OS query,
+// Observer callbacks enqueue bounded scalar evidence. No runtime/OS query,
 // JSON encoding, disk operation or waiting is performed on the failed path.
 func (d *runtimeDiagnostics) ObserveFailure(at time.Time, fault string) {
+	heartbeat := d.heartbeatSnapshot()
+	notified := d.stamp(time.Now())
+	heartbeat.AtMicros = notified
 	select {
-	case d.gcFailures <- gcFailureTrigger{at: at, notified: d.stamp(time.Now()), fault: fault}:
+	case d.gcFailures <- gcFailureTrigger{at: at, notified: notified, fault: fault, heartbeat: heartbeat}:
 	default:
 		d.gcSkipped.Add(1)
 	}
@@ -137,6 +141,9 @@ func (r *gcEvidenceRing) add(w productlog.GCWindow) {
 
 func (r *gcEvidenceRing) snapshot(t gcFailureTrigger, skipped uint64) productlog.GCTrail {
 	s := productlog.GCTrail{Schema: 1, TriggerMicros: t.notified, TriggerObservedAt: t.at.Format(time.RFC3339Nano), Fault: t.fault, Wrapped: r.wrapped, SkippedTriggers: skipped, Samples: make([]productlog.GCWindow, r.count)}
+	if t.heartbeat.Schema != 0 {
+		s.Heartbeat = &t.heartbeat
+	}
 	start := (r.next - r.count + len(r.windows)) % len(r.windows)
 	for i := range s.Samples {
 		s.Samples[i] = r.windows[(start+i)%len(r.windows)]

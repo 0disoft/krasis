@@ -2,6 +2,29 @@
 
 ## g350: Distinguish request handling from the preceding dispatch
 
+The same generation freezes heartbeat progress at failure notification. Optional
+`runtime_gc_trail.heartbeat` contains one sender and receiver attempt: sender
+coordinator queue/acquire, TLS write start and terminal; receiver complete frame
+read, coordinator queue/acquire and terminal. A terminal write failure is marked
+before cleanup, never as sent. The last successful local completion survives a
+later queued attempt. The original policy-clock sent/received observations remain
+separate and cannot certify write completion or renewed lease authority.
+
+Callbacks publish fixed atomic fields only. Each serial producer has a sequence
+fence; failure snapshots retry at most three times per leg and omit a busy leg
+instead of blocking or combining attempts. Notification captures by value before
+cancellation can rewrite progress. The sampler logs it through the existing
+eight-trail budget, with no per-heartbeat disk output, new peer frame, identity,
+input content or endpoint. New connections clear heartbeat evidence after the
+previous session workers join; old-peer send/receive ages no longer appear as
+observations on a new connection. Policy timeouts and cleanup are unchanged.
+
+Focused tests distinguish an 80ms coordinator wait from a 40ms write, preserve
+cancel/expired/malformed and write-failure outcomes, freeze pending work before
+cleanup, reject mixed/invalid evidence and verify allocation-free callbacks.
+Peer, agent, productlog and residentagent tests and vet pass. These are local
+protocol/telemetry checks, not evidence that the g349 timeout cause is fixed.
+
 Paired g348 evidence `e5f5327ed3f74e9a2bea2ebfb55cc01a` separates two
 latency paths. Exchange `12888f8b41a76f196979cd7ffb1112913cb28934433abefcb342c846e7c3c0b0`
 records 238037us of receiver admission lock wait, all overlapping optional
@@ -28,7 +51,8 @@ dispatch while the following grant remains fast, preserving abort and EOF.
 This adds evidence for the next latency investigation; it does not establish
 that a prior dispatch caused either real-device sample or reduce the delay.
 Input ordering, lease authority, preparation lifetime and cancellation stay
-unchanged. The running g349 pair is not replaced while its trial is pending.
+unchanged. The g349 pair was preserved while the failure evidence below was
+collected; subsequent rollout verification must be recorded separately.
 
 Local validation: handoff, peer, productlog, localapi and residentagent package
 tests and vet pass. Export tests reject foreign roles, unsupported frame kinds

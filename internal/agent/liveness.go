@@ -63,7 +63,8 @@ func runLivenessTicks(
 			if timing, ok := observer.(peer.TimerObserver); ok {
 				timing.ObserveTimerLateness(max(0, time.Since(scheduled)))
 			}
-			pulse, err := peer.PulseLiveness(ctx, coordinator, runtime, now, policy.PeerTimeout)
+			progress, _ := observer.(peer.HeartbeatSendObserver)
+			pulse, err := peer.PulseLivenessObserved(ctx, coordinator, runtime, now, policy.PeerTimeout, progress)
 			if err != nil {
 				return err
 			}

@@ -97,6 +97,7 @@ func runSession(
 
 	progress, _ := observer.(SessionProgressObserver)
 	coordinatorProgress, _ := observer.(DispatchCoordinatorObserver)
+	heartbeatProgress, _ := observer.(HeartbeatReceiveObserver)
 	var previousKind transport.MessageKind
 	var previousDispatchStarted, previousDispatchCompleted time.Time
 	for {
@@ -118,6 +119,9 @@ func runSession(
 		}
 		controlCtx := ctx
 		readCompleted := time.Now()
+		if frame.Kind == transport.MessageHeartbeat && heartbeatProgress != nil {
+			heartbeatProgress.ObserveHeartbeatReceive(HeartbeatStart, readCompleted)
+		}
 		handoff.ReadProgress(ctx, handoff.ReadBetweenFrames, readCompleted, true)
 		if frame.Kind == transport.MessageControl {
 			controlCtx = handoff.WithControlRead(ctx, readCompleted)
@@ -170,10 +174,16 @@ func runSession(
 				err = errors.Join(ErrPeerInputDispatch, err)
 			}
 		case transport.MessageHeartbeat:
+			if heartbeatProgress != nil {
+				heartbeatProgress.ObserveHeartbeatReceive(HeartbeatGate, time.Now())
+			}
 			if coordinatorProgress != nil {
 				coordinatorProgress.ObserveDispatchCoordinatorWaiting(time.Now())
 			}
 			err = coordinateDispatch(ctx, coordinator, func() error {
+				if heartbeatProgress != nil {
+					heartbeatProgress.ObserveHeartbeatReceive(HeartbeatWork, time.Now())
+				}
 				if coordinatorProgress != nil {
 					coordinatorProgress.ObserveDispatchCoordinatorAcquired(time.Now())
 				}
@@ -197,6 +207,13 @@ func runSession(
 				heartbeat, dispatchErr = DispatchHeartbeatFrame(ctx, frame, observedAt, runtime)
 				return dispatchErr
 			})
+			if heartbeatProgress != nil {
+				stage := HeartbeatComplete
+				if err != nil {
+					stage = HeartbeatFailed
+				}
+				heartbeatProgress.ObserveHeartbeatReceive(stage, time.Now())
+			}
 			if err != nil {
 				err = errors.Join(ErrPeerHeartbeatDispatch, err)
 			}

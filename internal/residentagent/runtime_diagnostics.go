@@ -15,6 +15,7 @@ import (
 // stay off input, reader and heartbeat paths. Counters are diagnostic hints, not
 // lease authority; snapshots across atomics are deliberately approximate.
 type runtimeDiagnostics struct {
+	heartbeatSend, heartbeatReceive                         heartbeatProgressLeg
 	captureTrace                                            func()
 	hookStart, hookLast, hookMax                            atomic.Int64
 	hookCalls, rawInputs                                    atomic.Uint64
@@ -54,6 +55,12 @@ func newRuntimeDiagnostics() *runtimeDiagnostics {
 }
 func (d *runtimeDiagnostics) stamp(t time.Time) int64 { return max(1, t.Sub(d.started).Microseconds()) }
 func (d *runtimeDiagnostics) ObserveReadConnectionStarted() {
+	// Previous session workers are joined before the supervisor starts a new
+	// connection. Heartbeat evidence must never borrow progress from that peer.
+	d.send.Store(0)
+	d.receive.Store(0)
+	d.heartbeatSend.reset()
+	d.heartbeatReceive.reset()
 	d.readStart.Store(0)
 	d.lastReadByte.Store(0)
 	d.dispatchStart.Store(0)
