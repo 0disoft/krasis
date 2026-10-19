@@ -57,8 +57,24 @@ collected; subsequent rollout verification must be recorded separately.
 Local validation: handoff, peer, productlog, localapi and residentagent package
 tests and vet pass. Export tests reject foreign roles, unsupported frame kinds
 and out-of-bound durations, and project away unknown payload/timestamp fields.
-Read-only review found no change to ordering or failure outcomes. This patch
-has not been deployed or device-validated.
+Read-only review found no change to ordering or failure outcomes. The rollout
+below verifies application separately from the pending physical trial.
+
+Rollout verification: both PCs report g350 revision
+`5d245c8bb2a57a9ea5dc6e6fdc1a2f5fb30ec3a7`. The workspace build, 85 frontend
+tests, native build and update-package check pass; independent SHA-256 values
+for the four distributed executables match the bundle checksums. B transfer
+`cd125c03b68815905e23a31b355a595f` reached UPDATED before A was replaced.
+Paired collection `6bec90c97fe2c33dcdddaab6910b4eab` records successful install
+receipts and READY input/service states on both PCs. A doctor is healthy,
+CONNECTED, PROTECTED and CONFIGURED with matching UI/agent/installed builds;
+peer version query is ONLINE/IDLE at the same revision. Both sides record
+connection `6664bf5e34cfbae071fa396618cfaef0c713f95b319e0f766dd8e8a9c71af1c9`.
+B's network-acquisition timeouts precede that connection during replacement;
+no session fault is recorded after its establishment in this initial snapshot.
+Previous control logs are marked incomplete; agent logs are not. This is
+rollout evidence only: the g350 ordinary/lock/PIN trial and the g349 timeout
+cause remain unverified. No input authority or timeout policy changed.
 
 A later paired collection `8ee609eea5622660b8541c731e9503dd` supersedes the
 initial quiet g349 observation: B first triggers heartbeat timeout on connection
