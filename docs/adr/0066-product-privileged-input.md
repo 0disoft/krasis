@@ -1,5 +1,49 @@
 # ADR 0066: Product leases use the installed input service
 
+## g351: Observe the live TCP socket without attributing application delay to loss
+
+Paired g350 collection `cca26e51fe8aee9d36a24c7312c8c1ee` contains three
+matching completed ordinary source/receiver exchanges. Source grant waits are
+306889us, 627934us and 270036us; the corresponding receiver request handling
+spans are 33530us, 206887us and 28842us. The second receiver admission records
+175135us of overlap with optional preparation. Its preceding frame dispatch
+takes 445us; the other preceding dispatches take 587us and 0us. These samples
+do not establish long preceding-dispatch blocking as the explanation for the
+remaining source wait. They do not isolate transport loss or permit subtracting
+opposite-host clocks or nested durations.
+
+A's local runtime trace saved at approximately 11:03:40 UTC contains the first
+of those slow exchanges; its synchronization anchor is 11:03:34.3200044 UTC.
+Offline scheduler, synchronization, network and syscall profiles were inspected.
+The source reader is waiting in the TLS/socket read path during the grant wait,
+with a separate approximately 29ms source activation wait after reading it.
+Aggregate scheduler delay across the captured interval is approximately 86ms;
+it is not a single process pause or a measurement of network RTT. This trace
+does not explain the full grant wait with a long GC stop. Both input/service
+receipts remain READY in later collection `dc27dbe88b00a240a5cd613447b023d5`,
+with no new session failure in that snapshot. The physical lock/PIN trial is
+still pending, and the paired g349 heartbeat failures remain unresolved.
+
+The next diagnostic slice samples read-only TCP_INFO_v0 statistics on the source
+socket before the request and after its matching full grant. Bounded optional
+profiles retain estimated/minimum RTT, query costs and counter differences for
+retransmitted bytes and timeout episodes. Missing queries stay absent; counter
+decreases remain unknown. The collector's existing attempt/window budget limits
+query count. No traffic, peer frame, socket-option setting, authority decision,
+input ordering, timeout or failed-input classification changes. The numeric
+profile cannot by itself attribute retransmission or latency to a single frame.
+The running g350 pair is retained while this slice is validated locally.
+
+Local validation: transport, handoff, agent, productlog, localapi and
+residentagent tests and vet pass. A real authenticated loopback socket query
+returns estimated/minimum RTT values of 176/78us and 117/43us, validating the
+Windows control code and structure layout on this machine. Unit tests cover
+foreign grants, query failure, counter decrease, bounded source-only sampling,
+late results after retirement, both production wrappers across reconnect and
+sanitized numeric projection. Loopback validation does not establish the TCP
+behavior or latency benefit of the real two-PC connection. No g351 device
+deployment, lock/PIN trial or authority-policy change has occurred.
+
 ## g350: Distinguish request handling from the preceding dispatch
 
 The same generation freezes heartbeat progress at failure notification. Optional

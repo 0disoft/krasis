@@ -93,6 +93,7 @@ type Summary struct {
 	Focus                   *FocusProfile           `json:"focus,omitempty"`
 	Exchange                *ExchangeProfile        `json:"exchange,omitempty"`
 	ReadPredecessor         *ReadPredecessorProfile `json:"readPredecessor,omitempty"`
+	TCPInfo                 *TCPInfoProfile         `json:"tcpInfo,omitempty"`
 	GrantProgress           *GrantProgressProfile   `json:"grantProgress,omitempty"`
 	PreparationLockMicros   uint32                  `json:"preparationLockMicros,omitempty"`
 	PreparationLockMeasured bool                    `json:"preparationLockMeasured,omitempty"`
@@ -124,6 +125,9 @@ func (s Summary) Valid() bool {
 		return false
 	}
 	if s.ReadPredecessor != nil && !s.ReadPredecessor.Valid(s.Role) {
+		return false
+	}
+	if s.TCPInfo != nil && !s.TCPInfo.Valid(s.Role) {
 		return false
 	}
 	if s.GrantProgress != nil && !s.GrantProgress.Valid(s.Role) {
@@ -201,9 +205,11 @@ type attempt struct {
 	firstStarted              bool
 	entryStarted              bool
 	progress                  *grantProgress
+	tcpInfo                   tcpInfoAttempt
 }
 type session struct {
 	exchangeTag      func(string, string) string
+	tcpInfo          func() ([4]uint32, bool)
 	collector        *Collector
 	source, receiver *attempt
 	lastClose        time.Time
@@ -310,7 +316,9 @@ func Begin(ctx context.Context, role, sessionID, epoch string, start time.Time) 
 		}
 		c.mu.Unlock()
 	}
-	return context.WithValue(ctx, attemptKey{}, a)
+	ctx = context.WithValue(ctx, attemptKey{}, a)
+	sampleTCPInfo(ctx, false)
+	return ctx
 }
 
 func Activate(ctx context.Context) {
@@ -414,6 +422,7 @@ func Granted(ctx context.Context) {
 		at := time.Now()
 		Record(ctx, RequestToGrant, at.Sub(a.request))
 		recordGrantRead(ctx, at)
+		sampleTCPInfo(ctx, true)
 	}
 }
 

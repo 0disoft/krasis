@@ -1,5 +1,35 @@
 # Bounded handoff profile
 
+## g351 source TCP estimates around a matching grant
+
+Optional source-only `tcpInfo` schema 1 contains two local socket observations:
+before writing the lease request, and after reading its matching complete grant.
+`rttMicros` and `minRttMicros` hold Windows TCP's current estimated and minimum
+sampled round-trip times at those two points. They are not request/grant RTTs.
+`queryMicros` records the two diagnostic query costs, bounded at 120 seconds.
+Only complete pairs with positive, bounded RTT observations are exported.
+Unsupported, failed, missing or late queries omit the optional profile.
+
+`retransmittedBytes` and `timeoutEpisodes` are differences between those two
+reads of the same socket, not cumulative connection totals. A decrease in
+either counter makes `counterDeltasKnown:false` with zero placeholders; those
+zeros are unobserved. Known zero differences mean no increments were reported
+between the samples, not proof of no loss. TCP acknowledgements/statistics can
+lag application reads and the socket can carry other frames during that span.
+Do not attribute these counters to one request or subtract RTT estimates from
+application timings to calculate scheduling or worker overhead.
+
+The existing 12-attempt/120-second collector permits at most two read-only
+queries per retained source attempt. `SIO_TCP_INFO` version 0 uses the live
+Windows socket through `SyscallConn.Control`; other platforms or streams omit
+the evidence. There is no packet capture, new traffic, retry, socket-option
+change, endpoint, identity, input content or cumulative traffic export. Queries
+run outside the collector lock and physical-input threads; their duration is
+explicitly visible. No query runs on a failure callback or per-input frame.
+Counter/RTT samples never affect authority, timeout, cancellation or outcome.
+
+ABI reference: [Microsoft TCP_INFO_v0](https://learn.microsoft.com/en-us/windows/win32/api/mstcpip/ns-mstcpip-tcp_info_v0).
+
 ## g350 frozen heartbeat progress
 
 Optional `runtime_gc_trail.heartbeat` schema 1 freezes local progress at failure
