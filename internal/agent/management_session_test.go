@@ -25,7 +25,7 @@ func TestManagedPeerSessionRevokesExactInboundLeaseAndNotifiesPeer(t *testing.T)
 	source := &managementTestSource{active: true}
 	managed, err := newManagedPeerSession(
 		managementTestPeer(), runtime, coordinator, source, connection, nil,
-		func() time.Time { return time.Unix(200, 0) },
+		func() time.Time { return time.Unix(200, 0) }, newTestInput(false),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -65,7 +65,7 @@ func TestManagedPeerSessionRejectsDifferentAuthenticatedPeer(t *testing.T) {
 	}
 	source := &managementTestSource{active: true}
 	managed, err := newManagedPeerSession(
-		managementTestPeer(), runtime, coordinator, source, connection, nil, time.Now,
+		managementTestPeer(), runtime, coordinator, source, connection, nil, time.Now, newTestInput(false),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -93,7 +93,7 @@ func TestManagedPeerSessionRejectsStaleRequestWithoutSideEffects(t *testing.T) {
 	}
 	source := &managementTestSource{active: true}
 	managed, err := newManagedPeerSession(
-		managementTestPeer(), runtime, coordinator, source, connection, nil, time.Now,
+		managementTestPeer(), runtime, coordinator, source, connection, nil, time.Now, newTestInput(false),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -124,7 +124,7 @@ func TestManagedPeerSessionClosesConnectionWhenPeerNotificationFails(t *testing.
 	}
 	source := &managementTestSource{active: true}
 	managed, err := newManagedPeerSession(
-		managementTestPeer(), runtime, coordinator, source, connection, nil, time.Now,
+		managementTestPeer(), runtime, coordinator, source, connection, nil, time.Now, newTestInput(false),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -155,7 +155,7 @@ func TestManagedPeerSessionRevokeTrustIsIdempotentAndDisconnects(t *testing.T) {
 	trust := &managementTestTrustRevoker{}
 	managed, err := newManagedPeerSession(
 		managementTestPeer(), runtime, coordinator, source, connection, trust,
-		func() time.Time { return time.Unix(300, 0) },
+		func() time.Time { return time.Unix(300, 0) }, newTestInput(false),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -214,7 +214,7 @@ func TestManagedPeerSessionSerializesWithInputAndHeartbeatCoordinator(t *testing
 	}
 	source := &managementTestSource{active: true}
 	managed, err := newManagedPeerSession(
-		managementTestPeer(), runtime, coordinator, source, connection, nil, time.Now,
+		managementTestPeer(), runtime, coordinator, source, connection, nil, time.Now, newTestInput(false),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -262,7 +262,7 @@ func TestManagedPeerSessionDoesNotCancelLeaseAfterLocalEmergencyRelease(t *testi
 	}
 	source := &managementTestSource{active: true}
 	managed, err := newManagedPeerSession(
-		managementTestPeer(), runtime, coordinator, source, connection, nil, time.Now,
+		managementTestPeer(), runtime, coordinator, source, connection, nil, time.Now, newTestInput(false),
 	)
 	if err != nil {
 		t.Fatal(err)

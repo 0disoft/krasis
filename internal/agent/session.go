@@ -153,6 +153,7 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	if err != nil {
 		return Result{}, err
 	}
+	outbound.Returns = dependencies.Input
 	var admissionGate peer.BoundaryAdmissionGate
 	if gate, ok := dependencies.Hook.(peer.BoundaryAdmissionGate); ok {
 		admissionGate = gate
@@ -188,6 +189,7 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 			connection,
 			dependencies.TrustRevoker,
 			config.Now,
+			dependencies.Input,
 		)
 		if managedErr != nil {
 			return Result{}, managedErr

@@ -25,6 +25,9 @@ type OutboundController struct {
 	Runtime     *application.SessionRuntime
 	Source      SourceActivation
 	Observer    ControlFlowObserver
+	// Bidirectional sessions also receive source-initiated inbound revokes.
+	// Wire the same lease owner used by the responder and local return path.
+	Returns ReturnBoundaryPort
 }
 
 func NewOutboundController(
@@ -200,10 +203,21 @@ func (controller *OutboundController) RevokePeer(ctx context.Context, command tr
 	observeControlFlow(controller.Observer, ControlFlowRevokeReceived)
 	var emitProfile func()
 	err := controller.Coordinator.Execute(ctx, func(FrameWriter) error {
+		inbound := controller.Runtime.Snapshot().Control.State == control.StateInboundActive
 		controller.Source.Deactivate()
 		_, err := controller.Runtime.RevokePeer(ctx, command.SessionID, command.LeaseID, command.Epoch)
 		if err == nil {
-			emitProfile = handoff.Retire(handoff.Matching(ctx, "source", command.SessionID, command.Epoch), "ok")
+			role := "source"
+			if inbound {
+				role = "receiver"
+				if controller.Returns != nil {
+					// Runtime revocation releases held input first. Retire the
+					// exact native owner before another request can acquire the
+					// coordinator; never disarm an unrelated outbound lease.
+					controller.Returns.DisarmReturn(control.ReturnIntent{SessionID: command.SessionID, Epoch: command.Epoch})
+				}
+			}
+			emitProfile = handoff.Retire(handoff.Matching(ctx, role, command.SessionID, command.Epoch), "ok")
 		}
 		return err
 	})

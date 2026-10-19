@@ -28,6 +28,7 @@ type managedPeerSession struct {
 	connection        managementConnection
 	trust             TrustRevoker
 	now               func() time.Time
+	returns           peer.ReturnBoundaryPort
 }
 
 func newManagedPeerSession(
@@ -38,11 +39,12 @@ func newManagedPeerSession(
 	connection managementConnection,
 	trust TrustRevoker,
 	now func() time.Time,
+	returns peer.ReturnBoundaryPort,
 ) (*managedPeerSession, error) {
 	if err := authenticatedPeer.Validate(); err != nil {
 		return nil, err
 	}
-	if runtime == nil || coordinator == nil || source == nil || connection == nil || now == nil {
+	if runtime == nil || coordinator == nil || source == nil || connection == nil || now == nil || returns == nil {
 		return nil, errors.New("managed peer session dependencies are required")
 	}
 	return &managedPeerSession{
@@ -53,6 +55,7 @@ func newManagedPeerSession(
 		connection:        connection,
 		trust:             trust,
 		now:               now,
+		returns:           returns,
 	}, nil
 }
 
@@ -70,6 +73,7 @@ func (session *managedPeerSession) Revoke(ctx context.Context, request LeaseRevo
 			return ErrManagementLeaseMismatch
 		}
 
+		inbound := session.runtime.Snapshot().Control.State == control.StateInboundActive
 		session.source.Deactivate()
 		if _, err := session.runtime.RevokePeer(
 			ctx,
@@ -79,6 +83,11 @@ func (session *managedPeerSession) Revoke(ctx context.Context, request LeaseRevo
 		); err != nil {
 			interruptErr := session.connection.InterruptLocal(ErrManagementLocalCleanup)
 			return errors.Join(ErrManagementLocalCleanup, err, interruptErr)
+		}
+		if inbound {
+			// Match peer-initiated and boundary returns: key-up recovery must
+			// finish before retiring the exact installed input/return owner.
+			session.returns.DisarmReturn(control.ReturnIntent{SessionID: current.SessionID, Epoch: current.Epoch})
 		}
 
 		var trustErr error
