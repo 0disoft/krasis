@@ -282,6 +282,24 @@ connections also time out. Both service receipts remain READY with clean source
 retirements. This is a new failure investigation, not a passed g349 lock/PIN
 trial; the earlier normal handoffs cannot establish continued stability.
 
+Read-only follow-up of the same preserved g349 collection: B has four frozen
+heartbeat-timeout trails at 10:36:12.658713, 10:36:47.0598021,
+10:37:27.8794062 and 10:37:59.775203 UTC. Each retains 64 consecutive samples
+covering 6368643, 6370087, 6388589 and 6385295us respectively. GC pause counters
+are known in every sample. Their pause counts are respectively 6, 8, 8 and 2,
+all in the aggregate bucket with upper bound 100us; no higher pause bucket
+increments. Maximum sample spans are 100952, 100884, 112873 and 100545us;
+maximum timer lateness is 1347, 1109, 13439 and 980us. These retained intervals
+do not support a multi-second GC stop as the cause of these B timeouts. They
+do not exclude missing earlier evidence, OS/network stalls or an application
+path blocked while the sampler continues to run. g349 has no frozen heartbeat
+send/read/coordinator progress, so the original leg cannot be reconstructed
+from these trails. The later g352 ICMP variation is an independent observation,
+not evidence about this earlier connection. Keep the timeout cause unresolved;
+do not tune GC or extend lease authority based on either observation.
+Validation of this follow-up is the source-pinned trail projection and the
+current histogram aggregation boundaries; no code or device state changed.
+
 ## g349: Reject wrong-mode early reports on every outcome
 
 A focused regression reproduces a missing source cleanup fence when an early
