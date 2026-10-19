@@ -17,6 +17,8 @@ func watchPreparationPeer(ctx context.Context, stream net.Conn, prepare func(con
 	}
 	run, cancel := context.WithCancel(ctx)
 	defer cancel()
+	watch, cancelWatch := context.WithCancel(run)
+	defer cancelWatch()
 	var watching atomic.Bool
 	watching.Store(true)
 	done := make(chan struct{})
@@ -24,7 +26,13 @@ func watchPreparationPeer(ctx context.Context, stream net.Conn, prepare func(con
 	go func() {
 		defer close(done)
 		var extra [1]byte
-		_, _ = stream.Read(extra[:])
+		if reader, ok := stream.(interface {
+			readContext(context.Context, []byte) (int, error)
+		}); ok {
+			_, _ = reader.readContext(watch, extra[:])
+		} else {
+			_, _ = stream.Read(extra[:])
+		}
 		if watching.CompareAndSwap(true, false) {
 			cancel()
 		}
@@ -34,6 +42,7 @@ func watchPreparationPeer(ctx context.Context, stream net.Conn, prepare func(con
 	// must not cancel itself or retain a reader when the receipt is written.
 	watching.Store(false)
 	interrupt := stream.SetReadDeadline(time.Now())
+	cancelWatch()
 	if interrupt != nil {
 		_ = stream.Close()
 	}

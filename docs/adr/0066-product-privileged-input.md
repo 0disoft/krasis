@@ -932,3 +932,12 @@ shield restoration still checks its active desktop before native window work.
 Actual physical events keep their existing desktop/authority checks. Wheels
 keep the previous window-ownership suppression and synthesized touchpad path.
 The authenticated injection worker still checks every request independently.
+
+Preparation's disconnected-peer watcher uses an independently canceled read
+context on native pipes. After unbound construction finishes, disarm its peer
+failure callback, cancel that exact pending read, and join it before sending the
+receipt. Native overlapped context cancellation calls CancelIoEx with its exact
+OVERLAPPED, not all duplex operations. Join the cancellation callback before
+unpinning its buffer/event; an already-completed successful kernel operation
+keeps its actual bytes/result. Generic streams retain deadline interruption.
+Preparation/input deadlines, warm-child lifetime and lease authority are unchanged.

@@ -76,3 +76,50 @@ func TestCompletedPreparationJoinsWatcherBeforeReceiptAndPreservesFailure(t *tes
 		_ = service.Close()
 	}
 }
+
+type contextPreparationReader struct {
+	net.Conn
+	entered, canceled, release chan struct{}
+}
+
+func (reader *contextPreparationReader) Read([]byte) (int, error) {
+	panic("context-aware preparation fell back to polling Read")
+}
+
+func (reader *contextPreparationReader) readContext(ctx context.Context, _ []byte) (int, error) {
+	close(reader.entered)
+	<-ctx.Done()
+	close(reader.canceled)
+	<-reader.release
+	return 0, ctx.Err()
+}
+
+func TestCompletedPreparationCancelsExactWatcherAndJoinsItBeforeReturning(t *testing.T) {
+	for _, failure := range []error{nil, ErrRecovery} {
+		agent, service := net.Pipe()
+		reader := &contextPreparationReader{Conn: service, entered: make(chan struct{}), canceled: make(chan struct{}), release: make(chan struct{})}
+		done := make(chan error, 1)
+		go func() {
+			done <- watchPreparationPeer(context.Background(), reader, func(context.Context) error {
+				<-reader.entered
+				return failure
+			})
+		}()
+		select {
+		case <-reader.canceled:
+		case <-time.After(time.Second):
+			t.Fatal("completed preparation did not cancel its exact reader")
+		}
+		select {
+		case <-done:
+			t.Fatal("preparation returned with watcher still using its buffer")
+		default:
+		}
+		close(reader.release)
+		if err := <-done; !errors.Is(err, failure) || errors.Is(err, context.Canceled) {
+			t.Fatal("watcher cancellation changed build result", err)
+		}
+		_ = agent.Close()
+		_ = service.Close()
+	}
+}

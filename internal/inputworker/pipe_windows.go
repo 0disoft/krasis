@@ -320,6 +320,23 @@ func (pipe *pipeConn) overlapped(ctx context.Context, read bool, data []byte, be
 	if err != windows.ERROR_IO_PENDING {
 		return 0, err
 	}
+	if ctx.Done() != nil {
+		// Context-bound reads (source retirement and preparation watching) can
+		// cancel their exact submitted I/O without waiting for the poll tick or
+		// closing the duplex pipe. Background per-input I/O adds no callback.
+		// AfterFunc may already be running when Stop returns false: join it
+		// before unpinning OVERLAPPED or closing its completion event.
+		canceled := make(chan struct{})
+		stop := context.AfterFunc(ctx, func() {
+			defer close(canceled)
+			_ = windows.CancelIoEx(pipe.handle, &overlap)
+		})
+		defer func() {
+			if !stop() {
+				<-canceled
+			}
+		}()
+	}
 	for {
 		var stop error
 		if ctx.Err() != nil {
@@ -358,6 +375,9 @@ func (pipe *pipeConn) overlapped(ctx context.Context, read bool, data []byte, be
 		}
 		err = windows.GetOverlappedResult(pipe.handle, &overlap, &transferred, false)
 		if err == windows.ERROR_OPERATION_ABORTED {
+			if ctx.Err() != nil {
+				return transferred, ctx.Err()
+			}
 			return transferred, net.ErrClosed
 		}
 		if err != nil && err != windows.ERROR_BROKEN_PIPE && err != windows.ERROR_PIPE_NOT_CONNECTED {
