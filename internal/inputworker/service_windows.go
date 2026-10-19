@@ -93,21 +93,25 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 	var next *preparedConsole
 	var lastPreparation time.Time
 	var returned presentationReturn
-	var listener *pipeConn
+	var initial *pipeConn
 	if len(first) != 0 {
-		listener = first[0]
+		initial = first[0]
+	}
+	listener, err := newServicePipeListener(pipeName, initial)
+	if err != nil {
+		return err
 	}
 	defer func() {
 		if next.close() != nil {
 			result = errors.Join(result, ErrRecovery)
 		}
-		if listener != nil && listener.Close() != nil {
-			result = errors.Join(result, ErrRecovery)
-		}
+		result = errors.Join(result, listener.Close())
 	}()
 	for ctx.Err() == nil {
-		initial := listener
-		listener = nil // accept owns this instance, including its failure cleanup.
+		initial, err := listener.borrow()
+		if err != nil {
+			return err
+		}
 		readyFailed := false
 		channel, err := acceptAgentReadyOnPipe(ctx, agent, func() error {
 			if ready != nil && ready() != nil {
@@ -201,14 +205,6 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 				})
 				if err == nil && !lease.Presentation {
 					returned = presentationReturn{lease: lease, pid: agentPID, started: channel.authority.agentStarted, at: time.Now()}
-				}
-				if err == nil && ctx.Err() == nil {
-					// The previous worker and native recovery have joined. Own
-					// the next pipe name before optional child preparation, so
-					// a rapid reentry can connect within the existing open grace.
-					// Authentication and request consumption still occur only
-					// on the next serial accept after preparation has joined.
-					listener, err = rebindServiceInputPipe(channel, pipeName)
 				}
 				if !lease.Presentation {
 					// Capture-owned cursor hiding does not open a passive lease,

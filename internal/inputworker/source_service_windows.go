@@ -12,13 +12,22 @@ const sourcePipeName = `\\.\pipe\Krasis.Source.v1`
 
 // One serial source endpoint per service/console, independent of the input
 // endpoint. Neither accepts the other mode. Cleanup uncertainty stops both.
-func runSourceService(ctx context.Context, installation *Installation, admit func(context.Context) error, observe func(Report, error)) error {
+func runSourceService(ctx context.Context, installation *Installation, admit func(context.Context) error, observe func(Report, error)) (result error) {
 	agent, service, err := installation.digests()
 	if err != nil {
 		return err
 	}
+	listener, err := newServicePipeListener(sourcePipeName, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { result = errors.Join(result, listener.Close()) }()
 	for ctx.Err() == nil {
-		channel, err := acceptAgentNamed(ctx, agent, nil, installation, nil, sourcePipeName)
+		initial, err := listener.borrow()
+		if err != nil {
+			return err
+		}
+		channel, err := acceptAgentNamed(ctx, agent, nil, installation, initial, sourcePipeName)
 		if err == nil {
 			var report Report
 			if admit != nil {

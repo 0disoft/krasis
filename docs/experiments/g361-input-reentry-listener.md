@@ -94,3 +94,12 @@ The operator was asked for an idle first entry, six quick returns and one
 B lock/PIN/login sequence. That human result and its corresponding fresh
 movement evidence are pending. The goal remains open; a short clean startup
 window and local regressions do not establish long-term resolution.
+
+## Attended result
+
+The operator completed movement and lock/PIN/login steps but B errored just
+before the final response, then reconnected. Treat the trial as failed.
+Collection `0997c86cdc10fe2f68d637cd941ca18b` confirms B pipe_open / native 2
+after a cancelled return-cursor presentation; its service remained READY.
+The remaining lifetime gap and the g362 correction are documented in
+`g362-service-listener-lifetime.md`.
