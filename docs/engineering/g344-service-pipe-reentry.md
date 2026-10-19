@@ -31,3 +31,23 @@ Validation covers native late-endpoint opening, native owner metadata, cancellat
 of successful opens, missing-grace consumption, terminal errors and numeric export
 invariants. Field data must distinguish retry waits from native open time before
 attributing a remaining pipe span to polling.
+
+## First local runtime-trace inspection
+
+The preceding g343 run saved a 2,447,274-byte trace at
+`2026-10-19T08:36:23.5651324Z`. Its SHA-256 is
+`4e40afb4180d2c37ecd40f2f901410bb40fdb5ba26618fcbdcb1b3fd8b302659`.
+Offline `go tool trace -d=parsed` analysis covers 6.594572049 seconds and pairs
+10 GC stop-the-world begin/end ranges. Their maximum is 234,330 ns and total
+is 1,316,738 ns. This sample does not reproduce a long GC stop.
+
+The snapshot follows the `peer-session` termination at `08:36:23.4622091Z`
+while B was applying g344. Native file/security calls in this window include
+update archive reads and transfer work. It is not an ordinary idle-first-entry
+sample, and cannot establish which operation caused the earlier field delay.
+The raw trace remains local; no source/input/clipboard payload is copied here.
+
+Paired g344 request `25ab718684436950c978539da307d3bd` confirms connected
+protected input and no new fault but contains no new handoff. Therefore it
+does not prove that the retry change reduced field entry latency. Do not
+substitute this idle observation for the pending ordinary and lock/PIN trials.
