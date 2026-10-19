@@ -62,6 +62,36 @@ this initial snapshot, so real two-PC TCP observations and the physical trial
 are still unverified. Previous control logs are marked incomplete; agent logs
 are not. No further source, authority or timeout changes accompanied rollout.
 
+Device verification: the user reported completion of ordinary round trips,
+B lock, PIN-screen transition, A-to-B control/round trips and login/round trips.
+Paired collection `c0b47135158f14b12b4106ba072acc40` retains that same g351
+revision and connection on both PCs. B records five desktop-switch events from
+11:21:09.3548852 through 11:21:32.1591506 UTC and four clean source exits:
+capture/sender/interrupt joined, retirement clean_sent and report ok. No new
+fault, session failure or reconnect follows connection establishment. Both
+service lifetimes are unchanged and input/service receipts remain READY; A
+doctor is healthy, CONNECTED, PROTECTED and CONFIGURED after collection.
+
+The same collection has 12 unique matched completed ordinary handoff pairs,
+all emitted before B's first desktop switch. Source grant waits range from
+41384us to 214153us (median 119922us). The first receiver records 115639us of
+preparation-lock overlap; its request processing is 141352us. The other
+receivers process requests in 24253us to 32678us. Source TCP estimated RTT
+observations range from 23223us to 84411us; minimum sampled RTT falls to 4644us.
+One pair observes a 1460-byte increase in retransmitted bytes; the other eleven
+observe no counter increase, and all timeout-episode differences are zero.
+Socket-query costs range from observed zero to 564us. These observations do
+not establish that retransmission or delayed ACK caused the grant waits.
+
+The first ordinary round trips exhausted the existing 12-attempt window before
+the lock/PIN sequence. Therefore there are no matching handoff/TCP profiles for
+that later phase; its continuity is supported by the physical report, lifecycle
+events and clean retirements, not by ordinary-phase latency numbers. Agent logs
+are complete within the export; earlier control logs remain marked incomplete.
+This trial supports continuity for this run. Remaining grant/preparation delay
+and the historical heartbeat-timeout cause are still unresolved; no PIN values
+or input content were collected.
+
 ## g350: Distinguish request handling from the preceding dispatch
 
 The same generation freezes heartbeat progress at failure notification. Optional
