@@ -18,6 +18,7 @@ type PeerConnection struct {
 	peer            AuthenticatedPeerContext
 	diagnosticID    string
 	keepAlivePolicy string
+	ackPolicy       string
 }
 
 const FrameWriteTimeout = 2 * time.Second
@@ -71,7 +72,7 @@ func NewPeerConnection(ctx context.Context, connection *tls.Conn, anchors ...*x5
 		clear(material)
 		diagnosticID = hex.EncodeToString(digest[:])
 	}
-	return &PeerConnection{connection: connection, reader: reader, writer: writer, writeGate: writeGate, peer: peer, diagnosticID: diagnosticID, keepAlivePolicy: configureConnectionKeepAlive(connection.NetConn())}, nil
+	return &PeerConnection{connection: connection, reader: reader, writer: writer, writeGate: writeGate, peer: peer, diagnosticID: diagnosticID, keepAlivePolicy: configureConnectionKeepAlive(connection.NetConn()), ackPolicy: configureConnectionACK(connection.NetConn())}, nil
 }
 
 // DiagnosticID is a label-specific digest shared only by this TLS connection.

@@ -29,6 +29,9 @@ func (source *disconnectSource) Next(ctx context.Context) (agent.Connection, err
 	if policy, ok := connection.(interface{ KeepAlivePolicy() string }); ok {
 		source.log.Event(policy.KeepAlivePolicy())
 	}
+	if policy, ok := connection.(interface{ ACKPolicy() string }); ok {
+		source.log.Event(policy.ACKPolicy())
+	}
 	return &disconnectConnection{Connection: connection, intent: source.intent, log: source.log}, nil
 }
 

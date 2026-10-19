@@ -83,3 +83,9 @@ Keep g353 running for the pending attended trial. The more detailed lock-file
 trust observer is separately committed locally and has not been deployed. No
 input replay, wider timeout, policy change or transport replacement is justified
 by these two uncontrolled observations alone.
+
+The subsequent attended trial is now reported complete with frequent movement
+stutter. Collection `8dbdd9ede481b84b886f8373efc57b1f` retains the longer matched
+movement profiles and an earlier heartbeat failure. The follow-up investigation
+and socket-level experiment are recorded in `g354-ack-cadence.md`; the prior
+short baseline must not be used to claim g353 solved jitter or all disconnections.
