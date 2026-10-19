@@ -43,3 +43,43 @@ had no prepared candidate and about 232ms source request-to-grant. This patch
 does not extend warm-child lifetime or claim to fix cold entry.
 
 Primary reference: [Microsoft LowLevelMouseProc execution model](https://learn.microsoft.com/en-us/windows/win32/winmsg/lowlevelmouseproc).
+
+## Local validation and paired rollout
+
+Source revision `f0c9dc3a27bfc19646351ddb9226cdfd78980a8d`, generation 355.
+Wininput, inputdesktop, inputworker and localapi tests pass, as do desktop-tagged
+workspacehost tests, all 85 frontend tests, native UI build, installer provenance,
+update package roundtrip, file/icon verification and offline update verification.
+`go vet -unsafeptr=false` passes for the four related packages. Unfiltered vet
+reports Win32 callback LPARAM/uintptr conversions (including the extracted
+callbacks and pre-existing capture/shadow/window callbacks); it is not a clean
+unfiltered-vet result. No race run was added for this owner-thread-only change.
+
+Independent PowerShell SHA-256 values:
+
+| File | SHA-256 |
+| --- | --- |
+| krasis.exe | 5e03de16cba3148eaf98a86a7e99192cfa639def807ff9e7e8129c22e3c6dded |
+| krasis-agent.exe | e6a43a9c119229006d66ef40f7451f6a7de9b651e8220bdd749b4980f6bfce7f |
+| krasis-cli.exe | 6fd6e6d8a3af770c0b37a6951094851b32133fb7683010aa0f4e215f8cd1ffc2 |
+| krasis-install.exe | 93a8f684937dc6253e5e72fb6fc3486448ff979dc4bdd86f2b3fa75f781d82e1 |
+
+B update `be1b170cf1830d052ebc167836f62267` reached UPDATED at this revision.
+A then used ordinary UI replacement and automatic protected-input refresh,
+followed by connecting its existing B profile. No reboot or manual service start
+was used. A doctor is healthy/CONNECTED/PROTECTED/CONFIGURED with matching UI,
+agent and protected installation. B is observed g355 ONLINE/IDLE at this revision.
+
+Paired collection `a2486eebde9da728e99e00d1ba97725a`, both supports created at
+2026-10-19 13:48:21Z, is RECEIVED. Both supports have install result 0/complete/
+recovery not_needed, service READY and input-health READY; new-revision events
+retain no session-end trigger or fault. Both retain g354's accepted ACK option.
+Old control.previous.jsonl is incomplete on both. Automatic installer process
+exit/stdout were not captured independently of its receipt. This short baseline
+does not prove the performance hypothesis or long-term stability.
+
+The next attended comparison is the same idle/continuous movement/three-return
+trial as g354. No new PIN trial is requested for this performance step. No push,
+public release, CI run, API/DB or runner change was made. ADR 0066 records the
+ignored-event boundary; bugfix and desktop-app procedures plus the incident
+evidence review were used.
