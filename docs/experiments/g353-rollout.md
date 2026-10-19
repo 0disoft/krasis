@@ -47,3 +47,39 @@ about 20 seconds, then make three round trips. Collect a new immutable pair and
 interpret source/receiver cadence separately. Initial entry delay and subsequent
 movement jitter need separate user observations; no additional PIN trial is
 required for this performance step. No push or public release was performed.
+
+## Later paired observation, 12:33:15Z
+
+Collection `b4d822722dd5a4544fcd93b09e27ce30` was RECEIVED. Both services and
+input health remain READY; the retained g353 events contain no session fault.
+B's acquire-network timeouts occurred during the earlier A replacement, before
+the 12:24:48Z baseline. A doctor remains healthy/CONNECTED/PROTECTED and B's
+management observation is g353 ONLINE/IDLE. These observations do not substitute
+for the requested attended movement trial or a long-term stability check.
+
+Two ordinary source/receiver profiles match by exchange tag, independently of
+wall-clock offsets. In tag `6959899c...`, A records 430 ordinary dispatch samples
+(maximum 6224us); B records 429 (maximum 16464us). The next tag `5a1a9280...`
+has 23/22 samples, with maxima 561us/3053us. The source and receiver begin their
+sample populations at different boundaries; count differences do not prove loss.
+
+Their input-start gap histograms use <1ms/<4ms/<10ms/<25ms/<100ms/>=100ms:
+
+| Tag | A source | B receiver |
+| --- | --- | --- |
+| 6959899c | 9/5/343/38/23/12 | 0/75/213/101/28/12 |
+| 5a1a9280 | 0/0/21/0/1/1 | 0/6/10/4/1/1 |
+
+Both sides have long gaps, and the receiver distribution spreads across short
+and longer intervals. This is evidence to examine arrival cadence and delivery
+as well as native dispatch, not proof of Wi-Fi causation. The continuous-motion
+duration and intentional pauses are unreported; independent distributions and
+maximum gaps cannot be subtracted or matched per input. Existing source request
+to grant-read spans are 35915us and 79802us; those include both hosts' work and
+transport. Receiver startup marks both workers prepared. This excludes neither
+later worker cost nor other contributors to perceived stutter.
+
+Keep g353 running for the pending attended trial. The more detailed lock-file
+trust observer is separately committed locally and has not been deployed. No
+input replay, wider timeout, policy change or transport replacement is justified
+by these two uncontrolled observations alone.
