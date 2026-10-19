@@ -1,5 +1,40 @@
 # ADR 0066: Product leases use the installed input service
 
+## g347: Reauthorize one failed cursor observation without replaying movement
+
+Paired g346 collection `ca7047624f7632d90cb1ebcebb9a81cf` records B's first
+input failure at `2026-10-19T09:18:06.2785836Z`: `cursor_readback` after dispatch,
+followed by `fault_injection_outcome_unknown`. Source deactivation failure
+follows this observation and is not the first fault. Both services remain READY.
+B's earlier lock/desktop transitions are recorded; a later desktop notification
+arrives after the fault. A desktop race is plausible, but the failed GetCursorPos
+native code was erased by the old wrapper, so it is not proven for that sample.
+
+The native cursor query now preserves its original error and marks only a real
+read-only GetCursorPos failure as `ErrCursorObservationUnavailable`. Cancellation,
+failed movement and unclassified adapter failures do not gain that marker.
+The installed input worker supplies a private in-process observation executor.
+On a marked failed readback it may recheck the current desktop and agent authority
+on the same windowless OS thread and read the cursor once more. The interactive
+desktop binding retains its existing fixed-name selection, cleanup fence and
+100ms preparation budget, within the original command context and lease.
+The fixed-desktop runner cannot follow a desktop it was not allowed to select.
+
+Only a successful second observation supplies coordinates to the existing ACK.
+The movement, key/button input, placement and entry transaction are never
+repeated. Reauthorization/cleanup/cancellation failure or another failed read
+preserves the original observation error and the unknown post-move outcome.
+No success ACK is invented, no wire schema or failure certainty changes, and no
+new handle, desktop selector or authority arrives from the peer. The additional
+scope/query work is included in that operation's readback timing.
+
+Focused tests cover recovery with exactly one movement and two reads, persistent
+failure, rejected authority, failed cleanup, cancellation, absent recovery scope,
+unclassified errors and native error preservation. Existing unknown-outcome and
+ACK-framing tests remain applicable. Real lock/PIN continuity must be checked
+after rollout; this change does not claim to remove the independent cold-entry
+preparation wait observed in g346.
+
 ## g346: Refresh an aging candidate on a fresh hint
 
 The g345 trial has an expired-candidate entry taking 174.220ms at the source,

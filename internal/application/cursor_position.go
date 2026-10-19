@@ -1,6 +1,13 @@
 package application
 
-import "context"
+import (
+	"context"
+	"errors"
+)
+
+// ErrCursorObservationUnavailable identifies a failed read-only native cursor
+// query. It says nothing about a preceding write and never permits input replay.
+var ErrCursorObservationUnavailable = errors.New("native cursor observation unavailable")
 
 // CursorPositionPort is local cursor I/O on the selected input backend. It
 // grants no lease authority and never selects a process, session or desktop.

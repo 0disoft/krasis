@@ -4,6 +4,7 @@ package wininput
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/0disoft/krasis/internal/application"
@@ -47,7 +48,8 @@ func (nativeInjectionPort) CursorPosition(ctx context.Context) (int32, int32, er
 	}
 	position, err := cursorPosition()
 	if err != nil {
-		return 0, 0, &application.InjectionError{Certainty: application.InjectionNotApplied, Cause: ErrInputInjection}
+		return 0, 0, &application.InjectionError{Certainty: application.InjectionNotApplied,
+			Cause: errors.Join(ErrInputInjection, application.ErrCursorObservationUnavailable, err)}
 	}
 	return position.X, position.Y, nil
 }

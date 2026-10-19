@@ -123,7 +123,22 @@ func serveReadyProfileOnDesktop(ctx context.Context, channel *Channel, input app
 			}
 			return scope.Do(ctx, operation)
 		}
-		report, runErr = serve(ctx, stream, input, lease, inputDo, recoveryDo, time.Now, timing)
+		// A desktop can change after an applied move but before GetCursorPos.
+		// Retry only that observation after fresh scope/authority checks, on this
+		// same windowless OS thread and within the original request deadline.
+		observe := executor(func(ctx context.Context, read func() error) error {
+			return scope.Do(ctx, func() error {
+				if err := authority.check(false); err != nil {
+					return err
+				}
+				if err := ctx.Err(); err != nil {
+					return err
+				}
+				return read()
+			})
+		})
+		workerCtx := context.WithValue(ctx, cursorObservationScopeKey{}, observe)
+		report, runErr = serve(workerCtx, stream, input, lease, inputDo, recoveryDo, time.Now, timing)
 		return runErr
 	})
 	return report, err

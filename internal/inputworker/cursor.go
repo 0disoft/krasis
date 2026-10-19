@@ -2,6 +2,7 @@ package inputworker
 
 import (
 	"context"
+	"errors"
 
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
@@ -71,5 +72,22 @@ func readCursorResponse(ctx context.Context, input application.InputPort, ack *r
 	}
 	var err error
 	ack.x, ack.y, err = port.CursorPosition(ctx)
+	if err != nil && errors.Is(err, application.ErrCursorObservationUnavailable) && ctx.Err() == nil {
+		if observe, ok := ctx.Value(cursorObservationScopeKey{}).(executor); ok {
+			first := err
+			err = observe(ctx, func() error {
+				var retryErr error
+				ack.x, ack.y, retryErr = port.CursorPosition(ctx)
+				return retryErr
+			})
+			if err != nil {
+				err = errors.Join(first, err)
+			}
+		}
+	}
 	return err
 }
+
+// Installed workers alone provide this local read-only reauthorization scope.
+// It cannot arrive over IPC, dispatch input, renew a deadline or replace a lease.
+type cursorObservationScopeKey struct{}
