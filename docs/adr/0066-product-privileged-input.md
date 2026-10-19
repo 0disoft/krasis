@@ -7,9 +7,8 @@ KRR1 injection report carries an ordinary failure instead of success. Every
 early report without the source summary now adds ErrRecovery and preserves the
 reported error, regardless of its status. A valid source report keeps its
 existing handling. This is a static protocol-boundary finding, not an observed
-cause of the paired g347 failure. Generation 348 remains on the devices after
-its successful lock/PIN trial; the g349 artifact is locally verified but has
-not been applied to either device.
+cause of the paired g347 failure. Generation 348's successful lock/PIN trial
+was collected before applying the locally verified g349 artifact.
 
 The same review reproduces a second ordering: after readiness, a clean final
 source retirement can arrive before sourceStart is sent or while its ACK is
@@ -21,6 +20,16 @@ missing proof, cleanup failure, emergency stop and input activation retain their
 failure. Full authority checks still precede this classification. Stream tests
 cover both orderings and prove no input epoch or replay is introduced. This
 finding is reproduced in tests and is not yet a device-trial result.
+
+Rollout verification: both PCs now report g349 revision
+`43a43496d0bd3bd4db7b4d54bd263ba841ace476`. B transfer
+`c0fab239cb7b28f97a93f994c6c4a5cc` reached UPDATED before A was replaced.
+Paired collection `79785aa1707a3c26591a596a168b9afe` records successful install
+receipts and READY input/service states on both PCs. A doctor is healthy,
+CONNECTED, PROTECTED and CONFIGURED; peer version query is ONLINE/IDLE with the
+same revision. No new fault is recorded in this initial collection. The g349
+physical lock/PIN trial remains pending; no source code or authority settings
+changed during rollout.
 
 ## g348: Preserve source retirement before startup readiness
 
@@ -70,7 +79,7 @@ sample is not counted as a completed handoff. Previous UI logs are incomplete;
 agent logs in this collection are not marked incomplete. The successful device
 trial supports continuity for this run, not a proof of the original native
 cause or removal of every latency source. No PIN values or input content are
-recorded. g349 remains untested on devices.
+recorded. This device-trial result belongs to g348, not the later g349 rollout.
 
 ## g347: Reauthorize one failed cursor observation without replaying movement
 
