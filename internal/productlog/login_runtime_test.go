@@ -19,7 +19,7 @@ func TestThreadRetirementDetailsSurviveSupportWithoutThreadIdentity(t *testing.T
 }
 
 func TestSourceExitHistorySurvivesSupportAndRejectsPrivateOutcomes(t *testing.T) {
-	exit := logindiag.SourceExit{Time: "2026-10-15T08:01:00Z", Command: "inspection", Reader: "cancelled", Capture: "joined", Sender: "joined", Interrupt: "joined", Retirement: "clean_sent", Report: "failed"}
+	exit := logindiag.SourceExit{Time: "2026-10-15T08:01:00Z", Command: "inspection", Reader: "cancelled", Capture: "joined", Sender: "joined", Interrupt: "joined", Retirement: "clean_sent", Report: "failed", Failure: &logindiag.SourceFailure{Operation: "source-reader-timeout", Win32Error: 170, Win32Known: true}}
 	v := logindiag.Runtime{StartedAt: "2026-10-15T08:00:00Z", Time: "2026-10-15T08:01:00Z", Service: "READY", Console: "USER_SESSION", Grant: "PRESENT", LastWorker: "NONE", Source: &logindiag.SourceHistory{Total: 1, Exits: []logindiag.SourceExit{exit}}}
 	for _, private := range []bool{false, true} {
 		if private {
@@ -36,7 +36,7 @@ func TestSourceExitHistorySurvivesSupportAndRejectsPrivateOutcomes(t *testing.T)
 			if !strings.Contains(string(clean), "loginRuntimeIncomplete") {
 				t.Fatal("invalid source history became trustworthy")
 			}
-		} else if !strings.Contains(string(clean), `"command":"inspection"`) || !strings.Contains(string(clean), `"report":"failed"`) || !strings.Contains(string(clean), `"service":"READY"`) {
+		} else if !strings.Contains(string(clean), `"command":"inspection"`) || !strings.Contains(string(clean), `"report":"failed"`) || !strings.Contains(string(clean), `"service":"READY"`) || !strings.Contains(string(clean), `"operation":"source-reader-timeout"`) || !strings.Contains(string(clean), `"win32Error":170`) || !strings.Contains(string(clean), `"win32Known":true`) {
 			t.Fatal("failed command, clean retirement and live service collapsed")
 		}
 	}

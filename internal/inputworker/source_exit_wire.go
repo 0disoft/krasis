@@ -21,7 +21,7 @@ func encodeSourceExit(v logindiag.SourceExit, status byte) ([8]byte, error) {
 		return encoded, ErrProtocol
 	}
 	v.Report = sourceReportState(status)
-	if !v.ValidDetails() || v.Time != "" || status != 2 && (v.Sender == "unjoined" || v.Interrupt == "unjoined" || v.Capture == "failed") {
+	if !v.ValidDetails() || v.Time != "" || v.Failure != nil || status != 2 && (v.Sender == "unjoined" || v.Interrupt == "unjoined" || v.Capture == "failed") {
 		return encoded, ErrProtocol
 	}
 	for i, field := range []string{v.Command, v.Reader, v.Capture, v.Sender, v.Interrupt, v.Retirement} {

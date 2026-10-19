@@ -102,7 +102,7 @@ func TestSourceExitHistoryIsBoundedImmutableAndKeepsPriorFailure(t *testing.T) {
 	exit := cleanSourceExit()
 	var first *logindiag.SourceHistory
 	for i := 0; i < logindiag.MaxSourceExits+3; i++ {
-		r.recordSourceExit(Report{Source: &exit})
+		r.recordSourceExit(Report{Source: &exit}, nil)
 		if i == 0 {
 			first = r.source.Load()
 		}
@@ -123,19 +123,72 @@ func TestSourceExitHistoryIsBoundedImmutableAndKeepsPriorFailure(t *testing.T) {
 	}
 	count := len(saved)
 	exit.Reader = "PRIVATE/input"
-	r.recordSourceExit(Report{Source: &exit})
+	r.recordSourceExit(Report{Source: &exit}, nil)
 	if len(saved) != count {
 		t.Fatal("unbounded source evidence persisted")
 	}
 	r.persist = func(logindiag.Runtime) error { return io.ErrClosedPipe }
 	exit = cleanSourceExit()
-	r.recordSourceExit(Report{Source: &exit})
+	r.recordSourceExit(Report{Source: &exit}, nil)
 	r.record("console", "USER_SESSION", nil)
 	if r.value.Source.Total != logindiag.MaxSourceExits+3 {
 		t.Fatal("failed persistence marked as saved")
 	}
 	if r.source.Load().Total != logindiag.MaxSourceExits+4 {
 		t.Fatal("failed persistence discarded pending source history")
+	}
+}
+
+func TestSourceHistoryRetainsJoinedFailureWithoutChangingReportOrRetirement(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		cause     error
+		operation string
+		native    uint32
+	}{
+		{"native", &workerReportFailure{operation: "source-reader-timeout", cause: syscall.Errno(170)}, "source-reader-timeout", 170},
+		{"service-operation", &workerReportFailure{operation: "worker-report-timeout", cause: ErrRecovery}, "worker-report-timeout", 0},
+		{"unknown", errors.New("SECRET/PIN/input"), "", 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := newLoginRuntimeRecorder(func(logindiag.Runtime) error { return nil })
+			r.record("service", "READY", nil)
+			exit := cleanSourceExit()
+			exit.Report = "failed"
+			var wire bytes.Buffer
+			if err := writeReport(&wire, Report{Source: &exit}, tc.cause); err != nil {
+				t.Fatal(err)
+			}
+			report, result := readReport(&wire)
+			// Native errors and known operation codes cross the existing wire;
+			// service-only failure wrappers may also be added after that receipt.
+			if tc.name == "service-operation" {
+				result = tc.cause
+			}
+			r.recordSourceExit(report, result)
+			r.record("console", "USER_SESSION", nil)
+			if !r.value.Valid() || r.value.Service != "READY" || r.value.LastFailure != nil {
+				t.Fatal("source result changed service failure state", r.value)
+			}
+			got := r.value.Source.Exits[0]
+			if got.Failure == nil || got.Failure.Operation != tc.operation || got.Failure.Win32Error != tc.native || got.Failure.Win32Known != (tc.native != 0) || got.Retirement != "clean_sent" || got.Report != report.Source.Report {
+				t.Fatal("source result evidence was lost or changed retirement", got)
+			}
+			data, _ := json.Marshal(got)
+			if bytes.Contains(data, []byte("SECRET")) {
+				t.Fatal("raw error escaped into history")
+			}
+			if report.Source.Failure != nil || report.Source.Time != "" {
+				t.Fatal("recorder mutated authenticated report")
+			}
+			if err := writeReport(io.Discard, Report{Source: &got}, result); err != ErrProtocol {
+				t.Fatal("service-only fields entered worker protocol", err)
+			}
+			got.Time = ""
+			if err := writeReport(io.Discard, Report{Source: &got}, result); err != ErrProtocol {
+				t.Fatal("service failure accepted without timestamp", err)
+			}
+		})
 	}
 }
 
@@ -166,7 +219,7 @@ func TestSourceExitPublicationCannotWaitForSlowRuntimePersistence(t *testing.T) 
 	defer func() { close(release); <-recorded }()
 	exit := cleanSourceExit()
 	published := make(chan struct{})
-	go func() { r.recordSourceExit(Report{Source: &exit}); close(published) }()
+	go func() { r.recordSourceExit(Report{Source: &exit}, nil); close(published) }()
 	select {
 	case <-published:
 	case <-time.After(time.Second):

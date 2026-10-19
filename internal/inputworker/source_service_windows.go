@@ -12,7 +12,7 @@ const sourcePipeName = `\\.\pipe\Krasis.Source.v1`
 
 // One serial source endpoint per service/console, independent of the input
 // endpoint. Neither accepts the other mode. Cleanup uncertainty stops both.
-func runSourceService(ctx context.Context, installation *Installation, admit func(context.Context) error, observe func(Report)) error {
+func runSourceService(ctx context.Context, installation *Installation, admit func(context.Context) error, observe func(Report, error)) error {
 	agent, service, err := installation.digests()
 	if err != nil {
 		return err
@@ -35,7 +35,7 @@ func runSourceService(ctx context.Context, installation *Installation, admit fun
 			}
 			closeErr := channel.Close()
 			if observe != nil && report.Source != nil {
-				observe(report) // Once per authenticated final report, after close.
+				observe(report, err) // Preserve the joined lease result; close failure is separate.
 			}
 			if failure := serviceRecoveryFailure(err, closeErr); failure != nil {
 				return failure
@@ -56,7 +56,7 @@ func runSourceService(ctx context.Context, installation *Installation, admit fun
 	return nil
 }
 
-func runServiceWithSource(ctx context.Context, installation *Installation, admit func(context.Context) error, regular func(context.Context) error, observe func(Report)) error {
+func runServiceWithSource(ctx context.Context, installation *Installation, admit func(context.Context) error, regular func(context.Context) error, observe func(Report, error)) error {
 	run, cancel := context.WithCancel(ctx)
 	defer cancel()
 	done := make(chan error, 1)

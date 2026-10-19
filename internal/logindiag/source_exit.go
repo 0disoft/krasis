@@ -5,14 +5,29 @@ import "time"
 // SourceExit records one source-only lifetime. It is never native retirement
 // proof or input authority and contains no operation payload or input content.
 type SourceExit struct {
-	Time       string `json:"time,omitempty"`
-	Command    string `json:"command"`
-	Reader     string `json:"reader"`
-	Capture    string `json:"capture"`
-	Sender     string `json:"sender"`
-	Interrupt  string `json:"interrupt"`
-	Retirement string `json:"retirement"`
-	Report     string `json:"report"`
+	Time       string         `json:"time,omitempty"`
+	Command    string         `json:"command"`
+	Reader     string         `json:"reader"`
+	Capture    string         `json:"capture"`
+	Sender     string         `json:"sender"`
+	Interrupt  string         `json:"interrupt"`
+	Retirement string         `json:"retirement"`
+	Report     string         `json:"report"`
+	Failure    *SourceFailure `json:"failure,omitempty"`
+}
+
+// Added by the service after consuming the final worker report and joining its
+// owner. Report status and native retirement remain separate from this cause.
+// No child-provided error text or operation payload is retained.
+type SourceFailure struct {
+	Operation  string `json:"operation,omitempty"`
+	Win32Error uint32 `json:"win32Error"`
+	Win32Known bool   `json:"win32Known"`
+}
+
+func (v SourceFailure) Valid() bool {
+	return ValidRuntimeOperation(v.Operation) &&
+		(v.Win32Known && v.Win32Error != 0 || !v.Win32Known && v.Win32Error == 0)
 }
 
 type SourceHistory struct {
@@ -23,6 +38,9 @@ type SourceHistory struct {
 const MaxSourceExits = 16
 
 func (v SourceExit) ValidDetails() bool {
+	if v.Failure != nil && !v.Failure.Valid() {
+		return false
+	}
 	if v.Report != "recovery" && (v.Sender == "unjoined" || v.Interrupt == "unjoined" || v.Capture == "failed") {
 		return false
 	}
