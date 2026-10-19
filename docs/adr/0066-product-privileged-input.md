@@ -7,8 +7,9 @@ KRR1 injection report carries an ordinary failure instead of success. Every
 early report without the source summary now adds ErrRecovery and preserves the
 reported error, regardless of its status. A valid source report keeps its
 existing handling. This is a static protocol-boundary finding, not an observed
-cause of the paired g347 failure. Generation 348 remains on the devices until
-its pending lock/PIN trial has been collected.
+cause of the paired g347 failure. Generation 348 remains on the devices after
+its successful lock/PIN trial; the g349 artifact is locally verified but has
+not been applied to either device.
 
 The same review reproduces a second ordering: after readiness, a clean final
 source retirement can arrive before sourceStart is sent or while its ACK is
@@ -51,6 +52,25 @@ Focused stream tests cover pre-ready retirement, cleanup failure, malformed and
 wrong-mode reports, and readiness followed by an independently decoded report.
 These reproduce the code-level races; the recorded g347 incident still needs a
 new device trial to establish whether either race caused that specific failure.
+
+Device verification: the user reported completion of B lock, PIN-screen
+transition, A-to-B control/round trips and login/round trips. Fresh paired
+collection `e5f5327ed3f74e9a2bea2ebfb55cc01a` retains g348 revision
+`e7c8c7798c2945838a6cae6db55354e0301c7bf0` on both PCs. B records its lock and
+desktop transitions at `2026-10-19T10:12:29.0767538Z` through
+`10:12:37.0961138Z`, with four clean source exits: capture/sender/interrupt
+joined, retirement clean_sent and report ok. Neither side records a new fault,
+session failure or reconnect in this trial. Both service lifetimes remain
+unchanged with READY input/service receipts, and A doctor is healthy,
+CONNECTED, PROTECTED and CONFIGURED after collection.
+
+The collection has 34 matching completed handoff profiles per side and one
+earlier incomplete profile per side at approximately 10:10 UTC. That incomplete
+sample is not counted as a completed handoff. Previous UI logs are incomplete;
+agent logs in this collection are not marked incomplete. The successful device
+trial supports continuity for this run, not a proof of the original native
+cause or removal of every latency source. No PIN values or input content are
+recorded. g349 remains untested on devices.
 
 ## g347: Reauthorize one failed cursor observation without replaying movement
 
