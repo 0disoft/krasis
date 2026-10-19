@@ -27,8 +27,10 @@ func readSourceWorkerStartup(reader io.Reader) (*handoff.StartupProfile, Report,
 	}
 	report, err := readReport(reader)
 	report, err = receipt(report, err)
-	if report.Source == nil && err == nil {
-		err = ErrRecovery // An injection report cannot certify a source child.
+	if report.Source == nil {
+		// A failed injection report cannot certify source cleanup either.
+		// Preserve its original failure while keeping the service fenced.
+		err = errors.Join(ErrRecovery, err)
 	}
 	return nil, report, true, err
 }

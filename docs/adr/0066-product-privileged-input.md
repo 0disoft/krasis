@@ -1,5 +1,15 @@
 # ADR 0066: Product leases use the installed input service
 
+## g349: Reject wrong-mode early reports on every outcome
+
+A focused regression reproduces a missing source cleanup fence when an early
+KRR1 injection report carries an ordinary failure instead of success. Every
+early report without the source summary now adds ErrRecovery and preserves the
+reported error, regardless of its status. A valid source report keeps its
+existing handling. This is a static protocol-boundary finding, not an observed
+cause of the paired g347 failure. Generation 348 remains on the devices until
+its pending lock/PIN trial has been collected.
+
 ## g348: Preserve source retirement before startup readiness
 
 Paired g347 collection `fe3ca2b31a96817da2fd8b4b063f8f44` shows B accepting

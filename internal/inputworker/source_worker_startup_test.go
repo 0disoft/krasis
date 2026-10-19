@@ -39,12 +39,26 @@ func TestSourceWorkerStartupPreservesRecoveryAndNeverAcceptsOtherReports(t *test
 	if profile != nil || !finished || report.Source == nil || !errors.Is(err, ErrRecovery) {
 		t.Fatal("cleanup failure lost", report, err)
 	}
-	var other bytes.Buffer
-	_ = writeReport(&other, Report{}, nil)
-	for _, data := range [][]byte{nil, failed.Bytes()[:7], failed.Bytes()[:12], other.Bytes(), []byte("invalid!")} {
+	for _, data := range [][]byte{nil, failed.Bytes()[:7], failed.Bytes()[:12], []byte("invalid!")} {
 		profile, _, _, err := readSourceWorkerStartup(bytes.NewReader(data))
 		if profile != nil || !errors.Is(err, ErrRecovery) {
 			t.Fatal("missing or invalid source report passed cleanup fence", len(data), err)
+		}
+	}
+}
+
+func TestSourceWorkerStartupRejectsWrongModeRegardlessOfReportedOutcome(t *testing.T) {
+	for _, failure := range []error{nil, ErrAuthority, ErrRecovery} {
+		var wire bytes.Buffer
+		if err := writeReport(&wire, Report{}, failure); err != nil {
+			t.Fatal(err)
+		}
+		profile, report, finished, err := readSourceWorkerStartup(&wire)
+		if profile != nil || report.Source != nil || !finished || !errors.Is(err, ErrRecovery) {
+			t.Fatal("wrong-mode report escaped source cleanup fence", failure, err)
+		}
+		if failure != nil && !errors.Is(err, failure) {
+			t.Fatal("wrong-mode rejection discarded reported failure", failure, err)
 		}
 	}
 }
