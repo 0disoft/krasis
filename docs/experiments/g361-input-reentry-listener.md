@@ -46,3 +46,20 @@ g360 report is generally smooth, and g360 remains running on both PCs.
 Bugfix and desktop-app procedures apply. No public CLI/API, DB, dependency,
 runner or trust-policy change. No push, public release, CI run, reboot or
 manual service start. Real long-term behavior remains unverified.
+
+## Packaged candidate
+
+The normal workspace builder passes 85 UI tests, native UI compilation,
+installer provenance, archive roundtrip and eight-file/icon verification.
+Offline `update verify` returns valid/ok for generation 361, revision
+`6bd0dedb087a0579b13b39151b04bdbb2bee6cb3`, archive size 27895265 bytes.
+Independent PowerShell SHA-256 values are:
+
+| File | SHA-256 |
+| --- | --- |
+| krasis.exe | 76f1ceb68bc37c0549791f528c8bf62de6de01f4507884f792a315418ad654b9 |
+| krasis-agent.exe | f8f69df169688e6e60679384465327ee822e0fc143ec007bcb9a1876e8c93892 |
+| krasis-cli.exe | 2e9678faaae700bdc16187c3d5786d433be64e09361cab75897600029a7d5377 |
+| krasis-install.exe | 31c668b59779a08900ad6115dc722fb80c61abdf3b463e8184987996143b4e7f |
+
+Packaging does not prove attended movement or long-term service stability.
