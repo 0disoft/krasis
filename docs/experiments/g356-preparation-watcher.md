@@ -38,6 +38,7 @@ deadline recovery, source-read cancellation and concurrent close behavior. The
 full inputworker package tests and vet with only the known Win32 unsafe-pointer
 analyzer disabled pass. Race instrumentation was not run: no C compiler is
 available on this command environment's PATH. No UI or peer protocol changed.
+Localapi tests also pass after reserving source generation 356.
 
 This is a separate local change while the g355 attended movement comparison is
 pending. Generation 356 has not been built or applied to either PC. Keep the

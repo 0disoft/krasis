@@ -83,3 +83,15 @@ trial as g354. No new PIN trial is requested for this performance step. No push,
 public release, CI run, API/DB or runner change was made. ADR 0066 records the
 ignored-event boundary; bugfix and desktop-app procedures plus the incident
 evidence review were used.
+
+## Later retained observation, 13:54:47Z
+
+Collection `34a40768a602457db87d5c42ecb25d65` is RECEIVED. Both g355 supports
+still show service/input health READY and no retained new-revision session-end
+trigger or fault. Three matched handoff profiles are present on each side;
+ordinary dispatch maxima are A 2015us and B 21282us. This is a much smaller,
+uncontrolled sample than the g354 attended movement trial, so it does not yet
+establish a movement-stutter improvement. Both supports retain an incomplete
+older control.previous.jsonl. A doctor remains healthy/CONNECTED/PROTECTED.
+The requested g355 user comparison is still pending. A separate local g356
+preparation-watcher patch has been committed without changing either live PC.
