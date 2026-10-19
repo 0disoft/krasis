@@ -100,3 +100,29 @@ remains pending. Both PCs retain g357; g358 is still not built or deployed.
 Bugfix, desktop-app and error-message-integrity review were applied. No API,
 DB, runner or repository-hygiene change, push, public release, CI, installation,
 service restart, deadline relaxation or new live profiling was performed.
+
+## Packaged candidate, not applied
+
+The g358 workspace build at revision
+`ee0c2c529251e5442b62ef3cec85cc723bd300a3` now passes 85 frontend tests,
+native UI compilation, installer provenance, archive roundtrip and the
+eight-file/icon package check. Offline `update verify` returns valid/ok with
+archive size 27721253 bytes. The inputworker, logindiag, productlog and localapi
+tests and `go vet -unsafeptr=false` were checked again successfully.
+Independent PowerShell SHA-256 values are:
+
+| File | SHA-256 |
+| --- | --- |
+| krasis.exe | 9ad8a6c8b73c0b7acf5e2456c985e92075985a75f7351cf18c399f533c0c290f |
+| krasis-agent.exe | cd8bcb6807c169fe431c65105d078ab7b521781df94f3ab2b08c286b997c2a16 |
+| krasis-cli.exe | e7434a87005634fcba59fcb0bf5b2fbee1fc000e5fcc60c9bf7270ea8865cd6c |
+| krasis-install.exe | fd47e435111c2c69a9c4a0c8c79b013eff5acccd3cb43d676c3b2c29d2e6bee4 |
+
+The paired g357 collection above covers about 40 minutes on A and 43 minutes
+on B. Its 39/42 runtime-summary windows record maximum timer lateness of
+21846/13102 microseconds. However, these windows have no counted hook calls,
+injections or queue/dispatch work, and no handoff evidence was retained for the
+g357 build. They provide idle-lifetime evidence, not an attended movement or
+latency comparison. The earlier g356 success cannot fill that gap. Both live
+PCs remain on g357 while the g357 observation is requested; the g358 candidate
+has not been sent, installed or used to claim the underlying stall resolved.
