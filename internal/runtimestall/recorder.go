@@ -58,7 +58,7 @@ func start(parent context.Context, source traceSource, save func(traceSource) er
 			return
 		case <-r.request:
 			if err := save(source); err != nil {
-				event("runtime_trace_save_failed")
+				event(saveFailureCode(err))
 			} else {
 				event("runtime_trace_saved")
 			}

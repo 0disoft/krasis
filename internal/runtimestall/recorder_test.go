@@ -78,7 +78,7 @@ func TestFailedOrOversizedSnapshotPreservesPreviousAndNeverExports(t *testing.T)
 	if err := save(base, &fakeSource{payload: "private-runtime-record"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := save(base, &fakeSource{oversized: true}); !errors.Is(err, errTraceLimit) {
+	if err := save(base, &fakeSource{oversized: true}); !errors.Is(err, errTraceLimit) || saveFailureCode(err) != "runtime_trace_save_limit" {
 		t.Fatal(err)
 	}
 	path := filepath.Join(base, "Krasis", "diagnostics", FileName)
