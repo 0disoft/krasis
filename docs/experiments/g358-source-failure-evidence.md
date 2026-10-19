@@ -67,6 +67,36 @@ repairs evidence loss, not the underlying stall. The next failure's preserved
 operation will narrow the remaining authority/worker-retirement investigation.
 Existing g356 evidence cannot recover information already discarded.
 
+## Published receipt priority
+
+The supervisor's 100ms policy tick and final worker receipt could both be ready
+when Go selected the tick. A synchronous authority query could then delay an
+already published final result. The supervisor now checks for that result before
+selecting work, again before querying policy, and before sending a stop after a
+policy query. A report published during the query is consumed when the query
+returns; this does not interrupt an in-flight query or prove the earlier incident
+was caused by it. All consumed results still pass through `receipt`, preserving
+protocol errors and uncertain recovery. No authorization check is bypassed for
+a continuing lease, and no timeout or lease duration changes.
+
+The reader goroutine, single buffered result channel, pipe close/join and ticker
+remain owned by `supervise`. Focused tests supply simultaneous ready report,
+poll and cancellation events, and publish an uncertain recovery result during
+the authority query. They verify the exact failure classification and absence
+of an unnecessary stop write or read/write deadline. Inputworker and
+residentagent package tests and `go vet -unsafeptr=false` pass. Existing tests
+still cover waiting for a real wire recovery report and rejecting missing or
+remaining-input receipts. Full UI/package builds and device rollout were not
+repeated because the candidate remains local.
+
+Fresh paired collection `c26186acaabaf509bebf07e606d53d7e`, created at
+2026-10-19 17:02:31-32Z, retains READY service/input state on both g357 PCs and
+no g357 fault/failed/session-end events. Each support still marks
+control.previous.jsonl incomplete. Local doctor independently reports healthy,
+CONNECTED, PROTECTED and CONFIGURED. The user's newly delivered "seems okay"
+response belongs to the earlier g356 question; g357's attended movement result
+remains pending. Both PCs retain g357; g358 is still not built or deployed.
+
 Bugfix, desktop-app and error-message-integrity review were applied. No API,
 DB, runner or repository-hygiene change, push, public release, CI, installation,
 service restart, deadline relaxation or new live profiling was performed.
