@@ -63,3 +63,34 @@ Independent PowerShell SHA-256 values are:
 | krasis-install.exe | 31c668b59779a08900ad6115dc722fb80c61abdf3b463e8184987996143b4e7f |
 
 Packaging does not prove attended movement or long-term service stability.
+
+## Paired application
+
+B update `ec2384640900d41d8a70256d7c9eaec7` reaches UPDATED for the exact
+g361 revision and 27895265-byte archive. A opens the verified new bundle
+through the existing single-instance replacement procedure. A UI, agent,
+launch record and installed agent all reach g361 with matching paths and
+revision. The saved B connection is started once after A reaches LOCAL.
+No force kill, manual service start or reboot is used.
+
+A doctor returns healthy / CONNECTED / PROTECTED / CONFIGURED with service
+RUNNING. Peer update status observes B ONLINE at the same revision, IDLE.
+Fresh paired collection `8872f2312ec9dadc05a1d6b281a32561` is RECEIVED with
+both files created at `2026-10-19T19:59:23Z`. Both service/input-health states
+are READY, with no lastFailure. Service start observations are A
+19:58:10.00523Z and B 19:57:33.7399883Z. Automatic installation receipts are
+A 19:58:08.8306445Z and B 19:57:31.452698Z, both result 0 / complete /
+not_needed; actual automatic installer stdout/stderr/exit codes were not
+independently captured. No remote B doctor was executed.
+
+The new-revision logs contain CONNECTED at A 19:58:31.5456178Z and
+B 19:58:32.1814964Z, with no triggering session failure retained in this
+post-update window. Earlier startup acquisition retries occurred while the
+pair was being replaced and the saved connection had not yet been resumed;
+they are not classified as failures of the new attended movement trial.
+Both control.previous.jsonl files remain incomplete.
+
+The operator was asked for an idle first entry, six quick returns and one
+B lock/PIN/login sequence. That human result and its corresponding fresh
+movement evidence are pending. The goal remains open; a short clean startup
+window and local regressions do not establish long-term resolution.
