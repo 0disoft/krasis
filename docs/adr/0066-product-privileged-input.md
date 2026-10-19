@@ -26,6 +26,25 @@ new both-direction ongoing-approach regression that fails at the old lead.
 Agent, peer, handoff and localapi tests and vet pass. The change does not modify
 the public API, wire format, storage, timeout, runner or dependency contract.
 
+Rollout verification: both PCs report g352 revision
+`56457e8d29bc31f3b3572544be16f0eea5a58462`. The workspace build, 85 frontend
+tests, native build, update-package test and package check pass. Four independent
+SHA-256 values match SHA256SUMS: UI
+`018ec2bada727d1d7c125fa83c7f64cab67f1a8a10d9d4f78ec66126a3a7d83f`, agent
+`e9238fa2ed5cab7f5a97989fdff0597f309e8e44f02f3e3668bc08ae67388e42`, CLI
+`3b0ab4ed32a1649929152f6ea8d2058a183fa8549036131106fe57e5835e851e`, installer
+`3b9d532dbed7b6b10ea79c720680d04fa9f4c7315aef2095efdbf31e573f30ad`.
+Offline update verification accepts the 27788525-byte bundle. B transfer
+`867faec08a17cf4d3fb463b093aca8e3` reaches UPDATED before A UI replacement.
+After replacement A is LOCAL; one saved-profile connect request restores
+CONNECTED. A doctor is healthy, PROTECTED and CONFIGURED with matching UI,
+agent and installed builds. B version inspection is ONLINE/IDLE at the same
+revision. Paired collection `921f4354c1b62b3bbec389652438a7be` confirms both
+install receipts at result 0/complete/not_needed and both input/service receipts
+READY, with no current-build fault/process-failed/session-failed event in the
+export. These are deployment checks only; physical latency improvement and
+the user-reported moving-input stutter remain unverified. No push or release.
+
 ## g351: Observe the live TCP socket without attributing application delay to loss
 
 Paired g350 collection `cca26e51fe8aee9d36a24c7312c8c1ee` contains three
