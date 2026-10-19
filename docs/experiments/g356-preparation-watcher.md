@@ -106,3 +106,45 @@ tests/build evidence remains applicable; only docs changed after packaging, so
 no rebuild, broad retest or CI run was performed. No push, public release, API,
 DB or runner change occurred. Desktop-app, ops-change and incident-triage review
 procedures were used.
+
+## Attended movement observation, 14:18:11Z
+
+The user reports the requested g356 movement trial seems acceptable ("괜찮은듯").
+Do not turn this into a quantified comparison or confirmation that all concurrent
+host work stopped. Paired collection `7e6830edf66d7d9d8b7632de14ebd6bf` is RECEIVED,
+with A support created 2026-10-19 14:18:11Z and B 14:18:10Z.
+
+Filtering to exact source revision yields 12 matched handoff tags on both PCs,
+all ending ok. The retained movement profiles are around 14:17:33..14:17:53Z;
+all 12 B startup records reuse a prepared worker (preparationDecision 1).
+Ordinary dispatch maxima are A 5593us and B 10850us. A request-to-grant spans
+30006..50150us across these profiles. These are measured software spans, not
+cursor-display latency or proof of a causal improvement over earlier generations.
+
+The longest B profile has 746 cadence intervals with histogram
+[0,117,415,194,20,0], i.e. 20 intervals at least 25ms and none at least 100ms.
+Cadence includes intentional idle, transport and scheduling, and the user did
+not confirm an exact continuous-movement duration, so no like-for-like percentage
+comparison to g354/g355 is claimed.
+
+Both service records retain their rollout start times with service READY and
+input health READY. A doctor remains healthy/CONNECTED/PROTECTED/CONFIGURED;
+peer inspection is g356 ONLINE/IDLE at the matching revision. No exact-build
+fault, failed event or session-end trigger is retained. B's six reconnect
+acquisition timeouts are at 14:12:19..14:12:55Z, before this movement trial,
+during rollout and reconnection, not trial disconnects.
+
+A's 14:18:02Z runtime summary still retains queue residence 40537us, timer
+lateness 99027us and a 145006us slow control dispatch. These separate maxima
+are not additive and do not establish a GC or competing-process cause. B's
+latest retained runtime summary predates movement (14:17:13Z), so it cannot
+characterize that trial's runtime scheduling; the handoff records do cover it.
+Both exports still flag the older control.previous.jsonl as incomplete.
+
+Keep g356 as the current observation baseline, with no new code or rollout from
+this result. Paired diagnostics, doctor and peer-version inspection passed;
+git diff --check validates this documentation-only update. No rebuild or broad
+retest is needed because source and artifacts are unchanged. Longer ordinary
+use and later lock/PIN regression checks remain outside this movement trial.
+No API, DB, repository-hygiene or runner change, push, public release or CI run
+was made. Desktop-app, ops-change and incident-triage procedures were applied.
