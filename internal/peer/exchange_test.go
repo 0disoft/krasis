@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/0disoft/krasis/internal/control"
@@ -58,4 +59,45 @@ func TestSessionRequestExchangePreservesMatchingAbort(t *testing.T) {
 	if p == nil || p.Measured != 12 || p.Micros[handoff.RequestReadToHandler] > p.Micros[handoff.RequestReadToGrantWritten] {
 		t.Fatal("receiver read boundary lost or overlapping spans reversed", p)
 	}
+	if summaries[0].ReadPredecessor != nil {
+		t.Fatal("first request invented a preceding dispatch")
+	}
+}
+
+type slowPreparationResponder struct{ *LeaseResponder }
+
+func (*slowPreparationResponder) HandleInputPreparation(context.Context, time.Time) {
+	// Model a preceding handler retaining this serial reader, independently of
+	// how fast the following request itself can be authorized and granted.
+	time.Sleep(80 * time.Millisecond)
+}
+
+func TestSessionRequestRetainsSlowPrecedingDispatchWithoutReordering(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var summaries []handoff.Summary
+		collector := handoff.New(func(s handoff.Summary) { summaries = append(summaries, s) })
+		ctx := handoff.WithSession(context.Background(), collector)
+		defer handoff.EndSession(ctx)
+		runtime := newLocalRuntime(t)
+		writer := &recordingFrameWriter{}
+		coordinator := testWriteCoordinator(t, writer)
+		entry := &recordingCursorEntry{}
+		responder := &slowPreparationResponder{&LeaseResponder{Coordinator: coordinator, Runtime: runtime,
+			Authorizer: staticLeaseAuthorizer{leaseID: "lease", accepted: true}, Peer: testAuthenticatedPeer(), Entry: entry, Returns: entry}}
+		prepare := controlFrame(t, transport.ControlCommand{Kind: transport.ControlPrepareInput})
+		request := controlFrame(t, transport.ControlCommand{Kind: transport.ControlLeaseRequest, SessionID: "session", Epoch: "epoch", Edge: control.ScreenEdgeRight})
+		abort := controlFrame(t, transport.ControlCommand{Kind: transport.ControlLeaseAbort, SessionID: "session", Epoch: "epoch", LeaseID: "lease"})
+		connection := &scriptedConnection{frames: []transport.Frame{prepare, request, abort}}
+		err := RunSessionWithLifecycle(ctx, connection, coordinator, runtime, responder, nil, fixedClock(time.Unix(100, 0)))
+		if !errors.Is(err, io.ErrUnexpectedEOF) || len(summaries) != 1 || !summaries[0].Valid() || summaries[0].End != "error" {
+			t.Fatal("predecessor evidence changed abort/EOF outcome", err, summaries)
+		}
+		want := handoff.ReadPredecessorProfile{Schema: 1, Kind: uint8(transport.MessageControl), Micros: [3]uint32{80000, 0, 0}}
+		if got := summaries[0].ReadPredecessor; got == nil || *got != want {
+			t.Fatal("slow prior dispatch was lost or replaced by the abort", got)
+		}
+		if got := summaries[0].Exchange; got == nil || got.Micros[handoff.RequestReadToGrantWritten] != 0 {
+			t.Fatal("prior dispatch was attributed to the following request", got)
+		}
+	})
 }

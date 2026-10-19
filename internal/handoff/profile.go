@@ -76,27 +76,28 @@ type Vector struct {
 }
 
 type Summary struct {
-	Schema                  uint8                 `json:"schema"`
-	Attempt                 uint8                 `json:"attempt"`
-	Role                    string                `json:"role"`
-	Backend                 string                `json:"backend"`
-	Preparation             Vector                `json:"preparation"`
-	First                   Vector                `json:"first"`
-	Worst                   Vector                `json:"worst"`
-	Entry                   *Vector               `json:"entry,omitempty"`
-	Frames                  uint32                `json:"frames"`
-	Histogram               [5]uint32             `json:"histogram"`
-	End                     string                `json:"end"`
-	Incomplete              bool                  `json:"incomplete"`
-	Startup                 *StartupProfile       `json:"startup,omitempty"`
-	Capture                 *CaptureProfile       `json:"capture,omitempty"`
-	Focus                   *FocusProfile         `json:"focus,omitempty"`
-	Exchange                *ExchangeProfile      `json:"exchange,omitempty"`
-	GrantProgress           *GrantProgressProfile `json:"grantProgress,omitempty"`
-	PreparationLockMicros   uint32                `json:"preparationLockMicros,omitempty"`
-	PreparationLockMeasured bool                  `json:"preparationLockMeasured,omitempty"`
-	ExchangeTag             string                `json:"exchangeTag,omitempty"`
-	PipeOpen                *PipeOpenProfile      `json:"pipeOpen,omitempty"`
+	Schema                  uint8                   `json:"schema"`
+	Attempt                 uint8                   `json:"attempt"`
+	Role                    string                  `json:"role"`
+	Backend                 string                  `json:"backend"`
+	Preparation             Vector                  `json:"preparation"`
+	First                   Vector                  `json:"first"`
+	Worst                   Vector                  `json:"worst"`
+	Entry                   *Vector                 `json:"entry,omitempty"`
+	Frames                  uint32                  `json:"frames"`
+	Histogram               [5]uint32               `json:"histogram"`
+	End                     string                  `json:"end"`
+	Incomplete              bool                    `json:"incomplete"`
+	Startup                 *StartupProfile         `json:"startup,omitempty"`
+	Capture                 *CaptureProfile         `json:"capture,omitempty"`
+	Focus                   *FocusProfile           `json:"focus,omitempty"`
+	Exchange                *ExchangeProfile        `json:"exchange,omitempty"`
+	ReadPredecessor         *ReadPredecessorProfile `json:"readPredecessor,omitempty"`
+	GrantProgress           *GrantProgressProfile   `json:"grantProgress,omitempty"`
+	PreparationLockMicros   uint32                  `json:"preparationLockMicros,omitempty"`
+	PreparationLockMeasured bool                    `json:"preparationLockMeasured,omitempty"`
+	ExchangeTag             string                  `json:"exchangeTag,omitempty"`
+	PipeOpen                *PipeOpenProfile        `json:"pipeOpen,omitempty"`
 }
 
 func (s Summary) Valid() bool {
@@ -120,6 +121,9 @@ func (s Summary) Valid() bool {
 		return false
 	}
 	if s.Exchange != nil && !s.Exchange.Valid(s.Role) {
+		return false
+	}
+	if s.ReadPredecessor != nil && !s.ReadPredecessor.Valid(s.Role) {
 		return false
 	}
 	if s.GrantProgress != nil && !s.GrantProgress.Valid(s.Role) {

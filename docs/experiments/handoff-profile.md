@@ -1,5 +1,25 @@
 # Bounded handoff profile
 
+## g350 receiver request predecessor
+
+Optional `readPredecessor` schema 1 retains only the successful frame dispatch
+immediately before a receiver's lease request. `kind` is the fixed frame kind:
+1 control, 2 input, 3 heartbeat. Its three `micros` entries are the previous
+dispatch duration, previous dispatch completion to this read start, and this
+read start to complete request frame. All use the receiver's monotonic clock
+and saturate at 120 seconds. The pointer is absent on the first frame, without
+valid boundaries, or outside the existing bounded collector. An observed zero
+remains different from absent evidence. Source summaries cannot carry it.
+
+The request's existing exchange tag links this evidence to the matching source
+grant wait. A slow prior dispatch exposes possible reader head-of-line blocking,
+but cannot prove the request had already arrived while that dispatch ran. The
+read span includes idle waiting, transport, decode and scheduling; it is not a
+network RTT. Do not add it to the source wait or subtract opposite-PC timestamps.
+The first two spans also do not establish overlap with the source's request.
+No read-ahead, input reordering, new wire field or input content is introduced.
+The preceding frame's payload, identity and absolute timestamps are discarded.
+
 ## g319 later handoff windows
 
 The product runner uses `handoff.NewRolling`: at most 12 attempts in each

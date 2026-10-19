@@ -97,6 +97,8 @@ func runSession(
 
 	progress, _ := observer.(SessionProgressObserver)
 	coordinatorProgress, _ := observer.(DispatchCoordinatorObserver)
+	var previousKind transport.MessageKind
+	var previousDispatchStarted, previousDispatchCompleted time.Time
 	for {
 		readStarted := time.Now()
 		handoff.ReadProgress(ctx, handoff.ReadWaiting, readStarted, false)
@@ -119,6 +121,7 @@ func runSession(
 		handoff.ReadProgress(ctx, handoff.ReadBetweenFrames, readCompleted, true)
 		if frame.Kind == transport.MessageControl {
 			controlCtx = handoff.WithControlRead(ctx, readCompleted)
+			controlCtx = handoff.WithReadPredecessor(controlCtx, uint8(previousKind), previousDispatchStarted, previousDispatchCompleted, readStarted)
 		}
 		if progress != nil {
 			progress.ObserveReadCompleted(readCompleted)
@@ -201,6 +204,7 @@ func runSession(
 			err = transport.ErrUnsupportedFrame
 		}
 		dispatchCompleted := time.Now()
+		previousKind, previousDispatchStarted, previousDispatchCompleted = frame.Kind, dispatchStarted, dispatchCompleted
 		handoff.ReadProgress(ctx, handoff.ReadBetweenFrames, dispatchCompleted, false)
 		if progress != nil {
 			progress.ObserveDispatchCompleted(dispatchCompleted)

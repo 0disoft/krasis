@@ -1,5 +1,49 @@
 # ADR 0066: Product leases use the installed input service
 
+## g350: Distinguish request handling from the preceding dispatch
+
+Paired g348 evidence `e5f5327ed3f74e9a2bea2ebfb55cc01a` separates two
+latency paths. Exchange `12888f8b41a76f196979cd7ffb1112913cb28934433abefcb342c846e7c3c0b0`
+records 238037us of receiver admission lock wait, all overlapping optional
+preparation. In exchange `09394b5697cec50e1a03021705ef408f3ba9bf992802cc782a1bc7dfb9804174`,
+the source's write-to-grant-read span is 428606us while the receiver's complete
+request-read-to-grant-write span is 29875us. The source reader remains in its
+read phase. These are matching per-process durations, not clock differences;
+they do not identify network loss or prove one common cause.
+
+Fresh g349 collection `63df4194a1e6dc837467b27d312f0368` has two matching
+successful ordinary handoffs. Source grant waits are 134261us and 55780us;
+receiver request processing is 25794us and 28623us respectively. Both services
+and input health remain READY. No new fault/reconnect follows connection
+stabilization at 10:24:10 UTC; earlier B network-acquisition timeouts belong
+to the rollout interval. No g349 lock/PIN trial is present in this collection.
+
+The serial frame reader previously retained no evidence about the dispatch
+immediately preceding a request. Optional receiver-only `readPredecessor` now
+records that frame's fixed kind and three bounded local spans: dispatch,
+dispatch-end to next read-start, and next read duration. It is attached once to
+the matching request profile, with no payload, input identity or wall clock.
+A first frame stays unobserved. A deterministic stream test models a slow prior
+dispatch while the following grant remains fast, preserving abort and EOF.
+This adds evidence for the next latency investigation; it does not establish
+that a prior dispatch caused either real-device sample or reduce the delay.
+Input ordering, lease authority, preparation lifetime and cancellation stay
+unchanged. The running g349 pair is not replaced while its trial is pending.
+
+Local validation: handoff, peer, productlog, localapi and residentagent package
+tests and vet pass. Export tests reject foreign roles, unsupported frame kinds
+and out-of-bound durations, and project away unknown payload/timestamp fields.
+Read-only review found no change to ordering or failure outcomes. This patch
+has not been deployed or device-validated.
+
+A later paired collection `8ee609eea5622660b8541c731e9503dd` supersedes the
+initial quiet g349 observation: B first triggers heartbeat timeout on connection
+`e7c419e9c739d6ca3dddd91698e0adcb8476e5598c5c649f98f325aa94a1aea7`
+at 10:36:12.658713 UTC; A observes remote EOF on that same connection. Further
+connections also time out. Both service receipts remain READY with clean source
+retirements. This is a new failure investigation, not a passed g349 lock/PIN
+trial; the earlier normal handoffs cannot establish continued stability.
+
 ## g349: Reject wrong-mode early reports on every outcome
 
 A focused regression reproduces a missing source cleanup fence when an early

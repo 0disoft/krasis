@@ -120,8 +120,13 @@ func recordReceiverExchange(ctx context.Context, stage ExchangeStage, at time.Ti
 	}
 	s.collector.mu.Lock()
 	defer s.collector.mu.Unlock()
-	if exchangeActive(s, a) && a.summary.Role == "receiver" {
+	if exchangeActive(s, a) && a.summary.Role == "receiver" && !at.Before(readAt) {
 		putExchange(a, stage, at.Sub(readAt))
+		if stage == RequestReadToHandler && a.summary.ReadPredecessor == nil {
+			if p, ok := ctx.Value(readPredecessorKey{}).(ReadPredecessorProfile); ok && p.Valid("receiver") {
+				a.summary.ReadPredecessor = &p
+			}
+		}
 	}
 }
 
