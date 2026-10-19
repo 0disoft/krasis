@@ -45,6 +45,28 @@ READY, with no current-build fault/process-failed/session-failed event in the
 export. These are deployment checks only; physical latency improvement and
 the user-reported moving-input stutter remain unverified. No push or release.
 
+Independent link observation: paired collection
+`3ba5c04917896e2a8cd9e54dcb844782` contains one completed g352 ordinary pair,
+not confirmation of the requested full physical trial. Its source grant wait
+is 107786us, TCP estimated RTT 110821–111300us, receiver request processing
+27998us and receiver worst input dispatch 10910us. Counter differences report
+zero retransmitted bytes/timeout episodes. Worker preparation is already
+claimed from a 1426787us-old candidate with no measured preparation-lock wait.
+This sample does not support preparation overlap as the whole remaining delay.
+
+An independent 12-packet ICMP probe of the actual established peer socket's
+remote address observes 7–196ms round trips. Eight alternating gateway/peer
+rounds observe 6–65ms successful gateway responses plus one 500ms timeout;
+peer responses in those rounds take 10–46ms. Numeric observations and limits
+are retained in `docs/experiments/g352-link-probe.json`. The saved profile
+address on this listener is local, so its initial self-probe was discarded;
+it cannot be used as evidence of a fast peer path. This measurement bypasses
+Krasis input handling but includes ICMP response scheduling. It exposes an
+independent latency variation, not proof of application packet loss, a specific
+Wi-Fi defect or an exclusive cause of stutter. No network or power setting was
+changed. Keep g352 fixed for the pending movement trial before attributing any
+benefit or rolling out another performance change.
+
 ## g351: Observe the live TCP socket without attributing application delay to loss
 
 Paired g350 collection `cca26e51fe8aee9d36a24c7312c8c1ee` contains three

@@ -1,0 +1,36 @@
+{
+  "schema": "krasis.link-observation/v1",
+  "generation": 352,
+  "revision": "56457e8d29bc31f3b3572544be16f0eea5a58462",
+  "date": "2026-10-19",
+  "source": "A",
+  "method": "Windows Ping.Send, 32-byte payload, 500ms timeout, 100ms between rounds",
+  "targetSelection": "Remote address of the established krasis-agent socket on the saved profile port; verified not a local host address",
+  "discardedProbe": "Initial saved-profile address was the local listening address. Its loopback-like observations were discarded and are not peer measurements.",
+  "peerOnlyRoundtripMillis": [98, 182, 196, 18, 43, 35, 9, 7, 91, 73, 9, 10],
+  "alternatingRounds": [
+    {"gatewayMillis": 13, "peerMillis": 10},
+    {"gatewayMillis": 30, "peerMillis": 37},
+    {"gatewayMillis": 65, "peerMillis": 46},
+    {"gatewayMillis": 6, "peerMillis": 29},
+    {"gatewayMillis": null, "gatewayStatus": "TimedOut", "peerMillis": 29},
+    {"gatewayMillis": 23, "peerMillis": 33},
+    {"gatewayMillis": 16, "peerMillis": 19},
+    {"gatewayMillis": 29, "peerMillis": 18}
+  ],
+  "localLink": {"medium": "Wi-Fi", "reportedMegabitsPerSecond": 600},
+  "localAdapterCumulativeCounters": {
+    "receivedPacketErrors": 0,
+    "outboundPacketErrors": 0,
+    "receivedDiscardedPackets": 0,
+    "outboundDiscardedPackets": 0
+  },
+  "powerManagementRead": "unavailable: Windows reported device not functioning; no settings changed",
+  "limits": [
+    "ICMP response scheduling may differ from the application's TLS input path.",
+    "A gateway timeout is not proof that the application lost a packet.",
+    "These sequential probes do not isolate one PC, radio interference, power policy or router behavior.",
+    "Reported link rate and cumulative zero error counters do not establish low latency.",
+    "No input, endpoint, adapter address, network name or identity is retained."
+  ]
+}
