@@ -1,5 +1,15 @@
 # Bounded handoff profile
 
+## g353 native maintenance admission
+
+`installed_source_heartbeat_unsent_expired` means the native pipe rejected an
+expired deadline before any WriteFile submission, and the optional heartbeat
+was discarded without consuming a sequence or renewing liveness. It is not a
+sent request, ACK, successful heartbeat or recovery. The marker is never inferred
+from zero returned bytes alone; attempted/partial and ordinary-command failures
+retain the existing fatal classification. This code does not explain an older
+unclassified write timeout and does not hide trust-freshness expiry.
+
 ## g353 local input cadence
 
 Optional `cadence` schema 1 summarizes successive local input-dispatch starts

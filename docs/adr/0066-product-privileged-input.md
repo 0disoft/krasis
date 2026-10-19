@@ -1,5 +1,48 @@
 # ADR 0066: Product leases use the installed input service
 
+## g353: Skip maintenance only when the native pipe proves no submission
+
+Fresh g352 paired collection `e8d3d44cc5a176b80aa1a14599346460` supersedes the
+initial READY-only snapshot. A fails source capture at 11:51:06.0049586 UTC;
+the matching fixed codes identify a heartbeat write timeout, not a reply
+timeout. The preceding GC trail has a total/stopping pause in the 100ms–1s
+bucket and 704545us maximum timer lateness. B observes remote EOF while both
+services remain READY. A separately expires trust at 11:54:03.5798612 UTC while
+`prelock_lockfile_acl` is still reading. That second cause remains open and is
+not explained by the earlier GC sample or by the ICMP observations.
+
+Inspection finds a definite pre-submission path: the native pipe can detect
+an expired write deadline before calling WriteFile, but previously returned
+the same undifferentiated timeout as an attempted write. The source client
+then fenced its capture owner even for optional heartbeat maintenance. Mark
+only native pre-submission deadline rejection with a private typed proof and
+recheck immediately after event/pin setup before kernel submission. A generic
+zero-byte timeout, failed SetWriteDeadline, partial write or canceled submitted
+operation cannot establish that proof.
+
+Under the existing source command mutex, only a heartbeat with that proof and
+zero returned bytes discards its unsent sequence and preserves the owner. It
+returns the existing unsent-expiry result to the heartbeat poller, records
+`installed_source_heartbeat_unsent_expired`, and creates no ACK, pending request,
+traffic or idle renewal. Later maintenance uses a fresh command; nothing is
+replayed. All attempted/partial writes and ordinary commands keep their current
+failure/fencing policy, including native causes. Active and standby worker
+deadlines, peer timeout and lease authorization are unchanged. Old g352 logs
+cannot prove whether their failed write was submitted; the new classification
+fixes the reproduced path, not every source/trust failure.
+
+Local validation: inputworker and productlog package tests pass; inputworker,
+productlog and residentagent vet pass. Focused inputworker race/checkptr checks
+pass for native pre-submission rejection, expiry during event/pin setup,
+unsent-only sequence preservation, later fresh maintenance and unchanged
+unknown/partial/ordinary-command failure. The fixed event survives sanitized
+export. The initial combined run's residentagent discovery test fails in its
+same-identity loopback fallback case; its isolated rerun and a subsequent full
+residentagent package run pass without discovery-source changes. Preserve this
+transient validation failure rather than attributing it to the IPC patch.
+The change remains local under g353; packaging and device validation follow
+the separate auxiliary connection-cost review. No API, storage or runner change.
+
 ## g353: Distinguish input arrival cadence from dispatch cost
 
 The user reports jitter after entry as well as at entry. g352's independent
@@ -24,7 +67,8 @@ or out-of-window spans are counted as skipped. Counter overflow stops counting;
 retirement copies the fixed profile once. Late callbacks cannot change the
 frozen record or a newer attempt. No wire, input ordering, authority, timeout,
 dependency or runner change. g352 stays deployed while its physical trial is
-pending; g353 is a local diagnostic addition, not a claimed performance fix.
+pending. This cadence addition alone is not a claimed performance fix; the
+separate maintenance admission change has its own validation above.
 
 Local validation: handoff, productlog, peer, agent, residentagent and localapi
 tests and vet pass. Focused handoff/productlog race checks pass, including

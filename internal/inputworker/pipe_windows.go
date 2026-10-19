@@ -281,7 +281,7 @@ func (pipe *pipeConn) overlapped(ctx context.Context, read bool, data []byte, be
 	}
 	deadline := pipe.deadline(read)
 	if !deadline.IsZero() && !time.Now().Before(deadline) {
-		return 0, os.ErrDeadlineExceeded
+		return 0, pipeAdmissionFailure(read, os.ErrDeadlineExceeded)
 	}
 	event, err := windows.CreateEvent(nil, 1, 0, nil)
 	if err != nil {
@@ -295,6 +295,15 @@ func (pipe *pipeConn) overlapped(ctx context.Context, read bool, data []byte, be
 		pinned.Pin(&data[0])
 	}
 	defer pinned.Unpin()
+	// Event creation, pinning or a runtime pause can consume the budget after
+	// the first check. Do not submit a new kernel operation after that deadline.
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	deadline = pipe.deadline(read)
+	if !deadline.IsZero() && !time.Now().Before(deadline) {
+		return 0, pipeAdmissionFailure(read, os.ErrDeadlineExceeded)
+	}
 	err = begin(&overlap)
 	var transferred uint32
 	if err == nil {

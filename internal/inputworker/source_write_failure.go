@@ -10,11 +10,26 @@ import (
 	"time"
 )
 
-// A failed write remains fatal: zero returned bytes cannot prove the worker
+// Only the native pipe's pre-submission deadline checks may create this proof.
+// A zero-byte result from an attempted WriteFile is not equivalent.
+type unsubmittedPipeWrite struct{ cause error }
+
+func (e *unsubmittedPipeWrite) Error() string { return "pipe write not submitted" }
+func (e *unsubmittedPipeWrite) Unwrap() error { return e.cause }
+
+func pipeAdmissionFailure(read bool, cause error) error {
+	if !read && errors.Is(cause, os.ErrDeadlineExceeded) {
+		return &unsubmittedPipeWrite{cause: cause}
+	}
+	return cause
+}
+
+// An attempted write remains fatal: zero returned bytes cannot prove the worker
 // never received a command. Keep its cause for diagnostics, never for replay.
 type sourceIOFailure struct {
-	stage string
-	cause error
+	stage       string
+	cause       error
+	unsubmitted bool
 }
 
 func (e *sourceIOFailure) Error() string { return "source command write failed" }
@@ -22,11 +37,16 @@ func (e *sourceIOFailure) Unwrap() error { return e.cause }
 
 func writeSourceCommand(stream net.Conn, data []byte, deadline time.Time) error {
 	stage := "deadline"
+	unsubmitted := false
 	err := stream.SetWriteDeadline(deadline)
 	if err == nil {
 		stage = "write"
 		var n int
 		n, err = stream.Write(data)
+		if n == 0 && err != nil {
+			var proof *unsubmittedPipeWrite
+			unsubmitted = errors.As(err, &proof)
+		}
 		if err == nil && n != len(data) {
 			err = io.ErrShortWrite
 		}
@@ -34,7 +54,7 @@ func writeSourceCommand(stream net.Conn, data []byte, deadline time.Time) error 
 	if err == nil {
 		return nil
 	}
-	return &sourceIOFailure{stage: stage, cause: errors.Join(ErrAuthority, err)}
+	return &sourceIOFailure{stage: stage, cause: errors.Join(ErrAuthority, err), unsubmitted: unsubmitted}
 }
 
 func sourceIOFailureReason(err error) string {

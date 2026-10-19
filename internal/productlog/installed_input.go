@@ -24,6 +24,7 @@ func init() {
 	}
 	allowed["installed_source_heartbeat_deferred"] = true
 	allowed["installed_source_heartbeat_preflight_expired"] = true
+	allowed["installed_source_heartbeat_unsent_expired"] = true
 	allowed["installed_source_command_preflight_expired"] = true
 	allowed["installed_source_heartbeat_failed"] = true
 	for _, target := range []string{"default", "winlogon", "limit"} {

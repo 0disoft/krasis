@@ -38,7 +38,7 @@ func TestInputConnectionDiagnosticAllowlistRejectsDynamicStages(t *testing.T) {
 	if allowed["installed_source_failure_PRIVATE"] || allowed["installed_source_timing_client_response_123ms"] || allowed["installed_source_timing_worker_authority_lt1ms"] || allowed["installed_source_heartbeat_timing_worker_apply_lt1ms"] {
 		t.Fatal("dynamic or unmeasured source timing accepted")
 	}
-	for _, result := range []string{"deferred", "failed"} {
+	for _, result := range []string{"deferred", "failed", "unsent_expired"} {
 		line := `{"time":"2026-10-15T09:40:00Z","code":"installed_source_heartbeat_` + result + `","error":"PRIVATE"}` + "\n"
 		result := sanitizeLog("agent.jsonl", strings.NewReader(line))
 		if result.Incomplete || len(result.Events) != 1 {

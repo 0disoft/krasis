@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -120,9 +121,16 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 	}
 	stage := "context"
 	replyOutcome := ""
+	unsentExpired := false
 	defer func() {
 		now := time.Now()
 		sampler.observe(sample, now)
+		if unsentExpired {
+			if sampler.emit != nil {
+				emitTiming(sampler.emit, "installed_source_heartbeat_unsent_expired")
+			}
+			return
+		}
 		if result != nil || op == sourceStop {
 			sampler.flush(now)
 		}
@@ -261,6 +269,15 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 		handoff.RecordCapture(ctx, handoff.CaptureIPCWrite, time.Since(started))
 	}
 	if writeErr != nil {
+		var unsent *sourceIOFailure
+		if op == sourceHeartbeat && errors.As(writeErr, &unsent) && unsent.unsubmitted && errors.Is(unsent, os.ErrDeadlineExceeded) {
+			// mu still owns the sequence, and the native pipe proves WriteFile
+			// was never called. Discard this unsent maintenance attempt only.
+			// No ACK, traffic, pending request or idle renewal is fabricated.
+			c.sequence--
+			accepted, unsentExpired = true, true
+			return sourcePacket{}, context.DeadlineExceeded
+		}
 		c.epoch.Store(0)
 		_ = c.channel.Close()
 		return sourcePacket{}, writeErr
