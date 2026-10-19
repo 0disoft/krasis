@@ -41,8 +41,9 @@ lock, timer, packet or I/O, and the profile cannot affect authority or outcomes.
 A continuous-movement trial is needed to interpret arrival gaps and compressed
 bursts. Intentional pauses can dominate the maximum. Source/receiver histograms
 are independent populations, not matched per-input samples. Missing or saturated
-profiles remain limitations. g352 remains on both PCs while its requested trial
-is pending; this local addition has not been deployed or device-verified.
+profiles remain limitations. Both PCs now run g353; the rollout and fresh paired
+baseline are recorded in `g353-rollout.md`. A continuous-movement trial and
+interpretation of its new cadence profile remain pending.
 
 ## g352 earlier preparation on an ongoing approach
 
