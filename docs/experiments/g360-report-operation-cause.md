@@ -62,3 +62,35 @@ pending attended movement comparison are unchanged. No additional live trial,
 service restart, installation, push, release or CI run was performed. Build and
 artifact checks do not establish a human-visible movement improvement or
 resolution of the original long-term source-hook failure.
+
+## Paired rollout
+
+The g357 attended comparison remains unavailable; it is not inferred from the
+earlier g356 reply. To make the failure-evidence changes available on actual
+devices, the verified g360 candidate was applied through the existing product
+update path. B transfer `5d2b23ff5ce287912c2af35330f87b41` reaches UPDATED for
+generation 360 and exact revision `7ab3a4aa77c90cd5bc519ff334cea61b58142a07`.
+A then opens the verified bundle through normal single-instance UI replacement.
+The UI and agent transition succeeds without force-killing either process.
+The saved B connection is started once after A reaches LOCAL.
+
+A doctor now reports healthy/CONNECTED/PROTECTED/CONFIGURED, matching UI,
+launch record and installed agent at the g360 revision, with the protected
+service RUNNING. Remote update status observes B ONLINE at that same revision.
+Paired collection `c431900cec45102b4811a534d20edc45` is RECEIVED with both
+support files created at 2026-10-19 17:22:10-12Z. Both service/input-health
+records are READY. Install receipts are A 17:21:57.3625265Z and
+B 17:21:19.1067894Z, each result 0 / complete / recovery not_needed. Automatic
+installer process exit/stdout/stderr were not captured independently. B doctor
+was not run through a remote shell; its fresh service/input records and exact
+agent version are the available remote evidence.
+
+No g360 fault/failed/session-end event is retained in this short startup window;
+control.previous.jsonl remains incomplete on both PCs. This does not establish
+attended input behavior or long-term stability. A new g360 idle/continuous
+movement/three-return question explicitly supersedes the pending g357 question;
+its human result and corresponding movement diagnostics remain outstanding.
+The hot input performance changes under comparison remain those of g357.
+No reboot, manual service start, repeated installation, input replay, trust or
+security change, force kill, push, public release or CI was performed. Ops-change
+review applies to this rollout in addition to the source review procedures.
