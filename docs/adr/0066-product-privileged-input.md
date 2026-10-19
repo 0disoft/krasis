@@ -1,5 +1,25 @@
 # ADR 0066: Product leases use the installed input service
 
+## g346: Refresh an aging candidate on a fresh hint
+
+The g345 trial has an expired-candidate entry taking 174.220ms at the source,
+including 158.838ms receiver readiness wait. A preparation hint was acknowledged
+between the preceding clean return and entry. A recent reentry candidate can be
+kept by the previous 1.5-second refresh threshold, then expire during a slower
+physical approach. The fixed acknowledgement does not promise lease readiness.
+
+A fresh authenticated, rate-admitted hint may now replace a candidate aged at
+least one second, half its existing lifetime. A replacement gets its own timer
+only after the original child's cleanup succeeds. The two-second hint-launch
+cooldown, two-second unbound lifetime, single candidate, one claim, independent
+lease/bootstrap authentication and ordinary cold fallback remain unchanged.
+Recent candidates are retained. No idle timer creates work and duplicates cannot
+renew an existing child. This trades a possible earlier replacement within the
+existing launch budget for more approach time before expiry; device benefit
+still needs paired evidence. It does not address construction already overlapping
+an entry. A deterministic replay covers the aging candidate, slow approach and
+unchanged cooldown; native ownership/expiry tests cover the adjacent boundary.
+
 ## g340: Renew a retreated approach before its edge band
 
 The paired g339 trial completed twelve handoffs. One receiver admission spent

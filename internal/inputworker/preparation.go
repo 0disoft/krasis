@@ -19,11 +19,12 @@ func preparationAllowed(last, now time.Time) bool {
 }
 
 // Only a new authenticated hint after the unchanged launch cooldown may replace
-// a nearly expired unbound child. The original child's timer is never renewed.
-// A recent reentry preparation remains usable instead of being rebuilt again.
+// an aging unbound child. Leave at least half its lifetime after an acknowledged
+// hint: a still-usable child can otherwise expire during the physical approach.
+// The original timer is never renewed; recent reentry preparation is retained.
 func preparationRefreshDue(last, preparedAt, now time.Time) bool {
 	if preparedAt.IsZero() || !preparationAllowed(last, now) {
 		return false
 	}
-	return now.Sub(preparedAt) >= preparedConsoleWindow*3/4
+	return now.Sub(preparedAt) >= preparedConsoleWindow/2
 }
