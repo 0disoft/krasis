@@ -70,3 +70,20 @@ Generation 362 is a local candidate at this checkpoint. The running pair still
 uses g361, and real lock/PIN/movement acceptance remains unverified. Bugfix and
 desktop-app procedures apply. No public CLI/API, DB, dependency, runner, trust
 policy, reboot, service restart, force kill, push, public release or CI run.
+
+## Verified package
+
+Workspace build passes 85 UI tests, native compilation, protected installer
+provenance, archive roundtrip and eight-file/icon checks. Offline update verify
+returns valid/ok for generation 362, source revision
+`1857565d81f90081407e9470dd26dc67859ff552`, archive size 27714432 bytes.
+Independent PowerShell SHA-256 values:
+
+| File | SHA-256 |
+| --- | --- |
+| krasis.exe | ae6a15c89d56f49c860183c939b2ea4d9c008f57c2cfb88149ad7239cdddd622 |
+| krasis-agent.exe | 080b84e22236d136a7ce80e6aaeec01131cc28f37dc9e67cceb24a44825560ec |
+| krasis-cli.exe | 1ff9aec92a1aa96f5b6768c88d44dd7f6d60dd31b1f894d46ea346b664727705 |
+| krasis-install.exe | 79215701f8f740b1be0dd16d8f22aac3d9e3ea103b80c603330b0cf8ca8bca4f |
+
+Generation 362 is packaged at this checkpoint; attended acceptance is pending.
