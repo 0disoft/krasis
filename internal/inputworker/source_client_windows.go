@@ -438,8 +438,9 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 	go func() {
 		defer close(live.done)
 		var sequence uint64
+		reader := newSourcePacketReader(channel.stream)
 		for {
-			p, err := readSourcePacket(channel.stream)
+			p, err := readSourcePacket(reader)
 			if err != nil {
 				live.err = err
 				return

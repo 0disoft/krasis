@@ -64,3 +64,24 @@ ACK with no follow-up bytes, truncated-frame failure, and closing an outstanding
 read. The candidate is not yet connected to the product source client at this
 benchmark checkpoint. Production source, generation and both live devices remain
 g356. No push, public release, CI, API, DB or runner change was made.
+
+## Product adoption
+
+After the benchmark checkpoint, source_client_windows.go uses this reader only
+inside its existing serial packet goroutine, after the startup handshake and
+before the unchanged sourceStart exchange. Worker command readers and every
+other pipe user remain unbuffered. Generation 357 reserves a distinct artifact
+for paired observation. The wire format, frame validation and error handling
+are unchanged. This increases per-source read-ahead by at most 1024 bytes; there
+is no unbounded backlog, new lifetime owner or change to writer serialization.
+Native input is never injected by these transport tests.
+
+Inputworker, localapi, agent and residentagent package tests pass, including all
+native source-reader, reply, retirement, authority and cancellation tests.
+`go vet -unsafeptr=false` passes for these four packages; the existing Win32
+uintptr callback conversions are not claimed clean under unfiltered vet. The
+focused native reader tests and both benchmarks also pass. No race run was
+added; the new reader is local to the already serial source goroutine and is
+never shared. Bugfix, desktop-app and memory-lifetime review procedures were
+applied, including the performance/security checklists. Device benefit remains
+unverified until a separately packaged build is applied and observed.
