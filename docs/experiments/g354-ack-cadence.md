@@ -62,3 +62,37 @@ Primary API definitions:
 
 The bundle also carries the separately committed detailed trust lock-file
 observer. That addition supplies attribution only and does not cache trust.
+
+## Paired rollout
+
+Bundle revision `47772998cbfb2416127cae54e47840f246e8a57c`, generation 354,
+was built with the ordinary workspace script. All 85 frontend tests, the native
+build, desktop workspacehost tests, installer provenance, package roundtrip and
+offline bundle verification passed. No push, public release or CI run was made.
+
+Independent PowerShell SHA-256 values:
+
+| File | SHA-256 |
+| --- | --- |
+| krasis.exe | d59a4933ccd5098213f79720494188dbd18f198a9186224378c3fe1257c8f873 |
+| krasis-agent.exe | a5e873bb88039602f8eec4a7f3ab4789145c14de214d19779bcb9713a69149c9 |
+| krasis-cli.exe | 14e9bbcd07c3e1e3c4b48acb8b0be7ffa830ff7239eaf1adbc0e75156a78caea |
+| krasis-install.exe | 5a777a53c00f53d1e63946b1651c7103b2ba3fc0e77a11e4f142d8568d2384a1 |
+
+B transfer `787c5cb842058f2c3f3c0780030e4796` reached UPDATED for that revision.
+A then used normal UI replacement and automatic protected-input refresh, followed
+by reconnecting its existing B profile. No reboot or manual service start was used.
+A doctor reports healthy/CONNECTED/PROTECTED/CONFIGURED with matching UI and
+installed agent; B is g354 ONLINE/IDLE at the exact revision.
+
+Collection `37ec7868faad2d6e8561cd18a92f9cd7`, created 2026-10-19 12:53:21 UTC,
+was RECEIVED. Both installation receipts have result 0/stage complete and both
+service/input-health records are READY. Both actual product connections emit
+`tcp_ack_every_packet_requested`; no session termination trigger is retained for
+the new revision in this short baseline. Both supports retain an incomplete old
+control log. Automatic installer process exit/stdout were not captured separately.
+
+The next attended comparison remains 15 seconds idle, A-to-B entry, about 20
+seconds continuous movement on B and three round trips. Source/receiver cadence,
+local dispatch costs and perceived jitter must be assessed separately. Acceptance
+of the option is confirmed on both PCs; its real movement benefit remains pending.
