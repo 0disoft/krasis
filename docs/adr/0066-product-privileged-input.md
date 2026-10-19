@@ -10,6 +10,17 @@ existing handling. This is a static protocol-boundary finding, not an observed
 cause of the paired g347 failure. Generation 348 remains on the devices until
 its pending lock/PIN trial has been collected.
 
+The same review reproduces a second ordering: after readiness, a clean final
+source retirement can arrive before sourceStart is sent or while its ACK is
+pending. Previously both cases became generic authority failure. Only this
+input-free startup handshake now preserves the authenticated reader's completed
+clean retirement as a terminal transition, never successful readiness. Native
+owners must still be joined before replacement. Explicit rejected/foreign ACKs,
+missing proof, cleanup failure, emergency stop and input activation retain their
+failure. Full authority checks still precede this classification. Stream tests
+cover both orderings and prove no input epoch or replay is introduced. This
+finding is reproduced in tests and is not yet a device-trial result.
+
 ## g348: Preserve source retirement before startup readiness
 
 Paired g347 collection `fe3ca2b31a96817da2fd8b4b063f8f44` shows B accepting

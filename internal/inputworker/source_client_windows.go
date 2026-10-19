@@ -221,6 +221,12 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 	}
 	select {
 	case <-c.done:
+		if op == sourceStart {
+			if result, confirmed := sourceRetirementResult(ctx, c.retired.Load(), c.err); confirmed {
+				accepted = true
+				return sourcePacket{}, result
+			}
+		}
 		return sourcePacket{}, ErrAuthority
 	default:
 	}
@@ -303,6 +309,16 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 	}
 	select {
 	case <-c.done:
+		// sourceStart only establishes the capture stream; it dispatches no
+		// input. A complete independent retirement may replace its missing
+		// ACK with a terminal transition, never successful readiness. An
+		// observed negative/foreign ACK has already returned above.
+		if op == sourceStart {
+			if result, confirmed := sourceRetirementResult(ctx, c.retired.Load(), c.err); confirmed {
+				accepted = true
+				return sourcePacket{}, result
+			}
+		}
 		if op == sourceStop && c.retired.Load() && c.err == nil {
 			accepted = true // Independent authenticated native retirement proof.
 			return sourcePacket{}, nil
@@ -457,6 +473,9 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 	}()
 	defer func() { _ = channel.Close(); <-live.done }()
 	if _, err = live.call(ctx, sourceStart); err != nil {
+		if CleanSourceRetirement(err) && c.observe != nil {
+			c.observe("installed_source_startup_retired")
+		}
 		return err
 	}
 	c.mu.Lock()
