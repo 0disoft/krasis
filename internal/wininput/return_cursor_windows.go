@@ -195,6 +195,20 @@ func (shield *returnCursorShield) beforeInput() error {
 	return shield.failureResult()
 }
 
+// Ignored injected input is not physical capture work. With no visible shield,
+// only invalidate queued presentation and preserve earlier cleanup failures;
+// no native operation, desktop selection or input authority is needed. A visible
+// shield still requires the same current-desktop check before native hiding.
+// Both this and beforeInput run only on the owning low-level hook thread.
+func (shield *returnCursorShield) beforeIgnoredInput(check func() error) error {
+	if shield != nil && shield.visible {
+		if err := check(); err != nil {
+			return err
+		}
+	}
+	return shield.beforeInput()
+}
+
 func (shield *returnCursorShield) restore() {
 	if shield == nil {
 		return

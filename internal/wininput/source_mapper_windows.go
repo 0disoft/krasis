@@ -8,8 +8,12 @@ const llkhfExtended = 0x00000001
 
 type sourceKeyboardMapper struct{}
 
+func isInjectedKeyboard(data keyboardHookData) bool {
+	return data.Flags&llkhfInjected != 0 || data.ExtraInfo == krasisInjectedExtraInfo || data.ExtraInfo == selfTestExtraInfo
+}
+
 func (mapper *sourceKeyboardMapper) keyboard(message uint32, data keyboardHookData) (control.InputAction, bool, error) {
-	if data.Flags&llkhfInjected != 0 || data.ExtraInfo == krasisInjectedExtraInfo || data.ExtraInfo == selfTestExtraInfo {
+	if isInjectedKeyboard(data) {
 		return control.InputAction{}, false, nil
 	}
 	// Right Shift has its own non-E0 scan code. Some IME paths report an

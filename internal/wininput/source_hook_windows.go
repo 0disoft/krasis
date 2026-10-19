@@ -340,82 +340,9 @@ func runSourceLowLevelHookThread(
 	threadID, _, _ := procGetCurrentThreadID.Call()
 	var bootstrapMessage message
 	procPeekMessageW.Call(uintptr(unsafe.Pointer(&bootstrapMessage)), 0, 0, 0, pmNoRemove)
-	mapper := &sourceKeyboardMapper{}
-	keyboardCallback := func(code int, wParam uintptr, lParam uintptr) uintptr {
-		if code == hcAction && lParam != 0 {
-			if err := sourceLoginDesktopCheck(ctx); err != nil {
-				session.Abort(err)
-				return callNextHook(code, wParam, lParam)
-			}
-			if err := shield.beforeInput(); err != nil {
-				session.Abort(err)
-				return callNextHook(code, wParam, lParam)
-			}
-			if routeMappedPhysicalAction(session, boundary, func() (control.InputAction, bool, int32, error) {
-				data := *(*keyboardHookData)(unsafe.Pointer(lParam))
-				action, emitted, err := mapper.keyboard(uint32(wParam), data)
-				if emitted && contextMenu != nil {
-					contextMenu.Store(0)
-				}
-				return action, emitted, 0, err
-			}) {
-				return 1
-			}
-		}
-		return callNextHook(code, wParam, lParam)
-	}
-	mouseCallback := func(code int, wParam uintptr, lParam uintptr) uintptr {
-		if code == hcAction && lParam != 0 {
-			if err := sourceLoginDesktopCheck(ctx); err != nil {
-				session.Abort(err)
-				return callNextHook(code, wParam, lParam)
-			}
-			if err := shield.beforeInput(); err != nil {
-				session.Abort(err)
-				return callNextHook(code, wParam, lParam)
-			}
-			data := *(*mouseHookData)(unsafe.Pointer(lParam))
-			message := uint32(wParam)
-			if action, button := mapSourceHookButton(message, data); button {
-				if contextMenu != nil {
-					owner := uintptr(0)
-					if action.Kind == control.InputButtonUp && action.Code == MouseButtonRight && !session.Active() {
-						owner = sourceWheelCaptureGetForeground()
-					}
-					contextMenu.Store(owner)
-				}
-				if routePhysicalAction(session, boundary, action, data.Point.X) {
-					return 1
-				}
-				return callNextHook(code, wParam, lParam)
-			}
-			if message == wmMouseMove {
-				pointerState.observe(data.Point)
-			}
-			if message == wmMouseWheel || message == wmMouseHWheel {
-				if ownedByWindow, suppress := sourceWindowOwnsHookWheel(wheelCapture, data); ownedByWindow {
-					if suppress {
-						return 1
-					}
-					observeHookMouseWheel(observer, data)
-					return callNextHook(code, wParam, lParam)
-				}
-				if routeMappedPhysicalAction(session, boundary, func() (control.InputAction, bool, int32, error) {
-					action, emitted, err := mapObservedHookMouseWheel(observer, message, data)
-					return action, emitted, data.Point.X, err
-				}) {
-					return 1
-				}
-			}
-			activePhysical := shouldSuppressPhysicalMouseInput(session, data)
-			observeActivePhysicalHookMouse(observer, message, activePhysical)
-			if activePhysical {
-				return 1
-			}
-		}
-		return callNextHook(code, wParam, lParam)
-	}
-	owner := &sourceHookCallbacks{keyboard: timedSourceCallback(keyboardCallback, timing), mouse: timedSourceCallback(mouseCallback, timing)}
+	callbacks := newSourceLowLevelCallbacks(session, boundary, observer, wheelCapture, pointerState, contextMenu, shield,
+		func() error { return sourceLoginDesktopCheck(ctx) }, callNextHook)
+	owner := &sourceHookCallbacks{keyboard: timedSourceCallback(callbacks.keyboard, timing), mouse: timedSourceCallback(callbacks.mouse, timing)}
 	if _, loaded := sourceHookOwners.LoadOrStore(threadID, owner); loaded {
 		return errors.New("source hook thread already has an owner")
 	}

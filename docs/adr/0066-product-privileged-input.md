@@ -919,3 +919,16 @@ Source relative frames share the worker's +/-32767 delta bound. Pending moves
 coalesce only within that bound; larger individual moves are split with total
 movement and button ordering preserved. Admission reserves the complete split
 or takes the existing overflow safety path.
+
+## Ignored injected source-hook input
+
+The source hook excludes injected keyboard input and Krasis/self-test tagged
+mouse input from physical capture. When its passive cursor shield is not visible,
+ignored keyboard and tagged non-wheel mouse callbacks only invalidate pending
+presentation, retain cleanup failures, and update the mouse position snapshot.
+They do not query desktop activity or acquire the physical routing gate. No
+input is captured, suppressed or authorized by this early pass-through. Visible
+shield restoration still checks its active desktop before native window work.
+Actual physical events keep their existing desktop/authority checks. Wheels
+keep the previous window-ownership suppression and synthesized touchpad path.
+The authenticated injection worker still checks every request independently.
