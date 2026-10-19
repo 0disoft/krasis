@@ -17,6 +17,7 @@ func init() {
 	// Append only: existing operation bytes and the report layout stay stable.
 	reportOperations = append(reportOperations, inputdesktop.CaptureThreadFailureOperations()...)
 	reportOperations = append(reportOperations, "thread-join-low-level-hook", "thread-join-raw-mouse", "thread-join-wheel-capture", "thread-join-multiple")
+	reportOperations = append(reportOperations, "authority-process-query", "authority-process-exited", "authority-console-session", "authority-console-token", "authority-logon-token", "authority-logon-changed", "authority-service-pipe", "authority-service-status")
 }
 
 type workerReportFailure struct {
@@ -30,6 +31,10 @@ func (e *workerReportFailure) LoginRuntimeOperation() string { return e.operatio
 
 func reportFailureDetails(err error) (byte, uint32) {
 	operation := wininput.SourceFailureStage(err)
+	var authority *authorityCheckFailure
+	if errors.As(err, &authority) && validAuthorityOperation(authority.operation) {
+		operation = authority.operation // Preserve the failed check, not only its source-loop wrapper.
+	}
 	if operation == "" {
 		var failure interface{ LoginRuntimeOperation() string }
 		if errors.As(err, &failure) && logindiag.ValidRuntimeOperation(failure.LoginRuntimeOperation()) {
@@ -42,6 +47,9 @@ func reportFailureDetails(err error) (byte, uint32) {
 			code = byte(index)
 			break
 		}
+	}
+	if authority != nil && validAuthorityOperation(authority.operation) {
+		return code, authority.native
 	}
 	var native syscall.Errno
 	if errors.As(err, &native) && native != 0 && uint64(native) <= 0xffffffff {

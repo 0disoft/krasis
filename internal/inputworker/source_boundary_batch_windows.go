@@ -41,13 +41,13 @@ func (w *sourceWriter) sendBoundaries(batch []sourcePacket) error {
 	// the shared writer gate needed by heartbeat replies. No input/actions or
 	// capture decisions enter this batch. Validate fully before admission, then
 	// recheck the pinned owner's presence under the sequence/write gate.
-	if w.channel.authority.check(false) != nil {
-		return sourceTransportFailure(ErrAuthority)
+	if err := w.channel.authority.checkSource(); err != nil {
+		return sourceTransportFailure(err)
 	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if w.channel.authority.checkHeartbeat() != nil {
-		return sourceTransportFailure(ErrAuthority)
+	if err := w.channel.authority.checkSourceHeartbeat(); err != nil {
+		return sourceTransportFailure(err)
 	}
 	var wire [sourceBoundaryBatchLimit * sourcePacketSize]byte
 	next := w.sequence

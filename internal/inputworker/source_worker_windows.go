@@ -42,8 +42,8 @@ func (w *sourceWriter) writePacket(p sourcePacket, current func() bool, retireme
 		// needed by keepalive replies. Admit a fresh proof only with immediate
 		// TryLock success; after contention, wait without a proof and recheck.
 		for {
-			if w.channel.authority.check(false) != nil {
-				return sourceTransportFailure(ErrAuthority)
+			if err := w.channel.authority.checkSource(); err != nil {
+				return sourceTransportFailure(err)
 			}
 			if w.mu.TryLock() {
 				break
@@ -65,8 +65,8 @@ func (w *sourceWriter) writePacket(p sourcePacket, current func() bool, retireme
 		// Input and observations retain their full check above. A completed
 		// command reply reports an already known outcome, not new authority.
 		// Recheck the pinned owner's presence after admission and before bytes.
-		if w.channel.authority.checkHeartbeat() != nil {
-			return sourceTransportFailure(ErrAuthority)
+		if err := w.channel.authority.checkSourceHeartbeat(); err != nil {
+			return sourceTransportFailure(err)
 		}
 	}
 	w.sequence++
@@ -129,16 +129,16 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 	run, cancel := context.WithDeadline(ctx, lease.ExpiresAt)
 	defer cancel()
 	authorize := func() error {
-		if proof.check(false) != nil || channel.authority.check(false) != nil {
-			return ErrAuthority
+		if err := proof.checkSource(); err != nil {
+			return err
 		}
-		return nil
+		return channel.authority.checkSource()
 	}
 	present := func() error {
-		if proof.checkHeartbeat() != nil || channel.authority.checkHeartbeat() != nil {
-			return ErrAuthority
+		if err := proof.checkSourceHeartbeat(); err != nil {
+			return err
 		}
-		return nil
+		return channel.authority.checkSourceHeartbeat()
 	}
 	authorizeCommand := func(op byte) error {
 		return sourceCommandReadAuthorization(op, authorize, present)

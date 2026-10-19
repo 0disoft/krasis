@@ -33,6 +33,9 @@ func sourceTransportJoinedOnly(err error, ownExpiry bool, command bool) bool {
 	if inspection, ok := err.(*sourceInspectionRejected); ok {
 		return command && sourceRetryableInspection(inspection.cause)
 	}
+	if failure, ok := err.(*authorityCheckFailure); ok {
+		return command && validAuthorityOperation(failure.operation)
+	}
 	if joined, ok := err.(interface{ Unwrap() []error }); ok {
 		for _, cause := range joined.Unwrap() {
 			if !sourceTransportJoinedOnly(cause, ownExpiry, command) {

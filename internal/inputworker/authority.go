@@ -35,6 +35,17 @@ type Authority struct {
 // SCM/WTS RPC. All state-changing commands and input still use check(false).
 // Authorities without a separate presence proof retain the full check.
 func (authority *Authority) checkHeartbeat() error {
+	if authority.heartbeatResult() != nil {
+		return ErrAuthority
+	}
+	return nil
+}
+
+func (authority *Authority) checkSourceHeartbeat() error {
+	return sourceAuthorityResult(authority.heartbeatResult())
+}
+
+func (authority *Authority) heartbeatResult() error {
 	if authority == nil {
 		return ErrAuthority
 	}
@@ -47,10 +58,7 @@ func (authority *Authority) checkHeartbeat() error {
 	if check == nil {
 		check = authority.checkInput
 	}
-	if check() != nil {
-		return ErrAuthority
-	}
-	return nil
+	return check()
 }
 
 func (authority *Authority) check(recovery bool) error {
@@ -60,6 +68,19 @@ func (authority *Authority) check(recovery bool) error {
 // The context only selects diagnostic recording for an actual client input.
 // Closed/zero proofs and recovery use the same mandatory checks as before.
 func (authority *Authority) checkObserved(ctx context.Context, recovery bool) error {
+	if authority.checkResult(ctx, recovery) != nil {
+		return ErrAuthority
+	}
+	return nil
+}
+
+// Source reports retain only a closed operation code and numeric native error.
+// Ordinary callers keep the existing sentinel-only error contract.
+func (authority *Authority) checkSource() error {
+	return sourceAuthorityResult(authority.checkResult(nil, false))
+}
+
+func (authority *Authority) checkResult(ctx context.Context, recovery bool) error {
 	if authority == nil {
 		return ErrAuthority
 	}
@@ -88,10 +109,7 @@ func (authority *Authority) checkObserved(ctx context.Context, recovery bool) er
 	} else {
 		err = check()
 	}
-	if err != nil {
-		return ErrAuthority
-	}
-	return nil
+	return err
 }
 
 func (authority *Authority) Close() error {

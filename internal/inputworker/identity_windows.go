@@ -92,24 +92,33 @@ func authenticateAgentInstalled(pipe uintptr, expected [sha256.Size]byte, instal
 	}
 	consoleStillCurrent := func() error {
 		if windows.WTSGetActiveConsoleSessionId() != session {
-			return ErrAuthority
+			return authorityCheckFailed("authority-console-session", nil)
 		}
 		var current windows.Token
-		if windows.WTSQueryUserToken(session, &current) != nil {
-			return ErrAuthority
+		if err := windows.WTSQueryUserToken(session, &current); err != nil {
+			return authorityCheckFailed("authority-console-token", err)
 		}
 		defer current.Close()
 		currentLogon, err := tokenLogon(current)
-		if err != nil || currentLogon != logon {
-			return ErrAuthority
+		if err != nil {
+			return authorityCheckFailed("authority-logon-token", err)
+		}
+		if currentLogon != logon {
+			return authorityCheckFailed("authority-logon-changed", nil)
 		}
 		return nil
 	}
 	accepted = true
 	processPresent := func() error {
 		state, err := windows.WaitForSingleObject(identity.handle, 0)
-		if err != nil || state != uint32(windows.WAIT_TIMEOUT) || windows.WTSGetActiveConsoleSessionId() != session {
-			return ErrAuthority
+		if err != nil {
+			return authorityCheckFailed("authority-process-query", err)
+		}
+		if state != uint32(windows.WAIT_TIMEOUT) {
+			return authorityCheckFailed("authority-process-exited", nil)
+		}
+		if windows.WTSGetActiveConsoleSessionId() != session {
+			return authorityCheckFailed("authority-console-session", nil)
 		}
 		return nil
 	}
@@ -118,8 +127,8 @@ func authenticateAgentInstalled(pipe uintptr, expected [sha256.Size]byte, instal
 		agentStarted: agentStarted,
 		checkPresent: processPresent,
 		checkInput: func() error {
-			if processPresent() != nil {
-				return ErrAuthority
+			if err := processPresent(); err != nil {
+				return err
 			}
 			return consoleStillCurrent()
 		},
@@ -209,8 +218,11 @@ func authenticateServiceInstalled(ctx context.Context, pipe uintptr, expected [s
 	accepted = true
 	present := func() error {
 		var current uint32
-		if windows.GetNamedPipeServerProcessId(windows.Handle(pipe), &current) != nil || current != pid {
-			return ErrAuthority
+		if err := windows.GetNamedPipeServerProcessId(windows.Handle(pipe), &current); err != nil {
+			return authorityCheckFailed("authority-service-pipe", err)
+		}
+		if current != pid {
+			return authorityCheckFailed("authority-service-pipe", nil)
 		}
 		return nil
 	}
@@ -364,7 +376,10 @@ func tokenLogon(token windows.Token) (windows.LUID, error) {
 	var stats tokenStatistics
 	var returned uint32
 	err := windows.GetTokenInformation(token, windows.TokenStatistics, (*byte)(unsafe.Pointer(&stats)), uint32(unsafe.Sizeof(stats)), &returned)
-	if err != nil || returned != uint32(unsafe.Sizeof(stats)) {
+	if err != nil {
+		return windows.LUID{}, err
+	}
+	if returned != uint32(unsafe.Sizeof(stats)) {
 		return windows.LUID{}, ErrAuthority
 	}
 	return stats.AuthenticationID, nil
