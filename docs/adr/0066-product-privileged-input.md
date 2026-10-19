@@ -1,5 +1,31 @@
 # ADR 0066: Product leases use the installed input service
 
+## g352: Leave the preparation budget before a moderate approach reaches the edge
+
+The successful g351 lock/PIN/login trial still leaves user-observed jitter
+during movement after entry. Its retained ordinary handoff profiles show
+3773us maximum source dispatch and 15369us maximum receiver dispatch; source
+runtime queue residence reaches 19910us. These do not measure transport or
+display latency and cannot explain away the report. The later protected-desktop
+phase lacks matching profiles because the existing attempt limit was exhausted.
+
+Separately, a deterministic ongoing 1px/ms approach shows that the 250ms
+prediction admits preparation only 240ms before crossing, while optional local
+preparation may take 300ms. Increase the prediction lead to 500ms, leaving 480ms
+in that model. Keep the 192px/quarter-width fallback, three-quarter-width cap,
+sample validation, approach suppression, bounded queue, cooldown, freshness,
+candidate lifetime and independent lease authorization. The tradeoff is earlier
+unused preparation within the same resource limits. Fast warps or slow hint
+delivery can still need cold entry; no latency guarantee follows from this test.
+Reverting the preview constant restores the previous tuning without state or
+wire migration. Moving-input jitter and the earlier heartbeat failure remain
+separate open investigations. Device results are recorded after deployment.
+
+Local validation: preparation geometry/queue/renewal tests pass, including the
+new both-direction ongoing-approach regression that fails at the old lead.
+Agent, peer, handoff and localapi tests and vet pass. The change does not modify
+the public API, wire format, storage, timeout, runner or dependency contract.
+
 ## g351: Observe the live TCP socket without attributing application delay to loss
 
 Paired g350 collection `cca26e51fe8aee9d36a24c7312c8c1ee` contains three

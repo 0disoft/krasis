@@ -7,7 +7,9 @@ import (
 )
 
 const (
-	preparationPreviewLead = 250 * time.Millisecond
+	// Leave room for the existing 300ms preparation budget and hint delivery.
+	// The region cap and launch cooldown still bound unused preparation.
+	preparationPreviewLead = 500 * time.Millisecond
 	previewSampleMinimum   = 4 * time.Millisecond
 	previewSampleAdvance   = 16 * time.Millisecond
 	previewSampleMaximum   = 50 * time.Millisecond

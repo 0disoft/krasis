@@ -1,5 +1,26 @@
 # Bounded handoff profile
 
+## g352 earlier preparation on an ongoing approach
+
+The physical-position velocity preview now projects 500ms ahead instead of
+250ms. A deterministic 1px/ms approach in either direction previously admitted
+its first hint only 240ms before crossing, less than the existing 300ms local
+preparation budget. The same test now leaves 480ms. This models geometry only;
+it cannot guarantee timely delivery, worker readiness or a real-device speedup.
+The baseline band, three-quarter-screen cap, sample validation, sticky retreat,
+single-slot nonblocking queue, freshness, launch cooldown and child lifetime
+remain unchanged. Earlier unused preparation is possible; no idle timer or
+additional launch allowance is introduced. Lease authority is unchanged.
+
+The g351 user trial completed lock/PIN/login transitions, but the user also
+reports stutter during movement after entry. In its 12 retained ordinary pairs,
+source frame dispatch peaks at 3773us and receiver dispatch at 15369us; the
+source queue residence maximum is 19910us in its runtime interval. These are
+independent local measurements, not complete input-to-display latency. Later
+lock/PIN input is outside the retained handoff window. Moving-input jitter,
+transport delay and the historical heartbeat failure remain unresolved; this
+preparation-only change does not claim to fix them.
+
 ## g351 source TCP estimates around a matching grant
 
 Optional source-only `tcpInfo` schema 1 contains two local socket observations:

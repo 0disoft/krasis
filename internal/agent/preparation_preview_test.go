@@ -99,9 +99,9 @@ func TestPreparationLeavesMoreLeadForModeratePhysicalApproach(t *testing.T) {
 		if p.previewAndSend(move, start, at) {
 			t.Fatal("initial sample prepared before speed was known")
 		}
-		// 2px/ms predicts 500px with the larger lead. This position remains
-		// 379/380px from the boundary and outside the old 300px prediction.
-		if !p.previewAndSend(move, next, at.Add(20*time.Millisecond)) || p.band != 500 {
+		// 2px/ms reaches the existing three-quarter-screen prediction cap.
+		// Preparation remains bounded even with the longer lead.
+		if !p.previewAndSend(move, next, at.Add(20*time.Millisecond)) || p.band != 750 {
 			t.Fatal("moderate approach retained the last-moment hint", p.band)
 		}
 	}
