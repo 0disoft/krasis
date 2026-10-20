@@ -315,7 +315,7 @@ func (client *Client) performResponse(ctx context.Context, command request, obse
 // Fixed phase evidence only; the existing observer contract forbids reentry.
 func (client *Client) observeFailure(code string) {
 	if client.timing.emit != nil {
-		client.timing.emit(code)
+		emitTiming(client.timing.emit, code)
 	}
 }
 
