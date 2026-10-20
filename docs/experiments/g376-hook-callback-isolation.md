@@ -34,3 +34,37 @@ waiting paths, not every cause of native callback delay or repeated recovery.
 No new control API, DB, dependency, runner or firewall changes. Support/v1 adds
 one optional numeric diagnostic field. No push or issue comments. Paired device
 application is recorded below after packaging.
+
+## Paired application and observed recovery
+
+Both PCs run g376 at revision
+`ad0e4f032604c5895df394ec8f5097a391199b59`. The 27,841,083-byte package
+passed offline verification, frontend's 85 tests, native build, installer
+provenance and eight-file bundle checks. B transfer
+`5c5203aab732f5d04e3407c16d457d9f` reports UPDATED at the exact revision.
+
+A's first installation returned 4 at 19:34:08Z: replace/file_move, Win32 5,
+recovery restored. Read-only doctor confirmed the previous g375 installed
+agent and service remained intact. One retry returned 0 at 19:34:42Z and
+its installed agent SHA-256 matches the bundle. This is an observed rollback
+and retry outcome, not identification of which process denied the move.
+No security software was disabled, no process was killed, and no broad
+permission/firewall change was made.
+
+Doctor reports healthy/CONNECTED and matching CLI/UI/running/installed agent
+and recovery record at g376. The 19:35:50Z/52Z paired diagnostics show READY
+input health and complete current logs on both PCs. Both connected at
+19:35:35Z. Neither g376 report contains a fault/session_failed event; no
+reconnect follows 19:35:30Z. B's earlier acquisition timeouts occurred while
+A was stopped for replacement. This brief idle connection does not verify
+physical held-input, first-click, lock/unlock or long-term stability.
+
+#59 stays open; all ten previously open issues remain open. No issue comments
+were added. The next bounded implementation should address synchronous native
+presentation and physical/boundary gates without weakening desktop authority
+or first-input semantics, then finish #59 before claiming hook work complete.
+#50's non-cancelable injection lifetime and the actual device/signing gates
+remain separate outstanding work. No new task was begun after ten minutes.
+
+All source and evidence changes are local main commits; one checkout, no new
+branches and no Git push. The dependency dashboard was left unchanged.
