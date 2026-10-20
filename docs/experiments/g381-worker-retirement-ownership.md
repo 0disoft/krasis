@@ -74,3 +74,28 @@ The exact relationship to the new retirement code is unproven. Restore the
 previous g380 implementation as forward generation g382, retaining this record
 and the rejected implementation commit for a later isolated investigation.
 The native retirement proposal and client-side SCM work remain outstanding.
+
+## g382 rollback application and immediate next action
+
+Both PCs installed g382, revision 01d84566f783510f005f0ea60518333fc8d89b9a.
+Production internal/cmd code matches g380 exactly except AgentGeneration=382.
+Frontend's 85 tests, native build and archive/provenance checks passed; update
+verify accepted 27,968,331 bytes. B's receipt f7c23bdb9b532a0bae02976327b3005c
+reports UPDATED. A installer returned 0 and its installed agent hash matches.
+The 20:40:07Z/08Z paired collection reports READY input service and completed
+stage cleanup on both sides, with no current-build fault/session_failed event.
+
+Connection recovery is NOT complete. B recorded one protected-source-ready
+event before a subsequent peer_disconnect_requested/session_stopped. A's
+explicit disconnect before replacement caused that peer stop; A is now
+CONNECTING rather than healthy/CONNECTED. Do not treat READY installation or
+management connectivity as proof of working paired input. B's stopped session
+needs resuming without another disconnect on A. Existing management app-open
+confirms the UI window but does not resume the input session. Resume this
+connection first next run, then isolate the rejected g381 change.
+
+One rollback packaging attempt stopped at the clean-tree guard because a
+deleted-path staging command failed. The subsequent local commit preserved
+this evidence and generation 382, and packaging then succeeded. No artifact was
+overwritten and no remote push or issue closure occurred. Ten issues remain
+open. No new implementation task was started after the ten-minute cutoff.
