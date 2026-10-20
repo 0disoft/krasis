@@ -62,3 +62,38 @@ closing #50; a successful cursor smoke does not establish every failure path.
 Physical input/fault, home-pair, endpoint-change, UI/accessibility and signed
 release gates keep their own requirements. No push, issue comment, external
 API, DB, runner, dependency, firewall or signing change is part of this unit.
+
+## Packaged application and observed startup failure
+
+Both PCs applied generation 394, revision
+2213b731fa8113f999470dda229372902546da92. UI's 85 tests, native builds,
+installer provenance and eight-file archive checks passed. Offline verify
+accepted 28,270,809 bytes. A installer exited 0 and its installed agent SHA-256
+matched. The actual protected agent's ordinary service/native-child cursor
+read/same-point placement/shutdown smoke passed. Only the session-0 service
+remained afterwards; no console input processes remained. This is ordinary
+installed-path evidence and does not exercise the before-login Winlogon path.
+
+A's first source startup failed at 2026-10-20T23:09:47Z, stage worker_ready,
+native error unknown, with fault_remote_eof/session_failed. Automatic recovery
+restarted A at 23:09:57Z, replacing the first update receipt
+9f9e5fe792234fe8d84fb4bfee97058b before B had changed from g393. Fresh status
+confirmed IDLE/peer g393 before a new send was created. B receipt
+22765218a4ebcef70a7cdf0ab4bb0f52 reports UPDATED/g394. Its replacement then
+ended A's connection; A was explicitly reconnected at 23:11:51Z. No Disconnect
+command was sent during replacement. The initial startup failure is unexplained
+and is not dismissed as a successful or fault-free stability trial.
+
+Doctor now reports healthy/CONNECTED, matching CLI/UI/resident/installed builds,
+protected input CONFIGURED and completed stage cleanup. Peer status is ONLINE
+at the same g394 revision. Collection bcb106e38fc134dbed439687dc62be06 at
+23:12:21Z has 127 A / 60 B current-build events, both READY, and no new fault or
+triggered session-end detail after the explicit reconnect. This short window
+does not establish physical input, soak, DHCP change or before-login recovery.
+
+Next priority is the observed installed source worker_ready startup failure and
+its automatic agent replacement, before speculative additional authority work.
+Retain the first collection 08960d16ba365607fc7321cf690749f9 and later
+8d4b5790393bd4de198fb11c625e0ce8 for that investigation. All ten issues remain
+open. No new implementation unit started after the ten-minute cutoff; completed
+source and rollout evidence are local main commits with no push.
