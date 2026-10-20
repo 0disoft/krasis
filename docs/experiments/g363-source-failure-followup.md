@@ -166,3 +166,29 @@ No runtime fix is claimed from this collection. No authorization checks,
 input protocol, process priority, dependencies or CI configuration were changed.
 The installed pair remains on g365; no replacement, reboot or remote Git update
 was performed for this follow-up.
+
+## Low-load comparison preflight found another connection fault
+
+At 09:40Z (18:40 KST), before a new motion trial, A was FAULTED on g365 while
+the input service remained running. Its log records an idle source heartbeat
+response timeout at 09:31:24.3466489Z, a failed stop at 09:31:26.3113161Z,
+and fault_source_hook_failed. The runtime receipt records reader EOF, joined
+capture/sender/interrupt owners, and failed retirement delivery. It does not
+identify why the original heartbeat response was delayed. The service did not
+repeat the earlier g362 service-stop failure.
+
+The support export and runtime receipt were saved before recovery under
+`.git/krasis-improvement/g365-fault-20261020-1841`. One safe stop completed,
+agent exit was observed, and the installed agent SHA-256 matched the verified
+g365 bundle. Normal agent startup and connect B restored CONNECTED and protected
+source readiness. Doctor subsequently passed with matching g365 CLI/UI/agent
+versions and a running input service; the recovery task remained ENABLED.
+Paired post-reconnect collection `e3ea67eedaa7b0a4051018ea0c7eb0f4` is retained
+in the same local evidence directory. No service reinstall or reboot was used.
+
+A's aggregate CPU readings were 100% repeatedly during this preflight, including
+09:45:21Z/23Z/24Z. A later reading at 09:48Z was 51%; neither reading establishes
+load during the 09:31 failure. A fresh attended motion trial after competing
+work subsides is still pending. Recovery alone is not a successful latency or
+stability comparison. No runtime code, API, DB, dependency or CI changes were
+made, and no remote Git update was performed.
