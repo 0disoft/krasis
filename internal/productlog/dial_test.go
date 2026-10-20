@@ -8,6 +8,7 @@ import (
 
 func TestDialExportRejectsPrivateFieldsAndInvalidVocabulary(t *testing.T) {
 	v := DialSummary{Phase: "tcp", Family: "ipv4", DNS: "not_applicable", Result: "ok", Route: "selected", Interface: "0123456789abcdef", SuggestedInterface: "0123456789abcdef", LocalChange: "same", EndpointChange: "changed"}
+	v.Error, v.Policy, v.NetworkProfile = "ok", "unknown", "unknown"
 	l := &Logger{queue: make(chan record, 1)}
 	l.Dial(v)
 	data, _ := json.Marshal(<-l.queue)

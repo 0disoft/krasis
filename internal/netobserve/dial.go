@@ -25,6 +25,9 @@ type DialObservation struct {
 	Family             string `json:"family"`
 	DNS                string `json:"dns"`
 	Result             string `json:"result"`
+	Error              string `json:"error"`
+	Policy             string `json:"policy"`
+	NetworkProfile     string `json:"networkProfile"`
 	Micros             int64  `json:"micros"`
 	Route              string `json:"route"`
 	Interface          string `json:"interface,omitempty"`
@@ -48,7 +51,7 @@ func (v DialObservation) Valid() bool {
 		return e == nil && len(b) == 8 && s == hex.EncodeToString(b)
 	}
 	return in(v.Phase, "tcp", "tls_auth") && in(v.Family, "ipv4", "ipv6", "unknown") && in(v.DNS, "not_applicable", "unknown") &&
-		in(v.Result, "ok", "failed") && v.Micros >= 0 && in(v.Route, "selected", "different", "suggested", "unknown") &&
+		in(v.Result, "ok", "failed") && validNetworkError(v.Error) && (v.Result == "ok") == (v.Error == "ok") && v.Policy == "unknown" && v.NetworkProfile == "unknown" && v.Micros >= 0 && in(v.Route, "selected", "different", "suggested", "unknown") &&
 		(v.Interface == "" || id(v.Interface)) && (v.SuggestedInterface == "" || id(v.SuggestedInterface)) &&
 		in(v.LocalChange, "unknown", "same", "changed") && in(v.EndpointChange, "unknown", "same", "changed") &&
 		(v.Route != "selected" || v.Interface != "" && v.Interface == v.SuggestedInterface) &&
@@ -152,6 +155,7 @@ func (m *DialMonitor) Close() { m.cancel(); <-m.done }
 
 func summarizeDial(a DialAttempt, p dialPath, key [32]byte, known bool, previousEndpoint string, previousPath int) DialObservation {
 	v := DialObservation{Phase: a.Phase, Family: "unknown", DNS: "unknown", Result: "ok", Micros: max(0, a.Duration.Microseconds()), Route: "unknown", LocalChange: "unknown", EndpointChange: "unknown"}
+	v.Error, v.Policy, v.NetworkProfile = NetworkError(a.Err), "unknown", "unknown"
 	if a.Err != nil {
 		v.Result = "failed"
 	}

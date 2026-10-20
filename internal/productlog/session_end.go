@@ -14,6 +14,8 @@ type SessionEndSummary struct {
 	Closed             bool   `json:"closed"`
 	NativeError        uint32 `json:"nativeError"`
 	NativeKnown        bool   `json:"nativeKnown"`
+	NetworkError       string `json:"networkError,omitempty"`
+	NetworkPolicy      string `json:"networkPolicy,omitempty"`
 	LastLifecycle      string `json:"lastLifecycle"`
 	LifecycleAgeMicros int64  `json:"lifecycleAgeMicros"`
 	CaptureMode        string `json:"captureMode"`
@@ -22,6 +24,14 @@ type SessionEndSummary struct {
 func init() { allowed["session_end_detail"] = true }
 
 func (s SessionEndSummary) valid() bool {
+	switch s.NetworkError {
+	case "", "not_observed", "network_failed", "network_canceled", "network_access_denied", "network_refused", "network_unreachable", "network_reset", "network_aborted", "network_timeout":
+	default:
+		return false
+	}
+	if s.NetworkPolicy != "" && s.NetworkPolicy != "unknown" {
+		return false
+	}
 	if _, err := time.Parse(time.RFC3339Nano, s.ObservedAt); err != nil {
 		return false
 	}

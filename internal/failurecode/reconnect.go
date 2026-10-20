@@ -44,6 +44,10 @@ var reconnectReasons = map[[3]string]string{
 }
 
 func init() {
+	for _, code := range []string{"network_access_denied", "network_aborted", "network_canceled"} {
+		allowed["reconnect_acquire_"+code] = true
+		allowed["preauth_"+code] = true
+	}
 	for _, code := range []string{"no_liveness", "stale", "deadline", "canceled"} {
 		reconnectReasons[[3]string{"peer-dispatch", "heartbeat", code}] = "reconnect_heartbeat_dispatch_" + code
 	}

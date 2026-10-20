@@ -15,6 +15,7 @@ func TestSessionEndExportKeepsFixedTriggerNativeAndLifecycleEvidence(t *testing.
 	<-l.queue
 	<-l.queue
 	s := SessionEndSummary{ObservedAt: "2026-10-15T09:14:20Z", Trigger: true, Component: "peer-liveness", Fault: failurecode.FaultCode("peer-writer", "write-deadline", "failed"), Closed: true, NativeError: 5, NativeKnown: true}
+	s.NetworkError, s.NetworkPolicy = "network_access_denied", "unknown"
 	l.SessionEnd(s)
 	raw, _ := json.Marshal(<-l.queue)
 	got := sanitizeLog("agent.jsonl", strings.NewReader(string(raw)+"\n"))
@@ -25,6 +26,9 @@ func TestSessionEndExportKeepsFixedTriggerNativeAndLifecycleEvidence(t *testing.
 	if !v.Trigger || v.NativeError != 5 || v.LastLifecycle != "session_lock" || v.CaptureMode != "protected" || v.ObservedAt != s.ObservedAt {
 		t.Fatalf("wrong evidence: %+v", v)
 	}
+	if v.NetworkError != "network_access_denied" || v.NetworkPolicy != "unknown" {
+		t.Fatal("network evidence lost", v)
+	}
 	for _, change := range []func(*SessionEndSummary){
 		func(v *SessionEndSummary) { v.Component = "private window title" },
 		func(v *SessionEndSummary) { v.Fault = "fault_private_secret" },
@@ -32,6 +36,8 @@ func TestSessionEndExportKeepsFixedTriggerNativeAndLifecycleEvidence(t *testing.
 		func(v *SessionEndSummary) { v.ObservedAt = "invalid" },
 		func(v *SessionEndSummary) { v.LastLifecycle = "private desktop name" },
 		func(v *SessionEndSummary) { v.CaptureMode = "private process path" },
+		func(v *SessionEndSummary) { v.NetworkPolicy = "blocked" },
+		func(v *SessionEndSummary) { v.NetworkError = "SECRET firewall rule" },
 	} {
 		invalid := *v
 		change(&invalid)

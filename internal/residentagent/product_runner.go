@@ -288,7 +288,7 @@ func productRunnerWithTrace(identities *productidentity.Store, trust *truststore
 			if v.Trigger {
 				progress.ObserveFailure(v.ObservedAt, productlog.FaultCode(v.Failure.Component, v.Failure.Phase, v.Failure.Code))
 			}
-			log.SessionEnd(productlog.SessionEndSummary{ObservedAt: v.ObservedAt.Format(time.RFC3339Nano), Trigger: v.Trigger, Component: v.Component, Fault: productlog.FaultCode(v.Failure.Component, v.Failure.Phase, v.Failure.Code), Canceled: v.Canceled, Timeout: v.Timeout, Closed: v.Closed, NativeError: v.NativeError, NativeKnown: v.NativeKnown})
+			log.SessionEnd(productlog.SessionEndSummary{ObservedAt: v.ObservedAt.Format(time.RFC3339Nano), Trigger: v.Trigger, Component: v.Component, Fault: productlog.FaultCode(v.Failure.Component, v.Failure.Phase, v.Failure.Code), Canceled: v.Canceled, Timeout: v.Timeout, Closed: v.Closed, NativeError: v.NativeError, NativeKnown: v.NativeKnown, NetworkError: v.NetworkError, NetworkPolicy: "unknown"})
 		}
 		// Initial conservative defaults, not a measured latency guarantee.
 		config.Liveness = &agent.LivenessPolicy{HeartbeatInterval: 250 * time.Millisecond, PeerTimeout: 2 * time.Second}
