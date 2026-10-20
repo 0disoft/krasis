@@ -47,3 +47,25 @@ added by these controlled tests.
 
 No public control API, DB, dependency, firewall or runner change. Runtime
 diagnostics gain one optional aggregate field. No push or issue comment.
+
+## Paired application
+
+Both PCs applied g380, revision 70c5308ff56f27702195dfd2bbe41d25bf3c6b8c.
+Frontend's 85 tests, native build, installer provenance and eight-file archive
+checks passed. update verify accepted 27,968,505 bytes. B's existing receipt
+8e8035c3a719bb1125678eb4f97b7de9 reports UPDATED for that exact revision.
+A installer returned 0; its installed agent SHA-256 matches the package.
+
+Doctor reports healthy/CONNECTED and matching CLI, UI, agent, installed image
+and recovery record. The paired 20:21:44Z collection reports READY input health
+and completed installation without recovery on both PCs. A cleanup completed
+and removed one obsolete stage; B cleanup completed and removed zero. Its
+26 A and 53 B current-build events contain no fault_/session_failed code. This
+short collection precedes runtime summaries and does not prove zero diagnostic
+loss, a long soak, or new physical-input acceptance.
+
+All ten previously open issues remain open. Next work is #59's mandatory native
+checks/semantic gates and #50's non-cancelable native owner retirement. Separate
+questions about availability of H-A/H-B and a publisher signing certificate are
+pending; no reply or external acceptance is inferred. No further implementation
+task is started after the ten-minute cutoff. The checkout remains local main.
