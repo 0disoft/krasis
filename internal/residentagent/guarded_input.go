@@ -3,12 +3,12 @@ package residentagent
 import (
 	"context"
 	"errors"
-	"sync"
 
 	"github.com/0disoft/krasis/internal/agent"
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/productlog"
+	"github.com/0disoft/krasis/internal/syncgate"
 	"github.com/0disoft/krasis/internal/wininput"
 )
 
@@ -22,14 +22,16 @@ type guardedProductInput struct {
 	agent.InputBoundaryPort
 	guard         productInputGuard
 	log           *productlog.Logger
-	mu            sync.Mutex
+	mu            syncgate.Mutex
 	geometry      func() error
 	protected     func() bool
 	stopProtected func()
 }
 
 func (input *guardedProductInput) Press(ctx context.Context, token control.PressedToken) error {
-	input.mu.Lock()
+	if err := input.mu.LockContext(ctx); err != nil {
+		return &application.InjectionError{Certainty: application.InjectionNotApplied, Requested: 1, Cause: err}
+	}
 	defer input.mu.Unlock()
 	if err := input.checkProtectedInput(); err != nil {
 		return err
@@ -50,7 +52,9 @@ func (input *guardedProductInput) Press(ctx context.Context, token control.Press
 }
 
 func (input *guardedProductInput) Release(ctx context.Context, token control.PressedToken) error {
-	input.mu.Lock()
+	if err := input.mu.LockContext(ctx); err != nil {
+		return &application.InjectionError{Certainty: application.InjectionNotApplied, Requested: 1, Cause: err}
+	}
 	defer input.mu.Unlock()
 	if err := input.InputBoundaryPort.Release(ctx, token); err != nil {
 		input.log.Injection("release", err)

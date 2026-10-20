@@ -191,10 +191,14 @@ func runSession(
 				// After normal return, the dispatcher must still validate and
 				// drain the exact retired heartbeat (ADR 0020). Only active
 				// leases have a deadline; other identities remain rejected.
-				state := runtime.Snapshot().Control.State
+				cleanupCtx, cancel := context.WithTimeout(ctx, CleanupTimeout)
+				defer cancel()
+				snapshot, snapshotErr := runtime.SnapshotContext(cleanupCtx)
+				if snapshotErr != nil {
+					return snapshotErr
+				}
+				state := snapshot.Control.State
 				if peerTimeout > 0 && (state == control.StateInboundActive || state == control.StateOutboundActive) {
-					cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), CleanupTimeout)
-					defer cancel()
 					faulted, livenessErr := runtime.CheckLiveness(cleanupCtx, observedAt, peerTimeout)
 					if livenessErr != nil {
 						return livenessErr
@@ -204,7 +208,7 @@ func runSession(
 					}
 				}
 				var dispatchErr error
-				heartbeat, dispatchErr = DispatchHeartbeatFrame(ctx, frame, observedAt, runtime)
+				heartbeat, dispatchErr = DispatchHeartbeatFrame(cleanupCtx, frame, observedAt, runtime)
 				return dispatchErr
 			})
 			if heartbeatProgress != nil {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/0disoft/krasis/internal/agent"
 	"github.com/0disoft/krasis/internal/application"
@@ -95,6 +96,43 @@ func TestCancellationDoesNotHideCleanupFailure(t *testing.T) {
 	for _, err := range []error{errors.Join(context.Canceled, errors.New("cleanup failed")), &application.InjectionError{Certainty: application.InjectionOutcomeUnknown}} {
 		if cancellationOnly(err, context.Canceled) {
 			t.Fatalf("cleanup failure suppressed: %v", err)
+		}
+	}
+}
+
+func TestProductGuardExpiredWaitDoesNotInjectOrClearObligation(t *testing.T) {
+	for _, press := range []bool{true, false} {
+		var events []string
+		input := &guardedProductInput{InputBoundaryPort: safetyInput{events: &events}, guard: safetyGuard{&events}}
+		input.mu.Lock()
+		ctx, cancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
+		done := make(chan error, 1)
+		go func() {
+			token := control.PressedToken{Kind: control.PressedKeyboardKey, Code: 30}
+			if press {
+				done <- input.Press(ctx, token)
+			} else {
+				done <- input.Release(ctx, token)
+			}
+		}()
+		select {
+		case err := <-done:
+			input.mu.Unlock()
+			cancel()
+			certainty, ok := application.InjectionCertaintyOf(err)
+			if !errors.Is(err, context.DeadlineExceeded) || !ok || certainty != application.InjectionNotApplied || len(events) != 0 {
+				t.Fatal("expired waiter mutated native or guard state", err, events)
+			}
+		case <-time.After(time.Second):
+			input.mu.Unlock()
+			cancel()
+			t.Fatal("guard admission exceeded caller budget")
+		}
+		if err := input.Release(context.Background(), control.PressedToken{Kind: control.PressedKeyboardKey, Code: 30}); err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(events, []string{"inject_release", "released"}) {
+			t.Fatal("fresh cleanup lost its obligation", events)
 		}
 	}
 }

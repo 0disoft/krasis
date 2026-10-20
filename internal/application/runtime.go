@@ -604,7 +604,9 @@ func (runtime *SessionRuntime) ObserveHeartbeat(
 	sessionID string,
 	observedAt time.Time,
 ) error {
-	runtime.mu.Lock()
+	if err := runtime.mu.LockContext(ctx); err != nil {
+		return err
+	}
 	defer runtime.mu.Unlock()
 	if runtime.canDrainRetiredLocked() && runtime.retiredInbound.SessionID == sessionID {
 		return nil
@@ -642,7 +644,9 @@ func (runtime *SessionRuntime) CheckLiveness(
 	now time.Time,
 	timeout time.Duration,
 ) (bool, error) {
-	runtime.mu.Lock()
+	if err := runtime.mu.LockContext(ctx); err != nil {
+		return false, err
+	}
 	defer runtime.mu.Unlock()
 
 	if runtime.control.State != control.StateInboundActive && runtime.control.State != control.StateOutboundActive {

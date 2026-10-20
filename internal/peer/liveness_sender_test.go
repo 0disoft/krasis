@@ -22,6 +22,67 @@ func TestPulseLivenessSkipsInactiveRuntime(t *testing.T) {
 	}
 }
 
+type uncooperativeHeartbeatInput struct {
+	inputPort
+	entered, resume chan struct{}
+}
+
+func (p *uncooperativeHeartbeatInput) Press(context.Context, control.PressedToken) error {
+	close(p.entered)
+	<-p.resume
+	return errors.New("native outcome unknown")
+}
+
+func TestPulseLivenessDoesNotWaitForUncooperativeInjection(t *testing.T) {
+	port := &uncooperativeHeartbeatInput{entered: make(chan struct{}), resume: make(chan struct{})}
+	runtime, err := application.NewSessionRuntime(effectExecutor{}, port)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runtime.GrantInbound(context.Background(), control.Event{Kind: control.EventInboundLeaseGranted, SessionID: "s", LeaseID: "l"}, "e", time.Unix(100, 0)); err != nil {
+		t.Fatal(err)
+	}
+	inputDone := make(chan error, 1)
+	go func() {
+		inputDone <- runtime.HandleInputAction(context.Background(), control.InputEnvelope{SessionID: "s", Epoch: "e", Sequence: 1}, control.InputAction{Kind: control.InputKeyDown, Code: 30})
+	}()
+	defer func() {
+		close(port.resume)
+		select {
+		case <-inputDone:
+		case <-time.After(3 * time.Second):
+			t.Error("native test owner did not retire")
+		}
+	}()
+	select {
+	case <-port.entered:
+	case <-time.After(time.Second):
+		t.Fatal("native operation did not enter")
+	}
+	writer := &recordingFrameWriter{}
+	coordinator := testWriteCoordinator(t, writer)
+	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		_, err := PulseLiveness(ctx, coordinator, runtime, fixedClock(time.Unix(101, 0)), 3*time.Second)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.DeadlineExceeded) || len(writer.frames) != 0 {
+			t.Fatal("blocked injection produced a heartbeat", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("pulse retained coordinator behind native input")
+	}
+	// The departed waiter releases serialization while the native owner remains
+	// joined; no second input backend or unverified liveness update is started.
+	if err := coordinator.Execute(context.Background(), func(FrameWriter) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestPulseLivenessWritesCurrentSessionHeartbeat(t *testing.T) {
 	runtime, _ := newInboundRuntime(t)
 	writer := &recordingFrameWriter{}

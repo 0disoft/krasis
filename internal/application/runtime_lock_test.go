@@ -69,3 +69,39 @@ func TestRuntimeRecoveryAndSnapshotHonorLockDeadline(t *testing.T) {
 		t.Fatal("unavailable runtime reported a guessed state")
 	}
 }
+
+func TestRuntimeHeartbeatWaitCannotOutliveDeadlineOrRefreshLiveness(t *testing.T) {
+	for _, operation := range []string{"observe", "check"} {
+		t.Run(operation, func(t *testing.T) {
+			runtime := newTestRuntime(t, &recordingInputPort{})
+			grantInbound(t, runtime, time.Unix(100, 0))
+			before := runtime.Snapshot()
+			runtime.mu.Lock()
+			ctx, cancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
+			defer cancel()
+			done := make(chan error, 1)
+			go func() {
+				if operation == "observe" {
+					done <- runtime.ObserveHeartbeat(ctx, "session-1", time.Unix(101, 0))
+				} else {
+					_, err := runtime.CheckLiveness(ctx, time.Unix(104, 0), 3*time.Second)
+					done <- err
+				}
+			}()
+			select {
+			case err := <-done:
+				runtime.mu.Unlock()
+				if !errors.Is(err, context.DeadlineExceeded) {
+					t.Fatal(err)
+				}
+			case <-time.After(time.Second):
+				runtime.mu.Unlock()
+				t.Fatal("heartbeat waited beyond its admission budget")
+			}
+			after := runtime.Snapshot()
+			if before.Control != after.Control || before.Liveness != after.Liveness {
+				t.Fatal("unadmitted heartbeat mutated lease or liveness")
+			}
+		})
+	}
+}

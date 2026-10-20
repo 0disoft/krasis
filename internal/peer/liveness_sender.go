@@ -45,13 +45,20 @@ func PulseLivenessObserved(ctx context.Context, coordinator *SessionWriteCoordin
 	observe(HeartbeatStart)
 	err := coordinator.Execute(ctx, func(writer FrameWriter) error {
 		observe(HeartbeatGate)
-		snapshot := runtime.Snapshot()
+		admissionCtx, stopAdmission := context.WithTimeout(ctx, CleanupTimeout)
+		defer stopAdmission()
+		snapshot, err := runtime.SnapshotContext(admissionCtx)
+		if err != nil {
+			return err
+		}
 		if snapshot.Control.State != control.StateInboundActive && snapshot.Control.State != control.StateOutboundActive {
 			return nil
 		}
 		pulse.Active = true
 		pulse.SessionID = snapshot.Control.SessionID
 		pulse.ObservedAt = now()
+		// Recovery after an observed timeout must retain its own budget even
+		// when session cancellation races the observation clock.
 		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), CleanupTimeout)
 		defer cancel()
 		faulted, err := runtime.CheckLiveness(cleanupCtx, pulse.ObservedAt, timeout)
