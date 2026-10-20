@@ -64,3 +64,25 @@ Hardware/accessibility/signing requirements of #4/#5/#6/#7/#15/#16/#20 remain.
 No public API, DB, dependency, CI runner, firewall or signing changes. Only the
 internal retirement contract, source/tests, generation and this record change.
 Local main only; no push, GitHub comment, extra branch or worktree.
+
+## Paired application verified
+
+Both PCs applied e1954c28f5edb74e654104e43b9bee8d6e4f9ac6. UI's 85 tests,
+native builds, installer provenance and eight-file archive verification passed.
+Update verify accepted 27,983,715 bytes; B receipt
+4a7d63d7bf11be9c2525eca744890841 reports UPDATED. A installer returned 0 and
+its installed agent SHA-256 matches. No Disconnect was sent during replacement.
+
+Doctor reports healthy/CONNECTED with matching UI/agent/installed revisions
+and completed stage cleanup. Collection da9e74338178ac9b8ded82b7a0817649 at
+21:21:34Z/35Z reports READY input health and one protected source ready event
+on each PC. Its 22 A / 49 B current-build events contain no fault_ or
+session_failed. This is startup/short-window runtime evidence, not a new
+physical-input or fault-matrix trial. No issue acceptance is inferred from it.
+
+This round completed the guard retirement implementation and the portable
+native/cursor-path audit. No portable product behavior was changed. Its full
+process ownership implementation is the next #50 task; the g387 synchronous
+abort/close follow-up is now covered by this generation. All ten issues remain
+open (#4/#5/#6/#7/#15/#16/#20/#50/#59/#70), and the full goal stays active.
+The source tree is clean after scoped commits; only local main exists.
