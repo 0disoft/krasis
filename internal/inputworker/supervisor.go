@@ -15,8 +15,6 @@ type workerReportResult struct {
 // supervise waits for the worker's recovery receipt, not just process exit.
 // A missing/malformed receipt is recovery-unknown and stops the service from
 // approving another lease. Forced job cleanup happens only after this returns.
-// authorized is an owner-presence check, never an input authorization grant;
-// native callers must not put SCM/WTS RPC on this cancellation/recovery loop.
 func supervise(ctx context.Context, control net.Conn, authorized func() error, exited func() bool, expires time.Time) (Report, error) {
 	results := make(chan workerReportResult, 1)
 	done := make(chan struct{})
