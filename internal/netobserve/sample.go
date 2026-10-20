@@ -13,6 +13,7 @@ func Sample() Snapshot {
 	power, saver := powerStatus()
 	s := sampleInterfaces(net.Interfaces, func(i net.Interface) ([]net.Addr, error) { return i.Addrs() })
 	s.Power, s.Saver = power, saver
+	s.wifi = sampleWiFi()
 	return s
 }
 

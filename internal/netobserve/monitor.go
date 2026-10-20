@@ -40,6 +40,7 @@ type Snapshot struct {
 	Link          Link
 	topology      [32]byte // Process-local comparison only; never exported or persisted.
 	topologyKnown bool
+	wifi          wifiSnapshot
 }
 
 // Codes is the entire persistent vocabulary. Unsupported observations are
@@ -51,6 +52,8 @@ func Codes() []string {
 		"network_link_unknown", "network_link_down", "network_link_usable",
 		"network_adapter_power_unknown", "network_roaming_unknown", "network_policy_unknown",
 		"network_local_path_changed", "network_observation_unavailable", "network_retry_woken",
+		"network_wifi_unknown", "network_wifi_absent", "network_wifi_disconnected", "network_wifi_connected", "network_wifi_connecting",
+		"network_roaming_available", "network_roaming_access_unavailable", "network_wifi_ap_changed", "network_wifi_network_changed",
 	}
 }
 
@@ -66,6 +69,7 @@ type Monitor struct {
 	lastLink      Link
 	topology      [32]byte
 	topologyKnown bool
+	lastWiFi      wifiState
 }
 
 func Start(ctx context.Context, emit func(string)) *Monitor { return start(ctx, Sample, emit) }
@@ -103,6 +107,9 @@ func (m *Monitor) event(code string) {
 // Only the monitor goroutine owns the comparison state. Notifications can
 // shorten one serial supervisor wait; they never cancel a session or dial.
 func (m *Monitor) observe(s Snapshot, at time.Time) {
+	if s.wifi.state > wifiConnecting {
+		s.wifi = wifiSnapshot{}
+	}
 	if s.Power > PowerBattery {
 		s.Power = PowerUnknown
 	}
@@ -114,7 +121,6 @@ func (m *Monitor) observe(s Snapshot, at time.Time) {
 	}
 	if !m.started {
 		m.event("network_adapter_power_unknown")
-		m.event("network_roaming_unknown")
 		m.event("network_policy_unknown")
 	}
 	if !m.started || m.previous.Power != s.Power {
@@ -133,7 +139,8 @@ func (m *Monitor) observe(s Snapshot, at time.Time) {
 	if changed {
 		m.event("network_local_path_changed")
 	}
-	if s.Link == LinkUsable && (m.lastLink == LinkDown || changed) {
+	wifiRestored := m.observeWiFi(s.wifi)
+	if wifiRestored || s.Link == LinkUsable && (m.lastLink == LinkDown || changed) {
 		// Keep the newest notification if a prior active-session change was
 		// never consumed. Queue capacity is always one.
 		select {

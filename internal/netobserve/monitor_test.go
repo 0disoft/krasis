@@ -80,7 +80,7 @@ func TestUnknownProviderValuesCannotInventObservations(t *testing.T) {
 	m := newMonitor(context.Background(), func(code string) { events = append(events, code) })
 	defer m.cancel()
 	m.observe(Snapshot{Power: 255, Saver: 255, Link: 255}, time.Now())
-	want := []string{"network_adapter_power_unknown", "network_roaming_unknown", "network_policy_unknown", "network_power_unknown", "network_saver_unknown", "network_link_unknown", "network_observation_unavailable"}
+	want := []string{"network_adapter_power_unknown", "network_policy_unknown", "network_power_unknown", "network_saver_unknown", "network_link_unknown", "network_observation_unavailable", "network_wifi_unknown", "network_roaming_unknown"}
 	if !reflect.DeepEqual(events, want) || len(m.restored) != 0 {
 		t.Fatal("invalid provider values claimed an OS observation", events)
 	}
