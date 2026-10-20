@@ -20,6 +20,20 @@ func sourceTransportFailure(err error) error {
 	return &sourceTransportError{cause: err}
 }
 
+// SourceSession.Activate only checks/updates Go session state. A rejection
+// occurs before the separate native capture activation is attempted.
+type sourceActivationRejected struct{ cause error }
+
+func (e *sourceActivationRejected) Error() string { return "source session activation rejected" }
+func (e *sourceActivationRejected) Unwrap() error { return e.cause }
+
+func activateSourceSession(session *wininput.SourceSession) error {
+	if err := session.Activate(); err != nil {
+		return &sourceActivationRejected{cause: err}
+	}
+	return nil
+}
+
 func sourceTransportJoinedOnly(err error, ownExpiry bool, command bool) bool {
 	if sourceTransitionOnly(err, ownExpiry) {
 		return true
@@ -29,6 +43,9 @@ func sourceTransportJoinedOnly(err error, ownExpiry bool, command bool) bool {
 	}
 	if _, ok := err.(*sourceTransportError); ok {
 		return true
+	}
+	if _, ok := err.(*sourceActivationRejected); ok {
+		return command
 	}
 	if inspection, ok := err.(*sourceInspectionRejected); ok {
 		return command && sourceRetryableInspection(inspection.cause)

@@ -330,7 +330,7 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 						return failure
 					case sourceActivate:
 						writer.epoch.Store(p.sequence)
-						if err := session.Activate(); err != nil {
+						if err := activateSourceSession(session); err != nil {
 							writer.epoch.Store(0)
 							return err
 						}
