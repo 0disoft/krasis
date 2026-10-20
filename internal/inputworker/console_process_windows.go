@@ -108,14 +108,10 @@ func createManagedConsoleProcess(ctx context.Context, token windows.Token, path 
 			result, resultErr = 0, errors.Join(resultErr, ErrRecovery)
 		}
 		if !accepted {
-			// Retire the entire owned job, including a still-suspended child.
-			// An unconfirmed cleanup must fence the next launch.
-			terminateErr := windows.TerminateJobObject(job, 1)
-			state, waitErr := windows.WaitForSingleObject(child.Process, 5000)
-			closeErr := windows.CloseHandle(child.Process)
-			if terminateErr != nil || waitErr != nil || state != windows.WAIT_OBJECT_0 || closeErr != nil {
-				result, resultErr = 0, errors.Join(resultErr, ErrRecovery)
-			}
+			// Return ownership even on rejection. The caller's ConsoleWorker
+			// owns the job and image pin and performs bounded retirement. Never
+			// discard the exact process handle after an unconfirmed local wait.
+			result, resultErr = child.Process, errors.Join(resultErr, ErrAuthority)
 		}
 	}()
 	// Verify the actual child's token while it is suspended. Arguments and a

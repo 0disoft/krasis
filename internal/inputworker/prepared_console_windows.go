@@ -91,7 +91,13 @@ func (p *preparedConsole) claimDecision(ctx context.Context) handoff.Preparation
 	}
 	p.warmTimer.Stop()
 	age := time.Since(p.preparedAt)
-	if p.worker == nil || p.worker.process == 0 || p.control == nil || p.pid == 0 {
+	if p.worker == nil || p.control == nil || p.pid == 0 {
+		return handoff.PreparationUnusable
+	}
+	p.worker.mu.Lock()
+	unusable := p.worker.closed || p.worker.retiring || p.worker.process == 0
+	p.worker.mu.Unlock()
+	if unusable {
 		return handoff.PreparationUnusable
 	}
 	decision := preparedConsoleHealth(age, p.session, windows.WTSGetActiveConsoleSessionId(), !p.worker.exited())

@@ -27,6 +27,9 @@ type ConsoleWorker struct {
 	done         chan struct{}
 	once         sync.Once
 	err          error
+	retiring     bool
+	poisoned     bool // A failed handle operation is never retried against a reused value.
+	closeOps     *consoleCloseOps
 }
 
 // LaunchConsoleWorker is service-only. Both image digest and agent authority
@@ -56,11 +59,18 @@ func launchManagedConsoleChecked(ctx context.Context, digest [sha256.Size]byte, 
 }
 
 func launchManagedConsoleMode(ctx context.Context, digest [sha256.Size]byte, prepare func(windows.Handle, uint32) error, installation *Installation, mode consoleMode, authorized func() bool) (*ConsoleWorker, error) {
+	if workerRetirementPending() {
+		return nil, ErrRecovery
+	}
 	if _, _, err := consoleLaunchMode(mode); err != nil {
 		return nil, err
 	}
 	if ctx == nil || ctx.Err() != nil || digest == ([sha256.Size]byte{}) || authorized == nil || !authorized() {
 		return nil, ErrAuthority
+	}
+	checkOwner := authorized
+	authorized = func() bool {
+		return !workerRetirementPending() && checkOwner()
 	}
 	type result struct {
 		worker *ConsoleWorker
@@ -180,7 +190,7 @@ func (worker *ConsoleWorker) watch(ctx context.Context, agent *Authority) {
 				_ = worker.Close()
 				return
 			}
-			if agent.check(false) != nil {
+			if agent.checkHeartbeat() != nil {
 				// The channel's independent recovery has a bounded opportunity
 				// to release inputs before we forcibly reap the owned process.
 				timer := time.NewTimer(RecoveryTimeout + 100*time.Millisecond)
@@ -203,11 +213,11 @@ func (worker *ConsoleWorker) exited() bool {
 	if worker.closed {
 		return true
 	}
-	if worker.process == 0 {
+	if worker.process == 0 || worker.poisoned {
 		return false
 	}
-	state, err := windows.WaitForSingleObject(worker.process, 0)
-	return err != nil || state != uint32(windows.WAIT_TIMEOUT)
+	state, err := worker.retirementOps().wait(worker.process, 0)
+	return err == nil && state == windows.WAIT_OBJECT_0
 }
 
 // Close is idempotent and waits for the exact owned child, never a PID lookup.
@@ -221,28 +231,11 @@ func (worker *ConsoleWorker) closeWithin(waitMilliseconds uint32) error {
 		return nil
 	}
 	worker.once.Do(func() {
-		worker.mu.Lock()
-		defer worker.mu.Unlock()
-		worker.closed = true
-		if worker.job != 0 && windows.CloseHandle(worker.job) != nil {
-			worker.err = ErrAuthority
-		}
-		if worker.process != 0 {
-			state, err := windows.WaitForSingleObject(worker.process, waitMilliseconds)
-			if err != nil || state != windows.WAIT_OBJECT_0 {
-				worker.err = ErrAuthority
-			}
-			if windows.CloseHandle(worker.process) != nil {
-				worker.err = ErrAuthority
-			}
-		}
-		if worker.image != nil && worker.image.Close() != nil {
-			worker.err = ErrAuthority
-		}
-		// Never signal retirement before exact-process exit and pin cleanup.
-		if worker.err == nil && worker.done != nil {
-			close(worker.done)
+		if worker.tryRetire(waitMilliseconds) != nil {
+			retainWorkerRetirement(worker)
 		}
 	})
+	worker.mu.Lock()
+	defer worker.mu.Unlock()
 	return worker.err
 }

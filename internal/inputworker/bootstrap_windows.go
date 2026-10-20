@@ -144,7 +144,9 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 			notify()
 		}
 	}
-	report, result = supervise(ctx, control, func() error { return channel.authority.check(false) }, worker.exited, lease.ExpiresAt)
+	// Supervision grants no input authority; commands and recovery retain
+	// their full checks. Do not stall stop/report consumption on WTS RPC.
+	report, result = supervise(ctx, control, channel.authority.checkHeartbeat, worker.exited, lease.ExpiresAt)
 	return report, observeMissingWorkerReport(result, worker.reportExit)
 }
 
@@ -312,7 +314,7 @@ func transferWorkerBootstrap(ctx context.Context, worker *ConsoleWorker, authori
 	defer image.Close()
 	worker.mu.Lock()
 	defer worker.mu.Unlock()
-	if ctx.Err() != nil || worker.closed || worker.process == 0 || authority.check(false) != nil {
+	if ctx.Err() != nil || worker.closed || worker.retiring || worker.process == 0 || authority.check(false) != nil {
 		return [bootstrapSize]byte{}, ErrAuthority
 	}
 	state, err := windows.WaitForSingleObject(worker.process, 0)

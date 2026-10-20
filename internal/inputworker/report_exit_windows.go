@@ -13,7 +13,7 @@ func (worker *ConsoleWorker) reportExit() logindiag.WorkerExit {
 	}
 	worker.mu.Lock()
 	defer worker.mu.Unlock()
-	if worker.closed || worker.process == 0 {
+	if worker.closed || worker.poisoned || worker.process == 0 {
 		return logindiag.WorkerExit{State: "UNAVAILABLE"}
 	}
 	return inspectWorkerExit(func() (uint32, error) { return windows.WaitForSingleObject(worker.process, 0) }, func() (uint32, error) {
