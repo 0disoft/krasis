@@ -128,6 +128,8 @@ func (hook *SourceHook) runWithBoundary(ctx context.Context, session *SourceSess
 	}
 	hook.contextMenu.Store(0) // A gesture from an earlier connection is not popup evidence.
 	pointerState := newSourcePointerState(initialPosition)
+	progress := &sourceHookProgress{origin: time.Now(), next: hook.timing}
+	pointerState.progress = progress
 	session.physicalMu.Lock()
 	session.physicalCheck = sourceAnyInputPressed
 	session.physicalMu.Unlock()
@@ -140,14 +142,14 @@ func (hook *SourceHook) runWithBoundary(ctx context.Context, session *SourceSess
 	results := make(chan sourceInputThreadResult, 3)
 	startSourceInputThread(results, "low-level-hook", func() error {
 		return hook.onDesktop(runCtx, func(owned context.Context) error {
-			return runSourceLowLevelHookThread(owned, session, boundary, hook.observer, hook.capture, pointerState, hook.timing, func() {
+			return runSourceLowLevelHookThread(owned, session, boundary, hook.observer, hook.capture, pointerState, progress, func() {
 				readySignals <- struct{}{}
 			}, &hook.contextMenu, &hook.returnCursor)
 		})
 	})
 	startSourceInputThread(results, "raw-mouse", func() error {
 		return hook.onDesktop(runCtx, func(owned context.Context) error {
-			return runSourceRawMouseThread(owned, session, boundary, pointerState, hook.timing, func() {
+			return runSourceRawMouseThread(owned, session, boundary, pointerState, progress, func() {
 				readySignals <- struct{}{}
 			})
 		})
@@ -178,15 +180,29 @@ func (hook *SourceHook) runWithBoundary(ctx context.Context, session *SourceSess
 	if ready != nil {
 		ready()
 	}
-	select {
-	case first := <-results:
-		resultErr, joined := collectSourceInputThreads(ctx, cancel, results, []sourceInputThreadResult{first}, 3, SourceCleanupTimeout)
-		releaseAllowed = joined
-		return resultErr
-	case <-ctx.Done():
-		resultErr, joined := collectSourceInputThreads(ctx, cancel, results, nil, 3, SourceCleanupTimeout)
-		releaseAllowed = joined
-		return resultErr
+	watch := time.NewTicker(100 * time.Millisecond)
+	defer watch.Stop()
+	for {
+		select {
+		case <-watch.C:
+			if err := progress.failure(time.Now()); err != nil {
+				session.retireHookFailure(err)
+				resultErr, joined := collectSourceInputThreads(ctx, cancel, results, nil, 3, SourceCleanupTimeout)
+				releaseAllowed = joined
+				if joined && cancellationOnly(resultErr) {
+					return &retiredHookProgress{cause: errors.Join(err, resultErr)}
+				}
+				return errors.Join(err, resultErr)
+			}
+		case first := <-results:
+			resultErr, joined := collectSourceInputThreads(ctx, cancel, results, []sourceInputThreadResult{first}, 3, SourceCleanupTimeout)
+			releaseAllowed = joined
+			return resultErr
+		case <-ctx.Done():
+			resultErr, joined := collectSourceInputThreads(ctx, cancel, results, nil, 3, SourceCleanupTimeout)
+			releaseAllowed = joined
+			return resultErr
+		}
 	}
 }
 
@@ -437,6 +453,11 @@ func runSourceRawMouseThread(
 		}
 		if timing != nil {
 			timing.ObserveRawInput(time.Now())
+		}
+		if pointerState != nil && pointerState.progress != nil && mouse.Flags&mouseMoveAbsolute == 0 &&
+			(mouse.LastX != 0 || mouse.LastY != 0) &&
+			uintptr(mouse.ExtraInformation) != krasisInjectedExtraInfo && uintptr(mouse.ExtraInformation) != selfTestExtraInfo {
+			pointerState.progress.observePhysicalRaw(time.Now())
 		}
 		return sourceStage("raw-route", routeRawMouse(session, boundary, pointerState, header, mouse))
 	}

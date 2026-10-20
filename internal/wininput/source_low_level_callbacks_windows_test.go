@@ -84,3 +84,24 @@ func TestIgnoredSourceInputChecksVisibleShieldAndRetainsFailures(t *testing.T) {
 		t.Fatal("earlier cleanup failure was dropped", err)
 	}
 }
+
+func TestSourceMouseProgressCannotBeRenewedByInjectedTraffic(t *testing.T) {
+	session := newInactiveSourceSession(t)
+	pointer := newSourcePointerState(point{})
+	pointer.progress = &sourceHookProgress{}
+	callbacks := newSourceLowLevelCallbacks(session, nil, nil, nil, pointer, nil, nil,
+		func() error { return nil }, func(int, uintptr, uintptr) uintptr { return 42 })
+	for _, data := range []mouseHookData{
+		{ExtraInfo: krasisInjectedExtraInfo}, {ExtraInfo: selfTestExtraInfo}, {Flags: llmhfInjected},
+	} {
+		callbacks.mouse(hcAction, wmMouseMove, uintptr(unsafe.Pointer(&data)))
+	}
+	if pointer.progress.mouse.Load() != 0 {
+		t.Fatal("injected traffic hid missing physical hook progress")
+	}
+	data := mouseHookData{}
+	callbacks.mouse(hcAction, wmMouseMove, uintptr(unsafe.Pointer(&data)))
+	if pointer.progress.mouse.Load() != 1 {
+		t.Fatal("physical hook progress not observed")
+	}
+}

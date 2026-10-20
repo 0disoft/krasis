@@ -63,7 +63,7 @@ func TestReconnectReasonsDoNotCopyPrivateDescriptors(t *testing.T) {
 }
 
 func TestSourceOperationFaultCodes(t *testing.T) {
-	for _, stage := range []string{"low-level-hook", "raw-mouse", "wheel-capture", "thread-join", "hook-install", "hook-release", "raw-register", "raw-release", "raw-read", "raw-buffer", "raw-route", "message-loop", "pointer-snapshot", "cursor-present", "cursor-restore", "cursor-release"} {
+	for _, stage := range []string{"hook-callback-stalled", "hook-mouse-progress", "low-level-hook", "raw-mouse", "wheel-capture", "thread-join", "hook-install", "hook-release", "raw-register", "raw-release", "raw-read", "raw-buffer", "raw-route", "message-loop", "pointer-snapshot", "cursor-present", "cursor-restore", "cursor-release"} {
 		want := "fault_source_" + strings.ReplaceAll(stage, "-", "_") + "_failed"
 		if got := FaultCode("source-hook", stage, "failed"); got != want || !allowed[got] {
 			t.Fatalf("stage %s: %s", stage, got)

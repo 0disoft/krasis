@@ -48,6 +48,9 @@ func newSourceLowLevelCallbacks(session *SourceSession, boundary BoundaryObserve
 	mouseCallback := func(code int, wParam uintptr, lParam uintptr) uintptr {
 		if code == hcAction && lParam != 0 {
 			data := *(*mouseHookData)(unsafe.Pointer(lParam))
+			if pointerState != nil && pointerState.progress != nil && !isInjectedMouse(data) {
+				pointerState.progress.observeMouse()
+			}
 			message := uint32(wParam)
 			// Wheels retain existing foreground ownership/suppression. Untagged
 			// synthesized wheels can also come from precision touchpads.

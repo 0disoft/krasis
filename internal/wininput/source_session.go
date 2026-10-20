@@ -238,23 +238,23 @@ func (session *SourceSession) Deactivate() {
 }
 
 func (session *SourceSession) Active() bool {
-	if session == nil {
+	if session == nil || session.terminal.Load() {
 		return false
 	}
 	session.stateMu.RLock()
 	defer session.stateMu.RUnlock()
-	return session.active
+	return session.active && !session.terminal.Load()
 }
 
 // Offer is safe for a low-level hook callback. It never blocks. It returns true
 // only when the physical event was accepted for the current outbound generation
 // and may therefore be suppressed locally.
 func (session *SourceSession) Offer(action control.InputAction) bool {
-	if session == nil {
+	if session == nil || session.terminal.Load() {
 		return false
 	}
 	session.stateMu.RLock()
-	if !session.active {
+	if !session.active || session.terminal.Load() {
 		session.stateMu.RUnlock()
 		session.observeWheelQueue(action, SourceQueueRejectedInactive)
 		return false
@@ -389,6 +389,13 @@ func (session *SourceSession) RunWithReady(ctx context.Context, ready func()) er
 	for {
 		select {
 		case <-ctx.Done():
+			// A hook watchdog fences suppression before canceling its owners.
+			// Cancellation must not hide that queued failure and skip Fail.
+			select {
+			case cause := <-session.faults:
+				return session.stopSender(ctx, cancelSend, senderDone, cause, true)
+			default:
+			}
 			return session.stopSender(ctx, cancelSend, senderDone, ctx.Err(), session.Active())
 		case cause := <-session.faults:
 			return session.stopSender(ctx, cancelSend, senderDone, cause, true)
@@ -479,9 +486,12 @@ func (session *SourceSession) abort(cause error) {
 }
 
 func (session *SourceSession) current(generation uint64) bool {
+	if session.terminal.Load() {
+		return false
+	}
 	session.stateMu.RLock()
 	defer session.stateMu.RUnlock()
-	return session.active && session.generation == generation
+	return !session.terminal.Load() && session.active && session.generation == generation
 }
 
 func (session *SourceSession) cleanupSession(

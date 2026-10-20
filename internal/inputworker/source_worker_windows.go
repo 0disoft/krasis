@@ -210,7 +210,7 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 		// this sender also preserves a real preflight/write failure on cleanup.
 		boundary := <-boundaryDone
 		exit.Capture = "joined"
-		if !sourceTransitionOnly(capture, run.Err() == context.DeadlineExceeded) {
+		if !sourceTransitionOnly(capture, run.Err() == context.DeadlineExceeded) && !wininput.SourceHookProgressRetiredOnly(capture) {
 			exit.Capture = "failed"
 		}
 		if started, senderJoined, interruptJoined := session.CleanupCompletion(); started {

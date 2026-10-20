@@ -12,7 +12,7 @@ import (
 )
 
 func TestCaptureThreadFailureDetailsSurviveReportAndSanitizedRuntimeReceipt(t *testing.T) {
-	operations := append(inputdesktop.CaptureThreadFailureOperations(), "thread-join-low-level-hook", "thread-join-raw-mouse", "thread-join-wheel-capture", "thread-join-multiple")
+	operations := append(inputdesktop.CaptureThreadFailureOperations(), "thread-join-low-level-hook", "thread-join-raw-mouse", "thread-join-wheel-capture", "thread-join-multiple", "hook-callback-stalled", "hook-mouse-progress")
 	for _, operation := range operations {
 		var wire bytes.Buffer
 		failure := &workerReportFailure{operation: operation, cause: errors.Join(ErrRecovery, syscall.Errno(1460))}

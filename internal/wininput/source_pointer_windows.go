@@ -58,8 +58,9 @@ func (actions *rawMouseActions) append(action control.InputAction) error {
 }
 
 type sourcePointerState struct {
-	x     atomic.Int32
-	known atomic.Bool
+	progress *sourceHookProgress
+	x        atomic.Int32
+	known    atomic.Bool
 }
 
 func newSourcePointerState(position point) *sourcePointerState {

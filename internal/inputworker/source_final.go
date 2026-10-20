@@ -79,12 +79,13 @@ func sourceCaptureFinal(loop, capture, sender error, ownExpiry bool) error {
 		return nil
 	}
 	uncertain := false
+	progressRetired := wininput.SourceHookProgressRetiredOnly(capture)
 	if !sourceTransitionOnly(capture, ownExpiry) {
 		capture = &workerReportFailure{operation: "source-capture-join", cause: capture}
-		uncertain = true
+		uncertain = !progressRetired
 	}
 	if !sourceTransitionOnly(sender, ownExpiry) {
-		uncertain = uncertain || !sourceTransportJoinedOnly(sender, ownExpiry, false)
+		uncertain = uncertain || !(sourceTransportJoinedOnly(sender, ownExpiry, false) || progressRetired && wininput.SourceHookProgressFailureOnly(sender))
 		sender = &workerReportFailure{operation: "source-sender-join", cause: sender}
 	}
 	if !sourceTransitionOnly(loop, ownExpiry) {

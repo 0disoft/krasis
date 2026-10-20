@@ -21,6 +21,7 @@ func init() {
 	for op := sourceStart; op <= sourceCursorRestore; op++ {
 		reportOperations = append(reportOperations, sourceCommandOperation(op))
 	}
+	reportOperations = append(reportOperations, "hook-callback-stalled", "hook-mouse-progress")
 }
 
 type workerReportFailure struct {
