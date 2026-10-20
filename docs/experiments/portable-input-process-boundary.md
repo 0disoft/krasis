@@ -57,12 +57,36 @@ A locally compiled real agent passed Default-desktop heartbeat, cursor read,
 same-point cursor placement/entry snapshot, and full paired shutdown. This is
 local cursor smoke, not physical keyboard/wheel/drag or laptop fault acceptance.
 Race detection was skipped because CGO/compiler support is unavailable. No
-hosted CI was invoked. Packaging/deployment evidence will be recorded after the
-committed candidate is built and applied.
+hosted CI was invoked.
+
+## Packaged candidate and paired application
+
+Both PCs applied generation 389, revision
+d8e5c26a72444acf25b9a6a41b48e7f143598882. UI's 85 tests, native builds,
+installer provenance and eight-file archive checks passed. Offline verify
+accepted 28,067,185 bytes. B receipt 5448e930e689aaaee0e4c87f66d7b1e7 reports
+UPDATED. A installer exited 0 and installed agent SHA-256 matched the bundle.
+No Disconnect command was sent during replacement.
+
+The real packaged agent also passed the same ordinary Default-desktop cursor
+smoke and paired shutdown. This directly exercises its private child modes;
+it does not inject physical keys/buttons or establish fault-matrix acceptance.
+
+Doctor reports healthy/CONNECTED with matched UI, resident and installed build,
+protected input CONFIGURED and completed stage cleanup. Collection
+ba41ce8f718bd6989914a151a06df388 at 2026-10-20T21:58:15Z/17Z reports READY on
+both PCs. Its 30 A / 58 B current-build events contain no fault_ or session_failed
+and each contains installed_source_capture_protected_ready. B recorded a network
+acquire timeout/RECONNECTING while A was being replaced, followed by CONNECTED;
+that deployment interruption is not suppressed or counted as a physical trial.
+
+This is short-window startup/runtime evidence. Both installed PCs select
+protected service input, so their healthy state does not establish ordinary
+physical-input recovery. No hardware, accessibility, endpoint-change or signing
+gate is closed by this rollout. No push or issue comments were made.
 
 ## Remaining acceptance
 
-- Verify the packaged candidate and paired startup/recovery health after rollout.
 - Obtain ordinary-route physical input/fault evidence; current A/B installations
   select protected service input, so their healthy state cannot prove this route.
 - Continue the full #50 native-boundary audit, including parent geometry/admission
