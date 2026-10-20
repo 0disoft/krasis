@@ -305,7 +305,7 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 	readDone := make(chan error, 1)
 	go func() {
 		readDone <- pumpSourceCommandsOrdered(run, read, requests, cancel, completed, func(p sourcePacket) error {
-			return writer.sendCompletedReply(p, sourcePacket{kind: sourceReply, op: sourceHeartbeat, reply: p.sequence})
+			return sourceCommandFailed(sourceHeartbeat, writer.sendCompletedReply(p, sourcePacket{kind: sourceReply, op: sourceHeartbeat, reply: p.sequence}))
 		})
 	}()
 	// Retire only this read; the final native response still needs the writer.

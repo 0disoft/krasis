@@ -87,6 +87,8 @@ func (v Runtime) Valid() bool {
 
 func ValidRuntimeOperation(operation string) bool {
 	switch operation {
+	case "source-write-deadline", "source-write-unsubmitted", "source-write-partial", "source-write-timeout", "source-write-closed", "source-write-native", "source-write-other":
+		return true
 	case "source-command-start", "source-command-admit", "source-command-activate", "source-command-deactivate", "source-command-heartbeat", "source-command-stop", "source-command-cursor-prepare", "source-command-cursor-show", "source-command-cursor-restore":
 		return true
 	case "service-pipe-owner", "service-pipe-reset", "service-pipe-duplicate", "service-pipe-close":
