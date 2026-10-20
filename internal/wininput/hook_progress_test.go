@@ -109,7 +109,7 @@ func TestHookProgressRetirementFencesSuppressionWithoutWaitingForStateMutex(t *t
 	}
 	session.active.Store(true)
 	session.started.Store(true)
-	session.generation = 4
+	session.generation.Store(4)
 	session.stateMu.Lock()
 	defer session.stateMu.Unlock()
 	session.retireHookFailure(errHookCallbackStalled)

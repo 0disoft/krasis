@@ -87,7 +87,7 @@ func TestSourceAbortFencesLateGrantWithoutWaitingForStateMutex(t *testing.T) {
 	s := newInactiveSourceSession(t)
 	s.started.Store(true)
 	s.active.Store(true)
-	s.generation = 7
+	s.generation.Store(7)
 	s.stateMu.Lock()
 	defer s.stateMu.Unlock()
 	cause := errors.New("capture failed")

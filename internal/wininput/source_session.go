@@ -157,10 +157,10 @@ type SourceSession struct {
 	physicalMu       sync.Mutex
 	physicalHeld     map[physicalPress]struct{}
 	physicalCheck    func() bool
-	physicalRevision uint64      // physicalMu; invalidates native inspection across local input/owner changes.
-	capturePaused    bool        // physicalMu; native owner replacement fences new grants.
-	active           atomic.Bool // Published inside stateMu transactions; hook reads never wait.
-	generation       uint64
+	physicalRevision uint64        // physicalMu; invalidates native inspection across local input/owner changes.
+	capturePaused    bool          // physicalMu; native owner replacement fences new grants.
+	active           atomic.Bool   // Published inside stateMu transactions; hook reads never wait.
+	generation       atomic.Uint64 // Lease state only; never a native desktop/authority cache.
 	faultSent        atomic.Bool
 }
 
@@ -229,7 +229,7 @@ func (session *SourceSession) Activate() error {
 	if session.active.Load() {
 		return errors.New("source session is already active")
 	}
-	session.generation++
+	session.generation.Add(1)
 	session.active.Store(true)
 	return nil
 }
@@ -249,7 +249,7 @@ func (session *SourceSession) Deactivate() {
 	}
 	session.stateMu.Lock()
 	session.active.Store(false)
-	session.generation++
+	session.generation.Add(1)
 	session.stateMu.Unlock()
 }
 
@@ -260,28 +260,33 @@ func (session *SourceSession) Active() bool {
 	return session.active.Load() && !session.terminal.Load()
 }
 
-// Offer is safe for a low-level hook callback. It never blocks. It returns true
+// Offer does not wait on state transactions. Queue producers still serialize
+// ordered/coalesced frames on queueMu. It returns true
 // only when the physical event was accepted for the current outbound generation
 // and may therefore be suppressed locally.
 func (session *SourceSession) Offer(action control.InputAction) bool {
 	if session == nil || session.terminal.Load() {
 		return false
 	}
-	session.stateMu.RLock()
-	if !session.active.Load() || session.terminal.Load() {
-		session.stateMu.RUnlock()
+	generation := session.generation.Load()
+	if !session.current(generation) {
 		session.observeWheelQueue(action, SourceQueueRejectedInactive)
 		return false
 	}
 	if err := action.Validate(); err != nil {
-		session.stateMu.RUnlock()
 		session.abort(errors.Join(ErrSourceSession, err))
 		session.observeWheelQueue(action, SourceQueueRejectedInvalid)
 		return false
 	}
-	generation := session.generation
 	queuedAt := session.now()
 	session.queueMu.Lock()
+	// A producer may have waited for another queue producer/consumer. Never
+	// carry its old action into an activation that completed during that wait.
+	if !session.current(generation) {
+		session.queueMu.Unlock()
+		session.observeWheelQueue(action, SourceQueueRejectedInactive)
+		return false
+	}
 	if action.Kind == control.InputPointerMove && session.pendingMove != nil && session.pendingMove.generation == generation {
 		pending := session.pendingMove
 		dx := int64(pending.action.DeltaX) + int64(action.DeltaX)
@@ -290,7 +295,6 @@ func (session *SourceSession) Offer(action control.InputAction) bool {
 			pending.action.DeltaX = int32(dx)
 			pending.action.DeltaY = int32(dy)
 			session.queueMu.Unlock()
-			session.stateMu.RUnlock()
 			if observer, ok := session.queueObserver.(SourceQueueCoalescedObserver); ok {
 				observer.ObserveSourceQueueCoalesced()
 			}
@@ -320,7 +324,6 @@ func (session *SourceSession) Offer(action control.InputAction) bool {
 			}
 		}
 		session.queueMu.Unlock()
-		session.stateMu.RUnlock()
 		if session.observer != nil {
 			session.observer.ObserveSourceQueueEnqueued(uint64(depth))
 		}
@@ -331,7 +334,6 @@ func (session *SourceSession) Offer(action control.InputAction) bool {
 		return true
 	} else {
 		session.queueMu.Unlock()
-		session.stateMu.RUnlock()
 		session.abort(ErrSourceQueueOverflow)
 		session.observeWheelQueue(action, SourceQueueRejectedOverflow)
 		return false
@@ -501,9 +503,7 @@ func (session *SourceSession) current(generation uint64) bool {
 	if session.terminal.Load() {
 		return false
 	}
-	session.stateMu.RLock()
-	defer session.stateMu.RUnlock()
-	return !session.terminal.Load() && session.active.Load() && session.generation == generation
+	return session.active.Load() && session.generation.Load() == generation && !session.terminal.Load()
 }
 
 func (session *SourceSession) cleanupSession(

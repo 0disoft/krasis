@@ -12,9 +12,9 @@ func (session *SourceSession) RequestLocalReturn() bool {
 	if !session.active.Load() || session.terminal.Load() || session.yieldPending != 0 {
 		return false
 	}
-	session.yieldPending = session.generation
+	session.yieldPending = session.generation.Load()
 	session.active.Store(false)
-	session.generation++
+	session.generation.Add(1)
 	session.yields <- session.yieldPending // One pending generation, capacity one.
 	return true
 }
