@@ -26,3 +26,20 @@ localapi tests pass. Package and installed acceptance are verified separately.
 No public API, DB, dependency or CI runner changes. No Git push or public
 release. Remaining hook-liveness, native-call cancellation and hardware gates
 are not completed by this narrow fix.
+
+## Installed acceptance
+
+Revision `41fe24aa184bb7a47e4eefe1c00df41a21aa5204` passed all 85 UI tests,
+native builds, installer provenance and the eight-file update package checks.
+Offline verification accepted the 27,784,933-byte g369 bundle. A's installed
+agent hash matches the bundle; its running UI, agent and recovery record all
+match g369. B transfer `edff563874248fad5b92c4394de51615` reports UPDATED
+at that same revision.
+
+Final collection `0c18e80d8b1d590180bd028296f5008c` at 18:04:03Z/02Z
+(2026-10-21 Korea time) reports input health and service READY on both PCs,
+with no new fault, session failure or source-command/heartbeat failure for g369.
+A doctor is healthy/CONNECTED and B is ONLINE. The observation covers about
+two and a half minutes after connection, not long-term stability or the complete
+hardware matrix. Remaining #50/#59 native-stall/hook-liveness work stays open.
+No issue comments were added during this execution and no Git push occurred.
