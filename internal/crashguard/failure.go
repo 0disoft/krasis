@@ -9,8 +9,9 @@ var (
 	ErrRecoveryFailed = errors.New("crash guard input recovery failed")
 )
 
-// ExitPending retains the exit acknowledgement after Close's bounded wait.
-// A timeout is not proof that the guard process has released its ownership.
+// ExitPending retains full retirement acknowledgement after Close's bounded
+// wait: real child exit plus joined protocol and native cleanup operations.
+// A timeout or child exit alone is not proof that ownership has been released.
 type ExitPending struct {
 	Done  <-chan struct{}
 	Cause error

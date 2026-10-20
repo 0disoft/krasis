@@ -36,7 +36,7 @@ func TestCloseBoundsFailedKillAndRetainsUnconfirmedExit(t *testing.T) {
 		started := time.Now()
 		err := p.Close()
 		var pending *ExitPending
-		if !errors.Is(err, ErrExitTimeout) || !errors.Is(err, denied) || !errors.As(err, &pending) || pending.Done != p.Done() || time.Since(started) != 2*processIPCTimeout {
+		if !errors.Is(err, ErrExitTimeout) || !errors.Is(err, denied) || !errors.As(err, &pending) || pending.Done != p.closeDone || time.Since(started) != 2*processIPCTimeout {
 			t.Fatal(err, time.Since(started))
 		}
 		select {
@@ -44,7 +44,7 @@ func TestCloseBoundsFailedKillAndRetainsUnconfirmedExit(t *testing.T) {
 			t.Fatal("timeout fabricated an exit acknowledgement")
 		default:
 		}
-		_ = p.abortProcess()
+		<-p.requestAbort()
 		if kills != 1 {
 			t.Fatal("termination retried", kills)
 		}

@@ -30,9 +30,10 @@ func TestTimedOutGuardNeverStartsAnotherProtocolCall(t *testing.T) {
 		for range cap(waiters) {
 			go func() { waiters <- p.invoke(func() error { calls.Add(1); return nil }) }()
 		}
-		if err := <-done; !errors.Is(err, ErrIPCTimeout) || !errors.Is(err, denied) {
-			t.Fatal("protocol timeout lost its uncertain termination result", err)
+		if err := <-done; !errors.Is(err, ErrIPCTimeout) {
+			t.Fatal("protocol timeout lost its failure", err)
 		}
+		<-p.requestAbort()
 		for range cap(waiters) {
 			if err := <-waiters; !errors.Is(err, ErrIPCTimeout) {
 				t.Fatal("contended guard request bypassed admission", err)

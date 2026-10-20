@@ -61,3 +61,11 @@ the actual exit acknowledgement. The resident agent keeps its fault latch and
 rejects managed safe-stop and upgrade-stop with `guard_exit_pending` until that
 acknowledgement arrives. A timeout does not count as release of ownership or
 permit a replacement session. Normal guard exit and recovery behavior is unchanged.
+
+Generation 388 keeps those caller budgets even when native Kill or pipe Close
+does not return. One retirement owner retains the original process, protocol
+operation and single native cleanup attempts. Process.Done continues to notify
+the live monitor of process-wait completion; ExitPending.Done now acknowledges
+the stronger boundary of process exit plus joined protocol, Kill and pipe-close
+tasks. Managed replacement remains blocked until that full acknowledgement.
+Late cleanup cannot fabricate input release or clear the existing fault latch.

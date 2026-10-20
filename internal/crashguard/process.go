@@ -32,16 +32,29 @@ func StartProduct(executable string) (*Process, error) {
 var processIPCTimeout = 2 * time.Second
 
 type Process struct {
-	client   *Client
-	stdin    io.WriteCloser
-	stdout   io.ReadCloser
-	process  *os.Process
-	done     chan struct{}
-	abort    sync.Once
-	abortErr error
-	kill     func() error
-	callMu   syncgate.Mutex
-	failed   atomic.Bool
+	client      *Client
+	stdin       io.WriteCloser
+	stdout      io.ReadCloser
+	process     *os.Process
+	done        chan struct{}
+	abort       sync.Once
+	abortDone   chan struct{}
+	abortErr    error
+	kill        func() error
+	callMu      syncgate.Mutex
+	failed      atomic.Bool
+	closing     atomic.Bool
+	active      sync.WaitGroup
+	closeOnce   sync.Once
+	closeDone   chan struct{}
+	closeErr    error
+	closeCause  error
+	stdinClose  sync.Once
+	stdinDone   chan struct{}
+	stdinErr    error
+	stdoutClose sync.Once
+	stdoutDone  chan struct{}
+	stdoutErr   error
 
 	mu      sync.Mutex
 	waitErr error
@@ -151,33 +164,34 @@ func (process *Process) Close() error {
 	if process == nil {
 		return nil
 	}
-	deadline := time.Now().Add(2 * processIPCTimeout)
-	disarmErr := process.invoke(process.client.Disarm)
-	closeErr := process.stdin.Close()
-	if errors.Is(closeErr, os.ErrClosed) {
-		closeErr = nil
-	}
+	process.closeOnce.Do(func() {
+		process.closing.Store(true)
+		process.closeDone = make(chan struct{})
+		go process.closeOwned()
+	})
+	timer := time.NewTimer(2 * processIPCTimeout)
+	defer timer.Stop()
 	select {
-	case <-process.done:
-	case <-time.After(processIPCTimeout):
-		disarmErr = errors.Join(disarmErr, ErrExitTimeout, process.abortProcess())
+	case <-process.closeDone:
+		return operationFailure("close", process.closeErr)
+	case <-timer.C:
 		select {
-		case <-process.done:
-		case <-time.After(max(0, time.Until(deadline))):
-			return operationFailure("close", &ExitPending{Done: process.done, Cause: errors.Join(disarmErr, closeErr)})
+		case <-process.closeDone:
+			return operationFailure("close", process.closeErr)
+		default:
 		}
+		process.mu.Lock()
+		cause := errors.Join(ErrExitTimeout, process.closeCause, process.abortErr, process.stdinErr, process.stdoutErr)
+		process.mu.Unlock()
+		return operationFailure("close", &ExitPending{Done: process.closeDone, Cause: cause})
 	}
-	process.mu.Lock()
-	waitErr := process.waitErr
-	stderr := process.stderr.String()
-	process.mu.Unlock()
-	if waitErr != nil && stderr != "" {
-		waitErr = fmt.Errorf("crash guard exited: %w: %s", waitErr, stderr)
-	}
-	return operationFailure("close", errors.Join(disarmErr, closeErr, waitErr))
 }
 
 func (process *Process) invoke(operation func() error) error {
+	return process.invokeOwned(operation, false)
+}
+
+func (process *Process) invokeOwned(operation func() error, shutdown bool) error {
 	ctx, cancel := context.WithTimeout(context.Background(), processIPCTimeout)
 	defer cancel()
 	// Waiting callers cannot create a goroutine behind the protocol mutex.
@@ -186,38 +200,48 @@ func (process *Process) invoke(operation func() error) error {
 		return errors.Join(ErrIPCTimeout, err)
 	}
 	defer process.callMu.Unlock()
-	if process.failed.Load() {
+	if process.failed.Load() || process.closing.Load() && !shutdown {
 		return ErrIPCTimeout
 	}
 	result := make(chan error, 1)
-	go func() { result <- operation() }()
+	process.active.Add(1)
+	go func() { defer process.active.Done(); result <- operation() }()
 	select {
 	case err := <-result:
-		if ctx.Err() == nil && !process.failed.Load() {
+		if ctx.Err() == nil && !process.failed.Load() && (!process.closing.Load() || shutdown) {
 			return err
 		}
 	case <-ctx.Done():
 	}
-	return errors.Join(ErrIPCTimeout, process.abortProcess())
+	process.requestAbort()
+	return ErrIPCTimeout
 }
 
-func (process *Process) abortProcess() error {
-	// A timeout permanently retires this protocol owner. Even if pipe close
-	// or process kill cannot unblock native I/O, at most its one call survives.
+// Abort/pipe-close calls have their own single owners. A native call that does
+// not return cannot hold the caller's input/shutdown gate or spawn replacements.
+func (process *Process) requestAbort() <-chan struct{} {
 	process.failed.Store(true)
 	process.abort.Do(func() {
-		_ = process.stdin.Close()
-		_ = process.stdout.Close()
-		if process.kill != nil {
-			process.abortErr = process.kill()
-		} else if process.process != nil {
-			process.abortErr = process.process.Kill()
-		}
-		if errors.Is(process.abortErr, os.ErrProcessDone) {
-			process.abortErr = nil
-		}
+		process.abortDone = make(chan struct{})
+		go func() {
+			var err error
+			if process.kill != nil {
+				err = process.kill()
+			} else if process.process != nil {
+				err = process.process.Kill()
+			}
+			if errors.Is(err, os.ErrProcessDone) {
+				err = nil
+			}
+			process.mu.Lock()
+			process.abortErr = err
+			process.mu.Unlock()
+			close(process.abortDone)
+		}()
+		process.closeInputPipe()
+		process.closeOutputPipe()
 	})
-	return process.abortErr
+	return process.abortDone
 }
 
 type limitedBuffer struct {

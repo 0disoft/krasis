@@ -30,8 +30,8 @@ func (operations *Operations) StopForUpgrade(ctx context.Context, generation int
 	return completed("upgrade_stop_requested"), nil
 }
 
-// Only a real process-exit acknowledgement releases the replacement fence.
-// The fault latch still requires replacement even after the guard exits.
+// Full guard retirement (real process exit plus joined protocol/native cleanup)
+// releases this fence. The fault latch remains independent of that completion.
 func (operations *Operations) guardExitPendingLocked() bool {
 	if operations.guardExitDone == nil {
 		return false
