@@ -70,3 +70,27 @@ previous reader-join semantics. The g384 change had also fenced these unrelated
 proofs before joining; its causal role in startup failure is unproven. This
 follow-up isolates that behavior without reapplying g381 worker retirement.
 Focused and package checks plus actual source readiness remain required.
+
+## g385 paired application verified
+
+Both PCs applied 684439616424b7cbbc662927a581f7edcfadb6cd. The inputworker,
+handoff and residentagent suites passed again after narrowing fencing. UI's
+85 tests, native build, installer provenance and eight-file archive checks
+passed. Update verification accepted 27,970,119 bytes and B's receipt
+9fafb5e9ead5091046b9329b16a85dee reports UPDATED. A's installer returned 0,
+and the installed agent SHA-256 matches its bundle. No Disconnect was sent.
+
+Doctor reports healthy/CONNECTED, matching UI/agent/installed images and
+completed update-stage cleanup. Collection d717bb69bd5f01d9e0c58d61bcfbb654
+at 20:59:59Z (A) / 21:00:01Z (B) reports READY input health and one
+installed_source_capture_protected_ready event on each PC. Its 21 A / 45 B
+current-build events contain no fault_ or session_failed event. These are
+short-window startup observations, not a new physical input or soak trial.
+The causal explanation for g384's startup failure is still unconfirmed.
+
+No new task was started after the ten-minute cutoff. Remaining priority is
+#50's native input/console retirement, followed by #59's mandatory callback
+dependencies, #70's real endpoint-change trial and the grouped hardware/signing
+gates. All ten issues remain open because their full acceptance is incomplete.
+Only main exists locally; the checkout has one worktree. No push or GitHub
+comment was performed.
