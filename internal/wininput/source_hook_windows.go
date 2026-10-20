@@ -132,6 +132,7 @@ func (hook *SourceHook) runWithBoundary(ctx context.Context, session *SourceSess
 	pointerState.progress = progress
 	session.physicalMu.Lock()
 	session.physicalCheck = sourceAnyInputPressed
+	session.advancePhysicalRevision()
 	session.physicalMu.Unlock()
 	if boundary != nil {
 		boundary = &serializedBoundaryObserver{next: boundary}

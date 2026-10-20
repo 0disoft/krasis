@@ -138,29 +138,30 @@ type queuedAction struct {
 }
 
 type SourceSession struct {
-	sink          SourceSink
-	observer      SourcePipelineObserver
-	queueObserver SourceQueueObserver
-	cleanup       time.Duration
-	cleanupState  atomic.Uint32
-	queue         chan *queuedAction
-	queueDepth    atomic.Int64
-	queueMu       sync.Mutex
-	pendingMove   *queuedAction
-	faults        chan error
-	yields        chan uint64
-	yieldPending  uint64 // stateMu; prevents a new lease until local-return cleanup finishes.
-	now           func() time.Time
-	started       atomic.Bool
-	terminal      atomic.Bool
-	stateMu       sync.RWMutex
-	physicalMu    sync.Mutex
-	physicalHeld  map[physicalPress]struct{}
-	physicalCheck func() bool
-	capturePaused bool // physicalMu; native owner replacement fences new grants.
-	active        bool
-	generation    uint64
-	faultOnce     sync.Once
+	sink             SourceSink
+	observer         SourcePipelineObserver
+	queueObserver    SourceQueueObserver
+	cleanup          time.Duration
+	cleanupState     atomic.Uint32
+	queue            chan *queuedAction
+	queueDepth       atomic.Int64
+	queueMu          sync.Mutex
+	pendingMove      *queuedAction
+	faults           chan error
+	yields           chan uint64
+	yieldPending     uint64 // stateMu; prevents a new lease until local-return cleanup finishes.
+	now              func() time.Time
+	started          atomic.Bool
+	terminal         atomic.Bool
+	stateMu          sync.RWMutex
+	physicalMu       sync.Mutex
+	physicalHeld     map[physicalPress]struct{}
+	physicalCheck    func() bool
+	physicalRevision uint64 // physicalMu; invalidates native inspection across local input/owner changes.
+	capturePaused    bool   // physicalMu; native owner replacement fences new grants.
+	active           bool
+	generation       uint64
+	faultOnce        sync.Once
 }
 
 func NewSourceSession(capacity int, sink SourceSink) (*SourceSession, error) {
@@ -195,12 +196,27 @@ func (session *SourceSession) Activate() error {
 		return errors.New("source session worker is not running")
 	}
 	session.physicalMu.Lock()
-	defer session.physicalMu.Unlock()
 	if session.capturePaused {
+		session.physicalMu.Unlock()
 		return errors.New("source capture is being prepared")
 	}
-	if len(session.physicalHeld) != 0 || session.physicalCheck != nil && session.physicalCheck() {
+	if len(session.physicalHeld) != 0 {
+		session.physicalMu.Unlock()
 		return errors.New("physical input is held during source activation")
+	}
+	check, revision := session.physicalCheck, session.physicalRevision
+	session.physicalMu.Unlock()
+	// Native queries may yield. Never make the low-level hook wait for them.
+	// The final ledger/revision check rejects even a complete local down/up or
+	// native-owner replacement that occurred while this inspection was running.
+	if check != nil && check() {
+		return errors.New("physical input is held during source activation")
+	}
+	session.physicalMu.Lock()
+	defer session.physicalMu.Unlock()
+	if session.capturePaused || len(session.physicalHeld) != 0 ||
+		revision != session.physicalRevision || revision == ^uint64(0) {
+		return errors.New("physical input changed during source activation")
 	}
 	session.stateMu.Lock()
 	defer session.stateMu.Unlock()

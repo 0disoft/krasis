@@ -20,6 +20,7 @@ func (session *SourceSession) UseExternalPhysicalCapture() bool {
 		return false
 	}
 	session.physicalCheck = nil
+	session.advancePhysicalRevision()
 	return true
 }
 
@@ -54,6 +55,7 @@ func (session *SourceSession) PauseCapture() bool {
 		return false
 	}
 	session.capturePaused = true
+	session.advancePhysicalRevision()
 	return true
 }
 
@@ -63,6 +65,7 @@ func (session *SourceSession) ResumeCapture() {
 	if session != nil {
 		session.physicalMu.Lock()
 		session.capturePaused = false
+		session.advancePhysicalRevision()
 		session.physicalMu.Unlock()
 	}
 }

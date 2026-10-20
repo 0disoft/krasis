@@ -26,6 +26,7 @@ func (session *SourceSession) observePhysicalPress(action control.InputAction) {
 	default:
 		return
 	}
+	session.advancePhysicalRevision()
 	if down {
 		if session.physicalHeld == nil {
 			session.physicalHeld = make(map[physicalPress]struct{})
@@ -33,5 +34,13 @@ func (session *SourceSession) observePhysicalPress(action control.InputAction) {
 		session.physicalHeld[key] = struct{}{}
 	} else {
 		delete(session.physicalHeld, key)
+	}
+}
+
+// Caller owns physicalMu. Saturation permanently rejects activation rather
+// than allowing an ancient native inspection to match after counter wrap.
+func (session *SourceSession) advancePhysicalRevision() {
+	if session.physicalRevision != ^uint64(0) {
+		session.physicalRevision++
 	}
 }
