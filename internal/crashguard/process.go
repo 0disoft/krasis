@@ -45,6 +45,30 @@ func StartPortable(executable string) (*Process, error) {
 	return process, err
 }
 
+// StartLocalInputCommand owns only local child transport and retirement. A
+// privileged dispatcher must independently authenticate its bootstrap before
+// accepting input; this constructor supplies no Windows/service authority.
+func StartLocalInputCommand(command *exec.Cmd, bootstrap []byte) (*Process, error) {
+	process, err := startCommand(command)
+	if err != nil {
+		return nil, err
+	}
+	process.portable = true
+	if len(bootstrap) != 0 {
+		err = process.ExchangeInput(context.Background(), func(writer io.Writer, _ io.Reader) error {
+			n, err := writer.Write(bootstrap)
+			if err != nil || n != len(bootstrap) {
+				return errors.Join(ErrUnexpectedExit, err)
+			}
+			return nil
+		})
+		if err != nil {
+			return process, errors.Join(err, process.Close())
+		}
+	}
+	return process, nil
+}
+
 var processIPCTimeout = 2 * time.Second
 
 type Process struct {

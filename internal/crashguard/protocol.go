@@ -76,8 +76,9 @@ func ServeWithRetirement(reader io.Reader, writer io.Writer, release application
 	return serveWithInput(reader, writer, release, nil, retire)
 }
 
-// ServeWithInput is only the ordinary portable child. Standard guards continue
-// to reject input frames. One serial owner retains both input and its journal.
+// ServeWithInput frames an inherited local dispatcher. Standard guards reject
+// input frames. Privileged callers must independently authenticate their exact
+// bootstrap before entering; this framing supplies no input authorization.
 func ServeWithInput(reader io.Reader, writer io.Writer, release application.ReleasePort, input func(io.Reader, io.Writer) error) (Result, error) {
 	if input == nil {
 		return Result{}, errors.New("portable input dispatcher required")

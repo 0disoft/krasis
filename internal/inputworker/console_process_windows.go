@@ -20,13 +20,27 @@ const (
 )
 
 func makeWorkerJob() (windows.Handle, error) {
+	return makeWorkerJobLimit(1)
+}
+
+func makeConsoleWorkerJob(mode consoleMode) (windows.Handle, error) {
+	if mode == ordinaryConsole {
+		return makeWorkerJobLimit(2)
+	}
+	if mode == loginConsole {
+		return makeWorkerJob()
+	}
+	return 0, ErrAuthority
+}
+
+func makeWorkerJobLimit(limit uint32) (windows.Handle, error) {
 	job, err := windows.CreateJobObject(nil, nil)
 	if err != nil {
 		return 0, ErrAuthority
 	}
 	limits := windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION{}
 	limits.BasicLimitInformation.LimitFlags = windows.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | windows.JOB_OBJECT_LIMIT_ACTIVE_PROCESS
-	limits.BasicLimitInformation.ActiveProcessLimit = 1
+	limits.BasicLimitInformation.ActiveProcessLimit = limit
 	_, err = windows.SetInformationJobObject(job, windows.JobObjectExtendedLimitInformation, uintptr(unsafe.Pointer(&limits)), uint32(unsafe.Sizeof(limits)))
 	if err != nil {
 		_ = windows.CloseHandle(job)

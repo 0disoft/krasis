@@ -5,16 +5,29 @@ package inputworker
 import (
 	"sync"
 	"time"
+	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
 
 type consoleCloseOps struct {
-	wait        func(windows.Handle, uint32) (uint32, error)
-	closeHandle func(windows.Handle) error
+	wait            func(windows.Handle, uint32) (uint32, error)
+	closeHandle     func(windows.Handle) error
+	terminateJob    func(windows.Handle, uint32) error
+	activeProcesses func(windows.Handle) (uint32, error)
 }
 
-var nativeConsoleCloseOps = consoleCloseOps{windows.WaitForSingleObject, windows.CloseHandle}
+var nativeConsoleCloseOps = consoleCloseOps{wait: windows.WaitForSingleObject, closeHandle: windows.CloseHandle, terminateJob: windows.TerminateJobObject, activeProcesses: activeJobProcesses}
+
+func activeJobProcesses(job windows.Handle) (uint32, error) {
+	// JOBOBJECT_BASIC_ACCOUNTING_INFORMATION; x/sys exports its class only.
+	var accounting struct {
+		Times                                                             [4]int64
+		TotalPageFaults, TotalProcesses, ActiveProcesses, TotalTerminated uint32
+	}
+	err := windows.QueryInformationJobObject(job, windows.JobObjectBasicAccountingInformation, uintptr(unsafe.Pointer(&accounting)), uint32(unsafe.Sizeof(accounting)), nil)
+	return accounting.ActiveProcesses, err
+}
 
 func (w *ConsoleWorker) retirementOps() *consoleCloseOps {
 	if w.closeOps != nil {
@@ -38,6 +51,33 @@ func (w *ConsoleWorker) tryRetire(waitMilliseconds uint32) error {
 	w.retiring, w.err = true, ErrAuthority
 	ops := w.retirementOps()
 	if w.job != 0 {
+		if w.pairJob {
+			// Keep the exact job reference until BOTH worker and native child
+			// are gone. Closing kill-on-close then waiting only for the parent
+			// would allow replacement while its child is still terminating.
+			if !w.jobTerminated {
+				if ops.terminateJob(w.job, 1) != nil {
+					w.poisoned = true
+					return w.err
+				}
+				w.jobTerminated = true
+			}
+			deadline := time.Now().Add(time.Duration(waitMilliseconds) * time.Millisecond)
+			for {
+				active, err := ops.activeProcesses(w.job)
+				if err != nil {
+					w.poisoned = true
+					return w.err
+				}
+				if active == 0 {
+					break
+				}
+				if !time.Now().Before(deadline) {
+					return w.err
+				}
+				time.Sleep(min(10*time.Millisecond, time.Until(deadline)))
+			}
+		}
 		if ops.closeHandle(w.job) != nil {
 			w.poisoned = true
 			return w.err

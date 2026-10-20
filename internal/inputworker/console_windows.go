@@ -20,16 +20,18 @@ import (
 // primitive, not an input authorization endpoint. The service must close the
 // authenticated input channel and finish recovery before calling Close.
 type ConsoleWorker struct {
-	mu           sync.Mutex
-	closed       bool
-	job, process windows.Handle
-	image        *os.File
-	done         chan struct{}
-	once         sync.Once
-	err          error
-	retiring     bool
-	poisoned     bool // A failed handle operation is never retried against a reused value.
-	closeOps     *consoleCloseOps
+	mu            sync.Mutex
+	closed        bool
+	job, process  windows.Handle
+	image         *os.File
+	done          chan struct{}
+	once          sync.Once
+	err           error
+	retiring      bool
+	poisoned      bool // A failed handle operation is never retried against a reused value.
+	closeOps      *consoleCloseOps
+	pairJob       bool
+	jobTerminated bool
 }
 
 // LaunchConsoleWorker is service-only. Both image digest and agent authority
@@ -143,7 +145,7 @@ func launchConsoleMode(ctx context.Context, digest [sha256.Size]byte, prepare fu
 	if err != nil {
 		return nil, ErrAuthority
 	}
-	worker := &ConsoleWorker{image: image, done: make(chan struct{})}
+	worker := &ConsoleWorker{image: image, done: make(chan struct{}), pairJob: mode == ordinaryConsole}
 	accepted := false
 	defer func() {
 		if !accepted {
@@ -161,7 +163,7 @@ func launchConsoleMode(ctx context.Context, digest [sha256.Size]byte, prepare fu
 		return nil, ErrAuthority
 	}
 	defer token.Close()
-	worker.job, err = makeWorkerJob()
+	worker.job, err = makeConsoleWorkerJob(mode)
 	if err != nil {
 		return nil, ErrAuthority
 	}

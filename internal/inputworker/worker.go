@@ -165,6 +165,15 @@ func serve(ctx context.Context, stream net.Conn, input application.InputPort, le
 		// Close first to interrupt the sole bounded reader. Cleanup cannot wait
 		// for the client to read an acknowledgement or send any further command.
 		_ = stream.Close()
+		if input, ok := input.(interface{ retireForRecovery() (bool, error) }); ok {
+			retired, retireErr := input.retireForRecovery()
+			err = errors.Join(err, retireErr)
+			if !retired {
+				report.Recovery.Remaining = pressed.Count()
+				err = errors.Join(err, ErrRecovery)
+				return
+			}
+		}
 		if pressed.Count() == 0 {
 			return
 		}

@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/handoff"
 	"github.com/0disoft/krasis/internal/inputdesktop"
 	"github.com/0disoft/krasis/internal/logindiag"
@@ -280,13 +281,29 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 			}, callback)
 		}
 	}
-	report, result := serveReadyProfileOnDesktop(run, channel, wininput.NewInjectionPort(), lease, func() error {
+	var input application.InputPort = wininput.NewInjectionPort()
+	var isolated *isolatedInput
+	if installation != nil {
+		isolated, err = startIsolatedInput(run, control, channel, proof, lease, installation)
+		if err != nil {
+			return finishWorkerReport(control, Report{}, errors.Join(err, ErrRecovery))
+		}
+		input = isolated
+	}
+	report, result := serveReadyProfileOnDesktop(run, channel, input, lease, func() error {
 		if proof.check(false) != nil {
 			return ErrAuthority
 		}
 		_ = control.SetWriteDeadline(time.Now().Add(startupTimeout))
 		return writeStartupReady(control, profile)
 	}, &profile, desktop)
+	if isolated != nil && !isolated.recovering {
+		retired, retireErr := isolated.retireForRecovery()
+		result = errors.Join(result, retireErr)
+		if !retired {
+			result = errors.Join(result, ErrRecovery)
+		}
+	}
 	result = normalizeWorkerStop(requested.Load(), report, result)
 	return finishWorkerReport(control, report, result)
 }

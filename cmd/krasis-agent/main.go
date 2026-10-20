@@ -19,6 +19,9 @@ func main() {
 		fmt.Fprintln(os.Stderr, "agent_error: physical screen coordinates unavailable")
 		os.Exit(1)
 	}
+	if len(os.Args) == 2 && os.Args[1] == "installed-input-smoke-internal" {
+		os.Exit(runInstalledInputSmoke())
+	}
 	if handled, code := runPortableChild(os.Args[1:]); handled {
 		os.Exit(code)
 	}
