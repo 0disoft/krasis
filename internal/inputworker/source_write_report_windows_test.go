@@ -49,13 +49,13 @@ func TestSourceWriteReportPreservesFailureBeforeRetirement(t *testing.T) {
 			if err := writeReport(&wire, Report{}, final); err != nil {
 				t.Fatal(err)
 			}
+			if strings.Contains(string(wire.Bytes()), "private") {
+				t.Fatal("private error entered report")
+			}
 			_, received := readReport(&wire)
 			var detail interface{ LoginRuntimeOperation() string }
 			if !errors.As(received, &detail) || detail.LoginRuntimeOperation() != tc.operation || !logindiag.ValidRuntimeOperation(tc.operation) {
 				t.Fatal("original write stage lost to retirement", received, tc.operation)
-			}
-			if strings.Contains(string(wire.Bytes()), "private") {
-				t.Fatal("private error entered report")
 			}
 			wantWrites := 1
 			if tc.deadline {
