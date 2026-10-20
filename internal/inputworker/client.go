@@ -105,22 +105,51 @@ func (client *Client) performResponse(ctx context.Context, command request, obse
 	ctx, cancel := context.WithTimeout(ctx, IdleTimeout)
 	defer cancel()
 	start := time.Now()
+	var lockElapsed, authorityElapsed time.Duration
+	var authorityErr error
 	if command.op == opHeartbeat {
 		if !client.mu.TryLock() {
 			return nil
 		}
+		lockElapsed = time.Since(start)
 	} else {
-		if err := client.mu.LockContext(ctx); err != nil {
-			handoff.Record(ctx, handoff.ClientLock, time.Since(start))
-			return notSent(errors.Join(ErrAuthority, err))
+		if client.channel == nil {
+			return notSent(ErrAuthority)
+		}
+		for {
+			if err := ctx.Err(); err != nil {
+				return notSent(errors.Join(ErrAuthority, err))
+			}
+			// SCM queries are not wire demand. Keep the serial input gate
+			// free for maintenance until full authorization has completed.
+			start = time.Now()
+			authorityErr = client.channel.authority.checkObserved(ctx, false)
+			authorityElapsed += time.Since(start)
+			if authorityErr == nil && ctx.Err() != nil {
+				handoff.Record(ctx, handoff.ClientAuthority, authorityElapsed)
+				return notSent(ctx.Err())
+			}
+			start = time.Now()
+			if client.mu.TryLock() {
+				lockElapsed += time.Since(start)
+				break
+			}
+			err := client.mu.LockContext(ctx)
+			lockElapsed += time.Since(start)
+			if err != nil {
+				handoff.Record(ctx, handoff.ClientLock, lockElapsed)
+				return notSent(errors.Join(ErrAuthority, err))
+			}
+			client.mu.Unlock()
+			// Another operation owned the wire after this check. Discard
+			// the proof and reauthorize rather than caching it across a wait.
 		}
 	}
 	var sample [7]byte
 	wasFailed := client.failed
-	elapsed0 := time.Since(start)
-	sample[0] = timingBucket(elapsed0)
+	sample[0] = timingBucket(lockElapsed)
 	if command.op != opHeartbeat {
-		handoff.Record(ctx, handoff.ClientLock, elapsed0)
+		handoff.Record(ctx, handoff.ClientLock, lockElapsed)
 	}
 	defer func() {
 		if !wasFailed {
@@ -150,18 +179,16 @@ func (client *Client) performResponse(ctx context.Context, command request, obse
 		return nil
 	}
 	start = time.Now()
-	var authorityErr error
-	if command.op == opHeartbeat {
-		// Maintenance checks the pinned pipe owner. Actual input still
-		// performs full service authorization, as does the worker executor.
+	if authorityErr == nil {
+		// Maintenance checks only the pinned pipe owner. Input has just
+		// completed full authorization without waiting for this gate; still
+		// reject a closed/exited owner before submitting any request.
 		authorityErr = client.channel.authority.checkHeartbeat()
-	} else {
-		authorityErr = client.channel.authority.checkObserved(ctx, false)
 	}
-	elapsed1 := time.Since(start)
-	sample[1] = timingBucket(elapsed1)
+	authorityElapsed += time.Since(start)
+	sample[1] = timingBucket(authorityElapsed)
 	if command.op != opHeartbeat {
-		handoff.Record(ctx, handoff.ClientAuthority, elapsed1)
+		handoff.Record(ctx, handoff.ClientAuthority, authorityElapsed)
 	}
 	if authorityErr != nil {
 		client.fail()
