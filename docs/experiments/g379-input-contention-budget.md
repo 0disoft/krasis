@@ -42,3 +42,27 @@ new branch/worktree, issue comment or hosted CI run.
    release gates; #4/#5/#6/#7 still require their explicit hardware reports.
 
 No further implementation task is started after this run's ten-minute cutoff.
+
+## Paired application and verification
+
+Both PCs now run g379, revision 5e2e7cd97b0d3280a0d542d7534f26dbd61c2cb1.
+The frontend's 85 tests, native build and eight-file archive/installer provenance
+checks passed. update verify accepted 27,930,473 bytes; B's receipt
+6832b91dd48b9350e4e2d46b1b8787fe reports UPDATED at that revision. A installer
+returned 0, and its installed agent SHA-256 matches the package.
+
+Doctor reports healthy/CONNECTED and matched UI, agent, installed image and
+recovery record. Paired collection at 20:11:19Z/20Z reports READY input health,
+successful installations without recovery, and completed cleanup on both sides
+(zero stages removed). Its 22 A and 49 B current-build events contain no
+fault_/session_failed code. B's temporary network timeout/reacquisition occurred
+while A was being replaced and is retained as such. Immediate launch-time
+agent-unavailable preceded successful startup; no second installation was used.
+This short window does not establish long-term or physical-input acceptance.
+
+The ten remaining issues are #4, #5, #6, #7, #15, #16, #20, #50, #59 and #70.
+None is closed solely from this user input report or these admission fixes.
+Unsigned release, hosted CI, hardware fault/DPI/polling/accessibility matrices
+and non-cancelable native-owner retirement remain unverified in this run.
+No product source-of-truth contracts changed; only implementation and these
+experiment/acceptance records changed. Changes remain on local main only.
