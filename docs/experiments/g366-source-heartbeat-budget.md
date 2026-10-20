@@ -32,3 +32,31 @@ This fixes one premature-failure condition, not all recorded recovery triggers.
 Delays exceeding the existing active deadline still require safe release.
 No public API, DB, dependency, repository-hygiene or CI runner changes. No push,
 reboot or installed-program replacement is performed by building this package.
+
+## Verified package and authorized application
+
+The generation 366 bundle is revision
+`dc43a1fdbf738470bca4649f451cf9287ae77fae`, 27837707 bytes. All 85 frontend
+tests, native build, installer provenance, transfer roundtrip, icon and eight-file
+checks pass. Offline update verify returns valid/ok.
+
+The operator explicitly approved application to both PCs. B transfer
+`9ce7e4229979334342759158839282c4` completed UPDATED at that exact generation
+and revision. A's installer completed successfully at 13:03:15Z, and its
+installed agent hash matches the built g366 agent:
+`b2761d6da83be177fb5a0acbb9569c6968aacbc2503931beecb0f3d1ec17d439`.
+The replacement UI and launch record are verified at the same revision.
+
+Paired collections `abc8460e6ec64af10976d4128f0b6bb6` and
+`04246d00c2caad8c2393445d3d2c2c44` preserve initial readiness and the short
+post-application observation. At 13:05:07Z both input health and service states
+are READY, A doctor is healthy/CONNECTED with matching CLI/UI/running/installed
+agent versions, and B reports ONLINE g366 at the same revision. Both logs
+contain two handoff profiles and no new fault/session_failed/source-heartbeat
+failure codes for this build. Recent source heartbeat response buckets are
+below 10 ms on A and below 1 ms on B.
+
+This is roughly one minute of paired observation after reconnect, not proof
+that the historical recovery frequency is resolved. Longer normal use and
+the previously deferred low-load comparison remain unverified. No remote Git
+push, public release or reboot was performed.
