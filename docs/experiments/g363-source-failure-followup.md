@@ -88,3 +88,23 @@ replacement allowed. An uncertain start/stop keeps the journal; no restart
 loop or receipt deletion bypasses cleanup verification. Startup policy and
 service permissions are unchanged. Both real application and interrupted
 repair behavior require validation before claiming recovery.
+
+## Final g365 package
+
+Revision 64c8b30863dbeb67fd9504a4c1a2db5469bc1e21, size 27837612 bytes.
+Inputworker and installer tests/vet pass after the installer-only startup
+restriction. The unchanged frontend and third-party notices reuse the verified
+g364 build inputs; all 85 UI tests already passed. Native executables and
+embedded installer are rebuilt at this revision. Offline verification, package
+roundtrip, eight-file and icon checks pass; independent EXE SHA-256 checks:
+
+| File | SHA-256 |
+| --- | --- |
+| krasis.exe | ef00f0d1728cd7e8eb44096a690be27dc4a4c8ac38fe4b439846c8c7ba29db8f |
+| krasis-agent.exe | 4424bf5cd112f38776e15b8638b6cfa8c8946832afafcdcad591d55212daffa8 |
+| krasis-cli.exe | 6b83173cb39717cadf32ef5a08e7f2593b2a3ea9b02743783fe714b074fd88e7 |
+| krasis-install.exe | 6828119fa9063b4c7bbdc57afbc3e702486639ed0664a14f1de6c0a1ed799bed |
+
+B transfer 86e33b30804ffe93fda989672ebc05d8 is queued. G364 was not applied;
+its unused local artifact is retained. Real g365 service recovery, paired
+readiness and attended acceptance remain to be observed.
