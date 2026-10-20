@@ -44,7 +44,7 @@ func acceptAgentNamed(ctx context.Context, agentDigest [sha256.Size]byte, ready 
 	if ctx == nil || ctx.Err() != nil || agentDigest == ([sha256.Size]byte{}) {
 		return nil, ErrAuthority
 	}
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctx, cancel := agentAcceptContext(ctx, initial != nil)
 	defer cancel()
 	self, err := inspectProcess(windows.GetCurrentProcessId())
 	if err != nil {

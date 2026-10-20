@@ -31,6 +31,69 @@ func testServiceListener(t *testing.T) (*servicePipeListener, string) {
 	return listener, name
 }
 
+func TestServiceListenerAcceptSurvivesIdleStartupTimeout(t *testing.T) {
+	listener, name := testServiceListener(t)
+	parent, stop := context.WithTimeout(context.Background(), 10*time.Second)
+	defer stop()
+	server, err := listener.borrow()
+	if err != nil {
+		t.Fatal(err)
+	}
+	accept, cancel := agentAcceptContext(parent, true)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- server.connect(accept) }()
+	joined := false
+	defer func() {
+		cancel()
+		if !joined {
+			<-done
+		}
+	}()
+	// Real kernel I/O: the old accept deadline retired this loan after five
+	// seconds, before any client existed, even while the service remained live.
+	timer := time.NewTimer(5*time.Second + 50*time.Millisecond)
+	defer timer.Stop()
+	select {
+	case err := <-done:
+		joined = true
+		t.Fatal("idle service retired its listening instance", err)
+	case <-timer.C:
+	}
+	client, err := openPipe(parent, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	if err := <-done; err != nil {
+		joined = true
+		t.Fatal(err)
+	}
+	joined = true
+	_ = client.SetDeadline(time.Now().Add(time.Second))
+	_ = server.SetDeadline(time.Now().Add(time.Second))
+	if _, err := client.Write([]byte("new")); err != nil {
+		t.Fatal(err)
+	}
+	var data [3]byte
+	if _, err := io.ReadFull(server, data[:]); err != nil || string(data[:]) != "new" {
+		t.Fatal("client was reset after idle", err)
+	}
+	if err := server.Close(); err != nil {
+		t.Fatal(err)
+	}
+	second, err := listener.borrow()
+	if err != nil {
+		t.Fatal(err)
+	}
+	shutdown := make(chan error, 1)
+	go func() { shutdown <- second.connect(accept) }()
+	cancel()
+	if err := <-shutdown; !errors.Is(err, context.Canceled) {
+		t.Fatal("service shutdown did not retire accept", err)
+	}
+}
+
 func TestServiceListenerKeepsNameAcrossFailedOrCancelledLeaseBackoff(t *testing.T) {
 	for _, mode := range []string{"input", "source"} {
 		t.Run(mode, func(t *testing.T) {
