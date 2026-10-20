@@ -46,3 +46,17 @@ and localapi tests; vet with the repository's existing unsafeptr exclusion;
 and whitespace checks. Terminal-category tests retain cleanup priority and
 never export arbitrary error strings. The distinct package and installed
 acceptance results are recorded separately when performed.
+
+## Verified g367 trial package
+
+Package revision `13c8f375689834018c97356509f2e2a2f5fee344` passes all
+85 frontend tests, native UI build, installer provenance, package transfer
+roundtrip, icon and eight-file checks. Offline CLI update verification returns
+valid/ok for generation 367, 27777535 bytes. The package is a local manual
+two-PC trial artifact, not a public release.
+
+At 16:31Z A doctor still reports healthy/CONNECTED to B with running and
+installed g366. G367 has not been installed on either PC; installation awaits
+the existing operator approval gate. The next priority is applying the trial
+and observing ordinary use, distinguishing any remaining reader termination
+from the corrected premature activation timeout. No Git push was performed.
