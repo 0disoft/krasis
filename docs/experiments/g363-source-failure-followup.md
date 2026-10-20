@@ -108,3 +108,61 @@ roundtrip, eight-file and icon checks pass; independent EXE SHA-256 checks:
 B transfer 86e33b30804ffe93fda989672ebc05d8 is queued. G364 was not applied;
 its unused local artifact is retained. Real g365 service recovery, paired
 readiness and attended acceptance remain to be observed.
+
+## Observed recovery and continuous-motion follow-up
+
+G365 was subsequently applied to both PCs. A's installed input service is
+RUNNING, input is CONFIGURED, and paired input health is READY. The local
+doctor check on 2026-10-20 confirms CONNECTED, matching g365 CLI/UI/running
+and installed agent metadata, and the running input service. Collection
+`4addee2f196aa3acd245f1b08915c947` preserves the initial paired observations.
+This confirms recovery, not the cause of the original 08:13 service stop.
+
+The operator reports stutter while continuously moving inside B's screen,
+without locking either PC. After an attended 10-15 second movement request,
+the operator confirmed continued stutter. Paired collection
+`a5b7270bb5bd13e02b0c031e82b250f2` preserves this follow-up. Its latest
+matching source/receiver profiles end at 09:20:30.162737Z and
+09:20:29.8903349Z, exchange tag
+`2ebb50c488a17c1fd0cd26d053da0ebccb76351d79098bf00a5e0053bc88062a`.
+The profiles cover the whole lease, including entry; they do not mark the
+exact beginning and end of uninterrupted physical motion.
+
+| Observation | A source | B receiver |
+| --- | --- | --- |
+| Profiled post-first dispatches | 628 | 627 |
+| Worst post-first dispatch | 423.623 ms | 36.687 ms |
+| Relevant stage within that dispatch | network write 423.235 ms; coordinator 0 ms | authority 32.502 ms; response 4.185 ms |
+| Cadence intervals at least 100 ms | 15 of 628 | 16 of 628 |
+| Maximum dispatch-start gap | 1304.804 ms | 648.954 ms |
+| Previous dispatch / time until next dispatch at maximum gap | 1303.049 / 1.755 ms | 3.102 / 645.851 ms |
+
+The source's maximum cadence gap includes its first dispatch, so it must not
+be described as a 1.3-second steady-state stall. Source TCP RTT snapshots are
+14.364/13.448 ms, minimum 2.381/2.381 ms, with no retransmitted-byte or timeout
+counter increase. These endpoint snapshots cannot exclude transient network
+delay during the lease. Receiver time between dispatches includes transport,
+source capture/IPC and scheduling; it is not receiver injection time.
+
+After collection, A's processor load query returned 100%. A separate aggregate
+performance-counter sample at 09:24:28Z-09:24:31Z returned 63%, 93%, and 82%.
+Node, PowerShell, Codex and other processes were consuming CPU. This establishes
+host pressure during investigation, not CPU load during the earlier motion
+trial or a proven cause. No unrelated process was stopped or reprioritized.
+
+Next work, ranked by likely user benefit and cost:
+
+1. Repeat the same attended motion with lower A host load and retain paired
+   profiles. Low cost; needed before choosing a scheduling or IPC change.
+2. If stutter remains, separate source native/authority/pipe delay from successful
+   network-write gate and I/O time. Medium cost; current source cadence starts
+   after capture IPC and cannot identify those upstream delays. Retain fresh
+   input authorization and owner-presence checks.
+3. Revisit B's per-input authorization only if the isolated trial still shows
+   receiver dispatch dominating. Medium cost; the present worst receiver
+   dispatch is much shorter than the observed arrival gap.
+
+No runtime fix is claimed from this collection. No authorization checks,
+input protocol, process priority, dependencies or CI configuration were changed.
+The installed pair remains on g365; no replacement, reboot or remote Git update
+was performed for this follow-up.
