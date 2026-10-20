@@ -43,3 +43,38 @@ Vet passes with the existing unsafeptr exclusion. Regression coverage uses a
 real native pipe for an unsubmitted reply and batch, and rejects further
 retirement/batch writes after zero-byte attempted and partial failures.
 Package and installed acceptance results are recorded separately below.
+
+## Package and recovery before application
+
+Revision `444d0e44e73ecddc063ee53ebbb5f2cead20167b` passes all 85 UI
+tests, native build, installer provenance, update transfer roundtrip, icon and
+eight-file checks. Offline update verify is valid/ok for g368, 27784446 bytes.
+
+Before sending, A's failed g367 agent was safely stopped. Its process exit
+and installed image hash were verified before launching one replacement
+installed agent. A reconnected healthy to B. The captured failed support
+snapshot was preserved before this recovery. No user recovery click was needed.
+
+B transfer `e3827590cff7e243cac32b54b3dd1c26` completed UPDATED at the
+exact g368 revision. A's installer completed with result 0 at 17:01:03Z.
+
+## Paired installed verification
+
+A's installed agent SHA256 matches the verified bundle:
+`649cacd51234a3b07801a2cc9b5f22302161357a14239511feb9d44bef70c4be`.
+A doctor reports healthy/CONNECTED with matching CLI/UI/launch/running and
+installed g368 versions. B reports ONLINE g368 at the exact revision, IDLE.
+A's scheduled recovery task is enabled and reports agent_present/CONNECTED.
+
+Initial collection `142c6a83366e2a3a51934cad88f3727f` records protected
+source readiness on both PCs. Final collection
+`8b51044bc8d0cc91f68a4659870578ec`, created at 17:04:32Z/31Z, records
+input health READY and service READY on both PCs, with no new fault,
+session_failed, source-command failure, heartbeat timeout or reader protocol
+failure events for g368. Each PC has one handoff profile. Recent heartbeat
+response buckets are below 100 ms on A and below 10 ms on B.
+
+The observation spans approximately three minutes since CONNECTED. It verifies
+application and short operation, not sustained stability or the cause of the
+original scheduling stalls. Future failures still require distinguishing the
+initial timeout from actual native cleanup uncertainty. No Git push or reboot.
