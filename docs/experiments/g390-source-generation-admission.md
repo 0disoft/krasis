@@ -43,3 +43,32 @@ boundary audit and #70's physical endpoint change remain open, as do the seven
 hardware/UI/installer/release acceptance issues. No issue comments, push, extra
 branch/worktree, external API, DB, CI runner, dependency, firewall or signing
 change is included in this unit.
+
+The callback audit also narrows the next native investigation: protected
+low-level physical callbacks call sourceLoginDesktopCheck/Scope.Do on their
+fixed capture desktop binding. That path reads current desktop activity; it
+does not execute a full SCM/WTS proof on every mouse move. Full service/agent
+checks remain on source commands, startup and transport admission. Do not remove
+or cache the live desktop check to fix an assumed duplicate authority query.
+
+## Paired application
+
+Both PCs applied generation 390, revision
+6233ccca81eef0eb482b35219576e170f315db7b. UI's 85 tests, native builds,
+installer provenance and eight-file archive checks passed. Offline verify
+accepted 28,061,680 bytes. B receipt 0f837488023efd7e285bd601b18d89be reports
+UPDATED. A installer exited 0 and installed agent SHA-256 matched. No Disconnect
+command was sent during replacement.
+
+Doctor reports healthy/CONNECTED with matching UI, resident, installed build
+and recovery record. Collection 04cddcb0a945246deec7cc0109e3aaf2 at
+2026-10-20T22:10:02Z/03Z reports READY on both PCs and one
+installed_source_capture_protected_ready event each. Its 26 A / 49 B current-build
+events contain no fault_ or session_failed. B recorded one RECONNECTING while A
+was replaced, then reconnected. This short startup window is not physical input,
+latency, polling/DPI or soak acceptance. All ten issues remain open.
+
+No new implementation unit was started after this round's ten-minute cutoff.
+Next work remains the physical/queue semantic gates and synchronous cursor work
+under #59, followed by the native-boundary acceptance under #50. Source and
+rollout evidence are local main commits; no push or issue comments were made.
