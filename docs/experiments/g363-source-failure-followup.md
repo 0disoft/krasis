@@ -1,4 +1,4 @@
-# g363/g364: input recovery trial and installer repair admission
+# g363-g365: input recovery trial and installer repair admission
 
 ## Baseline and scope
 
@@ -79,10 +79,11 @@ the old service rejects a normal start with that lock held and no journal.
 This is a separate, source-confirmed explanation for the repair refusal;
 it does not establish the original 08:13 source command failure.
 
-G364 persists a matching restored-image journal before starting the verified
-old service, using the existing rollback_start phase that g362 understands.
+G365 supersedes the unapplied g364 package. It persists a matching journal before starting the verified old service,
+using the existing installer-only start phase and SCM argument g362 understands.
 It retains the exclusive lock, retired-process check and pinned old images.
-Only after a verified clean stop is that journal finished and normal image
+Ordinary reboot startup cannot use this repair journal. Only after a verified
+clean stop is that journal finished and normal image
 replacement allowed. An uncertain start/stop keeps the journal; no restart
 loop or receipt deletion bypasses cleanup verification. Startup policy and
 service permissions are unchanged. Both real application and interrupted

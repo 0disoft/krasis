@@ -20,8 +20,10 @@ func TestStoppedRepairStartsOldServiceWithDurableMatchingJournal(t *testing.T) {
 			starts++
 			// An old service rejects the held installer lock without a journal.
 			// Its unchanged startup policy must accept only the verified old image.
-			if backend.journal == nil || !serviceStartAllowed([]string{ServiceName}, images, backend.journal) ||
-				serviceStartAllowed([]string{ServiceName}, installTestImages("unrelated"), backend.journal) {
+			args := []string{ServiceName, installServiceStartArgument}
+			if backend.journal == nil || !serviceStartAllowed(args, images, backend.journal) ||
+				serviceStartAllowed(args, installTestImages("unrelated"), backend.journal) ||
+				serviceStartAllowed([]string{ServiceName}, images, backend.journal) {
 				t.Fatal("repair start has no matching durable authorization")
 			}
 			backend.state.Running = true
@@ -55,6 +57,7 @@ func TestStoppedRepairRetainsJournalAfterUncertainStartOrStop(t *testing.T) {
 			t.Fatal("uncertain repair erased its durable evidence", err)
 		}
 		// Recovery must not replace files or restart an unconfirmed running owner.
+		backend.fail = "stop"
 		if err := recoverInputInstallation(backend); err == nil || backend.journal == nil {
 			t.Fatal("uncertain repair was silently committed", failStart, err)
 		}
