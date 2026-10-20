@@ -60,3 +60,34 @@ installed g366. G367 has not been installed on either PC; installation awaits
 the existing operator approval gate. The next priority is applying the trial
 and observing ordinary use, distinguishing any remaining reader termination
 from the corrected premature activation timeout. No Git push was performed.
+
+## Authorized paired application
+
+The operator approved g367 on both PCs, then instructed that future new
+Krasis versions in this paired trial should be applied without requesting
+another chat approval. This supersedes the approval wait above. Windows
+administrator consent remains an OS-controlled step when required. The Git
+push prohibition remains in force.
+
+B transfer `aa8b45dc6c2c720de2764671757feb97` completed UPDATED at g367,
+revision `13c8f375689834018c97356509f2e2a2f5fee344`, 27777535 bytes.
+A's bundled installer completed at 2026-10-20 16:34:49Z with result 0.
+Its installed agent SHA256 matches the verified bundle:
+`316a1eba9ec631d91dac1733fc58ecb634f73890a14fa1e26a0259c0d9d12551`.
+The replacement UI and launch record also report g367 at that revision.
+
+Collection `4f2d9b04540f4fa81549c53df5ca6fd1` preserves the initial
+post-install connection setup. Collection
+`d3b01edfc8fbb25e35f851ead5759fe6`, created at 16:36:13Z/14Z, records
+both PCs' input health READY and services READY. A doctor is healthy/CONNECTED
+with matching CLI/UI/running/installed versions; B update status is ONLINE
+g367, matching revision, IDLE. A's recovery task is enabled. Both logs record
+CONNECTED, protected source readiness, and no new fault, session_failed or
+source command/heartbeat failure events after reconnect in this short window.
+
+This is approximately 35 seconds of connected observation, with no handoff
+profiles in this collection. Sustained normal-use recovery frequency and the
+remaining reader-termination cause are still unverified. Existing source and
+package tests were reused because no runtime code changed in this application
+step. Documentation diff checks pass. No API, DB, dependency, hygiene or CI
+runner changes; no Git push, public release or reboot.
