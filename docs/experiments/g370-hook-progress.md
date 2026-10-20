@@ -33,3 +33,39 @@ Reference: https://learn.microsoft.com/en-us/windows/win32/winmsg/lowlevelmousep
 
 No product API, DB, dependency or CI runner change; no Git push. Package and
 installed acceptance are recorded after verification.
+
+## Installed acceptance and remaining recovery failure
+
+Both PCs now run generation 370, revision
+`858cc31d7bd514543459ccdd00986957dc973a48`. B transfer
+`535a2c00ec017e991992accb70d73b4f` reports UPDATED for the verified
+27,883,645-byte bundle. A's attended installer completed with exit code 0;
+the installed agent SHA-256 matches the bundle. A's CLI, UI, running agent,
+installed agent and launch record all match this revision.
+
+The first paired collection at 18:21:46Z/44Z on 2026-10-20 reported input
+health and input service READY on both PCs. This did not establish stability:
+at 18:22:25Z A recorded `installed_source_reader_eof`, heartbeat response
+failure, `fault_source_hook_failed` and `session_failed`. No specific new
+hook-progress cause was reported in that failure. These observations do not
+identify external interference or prove silent hook removal.
+
+Automatic application recovery restarted A at 18:22:39Z and reconnected at
+18:22:41Z. Final collection at 18:23:23Z/22Z again reports input health and
+service READY on both PCs; A doctor is healthy/CONNECTED and B is ONLINE.
+The short recovered window is not long-term stability or hardware acceptance.
+
+Issue #86 was closed without a comment for the implemented bounded mismatch
+classification and safe fencing. Recurring recovery remains unresolved.
+Next execution should investigate the service/worker EOF path and its missing
+terminal cause, then remove callback-side authorization waits under #59.
+Native injection cancellation (#50), network observation (#67/#68/#71/#72),
+endpoint hardware acceptance (#70), GUI/release acceptance (#15/#16), and the
+physical device matrix (#4/#5/#6/#7 with umbrella #20) remain open. No new
+implementation work was started beyond this execution's ten-minute cutoff.
+
+Only main remains locally and remotely, with one worktree and no open PRs.
+No new issue comments or Git push were made. Existing package/UI test results
+were reused because deployment changed no source. Full hardware fault matrix,
+signed release and hosted CI remain unverified. No API, DB, dependency or
+runner changes were made by this installation record.
