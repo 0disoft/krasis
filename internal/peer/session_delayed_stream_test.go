@@ -152,6 +152,54 @@ func TestPausedReceiverDoesNotValidateQueuedHeartbeat(t *testing.T) {
 		runtime.Snapshot().Control.State, input, observer, readBytes.Load(), len(wire))
 }
 
+func TestOrderedStreamCancellationReleasesHeldInputBeforeHeartbeatCanArrive(t *testing.T) {
+	wire, inputEnd, _ := orderedInputAndHeartbeat(t)
+	runtime, input := newInboundRuntime(t)
+	left, right := net.Pipe()
+	defer left.Close()
+	defer right.Close()
+	reader, err := transport.NewReader(left)
+	if err != nil {
+		t.Fatal(err)
+	}
+	observer := newOrderedStallObserver()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		done <- RunSessionWithLifecycleObserved(ctx,
+			&framedPipeConnection{connection: left, reader: reader},
+			testWriteCoordinator(t, &recordingFrameWriter{}), runtime, nil, nil,
+			fixedClock(time.Unix(101, 0)), 3*time.Second, observer)
+	}()
+	awaitStallSignal(t, observer.readStarted, "initial read")
+	sent := make(chan error, 1)
+	go func() {
+		_, err := io.Copy(right, bytes.NewReader(wire[:inputEnd]))
+		sent <- err
+	}()
+	if err := awaitStallResult(t, sent, "input before delivery stall"); err != nil {
+		t.Fatal(err)
+	}
+	// The second read begins only after the key-down has completed. No
+	// heartbeat bytes are delivered, so recovery must interrupt that read.
+	awaitStallSignal(t, observer.readStarted, "read stalled after held input")
+	if snapshot := runtime.Snapshot(); snapshot.PressedCount != 1 {
+		t.Fatal("input was not held before the stall", snapshot)
+	}
+	cancel()
+	if err := awaitStallResult(t, done, "stalled session recovery"); !errors.Is(err, context.Canceled) {
+		t.Fatal("cancellation cause lost during recovery", err)
+	}
+	if snapshot := runtime.Snapshot(); snapshot.Control.State != control.StateLocal || snapshot.PressedCount != 0 {
+		t.Fatal("stalled stream kept input authority", snapshot)
+	}
+	if len(input.presses) != 1 || len(input.releases) != 1 || input.presses[0] != input.releases[0] ||
+		observer.frames.Load() != 1 || observer.heartbeats.Load() != 0 {
+		t.Fatal("recovery lost held input or validated an undelivered heartbeat")
+	}
+}
+
 func orderedInputAndHeartbeat(t *testing.T) ([]byte, int, []byte) {
 	t.Helper()
 	inputPayload, err := transport.EncodeInputPayload(

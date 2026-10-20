@@ -58,3 +58,12 @@ Ranked by user impact, expected benefit and implementation/verification cost:
 4. **#57 and #49 device acceptance:** reuse current coalescing and delay tests, then collect bounded two-PC queue/latency/recovery evidence when the user can operate both devices. No new queue-size change is justified by this audit.
 
 No new implementation task was started after the audit's ten-minute cutoff. The remaining issues stay open with explicit outstanding conditions; they must not be closed solely to clear the issue list.
+
+## Follow-up acceptance
+
+The subsequent user-authorized execution completed additional Windows process
+and stream-recovery tests. #90 is closed with evidence in
+`2026-10-21-trust-regression-acceptance.md`. #49 and #57 implementation tracking
+is closed with evidence and explicit remaining #6/#7 hardware conditions in
+`2026-10-21-stream-queue-acceptance.md`. The table above preserves the earlier
+audit snapshot; these follow-up records describe the newer disposition.
