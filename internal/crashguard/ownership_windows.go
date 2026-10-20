@@ -4,12 +4,35 @@ package crashguard
 
 import (
 	"errors"
+	"io"
 	"strconv"
 	"sync"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
+
+const portableOwnershipName = `Local\Krasis-Portable-Input-v1`
+
+// CheckPortableRecovery prevents a new resident from starting either input
+// route while the previous ordinary input/recovery children still own work.
+// The caller holds the resident instance lease across this check and startup.
+func CheckPortableRecovery() error {
+	pending, err := pendingPortableOwnership(portableOwnershipName)
+	if err != nil {
+		return err
+	}
+	if pending {
+		return ErrExitTimeout
+	}
+	return nil
+}
+
+// AdoptPortableOwnership consumes a reference from the ordinary child launch
+// allowlist. Keep it until all native input, journal and IPC work has finished.
+func AdoptPortableOwnership(value string) (io.Closer, error) {
+	return adoptPortableOwnership(value)
+}
 
 // Object existence is the fence. Mutex thread ownership/abandonment is never
 // used: inherited references keep it alive after the resident process dies.

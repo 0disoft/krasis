@@ -27,6 +27,13 @@ func TestPortableGuardianFixture(t *testing.T) {
 	}
 	switch mode {
 	case "input", "input-cooperative":
+		if os.Getenv("KRASIS_GUARDIAN_OWNERSHIP") != "" {
+			ownership, err := adoptPortableOwnership(os.Args[len(os.Args)-1])
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer ownership.Close()
+		}
 		// Deliberately ignores cancellation/EOF; only native retirement stops
 		// it. This fixture performs no keyboard/mouse injection.
 		line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
@@ -46,11 +53,20 @@ func TestPortableGuardianFixture(t *testing.T) {
 		}
 		time.Sleep(10 * time.Second)
 	case "guardian":
-		parent, err := strconv.ParseUint(os.Args[len(os.Args)-2], 10, 64)
+		end := len(os.Args)
+		if os.Getenv("KRASIS_GUARDIAN_OWNERSHIP") != "" {
+			ownership, err := adoptPortableOwnership(os.Args[end-1])
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer ownership.Close()
+			end--
+		}
+		parent, err := strconv.ParseUint(os.Args[end-2], 10, 64)
 		if err != nil {
 			t.Fatal(err)
 		}
-		input, err := strconv.ParseUint(os.Args[len(os.Args)-1], 10, 64)
+		input, err := strconv.ParseUint(os.Args[end-1], 10, 64)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -60,7 +76,18 @@ func TestPortableGuardianFixture(t *testing.T) {
 			t.Fatal(result, err)
 		}
 	case "parent":
-		input, err := startCommand(guardianFixtureCommand("input"))
+		var input *Process
+		var err error
+		if name := os.Getenv("KRASIS_GUARDIAN_OWNERSHIP"); name != "" {
+			ownership, acquireErr := acquirePortableOwnership(name)
+			if acquireErr != nil {
+				t.Fatal(acquireErr)
+			}
+			defer ownership.Close()
+			input, err = startOwnedPortable(guardianFixtureCommand("input"), ownership)
+		} else {
+			input, err = startCommand(guardianFixtureCommand("input"))
+		}
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -105,6 +132,21 @@ func (release retiredMarkerRelease) Release(ctx context.Context, token control.P
 	state, err := windows.WaitForSingleObject(release.input, 0)
 	if err != nil || state != windows.WAIT_OBJECT_0 {
 		return errors.New("release preceded exact input child exit")
+	}
+	if gate := os.Getenv("KRASIS_GUARDIAN_RECOVERY_GATE"); gate != "" {
+		if err := os.WriteFile(gate+"-ready", nil, 0600); err != nil {
+			return err
+		}
+		deadline := time.Now().Add(5 * time.Second)
+		for {
+			if _, err := os.Stat(gate); err == nil {
+				break
+			}
+			if time.Now().After(deadline) {
+				return errors.New("recovery fixture gate timed out")
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
 	}
 	return (markerReleasePort{path: release.path}).Release(ctx, token)
 }
@@ -153,6 +195,100 @@ func TestPortableGuardianStopsUncooperativeInputAfterParentDeath(t *testing.T) {
 		case <-ticker.C:
 		case <-deadline.C:
 			t.Fatal("guardian failed to retire input and recover after parent death")
+		}
+	}
+}
+
+func TestPortableGuardianBlocksRestartUntilJournalRecoveryAfterResidentDeath(t *testing.T) {
+	dir := t.TempDir()
+	name := ownershipTestName(t)
+	gate := filepath.Join(dir, "allow-recovery")
+	marker := filepath.Join(dir, "recovered")
+	t.Setenv("KRASIS_GUARDIAN_OWNERSHIP", name)
+	t.Setenv("KRASIS_GUARDIAN_RECOVERY_GATE", gate)
+	t.Setenv(guardMarkerEnvironment, marker)
+	command := guardianFixtureCommand("parent")
+	configureProcess(command)
+	stdout, err := command.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := command.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer command.Wait()
+	defer command.Process.Kill()
+	defer func() {
+		_ = os.WriteFile(gate, nil, 0600)
+		// Let the recovery child retire before removing its marker directory.
+		deadline := time.Now().Add(5 * time.Second)
+		for time.Now().Before(deadline) {
+			pending, err := pendingPortableOwnership(name)
+			if err != nil || !pending {
+				return
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}()
+	ready := make(chan string, 1)
+	go func() { line, _ := bufio.NewReader(stdout).ReadString('\n'); ready <- line }()
+	select {
+	case line := <-ready:
+		if line != "READY\n" {
+			t.Fatalf("missing journal/input acknowledgement: %q", line)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("resident/guardian did not start")
+	}
+	if err := command.Process.Kill(); err != nil {
+		t.Fatal(err)
+	}
+	_ = command.Wait()
+	waitOwnershipCondition(t, func() bool { _, err := os.Stat(gate + "-ready"); return err == nil })
+	// The real guardian has proved exact input exit, but its release port has
+	// not acknowledged recovery. A fresh pair must still be denied admission.
+	pair, err := startPortableProcesses(os.Args[0], name)
+	if pair != nil {
+		_ = pair.Close()
+		t.Fatal("replacement input started before recovery")
+	}
+	if !errors.Is(err, ErrExitTimeout) {
+		t.Fatal("restart did not retain recovery fence", err)
+	}
+	if _, err := os.Stat(marker); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("release completed through the closed gate", err)
+	}
+	if err := os.WriteFile(gate, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	waitOwnershipCondition(t, func() bool {
+		pending, err := pendingPortableOwnership(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return !pending
+	})
+	if data, err := os.ReadFile(marker); err != nil || string(data) != "KEYBOARD_KEY:30" {
+		t.Fatal("guardian did not recover held journal", string(data), err)
+	}
+	owner, err := acquirePortableOwnership(name)
+	if err != nil {
+		t.Fatal("completed recovery blocked replacement", err)
+	}
+	if err := owner.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPortablePairStartupFailureReleasesOwnership(t *testing.T) {
+	name := ownershipTestName(t)
+	for range 4 {
+		pair, err := startPortableProcesses(filepath.Join(t.TempDir(), "missing.exe"), name)
+		if pair != nil || err == nil {
+			t.Fatal("missing child did not fail startup", pair, err)
+		}
+		if pending, err := pendingPortableOwnership(name); err != nil || pending {
+			t.Fatal("failed launch leaked ownership", pending, err)
 		}
 	}
 }

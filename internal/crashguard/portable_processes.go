@@ -16,6 +16,7 @@ import (
 // Its serial gate preserves ledger/input command order across both streams.
 type PortableProcesses struct {
 	input, guardian *Process
+	ownership       io.Closer
 	gate            syncgate.Mutex
 	closing         atomic.Bool
 	inputFenced     atomic.Bool
@@ -125,6 +126,9 @@ func (processes *PortableProcesses) Close() error {
 			inputErr := processes.retireChild(processes.input)
 			guardErr := processes.retireChild(processes.guardian)
 			processes.closeErr = errors.Join(inputErr, guardErr)
+			if processes.ownership != nil {
+				processes.closeErr = errors.Join(processes.closeErr, processes.ownership.Close())
+			}
 			close(processes.closeDone)
 		}()
 	})

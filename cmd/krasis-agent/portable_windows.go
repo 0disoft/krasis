@@ -23,8 +23,9 @@ func runPortableChild(args []string) (bool, int) {
 	}
 	guardian := args[0] == "product-portable-guardian-internal"
 	var parent, input uint64
+	var ownershipValue string
 	if guardian {
-		if len(args) != 3 {
+		if len(args) != 3 && len(args) != 4 {
 			return true, 2
 		}
 		var err error
@@ -36,7 +37,25 @@ func runPortableChild(args []string) (bool, int) {
 		if err != nil || input == 0 || input == parent {
 			return true, 2
 		}
+		if len(args) == 4 {
+			ownershipValue = args[3]
+			value, err := strconv.ParseUint(ownershipValue, 10, strconv.IntSize)
+			if err != nil || value == parent || value == input {
+				return true, 2
+			}
+		}
+	} else if len(args) == 2 {
+		ownershipValue = args[1]
 	} else if len(args) != 1 {
+		return true, 2
+	}
+	if ownershipValue != "" {
+		ownership, err := crashguard.AdoptPortableOwnership(ownershipValue)
+		if err != nil {
+			return true, 2
+		}
+		defer ownership.Close()
+	} else if len(args) == 2 || len(args) == 4 {
 		return true, 2
 	}
 	err := inputdesktop.Run(context.Background(), func(scope *inputdesktop.Scope) error {

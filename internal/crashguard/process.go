@@ -72,6 +72,8 @@ type Process struct {
 	stdoutDone  chan struct{}
 	stdoutErr   error
 	portable    bool
+	// Borrowed from PortableProcesses; that owner outlives both children.
+	portableOwnership uintptr
 
 	mu      sync.Mutex
 	waitErr error

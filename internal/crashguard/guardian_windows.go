@@ -22,16 +22,40 @@ import (
 // On startup failure a non-nil pair retains any incomplete input retirement;
 // callers must retain its ExitPending acknowledgement before replacement.
 func StartPortableProcesses(executable string) (*PortableProcesses, error) {
-	input, err := StartPortable(executable)
+	return startPortableProcesses(executable, portableOwnershipName)
+}
+
+func startPortableProcesses(executable, name string) (*PortableProcesses, error) {
+	if !filepath.IsAbs(executable) {
+		return nil, errors.New("absolute input executable required")
+	}
+	ownership, err := acquirePortableOwnership(name)
 	if err != nil {
 		return nil, err
 	}
+	command := exec.Command(executable, "product-portable-input-internal")
+	command.Dir = filepath.Dir(executable)
+	input, err := startOwnedPortable(command, ownership)
+	if err != nil {
+		return nil, errors.Join(err, ownership.Close())
+	}
 	guardian, err := StartPortableGuardian(executable, input)
-	processes := &PortableProcesses{input: input, guardian: guardian}
+	processes := &PortableProcesses{input: input, guardian: guardian, ownership: ownership}
 	if err != nil {
 		return processes, errors.Join(err, processes.Close())
 	}
 	return processes, nil
+}
+
+func startOwnedPortable(command *exec.Cmd, ownership *portableOwnership) (*Process, error) {
+	command.Args = append(command.Args, ownership.argument())
+	command.SysProcAttr = &syscall.SysProcAttr{AdditionalInheritedHandles: []syscall.Handle{syscall.Handle(ownership.handle)}}
+	input, err := startCommand(command)
+	if err == nil {
+		input.portable = true
+		input.portableOwnership = uintptr(ownership.handle)
+	}
+	return input, err
 }
 
 // StartPortableGuardian launches an independent ordinary recovery owner.
@@ -68,6 +92,10 @@ func startPortableGuardian(command *exec.Cmd, input *Process) (*Process, error) 
 	// the other's parent-side stdio writers, so parent death also delivers EOF.
 	command.SysProcAttr = &syscall.SysProcAttr{AdditionalInheritedHandles: []syscall.Handle{syscall.Handle(parent), syscall.Handle(child)}}
 	command.Args = append(command.Args, strconv.FormatUint(uint64(parent), 10), strconv.FormatUint(uint64(child), 10))
+	if input.portableOwnership != 0 {
+		command.SysProcAttr.AdditionalInheritedHandles = append(command.SysProcAttr.AdditionalInheritedHandles, syscall.Handle(input.portableOwnership))
+		command.Args = append(command.Args, strconv.FormatUint(uint64(input.portableOwnership), 10))
+	}
 	return startCommand(command)
 }
 

@@ -15,7 +15,9 @@ import (
 func TestPortableProcessesRetirementRetainsBothChildrenAndAllCleanup(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		input, guardian := closeTestProcess(t), closeTestProcess(t)
-		processes := &PortableProcesses{input: input, guardian: guardian}
+		var ownershipCloses atomic.Int32
+		ownershipErr := errors.New("ownership close failed")
+		processes := &PortableProcesses{input: input, guardian: guardian, ownership: ownershipCloseFunc(func() error { ownershipCloses.Add(1); return ownershipErr })}
 		inputCleanup := make(chan struct{})
 		input.stdin = &stalledGuardPipe{release: inputCleanup}
 		inputDenied, guardDenied := errors.New("input termination denied"), errors.New("guardian termination denied")
@@ -34,6 +36,9 @@ func TestPortableProcessesRetirementRetainsBothChildrenAndAllCleanup(t *testing.
 		synctest.Wait()
 		if guardian.closing.Load() || guardKills.Load() != 0 {
 			t.Fatal("guardian disarmed before full input retirement")
+		}
+		if ownershipCloses.Load() != 0 {
+			t.Fatal("input exit released pair ownership before native cleanup")
 		}
 		select {
 		case <-pending.Done:
@@ -54,6 +59,9 @@ func TestPortableProcessesRetirementRetainsBothChildrenAndAllCleanup(t *testing.
 		if inputKills.Load() != 1 || guardKills.Load() != 1 {
 			t.Fatal("repeated pair Close duplicated native termination")
 		}
+		if ownershipCloses.Load() != 0 {
+			t.Fatal("pending guardian released pair ownership")
+		}
 		close(guardian.done)
 		<-pending.Done
 		err := processes.Close()
@@ -61,8 +69,19 @@ func TestPortableProcessesRetirementRetainsBothChildrenAndAllCleanup(t *testing.
 		if errors.As(err, &incomplete) || !errors.Is(err, inputDenied) || !errors.Is(err, guardDenied) {
 			t.Fatal("completed pair hid child errors or retained a stale pending wrapper", err)
 		}
+		if !errors.Is(err, ownershipErr) || ownershipCloses.Load() != 1 {
+			t.Fatal("ownership close error or once-only lifetime lost", err, ownershipCloses.Load())
+		}
+		_ = processes.Close()
+		if ownershipCloses.Load() != 1 {
+			t.Fatal("ownership close retried a possibly reused handle")
+		}
 	})
 }
+
+type ownershipCloseFunc func() error
+
+func (close ownershipCloseFunc) Close() error { return close() }
 
 func TestPortableProcessesAdmissionAndExchangeShareOneBudget(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {

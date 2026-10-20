@@ -5,6 +5,7 @@ package inputworker
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -15,9 +16,26 @@ import (
 	"github.com/0disoft/krasis/internal/crashguard"
 )
 
+func adoptPortableFixtureOwnership(args []string) (io.Closer, error) {
+	if len(args) == 0 {
+		return nil, nil
+	}
+	if len(args) != 1 {
+		return nil, ErrProtocol
+	}
+	return crashguard.AdoptPortableOwnership(args[0])
+}
+
 func servePortableFixtureGuardian(args []string, release application.ReleasePort) error {
-	if len(args) != 2 {
+	if len(args) != 2 && len(args) != 3 {
 		return ErrProtocol
+	}
+	ownership, err := adoptPortableFixtureOwnership(args[2:])
+	if err != nil {
+		return err
+	}
+	if ownership != nil {
+		defer ownership.Close()
 	}
 	parent, err := strconv.ParseUint(args[0], 10, strconv.IntSize)
 	if err != nil {

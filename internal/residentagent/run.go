@@ -9,6 +9,7 @@ import (
 	"github.com/0disoft/krasis/internal/agentinstance"
 	"github.com/0disoft/krasis/internal/agentlifecycle"
 	"github.com/0disoft/krasis/internal/appsettings"
+	"github.com/0disoft/krasis/internal/crashguard"
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/peerupdate"
 	"github.com/0disoft/krasis/internal/productidentity"
@@ -44,6 +45,7 @@ func Run(ctx context.Context, localAppData string, recovery ...string) error {
 		return fmt.Errorf("initialize diagnostics: %w", err)
 	}
 	dependencies := runDependencies{
+		checkStart:   crashguard.CheckPortableRecovery,
 		log:          log,
 		acquire:      func() (instanceLease, error) { return agentinstance.Acquire() },
 		bootstrap:    productidentity.BootstrapWindows,
@@ -56,6 +58,9 @@ func Run(ctx context.Context, localAppData string, recovery ...string) error {
 	}
 	if len(recovery) != 0 {
 		dependencies.checkStart = func() error {
+			if err := crashguard.CheckPortableRecovery(); err != nil {
+				return err
+			}
 			if !appsettings.RecoveryCurrent(localAppData, recovery[0]) {
 				return errors.New("automatic recovery superseded")
 			}

@@ -22,7 +22,14 @@ func TestMain(m *testing.M) {
 		var err error
 		switch os.Args[1] {
 		case "product-portable-input-internal":
-			_, err = crashguard.ServeWithInput(os.Stdin, os.Stdout, input, PortableInputHandler(input, func(_ context.Context, work func() error) error { return work() }))
+			var ownership io.Closer
+			ownership, err = adoptPortableFixtureOwnership(os.Args[2:])
+			if err == nil {
+				_, err = crashguard.ServeWithInput(os.Stdin, os.Stdout, input, PortableInputHandler(input, func(_ context.Context, work func() error) error { return work() }))
+			}
+			if ownership != nil {
+				err = errors.Join(err, ownership.Close())
+			}
 		case "product-crash-guard-internal":
 			_, err = crashguard.ServeWithResult(os.Stdin, os.Stdout, input)
 		case "product-portable-guardian-internal":
