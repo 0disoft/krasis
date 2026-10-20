@@ -409,6 +409,7 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 			c.observe("installed_source_startup_failed")
 			c.observe("installed_source_stage_" + startupStage)
 			c.observe(connectionNativeFailureEvent(result, "installed_source_native_"))
+			c.observe(sourceStartupFailureCode(result))
 		}
 	}()
 	startup, stopStartup := context.WithTimeout(ctx, startupTimeout)

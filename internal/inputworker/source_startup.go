@@ -21,8 +21,14 @@ func readSourceStartup(reader io.Reader, binding Binding) (*handoff.StartupProfi
 		return profile, false, err
 	}
 	p, err := readSourcePacket(io.MultiReader(bytes.NewReader(prefix[:]), reader))
-	if err != nil || p.kind != sourceRetired || p.binding != binding || p.sequence != 1 || p.status != 0 {
+	if err != nil || p.kind != sourceRetired || p.binding != binding || p.sequence != 1 {
 		return nil, false, ErrProtocol
+	}
+	if p.status != 0 {
+		// An authenticated failed retirement is valid framing, but never proof
+		// of joined native owners. Preserve the same cleanup failure as the
+		// live reader instead of disguising it as a protocol violation.
+		return nil, false, ErrRecovery
 	}
 	if p.op == 1 {
 		return nil, false, wininput.ErrEmergencyRelease

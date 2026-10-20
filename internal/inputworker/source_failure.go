@@ -13,6 +13,14 @@ import (
 // Read only by the reader owner after its terminal error is known. Fixed
 // categories preserve the cause without exporting error text or input values.
 func sourceClientReaderCode(err error, retired bool) string {
+	return "installed_source_reader_" + sourceFailureReason(err, retired)
+}
+
+func sourceStartupFailureCode(err error) string {
+	return "installed_source_startup_" + sourceFailureReason(err, false)
+}
+
+func sourceFailureReason(err error, retired bool) string {
 	reason := "other"
 	switch {
 	case errors.Is(err, wininput.ErrEmergencyRelease):
@@ -36,7 +44,7 @@ func sourceClientReaderCode(err error, retired bool) string {
 	case errors.Is(err, ErrAuthority):
 		reason = "authority"
 	}
-	return "installed_source_reader_" + reason
+	return reason
 }
 
 // Fixed protocol operations only. This never includes a key/button value,

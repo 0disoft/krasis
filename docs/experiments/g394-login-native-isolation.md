@@ -91,6 +91,15 @@ at the same g394 revision. Collection bcb106e38fc134dbed439687dc62be06 at
 triggered session-end detail after the explicit reconnect. This short window
 does not establish physical input, soak, DHCP change or before-login recovery.
 
+Follow-up paired collection 871f1c56129da71bf464e8fd7c1c6e23 establishes that
+B's first failure at 23:09:47.5983677Z was still revision 5cace49 (g393), before
+its update. B selected source-hook as the triggering component. A g394 then
+observed peer EOF at 23:09:47.7056422Z; its service source summary records
+command not_started, reader eof, joined capture/sender/interrupt and failed
+retirement delivery. These are not two independent g394 startup failures.
+The original B service summary was replaced by its subsequent installation,
+so the first native/service cause cannot be recovered from the current summary.
+
 Next priority is the observed installed source worker_ready startup failure and
 its automatic agent replacement, before speculative additional authority work.
 Retain the first collection 08960d16ba365607fc7321cf690749f9 and later

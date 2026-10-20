@@ -36,5 +36,10 @@ func TestSourceClientReaderKeepsTerminalCauseInFixedCategories(t *testing.T) {
 		if code := sourceClientReaderCode(test.err, test.retired); code != "installed_source_reader_"+test.reason {
 			t.Fatal("terminal cause was erased or leaked", code, test.reason)
 		}
+		if !test.retired {
+			if code := sourceStartupFailureCode(test.err); code != "installed_source_startup_"+test.reason {
+				t.Fatal("startup cause was erased or leaked", code, test.reason)
+			}
+		}
 	}
 }
