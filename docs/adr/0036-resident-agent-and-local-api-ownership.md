@@ -70,12 +70,14 @@ the stronger boundary of process exit plus joined protocol, Kill and pipe-close
 tasks. Managed replacement remains blocked until that full acknowledgement.
 Late cleanup cannot fabricate input release or clear the existing fault latch.
 
-The staged portable-input process split adds two distinct ordinary-user children:
+Generation 389's portable-input process split adds two distinct ordinary-user children:
 an input/cursor worker and an independent recovery guardian. The guardian inherits
 pinned references to the exact resident and input process objects; no peer PID,
 path, token or service identity grants authority. Recovery may release the held
 journal only after exact input exit, including on parent death and normal disarm.
 The parent coordinator retires the complete input lifetime before disarming the
 guardian and exposes one combined full-retirement receipt. Either child's live
-exit signal alone cannot permit a replacement. These components are not yet
-connected to productRunner or private agent modes; installed g388 is unchanged.
+exit signal alone cannot permit a replacement. Private agent modes bind ordinary
+input/recovery to a fixed Default desktop scope. productRunner selects this pair
+only when the installed privileged worker is unavailable, with no native-input
+fallback after child failure. The installed privileged route remains separate.

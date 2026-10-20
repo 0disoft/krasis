@@ -133,14 +133,26 @@ func productRunnerWithTrace(identities *productidentity.Store, trust *truststore
 		dialMonitor := netobserve.StartDial(ctx, log.Dial)
 		defer dialMonitor.Close()
 		worker := installedProductInput(prepared.deadline, cancelCause)
-		var input *wininput.InputAdapter
 		if worker != nil {
 			worker.event = log.Event
 			defer func() { err = errors.Join(err, worker.shutdown()) }()
+		}
+		var input *wininput.InputAdapter
+		var guard productSessionGuard
+		defer func() {
+			if guard != nil {
+				closeErr := guard.Close()
+				if closeErr != nil {
+					log.Event("session_guard_close_failed")
+				}
+				err = errors.Join(err, closeErr)
+			}
+		}()
+		if worker != nil {
 			input, err = wininput.NewInputAdapterWithInjection(prepared.profile.Rearm(), diagnostics.Display.Width, worker)
 			log.Event("installed_input_selected")
 		} else {
-			input, err = wininput.NewInputAdapterWithReturnRearmDistance(prepared.profile.Rearm(), diagnostics.Display.Width)
+			input, guard, err = portableProductInput(ctx, prepared.profile.Rearm(), diagnostics.Display.Width)
 		}
 		if err != nil {
 			return err
@@ -205,17 +217,12 @@ func productRunnerWithTrace(identities *productidentity.Store, trust *truststore
 		if err != nil {
 			return err
 		}
-		guard, err := crashguard.StartProduct(executable)
-		if err != nil {
-			return err
-		}
-		defer func() {
-			closeErr := guard.Close()
-			if closeErr != nil {
-				log.Event("session_guard_close_failed")
+		if guard == nil {
+			guard, err = crashguard.StartProduct(executable)
+			if err != nil {
+				return err
 			}
-			err = errors.Join(err, closeErr)
-		}()
+		}
 		policy, err := trust.NewPeerPolicyMonitor(prepared.peer, time.Now())
 		if err != nil {
 			return err

@@ -18,7 +18,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// StartPortableProcesses remains inactive until agent child modes are wired.
+// StartPortableProcesses starts distinct ordinary input and recovery children.
 // On startup failure a non-nil pair retains any incomplete input retirement;
 // callers must retain its ExitPending acknowledgement before replacement.
 func StartPortableProcesses(executable string) (*PortableProcesses, error) {
@@ -34,8 +34,8 @@ func StartPortableProcesses(executable string) (*PortableProcesses, error) {
 	return processes, nil
 }
 
-// StartPortableGuardian is staged until the private agent mode and full pair
-// coordinator are ready. Only the owned input Process supplies the identity;
+// StartPortableGuardian launches an independent ordinary recovery owner.
+// Only the owned input Process supplies the identity;
 // no PID lookup, peer-provided handle, token or service proof is accepted.
 func StartPortableGuardian(executable string, input *Process) (*Process, error) {
 	if !filepath.IsAbs(executable) {

@@ -12,8 +12,7 @@ import (
 	"github.com/0disoft/krasis/internal/syncgate"
 )
 
-// PortableProcesses owns distinct input and recovery children. Production
-// activation still requires the private agent modes and desktop validation.
+// PortableProcesses owns distinct ordinary input and recovery children.
 // Its serial gate preserves ledger/input command order across both streams.
 type PortableProcesses struct {
 	input, guardian *Process

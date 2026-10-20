@@ -29,9 +29,9 @@ func StartProduct(executable string) (*Process, error) {
 	return startCommand(command)
 }
 
-// StartPortable prepares the fixed ordinary child transport. Production wiring
-// waits for independent recovery/parent-death ownership; the agent currently
-// rejects this mode. It never constructs a privileged service proof.
+// StartPortable starts the fixed ordinary input child. Product callers use
+// StartPortableProcesses to retain an independent guardian and full retirement.
+// It never constructs a privileged service proof.
 func StartPortable(executable string) (*Process, error) {
 	if !filepath.IsAbs(executable) {
 		return nil, errors.New("absolute guard executable required")

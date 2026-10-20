@@ -17,7 +17,7 @@ import (
 // Fixed-mode child fixture exercises real inherited stdio/process retirement.
 // It performs no native input and never stands in for physical-device evidence.
 func TestMain(m *testing.M) {
-	if os.Getenv("KRASIS_PORTABLE_RPC_FIXTURE") != "" && len(os.Args) == 2 {
+	if os.Getenv("KRASIS_PORTABLE_RPC_FIXTURE") != "" && len(os.Args) >= 2 {
 		input := &portableFixture{x: 10, y: 20, mode: os.Getenv("KRASIS_PORTABLE_RPC_FIXTURE")}
 		var err error
 		switch os.Args[1] {
@@ -25,6 +25,8 @@ func TestMain(m *testing.M) {
 			_, err = crashguard.ServeWithInput(os.Stdin, os.Stdout, input, PortableInputHandler(input, func(_ context.Context, work func() error) error { return work() }))
 		case "product-crash-guard-internal":
 			_, err = crashguard.ServeWithResult(os.Stdin, os.Stdout, input)
+		case "product-portable-guardian-internal":
+			err = servePortableFixtureGuardian(os.Args[2:], input)
 		default:
 			os.Exit(2)
 		}
@@ -49,7 +51,13 @@ func (p *portableFixture) Press(context.Context, control.PressedToken) error {
 	}
 	return nil
 }
-func (p *portableFixture) Release(context.Context, control.PressedToken) error { p.hits++; return nil }
+func (p *portableFixture) Release(context.Context, control.PressedToken) error {
+	p.hits++
+	if marker := os.Getenv("KRASIS_PORTABLE_RELEASE_MARKER"); marker != "" {
+		return os.WriteFile(marker, []byte("released"), 0o600)
+	}
+	return nil
+}
 func (p *portableFixture) Move(_ context.Context, x, y int32) error {
 	p.hits++
 	if p.mode == "hang" {

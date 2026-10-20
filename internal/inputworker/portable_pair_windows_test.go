@@ -1,0 +1,79 @@
+//go:build windows
+
+package inputworker
+
+import (
+	"context"
+	"errors"
+	"os"
+	"path/filepath"
+	"strconv"
+	"testing"
+
+	"github.com/0disoft/krasis/internal/application"
+	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/crashguard"
+)
+
+func servePortableFixtureGuardian(args []string, release application.ReleasePort) error {
+	if len(args) != 2 {
+		return ErrProtocol
+	}
+	parent, err := strconv.ParseUint(args[0], 10, strconv.IntSize)
+	if err != nil {
+		return err
+	}
+	input, err := strconv.ParseUint(args[1], 10, strconv.IntSize)
+	if err != nil {
+		return err
+	}
+	_, err = crashguard.ServePortableGuardian(uintptr(parent), uintptr(input), os.Stdin, os.Stdout, release)
+	return err
+}
+
+func TestPortablePairRetainsIndependentRecoveryAfterInputFailure(t *testing.T) {
+	for _, mode := range []string{"lost_ack", "partial", "hang"} {
+		t.Run(mode, func(t *testing.T) {
+			t.Setenv("KRASIS_PORTABLE_RPC_FIXTURE", mode)
+			marker := filepath.Join(t.TempDir(), "independent-release")
+			t.Setenv("KRASIS_PORTABLE_RELEASE_MARKER", marker)
+			processes, err := crashguard.StartPortableProcesses(os.Args[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer processes.Close()
+			client, err := NewPortablePairClient(context.Background(), processes)
+			if err != nil {
+				t.Fatal(err)
+			}
+			key := control.PressedToken{Kind: control.PressedKeyboardKey, Code: 30}
+			if _, err := processes.PreparePress(key); err != nil {
+				t.Fatal(err)
+			}
+			if err := client.Press(context.Background(), key); err != nil {
+				t.Fatal(err)
+			}
+			want := application.InjectionOutcomeUnknown
+			if mode == "partial" {
+				want = application.InjectionPartiallyApplied
+				err = client.Wheel(context.Background(), 120, 120)
+			} else {
+				err = client.Move(context.Background(), 1, 0)
+			}
+			if certainty, ok := application.InjectionCertaintyOf(err); !ok || certainty != want {
+				t.Fatal("pair lost the original injection certainty", certainty, err)
+			}
+			if client.Move(context.Background(), 2, 0) == nil {
+				t.Fatal("failed pair replayed input")
+			}
+			closeErr := client.Close()
+			var pending *crashguard.ExitPending
+			if errors.As(closeErr, &pending) {
+				t.Fatal("fixture did not fully retire", closeErr)
+			}
+			if data, err := os.ReadFile(marker); err != nil || string(data) != "released" {
+				t.Fatal("input failure destroyed the independent recovery journal", string(data), err, closeErr)
+			}
+		})
+	}
+}

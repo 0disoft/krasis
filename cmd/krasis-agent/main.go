@@ -19,6 +19,9 @@ func main() {
 		fmt.Fprintln(os.Stderr, "agent_error: physical screen coordinates unavailable")
 		os.Exit(1)
 	}
+	if handled, code := runPortableChild(os.Args[1:]); handled {
+		os.Exit(code)
+	}
 	if len(os.Args) == 2 && os.Args[1] == "product-crash-guard-internal" {
 		_, err := crashguard.ServeWithResult(os.Stdin, os.Stdout, wininput.NewInputAdapter())
 		if err != nil {

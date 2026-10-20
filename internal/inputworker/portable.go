@@ -15,8 +15,8 @@ import (
 
 // NewPortableClient shares input/cursor validation and decoding with Client,
 // but has no Channel/Authority and cannot stand in for a SYSTEM service proof.
-// This transport is not wired into production until independent recovery and
-// parent-death retirement are implemented for the ordinary input child.
+// This single-child transport supports fixtures. Product callers must use
+// NewPortablePairClient to retain independent parent-death recovery.
 func NewPortableClient(ctx context.Context, process *crashguard.Process) (*Client, error) {
 	if process == nil {
 		return nil, ErrAuthority
@@ -25,7 +25,7 @@ func NewPortableClient(ctx context.Context, process *crashguard.Process) (*Clien
 }
 
 // NewPortablePairClient retains the full input/guardian retirement receipt on
-// Close. This staged constructor grants no service or peer authority.
+// Close. This constructor grants no service or peer authority.
 func NewPortablePairClient(ctx context.Context, processes *crashguard.PortableProcesses) (*Client, error) {
 	if processes == nil {
 		return nil, ErrAuthority
