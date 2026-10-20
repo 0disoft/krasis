@@ -42,3 +42,31 @@ small commits. Keep both work items open until their full acceptance is proved.
 
 No native stall was induced on A/B, no hardware result is invented, and no
 GitHub comment or remote push is part of this investigation.
+
+## Ownership primitive checkpoint
+
+`ownership_windows.go` now provides a private lifetime fence using a named
+Windows mutex object, with access limited to the current user and SYSTEM.
+Acquisition rejects an existing object; it never waits for mutex thread
+ownership or treats abandonment as recovery completion. Inherited references
+are adopted with inheritance disabled and each wrapper closes at most once.
+This primitive is not wired into the product launch or restart path yet.
+
+`TestPortableOwnershipSurvivesResidentAndEitherChild` kills a hidden parent
+after two hidden children have adopted inherited references. It verifies that
+acquisition remains denied after the exact parent exit and after either first
+child drops its reference, in both retirement orders. Acquisition succeeds
+only after the remaining reference is closed. These are simulated cleanup
+lifetimes, not native input injection or journal-recovery evidence.
+`TestPortableOwnershipCloseAndFailedAdmissionDoNotLeak` verifies repeated
+failed admission, repeated Close, object disappearance and invalid bootstrap
+rejection. Focused tests pass.
+
+The interrupted launcher integration was removed because it supplied an extra
+bootstrap argument that the product children did not yet accept. Next: wire
+one shared name through resident admission, StartPortableProcesses, BOTH child
+bootstrap modes and the full PortableProcesses.Close retirement receipt.
+Keep the parent reference alive until native/IPC cleanup completes. Add an
+integrated journal-recovery restart trial, including startup failure, before
+packaging or deploying. The installed route still requires its independent
+authenticated recovery owner. Issue #50 remains open; A/B remain on g391.
