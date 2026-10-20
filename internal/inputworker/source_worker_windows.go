@@ -20,6 +20,7 @@ type sourceWriter struct {
 	channel  *Channel
 	binding  Binding
 	sequence uint64
+	broken   bool // Under mu; an attempted failed write cannot carry further frames.
 	epoch    atomic.Uint64
 	started  atomic.Bool
 }
@@ -69,16 +70,32 @@ func (w *sourceWriter) writePacket(p sourcePacket, current func() bool, retireme
 			return sourceTransportFailure(err)
 		}
 	}
-	w.sequence++
-	p.sequence, p.binding = w.sequence, w.binding
+	p.sequence, p.binding = w.sequence+1, w.binding
 	data, err := encodeSourcePacket(p)
 	if err != nil {
 		return err
 	}
-	if err := w.channel.stream.SetWriteDeadline(time.Now().Add(time.Second)); err != nil {
-		return sourceTransportFailure(errors.Join(ErrAuthority, err))
+	return w.writeSequenced(data[:], p.sequence)
+}
+
+// Caller owns mu. Only native pre-submission proof (or failure to configure a
+// deadline) can leave the sequence untouched. No failed operation is replayed:
+// this permits only a later, distinct joined-retirement frame to remain valid.
+// Partial/attempted failures poison the stream, even when Write reports zero.
+func (w *sourceWriter) writeSequenced(data []byte, sequence uint64) error {
+	if w.broken {
+		return sourceTransportFailure(ErrProtocol)
 	}
-	return sourceTransportFailure(writeFrame(w.channel.stream, data[:]))
+	err := writeSourceCommand(w.channel.stream, data, time.Now().Add(time.Second))
+	if err != nil {
+		var failure *sourceIOFailure
+		if errors.As(err, &failure) && (failure.stage == "deadline" || failure.unsubmitted) {
+			return sourceTransportFailure(err)
+		}
+		w.broken = true
+	}
+	w.sequence = sequence
+	return sourceTransportFailure(err)
 }
 
 func (w *sourceWriter) SendAction(ctx context.Context, action control.InputAction, current func() bool) error {

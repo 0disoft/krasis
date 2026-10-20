@@ -2,8 +2,6 @@
 
 package inputworker
 
-import "time"
-
 const sourceBoundaryBatchLimit = 16
 
 // Drain only notifications already waiting. There is no batching timer, lost
@@ -63,9 +61,5 @@ func (w *sourceWriter) sendBoundaries(batch []sourcePacket) error {
 		}
 		copy(wire[i*sourcePacketSize:], data[:])
 	}
-	if err := w.channel.stream.SetWriteDeadline(time.Now().Add(time.Second)); err != nil {
-		return sourceTransportFailure(err)
-	}
-	w.sequence = next
-	return sourceTransportFailure(writeFrame(w.channel.stream, wire[:len(batch)*sourcePacketSize]))
+	return w.writeSequenced(wire[:len(batch)*sourcePacketSize], next)
 }
