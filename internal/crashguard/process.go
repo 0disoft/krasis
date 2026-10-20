@@ -29,6 +29,22 @@ func StartProduct(executable string) (*Process, error) {
 	return startCommand(command)
 }
 
+// StartPortable prepares the fixed ordinary child transport. Production wiring
+// waits for independent recovery/parent-death ownership; the agent currently
+// rejects this mode. It never constructs a privileged service proof.
+func StartPortable(executable string) (*Process, error) {
+	if !filepath.IsAbs(executable) {
+		return nil, errors.New("absolute guard executable required")
+	}
+	command := exec.Command(executable, "product-portable-input-internal")
+	command.Dir = filepath.Dir(executable)
+	process, err := startCommand(command)
+	if err == nil {
+		process.portable = true
+	}
+	return process, err
+}
+
 var processIPCTimeout = 2 * time.Second
 
 type Process struct {
@@ -55,6 +71,7 @@ type Process struct {
 	stdoutClose sync.Once
 	stdoutDone  chan struct{}
 	stdoutErr   error
+	portable    bool
 
 	mu      sync.Mutex
 	waitErr error
@@ -191,8 +208,21 @@ func (process *Process) invoke(operation func() error) error {
 	return process.invokeOwned(operation, false)
 }
 
+// ExchangeInput serializes one whole input frame/reply with guard ledger IPC.
+// A caller cannot supply another process, pipe, executable or desktop.
+func (process *Process) ExchangeInput(ctx context.Context, exchange func(io.Writer, io.Reader) error) error {
+	if process == nil || !process.portable || ctx == nil || exchange == nil {
+		return ErrUnexpectedExit
+	}
+	return process.invokeContext(ctx, func() error { return exchange(process.stdin, process.stdout) }, false)
+}
+
 func (process *Process) invokeOwned(operation func() error, shutdown bool) error {
-	ctx, cancel := context.WithTimeout(context.Background(), processIPCTimeout)
+	return process.invokeContext(context.Background(), operation, shutdown)
+}
+
+func (process *Process) invokeContext(parent context.Context, operation func() error, shutdown bool) error {
+	ctx, cancel := context.WithTimeout(parent, processIPCTimeout)
 	defer cancel()
 	// Waiting callers cannot create a goroutine behind the protocol mutex.
 	// Admission consumes the same budget as the exchange; it grants no IPC.
@@ -214,7 +244,7 @@ func (process *Process) invokeOwned(operation func() error, shutdown bool) error
 	case <-ctx.Done():
 	}
 	process.requestAbort()
-	return ErrIPCTimeout
+	return errors.Join(ErrIPCTimeout, ctx.Err())
 }
 
 // Abort/pipe-close calls have their own single owners. A native call that does

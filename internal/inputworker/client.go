@@ -31,6 +31,8 @@ type Client struct {
 	lastAcknowledged    time.Time
 	lastDesktop         inputdesktop.DesktopClass
 	desktopObservations uint8
+	localExchange       func(context.Context, request, func(response)) error
+	localClose          func() error
 }
 
 // SetTimingObserver enables bounded diagnostic summaries. The observer must
@@ -106,6 +108,9 @@ func (client *Client) perform(ctx context.Context, command request) error {
 }
 
 func (client *Client) performResponse(ctx context.Context, command request, observed func(response)) error {
+	if client != nil && client.localExchange != nil {
+		return client.localExchange(ctx, command, observed)
+	}
 	if client == nil || ctx == nil || ctx.Err() != nil {
 		return notSent(ErrAuthority)
 	}
@@ -330,6 +335,9 @@ func (client *Client) observeFailure(code string) {
 // Close interrupts pending I/O and triggers worker-owned recovery. A nil
 // result proves channel cleanup only; it is not a release-recovery receipt.
 func (client *Client) Close() error {
+	if client != nil && client.localClose != nil {
+		return client.localClose()
+	}
 	if client == nil || client.channel == nil {
 		return nil
 	}

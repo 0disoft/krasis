@@ -1,6 +1,7 @@
 package crashguard
 
 import (
+	"bufio"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -62,11 +63,46 @@ func Serve(reader io.Reader, writer io.Writer, release application.ReleasePort) 
 }
 
 func ServeWithResult(reader io.Reader, writer io.Writer, release application.ReleasePort) (Result, error) {
+	return serveWithInput(reader, writer, release, nil)
+}
+
+// ServeWithInput is only the ordinary portable child. Standard guards continue
+// to reject input frames. One serial owner retains both input and its journal.
+func ServeWithInput(reader io.Reader, writer io.Writer, release application.ReleasePort, input func(io.Reader, io.Writer) error) (Result, error) {
+	if input == nil {
+		return Result{}, errors.New("portable input dispatcher required")
+	}
+	return serveWithInput(reader, writer, release, input)
+}
+
+func serveWithInput(reader io.Reader, writer io.Writer, release application.ReleasePort, input func(io.Reader, io.Writer) error) (Result, error) {
 	if reader == nil || writer == nil || release == nil {
 		return Result{}, errors.New("crash guard reader, writer, and release port are required")
 	}
 	var pressed control.PressedState
+	var buffered *bufio.Reader
+	if input != nil {
+		buffered = bufio.NewReader(reader)
+		reader = buffered
+	}
 	for {
+		if input != nil {
+			header, err := buffered.Peek(4)
+			if err != nil {
+				if errors.Is(err, io.EOF) && buffered.Buffered() == 0 {
+					return recoverResult(ExitParentEOF, &pressed, release)
+				}
+				result, recoveryErr := recoverResult(ExitProtocolError, &pressed, release)
+				return result, errors.Join(err, recoveryErr)
+			}
+			if string(header) == "KRI1" {
+				if err := input(reader, writer); err != nil {
+					result, recoveryErr := recoverResult(ExitProtocolError, &pressed, release)
+					return result, errors.Join(err, recoveryErr)
+				}
+				continue
+			}
+		}
 		command, err := readCommand(reader)
 		if errors.Is(err, io.EOF) {
 			return recoverResult(ExitParentEOF, &pressed, release)
