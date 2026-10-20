@@ -123,3 +123,32 @@ func TestCompletedPreparationCancelsExactWatcherAndJoinsItBeforeReturning(t *tes
 		_ = service.Close()
 	}
 }
+
+type completedPreparationReader struct {
+	net.Conn
+
+	entered chan struct{}
+}
+
+func (reader *completedPreparationReader) readContext(ctx context.Context, data []byte) (int, error) {
+	close(reader.entered)
+	<-ctx.Done()
+	// A kernel read can complete before its cancellation is observed. Its
+	// bytes remain authoritative even if preparation has just finished.
+	data[0] = 1
+	return 1, nil
+}
+
+func TestCompletedPreparationStillRejectsCompletedExtraInput(t *testing.T) {
+	agent, service := net.Pipe()
+	defer agent.Close()
+	defer service.Close()
+	reader := &completedPreparationReader{Conn: service, entered: make(chan struct{})}
+	err := watchPreparationPeer(context.Background(), reader, func(context.Context) error {
+		<-reader.entered
+		return nil
+	})
+	if !errors.Is(err, ErrProtocol) {
+		t.Fatal("completed extra input was acknowledged as successful preparation", err)
+	}
+}

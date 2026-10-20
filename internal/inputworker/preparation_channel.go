@@ -22,16 +22,24 @@ func watchPreparationPeer(ctx context.Context, stream net.Conn, prepare func(con
 	var watching atomic.Bool
 	watching.Store(true)
 	done := make(chan struct{})
+	var peerErr error
 	wake := context.AfterFunc(run, func() { _ = stream.SetReadDeadline(time.Now()) })
 	go func() {
 		defer close(done)
 		var extra [1]byte
+		var n int
 		if reader, ok := stream.(interface {
 			readContext(context.Context, []byte) (int, error)
 		}); ok {
-			_, _ = reader.readContext(watch, extra[:])
+			n, _ = reader.readContext(watch, extra[:])
 		} else {
-			_, _ = stream.Read(extra[:])
+			n, _ = stream.Read(extra[:])
+		}
+		if n != 0 {
+			// Completed bytes survive cancellation of a pending read. They
+			// are invalid even if construction finished before this wakeup.
+			peerErr = ErrProtocol
+			cancel()
 		}
 		if watching.CompareAndSwap(true, false) {
 			cancel()
@@ -48,5 +56,5 @@ func watchPreparationPeer(ctx context.Context, stream net.Conn, prepare func(con
 	}
 	<-done
 	wake()
-	return errors.Join(result, run.Err(), interrupt)
+	return errors.Join(result, run.Err(), interrupt, peerErr)
 }
