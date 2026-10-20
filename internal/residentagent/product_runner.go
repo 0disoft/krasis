@@ -15,6 +15,7 @@ import (
 	"github.com/0disoft/krasis/internal/crashguard"
 	"github.com/0disoft/krasis/internal/handoff"
 	"github.com/0disoft/krasis/internal/localapi"
+	"github.com/0disoft/krasis/internal/netobserve"
 	"github.com/0disoft/krasis/internal/peer"
 	"github.com/0disoft/krasis/internal/peerdiscovery"
 	"github.com/0disoft/krasis/internal/productidentity"
@@ -127,6 +128,8 @@ func productRunnerWithTrace(identities *productidentity.Store, trust *truststore
 		defer cancel()
 		ctx, cancelCause := context.WithCancelCause(deadlineCtx)
 		defer cancelCause(context.Canceled)
+		network := netobserve.Start(ctx, log.Event)
+		defer network.Close()
 		worker := installedProductInput(prepared.deadline, cancelCause)
 		var input *wininput.InputAdapter
 		if worker != nil {
@@ -323,7 +326,7 @@ func productRunnerWithTrace(identities *productidentity.Store, trust *truststore
 				return agent.RunSession(ctx, config, dependencies)
 			}
 		}
-		return agent.RunSupervisor(ctx, agent.SupervisorConfig{Session: config, Backoff: backoff, Now: time.Now, Wait: agent.Wait, Observer: observer}, agent.SupervisorDependencies{
+		return agent.RunSupervisor(ctx, agent.SupervisorConfig{Session: config, Backoff: backoff, Now: time.Now, Wait: network.Wait, Observer: observer}, agent.SupervisorDependencies{
 			Source: source, Hook: sessionHook, Input: boundaryInput, Effects: agent.RuntimeEffects{}, Authorizer: authorizer, RunSession: runSession,
 		})
 	}
