@@ -37,20 +37,26 @@ func TestSlowInputAuthorizationDoesNotStarveWorkerHeartbeat(t *testing.T) {
 		<-entered
 		time.Sleep(time.Second)
 		firstHeartbeat := client.Heartbeat(context.Background())
-		time.Sleep(1500 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 		secondHeartbeat := client.Heartbeat(context.Background())
 		heartbeatWrites := stream.writes.Load()
-		close(release)
+		time.Sleep(time.Second)
+		// The caller must already have returned although native code is stuck.
 		err = <-inputDone
+		if err := client.Close(); err != ErrAuthority {
+			t.Fatal("unconfirmed query retirement reported cleanup success", err)
+		}
+		close(release)
+		synctest.Wait()
 		certainty, ok := application.InjectionCertaintyOf(err)
 		if firstHeartbeat != nil || secondHeartbeat != nil || heartbeatWrites != 2 || !errors.Is(err, context.DeadlineExceeded) || !ok || certainty != application.InjectionNotApplied {
 			t.Fatal("unsent native authorization starved maintenance or became transmitted input", firstHeartbeat, secondHeartbeat, heartbeatWrites, err)
 		}
-		if err := client.Move(context.Background(), 2, 0); err != nil {
-			t.Fatal("worker expired while unsent authorization was waiting", err)
+		if err := client.Move(context.Background(), 2, 0); err == nil || stream.writes.Load() != 2 {
+			t.Fatal("late native success revived an expired proof", err)
 		}
 		_ = client.Close()
-		if result := await(t, workerDone); result.err != nil || result.report.Completed != 1 {
+		if result := await(t, workerDone); result.err != nil || result.report.Completed != 0 {
 			t.Fatal("heartbeat changed worker input completion or cleanup", result)
 		}
 	})

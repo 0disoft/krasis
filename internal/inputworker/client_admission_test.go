@@ -111,23 +111,11 @@ func TestClientRechecksCancellationAndExpiryAfterAuthorization(t *testing.T) {
 					}
 					return
 				}
-				if !errors.Is(err, cause) || client.failed {
-					t.Fatal("unsent cancellation damaged the live channel", err)
+				if !errors.Is(err, cause) {
+					t.Fatal("unsent cancellation lost its cause", err)
 				}
-				channel.authority.checkInputObserved = nil
-				done := make(chan error, 1)
-				go func() {
-					command, err := readRequest(server)
-					if err == nil {
-						err = writeResponse(server, response{sequence: command.sequence, op: command.op})
-					}
-					done <- err
-				}()
-				if err := client.Move(context.Background(), 2, 0); err != nil {
-					t.Fatal("unsent cancellation prevented the next authorized input", err)
-				}
-				if err := <-done; err != nil || stream.writes.Load() != 1 || client.sequence != 2 {
-					t.Fatal("canceled input was replayed or consumed a sequence", err)
+				if err := client.Move(context.Background(), 2, 0); err == nil || stream.writes.Load() != 0 || client.sequence != 1 {
+					t.Fatal("expired proof accepted fresh input or replayed cancellation", err)
 				}
 			})
 		})

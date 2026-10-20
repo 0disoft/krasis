@@ -3,6 +3,7 @@ package inputworker
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/0disoft/krasis/internal/handoff"
@@ -23,6 +24,7 @@ type Authority struct {
 	agentStarted       uint64 // Kernel process creation time, immutable auth evidence.
 	mu                 sync.RWMutex
 	closed             bool
+	fenced             atomic.Bool // Deny immediately while a timed-out query still owns handles.
 	checkInput         func() error
 	checkInputObserved func(context.Context) error
 	checkRecovery      func() error
@@ -46,12 +48,12 @@ func (authority *Authority) checkSourceHeartbeat() error {
 }
 
 func (authority *Authority) heartbeatResult() error {
-	if authority == nil {
+	if authority == nil || authority.fenced.Load() {
 		return ErrAuthority
 	}
 	authority.mu.RLock()
 	defer authority.mu.RUnlock()
-	if authority.closed || authority.checkInput == nil || authority.checkRecovery == nil || authority.closeHandles == nil {
+	if authority.fenced.Load() || authority.closed || authority.checkInput == nil || authority.checkRecovery == nil || authority.closeHandles == nil {
 		return ErrAuthority
 	}
 	check := authority.checkPresent
@@ -80,7 +82,7 @@ func (authority *Authority) checkSource() error {
 	// Called by low-level physical input callbacks. A pending Close must deny
 	// new capture immediately rather than queue it behind existing SCM/WTS work.
 	// Acquired readers still pin all handles until their fresh check returns.
-	if authority == nil || !authority.mu.TryRLock() {
+	if authority == nil || authority.fenced.Load() || !authority.mu.TryRLock() {
 		return ErrAuthority
 	}
 	defer authority.mu.RUnlock()
@@ -88,7 +90,7 @@ func (authority *Authority) checkSource() error {
 }
 
 func (authority *Authority) checkResult(ctx context.Context, recovery bool) error {
-	if authority == nil {
+	if authority == nil || authority.fenced.Load() {
 		return ErrAuthority
 	}
 	var started time.Time
@@ -108,7 +110,7 @@ func (authority *Authority) checkResult(ctx context.Context, recovery bool) erro
 
 // Caller holds mu for the entire native check, including any slow RPC.
 func (authority *Authority) checkLocked(ctx context.Context, recovery bool) error {
-	if authority.closed || authority.checkInput == nil || authority.checkRecovery == nil || authority.closeHandles == nil {
+	if authority.fenced.Load() || authority.closed || authority.checkInput == nil || authority.checkRecovery == nil || authority.closeHandles == nil {
 		return ErrAuthority
 	}
 	check := authority.checkInput
@@ -128,6 +130,7 @@ func (authority *Authority) Close() error {
 	if authority == nil {
 		return nil
 	}
+	authority.fenced.Store(true)
 	authority.mu.Lock()
 	defer authority.mu.Unlock()
 	if authority.closed {

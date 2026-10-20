@@ -3,6 +3,7 @@ package inputworker
 import (
 	"net"
 	"sync"
+	"time"
 )
 
 // Channel ties one authenticated kernel pipe to its process proof. Its private
@@ -12,12 +13,34 @@ type Channel struct {
 	authority *Authority
 	closeOnce sync.Once
 	closeErr  error
+	queryMu   sync.Mutex
+	query     *authorityQuery
+	closing   bool
 }
 
 func (channel *Channel) Close() error {
 	if channel == nil {
 		return nil
 	}
+	channel.queryMu.Lock()
+	channel.closing = true
+	if channel.authority != nil {
+		channel.authority.fenced.Store(true)
+	}
+	if channel.query != nil {
+		// Interrupt wire work, but retain the pipe and proof handles used by
+		// the read-only native query. Its owner closes them after it returns.
+		if channel.stream != nil {
+			_ = channel.stream.SetDeadline(time.Now())
+		}
+		channel.queryMu.Unlock()
+		return ErrAuthority // Deferred retirement is not confirmed cleanup.
+	}
+	channel.queryMu.Unlock()
+	return channel.closeResources()
+}
+
+func (channel *Channel) closeResources() error {
 	channel.closeOnce.Do(func() {
 		var streamErr error
 		if channel.stream != nil {

@@ -45,6 +45,14 @@ func (client *Client) SetTimingObserver(emit func(string)) {
 var _ application.InputPort = (*Client)(nil)
 
 func NewClient(ctx context.Context, channel *Channel, lease Lease) (*Client, error) {
+	if ctx == nil {
+		if channel != nil {
+			_ = channel.Close()
+		}
+		return nil, ErrAuthority
+	}
+	ctx, cancel := context.WithTimeout(ctx, IdleTimeout)
+	defer cancel()
 	if lease.Presentation {
 		if channel != nil {
 			_ = channel.Close()
@@ -55,7 +63,7 @@ func NewClient(ctx context.Context, channel *Channel, lease Lease) (*Client, err
 	if channel == nil {
 		return nil, ErrAuthority
 	}
-	if !validLease(ctx, channel.stream, client, lease, time.Now()) || channel.authority == nil || channel.authority.kind != authorityService || channel.authority.check(false) != nil {
+	if !validLease(ctx, channel.stream, client, lease, time.Now()) || channel.authority == nil || channel.authority.kind != authorityService || channel.authorizeInput(ctx, false) != nil || !validLease(ctx, channel.stream, client, lease, time.Now()) {
 		_ = channel.Close()
 		return nil, ErrAuthority
 	}
@@ -123,9 +131,9 @@ func (client *Client) performResponse(ctx context.Context, command request, obse
 			// SCM queries are not wire demand. Keep the serial input gate
 			// free for maintenance until full authorization has completed.
 			start = time.Now()
-			authorityErr = client.channel.authority.checkObserved(ctx, false)
+			authorityErr = client.channel.authorizeInput(ctx, true)
 			authorityElapsed += time.Since(start)
-			if authorityErr == nil && ctx.Err() != nil {
+			if ctx.Err() != nil {
 				handoff.Record(ctx, handoff.ClientAuthority, authorityElapsed)
 				return notSent(ctx.Err())
 			}
