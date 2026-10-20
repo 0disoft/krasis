@@ -5,6 +5,8 @@ package productlog
 // runnable histograms use upper-bound buckets <=100us,1ms,10ms,100ms,1s,>1s.
 // An idle socket can have a large read age without being faulty.
 type RuntimeSummary struct {
+	SourceObservationDroppedTotal uint64 `json:"sourceObservationDroppedTotal,omitempty"`
+
 	HookCalls                 uint64          `json:"hookCalls"`
 	HookTimingDroppedTotal    uint64          `json:"hookTimingDroppedTotal,omitempty"`
 	RawInputs                 uint64          `json:"rawInputs"`

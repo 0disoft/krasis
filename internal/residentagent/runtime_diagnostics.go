@@ -181,6 +181,7 @@ func (d *runtimeDiagnostics) snapshot(now time.Time) productlog.RuntimeSummary {
 	send, receive := d.send.Load(), d.receive.Load()
 	s.HookCalls = d.hookCalls.Swap(0)
 	s.HookTimingDroppedTotal = wininput.HookTimingDroppedTotal()
+	s.SourceObservationDroppedTotal = wininput.SourceObservationDroppedTotal()
 	s.RawInputs = d.rawInputs.Swap(0)
 	s.QueueHighWatermark = d.queueHigh.Swap(0)
 	s.QueueEnqueued = d.queueEnqueued.Swap(0)

@@ -15,16 +15,17 @@ import (
 const wmSourceReady = 0x8002
 
 type SourceHook struct {
-	loginAuthorize    func() error   // Fixed service-child Winlogon mode only.
-	interactiveSource bool           // Fixed current interactive desktop, never follows with live owners.
-	contextMenu       atomic.Uintptr // Foreground owner of the most recent local right-click release.
-	boundaryGuard     func() error
-	timing            HookTimingObserver
-	observer          SourcePipelineObserver
-	admissionReport   func(string)
-	physicalSession   atomic.Pointer[SourceSession]
-	capture           *sourceWheelCapture
-	returnCursor      returnCursorShield
+	loginAuthorize     func() error   // Fixed service-child Winlogon mode only.
+	interactiveSource  bool           // Fixed current interactive desktop, never follows with live owners.
+	contextMenu        atomic.Uintptr // Foreground owner of the most recent local right-click release.
+	boundaryGuard      func() error
+	timing             HookTimingObserver
+	observer           SourcePipelineObserver
+	presentationReport SourcePresentationReporter
+	admissionReport    func(string)
+	physicalSession    atomic.Pointer[SourceSession]
+	capture            *sourceWheelCapture
+	returnCursor       returnCursorShield
 }
 
 type sourceInputThreadResult struct {
@@ -47,6 +48,7 @@ func NewSourceHookObserved(observer SourcePipelineObserver) *SourceHook {
 
 // Configure before Run; diagnostics contain fixed outcomes and durations only.
 func (hook *SourceHook) SetPresentationReporter(report SourcePresentationReporter) {
+	hook.presentationReport = report
 	hook.capture.presentationReport = report
 	hook.returnCursor.report = report
 }
@@ -116,6 +118,10 @@ func (hook *SourceHook) runWithBoundary(ctx context.Context, session *SourceSess
 	pointerState := newSourcePointerState(initialPosition)
 	timing := newHookTimingRelay(hook.timing)
 	defer timing.Close()
+	observations := newSourceObservationRelay(hook.observer, nil, hook.presentationReport)
+	defer observations.Close()
+	hook.capture.presentationReport = observations.presentationReporter()
+	hook.returnCursor.report = observations.presentationReporter()
 	progress := &sourceHookProgress{origin: time.Now(), next: timing}
 	pointerState.progress = progress
 	session.physicalMu.Lock()
@@ -128,7 +134,7 @@ func (hook *SourceHook) runWithBoundary(ctx context.Context, session *SourceSess
 	results := make(chan sourceInputThreadResult, 3)
 	startSourceInputThread(results, "low-level-hook", func() error {
 		return hook.onDesktop(runCtx, func(owned context.Context) error {
-			return runSourceLowLevelHookThread(owned, session, boundary, hook.observer, hook.capture, pointerState, progress, func() {
+			return runSourceLowLevelHookThread(owned, session, boundary, observations.Pipeline(), hook.capture, pointerState, progress, func() {
 				readySignals <- struct{}{}
 			}, &hook.contextMenu, &hook.returnCursor)
 		})

@@ -123,7 +123,9 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	if config.SourceObserver != nil {
 		sourceSink = &observedSourceSink{delegate: actionSink, observer: config.SourceObserver}
 	}
-	source, err := wininput.NewSourceSessionWithObservers(config.QueueCapacity, sourceSink, config.PipelineObserver, config.QueueObserver)
+	observations := wininput.NewSourceObservationRelay(config.PipelineObserver, config.QueueObserver)
+	defer observations.Close()
+	source, err := wininput.NewSourceSessionWithObservers(config.QueueCapacity, sourceSink, observations.Pipeline(), observations.Queue())
 	if err != nil {
 		return Result{}, err
 	}
