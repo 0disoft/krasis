@@ -119,13 +119,31 @@ func (client *Client) performPortable(ctx context.Context, process portableTrans
 // PortableInputHandler is used only on inherited stdio. Binding and sequence
 // identify one local process stream; they never grant peer trust or elevation.
 func PortableInputHandler(input application.InputPort, execute func(context.Context, func() error) error) func(io.Reader, io.Writer) error {
+	return portableInputHandler(input, execute, false)
+}
+
+// PortableReleaseHandler is only for the separately authenticated recovery
+// child. Its framing cannot admit presses, motion, wheels or cursor operations.
+func PortableReleaseHandler(input application.ReleasePort, execute func(context.Context, func() error) error) func(io.Reader, io.Writer) error {
+	return portableInputHandler(releaseOnlyInput{input}, execute, true)
+}
+
+type releaseOnlyInput struct{ application.ReleasePort }
+
+func (releaseOnlyInput) Press(context.Context, control.PressedToken) error {
+	return notSent(ErrAuthority)
+}
+func (releaseOnlyInput) Move(context.Context, int32, int32) error  { return notSent(ErrAuthority) }
+func (releaseOnlyInput) Wheel(context.Context, int32, int32) error { return notSent(ErrAuthority) }
+
+func portableInputHandler(input application.InputPort, execute func(context.Context, func() error) error, releaseOnly bool) func(io.Reader, io.Writer) error {
 	var binding Binding
 	sequence := uint64(1)
 	var pressed control.PressedState
 	failed := false
 	return func(reader io.Reader, writer io.Writer) error {
 		command, err := readRequest(reader)
-		if err != nil || input == nil || execute == nil || command.binding == (Binding{}) || command.sequence != sequence || sequence == math.MaxUint64 || command.op == opClose || command.applyDetail {
+		if err != nil || input == nil || execute == nil || command.binding == (Binding{}) || command.sequence != sequence || sequence == math.MaxUint64 || command.op == opClose || command.applyDetail || releaseOnly && command.op != opRelease && command.op != opHeartbeat {
 			return ErrProtocol
 		}
 		if binding == (Binding{}) {
@@ -143,6 +161,11 @@ func PortableInputHandler(input application.InputPort, execute func(context.Cont
 			applyErr = notSent(ErrAuthority)
 		} else {
 			applyErr = beforeInputCertainty(execute)(ctx, func() error {
+				if releaseOnly && command.op == opRelease {
+					// The authenticated parent owns this journal. A release child
+					// deliberately has no locally pressed keys to deduplicate.
+					return input.Release(ctx, command.token)
+				}
 				return applyCommand(ctx, input, &pressed, command, &ack)
 			})
 		}
