@@ -41,3 +41,31 @@ No issue comments or Git push; paired installation evidence follows packaging.
 Native references:
 - https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getsystempowerstatus
 - https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-system_power_status
+
+## Paired installation and issue disposition
+
+Both PCs run g373 at revision
+`184593abf40d7866e07a7d0ec0ef0dd2363eafa3`. Offline verification accepted
+the 27,900,571-byte bundle and B transfer
+`3e63bf2b56685fa7bd4e3c609ad99be7` reports UPDATED at that revision.
+Native packaging, installer provenance, UI tests and the eight-file update
+package check passed. A's installer returned 0; the installed agent SHA-256
+matches the bundle, and CLI/UI/running/installed agent/recovery record match.
+
+Both collected reports contain `network_power_ac`, `network_saver_off` and
+`network_link_usable`, plus explicit unknown adapter-power/roaming/policy
+events. The observations are genuine local API results on each PC; no WiFi
+power-saving episode, AP roam or firewall block was claimed or induced.
+Collections at 18:47:46Z and 18:48:32Z/30Z on 2026-10-20 show input health
+and service READY on both PCs, with no g373 fault/session failure. A doctor
+is healthy/CONNECTED and B is ONLINE. The short window does not prove
+long-term stability or the remaining hardware matrix.
+
+Issue #67 is closed without a comment for its explicit unknown attribution,
+separate OS/transport observations and safe restoration notification handling.
+Thirteen issues remain open. The next network priority is #68: a real WLAN
+association/roaming provider that compares AP identity only in memory and
+publishes fixed observation codes, reusing this one-shot serial retry wake.
+Selected-route and policy attribution remain #71/#72. No additional task was
+started beyond this execution's ten-minute cutoff; the working tree is clean
+after this record. No Git push or issue comments.
