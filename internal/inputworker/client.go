@@ -152,7 +152,9 @@ func (client *Client) performResponse(ctx context.Context, command request, obse
 	start = time.Now()
 	var authorityErr error
 	if command.op == opHeartbeat {
-		authorityErr = client.channel.authority.check(false)
+		// Maintenance checks the pinned pipe owner. Actual input still
+		// performs full service authorization, as does the worker executor.
+		authorityErr = client.channel.authority.checkHeartbeat()
 	} else {
 		authorityErr = client.channel.authority.checkObserved(ctx, false)
 	}

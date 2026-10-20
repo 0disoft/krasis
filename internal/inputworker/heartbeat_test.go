@@ -124,3 +124,44 @@ func TestRecentAcknowledgementCannotExtendLeaseOrHideFailure(t *testing.T) {
 	_ = client.Close()
 	_ = await(t, done)
 }
+
+func TestInputHeartbeatUsesPresenceWithoutWeakeningInputAuthority(t *testing.T) {
+	for _, mode := range []string{"present", "exited", "fallback"} {
+		t.Run(mode, func(t *testing.T) {
+			lease := testLease()
+			conn, done := startWorker(t, context.Background(), &recordingInput{}, lease)
+			channel := clientChannel(conn, authorityService)
+			client, err := NewClient(context.Background(), channel, lease)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer client.Close()
+			fullChecks, presenceChecks := 0, 0
+			channel.authority.checkInput = func() error { fullChecks++; return ErrAuthority }
+			if mode != "fallback" {
+				channel.authority.checkPresent = func() error {
+					presenceChecks++
+					if mode == "exited" {
+						return ErrAuthority
+					}
+					return nil
+				}
+			}
+			err = client.Heartbeat(context.Background())
+			if mode == "present" {
+				if err != nil || fullChecks != 0 || presenceChecks != 1 || client.sequence != 2 {
+					t.Fatal("heartbeat repeated full authorization instead of its pinned owner check", err, fullChecks, presenceChecks)
+				}
+				if err := client.Move(context.Background(), 1, 0); err == nil || fullChecks != 1 || client.sequence != 2 {
+					t.Fatal("heartbeat presence bypassed full input authorization", err)
+				}
+			} else if err == nil || client.sequence != 1 || mode == "fallback" && fullChecks != 1 || mode == "exited" && presenceChecks != 1 {
+				t.Fatal("heartbeat accepted a missing owner or skipped its fallback authority", err, fullChecks, presenceChecks)
+			}
+			_ = client.Close()
+			if result := await(t, done); result.err != nil || result.report.Completed != 0 {
+				t.Fatal("maintenance failure injected input or bypassed worker cleanup", result.err)
+			}
+		})
+	}
+}
