@@ -135,6 +135,7 @@ type queuedAction struct {
 	generation uint64
 	action     control.InputAction
 	queuedAt   time.Time
+	move       atomic.Uint64 // Coalescing vs single sender claim; metadata stays immutable.
 }
 
 type SourceSession struct {
@@ -145,8 +146,8 @@ type SourceSession struct {
 	cleanupState     atomic.Uint32
 	queue            chan *queuedAction
 	queueDepth       atomic.Int64
-	queueMu          sync.Mutex
-	pendingMove      *queuedAction
+	queueMu          sync.Mutex    // Ordered producers only; the sender never acquires it.
+	pendingMove      *queuedAction // queueMu; may retain the last claimed move until the next offer.
 	faults           chan error
 	yields           chan uint64
 	yieldPending     uint64 // stateMu; prevents a new lease until local-return cleanup finishes.
@@ -289,11 +290,7 @@ func (session *SourceSession) Offer(action control.InputAction) bool {
 	}
 	if action.Kind == control.InputPointerMove && session.pendingMove != nil && session.pendingMove.generation == generation {
 		pending := session.pendingMove
-		dx := int64(pending.action.DeltaX) + int64(action.DeltaX)
-		dy := int64(pending.action.DeltaY) + int64(action.DeltaY)
-		if (dx != 0 || dy != 0) && dx >= -control.MaxInputDelta && dx <= control.MaxInputDelta && dy >= -control.MaxInputDelta && dy <= control.MaxInputDelta {
-			pending.action.DeltaX = int32(dx)
-			pending.action.DeltaY = int32(dy)
+		if pending.mergeMove(action.DeltaX, action.DeltaY) {
 			session.queueMu.Unlock()
 			if observer, ok := session.queueObserver.(SourceQueueCoalescedObserver); ok {
 				observer.ObserveSourceQueueCoalesced()
@@ -315,6 +312,9 @@ func (session *SourceSession) Offer(action control.InputAction) bool {
 				action.DeltaY -= part.DeltaY
 			}
 			item := &queuedAction{generation: generation, action: part, queuedAt: queuedAt}
+			if part.Kind == control.InputPointerMove {
+				item.move.Store(packQueuedMove(part.DeltaX, part.DeltaY))
+			}
 			depth = session.queueDepth.Add(1)
 			session.queue <- item
 			if action.Kind == control.InputPointerMove {
@@ -430,14 +430,12 @@ func (session *SourceSession) runSender(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case queued := <-session.queue:
-			session.queueMu.Lock()
-			if session.pendingMove == queued {
-				session.pendingMove = nil
+			action, claimed := queued.takeAction()
+			if !claimed {
+				return ErrSourceSession
 			}
-			item := *queued
-			session.queueMu.Unlock()
 			session.queueDepth.Add(-1)
-			residence := session.now().Sub(item.queuedAt)
+			residence := session.now().Sub(queued.queuedAt)
 			if residence < 0 {
 				residence = 0
 			}
@@ -447,7 +445,7 @@ func (session *SourceSession) runSender(ctx context.Context) error {
 			if session.queueObserver != nil {
 				session.queueObserver.ObserveSourceQueueDequeued(residence)
 			}
-			if !session.current(item.generation) {
+			if !session.current(queued.generation) {
 				if session.observer != nil {
 					session.observer.ObserveSourceQueueDiscardedStale()
 				}
@@ -456,11 +454,11 @@ func (session *SourceSession) runSender(ctx context.Context) error {
 				}
 				continue
 			}
-			if item.action.Kind == control.InputPointerMove && item.action.DeltaX == 0 && item.action.DeltaY == 0 {
+			if action.Kind == control.InputPointerMove && action.DeltaX == 0 && action.DeltaY == 0 {
 				continue
 			}
-			if err := session.sink.SendAction(handoff.Offered(ctx, item.queuedAt), item.action, func() bool { return session.current(item.generation) }); err != nil {
-				if !session.current(item.generation) && sourceErrorsOnly(err, control.ErrSourceActionDiscarded) {
+			if err := session.sink.SendAction(handoff.Offered(ctx, queued.queuedAt), action, func() bool { return session.current(queued.generation) }); err != nil {
+				if !session.current(queued.generation) && sourceErrorsOnly(err, control.ErrSourceActionDiscarded) {
 					if session.observer != nil {
 						session.observer.ObserveSourceQueueDiscardedStale()
 					}
