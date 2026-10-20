@@ -1,0 +1,39 @@
+# Source activation and reader termination after g366
+
+Collection `61b4d586e5dc8d509e8744a297fb22a5` preserves the failed normal-use
+trial. A records activation response timeouts at 2026-10-20 13:40:21Z and
+14:11:38Z. Heartbeat attempts at 13:47:28Z and 14:02:45Z instead end because
+the client response reader has terminated. A separate trust-freshness expiry
+at 14:09:17Z reconnects after clean source retirement. B records remote EOFs;
+its clock is approximately two seconds behind A in these records.
+
+The source service receipt joins native capture, sender and interrupt owners
+for all five exits. Four final retirement deliveries fail. The last source
+exit is at 14:11:39Z; the next agent start at 16:19:25Z follows the operator's
+manual recovery. These observations do not establish the cause of every
+reader termination or the host scheduling delays.
+
+Priority by user impact and implementation cost:
+
+1. Correct premature activation failure between the one-second client cap and
+   existing two-second owner bound. Implemented with a 1200 ms exact-reply
+   regression through `CaptureSource.ActivateProfile`.
+2. Preserve the response reader's terminal cause, currently collapsed into
+   `reader_ended`, to distinguish transport failure from invalid packets or
+   native retirement. This remains a separate follow-up.
+3. Investigate the observed scheduling stalls and trust-refresh delays using
+   the next failed trial; no CPU or network cause is established yet.
+
+Activation may now wait up to two seconds for its exact ACK. An already active
+or cursor-prepared owner retains the earlier deadline derived from its last
+successful request start. Caller deadlines remain binding. Missing ACKs still
+clear the epoch and close the channel without replay; expired owners cannot
+send activation. Other input commands retain one second. Worker receive
+deadlines, authorization, desktop guards and native cleanup are unchanged.
+
+Regression coverage includes delayed exact replies in standby, active and
+cursor states; missing replies at the active/cursor deadline; shorter caller
+deadlines; expired owners; and unchanged non-activation command limits.
+Installed programs remain g366 until a separately authorized application.
+This addresses one reproduced failure condition; sustained paired stability
+is unverified. No public API, DB, dependency, hygiene or CI runner changes.

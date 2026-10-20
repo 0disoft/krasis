@@ -18,6 +18,10 @@ import (
 	"github.com/0disoft/krasis/internal/wininput"
 )
 
+// Activation can cross a scheduler/desktop dispatch delay. Its exact ACK may
+// use the existing owner idle budget, never extend an already active owner.
+const sourceActivationReplyTimeout = IdleTimeout
+
 // CaptureSource owns only authenticated local capture IPC. It has no peer
 // socket, file/clipboard operation, injection port or caller-selected desktop.
 type CaptureSource struct {
@@ -66,7 +70,7 @@ func (c *CaptureSource) ActivateProfile(profile context.Context) error {
 	if live == nil {
 		return ErrAuthority
 	}
-	ctx, cancel := context.WithTimeout(profile, time.Second)
+	ctx, cancel := context.WithTimeout(profile, sourceActivationReplyTimeout)
 	defer cancel()
 	_, err := live.call(ctx, sourceActivate)
 	return err
@@ -238,6 +242,29 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 		return sourcePacket{}, ErrAuthority
 	default:
 	}
+	limit := time.Now().Add(time.Second)
+	if op == sourceActivate {
+		limit = time.Now().Add(sourceActivationReplyTimeout)
+		if !c.lastReplyRequestAt.IsZero() {
+			idle := c.lastReplyRequestAt.Add(sourceReadTimeout(true, c.epoch.Load() != 0 || c.cursorPrepared))
+			if idle.Before(limit) {
+				limit = idle
+			}
+		}
+	}
+	if op == sourceHeartbeat {
+		limit = time.Now().Add(sourceHeartbeatReplyTimeout)
+	}
+	if op == sourceStop {
+		limit = time.Now().Add(RecoveryTimeout + time.Second)
+	}
+	if deadline, ok := ctx.Deadline(); ok && deadline.Before(limit) {
+		limit = deadline
+	}
+	// An expired existing owner cannot be activated by writing a fresh request.
+	if op == sourceActivate && !time.Now().Before(limit) {
+		return sourcePacket{}, ErrAuthority
+	}
 	c.sequence++
 	if op == sourceActivate {
 		c.epoch.Store(c.sequence)
@@ -252,16 +279,6 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 	data, err := encodeSourcePacket(p)
 	if err != nil {
 		return sourcePacket{}, err
-	}
-	limit := time.Now().Add(time.Second)
-	if op == sourceHeartbeat {
-		limit = time.Now().Add(sourceHeartbeatReplyTimeout)
-	}
-	if op == sourceStop {
-		limit = time.Now().Add(RecoveryTimeout + time.Second)
-	}
-	if deadline, ok := ctx.Deadline(); ok && deadline.Before(limit) {
-		limit = deadline
 	}
 	stage = "write"
 	started = time.Now()
