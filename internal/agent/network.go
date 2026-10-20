@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/0disoft/krasis/internal/netobserve"
 	"github.com/0disoft/krasis/internal/transport"
 )
 
@@ -323,6 +324,8 @@ func (*ListenSource) deliver(round *listenRound, result listenResult) bool {
 }
 
 type DialSource struct {
+	// Configure before Next. Production observers only enqueue bounded records.
+	ObserveDial func(netobserve.DialAttempt)
 	address     string
 	tlsConfig   *tls.Config
 	dialTimeout time.Duration
@@ -349,11 +352,23 @@ func (source *DialSource) Next(ctx context.Context) (Connection, error) {
 		return nil, errors.New("dial source is not initialized")
 	}
 	dialer := net.Dialer{Timeout: source.dialTimeout}
+	started := time.Now()
 	connection, err := dialer.DialContext(ctx, "tcp", source.address)
+	if source.ObserveDial != nil {
+		local := ""
+		if connection != nil {
+			local = connection.LocalAddr().String()
+		}
+		source.ObserveDial(netobserve.DialAttempt{Address: source.address, Local: local, Phase: "tcp", Duration: time.Since(started), Err: err})
+	}
 	if err != nil {
 		return nil, err
 	}
+	started = time.Now()
 	peerConnection, err := transport.NewPeerConnection(ctx, tls.Client(connection, source.tlsConfig.Clone()), source.keyAnchors...)
+	if source.ObserveDial != nil {
+		source.ObserveDial(netobserve.DialAttempt{Address: source.address, Local: connection.LocalAddr().String(), Phase: "tls_auth", Duration: time.Since(started), Err: err})
+	}
 	if err != nil {
 		return nil, closeConnectionOnError(connection, err)
 	}

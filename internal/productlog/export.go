@@ -35,6 +35,7 @@ type exportEvent struct {
 	Handoff       *handoff.Summary   `json:"handoff,omitempty"`
 	SessionEnd    *SessionEndSummary `json:"sessionEnd,omitempty"`
 	WiFi          *WiFiSummary       `json:"wifi,omitempty"`
+	Dial          *DialSummary       `json:"dial,omitempty"`
 }
 
 type exportLog struct {
@@ -188,6 +189,13 @@ func sanitizeLog(name string, r io.Reader) exportLog {
 				continue
 			}
 			event.SessionEnd = input.SessionEnd
+		}
+		if input.Code == "network_dial_observation" {
+			if input.Dial == nil || !input.Dial.Valid() {
+				result.Incomplete = true
+				continue
+			}
+			event.Dial = input.Dial
 		}
 		if input.Code == "network_wifi_observation" {
 			if input.WiFi == nil || !input.WiFi.Valid() {

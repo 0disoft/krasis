@@ -100,6 +100,7 @@ type record struct {
 	Handoff       *handoff.Summary   `json:"handoff,omitempty"`
 	SessionEnd    *SessionEndSummary `json:"sessionEnd,omitempty"`
 	WiFi          *WiFiSummary       `json:"wifi,omitempty"`
+	Dial          *DialSummary       `json:"dial,omitempty"`
 }
 type Logger struct {
 	mu              sync.Mutex

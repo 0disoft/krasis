@@ -9,11 +9,13 @@ import (
 	"time"
 
 	"github.com/0disoft/krasis/internal/agent"
+	"github.com/0disoft/krasis/internal/netobserve"
 	"github.com/0disoft/krasis/internal/transport"
 	"github.com/0disoft/krasis/internal/truststore"
 )
 
 type boundedProductDial struct {
+	observeDial   func(netobserve.DialAttempt)
 	load          func() (truststore.ConnectionProfile, error)
 	save          func(truststore.ConnectionProfile, string) error
 	discover      func(context.Context) ([]string, error)
@@ -51,6 +53,7 @@ func (source *boundedProductDial) Next(ctx context.Context) (agent.Connection, e
 		if err != nil {
 			return nil, err
 		}
+		d.ObserveDial = source.observeDial
 		return d.Next(attempt)
 	}
 	connection, original := dial(profile.Address, 5*time.Second)

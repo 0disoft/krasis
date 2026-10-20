@@ -130,6 +130,8 @@ func productRunnerWithTrace(identities *productidentity.Store, trust *truststore
 		defer cancelCause(context.Canceled)
 		network := netobserve.Start(ctx, log.Event, log.WiFi)
 		defer network.Close()
+		dialMonitor := netobserve.StartDial(ctx, log.Dial)
+		defer dialMonitor.Close()
 		worker := installedProductInput(prepared.deadline, cancelCause)
 		var input *wininput.InputAdapter
 		if worker != nil {
@@ -178,6 +180,7 @@ func productRunnerWithTrace(identities *productidentity.Store, trust *truststore
 			}, log.Event, prepared.anchor)
 		} else {
 			source = &boundedProductDial{
+				observeDial: dialMonitor.Observe,
 				load:        func() (truststore.ConnectionProfile, error) { return trust.Connection(alias) },
 				fingerprint: prepared.peer.CertificateSHA256,
 				tlsConfig:   prepared.tls,
