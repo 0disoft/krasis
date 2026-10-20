@@ -18,6 +18,9 @@ func init() {
 	reportOperations = append(reportOperations, inputdesktop.CaptureThreadFailureOperations()...)
 	reportOperations = append(reportOperations, "thread-join-low-level-hook", "thread-join-raw-mouse", "thread-join-wheel-capture", "thread-join-multiple")
 	reportOperations = append(reportOperations, "authority-process-query", "authority-process-exited", "authority-console-session", "authority-console-token", "authority-logon-token", "authority-logon-changed", "authority-service-pipe", "authority-service-status")
+	for op := sourceStart; op <= sourceCursorRestore; op++ {
+		reportOperations = append(reportOperations, sourceCommandOperation(op))
+	}
 }
 
 type workerReportFailure struct {
@@ -47,6 +50,15 @@ func reportFailureDetails(err error) (byte, uint32) {
 		case "", "low-level-hook", "raw-mouse", "wheel-capture", "source-reader-authority", "source-command-loop", "source-capture-join", "source-sender-join":
 			// Refine generic containers, never a concrete native cleanup failure.
 			operation, selected = authority.operation, authority
+		}
+	}
+	var command *sourceCommandFailure
+	if errors.As(err, &command) {
+		switch operation {
+		case "", "source-command-loop":
+			// Refine only the generic loop. Concrete native/authority failures
+			// keep their own operation and the native code from that branch.
+			operation, selected = sourceCommandOperation(command.op), command
 		}
 	}
 	var code byte

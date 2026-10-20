@@ -87,6 +87,8 @@ func (v Runtime) Valid() bool {
 
 func ValidRuntimeOperation(operation string) bool {
 	switch operation {
+	case "source-command-start", "source-command-admit", "source-command-activate", "source-command-deactivate", "source-command-heartbeat", "source-command-stop", "source-command-cursor-prepare", "source-command-cursor-show", "source-command-cursor-restore":
+		return true
 	case "service-pipe-owner", "service-pipe-reset", "service-pipe-duplicate", "service-pipe-close":
 		return true
 	case "authority-process-query", "authority-process-exited", "authority-console-session", "authority-console-token", "authority-logon-token", "authority-logon-changed", "authority-service-pipe", "authority-service-status":

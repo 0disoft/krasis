@@ -199,7 +199,9 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 		if started, senderJoined, interruptJoined := session.CleanupCompletion(); started {
 			exit.Sender, exit.Interrupt = joinedSourceState(senderJoined), joinedSourceState(interruptJoined)
 		}
-		result = errors.Join(result, firstCommandFailure, boundary)
+		// Preserve the first rejected command ahead of a later command failure.
+		// Concrete native/authority details still take priority in the report.
+		result = errors.Join(firstCommandFailure, result, boundary)
 		emergency := errors.Is(errors.Join(result, capture, sender), wininput.ErrEmergencyRelease)
 		result = sourceCaptureFinal(result, capture, sender, run.Err() == context.DeadlineExceeded)
 		if stopping != nil {
@@ -380,6 +382,7 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 				// remain available while the desktop is between Default/Winlogon.
 				timing, err := executeSourceCommand(commandContext, p.op, hook.ExecuteSourceDesktop, operation)
 				response.timing = timing
+				err = sourceCommandFailed(p.op, err)
 				if exit.Command == "not_started" || exit.Command == "ok" {
 					exit.Command = sourceCommandOutcome(err)
 				}
