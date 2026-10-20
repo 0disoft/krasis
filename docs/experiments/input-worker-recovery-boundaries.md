@@ -1,5 +1,10 @@
 # Remaining recovery ownership boundaries (#50)
 
+Current follow-up: g393-installed-native-isolation.md records the installed
+ordinary-console native-child isolation and its paired application. The
+single-worker stall below is the pre-g393 diagnosis and remains relevant to
+direct/foundation serving and the separate login-worker audit.
+
 ## Controlled worker stall
 
 TestHeldWorkerRecoveryWaitsForUncooperativeInput acknowledges a simulated down,

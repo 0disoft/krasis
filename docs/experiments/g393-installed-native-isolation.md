@@ -52,3 +52,36 @@ the separate login worker still need review before closing #50. Native-stall
 fixtures do not reproduce a Windows SendInput hang or replace physical held-
 input/fault-matrix evidence. No push, issue comment, external API, DB, runner,
 dependency, firewall or signing change is part of this unit.
+
+## Paired application
+
+Both PCs applied generation 393, revision
+5cace495a8a1bdaf83357fbc6d436cd8119f57f6. UI's 85 tests, native builds,
+installer provenance and the eight-file archive check passed. Offline bundle
+verification accepted 28,278,515 bytes. A installer exited 0 and its installed
+agent SHA-256 matched. Before restarting the UI, the actual protected agent's
+fixed maintenance mode passed service/native-child cursor read, same-point
+placement and shutdown. Afterwards only the session-0 service process remained;
+both console processes had retired. This uses the real privileged launch,
+inherited-handle bootstrap and independent authenticators, not a portable proxy.
+
+B receipt bc27e9bb8e8ae701590a51909206fd89 reports UPDATED. Doctor reports
+healthy/CONNECTED with matched CLI, UI, resident and installed builds and
+protected input CONFIGURED. Peer status reports ONLINE/g393 at the same
+revision. No Disconnect command was sent during replacement.
+
+The B replacement closed A's prior peer session at 22:52:09Z, with
+fault_peer_session_failed in its trigger detail and final LOCAL state. A was
+explicitly reconnected at 22:53:14Z. This interruption is retained, not reported
+as a fault-free rollout. Collection 09197c8028735820fc90e6d54de4465e at
+2026-10-20T22:53:23Z/25Z has 65 A / 55 B current-build events and both READY.
+No new fault or triggered session-end detail appears after that reconnect.
+This is a short observation window, not soak, physical key/button/scroll or
+real Windows native-stall acceptance. A g393 three-round-trip physical test
+request is pending; the user's earlier g377 pass is not reused for new routing.
+
+Next priorities are the journal owner's synchronous authority/desktop work,
+the separate login-worker recovery boundary, then the remaining #59 callback
+and #70 endpoint-change evidence. All ten issues remain open until their own
+acceptance is supported. No new implementation unit started after the
+ten-minute cutoff. All source and rollout commits remain local.
