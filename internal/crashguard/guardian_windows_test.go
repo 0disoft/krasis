@@ -26,7 +26,7 @@ func TestPortableGuardianFixture(t *testing.T) {
 		return
 	}
 	switch mode {
-	case "input":
+	case "input", "input-cooperative":
 		// Deliberately ignores cancellation/EOF; only native retirement stops
 		// it. This fixture performs no keyboard/mouse injection.
 		line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
@@ -34,6 +34,16 @@ func TestPortableGuardianFixture(t *testing.T) {
 			t.Fatal("missing simulated input")
 		}
 		fmt.Println("APPLIED")
+		if mode == "input-cooperative" {
+			command, err := readCommand(os.Stdin)
+			if err != nil || command.operation != operationDisarm {
+				t.Fatal("missing child disarm", err)
+			}
+			if err := writeAck(os.Stdout, operationDisarm, statusOK); err != nil {
+				t.Fatal(err)
+			}
+			return
+		}
 		time.Sleep(10 * time.Second)
 	case "guardian":
 		parent, err := strconv.ParseUint(os.Args[len(os.Args)-2], 10, 64)
@@ -181,7 +191,7 @@ func TestGuardianPinnedWaitNeverRetriesFailedHandle(t *testing.T) {
 
 func TestPortableGuardianDisarmJoinsInputAndRepeatedClose(t *testing.T) {
 	t.Setenv(guardMarkerEnvironment, filepath.Join(t.TempDir(), "recovered"))
-	input, err := startCommand(guardianFixtureCommand("input"))
+	input, err := startCommand(guardianFixtureCommand("input-cooperative"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,12 +202,13 @@ func TestPortableGuardianDisarmJoinsInputAndRepeatedClose(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer guard.Close()
+	processes := &PortableProcesses{input: input, guardian: guard}
 	if _, err := guard.PreparePress(control.PressedToken{Kind: control.PressedKeyboardKey, Code: 30}); err != nil {
 		t.Fatal(err)
 	}
 	acknowledgeFixtureDown(t, input)
 	for range 8 {
-		if err := guard.Close(); err != nil {
+		if err := processes.Close(); err != nil {
 			t.Fatal("disarm did not join the exact input lifetime and guardian monitor", err)
 		}
 	}

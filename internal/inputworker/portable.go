@@ -21,6 +21,24 @@ func NewPortableClient(ctx context.Context, process *crashguard.Process) (*Clien
 	if process == nil {
 		return nil, ErrAuthority
 	}
+	return newPortableClient(ctx, process)
+}
+
+// NewPortablePairClient retains the full input/guardian retirement receipt on
+// Close. This staged constructor grants no service or peer authority.
+func NewPortablePairClient(ctx context.Context, processes *crashguard.PortableProcesses) (*Client, error) {
+	if processes == nil {
+		return nil, ErrAuthority
+	}
+	return newPortableClient(ctx, processes)
+}
+
+type portableTransport interface {
+	Close() error
+	ExchangeInput(context.Context, func(io.Writer, io.Reader) error) error
+}
+
+func newPortableClient(ctx context.Context, process portableTransport) (*Client, error) {
 	binding, err := NewBinding()
 	if err != nil {
 		return nil, err
@@ -36,7 +54,7 @@ func NewPortableClient(ctx context.Context, process *crashguard.Process) (*Clien
 	return client, nil
 }
 
-func (client *Client) performPortable(ctx context.Context, process *crashguard.Process, binding Binding, command request, observed func(response)) error {
+func (client *Client) performPortable(ctx context.Context, process portableTransport, binding Binding, command request, observed func(response)) error {
 	if ctx == nil || ctx.Err() != nil {
 		return notSent(ErrAuthority)
 	}

@@ -75,7 +75,8 @@ an empty journal) retires the input child before releasing held state. Only a
 signalled exact input handle grants release. A successful termination request
 or EOF alone does not. A denied termination waits for actual exit; native wait
 errors and unexpected states are never retried. An unconfirmed retirement
-retains the journal and reports recovery failure. One retirement owner handles
+reports the journal as remaining, performs no release and returns recovery
+failure. One retirement owner handles
 concurrent parent-death and protocol recovery; handles close after monitor join.
 
 Tests include real hidden resident/input/guardian subprocesses: acknowledge a
@@ -85,10 +86,44 @@ input is injected. Normal disarm/repeated Close, real denied termination, empty
 journal fencing, malformed/EOF/disarm failure and poisoned wait rejection also
 pass. These fixtures do not establish physical held-key recovery or activation.
 
-The remaining next unit is one parent-owned retirement coordinator covering
-both children and every pending native/protocol operation, followed by private
-mode/product wiring and desktop/paired acceptance. The numbered requirements
-below remain the acceptance checklist for that full integration.
+### Combined parent retirement component implemented (not activated)
+
+PortableProcesses now owns the two children behind one bounded serial command
+gate. Gate admission and IPC share one deadline; waiting for the pair gate does
+not restart the native exchange budget. An observed operation failure fences
+further input, while conservative journal cleanup remains available. Existing
+guardedProductInput continues to own whole-action ordering in the future adapter.
+
+Close rejects new admission, joins the admitted command, then fully retires I
+before disarming/joining G. One ExitPending.Done covers both real exits and all
+owned protocol/native tasks. Its diagnostic cause includes both children's
+available failure details, including failures arriving during a child's Close.
+The final error preserves both causes without stale child-pending wrappers.
+Repeated Close observes this same owner and never starts another native cleanup.
+The live Done signal still reports either child's exit independently; it cannot
+authorize replacement before the stronger combined retirement receipt.
+
+NewPortablePairClient forwards this complete receipt rather than closing only
+the input child. The Windows-only paired launcher retains a partial pair and
+its shutdown receipt on guardian startup failure. Agent executable routes and
+productRunner remain unchanged, so these constructors are still inactive.
+
+Validation passed: crashguard, inputworker and residentagent suites; vet for
+those packages; diff whitespace checks. Synthetic pending-child tests prove
+ordered retirement, delayed native cleanup, two independent termination errors,
+shared deadlines, input fencing and one repeated-close owner. A real hidden
+subprocess test also verifies cooperative input shutdown before guardian disarm
+and repeated paired Close. The simulated-down parent-kill and denied-termination
+trials continue passing. Race detection remains unavailable in this toolchain;
+no native input, desktop acceptance, installer build or deployment was performed.
+
+Next: private child/guardian agent modes and productRunner integration, then
+desktop/cursor smoke and paired acceptance. Handle/bootstrap failures, partial
+or unknown injection receipts and replacement fencing must be checked through
+that complete product path before #50 can close. All ten issues remain open;
+no issue comments, push, generation bump, extra branch/worktree, public API,
+DB, runner, dependency, firewall or signing change occurred in these two units.
+The numbered requirements below remain the full integration acceptance checklist.
 
 1. Keep a distinct ordinary input child I and independent recovery guardian G
    under resident parent R. R sends journal prepare/cancel/released to G and

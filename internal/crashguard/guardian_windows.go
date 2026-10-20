@@ -18,6 +18,22 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// StartPortableProcesses remains inactive until agent child modes are wired.
+// On startup failure a non-nil pair retains any incomplete input retirement;
+// callers must retain its ExitPending acknowledgement before replacement.
+func StartPortableProcesses(executable string) (*PortableProcesses, error) {
+	input, err := StartPortable(executable)
+	if err != nil {
+		return nil, err
+	}
+	guardian, err := StartPortableGuardian(executable, input)
+	processes := &PortableProcesses{input: input, guardian: guardian}
+	if err != nil {
+		return processes, errors.Join(err, processes.Close())
+	}
+	return processes, nil
+}
+
 // StartPortableGuardian is staged until the private agent mode and full pair
 // coordinator are ready. Only the owned input Process supplies the identity;
 // no PID lookup, peer-provided handle, token or service proof is accepted.

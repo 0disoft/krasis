@@ -266,3 +266,40 @@ func TestPortableHandlerScopeFailureNeverDispatchesOrReusesInput(t *testing.T) {
 		}
 	}
 }
+
+type portablePairReceiptFixture struct {
+	pending *crashguard.ExitPending
+}
+
+func (fixture *portablePairReceiptFixture) Close() error { return fixture.pending }
+func (fixture *portablePairReceiptFixture) ExchangeInput(_ context.Context, exchange func(io.Writer, io.Reader) error) error {
+	var input, ack bytes.Buffer
+	if err := writeResponse(&ack, response{sequence: 1, op: opHeartbeat}); err != nil {
+		return err
+	}
+	if err := exchange(&input, &ack); err != nil {
+		return err
+	}
+	command, err := readRequest(&input)
+	if err != nil || command.op != opHeartbeat {
+		return ErrProtocol
+	}
+	return nil
+}
+
+func TestPortableClientCloseRetainsFullPairReceipt(t *testing.T) {
+	done := make(chan struct{})
+	fixture := &portablePairReceiptFixture{pending: &crashguard.ExitPending{Done: done, Cause: crashguard.ErrExitTimeout}}
+	client, err := newPortableClient(context.Background(), fixture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var pending *crashguard.ExitPending
+	if err := client.Close(); !errors.As(err, &pending) || pending.Done != done {
+		t.Fatal("input client narrowed full pair ownership to one child", err)
+	}
+	close(done)
+	if client, err := NewPortablePairClient(context.Background(), &crashguard.PortableProcesses{}); err == nil || client != nil {
+		t.Fatal("uninitialized process pair was accepted")
+	}
+}
