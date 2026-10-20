@@ -14,7 +14,10 @@ import (
 )
 
 func configureProcess(command *exec.Cmd) {
-	command.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	if command.SysProcAttr == nil {
+		command.SysProcAttr = &syscall.SysProcAttr{}
+	}
+	command.SysProcAttr.HideWindow = true
 }
 
 func waitProcess(command *exec.Cmd) error {

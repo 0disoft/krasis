@@ -63,7 +63,17 @@ func Serve(reader io.Reader, writer io.Writer, release application.ReleasePort) 
 }
 
 func ServeWithResult(reader io.Reader, writer io.Writer, release application.ReleasePort) (Result, error) {
-	return serveWithInput(reader, writer, release, nil)
+	return serveWithInput(reader, writer, release, nil, nil)
+}
+
+// ServeWithRetirement keeps recovery in an independent guardian. Every exit,
+// including disarm with an empty journal, must first prove the input child can
+// no longer complete an old press. A failed proof never releases the journal.
+func ServeWithRetirement(reader io.Reader, writer io.Writer, release application.ReleasePort, retire func() error) (Result, error) {
+	if retire == nil {
+		return Result{}, errors.New("input retirement proof required")
+	}
+	return serveWithInput(reader, writer, release, nil, retire)
 }
 
 // ServeWithInput is only the ordinary portable child. Standard guards continue
@@ -72,14 +82,22 @@ func ServeWithInput(reader io.Reader, writer io.Writer, release application.Rele
 	if input == nil {
 		return Result{}, errors.New("portable input dispatcher required")
 	}
-	return serveWithInput(reader, writer, release, input)
+	return serveWithInput(reader, writer, release, input, nil)
 }
 
-func serveWithInput(reader io.Reader, writer io.Writer, release application.ReleasePort, input func(io.Reader, io.Writer) error) (Result, error) {
+func serveWithInput(reader io.Reader, writer io.Writer, release application.ReleasePort, input func(io.Reader, io.Writer) error, retire func() error) (Result, error) {
 	if reader == nil || writer == nil || release == nil {
 		return Result{}, errors.New("crash guard reader, writer, and release port are required")
 	}
 	var pressed control.PressedState
+	recoverOwned := func(reason ExitReason) (Result, error) {
+		if retire != nil {
+			if err := retire(); err != nil {
+				return Result{Reason: reason, Remaining: pressed.Count()}, errors.Join(ErrRecoveryFailed, err)
+			}
+		}
+		return recoverResult(reason, &pressed, release)
+	}
 	var buffered *bufio.Reader
 	if input != nil {
 		buffered = bufio.NewReader(reader)
@@ -90,14 +108,14 @@ func serveWithInput(reader io.Reader, writer io.Writer, release application.Rele
 			header, err := buffered.Peek(4)
 			if err != nil {
 				if errors.Is(err, io.EOF) && buffered.Buffered() == 0 {
-					return recoverResult(ExitParentEOF, &pressed, release)
+					return recoverOwned(ExitParentEOF)
 				}
-				result, recoveryErr := recoverResult(ExitProtocolError, &pressed, release)
+				result, recoveryErr := recoverOwned(ExitProtocolError)
 				return result, errors.Join(err, recoveryErr)
 			}
 			if string(header) == "KRI1" {
 				if err := input(reader, writer); err != nil {
-					result, recoveryErr := recoverResult(ExitProtocolError, &pressed, release)
+					result, recoveryErr := recoverOwned(ExitProtocolError)
 					return result, errors.Join(err, recoveryErr)
 				}
 				continue
@@ -105,10 +123,10 @@ func serveWithInput(reader io.Reader, writer io.Writer, release application.Rele
 		}
 		command, err := readCommand(reader)
 		if errors.Is(err, io.EOF) {
-			return recoverResult(ExitParentEOF, &pressed, release)
+			return recoverOwned(ExitParentEOF)
 		}
 		if err != nil {
-			result, recoveryErr := recoverResult(ExitProtocolError, &pressed, release)
+			result, recoveryErr := recoverOwned(ExitProtocolError)
 			return result, errors.Join(err, recoveryErr)
 		}
 		switch command.operation {
@@ -116,7 +134,7 @@ func serveWithInput(reader io.Reader, writer io.Writer, release application.Rele
 			alreadyPrepared := pressed.Contains(command.token)
 			if !pressed.Contains(command.token) && pressed.Count() >= maxPressedInputs {
 				_ = writeAck(writer, command.operation, statusRejected)
-				result, recoveryErr := recoverResult(ExitProtocolError, &pressed, release)
+				result, recoveryErr := recoverOwned(ExitProtocolError)
 				return result, errors.Join(
 					errors.New("crash guard pressed-input limit exceeded"),
 					recoveryErr,
@@ -124,7 +142,7 @@ func serveWithInput(reader io.Reader, writer io.Writer, release application.Rele
 			}
 			if _, err := pressed.RecordPress(command.token); err != nil {
 				_ = writeAck(writer, command.operation, statusRejected)
-				result, recoveryErr := recoverResult(ExitProtocolError, &pressed, release)
+				result, recoveryErr := recoverOwned(ExitProtocolError)
 				return result, errors.Join(err, recoveryErr)
 			}
 			ackStatus := statusOK
@@ -132,31 +150,31 @@ func serveWithInput(reader io.Reader, writer io.Writer, release application.Rele
 				ackStatus = statusAlreadyPrepared
 			}
 			if err := writeAck(writer, command.operation, ackStatus); err != nil {
-				result, recoveryErr := recoverResult(ExitProtocolError, &pressed, release)
+				result, recoveryErr := recoverOwned(ExitProtocolError)
 				return result, errors.Join(err, recoveryErr)
 			}
 		case operationReleased:
 			if _, err := pressed.RecordRelease(command.token); err != nil {
 				_ = writeAck(writer, command.operation, statusRejected)
-				result, recoveryErr := recoverResult(ExitProtocolError, &pressed, release)
+				result, recoveryErr := recoverOwned(ExitProtocolError)
 				return result, errors.Join(err, recoveryErr)
 			}
 			if err := writeAck(writer, command.operation, statusOK); err != nil {
-				result, recoveryErr := recoverResult(ExitProtocolError, &pressed, release)
+				result, recoveryErr := recoverOwned(ExitProtocolError)
 				return result, errors.Join(err, recoveryErr)
 			}
 		case operationCancelPress:
 			if _, err := pressed.RecordRelease(command.token); err != nil {
 				_ = writeAck(writer, command.operation, statusRejected)
-				result, recoveryErr := recoverResult(ExitProtocolError, &pressed, release)
+				result, recoveryErr := recoverOwned(ExitProtocolError)
 				return result, errors.Join(err, recoveryErr)
 			}
 			if err := writeAck(writer, command.operation, statusOK); err != nil {
-				result, recoveryErr := recoverResult(ExitProtocolError, &pressed, release)
+				result, recoveryErr := recoverOwned(ExitProtocolError)
 				return result, errors.Join(err, recoveryErr)
 			}
 		case operationDisarm:
-			result, recoveryErr := recoverResult(ExitDisarm, &pressed, release)
+			result, recoveryErr := recoverOwned(ExitDisarm)
 			ackStatus := statusOK
 			if recoveryErr != nil {
 				ackStatus = statusRejected
@@ -164,7 +182,7 @@ func serveWithInput(reader io.Reader, writer io.Writer, release application.Rele
 			ackErr := writeAck(writer, command.operation, ackStatus)
 			return result, errors.Join(recoveryErr, ackErr)
 		default:
-			result, recoveryErr := recoverResult(ExitProtocolError, &pressed, release)
+			result, recoveryErr := recoverOwned(ExitProtocolError)
 			return result, errors.Join(
 				errors.New("crash guard received an unsupported operation"),
 				recoveryErr,

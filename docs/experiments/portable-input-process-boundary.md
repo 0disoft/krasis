@@ -60,6 +60,36 @@ a transport component, not evidence that #50 or its physical fault gates passed.
 
 ## Exact continuation scope
 
+### Independent guardian component implemented (not activated)
+
+The Windows-only StartPortableGuardian now duplicates the resident parent's
+process handle and the exact owned input child's pinned process handle into a
+closed inherited-handle allowlist. Parent access is synchronize/query only;
+input access additionally permits termination. No PID lookup, peer-selected
+identity or SYSTEM authorization is added. The private product mode is still
+not routed, so installed g388 behavior and generation remain unchanged.
+
+ServePortableGuardian monitors the exact parent lifetime independently of input
+IPC. Every recovery path (EOF, malformed protocol and normal disarm, even with
+an empty journal) retires the input child before releasing held state. Only a
+signalled exact input handle grants release. A successful termination request
+or EOF alone does not. A denied termination waits for actual exit; native wait
+errors and unexpected states are never retried. An unconfirmed retirement
+retains the journal and reports recovery failure. One retirement owner handles
+concurrent parent-death and protocol recovery; handles close after monitor join.
+
+Tests include real hidden resident/input/guardian subprocesses: acknowledge a
+simulated down, kill the resident while input ignores cancellation/EOF, then
+verify exact input exit before the guardian writes its release marker. No native
+input is injected. Normal disarm/repeated Close, real denied termination, empty
+journal fencing, malformed/EOF/disarm failure and poisoned wait rejection also
+pass. These fixtures do not establish physical held-key recovery or activation.
+
+The remaining next unit is one parent-owned retirement coordinator covering
+both children and every pending native/protocol operation, followed by private
+mode/product wiring and desktop/paired acceptance. The numbered requirements
+below remain the acceptance checklist for that full integration.
+
 1. Keep a distinct ordinary input child I and independent recovery guardian G
    under resident parent R. R sends journal prepare/cancel/released to G and
    input/cursor requests to I; serialized IPC must preserve current action order.
