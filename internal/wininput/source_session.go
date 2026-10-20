@@ -157,9 +157,9 @@ type SourceSession struct {
 	physicalMu       sync.Mutex
 	physicalHeld     map[physicalPress]struct{}
 	physicalCheck    func() bool
-	physicalRevision uint64 // physicalMu; invalidates native inspection across local input/owner changes.
-	capturePaused    bool   // physicalMu; native owner replacement fences new grants.
-	active           bool
+	physicalRevision uint64      // physicalMu; invalidates native inspection across local input/owner changes.
+	capturePaused    bool        // physicalMu; native owner replacement fences new grants.
+	active           atomic.Bool // Published inside stateMu transactions; hook reads never wait.
 	generation       uint64
 	faultSent        atomic.Bool
 }
@@ -226,11 +226,11 @@ func (session *SourceSession) Activate() error {
 	if session.yieldPending != 0 {
 		return errors.New("source local return is pending")
 	}
-	if session.active {
+	if session.active.Load() {
 		return errors.New("source session is already active")
 	}
 	session.generation++
-	session.active = true
+	session.active.Store(true)
 	return nil
 }
 
@@ -248,7 +248,7 @@ func (session *SourceSession) Deactivate() {
 		return
 	}
 	session.stateMu.Lock()
-	session.active = false
+	session.active.Store(false)
 	session.generation++
 	session.stateMu.Unlock()
 }
@@ -257,9 +257,7 @@ func (session *SourceSession) Active() bool {
 	if session == nil || session.terminal.Load() {
 		return false
 	}
-	session.stateMu.RLock()
-	defer session.stateMu.RUnlock()
-	return session.active && !session.terminal.Load()
+	return session.active.Load() && !session.terminal.Load()
 }
 
 // Offer is safe for a low-level hook callback. It never blocks. It returns true
@@ -270,7 +268,7 @@ func (session *SourceSession) Offer(action control.InputAction) bool {
 		return false
 	}
 	session.stateMu.RLock()
-	if !session.active || session.terminal.Load() {
+	if !session.active.Load() || session.terminal.Load() {
 		session.stateMu.RUnlock()
 		session.observeWheelQueue(action, SourceQueueRejectedInactive)
 		return false
@@ -505,7 +503,7 @@ func (session *SourceSession) current(generation uint64) bool {
 	}
 	session.stateMu.RLock()
 	defer session.stateMu.RUnlock()
-	return !session.terminal.Load() && session.active && session.generation == generation
+	return !session.terminal.Load() && session.active.Load() && session.generation == generation
 }
 
 func (session *SourceSession) cleanupSession(

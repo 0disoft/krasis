@@ -141,9 +141,9 @@ func TestCollectSourceThreadsRejectsLateCompletionAndNamesMissingOwner(t *testin
 	})
 }
 
-func TestSerializedBoundaryObserverPreventsConcurrentDetectorCalls(t *testing.T) {
+func TestPhysicalGatePreventsConcurrentDetectorCalls(t *testing.T) {
 	next := &concurrencyDetectingBoundaryObserver{}
-	observer := &serializedBoundaryObserver{next: next}
+	session := newInactiveSourceSession(t)
 	start := make(chan struct{})
 	var workers sync.WaitGroup
 	for index := 0; index < 8; index++ {
@@ -151,8 +151,8 @@ func TestSerializedBoundaryObserverPreventsConcurrentDetectorCalls(t *testing.T)
 		go func() {
 			defer workers.Done()
 			<-start
-			if err := observer.Observe(control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}, 0); err != nil {
-				t.Errorf("Observe() error = %v", err)
+			if routePhysicalAction(session, next, control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}, 0) {
+				t.Error("inactive source suppressed local input")
 			}
 		}()
 	}

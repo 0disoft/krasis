@@ -7,12 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
-	"sync"
 	"sync/atomic"
 	"time"
 	"unsafe"
-
-	"github.com/0disoft/krasis/internal/control"
 )
 
 const wmSourceReady = 0x8002
@@ -34,17 +31,6 @@ type sourceInputThreadResult struct {
 	component string
 	err       error
 	finished  time.Time
-}
-
-type serializedBoundaryObserver struct {
-	mu   sync.Mutex
-	next BoundaryObserver
-}
-
-func (observer *serializedBoundaryObserver) Observe(action control.InputAction, pointerX int32) error {
-	observer.mu.Lock()
-	defer observer.mu.Unlock()
-	return observer.next.Observe(action, pointerX)
 }
 
 func NewSourceHook(timing ...HookTimingObserver) *SourceHook {
@@ -136,9 +122,6 @@ func (hook *SourceHook) runWithBoundary(ctx context.Context, session *SourceSess
 	session.physicalCheck = sourceAnyInputPressed
 	session.advancePhysicalRevision()
 	session.physicalMu.Unlock()
-	if boundary != nil {
-		boundary = &serializedBoundaryObserver{next: boundary}
-	}
 	runCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	readySignals := make(chan struct{}, 3)

@@ -16,7 +16,7 @@ func (session *SourceSession) UseExternalPhysicalCapture() bool {
 	}
 	session.stateMu.RLock()
 	defer session.stateMu.RUnlock()
-	if session.active || session.terminal.Load() || session.yieldPending != 0 {
+	if session.active.Load() || session.terminal.Load() || session.yieldPending != 0 {
 		return false
 	}
 	session.physicalCheck = nil
@@ -36,7 +36,7 @@ func (session *SourceSession) captureRefreshPending() bool {
 	defer session.physicalMu.Unlock()
 	session.stateMu.RLock()
 	defer session.stateMu.RUnlock()
-	return session.capturePaused && !session.active && !session.terminal.Load()
+	return session.capturePaused && !session.active.Load() && !session.terminal.Load()
 }
 
 // PauseCapture fences grant activation under the same gate as physical presses.
@@ -51,7 +51,7 @@ func (session *SourceSession) PauseCapture() bool {
 	defer session.physicalMu.Unlock()
 	session.stateMu.RLock()
 	defer session.stateMu.RUnlock()
-	if session.terminal.Load() || session.active || session.yieldPending != 0 || len(session.physicalHeld) != 0 {
+	if session.terminal.Load() || session.active.Load() || session.yieldPending != 0 || len(session.physicalHeld) != 0 {
 		return false
 	}
 	session.capturePaused = true

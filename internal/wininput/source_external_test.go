@@ -12,7 +12,7 @@ func TestExternalCaptureNeverErasesHeldInputOrChangesActiveAuthority(t *testing.
 		t.Fatal("physical pressed journal erased")
 	}
 	session.physicalHeld = nil
-	session.active = true
+	session.active.Store(true)
 	if session.UseExternalPhysicalCapture() {
 		t.Fatal("active forwarding authority changed")
 	}

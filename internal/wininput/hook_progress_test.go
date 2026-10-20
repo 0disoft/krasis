@@ -107,7 +107,7 @@ func TestHookProgressRetirementFencesSuppressionWithoutWaitingForStateMutex(t *t
 	if err != nil {
 		t.Fatal(err)
 	}
-	session.active = true
+	session.active.Store(true)
 	session.started.Store(true)
 	session.generation = 4
 	session.stateMu.Lock()

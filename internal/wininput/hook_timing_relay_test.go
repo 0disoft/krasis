@@ -86,7 +86,7 @@ func TestBlockedTimingObserverCannotBlockHookOrSpawnReplacementConsumers(t *test
 func TestSourceAbortFencesLateGrantWithoutWaitingForStateMutex(t *testing.T) {
 	s := newInactiveSourceSession(t)
 	s.started.Store(true)
-	s.active = true
+	s.active.Store(true)
 	s.generation = 7
 	s.stateMu.Lock()
 	defer s.stateMu.Unlock()

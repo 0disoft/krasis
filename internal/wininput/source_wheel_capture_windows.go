@@ -155,8 +155,7 @@ type sourceWheelCapture struct {
 	observer           SourcePipelineObserver
 	opOnce             sync.Once
 	opGate             chan struct{}
-	runMu              sync.RWMutex
-	run                *sourceWheelCaptureRun
+	run                atomic.Pointer[sourceWheelCaptureRun]
 }
 
 type sourceWheelCaptureRun struct {
@@ -219,9 +218,7 @@ func (capture *sourceWheelCapture) Active() bool {
 	if capture == nil {
 		return false
 	}
-	capture.runMu.RLock()
-	current := capture.run
-	capture.runMu.RUnlock()
+	current := capture.run.Load()
 	return current != nil && current.active.Load()
 }
 
@@ -229,9 +226,7 @@ func (capture *sourceWheelCapture) OwnsWheel() bool {
 	if capture == nil {
 		return false
 	}
-	capture.runMu.RLock()
-	current := capture.run
-	capture.runMu.RUnlock()
+	current := capture.run.Load()
 	if current == nil || !current.active.Load() || current.window == 0 {
 		return false
 	}
@@ -259,9 +254,7 @@ func (capture *sourceWheelCapture) executeProfile(profile context.Context, messa
 		return err
 	}
 	stopSerialize()
-	capture.runMu.RLock()
-	current := capture.run
-	capture.runMu.RUnlock()
+	current := capture.run.Load()
 	if current == nil {
 		if allowMissing {
 			return nil
@@ -325,9 +318,7 @@ func (current *sourceWheelCaptureRun) stoppedError() error {
 }
 
 func (capture *sourceWheelCapture) failCurrentRun(cause error) {
-	capture.runMu.RLock()
-	current := capture.run
-	capture.runMu.RUnlock()
+	current := capture.run.Load()
 	if current == nil {
 		return
 	}
@@ -375,21 +366,14 @@ func resolveNamedRegisterTouchpadCapableWindow() (uintptr, bool) {
 }
 
 func (capture *sourceWheelCapture) attach(current *sourceWheelCaptureRun) error {
-	capture.runMu.Lock()
-	defer capture.runMu.Unlock()
-	if capture.run != nil {
+	if current == nil || !capture.run.CompareAndSwap(nil, current) {
 		return errors.New("source wheel capture is already running")
 	}
-	capture.run = current
 	return nil
 }
 
 func (capture *sourceWheelCapture) detach(current *sourceWheelCaptureRun) {
-	capture.runMu.Lock()
-	if capture.run == current {
-		capture.run = nil
-	}
-	capture.runMu.Unlock()
+	capture.run.CompareAndSwap(current, nil)
 }
 
 func (current *sourceWheelCaptureRun) run(ctx context.Context, ready func()) (resultErr error) {

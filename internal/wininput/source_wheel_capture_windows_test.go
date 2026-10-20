@@ -17,7 +17,8 @@ import (
 func TestSourceWheelCaptureShutdownDoesNotPromoteCancellationToFailure(t *testing.T) {
 	for _, cause := range []error{context.Canceled, errors.Join(context.Canceled, errors.New("native cleanup failed"))} {
 		current := &sourceWheelCaptureRun{terminalErr: cause}
-		capture := &sourceWheelCapture{run: current}
+		capture := &sourceWheelCapture{}
+		capture.run.Store(current)
 		err := capture.execute(wmSourceWheelCaptureDeactivate, true)
 		if cancellationOnly(err) != cancellationOnly(cause) {
 			t.Fatalf("shutdown changed failure classification: cause=%v result=%v", cause, err)

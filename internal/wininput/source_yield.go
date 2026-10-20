@@ -9,11 +9,11 @@ func (session *SourceSession) RequestLocalReturn() bool {
 	}
 	session.stateMu.Lock()
 	defer session.stateMu.Unlock()
-	if !session.active || session.terminal.Load() || session.yieldPending != 0 {
+	if !session.active.Load() || session.terminal.Load() || session.yieldPending != 0 {
 		return false
 	}
 	session.yieldPending = session.generation
-	session.active = false
+	session.active.Store(false)
 	session.generation++
 	session.yields <- session.yieldPending // One pending generation, capacity one.
 	return true
