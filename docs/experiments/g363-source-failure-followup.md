@@ -43,3 +43,25 @@ Real lock/PIN/login, rapid returns and ordinary-window typing still require
 the operator's observations; startup readiness alone is not stability proof.
 
 No public API, DB, dependency, CI runner, or repository hygiene changes.
+
+## Verified package
+
+Source revision 251755e3814366f7ea54a7c470d52d63461d0a64, generation 363.
+Inputworker, wininput, residentagent, logindiag, localapi and productcli tests
+with a 90-second package timeout and their go vet -unsafeptr=false pass.
+The workspace builder passes all 85 UI tests, native frontend/Go compilation,
+installer provenance, archive transfer roundtrip, icons and eight-file checks.
+Offline update verify returns valid/ok, size 27835305 bytes. This is a local
+unsigned development bundle, using the existing paired-update mechanism.
+
+Independent PowerShell SHA-256 checks:
+
+| File | SHA-256 |
+| --- | --- |
+| krasis.exe | 213d0914737003ab11ba1ea48c88ba40840d36ebdefa2da36b7a0f83a11e3978 |
+| krasis-agent.exe | 0cc3fa95d4c517d876ee801e0be8143fdcb26b0f2df0b354df43c1456f981f2d |
+| krasis-cli.exe | ecd2c6e4b60e166a60099ac5635ae9b4b3c1c8a287f61d9a9508d06c6b53fb01 |
+| krasis-install.exe | 80ee9e1f04f212876c971f1cf4f6a09c7017f81a13d9c24f692985a6488e9887 |
+
+B transfer f88649296fc0c84aea06bc9e696ab600 is queued. Application and
+attended acceptance are not established by these package checks.
