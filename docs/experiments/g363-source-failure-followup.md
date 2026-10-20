@@ -1,4 +1,4 @@
-# g363: apply locally verified input and source failure fixes
+# g363/g364: input recovery trial and installer repair admission
 
 ## Baseline and scope
 
@@ -65,3 +65,25 @@ Independent PowerShell SHA-256 checks:
 
 B transfer f88649296fc0c84aea06bc9e696ab600 is queued. Application and
 attended acceptance are not established by these package checks.
+
+## g363 application exposed a separate repair defect
+
+B transfer completed UPDATED at revision 251755e, generation 363. A also
+replaced its UI/portable agent with that revision. Its installed g362 service
+remained stopped, so the explicit UI repair action ran once after verified
+agent exit. At 08:58:29Z the installer reported result=5, stage=snapshot,
+operation=service_repair_start, Win32=1066. No repeated repair was attempted.
+
+The installer holds INPUT-TRANSACTION.lock during its snapshot repair, while
+the old service rejects a normal start with that lock held and no journal.
+This is a separate, source-confirmed explanation for the repair refusal;
+it does not establish the original 08:13 source command failure.
+
+G364 persists a matching restored-image journal before starting the verified
+old service, using the existing rollback_start phase that g362 understands.
+It retains the exclusive lock, retired-process check and pinned old images.
+Only after a verified clean stop is that journal finished and normal image
+replacement allowed. An uncertain start/stop keeps the journal; no restart
+loop or receipt deletion bypasses cleanup verification. Startup policy and
+service permissions are unchanged. Both real application and interrupted
+repair behavior require validation before claiming recovery.

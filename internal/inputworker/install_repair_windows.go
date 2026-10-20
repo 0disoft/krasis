@@ -36,9 +36,36 @@ func (backend *windowsInstallBackend) repairFailedService(ctx context.Context, i
 	if err != nil {
 		return err
 	}
-	return repairStoppedService(ctx, record, images.Service, retiredServiceProcess,
+	return repairStoppedServiceTransaction(ctx, record, images, backend, retiredServiceProcess,
 		func(ctx context.Context) error { return backend.scm.start(ctx, images.Service, false) },
 		func(ctx context.Context) error { return backend.scm.stop(ctx, images.Service) })
+}
+
+// The installer holds its exclusive lock throughout repair. An older service
+// refuses a normal start under that lock without a durable journal. Use its
+// existing restored-image phase, bound to the independently pinned old images;
+// do not change the old service's startup policy or release the install lock.
+func repairStoppedServiceTransaction(ctx context.Context, record serviceRecord, images installImages, backend installBackend,
+	retired func(uint32) (bool, error), start, stop func(context.Context) error) error {
+	previous := installSnapshot{Present: true, Images: images}
+	if !previous.valid() || backend == nil {
+		return ErrRecovery
+	}
+	return repairStoppedService(ctx, record, images.Service, retired, func(ctx context.Context) error {
+		journal := installJournal{Schema: "krasis.input.transaction/v1", Phase: installRollbackStart, Previous: previous, Target: images}
+		if err := backend.Save(ctx, journal); err != nil {
+			return errors.Join(errInstallJournal, err)
+		}
+		return start(ctx)
+	}, func(ctx context.Context) error {
+		if err := stop(ctx); err != nil {
+			return err
+		}
+		if err := backend.Verify(ctx, previous); err != nil {
+			return err
+		}
+		return backend.Finish(ctx)
+	})
 }
 
 func repairStoppedService(ctx context.Context, record serviceRecord, digest [32]byte, retired func(uint32) (bool, error), start, stop func(context.Context) error) error {
