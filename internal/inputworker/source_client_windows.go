@@ -254,6 +254,9 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 		return sourcePacket{}, err
 	}
 	limit := time.Now().Add(time.Second)
+	if op == sourceHeartbeat {
+		limit = time.Now().Add(sourceHeartbeatReplyTimeout)
+	}
 	if op == sourceStop {
 		limit = time.Now().Add(RecoveryTimeout + time.Second)
 	}

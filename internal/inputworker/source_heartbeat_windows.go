@@ -7,9 +7,15 @@ import (
 	"time"
 )
 
-// Keep 1.5 seconds of the worker's two-second idle budget for authority checks,
-// scheduling and the existing one-second request. No receive deadline changes.
+// Start maintenance after a quarter of the active owner's idle budget. Replies
+// may use the remaining budget; they never extend the worker's receive deadline.
 const sourceHeartbeatQuiet = IdleTimeout / 4
+
+// A keepalive may be delayed by scheduling even though its pinned owner is
+// still within the existing two-second active deadline. Do not fail it after
+// the one-second input-command budget. Standby is bounded by this too, so an
+// activation never queues behind its full ten-second idle receive window.
+const sourceHeartbeatReplyTimeout = IdleTimeout
 
 type sourceHeartbeatCheck struct {
 	owner   *sourceClient
@@ -105,7 +111,7 @@ func (c *sourceClient) pollHeartbeat(ctx context.Context) (bool, error) {
 	// start. A slow SCM check must neither consume the ACK budget nor extend the
 	// worker's state-specific idle limit. Standby has no suppressed input; the
 	// worker independently observes the pinned process while waiting for it.
-	deadline := time.Now().Add(time.Second)
+	deadline := time.Now().Add(sourceHeartbeatReplyTimeout)
 	if !c.lastReplyRequestAt.IsZero() {
 		idle := c.lastReplyRequestAt.Add(sourceReadTimeout(true, c.epoch.Load() != 0 || c.cursorPrepared))
 		if idle.Before(deadline) {
