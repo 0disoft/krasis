@@ -74,6 +74,36 @@ func TestNativeInputRejectsUninstalledOrIncompleteBootstrap(t *testing.T) {
 	}
 }
 
+func TestNativeRecoveryKeepsExactServiceLifetimeDuringStopPending(t *testing.T) {
+	handle, err := windows.OpenProcess(windows.SYNCHRONIZE, false, windows.GetCurrentProcessId())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer windows.CloseHandle(handle)
+	present := true
+	proof := &Authority{kind: authorityService, checkInput: func() error { return ErrAuthority }, checkRecovery: func() error { return ErrAuthority }, checkPresent: func() error {
+		if present {
+			return nil
+		}
+		return ErrAuthority
+	}, closeHandles: func() error { return nil }}
+	if checkNativeRecoveryService(handle, proof) != nil {
+		t.Fatal("SCM stop blocked existing recovery lifetime")
+	}
+	present = false
+	if checkNativeRecoveryService(handle, proof) == nil {
+		t.Fatal("foreign service pipe admitted recovery")
+	}
+	present = true
+	if checkNativeRecoveryService(0, proof) == nil || checkNativeRecoveryService(handle, nil) == nil {
+		t.Fatal("missing pinned service lifetime admitted recovery")
+	}
+	proof.kind = authorityAgent
+	if checkNativeRecoveryService(handle, proof) == nil {
+		t.Fatal("agent authority substituted for service")
+	}
+}
+
 func TestConsolePairRetirementRetainsJobUntilEveryProcessExits(t *testing.T) {
 	var active atomic.Uint32
 	active.Store(1) // The parent has exited; the native child has not.

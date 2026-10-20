@@ -5,7 +5,7 @@ package main
 import "testing"
 
 func TestInputModesAreFixedServiceModes(t *testing.T) {
-	for _, mode := range []string{"--service", "--input-worker", "--login-worker", "--native-input-worker", "--native-login-worker"} {
+	for _, mode := range []string{"--service", "--input-worker", "--login-worker", "--native-input-worker", "--native-login-worker", "--native-release-worker"} {
 		if !validInputMode(mode) {
 			t.Fatal(mode)
 		}

@@ -168,6 +168,9 @@ func validLease(ctx context.Context, stream net.Conn, input application.InputPor
 func serve(ctx context.Context, stream net.Conn, input application.InputPort, lease Lease, do, recoveryDo executor, now func() time.Time, timings ...*workerTiming) (report Report, err error) {
 	var pressed control.PressedState
 	defer func() {
+		if isolated, ok := input.(*isolatedInput); ok {
+			defer func() { err = errors.Join(err, isolated.finishRecovery()) }()
+		}
 		// Close first to interrupt the sole bounded reader. Cleanup cannot wait
 		// for the client to read an acknowledgement or send any further command.
 		_ = stream.Close()
@@ -185,7 +188,7 @@ func serve(ctx context.Context, stream net.Conn, input application.InputPort, le
 		}
 		recoveryCtx, cancel := context.WithTimeout(context.Background(), RecoveryTimeout)
 		defer cancel()
-		recoveryErr := recoveryDo(recoveryCtx, func() error {
+		recoveryErr := recoveryExecution(input, recoveryDo)(recoveryCtx, func() error {
 			var releaseErr error
 			report.Recovery, releaseErr = application.ReleaseAll(recoveryCtx, &pressed, input)
 			return releaseErr

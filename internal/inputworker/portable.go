@@ -125,10 +125,17 @@ func PortableInputHandler(input application.InputPort, execute func(context.Cont
 // PortableReleaseHandler is only for the separately authenticated recovery
 // child. Its framing cannot admit presses, motion, wheels or cursor operations.
 func PortableReleaseHandler(input application.ReleasePort, execute func(context.Context, func() error) error) func(io.Reader, io.Writer) error {
+	if input == nil {
+		return portableInputHandler(nil, execute, true)
+	}
 	return portableInputHandler(releaseOnlyInput{input}, execute, true)
 }
 
 type releaseOnlyInput struct{ application.ReleasePort }
+
+type deniedGuardRelease struct{}
+
+func (deniedGuardRelease) Release(context.Context, control.PressedToken) error { return ErrAuthority }
 
 func (releaseOnlyInput) Press(context.Context, control.PressedToken) error {
 	return notSent(ErrAuthority)

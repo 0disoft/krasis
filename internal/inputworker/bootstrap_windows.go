@@ -311,19 +311,29 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 		}
 		input = isolated
 	}
-	report, result := serveReadyProfileOnDesktop(run, channel, input, lease, func() error {
+	announceReady := func() error {
 		if proof.check(false) != nil {
 			return ErrAuthority
 		}
 		_ = control.SetWriteDeadline(time.Now().Add(startupTimeout))
 		return writeStartupReady(control, profile)
-	}, &profile, desktop)
+	}
+	var report Report
+	var result error
+	if isolated != nil && isolated.recoveryRetire != nil {
+		report, result = serveIsolatedJournal(run, channel, isolated, lease, announceReady)
+	} else {
+		report, result = serveReadyProfileOnDesktop(run, channel, input, lease, announceReady, &profile, desktop)
+	}
 	if isolated != nil && !isolated.recovering {
 		retired, retireErr := isolated.retireForRecovery()
 		result = errors.Join(result, retireErr)
 		if !retired {
 			result = errors.Join(result, ErrRecovery)
 		}
+	}
+	if isolated != nil {
+		result = errors.Join(result, isolated.finishRecovery())
 	}
 	result = normalizeWorkerStop(requested.Load(), report, result)
 	return finishWorkerReport(control, report, result)

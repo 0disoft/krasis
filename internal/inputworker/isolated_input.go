@@ -6,17 +6,53 @@ import (
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/crashguard"
+	"sync"
 	"time"
 )
 
 // The authenticated serving worker retains its journal. Only the separate
-// native child executes live commands. Recovery may use the worker's native
-// release port only after exact child exit AND owned IPC retirement are proved.
+// native child executes live commands. Recovery starts only after exact input
+// child/IPC retirement. Ordinary installed input uses a separate release-only
+// child; the legacy login/fixture paths still supply their own recovery port.
 type isolatedInput struct {
 	*Client
-	recovery   application.ReleasePort
-	retire     func() (bool, error)
-	recovering bool
+	recovery          application.ReleasePort
+	retire            func() (bool, error)
+	recovering        bool
+	recoveryRetire    func() (bool, error)
+	recoveryCloseOnce sync.Once
+	recoveryCloseErr  error
+}
+
+// Both native transports are prestarted before any journal can hold input.
+// Recovery IPC is bounded and its process/pipe retirement is also mandatory.
+func (input *isolatedInput) finishRecovery() error {
+	if input.recoveryRetire == nil {
+		return nil
+	}
+	input.recoveryCloseOnce.Do(func() {
+		retired, err := input.recoveryRetire()
+		if !retired || err != nil {
+			input.recoveryCloseErr = errors.Join(err, ErrRecovery)
+		}
+	})
+	return input.recoveryCloseErr
+}
+
+func recoveryExecution(input application.InputPort, owner executor) executor {
+	isolated, ok := input.(*isolatedInput)
+	if !ok || isolated.recoveryRetire == nil {
+		return owner
+	}
+	return func(ctx context.Context, work func() error) error {
+		if !isolated.recovering || ctx == nil || work == nil {
+			return ErrRecovery
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		return work() // Native recovery checks execute only in the release child.
+	}
 }
 
 func newIsolatedInput(client *Client, process *crashguard.Process, recovery application.ReleasePort) *isolatedInput {
@@ -50,8 +86,8 @@ func (input *isolatedInput) Release(ctx context.Context, token control.PressedTo
 
 // Only the concrete, independently authenticated native transport may move live
 // execution out of the journal owner's desktop. The child performs fresh native
-// authority/desktop checks for every command. Recovery still uses the original
-// owner executor, after exact child retirement; this is not cached authority.
+// authority/desktop checks for every command. Recovery has a distinct executor
+// after exact child retirement; this is not cached authority.
 func journalExecution(input application.InputPort, owner executor, timing *workerTiming) executor {
 	isolated, ok := input.(*isolatedInput)
 	if !ok {

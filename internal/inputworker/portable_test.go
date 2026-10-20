@@ -25,7 +25,11 @@ func TestMain(m *testing.M) {
 			var ownership io.Closer
 			ownership, err = adoptPortableFixtureOwnership(os.Args[2:])
 			if err == nil {
-				_, err = crashguard.ServeWithInput(os.Stdin, os.Stdout, input, PortableInputHandler(input, func(_ context.Context, work func() error) error { return work() }))
+				handler := PortableInputHandler(input, func(_ context.Context, work func() error) error { return work() })
+				if input.mode == "release" || input.mode == "release-hang" {
+					handler = PortableReleaseHandler(input, func(_ context.Context, work func() error) error { return work() })
+				}
+				_, err = crashguard.ServeWithInput(os.Stdin, os.Stdout, input, handler)
 			}
 			if ownership != nil {
 				err = errors.Join(err, ownership.Close())
@@ -60,6 +64,9 @@ func (p *portableFixture) Press(context.Context, control.PressedToken) error {
 }
 func (p *portableFixture) Release(context.Context, control.PressedToken) error {
 	p.hits++
+	if p.mode == "release-hang" {
+		time.Sleep(time.Minute)
+	}
 	if marker := os.Getenv("KRASIS_PORTABLE_RELEASE_MARKER"); marker != "" {
 		return os.WriteFile(marker, []byte("released"), 0o600)
 	}

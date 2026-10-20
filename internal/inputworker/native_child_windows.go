@@ -29,6 +29,14 @@ var nativeHandleInformation = windows.NewLazySystemDLL("kernel32.dll").NewProc("
 // inherited service/agent pipe handles are identity proofs, never read/write
 // transports here. Both authenticators run independently before native input.
 func RunInstalledNativeInput(ctx context.Context, installation *Installation) error {
+	return runInstalledNativeInput(ctx, installation, false)
+}
+
+func RunInstalledNativeRelease(ctx context.Context, installation *Installation) error {
+	return runInstalledNativeInput(ctx, installation, true)
+}
+
+func runInstalledNativeInput(ctx context.Context, installation *Installation, releaseOnly bool) error {
 	agentDigest, serviceDigest, err := installation.workerDigests()
 	if err != nil || !fixedInstalledInputProcess(serviceDigest, true, installation) {
 		return ErrAuthority
@@ -64,6 +72,14 @@ func RunInstalledNativeInput(ctx context.Context, installation *Installation) er
 		return err
 	}
 	defer proof.Close()
+	var recoveryService windows.Handle
+	if releaseOnly {
+		recoveryService, err = pinNativeRecoveryService(handles[2], proof)
+		if err != nil {
+			return err
+		}
+		defer windows.CloseHandle(recoveryService)
+	}
 	if installation.adoptWorkerAgentImage(proof, imageFile) != nil {
 		return ErrAuthority
 	}
@@ -83,18 +99,56 @@ func RunInstalledNativeInput(ctx context.Context, installation *Installation) er
 		return ErrAuthority
 	}
 	input := wininput.NewInjectionPort()
-	return inputdesktop.RunInteractive(ctx, func() error { return authority.check(false) }, func(scope *inputdesktop.Scope) error {
+	serviceCheck := func() error { return proof.check(false) }
+	if releaseOnly {
+		serviceCheck = func() error { return checkNativeRecoveryService(recoveryService, proof) }
+	}
+	return inputdesktop.RunInteractive(ctx, func() error { return authority.check(releaseOnly) }, func(scope *inputdesktop.Scope) error {
 		execute := func(ctx context.Context, work func() error) error {
-			if !time.Now().Before(lease.ExpiresAt) || authority.check(false) != nil || proof.check(false) != nil || !nativeParentAlive(handles[3]) {
+			if (!releaseOnly && !time.Now().Before(lease.ExpiresAt)) || authority.check(releaseOnly) != nil || serviceCheck() != nil || !nativeParentAlive(handles[3]) {
 				return ErrAuthority
 			}
 			return scope.Do(ctx, work)
+		}
+		if releaseOnly {
+			// Guard-side commands have no native release capability. Only the
+			// release-only framed handler executes within fresh authority/scope.
+			_, err := crashguard.ServeWithInput(os.Stdin, os.Stdout, deniedGuardRelease{}, PortableReleaseHandler(input, execute))
+			return err
 		}
 		// The parent worker owns the authoritative journal. This child's guard
 		// journal stays empty; retirement must precede the parent's key-up.
 		_, err := crashguard.ServeWithInput(os.Stdin, os.Stdout, input, PortableInputHandler(input, execute))
 		return err
 	})
+}
+
+// Pin the exact fully authenticated service before input admission. Cleanup
+// tolerates SCM StopPending, but never another/reused service process or pipe.
+func pinNativeRecoveryService(pipe windows.Handle, proof *Authority) (windows.Handle, error) {
+	if proof == nil || proof.kind != authorityService || proof.check(false) != nil {
+		return 0, ErrAuthority
+	}
+	var pid uint32
+	if windows.GetNamedPipeServerProcessId(pipe, &pid) != nil {
+		return 0, ErrAuthority
+	}
+	handle, err := windows.OpenProcess(windows.SYNCHRONIZE, false, pid)
+	if err != nil {
+		return 0, ErrAuthority
+	}
+	if !nativeParentAlive(handle) || proof.check(false) != nil {
+		_ = windows.CloseHandle(handle)
+		return 0, ErrAuthority
+	}
+	return handle, nil
+}
+
+func checkNativeRecoveryService(handle windows.Handle, proof *Authority) error {
+	if proof == nil || proof.kind != authorityService || !nativeParentAlive(handle) || proof.checkHeartbeat() != nil {
+		return ErrAuthority
+	}
+	return nil
 }
 
 func adoptNativeHandles(values []uint64) ([]windows.Handle, error) {
@@ -216,13 +270,26 @@ func startIsolatedInput(ctx context.Context, control *pipeConn, channel *Channel
 	copy(data[:], packet[:])
 	binary.BigEndian.PutUint64(data[bootstrapSize:bootstrapSize+8], uint64(handles[2]))
 	binary.BigEndian.PutUint64(data[bootstrapSize+8:], uint64(handles[3]))
-	return startNativeChildClient(ctx, "--native-input-worker", handles, data[:])
+	input, err := startNativeChildClient(ctx, "--native-input-worker", handles, data[:])
+	if err != nil {
+		return nil, err
+	}
+	release, err := startNativeChildClient(ctx, "--native-release-worker", handles, data[:])
+	if err != nil {
+		retired, closeErr := input.retire()
+		if !retired {
+			closeErr = errors.Join(closeErr, ErrRecovery)
+		}
+		return nil, errors.Join(err, closeErr)
+	}
+	input.recovery, input.recoveryRetire = release.Client, release.retire
+	return input, nil
 }
 
 // Framing/retirement is shared; the two callers retain distinct authenticators
 // and immutable desktop policies. No caller-selected command is admitted.
 func startNativeChildClient(ctx context.Context, mode string, handles []windows.Handle, data []byte) (*isolatedInput, error) {
-	if ctx == nil || ctx.Err() != nil || (mode != "--native-input-worker" && mode != "--native-login-worker") {
+	if ctx == nil || ctx.Err() != nil || (mode != "--native-input-worker" && mode != "--native-login-worker" && mode != "--native-release-worker") {
 		return nil, ErrAuthority
 	}
 	root, err := windows.KnownFolderPath(windows.FOLDERID_ProgramFiles, 0)
