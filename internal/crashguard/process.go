@@ -2,6 +2,7 @@ package crashguard
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -9,9 +10,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/syncgate"
 )
 
 const maxStderrBytes = 4096
@@ -37,6 +40,8 @@ type Process struct {
 	abort    sync.Once
 	abortErr error
 	kill     func() error
+	callMu   syncgate.Mutex
+	failed   atomic.Bool
 
 	mu      sync.Mutex
 	waitErr error
@@ -173,19 +178,33 @@ func (process *Process) Close() error {
 }
 
 func (process *Process) invoke(operation func() error) error {
+	ctx, cancel := context.WithTimeout(context.Background(), processIPCTimeout)
+	defer cancel()
+	// Waiting callers cannot create a goroutine behind the protocol mutex.
+	// Admission consumes the same budget as the exchange; it grants no IPC.
+	if err := process.callMu.LockContext(ctx); err != nil {
+		return errors.Join(ErrIPCTimeout, err)
+	}
+	defer process.callMu.Unlock()
+	if process.failed.Load() {
+		return ErrIPCTimeout
+	}
 	result := make(chan error, 1)
 	go func() { result <- operation() }()
-	timer := time.NewTimer(processIPCTimeout)
-	defer timer.Stop()
 	select {
 	case err := <-result:
-		return err
-	case <-timer.C:
-		return errors.Join(ErrIPCTimeout, process.abortProcess())
+		if ctx.Err() == nil && !process.failed.Load() {
+			return err
+		}
+	case <-ctx.Done():
 	}
+	return errors.Join(ErrIPCTimeout, process.abortProcess())
 }
 
 func (process *Process) abortProcess() error {
+	// A timeout permanently retires this protocol owner. Even if pipe close
+	// or process kill cannot unblock native I/O, at most its one call survives.
+	process.failed.Store(true)
 	process.abort.Do(func() {
 		_ = process.stdin.Close()
 		_ = process.stdout.Close()
