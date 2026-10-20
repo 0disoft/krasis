@@ -23,3 +23,17 @@ This generation change exists to recover the stopped peer through an available
 authenticated mechanism; it is not a product release/version promotion. Package
 validation and actual paired connection/source readiness remain required. No
 push, issue comment, branch or worktree creation.
+
+## Paired recovery verified
+
+Both PCs applied g383, revision 3f6dc1e9c5a8de6331fc4dd0b255605b86729c05.
+Package verification accepted 27,968,478 bytes and B receipt
+b1110beefa0accc9c19cc0a495b8d6f5 reports UPDATED. A installer returned 0 and
+its installed agent hash matches. No Disconnect was sent during A replacement.
+Doctor reports healthy/CONNECTED with matching UI, agent and installed build.
+Paired collection at 20:47:18Z/19Z reports READY input health and completed
+cleanup on both sides. A has one protected-source-ready event; B has two (the
+rolling replacement required reacquisition). Neither current-build collection
+contains fault_/session_failed. Input connection recovery is complete; this is
+not a new physical-input or long-soak acceptance claim. All ten issues remain
+open and g381's rejected changes remain out of the current production source.
