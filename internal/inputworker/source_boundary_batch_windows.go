@@ -2,6 +2,11 @@
 
 package inputworker
 
+import (
+	"errors"
+	"os"
+)
+
 const sourceBoundaryBatchLimit = 16
 
 // Drain only notifications already waiting. There is no batching timer, lost
@@ -61,5 +66,15 @@ func (w *sourceWriter) sendBoundaries(batch []sourcePacket) error {
 		}
 		copy(wire[i*sourcePacketSize:], data[:])
 	}
-	return w.writeSequenced(wire[:len(batch)*sourcePacketSize], next)
+	err := w.writeSequenced(wire[:len(batch)*sourcePacketSize], next)
+	var failure *sourceIOFailure
+	if errors.As(err, &failure) && failure.unsubmitted && errors.Is(failure, os.ErrDeadlineExceeded) {
+		// These are advisory pointer samples, just like the bounded queue's
+		// overflow drops. A native pre-submission proof means no bytes or
+		// sequence escaped. Discard this stale batch instead of canceling the
+		// capture owner and its heartbeat reader. Never replay the batch, and
+		// never suppress an attempted/partial write or an authority failure.
+		return nil
+	}
+	return err
 }
