@@ -63,3 +63,33 @@ described above. Issue #50 remains open. No live-device native stall or held-key
 restart trial is inferred from hidden fixtures. Packaging and paired application
 are recorded separately after validation. No push, issue comments, external API,
 DB, runner, dependency, firewall or signing changes are part of this unit.
+
+## g392 paired application
+
+Both PCs applied generation 392, revision
+0321587522bdeb72c6bba23d0e4044e0f95d4a54. UI's 85 tests, native builds,
+installer provenance and eight-file archive checks passed. Offline verify
+accepted 28,073,353 bytes. The packaged agent passed ordinary Default-desktop
+heartbeat, cursor read/same-point placement/entry and full paired shutdown.
+No keyboard/button injection was part of that smoke.
+
+B receipt a1a4b12d2b18705f3993c87282ac0df7 reports UPDATED. A installer exited
+0 and the installed agent SHA-256 matched. Doctor reports healthy/CONNECTED
+with matched CLI, UI, resident and installed builds, protected input CONFIGURED
+and completed update-stage cleanup. No Disconnect command was sent during A
+replacement.
+
+Collection b7610ca19e85ae935e82fe0fe07108c7 at 2026-10-20T22:36:36Z/38Z has
+35 A / 58 B current-build events, both READY, one protected capture readiness
+each and no fault_ or session_failed. B records replacement-time acquire
+timeouts and one RECONNECTING followed by CONNECTED. This short runtime window
+does not establish physical-input, held-key fault or DHCP-change acceptance.
+Both installed PCs select service input; the ordinary-route proof is the real
+agent smoke and hidden-process tests above.
+
+Next #50 unit: the installed bootstrap in inputworker/bootstrap_windows.go
+still selects the single worker serving loop and NewInjectionPort. Its
+pressed journal/ReleaseAll must survive an uncooperative native operation in
+an independently authenticated recovery owner. Keep the protected image,
+service/pipe/session/token/desktop and lease checks; the ordinary child mode
+is not an installed worker authorization path. All ten issues remain open.
