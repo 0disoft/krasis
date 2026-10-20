@@ -32,10 +32,12 @@ func runSourceService(ctx context.Context, installation *Installation, admit fun
 			var report Report
 			if admit != nil {
 				err = admit(ctx)
+				err = sourceStartupFailure("admission", report, err)
 			}
 			if err == nil {
 				lease, prepare, leaseErr := receiveAgentRequest(ctx, channel)
 				err = leaseErr
+				err = sourceStartupFailure("request", report, err)
 				if err == nil && !prepare && lease.Capture && !lease.Presentation {
 					report, err = runPreparedAgentLease(ctx, channel, lease, agent, service, installation, nil)
 				} else if err == nil {
@@ -43,7 +45,7 @@ func runSourceService(ctx context.Context, installation *Installation, admit fun
 				}
 			}
 			closeErr := channel.Close()
-			if observe != nil && report.Source != nil {
+			if observe != nil && (report.Source != nil || err != nil) {
 				observe(report, err) // Preserve the joined lease result; close failure is separate.
 			}
 			if failure := serviceRecoveryFailure(err, closeErr); failure != nil {

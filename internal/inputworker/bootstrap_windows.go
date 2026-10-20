@@ -37,6 +37,12 @@ func runInstalledAgentLease(ctx context.Context, channel *Channel, lease Lease, 
 }
 
 func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, agentDigest, serviceDigest [sha256.Size]byte, installation *Installation, candidate *preparedConsole, afterReady ...func()) (report Report, result error) {
+	startupStage := "validation"
+	defer func() {
+		if lease.Capture {
+			result = sourceStartupFailure(startupStage, report, result)
+		}
+	}()
 	defer func() { result = validateSourceReportMode(lease.Capture, report, result) }()
 	if candidate != nil {
 		defer func() {
@@ -58,6 +64,7 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 		return Report{}, ErrAuthority
 	}
 	prepared := candidate
+	startupStage = "prepare"
 	decision := candidate.claimDecision(ctx)
 	if decision != handoff.PreparationUsed {
 		if candidate != nil && candidate.close() != nil {
@@ -79,6 +86,7 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 	startup, cancel := context.WithTimeout(ctx, startupTimeout)
 	defer cancel()
 	var actual uint32
+	startupStage = "authentication"
 	if windows.GetNamedPipeClientProcessId(control.handle, &actual) != nil || actual != pid || windows.WTSGetActiveConsoleSessionId() != prepared.session || channel.authority.check(false) != nil {
 		return Report{}, ErrAuthority
 	}
@@ -94,6 +102,7 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 		}
 		return nil
 	}, func() ([bootstrapSize]byte, error) {
+		startupStage = "transfer"
 		if windows.WTSGetActiveConsoleSessionId() != prepared.session {
 			return [bootstrapSize]byte{}, ErrAuthority
 		}
@@ -110,6 +119,7 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 	var readyErr error
 	var finished bool
 	if writeErr == nil {
+		startupStage = "ready"
 		if lease.Capture {
 			childProfile, report, finished, readyErr = readSourceWorkerStartup(control)
 		} else {
@@ -134,6 +144,7 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 	}
 	_ = control.SetDeadline(time.Time{})
 	mergeWorkerStartup(&profile, childProfile)
+	startupStage = "publish"
 	if channel.authority.check(false) != nil || channel.stream.SetWriteDeadline(time.Now().Add(time.Second)) != nil || writeStartupReady(channel.stream, profile) != nil {
 		// The child is ready but no readiness receipt reached the agent. Still
 		// request shutdown and consume recovery before killing the job.
@@ -146,6 +157,7 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 		return report, observeMissingWorkerReport(result, worker.reportExit)
 	}
 	_ = channel.stream.SetWriteDeadline(time.Time{})
+	startupStage = ""
 	for _, notify := range afterReady {
 		if notify != nil {
 			notify()

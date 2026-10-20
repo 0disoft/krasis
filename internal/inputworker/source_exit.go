@@ -11,6 +11,14 @@ func emptySourceExit() logindiag.SourceExit {
 	return logindiag.SourceExit{Command: "not_started", Reader: "not_started", Capture: "not_started", Sender: "not_started", Interrupt: "not_started", Retirement: "not_sent", Report: "failed"}
 }
 
+func sourceStartupFailure(stage string, report Report, cause error) error {
+	operation := "source-startup-" + stage
+	if cause == nil || report.Source != nil || !logindiag.ValidRuntimeOperation(operation) {
+		return cause
+	}
+	return &workerReportFailure{operation: operation, cause: cause}
+}
+
 func sourceCommandOutcome(err error) string {
 	switch {
 	case err == nil:

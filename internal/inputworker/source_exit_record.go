@@ -14,10 +14,18 @@ const maxLoginRuntimeBytes = 16 << 10
 // persistence mutex or performs disk I/O on the source endpoint. The existing
 // policy recorder (or final service record) persists the immutable history.
 func (r *loginRuntimeRecorder) recordSourceExit(report Report, result error) {
-	if report.Source == nil || !report.Source.ValidDetails() || report.Source.Time != "" || report.Source.Failure != nil {
-		return
+	var exit logindiag.SourceExit
+	if report.Source == nil {
+		if result == nil {
+			return
+		}
+		exit = logindiag.SourceExit{Command: "unknown", Reader: "unknown", Capture: "unknown", Sender: "unknown", Interrupt: "unknown", Retirement: "unknown", Report: "missing"}
+	} else {
+		if !report.Source.ValidDetails() || report.Source.Time != "" || report.Source.Failure != nil {
+			return
+		}
+		exit = *report.Source
 	}
-	exit := *report.Source
 	exit.Time = time.Now().UTC().Format(time.RFC3339Nano)
 	if result != nil {
 		op, native := reportFailureDetails(result)

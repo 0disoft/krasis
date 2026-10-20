@@ -41,6 +41,12 @@ func (v SourceExit) ValidDetails() bool {
 	if v.Failure != nil && !v.Failure.Valid() {
 		return false
 	}
+	if v.Report == "missing" {
+		// Service-only absence of a final worker report. Unknown is never a
+		// claim that capture did not start or that native cleanup completed.
+		return v.Command == "unknown" && v.Reader == "unknown" && v.Capture == "unknown" &&
+			v.Sender == "unknown" && v.Interrupt == "unknown" && v.Retirement == "unknown" && v.Failure != nil
+	}
 	if v.Report != "recovery" && (v.Sender == "unjoined" || v.Interrupt == "unjoined" || v.Capture == "failed") {
 		return false
 	}
