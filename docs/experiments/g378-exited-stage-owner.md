@@ -19,3 +19,16 @@ applying the committed build.
 No product API, database, dependency, runner, firewall or signing change. No push
 or issue comment. This fixes a startup cleanup race; other cleanup failures must
 still be reported rather than classified as success.
+
+## Paired application
+
+Both peers applied g378, revision fc7cc07a1d7b41a6fe75f50d04224e8bc0fdb955.
+B's existing transfer receipt 02aee1deef79b8c3ce8ae0bf133e92bc reports UPDATED
+for all 27,933,721 bytes. A's installed agent hash matches the package.
+Both installation receipts report result 0, complete, recovery not needed.
+The 20:05:30Z/31Z paired collection reports READY input health on both sides.
+A cleanup completed at 20:05:17Z and removed one obsolete stage; B cleanup
+completed and removed zero. Doctor reports healthy/CONNECTED and matched
+CLI, UI, agent, installed image and recovery record. The immediate launch-time
+agent-unavailable response preceded successful startup; the connection was
+requested once the agent became available.
