@@ -456,7 +456,13 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 	live.timing = timingSampler{emit: c.observe, source: true}
 	live.heartbeatTiming = timingSampler{emit: c.observe, source: true, heartbeat: true}
 	go func() {
-		defer close(live.done)
+		defer func() {
+			code := sourceClientReaderCode(live.err, live.retired.Load())
+			close(live.done) // Observability must not delay the terminal signal.
+			if c.observe != nil {
+				emitTiming(c.observe, code)
+			}
+		}()
 		var sequence uint64
 		reader := newSourcePacketReader(channel.stream)
 		for {

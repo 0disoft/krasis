@@ -4,6 +4,9 @@ func init() {
 	allowed["installed_source_connect_failed"] = true
 	allowed["installed_source_startup_failed"] = true
 	allowed["installed_source_startup_retired"] = true
+	for _, reason := range []string{"retired", "emergency", "cleanup", "truncated", "eof", "timeout", "closed", "cancelled", "protocol", "authority", "other"} {
+		allowed["installed_source_reader_"+reason] = true
+	}
 	for _, reason := range []string{"cleanup", "stopped", "active", "unconfigured"} {
 		allowed["installed_input_admission_blocked_"+reason] = true
 	}

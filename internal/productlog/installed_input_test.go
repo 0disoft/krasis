@@ -14,6 +14,7 @@ func TestInputConnectionDiagnosticAllowlistRejectsDynamicStages(t *testing.T) {
 	}{
 		{"installed_source_command_failed_", []string{"start", "admit", "activate", "deactivate", "heartbeat", "stop", "cursor_prepare", "cursor_show", "cursor_restore", "unknown"}},
 		{"installed_source_response_", []string{"received", "cancelled", "timeout", "reader_ended", "protocol", "rejected"}},
+		{"installed_source_reader_", []string{"retired", "emergency", "cleanup", "truncated", "eof", "timeout", "closed", "cancelled", "protocol", "authority", "other"}},
 		{"installed_source_io_", []string{"timeout", "canceled", "closed", "short_write", "native", "other", "stage_deadline", "stage_write"}},
 		{"installed_input_admission_blocked_", []string{"cleanup", "stopped", "active", "unconfigured"}},
 	} {
