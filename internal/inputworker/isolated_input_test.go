@@ -35,7 +35,10 @@ func TestIsolatedWorkerRecoversHeldInputAfterNativeChildStall(t *testing.T) {
 	lease := testLease()
 	done := make(chan finish, 1)
 	go func() {
-		report, err := serve(context.Background(), server, input, lease, testExecute, testExecute, time.Now)
+		owner := func(context.Context, func() error) error {
+			return errors.New("live input entered parent native checks")
+		}
+		report, err := serve(context.Background(), server, input, lease, journalExecution(input, owner, nil), testExecute, time.Now)
 		done <- finish{report, err}
 	}()
 	ack := send(t, remote, request{op: opPress, sequence: 1, binding: lease.Binding, token: control.PressedToken{Kind: control.PressedKeyboardKey, Code: 30}})

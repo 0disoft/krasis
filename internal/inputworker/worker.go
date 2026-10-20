@@ -117,6 +117,7 @@ func serveReadyProfileOnDesktop(ctx context.Context, channel *Channel, input app
 			})
 		}
 		inputDo := beforeInputCertainty(measureExecution(func() error { return authority.check(false) }, execute, timing))
+		inputDo = journalExecution(input, inputDo, timing)
 		recoveryDo := func(ctx context.Context, operation func() error) error {
 			if err := authority.check(true); err != nil {
 				return err
@@ -138,6 +139,11 @@ func serveReadyProfileOnDesktop(ctx context.Context, channel *Channel, input app
 			})
 		})
 		workerCtx := context.WithValue(ctx, cursorObservationScopeKey{}, observe)
+		if _, isolated := input.(*isolatedInput); isolated {
+			// Cursor observation must remain in the authenticated native child;
+			// the journal owner must not perform a second desktop transaction.
+			workerCtx = ctx
+		}
 		report, runErr = serve(workerCtx, stream, input, lease, inputDo, recoveryDo, time.Now, timing)
 		return runErr
 	})

@@ -54,6 +54,7 @@ func runLoginInput(ctx context.Context, native loginNativeInput,
 	// Keep the desktop ownership alive for independent release recovery. The
 	// connection callback must cooperatively join its own cancellation cleanup.
 	result = bind(context.Background(), func(do executor) (err error) {
+		liveDo := journalExecution(native, do, nil)
 		var pressed control.PressedState
 		finished := port.retired
 		callbackErr := inputdesktop.ErrCallbackExit
@@ -106,7 +107,7 @@ func runLoginInput(ctx context.Context, native loginNativeInput,
 				return nil
 			case request := <-port.mailbox:
 				started := false
-				err := do(request.ctx, func() error {
+				err := liveDo(request.ctx, func() error {
 					select {
 					case <-finished:
 						return notSent(inputdesktop.ErrClosed)
