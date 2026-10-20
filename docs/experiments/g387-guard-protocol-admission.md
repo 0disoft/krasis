@@ -34,3 +34,36 @@ No race detector (CGO/compiler unavailable), hosted CI or new physical fault
 matrix was run. Paired application is recorded after verification. No public
 API, DB, runner, dependency, firewall, signing or trust-policy change. Local main
 only; no push, extra branch/worktree or GitHub comment.
+
+## Paired application
+
+Both PCs applied 3996941d698009c1c55d992cc1f21f6e574894ee. UI's 85 tests,
+native build, installer provenance and eight-file archive validation passed.
+Update verify accepted 27,985,727 bytes; B receipt
+b32f8ef8ec10697d5b5d4a3ddd3b44dc reports UPDATED. A installer returned 0 and
+its installed agent SHA-256 matches. No Disconnect was sent.
+
+Doctor reports healthy/CONNECTED with matching UI/agent/installed revisions
+and completed stage cleanup. Collection c390bc2a157df6a7a31eadc81b21117d at
+21:12:56Z/57Z reports READY input health and one protected source ready event
+on each PC. Its 22 A / 45 B current-build events contain no fault_ or
+session_failed. This verifies startup and short-window runtime, not a new
+physical-input, lock/suspend or long-soak acceptance trial.
+
+## Continuation
+
+Two implementation tasks were completed in this round; the guard admission
+task began before the ten-minute cutoff. No later task was started. All ten
+issues remain open because their complete acceptance is not yet established.
+The active goal remains resolving all issues, with the local-only/no-push
+instruction intact. There is no pending local source edit and only main exists.
+
+Next #50 work is the portable product path in product_runner.go that constructs
+the in-process wininput adapter when installedProductInput returns nil. Runtime
+joins that adapter synchronously, so a non-cooperative native injection still
+owns runtime state. Preserve ordinary portable operation, input ordering,
+pressed-state certainty and independent crashguard recovery while introducing
+a genuinely owned cancellation/retirement boundary. Also audit synchronous
+close/kill inside crashguard abortProcess; admission bounding alone does not
+prove those native calls interruptible. Do not label either boundary fixed from
+cooperative mocks or the protected-backend startup observations above.
