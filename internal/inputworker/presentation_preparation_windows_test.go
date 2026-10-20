@@ -8,8 +8,6 @@ import (
 	"testing"
 	"testing/synctest"
 	"time"
-
-	"golang.org/x/sys/windows"
 )
 
 func TestCursorInputPreparationDoesNotBlockAndTransfersOnce(t *testing.T) {
@@ -49,7 +47,7 @@ func TestCursorInputPreparationCancellationTimeoutAndCleanupFence(t *testing.T) 
 				defer cancel()
 				child := &preparedConsole{}
 				if kind == "cleanup failure" {
-					child.worker = &ConsoleWorker{job: windows.Handle(0x7ffffffe), done: make(chan struct{})}
+					child.worker = failedConsoleCloseForTest()
 				}
 				pending := startCursorInputPreparation(ctx, func(run context.Context) (*preparedConsole, error) {
 					<-run.Done()

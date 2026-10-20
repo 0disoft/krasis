@@ -93,9 +93,9 @@ func TestPreparedConsoleExpiryCannotCloseClaimedWorkerWithoutInput(t *testing.T)
 }
 
 func TestPreparedConsoleExpiryRetainsCleanupFailureWithoutInput(t *testing.T) {
-	// InvalidHandle (-1) is also the current-process pseudo handle. Use an
-	// impossible unaligned positive kernel handle for a real close failure.
-	p := &preparedConsole{worker: &ConsoleWorker{job: windows.Handle(0x7ffffffe), done: make(chan struct{})}}
+	// Native failure/late-join ownership is exercised by the retirement suite.
+	// This test checks that preparation preserves the failed Close outcome.
+	p := &preparedConsole{worker: failedConsoleCloseForTest()}
 	if p.expireUnbound() == nil || p.close() == nil {
 		t.Fatal("asynchronous preparation cleanup failure lost")
 	}

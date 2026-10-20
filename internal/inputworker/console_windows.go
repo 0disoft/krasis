@@ -27,6 +27,7 @@ type ConsoleWorker struct {
 	done         chan struct{}
 	once         sync.Once
 	err          error
+	closeOps     *consoleCloseOps // Native operations by default; controlled retirement tests override them.
 }
 
 // LaunchConsoleWorker is service-only. Both image digest and agent authority
@@ -56,6 +57,9 @@ func launchManagedConsoleChecked(ctx context.Context, digest [sha256.Size]byte, 
 }
 
 func launchManagedConsoleMode(ctx context.Context, digest [sha256.Size]byte, prepare func(windows.Handle, uint32) error, installation *Installation, mode consoleMode, authorized func() bool) (*ConsoleWorker, error) {
+	if workerRetirementPending() {
+		return nil, ErrRecovery
+	}
 	if _, _, err := consoleLaunchMode(mode); err != nil {
 		return nil, err
 	}
@@ -180,7 +184,9 @@ func (worker *ConsoleWorker) watch(ctx context.Context, agent *Authority) {
 				_ = worker.Close()
 				return
 			}
-			if agent.check(false) != nil {
+			// This watcher cannot authorize input; the worker reauthorizes every
+			// operation. Watch the pinned kernel owner without SCM/WTS RPC.
+			if agent.checkHeartbeat() != nil {
 				// The channel's independent recovery has a bounded opportunity
 				// to release inputs before we forcibly reap the owned process.
 				timer := time.NewTimer(RecoveryTimeout + 100*time.Millisecond)
@@ -206,7 +212,7 @@ func (worker *ConsoleWorker) exited() bool {
 	if worker.process == 0 {
 		return false
 	}
-	state, err := windows.WaitForSingleObject(worker.process, 0)
+	state, err := worker.retirementOps().wait(worker.process, 0)
 	return err != nil || state != uint32(windows.WAIT_TIMEOUT)
 }
 
@@ -221,28 +227,11 @@ func (worker *ConsoleWorker) closeWithin(waitMilliseconds uint32) error {
 		return nil
 	}
 	worker.once.Do(func() {
-		worker.mu.Lock()
-		defer worker.mu.Unlock()
-		worker.closed = true
-		if worker.job != 0 && windows.CloseHandle(worker.job) != nil {
-			worker.err = ErrAuthority
-		}
-		if worker.process != 0 {
-			state, err := windows.WaitForSingleObject(worker.process, waitMilliseconds)
-			if err != nil || state != windows.WAIT_OBJECT_0 {
-				worker.err = ErrAuthority
-			}
-			if windows.CloseHandle(worker.process) != nil {
-				worker.err = ErrAuthority
-			}
-		}
-		if worker.image != nil && worker.image.Close() != nil {
-			worker.err = ErrAuthority
-		}
-		// Never signal retirement before exact-process exit and pin cleanup.
-		if worker.err == nil && worker.done != nil {
-			close(worker.done)
+		if worker.tryRetire(waitMilliseconds) != nil {
+			retainWorkerRetirement(worker)
 		}
 	})
+	worker.mu.Lock()
+	defer worker.mu.Unlock()
 	return worker.err
 }

@@ -4,11 +4,61 @@ import (
 	"context"
 	"errors"
 	"net"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/0disoft/krasis/internal/application"
 )
+
+func TestSupervisorPinnedPresenceDoesNotWaitForFullInputAuthority(t *testing.T) {
+	entered, release := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	defer once.Do(func() { close(release) })
+	results := make(chan workerReportResult, 1)
+	a := &Authority{
+		checkInput:    func() error { close(entered); <-release; return nil },
+		checkRecovery: func() error { return nil },
+		closeHandles:  func() error { return nil },
+		checkPresent:  func() error { results <- workerReportResult{report: Report{Completed: 1}}; return nil },
+	}
+	checked := make(chan error, 1)
+	go func() { checked <- a.check(false) }()
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("full input authority did not enter")
+	}
+	server, client := net.Pipe()
+	defer server.Close()
+	defer client.Close()
+	control := &supervisorControlSpy{Conn: client}
+	polls := make(chan time.Time, 1)
+	polls <- time.Now()
+	done := make(chan error, 1)
+	go func() {
+		report, err := superviseWorkerResults(context.Background(), control, a.checkHeartbeat, func() bool { return false }, time.Now().Add(time.Hour), results, polls)
+		if report.Completed != 1 {
+			err = errors.Join(err, errors.New("worker receipt lost"))
+		}
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if err != nil || control.writes != 0 {
+			t.Fatal("full authority blocked receipt or caused stop", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("supervision waited on full input authority")
+	}
+	once.Do(func() { close(release) })
+	if err := <-checked; err != nil {
+		t.Fatal(err)
+	}
+	if a.Close() != nil || a.checkHeartbeat() != ErrAuthority {
+		t.Fatal("closed proof accepted supervision")
+	}
+}
 
 type supervisorControlSpy struct {
 	net.Conn

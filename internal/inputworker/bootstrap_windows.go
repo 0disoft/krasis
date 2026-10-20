@@ -144,7 +144,11 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 			notify()
 		}
 	}
-	report, result = supervise(ctx, control, func() error { return channel.authority.check(false) }, worker.exited, lease.ExpiresAt)
+	// Supervision only decides when to stop an already authenticated child.
+	// Every actual input/capture operation still performs full authorization in
+	// that child. SCM/WTS RPC here could otherwise block the service's stop and
+	// recovery deadline behind the very native operation it must retire.
+	report, result = supervise(ctx, control, channel.authority.checkHeartbeat, worker.exited, lease.ExpiresAt)
 	return report, observeMissingWorkerReport(result, worker.reportExit)
 }
 
