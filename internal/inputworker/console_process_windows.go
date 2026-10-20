@@ -24,11 +24,8 @@ func makeWorkerJob() (windows.Handle, error) {
 }
 
 func makeConsoleWorkerJob(mode consoleMode) (windows.Handle, error) {
-	if mode == ordinaryConsole {
+	if mode == ordinaryConsole || mode == loginConsole {
 		return makeWorkerJobLimit(2)
-	}
-	if mode == loginConsole {
-		return makeWorkerJob()
 	}
 	return 0, ErrAuthority
 }

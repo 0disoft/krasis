@@ -102,6 +102,9 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 	if err != nil {
 		return Report{}, ErrAuthority
 	}
+	if !lease.Capture && !lease.Presentation {
+		worker.expectNativeChild()
+	}
 	writeErr := writeFrame(control, packet[:])
 	var childProfile *handoff.StartupProfile
 	var readyErr error
@@ -137,6 +140,9 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 		stopped, stop := context.WithCancel(context.Background())
 		stop()
 		report, result = supervise(stopped, control, func() error { return ErrAuthority }, worker.exited, lease.ExpiresAt)
+		if !errors.Is(result, ErrRecovery) {
+			worker.confirmNativeRetirement()
+		}
 		return report, observeMissingWorkerReport(result, worker.reportExit)
 	}
 	_ = channel.stream.SetWriteDeadline(time.Time{})
@@ -148,6 +154,9 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 	// Supervision grants no input authority; commands and recovery retain
 	// their full checks. Do not stall stop/report consumption on WTS RPC.
 	report, result = supervise(ctx, control, channel.authority.checkHeartbeat, worker.exited, lease.ExpiresAt)
+	if !errors.Is(result, ErrRecovery) {
+		worker.confirmNativeRetirement()
+	}
 	return report, observeMissingWorkerReport(result, worker.reportExit)
 }
 

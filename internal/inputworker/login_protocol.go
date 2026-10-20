@@ -99,7 +99,7 @@ func writeLoginControl(writer io.Writer, b loginBinding, kind loginControlKind) 
 // Both authenticate callbacks bind the actual kernel pipe process and fixed
 // image. The child must prove its server before consuming a challenge; the
 // service must prove its exact owned child before sending anything.
-func loginParentBootstrap(ctx context.Context, stream net.Conn, binding loginBinding, authenticate func() error) error {
+func loginParentBootstrap(ctx context.Context, stream net.Conn, binding loginBinding, authenticate func() error, beforeActivate ...func()) error {
 	if ctx == nil || ctx.Err() != nil || stream == nil || authenticate == nil || authenticate() != nil {
 		return ErrAuthority
 	}
@@ -112,6 +112,11 @@ func loginParentBootstrap(ctx context.Context, stream net.Conn, binding loginBin
 	}
 	if ctx.Err() != nil || authenticate() != nil {
 		return ErrAuthority
+	}
+	for _, notify := range beforeActivate {
+		if notify != nil {
+			notify()
+		}
 	}
 	if err := writeLoginControl(stream, binding, loginActivate); err != nil {
 		// A failed write does not prove that the child did not activate.
@@ -207,7 +212,7 @@ type loginControlWorker struct {
 
 // reap owns the exact process/job and must join their bounded cleanup. Process
 // exit by itself is never a clean input-retirement receipt.
-func startLoginControlWorker(parent context.Context, stream net.Conn, binding loginBinding, reap func() error) *loginControlWorker {
+func startLoginControlWorker(parent context.Context, stream net.Conn, binding loginBinding, reap func() error, clean ...func()) *loginControlWorker {
 	lifetime, cancel := context.WithCancel(parent)
 	w := &loginControlWorker{stream: stream, binding: binding, cancel: cancel, done: make(chan struct{})}
 	stopFinished := make(chan struct{})
@@ -230,6 +235,12 @@ func startLoginControlWorker(parent context.Context, stream net.Conn, binding lo
 			w.err = ErrRecovery
 			if err == nil && actual == binding && kind >= loginFailed && kind <= loginFailedConnection {
 				w.err = errors.Join(w.err, &loginRuntimeFailure{reason: loginFailureReason(kind), cause: ErrRecovery})
+			}
+		} else {
+			for _, notify := range clean {
+				if notify != nil {
+					notify()
+				}
 			}
 		}
 		cancel()

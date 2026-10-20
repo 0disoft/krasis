@@ -122,7 +122,7 @@ func launchLoginConnection(ctx context.Context, installation *Installation, sess
 		}
 		return nil
 	}
-	if err := loginParentBootstrap(startup, control, binding, authenticate); err != nil {
+	if err := loginParentBootstrap(startup, control, binding, authenticate, child.expectNativeChild); err != nil {
 		return nil, &loginRuntimeFailure{reason: "bootstrap", cause: err}
 	}
 	activated = true
@@ -132,7 +132,7 @@ func launchLoginConnection(ctx context.Context, installation *Installation, sess
 	if err := control.SetDeadline(time.Time{}); err != nil {
 		return nil, ErrRecovery
 	}
-	result = startLoginControlWorker(ctx, control, binding, func() error { return child.closeWithin(1000) })
+	result = startLoginControlWorker(ctx, control, binding, func() error { return child.closeWithin(1000) }, child.confirmNativeRetirement)
 	adopted = true
 	return result, nil
 }
@@ -144,12 +144,12 @@ func RunInstalledLoginWorker(ctx context.Context, installation *Installation, ru
 	if run == nil {
 		return ErrAuthority
 	}
-	return runInstalledLoginWorker(ctx, installation, func(lifetime context.Context, session uint32, profile [32]byte, _ func() error) error {
+	return runInstalledLoginWorker(ctx, installation, func(lifetime context.Context, session uint32, profile [32]byte, _ func() error, _ *loginNativeOwner) error {
 		return run(lifetime, session, profile)
 	})
 }
 
-func runInstalledLoginWorker(ctx context.Context, installation *Installation, run func(context.Context, uint32, [32]byte, func() error) error) (result error) {
+func runInstalledLoginWorker(ctx context.Context, installation *Installation, run func(context.Context, uint32, [32]byte, func() error, *loginNativeOwner) error) (result error) {
 	if ctx == nil || ctx.Err() != nil || installation == nil || run == nil {
 		return ErrAuthority
 	}
@@ -187,6 +187,6 @@ func runInstalledLoginWorker(ctx context.Context, installation *Installation, ru
 		return ErrRecovery
 	}
 	return serveLoginControl(ctx, control, binding, func() error { return proof.check(false) }, func(lifetime context.Context) error {
-		return run(lifetime, binding.session, binding.profile, func() error { return proof.check(false) })
+		return run(lifetime, binding.session, binding.profile, func() error { return proof.check(false) }, &loginNativeOwner{installation: installation, control: control, proof: proof, binding: binding})
 	})
 }

@@ -98,7 +98,11 @@ func RunInstalledNativeInput(ctx context.Context, installation *Installation) er
 }
 
 func adoptNativeHandles(values []uint64) ([]windows.Handle, error) {
-	if len(values) != 4 {
+	return adoptNativeReferences(values, 4)
+}
+
+func adoptNativeReferences(values []uint64, expected int) ([]windows.Handle, error) {
+	if len(values) != expected {
 		return nil, ErrAuthority
 	}
 	handles := make([]windows.Handle, 0, len(values))
@@ -212,20 +216,42 @@ func startIsolatedInput(ctx context.Context, control *pipeConn, channel *Channel
 	copy(data[:], packet[:])
 	binary.BigEndian.PutUint64(data[bootstrapSize:bootstrapSize+8], uint64(handles[2]))
 	binary.BigEndian.PutUint64(data[bootstrapSize+8:], uint64(handles[3]))
-	command := exec.Command(filepath.Join(root, "Krasis", "Input", "krasis-input.exe"), "--native-input-worker")
+	return startNativeChildClient(ctx, "--native-input-worker", handles, data[:])
+}
+
+// Framing/retirement is shared; the two callers retain distinct authenticators
+// and immutable desktop policies. No caller-selected command is admitted.
+func startNativeChildClient(ctx context.Context, mode string, handles []windows.Handle, data []byte) (*isolatedInput, error) {
+	if ctx == nil || ctx.Err() != nil || (mode != "--native-input-worker" && mode != "--native-login-worker") {
+		return nil, ErrAuthority
+	}
+	root, err := windows.KnownFolderPath(windows.FOLDERID_ProgramFiles, 0)
+	if err != nil {
+		return nil, ErrAuthority
+	}
+	command := exec.Command(filepath.Join(root, "Krasis", "Input", "krasis-input.exe"), mode)
 	command.Dir = filepath.Dir(command.Path)
 	command.Env = []string{} // No inherited PATH, profile, secrets or selectors.
 	command.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	for _, handle := range handles {
 		command.SysProcAttr.AdditionalInheritedHandles = append(command.SysProcAttr.AdditionalInheritedHandles, syscall.Handle(handle))
 	}
-	process, err := crashguard.StartLocalInputCommand(command, data[:])
+	process, err := crashguard.StartLocalInputCommand(command, data)
 	if err != nil {
+		var pending *crashguard.ExitPending
+		if errors.As(err, &pending) {
+			return nil, errors.Join(err, ErrRecovery)
+		}
 		return nil, err
 	}
 	client, err := newPortableClient(ctx, process)
 	if err != nil {
-		return nil, errors.Join(err, process.Close())
+		closeErr := process.Close()
+		var pending *crashguard.ExitPending
+		if errors.As(closeErr, &pending) {
+			return nil, errors.Join(err, closeErr, ErrRecovery)
+		}
+		return nil, errors.Join(err, closeErr)
 	}
 	return newIsolatedInput(client, process, wininput.NewInjectionPort()), nil
 }

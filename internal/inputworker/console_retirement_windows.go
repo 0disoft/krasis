@@ -52,15 +52,22 @@ func (w *ConsoleWorker) tryRetire(waitMilliseconds uint32) error {
 	ops := w.retirementOps()
 	if w.job != 0 {
 		if w.pairJob {
-			// Keep the exact job reference until BOTH worker and native child
-			// are gone. Closing kill-on-close then waiting only for the parent
-			// would allow replacement while its child is still terminating.
+			// Force cleanup through the exact job, but require the worker's
+			// independent native-child receipt before accepting retirement.
+			// Accounting zero plus parent exit does not prove child exit.
 			if !w.jobTerminated {
 				if ops.terminateJob(w.job, 1) != nil {
 					w.poisoned = true
 					return w.err
 				}
 				w.jobTerminated = true
+			}
+			if w.nativeChildPossible && !w.nativeChildRetired {
+				// ActiveProcesses can reach zero before a member's exact process
+				// handle becomes signaled. Missing final recovery proof remains
+				// terminally fenced; never turn that accounting hint into success.
+				w.poisoned, w.err = true, ErrRecovery
+				return w.err
 			}
 			deadline := time.Now().Add(time.Duration(waitMilliseconds) * time.Millisecond)
 			for {

@@ -4,6 +4,7 @@ package inputworker
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"sync/atomic"
@@ -12,6 +13,28 @@ import (
 
 	"golang.org/x/sys/windows"
 )
+
+func TestPairAccountingZeroCannotReplaceMissingNativeRecoveryProof(t *testing.T) {
+	var terminated, queried, closed atomic.Int32
+	w := &ConsoleWorker{job: 11, process: 22, pairJob: true, nativeChildPossible: true, done: make(chan struct{}), closeOps: &consoleCloseOps{
+		wait:            func(windows.Handle, uint32) (uint32, error) { return windows.WAIT_OBJECT_0, nil },
+		closeHandle:     func(windows.Handle) error { closed.Add(1); return nil },
+		terminateJob:    func(windows.Handle, uint32) error { terminated.Add(1); return nil },
+		activeProcesses: func(windows.Handle) (uint32, error) { queried.Add(1); return 0, nil },
+	}}
+	if !errors.Is(w.tryRetire(0), ErrRecovery) || w.closed || !w.poisoned || terminated.Load() != 1 || closed.Load() != 0 {
+		t.Fatal("missing exact child receipt became successful retirement")
+	}
+	w.confirmNativeRetirement() // An already terminal missing receipt cannot revive ownership.
+	for range 4 {
+		if !errors.Is(w.tryRetire(0), ErrRecovery) || w.exited() {
+			t.Fatal("unknown native lifetime admitted replacement")
+		}
+	}
+	if queried.Load() != 0 || closed.Load() != 0 || terminated.Load() != 1 || w.nativeChildRetired {
+		t.Fatal("terminal missing proof retried kernel ownership")
+	}
+}
 
 func TestNativeInputRejectsUninstalledOrIncompleteBootstrap(t *testing.T) {
 	if RunInstalledNativeInput(context.Background(), nil) == nil {
@@ -108,6 +131,16 @@ func TestNativeConsolePairRetirementKillsAndJoinsBothProcesses(t *testing.T) {
 		}
 	}
 	w := &ConsoleWorker{job: job, process: handles[0], pairJob: true, done: make(chan struct{})}
+	// A job accounting count is not a final process-exit barrier. Model the
+	// real worker's authenticated receipt only AFTER its exact child exit.
+	w.expectNativeChild()
+	if err := windows.TerminateProcess(handles[1], 1); err != nil {
+		t.Fatal(err)
+	}
+	if state, err := windows.WaitForSingleObject(handles[1], 5000); err != nil || state != windows.WAIT_OBJECT_0 {
+		t.Fatal("native child exit not proved", state, err)
+	}
+	w.confirmNativeRetirement()
 	job = 0
 	handles[0] = 0
 	if err := w.Close(); err != nil {

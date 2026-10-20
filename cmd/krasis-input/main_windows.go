@@ -17,7 +17,7 @@ func main() {
 	}
 	var installation *inputworker.Installation
 	var err error
-	if os.Args[1] == "--service" || os.Args[1] == "--login-worker" {
+	if os.Args[1] == "--service" || os.Args[1] == "--login-worker" || os.Args[1] == "--native-login-worker" {
 		installation, err = inputworker.LoadInstallation()
 	} else {
 		installation, err = inputworker.LoadWorkerInstallation()
@@ -33,6 +33,8 @@ func main() {
 		err = inputworker.RunInstalledLoginConnection(context.Background(), installation)
 	} else if os.Args[1] == "--native-input-worker" {
 		err = inputworker.RunInstalledNativeInput(context.Background(), installation)
+	} else if os.Args[1] == "--native-login-worker" {
+		err = inputworker.RunInstalledNativeLoginInput(context.Background(), installation)
 	} else {
 		err = inputworker.RunInstalledWorker(context.Background(), installation)
 	}
@@ -44,5 +46,5 @@ func main() {
 }
 
 func validInputMode(mode string) bool {
-	return mode == "--service" || mode == "--input-worker" || mode == "--login-worker" || mode == "--native-input-worker"
+	return mode == "--service" || mode == "--input-worker" || mode == "--login-worker" || mode == "--native-input-worker" || mode == "--native-login-worker"
 }

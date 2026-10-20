@@ -1,5 +1,11 @@
 # g393: keep installed recovery outside the native input child (#50)
 
+Correction: the full-suite run during g394 exposed that a job accounting count
+of zero can precede a native child's signaled process handle. g394 now requires
+the authenticated final recovery receipt plus the exact parent exit; accounting
+alone cannot clear missing child-retirement proof. See
+g394-login-native-isolation.md. The g393 rollout below remains historical evidence.
+
 The authenticated console worker now retains its pressed-state journal and
 recovery desktop while a distinct job-bound native child performs live input.
 A timed-out native operation fences/kills that exact child. Before any recovery

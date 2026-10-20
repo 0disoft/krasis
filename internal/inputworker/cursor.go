@@ -12,12 +12,21 @@ import (
 var _ application.CursorPositionPort = (*Client)(nil)
 var _ application.PositionedMovePort = (*Client)(nil)
 var _ application.CursorPlacementPort = (*Client)(nil)
+var _ application.CursorPlacementProbePort = (*Client)(nil)
 
 func (client *Client) PlaceCursor(ctx context.Context, x, y int32) (placement application.CursorPlacement, err error) {
 	op := opCursorPlace
 	if handoff.WantCursorPlacement(ctx) {
 		op = opCursorPlaceProbe
 	}
+	return client.placeCursor(ctx, x, y, op)
+}
+
+func (client *Client) ProbeCursorPlacement(ctx context.Context, x, y int32) (application.CursorPlacement, error) {
+	return client.placeCursor(ctx, x, y, opCursorPlaceProbe)
+}
+
+func (client *Client) placeCursor(ctx context.Context, x, y int32, op operation) (placement application.CursorPlacement, err error) {
 	err = client.performResponse(ctx, request{op: op, x: x, y: y}, func(ack response) {
 		placement = application.CursorPlacement{TargetX: ack.targetX, TargetY: ack.targetY, X: ack.x, Y: ack.y}
 		p := ack.observation

@@ -20,18 +20,36 @@ import (
 // primitive, not an input authorization endpoint. The service must close the
 // authenticated input channel and finish recovery before calling Close.
 type ConsoleWorker struct {
-	mu            sync.Mutex
-	closed        bool
-	job, process  windows.Handle
-	image         *os.File
-	done          chan struct{}
-	once          sync.Once
-	err           error
-	retiring      bool
-	poisoned      bool // A failed handle operation is never retried against a reused value.
-	closeOps      *consoleCloseOps
-	pairJob       bool
-	jobTerminated bool
+	mu                  sync.Mutex
+	closed              bool
+	job, process        windows.Handle
+	image               *os.File
+	done                chan struct{}
+	once                sync.Once
+	err                 error
+	retiring            bool
+	poisoned            bool // A failed handle operation is never retried against a reused value.
+	closeOps            *consoleCloseOps
+	pairJob             bool
+	jobTerminated       bool
+	nativeChildPossible bool
+	nativeChildRetired  bool
+}
+
+func (worker *ConsoleWorker) expectNativeChild() {
+	worker.mu.Lock()
+	defer worker.mu.Unlock()
+	worker.nativeChildPossible = true
+}
+
+// Called only after the exact authenticated child publishes a valid final
+// recovery receipt. Process counts are hints, never this retirement proof.
+func (worker *ConsoleWorker) confirmNativeRetirement() {
+	worker.mu.Lock()
+	defer worker.mu.Unlock()
+	if !worker.poisoned && !worker.closed {
+		worker.nativeChildRetired = true
+	}
 }
 
 // LaunchConsoleWorker is service-only. Both image digest and agent authority
@@ -145,7 +163,7 @@ func launchConsoleMode(ctx context.Context, digest [sha256.Size]byte, prepare fu
 	if err != nil {
 		return nil, ErrAuthority
 	}
-	worker := &ConsoleWorker{image: image, done: make(chan struct{}), pairJob: mode == ordinaryConsole}
+	worker := &ConsoleWorker{image: image, done: make(chan struct{}), pairJob: true}
 	accepted := false
 	defer func() {
 		if !accepted {

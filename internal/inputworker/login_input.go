@@ -65,6 +65,15 @@ func runLoginInput(ctx context.Context, native loginNativeInput,
 			// closed/unknown outcome instead of deadlocking this owner.
 			<-finished
 			err = errors.Join(err, callbackErr)
+			if owner, ok := native.(interface{ retireForRecovery() (bool, error) }); ok {
+				retired, retireErr := owner.retireForRecovery()
+				err = errors.Join(err, retireErr)
+				if !retired {
+					report.Recovery.Remaining = pressed.Count()
+					err = errors.Join(err, ErrRecovery)
+					return
+				}
+			}
 			if pressed.Count() == 0 {
 				return
 			}
