@@ -77,7 +77,14 @@ func (authority *Authority) checkObserved(ctx context.Context, recovery bool) er
 // Source reports retain only a closed operation code and numeric native error.
 // Ordinary callers keep the existing sentinel-only error contract.
 func (authority *Authority) checkSource() error {
-	return sourceAuthorityResult(authority.checkResult(nil, false))
+	// Called by low-level physical input callbacks. A pending Close must deny
+	// new capture immediately rather than queue it behind existing SCM/WTS work.
+	// Acquired readers still pin all handles until their fresh check returns.
+	if authority == nil || !authority.mu.TryRLock() {
+		return ErrAuthority
+	}
+	defer authority.mu.RUnlock()
+	return sourceAuthorityResult(authority.checkLocked(nil, false))
 }
 
 func (authority *Authority) checkResult(ctx context.Context, recovery bool) error {
@@ -96,6 +103,11 @@ func (authority *Authority) checkResult(ctx context.Context, recovery bool) erro
 	if !started.IsZero() {
 		handoff.RecordAuthority(ctx, handoff.AuthorityLock, time.Since(started))
 	}
+	return authority.checkLocked(ctx, recovery)
+}
+
+// Caller holds mu for the entire native check, including any slow RPC.
+func (authority *Authority) checkLocked(ctx context.Context, recovery bool) error {
 	if authority.closed || authority.checkInput == nil || authority.checkRecovery == nil || authority.closeHandles == nil {
 		return ErrAuthority
 	}

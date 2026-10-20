@@ -1,10 +1,35 @@
 package inputworker
 
 import (
+	"errors"
 	"sync"
 	"testing"
 	"time"
 )
+
+func TestSourceAuthorityDoesNotWaitForClosingProof(t *testing.T) {
+	queried := false
+	a := &Authority{checkInput: func() error { queried = true; return nil }, checkRecovery: func() error { return nil }, closeHandles: func() error { return nil }}
+	a.mu.Lock()
+	done := make(chan error, 1)
+	go func() { done <- a.checkSource() }()
+	select {
+	case err := <-done:
+		a.mu.Unlock()
+		if !errors.Is(err, ErrAuthority) || queried {
+			t.Fatal("closing authority queried handles or accepted capture", err)
+		}
+	case <-time.After(time.Second):
+		a.mu.Unlock()
+		t.Fatal("source callback waited for proof retirement")
+	}
+	if err := a.checkSource(); err != nil || !queried {
+		t.Fatal("available proof skipped fresh authority check", err)
+	}
+	if err := a.Close(); err != nil || a.checkSource() != ErrAuthority {
+		t.Fatal("closed proof accepted input", err)
+	}
+}
 
 func TestAuthorityChecksOverlapButCloseJoinsBothReaders(t *testing.T) {
 	entered := make(chan struct{}, 2)
