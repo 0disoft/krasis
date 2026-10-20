@@ -5,6 +5,7 @@ package inputworker
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"io"
 	"net"
 	"os"
@@ -404,7 +405,7 @@ func (pipe *pipeConn) Close() error {
 	err := windows.CloseHandle(pipe.handle)
 	pipe.mu.Lock()
 	if err != nil {
-		pipe.closeErr = net.ErrClosed
+		pipe.closeErr = errors.Join(net.ErrClosed, err)
 	}
 	pipe.mu.Unlock()
 	close(pipe.closeDone)

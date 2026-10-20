@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"testing"
 	"time"
@@ -235,5 +236,39 @@ func TestServiceListenerRetainsNativeFailureAndFencesUncertainClose(t *testing.T
 				}
 			}
 		})
+	}
+}
+
+func TestServiceListenerRetainsActualNativeCloseFailureInReceipt(t *testing.T) {
+	name := fmt.Sprintf(`\\.\pipe\Krasis.Listener.Test.%d.%s`, os.Getpid(), t.Name())
+	listener, err := newServicePipeListener(name, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close() // The failed close is deliberate; retain the owner until cleanup.
+	loan, err := listener.borrow()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := windows.CloseHandle(loan.handle); err != nil {
+		t.Fatal(err)
+	}
+	// Do not leave a freed numeric handle available for accidental reuse.
+	loan.handle = 0
+	if err := loan.Close(); !errors.Is(err, net.ErrClosed) || !errors.Is(err, windows.ERROR_INVALID_HANDLE) {
+		t.Fatal("native close failure was erased", err)
+	}
+	_, err = listener.borrow()
+	if !errors.Is(err, ErrRecovery) {
+		t.Fatal("failed close did not fence listener reuse", err)
+	}
+	var recorded logindiag.Runtime
+	recorder := newLoginRuntimeRecorder(func(value logindiag.Runtime) error { recorded = value; return nil })
+	recorder.record("service", "FAILED", serviceEndpointFailure(err, "input"))
+	if recorded.LastFailure == nil || recorded.LastFailure.Operation != "service-pipe-close" || !recorded.LastFailure.Win32Known || recorded.LastFailure.Win32Error != uint32(windows.ERROR_INVALID_HANDLE) {
+		t.Fatal("service receipt lost the actual native close failure", recorded.LastFailure)
+	}
+	if err := listener.Close(); !errors.Is(err, windows.ERROR_INVALID_HANDLE) {
+		t.Fatal("final listener close lost the original failure", err)
 	}
 }
