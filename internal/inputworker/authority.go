@@ -130,7 +130,6 @@ func (authority *Authority) Close() error {
 	if authority == nil {
 		return nil
 	}
-	authority.fenced.Store(true)
 	authority.mu.Lock()
 	defer authority.mu.Unlock()
 	if authority.closed {

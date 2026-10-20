@@ -55,3 +55,18 @@ confirms ordinary paired input only and does not substitute for these gates.
 
 No public API, DB, dependency, CI runner, firewall, trust-policy or signing change.
 Local main only; no push, issue comment, extra branch or worktree.
+
+## g384 paired application rejected; narrow source behavior before retry
+
+Both PCs installed f2531d450cb76a59ad8f482f1c40d0b5b50f1f61 with successful
+receipts, matched images and READY input health. Source startup then failed at
+worker_ready on both PCs, and B latched fault_source_hook_failed. Collections
+dc2bc63fda16b0951174f124a42f3210 and 53091bb5b1ca3bdf452fb6dc34c49c61 preserve
+the exact-build failure. Installation success is not paired-input acceptance.
+
+g385 narrows permanent fencing to channels that actually have an owned client
+query. Ordinary source/service Channel.Close and Authority.Close preserve their
+previous reader-join semantics. The g384 change had also fenced these unrelated
+proofs before joining; its causal role in startup failure is unproven. This
+follow-up isolates that behavior without reapplying g381 worker retirement.
+Focused and package checks plus actual source readiness remain required.

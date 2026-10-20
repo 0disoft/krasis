@@ -24,10 +24,8 @@ func (channel *Channel) Close() error {
 	}
 	channel.queryMu.Lock()
 	channel.closing = true
-	if channel.authority != nil {
-		channel.authority.fenced.Store(true)
-	}
 	if channel.query != nil {
+		channel.authority.fenced.Store(true)
 		// Interrupt wire work, but retain the pipe and proof handles used by
 		// the read-only native query. Its owner closes them after it returns.
 		if channel.stream != nil {
