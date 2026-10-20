@@ -46,3 +46,42 @@ one-time startup/cleanup calls; #59 callback dependencies and #70 actual endpoin
 change remain separate. Hardware, UI/accessibility and signed release gates
 retain their own outstanding conditions. No issue comments or push. No public
 API, DB, dependency, runner, firewall, signing, branch or worktree changes.
+
+## Packaged application and recurring startup failure
+
+Inputworker, residentagent, application, peer, input-command and agent-command
+test/build checks pass, as does ordinary vet for those packages. UI's 85 tests,
+native builds, installer provenance and eight-file archive checks also pass.
+The verified update archive is 28,118,774 bytes.
+
+Both PCs applied g396, revision 7d354c880681df70e52880eb6c3c82b4cf2297e8.
+A installer exited 0, installed agent SHA-256 matched, and the actual protected
+service/native-child cursor read/same-point placement/clean-shutdown smoke
+exited 0. Only the session-0 input service remained after the smoke. This tests
+the real installed ordinary dispatch path changed here; it injects no native
+key/button and does not test before-login input. B receipt
+d8ec8e0bafc58ac4879170e5d2d23b57 reports UPDATED at the same revision.
+
+A's first source startup failed at 23:31:05.7757363Z, worker_ready, with the new
+fixed category installed_source_startup_eof. Source-hook triggered the session
+failure. The service summary contained no source report for this attempt, so
+failure before source capture/report creation is possible but not proved.
+This repeated startup failure must not be erased by the later successful smoke
+or described as fixed by removing journal checks. Preserve collection
+3c28603f5d836075f1301bc9ed68d54f and the initial local source events.
+
+A was safely stopped and its same installed g396 agent started again, followed
+by explicit Connect B. No Disconnect command was used during replacement.
+Collection f16a2979876c7f9fee461c17bc0f5f91 at 23:33:02/05Z records both PCs
+CONNECTED at 23:32:53Z and protected capture ready at 23:32:54Z (B) and
+23:32:55Z (A), with READY services. A doctor reports healthy with matching
+CLI/UI/resident/installed builds. This short recovered window is not a
+fault-free stability run. Ten issues remain open.
+
+First next priority is the recurring source startup EOF, particularly admission
+and pre-capture worker bootstrap failures that currently leave no SourceExit.
+Then finish #50 recovery-side native ownership and #59 callback work. Physical
+held-input, lifecycle fault matrix, home pair, endpoint change, accessibility,
+soak and signed-release acceptance were not run in this unit. No new independent
+implementation was started after the ten-minute cutoff. Source and application
+evidence remain local main commits; no push or issue comments.
