@@ -37,3 +37,39 @@ preserve these behaviors while bounding the remaining callback work.
 No product control API, DB, dependency, diagnostics schema, runner or firewall
 change. No raw keys/positions/desktop names are added to logs. No issue comment
 or push. Device application and its verification are recorded below.
+
+## Paired g377 acceptance
+
+Both PCs run generation 377, revision
+`c0e86f3cb022743fabd0987216f5f211b5786d7d`. Package verification accepted
+27,843,581 bytes. Frontend's 85 tests, native build, installer provenance and
+eight-file update archive checks passed. B's receipt
+`8fa9ce883189cfc1026f547cc3216634` reports UPDATED at that exact revision.
+The SEND command returned agent_unavailable rather than a receipt, but a
+read-only status recovered the existing completed receipt. No second SEND was
+issued. That lost response is not treated as proof of an agent crash.
+
+A's installer returned 0; the installed agent SHA-256 matches the bundle.
+Doctor reports healthy/CONNECTED with matching CLI, UI, running/installed
+agent and recovery record. The paired 2026-10-20T19:49:29Z/30Z collection
+shows READY input health on A and B. Both connected at 19:49:21Z. Neither
+current-build collection contains a fault/session_failed event. This short
+window does not establish physical mouse/held-input or long-term stability.
+
+A has a separate startup update-stage cleanup warning: failed, removed 0.
+B reports cleanup completed, removed 0. No folders were manually deleted and
+no cleanup success was fabricated. Prune intentionally runs before management
+endpoints are exposed and refuses managers with live network workers; it must
+not be bypassed using another manager during the active session. Inspect the
+protected-directory enumeration and original prune error in a later bounded
+maintenance step. Input/service health remains READY despite this warning.
+
+Ten issues remain open, including #59. Resume the remaining callback work
+without moving a stale desktop authorization or a late first click across
+its required boundary. #50 remains the separate non-cancelable injection
+lifetime task. Hardware/report/signing gates #4/#5/#6/#7/#15/#16/#20 and
+endpoint hardware acceptance #70 remain unproven.
+
+No third task was started after ten minutes. All changes are local main
+commits in the existing checkout; no push, new branch/worktree or issue comment.
+The dependency dashboard remains untouched.
