@@ -165,6 +165,16 @@ func (client *Client) performResponse(ctx context.Context, command request, obse
 		client.fail()
 		return notSent(ErrExpired)
 	}
+	// Native authorization can outlast the caller or the exact lease. No
+	// request has been submitted yet, so retain not-sent certainty and the
+	// sequence; cancellation alone must not retire an otherwise live channel.
+	if err := ctx.Err(); err != nil {
+		return notSent(err)
+	}
+	if !time.Now().Before(client.lease.ExpiresAt) {
+		client.fail()
+		return notSent(ErrExpired)
+	}
 	if command.op != opHeartbeat {
 		command.applyDetail = handoff.WantWorkerApply(ctx)
 		command.submissionDetail = command.applyDetail
@@ -205,8 +215,13 @@ func (client *Client) performResponse(ctx context.Context, command request, obse
 	}
 	if err != nil || n != len(data) {
 		client.fail()
+		var unsubmitted *unsubmittedPipeWrite
+		if n == 0 && errors.As(err, &unsubmitted) {
+			return notSent(errors.Join(ErrProtocol, err))
+		}
 		// Even a zero-byte write error does not prove that a prior native
-		// overlapped write was not consumed; classify transport loss as unknown.
+		// overlapped write was not consumed. Only the native admission checks
+		// above prove no WriteFile submission; transport loss remains unknown.
 		return unknownInput(ErrProtocol)
 	}
 	start = time.Now()
