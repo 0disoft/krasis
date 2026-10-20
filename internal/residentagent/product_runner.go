@@ -128,7 +128,7 @@ func productRunnerWithTrace(identities *productidentity.Store, trust *truststore
 		defer cancel()
 		ctx, cancelCause := context.WithCancelCause(deadlineCtx)
 		defer cancelCause(context.Canceled)
-		network := netobserve.Start(ctx, log.Event)
+		network := netobserve.Start(ctx, log.Event, log.WiFi)
 		defer network.Close()
 		worker := installedProductInput(prepared.deadline, cancelCause)
 		var input *wininput.InputAdapter

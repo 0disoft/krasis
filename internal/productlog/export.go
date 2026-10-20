@@ -34,6 +34,7 @@ type exportEvent struct {
 	GCTrail       *GCTrail           `json:"gcTrail,omitempty"`
 	Handoff       *handoff.Summary   `json:"handoff,omitempty"`
 	SessionEnd    *SessionEndSummary `json:"sessionEnd,omitempty"`
+	WiFi          *WiFiSummary       `json:"wifi,omitempty"`
 }
 
 type exportLog struct {
@@ -187,6 +188,13 @@ func sanitizeLog(name string, r io.Reader) exportLog {
 				continue
 			}
 			event.SessionEnd = input.SessionEnd
+		}
+		if input.Code == "network_wifi_observation" {
+			if input.WiFi == nil || !input.WiFi.Valid() {
+				result.Incomplete = true
+				continue
+			}
+			event.WiFi = input.WiFi
 		}
 		if input.Code == "retry_policy" {
 			if input.Retry == nil || !input.Retry.valid() {

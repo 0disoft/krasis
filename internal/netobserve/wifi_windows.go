@@ -79,8 +79,11 @@ func sampleWiFi() wifiSnapshot {
 			if data != nil {
 				defer wlanFree.Call(uintptr(data))
 			}
-			if r != 0 || data == nil {
-				return nil, uint32(r) | 1
+			if r != 0 {
+				return nil, uint32(r)
+			}
+			if data == nil {
+				return nil, 13
 			}
 			count := *(*uint32)(data)
 			if count > maxWiFiInterfaces {
@@ -127,6 +130,7 @@ func readWiFi(api wifiAPI) (s wifiSnapshot) {
 		return s
 	}
 	s.state = wifiDisconnected
+	statesKnown := true
 	var connected []wlanInterface
 	for _, i := range interfaces {
 		switch i.state {
@@ -139,12 +143,16 @@ func readWiFi(api wifiAPI) (s wifiSnapshot) {
 		case 0, 3, 4:
 		default:
 			s.state = wifiUnknown
+			statesKnown = false
 		}
 	}
 	if len(connected) == 0 {
 		return s
 	}
 	s.state = wifiConnected
+	if !statesKnown {
+		return s
+	}
 	if !api.allowed() {
 		s.denied = true
 		return s

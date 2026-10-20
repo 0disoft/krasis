@@ -99,6 +99,7 @@ type record struct {
 	GCTrail       *GCTrail           `json:"gcTrail,omitempty"`
 	Handoff       *handoff.Summary   `json:"handoff,omitempty"`
 	SessionEnd    *SessionEndSummary `json:"sessionEnd,omitempty"`
+	WiFi          *WiFiSummary       `json:"wifi,omitempty"`
 }
 type Logger struct {
 	mu              sync.Mutex

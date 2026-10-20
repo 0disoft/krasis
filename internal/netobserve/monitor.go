@@ -4,6 +4,7 @@ package netobserve
 
 import (
 	"context"
+	"crypto/rand"
 	"sync"
 	"time"
 )
@@ -43,7 +44,8 @@ type Snapshot struct {
 	wifi          wifiSnapshot
 }
 
-// Codes is the entire persistent vocabulary. Unsupported observations are
+// Codes is the plain event vocabulary. Typed WiFi records have their own
+// validated logger payload. Unsupported observations are
 // explicitly unknown, not evidence of absence or of a particular failure cause.
 func Codes() []string {
 	return []string{
@@ -58,23 +60,32 @@ func Codes() []string {
 }
 
 type Monitor struct {
-	ctx           context.Context
-	cancel        context.CancelFunc
-	done          chan struct{}
-	once          sync.Once
-	restored      chan time.Time
-	emit          func(string)
-	previous      Snapshot
-	started       bool
-	lastLink      Link
-	topology      [32]byte
-	topologyKnown bool
-	lastWiFi      wifiState
+	ctx                   context.Context
+	cancel                context.CancelFunc
+	done                  chan struct{}
+	once                  sync.Once
+	restored              chan time.Time
+	emit                  func(string)
+	previous              Snapshot
+	started               bool
+	lastLink              Link
+	topology              [32]byte
+	topologyKnown         bool
+	lastWiFi              wifiState
+	wifiReport            func(WiFiObservation)
+	wifiKey               [32]byte
+	wifiKeyKnown          bool
+	wifiLastAt, wifiGapAt time.Time
 }
 
-func Start(ctx context.Context, emit func(string)) *Monitor { return start(ctx, Sample, emit) }
-func start(ctx context.Context, sample func() Snapshot, emit func(string)) *Monitor {
+func Start(ctx context.Context, emit func(string), report ...func(WiFiObservation)) *Monitor {
+	return start(ctx, func() Snapshot { return platformProbe.read(ctx, Sample) }, emit, report...)
+}
+func start(ctx context.Context, sample func() Snapshot, emit func(string), report ...func(WiFiObservation)) *Monitor {
 	m := newMonitor(ctx, emit)
+	if len(report) > 0 {
+		m.wifiReport = report[0]
+	}
 	go func() {
 		defer close(m.done)
 		ticker := time.NewTicker(interval)
@@ -95,7 +106,10 @@ func start(ctx context.Context, sample func() Snapshot, emit func(string)) *Moni
 }
 func newMonitor(ctx context.Context, emit func(string)) *Monitor {
 	owned, cancel := context.WithCancel(ctx)
-	return &Monitor{ctx: owned, cancel: cancel, done: make(chan struct{}), restored: make(chan time.Time, 1), emit: emit}
+	m := &Monitor{ctx: owned, cancel: cancel, done: make(chan struct{}), restored: make(chan time.Time, 1), emit: emit}
+	_, err := rand.Read(m.wifiKey[:])
+	m.wifiKeyKnown = err == nil
+	return m
 }
 func (m *Monitor) Close() { m.once.Do(func() { m.cancel(); <-m.done }) }
 func (m *Monitor) event(code string) {
@@ -139,7 +153,7 @@ func (m *Monitor) observe(s Snapshot, at time.Time) {
 	if changed {
 		m.event("network_local_path_changed")
 	}
-	wifiRestored := m.observeWiFi(s.wifi)
+	wifiRestored := m.observeWiFi(s.wifi, at)
 	if wifiRestored || s.Link == LinkUsable && (m.lastLink == LinkDown || changed) {
 		// Keep the newest notification if a prior active-session change was
 		// never consumed. Queue capacity is always one.
