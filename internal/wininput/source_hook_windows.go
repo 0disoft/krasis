@@ -128,7 +128,9 @@ func (hook *SourceHook) runWithBoundary(ctx context.Context, session *SourceSess
 	}
 	hook.contextMenu.Store(0) // A gesture from an earlier connection is not popup evidence.
 	pointerState := newSourcePointerState(initialPosition)
-	progress := &sourceHookProgress{origin: time.Now(), next: hook.timing}
+	timing := newHookTimingRelay(hook.timing)
+	defer timing.Close()
+	progress := &sourceHookProgress{origin: time.Now(), next: timing}
 	pointerState.progress = progress
 	session.physicalMu.Lock()
 	session.physicalCheck = sourceAnyInputPressed

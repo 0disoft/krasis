@@ -9,6 +9,7 @@ import (
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/productlog"
 	"github.com/0disoft/krasis/internal/transport"
+	"github.com/0disoft/krasis/internal/wininput"
 )
 
 // Session callbacks only update atomics. Runtime/OS sampling and JSON/disk work
@@ -179,6 +180,7 @@ func (d *runtimeDiagnostics) snapshot(now time.Time) productlog.RuntimeSummary {
 	}
 	send, receive := d.send.Load(), d.receive.Load()
 	s.HookCalls = d.hookCalls.Swap(0)
+	s.HookTimingDroppedTotal = wininput.HookTimingDroppedTotal()
 	s.RawInputs = d.rawInputs.Swap(0)
 	s.QueueHighWatermark = d.queueHigh.Swap(0)
 	s.QueueEnqueued = d.queueEnqueued.Swap(0)

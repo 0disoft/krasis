@@ -6,6 +6,7 @@ package productlog
 // An idle socket can have a large read age without being faulty.
 type RuntimeSummary struct {
 	HookCalls                 uint64          `json:"hookCalls"`
+	HookTimingDroppedTotal    uint64          `json:"hookTimingDroppedTotal,omitempty"`
 	RawInputs                 uint64          `json:"rawInputs"`
 	QueueHighWatermark        uint64          `json:"queueHighWatermark"`
 	QueueEnqueued             uint64          `json:"queueEnqueued"`

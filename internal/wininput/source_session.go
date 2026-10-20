@@ -161,7 +161,7 @@ type SourceSession struct {
 	capturePaused    bool   // physicalMu; native owner replacement fences new grants.
 	active           bool
 	generation       uint64
-	faultOnce        sync.Once
+	faultSent        atomic.Bool
 }
 
 func NewSourceSession(capacity int, sink SourceSink) (*SourceSession, error) {
@@ -489,16 +489,14 @@ func (session *SourceSession) abort(cause error) {
 	// Retire synchronously: a late activation must not race the worker's
 	// asynchronous fault handling and resume suppression for this owner.
 	session.terminal.Store(true)
-	session.stateMu.Lock()
-	session.active = false
-	session.generation++
-	session.stateMu.Unlock()
-	session.faultOnce.Do(func() {
+	// Active, Offer, current and Activate all honor terminal. Ordinary worker
+	// cleanup owns deactivation; a hook must not wait for that worker's mutex.
+	if session.faultSent.CompareAndSwap(false, true) {
 		select {
 		case session.faults <- cause:
 		default:
 		}
-	})
+	}
 }
 
 func (session *SourceSession) current(generation uint64) bool {
