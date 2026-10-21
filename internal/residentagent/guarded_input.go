@@ -24,7 +24,7 @@ type guardedProductInput struct {
 	log           *productlog.Logger
 	mu            syncgate.Mutex
 	geometry      func() error
-	protected     func() bool
+	protected     func(context.Context) (bool, error)
 	stopProtected func()
 }
 
@@ -33,8 +33,8 @@ func (input *guardedProductInput) Press(ctx context.Context, token control.Press
 		return &application.InjectionError{Certainty: application.InjectionNotApplied, Requested: 1, Cause: err}
 	}
 	defer input.mu.Unlock()
-	if err := input.checkProtectedInput(); err != nil {
-		return err
+	if err := input.checkProtectedInput(ctx); err != nil {
+		return &application.InjectionError{Certainty: application.InjectionNotApplied, Requested: 1, Cause: err}
 	}
 	prepared, err := input.guard.PreparePress(token)
 	if err != nil {
@@ -74,7 +74,7 @@ func (input *guardedProductInput) Wheel(ctx context.Context, x, y int32) error {
 	return err
 }
 func (input *guardedProductInput) PrepareEntry(ctx context.Context, edge control.ScreenEdge) error {
-	if err := input.checkProtectedInput(); err != nil {
+	if err := input.checkProtectedInput(ctx); err != nil {
 		return err
 	}
 	if err := input.ValidateEntry(ctx); err != nil {
@@ -88,8 +88,15 @@ func (input *guardedProductInput) PrepareEntry(ctx context.Context, edge control
 	return err
 }
 
-func (input *guardedProductInput) checkProtectedInput() error {
-	if input.protected != nil && input.protected() {
+func (input *guardedProductInput) checkProtectedInput(ctx context.Context) error {
+	if input.protected == nil {
+		return nil
+	}
+	active, err := input.protected(ctx)
+	if err != nil {
+		return err
+	}
+	if active {
 		if input.stopProtected != nil {
 			input.stopProtected()
 		}

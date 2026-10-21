@@ -47,7 +47,8 @@ func (operations *Operations) runWithProtectedRecovery(ctx context.Context, alia
 		// intent and rebuild from a fresh trust/TLS check. Joined cleanup errors
 		// or negative trust verdicts must never enter this retry path.
 		trustExpired := errors.Is(err, agent.ErrSessionTrustFreshness) && cancellationOnly(err, agent.ErrSessionTrustFreshness)
-		if ctx.Err() != nil || (!desktopChanged && !trustExpired && !protectedInputOnly(err)) {
+		inspectionExpired := protectedInspectionExpiredOnly(err)
+		if ctx.Err() != nil || (!desktopChanged && !trustExpired && !inspectionExpired && !protectedInputOnly(err)) {
 			return err
 		}
 		operations.mu.Lock()
@@ -60,6 +61,8 @@ func (operations *Operations) runWithProtectedRecovery(ctx context.Context, alia
 		code := "protected_input_reconnecting"
 		if trustExpired {
 			code = "session_trust_reconnecting"
+		} else if inspectionExpired {
+			code = "protected_inspection_reconnecting"
 		}
 		operations.recordLocked(code)
 		operations.mu.Unlock()
@@ -79,6 +82,14 @@ func (operations *Operations) runWithProtectedRecovery(ctx context.Context, alia
 				case trustReadSlot <- struct{}{}:
 					<-trustReadSlot
 				default:
+					continue
+				}
+				break
+			}
+			if inspectionExpired {
+				// Read-only native owners retain their slots after timeout. Wait
+				// for retirement; a late clear result is never replacement authority.
+				if len(protectedInspectionSlots) != 0 {
 					continue
 				}
 				break

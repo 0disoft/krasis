@@ -33,15 +33,22 @@ func observedProtectedInput(inspect func() wininput.ProtectedInputReason, event 
 	}
 }
 
-func monitorProtectedInput(ctx context.Context, ticks <-chan time.Time, active func() bool, stop func()) {
+func monitorProtectedInput(ctx context.Context, ticks <-chan time.Time, active func(context.Context) (bool, error), stop func()) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return
+			return ctx.Err()
 		case <-ticks:
-			if ctx.Err() == nil && active() {
+			blocked, err := active(ctx)
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			if err != nil {
+				return err
+			}
+			if blocked {
 				stop()
-				return
+				return nil
 			}
 		}
 	}

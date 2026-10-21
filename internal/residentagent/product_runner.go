@@ -157,14 +157,17 @@ func productRunnerWithTrace(identities *productidentity.Store, trust *truststore
 		if err != nil {
 			return err
 		}
-		protectedActive := func() bool { return false }
+		protectedActive := func(context.Context) (bool, error) { return false, nil }
 		if reporter, ok := observer.(interface{ ObserveInputBackend(bool) }); ok {
 			reporter.ObserveInputBackend(worker != nil)
 		}
 		if worker == nil {
-			protectedActive = observedProtectedInput(wininput.InspectProtectedInput, log.Event)
+			protectedActive = boundedProtectedInputInspection(observedProtectedInput(wininput.InspectProtectedInput, log.Event))
 		}
 		defer func() {
+			if cause := context.Cause(ctx); errors.Is(cause, errProtectedInspectionUnavailable) {
+				err = errors.Join(err, cause)
+			}
 			if failure := agent.DescribeSessionFailure(context.Cause(ctx)); failure.Component == "session-trust" {
 				err = errors.Join(err, context.Cause(ctx))
 			}
@@ -259,7 +262,10 @@ func productRunnerWithTrace(identities *productidentity.Store, trust *truststore
 			defer close(protectedDone)
 			ticker := time.NewTicker(100 * time.Millisecond)
 			defer ticker.Stop()
-			monitorProtectedInput(ctx, ticker.C, protectedActive, stopProtected)
+			if err := monitorProtectedInput(ctx, ticker.C, protectedActive, stopProtected); err != nil && ctx.Err() == nil {
+				log.Event("protected_input_inspection_failed")
+				cancelCause(err)
+			}
 		}()
 		defer func() { cancel(); <-protectedDone }()
 		config := agent.DefaultConfig(control.BoundaryConfig{Edge: control.ScreenEdge(prepared.profile.Edge), ScreenLeft: diagnostics.Display.Left, ScreenWidth: diagnostics.Display.Width, RearmDistance: prepared.profile.Rearm()})

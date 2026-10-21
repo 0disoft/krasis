@@ -107,9 +107,9 @@ func TestProtectedInputMonitorStopsOnceWhenPromptAppears(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		monitorProtectedInput(ctx, ticks, func() bool {
+		monitorProtectedInput(ctx, ticks, func(context.Context) (bool, error) {
 			checks++
-			return checks == 2
+			return checks == 2, nil
 		}, func() { stops++; cancel() })
 	}()
 	ticks <- time.Now()

@@ -78,7 +78,7 @@ func TestProductGuardRejectsProtectedCredentialInputBeforeInjection(t *testing.T
 	input := &guardedProductInput{
 		InputBoundaryPort: safetyInput{events: &events},
 		guard:             safetyGuard{&events},
-		protected:         func() bool { return true },
+		protected:         func(context.Context) (bool, error) { return true, nil },
 		stopProtected:     func() { events = append(events, "stop") },
 	}
 	if err := input.Press(context.Background(), control.PressedToken{Kind: control.PressedKeyboardKey, Code: 30}); !errors.Is(err, wininput.ErrProtectedInput) {

@@ -310,7 +310,11 @@ func (operations *Operations) Connect(requestContext context.Context, request lo
 	resumeSaved := operations.rememberConnectionLocked(request.PeerAlias, request.Fingerprint)
 	go func(alias string) {
 		defer cancel(nil)
-		err := operations.runWithProtectedRecovery(ctx, alias, &sessionObserver{operations: operations, done: done}, wininput.ProtectedInputActive, agent.Wait)
+		inspect := boundedProtectedInputInspection(wininput.ProtectedInputActive)
+		err := operations.runWithProtectedRecovery(ctx, alias, &sessionObserver{operations: operations, done: done}, func() bool {
+			active, err := inspect(ctx)
+			return active || err != nil // An unknown/late observation cannot rearm.
+		}, agent.Wait)
 		displayChanged := ctx.Err() == nil && displayChangeOnly(err)
 		operations.finishSession(done, outcome, err, (ctx.Err() != nil && cancellationOnly(err, context.Cause(ctx))) || peerDisconnectOnly(err) || protectedInputOnly(err), displayChanged)
 	}(request.PeerAlias)
