@@ -270,20 +270,13 @@ func startIsolatedInput(ctx context.Context, control *pipeConn, channel *Channel
 	copy(data[:], packet[:])
 	binary.BigEndian.PutUint64(data[bootstrapSize:bootstrapSize+8], uint64(handles[2]))
 	binary.BigEndian.PutUint64(data[bootstrapSize+8:], uint64(handles[3]))
-	input, err := startNativeChildClient(ctx, "--native-input-worker", handles, data[:])
-	if err != nil {
-		return nil, err
-	}
-	release, err := startNativeChildClient(ctx, "--native-release-worker", handles, data[:])
-	if err != nil {
-		retired, closeErr := input.retire()
-		if !retired {
-			closeErr = errors.Join(closeErr, ErrRecovery)
+	return startNativePair(ctx, func(run context.Context, release bool) (*isolatedInput, error) {
+		mode := "--native-input-worker"
+		if release {
+			mode = "--native-release-worker"
 		}
-		return nil, errors.Join(err, closeErr)
-	}
-	input.recovery, input.recoveryRetire = release.Client, release.retire
-	return input, nil
+		return startNativeChildClient(run, mode, handles, data[:])
+	})
 }
 
 // Framing/retirement is shared; the two callers retain distinct authenticators
