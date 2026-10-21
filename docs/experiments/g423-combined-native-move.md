@@ -22,7 +22,10 @@ A regression exercises actual child request/response encoding, verifies one
 exchange, desktop admission, move and readback, and preserves unknown outcome
 after readback failure without replay. Existing direct-native readback/retry,
 submission and isolated-worker recovery regressions also pass. Full inputworker
-tests and packaging/application results are recorded below when available.
+suite passes in 24.879s. Workspace packaging passes 85 UI tests, native frontend
+and Windows builds, embedded installer build, update archive smoke (6.43s)
+and eight-file bundle verification. Offline verification accepts generation 423,
+revision `e1b17ef59b2321447d1f8dc5555d9323a50173fe`, 28162923 bytes.
 
 A fresh pre-change doctor reports UI RUNNING, session FAULTED and protected
 service STOPPED. Source response-reader backpressure and active-heartbeat
@@ -30,3 +33,27 @@ retirement remain separate investigation candidates; this change does not
 claim to fix the service's recurring 1066 or reconnect failure. Do not close
 those issues based on this optimization. No public API/wire schema, DB,
 dependency, runner, firewall or signing changes; no remote push.
+
+## Paired application
+
+B update `07db2ddd9e3ff85798437b31951fc5b3` reaches UPDATED at the exact
+revision; its install receipt is 11:12:53.860207Z, result 0. A's existing
+safe-stop completes and g423 repair receipt is 11:13:14.0481259Z, result 0.
+The old g422 management UI prevents ordinary replacement and logs
+ui_replacement_launch_failed. After verifying its exact executable path and
+retaining its process handle, only that old UI is terminated; the new UI is
+opened. The g423 installed agent is started and connect B completes.
+
+At 11:16Z A's doctor reports healthy CONNECTED, matched g423 UI/agent/CLI and
+installed agent, running protected service, and no next actions. Input health
+is READY; B's collected service and input health are also READY. Collection
+`06dba51a6320161ca2e508f610e1e63a` preserves the paired installation receipts.
+No forced agent/input-worker termination is used. A's UI is left open.
+
+The user has been asked for a short B-side movement comparison. Until that
+report and matching runtime samples exist, the confirmed effect is eliminating
+one child transaction per move, not a measured physical latency improvement.
+Hosted CI, signing and the full device acceptance matrix were not run.
+Remaining priority: deterministically reproduce source reader/backpressure
+blocking heartbeat replies and verify bounded orderly retirement on failure.
+No new implementation started after the ten-minute cutoff.
