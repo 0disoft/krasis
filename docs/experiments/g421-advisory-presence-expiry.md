@@ -26,3 +26,28 @@ seen in the paired history. Paired application and follow-up evidence follow.
 
 No push, issue comment, remote ref, API/DB, runner, dependency, firewall,
 signing configuration or source-of-truth specification change.
+
+## Verification and paired application
+
+The full inputworker suite passes (24.913s), including portable pair fixtures,
+and logindiag passes. The normal workspace builder passes 85 UI tests, native
+frontend and Windows executable/embedded installer builds, package archive
+smoke and eight-file verification. Offline verification accepts generation 421
+at `52e8da0616ad724ad9b02f709d5b1bd1f6694f2a`, 28,296,957 bytes. Hosted CI,
+physical held-input/Winlogon/fault matrices and publisher signing were not run.
+
+B update job `923725496fa9b9cfe55dcc1f05f582b2` reaches UPDATED at that
+revision; installation receipt 10:30:01.832244Z has result 0. A's old g420
+service had again reached SERVICE_RECOVERY_REQUIRED (1066). Existing safe-stop
+and verified older-UI shutdown complete before its g421 elevated repair.
+Installation receipt 10:30:37.0895021Z has result 0/stage complete, and the
+service is RUNNING. Collection `af6cd754f6383f2012f9cbe081f67edb` confirms
+both installation receipts and READY health on A and B. No Security dialog
+input or forced process termination was used.
+
+A's g421 UI/agent/CLI/installed agent match. Peer inspection confirms B ONLINE
+at the same g421 revision. A's existing connect command starts the saved B
+profile; at 10:33Z status is CONNECTED with PROTECTED input. During A's
+installation B logged acquisition timeouts; those replacement-window events
+are not a post-connection stability result. Physical round-trip feedback and
+the final paired history remain pending at this point.
