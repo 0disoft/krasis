@@ -254,6 +254,10 @@ func missingInstallPath(path string) bool {
 }
 
 func moveInstallPath(from, to string, replace bool) error {
+	return moveInstallPathOperation(from, to, replace, "file_move")
+}
+
+func moveInstallPathOperation(from, to string, replace bool, operation string) error {
 	source, err := windows.UTF16PtrFromString(from)
 	if err != nil {
 		return ErrAuthority
@@ -267,7 +271,7 @@ func moveInstallPath(from, to string, replace bool) error {
 		flags |= windows.MOVEFILE_REPLACE_EXISTING
 	}
 	if err := windows.MoveFileEx(source, destination, flags); err != nil {
-		return installNativeError("file_move", ErrAuthority, err)
+		return installNativeError(operation, ErrAuthority, err)
 	}
 	return nil
 }

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/0disoft/krasis/internal/installationdiag"
 	"golang.org/x/sys/windows"
 )
 
@@ -76,5 +77,54 @@ func TestProtectedFilePinStillBlocksImageMutation(t *testing.T) {
 	data, err := os.ReadFile(path)
 	if err != nil || string(data) != "original" {
 		t.Fatal("pinned image changed")
+	}
+}
+
+func TestInstallDirectoryMoveDeniedUntilChildImagePinCloses(t *testing.T) {
+	root := t.TempDir()
+	source, destination := filepath.Join(root, "Input"), filepath.Join(root, "Input.retired")
+	if err := os.Mkdir(source, 0700); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(source, "image.exe")
+	if err := os.WriteFile(path, []byte("verified image fixture"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	name, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handle, err := windows.CreateFile(name, windows.GENERIC_READ|windows.READ_CONTROL, protectedShareMode(false), nil, windows.OPEN_EXISTING, windows.FILE_FLAG_OPEN_REPARSE_POINT, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if handle != 0 {
+			_ = windows.CloseHandle(handle)
+		}
+	}()
+	for _, operation := range []string{"directory_retire_move", "directory_activate_move", "directory_restore_move"} {
+		err = moveInstallPathOperation(source, destination, false, operation)
+		op, code, known := installErrorFields(err)
+		if !errors.Is(err, windows.ERROR_ACCESS_DENIED) || op != operation || code != 5 || !known {
+			t.Fatalf("child image pin move result: operation=%s win32=%d known=%t", op, code, known)
+		}
+		if err.Error() != ErrAuthority.Error() {
+			t.Fatal("directory move exposed native error text or paths")
+		}
+		receipt := installationdiag.Summary{Time: "2026-10-21T00:00:00Z", Action: "install", Result: 4, Stage: "replace", Operation: op, Win32Error: code, Win32Known: known, Recovery: "restored"}
+		if !receipt.Valid() {
+			t.Fatal("directory failure cannot survive receipt validation")
+		}
+		if !missingInstallPath(destination) || missingInstallPath(source) {
+			t.Fatal("denied directory rename changed either endpoint")
+		}
+	}
+	if err := windows.CloseHandle(handle); err != nil {
+		t.Fatal(err)
+	}
+	handle = 0
+	if err := moveInstallPath(source, destination, false); err != nil {
+		t.Fatal("released child image pin still denied directory move")
 	}
 }

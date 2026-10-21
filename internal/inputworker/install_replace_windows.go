@@ -37,7 +37,7 @@ func (files *installFiles) replace(ctx context.Context, target installImages) er
 		if old.Close() != nil {
 			return ErrAuthority
 		}
-		if err := moveInstallPath(files.directory(installActive), files.directory(installRetired), false); err != nil {
+		if err := moveInstallPathOperation(files.directory(installActive), files.directory(installRetired), false, "directory_retire_move"); err != nil {
 			return err
 		}
 	}
@@ -45,7 +45,7 @@ func (files *installFiles) replace(ctx context.Context, target installImages) er
 		return ErrAuthority
 	}
 	if target.valid() {
-		return moveInstallPath(files.directory(installCandidate), files.directory(installActive), false)
+		return moveInstallPathOperation(files.directory(installCandidate), files.directory(installActive), false, "directory_activate_move")
 	}
 	return nil
 }
@@ -72,7 +72,7 @@ func (files *installFiles) restore(ctx context.Context, previous installSnapshot
 		return err
 	}
 	if previous.Present {
-		return moveInstallPath(files.directory(installBackup), files.directory(installActive), false)
+		return moveInstallPathOperation(files.directory(installBackup), files.directory(installActive), false, "directory_restore_move")
 	}
 	return nil
 }
