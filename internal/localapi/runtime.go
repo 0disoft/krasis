@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"net/http"
 	"runtime/debug"
 	"strconv"
@@ -11,7 +12,7 @@ import (
 
 const RuntimeSchemaVersion = "krasis.agent.runtime/v1"
 const AgentProtocol = 1
-const AgentGeneration = 413
+const AgentGeneration = 414
 
 type RuntimeInfo struct {
 	SchemaVersion string `json:"schemaVersion"`
@@ -46,16 +47,25 @@ func (client *Client) Runtime(ctx context.Context) (RuntimeInfo, error) {
 	return value, err
 }
 
-func (client *Client) StopForUpgrade(ctx context.Context, instance string, generation int, revision string) (OperationResult, error) {
-	var value OperationResult
+func (client *Client) StopForUpgrade(ctx context.Context, instance string, generation int, revision string) (value OperationResult, err error) {
+	owner, err := pinRuntimeExit(ctx, client, instance)
+	if err != nil {
+		return value, err
+	}
+	if owner != nil {
+		defer func() { err = errors.Join(err, owner.Close()) }()
+	}
 	headers := map[string]string{"If-Match": instance}
 	if generation > 0 && len(revision) == 40 {
 		headers["X-Krasis-Upgrade-Generation"] = strconv.Itoa(generation)
 		headers["X-Krasis-Upgrade-Build"] = revision
 	}
-	err := client.requestHeaders(ctx, http.MethodPost, "/v1/upgrade-stop", nil, &value, headers)
+	err = client.requestHeaders(ctx, http.MethodPost, "/v1/upgrade-stop", nil, &value, headers)
 	if err == nil && value.SchemaVersion != ResultSchemaVersion {
 		err = ErrProtocol
+	}
+	if err == nil && owner != nil && value.Status == "COMPLETED" && value.Code == "upgrade_stop_requested" {
+		err = owner.Wait(ctx)
 	}
 	return value, err
 }
