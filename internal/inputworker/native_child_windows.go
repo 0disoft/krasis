@@ -289,7 +289,7 @@ func startIsolatedInput(ctx context.Context, control *pipeConn, channel *Channel
 // Framing/retirement is shared; the two callers retain distinct authenticators
 // and immutable desktop policies. No caller-selected command is admitted.
 func startNativeChildClient(ctx context.Context, mode string, handles []windows.Handle, data []byte) (*isolatedInput, error) {
-	if ctx == nil || ctx.Err() != nil || (mode != "--native-input-worker" && mode != "--native-login-worker" && mode != "--native-release-worker") {
+	if ctx == nil || ctx.Err() != nil || (mode != "--native-input-worker" && mode != "--native-login-worker" && mode != "--native-release-worker" && mode != "--native-login-release-worker") {
 		return nil, ErrAuthority
 	}
 	root, err := windows.KnownFolderPath(windows.FOLDERID_ProgramFiles, 0)

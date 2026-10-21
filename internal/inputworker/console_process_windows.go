@@ -28,7 +28,7 @@ func makeConsoleWorkerJob(mode consoleMode) (windows.Handle, error) {
 		return makeWorkerJobLimit(3) // journal, live native input, release-only recovery
 	}
 	if mode == loginConsole {
-		return makeWorkerJobLimit(2)
+		return makeWorkerJobLimit(3) // journal, Winlogon input, release-only recovery
 	}
 	return 0, ErrAuthority
 }

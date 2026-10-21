@@ -69,9 +69,12 @@ func RunInstalledLoginConnection(ctx context.Context, installation *Installation
 					result = errors.Join(result, ErrRecovery)
 				}
 			}
+			result = errors.Join(result, native.finishRecovery())
 		}()
-		report, err := runLoginInput(lifetime, native, func(lifetime context.Context, run func(executor) error) error {
-			return inputdesktop.RunWinlogon(lifetime, authorize, func(scope *inputdesktop.Scope) error { return run(scope.Do) })
+		report, err := runLoginInput(lifetime, native, func(_ context.Context, run func(executor) error) error {
+			// Both authenticated children own native desktop/authority checks.
+			// The pressed journal must never enter a synchronous native scope.
+			return run(func(context.Context, func() error) error { return ErrAuthority })
 		}, func(owned context.Context, port application.InputPort) error {
 			callbackStarted = true
 			input, err := wininput.NewInputAdapterWithInjection(live.Profile.Rearm(), geometry.Width, port)

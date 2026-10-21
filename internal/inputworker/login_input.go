@@ -59,6 +59,9 @@ func runLoginInput(ctx context.Context, native loginNativeInput,
 		finished := port.retired
 		callbackErr := inputdesktop.ErrCallbackExit
 		defer func() {
+			if isolated, ok := native.(*isolatedInput); ok {
+				defer func() { err = errors.Join(err, isolated.finishRecovery()) }()
+			}
 			cancel()
 			port.stop()
 			// Even an input panic or Goexit must retire the connection callback
@@ -80,7 +83,7 @@ func runLoginInput(ctx context.Context, native loginNativeInput,
 			}
 			recovery, cancel := context.WithTimeout(context.Background(), RecoveryTimeout)
 			defer cancel()
-			releaseErr := do(recovery, func() error {
+			releaseErr := recoveryExecution(native, do)(recovery, func() error {
 				var failure error
 				report.Recovery, failure = application.ReleaseAll(recovery, &pressed, native)
 				return failure

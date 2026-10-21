@@ -12,8 +12,8 @@ import (
 
 // The authenticated serving worker retains its journal. Only the separate
 // native child executes live commands. Recovery starts only after exact input
-// child/IPC retirement. Ordinary installed input uses a separate release-only
-// child; the legacy login/fixture paths still supply their own recovery port.
+// child/IPC retirement. Installed ordinary/login input uses a separate
+// release-only child; direct test fixtures may supply their own recovery port.
 type isolatedInput struct {
 	*Client
 	recovery          application.ReleasePort

@@ -4,6 +4,7 @@ package inputworker
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 
@@ -51,13 +52,34 @@ func (owner *loginNativeOwner) start(ctx context.Context) (*isolatedInput, error
 	if err != nil {
 		return nil, err
 	}
-	return startNativeChildClient(ctx, "--native-login-worker", handles, data[:])
+	input, err := startNativeChildClient(ctx, "--native-login-worker", handles, data[:])
+	if err != nil {
+		return nil, err
+	}
+	release, err := startNativeChildClient(ctx, "--native-login-release-worker", handles, data[:])
+	if err != nil {
+		retired, closeErr := input.retire()
+		if !retired {
+			closeErr = errors.Join(closeErr, ErrRecovery)
+		}
+		return nil, errors.Join(err, closeErr)
+	}
+	input.recovery, input.recoveryRetire = release.Client, release.retire
+	return input, nil
 }
 
 // RunInstalledNativeLoginInput is a fixed SYSTEM/UIAccess child mode, bound to
 // the active Winlogon grant and a genuine live service/console parent. It never
 // authenticates from a profile hash or inherited numeric reference alone.
 func RunInstalledNativeLoginInput(ctx context.Context, installation *Installation) error {
+	return runInstalledNativeLoginInput(ctx, installation, false)
+}
+
+func RunInstalledNativeLoginRelease(ctx context.Context, installation *Installation) error {
+	return runInstalledNativeLoginInput(ctx, installation, true)
+}
+
+func runInstalledNativeLoginInput(ctx context.Context, installation *Installation, releaseOnly bool) error {
 	if ctx == nil || ctx.Err() != nil {
 		return ErrAuthority
 	}
@@ -86,11 +108,20 @@ func RunInstalledNativeLoginInput(ctx context.Context, installation *Installatio
 		return err
 	}
 	defer proof.Close()
+	serviceCheck := func() error { return proof.check(false) }
+	if releaseOnly {
+		handle, err := pinNativeRecoveryService(handles[0], proof)
+		if err != nil {
+			return err
+		}
+		defer windows.CloseHandle(handle)
+		serviceCheck = func() error { return checkNativeRecoveryService(handle, proof) }
+	}
 	if !validNativeParent(handles[1], installation, digest) || startup.Err() != nil || wininput.InitializePhysicalCoordinates() != nil {
 		return ErrAuthority
 	}
 	authorize := func() error {
-		if proof.check(false) != nil || !nativeParentAlive(handles[1]) {
+		if serviceCheck() != nil || !nativeParentAlive(handles[1]) {
 			return ErrAuthority
 		}
 		return authorizeLoginProfile(binding.session, binding.profile)
@@ -100,7 +131,17 @@ func RunInstalledNativeLoginInput(ctx context.Context, installation *Installatio
 	}
 	input := wininput.NewInjectionPort()
 	return inputdesktop.RunWinlogon(ctx, authorize, func(scope *inputdesktop.Scope) error {
-		_, err := crashguard.ServeWithInput(os.Stdin, os.Stdout, input, PortableInputHandler(input, scope.Do))
+		execute := func(ctx context.Context, work func() error) error {
+			if err := authorize(); err != nil {
+				return err
+			}
+			return scope.Do(ctx, work)
+		}
+		if releaseOnly {
+			_, err := crashguard.ServeWithInput(os.Stdin, os.Stdout, deniedGuardRelease{}, PortableReleaseHandler(input, execute))
+			return err
+		}
+		_, err := crashguard.ServeWithInput(os.Stdin, os.Stdout, input, PortableInputHandler(input, execute))
 		return err
 	})
 }
