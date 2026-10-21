@@ -1,5 +1,5 @@
 const schema = 'krasis.app-settings/v1';
-const codes = new Set(['ok','unavailable','startup_failed','save_failed','start_menu_failed','recovery_failed','rollback_failed']);
+const codes = new Set(['ok','unavailable','startup_failed','startup_query_failed','save_failed','start_menu_failed','recovery_failed','recovery_query_failed','rollback_failed']);
 export const emptyAppSettings = () => ({schema,code:'unavailable',startAtLogin:false,autoUpdate:false,preferencesKnown:false});
 export function appSettingsNoticeCode(settings, busy) {
   return busy ? 'checking' : settings.code;

@@ -39,6 +39,9 @@ func (s *WorkspaceService) appSettings() AppSettingsSnapshot {
 	actual, err := ops.startupRead(os.Getenv("LOCALAPPDATA"))
 	if err != nil || actual != v.StartAtLogin {
 		result.Code = "startup_failed"
+		if err != nil {
+			result.Code = "startup_query_failed"
+		}
 		if restorePending {
 			result.Code = "rollback_failed"
 		}
@@ -47,6 +50,9 @@ func (s *WorkspaceService) appSettings() AppSettingsSnapshot {
 	active, err := ops.recoveryRead(os.Getenv("LOCALAPPDATA"))
 	if err != nil || active != v.StartAtLogin {
 		result.Code = "recovery_failed"
+		if err != nil {
+			result.Code = "recovery_query_failed"
+		}
 		if restorePending {
 			result.Code = "rollback_failed"
 		}

@@ -15,6 +15,18 @@ test('pending settings reads do not become errors and completed failures stay vi
   assert.equal(appSettingsNoticeCode({...initial,code:'rollback_failed'},false),'rollback_failed');
   assert.equal(appSettingsNoticeCode({...initial,code:'ok'},false),'ok');
 });
+
+test('registration query uncertainty preserves known preferences and release guidance',async()=>{
+  for(const code of ['startup_query_failed','recovery_query_failed']) {
+    const value={schema:'krasis.app-settings/v1',code,startAtLogin:true,autoUpdate:true,preferencesKnown:true};
+    const b=createAppSettingsBridge({AppSettings:()=>({...value,privateError:'not for the renderer'})});
+    const read=await b.status();
+    assert.deepEqual(read,value);
+    assert.equal(appSettingsNoticeCode(read,false),code);
+    assert.equal(appReleaseNotice('READY',read,'en'),'Will apply after disconnecting');
+    assert.equal(appReleaseNotice('READY',{...read,autoUpdate:false},'en'),'Downloaded · Enable automatic updates to apply');
+  }
+});
 test('settings toggle is a single explicit native boolean write',async()=>{
   const calls=[];const b=createAppSettingsBridge({SetAppSettings:(...args)=>{calls.push(args);return {schema:'krasis.app-settings/v1',code:'ok',startAtLogin:false,autoUpdate:true}}});
   assert.equal((await b.set(false,true)).startAtLogin,false);assert.deepEqual(calls,[[false,true]]);
