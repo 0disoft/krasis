@@ -54,3 +54,48 @@ Issue #16 remains OPEN: publisher signing and the broader install/remove/data/
 firewall/interruption/rollback acceptance remain unverified. No new build,
 version bump, remote push/ref update, issue comment, API/DB, dependency, runner,
 repository-hygiene, certificate or firewall change is made in this round.
+
+## Subsequent runtime failure: installation success is not service stability
+
+Before finishing the round, fresh doctor contradicts continued healthy protected
+input: A's service is STOPPED, SCM exit 1066/specific code 2, and the replacement
+agent uses portable input. The last successful installation receipt remains
+result 0. Do not turn that installation success into a stability claim.
+
+Direct agent log inspection records CONNECTED/protected source ready at
+12:10:34Z, source reader EOF and failed heartbeat at 12:12:26.894Z, followed by
+fault_source_hook_failed and session_failed. LOGIN-RUNTIME.json records service
+FAILED at 12:12:27.0171177Z: capture, worker-report-eof, missing source report,
+and worker exit RUNNING/unknown when inspected. The source exit fields are
+unknown; they do not prove that native cleanup joined. No matching Krasis
+Application crash/hang event was found in the inspected 12:11:50Z-12:13:00Z
+window; that limited negative result does not establish an external kill or
+exclude a worker failure. Diagnostic request 6787707a19566e5a3174bca71c86d148
+was polled to its terminal EXPIRED state rather than treated as received.
+
+Code inspection identifies a candidate reporting-lifetime problem, not yet a
+reproduced root cause of this runtime event. The source worker's service proof
+Channel uses the same control pipe as the final worker report.
+channel_authority.go fences and eventually closes that Channel after a mandatory
+query expires. bootstrap_windows.go subsequently calls finishWorkerReport on
+the same control pipe after source cleanup. A query owner returning before
+final report delivery can therefore close its report transport. The source
+service must continue fencing a genuinely missing/uncertain cleanup report.
+
+Next implementation step: reproduce expiry/late query completion around the
+final source report; if confirmed, separate the report owner's control-pipe
+lifetime from the query owner's reference. Keep the exact native-query pipe
+alive until actual return, keep authority fencing and process-wide query bounds,
+preserve all failed/uncertain cleanup outcomes, and close the physical pipe only
+after both report delivery and query ownership retire. A bounded failing report
+must never become successful retirement. Add focused regressions before changing
+the shared resource lifecycle. No such fix or test is claimed in this round;
+the ten-minute new-work cutoff has passed.
+
+Recovery uses the unchanged g426 repair after path verification and actual exit
+of all three portable agent/child process handles. It returns exit 0/result 0 at
+12:18:07.8007471Z. The UI is restored at g426 and a saved-peer connect is started.
+Doctor observes matching UI/resident/installed builds and RUNNING service with
+PROTECTED input, initially CONNECTING. Collection e91146012136ff734f00feebf61ae9e8
+is RECEIVED. This recovery is not a fix for the source-worker failure and is not
+grounds to close #6/#7/#16/#20.
