@@ -54,7 +54,14 @@ func TestBoundaryPreflightDoesNotBlockHeartbeatReply(t *testing.T) {
 		defer w.channel.Close()
 		w.started.Store(true)
 		entered, release := make(chan struct{}), make(chan struct{})
-		w.channel.authority.checkInput = func() error { close(entered); <-release; return nil }
+		var announced atomic.Bool
+		w.channel.authority.checkInput = func() error {
+			if !announced.Swap(true) {
+				close(entered)
+			}
+			<-release
+			return nil
+		}
 		w.channel.authority.checkPresent = func() error { return nil }
 		batchDone, replyDone := make(chan error, 1), make(chan error, 1)
 		go func() { batchDone <- w.sendBoundaries([]sourcePacket{boundaryBatchPacket(1)}) }()

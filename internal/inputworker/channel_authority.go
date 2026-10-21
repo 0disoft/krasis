@@ -25,6 +25,7 @@ const (
 	heartbeatAuthorityQuery
 	sourceInputAuthorityQuery
 	sourcePresenceAuthorityQuery
+	sourceAdvisoryAuthorityQuery
 )
 
 // Only read-only proof queries run here. Input injection stays on its original
@@ -55,6 +56,10 @@ func (channel *Channel) authorizeSourcePresence(ctx context.Context) error {
 	return channel.queryAuthority(ctx, false, sourcePresenceAuthorityQuery)
 }
 
+func (channel *Channel) authorizeSourceAdvisory(ctx context.Context) error {
+	return channel.queryAuthority(ctx, false, sourceAdvisoryAuthorityQuery)
+}
+
 func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind authorityQueryKind) error {
 	if channel == nil || ctx == nil {
 		return ErrAuthority
@@ -71,8 +76,8 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 		current := &channel.query
 		if kind == presenceAuthorityQuery || kind == sourcePresenceAuthorityQuery {
 			current = &channel.presenceQuery
-		} else if kind == heartbeatAuthorityQuery {
-			current = &channel.heartbeatQuery
+		} else if kind == heartbeatAuthorityQuery || kind == sourceAdvisoryAuthorityQuery {
+			current = &channel.maintenanceQuery
 		}
 		if previous := *current; previous != nil {
 			channel.queryMu.Unlock()
@@ -94,7 +99,7 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 		queryCtx, merge := handoff.ForkAuthority(ctx)
 		go func() {
 			defer func() { <-authorityQueries }()
-			if kind == sourceInputAuthorityQuery {
+			if kind == sourceInputAuthorityQuery || kind == sourceAdvisoryAuthorityQuery {
 				query.err = channel.authority.checkSource()
 			} else if kind == sourcePresenceAuthorityQuery {
 				query.err = channel.authority.checkSourceHeartbeat()
@@ -153,7 +158,7 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 func (channel *Channel) cancelQuery(query *authorityQuery) {
 	channel.queryMu.Lock()
 	defer channel.queryMu.Unlock()
-	if channel.query != query && channel.presenceQuery != query && channel.heartbeatQuery != query {
+	if channel.query != query && channel.presenceQuery != query && channel.maintenanceQuery != query {
 		return
 	}
 	channel.closing = true

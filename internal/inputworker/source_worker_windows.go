@@ -5,18 +5,19 @@ package inputworker
 import (
 	"context"
 	"errors"
-	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/logindiag"
 	"github.com/0disoft/krasis/internal/peer"
+	"github.com/0disoft/krasis/internal/syncgate"
 	"github.com/0disoft/krasis/internal/wininput"
 )
 
 type sourceWriter struct {
-	mu       sync.Mutex
+	ctx      context.Context
+	mu       syncgate.Mutex
 	channel  *Channel
 	binding  Binding
 	sequence uint64
@@ -33,24 +34,25 @@ func (w *sourceWriter) write(p sourcePacket, current func() bool, retirement boo
 }
 
 func (w *sourceWriter) writePacket(p sourcePacket, current func() bool, retirement, completedReply bool) error {
+	return w.writePacketContext(nil, p, current, retirement, completedReply)
+}
+
+func (w *sourceWriter) writePacketContext(ctx context.Context, p sourcePacket, current func() bool, retirement, completedReply bool) error {
 	if !w.started.Load() && (p.kind == sourceAction || p.kind == sourceBoundary || p.kind == sourceReturn) {
 		return nil
 	}
+	ctx, cancel := w.operation(ctx, retirement || completedReply)
+	defer cancel()
 	if retirement || completedReply || p.kind == sourceReply && p.op == sourceHeartbeat {
-		w.mu.Lock()
+		if err := w.mu.LockContext(ctx); err != nil {
+			return sourceTransportFailure(err)
+		}
 	} else {
 		// Full WTS/SCM authorization may block. It must not own the wire gate
 		// needed by keepalive replies. Admit a fresh proof only with immediate
 		// TryLock success; after contention, wait without a proof and recheck.
-		for {
-			if err := w.channel.authority.checkSource(); err != nil {
-				return sourceTransportFailure(err)
-			}
-			if w.mu.TryLock() {
-				break
-			}
-			w.mu.Lock()
-			w.mu.Unlock()
+		if err := w.lockAuthorized(ctx, false); err != nil {
+			return sourceTransportFailure(err)
 		}
 	}
 	defer w.mu.Unlock()
@@ -66,7 +68,7 @@ func (w *sourceWriter) writePacket(p sourcePacket, current func() bool, retireme
 		// Input and observations retain their full check above. A completed
 		// command reply reports an already known outcome, not new authority.
 		// Recheck the pinned owner's presence after admission and before bytes.
-		if err := w.channel.authority.checkSourceHeartbeat(); err != nil {
+		if err := w.channel.authorizeSourcePresence(ctx); err != nil {
 			return sourceTransportFailure(err)
 		}
 	}
@@ -75,18 +77,22 @@ func (w *sourceWriter) writePacket(p sourcePacket, current func() bool, retireme
 	if err != nil {
 		return err
 	}
-	return w.writeSequenced(data[:], p.sequence)
+	return w.writeSequenced(ctx, data[:], p.sequence)
 }
 
 // Caller owns mu. Only native pre-submission proof (or failure to configure a
 // deadline) can leave the sequence untouched. No failed operation is replayed:
 // this permits only a later, distinct joined-retirement frame to remain valid.
 // Partial/attempted failures poison the stream, even when Write reports zero.
-func (w *sourceWriter) writeSequenced(data []byte, sequence uint64) error {
+func (w *sourceWriter) writeSequenced(ctx context.Context, data []byte, sequence uint64) error {
 	if w.broken {
 		return sourceTransportFailure(ErrProtocol)
 	}
-	err := writeSourceCommand(w.channel.stream, data, time.Now().Add(time.Second))
+	if err := ctx.Err(); err != nil {
+		return sourceTransportFailure(err)
+	}
+	deadline, _ := ctx.Deadline()
+	err := writeSourceCommand(w.channel.stream, data, deadline)
 	if err != nil {
 		var failure *sourceIOFailure
 		if errors.As(err, &failure) && (failure.stage == "deadline" || failure.unsubmitted) {
@@ -102,7 +108,7 @@ func (w *sourceWriter) SendAction(ctx context.Context, action control.InputActio
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	return w.send(sourcePacket{kind: sourceAction, reply: w.epoch.Load(), action: action}, current)
+	return w.writePacketContext(ctx, sourcePacket{kind: sourceAction, reply: w.epoch.Load(), action: action}, current, false, false)
 }
 func (w *sourceWriter) Interrupt(error) error {
 	return sourceTransportFailure(w.channel.stream.SetWriteDeadline(time.Now()))
@@ -167,7 +173,7 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 	hook.SetBoundaryGuard(authorize)
 	var pressedEvidence atomic.Uint32
 	hook.SetAdmissionReporter(func(code string) { pressedEvidence.Store(uint32(sourcePressedEvidence(code))) })
-	writer := &sourceWriter{channel: channel, binding: lease.Binding}
+	writer := &sourceWriter{ctx: run, channel: channel, binding: lease.Binding}
 	session, err := wininput.NewSourceSession(1024, writer)
 	if err != nil {
 		return err

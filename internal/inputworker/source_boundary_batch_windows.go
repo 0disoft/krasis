@@ -44,12 +44,13 @@ func (w *sourceWriter) sendBoundaries(batch []sourcePacket) error {
 	// the shared writer gate needed by heartbeat replies. No input/actions or
 	// capture decisions enter this batch. Validate fully before admission, then
 	// recheck the pinned owner's presence under the sequence/write gate.
-	if err := w.channel.authority.checkSource(); err != nil {
+	ctx, cancel := w.operation(nil, false)
+	defer cancel()
+	if err := w.lockAuthorized(ctx, true); err != nil {
 		return sourceTransportFailure(err)
 	}
-	w.mu.Lock()
 	defer w.mu.Unlock()
-	if err := w.channel.authority.checkSourceHeartbeat(); err != nil {
+	if err := w.channel.authorizeSourcePresence(ctx); err != nil {
 		return sourceTransportFailure(err)
 	}
 	var wire [sourceBoundaryBatchLimit * sourcePacketSize]byte
@@ -66,7 +67,7 @@ func (w *sourceWriter) sendBoundaries(batch []sourcePacket) error {
 		}
 		copy(wire[i*sourcePacketSize:], data[:])
 	}
-	err := w.writeSequenced(wire[:len(batch)*sourcePacketSize], next)
+	err := w.writeSequenced(ctx, wire[:len(batch)*sourcePacketSize], next)
 	var failure *sourceIOFailure
 	if errors.As(err, &failure) && failure.unsubmitted && errors.Is(failure, os.ErrDeadlineExceeded) {
 		// These are advisory pointer samples, just like the bounded queue's

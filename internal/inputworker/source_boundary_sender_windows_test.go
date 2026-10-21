@@ -58,7 +58,9 @@ func TestBoundarySenderBlockedAuthorizationCannotDelayCommandReply(t *testing.T)
 		}
 		cancel()
 		replyErr, pumpErr := <-replied, <-pumped
-		if ackErr != nil || observationErr != nil || replyErr != nil || pumpErr != context.Canceled || ack.op != sourceActivate || ack.sequence != 1 || observation.kind != sourceBoundary || observation.x != 1 || observation.sequence != 2 || checks.Load() != 2 {
+		// An advisory proof may be repeated after contention with the ACK
+		// writer. Both writes must still obtain their own full authorization.
+		if ackErr != nil || observationErr != nil || replyErr != nil || pumpErr != context.Canceled || ack.op != sourceActivate || ack.sequence != 1 || observation.kind != sourceBoundary || observation.x != 1 || observation.sequence != 2 || checks.Load() < 2 {
 			t.Fatal("advisory query delayed command ACK or lost/reordered packets", ack, observation, ackErr, observationErr, replyErr, pumpErr)
 		}
 	})
