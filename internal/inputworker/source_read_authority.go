@@ -6,7 +6,7 @@ import (
 )
 
 // Read admission checks both authenticated owners; a heartbeat never grants
-// input authority. The hook's desktop-affine authorization remains separate.
+// input authority. Actual desktop work remains on its owning Windows thread.
 func authorizeSourceRead(ctx context.Context, service, agent *Channel, op byte) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()

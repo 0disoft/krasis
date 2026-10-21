@@ -151,12 +151,7 @@ func runSourceCapture(ctx context.Context, channel, service *Channel, lease Leas
 	}
 	run, cancel := context.WithDeadline(ctx, lease.ExpiresAt)
 	defer cancel()
-	authorize := func() error {
-		if err := service.authority.checkSource(); err != nil {
-			return err
-		}
-		return channel.authority.checkSource()
-	}
+	authorize := sourceCaptureAuthorization(run, service, channel)
 	authorizeCommand := func(op byte) error {
 		return authorizeSourceRead(run, service, channel, op)
 	}
