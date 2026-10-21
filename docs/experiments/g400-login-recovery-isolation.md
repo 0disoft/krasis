@@ -48,3 +48,42 @@ hardware, UI and signed-distribution gates. No API/DB, runner, dependency,
 firewall, signing, issue-comment, branch/worktree or push changes are included.
 Generation 400 identifies the new executable bundle for the authorized A/B
 application. Applied state and further validation are recorded after completion.
+
+## Paired application and next work
+
+Both PCs applied g400 revision b4421dc6d5ff03b264a1c32c1cccb0f42a8ce67d.
+UI 85 tests, native build, embedded installer provenance and eight-file package
+checks pass. Offline verification accepted 28,125,278 bytes. B update receipt
+5f05932e8fcf554b7226bf06f16ffabc reports UPDATED at the same revision.
+
+A's installer receipt at 00:08:59Z is complete/result 0 with no recovery needed;
+its installed agent SHA-256 matches the packaged agent. The installed native
+cursor/same-point placement and recovery-shutdown smoke exited 0. The immediate
+process snapshot still contained the retiring journal; the next snapshot before
+reconnection contained only the session-0 service. No orphan native input or
+release child was retained. The authorized UI was restarted from g400 and its
+recovery entrypoints report recovery_ready.
+
+B's installer receipt at 00:09:47Z is also complete/result 0. Collection
+8309db8f24e5d42966ae44ff9f01ae39 captured A still CONNECTING during replacement;
+do not mislabel that early snapshot as both connected. Follow-up collection
+adafea74723c5d54978cafc4b34e3866 at 00:10:42Z/44Z confirms both CONNECTED,
+both services READY and protected capture ready. Its 33 A / 36 B current-build
+events contain no fault or startup-failed code. Doctor confirms matched CLI,
+UI, resident and installed builds and completed stage cleanup.
+
+These ordinary-desktop checks do not exercise the new Winlogon release mode,
+held native key/button recovery, lock/sleep, physical endpoint change, home
+hardware, DPI/accessibility or signed external release. The g377 user report is
+not reused as g400 evidence. No additional GitHub issue was closed; the ten
+remaining issues are #4/#5/#6/#7/#15/#16/#20/#50/#59/#70. Only local main and its
+primary checkout exist. No issue comments or remote refs were changed.
+
+Next priority is #50's complete production call-graph audit and an attended
+held-input/Winlogon failure trial, followed by #59's physical/queue semantic
+gates and synchronous desktop/cursor callback dependencies. The ordinary
+portable product route already uses the paired input/guardian transport;
+RunLoginInput's direct native helper is referenced only by its own test. The
+installed ordinary and login product routes now select isolated journals.
+Their source-capture owners still require separate #59 work. No second
+implementation unit was started in this continuation.

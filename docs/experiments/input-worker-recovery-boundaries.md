@@ -1,7 +1,11 @@
 # Remaining recovery ownership boundaries (#50)
 
-Current follow-up: g394-login-native-isolation.md records login native-child
-isolation, the correction to g393's job accounting barrier and paired application.
+Current follow-ups: g399-ordinary-recovery-isolation.md and
+g400-login-recovery-isolation.md record independent release-only native children
+for both installed product journals and paired application. The g394 document
+records the earlier login input isolation and g393 job-accounting correction.
+Historical remaining-work statements below describe their recorded generations;
+use g400's final section for current remaining acceptance.
 The single-worker stall below is the pre-g393 diagnosis and remains relevant to
 direct/foundation serving and the remaining parent authority/desktop audit.
 
