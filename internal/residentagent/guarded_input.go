@@ -13,7 +13,7 @@ import (
 )
 
 type productInputGuard interface {
-	PreparePress(control.PressedToken) (bool, error)
+	PreparePressContext(context.Context, control.PressedToken) (bool, error)
 	CancelPreparedPress(control.PressedToken) error
 	Released(control.PressedToken) error
 }
@@ -36,7 +36,7 @@ func (input *guardedProductInput) Press(ctx context.Context, token control.Press
 	if err := input.checkProtectedInput(ctx); err != nil {
 		return &application.InjectionError{Certainty: application.InjectionNotApplied, Requested: 1, Cause: err}
 	}
-	prepared, err := input.guard.PreparePress(token)
+	prepared, err := input.guard.PreparePressContext(ctx, token)
 	if err != nil {
 		return err
 	}

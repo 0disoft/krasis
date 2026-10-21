@@ -30,7 +30,7 @@ func (input safetyInput) Release(context.Context, control.PressedToken) error {
 
 type safetyGuard struct{ events *[]string }
 
-func (guard safetyGuard) PreparePress(control.PressedToken) (bool, error) {
+func (guard safetyGuard) PreparePressContext(context.Context, control.PressedToken) (bool, error) {
 	*guard.events = append(*guard.events, "prepare")
 	return true, nil
 }

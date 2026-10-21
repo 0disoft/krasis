@@ -30,8 +30,12 @@ type PortableProcesses struct {
 }
 
 func (processes *PortableProcesses) PreparePress(token control.PressedToken) (bool, error) {
+	return processes.PreparePressContext(context.Background(), token)
+}
+
+func (processes *PortableProcesses) PreparePressContext(ctx context.Context, token control.PressedToken) (bool, error) {
 	var prepared bool
-	err := processes.invoke(context.Background(), func(ctx context.Context) error {
+	err := processes.invoke(ctx, func(ctx context.Context) error {
 		return operationFailure("prepare", processes.guardian.invokeContext(ctx, func() error {
 			var err error
 			prepared, err = processes.guardian.client.PreparePress(token)

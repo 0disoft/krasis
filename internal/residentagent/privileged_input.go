@@ -269,9 +269,11 @@ type privilegedBoundary struct {
 // same press in the ordinary crash guard would race its independent key-up.
 type workerOwnedPressGuard struct{}
 
-func (workerOwnedPressGuard) PreparePress(control.PressedToken) (bool, error) { return false, nil }
-func (workerOwnedPressGuard) CancelPreparedPress(control.PressedToken) error  { return nil }
-func (workerOwnedPressGuard) Released(control.PressedToken) error             { return nil }
+func (workerOwnedPressGuard) PreparePressContext(context.Context, control.PressedToken) (bool, error) {
+	return false, nil
+}
+func (workerOwnedPressGuard) CancelPreparedPress(control.PressedToken) error { return nil }
+func (workerOwnedPressGuard) Released(control.PressedToken) error            { return nil }
 func (input *privilegedBoundary) DisarmReturn(intent control.ReturnIntent) {
 	input.guardedProductInput.DisarmReturn(intent)
 	input.worker.close(&intent)

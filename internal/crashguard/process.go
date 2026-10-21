@@ -167,15 +167,21 @@ func startCommand(command *exec.Cmd) (*Process, error) {
 }
 
 func (process *Process) PreparePress(token control.PressedToken) (bool, error) {
-	if process == nil || process.client == nil {
+	return process.PreparePressContext(context.Background(), token)
+}
+
+// Preparation precedes injection and shares its caller's remaining budget.
+// An admitted timeout still poisons and retires the exact protocol owner.
+func (process *Process) PreparePressContext(ctx context.Context, token control.PressedToken) (bool, error) {
+	if process == nil || process.client == nil || ctx == nil {
 		return false, errors.New("crash guard process is not initialized")
 	}
 	var prepared bool
-	err := process.invoke(func() error {
+	err := process.invokeContext(ctx, func() error {
 		var err error
 		prepared, err = process.client.PreparePress(token)
 		return err
-	})
+	}, false)
 	if err != nil {
 		return false, operationFailure("prepare", err)
 	}
