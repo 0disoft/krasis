@@ -4,7 +4,18 @@ This is an incomplete acceptance audit, not a release or hardware approval.
 The user excludes Dependency Dashboard #1 from closure and prohibits Git push,
 remote ref updates and issue comments. Those constraints remain in force.
 
-Latest correction (g424): #50 is CLOSED at 11:34:04Z. Its live original
+Latest correction (g425): #59 is CLOSED at 11:49:00Z. Its original completion
+criteria cover callback wait causes, nonblocking observation, normal idle and
+safe abort on actual progress disagreement. The reproduced lock-order defect
+is fixed in 8f51c46, with original-source regression failures and fixed full
+suite passes. Required immediate desktop checks remain. See
+2026-10-21-issue-59-acceptance.md and ../g425-hook-gate-order.md for rollout.
+At 11:52Z A's g425 UI is RUNNING with a matching verified launch record and
+CONNECTED agent; fresh paired diagnostics report protected input READY.
+Neither export has a g425 handoff sample, so physical stutter remains unverified.
+Live open issues are #1/#4/#5/#6/#7/#15/#16/#20/#70; #1 remains excluded.
+
+Previous correction (g424): #50 is CLOSED at 11:34:04Z. Its live original
 completion criteria require separated injection/network diagnostics, bounded
 cleanup and correct failure/pressed-state recovery, all covered by inspected
 current code and executed regressions. The earlier extra prerequisite of the
@@ -12,7 +23,7 @@ entire physical Winlogon matrix did not belong to #50; that matrix remains
 in #6/#7/#20. See 2026-10-21-issue-50-acceptance.md. Other rows below remain
 an incomplete historical audit, not a current g424 device acceptance claim.
 
-## Current authoritative observations
+## Historical g416 observations (superseded for installed/runtime state)
 
 - Local main is clean after source eb60473 and paired-application record e3c0c30.
 - Installed g416 source is eb6047375746698ecba7635239f59b53c9c75673 on both PCs.
@@ -48,7 +59,7 @@ an incomplete historical audit, not a current g424 device acceptance claim.
 | #16 | Full application/install/update/recovery/remove implementation and successful g416 paired upgrades. | Publisher signing configuration and signed candidate verification; full current-build device install/remove/data/firewall/rollback acceptance. A successful upgrade alone does not prove the full matrix. |
 | #20 | Linked core/product implementation work and the supporting local records. | All linked acceptance issues completed, required default-branch CI, consistent four-device evidence and a signed operable/rollbackable/removable beta candidate. |
 | #50 (CLOSED) | Current diagnostics, injection/cleanup budgets, stalled real-child input/release retirement, partial/unknown outcomes and exact pressed-state/LOCAL recovery regressions. | Original completion criteria verified; full physical release/Winlogon matrix stays in #6/#7/#20. See dedicated acceptance record. |
-| #59 | Observer isolation, hook-progress fences, native retirement owners and g415 cursor reentry fix. | Required desktop/cursor callback behavior and actual physical progress/retirement evidence. Removing immediate desktop checks or detaching callback input is not an acceptance substitute. |
+| #59 (CLOSED) | Observer isolation, hook-progress fences, joined native retirement and g425 removal of the reproduced physical-gate/state-wait inversion. | Original callback/observation/idle/safe-abort criteria verified; immediate desktop checks remain. Full physical matrix stays in #6/#7. See dedicated acceptance record. |
 | #70 | Authenticated route-discovery implementation and endpoint identity/stale-profile regressions. | Actual two-PC address/endpoint change and authenticated reconnection, with unchanged-address DHCP and different-identity rejection kept distinct. |
 
 ## Resume conditions
