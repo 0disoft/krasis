@@ -34,9 +34,11 @@ func (check *sourceHeartbeatCheck) validate(c *sourceClient, ctx context.Context
 	// The full immutable-handle check just completed. Closing the channel or
 	// its proof between preflight and immediate admission must still reject it.
 	a := c.channel.authority
-	a.mu.RLock()
+	if a == nil || a.fenced.Load() || !a.mu.TryRLock() {
+		return ErrAuthority
+	}
 	defer a.mu.RUnlock()
-	if a.closed || a.checkInput == nil || a.checkRecovery == nil || a.closeHandles == nil {
+	if a.fenced.Load() || a.closed || a.checkInput == nil || a.checkRecovery == nil || a.closeHandles == nil {
 		return ErrAuthority
 	}
 	return nil
@@ -80,9 +82,7 @@ func (c *sourceClient) pollHeartbeat(ctx context.Context) (bool, error) {
 	check, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
 	defer cancel()
 	started := time.Now()
-	if err := c.channel.authority.checkHeartbeat(); err != nil {
-		return true, err
-	}
+	err := c.channel.authorizeHeartbeatPresence(check)
 	proof := &sourceHeartbeatCheck{owner: c, elapsed: time.Since(started)}
 	if err := ctx.Err(); err != nil {
 		return false, err
@@ -92,6 +92,9 @@ func (c *sourceClient) pollHeartbeat(ctx context.Context) (bool, error) {
 			emitTiming(c.heartbeatTiming.emit, "installed_source_heartbeat_preflight_expired")
 		}
 		return false, nil // Nothing sent; no sequence, ACK or liveness renewal.
+	}
+	if err != nil {
+		return true, err
 	}
 	if c.commandWaiting.Load() != 0 || !c.mu.TryLock() {
 		return false, nil
@@ -124,7 +127,7 @@ func (c *sourceClient) pollHeartbeat(ctx context.Context) (bool, error) {
 	request, stopRequest := context.WithDeadline(context.WithoutCancel(ctx), deadline)
 	defer stopRequest()
 	sequence := c.sequence
-	_, err := c.callLockedChecked(request, sourceHeartbeat, proof)
+	_, err = c.callLockedChecked(request, sourceHeartbeat, proof)
 	if c.sequence == sequence && (err == context.DeadlineExceeded || err == context.Canceled) {
 		// Admission expired before any frame existed. Actual sent requests and
 		// failed owner checks still take the ordinary failure/retirement path.

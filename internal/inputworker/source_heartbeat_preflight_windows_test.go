@@ -78,6 +78,8 @@ func TestExpiredHeartbeatPreflightSendsNothingAndPreservesOwner(t *testing.T) {
 				t.Fatal("expired unsent heartbeat became a transport failure", attempted, err)
 			}
 		}
+		time.Sleep(200 * time.Millisecond)
+		synctest.Wait() // The expired native presence task still owns its handles.
 		if len(events) != 1 || events[0] != "installed_source_heartbeat_preflight_expired" {
 			t.Fatal("expired preflight evidence missing or unbounded", events)
 		}
@@ -103,6 +105,12 @@ func TestHeartbeatCheckCannotAuthorizeCaptureOrBeReused(t *testing.T) {
 		t.Fatal("heartbeat proof reused")
 	}
 	proof = &sourceHeartbeatCheck{owner: c}
+	c.channel.authority.fenced.Store(true)
+	if proof.validate(c, context.Background(), sourceHeartbeat) == nil {
+		t.Fatal("pending authority retirement accepted heartbeat preflight")
+	}
+	c.channel.authority.fenced.Store(false)
+	proof = &sourceHeartbeatCheck{owner: c}
 	_ = c.channel.authority.Close()
 	if proof.validate(c, context.Background(), sourceHeartbeat) == nil {
 		t.Fatal("closed authority accepted preflight")
@@ -118,11 +126,17 @@ func TestSourceCommandExpiresDuringAuthenticationWithoutStartingRequest(t *testi
 		c.channel.authority.checkInput = func() error { time.Sleep(200 * time.Millisecond); return nil }
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
-		if _, err := c.call(ctx, sourceActivate); err != context.DeadlineExceeded {
+		started := time.Now()
+		if _, err := c.call(ctx, sourceActivate); err != context.DeadlineExceeded || time.Since(started) != 100*time.Millisecond {
 			t.Fatal("expired authentication did not retain the caller outcome", err)
 		}
-		if c.sequence != 0 || c.epoch.Load() != 0 || c.channel.authority.closed {
-			t.Fatal("unsent activation consumed an epoch or retired the owner")
+		if c.sequence != 0 || c.epoch.Load() != 0 || c.channel.authority.closed || !c.channel.authority.fenced.Load() {
+			t.Error("unsent activation consumed an epoch or discarded pending native ownership")
+		}
+		time.Sleep(100 * time.Millisecond)
+		synctest.Wait()
+		if !c.channel.authority.closed || c.channel.Close() != nil {
+			t.Fatal("late authentication did not retire its fenced owner")
 		}
 	})
 }

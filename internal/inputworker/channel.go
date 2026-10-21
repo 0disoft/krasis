@@ -9,14 +9,15 @@ import (
 // Channel ties one authenticated kernel pipe to its process proof. Its private
 // fields prevent callers from pairing a proof with an unrelated input stream.
 type Channel struct {
-	stream        net.Conn
-	authority     *Authority
-	closeOnce     sync.Once
-	closeErr      error
-	queryMu       sync.Mutex
-	query         *authorityQuery
-	presenceQuery *authorityQuery
-	closing       bool
+	stream         net.Conn
+	authority      *Authority
+	closeOnce      sync.Once
+	closeErr       error
+	queryMu        sync.Mutex
+	query          *authorityQuery
+	presenceQuery  *authorityQuery
+	heartbeatQuery *authorityQuery
+	closing        bool
 }
 
 func (channel *Channel) Close() error {
@@ -25,7 +26,7 @@ func (channel *Channel) Close() error {
 	}
 	channel.queryMu.Lock()
 	channel.closing = true
-	if channel.query != nil || channel.presenceQuery != nil {
+	if channel.pendingQueriesLocked() {
 		channel.authority.fenced.Store(true)
 		// Interrupt wire work, but retain the pipe and proof handles used by
 		// the read-only native query. Its owner closes them after it returns.
@@ -37,6 +38,10 @@ func (channel *Channel) Close() error {
 	}
 	channel.queryMu.Unlock()
 	return channel.closeResources()
+}
+
+func (channel *Channel) pendingQueriesLocked() bool {
+	return channel.query != nil || channel.presenceQuery != nil || channel.heartbeatQuery != nil
 }
 
 func (channel *Channel) closeResources() error {

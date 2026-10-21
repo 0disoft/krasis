@@ -16,20 +16,35 @@ type authorityQuery struct {
 	err  error
 }
 
+type authorityQueryKind uint8
+
+const (
+	inputAuthorityQuery authorityQueryKind = iota
+	presenceAuthorityQuery
+	heartbeatAuthorityQuery
+)
+
 // Only read-only proof queries run here. Input injection stays on its original
 // ordered worker. Every command obtains a fresh query; no success is cached.
 func (channel *Channel) authorizeInput(ctx context.Context, observed bool) error {
-	return channel.queryAuthority(ctx, observed, false)
+	return channel.queryAuthority(ctx, observed, inputAuthorityQuery)
 }
 
 // Presence has independent admission so a slow full SCM authorization cannot
 // starve actual worker heartbeats. Both lanes retain native handles and share
 // the process-wide capacity until their queries really return.
 func (channel *Channel) authorizePresence(ctx context.Context) error {
-	return channel.queryAuthority(ctx, false, true)
+	return channel.queryAuthority(ctx, false, presenceAuthorityQuery)
 }
 
-func (channel *Channel) queryAuthority(ctx context.Context, observed, presence bool) error {
+// Unsent optional maintenance never grants input authority. Its expired native
+// query keeps its slot/handles without retiring a healthy command owner. New
+// commands require independent fresh checks; Close still joins every lane.
+func (channel *Channel) authorizeHeartbeatPresence(ctx context.Context) error {
+	return channel.queryAuthority(ctx, false, heartbeatAuthorityQuery)
+}
+
+func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind authorityQueryKind) error {
 	if channel == nil || ctx == nil {
 		return ErrAuthority
 	}
@@ -43,8 +58,10 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed, presence b
 			return ErrAuthority
 		}
 		current := &channel.query
-		if presence {
+		if kind == presenceAuthorityQuery {
 			current = &channel.presenceQuery
+		} else if kind == heartbeatAuthorityQuery {
+			current = &channel.heartbeatQuery
 		}
 		if previous := *current; previous != nil {
 			channel.queryMu.Unlock()
@@ -66,7 +83,7 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed, presence b
 		queryCtx, merge := handoff.ForkAuthority(ctx)
 		go func() {
 			defer func() { <-authorityQueries }()
-			if presence {
+			if kind != inputAuthorityQuery {
 				query.err = channel.authority.checkHeartbeat()
 			} else if observed {
 				query.err = channel.authority.checkObserved(queryCtx, false)
@@ -74,14 +91,14 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed, presence b
 				query.err = channel.authority.check(false)
 			}
 			channel.queryMu.Lock()
-			if ctx.Err() != nil {
+			if ctx.Err() != nil && kind != heartbeatAuthorityQuery {
 				channel.closing = true
 				channel.authority.fenced.Store(true)
 			}
 			*current = nil
 			if channel.closing {
 				query.err = ErrAuthority
-				if channel.query == nil && channel.presenceQuery == nil {
+				if !channel.pendingQueriesLocked() {
 					channel.queryMu.Unlock()
 					_ = channel.closeResources()
 					channel.queryMu.Lock()
@@ -94,13 +111,17 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed, presence b
 		select {
 		case <-query.done:
 			if err := ctx.Err(); err != nil {
-				_ = channel.Close()
+				if kind != heartbeatAuthorityQuery {
+					_ = channel.Close()
+				}
 				return errors.Join(ErrAuthority, err)
 			}
 			merge() // The query can no longer mutate its diagnostic sample.
 			return query.err
 		case <-ctx.Done():
-			_ = channel.Close()
+			if kind != heartbeatAuthorityQuery {
+				_ = channel.Close()
+			}
 			return errors.Join(ErrAuthority, ctx.Err())
 		}
 	}

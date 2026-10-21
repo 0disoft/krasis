@@ -28,6 +28,9 @@ func TestSourceCommandAuthorizationDoesNotStarveHeartbeat(t *testing.T) {
 	defer cancel()
 	go func() { _, err := c.call(ctx, sourceActivate); command <- err }()
 	<-entered
+	c.channel.queryMu.Lock()
+	query := c.channel.query
+	c.channel.queryMu.Unlock()
 	wire := make(chan sourcePacket, 1)
 	go func() {
 		p, err := readSourcePacket(server)
@@ -38,10 +41,12 @@ func TestSourceCommandAuthorizationDoesNotStarveHeartbeat(t *testing.T) {
 	}()
 	attempted, err := c.pollHeartbeat(context.Background())
 	// Cancel the unsent command before releasing its native query. It must not
-	// consume a sequence or retire the independent, authenticated heartbeat.
+	// consume a sequence or invalidate the heartbeat already acknowledged.
+	// The pending query must retain its handles until native return.
 	cancel()
 	once.Do(func() { close(release) })
 	commandErr := <-command
+	<-query.done
 	if !attempted || err != nil || commandErr != context.Canceled {
 		t.Fatal("slow unsent command starved heartbeat", attempted, err, commandErr)
 	}
@@ -50,7 +55,7 @@ func TestSourceCommandAuthorizationDoesNotStarveHeartbeat(t *testing.T) {
 	}
 	select {
 	case p := <-wire:
-		if p.op != sourceHeartbeat || p.sequence != 1 || c.sequence != 1 || c.epoch.Load() != 0 || c.channel.authority.closed {
+		if p.op != sourceHeartbeat || p.sequence != 1 || c.sequence != 1 || c.epoch.Load() != 0 || !c.channel.authority.closed {
 			t.Fatal("unsent command altered heartbeat or capture ownership", p)
 		}
 	case <-time.After(time.Second):

@@ -15,6 +15,7 @@ import (
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/handoff"
 	"github.com/0disoft/krasis/internal/peer"
+	"github.com/0disoft/krasis/internal/syncgate"
 	"github.com/0disoft/krasis/internal/wininput"
 )
 
@@ -33,7 +34,7 @@ type CaptureSource struct {
 type sourceClient struct {
 	channel                 *Channel
 	binding                 Binding
-	mu                      sync.Mutex
+	mu                      syncgate.Mutex
 	commandWaiting          atomic.Int32 // Published before mu; idle maintenance yields to queued commands.
 	preflightExpired        atomic.Bool  // At most one fixed diagnostic per capture owner.
 	commandPreflightExpired atomic.Bool  // Unsent command query exhausted its caller budget.
@@ -199,9 +200,9 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 	var authorityElapsed time.Duration
 	if command != nil {
 		authorityErr = command.validate(c, ctx, op)
-		authorityElapsed = command.elapsed
+		authorityElapsed = command.elapsed + time.Since(started)
 	} else if heartbeat == nil {
-		authorityErr = c.channel.authority.check(false)
+		authorityErr = c.channel.authorizeInput(ctx, false)
 		authorityElapsed = time.Since(started)
 	} else {
 		authorityErr = heartbeat.validate(c, ctx, op)
@@ -212,11 +213,14 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 		handoff.RecordCapture(ctx, handoff.CaptureIPCAuthority, authorityElapsed)
 	}
 	if authorityErr != nil {
-		if authorityErr == context.Canceled || authorityErr == context.DeadlineExceeded {
-			// Proof admission can race the entry check above. This is still an
-			// unsent request, not loss of authority or an unknown wire outcome.
+		if ctx.Err() != nil {
+			// Proof admission can race the entry check above. No request was
+			// sent; a fenced pending native query still requires retirement.
 			accepted = true
-			return sourcePacket{}, authorityErr
+			if c.channel.authority.fenced.Load() {
+				c.epoch.Store(0)
+			}
+			return sourcePacket{}, ctx.Err()
 		}
 		if op == sourceStop && c.awaitRetirement(ctx) == nil {
 			accepted = true
@@ -225,9 +229,8 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 		return sourcePacket{}, ErrAuthority
 	}
 	if ctx.Err() != nil {
-		// A synchronous OS check can outlive the caller's budget. No command
-		// has been written: do not consume sequence, publish an epoch or close
-		// an otherwise authenticated owner as if a request had timed out.
+		// Cancellation can race fresh proof completion. No command was written:
+		// retain the sequence and never publish a new epoch from this proof.
 		accepted = true
 		return sourcePacket{}, ctx.Err()
 	}
