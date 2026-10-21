@@ -5,9 +5,12 @@ import (
 	"errors"
 	"net"
 	"os"
+	"syscall"
 	"testing"
 	"testing/synctest"
 	"time"
+
+	"github.com/0disoft/krasis/internal/inputdesktop"
 )
 
 func TestSourceStandbyDoesNotTreatIdleSchedulerPauseAsActiveCaptureFailure(t *testing.T) {
@@ -82,6 +85,33 @@ func TestSourcePresenceLossStopsStandbyWithoutWaitingForIdleDeadline(t *testing.
 		cancel()
 		if err := watchSourcePresence(ctx, func() error { t.Fatal("queried after cancellation"); return nil }); err != nil {
 			t.Fatal(err)
+		}
+	})
+}
+
+func TestSourcePresenceWatchRetainsSanitizedFailureInServiceReport(t *testing.T) {
+	for _, operation := range []string{"authority-process-exited", "authority-console-session", "authority-service-pipe"} {
+		synctest.Test(t, func(t *testing.T) {
+			cause := authorityCheckFailed(operation, syscall.Errno(5))
+			observed := watchSourcePresence(context.Background(), func() error { return cause })
+			if !errors.Is(observed, ErrAuthority) {
+				t.Fatal("watcher lost authority denial", observed)
+			}
+			loop := &sourceReaderFailure{operation: "source-reader-authority", cause: observed}
+			err := sourceCaptureFinal(loop, inputdesktop.ErrInactive, context.Canceled, false)
+			code, native := reportFailureDetails(err)
+			if reportOperations[code] != operation || native != 5 {
+				t.Fatalf("watcher erased native failure: operation=%s native=%d", reportOperations[code], native)
+			}
+			if sourceRetirementStatus(err) != 0 || sourceRetirementStatus(errors.Join(err, ErrRecovery)) != 1 {
+				t.Fatal("diagnostic propagation changed retirement safety")
+			}
+		})
+	}
+	synctest.Test(t, func(t *testing.T) {
+		private := errors.New("SECRET/PIN/path")
+		if observed := watchSourcePresence(context.Background(), func() error { return private }); observed != ErrAuthority {
+			t.Fatal("watcher retained arbitrary callback details", observed)
 		}
 	})
 }

@@ -53,8 +53,8 @@ func watchSourcePresence(ctx context.Context, check func() error) error {
 			if ctx.Err() != nil {
 				return nil
 			}
-			if check() != nil {
-				return ErrAuthority
+			if err := check(); err != nil {
+				return sourceAuthorityResult(err)
 			}
 		}
 	}
