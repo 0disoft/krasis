@@ -69,3 +69,34 @@ func TestAuthorityChecksOverlapButCloseJoinsBothReaders(t *testing.T) {
 		t.Fatal("closed authority accepted a fresh check")
 	}
 }
+
+func TestPresenceChecksDoNotWaitForProofRetirement(t *testing.T) {
+	for _, source := range []bool{false, true} {
+		queried := false
+		a := &Authority{checkInput: func() error { return nil }, checkRecovery: func() error { return nil }, checkPresent: func() error { queried = true; return nil }, closeHandles: func() error { return nil }}
+		check := a.checkHeartbeat
+		if source {
+			check = a.checkSourceHeartbeat
+		}
+		a.mu.Lock()
+		done := make(chan error, 1)
+		go func() { done <- check() }()
+		select {
+		case err := <-done:
+			a.mu.Unlock()
+			if !errors.Is(err, ErrAuthority) || queried {
+				t.Fatal("closing proof queried handles or accepted presence", err)
+			}
+		case <-time.After(time.Second):
+			a.mu.Unlock()
+			<-done
+			t.Fatal("presence check waited for proof retirement", source)
+		}
+		if err := check(); err != nil || !queried {
+			t.Fatal("available presence proof was not checked freshly", err)
+		}
+		if err := a.Close(); err != nil || check() != ErrAuthority {
+			t.Fatal("closed proof accepted presence", err)
+		}
+	}
+}

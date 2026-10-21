@@ -48,10 +48,12 @@ func (authority *Authority) checkSourceHeartbeat() error {
 }
 
 func (authority *Authority) heartbeatResult() error {
-	if authority == nil || authority.fenced.Load() {
+	// A pending Close may be joining a native authority query. Presence callers
+	// must deny immediately rather than wait behind that writer while holding
+	// their input/heartbeat gate. An acquired reader still pins the live handles.
+	if authority == nil || authority.fenced.Load() || !authority.mu.TryRLock() {
 		return ErrAuthority
 	}
-	authority.mu.RLock()
 	defer authority.mu.RUnlock()
 	if authority.fenced.Load() || authority.closed || authority.checkInput == nil || authority.checkRecovery == nil || authority.closeHandles == nil {
 		return ErrAuthority
