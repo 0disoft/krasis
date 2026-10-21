@@ -122,3 +122,85 @@ func TestReturnCursorRestoreAndMessageFailuresAreNotReportedAsSuccess(t *testing
 		t.Fatalf("post failure lost: %v", err)
 	}
 }
+
+func TestReturnCursorNativeReentryCannotReshowAfterLocalInput(t *testing.T) {
+	for _, stage := range []string{"position", "show"} {
+		t.Run(stage, func(t *testing.T) {
+			oldPosition, oldShow, oldHide := returnCursorPosition, returnCursorShowWindow, returnCursorHideWindow
+			t.Cleanup(func() {
+				returnCursorPosition, returnCursorShowWindow, returnCursorHideWindow = oldPosition, oldShow, oldHide
+			})
+			position := point{X: 10, Y: 20}
+			shield := &returnCursorShield{position: position}
+			shield.window.Store(123)
+			nativeVisible, shows := false, 0
+			input := func() {
+				if err := shield.beforeInput(); err != nil {
+					t.Fatal(err)
+				}
+			}
+			returnCursorPosition = func() (point, error) {
+				if stage == "position" {
+					input()
+				}
+				return position, nil
+			}
+			returnCursorHideWindow = func(uintptr) error { nativeVisible = false; return nil }
+			returnCursorShowWindow = func(uintptr, point) error {
+				shows++
+				if stage == "show" {
+					input() // Native window calls may dispatch the input hook synchronously.
+				}
+				nativeVisible = true // The outer native operation completes after that hook.
+				return nil
+			}
+			shield.show(shield.generation.Load())
+			if nativeVisible || shield.visible || stage == "position" && shows != 0 {
+				t.Fatalf("stale presentation survived %s reentry: native=%t ledger=%t shows=%d", stage, nativeVisible, shield.visible, shows)
+			}
+		})
+	}
+}
+
+func TestReturnCursorHideReentryDoesNotRepeatNativeHide(t *testing.T) {
+	oldHide := returnCursorHideWindow
+	t.Cleanup(func() { returnCursorHideWindow = oldHide })
+	shield := &returnCursorShield{visible: true}
+	shield.window.Store(123)
+	hides := 0
+	returnCursorHideWindow = func(uintptr) error {
+		hides++
+		if hides == 1 {
+			if err := shield.beforeInput(); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return nil
+	}
+	if err := shield.beforeInput(); err != nil || hides != 1 || shield.visible {
+		t.Fatalf("hide reentry repeated native work: calls=%d visible=%t err=%v", hides, shield.visible, err)
+	}
+}
+
+func TestReturnCursorLateShowCleanupFailureRemainsVisibleAndFaulted(t *testing.T) {
+	oldPosition, oldShow, oldHide := returnCursorPosition, returnCursorShowWindow, returnCursorHideWindow
+	t.Cleanup(func() {
+		returnCursorPosition, returnCursorShowWindow, returnCursorHideWindow = oldPosition, oldShow, oldHide
+	})
+	shield := &returnCursorShield{}
+	shield.window.Store(123)
+	failure, hides := errors.New("late native hide failed"), 0
+	returnCursorPosition = func() (point, error) { return point{}, nil }
+	returnCursorShowWindow = func(uintptr, point) error { return shield.beforeInput() }
+	returnCursorHideWindow = func(uintptr) error {
+		hides++
+		if hides > 1 {
+			return failure
+		}
+		return nil
+	}
+	shield.show(shield.generation.Load())
+	if hides != 2 || !shield.visible || !errors.Is(shield.failureResult(), failure) || SourceFailureStage(shield.failureResult()) != "cursor-restore" {
+		t.Fatalf("late hide failure lost: calls=%d visible=%t err=%v", hides, shield.visible, shield.failureResult())
+	}
+}

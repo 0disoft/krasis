@@ -124,11 +124,12 @@ func (shield *returnCursorShield) prepare() func() {
 	}
 	return func() {
 		shield.mu.Lock()
-		defer shield.mu.Unlock()
 		if shield.generation.Load() != generation {
+			shield.mu.Unlock()
 			return
 		}
 		shield.position = position
+		shield.mu.Unlock()
 		if window := shield.window.Load(); window != 0 {
 			shield.record("cursor-present", returnCursorPost(window, wmReturnCursorShow, generation))
 		}
@@ -143,23 +144,43 @@ func (shield *returnCursorShield) show(generation uint64) {
 		return
 	}
 	shield.mu.Lock()
-	defer shield.mu.Unlock()
+	expectedPosition := shield.position
+	shield.mu.Unlock()
 	if shield.generation.Load() != generation {
 		result = "superseded"
 		return
 	}
 	position, err := returnCursorPosition()
-	if err != nil || position != shield.position {
+	if err != nil || position != expectedPosition {
 		result = "moved"
 		if err != nil {
 			result = "failed"
 		}
 		return
 	}
+	// Native queries/window calls can dispatch this thread's hook again. Input
+	// invalidation must win even when the cursor stayed at the same position.
+	if shield.generation.Load() != generation {
+		result = "superseded"
+		return
+	}
 	if window := shield.window.Load(); window != 0 {
 		shield.visible = true
 		err := returnCursorShowWindow(window, position)
 		shield.record("cursor-present", err)
+		if shield.generation.Load() != generation {
+			// A nested hook may have hidden the window before the outer show
+			// completed. Its false ledger alone cannot prove it stayed hidden.
+			if shield.window.Load() == window {
+				shield.visible = true
+				shield.hide()
+			}
+			result = "superseded"
+			if shield.failureResult() != nil {
+				result = "failed"
+			}
+			return
+		}
 		result = "accepted"
 		if err != nil {
 			result = "failed"
@@ -176,11 +197,13 @@ func (shield *returnCursorShield) observe(operation, result string, started time
 func (shield *returnCursorShield) hide() {
 	if shield.visible {
 		started, result := time.Now(), "accepted"
+		// A native hide can itself reenter the hook. Publish the in-progress
+		// hide before that call so nested input cannot recursively hide forever.
+		shield.visible = false
 		if err := returnCursorHideWindow(shield.window.Load()); err != nil {
+			shield.visible = true
 			shield.record("cursor-restore", err)
 			result = "failed"
-		} else {
-			shield.visible = false
 		}
 		shield.observe("return_hide", result, started)
 	}
