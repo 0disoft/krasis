@@ -51,3 +51,30 @@ profile; at 10:33Z status is CONNECTED with PROTECTED input. During A's
 installation B logged acquisition timeouts; those replacement-window events
 are not a post-connection stability result. Physical round-trip feedback and
 the final paired history remain pending at this point.
+
+## Reproduced remaining failure and next step
+
+Collection `03665bb12eceeda393f3d6d7df5d33c6` records another A failure at
+10:33:33Z, after the initial connection. A reports source-reader-authority,
+joined capture/sender/interrupt, delivery_failed retirement and a failed final
+report without a native code. Agent heartbeat response exceeds one second and
+its reader reaches EOF. B's independent source retires cleanly and its session
+enters RECONNECTING. This is direct evidence that g421 does not resolve the
+entire reported reconnect problem; do not close its tracking criteria.
+
+After the existing recovery/reconnect flow, A and B reconnect at 10:33:46Z /
+10:33:45Z. Collection `a34dbb12388b9aafd3f7236e396de81f` at 10:35Z shows
+both READY and no second source exit since installation. No g421 handoff
+profile is present, so this is idle connection evidence, not physical
+round-trip acceptance. User feedback is still pending.
+
+Next distinguish read-side authorization from the independent presence
+watcher's error, and preserve query stage/reason (service versus agent,
+capacity/deadline versus native rejection) before generic source-reader-authority
+projection. Inspect source read/presence query ownership and cancellation
+races without suppressing mandatory failures or widening input authority.
+No new implementation was started after this run's ten-minute cutoff.
+
+The local runtime trace copied during inspection has timestamp 10:22:57Z,
+from g420; it is not evidence of the g421 worker failure. A fresh worker-side
+trace or stage-specific report is needed before attributing its native delay.
