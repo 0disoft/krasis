@@ -106,9 +106,8 @@ func productRunnerWithTrace(identities *productidentity.Store, trust *truststore
 	profiles := handoff.NewRolling(func(s handoff.Summary) {
 		log.Handoff(s)
 		// Summary emission follows return/cleanup, outside the active input
-		// path. Capture the runtime timeline of a slow, completed exchange too.
-		if captureTrace != nil && s.Role == "source" && s.Exchange != nil &&
-			s.Exchange.Measured&1 != 0 && s.Exchange.Micros[handoff.RequestWrittenToGrantRead] >= 80000 {
+		// path. Capture slow network exchanges and local capture transitions.
+		if captureTrace != nil && handoffNeedsTrace(s) {
 			captureTrace()
 		}
 	})
