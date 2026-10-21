@@ -19,6 +19,17 @@ type authorityQuery struct {
 // Only read-only proof queries run here. Input injection stays on its original
 // ordered worker. Every command obtains a fresh query; no success is cached.
 func (channel *Channel) authorizeInput(ctx context.Context, observed bool) error {
+	return channel.queryAuthority(ctx, observed, false)
+}
+
+// Presence has independent admission so a slow full SCM authorization cannot
+// starve actual worker heartbeats. Both lanes retain native handles and share
+// the process-wide capacity until their queries really return.
+func (channel *Channel) authorizePresence(ctx context.Context) error {
+	return channel.queryAuthority(ctx, false, true)
+}
+
+func (channel *Channel) queryAuthority(ctx context.Context, observed, presence bool) error {
 	if channel == nil || ctx == nil {
 		return ErrAuthority
 	}
@@ -31,7 +42,11 @@ func (channel *Channel) authorizeInput(ctx context.Context, observed bool) error
 			channel.queryMu.Unlock()
 			return ErrAuthority
 		}
-		if previous := channel.query; previous != nil {
+		current := &channel.query
+		if presence {
+			current = &channel.presenceQuery
+		}
+		if previous := *current; previous != nil {
 			channel.queryMu.Unlock()
 			select {
 			case <-previous.done:
@@ -47,11 +62,13 @@ func (channel *Channel) authorizeInput(ctx context.Context, observed bool) error
 			return ErrAuthority
 		}
 		query := &authorityQuery{done: make(chan struct{})}
-		channel.query = query
+		*current = query
 		queryCtx, merge := handoff.ForkAuthority(ctx)
 		go func() {
 			defer func() { <-authorityQueries }()
-			if observed {
+			if presence {
+				query.err = channel.authority.checkHeartbeat()
+			} else if observed {
 				query.err = channel.authority.checkObserved(queryCtx, false)
 			} else {
 				query.err = channel.authority.check(false)
@@ -61,13 +78,15 @@ func (channel *Channel) authorizeInput(ctx context.Context, observed bool) error
 				channel.closing = true
 				channel.authority.fenced.Store(true)
 			}
+			*current = nil
 			if channel.closing {
-				channel.queryMu.Unlock()
-				_ = channel.closeResources()
-				channel.queryMu.Lock()
 				query.err = ErrAuthority
+				if channel.query == nil && channel.presenceQuery == nil {
+					channel.queryMu.Unlock()
+					_ = channel.closeResources()
+					channel.queryMu.Lock()
+				}
 			}
-			channel.query = nil
 			close(query.done)
 			channel.queryMu.Unlock()
 		}()

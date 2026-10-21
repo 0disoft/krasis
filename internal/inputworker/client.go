@@ -196,7 +196,7 @@ func (client *Client) performResponse(ctx context.Context, command request, obse
 		// Maintenance checks only the pinned pipe owner. Input has just
 		// completed full authorization without waiting for this gate; still
 		// reject a closed/exited owner before submitting any request.
-		authorityErr = client.channel.authority.checkHeartbeat()
+		authorityErr = client.channel.authorizePresence(ctx)
 	}
 	authorityElapsed += time.Since(start)
 	sample[1] = timingBucket(authorityElapsed)
@@ -205,7 +205,7 @@ func (client *Client) performResponse(ctx context.Context, command request, obse
 	}
 	if authorityErr != nil {
 		client.fail()
-		return notSent(ErrExpired)
+		return notSent(errors.Join(ErrExpired, ctx.Err()))
 	}
 	// Native authorization can outlast the caller or the exact lease. No
 	// request has been submitted yet, so retain not-sent certainty and the
