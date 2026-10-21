@@ -204,6 +204,11 @@ func (client *Client) performResponse(ctx context.Context, command request, obse
 		handoff.Record(ctx, handoff.ClientAuthority, authorityElapsed)
 	}
 	if authorityErr != nil {
+		if ctx.Err() != nil && !client.channel.authority.fenced.Load() {
+			// The read-only query already completed. Cancellation before bytes
+			// does not require retiring its otherwise available process proof.
+			return notSent(ctx.Err())
+		}
 		client.fail()
 		return notSent(errors.Join(ErrExpired, ctx.Err()))
 	}

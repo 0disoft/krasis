@@ -3,6 +3,7 @@ package inputworker
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/0disoft/krasis/internal/handoff"
 )
@@ -22,6 +23,8 @@ const (
 	inputAuthorityQuery authorityQueryKind = iota
 	presenceAuthorityQuery
 	heartbeatAuthorityQuery
+	sourceInputAuthorityQuery
+	sourcePresenceAuthorityQuery
 )
 
 // Only read-only proof queries run here. Input injection stays on its original
@@ -44,6 +47,14 @@ func (channel *Channel) authorizeHeartbeatPresence(ctx context.Context) error {
 	return channel.queryAuthority(ctx, false, heartbeatAuthorityQuery)
 }
 
+func (channel *Channel) authorizeSourceInput(ctx context.Context) error {
+	return channel.queryAuthority(ctx, false, sourceInputAuthorityQuery)
+}
+
+func (channel *Channel) authorizeSourcePresence(ctx context.Context) error {
+	return channel.queryAuthority(ctx, false, sourcePresenceAuthorityQuery)
+}
+
 func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind authorityQueryKind) error {
 	if channel == nil || ctx == nil {
 		return ErrAuthority
@@ -58,7 +69,7 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 			return ErrAuthority
 		}
 		current := &channel.query
-		if kind == presenceAuthorityQuery {
+		if kind == presenceAuthorityQuery || kind == sourcePresenceAuthorityQuery {
 			current = &channel.presenceQuery
 		} else if kind == heartbeatAuthorityQuery {
 			current = &channel.heartbeatQuery
@@ -83,7 +94,11 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 		queryCtx, merge := handoff.ForkAuthority(ctx)
 		go func() {
 			defer func() { <-authorityQueries }()
-			if kind != inputAuthorityQuery {
+			if kind == sourceInputAuthorityQuery {
+				query.err = channel.authority.checkSource()
+			} else if kind == sourcePresenceAuthorityQuery {
+				query.err = channel.authority.checkSourceHeartbeat()
+			} else if kind != inputAuthorityQuery {
 				query.err = channel.authority.checkHeartbeat()
 			} else if observed {
 				query.err = channel.authority.checkObserved(queryCtx, false)
@@ -99,9 +114,14 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 			if channel.closing {
 				query.err = ErrAuthority
 				if !channel.pendingQueriesLocked() {
+					// Resource retirement may itself join a native owner. Retain
+					// this lifecycle marker until it actually completes, so Close
+					// cannot block on closeOnce or claim cleanup prematurely.
+					*current = query
 					channel.queryMu.Unlock()
 					_ = channel.closeResources()
 					channel.queryMu.Lock()
+					*current = nil
 				}
 			}
 			close(query.done)
@@ -112,7 +132,7 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 		case <-query.done:
 			if err := ctx.Err(); err != nil {
 				if kind != heartbeatAuthorityQuery {
-					_ = channel.Close()
+					channel.cancelQuery(query)
 				}
 				return errors.Join(ErrAuthority, err)
 			}
@@ -120,9 +140,25 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 			return query.err
 		case <-ctx.Done():
 			if kind != heartbeatAuthorityQuery {
-				_ = channel.Close()
+				channel.cancelQuery(query)
 			}
 			return errors.Join(ErrAuthority, ctx.Err())
 		}
+	}
+}
+
+// Cancel only the task this caller owns. If its result already completed, there
+// is no pending native work to retire. Never start/join cleanup on a caller whose
+// deadline has already expired; the retained query owner finishes that work.
+func (channel *Channel) cancelQuery(query *authorityQuery) {
+	channel.queryMu.Lock()
+	defer channel.queryMu.Unlock()
+	if channel.query != query && channel.presenceQuery != query && channel.heartbeatQuery != query {
+		return
+	}
+	channel.closing = true
+	channel.authority.fenced.Store(true)
+	if channel.stream != nil {
+		_ = channel.stream.SetDeadline(time.Now())
 	}
 }
