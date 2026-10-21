@@ -26,6 +26,6 @@ or peer transfer. Only fixed enable/save/fail/expiry codes enter ordinary logs.
 The trace is local debugging evidence; source stacks can contain build paths.
 
 This is evidence capture, not a claim that the remaining stall is fixed.
-Use `go tool trace -d=1` or offline pprof output to compare STW boundaries with
+With Go 1.27, use `go tool trace -d=parsed` or offline pprof output to compare STW boundaries with
 long syscall and runnable intervals. Do not run the interactive trace server.
 The environment switch is per launch, so an ordinary relaunch disables it.
