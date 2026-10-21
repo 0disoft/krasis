@@ -4,6 +4,14 @@ This is an incomplete acceptance audit, not a release or hardware approval.
 The user excludes Dependency Dashboard #1 from closure and prohibits Git push,
 remote ref updates and issue comments. Those constraints remain in force.
 
+Latest correction (g424): #50 is CLOSED at 11:34:04Z. Its live original
+completion criteria require separated injection/network diagnostics, bounded
+cleanup and correct failure/pressed-state recovery, all covered by inspected
+current code and executed regressions. The earlier extra prerequisite of the
+entire physical Winlogon matrix did not belong to #50; that matrix remains
+in #6/#7/#20. See 2026-10-21-issue-50-acceptance.md. Other rows below remain
+an incomplete historical audit, not a current g424 device acceptance claim.
+
 ## Current authoritative observations
 
 - Local main is clean after source eb60473 and paired-application record e3c0c30.
@@ -39,7 +47,7 @@ remote ref updates and issue comments. Those constraints remain in force.
 | #15 | Product UI/control implementation, 85 UI tests and labeled connected accessibility tree. | Reviewable screenshot, keyboard/accessibility/localization/high-DPI and state coverage, plus publication/exact-revision CI. The security prompt currently blocks the screenshot review. |
 | #16 | Full application/install/update/recovery/remove implementation and successful g416 paired upgrades. | Publisher signing configuration and signed candidate verification; full current-build device install/remove/data/firewall/rollback acceptance. A successful upgrade alone does not prove the full matrix. |
 | #20 | Linked core/product implementation work and the supporting local records. | All linked acceptance issues completed, required default-branch CI, consistent four-device evidence and a signed operable/rollbackable/removable beta candidate. |
-| #50 | Injection/cleanup budgets, input/heartbeat attribution, stalled-input regressions and g416 real-child guard preparation fix. | Remaining native/physical held-input and Winlogon cleanup proof. An IPC deadline fixture does not establish a native SendInput or physical release outcome. |
+| #50 (CLOSED) | Current diagnostics, injection/cleanup budgets, stalled real-child input/release retirement, partial/unknown outcomes and exact pressed-state/LOCAL recovery regressions. | Original completion criteria verified; full physical release/Winlogon matrix stays in #6/#7/#20. See dedicated acceptance record. |
 | #59 | Observer isolation, hook-progress fences, native retirement owners and g415 cursor reentry fix. | Required desktop/cursor callback behavior and actual physical progress/retirement evidence. Removing immediate desktop checks or detaching callback input is not an acceptance substitute. |
 | #70 | Authenticated route-discovery implementation and endpoint identity/stale-profile regressions. | Actual two-PC address/endpoint change and authenticated reconnection, with unchanged-address DHCP and different-identity rejection kept distinct. |
 

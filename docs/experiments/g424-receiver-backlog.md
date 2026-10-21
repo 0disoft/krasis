@@ -38,3 +38,36 @@ closing the owned queue; its unchanged regression then passes.
 No issue is closed solely from this synthetic result. Packaging, paired
 application and current-device acceptance follow separately. No public wire
 schema, DB, dependency, runner, signing or firewall change; no push.
+
+## Verification and paired rollout
+
+The final full peer/agent/residentagent suites pass in 3.972s/2.076s/6.780s.
+Targeted real-child input-stall, release-stall and incomplete-retirement
+regressions pass on current source in 4.309s. Workspace packaging passes 85 UI
+tests, native frontend/Windows and installer builds, archive smoke (9.55s),
+and eight-file verification. Offline verification accepts g424 revision
+7185702b47ec58825b9fe3b0c9260676b9be2509, 28185873 bytes.
+
+B update 6b8efa78e5800a1aeb439961c7a7a863 reaches UPDATED for the app,
+but its protected-input installation receipt is result 4 at
+11:32:08.2907661Z: replace/directory_retire_move, Win32 5, previous
+installation restored. The app result is not proof the input service upgraded.
+Fresh paired collection 347b574b6312f2188a873a9e64fd5354 still reports
+B input UPDATE_REQUIRED at 11:34:58Z. B's current UI is opened via the
+authenticated app-open operation; a user handoff requests its recovery action,
+which the current remote API cannot invoke. Do not claim B protected g424 READY
+or a successful physical movement comparison before this is resolved.
+
+A safe-stop and g424 repair complete, install result 0 at
+11:33:01.3954165Z. Only the path-verified old g423 UI process is terminated
+for replacement; the installed g424 agent and new UI are launched. At 11:34Z
+doctor reports healthy CONNECTED with matched g424 UI/agent/CLI and installed
+agent, service RUNNING; input health is READY. A's new UI is left open.
+
+Issue #50 is closed at 11:34:04Z against its actual three completion criteria,
+with the separate local acceptance record in
+results/2026-10-21-issue-50-acceptance.md. No issue comments are posted.
+Physical performance, source reconnect/service failures and the full native
+matrix remain unresolved; B's service repair and a g424 comparison are next.
+No new implementation task started after the ten-minute cutoff. Hosted CI,
+signing and the full physical matrix were not run.
