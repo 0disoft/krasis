@@ -48,3 +48,43 @@ This is diagnostic snapshot reuse, not cached input authority. The regression
 prohibits reopening the installed path, including case variants and failed
 observations. g411 was built/verified but never applied or sent; g412 supersedes
 it before paired installation as completion of this same observation unit.
+
+## Verified g412 application
+
+Inputworker/productcli/productpanel suites and vet passed. The final focused
+native observer/writer tests and productcli suite/vet passed after completing
+the caller-budget/error-preservation and doctor paths. UI 85 tests, native build,
+installer provenance, archive test and eight-file package verification pass.
+Offline verification accepts g412 revision
+92cb4c880d5aa2fc3bd0fb793529081adf1565e7, 28,208,602 bytes. Source units are
+d48ea1d and 92cb4c8. No race detection with CGO=0, and no hosted CI because push
+remains forbidden. No standalone input smoke was run beside the healthy resident.
+
+A installation at 02:08:44Z and B at 02:09:42Z both report complete/result 0,
+recovery not_needed. A installed-agent SHA-256 matches the bundle. B transfer
+837117f8dc6d152faf9a59c789a30cf1 reports UPDATED at the exact g412 revision.
+Neither installation needed a retry, manual session stop, UI kill or reconnect.
+The initial 24-second receipt observation expired before the new record arrived;
+the still-running update was inspected, not restarted.
+
+Collection 3a6f4ff1236b50f16d17bc5d4eb7a08f at 02:10:11Z contains 28 current-build
+events on each device, CONNECTED on both, service/input READY, and no current-build
+fault/startup-failed event. A doctor independently reports healthy CONNECTED,
+matched CLI/UI/resident/installed revisions, verified launch record and completed
+stage cleanup. This normal installation does not identify g410's original handle
+owner, prove every future installer transition, or establish physical input
+failure/cleanup acceptance.
+
+Final remote inspection has no open PRs and still retains Dashboard #1 plus
+#4/#5/#6/#7/#15/#16/#20/#50/#59/#70. No issue was closed from adapter tests or
+idle health alone. Missing acceptance is tabulated in
+g410-geometry-invalidation.md. The attended physical matrix availability question
+is still pending; pair identity/signing-service availability remain unknown.
+The local certificate stores previously inspected had no usable code-signing
+certificate. No further implementation unit was started past ten minutes.
+
+Next: actual attended held-key/Winlogon recovery and the remaining production
+native boundaries under #50/#59, plus exact lock-owner attribution if a future
+installation genuinely fails. Do not provoke another healthy installation only
+to search for a handle. Keep native desktop checks and first-click shield
+semantics intact. Only local main was modified; no push or remote ref changes.
