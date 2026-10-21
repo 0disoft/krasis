@@ -27,3 +27,20 @@ latency and physical fault/lock/DPI acceptance are not established by fixtures.
 work and their final owner/liveness acceptance still require work. No public
 API, DB, dependency, runner, firewall, signing, issue-comment or remote-ref
 changes. Generation 401 identifies the authorized A/B executable update.
+
+## Paired application
+
+Both PCs applied revision 432cbdc6fb86b6334b459746cd3e0019c48432d9, g401.
+UI 85 tests, native builds, embedded installer provenance and eight-file bundle
+checks pass; offline verification accepted 28,127,078 bytes. A installer exited
+0 and the protected installed agent digest matches the bundle. B receipt
+54fb8ba07ad48f5b34474d97222fc562 reports UPDATED. A was explicitly reconnected
+after B replacement, without another update or a Disconnect command.
+
+Collection 8d5102c16e0f31b61f4201ddfbc0042d captured B still RECONNECTING.
+Follow-up 70cc164989f1fbd6b11dbaf9a51b705b at 00:20:04Z/06Z confirms both
+CONNECTED, both services READY, successful installer receipts and protected
+capture readiness. Its 90 A / 71 B current-build events contain no fault or
+startup-failed code. Doctor confirms matching UI/resident/installed builds.
+This short observation does not establish real nested-hook, held-input or
+performance acceptance. No issue was closed from these observations.
