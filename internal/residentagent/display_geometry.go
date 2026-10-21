@@ -23,6 +23,11 @@ func displayGeometryGuard(ctx context.Context, expected wininput.DisplayGeometry
 			}
 			return wininput.ErrDisplayGeometryChanged
 		}
-		return nil
+		// Native reads can yield while another caller retires this geometry or
+		// the session is canceled. A late matching result cannot revive either.
+		if invalid.Load() {
+			return wininput.ErrDisplayGeometryChanged
+		}
+		return ctx.Err()
 	}
 }

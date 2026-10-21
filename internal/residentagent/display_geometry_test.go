@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/0disoft/krasis/internal/wininput"
+	"sync/atomic"
 	"testing"
 )
 
@@ -37,5 +38,40 @@ func TestGeometryGuardRejectsUnsupportedInitialConfiguration(t *testing.T) {
 	check := displayGeometryGuard(context.Background(), g, func() wininput.DisplayGeometry { return g }, func() { stopped = true })
 	if !errors.Is(check(), wininput.ErrDisplayGeometryChanged) || !stopped {
 		t.Fatal("unsupported display admitted")
+	}
+}
+
+func TestGeometryGuardRejectsCancellationDuringNativeRead(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	g := wininput.DisplayGeometry{Count: 1, Width: 1920, Height: 1080}
+	check := displayGeometryGuard(ctx, g, func() wininput.DisplayGeometry { cancel(); return g }, func() { t.Fatal("unchanged geometry was invalidated") })
+	if err := check(); !errors.Is(err, context.Canceled) {
+		t.Fatal("late geometry result admitted canceled session", err)
+	}
+}
+
+func TestGeometryGuardCannotReviveAfterConcurrentInvalidation(t *testing.T) {
+	g := wininput.DisplayGeometry{Count: 1, Width: 1920, Height: 1080}
+	entered, release := make(chan struct{}), make(chan struct{})
+	var reads atomic.Int32
+	check := displayGeometryGuard(context.Background(), g, func() wininput.DisplayGeometry {
+		if reads.Add(1) == 1 {
+			close(entered)
+			<-release
+			return g
+		}
+		return wininput.DisplayGeometry{}
+	}, func() {})
+	first := make(chan error, 1)
+	go func() { first <- check() }()
+	<-entered
+	second := check()
+	close(release)
+	if !errors.Is(second, wininput.ErrDisplayGeometryChanged) {
+		t.Fatal("display change was accepted", second)
+	}
+	if err := <-first; !errors.Is(err, wininput.ErrDisplayGeometryChanged) {
+		t.Fatal("late native result revived invalidated geometry", err)
 	}
 }
