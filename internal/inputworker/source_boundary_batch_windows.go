@@ -57,7 +57,12 @@ func (w *sourceWriter) sendBoundaries(batch []sourcePacket) error {
 		return sourceTransportFailure(err)
 	}
 	defer w.mu.Unlock()
-	if err := w.channel.authorizeSourcePresence(ctx); err != nil {
+	if err := w.channel.authorizeSourceAdvisoryPresence(ctx); err != nil {
+		if ctx.Err() == context.DeadlineExceeded && errors.Is(err, context.DeadlineExceeded) && (w.ctx == nil || w.ctx.Err() == nil) {
+			// No bytes were submitted. Retain the optional query and discard
+			// this stale observation; command presence remains independent.
+			return nil
+		}
 		return sourceTransportFailure(err)
 	}
 	var wire [sourceBoundaryBatchLimit * sourcePacketSize]byte
@@ -73,6 +78,9 @@ func (w *sourceWriter) sendBoundaries(batch []sourcePacket) error {
 			return err
 		}
 		copy(wire[i*sourcePacketSize:], data[:])
+	}
+	if ctx.Err() == context.DeadlineExceeded && (w.ctx == nil || w.ctx.Err() == nil) {
+		return nil // Still before the write; no sequence or bytes escaped.
 	}
 	err := w.writeSequenced(ctx, wire[:len(batch)*sourcePacketSize], next)
 	var failure *sourceIOFailure

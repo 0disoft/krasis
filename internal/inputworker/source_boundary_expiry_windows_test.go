@@ -4,6 +4,7 @@ package inputworker
 
 import (
 	"context"
+	"errors"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -11,6 +12,52 @@ import (
 	"testing/synctest"
 	"time"
 )
+
+func TestBoundaryUnsentPresenceExpiryKeepsHeartbeat(t *testing.T) {
+	for _, deny := range []bool{false, true} {
+		synctest.Test(t, func(t *testing.T) {
+			server, conn := net.Pipe()
+			defer server.Close()
+			stream := &queryOwnedConn{admissionObservedConn: &admissionObservedConn{Conn: conn}}
+			w := &sourceWriter{ctx: context.Background(), channel: clientChannel(stream, authorityAgent), binding: Binding{1}}
+			defer w.channel.Close()
+			w.started.Store(true)
+			release := make(chan struct{})
+			var once sync.Once
+			defer once.Do(func() { close(release) })
+			var checks atomic.Int32
+			w.channel.authority.checkInput = func() error { return nil }
+			w.channel.authority.checkPresent = func() error {
+				if checks.Add(1) == 1 {
+					<-release
+				}
+				if deny {
+					return ErrAuthority
+				}
+				return nil
+			}
+			err := w.sendBoundaries([]sourcePacket{boundaryBatchPacket(1)})
+			if err != nil || w.sequence != 0 || stream.writes.Load() != 0 || w.channel.authority.fenced.Load() {
+				t.Error("unsent presence query retired capture", err, w.sequence)
+			}
+			// A late optional query cannot occupy the command presence lane.
+			err = w.channel.authorizeSourcePresence(context.Background())
+			if (err != nil) != deny {
+				t.Error("fresh heartbeat presence unavailable", err)
+			}
+			once.Do(func() { close(release) })
+			synctest.Wait()
+			// No late success is reused, and a real rejection is never dropped.
+			if !deny {
+				w.channel.authority.checkPresent = func() error { return ErrAuthority }
+			}
+			err = w.sendBoundaries([]sourcePacket{boundaryBatchPacket(2)})
+			if !errors.Is(err, ErrAuthority) || w.sequence != 0 || stream.writes.Load() != 0 {
+				t.Error("presence rejection was swallowed", err, w.sequence)
+			}
+		})
+	}
+}
 
 func TestBoundaryUnsentSlowProofKeepsHeartbeatAndRequiresFreshAuthority(t *testing.T) {
 	for _, deny := range []bool{false, true} {

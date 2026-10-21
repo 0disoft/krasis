@@ -16,7 +16,7 @@ type Channel struct {
 	queryMu          sync.Mutex
 	query            *authorityQuery
 	presenceQuery    *authorityQuery
-	maintenanceQuery *authorityQuery // Optional heartbeat or advisory full query; never input.
+	maintenanceQuery *authorityQuery // Optional heartbeat/advisory proof; never input.
 	closing          bool
 }
 

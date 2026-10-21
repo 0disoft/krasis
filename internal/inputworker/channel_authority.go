@@ -26,6 +26,7 @@ const (
 	sourceInputAuthorityQuery
 	sourcePresenceAuthorityQuery
 	sourceAdvisoryAuthorityQuery
+	sourceAdvisoryPresenceAuthorityQuery
 )
 
 // Only read-only proof queries run here. Input injection stays on its original
@@ -60,6 +61,12 @@ func (channel *Channel) authorizeSourceAdvisory(ctx context.Context) error {
 	return channel.queryAuthority(ctx, false, sourceAdvisoryAuthorityQuery)
 }
 
+// Advisory presence shares the optional query owner, leaving mandatory command
+// presence independent. An expired unsent observation never fences input.
+func (channel *Channel) authorizeSourceAdvisoryPresence(ctx context.Context) error {
+	return channel.queryAuthority(ctx, false, sourceAdvisoryPresenceAuthorityQuery)
+}
+
 func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind authorityQueryKind) error {
 	if channel == nil || ctx == nil {
 		return ErrAuthority
@@ -67,7 +74,7 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 	// An unsent advisory batch, like an unsent keepalive, grants no input.
 	// Keep its timed-out native query owned without fencing unrelated commands.
 	// Its caller must discard the batch; later work still needs a fresh check.
-	optional := kind == heartbeatAuthorityQuery || kind == sourceAdvisoryAuthorityQuery
+	optional := kind == heartbeatAuthorityQuery || kind == sourceAdvisoryAuthorityQuery || kind == sourceAdvisoryPresenceAuthorityQuery
 	for {
 		if err := ctx.Err(); err != nil {
 			return errors.Join(ErrAuthority, err)
@@ -80,7 +87,7 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 		current := &channel.query
 		if kind == presenceAuthorityQuery || kind == sourcePresenceAuthorityQuery {
 			current = &channel.presenceQuery
-		} else if kind == heartbeatAuthorityQuery || kind == sourceAdvisoryAuthorityQuery {
+		} else if optional {
 			current = &channel.maintenanceQuery
 		}
 		if previous := *current; previous != nil {
@@ -105,7 +112,7 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 			defer func() { <-authorityQueries }()
 			if kind == sourceInputAuthorityQuery || kind == sourceAdvisoryAuthorityQuery {
 				query.err = channel.authority.checkSource()
-			} else if kind == sourcePresenceAuthorityQuery {
+			} else if kind == sourcePresenceAuthorityQuery || kind == sourceAdvisoryPresenceAuthorityQuery {
 				query.err = channel.authority.checkSourceHeartbeat()
 			} else if kind != inputAuthorityQuery {
 				query.err = channel.authority.checkHeartbeat()
