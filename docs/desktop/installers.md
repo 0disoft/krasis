@@ -9,7 +9,7 @@
 `krasis-cli.exe`, 보호 입력 설치기 `krasis-install.exe`가 있다. 기본 앱은 portable로
 실행하며, 관리자 프로그램·Windows PIN 창 제어에는 선택적인 보호 입력 설치가 필요하다.
 
-설치기는 관리자 권한의 참석 설치에서 `--install` 또는 `--remove` 하나만 받는다.
+설치기는 관리자 권한의 참석 설치에서 `--install`, `--repair`, `--remove` 중 하나만 받는다.
 이미지와 SHA-256은 설치기에 내장된다. IPC나 받은 manifest가 설치 경로 또는
 실행 인자를 지정할 수 없다. 시스템의 Program Files 아래 고정 `Krasis\Input` 위치에
 agent, input service, `INPUT-INSTALL.json`을 놓고 `KrasisInput` 서비스를 관리한다.
@@ -18,7 +18,7 @@ agent, input service, `INPUT-INSTALL.json`을 놓고 `KrasisInput` 서비스를 
 설치 transaction은 stage, stop, replace, start, commit과 이전 설치 복원을 구분한다.
 중간 checkpoint와 최종 receipt에는 단계·제한된 Win32 오류·복원 결과가 포함된다.
 복원 여부가 불확실하면 `recovery_required`이며 설치 성공으로 바꾸지 않는다.
-별도 `--repair` 명령이나 사용자 데이터 삭제 옵션은 없다.
+`--repair`는 검증된 중지 서비스의 복구도 허용한다. 사용자 데이터 삭제 옵션은 없다.
 
 일반 권한 UI는 현재 배포본과 설치된 agent의 이미지가 일치할 때 보호 위치의 agent를
 선택한다. agent와 SYSTEM 서비스는 고정 이미지·SCM 설정·실제 pipe process·
@@ -32,6 +32,16 @@ g140부터 기존 보호 입력이 검증되고 새 배포본과 다르면, 새 
 설치기를 실행하는 동안 이미지와 디렉터리의 교체를 막는다.
 갱신 전에 agent의 정상 종료와 단일 실행 lease 해제를 확인한다. 설치 성공은 종료 코드
 0뿐 아니라 설치 agent 해시와 서비스 준비 상태를 다시 확인해야 한다.
+개발 중 설치기를 직접 실행할 때도 `safe_stop_requested` 응답을 프로세스 종료로
+간주하면 안 된다. 기존 UI의 재시작과 설치를 겹치지 않게 하고, 경로를 확인한
+기존 사용자 agent와 자식 프로세스의 핸들을 보관해 실제 종료를 기다린다.
+종료를 확인할 수 없으면 설치를 시작하지 않는다. 서비스 종료는 설치기의
+검증된 SCM 절차에 맡기며, 파일 pin의 쓰기·삭제 방지는 유지한다.
+PowerShell의 `Start-Process -Wait` 뒤 `ExitCode`가 비어 있으면 실패나 성공으로
+단정하지 않는다. 프로세스 객체에 `WaitForExit()`와 `Refresh()`를 적용한 뒤
+종료 코드와 새 설치 receipt를 대조한다. 실행 중인 설치기에 재시도하지 않는다.
+g426의 실제 종료 대기 후 동일 버전 복구 결과는
+[실기기 기록](../experiments/results/2026-10-21-issue-16-process-exit-repair.md)에 있다.
 취소·종료가 확인된 실패는 일반 입력으로 실행하며 자동으로 관리자 확인을 반복하지 않는다.
 설치 결과를 확인하지 못하면 새 agent 실행과 추가 설치를 보류한다. transaction 복원은
 기존 설치기만 수행하며 앱은 journal 삭제나 별도 서비스 시작으로 우회하지 않는다.

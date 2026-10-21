@@ -4,7 +4,15 @@ This is an incomplete acceptance audit, not a release or hardware approval.
 The user excludes Dependency Dashboard #1 from closure and prohibits Git push,
 remote ref updates and issue comments. Those constraints remain in force.
 
-Latest observation (g426): #15's actual connected/settings screenshots and
+Latest installation follow-up (unchanged g426): explicitly waiting for both
+path-verified user agent/child process handles before manual repair yields
+exit 0/result 0 at 12:08:49.8656586Z. No staging/rollback/retired directories or
+pending transaction journals remain. Paired collection confirms both input
+health states READY; the saved connection subsequently reaches CONNECTED.
+The earlier manual safe-stop acknowledgement was not process-exit evidence.
+See 2026-10-21-issue-16-process-exit-repair.md. Broader #16 acceptance remains.
+
+Previous observation (g426): #15's actual connected/settings screenshots and
 keyboard/localization checks exposed and verified a missing disclosure focus
 outline, fixed in local commit 1eaf84b. Both devices run g426; A's doctor and
 visible workspace report CONNECTED. Paired diagnostics confirm input READY.
@@ -66,7 +74,7 @@ an incomplete historical audit, not a current g424 device acceptance claim.
 | #6 | Lifecycle/guard cleanup implementation and controlled fault regressions. | Attended physical termination/held-input, network, lock, sleep, topology and uncertain-injection cases, with checked bounded recovery reports. |
 | #7 | Input instrumentation, controlled queue/stall tests and g377 ordinary-use report. | Actual supported device/DPI/privilege/rate combinations, bounded latency distributions and soak, then evidence-based support limits. |
 | #15 | Product controls, 85 UI tests, actual g425/g426 connected/settings screenshots and named accessibility tree; g426 accent disclosure focus and limited Korean/English, Tab/Shift+Tab/Escape/scroll validation. | Remaining state, screen-reader and high-DPI coverage, plus publication/exact-revision hosted CI. The earlier firewall prompt no longer blocks this limited screenshot review. |
-| #16 | Installation/update/recovery implementation, current paired g426 runtime and B result-0 update receipt. A's g426 attempts expose file_delete and directory_retire_move Win32-5 failures with subsequent restored health. | Reproduce and fix protected-file retirement/cleanup denial; publisher signing and full install/remove/data/firewall/rollback acceptance. Healthy runtime does not erase failed receipts or prove the matrix. |
+| #16 | Paired g426 runtime/result-0 receipts and A's successful unchanged-build repair after verified user-agent/child exit; earlier Win32-5 failures are retained. | Publisher signing and full install/remove/data/firewall/interruption/rollback acceptance. One successful repair does not prove the matrix or erase earlier failures. |
 | #20 | Linked core/product implementation work and the supporting local records. | All linked acceptance issues completed, required default-branch CI, consistent four-device evidence and a signed operable/rollbackable/removable beta candidate. |
 | #50 (CLOSED) | Current diagnostics, injection/cleanup budgets, stalled real-child input/release retirement, partial/unknown outcomes and exact pressed-state/LOCAL recovery regressions. | Original completion criteria verified; full physical release/Winlogon matrix stays in #6/#7/#20. See dedicated acceptance record. |
 | #59 (CLOSED) | Observer isolation, hook-progress fences, joined native retirement and g425 removal of the reproduced physical-gate/state-wait inversion. | Original callback/observation/idle/safe-abort criteria verified; immediate desktop checks remain. Full physical matrix stays in #6/#7. See dedicated acceptance record. |
