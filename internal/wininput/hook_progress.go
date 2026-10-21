@@ -66,6 +66,7 @@ type sourceHookProgress struct {
 	origin       time.Time
 	next         HookTimingObserver
 	active       atomic.Int64
+	depth        uint64 // Native hook owner only; the watchdog reads active, never depth.
 	mouse        atomic.Uint64
 	raw          atomic.Int64
 	missingSince int64 // source owner only
@@ -74,13 +75,25 @@ type sourceHookProgress struct {
 
 func (p *sourceHookProgress) stamp(at time.Time) int64 { return int64(at.Sub(p.origin)) + 1 }
 func (p *sourceHookProgress) ObserveHookStarted(at time.Time) {
-	p.active.Store(p.stamp(at))
+	// Native calls/hook chaining can reenter the callback on its owner thread.
+	// Keep the oldest active start: a nested call cannot renew its deadline.
+	if p.depth == 0 {
+		p.active.Store(p.stamp(at))
+	}
+	p.depth++
 	if p.next != nil {
 		p.next.ObserveHookStarted(at)
 	}
 }
 func (p *sourceHookProgress) ObserveHookCompleted(at time.Time) {
-	defer p.active.Store(0)
+	defer func() {
+		if p.depth != 0 {
+			p.depth--
+			if p.depth == 0 {
+				p.active.Store(0)
+			}
+		}
+	}()
 	if p.next != nil {
 		p.next.ObserveHookCompleted(at)
 	}

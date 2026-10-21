@@ -76,6 +76,47 @@ func TestHookProgressStalledCallbackDoesNotNeedRawInput(t *testing.T) {
 	}
 }
 
+func TestHookProgressNestedCompletionCannotHideStalledOuterCallback(t *testing.T) {
+	base := time.Now()
+	p := &sourceHookProgress{origin: base}
+	inner := timedSourceCallback(func(int, uintptr, uintptr) uintptr { return 17 }, p)
+	var duringOuter error
+	outer := timedSourceCallback(func(int, uintptr, uintptr) uintptr {
+		if got := inner(0, 0, 0); got != 17 {
+			t.Fatal("nested callback disposition changed", got)
+		}
+		duringOuter = p.failure(base.Add(2 * time.Second))
+		return 42
+	}, p)
+	if got := outer(0, 0, 0); got != 42 {
+		t.Fatal("outer callback disposition changed", got)
+	}
+	if !errors.Is(duringOuter, errHookCallbackStalled) {
+		t.Fatal("nested completion hid the still-running outer callback", duringOuter)
+	}
+	if err := p.failure(base.Add(time.Hour)); err != nil {
+		t.Fatal("completed nested callbacks stayed stalled", err)
+	}
+}
+
+func TestHookProgressNestedStartCannotRenewOuterDeadline(t *testing.T) {
+	base := time.Unix(100, 0)
+	p := &sourceHookProgress{origin: base}
+	p.ObserveHookStarted(base)
+	p.ObserveHookStarted(base.Add(900 * time.Millisecond))
+	if err := p.failure(base.Add(time.Second)); !errors.Is(err, errHookCallbackStalled) {
+		t.Fatal("nested start renewed the outer callback deadline", err)
+	}
+	p.ObserveHookCompleted(base.Add(time.Second))
+	if err := p.failure(base.Add(2 * time.Second)); !errors.Is(err, errHookCallbackStalled) {
+		t.Fatal("inner completion ended outer callback ownership", err)
+	}
+	p.ObserveHookCompleted(base.Add(2 * time.Second))
+	if err := p.failure(base.Add(time.Hour)); err != nil {
+		t.Fatal("fully unwound callback stayed stalled", err)
+	}
+}
+
 type blockedHookTiming struct{ entered, release chan struct{} }
 
 func (b *blockedHookTiming) ObserveHookStarted(time.Time) { close(b.entered); <-b.release }

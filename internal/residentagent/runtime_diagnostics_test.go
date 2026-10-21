@@ -59,6 +59,31 @@ func TestRuntimeTraceOnlyRequestedForLongTimerLateness(t *testing.T) {
 	}
 }
 
+func TestRuntimeHookDiagnosticsRetainOuterSpanAcrossNestedCompletion(t *testing.T) {
+	d := newRuntimeDiagnostics()
+	start := d.started.Add(time.Second)
+	d.ObserveHookStarted(start)
+	d.ObserveHookStarted(start.Add(time.Second))
+	d.ObserveHookCompleted(start.Add(2 * time.Second))
+	s := d.snapshot(start.Add(3 * time.Second))
+	if s.HookActiveMicros != 3000000 || s.HookCalls != 1 {
+		t.Fatal("nested completion hid outer callback activity", s)
+	}
+	d.ObserveHookCompleted(start.Add(4 * time.Second))
+	s = d.snapshot(start.Add(5 * time.Second))
+	if s.HookActiveMicros != 0 || s.HookMaxMicros != 4000000 || s.HookCalls != 1 {
+		t.Fatal("outer callback span or nested count lost", s)
+	}
+	// An unmatched completion cannot poison the following matched span.
+	d.ObserveHookCompleted(start.Add(6 * time.Second))
+	d.ObserveHookStarted(start.Add(7 * time.Second))
+	d.ObserveHookCompleted(start.Add(8 * time.Second))
+	s = d.snapshot(start.Add(9 * time.Second))
+	if s.HookActiveMicros != 0 || s.HookMaxMicros != 1000000 || s.HookCalls != 2 {
+		t.Fatal("unmatched completion corrupted future hook evidence", s)
+	}
+}
+
 func TestRuntimeDiagnosticsReportsBoundedQueueAggregates(t *testing.T) {
 	d := newRuntimeDiagnostics()
 	d.ObserveSourceQueueEnqueued(1)

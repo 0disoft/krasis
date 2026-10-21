@@ -20,6 +20,7 @@ type runtimeDiagnostics struct {
 	captureTrace                                            func()
 	hookStart, hookLast, hookMax                            atomic.Int64
 	hookCalls, rawInputs                                    atomic.Uint64
+	hookDepth                                               atomic.Uint64
 	started                                                 time.Time
 	readStart, lastReadByte, dispatchStart, send, receive   atomic.Int64
 	kind                                                    atomic.Uint32
@@ -39,12 +40,24 @@ type runtimeDiagnostics struct {
 	slowDispatchDropped                                     atomic.Uint64
 }
 
-func (d *runtimeDiagnostics) ObserveHookStarted(t time.Time) { d.hookStart.Store(d.stamp(t)) }
+// The timing relay serializes native-owner samples, including nested callbacks.
+// Keep the outer inclusive span; snapshots still read only atomic aggregates.
+func (d *runtimeDiagnostics) ObserveHookStarted(t time.Time) {
+	if d.hookDepth.Add(1) == 1 {
+		d.hookStart.Store(d.stamp(t))
+	}
+}
 func (d *runtimeDiagnostics) ObserveHookCompleted(t time.Time) {
 	stamp := d.stamp(t)
-	start := d.hookStart.Swap(0)
-	if start > 0 {
-		observeMaximum(&d.hookMax, max(0, stamp-start))
+	for depth := d.hookDepth.Load(); depth != 0; depth = d.hookDepth.Load() {
+		if d.hookDepth.CompareAndSwap(depth, depth-1) {
+			if depth == 1 {
+				if start := d.hookStart.Swap(0); start > 0 {
+					observeMaximum(&d.hookMax, max(0, stamp-start))
+				}
+			}
+			break
+		}
 	}
 	d.hookLast.Store(stamp)
 	d.hookCalls.Add(1)
