@@ -64,6 +64,10 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 	if channel == nil || ctx == nil {
 		return ErrAuthority
 	}
+	// An unsent advisory batch, like an unsent keepalive, grants no input.
+	// Keep its timed-out native query owned without fencing unrelated commands.
+	// Its caller must discard the batch; later work still needs a fresh check.
+	optional := kind == heartbeatAuthorityQuery || kind == sourceAdvisoryAuthorityQuery
 	for {
 		if err := ctx.Err(); err != nil {
 			return errors.Join(ErrAuthority, err)
@@ -111,7 +115,7 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 				query.err = channel.authority.check(false)
 			}
 			channel.queryMu.Lock()
-			if ctx.Err() != nil && kind != heartbeatAuthorityQuery {
+			if ctx.Err() != nil && !optional {
 				channel.closing = true
 				channel.authority.fenced.Store(true)
 			}
@@ -136,7 +140,7 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 		select {
 		case <-query.done:
 			if err := ctx.Err(); err != nil {
-				if kind != heartbeatAuthorityQuery {
+				if !optional {
 					channel.cancelQuery(query)
 				}
 				return errors.Join(ErrAuthority, err)
@@ -144,7 +148,7 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 			merge() // The query can no longer mutate its diagnostic sample.
 			return query.err
 		case <-ctx.Done():
-			if kind != heartbeatAuthorityQuery {
+			if !optional {
 				channel.cancelQuery(query)
 			}
 			return errors.Join(ErrAuthority, ctx.Err())

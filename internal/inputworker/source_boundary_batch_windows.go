@@ -3,6 +3,7 @@
 package inputworker
 
 import (
+	"context"
 	"errors"
 	"os"
 )
@@ -47,6 +48,12 @@ func (w *sourceWriter) sendBoundaries(batch []sourcePacket) error {
 	ctx, cancel := w.operation(nil, false)
 	defer cancel()
 	if err := w.lockAuthorized(ctx, true); err != nil {
+		if ctx.Err() == context.DeadlineExceeded && errors.Is(err, context.DeadlineExceeded) && (w.ctx == nil || w.ctx.Err() == nil) {
+			// No gate or bytes were acquired. Drop this stale observation just
+			// like queue overflow, retaining any native query until it joins.
+			// Actual rejection, owner cancellation and attempted writes fail.
+			return nil
+		}
 		return sourceTransportFailure(err)
 	}
 	defer w.mu.Unlock()
