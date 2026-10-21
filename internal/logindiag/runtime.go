@@ -87,6 +87,10 @@ func (v Runtime) Valid() bool {
 
 func ValidRuntimeOperation(operation string) bool {
 	switch operation {
+	case "source-query-deadline", "source-query-cancelled", "source-query-capacity", "source-query-closed",
+		"source-service-query-deadline", "source-service-query-cancelled", "source-service-query-capacity", "source-service-query-closed",
+		"source-agent-query-deadline", "source-agent-query-cancelled", "source-agent-query-capacity", "source-agent-query-closed":
+		return true
 	case "source-startup-admission", "source-startup-request", "source-startup-validation", "source-startup-prepare", "source-startup-authentication", "source-startup-transfer", "source-startup-ready", "source-startup-publish":
 		return true
 	case "source-write-deadline", "source-write-unsubmitted", "source-write-partial", "source-write-timeout", "source-write-closed", "source-write-native", "source-write-other":

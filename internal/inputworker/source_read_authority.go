@@ -12,15 +12,15 @@ func authorizeSourceRead(ctx context.Context, service, agent *Channel, op byte) 
 	defer cancel()
 	full := func() error {
 		if err := service.authorizeSourceInput(ctx); err != nil {
-			return err
+			return sourceQueryOwner("service", err)
 		}
-		return agent.authorizeSourceInput(ctx)
+		return sourceQueryOwner("agent", agent.authorizeSourceInput(ctx))
 	}
 	present := func() error {
 		if err := service.authorizeSourcePresence(ctx); err != nil {
-			return err
+			return sourceQueryOwner("service", err)
 		}
-		return agent.authorizeSourcePresence(ctx)
+		return sourceQueryOwner("agent", agent.authorizeSourcePresence(ctx))
 	}
 	return sourceCommandReadAuthorization(op, full, present)
 }

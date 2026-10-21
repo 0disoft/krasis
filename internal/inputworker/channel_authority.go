@@ -2,7 +2,6 @@ package inputworker
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/0disoft/krasis/internal/handoff"
@@ -77,12 +76,12 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 	optional := kind == heartbeatAuthorityQuery || kind == sourceAdvisoryAuthorityQuery || kind == sourceAdvisoryPresenceAuthorityQuery
 	for {
 		if err := ctx.Err(); err != nil {
-			return errors.Join(ErrAuthority, err)
+			return queryAdmissionFailure(kind, "", err)
 		}
 		channel.queryMu.Lock()
 		if channel.closing || channel.authority == nil || channel.authority.fenced.Load() {
 			channel.queryMu.Unlock()
-			return ErrAuthority
+			return queryAdmissionFailure(kind, "closed", nil)
 		}
 		current := &channel.query
 		if kind == presenceAuthorityQuery || kind == sourcePresenceAuthorityQuery {
@@ -96,14 +95,14 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 			case <-previous.done:
 				continue // A different command's success never authorizes this one.
 			case <-ctx.Done():
-				return errors.Join(ErrAuthority, ctx.Err())
+				return queryAdmissionFailure(kind, "", ctx.Err())
 			}
 		}
 		select {
 		case authorityQueries <- struct{}{}:
 		default:
 			channel.queryMu.Unlock()
-			return ErrAuthority
+			return queryAdmissionFailure(kind, "capacity", nil)
 		}
 		query := &authorityQuery{done: make(chan struct{})}
 		*current = query
@@ -150,7 +149,7 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 				if !optional {
 					channel.cancelQuery(query)
 				}
-				return errors.Join(ErrAuthority, err)
+				return queryAdmissionFailure(kind, "", err)
 			}
 			merge() // The query can no longer mutate its diagnostic sample.
 			return query.err
@@ -158,7 +157,7 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 			if !optional {
 				channel.cancelQuery(query)
 			}
-			return errors.Join(ErrAuthority, ctx.Err())
+			return queryAdmissionFailure(kind, "", ctx.Err())
 		}
 	}
 }

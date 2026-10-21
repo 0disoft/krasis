@@ -51,6 +51,16 @@ func sourceAuthorityResult(cause error) error {
 	if errors.As(cause, &failure) {
 		return authorityCheckFailed(failure.operation, failure)
 	}
+	var query *sourceQueryFailure
+	if errors.As(cause, &query) {
+		for _, operation := range sourceQueryFailureOperations() {
+			if operation == query.LoginRuntimeOperation() {
+				// Watcher projection historically exposes only ErrAuthority.
+				// Retain the fixed reason without changing cleanup classification.
+				return &sourceQueryFailure{owner: query.owner, reason: query.reason, cause: ErrAuthority}
+			}
+		}
+	}
 	var connection *connectionFailure
 	if errors.As(cause, &connection) {
 		switch connection.stage {

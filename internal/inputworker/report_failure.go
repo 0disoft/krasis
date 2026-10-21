@@ -23,6 +23,7 @@ func init() {
 	}
 	reportOperations = append(reportOperations, "hook-callback-stalled", "hook-mouse-progress")
 	reportOperations = append(reportOperations, "source-write-deadline", "source-write-unsubmitted", "source-write-partial", "source-write-timeout", "source-write-closed", "source-write-native", "source-write-other")
+	reportOperations = append(reportOperations, sourceQueryFailureOperations()...)
 }
 
 type workerReportFailure struct {
@@ -52,6 +53,17 @@ func reportFailureDetails(err error) (byte, uint32) {
 		case "", "low-level-hook", "raw-mouse", "wheel-capture", "source-reader-authority", "source-command-loop", "source-capture-join", "source-sender-join":
 			// Refine generic containers, never a concrete native cleanup failure.
 			operation, selected = authority.operation, authority
+		default:
+			if _, query := selected.(*sourceQueryFailure); query {
+				operation, selected = authority.operation, authority
+			}
+		}
+	}
+	var query *sourceQueryFailure
+	if errors.As(err, &query) {
+		switch operation {
+		case "", "source-reader-authority", "source-command-loop", "source-command-heartbeat", "source-sender-join":
+			operation, selected = query.LoginRuntimeOperation(), query
 		}
 	}
 	var command *sourceCommandFailure
