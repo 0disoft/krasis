@@ -45,3 +45,25 @@ Pre-update collection `ea9f576dd879112ef1f4b4ce3a7edfa0` also shows g419's
 earlier 10:02:04Z source heartbeat failure and missing worker report, followed
 by a stopped protected service and PORTABLE fallback. This startup performance
 change does not establish a repair for that separate source-worker failure.
+
+## Paired rollout and reconnect trial
+
+A's repair exited 0 with receipt 10:14:25.9868564Z; B update job
+`dfb8b417ad58e1741d5b151106a4d15f` reached UPDATED, receipt
+10:15:04.8059931Z. Both input health samples reached READY at revision
+`cab8e796101002e1254b39f7ee512f97085339cd`. The user then reported a
+connection followed by RECONNECTING.
+
+Collection `0393008cc59ea926cc46631f46654527` shows A's source-hook failure
+at 10:18:53Z and B's remote EOF/reconnect. A's native capture/sender/interrupt
+joined and sent clean retirement, but its independent worker report failed
+with source-command-loop (no native code). Later 10:23:43Z local and
+10:23:40Z peer snapshots show four A source exits versus four clean B source
+exits. A's later reports include source-reader-authority and one
+source-reader-timeout/recovery. Generic authority/loop records do not identify
+which native query expired; this is not proof of a network-first failure.
+
+B receiver profiles have ReadyWait 174.407ms and 165.069ms, AuthorizeTotal
+178.694ms and 169.150ms. Only the first ends ok; the second is incomplete.
+This small sample suggests lower startup waits than g419, not an end-to-end
+latency claim or a stability pass. No issue is closed from this trial.
