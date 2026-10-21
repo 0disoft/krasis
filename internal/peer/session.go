@@ -94,6 +94,16 @@ func runSession(
 		stopCancelClose()
 		returnErr = errors.Join(returnErr, ownedConnection.Close())
 	}()
+	var ahead *inputReadAhead
+	if peerTimeout > 0 {
+		readCtx, stopRead := context.WithCancel(ctx)
+		ahead = startInputReadAhead(readCtx, ownedConnection)
+		defer func() {
+			stopRead()
+			_ = ownedConnection.Close()
+			<-ahead.done
+		}()
+	}
 
 	progress, _ := observer.(SessionProgressObserver)
 	coordinatorProgress, _ := observer.(DispatchCoordinatorObserver)
@@ -106,7 +116,13 @@ func runSession(
 		if progress != nil {
 			progress.ObserveReadStarted(readStarted)
 		}
-		frame, err := ownedConnection.ReadFrame()
+		var frame transport.Frame
+		var err error
+		if ahead != nil {
+			frame, err = ahead.ReadFrame()
+		} else {
+			frame, err = ownedConnection.ReadFrame()
+		}
 		if err != nil {
 			_ = ownedConnection.Close()
 			if ctxErr := ctx.Err(); ctxErr != nil {
@@ -151,6 +167,18 @@ func runSession(
 				err = errors.Join(ErrPeerControlDispatch, err)
 			}
 		case transport.MessageInput:
+			var envelopes []control.InputEnvelope
+			var move control.InputAction
+			if ahead != nil {
+				envelopes, move = ahead.pointerBatch(frame)
+				if progress != nil {
+					// These original frames were consumed from the bounded reader,
+					// even though they share one injection/dispatch operation.
+					for i := 1; i < len(envelopes); i++ {
+						progress.ObserveReadCompleted(time.Now())
+					}
+				}
+			}
 			inputCtx, complete := handoff.Input(ctx, "receiver")
 			inputCtx, stopInput := context.WithTimeout(inputCtx, application.InputInjectionTimeout)
 			queued := time.Now()
@@ -164,6 +192,13 @@ func runSession(
 				}
 				defer func() { complete(dispatchErr); recorded = true }()
 				handoff.Record(inputCtx, handoff.InputCoordinator, time.Since(queued))
+				if len(envelopes) > 1 {
+					err := runtime.HandlePointerMoveBatch(inputCtx, envelopes, move, now, peerTimeout)
+					if errors.Is(err, application.ErrInputLivenessExpired) {
+						return errors.Join(ErrPeerLivenessExpired, err)
+					}
+					return err
+				}
 				return DispatchInputFrame(inputCtx, frame, observedInputRuntime{runtime, now, peerTimeout})
 			})
 			if !recorded {

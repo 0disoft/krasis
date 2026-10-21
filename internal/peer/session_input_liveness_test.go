@@ -29,7 +29,11 @@ func TestOrderedInputRenewsLeaseWhileHeartbeatIsQueued(t *testing.T) {
 		observedAt = observedAt.Add(time.Second)
 		return observedAt
 	}, 2*time.Second, observer)
-	if !errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrPeerLivenessExpired) || len(port.moves) != 4 || len(observer.received) != 1 {
+	var distance int32
+	for _, move := range port.moves {
+		distance += move[0]
+	}
+	if !errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrPeerLivenessExpired) || distance != 4 || len(observer.received) != 1 {
 		t.Fatalf("active ordered stream timed out: %v moves=%d heartbeats=%d", err, len(port.moves), len(observer.received))
 	}
 }
