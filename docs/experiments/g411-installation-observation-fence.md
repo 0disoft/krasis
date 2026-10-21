@@ -64,8 +64,10 @@ A installation at 02:08:44Z and B at 02:09:42Z both report complete/result 0,
 recovery not_needed. A installed-agent SHA-256 matches the bundle. B transfer
 837117f8dc6d152faf9a59c789a30cf1 reports UPDATED at the exact g412 revision.
 Neither installation needed a retry, manual session stop, UI kill or reconnect.
-The initial 24-second receipt observation expired before the new record arrived;
-the still-running update was inspected, not restarted.
+The initial receipt observation printed no new record; direct inspection later
+confirmed terminal success, and the update was not restarted. The g413 tooling
+audit found the monitoring script reparsed JSON DateTime values with a local
+offset, so this poll must not be used as installation-timing evidence.
 
 Collection 3a6f4ff1236b50f16d17bc5d4eb7a08f at 02:10:11Z contains 28 current-build
 events on each device, CONNECTED on both, service/input READY, and no current-build
