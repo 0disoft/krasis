@@ -29,6 +29,7 @@ type Installation struct {
 	images                     [2]installationImage
 	loadElapsed                time.Duration
 	workerPending              bool
+	observation                *os.File // Short-lived observer's transaction fence.
 }
 
 type installationImage struct {
@@ -332,6 +333,9 @@ func (installation *Installation) Close() error {
 		if file.Close() != nil {
 			result = ErrAuthority
 		}
+	}
+	if installation.observation != nil && installation.observation.Close() != nil {
+		result = ErrAuthority
 	}
 	return result
 }

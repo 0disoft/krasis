@@ -31,7 +31,7 @@ func inspectDoctorHost(ctx context.Context, appData, agentBuild string) doctorHo
 	if _, err := os.Lstat(installed); errors.Is(err, os.ErrNotExist) {
 		host.InstalledAgent.State = "NOT_INSTALLED"
 	} else if err == nil {
-		installation, err := inputworker.LoadInstallation()
+		installation, err := inputworker.ObserveInstallation()
 		if err != nil {
 			host.InstalledAgent.State = "INVALID"
 		} else {

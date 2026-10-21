@@ -136,7 +136,7 @@ func (files *installFiles) acquire(ctx context.Context) (func(), error) {
 	if files == nil || files.pinned == nil || files.lock != nil || ctx.Err() != nil {
 		return nil, ErrAuthority
 	}
-	file, err := openInstallWrite(filepath.Join(files.root, "INPUT-TRANSACTION.lock"))
+	file, err := waitInstallWrite(ctx, filepath.Join(files.root, "INPUT-TRANSACTION.lock"), openInstallWrite)
 	if err != nil {
 		return nil, err
 	}

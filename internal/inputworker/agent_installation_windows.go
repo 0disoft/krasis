@@ -58,7 +58,7 @@ func installationRefreshRunning(path string) (bool, error) {
 // Read-only identity comparison. This does not grant a lease or require service
 // readiness. Close every image pin before executing the elevated installer.
 func InstallationMatchesAgent(expected [sha256.Size]byte) (bool, error) {
-	installation, err := LoadInstallation()
+	installation, err := ObserveInstallation()
 	if err != nil {
 		return false, err
 	}
@@ -76,7 +76,7 @@ func InstallationMatchesAgent(expected [sha256.Size]byte) (bool, error) {
 // Inspect the currently installed service even when a newer portable bundle
 // differs. This is a read-only observation, never permission to run old code.
 func InstallationServiceHealth() error {
-	installation, err := LoadInstallation()
+	installation, err := ObserveInstallation()
 	if err != nil {
 		return err
 	}
@@ -109,7 +109,7 @@ func openAgentLaunch(expected [sha256.Size]byte, wait time.Duration) (*AgentLaun
 	if running, err := InstallationRefreshRunning(); err != nil || running {
 		return nil, ErrAuthority
 	}
-	installation, err := LoadInstallation()
+	installation, err := ObserveInstallation()
 	if err != nil {
 		return nil, err
 	}
