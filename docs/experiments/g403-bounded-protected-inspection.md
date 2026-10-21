@@ -48,3 +48,13 @@ presence/cleanup acceptance. #59 source hook/native cursor and semantic gates
 remain separate. No public API, DB, runner, dependency, firewall, signing,
 branch/worktree, remote ref or issue-comment changes. Generation 403 identifies
 the authorized A/B update; application evidence is appended after verification.
+
+## Pre-application diagnostic correction (g404)
+
+Final inspection found the two new fixed inspection failure/reconnecting event
+codes missing from productlog's allow-list. Add both so persisted/sanitized
+support evidence retains the cause without accepting arbitrary details. The
+existing export privacy test now covers both codes. Productlog tests/vet pass.
+The g403 artifact was built and checked but was never installed or sent; g404
+supersedes it before device application. This is completion of the same unit,
+not a second behavior change or a claim of real-device timeout reproduction.

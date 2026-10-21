@@ -29,7 +29,7 @@ func TestTrustTimingCodesSurviveExportWithoutArbitraryDetails(t *testing.T) {
 }
 
 func TestProtectedInputReasonsSurviveExportWithoutPrivateDetails(t *testing.T) {
-	for _, code := range []string{"protected_input_desktop_unavailable", "protected_input_non_default_desktop", "protected_input_credential_broker", "protected_input_identity_unknown"} {
+	for _, code := range []string{"protected_input_desktop_unavailable", "protected_input_non_default_desktop", "protected_input_credential_broker", "protected_input_identity_unknown", "protected_input_inspection_failed", "protected_inspection_reconnecting"} {
 		result := sanitizeLog("agent.jsonl", strings.NewReader(`{"time":"2026-09-17T00:00:00Z","code":"`+code+`","path":"private","title":"private"}`+"\n"))
 		if result.Incomplete || len(result.Events) != 1 || result.Events[0].Code != code {
 			t.Fatal(code)
