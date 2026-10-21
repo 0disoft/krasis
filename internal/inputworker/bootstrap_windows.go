@@ -204,7 +204,16 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 	if err != nil {
 		return ErrAuthority
 	}
-	defer control.Close()
+	// Capture transfers both the pipe and service proof to one query owner.
+	// A timed-out native query must retain its exact pipe until actual return.
+	var sourceService *Channel
+	defer func() {
+		if sourceService != nil {
+			_ = sourceService.Close()
+		} else {
+			_ = control.Close()
+		}
+	}()
 	stopControl := context.AfterFunc(startup, func() { _ = control.Close() })
 	defer stopControl()
 	started = time.Now()
@@ -213,7 +222,11 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 	if err != nil {
 		return ErrAuthority
 	}
-	defer proof.Close()
+	defer func() {
+		if sourceService == nil {
+			_ = proof.Close()
+		}
+	}()
 	_ = control.SetDeadline(time.Now().Add(startupTimeout))
 	if startup.Err() != nil || proof.check(false) != nil || writeFrame(control, workerAuthenticatedFrame[:]) != nil {
 		return ErrAuthority
@@ -227,7 +240,12 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 		return ErrProtocol
 	}
 	pipe := &pipeConn{handle: windows.Handle(handle), closed: make(chan struct{}), closeDone: make(chan struct{})}
-	defer pipe.Close()
+	pipeOwned := true
+	defer func() {
+		if pipeOwned {
+			_ = pipe.Close()
+		}
+	}()
 	image := os.NewFile(uintptr(imageHandle), "transferred-input-image")
 	defer func() {
 		if image != nil {
@@ -253,6 +271,7 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 		return ErrAuthority
 	}
 	channel := &Channel{stream: pipe, authority: authority}
+	pipeOwned = false // Channel now retains the pipe through pending native queries.
 	defer channel.Close()
 	if wininput.InitializePhysicalCoordinates() != nil {
 		return ErrAuthority
@@ -261,6 +280,9 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 		return ErrAuthority
 	}
 	_ = control.SetDeadline(time.Time{})
+	if lease.Capture {
+		sourceService = &Channel{stream: control, authority: proof}
+	}
 	run, cancel := context.WithCancel(ctx)
 	defer cancel()
 	var requested atomic.Bool
@@ -273,10 +295,18 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 		}
 		cancel()
 	}()
-	defer func() { _ = control.Close(); <-readerDone }()
+	defer func() {
+		if sourceService != nil {
+			// Interrupt the reader without closing a native query's pipe.
+			_ = control.SetReadDeadline(time.Now())
+		} else {
+			_ = control.Close()
+		}
+		<-readerDone
+	}()
 	if lease.Capture {
 		var exit logindiag.SourceExit
-		result := runSourceCapture(run, channel, proof, lease, func() error {
+		result := runSourceCapture(run, channel, sourceService, lease, func() error {
 			_ = control.SetWriteDeadline(time.Now().Add(startupTimeout))
 			return writeStartupReady(control, profile)
 		}, &exit)

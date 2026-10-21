@@ -137,7 +137,7 @@ func (q *sourcePointerQueue) Observe(a control.InputAction, x int32) error {
 
 // The child owns native suppression and physical pressed state. The medium
 // agent keeps mTLS, outbound lease negotiation and the network action sender.
-func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, lease Lease, ready func() error, exit *logindiag.SourceExit) (result error) {
+func runSourceCapture(ctx context.Context, channel, service *Channel, lease Lease, ready func() error, exit *logindiag.SourceExit) (result error) {
 	if exit == nil {
 		return ErrProtocol
 	}
@@ -152,19 +152,13 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 	run, cancel := context.WithDeadline(ctx, lease.ExpiresAt)
 	defer cancel()
 	authorize := func() error {
-		if err := proof.checkSource(); err != nil {
+		if err := service.authority.checkSource(); err != nil {
 			return err
 		}
 		return channel.authority.checkSource()
 	}
-	present := func() error {
-		if err := proof.checkSourceHeartbeat(); err != nil {
-			return err
-		}
-		return channel.authority.checkSourceHeartbeat()
-	}
 	authorizeCommand := func(op byte) error {
-		return sourceCommandReadAuthorization(op, authorize, present)
+		return authorizeSourceRead(run, service, channel, op)
 	}
 	hook, err := wininput.NewProtectedSourceHook(authorize)
 	if err != nil {
@@ -245,6 +239,15 @@ func runSourceCapture(ctx context.Context, channel *Channel, proof *Authority, l
 		}
 		if closeErr := channel.Close(); closeErr != nil {
 			result = errors.Join(result, ErrRecovery, &workerReportFailure{operation: "source-channel-close", cause: closeErr})
+		}
+		// Both command/watchdog callers have joined. A service query may still
+		// own native handles, so the service report must not claim cleanup yet.
+		// Keep its control pipe open for the final report; bootstrap retires it.
+		service.queryMu.Lock()
+		pendingService := service.pendingQueriesLocked()
+		service.queryMu.Unlock()
+		if pendingService {
+			result = errors.Join(result, ErrRecovery, &workerReportFailure{operation: "source-channel-close", cause: ErrAuthority})
 		}
 	}()
 	select {
