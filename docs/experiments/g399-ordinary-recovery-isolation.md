@@ -51,3 +51,26 @@ remains open for login recovery and final call-graph/device acceptance. #59,
 #70 and hardware/UI/distribution gates retain their own requirements. No public
 API, DB, dependency, runner, firewall, signing, issue comment, branch/worktree or
 push changes. Paired installation and ordinary smoke are recorded when verified.
+
+## Paired application
+
+Both PCs report generation 399 and revision
+32f45b5afb8a6c1154fa90fbfa3b490eae886f9f. B's persisted update status is UPDATED
+with all 28,124,622 bytes received. A's attended installer exited 0 and the
+installed agent digest matched. The installed-input smoke passed native child
+startup, cursor read/same-point placement and recovery shutdown. After that
+smoke, no session-1 native children remained; the session-0 service remained.
+
+After replacement A was LOCAL; an explicit connect B restored CONNECTED.
+Collection e82cb4b075dbdfa4e582d6da0f37258d captured that transition. Follow-up
+collection 9ffcfa3827854db37ca8bc091a1b7550 confirms both PCs CONNECTED, both
+services READY, successful installer receipts and protected capture readiness
+on each side. Neither collection contains current-build fault or startup-failed
+events. A live process snapshot shows its protected service and capture worker;
+the three-process receive path was exercised by the installed smoke, not by
+claiming all three children must exist during source-only idle capture.
+
+This is short-window runtime evidence. It does not establish held-key recovery,
+physical input latency, Winlogon or the full two-device fault matrix. The user's
+g377 input report remains evidence for that historical build only. No issue was
+closed from the g399 smoke or these collections.
