@@ -57,3 +57,35 @@ Hosted CI, signing and the full device acceptance matrix were not run.
 Remaining priority: deterministically reproduce source reader/backpressure
 blocking heartbeat replies and verify bounded orderly retirement on failure.
 No new implementation started after the ten-minute cutoff.
+
+## User comparison: stutter remains
+
+The user reports "similar" after the g423 B movement comparison. Treat the
+stutter objective as unresolved. Fresh paired collection
+`2474b2da442e3d9162199aa7980c898f` retains four matching exchanges.
+For `a8371c0fc9beb1e5f34f5b6defd555feea73f5766f0b36f89e2ef8ea1044a340`,
+A source worst dispatch is 1186284us, including write 915012us; B receiver
+worst dispatch is 161486us. Those are independent worst operations within
+the same exchange, not one matched event or additive end-to-end measurement.
+For `3ca275652bc4e442b5a412012760de685f06c3b4dcbb8661918258cefe7dbfa2`,
+B receiver worst dispatch is 528452us, client authority 2825us, response
+525111us and containing worker apply 133940us. The combined worker profile
+has only slot 0 measured, confirming the intended combined path ran.
+
+A source TCP RTT samples change from approximately 11-17ms in the earlier
+exchanges to 107-120ms in the later exchanges, without observed retransmitted
+bytes or timeout episodes. This does not distinguish receiver backpressure,
+network delay or scheduling. Do not infer a physical latency distribution
+from these samples or subtract nested software spans to claim native latency.
+Final doctor remains CONNECTED with matched g423 UI, agent and installed
+agent, running service and READY input. No fresh session fault is recorded
+in this comparison; no reconnect/soak acceptance is implied.
+
+Next priority is B's long ACK response interval versus the journal worker's
+combined native-child exchange, together with A's long write interval. Verify
+read/dispatch/write ownership and native-child admission using a bounded
+reproduction or trace before another rollout. The advisory review's proposed
+source-reader starvation is a hypothesis: SourceSession.Offer reserves channel
+capacity under its queue mutex, so it must not be described as an unbounded
+queue send without a concrete reproducer. Preserve ordering and held-input
+recovery, and do not replace missing evidence with widened timeouts.
