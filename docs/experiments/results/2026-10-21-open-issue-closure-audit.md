@@ -4,7 +4,18 @@ This is an incomplete acceptance audit, not a release or hardware approval.
 The user excludes Dependency Dashboard #1 from closure and prohibits Git push,
 remote ref updates and issue comments. Those constraints remain in force.
 
-Latest source correction (g427): 9ef9be7 fixes a reproduced loss of the source
+Latest source correction (g428): 90706b7 separates registration query errors
+from confirmed registration mismatches while retaining known preferences and
+rollback uncertainty. Windows desktop suite and 86 UI tests pass; both devices
+have result-0 receipts and READY input/service evidence, and A doctor reports
+healthy CONNECTED protected input with matched g428 revisions. See
+../g428-registration-query-outcome.md for application and the live eight-issue
+requirement audit. GUI interaction is blocked by the observed Windows Security
+permission overlay; manual handling and signing-environment questions remain
+pending. No usable local code-signing certificate/configuration was found.
+Physical/hosted-CI/signing prerequisites are still incomplete; no issue closes.
+
+Previous source correction (g427): 9ef9be7 fixes a reproduced loss of the source
 final report when an expired native query retires the shared control pipe first.
 Both reference-retirement orders preserve fencing, original failure evidence
 and uncertain cleanup. Full inputworker/productpanel suites and packaging pass;

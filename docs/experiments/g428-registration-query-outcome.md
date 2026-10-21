@@ -33,3 +33,59 @@ retain their existing unknown-code fallback. No agent/network wire schema, DB,
 dependency, runner, input path, signing, firewall or repository-hygiene change.
 Product-control documentation records the distinction. Native packaging and
 application results follow separately. No push or issue comment.
+
+## Packaging and paired application
+
+Local source 90706b73f85217fb459aaff6fa55f78ff77c3c74 is packaged as g428.
+The workspace builder passes 86 UI tests, native frontend/executable/embedded
+installer builds, real update archive smoke (6.63s) and eight-file verification.
+Offline verification accepts the 28,212,141-byte bundle. The existing input
+implementation is unchanged from g427, so its full suites are not repeated.
+
+B job 097b87692e938d61d6b354a611bc227a reaches UPDATED. Its installation
+receipt is result 0 at 12:44:19.4595716Z. A waits for actual exit of both
+path-verified UI/agent process handles and disposes them before repair; its
+installer returns exit 0/result 0 at 12:45:14.1064048Z. A app repair/relaunch
+registers and opens g428. Doctor reports matching UI/resident/installed g428
+revisions, healthy CONNECTED protected input, service RUNNING and complete
+update-stage cleanup. No Windows Security prompt is operated during application.
+
+Collection 691808a1e146a68dd9be20a0f9526cd3 at 12:45:40Z/12:45:42Z confirms
+both result-0 receipts, both services READY and both inputHealth states READY.
+This is successful application evidence, not a physical latency/soak claim.
+The earlier g427 protected connection also remained healthy in the 12:42Z
+doctor observation, but unattended health cannot close the physical matrix.
+
+## Remaining external prerequisites
+
+The live issue bodies were re-read after application. #1 remains excluded.
+The other eight issues still require evidence that this round does not provide:
+
+| Issue | Missing required evidence |
+| --- | --- |
+| #4 | Human-operated study-pair admission/input reports and exact-revision CI kit. |
+| #5 | Identified home pair, redacted device inventory and attended bidirectional probes. |
+| #6 | Manual power/session operations, physical held-input/termination/recovery matrix. |
+| #7 | Physical devices/rates/DPI/privilege combinations, measured distributions and soak. |
+| #15 | Remaining actual GUI/state/accessibility/high-DPI review, publication and hosted CI. |
+| #16 | Publisher signing plus complete attended install/remove/firewall/data/rollback acceptance. |
+| #20 | All linked issues, four-device acceptance, default-branch CI and signed beta candidate. |
+| #70 | Actual two-PC endpoint address change and authenticated recovery without unnecessary unchanged-address DHCP disconnect. |
+
+CurrentUser/My and LocalMachine/My contain zero currently valid private-key
+code-signing certificates. The configured file/thumbprint/timestamp variables
+are absent; external signing-service availability is unknown. Only counts and
+presence booleans were inspected. A user question requests a signing environment
+name/configuration location, never a key/password.
+
+GUI interaction stops at the observed Windows Security permission overlay.
+The user handoff to handle that dialog remains pending; silence is not consent.
+The classification correction is tested and applied, but a post-change GUI
+review is not claimed. Direct terminal application did not change permissions.
+
+The same hardware/signing/publication prerequisites remained unresolved through
+consecutive g425/g426/g427/g428 rounds. Local improvements do not satisfy them.
+No further independent source defect is established in this round. The next
+work depends on user/external evidence, including the two pending handoffs;
+do not generate more builds, fabricate reports, weaken criteria or close these
+issues merely to empty the tracker. Existing no-push instruction still applies.
