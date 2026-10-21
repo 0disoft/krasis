@@ -498,6 +498,16 @@ func (runtime *SessionRuntime) handleInputAction(
 	now func() time.Time,
 	timeout time.Duration,
 ) (returnErr error) {
+	return runtime.handleInputActions(ctx, []control.InputEnvelope{envelope}, action, now, timeout)
+}
+
+func (runtime *SessionRuntime) handleInputActions(
+	ctx context.Context,
+	envelopes []control.InputEnvelope,
+	action control.InputAction,
+	now func() time.Time,
+	timeout time.Duration,
+) (returnErr error) {
 	disposition := InputDispositionRejected
 	if runtime.inputObserver != nil {
 		runtime.inputObserver.ObserveDestinationInputReceived()
@@ -519,11 +529,13 @@ func (runtime *SessionRuntime) handleInputAction(
 			if err := action.Validate(); err != nil {
 				return err
 			}
-			next, err := runtime.retiredInbound.Accept(envelope)
-			if err != nil {
-				return err
+			for _, envelope := range envelopes {
+				next, err := runtime.retiredInbound.Accept(envelope)
+				if err != nil {
+					return err
+				}
+				runtime.retiredInbound = next
 			}
-			runtime.retiredInbound = next
 			disposition = InputDispositionRetiredDrained
 			return nil
 		}
@@ -537,21 +549,23 @@ func (runtime *SessionRuntime) handleInputAction(
 		_, faultErr := runtime.faultLocked(ctx, err)
 		return faultErr
 	}
-	next, outcome, accepted, err := HandleInputEnvelope(
-		ctx,
-		runtime.control,
-		runtime.stream,
-		envelope,
-		runtime.executor,
-	)
-	runtime.applyOutcomeLocked(outcome)
-	if err != nil {
-		return err
+	for _, envelope := range envelopes {
+		next, outcome, accepted, err := HandleInputEnvelope(
+			ctx,
+			runtime.control,
+			runtime.stream,
+			envelope,
+			runtime.executor,
+		)
+		runtime.applyOutcomeLocked(outcome)
+		if err != nil {
+			return err
+		}
+		if !accepted {
+			return errors.New("input envelope was not accepted")
+		}
+		runtime.stream = next
 	}
-	if !accepted {
-		return errors.New("input envelope was not accepted")
-	}
-	runtime.stream = next
 	progress, admittedAt, err := runtime.inputLivenessLocked(injectionCtx, now, timeout)
 	if err != nil {
 		return err
