@@ -45,6 +45,18 @@ func applyCommand(ctx context.Context, input application.InputPort, pressed *con
 			return enterCursorResponse(ctx, input, pressed, command, ack)
 		})
 	}
+	if command.op == opMoveRead {
+		if isolated, ok := input.(*isolatedInput); ok {
+			// The native child already supports one ordered move/read command.
+			// Keep its fresh desktop/authority checks and readback there,
+			// instead of two child exchanges and two desktop transactions.
+			return measureApplyPart(ack.applyDetail, 0, func() error {
+				var err error
+				ack.x, ack.y, err = isolated.MoveWithPosition(ctx, command.x, command.y)
+				return err
+			})
+		}
+	}
 	applyCtx := ctx
 	if command.submissionDetail {
 		applyCtx = handoff.WithWorkerApply(ctx, ack.applyDetail)
