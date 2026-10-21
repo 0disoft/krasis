@@ -204,12 +204,15 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 	if err != nil {
 		return ErrAuthority
 	}
-	// Capture transfers both the pipe and service proof to one query owner.
-	// A timed-out native query must retain its exact pipe until actual return.
+	// Capture keeps separate query/report references to the same exact pipe.
+	// Query retirement cannot discard the final report; a pending query still
+	// retains its native pipe after bootstrap releases reporting ownership.
 	var sourceService *Channel
+	var sourceReporter io.Closer
 	defer func() {
 		if sourceService != nil {
 			_ = sourceService.Close()
+			_ = sourceReporter.Close()
 		} else {
 			_ = control.Close()
 		}
@@ -281,7 +284,7 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 	}
 	_ = control.SetDeadline(time.Time{})
 	if lease.Capture {
-		sourceService = &Channel{stream: control, authority: proof}
+		sourceService, sourceReporter = sourceReportChannel(control, proof)
 	}
 	run, cancel := context.WithCancel(ctx)
 	defer cancel()
