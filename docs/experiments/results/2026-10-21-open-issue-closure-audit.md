@@ -4,7 +4,17 @@ This is an incomplete acceptance audit, not a release or hardware approval.
 The user excludes Dependency Dashboard #1 from closure and prohibits Git push,
 remote ref updates and issue comments. Those constraints remain in force.
 
-Latest correction (g425): #59 is CLOSED at 11:49:00Z. Its original completion
+Latest observation (g426): #15's actual connected/settings screenshots and
+keyboard/localization checks exposed and verified a missing disclosure focus
+outline, fixed in local commit 1eaf84b. Both devices run g426; A's doctor and
+visible workspace report CONNECTED. Paired diagnostics confirm input READY.
+A's installer nevertheless has result 5 file_delete and result 4 restored
+directory_retire_move access denials. Those outcomes remain unresolved in #16;
+current runtime health is not full installation acceptance. See
+2026-10-21-issue-15-keyboard-review.md for exact observations and screenshots.
+The eight actionable issues below remain open, plus excluded dashboard #1.
+
+Previous correction (g425): #59 is CLOSED at 11:49:00Z. Its original completion
 criteria cover callback wait causes, nonblocking observation, normal idle and
 safe abort on actual progress disagreement. The reproduced lock-order defect
 is fixed in 8f51c46, with original-source regression failures and fixed full
@@ -55,8 +65,8 @@ an incomplete historical audit, not a current g424 device acceptance claim.
 | #5 | Runbook and checker exist. H-A/H-B remain UNDECIDED in the device ledger. | Identify the home pair, record its redacted inventory and run the applicable baseline and bidirectional probes. Current A/B labels do not establish that location. |
 | #6 | Lifecycle/guard cleanup implementation and controlled fault regressions. | Attended physical termination/held-input, network, lock, sleep, topology and uncertain-injection cases, with checked bounded recovery reports. |
 | #7 | Input instrumentation, controlled queue/stall tests and g377 ordinary-use report. | Actual supported device/DPI/privilege/rate combinations, bounded latency distributions and soak, then evidence-based support limits. |
-| #15 | Product UI/control implementation, 85 UI tests and labeled connected accessibility tree. | Reviewable screenshot, keyboard/accessibility/localization/high-DPI and state coverage, plus publication/exact-revision CI. The security prompt currently blocks the screenshot review. |
-| #16 | Full application/install/update/recovery/remove implementation and successful g416 paired upgrades. | Publisher signing configuration and signed candidate verification; full current-build device install/remove/data/firewall/rollback acceptance. A successful upgrade alone does not prove the full matrix. |
+| #15 | Product controls, 85 UI tests, actual g425/g426 connected/settings screenshots and named accessibility tree; g426 accent disclosure focus and limited Korean/English, Tab/Shift+Tab/Escape/scroll validation. | Remaining state, screen-reader and high-DPI coverage, plus publication/exact-revision hosted CI. The earlier firewall prompt no longer blocks this limited screenshot review. |
+| #16 | Installation/update/recovery implementation, current paired g426 runtime and B result-0 update receipt. A's g426 attempts expose file_delete and directory_retire_move Win32-5 failures with subsequent restored health. | Reproduce and fix protected-file retirement/cleanup denial; publisher signing and full install/remove/data/firewall/rollback acceptance. Healthy runtime does not erase failed receipts or prove the matrix. |
 | #20 | Linked core/product implementation work and the supporting local records. | All linked acceptance issues completed, required default-branch CI, consistent four-device evidence and a signed operable/rollbackable/removable beta candidate. |
 | #50 (CLOSED) | Current diagnostics, injection/cleanup budgets, stalled real-child input/release retirement, partial/unknown outcomes and exact pressed-state/LOCAL recovery regressions. | Original completion criteria verified; full physical release/Winlogon matrix stays in #6/#7/#20. See dedicated acceptance record. |
 | #59 (CLOSED) | Observer isolation, hook-progress fences, joined native retirement and g425 removal of the reproduced physical-gate/state-wait inversion. | Original callback/observation/idle/safe-abort criteria verified; immediate desktop checks remain. Full physical matrix stays in #6/#7. See dedicated acceptance record. |
