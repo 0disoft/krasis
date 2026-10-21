@@ -4,7 +4,16 @@ This is an incomplete acceptance audit, not a release or hardware approval.
 The user excludes Dependency Dashboard #1 from closure and prohibits Git push,
 remote ref updates and issue comments. Those constraints remain in force.
 
-Latest runtime correction (unchanged g426): after the successful repair A's
+Latest source correction (g427): 9ef9be7 fixes a reproduced loss of the source
+final report when an expired native query retires the shared control pipe first.
+Both reference-retirement orders preserve fencing, original failure evidence
+and uncertain cleanup. Full inputworker/productpanel suites and packaging pass;
+paired result-0 installation receipts and protected readiness are recorded in
+../g427-source-report-pipe-lifetime.md. A connects with protected capture READY.
+This is not yet proof of recurring-service-failure resolution or physical
+stability; those observations and the eight actionable issues remain open.
+
+Previous runtime correction (unchanged g426): after the successful repair A's
 protected service fails again at 12:12:27Z with capture/worker-report-eof,
 SCM 1066/specific 2 and missing source cleanup report. A same-build recovery
 after verified process exit returns result 0 at 12:18:07Z; service and protected
