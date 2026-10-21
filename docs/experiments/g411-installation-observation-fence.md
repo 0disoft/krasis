@@ -37,3 +37,14 @@ device lifecycle criteria; #50/#59 retain their native/physical evidence gates.
 No DB, runner, dependency, firewall or signing change. One local read-only
 observation API was added within the application; no peer/control wire schema
 changed. No push, issue comment, remote ref, branch or worktree was created.
+
+## Pre-application completion: g412
+
+Final doctor call-graph inspection found process-location reporting reopening
+the installed image's build after closing its observation guard. It now reuses
+the verified observation from that same doctor invocation, while failed/unknown
+observations stay unknown. Portable bundle paths retain their ordinary read.
+This is diagnostic snapshot reuse, not cached input authority. The regression
+prohibits reopening the installed path, including case variants and failed
+observations. g411 was built/verified but never applied or sent; g412 supersedes
+it before paired installation as completion of this same observation unit.

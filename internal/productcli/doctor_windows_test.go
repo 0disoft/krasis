@@ -75,3 +75,21 @@ func TestDoctorCancelledHostInspectionRemainsUnknown(t *testing.T) {
 		t.Fatal("cancelled native checks claimed healthy")
 	}
 }
+
+func TestDoctorProcessLocationNeverReopensInstalledImage(t *testing.T) {
+	installed := `C:\Program Files\Krasis\Input\krasis-agent.exe`
+	for _, state := range []string{"VERIFIED", "UNKNOWN", "INVALID"} {
+		observed := doctorComponent{State: state, Build: strings.Repeat("a", 40)}
+		build := doctorAgentImageBuild(strings.ToUpper(installed), installed, observed, func(string) string {
+			t.Fatal("installed image reopened outside observation guard")
+			return ""
+		})
+		if (state == "VERIFIED" && build != observed.Build) || (state != "VERIFIED" && build != "") {
+			t.Fatal("unverified observation became an installed build", state, build)
+		}
+	}
+	read := 0
+	if build := doctorAgentImageBuild(`C:\bundle\krasis-agent.exe`, installed, doctorComponent{}, func(string) string { read++; return "portable-build" }); build != "portable-build" || read != 1 {
+		t.Fatal("portable image inspection was lost", build, read)
+	}
+}

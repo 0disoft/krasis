@@ -72,7 +72,7 @@ func inspectDoctorHost(ctx context.Context, appData, agentBuild string) doctorHo
 		if ctx.Err() != nil {
 			return host
 		}
-		if doctorImageBuild(path) != agentBuild {
+		if doctorAgentImageBuild(path, filepath.Join(installed, "krasis-agent.exe"), host.InstalledAgent, doctorImageBuild) != agentBuild {
 			continue
 		}
 		locations[strings.ToLower(filepath.Clean(path))] = true
@@ -89,6 +89,18 @@ func inspectDoctorHost(ctx context.Context, appData, agentBuild string) doctorHo
 		}
 	}
 	return host
+}
+
+// The installed build was already observed with its transaction guard held.
+// Process-location reporting must not reopen that image after releasing it.
+func doctorAgentImageBuild(path, installed string, observed doctorComponent, read func(string) string) string {
+	if strings.EqualFold(filepath.Clean(path), filepath.Clean(installed)) {
+		if observed.State == "VERIFIED" {
+			return observed.Build
+		}
+		return ""
+	}
+	return read(path)
 }
 
 func doctorImageBuild(path string) string {
