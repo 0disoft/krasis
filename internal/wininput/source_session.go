@@ -154,7 +154,7 @@ type SourceSession struct {
 	now              func() time.Time
 	started          atomic.Bool
 	terminal         atomic.Bool
-	stateMu          sync.RWMutex
+	stateMu          sync.RWMutex // When both are needed: stateMu before physicalMu.
 	physicalMu       sync.Mutex
 	physicalHeld     map[physicalPress]struct{}
 	physicalCheck    func() bool
@@ -213,14 +213,16 @@ func (session *SourceSession) Activate() error {
 	if check != nil && check() {
 		return errors.New("physical input is held during source activation")
 	}
+	// Wait for state before entering the physical callback gate. All operations
+	// needing both locks use stateMu -> physicalMu, with no native work inside.
+	session.stateMu.Lock()
+	defer session.stateMu.Unlock()
 	session.physicalMu.Lock()
 	defer session.physicalMu.Unlock()
 	if session.capturePaused || len(session.physicalHeld) != 0 ||
 		revision != session.physicalRevision || revision == ^uint64(0) {
 		return errors.New("physical input changed during source activation")
 	}
-	session.stateMu.Lock()
-	defer session.stateMu.Unlock()
 	if session.terminal.Load() || !session.started.Load() {
 		return errors.New("source session worker has stopped")
 	}

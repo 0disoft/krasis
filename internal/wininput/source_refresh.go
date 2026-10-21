@@ -9,13 +9,13 @@ func (session *SourceSession) UseExternalPhysicalCapture() bool {
 	if session == nil {
 		return false
 	}
+	session.stateMu.RLock()
+	defer session.stateMu.RUnlock()
 	session.physicalMu.Lock()
 	defer session.physicalMu.Unlock()
 	if !session.capturePaused || len(session.physicalHeld) != 0 {
 		return false
 	}
-	session.stateMu.RLock()
-	defer session.stateMu.RUnlock()
 	if session.active.Load() || session.terminal.Load() || session.yieldPending != 0 {
 		return false
 	}
@@ -32,10 +32,10 @@ func (session *SourceSession) captureRefreshPending() bool {
 	if session == nil {
 		return false
 	}
-	session.physicalMu.Lock()
-	defer session.physicalMu.Unlock()
 	session.stateMu.RLock()
 	defer session.stateMu.RUnlock()
+	session.physicalMu.Lock()
+	defer session.physicalMu.Unlock()
 	return session.capturePaused && !session.active.Load() && !session.terminal.Load()
 }
 
@@ -47,10 +47,10 @@ func (session *SourceSession) PauseCapture() bool {
 	if session == nil {
 		return false
 	}
-	session.physicalMu.Lock()
-	defer session.physicalMu.Unlock()
 	session.stateMu.RLock()
 	defer session.stateMu.RUnlock()
+	session.physicalMu.Lock()
+	defer session.physicalMu.Unlock()
 	if session.terminal.Load() || session.active.Load() || session.yieldPending != 0 || len(session.physicalHeld) != 0 {
 		return false
 	}
