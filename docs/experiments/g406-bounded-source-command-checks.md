@@ -48,3 +48,35 @@ Remaining direct source-writer, worker-side proof and native callback calls are
 outside this client unit; #50/#59 remain open for their call graph and physical
 acceptance. No public API/DB, dependency, runner, firewall or signing policy
 changes. No push, remote ref changes or issue comments.
+
+## Paired application
+
+Application/peer/residentagent/productpanel suites, UI 85 tests, native builds,
+embedded-installer provenance and eight-file package checks pass. Offline bundle
+verification accepted revision 0f6d17417f925993aa92429d7b4b00edc090b024,
+28,302,519 bytes. A's verified UI replacement installed g406 at 01:02:32Z with
+complete/result 0 and no recovery needed. Its installed agent SHA-256 matches
+the bundle. B update 9a85a3369b3c9842d952d728042f5872 reports UPDATED; B's
+installation at 01:02:58Z also reports complete/result 0, no recovery needed.
+
+The first collection ce03cfd19096036878103b58b35c9b87 overlapped reconnection and
+was not used as proof of completed connection. Fresh collection
+e2ceb9e1f4becafee7422d10dc55c79d at 01:03:51Z contains 33 A / 32 B current-build
+events, CONNECTED on both devices and READY service/input health, with no
+current-build fault or startup-failed event. A's fresh doctor independently
+reports CONNECTED, matching CLI/UI/resident/installed revisions, verified launch
+record and completed stage cleanup. No manual connect or installer retry was
+required for this application.
+
+Standalone installed-input smoke was not repeated while the normal resident was
+running; g405 had already established the singleton conflict. No held-key,
+Winlogon, power, DHCP, home-pair, DPI/accessibility or signed-release acceptance
+is inferred from these checks. CGO disabled: race detection not run. Hosted CI
+not run: commits remain local as requested.
+
+No further implementation unit was started after this continuation's ten-minute
+cutoff. Next: #50 sourceWriter's direct full/presence queries and worker-side
+authorize/present callbacks, including shutdown joins; #59's hook callback native
+desktop/cursor dependencies remain separate. #4/#5/#6/#7/#15/#16/#20/#50/#59/#70
+remain open because their evidence is incomplete. The earlier device-pair and
+real signer questions remain unresolved. No branch/worktree changes or push.
