@@ -17,6 +17,7 @@ type Channel struct {
 	query            *authorityQuery
 	presenceQuery    *authorityQuery
 	maintenanceQuery *authorityQuery // Optional heartbeat/advisory proof; never input.
+	queryClosed      chan struct{}   // Lazily allocated only for capacity waiters; queryMu.
 	closing          bool
 }
 
@@ -25,7 +26,7 @@ func (channel *Channel) Close() error {
 		return nil
 	}
 	channel.queryMu.Lock()
-	channel.closing = true
+	channel.closeQueryAdmissionLocked()
 	if channel.pendingQueriesLocked() {
 		channel.authority.fenced.Store(true)
 		// Interrupt wire work, but retain the pipe and proof handles used by
@@ -38,6 +39,17 @@ func (channel *Channel) Close() error {
 	}
 	channel.queryMu.Unlock()
 	return channel.closeResources()
+}
+
+// Capacity waiters own no native handles. Wake them when admission closes,
+// even if all process-wide query slots remain owned by blocked native calls.
+func (channel *Channel) closeQueryAdmissionLocked() {
+	if !channel.closing {
+		channel.closing = true
+		if channel.queryClosed != nil {
+			close(channel.queryClosed)
+		}
+	}
 }
 
 func (channel *Channel) pendingQueriesLocked() bool {

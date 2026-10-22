@@ -52,6 +52,11 @@ func TestSourceReadQueryDeadlineIdentifiesOwnerThroughFinalReport(t *testing.T) 
 }
 
 func TestSourceQueryCapacityAndClosedAreDifferentFromNativeDenial(t *testing.T) {
+	synctest.Test(t, testSourceQueryCapacityAndClosed)
+}
+
+func testSourceQueryCapacityAndClosed(t *testing.T) {
+	defer isolateAuthorityCapacity(t)()
 	server, pipe := net.Pipe()
 	defer server.Close()
 	channel := clientChannel(pipe, authorityService)
@@ -62,7 +67,9 @@ func TestSourceQueryCapacityAndClosedAreDifferentFromNativeDenial(t *testing.T) 
 	for i := 0; i < cap(authorityQueries); i++ {
 		authorityQueries <- struct{}{}
 	}
-	failure := channel.authorizeSourcePresence(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	failure := channel.authorizeSourcePresence(ctx)
 	for i := 0; i < cap(authorityQueries); i++ {
 		<-authorityQueries
 	}

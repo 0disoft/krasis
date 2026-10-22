@@ -74,6 +74,7 @@ func TestTimedOutAuthorityQueryRetainsHandlesAndNeverRevives(t *testing.T) {
 
 func TestAuthorityQueryCapacityIncludesExpiredNativeOwners(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
+		defer isolateAuthorityCapacity(t)()
 		release := make(chan struct{})
 		entered := make(chan struct{}, cap(authorityQueries))
 		done := make(chan error, cap(authorityQueries))
@@ -109,7 +110,9 @@ func TestAuthorityQueryCapacityIncludesExpiredNativeOwners(t *testing.T) {
 		defer server.Close()
 		replacement := clientChannel(pipe, authorityService)
 		replacement.authority.checkInputObserved = func(context.Context) error { t.Error("over-capacity native query started"); return nil }
-		if replacement.authorizeInput(context.Background(), true) != ErrAuthority || len(authorityQueries) != cap(authorityQueries) || closes.Load() != 0 {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+		defer cancel()
+		if !errors.Is(replacement.authorizeInput(ctx, true), context.DeadlineExceeded) || len(authorityQueries) != cap(authorityQueries) || closes.Load() != 0 {
 			t.Fatal("expired query abandoned its resource slot")
 		}
 		_ = replacement.Close()

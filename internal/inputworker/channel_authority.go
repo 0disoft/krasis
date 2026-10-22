@@ -109,11 +109,27 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 				return queryPhaseFailure(kind, "waiting", ctx.Err())
 			}
 		}
-		select {
-		case authorityQueries <- struct{}{}:
-		default:
+		if err := channel.reserveQueryCapacityLocked(ctx, kind); err != nil {
 			channel.queryMu.Unlock()
-			return queryAdmissionFailure(kind, "capacity", nil)
+			return err
+		}
+		// A contended reservation releases queryMu. Neither its old lane state
+		// nor its old admission decision survives that wait. The reserved slot
+		// authorizes no work; the native query below still obtains a fresh proof.
+		if channel.closing || channel.authority.fenced.Load() {
+			<-authorityQueries
+			channel.queryMu.Unlock()
+			return queryAdmissionFailure(kind, "closed", nil)
+		}
+		if err := ctx.Err(); err != nil {
+			<-authorityQueries
+			channel.queryMu.Unlock()
+			return queryCapacityFailure(kind, err)
+		}
+		if *current != nil {
+			<-authorityQueries
+			channel.queryMu.Unlock()
+			continue
 		}
 		query := &authorityQuery{done: make(chan struct{})}
 		if profile != nil {
@@ -144,7 +160,7 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 			query.phase.Store(queryPublishing)
 			channel.queryMu.Lock()
 			if ctx.Err() != nil && !optional {
-				channel.closing = true
+				channel.closeQueryAdmissionLocked()
 				channel.authority.fenced.Store(true)
 			}
 			*current = nil
@@ -200,7 +216,7 @@ func (channel *Channel) cancelQuery(query *authorityQuery) {
 	if channel.query != query && channel.presenceQuery != query && channel.maintenanceQuery != query {
 		return
 	}
-	channel.closing = true
+	channel.closeQueryAdmissionLocked()
 	channel.authority.fenced.Store(true)
 	if channel.stream != nil {
 		_ = channel.stream.SetDeadline(time.Now())
