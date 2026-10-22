@@ -1,48 +1,24 @@
 <script>
-  import { onDestroy } from 'svelte';
   import { nativeText } from './native-i18n.js';
-  import { appOpenProgress } from './app-open-bridge.js';
+  import { createAppOpenController } from './app-open-controller.js';
   import Icon from './Icon.svelte';
   let { bridge, peer, locale, compact = false } = $props();
   let busy = $state(false);
   let result = $state();
-  let disposed = false;
-  let timer;
+  let controller;
   const t = key => nativeText(locale, key);
   const visible = $derived(result?.peer === peer?.fingerprint ? result : undefined);
   $effect(()=>{
     const fingerprint=peer?.fingerprint;
-    if(bridge&&fingerprint&&!busy&&!result){
-      const pending=bridge.resume?.(fingerprint);
-      if(pending){busy=true;result=pending;follow(pending);}
-    }
+    const binding=bridge;
+    busy=false;result=undefined;
+    if(!binding||!fingerprint)return;
+    const next=createAppOpenController(binding,{apply:value=>{busy=value.busy;result=value.result;}});
+    controller=next;
+    next.resume(fingerprint);
+    return ()=>{next.dispose();if(controller===next)controller=undefined;};
   });
-  async function open() {
-    if (busy || !bridge || !peer || disposed) return;
-    busy = true;
-    const fingerprint = peer.fingerprint;
-    result = {peer:fingerprint, code:'pending'};
-    const next = await bridge.open(fingerprint);
-    if (disposed) return;
-    result = next;
-    if (!['pending','launch_accepted','launch_requested'].includes(next.code)) { busy = false; return; }
-    follow(next);
-  }
-  function follow(next){
-    const fingerprint=next.peer;
-    const deadline=performance.now()+Math.min(70000,next.remaining??70000);
-    async function poll() {
-      if (disposed) return;
-      const status = await bridge.status(fingerprint, next.id);
-      if (disposed) return;
-      const progress = appOpenProgress(result, status, bridge.expired ? bridge.expired(fingerprint,next.id) : performance.now() >= deadline);
-      result = progress.result;
-      if (progress.waiting) { timer = setTimeout(poll,1500); return; }
-      busy = false;
-    }
-    timer = setTimeout(poll,1500);
-  }
-  onDestroy(() => { disposed = true; clearTimeout(timer); });
+  function open() { controller?.open(peer?.fingerprint); }
 </script>
 
 <div class="peer-app-action" class:compact>
