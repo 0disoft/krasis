@@ -188,6 +188,12 @@ func TestPreparedConsoleRequiresExactUnboundRetirementReceipt(t *testing.T) {
 		if (err == nil) != valid || worker.nativeChildRetired != valid || worker.closed != valid {
 			t.Fatal("invalid receipt or accounting alone accepted as retirement", valid, err)
 		}
+		if !valid {
+			var failure *inputServiceFailure
+			if !errors.Is(err, ErrRecovery) || !errors.Is(err, ErrProtocol) || !errors.As(err, &failure) || failure.operation != "input-retire-receipt" {
+				t.Fatal("native retirement lost its stage or recovery fence", err)
+			}
+		}
 		if err := <-done; err != nil {
 			t.Fatal(err)
 		}

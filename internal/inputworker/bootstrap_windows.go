@@ -41,13 +41,15 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 	defer func() {
 		if lease.Capture {
 			result = sourceStartupFailure(startupStage, report, result)
+		} else {
+			result = inputServiceAt("input-startup-"+startupStage, result)
 		}
 	}()
 	defer func() { result = validateSourceReportMode(lease.Capture, report, result) }()
 	if candidate != nil {
 		defer func() {
-			if candidate.close() != nil {
-				result = errors.Join(result, ErrRecovery)
+			if closeErr := candidate.close(); closeErr != nil {
+				result = errors.Join(result, ErrRecovery, closeErr)
 			}
 		}()
 	}
@@ -67,8 +69,8 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 	startupStage = "prepare"
 	decision := candidate.claimDecision(ctx)
 	if decision != handoff.PreparationUsed {
-		if candidate != nil && candidate.close() != nil {
-			return Report{}, ErrRecovery
+		if closeErr := candidate.close(); closeErr != nil {
+			return Report{}, errors.Join(ErrRecovery, closeErr)
 		}
 		prepared, err = prepareAgentConsole(ctx, channel.authority, serviceDigest, installation)
 		if err != nil {
@@ -78,8 +80,8 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 	worker, control, pid, profile := prepared.worker, prepared.control, prepared.pid, prepared.profile
 	profile.PreparationDecision = decision
 	defer func() {
-		if prepared.close() != nil {
-			result = errors.Join(result, ErrRecovery)
+		if closeErr := prepared.close(); closeErr != nil {
+			result = errors.Join(result, ErrRecovery, closeErr)
 		}
 	}()
 	startup, cancel := context.WithTimeout(ctx, startupTimeout)

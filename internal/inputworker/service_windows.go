@@ -112,8 +112,8 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 		return err
 	}
 	defer func() {
-		if next.close() != nil {
-			result = errors.Join(result, ErrRecovery)
+		if closeErr := next.close(); closeErr != nil {
+			result = errors.Join(result, ErrRecovery, closeErr)
 		}
 		result = errors.Join(result, listener.Close())
 	}()
@@ -149,9 +149,9 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 				// duplicate hint cannot extend expiry. A fresh, rate-limited hint
 				// may retire a nearly expired child before preparing a new one.
 				if next == nil || next.retired() || preparationRefreshDue(lastPreparation, next.preparedAt, time.Now()) {
-					if next.close() != nil {
+					if closeErr := next.close(); closeErr != nil {
 						_ = channel.Close()
-						return ErrRecovery
+						return errors.Join(ErrRecovery, closeErr)
 					}
 					next = nil
 					if preparationAllowed(lastPreparation, time.Now()) {
@@ -207,8 +207,8 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 					next = nil
 					lastPreparation = time.Now()
 					warming = startCursorInputPreparation(ctx, func(run context.Context) (*preparedConsole, error) {
-						if retiring.close() != nil {
-							return nil, ErrRecovery
+						if closeErr := retiring.close(); closeErr != nil {
+							return nil, errors.Join(ErrRecovery, closeErr)
 						}
 						return prepareServiceConsole(run, installation, service)
 					})
@@ -248,8 +248,8 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 		if err == nil {
 			continue
 		}
-		if next.close() != nil {
-			return ErrRecovery
+		if closeErr := next.close(); closeErr != nil {
+			return errors.Join(ErrRecovery, closeErr)
 		}
 		next = nil
 		timer := time.NewTimer(200 * time.Millisecond)

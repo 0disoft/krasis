@@ -5,6 +5,7 @@ package inputworker
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"testing"
 	"time"
 
@@ -24,7 +25,7 @@ func TestConsolePreparationRejectsBeforeLaunchingWithoutInput(t *testing.T) {
 			t.Fatal("cancelled preparation launched a child")
 		}
 	}
-	if prepared, err := prepareAgentConsole(context.Background(), nil, [sha256.Size]byte{}, nil); prepared != nil || err != ErrAuthority {
+	if prepared, err := prepareAgentConsole(context.Background(), nil, [sha256.Size]byte{}, nil); prepared != nil || !errors.Is(err, ErrAuthority) {
 		t.Fatal("unauthenticated preparation accepted")
 	}
 }

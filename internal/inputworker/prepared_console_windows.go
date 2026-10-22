@@ -153,8 +153,10 @@ func prepareConsoleMode(ctx context.Context, native bool, launch consoleLauncher
 	p := &preparedConsole{}
 	accepted := false
 	defer func() {
-		if !accepted && p.close() != nil {
-			result = errors.Join(result, ErrRecovery)
+		if !accepted {
+			if closeErr := p.close(); closeErr != nil {
+				result = errors.Join(result, ErrRecovery, closeErr)
+			}
 		}
 	}()
 	started := time.Now()
@@ -166,7 +168,7 @@ func prepareConsoleMode(ctx context.Context, native bool, launch consoleLauncher
 	})
 	p.profile.Record(handoff.ServiceLaunch, time.Since(started))
 	if err != nil {
-		return nil, err
+		return nil, inputServiceAt("input-prepare-launch", err)
 	}
 	p.worker = worker
 	startup, cancel := context.WithTimeout(ctx, startupTimeout)
@@ -175,7 +177,7 @@ func prepareConsoleMode(ctx context.Context, native bool, launch consoleLauncher
 	err = p.control.connect(startup)
 	p.profile.Record(handoff.ServiceChildConnect, time.Since(started))
 	if err != nil || startup.Err() != nil {
-		return nil, ErrAuthority
+		return nil, inputServiceAt("input-prepare-connect", errors.Join(ErrAuthority, err, startup.Err()))
 	}
 	if native {
 		if err := p.beginNativePreparation(ctx); err != nil {
@@ -204,16 +206,16 @@ func (prepared *preparedConsole) closeOwned() error {
 			// An unbound pair has no input journal. Ask its exact parent to
 			// retire both native processes before accepting its final receipt.
 			if err := prepared.retireNativePreparation(); err != nil {
-				prepared.closeErr = errors.Join(ErrRecovery, err)
+				prepared.closeErr = observeInputPreparationExit(errors.Join(ErrRecovery, err), prepared.worker.reportExit)
 			} else {
 				prepared.worker.confirmNativeRetirement()
 			}
 		}
 		if prepared.control != nil {
-			prepared.closeErr = errors.Join(prepared.closeErr, prepared.control.Close())
+			prepared.closeErr = errors.Join(prepared.closeErr, inputServiceAt("input-close-control", prepared.control.Close()))
 		}
 		if prepared.worker != nil {
-			prepared.closeErr = errors.Join(prepared.closeErr, prepared.worker.Close())
+			prepared.closeErr = errors.Join(prepared.closeErr, inputServiceAt("input-close-worker", prepared.worker.Close()))
 		}
 	})
 	return prepared.closeErr
@@ -226,17 +228,17 @@ var nativePreparationFrame = [8]byte{'K', 'R', 'N', '1', 1, 0, 0, 0}
 // journal owner connects does the service permit native process creation.
 func (p *preparedConsole) beginNativePreparation(ctx context.Context) error {
 	if ctx == nil || ctx.Err() != nil || p == nil || p.worker == nil || p.control == nil {
-		return ErrAuthority
+		return inputServiceAt("input-prepare-permit", ErrAuthority)
 	}
 	if err := p.control.SetWriteDeadline(time.Now().Add(startupTimeout)); err != nil {
-		return err
+		return inputServiceAt("input-prepare-permit", err)
 	}
 	p.nativePrepared = true
 	p.worker.expectNativeChild()
-	if err := writeFrame(p.control, nativePreparationFrame[:]); err != nil {
-		return errors.Join(ErrRecovery, err)
+	if err := writeInputServiceFrame(p.control, nativePreparationFrame[:]); err != nil {
+		return inputServiceAt("input-prepare-permit", errors.Join(ErrRecovery, err))
 	}
-	return p.control.SetWriteDeadline(time.Time{})
+	return inputServiceAt("input-prepare-permit", p.control.SetWriteDeadline(time.Time{}))
 }
 
 func awaitNativePreparation(reader io.Reader) error {
@@ -251,19 +253,8 @@ func awaitNativePreparation(reader io.Reader) error {
 }
 
 func (p *preparedConsole) retireNativePreparation() error {
-	if p.control == nil || p.worker == nil || p.control.SetDeadline(time.Now().Add(startupTimeout)) != nil {
-		return ErrRecovery
+	if p == nil || p.control == nil || p.worker == nil {
+		return inputServiceAt("input-retire-validation", ErrRecovery)
 	}
-	if readWorkerAuthenticated(p.control) != nil {
-		return ErrRecovery
-	}
-	var stop [bootstrapSize]byte // Reserved all-zero bootstrap; never a lease.
-	if writeFrame(p.control, stop[:]) != nil {
-		return ErrRecovery
-	}
-	var receipt [8]byte
-	if _, err := io.ReadFull(p.control, receipt[:]); err != nil || receipt != unboundRetiredFrame {
-		return ErrRecovery
-	}
-	return nil
+	return retireInputPreparation(p.control, workerAuthenticatedFrame, unboundRetiredFrame)
 }
