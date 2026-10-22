@@ -3,6 +3,7 @@ package productpanel
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -53,6 +54,9 @@ func (b *DesktopLifecycle) Refresh() BridgeSnapshot {
 }
 
 func (b *DesktopLifecycle) save(value BridgeSnapshot) BridgeSnapshot {
+	// The input, returned snapshot and stored state each own their peer slice.
+	// BridgePeer contains only strings, so copying its elements is sufficient.
+	value.Peers = slices.Clone(value.Peers)
 	b.stateMu.Lock()
 	// Native projection revision, independent of HTTP response arrival order.
 	if value.InputRefreshCode == "" && value.ReconnectCode == "" {
@@ -60,6 +64,7 @@ func (b *DesktopLifecycle) save(value BridgeSnapshot) BridgeSnapshot {
 	}
 	value.Revision = b.state.Revision + 1
 	b.state = value
+	b.state.Peers = slices.Clone(value.Peers)
 	b.stateMu.Unlock()
 	return value
 }
