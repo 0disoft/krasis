@@ -154,3 +154,54 @@ test('UI timeout cannot release the real bridge native-call fence or replay the 
   assert.equal(f.states.at(-1).result.code, 'query_busy');
   assert.equal(f.timers.size, 0);
 });
+
+test('callback mutation cannot change polling identity or the acknowledged timeout outcome', async () => {
+  const calls = [], published = [];
+  const f = fixture({
+    open: async () => receipt(),
+    status: async (p, r) => { calls.push([p, r]); return receipt('launch_requested'); },
+  }, { apply: ({ busy, result }) => {
+    published.push({ busy, result: { ...result } });
+    result.id = 'changed'; result.code = 'pending';
+  } });
+  f.controller.open(peer);
+  await f.advance(3000);
+  assert.deepEqual(calls, [[peer, id], [peer, id]]);
+  await f.advance(70000);
+  assert.deepEqual(published.at(-1), { busy: false, result: receipt('window_unconfirmed') });
+  assert.equal(f.timers.size, 0);
+});
+
+test('adapter-owned receipts cannot change retained identity or acknowledgement', async () => {
+  for (const source of ['open', 'status', 'resume']) {
+    const external = receipt('launch_requested'), calls = [];
+    const f = fixture({
+      open: async () => source === 'open' ? external : receipt(),
+      resume: () => external,
+      status: async (p, r) => {
+        calls.push([p, r]);
+        return source === 'status' && calls.length === 1 ? external : receipt('unavailable');
+      },
+    });
+    if (source === 'resume') f.controller.resume(peer); else f.controller.open(peer);
+    await f.advance(source === 'status' ? 1500 : 0);
+    external.id = 'changed';
+    external.code = 'pending';
+    await f.advance(70000);
+    assert.ok(calls.length > 0);
+    assert.ok(calls.every(([p, r]) => p === peer && r === id), source);
+    assert.equal(f.states.at(-1).result.code, 'window_unconfirmed', source);
+    assert.equal(f.timers.size, 0);
+  }
+});
+
+test('completion callbacks cannot mutate the adapter result', async () => {
+  const external = receipt('window_ready');
+  const f = fixture({ open: async () => external }, {
+    apply: ({ busy, result }) => { if (!busy) result.id = 'changed'; },
+  });
+  f.controller.open(peer);
+  await flush();
+  assert.deepEqual(external, receipt('window_ready'));
+  assert.equal(f.timers.size, 0);
+});

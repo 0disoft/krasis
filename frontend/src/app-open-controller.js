@@ -16,6 +16,9 @@ export function createAppOpenController(bridge, {
   let active;
   let disposed = false;
   const current = job => !disposed && active === job;
+  // Receipts contain scalar fields. Keep callback-owned snapshots separate
+  // from the request identity and acknowledgement retained by this controller.
+  const publish = (busy, result) => apply({ busy, result: { ...result } });
   function clear(job) {
     scheduler.clearTimeout(job.poll);
     scheduler.clearTimeout(job.expiry);
@@ -24,7 +27,7 @@ export function createAppOpenController(bridge, {
     if (!current(job)) return;
     clear(job);
     active = undefined;
-    apply({ busy: false, result });
+    publish(false, result);
   }
   function expire(job) {
     if (!current(job)) return;
@@ -42,6 +45,7 @@ export function createAppOpenController(bridge, {
     if (!current(job)) return;
     if (clock() >= job.deadline) { expire(job); return; }
     if (!status || typeof status.code !== 'string') status = { ...job.result, code: initial ? 'outcome_unknown' : 'unavailable' };
+    status = { ...status };
     if (initial) {
       job.result = status;
       if (!pending(status.code)) { finish(job, status); return; }
@@ -55,7 +59,7 @@ export function createAppOpenController(bridge, {
       job.result = progress.result;
       if (!progress.waiting) { finish(job, job.result); return; }
     }
-    apply({ busy: true, result: job.result });
+    publish(true, job.result);
     schedule(job);
   }
   function invoke(job, initial) {
@@ -80,10 +84,10 @@ export function createAppOpenController(bridge, {
     // A reloaded, locally expired receipt still needs native confirmation.
     // Give that one observation a bounded window; never issue a new launch.
     const left = receipt ? (remaining(receipt.remaining) || budget) : budget;
-    const job = { peer, result: receipt ?? { peer, code: 'pending' }, deadline: clock() + left };
+    const job = { peer, result: receipt ? { ...receipt } : { peer, code: 'pending' }, deadline: clock() + left };
     active = job;
     job.expiry = scheduler.setTimeout(() => expire(job), left);
-    apply({ busy: true, result: job.result });
+    publish(true, job.result);
     if (receipt) observe(job);
     else invoke(job, true);
     return true;
