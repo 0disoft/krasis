@@ -1,7 +1,8 @@
 # g438: identify failed source-write origin
 
-Status: implementation prepared; packaging and paired installation pending.
-The installed A/B baseline remains g437.
+Status: built, verified, and installed on A/B. Both installation receipts are
+successful, both protected-input states are READY, and local doctor is healthy
+with matching g438 UI/agent/installed images and a CONNECTED peer.
 
 g436 was withdrawn after live source-write timeouts. The resolver observed
 installed_source_reader_eof; a later child report can describe a separate
@@ -39,8 +40,25 @@ architecture source-of-truth change. The private report enum gains appended
 diagnostic values, so paired installation must use matching g438 components.
 Local main only; no push or remote ref changes.
 
-Next run: finish packaging with scripts/build-workspace.ps1, verify the package,
-apply g438 to B then A using the existing update/repair procedure, and confirm
-both installed receipts, protected-input READY, connection, and doctor results.
-Then collect fresh paired diagnostics before choosing another behavior change.
-Packaging and rollout are deferred to respect this run's 20-minute budget.
+Rollout passed 91 frontend tests, the native build, update-package smoke test,
+eight-file bundle checks, and offline verification. B update reached UPDATED;
+A repair installer exited zero and app repair returned recovery_ready.
+
+Pre-rollout collection also captured an A service failure on g437, followed by
+portable execution; A repair restored the protected service. This predates g438
+deployment and does not establish causality for either g436 or g438.
+
+Fresh paired observations still show A heartbeat response timeouts. The source
+exit at 14:08:33Z retained reply_gate as its lifetime slow stage (at least one
+second); another reader timeout followed at 14:09:48Z. All three observed A
+source retirements joined their native/sender owners and sent clean retirement,
+while the service stayed READY. B observed a peer heartbeat timeout and clean
+retirement at 14:09:49Z; final local doctor recovered CONNECTED. No source-write
+origin failure in this sample identifies the first failed write. Aggregate
+client/worker maxima cannot attribute worker latency to an unanswered request.
+
+Next: identify which writer holds the reply gate, separate reader-idle expiry
+from network heartbeat timeout, and investigate g437's source-command-loop
+recovery report independently. Do not weaken authority checks or native cleanup
+proof, and do not claim the intermittent issue is resolved. Rollout evidence:
+results/2026-10-22-g438-source-write-origin.json.

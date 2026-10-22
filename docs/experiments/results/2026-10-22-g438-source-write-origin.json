@@ -1,0 +1,451 @@
+{
+  "generation": 438,
+  "sourceRevision": "832aa4a85cb92f554fd943a1433190fc53258365",
+  "change": "Fixed-category source-write origin diagnostics only; g435 writer/query behavior retained.",
+  "validation": {
+    "goTests": "Reused prior passing inputworker, logindiag, productlog and residentagent checks on unchanged source.",
+    "frontendTests": 91,
+    "nativeBuild": "PASS",
+    "bundleSmoke": "PASS TestWorkspaceUpdatePackage 7.86s",
+    "bundleFiles": 8,
+    "archiveBytes": 28387343,
+    "offlineVerify": "valid",
+    "skipped": [
+      "Portable pair fixed-owner fixture excluded in source validation to avoid live-owner conflict.",
+      "No physical-input acceptance, race detector, long soak or hosted CI; no push."
+    ]
+  },
+  "baseline": {
+    "generation": 437,
+    "collectionId": "4d8f44be8df39fda26130ca4c5751c48",
+    "localInputHealth": {
+      "time": "2026-10-22T14:05:29.183903Z",
+      "state": "SERVICE_RECOVERY_REQUIRED",
+      "stage": "service_recovery",
+      "win32Error": 1066,
+      "win32Known": true
+    },
+    "localRuntime": {
+      "startedAt": "2026-10-22T13:35:11.4295108Z",
+      "time": "2026-10-22T13:47:09.5599952Z",
+      "service": "FAILED",
+      "console": "USER_SESSION",
+      "grant": "PRESENT",
+      "lastWorker": "NONE",
+      "lastFailure": {
+        "time": "2026-10-22T13:47:09.5599952Z",
+        "stage": "service",
+        "reason": "capture",
+        "operation": "source-command-loop",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "source": {
+        "total": 2,
+        "exits": [
+          {
+            "time": "2026-10-22T13:47:04.3611493Z",
+            "command": "ok",
+            "reader": "failed",
+            "capture": "joined",
+            "sender": "joined",
+            "interrupt": "joined",
+            "retirement": "clean_sent",
+            "report": "failed",
+            "failure": {
+              "operation": "source-command-heartbeat",
+              "win32Error": 0,
+              "win32Known": false
+            },
+            "heartbeatStage": "reply_gate",
+            "heartbeatSlowStage": "reply_gate",
+            "heartbeatSlowBucket": 5
+          },
+          {
+            "time": "2026-10-22T13:47:09.5568094Z",
+            "command": "ok",
+            "reader": "cancelled",
+            "capture": "joined",
+            "sender": "joined",
+            "interrupt": "joined",
+            "retirement": "delivery_failed",
+            "report": "recovery",
+            "failure": {
+              "operation": "source-command-loop",
+              "win32Error": 0,
+              "win32Known": false
+            },
+            "heartbeatStage": "replied",
+            "heartbeatSlowStage": "service_presence",
+            "heartbeatSlowBucket": 1
+          }
+        ]
+      }
+    },
+    "interpretation": "Service failure predates g438 deployment; no causal attribution to g436 or g438."
+  },
+  "application": {
+    "peerUpdateId": "0b93860d263cb59c9f01945727f119b4",
+    "peerUpdateState": "UPDATED",
+    "localInstallerExit": 0,
+    "localAppRepair": "recovery_ready",
+    "doctor": {
+      "schemaVersion": "krasis.cli.doctor/v1",
+      "agent": "RUNNING",
+      "connection": "CONNECTED",
+      "peerAlias": "B",
+      "cliGeneration": 438,
+      "agentGeneration": 438,
+      "protocol": "COMPATIBLE",
+      "code": "healthy",
+      "cliBuild": "832aa4a85cb92f554fd943a1433190fc53258365",
+      "agentBuild": "832aa4a85cb92f554fd943a1433190fc53258365",
+      "ui": {
+        "state": "RUNNING",
+        "generation": 438,
+        "build": "832aa4a85cb92f554fd943a1433190fc53258365",
+        "pathStatus": "MATCHED"
+      },
+      "launchRecord": {
+        "state": "VERIFIED",
+        "generation": 438,
+        "build": "832aa4a85cb92f554fd943a1433190fc53258365",
+        "pathStatus": "MATCHED"
+      },
+      "installedAgent": {
+        "state": "VERIFIED",
+        "build": "832aa4a85cb92f554fd943a1433190fc53258365"
+      },
+      "service": {
+        "state": "RUNNING",
+        "pathStatus": "MATCHED"
+      },
+      "agentLocation": "PROTECTED",
+      "protectedInput": "CONFIGURED",
+      "checks": [
+        {
+          "name": "agent",
+          "state": "RUNNING"
+        },
+        {
+          "name": "connection",
+          "state": "CONNECTED"
+        },
+        {
+          "name": "protocol",
+          "state": "COMPATIBLE"
+        },
+        {
+          "name": "cli_agent_version",
+          "state": "MATCHED"
+        },
+        {
+          "name": "ui_agent_version",
+          "state": "MATCHED"
+        },
+        {
+          "name": "installed_agent_version",
+          "state": "MATCHED"
+        },
+        {
+          "name": "ui",
+          "state": "RUNNING"
+        },
+        {
+          "name": "launch_record",
+          "state": "VERIFIED"
+        },
+        {
+          "name": "installed_agent",
+          "state": "VERIFIED"
+        },
+        {
+          "name": "service",
+          "state": "RUNNING"
+        },
+        {
+          "name": "update_stage_cleanup",
+          "state": "COMPLETED"
+        }
+      ],
+      "nextActions": []
+    },
+    "initialCollectionId": "3bc79889040cc78b0106f255297eb7de",
+    "intermediateCollectionId": "a651a23363361c84eea56d4b72105f42",
+    "collectionId": "120126db5417f4da8c596878309c83c4",
+    "sides": {
+      "A": {
+        "created": "2026-10-22T14:09:49Z",
+        "installation": {
+          "time": "2026-10-22T14:06:56.8354426Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-22T14:09:46.3088706Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "loginRuntime": {
+          "startedAt": "2026-10-22T14:06:58.0213391Z",
+          "time": "2026-10-22T14:09:48.2967319Z",
+          "service": "READY",
+          "console": "USER_SESSION",
+          "grant": "PRESENT",
+          "lastWorker": "NONE",
+          "source": {
+            "total": 3,
+            "exits": [
+              {
+                "time": "2026-10-22T14:08:22.3969541Z",
+                "command": "ok",
+                "reader": "stopped",
+                "capture": "joined",
+                "sender": "joined",
+                "interrupt": "joined",
+                "retirement": "clean_sent",
+                "report": "ok",
+                "heartbeatStage": "replied",
+                "heartbeatSlowStage": "service_presence",
+                "heartbeatSlowBucket": 1
+              },
+              {
+                "time": "2026-10-22T14:08:33.7287746Z",
+                "command": "ok",
+                "reader": "failed",
+                "capture": "joined",
+                "sender": "joined",
+                "interrupt": "joined",
+                "retirement": "clean_sent",
+                "report": "failed",
+                "failure": {
+                  "operation": "source-command-heartbeat",
+                  "win32Error": 0,
+                  "win32Known": false
+                },
+                "heartbeatStage": "reply_gate",
+                "heartbeatSlowStage": "reply_gate",
+                "heartbeatSlowBucket": 5
+              },
+              {
+                "time": "2026-10-22T14:09:48.1819019Z",
+                "command": "ok",
+                "reader": "timeout",
+                "capture": "joined",
+                "sender": "joined",
+                "interrupt": "joined",
+                "retirement": "clean_sent",
+                "report": "failed",
+                "failure": {
+                  "operation": "source-reader-timeout",
+                  "win32Error": 0,
+                  "win32Known": false
+                },
+                "heartbeatStage": "replied",
+                "heartbeatSlowStage": "agent_presence",
+                "heartbeatSlowBucket": 4
+              }
+            ]
+          }
+        },
+        "failureEvents": [
+          {
+            "time": "2026-10-22T14:08:20.0099791Z",
+            "code": "installed_source_failure_response"
+          },
+          {
+            "time": "2026-10-22T14:08:20.0099791Z",
+            "code": "installed_source_command_failed_heartbeat"
+          },
+          {
+            "time": "2026-10-22T14:08:20.0099791Z",
+            "code": "installed_source_response_timeout"
+          },
+          {
+            "time": "2026-10-22T14:08:34.4572736Z",
+            "code": "installed_source_failure_response"
+          },
+          {
+            "time": "2026-10-22T14:08:34.4572736Z",
+            "code": "installed_source_command_failed_heartbeat"
+          },
+          {
+            "time": "2026-10-22T14:08:34.4572736Z",
+            "code": "installed_source_response_timeout"
+          }
+        ],
+        "lastHeartbeatTimings": [
+          {
+            "time": "2026-10-22T14:09:37.4307346Z",
+            "code": "installed_source_heartbeat_timing_client_lock_lt1ms"
+          },
+          {
+            "time": "2026-10-22T14:09:37.4307346Z",
+            "code": "installed_source_heartbeat_timing_client_authority_lt1ms"
+          },
+          {
+            "time": "2026-10-22T14:09:37.4307346Z",
+            "code": "installed_source_heartbeat_timing_client_write_lt1ms"
+          },
+          {
+            "time": "2026-10-22T14:09:37.4307346Z",
+            "code": "installed_source_heartbeat_timing_client_response_ge1s"
+          },
+          {
+            "time": "2026-10-22T14:09:37.4307346Z",
+            "code": "installed_source_heartbeat_timing_worker_presence_wait_lt1ms"
+          },
+          {
+            "time": "2026-10-22T14:09:37.4307346Z",
+            "code": "installed_source_heartbeat_timing_worker_presence_native_lt1ms"
+          },
+          {
+            "time": "2026-10-22T14:09:37.4307346Z",
+            "code": "installed_source_heartbeat_timing_worker_reply_gate_lt10ms"
+          }
+        ]
+      },
+      "B": {
+        "created": "2026-10-22T14:09:54Z",
+        "installation": {
+          "time": "2026-10-22T14:06:28.4999944Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-22T14:09:43.7798007Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "loginRuntime": {
+          "startedAt": "2026-10-22T14:06:31.4996983Z",
+          "time": "2026-10-22T14:09:49.8158646Z",
+          "service": "READY",
+          "console": "USER_SESSION",
+          "grant": "PRESENT",
+          "lastWorker": "NONE",
+          "source": {
+            "total": 1,
+            "exits": [
+              {
+                "time": "2026-10-22T14:09:49.8010517Z",
+                "command": "ok",
+                "reader": "stopped",
+                "capture": "joined",
+                "sender": "joined",
+                "interrupt": "joined",
+                "retirement": "clean_sent",
+                "report": "ok",
+                "heartbeatStage": "replied",
+                "heartbeatSlowStage": "reply_write",
+                "heartbeatSlowBucket": 2
+              }
+            ]
+          }
+        },
+        "failureEvents": [
+          {
+            "time": "2026-10-22T14:06:46.5442394Z",
+            "code": "reconnect_acquire_network_timeout"
+          },
+          {
+            "time": "2026-10-22T14:06:51.8484113Z",
+            "code": "reconnect_acquire_network_timeout"
+          },
+          {
+            "time": "2026-10-22T14:06:57.3633548Z",
+            "code": "reconnect_acquire_network_timeout"
+          },
+          {
+            "time": "2026-10-22T14:07:04.7998761Z",
+            "code": "reconnect_acquire_network_timeout"
+          },
+          {
+            "time": "2026-10-22T14:07:11.5854581Z",
+            "code": "reconnect_acquire_network_timeout"
+          },
+          {
+            "time": "2026-10-22T14:09:49.7885034Z",
+            "code": "installed_source_failure_authority"
+          },
+          {
+            "time": "2026-10-22T14:09:49.7885034Z",
+            "code": "installed_source_command_failed_deactivate"
+          },
+          {
+            "time": "2026-10-22T14:09:49.7892463Z",
+            "code": "reconnect_heartbeat_timeout"
+          },
+          {
+            "time": "2026-10-22T14:09:49.7892463Z",
+            "code": "heartbeat_timeout_observed"
+          }
+        ],
+        "lastHeartbeatTimings": [
+          {
+            "time": "2026-10-22T14:09:36.2538779Z",
+            "code": "installed_source_heartbeat_timing_client_lock_lt1ms"
+          },
+          {
+            "time": "2026-10-22T14:09:36.2538779Z",
+            "code": "installed_source_heartbeat_timing_client_authority_lt1ms"
+          },
+          {
+            "time": "2026-10-22T14:09:36.2538779Z",
+            "code": "installed_source_heartbeat_timing_client_write_lt10ms"
+          },
+          {
+            "time": "2026-10-22T14:09:36.2538779Z",
+            "code": "installed_source_heartbeat_timing_client_response_lt100ms"
+          },
+          {
+            "time": "2026-10-22T14:09:36.2538779Z",
+            "code": "installed_source_heartbeat_timing_worker_presence_wait_lt10ms"
+          },
+          {
+            "time": "2026-10-22T14:09:36.2538779Z",
+            "code": "installed_source_heartbeat_timing_worker_presence_native_lt1ms"
+          },
+          {
+            "time": "2026-10-22T14:09:36.2538779Z",
+            "code": "installed_source_heartbeat_timing_worker_reply_gate_lt1ms"
+          }
+        ]
+      }
+    }
+  },
+  "findings": [
+    "Both installation receipts succeeded; both services and protected input READY; local doctor healthy and versions matched.",
+    "A source response timeouts recurred. At 14:08:33Z its source exit retained reply_gate with lifetime slow bucket 5 (at least one second).",
+    "A source reader timed out at 14:09:48Z. All three observed A source retirements had joined capture/sender/interrupt and clean_sent retirement; service remained READY.",
+    "B observed peer heartbeat timeout and clean source retirement at 14:09:49Z; final local doctor recovered CONNECTED.",
+    "No observed source-write-origin failure identifies the first failed write in this sample. No latency or recovery-resolution claim.",
+    "Client timing maxima without a reply cannot attribute worker timing to the failed request. Lifetime slow-stage data is separate from per-request proof."
+  ],
+  "nextPriorities": [
+    "Identify the writer holding the reply gate during the slow A heartbeat; preserve authority checks and clean-retirement proof.",
+    "Separate A reader-idle expiration and B network heartbeat timeout from later shutdown/write failures.",
+    "Investigate the g437 source-command-loop recovery report without conflating it with clean source retirement."
+  ],
+  "scope": "Evidence only in this rollout commit. No public API, DB, dependencies, runner, repository hygiene or product/architecture specification changes. Local main; no push."
+}
