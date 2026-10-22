@@ -27,14 +27,16 @@ const (
 )
 
 type StartupProfile struct {
-	Schema              uint8                     `json:"schema"`
-	Micros              [StartupStageCount]uint32 `json:"micros"`
-	Measured            uint8                     `json:"measured"`
-	LoadMicros          uint32                    `json:"loadMicros,omitempty"`
-	LoadMeasured        bool                      `json:"loadMeasured,omitempty"`
-	Prepared            bool                      `json:"prepared,omitempty"`
-	PreparedAgeMicros   uint32                    `json:"preparedAgeMicros,omitempty"`
-	PreparationDecision PreparationDecision       `json:"preparationDecision,omitempty"`
+	Schema                  uint8                     `json:"schema"`
+	Micros                  [StartupStageCount]uint32 `json:"micros"`
+	Measured                uint8                     `json:"measured"`
+	LoadMicros              uint32                    `json:"loadMicros,omitempty"`
+	LoadMeasured            bool                      `json:"loadMeasured,omitempty"`
+	Prepared                bool                      `json:"prepared,omitempty"`
+	PreparedAgeMicros       uint32                    `json:"preparedAgeMicros,omitempty"`
+	PreparationDecision     PreparationDecision       `json:"preparationDecision,omitempty"`
+	PreparationWaitMicros   uint32                    `json:"preparationWaitMicros,omitempty"`
+	PreparationWaitMeasured bool                      `json:"preparationWaitMeasured,omitempty"`
 }
 
 func (p StartupProfile) Valid() bool {
@@ -42,6 +44,11 @@ func (p StartupProfile) Valid() bool {
 		return false
 	}
 	if (!p.Prepared && p.PreparedAgeMicros != 0) || (p.Prepared && (p.PreparedAgeMicros >= 2_000_000 || p.Measured&3 != 3)) {
+		return false
+	}
+	if p.PreparationWaitMicros > uint32(Window.Microseconds()) ||
+		(!p.PreparationWaitMeasured && p.PreparationWaitMicros != 0) ||
+		(p.PreparationWaitMeasured && p.PreparationDecision == PreparationUnobserved) {
 		return false
 	}
 	for i, n := range p.Micros {
@@ -54,6 +61,22 @@ func (p StartupProfile) Valid() bool {
 		return false
 	}
 	return true
+}
+
+// RecordPreparationWait measures only the remaining unbound-builder join after
+// agent authentication. It overlaps receiver ReadyWait and is never added to it.
+func (p *StartupProfile) RecordPreparationWait(elapsed time.Duration) {
+	if p == nil {
+		return
+	}
+	if elapsed < 0 {
+		elapsed = 0
+	}
+	if elapsed > Window {
+		elapsed = Window
+	}
+	p.PreparationWaitMicros = uint32(elapsed.Microseconds())
+	p.PreparationWaitMeasured = true
 }
 
 // RecordLoad is the measured file/metadata load within WorkerInstalledValidation,

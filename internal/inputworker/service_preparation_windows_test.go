@@ -138,3 +138,23 @@ func TestServicePreparationConstructionFailureKeepsColdFallback(t *testing.T) {
 		}
 	})
 }
+
+func TestServicePreparationCompletedBeforeAuthenticationRecordsZeroWait(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var slot serviceInputPreparation
+		slot.start(context.Background(), func(context.Context) (*preparedConsole, error) {
+			return &preparedConsole{}, nil
+		})
+		synctest.Wait()
+		channel, err := slot.accept(func() (*Channel, error) {
+			time.Sleep(100 * time.Millisecond)
+			return &Channel{}, nil
+		})
+		if err != nil || !channel.preparationWaitMeasured || channel.preparationWait != 0 {
+			t.Fatal("completed builder included authentication in remaining wait", err)
+		}
+		if err := slot.close(); err != nil {
+			t.Fatal(err)
+		}
+	})
+}

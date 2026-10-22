@@ -88,6 +88,9 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 	}
 	worker, control, pid, profile := prepared.worker, prepared.control, prepared.pid, prepared.profile
 	profile.PreparationDecision = decision
+	if channel.preparationWaitMeasured {
+		profile.RecordPreparationWait(channel.preparationWait)
+	}
 	defer func() {
 		if closeErr := prepared.close(); closeErr != nil {
 			result = errors.Join(result, ErrRecovery, closeErr)

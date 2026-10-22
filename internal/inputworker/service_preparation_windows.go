@@ -49,6 +49,7 @@ func (p *serviceInputPreparation) join() error {
 }
 
 func (p *serviceInputPreparation) accept(accept func() (*Channel, error)) (*Channel, error) {
+	hadPreparation := p.warming != nil
 	// A failure already known at loop entry must not wait for another client.
 	if p.warming != nil {
 		select {
@@ -63,6 +64,8 @@ func (p *serviceInputPreparation) accept(accept func() (*Channel, error)) (*Chan
 	if err != nil {
 		return channel, err
 	}
+	// A builder collected before authentication has zero remaining join wait.
+	channel.preparationWaitMeasured = hadPreparation
 	// Authentication can overlap construction, but admission, request handling
 	// and all subsequent launches remain behind this recovery fence.
 	if p.warming != nil {
