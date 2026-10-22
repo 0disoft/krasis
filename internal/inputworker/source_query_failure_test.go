@@ -43,7 +43,7 @@ func TestSourceReadQueryDeadlineIdentifiesOwnerThroughFinalReport(t *testing.T) 
 			}
 			_, received := readReport(&wire)
 			code, native := reportFailureDetails(received)
-			want := []string{"source-service-query-deadline", "source-agent-query-deadline"}[stalled]
+			want := []string{"source-service-query-deadline-checking", "source-agent-query-deadline-checking"}[stalled]
 			if reportOperations[code] != want || native != 0 || errors.Is(final, ErrRecovery) {
 				t.Fatal("query provenance or retirement classification lost", reportOperations[code], native, final)
 			}

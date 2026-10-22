@@ -71,7 +71,7 @@ func TestSourceFinalReportSurvivesExpiredServiceQuery(t *testing.T) {
 					t.Fatal("final report transport was retired before report delivery", received)
 				}
 				code, _ := reportFailureDetails(received)
-				if reportOperations[code] != "source-service-query-deadline" || !errors.Is(returned, failure) || errors.Is(received, ErrRecovery) == queryFirst {
+				if reportOperations[code] != "source-service-query-deadline-checking" || !errors.Is(returned, failure) || errors.Is(received, ErrRecovery) == queryFirst {
 					t.Fatal("query failure or uncertain cleanup was hidden", received, returned)
 				}
 				if service.authorizeSourcePresence(context.Background()) == nil {

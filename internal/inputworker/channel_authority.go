@@ -2,6 +2,7 @@ package inputworker
 
 import (
 	"context"
+	"sync/atomic"
 	"time"
 
 	"github.com/0disoft/krasis/internal/handoff"
@@ -15,6 +16,7 @@ type authorityQuery struct {
 	done   chan struct{}
 	err    error
 	timing *authorityQueryTiming
+	phase  atomic.Uint32 // Observation only; never authorizes or cancels work.
 }
 
 type authorityQueryKind uint8
@@ -85,7 +87,7 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 	optional := kind == heartbeatAuthorityQuery || kind == sourceAdvisoryAuthorityQuery || kind == sourceAdvisoryPresenceAuthorityQuery
 	for {
 		if err := ctx.Err(); err != nil {
-			return queryAdmissionFailure(kind, "", err)
+			return queryPhaseFailure(kind, "admission", err)
 		}
 		channel.queryMu.Lock()
 		if channel.closing || channel.authority == nil || channel.authority.fenced.Load() {
@@ -104,7 +106,7 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 			case <-previous.done:
 				continue // A different command's success never authorizes this one.
 			case <-ctx.Done():
-				return queryAdmissionFailure(kind, "", ctx.Err())
+				return queryPhaseFailure(kind, "waiting", ctx.Err())
 			}
 		}
 		select {
@@ -121,6 +123,7 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 		queryCtx, merge := handoff.ForkAuthority(ctx)
 		go func() {
 			defer func() { <-authorityQueries }()
+			query.phase.Store(queryChecking)
 			if query.timing != nil {
 				query.timing.started = time.Now()
 			}
@@ -138,6 +141,7 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 			if query.timing != nil {
 				query.timing.finished = time.Now()
 			}
+			query.phase.Store(queryPublishing)
 			channel.queryMu.Lock()
 			if ctx.Err() != nil && !optional {
 				channel.closing = true
@@ -152,11 +156,13 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 					// cannot block on closeOnce or claim cleanup prematurely.
 					*current = query
 					channel.queryMu.Unlock()
+					query.phase.Store(queryRetiring)
 					_ = channel.closeResources()
 					channel.queryMu.Lock()
 					*current = nil
 				}
 			}
+			query.phase.Store(queryCompleted)
 			close(query.done)
 			channel.queryMu.Unlock()
 		}()
@@ -164,10 +170,11 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 		select {
 		case <-query.done:
 			if err := ctx.Err(); err != nil {
+				failure := queryPhaseFailure(kind, query.phaseName(), err)
 				if !optional {
 					channel.cancelQuery(query)
 				}
-				return queryAdmissionFailure(kind, "", err)
+				return failure
 			}
 			if profile != nil {
 				profile.observe(admitted, query.timing)
@@ -175,10 +182,11 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 			merge() // The query can no longer mutate its diagnostic sample.
 			return query.err
 		case <-ctx.Done():
+			failure := queryPhaseFailure(kind, query.phaseName(), ctx.Err())
 			if !optional {
 				channel.cancelQuery(query)
 			}
-			return queryAdmissionFailure(kind, "", ctx.Err())
+			return failure
 		}
 	}
 }

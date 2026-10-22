@@ -3,6 +3,8 @@ package inputworker
 import (
 	"errors"
 	"syscall"
+
+	"github.com/0disoft/krasis/internal/logindiag"
 )
 
 // Only fixed operations and a numeric Win32 result survive. In particular this
@@ -53,6 +55,9 @@ func sourceAuthorityResult(cause error) error {
 	}
 	var query *sourceQueryFailure
 	if errors.As(cause, &query) {
+		if logindiag.ValidSourceQueryDeadlineOperation(query.LoginRuntimeOperation()) {
+			return &sourceQueryFailure{owner: query.owner, reason: query.reason, cause: ErrAuthority}
+		}
 		for _, operation := range sourceQueryFailureOperations() {
 			if operation == query.LoginRuntimeOperation() {
 				// Watcher projection historically exposes only ErrAuthority.

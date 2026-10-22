@@ -26,6 +26,7 @@ func init() {
 	reportOperations = append(reportOperations, sourceQueryFailureOperations()...)
 	reportOperations = append(reportOperations, logindiag.SourceWriteOriginOperations()...)
 	reportOperations = append(reportOperations, logindiag.SourceGateOperations()...)
+	reportOperations = append(reportOperations, logindiag.SourceQueryDeadlineOperations()...)
 }
 
 type workerReportFailure struct {
