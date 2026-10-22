@@ -1,0 +1,564 @@
+{
+  "generation": 439,
+  "sourceRevision": "6ac665d48c88c4bb33dfb71a0b491bf9a206bafe",
+  "change": "Sample the fixed category and phase of a writer holding the source reply gate when admission fails. Diagnostic only; no authority or timeout change.",
+  "baselineCollectionId": "58c40951fe86cceb4c8dc2fdd714fb5c",
+  "validation": {
+    "inputworker": "PASS 22.525s",
+    "logindiag": "PASS cached",
+    "productlog": "PASS cached",
+    "residentagent": "PASS cached",
+    "frontendTests": 91,
+    "nativeBuild": "PASS",
+    "bundleSmoke": "PASS 8.16s",
+    "bundleFiles": 8,
+    "archiveBytes": 28217725,
+    "offlineVerify": "valid",
+    "skipped": [
+      "Portable pair fixed-owner fixture excluded to avoid installed-owner conflict.",
+      "No race detector, hosted CI, physical-input acceptance or long soak; no push."
+    ]
+  },
+  "application": {
+    "firstPeerUpdateId": "0622dd585281770fc991fd3a5bd6195d",
+    "firstPeerUpdateResult": "transfer_replaced; A agent restarted while still g438; peer still advertised g438 before replacement send.",
+    "peerUpdateId": "15e2911516179db883a425281970db1f",
+    "peerUpdateState": "UPDATED",
+    "localUIShutdown": "Helper reported main loop unavailable; subsequent doctor and process inspection confirmed no UI remained. Safe-stop then confirmed agent exit before repair.",
+    "localInstallerExit": 0,
+    "localAppRepair": "recovery_ready",
+    "doctor": {
+      "schemaVersion": "krasis.cli.doctor/v1",
+      "agent": "RUNNING",
+      "connection": "FAULTED",
+      "cliGeneration": 439,
+      "agentGeneration": 439,
+      "protocol": "COMPATIBLE",
+      "code": "connection_not_ready",
+      "cliBuild": "6ac665d48c88c4bb33dfb71a0b491bf9a206bafe",
+      "agentBuild": "6ac665d48c88c4bb33dfb71a0b491bf9a206bafe",
+      "ui": {
+        "state": "RUNNING",
+        "generation": 439,
+        "build": "6ac665d48c88c4bb33dfb71a0b491bf9a206bafe",
+        "pathStatus": "MATCHED"
+      },
+      "launchRecord": {
+        "state": "VERIFIED",
+        "generation": 439,
+        "build": "6ac665d48c88c4bb33dfb71a0b491bf9a206bafe",
+        "pathStatus": "MATCHED"
+      },
+      "installedAgent": {
+        "state": "VERIFIED",
+        "build": "6ac665d48c88c4bb33dfb71a0b491bf9a206bafe"
+      },
+      "service": {
+        "state": "STOPPED",
+        "pathStatus": "MATCHED"
+      },
+      "agentLocation": "PROTECTED",
+      "protectedInput": "UNKNOWN",
+      "checks": [
+        {
+          "name": "agent",
+          "state": "RUNNING"
+        },
+        {
+          "name": "connection",
+          "state": "FAULTED"
+        },
+        {
+          "name": "protocol",
+          "state": "COMPATIBLE"
+        },
+        {
+          "name": "cli_agent_version",
+          "state": "MATCHED"
+        },
+        {
+          "name": "ui_agent_version",
+          "state": "MATCHED"
+        },
+        {
+          "name": "installed_agent_version",
+          "state": "MATCHED"
+        },
+        {
+          "name": "ui",
+          "state": "RUNNING"
+        },
+        {
+          "name": "launch_record",
+          "state": "VERIFIED"
+        },
+        {
+          "name": "installed_agent",
+          "state": "VERIFIED"
+        },
+        {
+          "name": "service",
+          "state": "STOPPED"
+        },
+        {
+          "name": "update_stage_cleanup",
+          "state": "COMPLETED"
+        }
+      ],
+      "nextActions": [
+        {
+          "code": "inspect_input_service",
+          "message": "입력 서비스가 중지돼 있습니다. 서비스 진단을 확인하세요."
+        },
+        {
+          "code": "check_connection",
+          "message": "krasis-cli status와 connection show <상대 별칭>으로 연결 설정을 확인하세요."
+        }
+      ]
+    },
+    "initialCollectionId": "2381d7be99dd7559f84597a6284eca1e",
+    "initialSides": {
+      "A": {
+        "created": "2026-10-22T14:25:11Z",
+        "installation": {
+          "time": "2026-10-22T14:24:18.3821261Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-22T14:24:42.4771461Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "loginRuntime": {
+          "startedAt": "2026-10-22T14:24:21.1469932Z",
+          "time": "2026-10-22T14:24:21.2227988Z",
+          "service": "READY",
+          "console": "USER_SESSION",
+          "grant": "PRESENT",
+          "lastWorker": "NONE"
+        }
+      },
+      "B": {
+        "created": "2026-10-22T14:25:15Z",
+        "installation": {
+          "time": "2026-10-22T14:23:06.6290412Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-22T14:24:56.6617769Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "loginRuntime": {
+          "startedAt": "2026-10-22T14:23:09.5430924Z",
+          "time": "2026-10-22T14:23:09.5943645Z",
+          "service": "READY",
+          "console": "USER_SESSION",
+          "grant": "PRESENT",
+          "lastWorker": "NONE"
+        }
+      }
+    }
+  },
+  "limits": [
+    "A holder sample identifies the owner present at failed admission, not the entire wait or the exact native call duration.",
+    "A brief unpublished/cleared sample is explicitly unobserved.",
+    "Synthetic stalls validate reporting and unchanged writer semantics; they do not establish the live intermittent cause."
+  ],
+  "nextPriorities": [
+    "Trace service-owner authorization query admission, scheduling and native substeps for the source-service-query-deadline case.",
+    "Correlate trust store freshness expiry and native query delays without attributing independent aggregate samples to one request.",
+    "Retain gate holder reporting for a distinct reply-gate failure; no latency or stability resolution is claimed."
+  ],
+  "scope": "No public API, frame layout, DB, dependency, runner, repository hygiene or product/architecture specification changes. Appended private diagnostic operation codes only. Local main; no push.",
+  "runtimeFailure": {
+    "created": "2026-10-22T14:28:00Z",
+    "inputHealth": {
+      "time": "2026-10-22T14:27:36.6553199Z",
+      "state": "SERVICE_RECOVERY_REQUIRED",
+      "stage": "service_recovery",
+      "win32Error": 1066,
+      "win32Known": true
+    },
+    "loginRuntime": {
+      "startedAt": "2026-10-22T14:24:21.1469932Z",
+      "time": "2026-10-22T14:26:24.3530879Z",
+      "service": "FAILED",
+      "console": "USER_SESSION",
+      "grant": "PRESENT",
+      "lastWorker": "NONE",
+      "lastFailure": {
+        "time": "2026-10-22T14:26:24.3530879Z",
+        "stage": "service",
+        "reason": "capture",
+        "operation": "source-service-query-deadline",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "source": {
+        "total": 2,
+        "exits": [
+          {
+            "time": "2026-10-22T14:25:25.3161394Z",
+            "command": "not_started",
+            "reader": "eof",
+            "capture": "joined",
+            "sender": "joined",
+            "interrupt": "joined",
+            "retirement": "delivery_failed",
+            "report": "failed",
+            "failure": {
+              "operation": "source-reader-eof",
+              "win32Error": 0,
+              "win32Known": false
+            }
+          },
+          {
+            "time": "2026-10-22T14:26:24.2660866Z",
+            "command": "ok",
+            "reader": "authority",
+            "capture": "joined",
+            "sender": "joined",
+            "interrupt": "joined",
+            "retirement": "failed_sent",
+            "report": "recovery",
+            "failure": {
+              "operation": "source-service-query-deadline",
+              "win32Error": 0,
+              "win32Known": false
+            },
+            "heartbeatStage": "service_presence",
+            "heartbeatSlowStage": "service_presence",
+            "heartbeatSlowBucket": 5
+          }
+        ]
+      }
+    },
+    "events": [
+      {
+        "time": "2026-10-22T14:24:44.0532066Z",
+        "code": "peer_stage_cleanup_completed"
+      },
+      {
+        "time": "2026-10-22T14:25:18.4072297Z",
+        "code": "installed_source_startup_failed"
+      },
+      {
+        "time": "2026-10-22T14:25:18.5229823Z",
+        "code": "fault_source_hook_failed"
+      },
+      {
+        "time": "2026-10-22T14:25:22.4313442Z",
+        "code": "session_guard_close_failed"
+      },
+      {
+        "time": "2026-10-22T14:25:22.4323411Z",
+        "code": "fault_guard_close_timeout"
+      },
+      {
+        "time": "2026-10-22T14:25:22.4323411Z",
+        "code": "session_failed"
+      },
+      {
+        "time": "2026-10-22T14:25:40.31416Z",
+        "code": "peer_stage_cleanup_completed"
+      },
+      {
+        "time": "2026-10-22T14:26:17.7022869Z",
+        "code": "installed_source_failure_response"
+      },
+      {
+        "time": "2026-10-22T14:26:17.7022869Z",
+        "code": "installed_source_command_failed_heartbeat"
+      },
+      {
+        "time": "2026-10-22T14:26:17.7022869Z",
+        "code": "installed_source_response_timeout"
+      },
+      {
+        "time": "2026-10-22T14:26:19.1364594Z",
+        "code": "session_trust_freshness_expired"
+      },
+      {
+        "time": "2026-10-22T14:26:20.2236512Z",
+        "code": "installed_source_reader_cleanup"
+      },
+      {
+        "time": "2026-10-22T14:26:20.2323738Z",
+        "code": "installed_source_failure_context"
+      },
+      {
+        "time": "2026-10-22T14:26:20.2323738Z",
+        "code": "installed_source_command_failed_stop"
+      },
+      {
+        "time": "2026-10-22T14:26:20.2323738Z",
+        "code": "installed_source_failure_context"
+      },
+      {
+        "time": "2026-10-22T14:26:20.2323738Z",
+        "code": "installed_source_command_failed_deactivate"
+      },
+      {
+        "time": "2026-10-22T14:26:20.9846463Z",
+        "code": "fault_trust_freshness_expired"
+      },
+      {
+        "time": "2026-10-22T14:26:24.2864597Z",
+        "code": "session_guard_close_failed"
+      },
+      {
+        "time": "2026-10-22T14:26:24.287014Z",
+        "code": "session_failed"
+      },
+      {
+        "time": "2026-10-22T14:27:15.3772656Z",
+        "code": "peer_stage_cleanup_completed"
+      },
+      {
+        "time": "2026-10-22T14:27:39.7533845Z",
+        "code": "protected_input_inspection_failed"
+      },
+      {
+        "time": "2026-10-22T14:27:44.363666Z",
+        "code": "fault_recovery_deadline_exceeded"
+      },
+      {
+        "time": "2026-10-22T14:27:44.363666Z",
+        "code": "session_failed"
+      },
+      {
+        "time": "2026-10-22T14:27:44.3771164Z",
+        "code": "fault_session_unknown"
+      },
+      {
+        "time": "2026-10-22T14:27:44.8468943Z",
+        "code": "session_failed"
+      }
+    ]
+  },
+  "repair": {
+    "installerExit": 0,
+    "appRepair": "recovery_ready",
+    "collectionId": "6bc591a79c402498f51bb19916376f2c",
+    "sides": {
+      "A": {
+        "created": "2026-10-22T14:30:39Z",
+        "installation": {
+          "time": "2026-10-22T14:29:49.4007553Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-22T14:30:23.6667371Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "loginRuntime": {
+          "startedAt": "2026-10-22T14:29:55.1601715Z",
+          "time": "2026-10-22T14:29:55.3057354Z",
+          "service": "READY",
+          "console": "USER_SESSION",
+          "grant": "PRESENT",
+          "lastWorker": "NONE"
+        }
+      },
+      "B": {
+        "created": "2026-10-22T14:30:43Z",
+        "installation": {
+          "time": "2026-10-22T14:23:06.6290412Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-22T14:30:12.3570804Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "loginRuntime": {
+          "startedAt": "2026-10-22T14:23:09.5430924Z",
+          "time": "2026-10-22T14:27:42.8716385Z",
+          "service": "READY",
+          "console": "USER_SESSION",
+          "grant": "PRESENT",
+          "lastWorker": "NONE",
+          "source": {
+            "total": 3,
+            "exits": [
+              {
+                "time": "2026-10-22T14:25:21.4540621Z",
+                "command": "ok",
+                "reader": "stopped",
+                "capture": "joined",
+                "sender": "joined",
+                "interrupt": "joined",
+                "retirement": "clean_sent",
+                "report": "ok",
+                "heartbeatStage": "replied",
+                "heartbeatSlowStage": "service_presence",
+                "heartbeatSlowBucket": 1
+              },
+              {
+                "time": "2026-10-22T14:26:22.1182871Z",
+                "command": "ok",
+                "reader": "stopped",
+                "capture": "joined",
+                "sender": "joined",
+                "interrupt": "joined",
+                "retirement": "clean_sent",
+                "report": "ok",
+                "heartbeatStage": "replied",
+                "heartbeatSlowStage": "service_presence",
+                "heartbeatSlowBucket": 1
+              },
+              {
+                "time": "2026-10-22T14:27:42.8374937Z",
+                "command": "ok",
+                "reader": "stopped",
+                "capture": "joined",
+                "sender": "joined",
+                "interrupt": "joined",
+                "retirement": "clean_sent",
+                "report": "ok",
+                "heartbeatStage": "replied",
+                "heartbeatSlowStage": "reply_presence",
+                "heartbeatSlowBucket": 2
+              }
+            ]
+          }
+        }
+      }
+    },
+    "doctor": {
+      "schemaVersion": "krasis.cli.doctor/v1",
+      "agent": "RUNNING",
+      "connection": "CONNECTED",
+      "peerAlias": "B",
+      "cliGeneration": 439,
+      "agentGeneration": 439,
+      "protocol": "COMPATIBLE",
+      "code": "healthy",
+      "cliBuild": "6ac665d48c88c4bb33dfb71a0b491bf9a206bafe",
+      "agentBuild": "6ac665d48c88c4bb33dfb71a0b491bf9a206bafe",
+      "ui": {
+        "state": "RUNNING",
+        "generation": 439,
+        "build": "6ac665d48c88c4bb33dfb71a0b491bf9a206bafe",
+        "pathStatus": "MATCHED"
+      },
+      "launchRecord": {
+        "state": "VERIFIED",
+        "generation": 439,
+        "build": "6ac665d48c88c4bb33dfb71a0b491bf9a206bafe",
+        "pathStatus": "MATCHED"
+      },
+      "installedAgent": {
+        "state": "VERIFIED",
+        "build": "6ac665d48c88c4bb33dfb71a0b491bf9a206bafe"
+      },
+      "service": {
+        "state": "RUNNING",
+        "pathStatus": "MATCHED"
+      },
+      "agentLocation": "PROTECTED",
+      "protectedInput": "CONFIGURED",
+      "checks": [
+        {
+          "name": "agent",
+          "state": "RUNNING"
+        },
+        {
+          "name": "connection",
+          "state": "CONNECTED"
+        },
+        {
+          "name": "protocol",
+          "state": "COMPATIBLE"
+        },
+        {
+          "name": "cli_agent_version",
+          "state": "MATCHED"
+        },
+        {
+          "name": "ui_agent_version",
+          "state": "MATCHED"
+        },
+        {
+          "name": "installed_agent_version",
+          "state": "MATCHED"
+        },
+        {
+          "name": "ui",
+          "state": "RUNNING"
+        },
+        {
+          "name": "launch_record",
+          "state": "VERIFIED"
+        },
+        {
+          "name": "installed_agent",
+          "state": "VERIFIED"
+        },
+        {
+          "name": "service",
+          "state": "RUNNING"
+        },
+        {
+          "name": "update_stage_cleanup",
+          "state": "COMPLETED"
+        }
+      ],
+      "nextActions": []
+    }
+  },
+  "findings": [
+    "g439 installed on both PCs. Initial paired receipts succeeded and both protected services were READY.",
+    "A subsequently faulted. At 14:26:24Z its service reported source-service-query-deadline with heartbeat service_presence slow bucket ge1s, then input health reported Win32 1066.",
+    "The same run logged heartbeat response timeout and trust freshness expiry. Temporal proximity is not proof of a common cause.",
+    "This failure did not produce a source-gate holder operation. A service-owner query deadline is distinct from reply-gate contention.",
+    "Retained failed report and input-health evidence before repairing A. Recovery on g437/g438 already occurred, so the g439 diagnostic is not established as the cause.",
+    "Local installer repair and app recovery were executed after verified UI/agent shutdown. Final statuses are recorded separately."
+  ]
+}

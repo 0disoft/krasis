@@ -36,5 +36,29 @@ change. Private diagnostic codes are appended; frame layout, public API, DB,
 dependencies, runner, repository hygiene, and product/architecture specifications
 are unchanged. Local main only; no push. This is diagnosis, not a latency fix.
 
-Packaging and paired rollout results will be recorded separately. Next identify
-the holder in a fresh failing sample before changing its behavior.
+Packaged and installed on both PCs: 91 frontend tests, native build, 8.16-second
+package smoke test, eight-file bundle checks, and offline verification passed.
+The first B transfer lost its receipt across an A g438 agent restart. After
+confirming B still advertised g438, a replacement transfer reached UPDATED.
+Both installer receipts succeeded, and initial protection/connection checks
+passed. No causal attribution of the pre-g439 agent restart is established.
+
+Live acceptance did not establish stability. At 14:26:24Z A reported a
+source-service-query-deadline and failed the protected service (input-health
+Win32 1066). The heartbeat lifetime's slow stage was service_presence, ge1s.
+That run also logged response timeout and trust freshness expiry. This failure
+did not identify a reply-gate holder; it is a separate service-owner query
+deadline, with possible admission, scheduling or native-check delay still to
+distinguish. Temporal proximity to trust expiry does not prove a common cause.
+
+Preserved the failed runtime and input-health evidence, safely stopped A's UI
+and agent, then repaired the installed g439 components (installer exit zero;
+app repair recovery_ready). Collection 6bc591a79c402498f51bb19916376f2c confirms
+both services and input health READY again; final local doctor is healthy and
+CONNECTED with matching g439 images. This recovery is not a stability claim.
+
+Next prioritize service-owner query admission/native substeps and correlate
+trust freshness delays. Keep gate-holder reporting for an actual gate failure;
+do not repeat the withdrawn admission experiment on this different evidence.
+See results/2026-10-22-g439-source-gate-holder.json for paired rollout, failure,
+and repair records.
