@@ -1,0 +1,166 @@
+{
+  "generation": 429,
+  "sourceRevision": "c11a71f370e7b24edf36a3121a858acff983ef79",
+  "observedFailure": {
+    "time": "2026-10-22T09:43:18.1350299Z",
+    "generation": 428,
+    "operation": "thread-join-wheel-capture",
+    "service": "FAILED",
+    "sourceCapture": "failed",
+    "serviceError": 1066
+  },
+  "change": "Separate final owner retirement from ordinary handoff deactivation; final retirement avoids external focus restore and activating SW_HIDE, while native cleanup errors remain failures.",
+  "causeStatus": "Exact blocking native call is unproved; removal of this shutdown risk is not proof of the original root cause.",
+  "validation": {
+    "wininput": "PASS (2.986s)",
+    "inputworker": "PASS (22.008s), portable-pair test excluded because a live portable owner held its mutex",
+    "frontendTests": 91,
+    "nativeFrontendAndExecutables": "PASS",
+    "updateArchiveSmoke": "PASS (11.46s)",
+    "bundleVerification": {
+      "valid": true,
+      "files": 8,
+      "archiveBytes": 28199974
+    },
+    "vetDefault": "Existing unsafe.Pointer warnings in unchanged Windows files; not a pass",
+    "vetWithoutUnsafePointerAnalyzer": "PASS",
+    "diffCheck": "PASS",
+    "hostedCI": "Not run; no push authorized",
+    "physicalActiveCaptureShutdownAndLongSoak": "Not run"
+  },
+  "application": {
+    "peerUpdateId": "3c949a3ad94d4f72a8b276f51132f95c",
+    "peerUpdateState": "UPDATED",
+    "initialSendResponse": "Timed out after queuing; recovered status without a duplicate send",
+    "connectionRestoration": "User clicked B connect after controlled disconnect; final A doctor healthy/CONNECTED/PROTECTED",
+    "reports": {
+      "A": {
+        "collectedAt": "2026-10-22T11:03:40Z",
+        "installation": {
+          "time": "2026-10-22T10:59:55.0021975Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "runtime": {
+          "startedAt": "2026-10-22T10:59:57.6541246Z",
+          "time": "2026-10-22T11:01:54.0470553Z",
+          "service": "READY",
+          "console": "USER_SESSION",
+          "grant": "PRESENT",
+          "lastWorker": "NONE",
+          "source": {
+            "total": 1,
+            "exits": [
+              {
+                "time": "2026-10-22T11:01:53.9205168Z",
+                "command": "ok",
+                "reader": "stopped",
+                "capture": "joined",
+                "sender": "joined",
+                "interrupt": "joined",
+                "retirement": "clean_sent",
+                "report": "ok"
+              }
+            ]
+          }
+        },
+        "health": {
+          "time": "2026-10-22T11:03:17.6436598Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "latestReadinessEvents": [
+          {
+            "time": "2026-10-22T11:03:23.4191265Z",
+            "code": "CONNECTED"
+          },
+          {
+            "time": "2026-10-22T11:03:23.9209671Z",
+            "code": "installed_source_capture_protected_ready"
+          }
+        ],
+        "failureEventsSince1103Z": []
+      },
+      "B": {
+        "collectedAt": "2026-10-22T11:03:44Z",
+        "installation": {
+          "time": "2026-10-22T10:59:28.5087212Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "runtime": {
+          "startedAt": "2026-10-22T10:59:33.3871385Z",
+          "time": "2026-10-22T11:01:57.7085268Z",
+          "service": "READY",
+          "console": "USER_SESSION",
+          "grant": "PRESENT",
+          "lastWorker": "NONE",
+          "source": {
+            "total": 1,
+            "exits": [
+              {
+                "time": "2026-10-22T11:01:57.648156Z",
+                "command": "ok",
+                "reader": "stopped",
+                "capture": "joined",
+                "sender": "joined",
+                "interrupt": "joined",
+                "retirement": "clean_sent",
+                "report": "ok"
+              }
+            ]
+          }
+        },
+        "health": {
+          "time": "2026-10-22T11:03:36.389576Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "latestReadinessEvents": [
+          {
+            "time": "2026-10-22T11:03:26.5525375Z",
+            "code": "CONNECTED"
+          },
+          {
+            "time": "2026-10-22T11:03:27.1611603Z",
+            "code": "installed_source_capture_protected_ready"
+          }
+        ],
+        "failureEventsSince1103Z": []
+      }
+    }
+  },
+  "nextPriorities": [
+    "Observe active-crossing workload for recurrence; if it recurs, add fixed cleanup-stage evidence rather than extending join timeouts.",
+    "Measure remaining boundary worker readiness delay before changing authorization or cleanup.",
+    "Investigate update SEND acknowledgement latency; one accepted request exceeded the CLI deadline."
+  ],
+  "scope": {
+    "apiChanged": false,
+    "databaseChanged": false,
+    "runnerChanged": false,
+    "dependenciesChanged": false,
+    "remotePush": false,
+    "sourceOfTruthDocumentsChanged": false
+  }
+}
