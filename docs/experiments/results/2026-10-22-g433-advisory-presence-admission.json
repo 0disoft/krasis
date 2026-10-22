@@ -1,0 +1,198 @@
+{
+  "generation": 433,
+  "sourceRevision": "78aabce9e0b618d3147d3c6ec2890ee862b5d19d",
+  "cause": "Optional advisory presence query held the shared source writer gate; deterministic concurrent heartbeat regression failed before the fix.",
+  "change": "Advisory presence now precedes the full fresh authority proof and immediate gate admission; contention repeats both checks. No advisory native query runs under the wire gate.",
+  "baseline": {
+    "generation": 432,
+    "collectionId": "6eee8d70566cb4d2fec85e2de71ddf39",
+    "sourceExits": [
+      {
+        "time": "2026-10-22T12:13:36.5187755Z",
+        "command": "authority",
+        "reader": "authority",
+        "capture": "joined",
+        "sender": "joined",
+        "interrupt": "joined",
+        "retirement": "delivery_failed",
+        "report": "failed",
+        "failure": {
+          "operation": "source-agent-query-cancelled",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "heartbeatStage": "replied",
+        "heartbeatSlowStage": "service_presence",
+        "heartbeatSlowBucket": 3
+      },
+      {
+        "time": "2026-10-22T12:18:03.1699488Z",
+        "command": "ok",
+        "reader": "authority",
+        "capture": "joined",
+        "sender": "joined",
+        "interrupt": "joined",
+        "retirement": "delivery_failed",
+        "report": "failed",
+        "failure": {
+          "operation": "source-agent-query-closed",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "heartbeatStage": "agent_presence",
+        "heartbeatSlowStage": "agent_presence",
+        "heartbeatSlowBucket": 5
+      },
+      {
+        "time": "2026-10-22T12:18:42.5571099Z",
+        "command": "ok",
+        "reader": "failed",
+        "capture": "joined",
+        "sender": "joined",
+        "interrupt": "joined",
+        "retirement": "clean_sent",
+        "report": "failed",
+        "failure": {
+          "operation": "source-command-heartbeat",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "heartbeatStage": "reply_gate",
+        "heartbeatSlowStage": "reply_gate",
+        "heartbeatSlowBucket": 5
+      },
+      {
+        "time": "2026-10-22T12:20:38.2931157Z",
+        "command": "ok",
+        "reader": "authority",
+        "capture": "joined",
+        "sender": "joined",
+        "interrupt": "joined",
+        "retirement": "delivery_failed",
+        "report": "failed",
+        "failure": {
+          "operation": "source-agent-query-closed",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "heartbeatStage": "agent_presence",
+        "heartbeatSlowStage": "agent_presence",
+        "heartbeatSlowBucket": 5
+      }
+    ],
+    "limitation": "The runtime reply_gate stage alone does not identify the holder. Agent-presence failures are a separate unresolved stage."
+  },
+  "validation": {
+    "regressionBefore": "FAIL: heartbeat read deadline while advisory presence blocked; boundary wrote sequence 1",
+    "inputworker": "PASS 22.297s",
+    "logindiag": "PASS",
+    "residentagent": "PASS 8.308s",
+    "focusedRegressions": "PASS 0.277s: concurrent heartbeat first, and authority revoked during advisory presence rejects before bytes",
+    "frontendTests": 91,
+    "nativeBuild": "PASS",
+    "bundleSmoke": "PASS 9.75s",
+    "bundleFiles": 8,
+    "archiveBytes": 28338304,
+    "offlineVerification": "PASS",
+    "diffCheck": "PASS",
+    "skipped": "Portable pair fixed-owner fixture to avoid interfering with the live owner; hosted CI because no push; physical input acceptance and long soak not run"
+  },
+  "application": {
+    "peerUpdateId": "f75cfd972be4b439862ae6446e5b2cba",
+    "peerUpdateState": "UPDATED",
+    "collectionId": "5d1006d8fed463e99578a57f25432521",
+    "sides": {
+      "A": {
+        "created": "2026-10-22T12:31:42Z",
+        "installation": {
+          "time": "2026-10-22T12:30:40.0949114Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-22T12:31:28.0297694Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "service": "READY",
+        "sourceHistory": null,
+        "readiness": [
+          {
+            "time": "2026-10-22T12:31:21.3290035Z",
+            "code": "CONNECTED"
+          },
+          {
+            "time": "2026-10-22T12:31:21.551767Z",
+            "code": "installed_source_capture_protected_ready"
+          }
+        ]
+      },
+      "B": {
+        "created": "2026-10-22T12:31:46Z",
+        "installation": {
+          "time": "2026-10-22T12:30:00.5020374Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-22T12:31:41.4743833Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "service": "READY",
+        "sourceHistory": null,
+        "readiness": [
+          {
+            "time": "2026-10-22T12:31:24.357455Z",
+            "code": "CONNECTED"
+          },
+          {
+            "time": "2026-10-22T12:31:24.7220535Z",
+            "code": "installed_source_capture_protected_ready"
+          }
+        ]
+      }
+    },
+    "localDoctor": "healthy / CONNECTED / PROTECTED",
+    "manualPeerConnectionRequired": false
+  },
+  "remainingWork": [
+    {
+      "priority": 1,
+      "task": "Distinguish agent-presence query admission from the native/kernel check after ge1s failures; preserve deadlines and fencing."
+    },
+    {
+      "priority": 2,
+      "task": "Correlate trust freshness and initial source startup separately if they recur; B entry delay remains lower priority."
+    }
+  ],
+  "scope": {
+    "publicApiChanged": false,
+    "databaseChanged": false,
+    "dependenciesChanged": false,
+    "runnerChanged": false,
+    "repositoryHygieneChanged": false,
+    "sourceOfTruthDocumentsChanged": false,
+    "remotePush": false
+  }
+}
