@@ -1,0 +1,118 @@
+{
+  "date": "2026-10-23",
+  "sourceRevision": "313016e5224a21169638e304b25896b90831202f",
+  "changes": [
+    {
+      "revision": "3ba27601d6abb5b5b0f7af8614f7d1d548d31f69",
+      "summary": "Authority capacity waits within the existing caller context instead of failing immediately; maximum four native queries; release queryMu while waiting; close wakeup; recheck authoritative lane."
+    },
+    {
+      "revision": "54a0564",
+      "summary": "Review build is isolated by source revision; refuses overwrite and signing; keeps the live bundle immutable."
+    },
+    {
+      "revision": "313016e5224a21169638e304b25896b90831202f",
+      "summary": "synctest.Wait joins native query owners before restoring the shared test semaphore."
+    }
+  ],
+  "validation": {
+    "priorContinuation": {
+      "status": "passed",
+      "checks": [
+        "go test -count=1 -timeout 90s ./internal/inputworker ./internal/logindiag ./internal/agent ./internal/residentagent",
+        "go vet ./internal/inputworker ./internal/agent ./internal/residentagent",
+        "focused capacity and boundary tests",
+        "build script syntax and overwrite guards"
+      ]
+    },
+    "raceTest": {
+      "command": "go test -race -count=1 -timeout 60s ./internal/inputworker -run 'Test(SourceAuthority.*Capacity|SourceAuthorityClose|AuthorityQueryCapacity|BoundaryCapacity|SourceQueryCapacity)'",
+      "status": "passed",
+      "durationSeconds": 1.227,
+      "toolchain": "llvm-mingw clang"
+    },
+    "reviewBuild": {
+      "command": "pwsh -NoProfile -File scripts/build-workspace.ps1 -Review",
+      "status": "passed",
+      "frontendTests": 103,
+      "nativeFrontendBuild": "passed",
+      "windowsExecutables": "passed",
+      "installerBuild": "passed; not installed",
+      "packageTransferTest": "TestWorkspaceUpdatePackage passed (16.86s)",
+      "packageLayout": "8 files and executable icons verified"
+    }
+  },
+  "reviewPackage": {
+    "status": "passed",
+    "path": "dist/review/313016e5224a21169638e304b25896b90831202f/g443",
+    "signed": false,
+    "installed": false,
+    "hashes": {
+      "BUILD.json": "d8a49a84f5007e5348ea96e4fdda9c14b8e6ca9ed4f5d3cc2366954faa4c0a8c",
+      "krasis-agent.exe": "53193808f60feb57668447a3af82f3de612eea661d6e993c281578b6358f6a0c",
+      "krasis-cli.exe": "8f074f2feedc502080b4e4cd164e13bcd7e80b1f33b5df8c65309d0a78f6df4b",
+      "krasis-install.exe": "3f066c6a00bf8018046fe93c9fa40483f23f24c8dc4ab54ec3d1afb4e0d26482",
+      "krasis.exe": "98b753784630f67ff45d1e043c84b004a8aa9042368b1cf61ced616156b0cdab",
+      "SHA256SUMS.txt": "fab28c811293eec208e6b386001b6b4e8a87556784d8ada9e5e84a8b34250390",
+      "START-HERE.md": "9cb4dafc3a052b58675444821ea62ac3e78a07f8c6db332a757a538f979856fb",
+      "THIRD-PARTY-NOTICES.txt": "8330173826be891d00e24553145ade72914166ad7464147114a2db57a92a9ab2"
+    }
+  },
+  "liveBundle": {
+    "path": "dist/workspace/g443",
+    "revision": "7c047c694ccec9b6b9bd4f3839c304d84cbc1060",
+    "runtimeCheck": "none in this continuation; historical health is not a current runtime check",
+    "unchangedHashCount": 8
+  },
+  "unconfirmed": {
+    "disconnectCause": "unproven",
+    "disconnectFixClaimed": false
+  },
+  "skipped": [
+    {
+      "checks": [
+        "two-PC physical acceptance",
+        "latency and soak testing",
+        "lock and reboot testing"
+      ],
+      "reason": "Review bundle was not deployed to the paired machines."
+    },
+    {
+      "checks": [
+        "hosted CI reproduction"
+      ],
+      "reason": "Local-only work; no remote CI run was requested."
+    },
+    {
+      "checks": [
+        "deployment",
+        "push",
+        "release"
+      ],
+      "reason": "Outside the authorized local work scope."
+    }
+  ],
+  "outstandingFailurePaths": [
+    "boundary prepare/write",
+    "service query cancelled/closed/deadline-admission",
+    "hosted CI COM failure",
+    "g442 installer file_delete Win32 5"
+  ],
+  "scope": {
+    "publicApiChanges": false,
+    "databaseChanges": false,
+    "dependencyChanges": false,
+    "ciRunnerChanges": false,
+    "repositoryHygieneChanges": false,
+    "productScopeChangeInSlice": false,
+    "packagingScriptEntryAdds": "-Review",
+    "sourceOfTruthDocs": {
+      "revision": "a1da2e6",
+      "files": [
+        "README.md",
+        "docs/product/02-spec.md"
+      ]
+    }
+  },
+  "documentationModel": "command-code/deepseek-deepseek-v4.1-flash, high; draft reviewed and completed with actual package evidence."
+}
