@@ -1,0 +1,281 @@
+{
+  "generation": 434,
+  "sourceRevision": "62665eb8b6ea692b0279d0269d07be00e7719d3f",
+  "baseline": {
+    "generation": 433,
+    "collectionId": "3547d7b797d02185a72b4ef1d07b5c46",
+    "slowResponseWindow": "2026-10-22T12:43:08.5530425Z",
+    "bucket": "ge1s",
+    "connectionRetained": true
+  },
+  "change": "Separate cumulative source presence admission/scheduling/publication wait from native-check invocation interval and writer-gate wait on matching heartbeat replies. No authorization or deadline change.",
+  "validation": {
+    "inputworker": "PASS 22.422s",
+    "productlog": "PASS 2.078s",
+    "residentagent": "PASS 7.288s",
+    "focused": "PASS 0.107s",
+    "frontendTests": 91,
+    "nativeBuild": "PASS",
+    "bundleSmoke": "PASS 8.35s",
+    "bundleFiles": 8,
+    "archiveBytes": 28388475,
+    "offlineVerification": "PASS",
+    "diffCheck": "PASS",
+    "skipped": "Portable-pair fixed-owner fixture conflicts with installed owner; hosted CI because no push; physical input acceptance and race-detector run omitted"
+  },
+  "application": {
+    "peerAppUpdateId": "068b24103b930d03123b1476a4cb2568",
+    "peerAppUpdateState": "UPDATED",
+    "collectionId": "723f1d31986ad721304486bc57b22398",
+    "sides": {
+      "A": {
+        "created": "2026-10-22T12:53:10Z",
+        "installation": {
+          "time": "2026-10-22T12:51:48.4168401Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-22T12:52:41.0113578Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "service": "READY",
+        "source": null,
+        "events": [
+          {
+            "time": "2026-10-22T12:52:32.3847007Z",
+            "code": "CONNECTED"
+          },
+          {
+            "time": "2026-10-22T12:52:32.5314224Z",
+            "code": "installed_source_capture_protected_ready"
+          },
+          {
+            "time": "2026-10-22T12:52:48.034724Z",
+            "code": "installed_source_heartbeat_timing_worker_presence_wait_lt10ms"
+          },
+          {
+            "time": "2026-10-22T12:52:48.034724Z",
+            "code": "installed_source_heartbeat_timing_worker_presence_native_lt10ms"
+          },
+          {
+            "time": "2026-10-22T12:52:48.034724Z",
+            "code": "installed_source_heartbeat_timing_worker_reply_gate_lt1ms"
+          },
+          {
+            "time": "2026-10-22T12:53:03.2821568Z",
+            "code": "installed_source_heartbeat_timing_worker_presence_wait_lt10ms"
+          },
+          {
+            "time": "2026-10-22T12:53:03.2821568Z",
+            "code": "installed_source_heartbeat_timing_worker_presence_native_lt1ms"
+          },
+          {
+            "time": "2026-10-22T12:53:03.2821568Z",
+            "code": "installed_source_heartbeat_timing_worker_reply_gate_lt1ms"
+          }
+        ]
+      },
+      "B": {
+        "created": "2026-10-22T12:53:14Z",
+        "installation": {
+          "time": "2026-10-22T12:50:57.7214868Z",
+          "action": "install",
+          "result": 4,
+          "stage": "replace",
+          "phase": "replace",
+          "operation": "directory_retire_move",
+          "win32Error": 5,
+          "win32Known": true,
+          "recovery": "restored",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-22T12:53:07.4252611Z",
+          "state": "UPDATE_REQUIRED",
+          "stage": "installation",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "service": "READY",
+        "source": null,
+        "events": [
+          {
+            "time": "2026-10-22T12:52:35.3907282Z",
+            "code": "CONNECTED"
+          }
+        ]
+      }
+    },
+    "localDoctor": "healthy / CONNECTED / PROTECTED",
+    "peerProtectedRepair": "COMPLETE: user ran B Agent Recovery after initial replace failure; new result-0 receipt at 2026-10-22T12:54:42.6965435Z, READY, protected source ready, and g434 worker timing codes observed. Initial failure retained above.",
+    "finalCollectionId": "782eb90f6bb4c192a877e4546b687c30",
+    "finalSides": {
+      "A": {
+        "created": "2026-10-22T12:55:06Z",
+        "installation": {
+          "time": "2026-10-22T12:51:48.4168401Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-22T12:54:45.1191183Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "service": "READY",
+        "source": {
+          "total": 1,
+          "exits": [
+            {
+              "time": "2026-10-22T12:54:34.3455579Z",
+              "command": "ok",
+              "reader": "stopped",
+              "capture": "joined",
+              "sender": "joined",
+              "interrupt": "joined",
+              "retirement": "clean_sent",
+              "report": "ok",
+              "heartbeatStage": "replied",
+              "heartbeatSlowStage": "service_presence",
+              "heartbeatSlowBucket": 2
+            }
+          ]
+        },
+        "events": [
+          {
+            "time": "2026-10-22T12:54:05.0421958Z",
+            "code": "installed_source_heartbeat_timing_worker_presence_native_lt1ms"
+          },
+          {
+            "time": "2026-10-22T12:54:05.0421958Z",
+            "code": "installed_source_heartbeat_timing_worker_reply_gate_lt1ms"
+          },
+          {
+            "time": "2026-10-22T12:54:20.7828253Z",
+            "code": "installed_source_heartbeat_timing_worker_presence_wait_lt1ms"
+          },
+          {
+            "time": "2026-10-22T12:54:20.7828253Z",
+            "code": "installed_source_heartbeat_timing_worker_presence_native_lt10ms"
+          },
+          {
+            "time": "2026-10-22T12:54:20.7828253Z",
+            "code": "installed_source_heartbeat_timing_worker_reply_gate_lt1ms"
+          },
+          {
+            "time": "2026-10-22T12:54:48.5380688Z",
+            "code": "CONNECTED"
+          },
+          {
+            "time": "2026-10-22T12:54:48.6981363Z",
+            "code": "installed_source_capture_protected_ready"
+          },
+          {
+            "time": "2026-10-22T12:55:04.4484434Z",
+            "code": "installed_source_heartbeat_timing_worker_presence_wait_lt1ms"
+          },
+          {
+            "time": "2026-10-22T12:55:04.4484434Z",
+            "code": "installed_source_heartbeat_timing_worker_presence_native_lt1ms"
+          },
+          {
+            "time": "2026-10-22T12:55:04.4484434Z",
+            "code": "installed_source_heartbeat_timing_worker_reply_gate_lt1ms"
+          }
+        ]
+      },
+      "B": {
+        "created": "2026-10-22T12:55:11Z",
+        "installation": {
+          "time": "2026-10-22T12:54:42.6965435Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-22T12:54:49.7524706Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "service": "READY",
+        "source": null,
+        "events": [
+          {
+            "time": "2026-10-22T12:52:35.3907282Z",
+            "code": "CONNECTED"
+          },
+          {
+            "time": "2026-10-22T12:54:51.5385347Z",
+            "code": "CONNECTED"
+          },
+          {
+            "time": "2026-10-22T12:54:52.0359803Z",
+            "code": "installed_source_capture_protected_ready"
+          },
+          {
+            "time": "2026-10-22T12:55:08.286324Z",
+            "code": "installed_source_heartbeat_timing_worker_presence_wait_lt1ms"
+          },
+          {
+            "time": "2026-10-22T12:55:08.286324Z",
+            "code": "installed_source_heartbeat_timing_worker_presence_native_lt10ms"
+          },
+          {
+            "time": "2026-10-22T12:55:08.286324Z",
+            "code": "installed_source_heartbeat_timing_worker_reply_gate_lt1ms"
+          }
+        ]
+      }
+    }
+  },
+  "interpretation": "Both sides export all three new worker timing phases. Latest A phases are below 1ms; latest B presence native-check interval below 10ms, other phases below 1ms. No new ge1s client window has yet been correlated. Independent 15-second maxima are not an exact per-request causal trace. A clean source retirement at 12:54:34Z belongs to B repair maintenance, not a spontaneous heartbeat failure.",
+  "remainingWork": [
+    "Correlate a renewed ge1s client-response window with presence wait, native-check interval and reply gate; actual pipe write/client read remain outside these worker phases.",
+    "Keep trust freshness, initial source readiness and B entry delay separate; do not infer the remaining latency root cause is fixed.",
+    "If replacement access-denied recurs, inspect verified process retirement separately; one successful attended recovery does not establish that installer race is fixed."
+  ],
+  "scope": {
+    "publicApiChanged": false,
+    "privateHeartbeatTimingBytesExtended": true,
+    "databaseChanged": false,
+    "dependenciesChanged": false,
+    "runnerChanged": false,
+    "repositoryHygieneChanged": false,
+    "sourceOfTruthDocumentsChanged": false,
+    "remotePush": false
+  }
+}
