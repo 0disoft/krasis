@@ -48,6 +48,9 @@ func (w *sourceWriter) writePacketContext(ctx context.Context, p sourcePacket, c
 	if p.kind == sourceReply && p.op == sourceHeartbeat {
 		progress = w.heartbeat
 	}
+	if progress != nil {
+		ctx = progress.presence.context(ctx)
+	}
 	gateDone := func() {}
 	if progress != nil {
 		gateDone = progress.measure(heartbeatReplyGate)
@@ -90,6 +93,9 @@ func (w *sourceWriter) writePacketContext(ctx context.Context, p sourcePacket, c
 		}
 	}
 	p.sequence, p.binding = w.sequence+1, w.binding
+	if progress != nil {
+		p.timing = progress.replyTiming()
+	}
 	data, err := encodeSourcePacket(p)
 	if err != nil {
 		return err

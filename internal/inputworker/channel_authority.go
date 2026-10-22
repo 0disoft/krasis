@@ -12,8 +12,9 @@ import (
 var authorityQueries = make(chan struct{}, 4)
 
 type authorityQuery struct {
-	done chan struct{}
-	err  error
+	done   chan struct{}
+	err    error
+	timing *authorityQueryTiming
 }
 
 type authorityQueryKind uint8
@@ -70,6 +71,14 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 	if channel == nil || ctx == nil {
 		return ErrAuthority
 	}
+	var profile *sourcePresenceTiming
+	var admitted time.Time
+	if kind == sourcePresenceAuthorityQuery {
+		profile, _ = ctx.Value(sourcePresenceTimingKey{}).(*sourcePresenceTiming)
+		if profile != nil {
+			admitted = time.Now()
+		}
+	}
 	// An unsent advisory batch, like an unsent keepalive, grants no input.
 	// Keep its timed-out native query owned without fencing unrelated commands.
 	// Its caller must discard the batch; later work still needs a fresh check.
@@ -105,10 +114,16 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 			return queryAdmissionFailure(kind, "capacity", nil)
 		}
 		query := &authorityQuery{done: make(chan struct{})}
+		if profile != nil {
+			query.timing = &authorityQueryTiming{}
+		}
 		*current = query
 		queryCtx, merge := handoff.ForkAuthority(ctx)
 		go func() {
 			defer func() { <-authorityQueries }()
+			if query.timing != nil {
+				query.timing.started = time.Now()
+			}
 			if kind == sourceInputAuthorityQuery || kind == sourceAdvisoryAuthorityQuery {
 				query.err = channel.authority.checkSource()
 			} else if kind == sourcePresenceAuthorityQuery || kind == sourceAdvisoryPresenceAuthorityQuery {
@@ -119,6 +134,9 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 				query.err = channel.authority.checkObserved(queryCtx, false)
 			} else {
 				query.err = channel.authority.check(false)
+			}
+			if query.timing != nil {
+				query.timing.finished = time.Now()
 			}
 			channel.queryMu.Lock()
 			if ctx.Err() != nil && !optional {
@@ -150,6 +168,9 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 					channel.cancelQuery(query)
 				}
 				return queryAdmissionFailure(kind, "", err)
+			}
+			if profile != nil {
+				profile.observe(admitted, query.timing)
 			}
 			merge() // The query can no longer mutate its diagnostic sample.
 			return query.err

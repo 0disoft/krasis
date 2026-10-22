@@ -69,6 +69,10 @@ func (sampler *timingSampler) flush(now time.Time) {
 	if sampler.emit != nil {
 		for stage, bucket := range sampler.maximum {
 			if code := timingCode(stage, bucket); code != "" {
+				if sampler.source && sampler.heartbeat && stage >= 4 {
+					phases := [...]string{"presence_wait", "presence_native", "reply_gate"}
+					code = "installed_input_timing_worker_" + phases[stage-4] + code[len("installed_input_timing_"+timingStages[stage]):]
+				}
 				if sampler.heartbeat {
 					code = "installed_input_heartbeat_timing_" + code[len("installed_input_timing_"):]
 				}

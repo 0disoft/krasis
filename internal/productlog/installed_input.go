@@ -79,6 +79,11 @@ func init() {
 			}
 		}
 	}
+	for _, phase := range []string{"presence_wait", "presence_native", "reply_gate"} {
+		for _, bucket := range []string{"lt1ms", "lt10ms", "lt100ms", "lt1s", "ge1s"} {
+			allowed["installed_source_heartbeat_timing_worker_"+phase+"_"+bucket] = true
+		}
+	}
 	for _, code := range []string{"installed_input_selected", "installed_input_lease_ready", "installed_input_connect_failed", "installed_input_heartbeat_failed", "installed_input_preparation_acknowledged", "installed_input_preparation_missed", "installed_input_preparation_joined", "installed_source_receive_only"} {
 		allowed[code] = true
 	}

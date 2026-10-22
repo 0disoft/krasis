@@ -40,7 +40,7 @@ type sourcePacket struct {
 	x                int32
 	decision         peer.BoundaryAdmissionDecision
 	pressedEvidence  byte
-	timing           [3]byte // Activation reply only; fixed elapsed-time buckets.
+	timing           [3]byte // Activation or heartbeat reply; fixed operation-specific buckets.
 }
 
 func (p sourcePacket) valid() bool {
@@ -50,10 +50,10 @@ func (p sourcePacket) valid() bool {
 	if p.pressedEvidence != 0 && (p.pressedEvidence > 3 || p.kind != sourceReply || p.op != sourceAdmit || p.status != 0 || p.decision != peer.BoundaryAdmissionBlockedPressedInput) {
 		return false
 	}
-	if p.timing != ([3]byte{}) && (p.kind != sourceReply || p.op != sourceActivate) {
+	if p.timing != ([3]byte{}) && (p.kind != sourceReply || p.op != sourceActivate && p.op != sourceHeartbeat) {
 		return false
 	}
-	if p.timing[0] != 0 { // Reader authorization has no dispatcher measurement.
+	if p.op != sourceHeartbeat && p.timing[0] != 0 { // Activation has no reader measurement.
 		return false
 	}
 	for _, bucket := range p.timing {

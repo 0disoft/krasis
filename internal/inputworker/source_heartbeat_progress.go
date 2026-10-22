@@ -20,6 +20,8 @@ const (
 // this process: only fixed stages and the lifetime's largest elapsed bucket.
 type sourceHeartbeatProgress struct {
 	stage, slowStage, slowBucket byte
+	presence                     sourcePresenceTiming
+	gateBucket                   byte
 }
 
 func (p *sourceHeartbeatProgress) measure(stage byte) func() {
@@ -30,9 +32,20 @@ func (p *sourceHeartbeatProgress) measure(stage byte) func() {
 
 func (p *sourceHeartbeatProgress) record(stage byte, elapsed time.Duration) {
 	bucket := timingBucket(elapsed)
+	if stage == heartbeatReplyGate {
+		p.gateBucket = bucket
+	}
 	if bucket > p.slowBucket {
 		p.slowStage, p.slowBucket = stage, bucket
 	}
+}
+
+func (p *sourceHeartbeatProgress) replyTiming() (buckets [3]byte) {
+	if p.presence.measured {
+		buckets[0], buckets[1] = timingBucket(p.presence.wait), timingBucket(p.presence.native)
+	}
+	buckets[2] = p.gateBucket
+	return
 }
 
 func (p *sourceHeartbeatProgress) snapshot(exit *logindiag.SourceExit) {

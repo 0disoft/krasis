@@ -101,7 +101,7 @@ func TestSourceTimingOnlySurvivesExactActivationReplies(t *testing.T) {
 			}
 		}
 		for op := sourceStart; op <= sourceCursorRestore; op++ {
-			if op == sourceActivate {
+			if op == sourceActivate || op == sourceHeartbeat {
 				continue
 			}
 			bad := wire
@@ -109,6 +109,25 @@ func TestSourceTimingOnlySurvivesExactActivationReplies(t *testing.T) {
 			if _, err := readSourcePacket(bytes.NewReader(bad[:])); err != ErrProtocol {
 				t.Fatal("activation timing escaped its fixed operation", op, err)
 			}
+		}
+	}
+}
+
+func TestSourceHeartbeatTimingRoundTripAndBounds(t *testing.T) {
+	p := sourcePacket{kind: sourceReply, op: sourceHeartbeat, sequence: 3, reply: 2, binding: Binding{1}, timing: [3]byte{4, 2, 1}}
+	wire, err := encodeSourcePacket(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := readSourcePacket(bytes.NewReader(wire[:]))
+	if err != nil || got != p {
+		t.Fatal("heartbeat phases lost on wire", got, err)
+	}
+	for _, offset := range []int{57, 58, 59} {
+		bad := wire
+		bad[offset] = 6
+		if _, err := readSourcePacket(bytes.NewReader(bad[:])); err != ErrProtocol {
+			t.Fatal("unbounded heartbeat phase accepted", offset, err)
 		}
 	}
 }

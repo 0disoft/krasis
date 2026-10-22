@@ -12,6 +12,10 @@ func authorizeSourceRead(ctx context.Context, service, agent *Channel, op byte) 
 }
 
 func authorizeSourceReadProgress(ctx context.Context, service, agent *Channel, op byte, progress *sourceHeartbeatProgress) error {
+	if progress != nil && op == sourceHeartbeat {
+		progress.presence, progress.gateBucket = sourcePresenceTiming{}, 0
+		ctx = progress.presence.context(ctx)
+	}
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 	full := func() error {
