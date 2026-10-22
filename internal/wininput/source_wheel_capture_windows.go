@@ -460,7 +460,7 @@ func (current *sourceWheelCaptureRun) run(ctx context.Context, ready func()) (re
 	sourceWindowOwners.Store(window, wndProc)
 	defer sourceWindowOwners.Delete(window)
 	defer func() {
-		resultErr = errors.Join(resultErr, current.deactivateWindow())
+		resultErr = errors.Join(resultErr, current.retireWindow())
 		current.forgetSavedFocus()
 		presentation.retire()
 		sourcePresentationWindows.CompareAndDelete(window, presentation)
@@ -743,76 +743,6 @@ func (current *sourceWheelCaptureRun) activateForegroundFallback() (SourceForegr
 func (current *sourceWheelCaptureRun) setForegroundWithThreadAttach(targetWindow, peerWindow uintptr) (foregroundThreadFallbackResult, error) {
 	result, _, _, err := current.setForegroundWithThreadAttachDetailed(targetWindow, peerWindow, nil)
 	return result, err
-}
-
-func (current *sourceWheelCaptureRun) deactivateWindow() error {
-	return current.deactivateWindowProfile(nil)
-}
-
-func (current *sourceWheelCaptureRun) deactivateWindowProfile(profile context.Context) error {
-	if scope := sourceLoginScope(current.loginContext); scope != nil {
-		if err := scope.Do(context.Background(), func() error { return nil }); err != nil {
-			return current.retireLoginCapture()
-		}
-	}
-	wasActive := current.active.Swap(false)
-	wasRegistered := current.registered
-	// Retry only the exact native pair we attached, never a newly discovered owner.
-	detachErr := current.detachForegroundThreads()
-	if !wasActive && !wasRegistered {
-		current.releaseFullscreenPresentation()
-		return detachErr
-	}
-	if current.observer != nil && wasActive {
-		current.observer.ObserveWheelCaptureDeactivated()
-	}
-	cleanupErr := detachErr
-	if wasRegistered {
-		if unregisterErr := sourceWheelCaptureRegisterWindow(current.registerProc, current.window, false); unregisterErr != nil {
-			cleanupErr = errors.Join(cleanupErr, ErrSourceCaptureUnregisterFailed, touchpadWin32Error("RegisterTouchpadCapableWindow(source FALSE)", unregisterErr))
-		} else {
-			current.registered = false
-		}
-	}
-	// Restore while the capture window is still foreground. Hiding it first lets
-	// Windows choose another foreground owner, which makes restoreFocus classify
-	// every ordinary return as skipped and loses the saved application focus.
-	current.observeFocus(profile, handoff.FocusBeforeRestore)
-	stopRestore := handoff.FocusSpan(profile, 0)
-	restoreResult, restoreErr := current.restoreFocusProfile(profile)
-	stopRestore()
-	handoff.RecordFocusResult(profile, 0, uint8(restoreResult))
-	current.observeFocus(profile, handoff.FocusAfterRestore)
-	stopHide := handoff.FocusSpan(profile, 1)
-	hideErr := current.hideAfterFocusRestore()
-	current.releaseFullscreenPresentation()
-	stopHide()
-	if hideErr != nil {
-		cleanupErr = errors.Join(cleanupErr, hideErr, ErrSourceCaptureRollbackFailed)
-	}
-	if current.observer != nil && wasActive {
-		current.observer.ObserveWheelFocusRestore(restoreResult)
-	}
-	if wasActive && cleanupErr == nil {
-		// The first restore's failure remains recorded. Only a fresh NULL owner
-		// after hide permits this separate, one-shot saved-window request.
-		current.restoreAfterHideProfile(profile, restoreResult, restoreErr)
-	}
-	savedFocus := current.savedFocus
-	current.forgetSavedFocus()
-	// Partial activation can own registration and foreground before active=true.
-	// It needs the same post-hide release proof as a fully active capture.
-	postHideResult, postHideErr := current.verifyPostHideFocusReleaseProfile(profile, savedFocus)
-	if restoreErr == nil {
-		return errors.Join(cleanupErr, postHideErr)
-	}
-	if current.observer != nil {
-		current.observer.ObserveWheelPostHideFocus(postHideResult)
-	}
-	if errors.Is(restoreErr, ErrSourceFocusRestoreThreadDetachFailed) || postHideErr != nil {
-		return errors.Join(cleanupErr, restoreErr, postHideErr)
-	}
-	return cleanupErr
 }
 
 func (current *sourceWheelCaptureRun) verifyPostHideFocusRelease() (SourcePostHideFocusResult, error) {
