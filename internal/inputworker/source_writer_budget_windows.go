@@ -44,6 +44,12 @@ func (w *sourceWriter) lockAuthorized(ctx context.Context, advisory bool) error 
 	for {
 		check := w.channel.authorizeSourceInput
 		if advisory {
+			// Optional native presence may consume its whole budget. Keep it
+			// outside the shared wire gate, then obtain the full fresh proof
+			// immediately before TryLock. Contention discards both proofs.
+			if err := w.channel.authorizeSourceAdvisoryPresence(ctx); err != nil {
+				return err
+			}
 			check = w.channel.authorizeSourceAdvisory
 		}
 		if err := check(ctx); err != nil {

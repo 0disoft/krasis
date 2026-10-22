@@ -44,7 +44,7 @@ func (w *sourceWriter) sendBoundaries(batch []sourcePacket) error {
 	// Slow SCM/WTS validation of advisory pointer observations must not hold
 	// the shared writer gate needed by heartbeat replies. No input/actions or
 	// capture decisions enter this batch. Validate fully before admission, then
-	// recheck the pinned owner's presence under the sequence/write gate.
+	// obtain presence and the final full proof before immediate gate admission.
 	ctx, cancel := w.operation(nil, false)
 	defer cancel()
 	if err := w.lockAuthorized(ctx, true); err != nil {
@@ -57,14 +57,6 @@ func (w *sourceWriter) sendBoundaries(batch []sourcePacket) error {
 		return sourceTransportFailure(err)
 	}
 	defer w.mu.Unlock()
-	if err := w.channel.authorizeSourceAdvisoryPresence(ctx); err != nil {
-		if ctx.Err() == context.DeadlineExceeded && errors.Is(err, context.DeadlineExceeded) && (w.ctx == nil || w.ctx.Err() == nil) {
-			// No bytes were submitted. Retain the optional query and discard
-			// this stale observation; command presence remains independent.
-			return nil
-		}
-		return sourceTransportFailure(err)
-	}
 	var wire [sourceBoundaryBatchLimit * sourcePacketSize]byte
 	next := w.sequence
 	for i, p := range batch {
