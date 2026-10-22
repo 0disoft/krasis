@@ -1,0 +1,701 @@
+{
+  "date": "2026-10-23",
+  "generation": 447,
+  "build": "c966f66427c76cae9afded2f122f5e6582f062d8",
+  "implementationCommit": "3790ff7",
+  "changes": [
+    "Retain startup authentication, transfer, readiness and publication I/O/native failures alongside existing authority/protocol/recovery classifications.",
+    "Record fixed timeout, cancellation, EOF, truncation and closure classes for input startup.",
+    "Handle startup deadline setup/reset failures. Drain worker recovery after failed readiness publication without converting the original failure into success.",
+    "Preserve ordinary authority sentinel contract, pinned native ownership, lease authentication and recovery fencing."
+  ],
+  "diagnostics": {
+    "before": {
+      "requestID": "a36ff1693ffd606f4c47374128df3983",
+      "sides": {
+        "A": {
+          "sha256": "b7aadf477e3a99155ef21f4fb7d44669a51605a2eb6aba9eaf643ec654541647",
+          "bytes": 1792042,
+          "createdUTC": "2026-10-22T19:53:10Z",
+          "service": "FAILED",
+          "serviceStartedUTC": "2026-10-22T19:17:53.5536649Z",
+          "lastFailure": {
+            "time": "2026-10-22T19:42:19.8427536Z",
+            "stage": "service",
+            "reason": "capture",
+            "operation": "worker-report-eof",
+            "win32Error": 0,
+            "win32Known": false,
+            "workerExit": {
+              "state": "RUNNING",
+              "code": 0,
+              "known": false
+            }
+          },
+          "inputHealth": {
+            "time": "2026-10-22T19:52:51.5633068Z",
+            "state": "SERVICE_RECOVERY_REQUIRED",
+            "stage": "service_recovery",
+            "win32Error": 1066,
+            "win32Known": true
+          },
+          "installation": {
+            "time": "2026-10-22T19:17:52.3714496Z",
+            "action": "install",
+            "result": 0,
+            "stage": "complete",
+            "win32Error": 0,
+            "win32Known": false,
+            "recovery": "not_needed",
+            "recoveryWin32Error": 0,
+            "recoveryWin32Known": false,
+            "closeWin32Error": 0,
+            "closeWin32Known": false
+          }
+        },
+        "B": {
+          "sha256": "5543c30aeebd80edf5e833e2172b3c6f998c84a9d7dbf600ecf91f13bc467d51",
+          "bytes": 2055940,
+          "createdUTC": "2026-10-22T19:53:14Z",
+          "service": "READY",
+          "serviceStartedUTC": "2026-10-22T19:17:35.7337223Z",
+          "lastFailure": null,
+          "inputHealth": {
+            "time": "2026-10-22T19:53:02.9816574Z",
+            "state": "READY",
+            "stage": "complete",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "installation": {
+            "time": "2026-10-22T19:17:33.4477898Z",
+            "action": "install",
+            "result": 0,
+            "stage": "complete",
+            "win32Error": 0,
+            "win32Known": false,
+            "recovery": "not_needed",
+            "recoveryWin32Error": 0,
+            "recoveryWin32Known": false,
+            "closeWin32Error": 0,
+            "closeWin32Known": false
+          }
+        }
+      }
+    },
+    "afterRollout": {
+      "requestID": "95a7e41ee40b4a07e07967950aa89226",
+      "sides": {
+        "A": {
+          "sha256": "1fd4c17fb85c34c523e71abc3744bd8b8646542bc4f3131219d4a958d257966c",
+          "bytes": 1793321,
+          "createdUTC": "2026-10-22T19:56:17Z",
+          "service": "READY",
+          "serviceStartedUTC": "2026-10-22T19:55:26.57824Z",
+          "lastFailure": null,
+          "inputHealth": {
+            "time": "2026-10-22T19:55:50.4902822Z",
+            "state": "READY",
+            "stage": "complete",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "installation": {
+            "time": "2026-10-22T19:55:25.0075188Z",
+            "action": "install",
+            "result": 0,
+            "stage": "complete",
+            "win32Error": 0,
+            "win32Known": false,
+            "recovery": "not_needed",
+            "recoveryWin32Error": 0,
+            "recoveryWin32Known": false,
+            "closeWin32Error": 0,
+            "closeWin32Known": false
+          }
+        },
+        "B": {
+          "sha256": "639fa8378b7b366e4cac26671db0a1841a0945329443fcc8119a9b446ff012d0",
+          "bytes": 2084577,
+          "createdUTC": "2026-10-22T19:56:21Z",
+          "service": "READY",
+          "serviceStartedUTC": "2026-10-22T19:54:28.0230149Z",
+          "lastFailure": null,
+          "inputHealth": {
+            "time": "2026-10-22T19:56:02.5818558Z",
+            "state": "READY",
+            "stage": "complete",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "installation": {
+            "time": "2026-10-22T19:54:25.7230269Z",
+            "action": "install",
+            "result": 0,
+            "stage": "complete",
+            "win32Error": 0,
+            "win32Known": false,
+            "recovery": "not_needed",
+            "recoveryWin32Error": 0,
+            "recoveryWin32Known": false,
+            "closeWin32Error": 0,
+            "closeWin32Known": false
+          }
+        }
+      }
+    },
+    "afterCrossing": {
+      "requestID": "7becb884e76766ba0bdddf67eb905220",
+      "sides": {
+        "A": {
+          "sha256": "8e328e5b4c1e6030ca8079ff7c9fcc129eec8f3ad767b7a3d286c7f65f2a8c8f",
+          "bytes": 1935094,
+          "createdUTC": "2026-10-22T19:58:02Z",
+          "service": "READY",
+          "serviceStartedUTC": "2026-10-22T19:55:26.57824Z",
+          "lastFailure": null,
+          "inputHealth": {
+            "time": "2026-10-22T19:57:46.2094111Z",
+            "state": "READY",
+            "stage": "complete",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "installation": {
+            "time": "2026-10-22T19:55:25.0075188Z",
+            "action": "install",
+            "result": 0,
+            "stage": "complete",
+            "win32Error": 0,
+            "win32Known": false,
+            "recovery": "not_needed",
+            "recoveryWin32Error": 0,
+            "recoveryWin32Known": false,
+            "closeWin32Error": 0,
+            "closeWin32Known": false
+          }
+        },
+        "B": {
+          "sha256": "5f54ab128c49996fdbfc261e9a68b027361192f874952e992bb3550b90f45f49",
+          "bytes": 1277510,
+          "createdUTC": "2026-10-22T19:58:05Z",
+          "service": "FAILED",
+          "serviceStartedUTC": "2026-10-22T19:54:28.0230149Z",
+          "lastFailure": {
+            "time": "2026-10-22T19:58:00.5397098Z",
+            "stage": "service",
+            "reason": "input",
+            "operation": "input-retire-receipt",
+            "win32Error": 0,
+            "win32Known": false,
+            "workerExit": {
+              "state": "RUNNING",
+              "code": 0,
+              "known": false
+            }
+          },
+          "inputHealth": {
+            "time": "2026-10-22T19:57:36.5124523Z",
+            "state": "READY",
+            "stage": "complete",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "installation": {
+            "time": "2026-10-22T19:54:25.7230269Z",
+            "action": "install",
+            "result": 0,
+            "stage": "complete",
+            "win32Error": 0,
+            "win32Known": false,
+            "recovery": "not_needed",
+            "recoveryWin32Error": 0,
+            "recoveryWin32Known": false,
+            "closeWin32Error": 0,
+            "closeWin32Known": false
+          }
+        }
+      }
+    },
+    "afterBRepair": {
+      "requestID": "8731b04d0e4bbe9e457f9bf8bdbfc995",
+      "sides": {
+        "A": {
+          "sha256": "b2f443cbe2d602e3c6c9fa1124ae1449a55ad10d439d7e180f561c7d8668543d",
+          "bytes": 2021175,
+          "createdUTC": "2026-10-22T20:00:51Z",
+          "service": "READY",
+          "serviceStartedUTC": "2026-10-22T19:55:26.57824Z",
+          "lastFailure": null,
+          "inputHealth": {
+            "time": "2026-10-22T20:00:25.0510551Z",
+            "state": "READY",
+            "stage": "complete",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "installation": {
+            "time": "2026-10-22T19:55:25.0075188Z",
+            "action": "install",
+            "result": 0,
+            "stage": "complete",
+            "win32Error": 0,
+            "win32Known": false,
+            "recovery": "not_needed",
+            "recoveryWin32Error": 0,
+            "recoveryWin32Known": false,
+            "closeWin32Error": 0,
+            "closeWin32Known": false
+          }
+        },
+        "B": {
+          "sha256": "bf85d9b50ca702ff22e56862822db96e61144941afc9943c433cab4d28cc3701",
+          "bytes": 1339467,
+          "createdUTC": "2026-10-22T20:00:55Z",
+          "service": "READY",
+          "serviceStartedUTC": "2026-10-22T20:00:23.2703159Z",
+          "lastFailure": null,
+          "inputHealth": {
+            "time": "2026-10-22T20:00:24.1800635Z",
+            "state": "READY",
+            "stage": "complete",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "installation": {
+            "time": "2026-10-22T20:00:20.5220639Z",
+            "action": "install",
+            "result": 0,
+            "stage": "complete",
+            "win32Error": 0,
+            "win32Known": false,
+            "recovery": "not_needed",
+            "recoveryWin32Error": 0,
+            "recoveryWin32Known": false,
+            "closeWin32Error": 0,
+            "closeWin32Known": false
+          }
+        }
+      }
+    }
+  },
+  "rollout": {
+    "bundleVerifiedBytes": 28463234,
+    "peerUpdateID": "32d22a4c79c5e368110ffd620fc9ddd5",
+    "peerTerminalState": "UPDATED",
+    "AInstallerAction": "verified g447 --repair after exact old UI/user-agent process exit and observation-handle release",
+    "AInstallerExitCode": 0,
+    "ARecoveryRegistration": "recovery_ready",
+    "finalADoctor": "healthy; CONNECTED; matching g447 UI/resident/installed builds",
+    "finalPeerVersion": "ONLINE; g447; matching build",
+    "manualReceiptOrJournalDeletion": false
+  },
+  "userRetest": {
+    "crossing": "works",
+    "latencyOrStutter": "still present",
+    "BRecovery": "user completed local recovery and Windows administrator confirmation; fresh installation result 0 and service READY verified"
+  },
+  "crossingAnalysis": {
+    "requestID": "7becb884e76766ba0bdddf67eb905220",
+    "build": "c966f66427c76cae9afded2f122f5e6582f062d8",
+    "sides": {
+      "A": {
+        "created": "2026-10-22T19:58:02Z",
+        "health": {
+          "time": "2026-10-22T19:57:46.2094111Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "lastFailure": null,
+        "profiles": 15,
+        "ends": {
+          "ok": 14,
+          "incomplete": 1
+        },
+        "faults": [
+          {
+            "time": "2026-10-22T19:57:35.3376783Z",
+            "code": "fault_boundary_orchestrator_failed"
+          },
+          {
+            "time": "2026-10-22T19:57:35.5086235Z",
+            "code": "session_failed"
+          }
+        ],
+        "source": {
+          "count": 15,
+          "metricsMicros": {
+            "preparation.BoundaryToBegin": {
+              "samples": 15,
+              "min": 2234,
+              "median": 35742,
+              "max": 160950
+            },
+            "preparation.RequestToGrant": {
+              "samples": 14,
+              "min": 47325,
+              "median": 217639.5,
+              "max": 1434916
+            },
+            "preparation.CaptureActivate": {
+              "samples": 14,
+              "min": 15041,
+              "median": 51744.0,
+              "max": 181204
+            },
+            "preparation.SourceActivate": {
+              "samples": 14,
+              "min": 0,
+              "median": 0.0,
+              "max": 0
+            },
+            "preparation.GrantCoordinator": {
+              "samples": 14,
+              "min": 0,
+              "median": 0.0,
+              "max": 0
+            },
+            "preparation.RequestCoordinator": {
+              "samples": 15,
+              "min": 0,
+              "median": 0,
+              "max": 0
+            },
+            "first.FirstOfferSinceBegin": {
+              "samples": 14,
+              "min": 86975,
+              "median": 365545.0,
+              "max": 1757017
+            },
+            "first.SourceQueue": {
+              "samples": 14,
+              "min": 0,
+              "median": 1037.0,
+              "max": 50897
+            },
+            "first.Dispatch": {
+              "samples": 14,
+              "min": 0,
+              "median": 1934.5,
+              "max": 57790
+            },
+            "first.InputCoordinator": {
+              "samples": 14,
+              "min": 0,
+              "median": 1921.0,
+              "max": 57790
+            },
+            "first.InputWrite": {
+              "samples": 14,
+              "min": 0,
+              "median": 0.0,
+              "max": 1011
+            },
+            "worst.Dispatch": {
+              "samples": 14,
+              "min": 623,
+              "median": 2184.0,
+              "max": 45398
+            }
+          },
+          "prepared": {
+            "None": 15
+          },
+          "cadenceMaxGapMicros": {
+            "samples": 14,
+            "min": 17064,
+            "median": 87026.0,
+            "max": 1853018
+          }
+        }
+      },
+      "B": {
+        "created": "2026-10-22T19:58:05Z",
+        "health": {
+          "time": "2026-10-22T19:57:36.5124523Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "lastFailure": {
+          "time": "2026-10-22T19:58:00.5397098Z",
+          "stage": "service",
+          "reason": "input",
+          "operation": "input-retire-receipt",
+          "win32Error": 0,
+          "win32Known": false,
+          "workerExit": {
+            "state": "RUNNING",
+            "code": 0,
+            "known": false
+          }
+        },
+        "profiles": 12,
+        "ends": {
+          "ok": 12
+        },
+        "faults": [
+          {
+            "time": "2026-10-22T19:58:00.919864Z",
+            "code": "fault_control_request_authorize_failed"
+          },
+          {
+            "time": "2026-10-22T19:58:00.9300292Z",
+            "code": "session_failed"
+          }
+        ],
+        "receiver": {
+          "count": 12,
+          "metricsMicros": {
+            "preparation.AuthorizeTotal": {
+              "samples": 12,
+              "min": 29454,
+              "median": 188666.0,
+              "max": 1399538
+            },
+            "preparation.ReadyWait": {
+              "samples": 12,
+              "min": 25902,
+              "median": 131563.0,
+              "max": 1110602
+            },
+            "preparation.EntryPrepare": {
+              "samples": 12,
+              "min": 4122,
+              "median": 7583.5,
+              "max": 49847
+            },
+            "preparation.CommitApply": {
+              "samples": 12,
+              "min": 0,
+              "median": 0.0,
+              "max": 0
+            },
+            "preparation.RequestCoordinator": {
+              "samples": 12,
+              "min": 0,
+              "median": 0.0,
+              "max": 0
+            },
+            "first.FirstOfferSinceBegin": {
+              "samples": 12,
+              "min": 90156,
+              "median": 406415.5,
+              "max": 1688065
+            },
+            "first.Dispatch": {
+              "samples": 12,
+              "min": 1728,
+              "median": 4890.0,
+              "max": 24255
+            },
+            "first.InputCoordinator": {
+              "samples": 12,
+              "min": 0,
+              "median": 0.0,
+              "max": 0
+            },
+            "first.ClientAuthority": {
+              "samples": 12,
+              "min": 0,
+              "median": 513.0,
+              "max": 4223
+            },
+            "first.ClientResponse": {
+              "samples": 12,
+              "min": 1175,
+              "median": 4480.0,
+              "max": 24255
+            },
+            "worst.Dispatch": {
+              "samples": 12,
+              "min": 3374,
+              "median": 19930.5,
+              "max": 431599
+            },
+            "worst.ClientTotal": {
+              "samples": 12,
+              "min": 3374,
+              "median": 19691.0,
+              "max": 431599
+            },
+            "worst.ClientResponse": {
+              "samples": 12,
+              "min": 3374,
+              "median": 18153.0,
+              "max": 425497
+            }
+          },
+          "prepared": {
+            "True": 11,
+            "None": 1
+          },
+          "cadenceMaxGapMicros": {
+            "samples": 12,
+            "min": 45315,
+            "median": 81997.0,
+            "max": 1839175
+          }
+        }
+      }
+    },
+    "matchedExchanges": [
+      {
+        "tag": "544dbffd2763c6fb66e64da333d557efbd83c8cdaf44d3221fcffc8f520f228a",
+        "aRole": "source",
+        "bRole": "receiver",
+        "aFirstOffer": 250171,
+        "bReadyWait": 115419,
+        "bEntryPrepare": 4831
+      },
+      {
+        "tag": "d21f442df999039a7d8d84728f43286b7989e776a78ea52e26e8e07b66bcfe0b",
+        "aRole": "source",
+        "bRole": "receiver",
+        "aFirstOffer": 1757017,
+        "bReadyWait": 1110602,
+        "bEntryPrepare": 13017
+      },
+      {
+        "tag": "87c0266f310e648c22f385efb362252c63deaa6b1599e8412b05d83f0c5d0b47",
+        "aRole": "source",
+        "bRole": "receiver",
+        "aFirstOffer": 767895,
+        "bReadyWait": 519183,
+        "bEntryPrepare": 49847
+      },
+      {
+        "tag": "233f4b24b0df9da00a7c131de21f2d43ced05507267661f30ef0668c5f21de75",
+        "aRole": "source",
+        "bRole": "receiver",
+        "aFirstOffer": 426134,
+        "bReadyWait": 29506,
+        "bEntryPrepare": 7709
+      },
+      {
+        "tag": "89561362209c417b570612881ee2ff657276bf3c43d05ccd83f586e8ba6e6faa",
+        "aRole": "source",
+        "bRole": "receiver",
+        "aFirstOffer": 109973,
+        "bReadyWait": 32577,
+        "bEntryPrepare": 5270
+      },
+      {
+        "tag": "7790548facd027b03080eefa5a3a99294bef6f8777f880f3fa6a07b9d9358c8c",
+        "aRole": "source",
+        "bRole": "receiver",
+        "aFirstOffer": 488974,
+        "bReadyWait": 213453,
+        "bEntryPrepare": 15425
+      },
+      {
+        "tag": "b3d7dfebaef5149eb173df8248c649e36aa629112616e3b3844051cf78842aeb",
+        "aRole": "source",
+        "bRole": "receiver",
+        "aFirstOffer": 953432,
+        "bReadyWait": 227451,
+        "bEntryPrepare": 19567
+      },
+      {
+        "tag": "d68b776e0aecbef6b78db42f2df929c9d8a172ef4238696f6ddb67af81c6e095",
+        "aRole": "source",
+        "bRole": "receiver",
+        "aFirstOffer": 715723,
+        "bReadyWait": 222528,
+        "bEntryPrepare": 43569
+      },
+      {
+        "tag": "293261ca90162b192f5599abc9042192223784e0689c569224088021bdcee2c8",
+        "aRole": "source",
+        "bRole": "receiver",
+        "aFirstOffer": 666390,
+        "bReadyWait": 147707,
+        "bEntryPrepare": 7458
+      },
+      {
+        "tag": "ec3a59fb5bb668e99b68f69050e3fa4b502f34720483bf5429373fd9ab3f2bc8",
+        "aRole": "source",
+        "bRole": "receiver",
+        "aFirstOffer": 240792,
+        "bReadyWait": 30134,
+        "bEntryPrepare": 4122
+      },
+      {
+        "tag": "b6ea22236f857b2083d445ffaabf53c879f01e12d0cf8dbfa048a76c43ed196f",
+        "aRole": "source",
+        "bRole": "receiver",
+        "aFirstOffer": 304956,
+        "bReadyWait": 26851,
+        "bEntryPrepare": 5922
+      },
+      {
+        "tag": "2685c5b5fb8e519e189172fa838e2a62b2a669814aa152fadd8801152ba11c9f",
+        "aRole": "source",
+        "bRole": "receiver",
+        "aFirstOffer": 163892,
+        "bReadyWait": 25902,
+        "bEntryPrepare": 5839
+      }
+    ]
+  },
+  "matchedSoftwareTimingsMicros": {
+    "exchanges": 12,
+    "AFirstOfferSinceBegin": {
+      "samples": 12,
+      "min": 109973,
+      "median": 457554.0,
+      "max": 1757017
+    },
+    "BReadyWait": {
+      "samples": 12,
+      "min": 25902,
+      "median": 131563.0,
+      "max": 1110602
+    }
+  },
+  "conclusions": [
+    "The rollout does not establish a latency fix. User-reported stutter remains.",
+    "The post-crossing B service failed at input-retire-receipt while its exact parent process was observed RUNNING; no native cause or retirement success can be inferred.",
+    "A retained boundary-orchestrator/session failure and B retained authorization/session failure during this short test.",
+    "B was repaired successfully after the failure. The final healthy snapshot is recovery evidence, not evidence that the retirement failure was fixed.",
+    "READY wait reached 1110602 microseconds and a receiver worst dispatch reached 431599 microseconds. These local software spans do not establish physical cursor/display latency or causality.",
+    "Prior g446 capture worker-report-eof failure remains an independent unresolved risk."
+  ],
+  "validation": {
+    "passed": [
+      "go test ./internal/inputworker ./internal/logindiag ./internal/productlog -count=1 -timeout=2m",
+      "Additional startup-original-failure and real Windows completion-error regressions",
+      "go vet ./internal/inputworker ./internal/logindiag ./internal/productlog",
+      "go test ./internal/localapi -run Runtime -count=1",
+      "Frontend 103 tests and native Vite build",
+      "Workspace package test; 8-file bundle/icons and installer provenance checks",
+      "CLI offline update verify; peer verified update completion; paired diagnostics",
+      "git diff --check"
+    ],
+    "notPassed": [
+      "Physical crossing acceptance: user reports remaining latency/stutter; service failure observed after crossing"
+    ],
+    "skipped": [
+      {
+        "check": "long-duration stability and controlled physical display latency",
+        "reason": "short paired exercise; no external display instrumentation"
+      }
+    ]
+  },
+  "changeBoundaries": {
+    "publicAPISchema": false,
+    "peerWireSchema": false,
+    "database": false,
+    "dependencies": false,
+    "CIRunner": false,
+    "repositoryHygiene": false,
+    "diagnosticOperationCodesExtended": true,
+    "generationBumpedForPairedUpdate": true,
+    "remoteGitPush": false,
+    "publicRelease": false
+  },
+  "nextPriority": "Reproduce missing unbound retirement receipt and correlate receiver startup/cadence stalls before changing the transport or relaxing cleanup proof."
+}
