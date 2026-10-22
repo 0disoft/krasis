@@ -82,7 +82,14 @@ func (o *Operations) SendDiagnostic(ctx context.Context, peer string) (localapi.
 }
 
 func (o *Operations) exportDiagnosticForRequest(peer, requestID string) error {
-	if o.updates == nil || !o.updateAuthorized(o.Context(), "", peer) {
+	return o.exportDiagnosticForRequestContext(o.Context(), peer, requestID)
+}
+
+func (o *Operations) exportDiagnosticForRequestContext(ctx context.Context, peer, requestID string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if o.updates == nil || !o.updateAuthorized(ctx, "", peer) {
 		return peerupdate.ErrDenied
 	}
 	if o.updates.DiagnosticRequestHandled(peer, requestID) {
@@ -90,6 +97,9 @@ func (o *Operations) exportDiagnosticForRequest(peer, requestID string) error {
 	}
 	path, err := productlog.ExportForRequest(o.localAppData, requestID)
 	if err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 	dir, err := productidentity.PrepareDiagnostics(o.localAppData)
@@ -107,7 +117,13 @@ func (o *Operations) exportDiagnosticForRequest(peer, requestID string) error {
 		return err
 	}
 	clean, err := productlog.SanitizeSupport(data)
-	if err != nil || !o.updateAuthorized(o.Context(), "", peer) {
+	if err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if !o.updateAuthorized(ctx, "", peer) {
 		return peerupdate.ErrDenied
 	}
 	return o.updates.QueueDiagnosticForRequest(peer, requestID, clean)

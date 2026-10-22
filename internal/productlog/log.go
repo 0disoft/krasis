@@ -25,6 +25,9 @@ const maxBytes = 1 << 20
 var allowed = map[string]bool{}
 
 func init() {
+	for _, code := range []string{"peer_diagnostic_export_failed", "peer_diagnostic_export_cancelled", "peer_diagnostic_export_timeout"} {
+		allowed[code] = true
+	}
 	for _, code := range []string{"runtime_trace_enabled", "runtime_trace_start_failed", "runtime_trace_saved", "runtime_trace_sample_saved", "runtime_trace_save_failed", "runtime_trace_save_limit", "runtime_trace_save_busy", "runtime_trace_save_denied", "runtime_trace_expired"} {
 		allowed[code] = true
 	}

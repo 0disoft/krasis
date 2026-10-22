@@ -31,6 +31,7 @@ type diagnosticTransfer struct {
 	state, received string
 	last            map[string]diagnosticReceipt
 	handled         map[string]string
+	export          *diagnosticExport
 }
 type diagnosticOffer struct {
 	peer, id, requestID string
@@ -95,6 +96,10 @@ func (m *Manager) DiagnosticRequestStatus(peer, id string) (string, string, stri
 func (m *Manager) DiagnosticRequestHandled(peer, id string) bool {
 	m.diagnostic.mu.Lock()
 	defer m.diagnostic.mu.Unlock()
+	return m.diagnosticRequestHandledLocked(peer, id)
+}
+
+func (m *Manager) diagnosticRequestHandledLocked(peer, id string) bool {
 	if m.diagnostic.out != nil && time.Now().After(m.diagnostic.out.expires) {
 		if m.diagnostic.out.requestID != "" && m.diagnostic.handled[m.diagnostic.out.peer] == m.diagnostic.out.requestID {
 			delete(m.diagnostic.handled, m.diagnostic.out.peer)
@@ -124,8 +129,16 @@ func (m *Manager) QueueDiagnosticForRequest(peer, requestID string, data []byte)
 	if !validID(requestID, 32) || !validID(peer, 64) || len(data) == 0 || len(data) > MaxDiagnosticBytes {
 		return ErrDenied
 	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.closed {
+		return ErrDenied
+	}
 	m.diagnostic.mu.Lock()
 	defer m.diagnostic.mu.Unlock()
+	if job := m.diagnostic.export; job != nil && job.peer == peer && job.id == requestID && job.ctx.Err() != nil {
+		return job.ctx.Err()
+	}
 	if m.diagnostic.out != nil && time.Now().After(m.diagnostic.out.expires) {
 		if m.diagnostic.out.requestID != "" && m.diagnostic.handled[m.diagnostic.out.peer] == m.diagnostic.out.requestID {
 			delete(m.diagnostic.handled, m.diagnostic.out.peer)
@@ -326,11 +339,11 @@ func (m *Manager) diagnosticRequestHTTP(w http.ResponseWriter, r *http.Request, 
 	}
 	if r.Method == http.MethodPost {
 		id := r.Header.Get("X-Krasis-Request-ID")
-		if !validID(id, 32) || m.ExportDiagnostic == nil || !authorized() {
+		if !validID(id, 32) || !m.hasDiagnosticExporter() || !authorized() {
 			w.WriteHeader(http.StatusForbidden)
 			return
 		}
-		if err := m.ExportDiagnostic(peer, id); err != nil {
+		if err := m.runDiagnosticExport(r.Context(), peer, id, authorized); err != nil {
 			w.WriteHeader(http.StatusConflict)
 			return
 		}
@@ -364,7 +377,7 @@ func (m *Manager) pushDiagnosticRequest(ctx context.Context, c *http.Client, add
 }
 
 func (m *Manager) pollDiagnosticRequest(ctx context.Context, c *http.Client, address, peer string, authorized func() bool) {
-	if !authorized() || m.ExportDiagnostic == nil {
+	if !authorized() || !m.hasDiagnosticExporter() {
 		return
 	}
 	ctx, cancel := context.WithTimeout(ctx, diagnosticPollTimeout)
@@ -380,7 +393,7 @@ func (m *Manager) pollDiagnosticRequest(ctx context.Context, c *http.Client, add
 	}
 	id := resp.Header.Get("X-Krasis-Request-ID")
 	if validID(id, 32) {
-		_ = m.ExportDiagnostic(peer, id)
+		_ = m.runDiagnosticExport(ctx, peer, id, authorized) // The worker records a sanitized failure event.
 	}
 }
 func (m *Manager) pollDiagnostic(ctx context.Context, c *http.Client, address, peer string, authorized func() bool) {

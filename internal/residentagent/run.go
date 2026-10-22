@@ -157,6 +157,7 @@ func run(ctx context.Context, localAppData string, dependencies runDependencies)
 				return productlog.SaveRemoteSupport(localAppData, peer, data)
 			}
 			updates.ExportDiagnostic = operations.exportDiagnosticForRequest
+			updates.ExportDiagnosticContext = operations.exportDiagnosticForRequestContext
 			updates.ReceiveCollection = func(peer, id string, data []byte) (string, error) {
 				return productlog.SaveRemoteSupportForRequest(localAppData, peer, id, data)
 			}

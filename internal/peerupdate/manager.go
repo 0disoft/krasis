@@ -89,6 +89,8 @@ type Manager struct {
 	receiving         bool
 	packing           bool
 	validate          func(io.ReaderAt, int64) (stagedBundle, error)
+
+	ExportDiagnosticContext func(context.Context, string, string) error
 }
 
 func Open(productRoot string, generation int) (*Manager, error) {

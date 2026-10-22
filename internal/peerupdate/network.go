@@ -69,6 +69,16 @@ func (m *Manager) Run(ctx context.Context, address, peer string, listener bool, 
 		m.runClipboardControl(clipboardCtx, clipboardClient, address, peer, authorized)
 	}()
 	defer func() { stopClipboard(); <-clipboardDone }()
+	diagnosticTransport := t.Clone()
+	defer diagnosticTransport.CloseIdleConnections()
+	diagnosticClient := &http.Client{Transport: diagnosticTransport, Timeout: diagnosticPollTimeout, CheckRedirect: client.CheckRedirect}
+	diagnosticCtx, stopDiagnostic := context.WithCancel(ctx)
+	diagnosticDone := make(chan struct{})
+	go func() {
+		defer close(diagnosticDone)
+		m.runDiagnosticControl(diagnosticCtx, diagnosticClient, address, peer, authorized)
+	}()
+	defer func() { stopDiagnostic(); <-diagnosticDone }()
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 	for {
@@ -88,9 +98,6 @@ func (m *Manager) Run(ctx context.Context, address, peer string, listener bool, 
 			if !statusOK {
 				continue
 			}
-			m.pollDiagnostic(ctx, client, address, peer, authorized)
-			m.pushDiagnosticRequest(ctx, client, address, peer, authorized)
-			m.pollDiagnosticRequest(ctx, client, address, peer, authorized)
 			if offer := m.offered(peer); offer != nil {
 				progress := &progressReader{Reader: offer.reader, update: func(n int64) { m.progress(peer, offer.id, "SENDING", n, offer.size) }}
 				req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://"+address+"/v1/bundle", &offerRequestBody{Reader: progress, lease: offer})
