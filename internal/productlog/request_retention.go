@@ -22,6 +22,7 @@ var ErrRequestStorageLimit = errors.New("diagnostic request storage limit")
 
 type requestSnapshotGroup struct {
 	id       string
+	names    []string
 	bytes    int64
 	modified time.Time
 }
@@ -89,6 +90,7 @@ func reserveRequestSnapshot(dir *securefs.Directory, id, name string, size int64
 			group = &requestSnapshotGroup{id: requestID}
 			groups[requestID] = group
 		}
+		group.names = append(group.names, entry)
 		group.bytes += info.Size()
 		total += info.Size()
 		if info.ModTime().After(group.modified) {
@@ -122,7 +124,7 @@ func reserveRequestSnapshot(dir *securefs.Directory, id, name string, size int64
 		if err := markRequestPrune(dir, group.id); err != nil {
 			return err
 		}
-		if err := finishRequestPrune(dir, group.id, dir.Remove); err != nil {
+		if err := finishRequestPrune(dir, group.id, group.names, dir.Remove); err != nil {
 			return err
 		}
 		count--

@@ -101,3 +101,39 @@ func TestRequestRetentionReservesByteBudget(t *testing.T) {
 		}
 	}
 }
+
+func TestRequestRetentionPrunesMultipleGroupsInStableOrder(t *testing.T) {
+	base := t.TempDir()
+	stamp := time.Now().Add(-time.Hour)
+	var paths []string
+	for i := 0; i < maxSupportRequests+3; i++ {
+		id := fmt.Sprintf("%032x", i)
+		path := requestRetentionFixture(t, base, "support-request-"+id+"-local.json", 0, true)
+		if err := os.Chtimes(path, stamp, stamp); err != nil {
+			t.Fatal(err)
+		}
+		paths = append(paths, path)
+	}
+	// An old local file with a recent peer file is still an active group.
+	requestRetentionFixture(t, base, "support-request-"+fmt.Sprintf("%032x", 1)+"-peer-"+strings.Repeat("c", 64)+".json", 0, false)
+	dir, err := productidentity.PrepareDiagnostics(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dir.Close()
+	// The current request is protected even though its timestamp is old.
+	id := fmt.Sprintf("%032x", 0)
+	if err = reserveRequestSnapshot(dir, id, filepath.Base(paths[0]), 0); err != nil {
+		t.Fatal(err)
+	}
+	for i, path := range paths {
+		_, err := os.Stat(path)
+		if i >= 2 && i <= 4 {
+			if !errors.Is(err, os.ErrNotExist) {
+				t.Fatal("oldest tied group retained", i, err)
+			}
+		} else if err != nil {
+			t.Fatal("protected or newer group removed", i, err)
+		}
+	}
+}

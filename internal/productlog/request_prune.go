@@ -51,12 +51,10 @@ func validateRequestPrune(dir *securefs.Directory, id string) error {
 	return nil
 }
 
-func finishRequestPrune(dir *securefs.Directory, id string, remove func(string) error) error {
+// Callers hold requestSnapshotGate while collecting and consuming names. Each
+// group keeps enumeration order; all file validation remains handle-relative.
+func finishRequestPrune(dir *securefs.Directory, id string, names []string, remove func(string) error) error {
 	if err := validateRequestPrune(dir, id); err != nil {
-		return err
-	}
-	names, err := dir.ReadNames()
-	if err != nil {
 		return err
 	}
 	for _, name := range names {
@@ -90,6 +88,7 @@ func resumeRequestPruning(dir *securefs.Directory) error {
 	if err != nil {
 		return err
 	}
+	var pending []string
 	for _, name := range names {
 		if !strings.HasPrefix(name, "request-prune-") || !strings.HasSuffix(name, ".pending") {
 			continue
@@ -98,7 +97,19 @@ func resumeRequestPruning(dir *securefs.Directory) error {
 		if !validRequestID(id) {
 			continue
 		}
-		if err = finishRequestPrune(dir, id, dir.Remove); err != nil {
+		pending = append(pending, id)
+	}
+	if len(pending) == 0 {
+		return nil
+	}
+	byRequest := make(map[string][]string)
+	for _, name := range names {
+		if id := snapshotRequestID(name); id != "" {
+			byRequest[id] = append(byRequest[id], name)
+		}
+	}
+	for _, id := range pending {
+		if err = finishRequestPrune(dir, id, byRequest[id], dir.Remove); err != nil {
 			return err
 		}
 	}

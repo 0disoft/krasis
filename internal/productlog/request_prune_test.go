@@ -2,6 +2,7 @@ package productlog
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,8 +23,12 @@ func TestRequestPruneResumesAfterPartialPairRemoval(t *testing.T) {
 	if err = markRequestPrune(dir, id); err != nil {
 		t.Fatal(err)
 	}
+	names, err := dir.ReadNames()
+	if err != nil {
+		t.Fatal(err)
+	}
 	calls := 0
-	err = finishRequestPrune(dir, id, func(name string) error {
+	err = finishRequestPrune(dir, id, names, func(name string) error {
 		calls++
 		if calls == 2 {
 			return errors.New("injected sharing violation")
@@ -46,6 +51,68 @@ func TestRequestPruneResumesAfterPartialPairRemoval(t *testing.T) {
 	for _, path := range []string{local, remote, marker} {
 		if _, err = os.Stat(path); !errors.Is(err, os.ErrNotExist) {
 			t.Fatal("partial pruning not resumed", path, err)
+		}
+	}
+}
+
+func TestRequestPruneResumesMultipleGroupsAndEmptyCheckpoint(t *testing.T) {
+	base := t.TempDir()
+	peer := strings.Repeat("b", 64)
+	keep := requestRetentionFixture(t, base, "support-request-"+strings.Repeat("f", 32)+"-local.json", 0, true)
+	var removed []string
+	for i := 0; i < 3; i++ {
+		id := fmt.Sprintf("%032x", i)
+		if i < 2 {
+			for _, suffix := range []string{"-local.json", "-peer-" + peer + ".json"} {
+				removed = append(removed, requestRetentionFixture(t, base, "support-request-"+id+suffix, 0, true))
+			}
+		}
+		dir, err := productidentity.PrepareDiagnostics(base)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = markRequestPrune(dir, id)
+		closeErr := dir.Close()
+		if err != nil || closeErr != nil {
+			t.Fatal(err, closeErr)
+		}
+		paths, _ := productidentity.ResolveWindowsPaths(base)
+		removed = append(removed, filepath.Join(paths.Diagnostics, requestPruneName(id)))
+	}
+	dir, err := productidentity.PrepareDiagnostics(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dir.Close()
+	if err = resumeRequestPruning(dir); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range removed {
+		if _, err = os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+			t.Fatal("unfinished group retained", path, err)
+		}
+	}
+	if _, err = os.Stat(keep); err != nil {
+		t.Fatal("unmarked request removed", err)
+	}
+}
+
+func TestRequestPruneRejectsInvalidCheckpointBeforeRemovingFiles(t *testing.T) {
+	base := t.TempDir()
+	id := strings.Repeat("a", 32)
+	path := requestRetentionFixture(t, base, "support-request-"+id+"-local.json", 0, true)
+	marker := requestRetentionFixture(t, base, requestPruneName(id), 0, true) // Nonempty checkpoint.
+	dir, err := productidentity.PrepareDiagnostics(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dir.Close()
+	if err = resumeRequestPruning(dir); err == nil {
+		t.Fatal("invalid checkpoint accepted")
+	}
+	for _, name := range []string{path, marker} {
+		if _, err = os.Stat(name); err != nil {
+			t.Fatal("invalid checkpoint must retain data", name, err)
 		}
 	}
 }
