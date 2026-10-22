@@ -3,14 +3,18 @@ package inputworker
 import (
 	"context"
 	"errors"
+	"time"
+
+	"github.com/0disoft/krasis/internal/handoff"
 )
 
 // Neither child can be used until the pair is ready. Failed startup retires
 // every successfully created owner before the caller releases inherited pins.
-func startNativePair(ctx context.Context, start func(context.Context, bool) (*isolatedInput, error)) (*isolatedInput, error) {
+func startNativePair(ctx context.Context, start func(context.Context, bool) (*isolatedInput, error), profile *handoff.StartupProfile) (*isolatedInput, error) {
 	if ctx == nil || ctx.Err() != nil || start == nil {
 		return nil, ErrAuthority
 	}
+	started := time.Now()
 	run, cancel := context.WithCancel(ctx)
 	defer cancel()
 	type startupResult struct {
@@ -62,5 +66,9 @@ func startNativePair(ctx context.Context, start func(context.Context, bool) (*is
 	}
 	input, release := owners[0], owners[1]
 	input.recovery, input.recoveryRetire = release.Client, release.retire
+	// Both independently authenticated native owners reached readiness. Reuse
+	// the desktop-ready span that the direct path already publishes; this is
+	// elapsed pair startup, never the sum of concurrent child measurements.
+	profile.Record(handoff.WorkerDesktopReady, time.Since(started))
 	return input, nil
 }

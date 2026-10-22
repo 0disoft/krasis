@@ -18,6 +18,8 @@ const (
 	WorkerIdentity
 	WorkerServiceAuth
 	WorkerAgentAuth
+	// Direct desktop binding, or elapsed startup of the independently
+	// authenticated input/release pair for the installed isolated journal.
 	WorkerDesktopReady
 	StartupStageCount
 )

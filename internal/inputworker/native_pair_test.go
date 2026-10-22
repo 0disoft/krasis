@@ -1,12 +1,15 @@
 package inputworker
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
+
+	"github.com/0disoft/krasis/internal/handoff"
 )
 
 func TestNativePairStartupOverlapsAndWaitsForBothAuthenticatedOwners(t *testing.T) {
@@ -14,6 +17,7 @@ func TestNativePairStartupOverlapsAndWaitsForBothAuthenticatedOwners(t *testing.
 		var ready, retired atomic.Int32
 		owners := [2]*isolatedInput{}
 		started := time.Now()
+		var profile handoff.StartupProfile
 		input, err := startNativePair(context.Background(), func(ctx context.Context, release bool) (*isolatedInput, error) {
 			i := 0
 			if release {
@@ -23,9 +27,17 @@ func TestNativePairStartupOverlapsAndWaitsForBothAuthenticatedOwners(t *testing.
 			owners[i] = &isolatedInput{Client: &Client{}, retire: func() (bool, error) { retired.Add(1); return true, nil }}
 			ready.Add(1)
 			return owners[i], nil
-		})
+		}, &profile)
 		if err != nil || time.Since(started) != 200*time.Millisecond || ready.Load() != 2 || retired.Load() != 0 || input != owners[0] || input.recovery != owners[1].Client {
 			t.Fatal("pair preparation serialized or published partial readiness", err, time.Since(started), ready.Load())
+		}
+		var wire bytes.Buffer
+		if err := writeStartupReady(&wire, profile); err != nil {
+			t.Fatal(err)
+		}
+		received, err := readStartupReady(&wire)
+		if err != nil || received == nil || received.Measured != 1<<handoff.WorkerDesktopReady || received.Micros[handoff.WorkerDesktopReady] != 200000 {
+			t.Fatal("paired native readiness time lost in the production receipt", received, err)
 		}
 		if err := input.finishRecovery(); err != nil || retired.Load() != 1 {
 			t.Fatal("release owner was not retained", err)
@@ -41,6 +53,7 @@ func TestNativePairStartupFailureJoinsAndRetiresLateOwner(t *testing.T) {
 				var canceled atomic.Bool
 				var retired atomic.Int32
 				started := time.Now()
+				var profile handoff.StartupProfile
 				input, err := startNativePair(context.Background(), func(ctx context.Context, release bool) (*isolatedInput, error) {
 					if release == failRelease {
 						time.Sleep(10 * time.Millisecond)
@@ -50,7 +63,10 @@ func TestNativePairStartupFailureJoinsAndRetiresLateOwner(t *testing.T) {
 					time.Sleep(100 * time.Millisecond)
 					canceled.Store(ctx.Err() != nil)
 					return &isolatedInput{Client: &Client{}, retire: func() (bool, error) { retired.Add(1); return confirmed, nil }}, nil
-				})
+				}, &profile)
+				if profile.Measured != 0 {
+					t.Fatal("failed native pair published desktop readiness", profile)
+				}
 				if input != nil || !errors.Is(err, failure) || !canceled.Load() || time.Since(started) != 100*time.Millisecond || retired.Load() != 1 || errors.Is(err, ErrRecovery) != !confirmed {
 					t.Fatal("failed pair abandoned a launch or lost retirement uncertainty", input, err, retired.Load(), time.Since(started))
 				}
@@ -65,10 +81,14 @@ func TestNativePairCanceledStartupCannotPublishLateReadyPair(t *testing.T) {
 		defer cancel()
 		var retired atomic.Int32
 		started := time.Now()
+		var profile handoff.StartupProfile
 		input, err := startNativePair(ctx, func(context.Context, bool) (*isolatedInput, error) {
 			time.Sleep(100 * time.Millisecond) // Native launch can ignore cancellation.
 			return &isolatedInput{Client: &Client{}, retire: func() (bool, error) { retired.Add(1); return true, nil }}, nil
-		})
+		}, &profile)
+		if profile.Measured != 0 {
+			t.Fatal("cancelled native pair published desktop readiness", profile)
+		}
 		if input != nil || !errors.Is(err, context.DeadlineExceeded) || retired.Load() != 2 || time.Since(started) != 100*time.Millisecond {
 			t.Fatal("canceled caller received late input authority or lost an owner", input, err, retired.Load())
 		}

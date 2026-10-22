@@ -319,7 +319,7 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 	var input application.InputPort = wininput.NewInjectionPort()
 	var isolated *isolatedInput
 	if installation != nil {
-		isolated, err = startIsolatedInput(run, control, channel, proof, lease, installation)
+		isolated, err = startIsolatedInput(run, control, channel, proof, lease, installation, &profile)
 		if err != nil {
 			return finishWorkerReport(control, Report{}, errors.Join(err, ErrRecovery))
 		}
