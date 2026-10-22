@@ -39,3 +39,26 @@ Passed: inputworker 22.431s, handoff 0.073s, productlog 2.276s, residentagent
 session; no ownership fence was changed. No race detector or long soak in this
 bounded diagnostic change. Paired application follows in the rollout record.
 No push.
+
+Paired rollout: frontend 91 tests, native build, 8.03s bundle smoke, eight-file
+inventory and offline verification passed; archive 28,385,384 bytes. B update
+`ff493482893b9a4a0546329b41470ddd` reached UPDATED. A's first direct installation
+committed the new files but exited 5 at finish/commit/file_delete with Win32 5.
+After acknowledged safe-stop, the fixed installer's repair exited 0. App repair
+registered g442 and the verified replacement UI resumed the saved B connection.
+This resolved the current installation; the cleanup error's cause is unproven.
+Do not report the first installer invocation as successful.
+
+Collection `e95c0c0e560cb56e25e10ff11f4c52ba` at 15:41:43Z/15:41:48Z confirms
+both successful installation receipts and both services/input health READY.
+Final doctor is healthy/CONNECTED with all local images matching g442. There is
+no g442 handoff profile yet, so the populated native-pair span is regression
+verified but has not been observed in a physical screen crossing. B's acquisition
+timeouts were during A's replacement, before this final connection.
+
+Next priorities: (1) collect the next ordinary g442 handoff to attribute startup,
+(2) investigate the observed installer cleanup access denial before another
+direct live installation, (3) retain independent cleanup evidence if the generic
+source loop or boundary-gate failure recurs. No further implementation started
+after this bounded change. Results:
+`results/2026-10-23-g442-isolated-pair-readiness.json`.

@@ -1,0 +1,139 @@
+{
+  "generation": 442,
+  "sourceRevision": "a478b084a85be1b9e34a682cb95969b7d63be35c",
+  "localDate": "2026-10-23",
+  "timezone": "Asia/Seoul",
+  "validation": {
+    "regressionWithoutMeasurement": "FAIL as expected: production startup receipt had no native-pair readiness sample",
+    "inputworker": "PASS 22.431s",
+    "handoff": "PASS 0.073s",
+    "productlog": "PASS 2.276s",
+    "residentagent": "PASS 8.544s",
+    "frontendTests": 91,
+    "nativeBuild": "PASS",
+    "bundleSmoke": "PASS 8.03s",
+    "bundleFiles": 8,
+    "archiveBytes": 28385384,
+    "offlineVerify": "valid",
+    "diffCheck": "PASS",
+    "skipped": [
+      "TestPortablePair fixed-owner fixture excluded to avoid the installed session",
+      "No race detector, hosted CI, attended physical-input acceptance or long soak"
+    ]
+  },
+  "baseline": {
+    "generation": 441,
+    "collectionId": "87bed82e690eb0f953290ea9d5620e24",
+    "matchedHandoffs": 7,
+    "sourceGrantWaitMicros": [
+      147404,
+      331073
+    ],
+    "receiverReadyWaitMicros": [
+      130283,
+      317168
+    ],
+    "receiverBootstrapReadyMicros": [
+      120468,
+      147348
+    ],
+    "sourceExits": 0,
+    "services": "Both READY",
+    "interpretation": "Overlapping process-local timings; dispatch gaps can include intentional idle. No observed recurrence of the previous source failure."
+  },
+  "application": {
+    "peerUpdateId": "ff493482893b9a4a0546329b41470ddd",
+    "peerUpdateState": "UPDATED",
+    "localInitialInstallerExit": 5,
+    "localInitialInstallerFailure": {
+      "time": "2026-10-22T15:39:59.3238979Z",
+      "stage": "finish",
+      "phase": "commit",
+      "operation": "file_delete",
+      "win32Error": 5
+    },
+    "localRecovery": "Safe-stop completed; fixed installer --repair exited 0; app repair recovery_ready; verified replacement UI resumed B",
+    "finalCollectionId": "e95c0c0e560cb56e25e10ff11f4c52ba",
+    "sides": {
+      "A": {
+        "created": "2026-10-22T15:41:43Z",
+        "installation": {
+          "time": "2026-10-22T15:40:57.4687782Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-22T15:41:19.0695891Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "loginRuntime": {
+          "startedAt": "2026-10-22T15:40:58.8355153Z",
+          "time": "2026-10-22T15:40:58.8806125Z",
+          "service": "READY",
+          "console": "USER_SESSION",
+          "grant": "PRESENT",
+          "lastWorker": "NONE"
+        },
+        "handoffProfiles": 0,
+        "sourceFailureEvents": 0
+      },
+      "B": {
+        "created": "2026-10-22T15:41:48Z",
+        "installation": {
+          "time": "2026-10-22T15:39:01.880825Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-22T15:41:41.4459317Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "loginRuntime": {
+          "startedAt": "2026-10-22T15:39:04.2972951Z",
+          "time": "2026-10-22T15:39:04.3352946Z",
+          "service": "READY",
+          "console": "USER_SESSION",
+          "grant": "PRESENT",
+          "lastWorker": "NONE"
+        },
+        "handoffProfiles": 0,
+        "sourceFailureEvents": 0
+      }
+    },
+    "finalDoctor": "healthy",
+    "finalConnection": "CONNECTED",
+    "images": "CLI, UI, installed agent and service matched g442"
+  },
+  "limits": [
+    "No g442 physical handoff profile captured yet; diagnostic effect is regression-tested, not field latency improvement",
+    "B network-acquisition timeouts occurred while A was still being replaced, before the final connection"
+  ],
+  "nextPriorities": [
+    "Use the next ordinary g442 handoff to separate native-pair startup from bootstrap overhead before changing startup",
+    "Investigate the observed installer finish/commit/file_delete access-denied failure before another direct live installation",
+    "If generic source-command-loop or boundary gate failures recur, retain independent cleanup evidence before changing classification"
+  ],
+  "remote": "Local main only; no fetch, push, remote refs, hosted CI or issue changes"
+}
