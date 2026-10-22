@@ -221,7 +221,6 @@ func (prepared *preparedConsole) closeOwned() error {
 	return prepared.closeErr
 }
 
-var unboundRetiredFrame = [8]byte{'K', 'R', 'U', '1', 1, 0, 0, 0}
 var nativePreparationFrame = [8]byte{'K', 'R', 'N', '1', 1, 0, 0, 0}
 
 // Launch rejection/cancellation must remain child-free. Only after the exact

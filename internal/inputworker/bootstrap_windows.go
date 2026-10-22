@@ -281,10 +281,7 @@ func runInstalledConsoleInputMode(ctx context.Context, agentDigest, serviceDiges
 		return ErrProtocol
 	}
 	if prepareNative && zeroBytes(packet[:]) {
-		if native.Close() != nil {
-			return ErrRecovery
-		}
-		return writeFrame(control, unboundRetiredFrame[:])
+		return retireUnboundNative(startup, control, stopControl, native.Close)
 	}
 	handle, imageHandle, err := decodeWorkerBootstrapHandles(packet, agentDigest)
 	if err != nil {
