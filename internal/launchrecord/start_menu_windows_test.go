@@ -5,11 +5,32 @@ package launchrecord
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"github.com/0disoft/krasis/internal/productidentity"
+	"github.com/0disoft/krasis/internal/windowsscript"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+func TestStartMenuCOMFailureRetainsSafeDiagnostics(t *testing.T) {
+	root := t.TempDir()
+	target := filepath.Join(root, "krasis-cli.exe")
+	if err := os.WriteFile(target, []byte("MZ-test"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	// Save must fail because its parent does not exist; never touch the user's
+	// actual Start menu. The real PowerShell/COM path supplies the HRESULT.
+	err := registerStartMenuLink(target, filepath.Join(root, "missing", "Krasis.lnk"))
+	var failure *windowsscript.Failure
+	if !errors.As(err, &failure) || failure.ExitCode != 1 || failure.Stage != 4 || failure.HRESULT == 0 || failure.Line == 0 || failure.Timeout {
+		t.Fatal("COM failure lost its stage or HRESULT", err)
+	}
+	if strings.Contains(err.Error(), root) {
+		t.Fatal("COM exception exposed a user path")
+	}
+}
 
 func TestStartMenuShortcutUsesFixedCLIAndPreservesForeignLink(t *testing.T) {
 	root := t.TempDir()

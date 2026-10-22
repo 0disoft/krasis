@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"github.com/0disoft/krasis/internal/launchrecord"
+	"github.com/0disoft/krasis/internal/windowsscript"
 	"golang.org/x/sys/windows"
 	"os"
 	"path/filepath"
@@ -17,7 +18,6 @@ import (
 )
 
 func TestRecoveryTaskRegistrationIsUserScopedAndReversible(t *testing.T) {
-	t.Setenv("KRASIS_RECOVERY_DEBUG", "1")
 	var nonce [16]byte
 	if _, err := rand.Read(nonce[:]); err != nil {
 		t.Fatal(err)
@@ -50,8 +50,8 @@ func TestRecoveryTaskRegistrationIsUserScopedAndReversible(t *testing.T) {
 	command := recoveryScriptCommand(ctx, system, legacy)
 	cli := filepath.Join(base, "Krasis", "launch", "krasis-cli.exe")
 	command.Env = append(os.Environ(), "KRASIS_RECOVERY_TARGET="+cli, "KRASIS_RECOVERY_LEGACY_TARGET="+cli, "KRASIS_RECOVERY_PREVIOUS=[]", "KRASIS_RECOVERY_SUFFIX="+suffix, "KRASIS_RECOVERY_ENABLED=1", "KRASIS_RECOVERY_CHECK=0")
-	if out, err := command.CombinedOutput(); err != nil {
-		t.Fatalf("legacy fixture: %v %s", err, out)
+	if err := windowsscript.Run(ctx, command, "legacy recovery fixture"); err != nil {
+		t.Fatalf("legacy fixture: %v", err)
 	}
 	if err := runRecoveryTask(base, suffix, false, true); !errors.Is(err, errRecoveryTaskInactive) {
 		t.Fatal("console action considered migrated", err)

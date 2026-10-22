@@ -20,6 +20,7 @@ import (
 
 	"github.com/0disoft/krasis/internal/productidentity"
 	"github.com/0disoft/krasis/internal/securefs"
+	"github.com/0disoft/krasis/internal/windowsscript"
 	"golang.org/x/sys/windows"
 )
 
@@ -202,11 +203,14 @@ func ensureStartMenuLink(dir *securefs.Directory, target, link string, register 
 
 const startMenuScript = `
 $ErrorActionPreference = 'Stop'
+$krasisStage = 1
 try {
   $krasisTarget = $env:KRASIS_MENU_TARGET
   $krasisLink = $env:KRASIS_MENU_LINK
   if (-not (Test-Path -LiteralPath $krasisTarget -PathType Leaf)) { exit 2 }
+  $krasisStage = 2
   $krasisShell = New-Object -ComObject WScript.Shell
+  $krasisStage = 3
   if (Test-Path -LiteralPath $krasisLink) {
     $krasisItem = Get-Item -LiteralPath $krasisLink -Force
     if ($krasisItem.Attributes -band [IO.FileAttributes]::ReparsePoint) { exit 3 }
@@ -220,11 +224,18 @@ try {
   $krasisShortcut.WorkingDirectory = [IO.Path]::GetDirectoryName($krasisTarget)
   $krasisShortcut.IconLocation = $krasisTarget + ',0'
   $krasisShortcut.Description = 'Krasis'
+  $krasisStage = 4
   $krasisShortcut.Save()
+  $krasisStage = 5
   $krasisSaved = $krasisShell.CreateShortcut($krasisLink)
   if ($krasisSaved.TargetPath -ne $krasisTarget -or $krasisSaved.Arguments -ne 'relaunch') { exit 4 }
   exit 0
-} catch { exit 1 }
+} catch {
+  $krasisException = $_.Exception
+  while ($krasisException.InnerException) { $krasisException = $krasisException.InnerException }
+  Write-Output ('KRASIS_HELPER_ERROR stage='+$krasisStage+' hresult='+$krasisException.HResult+' line='+$_.InvocationInfo.ScriptLineNumber)
+  exit 1
+}
 `
 
 func registerStartMenuLink(target, link string) error {
@@ -247,8 +258,8 @@ func registerStartMenuLink(target, link string) error {
 		"-NoProfile", "-NonInteractive", "-EncodedCommand", base64.StdEncoding.EncodeToString(encoded))
 	command.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: windows.CREATE_NO_WINDOW}
 	command.Env = append(os.Environ(), "KRASIS_MENU_TARGET="+target, "KRASIS_MENU_LINK="+link)
-	if err := command.Run(); err != nil {
-		return errors.New("start menu registration failed")
+	if err := windowsscript.Run(ctx, command, "start menu registration"); err != nil {
+		return err
 	}
 	info, err := os.Lstat(link)
 	if err != nil || !info.Mode().IsRegular() || info.Size() == 0 || info.Size() > 65536 {

@@ -9,7 +9,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"golang.org/x/sys/windows"
 	"os"
 	"os/exec"
@@ -20,6 +19,7 @@ import (
 	"unicode/utf16"
 
 	"github.com/0disoft/krasis/internal/launchrecord"
+	"github.com/0disoft/krasis/internal/windowsscript"
 )
 
 // The task runs the remembered GUI image in background recovery mode as the
@@ -27,18 +27,21 @@ import (
 const recoveryTaskScript = `
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
+$krasisStage=1
 try {
   $krasisSid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value
   $krasisName='Krasis Recovery '+$krasisSid+$env:KRASIS_RECOVERY_SUFFIX
   $krasisService=New-Object -ComObject Schedule.Service
   $krasisService.Connect()
   $krasisFolder=$krasisService.GetFolder('\')
+  $krasisStage=2
   $krasisTask=$null
   try { $krasisTask=$krasisFolder.GetTask($krasisName) } catch {
     $krasisException=$_.Exception
     while ($krasisException.InnerException) { $krasisException=$krasisException.InnerException }
     if ($krasisException.HResult -ne -2147024894) { throw }
   }
+  $krasisStage=3
   if ($krasisTask) {
     $krasisDefinition=$krasisTask.Definition
     $krasisTaskUser=$krasisDefinition.Principal.UserId
@@ -65,7 +68,7 @@ try {
     if ($env:KRASIS_RECOVERY_CHECK -eq '1') {
       if ($krasisTask.Enabled -and $krasisOwned -and $krasisAction.Path -eq $env:KRASIS_RECOVERY_TARGET) { exit 0 } else { exit 4 }
     }
-    if ($env:KRASIS_RECOVERY_ENABLED -eq '0') { $krasisFolder.DeleteTask($krasisName,0);exit 0 }
+    if ($env:KRASIS_RECOVERY_ENABLED -eq '0') { $krasisStage=4;$krasisFolder.DeleteTask($krasisName,0);exit 0 }
     if (-not (Test-Path -LiteralPath $env:KRASIS_RECOVERY_TARGET -PathType Leaf)) { exit 2 }
     $krasisDefinition.RegistrationInfo.Description='Krasis recovery v2'
     $krasisDefinition.Settings.Enabled=$true
@@ -73,12 +76,14 @@ try {
     $krasisAction.Arguments='--background-recovery'
     $krasisAction.WorkingDirectory=[IO.Path]::GetDirectoryName($env:KRASIS_RECOVERY_TARGET)
     $krasisSddl='D:P(A;;GA;;;SY)(A;;GA;;;'+$krasisSid+')'
+    $krasisStage=5
     $null=$krasisFolder.RegisterTaskDefinition($krasisName,$krasisDefinition,6,$krasisSid,$null,3,$krasisSddl)
     exit 0
   }
   if ($env:KRASIS_RECOVERY_CHECK -eq '1') { exit 4 }
   if ($env:KRASIS_RECOVERY_ENABLED -eq '0') { exit 0 }
   if (-not (Test-Path -LiteralPath $env:KRASIS_RECOVERY_TARGET -PathType Leaf)) { exit 2 }
+  $krasisStage=6
   $krasisDefinition=$krasisService.NewTask(0)
   $krasisDefinition.RegistrationInfo.Description='Krasis recovery v2'
   $krasisDefinition.Principal.UserId=$krasisSid
@@ -97,14 +102,13 @@ try {
   $krasisAction.Arguments='--background-recovery'
   $krasisAction.WorkingDirectory=[IO.Path]::GetDirectoryName($env:KRASIS_RECOVERY_TARGET)
   $krasisSddl='D:P(A;;GA;;;SY)(A;;GA;;;'+$krasisSid+')'
+  $krasisStage=7
   $null=$krasisFolder.RegisterTaskDefinition($krasisName,$krasisDefinition,2,$krasisSid,$null,3,$krasisSddl)
   exit 0
 } catch {
-  if ($env:KRASIS_RECOVERY_DEBUG -eq '1') {
-    $krasisException=$_.Exception
-    while ($krasisException.InnerException) { $krasisException=$krasisException.InnerException }
-    Write-Output ('error='+$krasisException.HResult+';line='+$_.InvocationInfo.ScriptLineNumber)
-  }
+  $krasisException=$_.Exception
+  while ($krasisException.InnerException) { $krasisException=$krasisException.InnerException }
+  Write-Output ('KRASIS_HELPER_ERROR stage='+$krasisStage+' hresult='+$krasisException.HResult+' line='+$_.InvocationInfo.ScriptLineNumber)
   exit 1
 }
 `
@@ -185,16 +189,13 @@ func runRecoveryScript(base, suffix string, enabled, inspect bool, record launch
 		check = "1"
 	}
 	cmd.Env = append(os.Environ(), "KRASIS_RECOVERY_TARGET="+record.Executable, "KRASIS_RECOVERY_LEGACY_TARGET="+filepath.Join(base, "Krasis", "launch", "krasis-cli.exe"), "KRASIS_RECOVERY_PREVIOUS="+string(history), "KRASIS_RECOVERY_ENABLED="+flag, "KRASIS_RECOVERY_SUFFIX="+suffix, "KRASIS_RECOVERY_CHECK="+check)
-	output, runErr := cmd.CombinedOutput()
+	runErr := windowsscript.Run(ctx, cmd, "recovery task registration")
 	if runErr != nil {
 		var exitErr *exec.ExitError
 		if inspect && errors.As(runErr, &exitErr) && exitErr.ExitCode() == 4 {
 			return errRecoveryTaskInactive
 		}
-		if suffix != "" {
-			return fmt.Errorf("recovery task registration failed: %v %s", runErr, strings.TrimSpace(string(output)))
-		}
-		return errors.New("recovery task registration failed")
+		return runErr
 	}
 	return nil
 }
