@@ -246,6 +246,10 @@ func (process *Process) Close() error {
 		process.closeDone = make(chan struct{})
 		go process.closeOwned()
 	})
+	return process.waitClose()
+}
+
+func (process *Process) waitClose() error {
 	timer := time.NewTimer(2 * processIPCTimeout)
 	defer timer.Stop()
 	select {
