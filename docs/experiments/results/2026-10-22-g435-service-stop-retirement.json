@@ -1,0 +1,116 @@
+{
+  "generation": 435,
+  "sourceRevision": "c9cdc0b02ca2a3034f41268865ca33d0668152b1",
+  "change": "Retain and join an already-STOP_PENDING protected service using its protected receipt and independently verified process, before directory replacement. No force termination or wait-budget increase.",
+  "priorities": [
+    "Fix code-proven STOP_PENDING retirement race; completed.",
+    "If B directory_retire_move access-denied recurs, identify actual remaining owner; prior failure is not causally attributed to this race.",
+    "Investigate initially-STOPPED owner binding without stale PID false positives.",
+    "Correlate renewed heartbeat ge1s with g434 worker timing; no resolution claim."
+  ],
+  "validation": {
+    "inputworker": "PASS 21.707s",
+    "productpanel": "PASS cached",
+    "frontendTests": "PASS 91",
+    "nativeBuild": "PASS",
+    "bundleSmoke": "PASS 6.261s",
+    "archiveFiles": 8,
+    "archiveBytes": 28401547,
+    "offlineVerification": "valid / g435 / c9cdc0b",
+    "diffCheck": "PASS",
+    "skipped": [
+      "Portable-pair fixed-owner fixture conflicts with live installed owner.",
+      "No physical input acceptance or long soak in this run.",
+      "Race detector not run for bounded native SCM change.",
+      "Hosted CI omitted: no push."
+    ]
+  },
+  "application": {
+    "peerUpdateId": "a62d0b9f09a8c5897f5c268cc7a17e81",
+    "peerUpdateState": "UPDATED",
+    "collectionId": "551bc3fa9a084e781f87b7b7584c268a",
+    "localDoctor": "healthy / CONNECTED / PROTECTED / g435 UI-agent match",
+    "sides": {
+      "A": {
+        "created": "2026-10-22T13:11:21Z",
+        "installation": {
+          "time": "2026-10-22T13:10:26.0094997Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-22T13:11:14.3558796Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "service": "READY",
+        "source": null,
+        "events": [
+          {
+            "time": "2026-10-22T13:11:18.7512954Z",
+            "code": "CONNECTED"
+          },
+          {
+            "time": "2026-10-22T13:11:18.900264Z",
+            "code": "installed_source_capture_protected_ready"
+          }
+        ]
+      },
+      "B": {
+        "created": "2026-10-22T13:11:26Z",
+        "installation": {
+          "time": "2026-10-22T13:09:58.715984Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-22T13:11:08.8087193Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "service": "READY",
+        "source": null,
+        "events": [
+          {
+            "time": "2026-10-22T13:11:21.7356244Z",
+            "code": "CONNECTED"
+          },
+          {
+            "time": "2026-10-22T13:11:22.4963921Z",
+            "code": "installed_source_capture_protected_ready"
+          }
+        ]
+      }
+    }
+  },
+  "interpretation": "Both new installation receipts are result 0 and both services/input health are READY; protected captures restarted. This validates rollout, not reproduction or elimination of the earlier B Win32 5. Short post-install interval is not a stability soak.",
+  "scope": {
+    "publicApiChanged": false,
+    "databaseChanged": false,
+    "dependenciesChanged": false,
+    "runnerChanged": false,
+    "repositoryHygieneChanged": false,
+    "sourceOfTruthDocumentsChanged": false,
+    "remotePush": false
+  }
+}
