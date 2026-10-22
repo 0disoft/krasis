@@ -31,9 +31,9 @@ func OpenClient(controlDirectory string) (*Client, error) {
 	credentials, err := LoadClientCredentials(controlDirectory)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("%w: endpoint credentials are absent", ErrUnavailable)
+			return nil, &requestError{ErrUnavailable, "endpoint credentials are absent", err}
 		}
-		return nil, fmt.Errorf("%w: endpoint credentials are invalid", ErrAuthentication)
+		return nil, &requestError{ErrAuthentication, "endpoint credentials are invalid", err}
 	}
 	return &Client{credentials: credentials, http: &http.Client{Timeout: clientRequestTimeout}}, nil
 }
@@ -147,13 +147,13 @@ func (client *Client) requestHeadersLimit(ctx context.Context, method, path stri
 	if body != nil {
 		encoded, err := json.Marshal(body)
 		if err != nil {
-			return fmt.Errorf("%w: encode request", ErrProtocol)
+			return &requestError{ErrProtocol, "encode request", err}
 		}
 		reader = bytes.NewReader(encoded)
 	}
 	request, err := http.NewRequestWithContext(ctx, method, "http://"+client.credentials.Endpoint.Address+path, reader)
 	if err != nil {
-		return fmt.Errorf("%w: create request", ErrProtocol)
+		return &requestError{ErrProtocol, "create request", err}
 	}
 	request.Header.Set("Authorization", "Bearer "+client.credentials.Token)
 	for key, value := range headers {
@@ -164,7 +164,7 @@ func (client *Client) requestHeadersLimit(ctx context.Context, method, path stri
 	}
 	response, err := client.http.Do(request)
 	if err != nil {
-		return fmt.Errorf("%w: request failed", ErrUnavailable)
+		return &requestError{ErrUnavailable, "request failed", err}
 	}
 	defer response.Body.Close()
 	if !strings.HasPrefix(response.Header.Get("Content-Type"), "application/json") {
@@ -181,7 +181,7 @@ func (client *Client) requestHeadersLimit(ctx context.Context, method, path stri
 	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, responseLimit+1))
 	if err != nil {
-		return fmt.Errorf("%w: read response", ErrTransport)
+		return &requestError{ErrTransport, "read response", err}
 	}
 	if int64(len(data)) > responseLimit {
 		return fmt.Errorf("%w: response exceeds size limit", ErrProtocol)
@@ -189,11 +189,11 @@ func (client *Client) requestHeadersLimit(ctx context.Context, method, path stri
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(target); err != nil {
-		return fmt.Errorf("%w: decode response", ErrProtocol)
+		return &requestError{ErrProtocol, "decode response", err}
 	}
 	var extra any
 	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
-		return fmt.Errorf("%w: trailing response", ErrProtocol)
+		return &requestError{ErrProtocol, "trailing response", err}
 	}
 	return nil
 }

@@ -41,8 +41,11 @@ func fetch(ctx context.Context, c *http.Client, url string, limit int64) ([]byte
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK || resp.ContentLength > limit {
-		return nil, errors.New("release download unavailable")
+	if resp.StatusCode != http.StatusOK {
+		return nil, &HTTPError{StatusCode: resp.StatusCode, RetryAfter: retryAfter(resp.Header.Get("Retry-After"), time.Now())}
+	}
+	if resp.ContentLength > limit {
+		return nil, ErrInvalid
 	}
 	data, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
 	if err != nil {
