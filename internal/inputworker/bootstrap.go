@@ -31,7 +31,10 @@ var workerAuthenticatedFrame = [8]byte{'K', 'R', 'A', '1', 1, 0, 0, 0}
 
 func readWorkerAuthenticated(reader io.Reader) error {
 	var data [8]byte
-	if _, err := io.ReadFull(reader, data[:]); err != nil || data != workerAuthenticatedFrame {
+	if _, err := io.ReadFull(reader, data[:]); err != nil {
+		return errors.Join(ErrProtocol, err)
+	}
+	if data != workerAuthenticatedFrame {
 		return ErrProtocol
 	}
 	return nil
@@ -40,11 +43,23 @@ func readWorkerAuthenticated(reader io.Reader) error {
 // Native handle transfer is unreachable until the exact peer's authentication
 // acknowledgement and fresh authority checks have both completed.
 func bootstrapAfterAuthentication(ctx context.Context, reader io.Reader, check func() error, transfer func() ([bootstrapSize]byte, error)) ([bootstrapSize]byte, error) {
-	if ctx == nil || ctx.Err() != nil || check == nil || transfer == nil {
+	if ctx == nil || check == nil || transfer == nil {
 		return [bootstrapSize]byte{}, ErrAuthority
 	}
-	if readWorkerAuthenticated(reader) != nil || ctx.Err() != nil || check() != nil || ctx.Err() != nil {
-		return [bootstrapSize]byte{}, ErrAuthority
+	if err := ctx.Err(); err != nil {
+		return [bootstrapSize]byte{}, errors.Join(ErrAuthority, err)
+	}
+	if err := readWorkerAuthenticated(reader); err != nil {
+		return [bootstrapSize]byte{}, errors.Join(ErrAuthority, err, ctx.Err())
+	}
+	if err := ctx.Err(); err != nil {
+		return [bootstrapSize]byte{}, errors.Join(ErrAuthority, err)
+	}
+	if err := check(); err != nil {
+		return [bootstrapSize]byte{}, errors.Join(ErrAuthority, err)
+	}
+	if err := ctx.Err(); err != nil {
+		return [bootstrapSize]byte{}, errors.Join(ErrAuthority, err)
 	}
 	return transfer()
 }
@@ -161,11 +176,7 @@ func zeroBytes(data []byte) bool {
 }
 
 func writeFrame(writer io.Writer, data []byte) error {
-	n, err := writer.Write(data)
-	if err != nil || n != len(data) {
-		return ErrProtocol
-	}
-	return nil
+	return writeInputServiceFrame(writer, data)
 }
 
 func readReady(reader io.Reader) error {

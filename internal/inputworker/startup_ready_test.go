@@ -3,6 +3,7 @@ package inputworker
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"testing"
 	"testing/iotest"
 	"time"
@@ -41,14 +42,14 @@ func TestStartupReadyRejectsMalformedReceiptButDropsInvalidNumbers(t *testing.T)
 	}
 	packet := append([]byte(nil), buffer.Bytes()...)
 	for _, length := range []int{0, 7, 8, startupReadySize - 1} {
-		if _, err := readStartupReady(bytes.NewReader(packet[:length])); err != ErrProtocol {
+		if _, err := readStartupReady(bytes.NewReader(packet[:length])); !errors.Is(err, ErrProtocol) {
 			t.Fatalf("truncated receipt accepted: %d", length)
 		}
 	}
 	for _, offset := range []int{0, 4, 6, 7} {
 		bad := append([]byte(nil), packet...)
 		bad[offset]++
-		if _, err := readStartupReady(bytes.NewReader(bad)); err != ErrProtocol {
+		if _, err := readStartupReady(bytes.NewReader(bad)); !errors.Is(err, ErrProtocol) {
 			t.Fatalf("malformed readiness accepted: %d", offset)
 		}
 	}
@@ -136,11 +137,11 @@ func TestPreparedStartupReadyRoundtripRejectsMalformedAndDropsStaleDiagnostics(t
 	for _, offset := range []int{startupReadyLoadSize + 4, startupReadyLoadSize + 5} {
 		bad := append([]byte(nil), packet...)
 		bad[offset]++
-		if _, err := readStartupReady(bytes.NewReader(bad)); err != ErrProtocol {
+		if _, err := readStartupReady(bytes.NewReader(bad)); !errors.Is(err, ErrProtocol) {
 			t.Fatal("malformed preparation detail accepted")
 		}
 	}
-	if _, err := readStartupReady(bytes.NewReader(packet[:len(packet)-1])); err != ErrProtocol {
+	if _, err := readStartupReady(bytes.NewReader(packet[:len(packet)-1])); !errors.Is(err, ErrProtocol) {
 		t.Fatal("truncated preparation detail accepted")
 	}
 	binary.BigEndian.PutUint32(packet[startupReadyLoadSize:], uint32(preparedConsoleWindow.Microseconds()))
@@ -171,14 +172,14 @@ func TestStartupLoadReadyRoundtripBoundsAndFollowingFrame(t *testing.T) {
 		t.Fatal("extended receipt consumed next frame")
 	}
 	for length := startupReadySize; length < startupReadyLoadSize; length++ {
-		if _, err := readStartupReady(bytes.NewReader(packet[:length])); err != ErrProtocol {
+		if _, err := readStartupReady(bytes.NewReader(packet[:length])); !errors.Is(err, ErrProtocol) {
 			t.Fatal("truncated load receipt accepted", length)
 		}
 	}
 	for _, offset := range []int{startupReadySize + 4, startupReadySize + 5, startupReadySize + 6, startupReadySize + 7} {
 		bad := append([]byte(nil), packet...)
 		bad[offset] = 2
-		if _, err := readStartupReady(bytes.NewReader(bad)); err != ErrProtocol {
+		if _, err := readStartupReady(bytes.NewReader(bad)); !errors.Is(err, ErrProtocol) {
 			t.Fatal("malformed extension accepted")
 		}
 	}

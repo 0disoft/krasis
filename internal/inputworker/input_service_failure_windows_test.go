@@ -34,3 +34,16 @@ func TestInputStartupRetainsCandidateCleanupFailure(t *testing.T) {
 		t.Fatal("startup discarded owned cleanup stage or recovery fence", result)
 	}
 }
+
+func TestNativeStartupCompletionRetainsWindowsFailure(t *testing.T) {
+	// No I/O is submitted. An explicitly pending completion returns the real
+	// Windows incomplete-I/O error without touching an installed process.
+	pipe := &pipeConn{}
+	_, err := pipe.overlapped(context.Background(), true, []byte{0}, func(overlap *windows.Overlapped) error {
+		overlap.Internal = uintptr(windows.STATUS_PENDING)
+		return nil
+	})
+	if !errors.Is(err, ErrProtocol) || !errors.Is(err, windows.ERROR_IO_INCOMPLETE) {
+		t.Fatal("native completion discarded Windows error", err)
+	}
+}

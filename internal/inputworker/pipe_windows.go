@@ -286,7 +286,7 @@ func (pipe *pipeConn) overlapped(ctx context.Context, read bool, data []byte, be
 	}
 	event, err := windows.CreateEvent(nil, 1, 0, nil)
 	if err != nil {
-		return 0, ErrProtocol
+		return 0, errors.Join(ErrProtocol, err)
 	}
 	defer windows.CloseHandle(event)
 	overlap := windows.Overlapped{HEvent: event}
@@ -314,7 +314,7 @@ func (pipe *pipeConn) overlapped(ctx context.Context, read bool, data []byte, be
 			return 0, nil
 		}
 		if err := windows.GetOverlappedResult(pipe.handle, &overlap, &transferred, false); err != nil {
-			return 0, ErrProtocol
+			return 0, errors.Join(ErrProtocol, err)
 		}
 		return transferred, nil
 	}
@@ -369,7 +369,7 @@ func (pipe *pipeConn) overlapped(ctx context.Context, read bool, data []byte, be
 		if err != nil || (state != uint32(windows.WAIT_TIMEOUT) && state != windows.WAIT_OBJECT_0) {
 			_ = windows.CancelIoEx(pipe.handle, &overlap)
 			_ = windows.GetOverlappedResult(pipe.handle, &overlap, &transferred, true)
-			return transferred, ErrProtocol
+			return transferred, errors.Join(ErrProtocol, err)
 		}
 		if state == uint32(windows.WAIT_TIMEOUT) {
 			continue
@@ -382,7 +382,7 @@ func (pipe *pipeConn) overlapped(ctx context.Context, read bool, data []byte, be
 			return transferred, net.ErrClosed
 		}
 		if err != nil && err != windows.ERROR_BROKEN_PIPE && err != windows.ERROR_PIPE_NOT_CONNECTED {
-			return transferred, ErrProtocol
+			return transferred, errors.Join(ErrProtocol, err)
 		}
 		return transferred, err
 	}

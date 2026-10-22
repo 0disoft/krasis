@@ -2,6 +2,7 @@ package inputworker
 
 import (
 	"encoding/binary"
+	"errors"
 	"io"
 
 	"github.com/0disoft/krasis/internal/handoff"
@@ -49,7 +50,7 @@ func writeStartupReady(writer io.Writer, profile handoff.StartupProfile) error {
 func readStartupReady(reader io.Reader) (*handoff.StartupProfile, error) {
 	var header [8]byte
 	if _, err := io.ReadFull(reader, header[:]); err != nil {
-		return nil, ErrProtocol
+		return nil, errors.Join(ErrProtocol, err)
 	}
 	if header == readyFrame {
 		return nil, nil
@@ -62,7 +63,7 @@ func readStartupReady(reader io.Reader) (*handoff.StartupProfile, error) {
 	}
 	var payload [startupReadySize - 8]byte
 	if _, err := io.ReadFull(reader, payload[:]); err != nil {
-		return nil, ErrProtocol
+		return nil, errors.Join(ErrProtocol, err)
 	}
 	profile := &handoff.StartupProfile{Schema: 1, Measured: header[5]}
 	for i := range profile.Micros {
@@ -70,7 +71,10 @@ func readStartupReady(reader io.Reader) (*handoff.StartupProfile, error) {
 	}
 	if load {
 		var detail [8]byte
-		if _, err := io.ReadFull(reader, detail[:]); err != nil || detail[4] > 1 || !zeroBytes(detail[5:]) {
+		if _, err := io.ReadFull(reader, detail[:]); err != nil {
+			return nil, errors.Join(ErrProtocol, err)
+		}
+		if detail[4] > 1 || !zeroBytes(detail[5:]) {
 			return nil, ErrProtocol
 		}
 		profile.LoadMicros = binary.BigEndian.Uint32(detail[:4])
@@ -78,14 +82,20 @@ func readStartupReady(reader io.Reader) (*handoff.StartupProfile, error) {
 	}
 	if prepared {
 		var detail [8]byte
-		if _, err := io.ReadFull(reader, detail[:]); err != nil || detail[4] > 1 || (!decision && detail[4] != 1) || !zeroBytes(detail[5:]) {
+		if _, err := io.ReadFull(reader, detail[:]); err != nil {
+			return nil, errors.Join(ErrProtocol, err)
+		}
+		if detail[4] > 1 || (!decision && detail[4] != 1) || !zeroBytes(detail[5:]) {
 			return nil, ErrProtocol
 		}
 		profile.Prepared, profile.PreparedAgeMicros = detail[4] == 1, binary.BigEndian.Uint32(detail[:4])
 	}
 	if decision {
 		var detail [8]byte
-		if _, err := io.ReadFull(reader, detail[:]); err != nil || !zeroBytes(detail[1:]) {
+		if _, err := io.ReadFull(reader, detail[:]); err != nil {
+			return nil, errors.Join(ErrProtocol, err)
+		}
+		if !zeroBytes(detail[1:]) {
 			return nil, ErrProtocol
 		}
 		profile.PreparationDecision = handoff.PreparationDecision(detail[0])

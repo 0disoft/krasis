@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"errors"
 	"testing"
 	"time"
 )
@@ -15,7 +16,7 @@ func TestBootstrapHandleTransferRequiresExactAuthenticationAndLiveAuthority(t *t
 			called = true
 			return [bootstrapSize]byte{}, nil
 		})
-		if err != ErrAuthority || called {
+		if !errors.Is(err, ErrAuthority) || called {
 			t.Fatal("handle transfer preceded authentication")
 		}
 	}
@@ -38,7 +39,7 @@ func TestBootstrapHandleTransferRequiresExactAuthenticationAndLiveAuthority(t *t
 			return [bootstrapSize]byte{}, nil
 		})
 		cancel()
-		if err != ErrAuthority || called {
+		if !errors.Is(err, ErrAuthority) || called {
 			t.Fatal("retired authority transferred handles")
 		}
 	}
@@ -50,7 +51,7 @@ func TestBootstrapHandleTransferRequiresExactAuthenticationAndLiveAuthority(t *t
 		called++
 		return [bootstrapSize]byte{}, ErrAuthority // Partial duplicate/launch failure.
 	})
-	if err != ErrAuthority || called != 2 {
+	if !errors.Is(err, ErrAuthority) || called != 2 {
 		t.Fatal("transfer failure was hidden or retried")
 	}
 }

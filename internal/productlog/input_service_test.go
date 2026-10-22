@@ -9,12 +9,19 @@ import (
 )
 
 func TestInputServiceStagesSurviveSupportWithoutPrivateCause(t *testing.T) {
-	for _, operation := range []string{
+	operations := []string{
 		"input-startup-validation", "input-startup-prepare", "input-startup-authentication", "input-startup-transfer", "input-startup-ready", "input-startup-publish",
 		"input-prepare-launch", "input-prepare-connect", "input-prepare-permit",
 		"input-retire-validation", "input-retire-deadline", "input-retire-authentication", "input-retire-stop", "input-retire-receipt",
 		"input-close-control", "input-close-worker", "input-retire-SECRET/path",
-	} {
+	}
+	for _, stage := range []string{"validation", "prepare", "authentication", "transfer", "ready", "publish"} {
+		for _, kind := range []string{"timeout", "cancelled", "truncated", "eof", "closed"} {
+			operations = append(operations, "input-startup-"+stage+"-"+kind)
+		}
+	}
+	operations = append(operations, "input-startup-ready-SECRET/path", "input-startup-SECRET/path-timeout")
+	for _, operation := range operations {
 		t.Run(operation, func(t *testing.T) {
 			raw := []byte(`{"schema":"krasis.support/v1","created":"2026-10-23T08:02:00Z","logs":[],"loginRuntime":{"startedAt":"2026-10-23T08:00:00Z","time":"2026-10-23T08:01:00Z","service":"FAILED","console":"USER_SESSION","grant":"PRESENT","lastWorker":"NONE","lastFailure":{"time":"2026-10-23T08:01:00Z","stage":"service","reason":"input","operation":"` + operation + `","win32Error":109,"win32Known":true,"workerExit":{"state":"EXITED","code":3221225477,"known":true},"rawCause":"SECRET/path"}}}`)
 			clean, err := SanitizeSupport(raw)

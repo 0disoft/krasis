@@ -42,7 +42,7 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 		if lease.Capture {
 			result = sourceStartupFailure(startupStage, report, result)
 		} else {
-			result = inputServiceAt("input-startup-"+startupStage, result)
+			result = inputStartupFailure(startupStage, result)
 		}
 	}()
 	defer func() { result = validateSourceReportMode(lease.Capture, report, result) }()
@@ -53,8 +53,17 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 			}
 		}()
 	}
-	if ctx == nil || ctx.Err() != nil || channel == nil || channel.authority == nil || channel.authority.kind != authorityAgent || channel.authority.check(false) != nil || agentDigest == ([sha256.Size]byte{}) || serviceDigest == ([sha256.Size]byte{}) {
+	if ctx == nil || channel == nil || channel.authority == nil || channel.authority.kind != authorityAgent || agentDigest == ([sha256.Size]byte{}) || serviceDigest == ([sha256.Size]byte{}) {
 		return Report{}, ErrAuthority
+	}
+	if err := ctx.Err(); err != nil {
+		return Report{}, errors.Join(ErrAuthority, err)
+	}
+	// Service-local diagnostics retain the native result. Ordinary authority
+	// callers keep their sentinel-only contract; diagnostics export fixed fields.
+	checkAgent := func(recovery bool) error { return channel.authority.checkResult(nil, recovery) }
+	if err := checkAgent(false); err != nil {
+		return Report{}, errors.Join(ErrAuthority, err)
 	}
 	defer channel.Close()
 	agentPipe, ok := channel.stream.(*pipeConn)
@@ -88,10 +97,26 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 	defer cancel()
 	var actual uint32
 	startupStage = "authentication"
-	if windows.GetNamedPipeClientProcessId(control.handle, &actual) != nil || actual != pid || windows.WTSGetActiveConsoleSessionId() != prepared.session || channel.authority.check(false) != nil {
-		return Report{}, ErrAuthority
+	// Tag the original startup failure before deferred cleanup can add a
+	// different operation. Capture keeps its independent source stage/report.
+	failStartup := func(cause error) error {
+		if lease.Capture {
+			return cause
+		}
+		return inputStartupFailure(startupStage, cause)
 	}
-	_ = control.SetDeadline(time.Now().Add(startupTimeout))
+	if err := windows.GetNamedPipeClientProcessId(control.handle, &actual); err != nil {
+		return Report{}, failStartup(errors.Join(ErrAuthority, err))
+	}
+	if actual != pid || windows.WTSGetActiveConsoleSessionId() != prepared.session {
+		return Report{}, failStartup(ErrAuthority)
+	}
+	if err := checkAgent(false); err != nil {
+		return Report{}, failStartup(errors.Join(ErrAuthority, err))
+	}
+	if err := control.SetDeadline(time.Now().Add(startupTimeout)); err != nil {
+		return Report{}, failStartup(errors.Join(ErrAuthority, err))
+	}
 	stopStartup := context.AfterFunc(startup, func() { _ = control.Close() })
 	defer stopStartup()
 	started := time.Now()
@@ -99,10 +124,13 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 	// SCM/actual pipe-owner authentication. No agent handle is transferred yet.
 	prepared.bootstrapBegun.Store(true)
 	packet, err := bootstrapAfterAuthentication(startup, control, func() error {
-		if windows.GetNamedPipeClientProcessId(control.handle, &actual) != nil || actual != pid || windows.WTSGetActiveConsoleSessionId() != prepared.session || channel.authority.check(false) != nil {
+		if err := windows.GetNamedPipeClientProcessId(control.handle, &actual); err != nil {
+			return errors.Join(ErrAuthority, err)
+		}
+		if actual != pid || windows.WTSGetActiveConsoleSessionId() != prepared.session {
 			return ErrAuthority
 		}
-		return nil
+		return checkAgent(false)
 	}, func() ([bootstrapSize]byte, error) {
 		startupStage = "transfer"
 		if windows.WTSGetActiveConsoleSessionId() != prepared.session {
@@ -111,7 +139,7 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 		return transferWorkerBootstrap(startup, worker, channel.authority, agentPipe, agentDigest, serviceDigest, data, installation)
 	})
 	if err != nil {
-		return Report{}, ErrAuthority
+		return Report{}, failStartup(errors.Join(ErrAuthority, err))
 	}
 	if !lease.Capture && !lease.Presentation {
 		worker.expectNativeChild()
@@ -139,15 +167,17 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 		if lease.Capture && readyErr != nil {
 			return report, observeMissingWorkerReport(readyErr, worker.reportExit)
 		}
-		return Report{}, ErrAuthority
+		return Report{}, failStartup(errors.Join(ErrAuthority, writeErr, readyErr, startup.Err()))
 	}
 	if !stopStartup() {
-		return Report{}, ErrAuthority
+		return Report{}, failStartup(errors.Join(ErrAuthority, startup.Err()))
 	}
-	_ = control.SetDeadline(time.Time{})
+	if err := control.SetDeadline(time.Time{}); err != nil {
+		return Report{}, failStartup(errors.Join(ErrAuthority, err))
+	}
 	mergeWorkerStartup(&profile, childProfile)
 	startupStage = "publish"
-	if channel.authority.check(false) != nil || channel.stream.SetWriteDeadline(time.Now().Add(time.Second)) != nil || writeStartupReady(channel.stream, profile) != nil {
+	if publishErr := publishStartupReady(channel.stream, checkAgent, profile); publishErr != nil {
 		// The child is ready but no readiness receipt reached the agent. Still
 		// request shutdown and consume recovery before killing the job.
 		stopped, stop := context.WithCancel(context.Background())
@@ -156,9 +186,12 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 		if !errors.Is(result, ErrRecovery) {
 			worker.confirmNativeRetirement()
 		}
-		return report, observeMissingWorkerReport(result, worker.reportExit)
+		result = observeMissingWorkerReport(result, worker.reportExit)
+		if !lease.Capture {
+			publishErr = inputStartupFailure("publish", publishErr)
+		}
+		return report, errors.Join(publishErr, result)
 	}
-	_ = channel.stream.SetWriteDeadline(time.Time{})
 	startupStage = ""
 	for _, notify := range afterReady {
 		if notify != nil {
@@ -237,7 +270,9 @@ func runInstalledConsoleInputMode(ctx context.Context, agentDigest, serviceDiges
 		}
 		defer func() { result = errors.Join(result, native.Close()) }()
 	}
-	_ = control.SetDeadline(time.Now().Add(startupTimeout))
+	if err := control.SetDeadline(time.Now().Add(startupTimeout)); err != nil {
+		return errors.Join(ErrAuthority, err)
+	}
 	if startup.Err() != nil || proof.check(false) != nil || writeFrame(control, workerAuthenticatedFrame[:]) != nil {
 		return ErrAuthority
 	}
@@ -295,7 +330,9 @@ func runInstalledConsoleInputMode(ctx context.Context, agentDigest, serviceDiges
 	if startup.Err() != nil || !stopControl() {
 		return ErrAuthority
 	}
-	_ = control.SetDeadline(time.Time{})
+	if err := control.SetDeadline(time.Time{}); err != nil {
+		return errors.Join(ErrAuthority, err)
+	}
 	var sourceService *Channel
 	if lease.Capture {
 		sourceService = lifetime.captureChannel()
@@ -319,7 +356,9 @@ func runInstalledConsoleInputMode(ctx context.Context, agentDigest, serviceDiges
 	if lease.Capture {
 		var exit logindiag.SourceExit
 		result := runSourceCapture(run, channel, sourceService, lease, func() error {
-			_ = control.SetWriteDeadline(time.Now().Add(startupTimeout))
+			if err := control.SetWriteDeadline(time.Now().Add(startupTimeout)); err != nil {
+				return errors.Join(ErrAuthority, err)
+			}
 			return writeStartupReady(control, profile)
 		}, &exit)
 		return finishWorkerReport(control, Report{Source: &exit}, result)
@@ -328,7 +367,9 @@ func runInstalledConsoleInputMode(ctx context.Context, agentDigest, serviceDiges
 		desktopStarted := time.Now()
 		result := runCursorPresentation(run, channel, proof, lease, func() error {
 			profile.Record(handoff.WorkerDesktopReady, time.Since(desktopStarted))
-			_ = control.SetWriteDeadline(time.Now().Add(startupTimeout))
+			if err := control.SetWriteDeadline(time.Now().Add(startupTimeout)); err != nil {
+				return errors.Join(ErrAuthority, err)
+			}
 			return writeStartupReady(control, profile)
 		})
 		return finishWorkerReport(control, Report{}, result)
@@ -354,10 +395,12 @@ func runInstalledConsoleInputMode(ctx context.Context, agentDigest, serviceDiges
 		input = isolated
 	}
 	announceReady := func() error {
-		if proof.check(false) != nil {
-			return ErrAuthority
+		if err := proof.check(false); err != nil {
+			return errors.Join(ErrAuthority, err)
 		}
-		_ = control.SetWriteDeadline(time.Now().Add(startupTimeout))
+		if err := control.SetWriteDeadline(time.Now().Add(startupTimeout)); err != nil {
+			return errors.Join(ErrAuthority, err)
+		}
 		return writeStartupReady(control, profile)
 	}
 	var report Report
@@ -383,36 +426,60 @@ func runInstalledConsoleInputMode(ctx context.Context, agentDigest, serviceDiges
 // No PID reopening: worker.process is the handle returned for the exact
 // job-bound child. Failed/partial duplication is reaped by the owned job.
 func transferWorkerBootstrap(ctx context.Context, worker *ConsoleWorker, authority *Authority, pipe *pipeConn, agent, service [sha256.Size]byte, lease [leaseSize]byte, installation *Installation) ([bootstrapSize]byte, error) {
-	if ctx == nil || ctx.Err() != nil || worker == nil || pipe == nil || authority == nil || authority.kind != authorityAgent || authority.check(false) != nil {
+	if ctx == nil || worker == nil || pipe == nil || authority == nil || authority.kind != authorityAgent {
 		return [bootstrapSize]byte{}, ErrAuthority
+	}
+	if err := ctx.Err(); err != nil {
+		return [bootstrapSize]byte{}, errors.Join(ErrAuthority, err)
+	}
+	if err := authority.checkResult(nil, false); err != nil {
+		return [bootstrapSize]byte{}, errors.Join(ErrAuthority, err)
 	}
 	root, err := windows.KnownFolderPath(windows.FOLDERID_ProgramFiles, 0)
 	if err != nil {
-		return [bootstrapSize]byte{}, ErrAuthority
+		return [bootstrapSize]byte{}, errors.Join(ErrAuthority, err)
 	}
 	if installation != nil {
 		a, s, err := installation.digests()
-		if err != nil || a != agent || s != service {
+		if err != nil {
+			return [bootstrapSize]byte{}, errors.Join(ErrAuthority, err)
+		}
+		if a != agent || s != service {
 			return [bootstrapSize]byte{}, ErrAuthority
 		}
 	}
 	image, err := pinIdentityImage(installation, filepath.Join(root, "Krasis", "Input", "krasis-agent.exe"), agent)
 	if err != nil {
-		return [bootstrapSize]byte{}, ErrAuthority
+		return [bootstrapSize]byte{}, errors.Join(ErrAuthority, err)
 	}
 	defer image.Close()
 	worker.mu.Lock()
 	defer worker.mu.Unlock()
-	if ctx.Err() != nil || worker.closed || worker.retiring || worker.process == 0 || authority.check(false) != nil {
+	if err := ctx.Err(); err != nil {
+		return [bootstrapSize]byte{}, errors.Join(ErrAuthority, err)
+	}
+	if worker.closed || worker.retiring || worker.process == 0 {
 		return [bootstrapSize]byte{}, ErrAuthority
+	}
+	if err := authority.checkResult(nil, false); err != nil {
+		return [bootstrapSize]byte{}, errors.Join(ErrAuthority, err)
 	}
 	state, err := windows.WaitForSingleObject(worker.process, 0)
 	if err != nil || state != uint32(windows.WAIT_TIMEOUT) {
-		return [bootstrapSize]byte{}, ErrAuthority
+		return [bootstrapSize]byte{}, errors.Join(ErrAuthority, err)
 	}
 	var pipeHandle, imageHandle windows.Handle
-	if windows.DuplicateHandle(windows.CurrentProcess(), pipe.handle, worker.process, &pipeHandle, 0, false, windows.DUPLICATE_SAME_ACCESS) != nil || windows.DuplicateHandle(windows.CurrentProcess(), windows.Handle(image.Fd()), worker.process, &imageHandle, 0, false, windows.DUPLICATE_SAME_ACCESS) != nil || ctx.Err() != nil || authority.check(false) != nil {
-		return [bootstrapSize]byte{}, ErrAuthority
+	if err := windows.DuplicateHandle(windows.CurrentProcess(), pipe.handle, worker.process, &pipeHandle, 0, false, windows.DUPLICATE_SAME_ACCESS); err != nil {
+		return [bootstrapSize]byte{}, errors.Join(ErrAuthority, err)
+	}
+	if err := windows.DuplicateHandle(windows.CurrentProcess(), windows.Handle(image.Fd()), worker.process, &imageHandle, 0, false, windows.DUPLICATE_SAME_ACCESS); err != nil {
+		return [bootstrapSize]byte{}, errors.Join(ErrAuthority, err)
+	}
+	if err := ctx.Err(); err != nil {
+		return [bootstrapSize]byte{}, errors.Join(ErrAuthority, err)
+	}
+	if err := authority.checkResult(nil, false); err != nil {
+		return [bootstrapSize]byte{}, errors.Join(ErrAuthority, err)
 	}
 	return encodeWorkerBootstrap(uint64(pipeHandle), uint64(imageHandle), agent, lease)
 }

@@ -2,6 +2,7 @@ package inputworker
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 	"testing/iotest"
 	"time"
@@ -50,14 +51,14 @@ func TestDecisionReadyFramingFailsClosedButInvalidDiagnosticDoesNotRevokeReadine
 	_ = writeStartupReady(&wire, p)
 	packet := append([]byte(nil), wire.Bytes()...)
 	for length := startupReadyPreparedSize; length < startupReadyDecisionSize; length++ {
-		if _, err := readStartupReady(bytes.NewReader(packet[:length])); err != ErrProtocol {
+		if _, err := readStartupReady(bytes.NewReader(packet[:length])); !errors.Is(err, ErrProtocol) {
 			t.Fatal("truncated decision receipt accepted", length)
 		}
 	}
 	for i := startupReadyPreparedSize + 1; i < startupReadyDecisionSize; i++ {
 		bad := append([]byte(nil), packet...)
 		bad[i] = 1
-		if _, err := readStartupReady(bytes.NewReader(bad)); err != ErrProtocol {
+		if _, err := readStartupReady(bytes.NewReader(bad)); !errors.Is(err, ErrProtocol) {
 			t.Fatal("nonzero reserved decision byte accepted")
 		}
 	}

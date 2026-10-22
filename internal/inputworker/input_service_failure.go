@@ -1,8 +1,11 @@
 package inputworker
 
 import (
+	"context"
 	"errors"
 	"io"
+	"net"
+	"os"
 	"time"
 
 	"github.com/0disoft/krasis/internal/logindiag"
@@ -28,6 +31,25 @@ func inputServiceAt(operation string, cause error) error {
 		return cause
 	}
 	return &inputServiceFailure{operation: operation, cause: cause}
+}
+
+// A fixed transport class remains useful when no Win32 result exists. Keep
+// more specific worker/authority operations through inputServiceAt as before.
+func inputStartupFailure(stage string, cause error) error {
+	operation := "input-startup-" + stage
+	switch {
+	case errors.Is(cause, context.DeadlineExceeded), errors.Is(cause, os.ErrDeadlineExceeded):
+		operation += "-timeout"
+	case errors.Is(cause, context.Canceled):
+		operation += "-cancelled"
+	case errors.Is(cause, io.ErrUnexpectedEOF):
+		operation += "-truncated"
+	case errors.Is(cause, io.EOF):
+		operation += "-eof"
+	case errors.Is(cause, net.ErrClosed), errors.Is(cause, os.ErrClosed):
+		operation += "-closed"
+	}
+	return inputServiceAt(operation, cause)
 }
 
 // Preserve I/O/native causes alongside the existing protocol classification.
