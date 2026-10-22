@@ -72,6 +72,8 @@ type Manager struct {
 	deliveredUntil    time.Time
 	workers           sync.WaitGroup
 	closed            bool
+	closeDone         chan struct{}
+	closeErr          error
 	cancels           map[uint64]context.CancelFunc
 	nextWorker        uint64
 	Observe           func(string)
@@ -182,21 +184,36 @@ func Open(productRoot string, generation int) (*Manager, error) {
 }
 
 func (m *Manager) Close() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return m.closeContext(ctx)
+}
+
+// A caller's bounded wait never owns the final cleanup. All callers join the
+// same shutdown, which keeps the root alive until the last worker releases it.
+func (m *Manager) closeContext(ctx context.Context) error {
 	m.mu.Lock()
-	m.closed = true
-	for _, cancel := range m.cancels {
-		cancel()
+	if m.closeDone == nil {
+		m.closeDone = make(chan struct{})
+		m.closed = true
+		for _, cancel := range m.cancels {
+			cancel()
+		}
+		go func() {
+			defer close(m.closeDone)
+			m.workers.Wait()
+			m.mu.Lock()
+			defer m.mu.Unlock()
+			cleanupErr := m.retireOfferLocked("CANCELLED")
+			m.closeErr = errors.Join(cleanupErr, m.root.Close())
+		}()
 	}
+	done := m.closeDone
 	m.mu.Unlock()
-	done := make(chan struct{})
-	go func() { m.workers.Wait(); close(done) }()
 	select {
 	case <-done:
-		m.mu.Lock()
-		defer m.mu.Unlock()
-		cleanupErr := m.retireOfferLocked("CANCELLED")
-		return errors.Join(cleanupErr, m.root.Close())
-	case <-time.After(5 * time.Second):
+		return m.closeErr
+	case <-ctx.Done():
 		return ErrBusy
 	}
 }
