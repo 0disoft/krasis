@@ -1,0 +1,146 @@
+{
+  "generation": 432,
+  "sourceRevision": "76ac3947a8f9c086101582e31d70aadbff111f83",
+  "purpose": "Source-child heartbeat progress diagnosis; original response stall unresolved",
+  "validation": {
+    "inputworker": "PASS 22.171s",
+    "logindiag": "PASS",
+    "productlog": "PASS 2.258s",
+    "residentagent": "PASS 7.104s",
+    "frontendTests": 91,
+    "nativeBuild": "PASS",
+    "bundleSmoke": "PASS 7.44s",
+    "bundleFiles": 8,
+    "bundleBytes": 28338499,
+    "offlineVerification": "PASS",
+    "diffCheck": "PASS",
+    "skipped": "Portable pair fixed-owner fixture conflicts with live session; hosted CI omitted because no push; physical input acceptance and low-load reproduction not performed"
+  },
+  "application": {
+    "peerUpdateId": "afeaa9035d5892bd90c868523171ffab",
+    "peerUpdateState": "UPDATED",
+    "collectionId": "68957a872ece18a9884bc4c529191659",
+    "A": {
+      "created": "2026-10-22T12:08:59Z",
+      "installation": {
+        "time": "2026-10-22T12:06:52.2133178Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "inputHealth": {
+        "time": "2026-10-22T12:08:44.8645016Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "sourceExit": {
+        "time": "2026-10-22T12:08:41.2990195Z",
+        "command": "ok",
+        "reader": "stopped",
+        "capture": "joined",
+        "sender": "joined",
+        "interrupt": "joined",
+        "retirement": "clean_sent",
+        "report": "ok",
+        "heartbeatStage": "replied",
+        "heartbeatSlowStage": "service_presence",
+        "heartbeatSlowBucket": 2
+      }
+    },
+    "B": {
+      "created": "2026-10-22T12:09:07Z",
+      "installation": {
+        "time": "2026-10-22T12:06:27.5744435Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "inputHealth": {
+        "time": "2026-10-22T12:08:38.2882633Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "sourceExit": {
+        "time": "2026-10-22T12:08:43.7584475Z",
+        "command": "ok",
+        "reader": "stopped",
+        "capture": "joined",
+        "sender": "joined",
+        "interrupt": "joined",
+        "retirement": "clean_sent",
+        "report": "ok",
+        "heartbeatStage": "replied",
+        "heartbeatSlowStage": "reply_gate",
+        "heartbeatSlowBucket": 2
+      }
+    },
+    "finalCollectionId": "9d17c0065f029d84b7163cdbb4eab0f2",
+    "finalReadiness": {
+      "A": {
+        "created": "2026-10-22T12:11:13Z",
+        "service": "READY",
+        "inputHealth": "READY",
+        "connectedAt": "2026-10-22T12:10:50.1088872Z",
+        "protectedSourceReadyAt": "2026-10-22T12:10:50.2368403Z"
+      },
+      "B": {
+        "created": "2026-10-22T12:11:18Z",
+        "service": "READY",
+        "inputHealth": "READY",
+        "connectedAt": "2026-10-22T12:10:53.1627638Z",
+        "protectedSourceReadyAt": "2026-10-22T12:10:53.6692581Z"
+      }
+    }
+  },
+  "controlledDisconnect": {
+    "startedAt": "2026-10-22T12:08:40Z",
+    "purpose": "Verify real child report persistence and sanitized paired export",
+    "result": "Both source owners joined; clean_sent / report ok; heartbeatStage replied",
+    "ASlowStage": "service_presence",
+    "BSlowStage": "reply_gate",
+    "maximumBucket": "1ms to under 10ms on both sides",
+    "reconnect": "User confirmed B connection click; A and B CONNECTED with protected source ready. A healthy doctor at final check."
+  },
+  "observations": [
+    {
+      "time": "2026-10-22T12:07:31.3839366Z",
+      "side": "A",
+      "operation": "source-startup-prepare",
+      "report": "missing",
+      "note": "Initial post-install source readiness failed once; automatic reconnect subsequently reached protected source ready at 12:07:46.8251325Z. Do not classify as heartbeat failure or a new regression without reproduction."
+    }
+  ],
+  "remainingWork": [
+    "Correlate original heartbeat response timeout with new source-child stages; preserve authority checks and deadlines.",
+    "Investigate startup readiness separately if it recurs; trust freshness remains an independent lead.",
+    "Consider an explicit authenticated peer reconnect command so diagnostic disconnect checks do not require a manual B connection click."
+  ],
+  "scope": {
+    "publicApiChanged": false,
+    "localWorkerReportVersion": 4,
+    "databaseChanged": false,
+    "dependenciesChanged": false,
+    "runnerChanged": false,
+    "repositoryHygieneChanged": false,
+    "sourceOfTruthDocumentsChanged": false,
+    "remotePush": false
+  }
+}
