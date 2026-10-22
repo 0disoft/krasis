@@ -1,0 +1,107 @@
+{
+  "date": "2026-10-23",
+  "sourceRevision": "5ad4ae68998d3538cb98be7d9f245869f640f04f",
+  "diagnosticBaseline": "0ced72303de839c87bf1c2407a094a0d",
+  "changes": [
+    {
+      "revision": "5410e0c",
+      "summary": "Native startup shares caller cancellation through launch admission and bootstrap transport. A late or abandoned child is aborted and joined; the original helper API remains available."
+    },
+    {
+      "revision": "5ad4ae6",
+      "summary": "Failed or canceled startup retires both unbound native owners concurrently, joins both receipts and retains every cleanup error. Successful lease recovery ordering is unchanged."
+    }
+  ],
+  "regressions": [
+    {
+      "test": "TestLocalInputStartupRejectsCanceledCallerBeforeLaunch",
+      "result": "PASS; canceled caller starts no child."
+    },
+    {
+      "test": "TestLocalInputStartupRetiresLaunchThatFinishesAfterCancellation",
+      "result": "PASS; 20ms late launch under a 10ms deadline receives no bootstrap and is killed once and joined."
+    },
+    {
+      "test": "TestLocalInputBootstrapUsesRemainingCallerBudget",
+      "result": "PASS; blocked bootstrap uses the 10ms caller deadline instead of a fresh 2s IPC budget."
+    },
+    {
+      "test": "TestNativePairCanceledStartupRetiresBothUnboundOwnersTogether",
+      "result": "PASS; 2ms launch plus concurrent 10ms/20ms retirement takes 22ms instead of the prior serial 32ms. Both owners join; cancellation, cleanup failure and uncertain recovery remain distinguishable."
+    }
+  ],
+  "validation": {
+    "fullTests": {
+      "crashguard": "PASS 1.524s",
+      "inputworker": "PASS 24.664s",
+      "residentagent": "PASS 10.473s"
+    },
+    "vet": "PASS internal/crashguard and internal/inputworker",
+    "filteredRace": {
+      "command": "go test -race -count=1 -timeout 60s ./internal/crashguard ./internal/inputworker -run 'Test(LocalInput|NativePair)'",
+      "crashguard": "PASS 1.064s",
+      "inputworker": "PASS 1.117s"
+    },
+    "reviewBuild": {
+      "command": "pwsh -NoProfile -File scripts/build-workspace.ps1 -Review",
+      "status": "PASS",
+      "frontendTests": 103,
+      "nativeFrontendBuild": "PASS",
+      "windowsAppAgentCLIInstaller": "PASS",
+      "packageTransfer": "TestWorkspaceUpdatePackage PASS 11.84s",
+      "packageLayout": "8 files and executable icons verified"
+    },
+    "initialFailures": [
+      "An initial compilation failure from the changed startup helper signature was corrected by retaining the original wrapper; residentagent tests subsequently passed.",
+      "An initial inputworker run timed out in the existing 50ms TestSourceWriterSlowAuthorizationYieldsToHeartbeat/command-ack assertion. The focused rerun and final full inputworker run passed with that test unchanged; the transient failure's cause was not established."
+    ]
+  },
+  "reviewPackage": {
+    "path": "dist/review/5ad4ae68998d3538cb98be7d9f245869f640f04f/g443",
+    "signed": false,
+    "installed": false,
+    "hashes": {
+      "BUILD.json": "8977b02adcf19134fdc5795fbe19f089c53f8a49ce188db39ba7c71149f8371b",
+      "krasis-agent.exe": "74fd1338c3205efa96c6801298f86e419631ceaf0423c09e105d4e4385414fab",
+      "krasis-cli.exe": "573e446aff8c212338b46e0f28f6654125556c9b5e8c80e56e0c26903d245f9e",
+      "krasis-install.exe": "d735878b2ef7ebd83098763cf1e8cb579bffe3946af885136c9c4c6e21cb6920",
+      "krasis.exe": "ae9063fdfacd47aa4c67e8e1d0ab947eb6496ff4fc094213696dc3bfe6894aff",
+      "SHA256SUMS.txt": "85e2c5a013e965fadcebd1c763a09580611c433c56818600607b2bb1024eb0f7",
+      "START-HERE.md": "9cb4dafc3a052b58675444821ea62ac3e78a07f8c6db332a757a538f979856fb",
+      "THIRD-PARTY-NOTICES.txt": "8330173826be891d00e24553145ade72914166ad7464147114a2db57a92a9ab2"
+    }
+  },
+  "liveBundle": {
+    "path": "dist/workspace/g443",
+    "build": "7c047c694ccec9b6b9bd4f3839c304d84cbc1060",
+    "unchangedHashCount": 8
+  },
+  "limitations": [
+    "Fixture durations use synctest virtual time, not measured product performance.",
+    "These changes reduce canceled/failed startup work and serial cleanup delay. They do not remove the normal successful entry's observed 166.629ms grant median or 123.648ms native pair startup median.",
+    "Native process creation cannot itself be interrupted by this helper; a launch completing after cancellation is instead retired before returning.",
+    "Cleanup retains its existing bounded Close and ExitPending rules; the caller deadline is not proof that native cleanup finished.",
+    "A source/query/gate disconnect root cause, capture/apply tails, hosted CI COM failures and installer cleanup failures remain independent unresolved paths."
+  ],
+  "skipped": [
+    {
+      "check": "Paired deployment and physical acceptance, entry latency comparison, lock/reboot or soak",
+      "reason": "Review package was built locally; installed running images were preserved."
+    },
+    {
+      "check": "Push, release, signing and hosted CI",
+      "reason": "Not authorized in this local improvement scope."
+    }
+  ],
+  "scope": {
+    "publicAPISchemaChanges": false,
+    "databaseChanges": false,
+    "dependenciesChanged": false,
+    "ciRunnerChanges": false,
+    "repositoryHygieneChanges": false,
+    "sourceOfTruthDocumentsChanged": [],
+    "internalAPI": "Adds context-aware startup helper while preserving original wrapper.",
+    "productScopeChanges": false
+  },
+  "documentationModel": "command-code/deepseek-deepseek-v4.1-flash, high; wording reviewed and updated with completed build evidence."
+}
