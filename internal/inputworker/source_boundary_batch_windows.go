@@ -56,7 +56,8 @@ func (w *sourceWriter) sendBoundaries(batch []sourcePacket) error {
 		}
 		return sourceTransportFailure(err)
 	}
-	defer w.mu.Unlock()
+	w.gateStage(sourceBoundary, sourceGatePrepare)
+	defer w.unlockGate()
 	var wire [sourceBoundaryBatchLimit * sourcePacketSize]byte
 	next := w.sequence
 	for i, p := range batch {
@@ -74,6 +75,7 @@ func (w *sourceWriter) sendBoundaries(batch []sourcePacket) error {
 	if ctx.Err() == context.DeadlineExceeded && (w.ctx == nil || w.ctx.Err() == nil) {
 		return nil // Still before the write; no sequence or bytes escaped.
 	}
+	w.gateStage(sourceBoundary, sourceGateWrite)
 	err := w.writeSequenced(ctx, wire[:len(batch)*sourcePacketSize], next, sourceBoundary)
 	var failure *sourceIOFailure
 	if errors.As(err, &failure) && failure.unsubmitted && errors.Is(failure, os.ErrDeadlineExceeded) {

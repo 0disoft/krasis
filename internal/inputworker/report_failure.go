@@ -25,6 +25,7 @@ func init() {
 	reportOperations = append(reportOperations, "source-write-deadline", "source-write-unsubmitted", "source-write-partial", "source-write-timeout", "source-write-closed", "source-write-native", "source-write-other")
 	reportOperations = append(reportOperations, sourceQueryFailureOperations()...)
 	reportOperations = append(reportOperations, logindiag.SourceWriteOriginOperations()...)
+	reportOperations = append(reportOperations, logindiag.SourceGateOperations()...)
 }
 
 type workerReportFailure struct {
@@ -86,8 +87,11 @@ func reportFailureDetails(err error) (byte, uint32) {
 			candidate = err
 		}
 		var write *sourceIOFailure
+		var gate *sourceGateFailure
 		if !sourceCleanupUncertain(err) && errors.As(candidate, &write) {
 			operation, selected = write.operation(), write
+		} else if !sourceCleanupUncertain(err) && errors.As(candidate, &gate) {
+			operation, selected = gate.operation, gate
 		}
 	}
 	for index, name := range reportOperations {

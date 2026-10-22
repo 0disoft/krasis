@@ -18,6 +18,7 @@ import (
 type sourceWriter struct {
 	ctx       context.Context
 	mu        syncgate.Mutex
+	gateOwner atomic.Uint32 // Fixed holder/stage sample, diagnostics only.
 	channel   *Channel
 	binding   Binding
 	sequence  uint64
@@ -58,7 +59,7 @@ func (w *sourceWriter) writePacketContext(ctx context.Context, p sourcePacket, c
 	if retirement || completedReply || p.kind == sourceReply && p.op == sourceHeartbeat {
 		if err := w.mu.LockContext(ctx); err != nil {
 			gateDone()
-			return sourceTransportFailure(err)
+			return w.gateFailure(err)
 		}
 	} else {
 		// Full WTS/SCM authorization may block. It must not own the wire gate
@@ -69,7 +70,12 @@ func (w *sourceWriter) writePacketContext(ctx context.Context, p sourcePacket, c
 		}
 	}
 	gateDone()
-	defer w.mu.Unlock()
+	origin := p.kind
+	if retirement {
+		origin = sourceRetired
+	}
+	w.gateStage(origin, sourceGatePrepare)
+	defer w.unlockGate()
 	if !w.started.Load() && (p.kind == sourceAction || p.kind == sourceBoundary || p.kind == sourceReturn) {
 		return nil
 	}
@@ -86,12 +92,14 @@ func (w *sourceWriter) writePacketContext(ctx context.Context, p sourcePacket, c
 		if progress != nil {
 			presenceDone = progress.measure(heartbeatReplyPresence)
 		}
+		w.gateStage(origin, sourceGatePresence)
 		err := w.channel.authorizeSourcePresence(ctx)
 		presenceDone()
 		if err != nil {
 			return sourceTransportFailure(err)
 		}
 	}
+	w.gateStage(origin, sourceGatePrepare)
 	p.sequence, p.binding = w.sequence+1, w.binding
 	if progress != nil {
 		p.timing = progress.replyTiming()
@@ -104,10 +112,7 @@ func (w *sourceWriter) writePacketContext(ctx context.Context, p sourcePacket, c
 	if progress != nil {
 		writeDone = progress.measure(heartbeatReplyWrite)
 	}
-	origin := p.kind
-	if retirement {
-		origin = sourceRetired // A stop ACK is also retirement delivery.
-	}
+	w.gateStage(origin, sourceGateWrite)
 	err = w.writeSequenced(ctx, data[:], p.sequence, origin)
 	writeDone()
 	if progress != nil && err == nil {

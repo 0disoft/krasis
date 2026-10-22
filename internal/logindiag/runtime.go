@@ -86,7 +86,7 @@ func (v Runtime) Valid() bool {
 }
 
 func ValidRuntimeOperation(operation string) bool {
-	if validSourceWriteOriginOperation(operation) {
+	if validSourceWriteOriginOperation(operation) || validSourceGateOperation(operation) {
 		return true
 	}
 	switch operation {
