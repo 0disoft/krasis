@@ -22,6 +22,9 @@ func isolateAuthorityCapacity(t *testing.T) func() {
 	}
 	authorityQueries = make(chan struct{}, cap(previous))
 	return func() {
+		// A published query result precedes its deferred slot release. Join
+		// that final goroutine work before restoring the shared test fixture.
+		synctest.Wait()
 		if len(authorityQueries) != 0 {
 			t.Error("test left an unretired capacity owner")
 		}
