@@ -45,6 +45,7 @@ type Operations struct {
 	updateTargetGeneration int
 	updateTargetRevision   string
 	releaseClaimID         string
+	releaseClaim           *releaseClaimLifetime
 	uiReadyAt              time.Time
 	uiReadyPID             uint32
 	log                    *productlog.Logger
@@ -445,6 +446,11 @@ func (operations *Operations) Close(ctx context.Context) error {
 		return nil
 	}
 	operations.stopAgent(context.Canceled)
+	operations.mu.Lock()
+	if operations.releaseClaim != nil {
+		operations.clearReleaseClaimLocked()
+	}
+	operations.mu.Unlock()
 	if workflow, ok := operations.pairing.(interface{ Close(context.Context) error }); ok {
 		if err := workflow.Close(ctx); err != nil {
 			return err

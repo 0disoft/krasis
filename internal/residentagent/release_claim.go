@@ -2,9 +2,12 @@ package residentagent
 
 import (
 	"context"
-	"github.com/0disoft/krasis/internal/localapi"
 	"time"
+
+	"github.com/0disoft/krasis/internal/localapi"
 )
+
+type releaseClaimLifetime struct{ timer *time.Timer }
 
 // A claim shares the Connect/Pair/peer-update mutex. It never disconnects input.
 // The request ID binds rollback to this owner; a crashed UI cannot fence forever.
@@ -28,17 +31,27 @@ func (o *Operations) ReleaseClaim(ctx context.Context, id string, generation int
 		return rejected("agent_busy"), nil
 	}
 	o.updateApplying, o.updateTargetGeneration, o.updateTargetRevision, o.releaseClaimID = true, generation, revision, id
-	time.AfterFunc(3*time.Minute, func() {
-		o.mu.Lock()
-		defer o.mu.Unlock()
-		if o.releaseClaimID == id {
-			o.clearReleaseClaimLocked()
-		}
-	})
+	claimLifetime := &releaseClaimLifetime{}
+	o.releaseClaim = claimLifetime
+	claimLifetime.timer = time.AfterFunc(3*time.Minute, func() { o.expireReleaseClaim(claimLifetime) })
 	return completed("release_claimed"), nil
 }
 
+func (o *Operations) expireReleaseClaim(claim *releaseClaimLifetime) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	// Stop cannot retract a callback already waiting for mu. An independent
+	// lifetime also fences release/reacquire with the same external request ID.
+	if o.releaseClaim == claim {
+		o.clearReleaseClaimLocked()
+	}
+}
+
 func (o *Operations) clearReleaseClaimLocked() {
+	if o.releaseClaim != nil {
+		o.releaseClaim.timer.Stop()
+		o.releaseClaim = nil
+	}
 	o.updateApplying = false
 	o.updateTargetGeneration = 0
 	o.updateTargetRevision = ""
