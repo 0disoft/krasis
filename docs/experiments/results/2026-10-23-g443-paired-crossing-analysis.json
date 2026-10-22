@@ -1,0 +1,496 @@
+{
+  "date": "2026-10-23",
+  "requestID": "0ced72303de839c87bf1c2407a094a0d",
+  "collectionState": "RECEIVED",
+  "observedGeneration": 443,
+  "observedBuild": "7c047c694ccec9b6b9bd4f3839c304d84cbc1060",
+  "localDoctor": "healthy/CONNECTED",
+  "peerStatus": "ONLINE; matching generation and build",
+  "inputs": {
+    "A": {
+      "sha256": "0765835500f3e26cfe13b9f700d1c7d8ada48e6bc4d92238fa193fd1de05c6b8",
+      "bytes": 2016716,
+      "createdUTC": "2026-10-22T18:11:06Z",
+      "schema": "krasis.support/v1",
+      "logs": [
+        {
+          "source": "agent.previous.jsonl",
+          "events": 2868,
+          "incomplete": false
+        },
+        {
+          "source": "agent.jsonl",
+          "events": 2304,
+          "incomplete": false
+        },
+        {
+          "source": "control.previous.jsonl",
+          "events": 0,
+          "incomplete": true
+        },
+        {
+          "source": "control.jsonl",
+          "events": 607,
+          "incomplete": false
+        }
+      ]
+    },
+    "B": {
+      "sha256": "661a66aef813dce5c79dcab24d6090cd96845191982ed913ddbdc3bd4988a175",
+      "bytes": 1101583,
+      "createdUTC": "2026-10-22T18:11:09Z",
+      "schema": "krasis.support/v1",
+      "logs": [
+        {
+          "source": "agent.previous.jsonl",
+          "events": 2611,
+          "incomplete": false
+        },
+        {
+          "source": "agent.jsonl",
+          "events": 6,
+          "incomplete": false
+        },
+        {
+          "source": "control.previous.jsonl",
+          "events": 0,
+          "incomplete": true
+        },
+        {
+          "source": "control.jsonl",
+          "events": 473,
+          "incomplete": false
+        }
+      ]
+    }
+  },
+  "recentExercise": {
+    "selectionStartUTC": "2026-10-22T18:08:00Z",
+    "pairedExchangeCount": 13,
+    "unmatchedExchangeCount": 0,
+    "sourceSide": "A",
+    "receiverSide": "B",
+    "allEndsOK": true,
+    "allProfilesComplete": true,
+    "sides": {
+      "A": {
+        "profileRangeUTC": [
+          "2026-10-22T18:08:28.6952389Z",
+          "2026-10-22T18:10:28.2768641Z"
+        ],
+        "subsequentInputFrames": 1433,
+        "subsequentDispatchHistogram": {
+          "buckets": [
+            "lt1ms",
+            "1to10ms",
+            "10to100ms",
+            "100to1000ms",
+            "ge1000ms"
+          ],
+          "counts": [
+            1415,
+            17,
+            1,
+            0,
+            0
+          ],
+          "excludesFirstInput": true
+        },
+        "timingsMicros": {
+          "BoundaryToBegin": {
+            "count": 13,
+            "minimum": 2297,
+            "median": 2837,
+            "maximum": 106578
+          },
+          "RequestToGrant": {
+            "count": 13,
+            "minimum": 148670,
+            "median": 166629,
+            "maximum": 239536
+          },
+          "CaptureActivate": {
+            "count": 13,
+            "minimum": 11127,
+            "median": 18432,
+            "maximum": 259854
+          },
+          "SourceDeactivate": {
+            "count": 13,
+            "minimum": 6029,
+            "median": 7164,
+            "maximum": 197871
+          },
+          "FirstOfferSinceBegin": {
+            "count": 13,
+            "minimum": 161559,
+            "median": 203714,
+            "maximum": 386278
+          },
+          "FirstDispatch": {
+            "count": 13,
+            "minimum": 0,
+            "median": 5082,
+            "maximum": 157388
+          },
+          "PerAttemptWorstSubsequentDispatch": {
+            "count": 13,
+            "minimum": 554,
+            "median": 1461,
+            "maximum": 25835
+          }
+        },
+        "recentCodes": {
+          "boundary_request_written": 13,
+          "boundary_admitted": 13,
+          "boundary_dropped_not_ready": 7
+        },
+        "tcp": {
+          "profiles": 13,
+          "allCounterDeltasKnown": true,
+          "retransmittedBytes": 0,
+          "timeoutEpisodes": 0,
+          "rttMicros": {
+            "count": 26,
+            "minimum": 7046,
+            "median": 8808.0,
+            "maximum": 10741
+          }
+        }
+      },
+      "B": {
+        "profileRangeUTC": [
+          "2026-10-22T18:08:31.3136097Z",
+          "2026-10-22T18:10:30.8857415Z"
+        ],
+        "subsequentInputFrames": 1211,
+        "subsequentDispatchHistogram": {
+          "buckets": [
+            "lt1ms",
+            "1to10ms",
+            "10to100ms",
+            "100to1000ms",
+            "ge1000ms"
+          ],
+          "counts": [
+            1,
+            1147,
+            61,
+            2,
+            0
+          ],
+          "excludesFirstInput": true
+        },
+        "timingsMicros": {
+          "AuthorizeTotal": {
+            "count": 13,
+            "minimum": 133580,
+            "median": 151657,
+            "maximum": 222478
+          },
+          "OpenLock": {
+            "count": 13,
+            "minimum": 0,
+            "median": 0,
+            "maximum": 80304
+          },
+          "ConnectTotal": {
+            "count": 13,
+            "minimum": 131868,
+            "median": 144037,
+            "maximum": 172150
+          },
+          "PipeOpen": {
+            "count": 13,
+            "minimum": 0,
+            "median": 0,
+            "maximum": 631
+          },
+          "ReadyWait": {
+            "count": 13,
+            "minimum": 129573,
+            "median": 141968,
+            "maximum": 170292
+          },
+          "FirstOfferSinceBegin": {
+            "count": 13,
+            "minimum": 160268,
+            "median": 204391,
+            "maximum": 439893
+          },
+          "FirstDispatch": {
+            "count": 13,
+            "minimum": 1695,
+            "median": 2548,
+            "maximum": 5580
+          },
+          "PerAttemptWorstSubsequentDispatch": {
+            "count": 13,
+            "minimum": 3089,
+            "median": 4875,
+            "maximum": 154274
+          },
+          "PerAttemptWorstSubsequentClientResponse": {
+            "count": 13,
+            "minimum": 2377,
+            "median": 4272,
+            "maximum": 143173
+          }
+        },
+        "recentCodes": {
+          "lifecycle_desktop_switch": 5,
+          "lifecycle_session_lock": 1,
+          "installed_source_reader_closed": 4,
+          "installed_source_refresh_joined": 4
+        },
+        "startupMicros": {
+          "ServiceLaunch": {
+            "count": 13,
+            "minimum": 19517,
+            "median": 25121,
+            "maximum": 28142
+          },
+          "ServiceChildConnect": {
+            "count": 13,
+            "minimum": 115500,
+            "median": 123762,
+            "maximum": 158099
+          },
+          "ServiceBootstrapReady": {
+            "count": 13,
+            "minimum": 118838,
+            "median": 131056,
+            "maximum": 158312
+          },
+          "WorkerInstalledValidation": {
+            "count": 13,
+            "minimum": 56773,
+            "median": 61910,
+            "maximum": 86236
+          },
+          "WorkerIdentity": {
+            "count": 13,
+            "minimum": 0,
+            "median": 0,
+            "maximum": 0
+          },
+          "WorkerServiceAuth": {
+            "count": 13,
+            "minimum": 2154,
+            "median": 2869,
+            "maximum": 4114
+          },
+          "WorkerAgentAuth": {
+            "count": 13,
+            "minimum": 3430,
+            "median": 4158,
+            "maximum": 4985
+          },
+          "WorkerDesktopReady": {
+            "count": 13,
+            "minimum": 113129,
+            "median": 123648,
+            "maximum": 150894
+          }
+        },
+        "preparedBootstrapUsedCount": 13,
+        "pipeOpenBusyCount": 0,
+        "pipeOpenMissingCount": 0,
+        "slowestSubsequentDispatch": {
+          "exchangeTag": "5d7e1568707d559c85dd060f7b479aad0db231d0e28c9e0d4daf251e120cb50c",
+          "dispatchMicros": 154274,
+          "clientResponseMicros": 143173,
+          "workerApplyMillisFloored": 132,
+          "authorityMicros": [
+            0,
+            0,
+            10587
+          ],
+          "workerMeasured": 4
+        }
+      }
+    }
+  },
+  "historicalSessionTriggers": {
+    "A": [
+      {
+        "timeUTC": "2026-10-22T16:50:19.0454156Z",
+        "connection": "cbfd4b9571eed4c7e285e49ec3efd8708b0a22734dc0445cd4e4402286028e52",
+        "component": "peer-liveness",
+        "fault": "fault_peer_liveness_failed",
+        "timeout": true
+      },
+      {
+        "timeUTC": "2026-10-22T17:52:21.8374418Z",
+        "connection": "7f6c7aa26fbe202de6f98be9ed959ea408e50d45af9240d017ee3a311343dd05",
+        "component": "source-hook",
+        "fault": "fault_source_hook_failed",
+        "timeout": false
+      },
+      {
+        "timeUTC": "2026-10-22T17:52:49.5866731Z",
+        "connection": "f370cd0b1a2656f9e1f4ba7e54845bbce58218e465f4d94ac278475c20e0eee3",
+        "component": "source-hook",
+        "fault": "fault_source_hook_failed",
+        "timeout": false
+      },
+      {
+        "timeUTC": "2026-10-22T17:54:08.5944909Z",
+        "connection": "cac4dad345547127cda797a5a24064fdb97e9fd38711d05558842fa54b3d9496",
+        "component": "boundary-orchestrator",
+        "fault": "fault_boundary_orchestrator_failed",
+        "timeout": true
+      },
+      {
+        "timeUTC": "2026-10-22T17:58:15.0651203Z",
+        "connection": "8632e098b02c82260576e36003f04ec9709203f1863b70d7c6978233d0ac3aba",
+        "component": "source-hook",
+        "fault": "fault_source_hook_failed",
+        "timeout": false
+      },
+      {
+        "timeUTC": "2026-10-22T17:59:22.7411027Z",
+        "connection": "89c0b84fda15ba153ce77f5fe392383b2a4891247b42679350e8e6cadd6533fe",
+        "component": "source-hook",
+        "fault": "fault_source_hook_failed",
+        "timeout": false
+      }
+    ],
+    "B": [
+      {
+        "timeUTC": "2026-10-22T17:52:24.4813567Z",
+        "connection": "7f6c7aa26fbe202de6f98be9ed959ea408e50d45af9240d017ee3a311343dd05",
+        "component": "peer-session",
+        "fault": "fault_remote_eof",
+        "timeout": false
+      },
+      {
+        "timeUTC": "2026-10-22T17:52:52.2329346Z",
+        "connection": "f370cd0b1a2656f9e1f4ba7e54845bbce58218e465f4d94ac278475c20e0eee3",
+        "component": "peer-session",
+        "fault": "fault_remote_eof",
+        "timeout": false
+      },
+      {
+        "timeUTC": "2026-10-22T17:54:11.2411218Z",
+        "connection": "cac4dad345547127cda797a5a24064fdb97e9fd38711d05558842fa54b3d9496",
+        "component": "peer-session",
+        "fault": "fault_remote_eof",
+        "timeout": false
+      },
+      {
+        "timeUTC": "2026-10-22T17:58:17.7046519Z",
+        "connection": "8632e098b02c82260576e36003f04ec9709203f1863b70d7c6978233d0ac3aba",
+        "component": "peer-session",
+        "fault": "fault_remote_eof",
+        "timeout": false
+      },
+      {
+        "timeUTC": "2026-10-22T17:59:25.3660168Z",
+        "connection": "89c0b84fda15ba153ce77f5fe392383b2a4891247b42679350e8e6cadd6533fe",
+        "component": "peer-session",
+        "fault": "fault_remote_eof",
+        "timeout": false
+      }
+    ]
+  },
+  "serviceSourceHistory": {
+    "A": {
+      "total": 17,
+      "retainedExitRecords": 16,
+      "retainedReportCounts": {
+        "failed": 16
+      },
+      "service": "READY",
+      "inputHealth": "READY",
+      "previousTotal": 7,
+      "totalIncrease": 10,
+      "newExitOperations": {
+        "source-service-query-cancelled": 2,
+        "source-agent-query-closed": 2,
+        "source-write-boundary-timeout": 1,
+        "source-query-cancelled": 1,
+        "source-reader-eof": 1,
+        "source-gate-boundary-prepare": 1,
+        "source-gate-boundary-write": 2
+      }
+    },
+    "B": {
+      "total": 11,
+      "retainedExitRecords": 11,
+      "retainedReportCounts": {
+        "ok": 11
+      },
+      "service": "READY",
+      "inputHealth": "READY"
+    }
+  },
+  "scope": {
+    "runtimeReplaced": false,
+    "push": false,
+    "deployment": false,
+    "codeChanges": false,
+    "publicAPIChanges": false,
+    "databaseChanges": false,
+    "ciRunnerChanges": false,
+    "repositoryHygieneChanges": false,
+    "sourceOfTruthDocumentsChanged": []
+  },
+  "validation": [
+    "Both CLI collection paths exist and parse as krasis.support/v1",
+    "SHA256 recorded for both immutable request exports",
+    "13 unique exchange tags match one-to-one across both PCs",
+    "All 26 role profiles end ok and are complete",
+    "Recent dispatch histogram sums match subsequent frame counts",
+    "Live local doctor and peer version/status reads succeeded"
+  ],
+  "skipped": [
+    {
+      "check": "Code tests, vet and rebuild",
+      "reason": "Read-only diagnostic analysis; no application code or build scripts changed."
+    },
+    {
+      "check": "New fix acceptance",
+      "reason": "Review build313016e is not deployed; both PCs still run7c047c6."
+    },
+    {
+      "check": "Independent screen/physical latency or long soak",
+      "reason": "Evidence is user-reported exercise plus paired software timings."
+    }
+  ],
+  "documentationModel": "command-code/deepseek-deepseek-v4.1-flash, high; interpretation reviewed against source",
+  "historicalMatchedFatalConnections": 5,
+  "findings": [
+    "The recent exercise produced 13 matched A-source/B-receiver leases with returns. All 26 role profiles ended ok and were complete; no recent connection fault or reconnection was recorded.",
+    "Receiver readiness is the principal measured entry-delay contributor: source grant wait median166.629ms, receiver ReadyWait median141.968ms, and isolated native input/release pair startup median123.648ms. All13 leases used prepared bootstrap owners, so that preparation did not remove native pair readiness time. Pipe busy/missing counts were zero.",
+    "Most subsequent receiver dispatches completed under10ms (1148/1211), but two took100ms-1s; the maximum was154.274ms. Its matching worker apply span was132ms floored and client response143.173ms. This is local operation time, not raw SendInput or display latency. The same lease overlapped lock/desktop changes; causation is unproven.",
+    "A capture activation had a259.854ms maximum and source deactivation197.871ms maximum. These are separate tails from the receiver worker apply stall.",
+    "Before the recent exercise, five A fatal sessions (four source-hook classifications and one boundary-orchestrator timeout) match five B remote EOF triggers by connection identity. The A source/control path leads the investigation; the exact native cause remains unproven.",
+    "Seven recent A boundary_dropped_not_ready events record edge attempts ignored while unready, not seven completed handoffs failing. Peer lock/desktop switching also caused four clean source refresh joins without a recent connection failure.",
+    "Both running images still identify as7c047c6/g443. This exercise does not validate writer preparation552c35c or capacity admission3ba2760 in the undeployed review bundle313016e."
+  ],
+  "interpretationLimits": [
+    "The13 paired leases are not26 independently tested directions. Subsequent-input histograms exclude first-input samples; first-input statistics are separate.",
+    "Timing spans are local and nested spans overlap. Do not sum bootstrap/child spans, subtract timestamps across PCs, or treat first-offer timing or cadence gaps as end-to-end cursor latency.",
+    "The source exit total rose from7 to17, including refresh/teardown. The retained ring holds16 records; the increase is not ten proven user-visible disconnections.",
+    "Agent logs are complete within their retained ranges; empty control.previous.jsonl is marked incomplete on both exports. This is not complete crash history.",
+    "Software ACKs and user-reported exercise do not measure displayed pixels. Recent zero retransmission/timeouts do not rule out broader intermittent network failures."
+  ],
+  "nextPriorities": [
+    {
+      "priority": 1,
+      "task": "Attribute A fatal source/query/gate exits and separately validate the existing review fixes during an authorized paired rollout.",
+      "reason": "Current deployed diagnostics cannot prove the new fixes work; reliability failures remain unresolved."
+    },
+    {
+      "priority": 2,
+      "task": "Reduce B native input/release pair initialization time while preserving current authorization and isolation.",
+      "reason": "Native pair startup dominates measured receiver readiness even with prepared bootstrap."
+    },
+    {
+      "priority": 3,
+      "task": "Investigate A capture/deactivation jitter separately from the B worker apply tail, with lock/desktop transitions retained as context.",
+      "reason": "Different operations exhibit independent latency tails."
+    }
+  ]
+}
