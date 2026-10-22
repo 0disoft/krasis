@@ -21,6 +21,7 @@
   import { resolveLocale } from './i18n.js';
   import { nativeText } from './native-i18n.js';
   import { createOperationGate } from './operation-gate.js';
+  import { createPairingController } from './pairing-controller.js';
   import { createWorkspacePoll, pollStatus } from './workspace-poll.js';
   import { createTrayLocaleSync } from './tray-locale.js';
   let saved;
@@ -42,7 +43,7 @@
   let error = $state('');
   let bridge = $state.raw();
   let clipboardBridge;
-  let pairingBridge;
+  let pairingController;
   let layoutBridge;
   let layoutController;
   let diagnosticsBridge = $state.raw();
@@ -183,32 +184,8 @@
     openDialog(consent);
   }
   async function runPair(action, background = false) {
-    if (!pairingBridge || pairBusy || disposed) return;
-    const joinCandidate = candidate, joinPIN = pinInput;
-    await pairingOperation(async () => {
-      if (disposed) return;
-      if (action !== 'status') pairNotice = '';
-      const value = action === 'invite' ? await pairingBridge.invite()
-        : action === 'search' ? await pairingBridge.search()
-        : action === 'cancel' ? await pairingBridge.cancel()
-        : action === 'join' ? await pairingBridge.join(joinCandidate, joinPIN)
-        : await pairingBridge.status();
-      if (disposed) return;
-      applyPair(value);
-      if (value.candidates[0] && !value.candidates.some(c => c.id === candidate)) candidate = value.candidates[0].id;
-      if (action === 'join') pinInput = '';
-      if (value.code === 'pairing_completed' || value.code === 'paired_connect_failed') await run('refresh', true);
-    }, background);
-  }
-  function applyPair(value) {
-    if (value.code === 'busy') return;
-    if (value.code === 'unavailable' && pairing.job && !value.job) {
-      value = {...value, job: pairing.job};
-    }
-    pairing = value;
-    if (['pairing_completed', 'paired_connect_failed', 'pairing_ended'].includes(value.code)) {
-      pairNotice = value.code;
-    }
+    if (!pairingController || pairBusy || disposed) return;
+    await pairingController.run(action, background);
   }
   async function swap() {
     if (!layoutController || !selectedPeer || !canPlace) return;
@@ -276,7 +253,7 @@
             if(!disposed) clipboard=value;
           }, true);
         },
-        async () => { if (!pairBusy && !disposed && pairingBridge) await runPair('status', true); },
+        async () => { if (!pairBusy && !disposed && pairingController) await runPair('status', true); },
         async () => { if (!disposed && !diagBusy && diagnosticsBridge) await runDiagnostics('status', true); },
         async () => { if (!disposed) await pollUIReplacement(); },
       ]);
@@ -308,12 +285,18 @@
           ClipboardStatus:()=>Call.ByName(name+'ClipboardStatus'),
           ClipboardSet:(peer,enable)=>Call.ByName(name+'ClipboardSet',peer,enable),
         });
-        pairingBridge=createPairingBridge({
+        const pairingBridge=createPairingBridge({
           PairStatus:()=>Call.ByName(name+'PairStatus'),
           PairInvite:()=>Call.ByName(name+'PairInvite'),
           PairSearch:()=>Call.ByName(name+'PairSearch'),
           PairJoin:(id,pin)=>Call.ByName(name+'PairJoin',id,pin),
           PairCancel:()=>Call.ByName(name+'PairCancel'),
+        });
+        pairingController=createPairingController(pairingBridge, pairingOperation, {
+          active: () => !disposed,
+          read: () => ({pairing, notice:pairNotice, candidate, pin:pinInput}),
+          apply: value => { pairing=value.pairing; pairNotice=value.notice; candidate=value.candidate; pinInput=value.pin; },
+          refresh: () => run('refresh', true),
         });
         layoutBridge=createLayoutBridge({
           LayoutStatus:(fp)=>Call.ByName(name+'LayoutStatus',fp),
