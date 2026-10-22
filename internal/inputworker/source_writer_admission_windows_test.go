@@ -7,7 +7,6 @@ import (
 	"net"
 	"sync/atomic"
 	"testing"
-	"testing/synctest"
 	"time"
 
 	"github.com/0disoft/krasis/internal/control"
@@ -56,71 +55,6 @@ func TestSourceWriterSlowAuthorizationYieldsToHeartbeat(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestSourceWriterSlowFinalPresenceYieldsToHeartbeat(t *testing.T) {
-	server, conn := net.Pipe()
-	defer server.Close()
-	w := &sourceWriter{channel: clientChannel(conn, authorityAgent), binding: Binding{1}}
-	defer w.channel.Close()
-	w.started.Store(true)
-	entered, release := make(chan struct{}), make(chan struct{})
-	var checks atomic.Int32
-	w.channel.authority.checkInput = func() error { return nil }
-	w.channel.authority.checkPresent = func() error {
-		if checks.Add(1) == 1 {
-			close(entered)
-			<-release
-		}
-		return nil
-	}
-	dataDone, heartbeatDone := make(chan error, 1), make(chan error, 1)
-	go func() {
-		dataDone <- w.send(sourcePacket{kind: sourceAction, reply: 1, action: control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}}, nil)
-	}()
-	<-entered
-	go func() { heartbeatDone <- w.send(sourcePacket{kind: sourceReply, op: sourceHeartbeat, reply: 2}, nil) }()
-	_ = server.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
-	first, firstErr := readSourcePacket(server)
-	close(release)
-	_ = server.SetReadDeadline(time.Now().Add(time.Second))
-	second, secondErr := readSourcePacket(server)
-	if firstErr != nil {
-		_, _ = readSourcePacket(server)
-	}
-	dataErr, heartbeatErr := <-dataDone, <-heartbeatDone
-	if firstErr != nil || secondErr != nil || dataErr != nil || heartbeatErr != nil || first.op != sourceHeartbeat || first.sequence != 1 || second.kind != sourceAction || second.sequence != 2 {
-		t.Fatal("slow final owner check held the heartbeat lane or wire gate", first, second, firstErr, secondErr, dataErr, heartbeatErr)
-	}
-}
-
-func TestSourceWriterRechecksFinalPresenceAfterGateContention(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		server, conn := net.Pipe()
-		defer server.Close()
-		w := &sourceWriter{channel: clientChannel(conn, authorityAgent), binding: Binding{1}}
-		defer w.channel.Close()
-		w.started.Store(true)
-		var full, presence atomic.Int32
-		checked := make(chan struct{})
-		w.channel.authority.checkInput = func() error { full.Add(1); return nil }
-		w.channel.authority.checkPresent = func() error {
-			if presence.Add(1) == 1 {
-				close(checked)
-				return nil
-			}
-			return ErrAuthority
-		}
-		w.mu.Lock()
-		done := make(chan error, 1)
-		go func() { done <- w.send(sourcePacket{kind: sourceReturn, reply: 1}, nil) }()
-		<-checked
-		synctest.Wait()
-		w.mu.Unlock()
-		if err := <-done; !errors.Is(err, ErrAuthority) || full.Load() != 2 || presence.Load() != 2 || w.sequence != 0 {
-			t.Fatal("stale final presence survived admission contention", err, full.Load(), presence.Load(), w.sequence)
-		}
-	})
 }
 
 func TestSourceWriterReauthorizesAfterContendedAdmission(t *testing.T) {

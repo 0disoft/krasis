@@ -33,3 +33,5 @@ fresh paired timings and inspect remaining wire/write scheduling if needed.
 
 No private/public frame layout, public API, DB, dependency, runner, hygiene or
 product/architecture source-of-truth change. Local main; no push/ref update.
+
+WITHDRAWN in g437: A had two live source-write-timeout / heartbeat failures at 13:29:32Z and 13:30:11Z on g436. Restore g435 writer/query behavior before further experiments. Causality is unproven; do not claim the gate change fixed runtime latency. Paired evidence: 6f697649892a6df3ff431a73bde2a0e5. g435 inputworker/productpanel validation remains applicable to the restored code; packaging validates the new generation.

@@ -27,7 +27,6 @@ const (
 	sourcePresenceAuthorityQuery
 	sourceAdvisoryAuthorityQuery
 	sourceAdvisoryPresenceAuthorityQuery
-	sourceWriterAuthorityQuery
 )
 
 // Only read-only proof queries run here. Input injection stays on its original
@@ -52,13 +51,6 @@ func (channel *Channel) authorizeHeartbeatPresence(ctx context.Context) error {
 
 func (channel *Channel) authorizeSourceInput(ctx context.Context) error {
 	return channel.queryAuthority(ctx, false, sourceInputAuthorityQuery)
-}
-
-// One mandatory query owns both full authorization and final owner presence.
-// Run before immediate writer admission, on the input lane so a delayed check
-// cannot occupy the independent heartbeat-presence lane or the wire gate.
-func (channel *Channel) authorizeSourceWrite(ctx context.Context) error {
-	return channel.queryAuthority(ctx, false, sourceWriterAuthorityQuery)
 }
 
 func (channel *Channel) authorizeSourcePresence(ctx context.Context) error {
@@ -132,12 +124,7 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 			if query.timing != nil {
 				query.timing.started = time.Now()
 			}
-			if kind == sourceWriterAuthorityQuery {
-				query.err = channel.authority.checkSource()
-				if query.err == nil {
-					query.err = channel.authority.checkSourceHeartbeat()
-				}
-			} else if kind == sourceInputAuthorityQuery || kind == sourceAdvisoryAuthorityQuery {
+			if kind == sourceInputAuthorityQuery || kind == sourceAdvisoryAuthorityQuery {
 				query.err = channel.authority.checkSource()
 			} else if kind == sourcePresenceAuthorityQuery || kind == sourceAdvisoryPresenceAuthorityQuery {
 				query.err = channel.authority.checkSourceHeartbeat()
