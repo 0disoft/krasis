@@ -297,7 +297,7 @@ func startNativeChildClient(ctx context.Context, mode string, handles []windows.
 	for _, handle := range handles {
 		command.SysProcAttr.AdditionalInheritedHandles = append(command.SysProcAttr.AdditionalInheritedHandles, syscall.Handle(handle))
 	}
-	process, err := crashguard.StartLocalInputCommand(command, data)
+	process, err := crashguard.StartLocalInputCommandContext(ctx, command, data)
 	if err != nil {
 		var pending *crashguard.ExitPending
 		if errors.As(err, &pending) {

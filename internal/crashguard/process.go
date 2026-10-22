@@ -49,22 +49,50 @@ func StartPortable(executable string) (*Process, error) {
 // privileged dispatcher must independently authenticate its bootstrap before
 // accepting input; this constructor supplies no Windows/service authority.
 func StartLocalInputCommand(command *exec.Cmd, bootstrap []byte) (*Process, error) {
-	process, err := startCommand(command)
+	return StartLocalInputCommandContext(context.Background(), command, bootstrap)
+}
+
+// StartLocalInputCommandContext shares the startup caller's remaining budget.
+// Cancellation retires the exact launched child; it never grants input authority.
+func StartLocalInputCommandContext(ctx context.Context, command *exec.Cmd, bootstrap []byte) (*Process, error) {
+	return startLocalInputCommand(ctx, command, bootstrap, startCommand)
+}
+
+func startLocalInputCommand(ctx context.Context, command *exec.Cmd, bootstrap []byte, start func(*exec.Cmd) (*Process, error)) (*Process, error) {
+	if ctx == nil {
+		return nil, ErrUnexpectedExit
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	process, err := start(command)
 	if err != nil {
 		return nil, err
 	}
 	process.portable = true
-	if len(bootstrap) != 0 {
-		err = process.ExchangeInput(context.Background(), func(writer io.Writer, _ io.Reader) error {
+	// Native process creation can finish after cancellation. Retire that exact
+	// owner before returning; it must not receive a late bootstrap or input.
+	err = ctx.Err()
+	if err == nil && len(bootstrap) != 0 {
+		err = process.ExchangeInput(ctx, func(writer io.Writer, _ io.Reader) error {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 			n, err := writer.Write(bootstrap)
 			if err != nil || n != len(bootstrap) {
 				return errors.Join(ErrUnexpectedExit, err)
 			}
 			return nil
 		})
-		if err != nil {
-			return process, errors.Join(err, process.Close())
-		}
+	}
+	if err == nil {
+		err = ctx.Err()
+	}
+	if err != nil {
+		// No input journal exists during startup. Abort instead of sending a
+		// graceful disarm into a child that may still be reading its bootstrap.
+		process.requestAbort()
+		return process, errors.Join(err, process.Close())
 	}
 	return process, nil
 }
