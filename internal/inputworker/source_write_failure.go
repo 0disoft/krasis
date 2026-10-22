@@ -28,6 +28,7 @@ func pipeAdmissionFailure(read bool, cause error) error {
 // never received a command. Keep its cause for diagnostics, never for replay.
 type sourceIOFailure struct {
 	stage       string
+	origin      byte // Fixed local packet category; no input operation or payload.
 	cause       error
 	unsubmitted bool
 	partial     bool
@@ -63,6 +64,30 @@ func writeSourceCommand(stream net.Conn, data []byte, deadline time.Time) error 
 // Closed labels only. Partial/attempted writes remain fatal; these observations
 // cannot authorize replay or alter independent native-retirement evidence.
 func (e *sourceIOFailure) operation() string {
+	operation := e.genericOperation()
+	if origin := sourceWriteOrigin(e.origin); origin != "" {
+		return "source-write-" + origin + "-" + operation[len("source-write-"):]
+	}
+	return operation
+}
+
+func sourceWriteOrigin(kind byte) string {
+	switch kind {
+	case sourceBoundary:
+		return "boundary"
+	case sourceAction:
+		return "action"
+	case sourceReply:
+		return "reply"
+	case sourceReturn:
+		return "return"
+	case sourceRetired:
+		return "retirement"
+	}
+	return ""
+}
+
+func (e *sourceIOFailure) genericOperation() string {
 	switch {
 	case e.stage == "deadline":
 		return "source-write-deadline"

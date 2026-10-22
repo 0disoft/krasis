@@ -86,6 +86,9 @@ func (v Runtime) Valid() bool {
 }
 
 func ValidRuntimeOperation(operation string) bool {
+	if validSourceWriteOriginOperation(operation) {
+		return true
+	}
 	switch operation {
 	case "source-query-deadline", "source-query-cancelled", "source-query-capacity", "source-query-closed",
 		"source-service-query-deadline", "source-service-query-cancelled", "source-service-query-capacity", "source-service-query-closed",

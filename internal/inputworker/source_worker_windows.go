@@ -104,7 +104,11 @@ func (w *sourceWriter) writePacketContext(ctx context.Context, p sourcePacket, c
 	if progress != nil {
 		writeDone = progress.measure(heartbeatReplyWrite)
 	}
-	err = w.writeSequenced(ctx, data[:], p.sequence)
+	origin := p.kind
+	if retirement {
+		origin = sourceRetired // A stop ACK is also retirement delivery.
+	}
+	err = w.writeSequenced(ctx, data[:], p.sequence, origin)
 	writeDone()
 	if progress != nil && err == nil {
 		progress.stage = heartbeatReplied
@@ -116,7 +120,7 @@ func (w *sourceWriter) writePacketContext(ctx context.Context, p sourcePacket, c
 // deadline) can leave the sequence untouched. No failed operation is replayed:
 // this permits only a later, distinct joined-retirement frame to remain valid.
 // Partial/attempted failures poison the stream, even when Write reports zero.
-func (w *sourceWriter) writeSequenced(ctx context.Context, data []byte, sequence uint64) error {
+func (w *sourceWriter) writeSequenced(ctx context.Context, data []byte, sequence uint64, origin byte) error {
 	if w.broken {
 		return sourceTransportFailure(ErrProtocol)
 	}
@@ -125,6 +129,9 @@ func (w *sourceWriter) writeSequenced(ctx context.Context, data []byte, sequence
 	}
 	deadline, _ := ctx.Deadline()
 	err := writeSourceCommand(w.channel.stream, data, deadline)
+	if failure, ok := err.(*sourceIOFailure); ok {
+		failure.origin = origin // The failed local call has one owner.
+	}
 	if err != nil {
 		var failure *sourceIOFailure
 		if errors.As(err, &failure) && (failure.stage == "deadline" || failure.unsubmitted) {

@@ -99,7 +99,7 @@ func TestCleanRetirementWithDisconnectedAgentCannotStopService(t *testing.T) {
 		r := newLoginRuntimeRecorder(func(logindiag.Runtime) error { return nil })
 		r.record("worker", "FAILED", serviceEndpointFailure(received, "capture"))
 		failure := r.value.LastFailure
-		if failure == nil || failure.Operation != "source-retirement-write" || failure.Win32Known || !r.value.Valid() {
+		if failure == nil || failure.Operation != "source-write-retirement-deadline" || failure.Win32Known || !r.value.Valid() {
 			t.Fatal("delivery failure classification lost", failure)
 		}
 	}

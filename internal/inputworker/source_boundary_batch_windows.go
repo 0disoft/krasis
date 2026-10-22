@@ -74,7 +74,7 @@ func (w *sourceWriter) sendBoundaries(batch []sourcePacket) error {
 	if ctx.Err() == context.DeadlineExceeded && (w.ctx == nil || w.ctx.Err() == nil) {
 		return nil // Still before the write; no sequence or bytes escaped.
 	}
-	err := w.writeSequenced(ctx, wire[:len(batch)*sourcePacketSize], next)
+	err := w.writeSequenced(ctx, wire[:len(batch)*sourcePacketSize], next, sourceBoundary)
 	var failure *sourceIOFailure
 	if errors.As(err, &failure) && failure.unsubmitted && errors.Is(failure, os.ErrDeadlineExceeded) {
 		// These are advisory pointer samples, just like the bounded queue's

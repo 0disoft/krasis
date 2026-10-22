@@ -24,6 +24,7 @@ func init() {
 	reportOperations = append(reportOperations, "hook-callback-stalled", "hook-mouse-progress")
 	reportOperations = append(reportOperations, "source-write-deadline", "source-write-unsubmitted", "source-write-partial", "source-write-timeout", "source-write-closed", "source-write-native", "source-write-other")
 	reportOperations = append(reportOperations, sourceQueryFailureOperations()...)
+	reportOperations = append(reportOperations, logindiag.SourceWriteOriginOperations()...)
 }
 
 type workerReportFailure struct {
@@ -79,7 +80,7 @@ func reportFailureDetails(err error) (byte, uint32) {
 	// Refine only the selected transport container. Searching all siblings here
 	// would let a later failed retirement hide the original command/native cause.
 	switch operation {
-	case "", "source-command-loop", "source-sender-join", "source-command-heartbeat":
+	case "", "source-command-loop", "source-sender-join", "source-command-heartbeat", "source-retirement-write":
 		candidate := selected
 		if candidate == nil {
 			candidate = err
