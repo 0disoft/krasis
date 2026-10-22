@@ -14,8 +14,16 @@ const revision = git(['rev-parse','HEAD']);
 const generation = Number(fs.readFileSync('internal/localapi/runtime.go','utf8').match(/const AgentGeneration = (\d+)/u)?.[1]);
 if (!Number.isSafeInteger(generation)) throw Error('Missing generation');
 const bundleRoot = process.argv[2];
-if (!bundleRoot || path.resolve(bundleRoot) !== path.resolve('dist/workspace', `g${generation}`)) throw Error('Expected generation-scoped distribution');
+const reviewRoot = path.resolve('dist/review', revision, `g${generation}`);
+const review = bundleRoot && path.resolve(bundleRoot) === reviewRoot;
+if (process.argv.length !== 3 || !bundleRoot || !review && path.resolve(bundleRoot) !== path.resolve('dist/workspace', `g${generation}`)) throw Error('Expected generation-scoped distribution or current-revision review distribution');
+if (review && signingEnabled()) throw Error('Review distributions must use unsigned development builds');
 const directory = bundleRoot;
+// The direct Node entry point must also refuse an existing build before Go can
+// replace any executable. A failed/partial build needs a different revision.
+for (const name of ['krasis.exe','krasis-agent.exe','krasis-cli.exe','krasis-install.exe','BUILD.json','SHA256SUMS.txt']) {
+  if (fs.existsSync(path.join(directory,name))) throw Error('Distribution already contains build artifacts; never overwrite it');
+}
 for (const name of ['krasis','krasis-agent','krasis-cli']) {
   const tags = name === 'krasis' ? ['-tags','desktop,production'] : [];
   const publicKey = process.env.KRASIS_RELEASE_PUBLIC_KEY ?? '';

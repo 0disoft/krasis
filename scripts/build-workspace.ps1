@@ -1,5 +1,16 @@
+param([switch]$Review)
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$revision = (git rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or $revision -notmatch '^[a-f0-9]{40}$') { throw 'Missing source revision' }
+if (git status --porcelain --untracked-files=no) { throw 'Commit source changes before packaging' }
+$generation = [regex]::Match((Get-Content -Raw -LiteralPath 'internal/localapi/runtime.go'), '(?m)^const AgentGeneration = ([1-9][0-9]*)\r?$')
+if (-not $generation.Success) { throw 'Missing agent generation' }
+$outputRoot = if ($Review) { Join-Path 'dist/review' $revision } else { 'dist/workspace' }
+$bundle = Join-Path $outputRoot ('g' + $generation.Groups[1].Value)
+if (Test-Path -LiteralPath $bundle) { throw 'Generation artifact already exists; do not overwrite running programs' }
+
 $env:GOMODCACHE = Join-Path (Get-Location) '.cache/go-mod'
 $env:GOCACHE = Join-Path (Get-Location) '.cache/go-build'
 $env:GOPROXY = 'off'
@@ -8,13 +19,6 @@ npm.cmd --prefix frontend test
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 npm.cmd --prefix frontend run build -- --mode native
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-$revision = (git rev-parse HEAD).Trim()
-if ($LASTEXITCODE -ne 0 -or $revision -notmatch '^[a-f0-9]{40}$') { throw 'Missing source revision' }
-if (git status --porcelain --untracked-files=no) { throw 'Commit source changes before packaging' }
-$generation = [regex]::Match((Get-Content -Raw -LiteralPath 'internal/localapi/runtime.go'), '(?m)^const AgentGeneration = ([1-9][0-9]*)\r?$')
-if (-not $generation.Success) { throw 'Missing agent generation' }
-$bundle = Join-Path 'dist/workspace' ('g' + $generation.Groups[1].Value)
-if (Test-Path -LiteralPath $bundle) { throw 'Generation artifact already exists; do not overwrite running programs' }
 New-Item -ItemType Directory -Path $bundle | Out-Null
 Copy-Item -LiteralPath 'frontend/README.md' -Destination (Join-Path $bundle 'START-HERE.md')
 $notice = [Collections.Generic.List[string]]::new()
