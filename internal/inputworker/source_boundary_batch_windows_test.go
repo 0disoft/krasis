@@ -3,6 +3,7 @@
 package inputworker
 
 import (
+	"errors"
 	"net"
 	"sync/atomic"
 	"testing"
@@ -11,6 +12,45 @@ import (
 
 	"github.com/0disoft/krasis/internal/control"
 )
+
+func TestBoundaryMalformedBatchDoesNotWaitForWriterOrQueryAuthority(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		server, conn := net.Pipe()
+		defer server.Close()
+		stream := &queryOwnedConn{admissionObservedConn: &admissionObservedConn{Conn: conn}}
+		w := &sourceWriter{channel: clientChannel(stream, authorityAgent), binding: Binding{1}, sequence: 42}
+		defer w.channel.Close()
+		w.started.Store(true)
+		var checks atomic.Int32
+		w.channel.authority.checkInput = func() error { checks.Add(1); return nil }
+		w.channel.authority.checkPresent = func() error { checks.Add(1); return nil }
+		w.mu.Lock()
+		defer w.mu.Unlock()
+		started := time.Now()
+		for _, bad := range []sourcePacket{
+			{kind: sourceAction, reply: 1, action: control.InputAction{Kind: control.InputKeyDown, Code: 65}},
+			{kind: sourceBoundary},
+		} {
+			err := w.sendBoundaries([]sourcePacket{boundaryBatchPacket(1), bad})
+			if !errors.Is(err, ErrProtocol) || time.Since(started) != 0 || checks.Load() != 0 || stream.writes.Load() != 0 || w.sequence != 42 || w.broken {
+				t.Fatal("invalid advisory work waited for the mandatory writer or changed its state", err, checks.Load(), w.sequence)
+			}
+		}
+	})
+}
+
+func TestBoundarySequenceOverflowNeverSubmitsPreparedPayload(t *testing.T) {
+	server, conn := net.Pipe()
+	defer server.Close()
+	stream := &queryOwnedConn{admissionObservedConn: &admissionObservedConn{Conn: conn}}
+	w := &sourceWriter{channel: clientChannel(stream, authorityAgent), binding: Binding{1}, sequence: ^uint64(0) - 1}
+	defer w.channel.Close()
+	w.started.Store(true)
+	err := w.sendBoundaries([]sourcePacket{boundaryBatchPacket(1), boundaryBatchPacket(2)})
+	if !errors.Is(err, ErrProtocol) || w.sequence != ^uint64(0)-1 || stream.writes.Load() != 0 || w.broken {
+		t.Fatal("overflow submitted a placeholder or consumed part of a batch", err, w.sequence)
+	}
+}
 
 func boundaryBatchPacket(x int32) sourcePacket {
 	return sourcePacket{kind: sourceBoundary, x: x, action: control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}}

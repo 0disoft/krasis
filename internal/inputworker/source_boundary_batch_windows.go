@@ -4,6 +4,7 @@ package inputworker
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"os"
 )
@@ -47,6 +48,23 @@ func (w *sourceWriter) sendBoundaries(batch []sourcePacket) error {
 	// obtain presence and the final full proof before immediate gate admission.
 	ctx, cancel := w.operation(nil, false)
 	defer cancel()
+	// Allocate, validate and encode the bounded observation payload before
+	// obtaining authority or the wire gate. Sequence 1 is a private placeholder;
+	// only the gate owner assigns real sequences immediately before the write.
+	// A heartbeat can proceed throughout this preparation, and the later full
+	// proof is still fresh at TryLock admission.
+	var wire [sourceBoundaryBatchLimit * sourcePacketSize]byte
+	for i, p := range batch {
+		if p.kind != sourceBoundary {
+			return ErrProtocol
+		}
+		p.sequence, p.binding = 1, w.binding
+		data, err := encodeSourcePacket(p)
+		if err != nil {
+			return err
+		}
+		copy(wire[i*sourcePacketSize:], data[:])
+	}
 	if err := w.lockAuthorized(ctx, true); err != nil {
 		if ctx.Err() == context.DeadlineExceeded && errors.Is(err, context.DeadlineExceeded) && (w.ctx == nil || w.ctx.Err() == nil) {
 			// No gate or bytes were acquired. Drop this stale observation just
@@ -58,19 +76,13 @@ func (w *sourceWriter) sendBoundaries(batch []sourcePacket) error {
 	}
 	w.gateStage(sourceBoundary, sourceGatePrepare)
 	defer w.unlockGate()
-	var wire [sourceBoundaryBatchLimit * sourcePacketSize]byte
 	next := w.sequence
-	for i, p := range batch {
-		if p.kind != sourceBoundary {
+	for i := range batch {
+		next++
+		if next == 0 {
 			return ErrProtocol
 		}
-		next++
-		p.sequence, p.binding = next, w.binding
-		data, err := encodeSourcePacket(p)
-		if err != nil {
-			return err
-		}
-		copy(wire[i*sourcePacketSize:], data[:])
+		binary.BigEndian.PutUint64(wire[i*sourcePacketSize+8:i*sourcePacketSize+16], next)
 	}
 	if ctx.Err() == context.DeadlineExceeded && (w.ctx == nil || w.ctx.Err() == nil) {
 		return nil // Still before the write; no sequence or bytes escaped.

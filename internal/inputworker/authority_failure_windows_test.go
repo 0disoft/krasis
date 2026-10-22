@@ -53,7 +53,7 @@ func TestSourceWritersRejectAuthorityWithoutLosingDetailsOrWriting(t *testing.T)
 			w.started.Store(true)
 			var result error
 			if batch {
-				result = w.sendBoundaries([]sourcePacket{{kind: sourceBoundary}})
+				result = w.sendBoundaries([]sourcePacket{boundaryBatchPacket(1)})
 			} else {
 				result = w.send(sourcePacket{kind: sourceAction}, nil)
 			}
