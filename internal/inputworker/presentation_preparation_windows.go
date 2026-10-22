@@ -16,11 +16,12 @@ type cursorInputPreparation struct {
 	next   *preparedConsole
 	err    error
 	joined atomic.Bool
+	cancel context.CancelFunc
 }
 
 // A clean input return is a single preparation opportunity, independent of the
 // rate-limited movement hints. No lease or agent handle enters the warm child.
-// The service still joins construction before accepting its next request.
+// Construction is joined before admission, after the next agent authenticates.
 func prepareInputReentry(ctx context.Context, lease Lease, result error, prepare func(context.Context) (*preparedConsole, error)) *cursorInputPreparation {
 	if ctx == nil || ctx.Err() != nil || result != nil || lease.Capture || lease.Presentation || !lease.ExpiresAt.After(time.Now()) {
 		return nil
@@ -29,10 +30,12 @@ func prepareInputReentry(ctx context.Context, lease Lease, result error, prepare
 }
 
 func startCursorInputPreparation(ctx context.Context, prepare func(context.Context) (*preparedConsole, error)) *cursorInputPreparation {
-	p := &cursorInputPreparation{done: make(chan struct{})}
+	lifetime, stop := context.WithCancel(ctx)
+	p := &cursorInputPreparation{done: make(chan struct{}), cancel: stop}
 	go func() {
 		defer close(p.done)
-		run, cancel := context.WithTimeout(ctx, startupTimeout)
+		defer stop()
+		run, cancel := context.WithTimeout(lifetime, startupTimeout)
 		defer cancel()
 		p.next, p.err = prepare(run)
 		if run.Err() != nil {

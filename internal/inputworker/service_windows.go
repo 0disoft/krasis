@@ -100,7 +100,7 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 	if err != nil {
 		return ErrAuthority
 	}
-	var next *preparedConsole
+	var preparation serviceInputPreparation
 	var lastPreparation time.Time
 	var returned presentationReturn
 	var initial *pipeConn
@@ -112,7 +112,7 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 		return err
 	}
 	defer func() {
-		if closeErr := next.close(); closeErr != nil {
+		if closeErr := preparation.close(); closeErr != nil {
 			result = errors.Join(result, ErrRecovery, closeErr)
 		}
 		result = errors.Join(result, listener.Close())
@@ -123,15 +123,20 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 			return err
 		}
 		readyFailed := false
-		channel, err := acceptAgentReadyOnPipe(ctx, agent, func() error {
-			if ready != nil && ready() != nil {
-				readyFailed = true
-				return ErrAuthority
-			}
-			return nil
-		}, installation, initial)
+		channel, err := preparation.accept(func() (*Channel, error) {
+			return acceptAgentReadyOnPipe(ctx, agent, func() error {
+				if ready != nil && ready() != nil {
+					readyFailed = true
+					return ErrAuthority
+				}
+				return nil
+			}, installation, initial)
+		})
 		if readyFailed {
 			return ErrAuthority
+		}
+		if errors.Is(err, ErrRecovery) {
+			return err
 		}
 		if err == nil {
 			if admit != nil {
@@ -148,24 +153,24 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 				// No lease is created and no agent handle is transferred. A
 				// duplicate hint cannot extend expiry. A fresh, rate-limited hint
 				// may retire a nearly expired child before preparing a new one.
-				if next == nil || next.retired() || preparationRefreshDue(lastPreparation, next.preparedAt, time.Now()) {
-					if closeErr := next.close(); closeErr != nil {
+				if preparation.next == nil || preparation.next.retired() || preparationRefreshDue(lastPreparation, preparation.next.preparedAt, time.Now()) {
+					if closeErr := preparation.next.close(); closeErr != nil {
 						_ = channel.Close()
 						return errors.Join(ErrRecovery, closeErr)
 					}
-					next = nil
+					preparation.next = nil
 					if preparationAllowed(lastPreparation, time.Now()) {
 						lastPreparation = time.Now()
 						err = watchPreparationPeer(ctx, channel.stream, func(run context.Context) error {
 							var preparationErr error
-							next, preparationErr = prepareServiceConsole(run, installation, service)
+							preparation.next, preparationErr = prepareServiceConsole(run, installation, service)
 							return preparationErr
 						})
-						if err != nil && next != nil {
-							if closeErr := next.close(); closeErr != nil {
+						if err != nil && preparation.next != nil {
+							if closeErr := preparation.next.close(); closeErr != nil {
 								err = errors.Join(err, ErrRecovery, closeErr)
 							}
-							next = nil
+							preparation.next = nil
 						}
 					}
 				}
@@ -195,23 +200,18 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 				if !lease.Presentation {
 					returned = presentationReturn{}
 				}
-				candidate := takeInputPreparation(&next, lease)
-				var warming *cursorInputPreparation
+				candidate := takeInputPreparation(&preparation.next, lease)
 				_, err = runPreparedAgentLease(ctx, channel, lease, agent, service, installation, candidate, func() {
-					if !lease.Presentation || next != nil && !next.retired() {
+					if !lease.Presentation {
 						return
 					}
 					// Readiness has reached the agent before any next-input work.
 					// Neither a warm child nor its cleanup delays cursor hiding.
-					retiring := next
-					next = nil
-					lastPreparation = time.Now()
-					warming = startCursorInputPreparation(ctx, func(run context.Context) (*preparedConsole, error) {
-						if closeErr := retiring.close(); closeErr != nil {
-							return nil, errors.Join(ErrRecovery, closeErr)
-						}
+					if preparation.start(ctx, func(run context.Context) (*preparedConsole, error) {
 						return prepareServiceConsole(run, installation, service)
-					})
+					}) {
+						lastPreparation = time.Now()
+					}
 				})
 				if err == nil && !lease.Presentation {
 					returned = presentationReturn{lease: lease, pid: agentPID, started: channel.authority.agentStarted, at: time.Now()}
@@ -221,16 +221,9 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 					// so it cannot trigger the preparation callback above. Prepare
 					// once after clean recovery instead of cold-launching on every
 					// rapid reentry suppressed by the movement-hint cooldown.
-					warming = prepareInputReentry(ctx, lease, err, func(run context.Context) (*preparedConsole, error) {
+					preparation.reenter(ctx, lease, err, func(run context.Context) (*preparedConsole, error) {
 						return prepareServiceConsole(run, installation, service)
 					})
-				}
-				if warming != nil {
-					var preparationErr error
-					next, preparationErr = warming.join()
-					if errors.Is(preparationErr, ErrRecovery) {
-						return serviceRecoveryFailure(errors.Join(err, preparationErr), channel.Close())
-					}
 				}
 				if errors.Is(err, ErrRecovery) {
 					return serviceRecoveryFailure(err, channel.Close())
@@ -248,10 +241,9 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 		if err == nil {
 			continue
 		}
-		if closeErr := next.close(); closeErr != nil {
+		if closeErr := preparation.close(); closeErr != nil {
 			return errors.Join(ErrRecovery, closeErr)
 		}
-		next = nil
 		timer := time.NewTimer(200 * time.Millisecond)
 		select {
 		case <-ctx.Done():

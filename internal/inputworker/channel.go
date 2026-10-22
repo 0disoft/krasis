@@ -9,16 +9,18 @@ import (
 // Channel ties one authenticated kernel pipe to its process proof. Its private
 // fields prevent callers from pairing a proof with an unrelated input stream.
 type Channel struct {
-	stream           net.Conn
-	authority        *Authority
-	closeOnce        sync.Once
-	closeErr         error
-	queryMu          sync.Mutex
-	query            *authorityQuery
-	presenceQuery    *authorityQuery
-	maintenanceQuery *authorityQuery // Optional heartbeat/advisory proof; never input.
-	queryClosed      chan struct{}   // Lazily allocated only for capacity waiters; queryMu.
-	closing          bool
+	preparationWait         time.Duration // Service-local remaining join wait, never authority.
+	preparationWaitMeasured bool
+	stream                  net.Conn
+	authority               *Authority
+	closeOnce               sync.Once
+	closeErr                error
+	queryMu                 sync.Mutex
+	query                   *authorityQuery
+	presenceQuery           *authorityQuery
+	maintenanceQuery        *authorityQuery // Optional heartbeat/advisory proof; never input.
+	queryClosed             chan struct{}   // Lazily allocated only for capacity waiters; queryMu.
+	closing                 bool
 }
 
 func (channel *Channel) Close() error {
