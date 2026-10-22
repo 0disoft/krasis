@@ -1,0 +1,816 @@
+{
+  "date": "2026-10-23",
+  "requestID": "ccc2670c289ce6a11d25a78c57cf8201",
+  "observedGeneration": 444,
+  "observedBuild": "42d2ff60db512e7566ce621ee9b56f286c8bfa14",
+  "scope": "Retained g444 A-source/B-receiver software profiles after user reported approximately 300ms cursor entry delay.",
+  "inputs": {
+    "A": {
+      "sha256": "ed076f6780ba02835c5bc8153bde23e3d8490ed77f6f5c288f117d5ab46092b6",
+      "bytes": 1558862,
+      "createdUTC": "2026-10-22T18:46:30Z",
+      "schema": "krasis.support/v1",
+      "logs": [
+        {
+          "source": "agent.previous.jsonl",
+          "events": 2674,
+          "incomplete": false
+        },
+        {
+          "source": "agent.jsonl",
+          "events": 1086,
+          "incomplete": false
+        },
+        {
+          "source": "control.previous.jsonl",
+          "events": 0,
+          "incomplete": true
+        },
+        {
+          "source": "control.jsonl",
+          "events": 611,
+          "incomplete": false
+        }
+      ]
+    },
+    "B": {
+      "sha256": "2cd67d4cfe187aab68b72e549b7ad93c67ffa9933888f8ac65d769350ee1cd7f",
+      "bytes": 1741747,
+      "createdUTC": "2026-10-22T18:46:33Z",
+      "schema": "krasis.support/v1",
+      "logs": [
+        {
+          "source": "agent.previous.jsonl",
+          "events": 2611,
+          "incomplete": false
+        },
+        {
+          "source": "agent.jsonl",
+          "events": 1626,
+          "incomplete": false
+        },
+        {
+          "source": "control.previous.jsonl",
+          "events": 0,
+          "incomplete": true
+        },
+        {
+          "source": "control.jsonl",
+          "events": 474,
+          "incomplete": false
+        }
+      ]
+    }
+  },
+  "sides": {
+    "A": {
+      "profiles": 12,
+      "ends": {
+        "ok": 12
+      },
+      "allProfilesComplete": true,
+      "preparationMicros": {
+        "BoundaryToBegin": {
+          "samples": 12,
+          "min": 2734,
+          "median": 38339.0,
+          "max": 510997
+        },
+        "RequestCoordinator": {
+          "samples": 12,
+          "min": 0,
+          "median": 0.0,
+          "max": 0
+        },
+        "RequestWrite": {
+          "samples": 12,
+          "min": 0,
+          "median": 0.0,
+          "max": 1092
+        },
+        "RequestToGrant": {
+          "samples": 12,
+          "min": 157786,
+          "median": 188118.0,
+          "max": 786869
+        },
+        "GrantCoordinator": {
+          "samples": 12,
+          "min": 0,
+          "median": 0.0,
+          "max": 0
+        },
+        "SourceActivate": {
+          "samples": 12,
+          "min": 0,
+          "median": 0.0,
+          "max": 0
+        },
+        "CaptureActivate": {
+          "samples": 12,
+          "min": 28713,
+          "median": 72513.0,
+          "max": 139829
+        },
+        "CommitWrite": {
+          "samples": 12,
+          "min": 0,
+          "median": 0.0,
+          "max": 5495
+        },
+        "SourceDeactivate": {
+          "samples": 12,
+          "min": 6777,
+          "median": 22194.5,
+          "max": 58638
+        },
+        "ReentryGap": {
+          "samples": 11,
+          "min": 379013,
+          "median": 505138,
+          "max": 21049792
+        }
+      },
+      "firstMicros": {
+        "SourceQueue": {
+          "samples": 12,
+          "min": 0,
+          "median": 2882.5,
+          "max": 11879
+        },
+        "FirstOfferSinceBegin": {
+          "samples": 12,
+          "min": 246127,
+          "median": 286547.0,
+          "max": 970056
+        },
+        "InputCoordinator": {
+          "samples": 12,
+          "min": 0,
+          "median": 2838.0,
+          "max": 50160
+        },
+        "InputWrite": {
+          "samples": 12,
+          "min": 0,
+          "median": 0.0,
+          "max": 4394
+        },
+        "Dispatch": {
+          "samples": 12,
+          "min": 0,
+          "median": 3575.5,
+          "max": 50160
+        }
+      },
+      "entryMicros": {},
+      "startupMicros": {},
+      "captureMicros": {
+        "CaptureIPCLock": {
+          "samples": 12,
+          "min": 0,
+          "median": 0.0,
+          "max": 0
+        },
+        "CaptureIPCAuthority": {
+          "samples": 12,
+          "min": 0,
+          "median": 1019.5,
+          "max": 42154
+        },
+        "CaptureIPCWrite": {
+          "samples": 12,
+          "min": 0,
+          "median": 0.0,
+          "max": 785
+        },
+        "CaptureIPCResponse": {
+          "samples": 12,
+          "min": 26887,
+          "median": 63867.0,
+          "max": 104751
+        }
+      },
+      "subsequentDispatchHistogram": [
+        810,
+        54,
+        5,
+        0,
+        0
+      ],
+      "pipeBusy": 0,
+      "pipeMissing": 0,
+      "preparationDecisions": {
+        "0": 12
+      },
+      "eventsOfInterest": [
+        {
+          "time": "2026-10-22T18:44:52.2024121Z",
+          "code": "boundary_dropped_not_ready"
+        },
+        {
+          "time": "2026-10-22T18:45:44.6987254Z",
+          "code": "boundary_dropped_not_ready"
+        },
+        {
+          "time": "2026-10-22T18:45:45.0342033Z",
+          "code": "boundary_dropped_not_ready"
+        },
+        {
+          "time": "2026-10-22T18:45:45.3503527Z",
+          "code": "boundary_dropped_not_ready"
+        },
+        {
+          "time": "2026-10-22T18:45:45.6124224Z",
+          "code": "boundary_dropped_not_ready"
+        }
+      ]
+    },
+    "B": {
+      "profiles": 12,
+      "ends": {
+        "ok": 12
+      },
+      "allProfilesComplete": true,
+      "preparationMicros": {
+        "RequestCoordinator": {
+          "samples": 12,
+          "min": 0,
+          "median": 0.0,
+          "max": 0
+        },
+        "PeerAuthorize": {
+          "samples": 12,
+          "min": 1102,
+          "median": 1793.0,
+          "max": 2374
+        },
+        "AuthorizeTotal": {
+          "samples": 12,
+          "min": 136048,
+          "median": 152890.5,
+          "max": 717928
+        },
+        "OpenLock": {
+          "samples": 12,
+          "min": 0,
+          "median": 0.0,
+          "max": 40297
+        },
+        "ConnectTotal": {
+          "samples": 12,
+          "min": 134282,
+          "median": 151195.5,
+          "max": 715567
+        },
+        "PipeOpen": {
+          "samples": 12,
+          "min": 0,
+          "median": 0.0,
+          "max": 562
+        },
+        "ServiceAuth": {
+          "samples": 12,
+          "min": 1173,
+          "median": 2287.0,
+          "max": 5196
+        },
+        "ServiceImagePin": {
+          "samples": 12,
+          "min": 0,
+          "median": 0.0,
+          "max": 0
+        },
+        "LeaseWrite": {
+          "samples": 12,
+          "min": 0,
+          "median": 0.0,
+          "max": 648
+        },
+        "ReadyWait": {
+          "samples": 12,
+          "min": 131398,
+          "median": 149081.5,
+          "max": 709821
+        },
+        "NewClientCheck": {
+          "samples": 12,
+          "min": 0,
+          "median": 267.0,
+          "max": 604
+        },
+        "ReturnArm": {
+          "samples": 12,
+          "min": 0,
+          "median": 0.0,
+          "max": 0
+        },
+        "EntryPrepare": {
+          "samples": 12,
+          "min": 4061,
+          "median": 5082.0,
+          "max": 17382
+        },
+        "PrepareInbound": {
+          "samples": 12,
+          "min": 0,
+          "median": 0.0,
+          "max": 0
+        },
+        "GrantWrite": {
+          "samples": 12,
+          "min": 0,
+          "median": 0.0,
+          "max": 635
+        },
+        "CommitCoordinator": {
+          "samples": 12,
+          "min": 0,
+          "median": 0.0,
+          "max": 0
+        },
+        "CommitApply": {
+          "samples": 12,
+          "min": 0,
+          "median": 0.0,
+          "max": 0
+        },
+        "InputClose": {
+          "samples": 12,
+          "min": 0,
+          "median": 594.0,
+          "max": 2222
+        },
+        "ReentryGap": {
+          "samples": 11,
+          "min": 430165,
+          "median": 525106,
+          "max": 21062453
+        }
+      },
+      "firstMicros": {
+        "FirstOfferSinceBegin": {
+          "samples": 12,
+          "min": 187425,
+          "median": 267876.5,
+          "max": 925891
+        },
+        "InputCoordinator": {
+          "samples": 12,
+          "min": 0,
+          "median": 0.0,
+          "max": 0
+        },
+        "Dispatch": {
+          "samples": 12,
+          "min": 1665,
+          "median": 2285.0,
+          "max": 19262
+        },
+        "OuterLock": {
+          "samples": 12,
+          "min": 0,
+          "median": 0.0,
+          "max": 0
+        },
+        "ClientTotal": {
+          "samples": 12,
+          "min": 1665,
+          "median": 2285.0,
+          "max": 18530
+        },
+        "ClientLock": {
+          "samples": 12,
+          "min": 0,
+          "median": 0.0,
+          "max": 0
+        },
+        "ClientAuthority": {
+          "samples": 12,
+          "min": 0,
+          "median": 150.0,
+          "max": 3017
+        },
+        "ClientWrite": {
+          "samples": 12,
+          "min": 0,
+          "median": 0.0,
+          "max": 514
+        },
+        "ClientResponse": {
+          "samples": 12,
+          "min": 1665,
+          "median": 2211.5,
+          "max": 15513
+        },
+        "CursorPostprocess": {
+          "samples": 12,
+          "min": 0,
+          "median": 0.0,
+          "max": 0
+        }
+      },
+      "entryMicros": {
+        "Dispatch": {
+          "samples": 12,
+          "min": 4061,
+          "median": 5082.0,
+          "max": 17382
+        },
+        "OuterLock": {
+          "samples": 12,
+          "min": 0,
+          "median": 0.0,
+          "max": 0
+        },
+        "ClientTotal": {
+          "samples": 12,
+          "min": 4061,
+          "median": 4793.5,
+          "max": 16361
+        },
+        "ClientLock": {
+          "samples": 12,
+          "min": 0,
+          "median": 0.0,
+          "max": 0
+        },
+        "ClientAuthority": {
+          "samples": 12,
+          "min": 0,
+          "median": 0.0,
+          "max": 996
+        },
+        "ClientWrite": {
+          "samples": 12,
+          "min": 0,
+          "median": 0.0,
+          "max": 604
+        },
+        "ClientResponse": {
+          "samples": 12,
+          "min": 4061,
+          "median": 4541.5,
+          "max": 14760
+        }
+      },
+      "startupMicros": {
+        "ServiceLaunch": {
+          "samples": 12,
+          "min": 22879,
+          "median": 27178.5,
+          "max": 38660
+        },
+        "ServiceChildConnect": {
+          "samples": 12,
+          "min": 112678,
+          "median": 130577.5,
+          "max": 298590
+        },
+        "ServiceBootstrapReady": {
+          "samples": 12,
+          "min": 121946,
+          "median": 139166.0,
+          "max": 351575
+        },
+        "WorkerInstalledValidation": {
+          "samples": 12,
+          "min": 57728,
+          "median": 63654.5,
+          "max": 128522
+        },
+        "WorkerIdentity": {
+          "samples": 12,
+          "min": 0,
+          "median": 0.0,
+          "max": 998
+        },
+        "WorkerServiceAuth": {
+          "samples": 12,
+          "min": 2194,
+          "median": 3007.5,
+          "max": 6153
+        },
+        "WorkerAgentAuth": {
+          "samples": 12,
+          "min": 3159,
+          "median": 4273.0,
+          "max": 12018
+        },
+        "WorkerDesktopReady": {
+          "samples": 12,
+          "min": 115113,
+          "median": 132028.5,
+          "max": 322095
+        }
+      },
+      "captureMicros": {},
+      "subsequentDispatchHistogram": [
+        0,
+        633,
+        73,
+        1,
+        0
+      ],
+      "pipeBusy": 0,
+      "pipeMissing": 0,
+      "preparationDecisions": {
+        "2": 1,
+        "1": 10,
+        "3": 1
+      },
+      "eventsOfInterest": [
+        {
+          "time": "2026-10-22T18:44:15.5681373Z",
+          "code": "peer_disconnect_requested"
+        },
+        {
+          "time": "2026-10-22T18:44:51.5194322Z",
+          "code": "installed_return_cursor_capture_show_lt10ms"
+        },
+        {
+          "time": "2026-10-22T18:44:56.465373Z",
+          "code": "installed_return_cursor_capture_show_lt10ms"
+        },
+        {
+          "time": "2026-10-22T18:44:58.3323073Z",
+          "code": "installed_return_cursor_capture_show_lt10ms"
+        },
+        {
+          "time": "2026-10-22T18:45:20.6449327Z",
+          "code": "installed_return_cursor_capture_show_lt10ms"
+        },
+        {
+          "time": "2026-10-22T18:45:22.0441622Z",
+          "code": "installed_return_cursor_capture_show_lt10ms"
+        },
+        {
+          "time": "2026-10-22T18:45:23.9453309Z",
+          "code": "installed_return_cursor_capture_show_lt10ms"
+        },
+        {
+          "time": "2026-10-22T18:45:26.7434889Z",
+          "code": "installed_return_cursor_capture_show_lt10ms"
+        },
+        {
+          "time": "2026-10-22T18:45:28.0179723Z",
+          "code": "installed_return_cursor_capture_show_lt10ms"
+        },
+        {
+          "time": "2026-10-22T18:45:29.3861796Z",
+          "code": "installed_return_cursor_capture_show_lt10ms"
+        },
+        {
+          "time": "2026-10-22T18:45:30.6900894Z",
+          "code": "installed_return_cursor_capture_show_lt10ms"
+        },
+        {
+          "time": "2026-10-22T18:45:48.6597276Z",
+          "code": "installed_return_cursor_capture_show_lt10ms"
+        },
+        {
+          "time": "2026-10-22T18:45:52.408608Z",
+          "code": "installed_return_cursor_capture_show_lt10ms"
+        }
+      ]
+    }
+  },
+  "pairedExchanges": [
+    {
+      "exchangeTag": "b1c331176295baaa6b3876cf8c2eb3115e981cbb6ad683a1a02a0b37de089123",
+      "A": {
+        "preparationMicros": {
+          "BoundaryToBegin": 82295,
+          "RequestToGrant": 786869,
+          "CaptureActivate": 139829
+        },
+        "firstOfferSinceBeginMicros": 970056
+      },
+      "B": {
+        "readyWaitMicros": 709821,
+        "nativePairReadyMicros": 322095,
+        "entryDispatchMicros": 17382,
+        "firstDispatchMicros": 19262,
+        "prepared": false
+      }
+    },
+    {
+      "exchangeTag": "57a1e32be1527348f65f6400ab83becae07662927c612070e372b60cf09c923a",
+      "A": {
+        "preparationMicros": {
+          "BoundaryToBegin": 10319,
+          "RequestToGrant": 272343,
+          "CaptureActivate": 28842
+        },
+        "firstOfferSinceBeginMicros": 296903
+      },
+      "B": {
+        "readyWaitMicros": 244768,
+        "nativePairReadyMicros": 215424,
+        "entryDispatchMicros": 6877,
+        "firstDispatchMicros": 10094,
+        "prepared": true
+      }
+    },
+    {
+      "exchangeTag": "a9f24e27df529f15d5e58f5cc8bec9cb2d8fac674c72f6f17a5233ceba2e9eea",
+      "A": {
+        "preparationMicros": {
+          "BoundaryToBegin": 2734,
+          "RequestToGrant": 240431,
+          "CaptureActivate": 28713
+        },
+        "firstOfferSinceBeginMicros": 262127
+      },
+      "B": {
+        "readyWaitMicros": 204600,
+        "nativePairReadyMicros": 180704,
+        "entryDispatchMicros": 9094,
+        "firstDispatchMicros": 9543,
+        "prepared": true
+      }
+    },
+    {
+      "exchangeTag": "f4fcc17b28a70e5ad8ad7b1608367a891875d4e40edb129535ac2887f7b150b7",
+      "A": {
+        "preparationMicros": {
+          "BoundaryToBegin": 42283,
+          "RequestToGrant": 160806,
+          "CaptureActivate": 93078
+        },
+        "firstOfferSinceBeginMicros": 284289
+      },
+      "B": {
+        "readyWaitMicros": 135755,
+        "nativePairReadyMicros": 117579,
+        "entryDispatchMicros": 4061,
+        "firstDispatchMicros": 1665,
+        "prepared": true
+      }
+    },
+    {
+      "exchangeTag": "adc8bc7367f02e997182a8b958c19d079998e5995d8de2491e1edc4764408ffe",
+      "A": {
+        "preparationMicros": {
+          "BoundaryToBegin": 11604,
+          "RequestToGrant": 159437,
+          "CaptureActivate": 91664
+        },
+        "firstOfferSinceBeginMicros": 260605
+      },
+      "B": {
+        "readyWaitMicros": 135207,
+        "nativePairReadyMicros": 118217,
+        "entryDispatchMicros": 4183,
+        "firstDispatchMicros": 1708,
+        "prepared": true
+      }
+    },
+    {
+      "exchangeTag": "adaedf6e1af7dd4be9ae41653a4b05f1a54559337616434154d2b5a752996246",
+      "A": {
+        "preparationMicros": {
+          "BoundaryToBegin": 13361,
+          "RequestToGrant": 183626,
+          "CaptureActivate": 83700
+        },
+        "firstOfferSinceBeginMicros": 250908
+      },
+      "B": {
+        "readyWaitMicros": 144550,
+        "nativePairReadyMicros": 128529,
+        "entryDispatchMicros": 5344,
+        "firstDispatchMicros": 2202,
+        "prepared": true
+      }
+    },
+    {
+      "exchangeTag": "c361813af2a5a0578dcdab97b8166574f34c56bcd9b1105eacc62607ea62aab2",
+      "A": {
+        "preparationMicros": {
+          "BoundaryToBegin": 510997,
+          "RequestToGrant": 170944,
+          "CaptureActivate": 68896
+        },
+        "firstOfferSinceBeginMicros": 755807
+      },
+      "B": {
+        "readyWaitMicros": 131398,
+        "nativePairReadyMicros": 115113,
+        "entryDispatchMicros": 4316,
+        "firstDispatchMicros": 2256,
+        "prepared": true
+      }
+    },
+    {
+      "exchangeTag": "4e44cc0548d8d8ab79d33983357be93b831c4ece2d0e8e512a6be0c278419661",
+      "A": {
+        "preparationMicros": {
+          "BoundaryToBegin": 43771,
+          "RequestToGrant": 171144,
+          "CaptureActivate": 76130
+        },
+        "firstOfferSinceBeginMicros": 286807
+      },
+      "B": {
+        "readyWaitMicros": 137325,
+        "nativePairReadyMicros": 120020,
+        "entryDispatchMicros": 4100,
+        "firstDispatchMicros": 1684,
+        "prepared": true
+      }
+    },
+    {
+      "exchangeTag": "b7f20ae3506f3b0ba3259664625fca2faf9a50689ff221467ebfcae2986c2d52",
+      "A": {
+        "preparationMicros": {
+          "BoundaryToBegin": 34395,
+          "RequestToGrant": 192610,
+          "CaptureActivate": 113165
+        },
+        "firstOfferSinceBeginMicros": 286287
+      },
+      "B": {
+        "readyWaitMicros": 153613,
+        "nativePairReadyMicros": 135528,
+        "entryDispatchMicros": 4820,
+        "firstDispatchMicros": 1975,
+        "prepared": true
+      }
+    },
+    {
+      "exchangeTag": "8030f9b8b10bb607c0fe59b6df26549684035c2d0fbaa2dc181a31669f53500a",
+      "A": {
+        "preparationMicros": {
+          "BoundaryToBegin": 61729,
+          "RequestToGrant": 157786,
+          "CaptureActivate": 30416
+        },
+        "firstOfferSinceBeginMicros": 246127
+      },
+      "B": {
+        "readyWaitMicros": 136399,
+        "nativePairReadyMicros": 119811,
+        "entryDispatchMicros": 4686,
+        "firstDispatchMicros": 2314,
+        "prepared": true
+      }
+    },
+    {
+      "exchangeTag": "c2bce6c4fe561d0a0e6e3e6a71a965b4ee7b895eb6aa17df031aa13b12233605",
+      "A": {
+        "preparationMicros": {
+          "BoundaryToBegin": 7897,
+          "RequestToGrant": 222201,
+          "CaptureActivate": 34342
+        },
+        "firstOfferSinceBeginMicros": 333992
+      },
+      "B": {
+        "readyWaitMicros": 157893,
+        "nativePairReadyMicros": 141071,
+        "entryDispatchMicros": 5375,
+        "firstDispatchMicros": 2679,
+        "prepared": true
+      }
+    },
+    {
+      "exchangeTag": "35cfd161e9ebce39a2b091dd31e6080a539c2c1826e874eb89d95ae6e2b846b7",
+      "A": {
+        "preparationMicros": {
+          "BoundaryToBegin": 57829,
+          "RequestToGrant": 398727,
+          "CaptureActivate": 56656
+        },
+        "firstOfferSinceBeginMicros": 508811
+      },
+      "B": {
+        "readyWaitMicros": 375291,
+        "nativePairReadyMicros": 139544,
+        "entryDispatchMicros": 5599,
+        "firstDispatchMicros": 9058,
+        "prepared": false
+      }
+    }
+  ],
+  "tcp": {
+    "rttMicros": {
+      "samples": 24,
+      "min": 7873,
+      "median": 9076.5,
+      "max": 12634
+    },
+    "retransmittedBytes": 0,
+    "timeoutEpisodes": 0
+  },
+  "interpretation": [
+    "All 12 retained exchanges match A source to B receiver and finish ok. These are 12 leases, not 24 independent directions.",
+    "A first offer since begin median 286547us is consistent with the reported approximately 300ms, but this is a software offer time, not cursor presentation latency.",
+    "B native pair startup median 132029us remains a substantial readiness span. A capture activation median 72513us also contributes after grant. Nested spans and medians must not be summed.",
+    "B entry dispatch median 5082us and 12 capture-show events below 10ms do not support cursor showing itself as the dominant retained delay.",
+    "First lease is a cold outlier: A request-to-grant 786869us and B readiness 709821us. Later requests still include native pair startup.",
+    "One peer_disconnect_requested event preceded the sampled crossings. No fault/fatal event was retained for g444 in these exports; this short window cannot establish that earlier source faults are fixed.",
+    "Five boundary_dropped_not_ready events on A remain visible; they are not counted as successful matched leases.",
+    "Native pair ready measures the concurrent startup elapsed. Its internal image load/authentication portions are not separately resolved by this profile."
+  ]
+}
