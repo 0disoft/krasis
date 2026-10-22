@@ -1,0 +1,205 @@
+{
+  "generation": 443,
+  "sourceRevision": "7c047c694ccec9b6b9bd4f3839c304d84cbc1060",
+  "localDate": "2026-10-23",
+  "changes": [
+    {
+      "commit": "542b693",
+      "change": "Extract optional clock/scheduler/signal app-open controller; independent observation deadline; retain native no-replay fence"
+    },
+    {
+      "commit": "7c047c6",
+      "change": "Keep Delay signature and comparable policy; optional supervisor retry random source; cap before duration conversion"
+    }
+  ],
+  "validation": {
+    "frontendTests": 100,
+    "controllerTests": 9,
+    "agent": "PASS 1.976s",
+    "loginagent": "PASS 2.433s",
+    "residentagent": "PASS 6.317s",
+    "overflowRegressionBeforeFix": "FAIL: MaxInt64-1 with midpoint jitter became 1ns",
+    "nativeFrontendBuild": "PASS",
+    "bundleSmoke": "PASS 8.43s",
+    "bundleFiles": 8,
+    "archiveBytes": 28363539,
+    "offlineVerify": "valid",
+    "diffCheck": "PASS",
+    "skipped": [
+      "No race detector or full unrelated Go suite for bounded UI/retry changes",
+      "No live stalled app-open invocation, attended physical input acceptance, or long soak; hung-call/abort boundaries verified with fake time and the real bridge",
+      "No hosted CI or push"
+    ]
+  },
+  "baseline": {
+    "generation": 442,
+    "collectionId": "3772c3078da242848652ff6390952896",
+    "localInputHealth": {
+      "time": "2026-10-22T16:00:33.4907538Z",
+      "state": "READY",
+      "stage": "complete",
+      "win32Error": 0,
+      "win32Known": false
+    },
+    "localSourceExits": {
+      "total": 4,
+      "exits": [
+        {
+          "time": "2026-10-22T15:58:01.3004676Z",
+          "command": "ok",
+          "reader": "failed",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "clean_sent",
+          "report": "failed",
+          "failure": {
+            "operation": "source-gate-boundary-write",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "heartbeatStage": "reply_gate",
+          "heartbeatSlowStage": "reply_gate",
+          "heartbeatSlowBucket": 5
+        },
+        {
+          "time": "2026-10-22T15:58:10.0457123Z",
+          "command": "ok",
+          "reader": "failed",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "clean_sent",
+          "report": "failed",
+          "failure": {
+            "operation": "source-gate-boundary-prepare",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "heartbeatStage": "reply_gate",
+          "heartbeatSlowStage": "reply_gate",
+          "heartbeatSlowBucket": 5
+        },
+        {
+          "time": "2026-10-22T15:58:16.46499Z",
+          "command": "ok",
+          "reader": "failed",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "clean_sent",
+          "report": "failed",
+          "failure": {
+            "operation": "source-gate-boundary-write",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "heartbeatStage": "reply_gate",
+          "heartbeatSlowStage": "reply_gate",
+          "heartbeatSlowBucket": 5
+        },
+        {
+          "time": "2026-10-22T16:00:18.8876984Z",
+          "command": "ok",
+          "reader": "failed",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "delivery_failed",
+          "report": "failed",
+          "failure": {
+            "operation": "source-command-heartbeat",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "heartbeatStage": "reply_write",
+          "heartbeatSlowStage": "reply_gate",
+          "heartbeatSlowBucket": 4
+        }
+      ]
+    },
+    "interpretation": "Before g443: advisory boundary gate write/prepare failures and a heartbeat reply-write failure recurred while the service remained READY. These changes do not fix that separate contention."
+  },
+  "application": {
+    "peerUpdateId": "b9555f731376d4725921004133862ba6",
+    "peerUpdateState": "UPDATED",
+    "localSafeStop": "COMPLETED",
+    "localInstallerAction": "--repair after safe-stop",
+    "localInstallerExit": 0,
+    "localAppRepair": "recovery_ready",
+    "collectionId": "4e011131d7d64d49987db530cc7b85c0",
+    "sides": {
+      "A": {
+        "created": "2026-10-22T16:03:00Z",
+        "installation": {
+          "time": "2026-10-22T16:02:39.1352251Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-22T16:02:50.9105124Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "loginRuntime": {
+          "startedAt": "2026-10-22T16:02:40.5305359Z",
+          "time": "2026-10-22T16:02:40.5610109Z",
+          "service": "READY",
+          "console": "USER_SESSION",
+          "grant": "PRESENT",
+          "lastWorker": "NONE"
+        }
+      },
+      "B": {
+        "created": "2026-10-22T16:03:03Z",
+        "installation": {
+          "time": "2026-10-22T16:02:05.6101108Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-22T16:02:48.2550442Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "loginRuntime": {
+          "startedAt": "2026-10-22T16:02:07.9523135Z",
+          "time": "2026-10-22T16:02:07.9980102Z",
+          "service": "READY",
+          "console": "USER_SESSION",
+          "grant": "PRESENT",
+          "lastWorker": "NONE"
+        }
+      }
+    },
+    "doctor": "healthy",
+    "connection": "CONNECTED",
+    "peerVersion": "ONLINE g443 matching build"
+  },
+  "nextPriorities": [
+    "Investigate the pre-existing source-gate-boundary-write/prepare recurrence without weakening cleanup or repeating the withdrawn admission experiment",
+    "Add cancellation for queued UI work while retaining ownership of already-started native mutations",
+    "Specify the success-versus-cancellation boundary in update wait"
+  ],
+  "remote": "Local main commits only; no push or remote ref change"
+}

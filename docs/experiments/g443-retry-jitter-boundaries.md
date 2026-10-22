@@ -20,3 +20,8 @@ Related agent/loginagent/residentagent tests validate the optional dependency.
 No new required argument, wire protocol, security policy, DB, dependency, runner
 or repository hygiene change. Local main; no push. Packaged together with the
 independent app-open observation change in g443.
+
+Agent 1.976s, loginagent 2.433s and residentagent 6.317s passed; the production
+supervisor test confirms the injected midpoint source is consumed once and
+produces the exact initial retry interval. Paired rollout and skipped checks
+are recorded in g443-app-open-observation.md and its result file.
