@@ -1,0 +1,104 @@
+{
+  "generation": 430,
+  "sourceRevision": "10d507aa1f297bb91fe24c2263c68bcbd1e8e20b",
+  "g429Inspection": {
+    "collectionId": "79239885586bdaade3850581b9b2021c",
+    "sourceJoinTimeoutRecurred": false,
+    "bothServices": "READY",
+    "connectionFailuresPersist": true,
+    "observedTriggers": [
+      "fault_source_hook_failed",
+      "fault_remote_eof",
+      "fault_heartbeat_timeout",
+      "fault_trust_freshness_expired"
+    ],
+    "reportingDefect": "An in-flight presence query cancelled by local shutdown was reported as source-query-cancelled authority failure."
+  },
+  "change": "Ignore only a direct sourceQueryFailure retaining context.Canceled when the watcher itself is cancelled; keep native denial, deadline, capacity, closed, mixed and projected errors. Query fencing and final retirement checks are unchanged.",
+  "validation": {
+    "regressionOnOldSource": "FAIL with local stop became authority failure (expected)",
+    "regressionOnFixedSource": "PASS",
+    "inputworker": "PASS (22.107s), portable-pair hardware test excluded to avoid interfering with live input ownership",
+    "logindiag": "PASS",
+    "frontendTests": 91,
+    "nativeBuild": "PASS",
+    "bundleSmoke": "PASS (7.96s)",
+    "bundleVerification": {
+      "valid": true,
+      "files": 8,
+      "archiveBytes": 28206529
+    },
+    "vet": "PASS with unsafeptr analyzer disabled for existing Windows native code",
+    "diffCheck": "PASS",
+    "hostedCI": "Not run; push prohibited",
+    "physicalAcceptanceAndLongSoak": "Not run"
+  },
+  "application": {
+    "peerUpdateId": "984fe6622b31ded2c26c1b7489907ff8",
+    "peerUpdateState": "UPDATED",
+    "localDoctor": "healthy / CONNECTED / PROTECTED",
+    "reports": {
+      "A": {
+        "collectedAt": "2026-10-22T11:34:29Z",
+        "installationResult": 0,
+        "installationTime": "2026-10-22T11:33:39.1937152Z",
+        "service": "READY",
+        "inputHealth": "READY",
+        "latestReadyEvents": [
+          {
+            "time": "2026-10-22T11:34:07.6386736Z",
+            "code": "CONNECTED"
+          },
+          {
+            "time": "2026-10-22T11:34:07.824586Z",
+            "code": "installed_source_capture_protected_ready"
+          }
+        ],
+        "sourceExitSummary": null
+      },
+      "B": {
+        "collectedAt": "2026-10-22T11:34:33Z",
+        "installationResult": 0,
+        "installationTime": "2026-10-22T11:32:54.8000245Z",
+        "service": "READY",
+        "inputHealth": "READY",
+        "latestReadyEvents": [
+          {
+            "time": "2026-10-22T11:34:10.7387871Z",
+            "code": "CONNECTED"
+          },
+          {
+            "time": "2026-10-22T11:34:11.2958779Z",
+            "code": "installed_source_capture_protected_ready"
+          }
+        ],
+        "sourceExitSummary": null
+      }
+    }
+  },
+  "remainingWork": [
+    {
+      "priority": 1,
+      "task": "Identify the original heartbeat/response stall using correlated source/receiver traces. The cancellation-report fix does not prove the connection failures repaired.",
+      "status": "not implemented; cause unproved"
+    },
+    {
+      "priority": 2,
+      "task": "Measure source cursor preparation and receiver startup delays before changing readiness or authorization.",
+      "status": "deferred"
+    },
+    {
+      "priority": 3,
+      "task": "Review update SEND acknowledgement latency observed on g429; g430 send returned queued successfully.",
+      "status": "deferred"
+    }
+  ],
+  "scope": {
+    "apiChanged": false,
+    "databaseChanged": false,
+    "runnerChanged": false,
+    "dependenciesChanged": false,
+    "sourceOfTruthDocumentsChanged": false,
+    "remotePush": false
+  }
+}
