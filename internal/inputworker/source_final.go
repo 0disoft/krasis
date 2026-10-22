@@ -41,6 +41,9 @@ func sourceTransportJoinedOnly(err error, ownExpiry bool, command bool) bool {
 	if sourceCleanupUncertain(err) {
 		return false
 	}
+	if command && sourceReadQueryRejected(err) {
+		return true
+	}
 	if _, ok := err.(*sourceTransportError); ok {
 		return true
 	}
@@ -96,6 +99,25 @@ func sourceCaptureFinal(loop, capture, sender error, ownExpiry bool) error {
 		return errors.Join(loop, capture, sender, ErrRecovery)
 	}
 	return errors.Join(loop, capture, sender)
+}
+
+// All command, watchdog, native and sender callers must already be joined.
+// A rejected read-only query cannot grant a clean retirement while a native
+// query still owns either channel. Check before publishing status, not just
+// after the agent's retirement notification has already been sent.
+func sourceCaptureQueryRetirement(result error, owners ...*Channel) error {
+	for _, owner := range owners {
+		pending := owner == nil
+		if owner != nil {
+			owner.queryMu.Lock()
+			pending = owner.pendingQueriesLocked()
+			owner.queryMu.Unlock()
+		}
+		if pending {
+			return errors.Join(result, ErrRecovery, &workerReportFailure{operation: "source-channel-close", cause: ErrAuthority})
+		}
+	}
+	return result
 }
 
 func sourceRetirementDelivery(result, delivery error) error {

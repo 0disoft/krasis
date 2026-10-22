@@ -3,6 +3,8 @@ package inputworker
 import (
 	"context"
 	"errors"
+
+	"github.com/0disoft/krasis/internal/logindiag"
 )
 
 // Fixed query admission/outcome codes, separate from native authority denials.
@@ -30,6 +32,45 @@ func sourceQueryFailureOperations() []string {
 		}
 	}
 	return values
+}
+
+func validSourceQueryOperation(operation string) bool {
+	if logindiag.ValidSourceQueryDeadlineOperation(operation) {
+		return true
+	}
+	for _, candidate := range sourceQueryFailureOperations() {
+		if candidate == operation {
+			return true
+		}
+	}
+	return false
+}
+
+// This reader rejected a command before dispatching any native input work.
+// Its failure is not proof that query handles retired: the final-report caller
+// must independently fence pending queries before sending retirement status.
+func sourceReadQueryRejected(err error) bool {
+	reader, ok := err.(*sourceReaderFailure)
+	if !ok || reader.operation != "source-reader-authority" {
+		return false
+	}
+	query, ok := reader.cause.(*sourceQueryFailure)
+	return ok && validSourceQueryOperation(query.LoginRuntimeOperation()) && errors.Is(query.cause, ErrAuthority) && sourceQueryRejectionOnly(query.cause)
+}
+
+func sourceQueryRejectionOnly(err error) bool {
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		for _, cause := range joined.Unwrap() {
+			if !sourceQueryRejectionOnly(cause) {
+				return false
+			}
+		}
+		return true
+	}
+	if wrapped, ok := err.(interface{ Unwrap() error }); ok {
+		return sourceQueryRejectionOnly(wrapped.Unwrap())
+	}
+	return err == ErrAuthority || err == context.Canceled || err == context.DeadlineExceeded
 }
 
 func queryAdmissionFailure(kind authorityQueryKind, reason string, cause error) error {

@@ -1,6 +1,7 @@
 package inputworker
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"net"
@@ -8,6 +9,8 @@ import (
 	"testing"
 	"testing/synctest"
 	"time"
+
+	"github.com/0disoft/krasis/internal/inputdesktop"
 )
 
 func TestSourceFinalReportSurvivesExpiredServiceQuery(t *testing.T) {
@@ -39,7 +42,17 @@ func TestSourceFinalReportSurvivesExpiredServiceQuery(t *testing.T) {
 				ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 				defer cancel()
 				done := make(chan error, 1)
-				go func() { done <- sourceQueryOwner("service", service.authorizeSourceInput(ctx)) }()
+				request := sourcePacket{kind: sourceCommand, op: sourceHeartbeat, sequence: 1, binding: Binding{1}}
+				encoded, err := encodeSourcePacket(request)
+				if err != nil {
+					t.Fatal(err)
+				}
+				go func() {
+					_, failure := readSourceCommandAuthorized(bytes.NewReader(encoded[:]), context.Background(), request.binding, 0, func(byte) error {
+						return sourceQueryOwner("service", service.authorizeSourceInput(ctx))
+					})
+					done <- failure
+				}()
 				<-entered
 				failure := <-done
 				if !errors.Is(failure, context.DeadlineExceeded) || !proof.fenced.Load() {
@@ -55,8 +68,10 @@ func TestSourceFinalReportSurvivesExpiredServiceQuery(t *testing.T) {
 				if queryFirst {
 					close(release)
 					synctest.Wait()
-				} else {
-					failure = errors.Join(failure, ErrRecovery)
+				}
+				failure = sourceCaptureQueryRetirement(sourceCaptureFinal(failure, inputdesktop.ErrInactive, context.Canceled, false), service)
+				if (sourceRetirementStatus(failure) == 0) != queryFirst {
+					t.Fatal("retirement status ignored pending query before notification", failure)
 				}
 				exit := cleanSourceExit()
 				exit.Command, exit.Reader, exit.Retirement = "authority", "authority", "failed_sent"

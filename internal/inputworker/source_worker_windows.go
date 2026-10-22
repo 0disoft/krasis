@@ -261,6 +261,7 @@ func runSourceCapture(ctx context.Context, channel, service *Channel, lease Leas
 		result = errors.Join(firstCommandFailure, result, boundary)
 		emergency := errors.Is(errors.Join(result, capture, sender), wininput.ErrEmergencyRelease)
 		result = sourceCaptureFinal(result, capture, sender, run.Err() == context.DeadlineExceeded)
+		result = sourceCaptureQueryRetirement(result, channel, service)
 		if stopping != nil {
 			response := sourcePacket{kind: sourceReply, op: sourceStop, reply: stopping.sequence}
 			response.status = sourceRetirementStatus(result)
@@ -283,12 +284,7 @@ func runSourceCapture(ctx context.Context, channel, service *Channel, lease Leas
 		// Both command/watchdog callers have joined. A service query may still
 		// own native handles, so the service report must not claim cleanup yet.
 		// Keep its control pipe open for the final report; bootstrap retires it.
-		service.queryMu.Lock()
-		pendingService := service.pendingQueriesLocked()
-		service.queryMu.Unlock()
-		if pendingService {
-			result = errors.Join(result, ErrRecovery, &workerReportFailure{operation: "source-channel-close", cause: ErrAuthority})
-		}
+		result = sourceCaptureQueryRetirement(result, service)
 	}()
 	select {
 	case <-hookReady:
