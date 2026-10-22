@@ -18,6 +18,7 @@ import (
 type runtimeDiagnostics struct {
 	heartbeatSend, heartbeatReceive                         heartbeatProgressLeg
 	captureTrace                                            func()
+	sampleTrace                                             func()
 	hookStart, hookLast, hookMax                            atomic.Int64
 	hookCalls, rawInputs                                    atomic.Uint64
 	hookDepth                                               atomic.Uint64
@@ -118,8 +119,8 @@ func (d *runtimeDiagnostics) ObserveHeartbeatReceived(_ string, t time.Time) {
 }
 func (d *runtimeDiagnostics) ObserveTimerLateness(delay time.Duration) {
 	observeMaximum(&d.timerMax, max(0, delay.Microseconds()))
-	if delay >= time.Second && d.captureTrace != nil {
-		d.captureTrace()
+	if delay >= time.Second && d.sampleTrace != nil {
+		d.sampleTrace()
 	}
 }
 func (*runtimeDiagnostics) ObserveDestinationInputReceived()                                {}

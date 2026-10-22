@@ -1,4 +1,4 @@
-// Package runtimestall captures one local execution trace after a runtime stall.
+// Package runtimestall captures bounded local latency and failure traces.
 // It never annotates traces with input, clipboard, peer or credential values.
 package runtimestall
 
@@ -21,10 +21,11 @@ type traceSource interface {
 }
 
 type Recorder struct {
-	request   chan struct{}
+	request   chan bool // true: terminal failure; false: optional latency sample.
 	done      chan struct{}
 	cancel    context.CancelFunc
 	requested atomic.Bool
+	sampled   atomic.Bool
 }
 
 // Start is opt-in for this process only; ordinary and service launches stay off.
@@ -42,7 +43,7 @@ func start(parent context.Context, source traceSource, save func(traceSource) er
 		return nil
 	}
 	ctx, cancel := context.WithCancel(parent)
-	r := &Recorder{request: make(chan struct{}, 1), done: make(chan struct{}), cancel: cancel}
+	r := &Recorder{request: make(chan bool, 2), done: make(chan struct{}), cancel: cancel}
 	event("runtime_trace_enabled")
 	go func() {
 		defer cancel()
@@ -50,30 +51,53 @@ func start(parent context.Context, source traceSource, save func(traceSource) er
 		defer source.Stop()
 		timer := time.NewTimer(ttl)
 		defer timer.Stop()
-		select {
-		case <-ctx.Done():
-			return
-		case <-timer.C:
-			event("runtime_trace_expired")
-			return
-		case <-r.request:
-			if err := save(source); err != nil {
-				event(saveFailureCode(err))
-			} else {
-				event("runtime_trace_saved")
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-timer.C:
+				event("runtime_trace_expired")
+				return
+			case terminal := <-r.request:
+				if !terminal && r.requested.Load() {
+					continue // A queued sample cannot precede a requested failure.
+				}
+				if err := save(source); err != nil {
+					event(saveFailureCode(err))
+				} else if terminal {
+					event("runtime_trace_saved")
+				} else {
+					event("runtime_trace_sample_saved")
+				}
+				if terminal {
+					return
+				}
 			}
 		}
 	}()
 	return r
 }
 
-// Request cannot wait for trace flushing, runtime sampling or disk I/O.
+// Request captures the final failure and cannot wait for flushing or disk I/O.
 func (r *Recorder) Request() {
 	if r == nil || !r.requested.CompareAndSwap(false, true) {
 		return
 	}
 	select {
-	case r.request <- struct{}{}:
+	case r.request <- true:
+	default:
+	}
+}
+
+// RequestSample retains one latency sample without consuming the final failure
+// snapshot. Both requests are nonblocking and use the same bounded recorder and
+// existing output slots; the final failure replaces the earlier sample.
+func (r *Recorder) RequestSample() {
+	if r == nil || r.requested.Load() || !r.sampled.CompareAndSwap(false, true) {
+		return
+	}
+	select {
+	case r.request <- false:
 	default:
 	}
 }

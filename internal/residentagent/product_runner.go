@@ -99,16 +99,16 @@ func prepareProductConnection(identities *productidentity.Store, trust *truststo
 }
 
 func productRunner(identities *productidentity.Store, trust *truststore.Store, log *productlog.Logger, auxiliary ...func(context.Context, string, productConnection)) SessionRunner {
-	return productRunnerWithTrace(identities, trust, log, nil, auxiliary...)
+	return productRunnerWithTrace(identities, trust, log, nil, nil, auxiliary...)
 }
 
-func productRunnerWithTrace(identities *productidentity.Store, trust *truststore.Store, log *productlog.Logger, captureTrace func(), auxiliary ...func(context.Context, string, productConnection)) SessionRunner {
+func productRunnerWithTrace(identities *productidentity.Store, trust *truststore.Store, log *productlog.Logger, captureTrace, sampleTrace func(), auxiliary ...func(context.Context, string, productConnection)) SessionRunner {
 	profiles := handoff.NewRolling(func(s handoff.Summary) {
 		log.Handoff(s)
 		// Summary emission follows return/cleanup, outside the active input
 		// path. Capture slow network exchanges and local capture transitions.
-		if captureTrace != nil && handoffNeedsTrace(s) {
-			captureTrace()
+		if sampleTrace != nil && handoffNeedsTrace(s) {
+			sampleTrace()
 		}
 	})
 	return func(parent context.Context, alias string, observer agent.SupervisorObserver) (err error) {
@@ -283,6 +283,7 @@ func productRunnerWithTrace(identities *productidentity.Store, trust *truststore
 		config.HandoffProfiles = profiles
 		progress := newRuntimeDiagnostics()
 		progress.captureTrace = captureTrace
+		progress.sampleTrace = sampleTrace
 		config.LivenessObserver = progress
 		config.QueueObserver = progress
 		config.DestinationObserver = progress

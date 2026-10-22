@@ -73,6 +73,39 @@ func TestExpiryStopsWithoutWriting(t *testing.T) {
 	r.Close()
 }
 
+func TestLatencySamplePreservesOneFinalFailureSnapshot(t *testing.T) {
+	for _, sampleFails := range []bool{false, true} {
+		t.Run(map[bool]string{false: "saved sample", true: "failed sample"}[sampleFails], func(t *testing.T) {
+			f := &fakeSource{}
+			var writes atomic.Int32
+			events := make(chan string, 4)
+			r := start(context.Background(), f, func(traceSource) error {
+				if writes.Add(1) == 1 && sampleFails {
+					return errors.New("sample failure")
+				}
+				return nil
+			}, func(code string) { events <- code }, time.Minute)
+			defer r.Close()
+			<-events // Enabled.
+			for range 32 {
+				r.RequestSample()
+			}
+			<-events // The sample attempt has finished.
+			if f.stopped.Load() || writes.Load() != 1 {
+				t.Fatal("latency sample stopped or duplicated the recorder")
+			}
+			for range 32 {
+				r.RequestSample()
+				r.Request()
+			}
+			<-r.done
+			if writes.Load() != 2 || !f.stopped.Load() || <-events != "runtime_trace_saved" {
+				t.Fatal("final failure was lost or exceeded the snapshot budget")
+			}
+		})
+	}
+}
+
 func TestFailedOrOversizedSnapshotPreservesPreviousAndNeverExports(t *testing.T) {
 	base := t.TempDir()
 	if err := save(base, &fakeSource{payload: "private-runtime-record"}); err != nil {
@@ -107,10 +140,10 @@ func TestOptInRealRecorderWritesLocalTrace(t *testing.T) {
 	}
 	t.Setenv(Environment, "1")
 	base := t.TempDir()
-	saved := make(chan struct{}, 1)
+	saved := make(chan string, 2)
 	r := Start(context.Background(), base, func(code string) {
-		if code == "runtime_trace_saved" {
-			saved <- struct{}{}
+		if code == "runtime_trace_saved" || code == "runtime_trace_sample_saved" {
+			saved <- code
 		}
 	})
 	if r == nil {
@@ -118,9 +151,21 @@ func TestOptInRealRecorderWritesLocalTrace(t *testing.T) {
 	}
 	defer r.Close()
 	time.Sleep(20 * time.Millisecond)
+	r.RequestSample()
+	select {
+	case code := <-saved:
+		if code != "runtime_trace_sample_saved" {
+			t.Fatal("sample consumed final snapshot", code)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("no sample saved")
+	}
 	r.Request()
 	select {
-	case <-saved:
+	case code := <-saved:
+		if code != "runtime_trace_saved" {
+			t.Fatal("final failure not saved", code)
+		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("no trace saved")
 	}

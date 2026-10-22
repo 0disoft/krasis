@@ -48,7 +48,8 @@ func TestRuntimeDiagnosticsSeparatesReadDispatchAndValidatedHeartbeat(t *testing
 func TestRuntimeTraceOnlyRequestedForLongTimerLateness(t *testing.T) {
 	d := newRuntimeDiagnostics()
 	requests := 0
-	d.captureTrace = func() { requests++ }
+	d.captureTrace = func() { t.Fatal("timer delay consumed final failure trace") }
+	d.sampleTrace = func() { requests++ }
 	d.ObserveTimerLateness(999 * time.Millisecond)
 	if requests != 0 {
 		t.Fatal("ordinary delay triggered trace")
