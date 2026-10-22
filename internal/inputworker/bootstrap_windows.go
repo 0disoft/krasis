@@ -77,9 +77,8 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 	}
 	worker, control, pid, profile := prepared.worker, prepared.control, prepared.pid, prepared.profile
 	profile.PreparationDecision = decision
-	defer control.Close()
 	defer func() {
-		if worker.Close() != nil {
+		if prepared.close() != nil {
 			result = errors.Join(result, ErrRecovery)
 		}
 	}()
@@ -96,6 +95,7 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 	started := time.Now()
 	// The worker cannot acknowledge before full service-image validation and
 	// SCM/actual pipe-owner authentication. No agent handle is transferred yet.
+	prepared.bootstrapBegun.Store(true)
 	packet, err := bootstrapAfterAuthentication(startup, control, func() error {
 		if windows.GetNamedPipeClientProcessId(control.handle, &actual) != nil || actual != pid || windows.WTSGetActiveConsoleSessionId() != prepared.session || channel.authority.check(false) != nil {
 			return ErrAuthority
@@ -184,6 +184,10 @@ func runConsoleInput(ctx context.Context, agentDigest, serviceDigest [sha256.Siz
 }
 
 func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [sha256.Size]byte, profile handoff.StartupProfile, installation *Installation) error {
+	return runInstalledConsoleInputMode(ctx, agentDigest, serviceDigest, profile, installation, false)
+}
+
+func runInstalledConsoleInputMode(ctx context.Context, agentDigest, serviceDigest [sha256.Size]byte, profile handoff.StartupProfile, installation *Installation, prepareNative bool) (result error) {
 	if ctx == nil || ctx.Err() != nil || agentDigest == ([sha256.Size]byte{}) || serviceDigest == ([sha256.Size]byte{}) {
 		return ErrAuthority
 	}
@@ -215,6 +219,17 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 		return ErrAuthority
 	}
 	lifetime.proof = proof
+	var native *preparedNativePair
+	if prepareNative {
+		if installation == nil {
+			return ErrAuthority
+		}
+		native, err = prepareNativePair(startup)
+		if err != nil {
+			return err
+		}
+		defer func() { result = errors.Join(result, native.Close()) }()
+	}
 	_ = control.SetDeadline(time.Now().Add(startupTimeout))
 	if startup.Err() != nil || proof.check(false) != nil || writeFrame(control, workerAuthenticatedFrame[:]) != nil {
 		return ErrAuthority
@@ -222,6 +237,12 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 	var packet [bootstrapSize]byte
 	if _, err := io.ReadFull(control, packet[:]); err != nil {
 		return ErrProtocol
+	}
+	if prepareNative && zeroBytes(packet[:]) {
+		if native.Close() != nil {
+			return ErrRecovery
+		}
+		return writeFrame(control, unboundRetiredFrame[:])
 	}
 	handle, imageHandle, err := decodeWorkerBootstrapHandles(packet, agentDigest)
 	if err != nil {
@@ -243,7 +264,7 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 	var leaseData [leaseSize]byte
 	copy(leaseData[:], packet[bootstrapLeaseOffset:])
 	lease, err := decodeLease(leaseData, time.Now())
-	if err != nil || startup.Err() != nil || proof.check(false) != nil {
+	if err != nil || prepareNative && (lease.Capture || lease.Presentation) || startup.Err() != nil || proof.check(false) != nil {
 		return ErrAuthority
 	}
 	started = time.Now()
@@ -319,7 +340,7 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 	var input application.InputPort = wininput.NewInjectionPort()
 	var isolated *isolatedInput
 	if installation != nil {
-		isolated, err = startIsolatedInput(run, control, channel, proof, lease, installation, &profile)
+		isolated, err = startIsolatedInput(run, control, channel, proof, lease, installation, &profile, native)
 		if err != nil {
 			return finishWorkerReport(control, Report{}, errors.Join(err, ErrRecovery))
 		}
@@ -333,7 +354,6 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 		return writeStartupReady(control, profile)
 	}
 	var report Report
-	var result error
 	if isolated != nil && isolated.recoveryRetire != nil {
 		report, result = serveIsolatedJournal(run, channel, isolated, lease, announceReady)
 	} else {

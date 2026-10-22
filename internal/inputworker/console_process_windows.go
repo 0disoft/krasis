@@ -24,7 +24,7 @@ func makeWorkerJob() (windows.Handle, error) {
 }
 
 func makeConsoleWorkerJob(mode consoleMode) (windows.Handle, error) {
-	if mode == ordinaryConsole {
+	if mode == ordinaryConsole || mode == preparedInputConsole {
 		return makeWorkerJobLimit(3) // journal, live native input, release-only recovery
 	}
 	if mode == loginConsole {
@@ -59,6 +59,7 @@ type consoleMode uint8
 const (
 	ordinaryConsole consoleMode = iota
 	loginConsole
+	preparedInputConsole
 )
 
 func consoleLaunchMode(mode consoleMode) (arguments, desktop string, err error) {
@@ -67,6 +68,8 @@ func consoleLaunchMode(mode consoleMode) (arguments, desktop string, err error) 
 		return workerArguments, `winsta0\default`, nil
 	case loginConsole:
 		return " --login-worker", `winsta0\Winlogon`, nil
+	case preparedInputConsole:
+		return " --prepared-input-worker", `winsta0\default`, nil
 	default:
 		return "", "", ErrAuthority
 	}

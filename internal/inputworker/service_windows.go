@@ -68,6 +68,16 @@ func fixedInstalledInputProcess(digest [32]byte, console bool, installation *Ins
 
 // RunInstalledWorker cannot consume a caller-provided trust record.
 func RunInstalledWorker(ctx context.Context, installation *Installation) error {
+	return runInstalledWorker(ctx, installation, false)
+}
+
+// Only the service's bounded input preparation selects this fixed mode. The
+// extra processes receive no agent handles, lease or input until bootstrap.
+func RunInstalledPreparedWorker(ctx context.Context, installation *Installation) error {
+	return runInstalledWorker(ctx, installation, true)
+}
+
+func runInstalledWorker(ctx context.Context, installation *Installation, prepareNative bool) error {
 	var profile handoff.StartupProfile
 	started := time.Now()
 	agent, service, err := installation.workerDigests()
@@ -78,7 +88,7 @@ func RunInstalledWorker(ctx context.Context, installation *Installation) error {
 	// span overlaps ServiceChildConnect; it must not be added to that span.
 	profile.Record(handoff.WorkerInstalledValidation, installation.loadElapsed+time.Since(started))
 	profile.RecordLoad(installation.loadElapsed)
-	return runInstalledConsoleInput(ctx, agent, service, profile, installation)
+	return runInstalledConsoleInputMode(ctx, agent, service, profile, installation, prepareNative)
 }
 
 func runServiceLoop(ctx context.Context, installation *Installation, ready func() error) (result error) {

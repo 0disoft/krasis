@@ -224,7 +224,7 @@ func validNativeParent(handle windows.Handle, installation *Installation, digest
 	return pin.Close() == nil
 }
 
-func startIsolatedInput(ctx context.Context, control *pipeConn, channel *Channel, proof *Authority, lease Lease, installation *Installation, profile *handoff.StartupProfile) (*isolatedInput, error) {
+func startIsolatedInput(ctx context.Context, control *pipeConn, channel *Channel, proof *Authority, lease Lease, installation *Installation, profile *handoff.StartupProfile, prepared ...*preparedNativePair) (*isolatedInput, error) {
 	agentDigest, serviceDigest, err := installation.digests()
 	if err != nil || control == nil || channel == nil || channel.authority == nil || proof == nil || proof.kind != authorityService || proof.check(false) != nil || channel.authority.check(false) != nil || lease.Capture || lease.Presentation || !fixedInstalledInputProcess(serviceDigest, true, installation) {
 		return nil, ErrAuthority
@@ -272,6 +272,9 @@ func startIsolatedInput(ctx context.Context, control *pipeConn, channel *Channel
 	binary.BigEndian.PutUint64(data[bootstrapSize:bootstrapSize+8], uint64(handles[2]))
 	binary.BigEndian.PutUint64(data[bootstrapSize+8:], uint64(handles[3]))
 	return startNativePair(ctx, func(run context.Context, release bool) (*isolatedInput, error) {
+		if len(prepared) == 1 && prepared[0] != nil {
+			return prepared[0].bind(run, release, handles, data[:])
+		}
 		mode := "--native-input-worker"
 		if release {
 			mode = "--native-release-worker"

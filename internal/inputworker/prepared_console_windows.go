@@ -6,6 +6,8 @@ import (
 	"context"
 	"crypto/sha256"
 	"errors"
+	"io"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -16,14 +18,18 @@ import (
 // Preparation owns only the job and the SYSTEM-only control pipe. No lease,
 // agent input pipe or image is transferred until the existing bootstrap.
 type preparedConsole struct {
-	worker     *ConsoleWorker
-	control    *pipeConn
-	pid        uint32
-	session    uint32
-	profile    handoff.StartupProfile
-	preparedAt time.Time
-	warmState  atomic.Uint32 // 0: unbound, 1: claimed once, 2: retired, 3: expired
-	warmTimer  *time.Timer
+	worker         *ConsoleWorker
+	control        *pipeConn
+	pid            uint32
+	session        uint32
+	profile        handoff.StartupProfile
+	preparedAt     time.Time
+	warmState      atomic.Uint32 // 0: unbound, 1: claimed once, 2: retired, 3: expired
+	warmTimer      *time.Timer
+	nativePrepared bool
+	bootstrapBegun atomic.Bool
+	closeOnce      sync.Once
+	closeErr       error
 }
 
 // A passive presentation launches its own bounded owner. Keep the unbound input
@@ -47,8 +53,8 @@ func prepareServiceConsole(ctx context.Context, installation *Installation, dige
 	if err != nil || service != digest || !fixedInstalledInputProcess(service, false, installation) {
 		return nil, ErrAuthority
 	}
-	p, err := prepareConsole(ctx, func(prepare func(windows.Handle, uint32) error) (*ConsoleWorker, error) {
-		return launchManagedConsoleChecked(ctx, digest, prepare, installation, func() bool {
+	p, err := prepareConsoleMode(ctx, true, func(prepare func(windows.Handle, uint32) error) (*ConsoleWorker, error) {
+		return launchManagedConsoleMode(ctx, digest, prepare, installation, preparedInputConsole, func() bool {
 			return fixedInstalledInputProcess(digest, false, installation)
 		})
 	})
@@ -137,10 +143,14 @@ func prepareAgentConsole(ctx context.Context, agent *Authority, digest [sha256.S
 }
 
 func prepareConsole(ctx context.Context, launch consoleLauncher) (prepared *preparedConsole, result error) {
+	return prepareConsoleMode(ctx, false, launch)
+}
+
+func prepareConsoleMode(ctx context.Context, native bool, launch consoleLauncher) (prepared *preparedConsole, result error) {
 	if ctx == nil || ctx.Err() != nil || launch == nil {
 		return nil, ErrAuthority
 	}
-	p := &preparedConsole{}
+	p := &preparedConsole{nativePrepared: native}
 	accepted := false
 	defer func() {
 		if !accepted && p.close() != nil {
@@ -184,12 +194,42 @@ func (prepared *preparedConsole) close() error {
 }
 
 func (prepared *preparedConsole) closeOwned() error {
-	var err error
-	if prepared.control != nil {
-		err = prepared.control.Close()
+	prepared.closeOnce.Do(func() {
+		if prepared.nativePrepared && !prepared.bootstrapBegun.Load() {
+			// An unbound pair has no input journal. Ask its exact parent to
+			// retire both native processes before accepting its final receipt.
+			if prepared.retireNativePreparation() != nil {
+				prepared.closeErr = ErrRecovery
+			} else {
+				prepared.worker.confirmNativeRetirement()
+			}
+		}
+		if prepared.control != nil {
+			prepared.closeErr = errors.Join(prepared.closeErr, prepared.control.Close())
+		}
+		if prepared.worker != nil {
+			prepared.closeErr = errors.Join(prepared.closeErr, prepared.worker.Close())
+		}
+	})
+	return prepared.closeErr
+}
+
+var unboundRetiredFrame = [8]byte{'K', 'R', 'U', '1', 1, 0, 0, 0}
+
+func (p *preparedConsole) retireNativePreparation() error {
+	if p.control == nil || p.worker == nil || p.control.SetDeadline(time.Now().Add(startupTimeout)) != nil {
+		return ErrRecovery
 	}
-	if prepared.worker != nil {
-		err = errors.Join(err, prepared.worker.Close())
+	if readWorkerAuthenticated(p.control) != nil {
+		return ErrRecovery
 	}
-	return err
+	var stop [bootstrapSize]byte // Reserved all-zero bootstrap; never a lease.
+	if writeFrame(p.control, stop[:]) != nil {
+		return ErrRecovery
+	}
+	var receipt [8]byte
+	if _, err := io.ReadFull(p.control, receipt[:]); err != nil || receipt != unboundRetiredFrame {
+		return ErrRecovery
+	}
+	return nil
 }

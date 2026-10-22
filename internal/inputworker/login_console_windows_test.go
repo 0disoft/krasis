@@ -39,8 +39,8 @@ func TestLoginConsoleRejectsUntrustedLaunchWithoutCreatingProcess(t *testing.T) 
 	}
 }
 
-func TestConsoleLaunchHasOnlyTwoFixedModes(t *testing.T) {
-	for _, mode := range []consoleMode{ordinaryConsole, loginConsole} {
+func TestConsoleLaunchHasOnlyFixedModes(t *testing.T) {
+	for _, mode := range []consoleMode{ordinaryConsole, loginConsole, preparedInputConsole} {
 		arguments, desktop, err := consoleLaunchMode(mode)
 		if err != nil {
 			t.Fatal(err)
@@ -52,7 +52,7 @@ func TestConsoleLaunchHasOnlyTwoFixedModes(t *testing.T) {
 			t.Fatal("login worker selected an unbound mode")
 		}
 	}
-	for _, mode := range []consoleMode{2, 255} {
+	for _, mode := range []consoleMode{3, 255} {
 		if _, _, err := consoleLaunchMode(mode); err != ErrAuthority {
 			t.Fatal("unknown desktop/mode accepted")
 		}

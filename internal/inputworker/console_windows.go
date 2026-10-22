@@ -188,6 +188,9 @@ func launchConsoleMode(ctx context.Context, digest [sha256.Size]byte, prepare fu
 	worker.process, err = createManagedConsoleProcess(ctx, token, path, worker.job, mode, func() bool {
 		return windows.WTSGetActiveConsoleSessionId() == session && authorized()
 	}, prepare)
+	if mode == preparedInputConsole && worker.process != 0 {
+		worker.expectNativeChild()
+	}
 	if err != nil {
 		return nil, err
 	}

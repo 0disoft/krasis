@@ -20,6 +20,8 @@ const (
 	WorkerAgentAuth
 	// Direct desktop binding, or elapsed startup of the independently
 	// authenticated input/release pair for the installed isolated journal.
+	// Prepared input children may already be loading while unbound; in that
+	// case this measures the remaining authenticated binding/readiness wait.
 	WorkerDesktopReady
 	StartupStageCount
 )
