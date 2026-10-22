@@ -1,0 +1,871 @@
+{
+  "date": "2026-10-23",
+  "requestID": "3a672fddda04139d1dcf1538393cb528",
+  "observedGeneration": 446,
+  "observedBuild": "706c6f305ffae1c6fa4c600e65e1a169577d88b8",
+  "scope": "Retained g446 A-source/B-receiver software profiles after user confirmed reduced cursor entry delay.",
+  "inputs": {
+    "A": {
+      "sha256": "999af85c623291b5b6b36d69aaccde513f14b2155d8b9ff54a2e89c180b39c55",
+      "bytes": 1265319,
+      "createdUTC": "2026-10-22T19:19:23Z",
+      "schema": "krasis.support/v1",
+      "logs": [
+        {
+          "source": "agent.previous.jsonl",
+          "events": 2541,
+          "incomplete": false
+        },
+        {
+          "source": "agent.jsonl",
+          "events": 348,
+          "incomplete": false
+        },
+        {
+          "source": "control.previous.jsonl",
+          "events": 0,
+          "incomplete": true
+        },
+        {
+          "source": "control.jsonl",
+          "events": 615,
+          "incomplete": false
+        }
+      ]
+    },
+    "B": {
+      "sha256": "3bd30fdc2a7779998386ac963d3c7cd5a0e7b193690887502d490e46d126b428",
+      "bytes": 1514031,
+      "createdUTC": "2026-10-22T19:19:26Z",
+      "schema": "krasis.support/v1",
+      "logs": [
+        {
+          "source": "agent.previous.jsonl",
+          "events": 2581,
+          "incomplete": false
+        },
+        {
+          "source": "agent.jsonl",
+          "events": 978,
+          "incomplete": false
+        },
+        {
+          "source": "control.previous.jsonl",
+          "events": 0,
+          "incomplete": true
+        },
+        {
+          "source": "control.jsonl",
+          "events": 476,
+          "incomplete": false
+        }
+      ]
+    }
+  },
+  "sides": {
+    "A": {
+      "profiles": 5,
+      "ends": {
+        "ok": 5
+      },
+      "allProfilesComplete": true,
+      "preparationMicros": {
+        "BoundaryToBegin": {
+          "samples": 5,
+          "min": 2203,
+          "median": 2491,
+          "max": 6318
+        },
+        "RequestCoordinator": {
+          "samples": 5,
+          "min": 0,
+          "median": 0,
+          "max": 0
+        },
+        "RequestWrite": {
+          "samples": 5,
+          "min": 0,
+          "median": 0,
+          "max": 582
+        },
+        "RequestToGrant": {
+          "samples": 5,
+          "min": 41380,
+          "median": 45796,
+          "max": 206615
+        },
+        "GrantCoordinator": {
+          "samples": 5,
+          "min": 0,
+          "median": 0,
+          "max": 0
+        },
+        "SourceActivate": {
+          "samples": 5,
+          "min": 0,
+          "median": 0,
+          "max": 0
+        },
+        "CaptureActivate": {
+          "samples": 5,
+          "min": 14938,
+          "median": 17054,
+          "max": 45557
+        },
+        "CommitWrite": {
+          "samples": 5,
+          "min": 0,
+          "median": 0,
+          "max": 779
+        },
+        "SourceDeactivate": {
+          "samples": 5,
+          "min": 7571,
+          "median": 9276,
+          "max": 18063
+        },
+        "ReentryGap": {
+          "samples": 4,
+          "min": 228841,
+          "median": 326864.5,
+          "max": 403878
+        }
+      },
+      "firstMicros": {
+        "SourceQueue": {
+          "samples": 5,
+          "min": 0,
+          "median": 0,
+          "max": 0
+        },
+        "FirstOfferSinceBegin": {
+          "samples": 5,
+          "min": 54857,
+          "median": 59052,
+          "max": 227049
+        },
+        "InputCoordinator": {
+          "samples": 5,
+          "min": 4343,
+          "median": 6918,
+          "max": 28945
+        },
+        "InputWrite": {
+          "samples": 5,
+          "min": 0,
+          "median": 555,
+          "max": 634
+        },
+        "Dispatch": {
+          "samples": 5,
+          "min": 4343,
+          "median": 7552,
+          "max": 29503
+        }
+      },
+      "entryMicros": {},
+      "startupMicros": {},
+      "captureMicros": {
+        "CaptureIPCLock": {
+          "samples": 5,
+          "min": 0,
+          "median": 0,
+          "max": 0
+        },
+        "CaptureIPCAuthority": {
+          "samples": 5,
+          "min": 0,
+          "median": 0,
+          "max": 772
+        },
+        "CaptureIPCWrite": {
+          "samples": 5,
+          "min": 0,
+          "median": 0,
+          "max": 559
+        },
+        "CaptureIPCResponse": {
+          "samples": 5,
+          "min": 12836,
+          "median": 16475,
+          "max": 44784
+        }
+      },
+      "subsequentDispatchHistogram": [
+        265,
+        3,
+        0,
+        0,
+        0
+      ],
+      "pipeBusy": 0,
+      "pipeMissing": 0,
+      "preparationDecisions": {
+        "0": 5
+      },
+      "eventsOfInterest": [],
+      "inputHealth": {
+        "time": "2026-10-22T19:19:20.281378Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "serviceRuntime": {
+        "startedAt": "2026-10-22T19:17:53.5536649Z",
+        "time": "2026-10-22T19:17:53.5795807Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      }
+    },
+    "B": {
+      "profiles": 5,
+      "ends": {
+        "ok": 5
+      },
+      "allProfilesComplete": true,
+      "preparationMicros": {
+        "RequestCoordinator": {
+          "samples": 5,
+          "min": 0,
+          "median": 0,
+          "max": 0
+        },
+        "PeerAuthorize": {
+          "samples": 5,
+          "min": 1074,
+          "median": 1767,
+          "max": 1893
+        },
+        "AuthorizeTotal": {
+          "samples": 5,
+          "min": 28159,
+          "median": 32990,
+          "max": 194077
+        },
+        "OpenLock": {
+          "samples": 5,
+          "min": 0,
+          "median": 0,
+          "max": 66348
+        },
+        "ConnectTotal": {
+          "samples": 5,
+          "min": 27020,
+          "median": 31643,
+          "max": 125961
+        },
+        "PipeOpen": {
+          "samples": 5,
+          "min": 0,
+          "median": 0,
+          "max": 0
+        },
+        "ServiceAuth": {
+          "samples": 5,
+          "min": 1292,
+          "median": 1707,
+          "max": 2204
+        },
+        "ServiceImagePin": {
+          "samples": 5,
+          "min": 0,
+          "median": 0,
+          "max": 0
+        },
+        "LeaseWrite": {
+          "samples": 5,
+          "min": 0,
+          "median": 0,
+          "max": 607
+        },
+        "ReadyWait": {
+          "samples": 5,
+          "min": 24038,
+          "median": 29072,
+          "max": 123711
+        },
+        "NewClientCheck": {
+          "samples": 5,
+          "min": 0,
+          "median": 551,
+          "max": 628
+        },
+        "ReturnArm": {
+          "samples": 5,
+          "min": 0,
+          "median": 0,
+          "max": 0
+        },
+        "EntryPrepare": {
+          "samples": 5,
+          "min": 3385,
+          "median": 4165,
+          "max": 4252
+        },
+        "PrepareInbound": {
+          "samples": 5,
+          "min": 0,
+          "median": 0,
+          "max": 0
+        },
+        "GrantWrite": {
+          "samples": 5,
+          "min": 0,
+          "median": 594,
+          "max": 617
+        },
+        "CommitCoordinator": {
+          "samples": 5,
+          "min": 0,
+          "median": 0,
+          "max": 0
+        },
+        "CommitApply": {
+          "samples": 5,
+          "min": 0,
+          "median": 0,
+          "max": 0
+        },
+        "InputClose": {
+          "samples": 5,
+          "min": 511,
+          "median": 596,
+          "max": 616
+        },
+        "ReentryGap": {
+          "samples": 4,
+          "min": 249371,
+          "median": 344881.5,
+          "max": 416564
+        }
+      },
+      "firstMicros": {
+        "FirstOfferSinceBegin": {
+          "samples": 5,
+          "min": 60259,
+          "median": 66632,
+          "max": 255730
+        },
+        "InputCoordinator": {
+          "samples": 5,
+          "min": 0,
+          "median": 0,
+          "max": 0
+        },
+        "Dispatch": {
+          "samples": 5,
+          "min": 1640,
+          "median": 1668,
+          "max": 2889
+        },
+        "OuterLock": {
+          "samples": 5,
+          "min": 0,
+          "median": 0,
+          "max": 0
+        },
+        "ClientTotal": {
+          "samples": 5,
+          "min": 1640,
+          "median": 1668,
+          "max": 2889
+        },
+        "ClientLock": {
+          "samples": 5,
+          "min": 0,
+          "median": 0,
+          "max": 0
+        },
+        "ClientAuthority": {
+          "samples": 5,
+          "min": 0,
+          "median": 0,
+          "max": 582
+        },
+        "ClientWrite": {
+          "samples": 5,
+          "min": 0,
+          "median": 0,
+          "max": 0
+        },
+        "ClientResponse": {
+          "samples": 5,
+          "min": 1640,
+          "median": 1668,
+          "max": 2331
+        },
+        "CursorPostprocess": {
+          "samples": 5,
+          "min": 0,
+          "median": 0,
+          "max": 0
+        }
+      },
+      "entryMicros": {
+        "Dispatch": {
+          "samples": 5,
+          "min": 3385,
+          "median": 4165,
+          "max": 4252
+        },
+        "OuterLock": {
+          "samples": 5,
+          "min": 0,
+          "median": 0,
+          "max": 0
+        },
+        "ClientTotal": {
+          "samples": 5,
+          "min": 3385,
+          "median": 4165,
+          "max": 4252
+        },
+        "ClientLock": {
+          "samples": 5,
+          "min": 0,
+          "median": 0,
+          "max": 0
+        },
+        "ClientAuthority": {
+          "samples": 5,
+          "min": 0,
+          "median": 586,
+          "max": 642
+        },
+        "ClientWrite": {
+          "samples": 5,
+          "min": 0,
+          "median": 0,
+          "max": 0
+        },
+        "ClientResponse": {
+          "samples": 5,
+          "min": 2794,
+          "median": 3590,
+          "max": 4252
+        }
+      },
+      "startupMicros": {
+        "ServiceLaunch": {
+          "samples": 5,
+          "min": 21092,
+          "median": 25350,
+          "max": 28002
+        },
+        "ServiceChildConnect": {
+          "samples": 5,
+          "min": 116805,
+          "median": 119731,
+          "max": 129568
+        },
+        "ServiceBootstrapReady": {
+          "samples": 5,
+          "min": 14610,
+          "median": 19160,
+          "max": 114437
+        },
+        "WorkerInstalledValidation": {
+          "samples": 5,
+          "min": 57362,
+          "median": 60898,
+          "max": 62261
+        },
+        "WorkerIdentity": {
+          "samples": 5,
+          "min": 0,
+          "median": 0,
+          "max": 0
+        },
+        "WorkerServiceAuth": {
+          "samples": 5,
+          "min": 2278,
+          "median": 2517,
+          "max": 2843
+        },
+        "WorkerAgentAuth": {
+          "samples": 5,
+          "min": 3450,
+          "median": 4224,
+          "max": 5217
+        },
+        "WorkerDesktopReady": {
+          "samples": 5,
+          "min": 8817,
+          "median": 12026,
+          "max": 103041
+        }
+      },
+      "captureMicros": {},
+      "subsequentDispatchHistogram": [
+        0,
+        248,
+        0,
+        0,
+        0
+      ],
+      "pipeBusy": 0,
+      "pipeMissing": 0,
+      "preparationDecisions": {
+        "1": 5
+      },
+      "eventsOfInterest": [
+        {
+          "time": "2026-10-22T19:19:11.8369283Z",
+          "code": "installed_return_cursor_capture_show_lt10ms"
+        },
+        {
+          "time": "2026-10-22T19:19:12.9469052Z",
+          "code": "installed_return_cursor_capture_show_lt10ms"
+        },
+        {
+          "time": "2026-10-22T19:19:13.8751581Z",
+          "code": "installed_return_cursor_capture_show_lt10ms"
+        },
+        {
+          "time": "2026-10-22T19:19:14.7380724Z",
+          "code": "installed_return_cursor_capture_show_lt10ms"
+        },
+        {
+          "time": "2026-10-22T19:19:15.4758464Z",
+          "code": "installed_return_cursor_capture_show_lt10ms"
+        }
+      ],
+      "inputHealth": {
+        "time": "2026-10-22T19:19:10.8445355Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "serviceRuntime": {
+        "startedAt": "2026-10-22T19:17:35.7337223Z",
+        "time": "2026-10-22T19:17:35.7762562Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      }
+    }
+  },
+  "pairedExchanges": [
+    {
+      "exchangeTag": "3519f80fbf712f377a7a9ec497cd4bd37a1c4cec3ee148996bcd2f747b32a8b8",
+      "A": {
+        "preparationMicros": {
+          "BoundaryToBegin": 3821,
+          "RequestToGrant": 206615,
+          "CaptureActivate": 45557
+        },
+        "firstOfferSinceBeginMicros": 227049
+      },
+      "B": {
+        "readyWaitMicros": 123711,
+        "nativePairReadyMicros": 103041,
+        "entryDispatchMicros": 3385,
+        "firstDispatchMicros": 2889,
+        "prepared": true
+      }
+    },
+    {
+      "exchangeTag": "e0178b6374ad8bf00ca60eac4ba0a75bb188a2d745e54beb94c90c5e127b4f5b",
+      "A": {
+        "preparationMicros": {
+          "BoundaryToBegin": 2491,
+          "RequestToGrant": 45796,
+          "CaptureActivate": 14938
+        },
+        "firstOfferSinceBeginMicros": 58215
+      },
+      "B": {
+        "readyWaitMicros": 24038,
+        "nativePairReadyMicros": 9661,
+        "entryDispatchMicros": 4165,
+        "firstDispatchMicros": 2410,
+        "prepared": true
+      }
+    },
+    {
+      "exchangeTag": "db673b4d58fa9ae49d713e4496e88b8435360557247994d7d96ce3e221931df9",
+      "A": {
+        "preparationMicros": {
+          "BoundaryToBegin": 2203,
+          "RequestToGrant": 45716,
+          "CaptureActivate": 14964
+        },
+        "firstOfferSinceBeginMicros": 59052
+      },
+      "B": {
+        "readyWaitMicros": 29072,
+        "nativePairReadyMicros": 12026,
+        "entryDispatchMicros": 4252,
+        "firstDispatchMicros": 1668,
+        "prepared": true
+      }
+    },
+    {
+      "exchangeTag": "89fbfbe327c47fbd77927796e930768748a39a706b70ffabc46fb3e18b6be00a",
+      "A": {
+        "preparationMicros": {
+          "BoundaryToBegin": 2256,
+          "RequestToGrant": 41380,
+          "CaptureActivate": 17579
+        },
+        "firstOfferSinceBeginMicros": 54857
+      },
+      "B": {
+        "readyWaitMicros": 24815,
+        "nativePairReadyMicros": 8817,
+        "entryDispatchMicros": 4192,
+        "firstDispatchMicros": 1653,
+        "prepared": true
+      }
+    },
+    {
+      "exchangeTag": "b2d5e65e1aa0da1b551cbe3480db473e8f12513b505d7a1c1c14b476fc6d94f8",
+      "A": {
+        "preparationMicros": {
+          "BoundaryToBegin": 6318,
+          "RequestToGrant": 59621,
+          "CaptureActivate": 17054
+        },
+        "firstOfferSinceBeginMicros": 72140
+      },
+      "B": {
+        "readyWaitMicros": 39624,
+        "nativePairReadyMicros": 22330,
+        "entryDispatchMicros": 4070,
+        "firstDispatchMicros": 1640,
+        "prepared": true
+      }
+    }
+  ],
+  "tcp": {
+    "rttMicros": {
+      "samples": 10,
+      "min": 9006,
+      "median": 9622.0,
+      "max": 12363
+    },
+    "retransmittedBytes": 0,
+    "timeoutEpisodes": 0
+  },
+  "comparison": {
+    "baselineFile": "2026-10-23-g444-paired-crossing-analysis.json",
+    "baselineSamples": 12,
+    "currentSamples": 5,
+    "unit": "microseconds",
+    "metrics": {
+      "A.FirstOfferSinceBegin": {
+        "beforeMedian": 286547.0,
+        "afterMedian": 59052
+      },
+      "A.RequestToGrant": {
+        "beforeMedian": 188118.0,
+        "afterMedian": 45796
+      },
+      "A.CaptureActivate": {
+        "beforeMedian": 72513.0,
+        "afterMedian": 17054
+      },
+      "B.ReadyWait": {
+        "beforeMedian": 149081.5,
+        "afterMedian": 29072
+      },
+      "B.WorkerDesktopReady": {
+        "beforeMedian": 132028.5,
+        "afterMedian": 12026
+      }
+    }
+  },
+  "rollout": {
+    "expectedBuild": "706c6f305ffae1c6fa4c600e65e1a169577d88b8",
+    "A": {
+      "doctor": "healthy/CONNECTED",
+      "uiAgentCLIInstalledAgentBuild": "MATCHED",
+      "installerRepair": {
+        "exitCode": 0,
+        "timeUTC": "2026-10-22T19:17:53.8020019Z",
+        "installerSha256": "0ed2e6df0597e8411db9a396d1180b59a2952e8f814bc663c219e6e3230648b4"
+      }
+    },
+    "B": {
+      "updateID": "e1b31903131231001508c897ace43cf8",
+      "result": "UPDATED",
+      "generation": 446,
+      "build": "706c6f305ffae1c6fa4c600e65e1a169577d88b8"
+    },
+    "userReport": "지연이 줄었음"
+  },
+  "g445Failure": {
+    "requestID": "fcd980e4a9a95b08cd91f02a786f6051",
+    "generation": 445,
+    "build": "29a92e15b76eb62a8f524f08fc2fb776b5158798",
+    "evidence": [
+      {
+        "side": "A",
+        "sha256": "6775bdab702deeb4ae94103e79414c7e7c9c9f130ea11eedea64849296610171",
+        "bytes": 2099187,
+        "created": "2026-10-22T19:09:15Z",
+        "installation": {
+          "time": "2026-10-22T19:08:21.4072895Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-22T19:09:05.9910326Z",
+          "state": "SERVICE_RECOVERY_REQUIRED",
+          "stage": "service_recovery",
+          "win32Error": 1066,
+          "win32Known": true
+        },
+        "loginRuntime": {
+          "startedAt": "2026-10-22T19:08:23.1160842Z",
+          "time": "2026-10-22T19:08:51.2511717Z",
+          "service": "FAILED",
+          "console": "USER_SESSION",
+          "grant": "PRESENT",
+          "lastWorker": "NONE",
+          "lastFailure": {
+            "time": "2026-10-22T19:08:51.2511717Z",
+            "stage": "service",
+            "reason": "input",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "source": {
+            "total": 1,
+            "exits": [
+              {
+                "time": "2026-10-22T19:08:51.2294963Z",
+                "command": "ok",
+                "reader": "cancelled",
+                "capture": "joined",
+                "sender": "joined",
+                "interrupt": "joined",
+                "retirement": "clean_sent",
+                "report": "ok",
+                "heartbeatStage": "replied",
+                "heartbeatSlowStage": "service_presence",
+                "heartbeatSlowBucket": 1
+              }
+            ]
+          }
+        }
+      },
+      {
+        "side": "B",
+        "sha256": "2e048c8c8e3e3f9604ea573fe72b18dbacf204c798498df78ca139936eba55f2",
+        "bytes": 1278125,
+        "created": "2026-10-22T19:09:19Z",
+        "installation": {
+          "time": "2026-10-22T19:07:48.756398Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-22T19:08:55.5520246Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "loginRuntime": {
+          "startedAt": "2026-10-22T19:07:51.1669854Z",
+          "time": "2026-10-22T19:08:55.972072Z",
+          "service": "READY",
+          "console": "USER_SESSION",
+          "grant": "PRESENT",
+          "lastWorker": "NONE",
+          "source": {
+            "total": 1,
+            "exits": [
+              {
+                "time": "2026-10-22T19:08:55.79726Z",
+                "command": "ok",
+                "reader": "stopped",
+                "capture": "joined",
+                "sender": "joined",
+                "interrupt": "joined",
+                "retirement": "clean_sent",
+                "report": "ok",
+                "heartbeatStage": "replied",
+                "heartbeatSlowStage": "reply_presence",
+                "heartbeatSlowBucket": 2
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "observed": "A service failed on the input endpoint; protected input became unavailable. B remained READY. g445 was not accepted as a successful rollout.",
+    "codeFinding": "Marking native children possible during cancellable OS launch let late launch rejection close the job without an unbound native retirement handshake. g446 requires a fixed service permit after launch/connect before creating native children. This is a code-identified failure path, not a separately reproduced Windows root cause.",
+    "recovery": "A safely stopped; verified g446 installer --repair exited 0 through the protected old-service repair transaction. No receipt or transaction files were manually cleared."
+  },
+  "validations": {
+    "passed": [
+      "go test ./internal/crashguard ./internal/inputworker ./internal/handoff ./cmd/krasis-input -count=1 (pre-permit-fix implementation)",
+      "targeted prepared/native/cancellation/permit and fixed-mode tests after 6581f72",
+      "go vet ./internal/crashguard ./internal/inputworker ./cmd/krasis-input after 6581f72; earlier handoff vet passed (unchanged)",
+      "go test -race ./internal/crashguard ./internal/inputworker -run TestPreparedLocalInput|TestPreparedNative|TestCancelledConsole|TestConsoleNativePreparation|TestPreparedConsoleRequiresExact -count=1 -timeout=120s; CGO=1 with bundled x86_64-w64-mingw32-clang",
+      "frontend: 103 tests; native Vite build",
+      "8-file workspace package and installer provenance checks",
+      "CLI offline bundle verify: 28472263 bytes; g446; matching revision",
+      "paired post-rollout diagnostics: both input health/service READY; five matching successful complete exchange tags",
+      "git diff --check"
+    ],
+    "skipped": [
+      {
+        "check": "controlled physical cursor/display latency measurement",
+        "reason": "No external display/cursor capture instrument; only software spans and user feedback are available."
+      },
+      {
+        "check": "long-duration reconnect/source-fault endurance",
+        "reason": "This is a short post-rollout crossing window; earlier source-write failures remain an independent unresolved risk."
+      }
+    ]
+  },
+  "changeBoundaries": {
+    "publicPeerWireSchema": false,
+    "publicAPI": false,
+    "database": false,
+    "dependencies": false,
+    "CIRunner": false,
+    "repositoryHygiene": false,
+    "privateWorkerMode": "--prepared-input-worker",
+    "privateServiceFrames": [
+      "KRN1: service permits unbound native creation after exact launch/connect",
+      "KRU1: parent confirms both unbound native process exits and cleanup"
+    ],
+    "inputAuthority": "Still independently authenticated and freshly lease-bound; no authority handles or lease are transferred during prestart. No reuse of a previously bound child.",
+    "resources": "Existing three-process job limit and bounded preparation lifetime retained.",
+    "sourceOfTruthDocumentsChanged": []
+  },
+  "interpretation": [
+    "Five exchange tags match A source to B receiver; all complete and end ok. They represent five leases, not ten independent directions.",
+    "A first offer since begin median fell from 286547us (12 g444 samples) to 59052us (5 g446 samples). B ReadyWait median fell from 149082us to 29072us. These are different short exercise windows, not a controlled benchmark.",
+    "B native pair readiness span now measures the remaining authenticated binding/startup after prestart, not the entire background startup elapsed. Its median is 12026us versus 132029us cold startup in g444; those spans have different start boundaries.",
+    "The first g446 lease still had A first offer 227049us and B native-pair readiness 103041us. Prestart does not promise zero delay or complete readiness before a very early claim.",
+    "Source CaptureActivate also varied downward from 72513us to 17054us without a source capture implementation change in this work; do not attribute the full end-to-end change solely to native prestart.",
+    "Nested spans and medians overlap and must not be summed. Local software offer/IPC timings do not measure visible cursor/display latency.",
+    "No failure/fault/fatal/disconnect event was retained for g446 in either post-test export. The window is short and does not establish that all previous source faults are fixed."
+  ]
+}
