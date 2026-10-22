@@ -5,15 +5,18 @@ import "time"
 // SourceExit records one source-only lifetime. It is never native retirement
 // proof or input authority and contains no operation payload or input content.
 type SourceExit struct {
-	Time       string         `json:"time,omitempty"`
-	Command    string         `json:"command"`
-	Reader     string         `json:"reader"`
-	Capture    string         `json:"capture"`
-	Sender     string         `json:"sender"`
-	Interrupt  string         `json:"interrupt"`
-	Retirement string         `json:"retirement"`
-	Report     string         `json:"report"`
-	Failure    *SourceFailure `json:"failure,omitempty"`
+	Time                string         `json:"time,omitempty"`
+	Command             string         `json:"command"`
+	Reader              string         `json:"reader"`
+	Capture             string         `json:"capture"`
+	Sender              string         `json:"sender"`
+	Interrupt           string         `json:"interrupt"`
+	Retirement          string         `json:"retirement"`
+	Report              string         `json:"report"`
+	Failure             *SourceFailure `json:"failure,omitempty"`
+	HeartbeatStage      string         `json:"heartbeatStage,omitempty"`
+	HeartbeatSlowStage  string         `json:"heartbeatSlowStage,omitempty"`
+	HeartbeatSlowBucket byte           `json:"heartbeatSlowBucket,omitempty"`
 }
 
 // Added by the service after consuming the final worker report and joining its
@@ -38,13 +41,16 @@ type SourceHistory struct {
 const MaxSourceExits = 16
 
 func (v SourceExit) ValidDetails() bool {
+	if !v.validHeartbeat() {
+		return false
+	}
 	if v.Failure != nil && !v.Failure.Valid() {
 		return false
 	}
 	if v.Report == "missing" {
 		// Service-only absence of a final worker report. Unknown is never a
 		// claim that capture did not start or that native cleanup completed.
-		return v.Command == "unknown" && v.Reader == "unknown" && v.Capture == "unknown" &&
+		return v.HeartbeatStage == "" && v.Command == "unknown" && v.Reader == "unknown" && v.Capture == "unknown" &&
 			v.Sender == "unknown" && v.Interrupt == "unknown" && v.Retirement == "unknown" && v.Failure != nil
 	}
 	if v.Report != "recovery" && (v.Sender == "unjoined" || v.Interrupt == "unjoined" || v.Capture == "failed") {

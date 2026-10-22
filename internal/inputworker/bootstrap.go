@@ -199,6 +199,9 @@ func writeReport(writer io.Writer, report Report, result error) error {
 			return err
 		}
 		data[4], data[7] = 3, 1
+		if encoded[6] != 0 || encoded[7] != 0 {
+			data[4] = 4
+		}
 		copy(data[8:16], encoded[:])
 	}
 	for i, value := range []int{report.Recovery.Attempted, report.Recovery.Released, report.Recovery.Remaining} {
@@ -249,10 +252,10 @@ func readReport(reader io.Reader) (Report, error) {
 		}
 		return Report{}, &workerReportFailure{operation: operation, cause: errors.Join(ErrProtocol, err)}
 	}
-	if string(data[:4]) != "KRR1" || (data[4] != 1 && data[4] != 2 && data[4] != 3) || data[5] > 2 || !validReportOperation(data[6]) {
+	if string(data[:4]) != "KRR1" || (data[4] < 1 || data[4] > 4) || data[5] > 2 || !validReportOperation(data[6]) {
 		return Report{}, ErrProtocol
 	}
-	if data[4] < 3 && data[7] != 0 || data[4] == 3 && data[7] != 1 {
+	if data[4] < 3 && data[7] != 0 || data[4] >= 3 && data[7] != 1 {
 		return Report{}, ErrProtocol
 	}
 	if data[4] == 1 && (!zeroBytes(data[6:8]) || !zeroBytes(data[28:])) || data[5] == 0 && (data[6] != 0 || !zeroBytes(data[28:])) {
@@ -270,7 +273,10 @@ func readReport(reader io.Reader) (Report, error) {
 		return Report{}, ErrProtocol
 	}
 	report := Report{Completed: binary.BigEndian.Uint64(data[8:16]), Recovery: application.ReleaseReport{Attempted: values[0], Released: values[1], Remaining: values[2]}}
-	if data[4] == 3 {
+	if data[4] >= 3 {
+		if data[4] == 3 && !zeroBytes(data[14:16]) {
+			return Report{}, ErrProtocol
+		}
 		if report.Recovery != (application.ReleaseReport{}) {
 			return Report{}, ErrProtocol
 		}

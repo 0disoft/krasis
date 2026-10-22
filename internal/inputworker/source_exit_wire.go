@@ -37,11 +37,19 @@ func encodeSourceExit(v logindiag.SourceExit, status byte) ([8]byte, error) {
 			return [8]byte{}, ErrProtocol
 		}
 	}
+	for code, stage := range logindiag.SourceHeartbeatStages {
+		if stage == v.HeartbeatStage {
+			encoded[6] = byte(code)
+		}
+		if stage == v.HeartbeatSlowStage {
+			encoded[7] = byte(code)<<4 | v.HeartbeatSlowBucket
+		}
+	}
 	return encoded, nil
 }
 
 func decodeSourceExit(encoded []byte, status byte) (*logindiag.SourceExit, error) {
-	if len(encoded) != 8 || status > 2 || encoded[6] != 0 || encoded[7] != 0 {
+	if len(encoded) != 8 || status > 2 || int(encoded[6]) >= len(logindiag.SourceHeartbeatStages) || int(encoded[7]>>4) >= len(logindiag.SourceHeartbeatStages) {
 		return nil, ErrProtocol
 	}
 	var fields [6]string
@@ -52,6 +60,9 @@ func decodeSourceExit(encoded []byte, status byte) (*logindiag.SourceExit, error
 		fields[i] = sourceExitVocabulary[i][encoded[i]]
 	}
 	v := &logindiag.SourceExit{Command: fields[0], Reader: fields[1], Capture: fields[2], Sender: fields[3], Interrupt: fields[4], Retirement: fields[5], Report: sourceReportState(status)}
+	v.HeartbeatStage = logindiag.SourceHeartbeatStages[encoded[6]]
+	v.HeartbeatSlowStage = logindiag.SourceHeartbeatStages[encoded[7]>>4]
+	v.HeartbeatSlowBucket = encoded[7] & 15
 	if _, err := encodeSourceExit(*v, status); err != nil {
 		return nil, err
 	}

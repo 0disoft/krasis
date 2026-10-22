@@ -16,14 +16,15 @@ import (
 )
 
 type sourceWriter struct {
-	ctx      context.Context
-	mu       syncgate.Mutex
-	channel  *Channel
-	binding  Binding
-	sequence uint64
-	broken   bool // Under mu; an attempted failed write cannot carry further frames.
-	epoch    atomic.Uint64
-	started  atomic.Bool
+	ctx       context.Context
+	mu        syncgate.Mutex
+	channel   *Channel
+	binding   Binding
+	sequence  uint64
+	broken    bool // Under mu; an attempted failed write cannot carry further frames.
+	epoch     atomic.Uint64
+	started   atomic.Bool
+	heartbeat *sourceHeartbeatProgress
 }
 
 func (w *sourceWriter) send(p sourcePacket, current func() bool) error {
@@ -43,8 +44,17 @@ func (w *sourceWriter) writePacketContext(ctx context.Context, p sourcePacket, c
 	}
 	ctx, cancel := w.operation(ctx, retirement || completedReply)
 	defer cancel()
+	var progress *sourceHeartbeatProgress
+	if p.kind == sourceReply && p.op == sourceHeartbeat {
+		progress = w.heartbeat
+	}
+	gateDone := func() {}
+	if progress != nil {
+		gateDone = progress.measure(heartbeatReplyGate)
+	}
 	if retirement || completedReply || p.kind == sourceReply && p.op == sourceHeartbeat {
 		if err := w.mu.LockContext(ctx); err != nil {
+			gateDone()
 			return sourceTransportFailure(err)
 		}
 	} else {
@@ -55,6 +65,7 @@ func (w *sourceWriter) writePacketContext(ctx context.Context, p sourcePacket, c
 			return sourceTransportFailure(err)
 		}
 	}
+	gateDone()
 	defer w.mu.Unlock()
 	if !w.started.Load() && (p.kind == sourceAction || p.kind == sourceBoundary || p.kind == sourceReturn) {
 		return nil
@@ -68,7 +79,13 @@ func (w *sourceWriter) writePacketContext(ctx context.Context, p sourcePacket, c
 		// Input and observations retain their full check above. A completed
 		// command reply reports an already known outcome, not new authority.
 		// Recheck the pinned owner's presence after admission and before bytes.
-		if err := w.channel.authorizeSourcePresence(ctx); err != nil {
+		presenceDone := func() {}
+		if progress != nil {
+			presenceDone = progress.measure(heartbeatReplyPresence)
+		}
+		err := w.channel.authorizeSourcePresence(ctx)
+		presenceDone()
+		if err != nil {
 			return sourceTransportFailure(err)
 		}
 	}
@@ -77,7 +94,16 @@ func (w *sourceWriter) writePacketContext(ctx context.Context, p sourcePacket, c
 	if err != nil {
 		return err
 	}
-	return w.writeSequenced(ctx, data[:], p.sequence)
+	writeDone := func() {}
+	if progress != nil {
+		writeDone = progress.measure(heartbeatReplyWrite)
+	}
+	err = w.writeSequenced(ctx, data[:], p.sequence)
+	writeDone()
+	if progress != nil && err == nil {
+		progress.stage = heartbeatReplied
+	}
+	return err
 }
 
 // Caller owns mu. Only native pre-submission proof (or failure to configure a
@@ -152,8 +178,9 @@ func runSourceCapture(ctx context.Context, channel, service *Channel, lease Leas
 	run, cancel := context.WithDeadline(ctx, lease.ExpiresAt)
 	defer cancel()
 	authorize := sourceCaptureAuthorization(run, service, channel)
+	var heartbeat sourceHeartbeatProgress
 	authorizeCommand := func(op byte) error {
-		return authorizeSourceRead(run, service, channel, op)
+		return authorizeSourceReadProgress(run, service, channel, op, &heartbeat)
 	}
 	hook, err := wininput.NewProtectedSourceHook(authorize)
 	if err != nil {
@@ -162,7 +189,7 @@ func runSourceCapture(ctx context.Context, channel, service *Channel, lease Leas
 	hook.SetBoundaryGuard(authorize)
 	var pressedEvidence atomic.Uint32
 	hook.SetAdmissionReporter(func(code string) { pressedEvidence.Store(uint32(sourcePressedEvidence(code))) })
-	writer := &sourceWriter{ctx: run, channel: channel, binding: lease.Binding}
+	writer := &sourceWriter{ctx: run, channel: channel, binding: lease.Binding, heartbeat: &heartbeat}
 	session, err := wininput.NewSourceSession(1024, writer)
 	if err != nil {
 		return err
@@ -290,7 +317,7 @@ func runSourceCapture(ctx context.Context, channel, service *Channel, lease Leas
 	close(boundaryStart)
 	presenceDone := make(chan error, 1)
 	go func() {
-		err := watchSourcePresence(run, func() error { return authorizeCommand(sourceHeartbeat) })
+		err := watchSourcePresence(run, func() error { return authorizeSourceRead(run, service, channel, sourceHeartbeat) })
 		presenceDone <- err
 		if err != nil {
 			cancel()
@@ -317,6 +344,7 @@ func runSourceCapture(ctx context.Context, channel, service *Channel, lease Leas
 		cancel()
 		stopReads()
 		readerErr := <-readDone
+		heartbeat.snapshot(exit)
 		exit.Reader = sourceReaderOutcome(readerErr)
 		result = errors.Join(result, readerErr)
 	}()

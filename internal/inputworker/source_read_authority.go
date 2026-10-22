@@ -8,6 +8,10 @@ import (
 // Read admission checks both authenticated owners; a heartbeat never grants
 // input authority. Actual desktop work remains on its owning Windows thread.
 func authorizeSourceRead(ctx context.Context, service, agent *Channel, op byte) error {
+	return authorizeSourceReadProgress(ctx, service, agent, op, nil)
+}
+
+func authorizeSourceReadProgress(ctx context.Context, service, agent *Channel, op byte, progress *sourceHeartbeatProgress) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 	full := func() error {
@@ -17,10 +21,16 @@ func authorizeSourceRead(ctx context.Context, service, agent *Channel, op byte) 
 		return sourceQueryOwner("agent", agent.authorizeSourceInput(ctx))
 	}
 	present := func() error {
-		if err := service.authorizeSourcePresence(ctx); err != nil {
+		check := func(owner *Channel, stage byte) error {
+			if progress != nil && op == sourceHeartbeat {
+				defer progress.measure(stage)()
+			}
+			return owner.authorizeSourcePresence(ctx)
+		}
+		if err := check(service, heartbeatServicePresence); err != nil {
 			return sourceQueryOwner("service", err)
 		}
-		return sourceQueryOwner("agent", agent.authorizeSourcePresence(ctx))
+		return sourceQueryOwner("agent", check(agent, heartbeatAgentPresence))
 	}
 	return sourceCommandReadAuthorization(op, full, present)
 }
