@@ -26,10 +26,10 @@ func (s *WorkspaceService) AppSettings() AppSettingsSnapshot {
 func (s *WorkspaceService) appSettings() AppSettingsSnapshot {
 	restorePending := s.settingsRestorePending.Load()
 	v, err := appsettings.Load(os.Getenv("LOCALAPPDATA"))
-	result := AppSettingsSnapshot{Schema: appsettings.Schema, Code: "unavailable"}
+	result := AppSettingsSnapshot{Schema: appsettings.Schema, Code: appsettings.StatusUnavailable}
 	if err != nil {
 		if restorePending {
-			result.Code = "rollback_failed"
+			result.Code = appsettings.StatusRollbackFailed
 		}
 		return result
 	}
@@ -38,23 +38,23 @@ func (s *WorkspaceService) appSettings() AppSettingsSnapshot {
 	ops := s.startupSettings()
 	actual, err := ops.startupRead(os.Getenv("LOCALAPPDATA"))
 	if err != nil || actual != v.StartAtLogin {
-		result.Code = "startup_failed"
+		result.Code = appsettings.StatusStartupFailed
 		if err != nil {
-			result.Code = "startup_query_failed"
+			result.Code = appsettings.StatusStartupQueryFailed
 		}
 		if restorePending {
-			result.Code = "rollback_failed"
+			result.Code = appsettings.StatusRollbackFailed
 		}
 		return result
 	}
 	active, err := ops.recoveryRead(os.Getenv("LOCALAPPDATA"))
 	if err != nil || active != v.StartAtLogin {
-		result.Code = "recovery_failed"
+		result.Code = appsettings.StatusRecoveryFailed
 		if err != nil {
-			result.Code = "recovery_query_failed"
+			result.Code = appsettings.StatusRecoveryQueryFailed
 		}
 		if restorePending {
-			result.Code = "rollback_failed"
+			result.Code = appsettings.StatusRollbackFailed
 		}
 		return result
 	}
@@ -64,12 +64,12 @@ func (s *WorkspaceService) appSettings() AppSettingsSnapshot {
 		s.recoverySettingsReady = true
 		s.log.Event("settings_restore_all_verified")
 	}
-	result.Code = "ok"
+	result.Code = appsettings.StatusOK
 	if s.startMenuFailed.Load() {
-		result.Code = "start_menu_failed"
+		result.Code = appsettings.StatusStartMenuFailed
 	}
 	if s.launchRecordFailed.Load() || s.recoveryFailed.Load() {
-		result.Code = "recovery_failed"
+		result.Code = appsettings.StatusRecoveryFailed
 	}
 	return result
 }
@@ -88,9 +88,9 @@ func (s *WorkspaceService) SetAppSettings(startAtLogin, autoUpdate bool) AppSett
 			s.log.Event("settings_change_startup_failed")
 			restored := s.restoreStartupSettings(base, old.StartAtLogin, false)
 			result := s.appSettings()
-			result.Code = "startup_failed"
+			result.Code = appsettings.StatusStartupFailed
 			if !restored {
-				result.Code = "rollback_failed"
+				result.Code = appsettings.StatusRollbackFailed
 			}
 			return result
 		}
@@ -100,9 +100,9 @@ func (s *WorkspaceService) SetAppSettings(startAtLogin, autoUpdate bool) AppSett
 			s.recoveryFailed.Store(true)
 			s.recoverySettingsReady = false
 			result := s.appSettings()
-			result.Code = "recovery_failed"
+			result.Code = appsettings.StatusRecoveryFailed
 			if !restored {
-				result.Code = "rollback_failed"
+				result.Code = appsettings.StatusRollbackFailed
 			}
 			return result
 		}
@@ -115,9 +115,9 @@ func (s *WorkspaceService) SetAppSettings(startAtLogin, autoUpdate bool) AppSett
 			restored = s.restoreStartupSettings(base, old.StartAtLogin, true)
 		}
 		result := s.appSettings()
-		result.Code = "save_failed"
+		result.Code = appsettings.StatusSaveFailed
 		if !restored {
-			result.Code = "rollback_failed"
+			result.Code = appsettings.StatusRollbackFailed
 		}
 		return result
 	}

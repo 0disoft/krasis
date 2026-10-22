@@ -10,6 +10,11 @@
 자동 업데이트 설정을 임의로 끄거나 기본값으로 바꾸지 않는다. 미확인 설정
 복원은 계속 `rollback_failed`로 표시하며, 조회만으로 등록을 다시 쓰지 않는다.
 
+설정 스키마와 상태 코드는 `internal/appsettings/status-contract.json`에서 관리한다.
+JS는 이 목록을 직접 읽고 Go는 같은 목록에서 생성한 상수를 사용한다. 목록을
+수정하면 저장소 루트에서 `go generate ./internal/appsettings`를 실행한다.
+`npm --prefix frontend test`는 생성 파일이 목록과 다르면 실패하며 자동으로 고치지 않는다.
+
 ## 앱 아이콘
 
 사용자가 선택한 K 모노그램을 Windows x64 실행 파일 3종과 관리 창·작업 표시줄·

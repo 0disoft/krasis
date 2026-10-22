@@ -3,6 +3,6 @@
   "private": true,
   "version": "0.9.4",
   "type": "module",
-  "scripts": { "dev": "vite", "build": "vite build", "test": "node --test src/*.test.js" },
+  "scripts": { "dev": "vite", "build": "vite build", "pretest": "node ../scripts/generate-app-settings-contract.mjs --check", "test": "node --test src/*.test.js" },
   "devDependencies": { "@sveltejs/vite-plugin-svelte": "7", "@phosphor-icons/core": "2", "svelte": "5", "vite": "8" }
 }

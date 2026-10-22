@@ -1,6 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { appReleaseNotice, appSettingsNoticeCode, createAppSettingsBridge, emptyAppSettings } from './app-settings-bridge.js';
+import contract from '../../internal/appsettings/status-contract.json' with { type: 'json' };
+
+test('every shared settings outcome crosses the bridge without exposing native fields', async () => {
+  for (const code of Object.values(contract.codes)) {
+    const value = {schema:contract.schema,code,startAtLogin:true,autoUpdate:false,preferencesKnown:true};
+    const bridge = createAppSettingsBridge({AppSettings:()=>({...value,privateError:'native detail'})});
+    assert.deepEqual(await bridge.status(),value);
+  }
+  const bridge = createAppSettingsBridge({AppSettings:()=>({schema:contract.schema,code:'future_unknown',startAtLogin:true,autoUpdate:true,preferencesKnown:true})});
+  assert.deepEqual(await bridge.status(),emptyAppSettings());
+});
+
 test('failed and malformed settings do not advertise defaults as applied',async()=>{
   for(const value of [null,{schema:'krasis.app-settings/v1',code:'ok',startAtLogin:'true',autoUpdate:true}]) {
     const b=createAppSettingsBridge({AppSettings:()=>value});assert.equal((await b.status()).code,'unavailable');

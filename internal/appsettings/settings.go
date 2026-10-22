@@ -17,8 +17,6 @@ import (
 	"github.com/0disoft/krasis/internal/securefs"
 )
 
-const Schema = "krasis.app-settings/v1"
-
 // Internal GUI entrypoint for the scheduled task; it never creates a console.
 const RecoveryArgument = "--background-recovery"
 

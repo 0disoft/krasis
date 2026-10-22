@@ -1,0 +1,14 @@
+{
+  "schema": "krasis.app-settings/v1",
+  "codes": {
+    "OK": "ok",
+    "Unavailable": "unavailable",
+    "StartupFailed": "startup_failed",
+    "StartupQueryFailed": "startup_query_failed",
+    "SaveFailed": "save_failed",
+    "StartMenuFailed": "start_menu_failed",
+    "RecoveryFailed": "recovery_failed",
+    "RecoveryQueryFailed": "recovery_query_failed",
+    "RollbackFailed": "rollback_failed"
+  }
+}

@@ -1,6 +1,8 @@
-const schema = 'krasis.app-settings/v1';
-const codes = new Set(['ok','unavailable','startup_failed','startup_query_failed','save_failed','start_menu_failed','recovery_failed','recovery_query_failed','rollback_failed']);
-export const emptyAppSettings = () => ({schema,code:'unavailable',startAtLogin:false,autoUpdate:false,preferencesKnown:false});
+import contract from '../../internal/appsettings/status-contract.json' with { type: 'json' };
+
+const schema = contract.schema;
+const codes = new Set(Object.values(contract.codes));
+export const emptyAppSettings = () => ({schema,code:contract.codes.Unavailable,startAtLogin:false,autoUpdate:false,preferencesKnown:false});
 export function appSettingsNoticeCode(settings, busy) {
   return busy ? 'checking' : settings.code;
 }
@@ -15,7 +17,7 @@ export function appReleaseNotice(state, settings, locale = 'ko', readyGeneration
     return `${releaseNotices[ko ? 'ko' : 'en'][state] ?? ''} · ${retained}`;
   }
   if (state !== 'READY') return releaseNotices[ko ? 'ko' : 'en'][state] ?? '';
-  if (!settings || !settings.preferencesKnown || settings.code === 'unavailable' || typeof settings.autoUpdate !== 'boolean') {
+  if (!settings || !settings.preferencesKnown || settings.code === contract.codes.Unavailable || typeof settings.autoUpdate !== 'boolean') {
     return ko ? '다운로드 완료 · 자동 업데이트 설정 확인 필요' : 'Downloaded · Verify automatic update settings';
   }
   if (!settings.autoUpdate) {
@@ -33,8 +35,8 @@ export function createAppSettingsBridge(binding) {
       if (!value || value.schema !== schema || !codes.has(value.code) || typeof value.startAtLogin !== 'boolean' || typeof value.autoUpdate !== 'boolean') return emptyAppSettings();
       if (value.preferencesKnown !== undefined && typeof value.preferencesKnown !== 'boolean') return emptyAppSettings();
       // Older hosts only prove loaded preferences with an ok response.
-      const preferencesKnown = value.preferencesKnown ?? (value.code === 'ok');
-      if (value.code === 'ok' && !preferencesKnown) return emptyAppSettings();
+      const preferencesKnown = value.preferencesKnown ?? (value.code === contract.codes.OK);
+      if (value.code === contract.codes.OK && !preferencesKnown) return emptyAppSettings();
       return {schema,code:value.code,startAtLogin:preferencesKnown && value.startAtLogin,autoUpdate:preferencesKnown && value.autoUpdate,preferencesKnown};
     } catch { return emptyAppSettings(); }
     finally { busy = false; }
@@ -52,7 +54,7 @@ export function createAppSettingsBridge(binding) {
   async function set(startup,update) {
     if(typeof startup!=='boolean'||typeof update!=='boolean') return emptyAppSettings();
     const result=await call('SetAppSettings',startup,update);
-    if(result.code==='ok') return result;
+    if(result.code===contract.codes.OK) return result;
     const actual=await call('AppSettings');
     return {...actual,code:result.code};
   }
