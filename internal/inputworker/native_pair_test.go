@@ -94,3 +94,35 @@ func TestNativePairCanceledStartupCannotPublishLateReadyPair(t *testing.T) {
 		}
 	})
 }
+
+func TestNativePairCanceledStartupRetiresBothUnboundOwnersTogether(t *testing.T) {
+	for _, releaseConfirmed := range []bool{true, false} {
+		synctest.Test(t, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
+			defer cancel()
+			var retired atomic.Int32
+			retirementErr := errors.New("input retirement failure")
+			var profile handoff.StartupProfile
+			started := time.Now()
+			input, err := startNativePair(ctx, func(_ context.Context, release bool) (*isolatedInput, error) {
+				time.Sleep(2 * time.Millisecond) // Both native launches finish late.
+				return &isolatedInput{Client: &Client{}, retire: func() (bool, error) {
+					if release {
+						time.Sleep(20 * time.Millisecond)
+						retired.Add(1)
+						return releaseConfirmed, nil
+					}
+					time.Sleep(10 * time.Millisecond)
+					retired.Add(1)
+					return true, retirementErr
+				}}, nil
+			}, &profile)
+			if input != nil || !errors.Is(err, context.DeadlineExceeded) || !errors.Is(err, retirementErr) || errors.Is(err, ErrRecovery) != !releaseConfirmed {
+				t.Fatal("parallel retirement lost cancellation or an owner's failure", input, err)
+			}
+			if elapsed := time.Since(started); elapsed != 22*time.Millisecond || retired.Load() != 2 || profile.Measured != 0 {
+				t.Fatal("startup retirement serialized, abandoned an owner or published readiness", elapsed, retired.Load(), profile)
+			}
+		})
+	}
+}

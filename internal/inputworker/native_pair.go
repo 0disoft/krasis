@@ -3,6 +3,7 @@ package inputworker
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/0disoft/krasis/internal/handoff"
@@ -48,21 +49,31 @@ func startNativePair(ctx context.Context, start func(context.Context, bool) (*is
 	}
 	failure = errors.Join(failure, ctx.Err())
 	if failure != nil {
-		for _, owner := range owners {
+		// No journal or input authority was published. These two independent
+		// startup owners can retire together; still join both exact receipts
+		// before the caller releases inherited pins or starts a replacement.
+		var retirement sync.WaitGroup
+		var failures [2]error
+		for i, owner := range owners {
 			if owner == nil {
 				continue
 			}
 			if owner.retire == nil {
-				failure = errors.Join(failure, ErrRecovery)
+				failures[i] = ErrRecovery
 				continue
 			}
-			retired, err := owner.retire()
-			failure = errors.Join(failure, err)
-			if !retired {
-				failure = errors.Join(failure, ErrRecovery)
-			}
+			retirement.Add(1)
+			go func() {
+				defer retirement.Done()
+				retired, err := owner.retire()
+				failures[i] = err
+				if !retired {
+					failures[i] = errors.Join(err, ErrRecovery)
+				}
+			}()
 		}
-		return nil, failure
+		retirement.Wait()
+		return nil, errors.Join(failure, failures[0], failures[1])
 	}
 	input, release := owners[0], owners[1]
 	input.recovery, input.recoveryRetire = release.Client, release.retire
