@@ -1,0 +1,312 @@
+{
+  "generation": 440,
+  "sourceRevision": "61efa417b64faa169ae64f16209a7bae0b4afdf1",
+  "change": "Preserve fixed source authority-query deadline phase; diagnostic only. No authorization, timeout, cancellation, capacity, retirement or recovery-policy change.",
+  "validation": {
+    "inputworker": "PASS 22.629s",
+    "logindiag": "PASS cached",
+    "productlog": "PASS cached",
+    "residentagent": "PASS cached",
+    "frontendTests": 91,
+    "nativeBuild": "PASS",
+    "bundleSmoke": "PASS 6.75s",
+    "bundleFiles": 8,
+    "archiveBytes": 28369211,
+    "offlineVerify": "valid",
+    "diffCheck": "PASS",
+    "skipped": [
+      "Portable pair fixed-owner fixture excluded to avoid conflict with installed owner.",
+      "No race detector, hosted CI, physical-input acceptance or long soak; no push."
+    ]
+  },
+  "baseline": {
+    "generation": 439,
+    "collectionId": "034ef4a01bfc4fe54338ed44bebfc3f0",
+    "localCreated": "2026-10-22T14:50:18Z",
+    "localInputHealth": {
+      "time": "2026-10-22T14:49:51.8430372Z",
+      "state": "READY",
+      "stage": "complete",
+      "win32Error": 0,
+      "win32Known": false
+    },
+    "localRuntime": {
+      "startedAt": "2026-10-22T14:29:55.1601715Z",
+      "time": "2026-10-22T14:49:08.0350076Z",
+      "service": "READY",
+      "console": "USER_SESSION",
+      "grant": "PRESENT",
+      "lastWorker": "NONE",
+      "source": {
+        "total": 2,
+        "exits": [
+          {
+            "time": "2026-10-22T14:48:06.7364949Z",
+            "command": "ok",
+            "reader": "failed",
+            "capture": "joined",
+            "sender": "joined",
+            "interrupt": "joined",
+            "retirement": "clean_sent",
+            "report": "failed",
+            "failure": {
+              "operation": "source-gate-boundary-write",
+              "win32Error": 0,
+              "win32Known": false
+            },
+            "heartbeatStage": "reply_gate",
+            "heartbeatSlowStage": "reply_gate",
+            "heartbeatSlowBucket": 5
+          },
+          {
+            "time": "2026-10-22T14:49:08.0110881Z",
+            "command": "ok",
+            "reader": "failed",
+            "capture": "joined",
+            "sender": "joined",
+            "interrupt": "joined",
+            "retirement": "delivery_failed",
+            "report": "failed",
+            "failure": {
+              "operation": "source-gate-boundary-prepare",
+              "win32Error": 0,
+              "win32Known": false
+            },
+            "heartbeatStage": "reply_gate",
+            "heartbeatSlowStage": "reply_gate",
+            "heartbeatSlowBucket": 5
+          }
+        ]
+      }
+    },
+    "finding": "At 14:48:06Z and 14:49:08Z the failed reply-gate sample observed boundary/write and boundary/prepare. Service remained READY. No proof of full-wait ownership or cause of scheduler delay."
+  },
+  "application": {
+    "peerUpdateId": "cf34b9ab8aeb6810f82a9be7e3188bb1",
+    "peerUpdateState": "UPDATED",
+    "localInstallerExit": 0,
+    "localAppRepair": "recovery_ready",
+    "initialCollectionId": "c48cfeffa5639e668e9075788ce10bdc",
+    "collectionId": "73c01e62e0096d03ea0f7c481b30632a",
+    "sides": {
+      "A": {
+        "created": "2026-10-22T14:57:04Z",
+        "installation": {
+          "time": "2026-10-22T14:54:51.1031147Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-22T14:56:37.9776088Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "loginRuntime": {
+          "startedAt": "2026-10-22T14:54:52.174641Z",
+          "time": "2026-10-22T14:54:52.2031411Z",
+          "service": "READY",
+          "console": "USER_SESSION",
+          "grant": "PRESENT",
+          "lastWorker": "NONE"
+        },
+        "failures": [],
+        "heartbeat": [
+          {
+            "time": "2026-10-22T14:56:50.2584984Z",
+            "code": "installed_source_heartbeat_timing_client_lock_lt1ms"
+          },
+          {
+            "time": "2026-10-22T14:56:50.2584984Z",
+            "code": "installed_source_heartbeat_timing_client_authority_lt1ms"
+          },
+          {
+            "time": "2026-10-22T14:56:50.2584984Z",
+            "code": "installed_source_heartbeat_timing_client_write_lt1ms"
+          },
+          {
+            "time": "2026-10-22T14:56:50.2590357Z",
+            "code": "installed_source_heartbeat_timing_client_response_lt10ms"
+          },
+          {
+            "time": "2026-10-22T14:56:50.2590357Z",
+            "code": "installed_source_heartbeat_timing_worker_presence_wait_lt1ms"
+          },
+          {
+            "time": "2026-10-22T14:56:50.2590357Z",
+            "code": "installed_source_heartbeat_timing_worker_presence_native_lt1ms"
+          },
+          {
+            "time": "2026-10-22T14:56:50.2590357Z",
+            "code": "installed_source_heartbeat_timing_worker_reply_gate_lt1ms"
+          }
+        ]
+      },
+      "B": {
+        "created": "2026-10-22T14:57:07Z",
+        "installation": {
+          "time": "2026-10-22T14:54:17.0938545Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-22T14:56:58.9584738Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "loginRuntime": {
+          "startedAt": "2026-10-22T14:54:20.5441014Z",
+          "time": "2026-10-22T14:54:20.6549691Z",
+          "service": "READY",
+          "console": "USER_SESSION",
+          "grant": "PRESENT",
+          "lastWorker": "NONE"
+        },
+        "failures": [],
+        "heartbeat": [
+          {
+            "time": "2026-10-22T14:56:53.2104721Z",
+            "code": "installed_source_heartbeat_timing_client_lock_lt1ms"
+          },
+          {
+            "time": "2026-10-22T14:56:53.2104721Z",
+            "code": "installed_source_heartbeat_timing_client_authority_lt1ms"
+          },
+          {
+            "time": "2026-10-22T14:56:53.2104721Z",
+            "code": "installed_source_heartbeat_timing_client_write_lt1ms"
+          },
+          {
+            "time": "2026-10-22T14:56:53.2104721Z",
+            "code": "installed_source_heartbeat_timing_client_response_lt1ms"
+          },
+          {
+            "time": "2026-10-22T14:56:53.2104721Z",
+            "code": "installed_source_heartbeat_timing_worker_presence_wait_lt1ms"
+          },
+          {
+            "time": "2026-10-22T14:56:53.2104721Z",
+            "code": "installed_source_heartbeat_timing_worker_presence_native_lt1ms"
+          },
+          {
+            "time": "2026-10-22T14:56:53.2104721Z",
+            "code": "installed_source_heartbeat_timing_worker_reply_gate_lt1ms"
+          }
+        ]
+      }
+    },
+    "doctor": {
+      "schemaVersion": "krasis.cli.doctor/v1",
+      "agent": "RUNNING",
+      "connection": "CONNECTED",
+      "peerAlias": "B",
+      "cliGeneration": 440,
+      "agentGeneration": 440,
+      "protocol": "COMPATIBLE",
+      "code": "healthy",
+      "cliBuild": "61efa417b64faa169ae64f16209a7bae0b4afdf1",
+      "agentBuild": "61efa417b64faa169ae64f16209a7bae0b4afdf1",
+      "ui": {
+        "state": "RUNNING",
+        "generation": 440,
+        "build": "61efa417b64faa169ae64f16209a7bae0b4afdf1",
+        "pathStatus": "MATCHED"
+      },
+      "launchRecord": {
+        "state": "VERIFIED",
+        "generation": 440,
+        "build": "61efa417b64faa169ae64f16209a7bae0b4afdf1",
+        "pathStatus": "MATCHED"
+      },
+      "installedAgent": {
+        "state": "VERIFIED",
+        "build": "61efa417b64faa169ae64f16209a7bae0b4afdf1"
+      },
+      "service": {
+        "state": "RUNNING",
+        "pathStatus": "MATCHED"
+      },
+      "agentLocation": "PROTECTED",
+      "protectedInput": "CONFIGURED",
+      "checks": [
+        {
+          "name": "agent",
+          "state": "RUNNING"
+        },
+        {
+          "name": "connection",
+          "state": "CONNECTED"
+        },
+        {
+          "name": "protocol",
+          "state": "COMPATIBLE"
+        },
+        {
+          "name": "cli_agent_version",
+          "state": "MATCHED"
+        },
+        {
+          "name": "ui_agent_version",
+          "state": "MATCHED"
+        },
+        {
+          "name": "installed_agent_version",
+          "state": "MATCHED"
+        },
+        {
+          "name": "ui",
+          "state": "RUNNING"
+        },
+        {
+          "name": "launch_record",
+          "state": "VERIFIED"
+        },
+        {
+          "name": "installed_agent",
+          "state": "VERIFIED"
+        },
+        {
+          "name": "service",
+          "state": "RUNNING"
+        },
+        {
+          "name": "update_stage_cleanup",
+          "state": "COMPLETED"
+        }
+      ],
+      "nextActions": []
+    }
+  },
+  "observations": [
+    "Both receipts succeeded, both services/input health READY, matching g440 images and final doctor CONNECTED.",
+    "No source exits or recorded source-command failures in either fresh service lifetime through the collected 14:57:04Z/14:57:07Z snapshots. This short observation does not prove intermittent stability.",
+    "Latest aggregate heartbeat response buckets: A lt10ms and B lt1ms. These are separate windows and not a measured before/after improvement.",
+    "No g440 query deadline was captured, so the failed native/scheduling substage remains unconfirmed.",
+    "Service heartbeat presence checks pipe server metadata, not the full SCM status binding. Do not attribute the old deadline to SCM without evidence."
+  ],
+  "nextPriorities": [
+    "Add a regression through the actual readSourceCommandAuthorized failure path: determine whether a completed read-only query deadline is wrongly treated as uncertain native cleanup.",
+    "Require independent query/handle retirement proof before changing any recovery classification; preserve real pending-query and native cleanup fences.",
+    "Use g440 deadline phase if recurrence identifies waiting versus checking versus publication; keep boundary-gate samples separate."
+  ],
+  "scope": "No public API, DB, dependencies, runner, repository hygiene or product/architecture specification changes. Appended private report diagnostic codes; unchanged frame layout. Local main only; no push."
+}

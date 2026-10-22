@@ -44,3 +44,23 @@ service still READY. These samples identify advisory boundary traffic as an
 observed gate holder, not proof that it occupied the full waiting interval or
 that the reader/pipe/encoding caused the delay. Keep this separate from the
 earlier service-query deadline; a shared scheduling cause is still unproven.
+
+Paired rollout succeeded: B UPDATED; A installer exit zero; app repair
+recovery_ready. Collection 73c01e62e0096d03ea0f7c481b30632a confirms both input
+health/service states READY and final doctor healthy/CONNECTED with matching
+g440 images. No source exit or source-command failure is recorded in either new
+service lifetime through 14:57:04Z/14:57:07Z. No query deadline was captured;
+this short observation does not establish intermittent stability. Latest
+heartbeat aggregate response buckets are A lt10ms and B lt1ms, not a controlled
+before/after comparison. Rollout checks: 91 frontend tests, native build,
+6.75-second package smoke, eight-file bundle, and offline verification passed.
+
+Next prioritize a regression through the actual readSourceCommandAuthorized
+failure path. Its unprojected query deadline retains context.DeadlineExceeded,
+while the watcher projection retains only ErrAuthority. Check whether a query
+that has already retired can therefore be classified as uncertain native
+cleanup in only the read path. This is a static candidate, not a reproduced
+runtime cause. Any fix must retain separate pending-query/handle and native
+cleanup proof; do not merely suppress ErrRecovery or relax mandatory queries.
+Results: results/2026-10-22-g440-source-query-phase.json. No further
+implementation was started after the ten-minute cutoff.
