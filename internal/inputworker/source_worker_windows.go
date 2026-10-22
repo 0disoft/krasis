@@ -55,7 +55,8 @@ func (w *sourceWriter) writePacketContext(ctx context.Context, p sourcePacket, c
 	if progress != nil {
 		gateDone = progress.measure(heartbeatReplyGate)
 	}
-	if retirement || completedReply || p.kind == sourceReply && p.op == sourceHeartbeat {
+	directReply := retirement || completedReply || p.kind == sourceReply && p.op == sourceHeartbeat
+	if directReply {
 		if err := w.mu.LockContext(ctx); err != nil {
 			gateDone()
 			return sourceTransportFailure(err)
@@ -78,10 +79,10 @@ func (w *sourceWriter) writePacketContext(ctx context.Context, p sourcePacket, c
 	}
 	// Retirement grants no authority. It is sent only after native/sender join
 	// on the exact already authenticated channel, even if logon authority changed.
-	if !retirement {
-		// Input and observations retain their full check above. A completed
-		// command reply reports an already known outcome, not new authority.
-		// Recheck the pinned owner's presence after admission and before bytes.
+	if !retirement && directReply {
+		// Ordinary writes obtained full authority and final presence immediately
+		// before TryLock; contention discards both. A completed command reply
+		// reports a known outcome and rechecks only presence after admission.
 		presenceDone := func() {}
 		if progress != nil {
 			presenceDone = progress.measure(heartbeatReplyPresence)

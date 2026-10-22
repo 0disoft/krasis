@@ -42,7 +42,7 @@ func (w *sourceWriter) operation(ctx context.Context, outcome bool) (context.Con
 // invalidates it; waiting never carries an old proof into a later write.
 func (w *sourceWriter) lockAuthorized(ctx context.Context, advisory bool) error {
 	for {
-		check := w.channel.authorizeSourceInput
+		check := w.channel.authorizeSourceWrite
 		if advisory {
 			// Optional native presence may consume its whole budget. Keep it
 			// outside the shared wire gate, then obtain the full fresh proof
