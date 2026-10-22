@@ -235,7 +235,9 @@ func TestServiceListenerReusesInstanceAfterCancelledUnconnectedAccept(t *testing
 	if err != nil {
 		t.Fatal("unconnected reset failed", err)
 	}
-	run, stop := context.WithTimeout(context.Background(), time.Second)
+	// Allow OS scheduling under concurrent builds; this checks instance reuse
+	// after cancellation, with no sub-second connection performance assertion.
+	run, stop := context.WithTimeout(context.Background(), 5*time.Second)
 	defer stop()
 	connected := make(chan error, 1)
 	go func() { connected <- next.connect(run) }()

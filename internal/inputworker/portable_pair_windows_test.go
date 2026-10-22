@@ -50,6 +50,12 @@ func servePortableFixtureGuardian(args []string, release application.ReleasePort
 }
 
 func TestPortablePairRetainsIndependentRecoveryAfterInputFailure(t *testing.T) {
+	// This fixture deliberately exercises the product's fixed ownership fence.
+	// A running portable session must retire through safe-stop before testing;
+	// do not bypass its mutex, skip recovery checks, or kill its children.
+	if err := crashguard.CheckPortableRecovery(); err != nil {
+		t.Fatalf("portable recovery fixture requires no live portable input owner; use Krasis safe-stop and confirm process exit before this suite: %v", err)
+	}
 	for _, mode := range []string{"lost_ack", "partial", "hang"} {
 		t.Run(mode, func(t *testing.T) {
 			t.Setenv("KRASIS_PORTABLE_RPC_FIXTURE", mode)
