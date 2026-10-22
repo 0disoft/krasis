@@ -1,0 +1,170 @@
+{
+  "generation": 437,
+  "sourceRevision": "4d7894d354e869f5ed34f96a628b47f4afa89b93",
+  "decision": "Withdraw g436 writer-admission experiment after two A heartbeat failures and restore the g435 writer/query implementation. No claimed latency fix.",
+  "withdrawnRevision": "12dac8602d2eacb5f0ccd7b24a59d1ea6ed5bef5",
+  "failureCollectionId": "6f697649892a6df3ff431a73bde2a0e5",
+  "failureTimes": [
+    "2026-10-22T13:29:32.3488195Z",
+    "2026-10-22T13:30:11.5907677Z"
+  ],
+  "failure": "A heartbeat commands failed, then source retirement reported source-write-timeout. B retired cleanly twice. Causality between experiment and recurrence is unproven.",
+  "validation": {
+    "g436GoTests": "PASS inputworker 22.353s; residentagent cached; runtime acceptance failed",
+    "g437GoTests": "Reused g435 validation for unchanged restored worker code; no new implementation",
+    "frontendTests": 91,
+    "nativeBuild": "PASS",
+    "bundleSmoke": "PASS 10.617s",
+    "archiveBytes": 28401365,
+    "offlineVerify": "valid",
+    "diffCheck": "PASS",
+    "skipped": "No physical-input acceptance or long soak; no race detector or hosted CI; no push."
+  },
+  "application": {
+    "peerUpdateId": "c97cfdf63ce447cb0a1796051dec25b6",
+    "peerUpdateState": "UPDATED",
+    "localInstallerExit": 0,
+    "localAppRepair": "recovery_ready",
+    "doctor": {
+      "schemaVersion": "krasis.cli.doctor/v1",
+      "agent": "RUNNING",
+      "connection": "CONNECTED",
+      "peerAlias": "B",
+      "cliGeneration": 437,
+      "agentGeneration": 437,
+      "protocol": "COMPATIBLE",
+      "code": "healthy",
+      "cliBuild": "4d7894d354e869f5ed34f96a628b47f4afa89b93",
+      "agentBuild": "4d7894d354e869f5ed34f96a628b47f4afa89b93",
+      "ui": {
+        "state": "RUNNING",
+        "generation": 437,
+        "build": "4d7894d354e869f5ed34f96a628b47f4afa89b93",
+        "pathStatus": "MATCHED"
+      },
+      "launchRecord": {
+        "state": "VERIFIED",
+        "generation": 437,
+        "build": "4d7894d354e869f5ed34f96a628b47f4afa89b93",
+        "pathStatus": "MATCHED"
+      },
+      "installedAgent": {
+        "state": "VERIFIED",
+        "build": "4d7894d354e869f5ed34f96a628b47f4afa89b93"
+      },
+      "service": {
+        "state": "RUNNING",
+        "pathStatus": "MATCHED"
+      },
+      "agentLocation": "PROTECTED",
+      "protectedInput": "CONFIGURED",
+      "checks": [
+        {
+          "name": "agent",
+          "state": "RUNNING"
+        },
+        {
+          "name": "connection",
+          "state": "CONNECTED"
+        },
+        {
+          "name": "protocol",
+          "state": "COMPATIBLE"
+        },
+        {
+          "name": "cli_agent_version",
+          "state": "MATCHED"
+        },
+        {
+          "name": "ui_agent_version",
+          "state": "MATCHED"
+        },
+        {
+          "name": "installed_agent_version",
+          "state": "MATCHED"
+        },
+        {
+          "name": "ui",
+          "state": "RUNNING"
+        },
+        {
+          "name": "launch_record",
+          "state": "VERIFIED"
+        },
+        {
+          "name": "installed_agent",
+          "state": "VERIFIED"
+        },
+        {
+          "name": "service",
+          "state": "RUNNING"
+        },
+        {
+          "name": "update_stage_cleanup",
+          "state": "COMPLETED"
+        }
+      ],
+      "nextActions": []
+    },
+    "collectionId": "c1a7cf10830f6054bb2090b0bc5d0cce",
+    "collectionState": "RECEIVED",
+    "sides": {
+      "A": {
+        "created": "2026-10-22T13:36:06Z",
+        "installation": {
+          "time": "2026-10-22T13:35:09.8799573Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-22T13:35:50.1882372Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "service": "READY",
+        "source": null
+      },
+      "B": {
+        "created": "2026-10-22T13:36:10Z",
+        "installation": {
+          "time": "2026-10-22T13:34:58.8167058Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-22T13:36:09.7139501Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "service": "READY",
+        "source": null
+      }
+    }
+  },
+  "remainingWork": [
+    "Identify A heartbeat command failure independently of the later retirement write timeout.",
+    "Observe restored g435 behavior in g437 before attempting another admission change.",
+    "Keep initially-STOPPED service retirement and prior B Win32 5 separate."
+  ],
+  "scope": "No public API, DB, dependencies, runner, repository hygiene or product/architecture specifications changed. Local main only; no push."
+}
