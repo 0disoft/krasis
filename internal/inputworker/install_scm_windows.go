@@ -5,6 +5,7 @@ package inputworker
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"path/filepath"
 	"strings"
 	"time"
@@ -353,16 +354,99 @@ func (manager *installSCM) stop(ctx context.Context, digest [32]byte) error {
 		return err
 	}
 	defer windows.CloseServiceHandle(handle)
+	return waitStoppedInstallService(ctx, installServiceStopOps{
+		status: func() (windows.SERVICE_STATUS_PROCESS, error) { return installServiceStatus(handle) },
+		pin: func(status windows.SERVICE_STATUS_PROCESS) (*processIdentity, error) {
+			return manager.stoppingProcess(status, digest)
+		},
+		clean: func(status windows.SERVICE_STATUS_PROCESS, pid uint32) error {
+			return manager.cleanStopped(status, digest, pid)
+		},
+		stop: func() error {
+			var result windows.SERVICE_STATUS
+			if err := windows.ControlService(handle, windows.SERVICE_CONTROL_STOP, &result); err != nil {
+				return installNativeError("service_stop", ErrRecovery, err)
+			}
+			return nil
+		},
+		pause: waitInstallService,
+	})
+}
+
+// SCM's PID may not be valid in STOP_PENDING. Use the protected service
+// receipt and independently validate any still-live process instead. The first
+// handle fences PID reuse while process() checks token, image and digest.
+func (manager *installSCM) stoppingProcess(status windows.SERVICE_STATUS_PROCESS, digest [32]byte) (*processIdentity, error) {
+	if status.CurrentState == windows.SERVICE_RUNNING {
+		return manager.process(status, digest)
+	}
+	record, err := readServiceRecord(manager.root)
+	if err != nil || record.Digest != digest || (record.Phase != serviceReady && record.Phase != serviceClean) {
+		return nil, ErrRecovery
+	}
+	return pinRetiringInstallProcess(record.PID, func() (*processIdentity, error) {
+		status.ProcessId = record.PID
+		return manager.process(status, digest)
+	})
+}
+
+func pinRetiringInstallProcess(pid uint32, verify func() (*processIdentity, error)) (*processIdentity, error) {
+	if pid == 0 {
+		return nil, ErrRecovery
+	}
+	handle, err := windows.OpenProcess(windows.SYNCHRONIZE|windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
+	if errors.Is(err, windows.ERROR_INVALID_PARAMETER) {
+		return nil, nil // No process has this receipt's PID.
+	}
+	if err != nil {
+		return nil, ErrRecovery
+	}
+	defer windows.CloseHandle(handle)
+	state, err := windows.WaitForSingleObject(handle, 0)
+	if err != nil {
+		return nil, ErrRecovery
+	}
+	if state == windows.WAIT_OBJECT_0 {
+		return nil, nil
+	}
+	if state != uint32(windows.WAIT_TIMEOUT) {
+		return nil, ErrRecovery
+	}
+	return verify()
+}
+
+// The stop loop is shared with deterministic SCM-transition tests; native
+// process identity validation and process-handle exit waits remain mandatory.
+type installServiceStopOps struct {
+	status func() (windows.SERVICE_STATUS_PROCESS, error)
+	pin    func(windows.SERVICE_STATUS_PROCESS) (*processIdentity, error)
+	clean  func(windows.SERVICE_STATUS_PROCESS, uint32) error
+	stop   func() error
+	pause  func(context.Context) error
+}
+
+func waitStoppedInstallService(ctx context.Context, ops installServiceStopOps) error {
 	var process *processIdentity
+	pinned := false
+	stopRequested := false
 	defer func() {
 		if process != nil {
 			_ = process.close()
 		}
 	}()
 	for ctx.Err() == nil {
-		status, err := installServiceStatus(handle)
+		status, err := ops.status()
 		if err != nil {
 			return err
+		}
+		// Join an already-stopping service too. Never trust the transitional
+		// SCM PID or accept STOPPED before the retained process exits.
+		if !pinned && (status.CurrentState == windows.SERVICE_RUNNING || status.CurrentState == windows.SERVICE_STOP_PENDING) {
+			process, err = ops.pin(status)
+			if err != nil {
+				return err
+			}
+			pinned = true
 		}
 		if status.CurrentState == windows.SERVICE_STOPPED {
 			pid := uint32(0)
@@ -372,7 +456,7 @@ func (manager *installSCM) stop(ctx context.Context, digest [32]byte) error {
 					return ErrRecovery
 				}
 			}
-			if manager.cleanStopped(status, digest, pid) != nil {
+			if ops.clean(status, pid) != nil {
 				return ErrRecovery
 			}
 			if process != nil {
@@ -381,7 +465,7 @@ func (manager *installSCM) stop(ctx context.Context, digest [32]byte) error {
 					return ErrRecovery
 				}
 				if state == uint32(windows.WAIT_TIMEOUT) {
-					if waitInstallService(ctx) != nil {
+					if ops.pause(ctx) != nil {
 						return ErrRecovery
 					}
 					continue
@@ -392,19 +476,18 @@ func (manager *installSCM) stop(ctx context.Context, digest [32]byte) error {
 			}
 			return nil
 		}
-		if status.CurrentState == windows.SERVICE_RUNNING && process == nil {
-			process, err = manager.process(status, digest)
-			if err != nil {
+		if status.CurrentState == windows.SERVICE_RUNNING && !stopRequested {
+			if process == nil {
+				return ErrRecovery
+			}
+			if err := ops.stop(); err != nil {
 				return err
 			}
-			var result windows.SERVICE_STATUS
-			if err := windows.ControlService(handle, windows.SERVICE_CONTROL_STOP, &result); err != nil {
-				return installNativeError("service_stop", ErrRecovery, err)
-			}
+			stopRequested = true
 		} else if status.CurrentState != windows.SERVICE_RUNNING && status.CurrentState != windows.SERVICE_START_PENDING && status.CurrentState != windows.SERVICE_STOP_PENDING {
 			return ErrRecovery
 		}
-		if waitInstallService(ctx) != nil {
+		if ops.pause(ctx) != nil {
 			break
 		}
 	}
