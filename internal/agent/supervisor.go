@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand/v2"
 	"sync"
 	"sync/atomic"
@@ -105,6 +106,10 @@ func DefaultBackoffPolicy() BackoffPolicy {
 }
 
 func (policy BackoffPolicy) Delay(attempt uint32) (time.Duration, error) {
+	return policy.delay(attempt, nil)
+}
+
+func (policy BackoffPolicy) delay(attempt uint32, random func() float64) (time.Duration, error) {
 	if err := policy.validate(); err != nil {
 		return 0, err
 	}
@@ -123,10 +128,21 @@ func (policy BackoffPolicy) Delay(attempt uint32) (time.Duration, error) {
 		delay = policy.Maximum
 	}
 	if policy.Jitter {
+		if random == nil {
+			random = rand.Float64
+		}
+		sample := random()
+		if math.IsNaN(sample) || sample < 0 || sample >= 1 {
+			return 0, errors.New("backoff random sample must be in [0,1)")
+		}
 		// Bounded independent jitter prevents symmetric peers retrying in lockstep.
-		delay = time.Duration(float64(delay) * (0.8 + rand.Float64()*0.4))
-		if delay > policy.Maximum {
+		adjusted := float64(delay) * (0.8 + sample*0.4)
+		// Cap before converting: a float at/above MaxInt64 can convert to a
+		// negative duration and then be mistaken for a one-nanosecond retry.
+		if adjusted >= float64(policy.Maximum) {
 			delay = policy.Maximum
+		} else {
+			delay = time.Duration(adjusted)
 		}
 		if delay < time.Nanosecond {
 			delay = time.Nanosecond
@@ -148,6 +164,9 @@ type SupervisorConfig struct {
 	Now      func() time.Time
 	Wait     func(context.Context, time.Duration) error
 	Observer SupervisorObserver
+	// Optional retry jitter source. BackoffPolicy remains a comparable value;
+	// cryptographic identity generation never uses this source.
+	Random func() float64
 }
 
 type SupervisorDependencies struct {
@@ -223,7 +242,7 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 				return ctx.Err()
 			}
 			acquireAttempt++
-			delay, err := config.Backoff.Delay(acquireAttempt)
+			delay, err := config.Backoff.delay(acquireAttempt, config.Random)
 			if err != nil {
 				return err
 			}
@@ -299,7 +318,7 @@ func RunSupervisor(ctx context.Context, config SupervisorConfig, dependencies Su
 			attempt = 0
 		}
 		attempt++
-		delay, err := config.Backoff.Delay(attempt)
+		delay, err := config.Backoff.delay(attempt, config.Random)
 		if err != nil {
 			return err
 		}
