@@ -89,3 +89,42 @@ No further independent source defect is established in this round. The next
 work depends on user/external evidence, including the two pending handoffs;
 do not generate more builds, fabricate reports, weaken criteria or close these
 issues merely to empty the tracker. Existing no-push instruction still applies.
+
+## 2026-10-22 physical-use follow-up
+
+The user reports that B-side movement is much improved, with almost no stutter,
+but a slight catch remains when crossing into B. This is current g428 ordinary
+use feedback, not completion of the device/rate/privilege or lifecycle matrix.
+
+Fresh paired collection `55c0dfc102811f65c0c8a7e51835594f` is saved locally at
+09:34:21Z/09:34:26Z. Filtering event timestamps after the preceding collection
+at 09:31:54Z retains 12 source and 12 receiver profiles, all ending `ok`, with
+1,663 source dispatches and 1,453 receiver dispatches. Counts differ because
+receiver pointer coalescing is enabled; they are not a lost-input count.
+Both reports retain service READY and input health READY. No triggering
+session-end event appears in that filtered interval. A's final doctor reports
+healthy CONNECTED and matched g428 UI/resident/installed builds.
+
+Receiver ReadyWait spans range from 115,000 to 137,007us, whereas the maximum
+entry dispatch is 9,321us and the maximum ordinary dispatch is 34,889us.
+Source ordinary dispatch peaks at 4,062us. These are process-local measured
+spans, not physical input-to-display latency. The entry wait is a separate
+remaining target from continuous movement; the current evidence does not
+establish its exact removable cause or justify skipping readiness checks.
+
+The earlier collection `2433774db9a59a92ce25f57d257635d6`, at
+09:31:49Z/09:31:54Z, retains a receiver dispatch of 1,018,280us, including
+96,559us of client authorization and 921,720us of response wait; its matching
+worker apply measurement is 917ms. Another dispatch is 861,098us with an
+858,663us response wait and 350ms worker apply measurement. These nested
+spans must not be added or subtracted to claim a native or network delay.
+The later sample and user report do not erase those earlier outliers.
+
+Next performance priority is a bounded breakdown of remaining worker readiness
+work during crossing, preserving fresh authorization and held-input cleanup.
+No new source defect is reproduced in this inspection, so no code change,
+new bundle, device replacement or issue closure follows. Signing, hosted CI,
+full device acceptance and pending security-dialog handling remain incomplete.
+Only this observation record changes; no API/DB, runner, dependency, security
+configuration or branch change. No implementation tests are rerun for this
+documentation-only update; validation is `git diff --check`. No push or comment.
