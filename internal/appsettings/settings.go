@@ -45,6 +45,15 @@ func Load(base string) (Settings, error) {
 // requiring existing policy; read-only Load never creates it. No-replace
 // promotion preserves a concurrent user's settings, including disabled flags.
 func Initialize(base string) (Settings, error) {
+	preferences, err := LockPreferences(base)
+	if err != nil {
+		return Settings{}, err
+	}
+	defer preferences.Close()
+	return preferences.Initialize()
+}
+
+func initializeSettings(base string) (Settings, error) {
 	gate.Lock()
 	defer gate.Unlock()
 	value, err := loadSettings(func(v any) error { return read(base, "settings.json", v) }, false)
@@ -77,6 +86,18 @@ func loadSettings(load func(any) error, allowMissing bool) (Settings, error) {
 	return Settings{Schema: value.Schema, StartAtLogin: *value.StartAtLogin, AutoUpdate: *value.AutoUpdate}, nil
 }
 func Save(base string, value Settings) error {
+	if value.Schema != Schema {
+		return errors.New("invalid app settings")
+	}
+	preferences, err := LockPreferences(base)
+	if err != nil {
+		return err
+	}
+	defer preferences.Close()
+	return preferences.Save(value)
+}
+
+func saveSettings(base string, value Settings) error {
 	if value.Schema != Schema {
 		return errors.New("invalid app settings")
 	}

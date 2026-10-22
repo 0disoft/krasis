@@ -77,6 +77,13 @@ func (s *WorkspaceService) SetAppSettings(startAtLogin, autoUpdate bool) AppSett
 	s.settingsGate.Lock()
 	defer s.settingsGate.Unlock()
 	base := os.Getenv("LOCALAPPDATA")
+	preferences, err := appsettings.LockPreferences(base)
+	if err != nil {
+		result := s.appSettings()
+		result.Code = appsettings.StatusSaveFailed
+		return result
+	}
+	defer preferences.Close()
 	old, err := appsettings.Load(base)
 	if err != nil {
 		return s.appSettings()
@@ -108,7 +115,7 @@ func (s *WorkspaceService) SetAppSettings(startAtLogin, autoUpdate bool) AppSett
 		}
 	}
 	value := appsettings.Settings{Schema: appsettings.Schema, StartAtLogin: startAtLogin, AutoUpdate: autoUpdate}
-	if err = appsettings.Save(base, value); err != nil {
+	if err = preferences.Save(value); err != nil {
 		s.log.Event("settings_change_save_failed")
 		restored := true
 		if startupChanged {
@@ -142,7 +149,12 @@ func (s *WorkspaceService) SetAppSettings(startAtLogin, autoUpdate bool) AppSett
 }
 func (s *WorkspaceService) prepareAppSettings() error {
 	base := os.Getenv("LOCALAPPDATA")
-	v, err := appsettings.Initialize(base)
+	preferences, err := appsettings.LockPreferences(base)
+	if err != nil {
+		return err
+	}
+	defer preferences.Close()
+	v, err := preferences.Initialize()
 	if err != nil {
 		return err
 	}

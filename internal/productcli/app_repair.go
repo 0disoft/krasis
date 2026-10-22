@@ -33,6 +33,11 @@ func repairApp(deps dependencies) (appRepairResult, int) {
 // Seed ownership while a pre-upgrade launch record still names the scheduler
 // target. First install may inspect absence, but cannot adopt an orphan task.
 func prepareExistingRecoveryTask(base string) error {
+	preferences, err := appsettings.LockPreferences(base)
+	if err != nil {
+		return err
+	}
+	defer preferences.Close()
 	if _, err := launchrecord.Load(base); errors.Is(err, launchrecord.ErrMissing) {
 		return appsettings.ValidateRecoveryTaskRegistration(base)
 	} else if err != nil {

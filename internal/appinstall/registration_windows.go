@@ -5,8 +5,24 @@ package appinstall
 import (
 	"errors"
 
+	"github.com/0disoft/krasis/internal/appsettings"
 	"github.com/0disoft/krasis/internal/launchrecord"
 )
+
+// Call after shutting down the old GUI, while still holding the startup fence.
+// All preference writers share this lease; keep it through OS registration.
+func lockInstalledPreferences(base string) (*appsettings.PreferencesLease, appsettings.Settings, error) {
+	preferences, err := appsettings.LockPreferences(base)
+	if err != nil {
+		return nil, appsettings.Settings{}, err
+	}
+	settings, err := appsettings.Load(base)
+	if err != nil {
+		preferences.Close()
+		return nil, appsettings.Settings{}, err
+	}
+	return preferences, settings, nil
+}
 
 // Migrate the owned task while the previous launch record still proves its
 // origin. Only then publish another generation, which replaces that history.

@@ -85,6 +85,11 @@ func Remove(ctx context.Context, base string) error {
 	}
 	// Check registration ownership and saved settings before protected-input
 	// removal. Recheck ownership again in the actual mutation helpers.
+	preferences, err := appsettings.LockPreferences(base)
+	if err != nil {
+		return err
+	}
+	defer preferences.Close()
 	if _, err := appsettings.Load(base); err != nil {
 		return err
 	}
@@ -132,7 +137,7 @@ func Remove(ctx context.Context, base string) error {
 		return err
 	}
 	v.StartAtLogin = false
-	if err = appsettings.Save(base, v); err != nil {
+	if err = preferences.Save(v); err != nil {
 		return err
 	}
 	if err = launchrecord.UnregisterStartMenu(base); err != nil {

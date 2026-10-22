@@ -121,8 +121,7 @@ func install(ctx context.Context, base, self string, p Package, before func() (i
 		return "", ErrInvalid
 	}
 	stage = "settings"
-	settings, err := appsettings.Load(base)
-	if err != nil {
+	if _, err := appsettings.Load(base); err != nil {
 		return "", err
 	}
 	stage = "startup_lock"
@@ -175,6 +174,14 @@ func install(ctx context.Context, base, self string, p Package, before func() (i
 	if plan.idle != nil {
 		defer plan.idle.Close()
 	}
+	// The old GUI could change preferences during image preparation. It is now
+	// stopped; pin fresh settings through OS registration and publication.
+	stage = "settings_refresh"
+	preferences, settings, err := lockInstalledPreferences(base)
+	if err != nil {
+		return "", err
+	}
+	defer preferences.Close()
 	r := plan.receipt
 	p.ID = r.Folders[0]
 	installed := filepath.Join(path, p.ID)
