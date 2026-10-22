@@ -23,6 +23,21 @@ jobs:
           go-version-file: go.mod
           cache: false
 
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+
+      - name: Test and build native frontend
+        shell: pwsh
+        run: |
+          npm.cmd --prefix frontend ci --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm.cmd --prefix frontend test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm.cmd --prefix frontend run build -- --mode native
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Check formatting
         shell: pwsh
         run: |
@@ -63,6 +78,16 @@ jobs:
           go build -trimpath -o build/krasis-agent.exe ./cmd/krasis-agent
           go build -trimpath -o build/krasis-lab.exe ./cmd/krasis-lab
           go build -trimpath -o build/krasis-launcher.exe ./cmd/krasis-launcher
+
+      - name: Test and build desktop product
+        shell: pwsh
+        env:
+          CGO_ENABLED: '0'
+        run: |
+          go test -tags desktop -timeout 3m ./internal/workspacehost ./cmd/krasis ./cmd/krasis-control ./cmd/krasis-workspace
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go build -tags desktop,production -trimpath -o build/ ./cmd/krasis ./cmd/krasis-control ./cmd/krasis-workspace
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Package and verify device probe kit
         shell: pwsh
