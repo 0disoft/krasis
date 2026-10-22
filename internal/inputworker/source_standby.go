@@ -2,6 +2,7 @@ package inputworker
 
 import (
 	"context"
+	"errors"
 	"io"
 	"time"
 )
@@ -54,6 +55,13 @@ func watchSourcePresence(ctx context.Context, check func() error) error {
 				return nil
 			}
 			if err := check(); err != nil {
+				// Stop may interrupt the query after the pre-check above. Only
+				// that exact local cancellation is normal; a concurrent native
+				// denial or query deadline must survive. Channel fencing and the
+				// final native/query joins remain independent obligations.
+				if query, ok := err.(*sourceQueryFailure); ok && ctx.Err() == context.Canceled && query.reason == "cancelled" && errors.Is(query.cause, context.Canceled) {
+					return nil
+				}
 				return sourceAuthorityResult(err)
 			}
 		}
