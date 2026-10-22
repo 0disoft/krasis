@@ -40,3 +40,19 @@ product/architecture specification change. Local main; no push. This corrects
 a reproduced service-recovery misclassification; it does not explain or resolve
 the underlying query/scheduler, boundary-gate, or network latency. Paired rollout
 and observations are recorded separately.
+
+Paired rollout: B reached UPDATED; A installer exited zero and app repair
+returned recovery_ready. Both installation receipts succeeded. Collection
+9f72843f28c8a2db7fe8c3938954be0f confirms both services/input health READY and
+final doctor healthy/CONNECTED with matching g441 images. No source exit or new
+source-command fault is recorded through the 15:16:46Z/15:16:49Z UTC snapshots.
+The new installation has only a short observation window; no live query timeout
+was induced or captured, so the regression proof is separate from runtime
+acceptance. Package checks passed: 91 frontend tests, native build, 6.48-second
+bundle smoke, eight-file inventory, and offline verification.
+
+Before deployment, g440 A was already stopped with Win32 1066 and a
+source-command-loop recovery report. That generic loop failure is not proven
+to be this reproduced defect. Next preserve its independent cleanup details if
+it recurs; keep boundary-gate and underlying scheduling/network delays separate.
+Results: results/2026-10-23-g441-completed-read-query-retirement.json.

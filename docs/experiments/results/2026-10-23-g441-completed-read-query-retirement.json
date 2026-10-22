@@ -1,0 +1,330 @@
+{
+  "generation": 441,
+  "localDate": "2026-10-23",
+  "timezone": "Asia/Seoul",
+  "sourceRevision": "2ff2d421d0b2ce4fdb3b00eb4e14a8bc29509d18",
+  "change": "Do not classify a pre-dispatch read-only query rejection as uncertain native cleanup once independent owners retired. Check both channels for pending native queries before retirement notification; preserve later cleanup checks.",
+  "validation": {
+    "regressionBeforeFix": "FAIL as expected: actual encoded reader path retained ErrRecovery after the native query and handles retired.",
+    "inputworker": "PASS 22.051s including actual-reader regression and both real query/report completion orderings",
+    "logindiag": "PASS cached",
+    "productlog": "PASS 1.316s",
+    "residentagent": "PASS 5.952s",
+    "frontendTests": 91,
+    "nativeBuild": "PASS",
+    "bundleSmoke": "PASS 6.48s",
+    "bundleFiles": 8,
+    "archiveBytes": 28385884,
+    "offlineVerify": "valid",
+    "diffCheck": "PASS",
+    "skipped": [
+      "Portable pair fixed-owner fixture excluded to avoid installed-owner conflict.",
+      "No race detector, hosted CI, attended physical-input acceptance or long soak; no push."
+    ]
+  },
+  "baseline": {
+    "generation": 440,
+    "collectionId": "969990f520c1ca03a850428ce2fdfa8f",
+    "inputHealth": {
+      "time": "2026-10-22T15:13:04.0048522Z",
+      "state": "SERVICE_RECOVERY_REQUIRED",
+      "stage": "service_recovery",
+      "win32Error": 1066,
+      "win32Known": true
+    },
+    "loginRuntime": {
+      "startedAt": "2026-10-22T14:54:52.174641Z",
+      "time": "2026-10-22T15:07:05.3804152Z",
+      "service": "FAILED",
+      "console": "USER_SESSION",
+      "grant": "PRESENT",
+      "lastWorker": "NONE",
+      "lastFailure": {
+        "time": "2026-10-22T15:07:05.3804152Z",
+        "stage": "service",
+        "reason": "capture",
+        "operation": "source-command-loop",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "source": {
+        "total": 2,
+        "exits": [
+          {
+            "time": "2026-10-22T15:06:48.6525276Z",
+            "command": "ok",
+            "reader": "authority",
+            "capture": "joined",
+            "sender": "joined",
+            "interrupt": "joined",
+            "retirement": "clean_sent",
+            "report": "failed",
+            "failure": {
+              "operation": "source-service-query-cancelled",
+              "win32Error": 0,
+              "win32Known": false
+            },
+            "heartbeatStage": "service_presence",
+            "heartbeatSlowStage": "agent_presence",
+            "heartbeatSlowBucket": 3
+          },
+          {
+            "time": "2026-10-22T15:07:05.2601325Z",
+            "command": "ok",
+            "reader": "cancelled",
+            "capture": "joined",
+            "sender": "joined",
+            "interrupt": "joined",
+            "retirement": "delivery_failed",
+            "report": "recovery",
+            "failure": {
+              "operation": "source-command-loop",
+              "win32Error": 0,
+              "win32Known": false
+            },
+            "heartbeatStage": "replied",
+            "heartbeatSlowStage": "reply_gate",
+            "heartbeatSlowBucket": 4
+          }
+        ]
+      }
+    },
+    "interpretation": "A was stopped/portable before g441 deployment. The last source-command-loop recovery is not proven to be the reproduced read-query defect."
+  },
+  "application": {
+    "peerUpdateId": "b5887bcde901c04db079c0b88f5ef6aa",
+    "peerUpdateState": "UPDATED",
+    "localInstallerExit": 0,
+    "localAppRepair": "recovery_ready",
+    "initialCollectionId": "4f9041ecec85a06257854d81dbbd2771",
+    "initialSides": {
+      "A": {
+        "created": "2026-10-22T15:15:26Z",
+        "installation": {
+          "time": "2026-10-22T15:14:57.05853Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-22T15:15:18.432046Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "loginRuntime": {
+          "startedAt": "2026-10-22T15:14:59.3383183Z",
+          "time": "2026-10-22T15:14:59.3736427Z",
+          "service": "READY",
+          "console": "USER_SESSION",
+          "grant": "PRESENT",
+          "lastWorker": "NONE"
+        }
+      },
+      "B": {
+        "created": "2026-10-22T15:15:31Z",
+        "installation": {
+          "time": "2026-10-22T15:14:08.0466761Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-22T15:15:22.6167135Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "loginRuntime": {
+          "startedAt": "2026-10-22T15:14:10.5199561Z",
+          "time": "2026-10-22T15:14:10.5682092Z",
+          "service": "READY",
+          "console": "USER_SESSION",
+          "grant": "PRESENT",
+          "lastWorker": "NONE"
+        }
+      }
+    },
+    "collectionId": "9f72843f28c8a2db7fe8c3938954be0f",
+    "sides": {
+      "A": {
+        "created": "2026-10-22T15:16:46Z",
+        "installation": {
+          "time": "2026-10-22T15:14:57.05853Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-22T15:16:20.5883931Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "loginRuntime": {
+          "startedAt": "2026-10-22T15:14:59.3383183Z",
+          "time": "2026-10-22T15:14:59.3736427Z",
+          "service": "READY",
+          "console": "USER_SESSION",
+          "grant": "PRESENT",
+          "lastWorker": "NONE"
+        },
+        "sourceFailures": []
+      },
+      "B": {
+        "created": "2026-10-22T15:16:49Z",
+        "installation": {
+          "time": "2026-10-22T15:14:08.0466761Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-22T15:16:24.2815434Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "loginRuntime": {
+          "startedAt": "2026-10-22T15:14:10.5199561Z",
+          "time": "2026-10-22T15:14:10.5682092Z",
+          "service": "READY",
+          "console": "USER_SESSION",
+          "grant": "PRESENT",
+          "lastWorker": "NONE"
+        },
+        "sourceFailures": []
+      }
+    },
+    "doctor": {
+      "schemaVersion": "krasis.cli.doctor/v1",
+      "agent": "RUNNING",
+      "connection": "CONNECTED",
+      "peerAlias": "B",
+      "cliGeneration": 441,
+      "agentGeneration": 441,
+      "protocol": "COMPATIBLE",
+      "code": "healthy",
+      "cliBuild": "2ff2d421d0b2ce4fdb3b00eb4e14a8bc29509d18",
+      "agentBuild": "2ff2d421d0b2ce4fdb3b00eb4e14a8bc29509d18",
+      "ui": {
+        "state": "RUNNING",
+        "generation": 441,
+        "build": "2ff2d421d0b2ce4fdb3b00eb4e14a8bc29509d18",
+        "pathStatus": "MATCHED"
+      },
+      "launchRecord": {
+        "state": "VERIFIED",
+        "generation": 441,
+        "build": "2ff2d421d0b2ce4fdb3b00eb4e14a8bc29509d18",
+        "pathStatus": "MATCHED"
+      },
+      "installedAgent": {
+        "state": "VERIFIED",
+        "build": "2ff2d421d0b2ce4fdb3b00eb4e14a8bc29509d18"
+      },
+      "service": {
+        "state": "RUNNING",
+        "pathStatus": "MATCHED"
+      },
+      "agentLocation": "PROTECTED",
+      "protectedInput": "CONFIGURED",
+      "checks": [
+        {
+          "name": "agent",
+          "state": "RUNNING"
+        },
+        {
+          "name": "connection",
+          "state": "CONNECTED"
+        },
+        {
+          "name": "protocol",
+          "state": "COMPATIBLE"
+        },
+        {
+          "name": "cli_agent_version",
+          "state": "MATCHED"
+        },
+        {
+          "name": "ui_agent_version",
+          "state": "MATCHED"
+        },
+        {
+          "name": "installed_agent_version",
+          "state": "MATCHED"
+        },
+        {
+          "name": "ui",
+          "state": "RUNNING"
+        },
+        {
+          "name": "launch_record",
+          "state": "VERIFIED"
+        },
+        {
+          "name": "installed_agent",
+          "state": "VERIFIED"
+        },
+        {
+          "name": "service",
+          "state": "RUNNING"
+        },
+        {
+          "name": "update_stage_cleanup",
+          "state": "COMPLETED"
+        }
+      ],
+      "nextActions": []
+    }
+  },
+  "limits": [
+    "A query rejection still fails the command and leaves its authority fenced; no expired success or replay is allowed.",
+    "Pending query handles, unknown errors and native/sender cleanup failures still require recovery before final status is sent.",
+    "The regression demonstrates one code defect, not the cause of every live source-command-loop, gate, native query or network failure."
+  ],
+  "nextPriorities": [
+    "Observe whether known read-only rejections can retire without stopping the service while genuine pending/native failures still fence it.",
+    "If source-command-loop recovery recurs, preserve its independent cleanup evidence; do not attribute it to this fixed path without proof.",
+    "Keep boundary writer contention and underlying authority-query/network scheduling latency separate."
+  ],
+  "scope": "No public API, frame layout, DB, dependencies, runner, repository hygiene or product/architecture specification changes. Local main only; no push.",
+  "observations": [
+    "Both g441 installation receipts succeeded; both protected-input health and services READY; final doctor healthy/CONNECTED with matching images.",
+    "No recorded source exits or new source-command faults through the paired 15:16:46Z/15:16:49Z snapshots. This is short observation, not proof of intermittent stability.",
+    "The corrected case is verified by the failing-before/passing-after actual reader regression. No live query timeout was induced or captured after deployment.",
+    "The prior source-command-loop service failure remains separate evidence and is not attributed to this corrected read-only rejection without proof."
+  ]
+}
