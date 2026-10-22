@@ -1,0 +1,192 @@
+{
+  "date": "2026-10-23",
+  "baselineRevision": "d91092158307d451697f5ef4a663edb8219a009e",
+  "observedGeneration": 443,
+  "observedBuild": "7c047c694ccec9b6b9bd4f3839c304d84cbc1060",
+  "changes": [
+    {
+      "change": "Preserve bounded numeric setup helper diagnostics, exit codes and caller deadlines; never include raw helper output or paths.",
+      "revision": "e26bf74"
+    },
+    {
+      "change": "Prepare advisory boundary payloads before fresh authorization and wire admission; assign real sequences under the existing gate.",
+      "revision": "552c35c"
+    }
+  ],
+  "validation": {
+    "windowsscript": "PASS 0.367s",
+    "launchrecord": "PASS 4.976s",
+    "appsettings": "PASS 17.166s",
+    "inputworker": "PASS 24.078s",
+    "appinstall": "PASS 0.884s",
+    "productcli": "PASS 2.037s",
+    "residentagent": "PASS 5.812s",
+    "vet": "PASS windowsscript, appsettings, launchrecord, inputworker",
+    "baselineRegression": "New malformed-boundary regression fails against baseline; passes after preparation is moved before authority and admission.",
+    "comFailure": "Real COM shortcut Save failure in a temporary directory retains stage 4, HRESULT, line and exit 1; no real Start menu touched.",
+    "build": "PASS krasis-agent, krasis-cli, krasis-input, krasis-install, krasis-setup"
+  },
+  "runtimeObservation": {
+    "changedRunningImages": false,
+    "doctor": "healthy/CONNECTED on original g443",
+    "service": "READY",
+    "runtimeTime": "2026-10-22T17:03:38.5671733Z",
+    "source": {
+      "total": 7,
+      "exits": [
+        {
+          "time": "2026-10-22T16:07:48.5974528Z",
+          "command": "ok",
+          "reader": "failed",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "clean_sent",
+          "report": "failed",
+          "failure": {
+            "operation": "source-gate-boundary-write",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "heartbeatStage": "reply_gate",
+          "heartbeatSlowStage": "reply_gate",
+          "heartbeatSlowBucket": 5
+        },
+        {
+          "time": "2026-10-22T16:09:02.6476611Z",
+          "command": "ok",
+          "reader": "authority",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "clean_sent",
+          "report": "failed",
+          "failure": {
+            "operation": "source-service-query-cancelled",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "heartbeatStage": "service_presence",
+          "heartbeatSlowStage": "service_presence",
+          "heartbeatSlowBucket": 4
+        },
+        {
+          "time": "2026-10-22T16:17:15.3321239Z",
+          "command": "ok",
+          "reader": "authority",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "clean_sent",
+          "report": "failed",
+          "failure": {
+            "operation": "source-service-query-closed",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "heartbeatStage": "service_presence",
+          "heartbeatSlowStage": "reply_gate",
+          "heartbeatSlowBucket": 4
+        },
+        {
+          "time": "2026-10-22T16:47:36.848654Z",
+          "command": "ok",
+          "reader": "authority",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "clean_sent",
+          "report": "failed",
+          "failure": {
+            "operation": "source-service-query-deadline-admission",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "heartbeatStage": "replied",
+          "heartbeatSlowStage": "agent_presence",
+          "heartbeatSlowBucket": 3
+        },
+        {
+          "time": "2026-10-22T16:50:19.3988187Z",
+          "command": "ok",
+          "reader": "authority",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "clean_sent",
+          "report": "failed",
+          "failure": {
+            "operation": "source-service-query-cancelled",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "heartbeatStage": "service_presence",
+          "heartbeatSlowStage": "agent_presence",
+          "heartbeatSlowBucket": 4
+        },
+        {
+          "time": "2026-10-22T17:01:20.7662897Z",
+          "command": "ok",
+          "reader": "authority",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "clean_sent",
+          "report": "failed",
+          "failure": {
+            "operation": "source-service-query-cancelled",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "heartbeatStage": "service_presence",
+          "heartbeatSlowStage": "agent_presence",
+          "heartbeatSlowBucket": 4
+        },
+        {
+          "time": "2026-10-22T17:03:38.5244786Z",
+          "command": "ok",
+          "reader": "failed",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "clean_sent",
+          "report": "failed",
+          "failure": {
+            "operation": "source-gate-boundary-prepare",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "heartbeatStage": "reply_gate",
+          "heartbeatSlowStage": "reply_gate",
+          "heartbeatSlowBucket": 5
+        }
+      ]
+    },
+    "installation": {
+      "time": "2026-10-22T16:02:39.1352251Z",
+      "action": "install",
+      "result": 0,
+      "stage": "complete",
+      "win32Error": 0,
+      "win32Known": false,
+      "recovery": "not_needed",
+      "recoveryWin32Error": 0,
+      "recoveryWin32Known": false,
+      "closeWin32Error": 0,
+      "closeWin32Known": false
+    }
+  },
+  "unresolved": [
+    "Original g443 has two observed gate failures after its deployment; packet preparation change is not deployed or physically accepted and does not establish a fix.",
+    "Source service-query cancellations and closed/admission failures require separate attribution; do not equate all source exits with writer contention.",
+    "Hosted CI COM failures did not reproduce locally; numeric diagnostics are improved, but the CI root cause remains unproven.",
+    "g442 installer file_delete Win32 5 remains unattributed; existing verified stop, process-exit and recovery rules are unchanged."
+  ],
+  "skipped": [
+    "No hosted CI rerun, push, release, version bump, paired deployment or installation into the running product.",
+    "No new physical screen-crossing acceptance, latency comparison, suspend/lock/reboot validation or long soak.",
+    "No race detector; no new concurrent owner or protocol lane was introduced. Frontend checks reused because no frontend files changed."
+  ],
+  "documentationModel": "command-code/deepseek-deepseek-v4.1-flash, high; wording reviewed against source.",
+  "contractChanges": "No public API schema, DB, dependency, CI runner, repository hygiene or release policy changes."
+}
