@@ -1,0 +1,141 @@
+{
+  "generation": 431,
+  "sourceRevision": "8ab05793e7eba2da9ef51b4088b43e8cdd1b2d34",
+  "diagnosticDefect": {
+    "g430SampleSavedAt": "2026-10-22T11:43:58.624957Z",
+    "g430FailureAt": "2026-10-22T11:44:53.1490266Z",
+    "problem": "Single-use latency snapshot stopped tracing before the later terminal failure."
+  },
+  "change": {
+    "snapshotBudget": "One optional latency sample and one terminal failure; a queued terminal request supersedes an unsaved sample.",
+    "lifetime": "Unchanged 15 minutes per opt-in recorder; latency saves never reset it.",
+    "storage": "Existing bounded local files; terminal failure replaces sample; no raw trace in peer/support export.",
+    "default": "Off"
+  },
+  "validation": {
+    "runtimestall": "PASS (0.622s), including real FlightRecorder sample then final save and failed-sample recovery",
+    "residentagent": "PASS (7.363s)",
+    "productlog": "PASS (1.850s)",
+    "frontendTests": 91,
+    "nativeBuild": "PASS",
+    "bundleSmoke": "PASS (6.35s)",
+    "bundleVerification": {
+      "valid": true,
+      "files": 8,
+      "archiveBytes": 28364620
+    },
+    "vet": "PASS with unsafeptr analyzer disabled for existing Windows native code",
+    "diffCheck": "PASS",
+    "hostedCI": "Not run; no push authorized",
+    "unrelatedHardwareSuites": "Not repeated; input injection/authority behavior unchanged"
+  },
+  "liveTrace": {
+    "collectionId": "d703333e61d9d612d7aa572204656d9a",
+    "sampleSavedAt": "2026-10-22T11:51:54.2938454Z",
+    "failureAt": "2026-10-22T11:52:10.1300089Z",
+    "terminalSavedAt": "2026-10-22T11:52:12.8950683Z",
+    "localIgnoredPath": ".cache/analysis/g431-failure/failure.trace",
+    "bytes": 2455428,
+    "sha256": "9ed7b57f076bdc2fa66db7c283d20adb5140ea23bf8de34b936c470c0ae601e9",
+    "durationSeconds": 9.539,
+    "completeSTWSpans": 8,
+    "incompleteSTWSpans": 0,
+    "maxSTWMillis": 448.758022,
+    "maxSTWStartedAt": "2026-10-22T11:52:12.146507Z",
+    "maxSTWBeforeFailureMillis": 0.214,
+    "clientAuthorityBucket": "lt1ms",
+    "clientWriteBucket": "lt1ms",
+    "clientResponseBucket": "ge1s",
+    "clientResponseOutcome": "timeout after the existing 2-second heartbeat reply budget",
+    "sourceFinalOperation": "source-agent-query-closed",
+    "sourceCaptureJoin": "joined",
+    "sourceFinalReportAt": "2026-10-22T11:52:11.6083547Z",
+    "interpretation": "A local source IPC response timeout precedes B remote EOF. The large agent STW starts after the failure and does not explain its onset. The late query-closed receipt does not identify the original stall.",
+    "limitation": "Captured while an analysis process was reading a 138MB parsed trace; that task-owned reader was stopped. Not a low-load reproduction, and the source child runtime is not captured."
+  },
+  "application": {
+    "peerUpdateId": "046c52d104126243e69f846f5c38852f",
+    "peerState": "UPDATED",
+    "localDoctor": "healthy / CONNECTED / PROTECTED",
+    "temporaryTraceDisabledByNormalRelaunch": true,
+    "reports": {
+      "A": {
+        "collectedAt": "2026-10-22T11:54:54Z",
+        "installationResult": 0,
+        "installationTime": "2026-10-22T11:51:00.2654139Z",
+        "service": "READY",
+        "inputHealth": "READY",
+        "latestReadinessEvents": [
+          {
+            "time": "2026-10-22T11:53:41.506422Z",
+            "code": "CONNECTED"
+          },
+          {
+            "time": "2026-10-22T11:53:41.673957Z",
+            "code": "installed_source_capture_protected_ready"
+          }
+        ],
+        "traceEvents": [
+          {
+            "time": "2026-10-22T11:51:07.8566839Z",
+            "code": "runtime_trace_enabled"
+          },
+          {
+            "time": "2026-10-22T11:51:54.2938454Z",
+            "code": "runtime_trace_sample_saved"
+          },
+          {
+            "time": "2026-10-22T11:52:12.8950683Z",
+            "code": "runtime_trace_saved"
+          },
+          {
+            "time": "2026-10-22T11:52:22.8314751Z",
+            "code": "runtime_trace_enabled"
+          },
+          {
+            "time": "2026-10-22T11:53:14.7807404Z",
+            "code": "runtime_trace_saved"
+          }
+        ]
+      },
+      "B": {
+        "collectedAt": "2026-10-22T11:54:59Z",
+        "installationResult": 0,
+        "installationTime": "2026-10-22T11:50:12.5659278Z",
+        "service": "READY",
+        "inputHealth": "READY",
+        "latestReadinessEvents": [
+          {
+            "time": "2026-10-22T11:53:44.5820621Z",
+            "code": "CONNECTED"
+          },
+          {
+            "time": "2026-10-22T11:53:44.7737958Z",
+            "code": "installed_source_capture_protected_ready"
+          }
+        ],
+        "traceEvents": []
+      }
+    }
+  },
+  "remainingWork": [
+    {
+      "priority": 1,
+      "status": "unresolved",
+      "task": "Capture source-child command-read, authority-check and reply-write progress under low load; retain the existing proof checks and deadlines."
+    },
+    {
+      "priority": 2,
+      "status": "unresolved",
+      "task": "Correlate the earlier trust_expiry_idle failure with trust-reader cadence; do not infer it is the same failure as the local source IPC timeout."
+    }
+  ],
+  "scope": {
+    "publicApiChanged": false,
+    "databaseChanged": false,
+    "runnerChanged": false,
+    "dependenciesChanged": false,
+    "sourceOfTruthDocumentsChanged": false,
+    "remotePush": false
+  }
+}
