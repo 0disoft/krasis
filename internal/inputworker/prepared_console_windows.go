@@ -150,7 +150,7 @@ func prepareConsoleMode(ctx context.Context, native bool, launch consoleLauncher
 	if ctx == nil || ctx.Err() != nil || launch == nil {
 		return nil, ErrAuthority
 	}
-	p := &preparedConsole{nativePrepared: native}
+	p := &preparedConsole{}
 	accepted := false
 	defer func() {
 		if !accepted && p.close() != nil {
@@ -177,6 +177,11 @@ func prepareConsoleMode(ctx context.Context, native bool, launch consoleLauncher
 	if err != nil || startup.Err() != nil {
 		return nil, ErrAuthority
 	}
+	if native {
+		if err := p.beginNativePreparation(ctx); err != nil {
+			return nil, err
+		}
+	}
 	p.preparedAt = time.Now()
 	accepted = true
 	return p, nil
@@ -198,8 +203,8 @@ func (prepared *preparedConsole) closeOwned() error {
 		if prepared.nativePrepared && !prepared.bootstrapBegun.Load() {
 			// An unbound pair has no input journal. Ask its exact parent to
 			// retire both native processes before accepting its final receipt.
-			if prepared.retireNativePreparation() != nil {
-				prepared.closeErr = ErrRecovery
+			if err := prepared.retireNativePreparation(); err != nil {
+				prepared.closeErr = errors.Join(ErrRecovery, err)
 			} else {
 				prepared.worker.confirmNativeRetirement()
 			}
@@ -215,6 +220,35 @@ func (prepared *preparedConsole) closeOwned() error {
 }
 
 var unboundRetiredFrame = [8]byte{'K', 'R', 'U', '1', 1, 0, 0, 0}
+var nativePreparationFrame = [8]byte{'K', 'R', 'N', '1', 1, 0, 0, 0}
+
+// Launch rejection/cancellation must remain child-free. Only after the exact
+// journal owner connects does the service permit native process creation.
+func (p *preparedConsole) beginNativePreparation(ctx context.Context) error {
+	if ctx == nil || ctx.Err() != nil || p == nil || p.worker == nil || p.control == nil {
+		return ErrAuthority
+	}
+	if err := p.control.SetWriteDeadline(time.Now().Add(startupTimeout)); err != nil {
+		return err
+	}
+	p.nativePrepared = true
+	p.worker.expectNativeChild()
+	if err := writeFrame(p.control, nativePreparationFrame[:]); err != nil {
+		return errors.Join(ErrRecovery, err)
+	}
+	return p.control.SetWriteDeadline(time.Time{})
+}
+
+func awaitNativePreparation(reader io.Reader) error {
+	var frame [8]byte
+	if _, err := io.ReadFull(reader, frame[:]); err != nil {
+		return err
+	}
+	if frame != nativePreparationFrame {
+		return ErrProtocol
+	}
+	return nil
+}
 
 func (p *preparedConsole) retireNativePreparation() error {
 	if p.control == nil || p.worker == nil || p.control.SetDeadline(time.Now().Add(startupTimeout)) != nil {

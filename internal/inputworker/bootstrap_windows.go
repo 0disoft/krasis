@@ -224,6 +224,11 @@ func runInstalledConsoleInputMode(ctx context.Context, agentDigest, serviceDiges
 		if installation == nil {
 			return ErrAuthority
 		}
+		// No native process exists during cancellable OS launch/connect.
+		// The exact service owner must explicitly start unbound preparation.
+		if err := awaitNativePreparation(control); err != nil {
+			return err
+		}
 		native, err = prepareNativePair(startup)
 		if err != nil {
 			return err

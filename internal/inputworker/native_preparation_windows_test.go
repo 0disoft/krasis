@@ -3,6 +3,7 @@
 package inputworker
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -15,6 +16,41 @@ import (
 	"github.com/0disoft/krasis/internal/crashguard"
 	"golang.org/x/sys/windows"
 )
+
+func TestCancelledConsoleLaunchCannotAuthorizeNativePreparation(t *testing.T) {
+	server, client := nativePair(t)
+	defer server.Close()
+	defer client.Close()
+	p := &preparedConsole{control: server, worker: &ConsoleWorker{}}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := p.beginNativePreparation(ctx); err == nil || p.nativePrepared || p.worker.nativeChildPossible {
+		t.Fatal("cancelled construction acquired native recovery obligations", err)
+	}
+	for _, data := range [][]byte{nil, nativePreparationFrame[:7], make([]byte, 8)} {
+		if awaitNativePreparation(bytes.NewReader(data)) == nil {
+			t.Fatal("missing/truncated/foreign native preparation permit accepted")
+		}
+	}
+	if awaitNativePreparation(bytes.NewReader(nativePreparationFrame[:])) != nil {
+		t.Fatal("fixed service preparation permit rejected")
+	}
+}
+
+func TestConsoleNativePreparationPermitPrecedesRetirementObligation(t *testing.T) {
+	server, client := nativePair(t)
+	defer server.Close()
+	defer client.Close()
+	p := &preparedConsole{control: server, worker: &ConsoleWorker{}}
+	done := make(chan error, 1)
+	go func() { done <- awaitNativePreparation(client) }()
+	if err := p.beginNativePreparation(context.Background()); err != nil || !p.nativePrepared || !p.worker.nativeChildPossible {
+		t.Fatal("native launch permit lost owned retirement", err)
+	}
+	if err := <-done; err != nil {
+		t.Fatal("child did not receive its fixed service permit", err)
+	}
+}
 
 // Ordinary-user process fixture only. It accepts four event handles instead
 // of authority/image pins and serves only the existing fake input port.
