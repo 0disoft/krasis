@@ -1,10 +1,12 @@
 package inputworker
 
 import (
+	"errors"
 	"io"
 	"net"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // The query owner must retain its exact native pipe until actual return, but
@@ -38,4 +40,37 @@ func (ref *sourceControlReference) Close() error {
 		}
 	})
 	return ref.err
+}
+
+// workerControlLifetime owns bootstrap's control pipe and service proof. Capture
+// transfers proof retirement to Channel and retains reporting independently.
+// Close may return before a pending native query retires; it cannot certify it.
+type workerControlLifetime struct {
+	stream net.Conn
+	proof  *Authority
+	source *Channel
+	report io.Closer
+}
+
+func (l *workerControlLifetime) captureChannel() *Channel {
+	if l.source == nil {
+		l.source, l.report = sourceReportChannel(l.stream, l.proof)
+	}
+	return l.source
+}
+
+func (l *workerControlLifetime) interruptReader() {
+	if l.source != nil {
+		// A read-only native query may still own this exact pipe.
+		_ = l.stream.SetReadDeadline(time.Now())
+	} else {
+		_ = l.stream.Close()
+	}
+}
+
+func (l *workerControlLifetime) Close() error {
+	if l.source != nil {
+		return errors.Join(l.source.Close(), l.report.Close())
+	}
+	return errors.Join(l.proof.Close(), l.stream.Close())
 }

@@ -22,9 +22,9 @@ func TestSourceFinalReportSurvivesExpiredServiceQuery(t *testing.T) {
 				defer peer.Close()
 				stream := &queryOwnedConn{admissionObservedConn: &admissionObservedConn{Conn: pipe}}
 				proof := clientChannel(stream, authorityService).authority
-				service, reporter := sourceReportChannel(stream, proof)
-				defer reporter.Close()
-				defer service.Close()
+				lifetime := &workerControlLifetime{stream: stream, proof: proof}
+				service := lifetime.captureChannel()
+				defer lifetime.Close()
 				entered, release := make(chan struct{}), make(chan struct{})
 				var proofCloses atomic.Int32
 				proof.closeHandles = func() error { proofCloses.Add(1); return nil }
@@ -47,6 +47,10 @@ func TestSourceFinalReportSurvivesExpiredServiceQuery(t *testing.T) {
 				}
 				if service.Close() != ErrAuthority || stream.closes.Load() != 0 {
 					t.Fatal("pending query claimed confirmed cleanup")
+				}
+				lifetime.interruptReader()
+				if stream.closes.Load() != 0 || proofCloses.Load() != 0 {
+					t.Fatal("reader interruption retired a live query")
 				}
 				if queryFirst {
 					close(release)
@@ -73,8 +77,8 @@ func TestSourceFinalReportSurvivesExpiredServiceQuery(t *testing.T) {
 				if service.authorizeSourcePresence(context.Background()) == nil {
 					t.Fatal("report ownership revived input authority")
 				}
-				if err := reporter.Close(); err != nil {
-					t.Fatal(err)
+				if err := lifetime.Close(); (queryFirst && err != nil) || (!queryFirst && !errors.Is(err, ErrAuthority)) {
+					t.Fatal("control lifetime hid pending-query cleanup", err)
 				}
 				if queryFirst {
 					if stream.closes.Load() != 1 || proofCloses.Load() != 1 {
@@ -92,5 +96,29 @@ func TestSourceFinalReportSurvivesExpiredServiceQuery(t *testing.T) {
 				}
 			})
 		})
+	}
+}
+
+func TestWorkerControlLifetimeReleasesFailedBootstrap(t *testing.T) {
+	for _, authenticated := range []bool{false, true} {
+		peer, pipe := net.Pipe()
+		stream := &queryOwnedConn{admissionObservedConn: &admissionObservedConn{Conn: pipe}}
+		lifetime := &workerControlLifetime{stream: stream}
+		var proofCloses atomic.Int32
+		if authenticated {
+			lifetime.proof = clientChannel(stream, authorityService).authority
+			lifetime.proof.closeHandles = func() error { proofCloses.Add(1); return nil }
+		}
+		if err := lifetime.Close(); err != nil {
+			t.Fatal(err)
+		}
+		wantProofCloses := int32(0)
+		if authenticated {
+			wantProofCloses = 1
+		}
+		if stream.closes.Load() != 1 || proofCloses.Load() != wantProofCloses {
+			t.Fatal("bootstrap failure leaked its pipe or authenticated proof")
+		}
+		_ = peer.Close()
 	}
 }

@@ -204,19 +204,8 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 	if err != nil {
 		return ErrAuthority
 	}
-	// Capture keeps separate query/report references to the same exact pipe.
-	// Query retirement cannot discard the final report; a pending query still
-	// retains its native pipe after bootstrap releases reporting ownership.
-	var sourceService *Channel
-	var sourceReporter io.Closer
-	defer func() {
-		if sourceService != nil {
-			_ = sourceService.Close()
-			_ = sourceReporter.Close()
-		} else {
-			_ = control.Close()
-		}
-	}()
+	lifetime := &workerControlLifetime{stream: control}
+	defer lifetime.Close()
 	stopControl := context.AfterFunc(startup, func() { _ = control.Close() })
 	defer stopControl()
 	started = time.Now()
@@ -225,11 +214,7 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 	if err != nil {
 		return ErrAuthority
 	}
-	defer func() {
-		if sourceService == nil {
-			_ = proof.Close()
-		}
-	}()
+	lifetime.proof = proof
 	_ = control.SetDeadline(time.Now().Add(startupTimeout))
 	if startup.Err() != nil || proof.check(false) != nil || writeFrame(control, workerAuthenticatedFrame[:]) != nil {
 		return ErrAuthority
@@ -283,8 +268,9 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 		return ErrAuthority
 	}
 	_ = control.SetDeadline(time.Time{})
+	var sourceService *Channel
 	if lease.Capture {
-		sourceService, sourceReporter = sourceReportChannel(control, proof)
+		sourceService = lifetime.captureChannel()
 	}
 	run, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -299,12 +285,7 @@ func runInstalledConsoleInput(ctx context.Context, agentDigest, serviceDigest [s
 		cancel()
 	}()
 	defer func() {
-		if sourceService != nil {
-			// Interrupt the reader without closing a native query's pipe.
-			_ = control.SetReadDeadline(time.Now())
-		} else {
-			_ = control.Close()
-		}
+		lifetime.interruptReader()
 		<-readerDone
 	}()
 	if lease.Capture {
