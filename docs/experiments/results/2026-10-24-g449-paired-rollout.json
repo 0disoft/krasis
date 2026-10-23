@@ -1,0 +1,199 @@
+{
+  "date": "2026-10-24",
+  "generation": 449,
+  "revision": "1c1664a2b4fc9b1e47067ebea23b140c2fbaaa32",
+  "toolchain": "go1.27.3",
+  "rollout": {
+    "A": "g449 UI and protected agent verified; input service RUNNING",
+    "B": "g449 runtime verified through authenticated update inspection; installed receiver profiles and READY health observed",
+    "packageBytes": 28458238,
+    "checksumsMatched": 7,
+    "frontendTestsPassed": 103,
+    "packageSmokePassed": true,
+    "pushed": false
+  },
+  "before": {
+    "requestId": "99014c43206ca66be91308f4f6ff8c7f",
+    "build": "b8f73fa6b4f2abeecf7871007e0e6d30bd3e237c",
+    "fromUTC": "2026-10-23T19:21:00Z",
+    "pairedProfiles": 12,
+    "successfulPairs": 12,
+    "metrics": {
+      "sourceCaptureActivation": {
+        "count": 12,
+        "minMs": 11.406,
+        "medianMs": 31.859,
+        "maxMs": 277.979
+      },
+      "requestToGrant": {
+        "count": 12,
+        "minMs": 40.121,
+        "medianMs": 50.881,
+        "maxMs": 193.922
+      },
+      "receiverReadyWait": {
+        "count": 12,
+        "minMs": 23.565,
+        "medianMs": 31.2465,
+        "maxMs": 94.528
+      },
+      "receiverEntryPreparation": {
+        "count": 12,
+        "minMs": 3.448,
+        "medianMs": 3.8525,
+        "maxMs": 6.395
+      }
+    },
+    "sides": [
+      {
+        "side": "A",
+        "evidence": {
+          "file": "support-request-99014c43206ca66be91308f4f6ff8c7f-local.json",
+          "sha256": "11e80534ab48780cc308813cdaff1ee469fb829c1b40f3f612ef6a6d38a29303",
+          "created": "2026-10-23T19:21:45Z"
+        },
+        "inputHealth": {
+          "time": "2026-10-23T19:21:28.2522127Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "faults": [],
+        "heartbeatCommandFailures": 0,
+        "sourceRefreshes": 0,
+        "maxObservedTimerLateMicros": 0,
+        "runtimeGCTrailMaxSampleLateMicros": 0,
+        "incompleteLogSources": [
+          "control.previous.jsonl"
+        ]
+      },
+      {
+        "side": "B",
+        "evidence": {
+          "file": "support-request-99014c43206ca66be91308f4f6ff8c7f-peer-1aeff94249a3a7a76cfa2765948a731e4b57cc898da1ab79f1bd64fa2583e3f0.json",
+          "sha256": "c4715705d3af52f437e2b0fd4e476568f5bb3c9f3fe25a6bc68f55caf42b1c31",
+          "created": "2026-10-23T19:21:46Z"
+        },
+        "inputHealth": {
+          "time": "2026-10-23T19:21:46.3367466Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "faults": [],
+        "heartbeatCommandFailures": 0,
+        "sourceRefreshes": 0,
+        "maxObservedTimerLateMicros": 6673,
+        "runtimeGCTrailMaxSampleLateMicros": 0,
+        "incompleteLogSources": [
+          "control.previous.jsonl"
+        ]
+      }
+    ]
+  },
+  "after": {
+    "requestId": "fe25dd4c3e2f5feab536e3b377e0654d",
+    "build": "1c1664a2b4fc9b1e47067ebea23b140c2fbaaa32",
+    "fromUTC": null,
+    "pairedProfiles": 5,
+    "successfulPairs": 5,
+    "metrics": {
+      "sourceCaptureActivation": {
+        "count": 5,
+        "minMs": 214.47,
+        "medianMs": 517.764,
+        "maxMs": 750.009
+      },
+      "requestToGrant": {
+        "count": 5,
+        "minMs": 46.08,
+        "medianMs": 52.18,
+        "maxMs": 330.366
+      },
+      "receiverReadyWait": {
+        "count": 5,
+        "minMs": 26.085,
+        "medianMs": 28.416,
+        "maxMs": 305.6
+      },
+      "receiverEntryPreparation": {
+        "count": 5,
+        "minMs": 4.14,
+        "medianMs": 4.792,
+        "maxMs": 6.365
+      }
+    },
+    "sides": [
+      {
+        "side": "A",
+        "evidence": {
+          "file": "support-request-fe25dd4c3e2f5feab536e3b377e0654d-local.json",
+          "sha256": "6ae1574efc42d27171f7cc59c32ff0fcecd27645caae813230e23b372e76739a",
+          "created": "2026-10-23T20:32:05Z"
+        },
+        "inputHealth": {
+          "time": "2026-10-23T20:31:40.3225142Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "faults": [
+          {
+            "time": "2026-10-23T20:31:16.4536652Z",
+            "code": "fault_source_hook_failed"
+          },
+          {
+            "time": "2026-10-23T20:31:16.7180952Z",
+            "code": "fault_trust_freshness_expired"
+          },
+          {
+            "time": "2026-10-23T20:31:16.7180952Z",
+            "code": "session_failed"
+          }
+        ],
+        "heartbeatCommandFailures": 0,
+        "sourceRefreshes": 0,
+        "maxObservedTimerLateMicros": 5220272,
+        "runtimeGCTrailMaxSampleLateMicros": 5220272,
+        "incompleteLogSources": [
+          "control.previous.jsonl"
+        ]
+      },
+      {
+        "side": "B",
+        "evidence": {
+          "file": "support-request-fe25dd4c3e2f5feab536e3b377e0654d-peer-1aeff94249a3a7a76cfa2765948a731e4b57cc898da1ab79f1bd64fa2583e3f0.json",
+          "sha256": "612c7f0a915f55c25be3e962e8ffc3a432dfbc1fbb783641903a3f937525f781",
+          "created": "2026-10-23T20:32:06Z"
+        },
+        "inputHealth": {
+          "time": "2026-10-23T20:31:45.340388Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "faults": [],
+        "heartbeatCommandFailures": 0,
+        "sourceRefreshes": 0,
+        "maxObservedTimerLateMicros": 13355,
+        "runtimeGCTrailMaxSampleLateMicros": 914,
+        "incompleteLogSources": [
+          "control.previous.jsonl"
+        ]
+      }
+    ]
+  },
+  "interpretation": {
+    "improvementDemonstrated": false,
+    "limitations": [
+      "Initial post-update sample; different sample sizes and operating load.",
+      "Stage durations overlap and do not measure physical input-to-display latency.",
+      "Observed runtime stalls and faults do not identify their root cause.",
+      "Incomplete historical control log is not evidence of no errors."
+    ]
+  }
+}
