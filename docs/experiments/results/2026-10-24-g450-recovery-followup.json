@@ -1,0 +1,137 @@
+{
+  "date": "2026-10-24",
+  "before": {
+    "generation": 449,
+    "revision": "1c1664a2b4fc9b1e47067ebea23b140c2fbaaa32",
+    "requestId": "54bfd55b747acf5d3bb7f8e2ba148f71",
+    "sourceSHA256": "0c2ea9f8a7249c1074d077f09abf667159764e0175a5e11cd166f5ad636949f4",
+    "service": "READY",
+    "health": "READY",
+    "sourceExits": [
+      {
+        "time": "2026-10-23T20:56:01.3209447Z",
+        "command": "ok",
+        "reader": "authority",
+        "capture": "joined",
+        "sender": "joined",
+        "interrupt": "joined",
+        "retirement": "clean_sent",
+        "report": "failed",
+        "failure": {
+          "operation": "source-service-query-cancelled",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "heartbeatStage": "service_presence",
+        "heartbeatSlowStage": "agent_presence",
+        "heartbeatSlowBucket": 4
+      },
+      {
+        "time": "2026-10-23T20:56:09.7303681Z",
+        "command": "ok",
+        "reader": "cancelled",
+        "capture": "joined",
+        "sender": "joined",
+        "interrupt": "joined",
+        "retirement": "clean_sent",
+        "report": "failed",
+        "failure": {
+          "operation": "source-write-action-unsubmitted",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "heartbeatStage": "replied",
+        "heartbeatSlowStage": "reply_gate",
+        "heartbeatSlowBucket": 4
+      }
+    ],
+    "observations": [
+      "A faulted again after a verified process replacement and successful connection.",
+      "An authority query cancellation retired the first capture owner.",
+      "The next owner retired after source-write-action-unsubmitted while a handoff was active.",
+      "Automatic UI recovery later replaced the agent and reconnected; the original failure was not a permanent installation failure."
+    ]
+  },
+  "fix": {
+    "commit": "1748b11",
+    "behavior": "Discard only an expired pointer movement proven by the native pipe to be unsubmitted; retain sequence and capture. Never retry it. Discrete and wheel input, attempted/partial writes, cancellation and authority failures remain terminal.",
+    "limitation": "Sanitized action evidence does not identify its action kind. This change covers the pointer-movement case; query delays and other faults remain unresolved."
+  },
+  "rollout": {
+    "generation": 450,
+    "revision": "eef6519ead730e11a5d5b86dab2476009d907a23",
+    "B": {
+      "requestId": "0a8f6c2ade63f3a1c2381c4404187e8f",
+      "result": "UPDATED"
+    },
+    "A": {
+      "ui": "MATCHED",
+      "agent": "MATCHED",
+      "installedAgent": "MATCHED",
+      "service": "RUNNING",
+      "health": "READY"
+    },
+    "frontendTestsPassed": 103,
+    "packageSmokePassed": true,
+    "archiveBytes": 28457754,
+    "pushed": false
+  },
+  "validation": {
+    "inputworkerSuite": "PASS",
+    "inputworkerVet": "PASS",
+    "nativeMovementExpiryRegression": "PASS",
+    "discreteAndWheelFailureRegression": "PASS",
+    "attemptedWriteRegression": "PASS",
+    "cancellationRegression": "PASS",
+    "race": "not run: CGO_ENABLED=0 and no gcc/clang found on PATH"
+  },
+  "after": {
+    "requestId": "b51f6bad9596ede761810faab4d015ed",
+    "health": {
+      "A": "READY",
+      "B": "READY"
+    },
+    "roundTripComparison": "pending user test; no performance or stability improvement established",
+    "observed": [
+      {
+        "side": "A",
+        "created": "2026-10-23T21:15:18Z",
+        "health": {
+          "time": "2026-10-23T21:15:05.2372272Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "service": "READY",
+        "connected": [
+          "2026-10-23T21:14:24.9298622Z"
+        ],
+        "faults": [],
+        "handoffProfiles": 0,
+        "profiles": [],
+        "timerLateMicros": 0
+      },
+      {
+        "side": "B",
+        "created": "2026-10-23T21:15:21Z",
+        "health": {
+          "time": "2026-10-23T21:15:17.6201895Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "service": "READY",
+        "connected": [
+          "2026-10-23T21:14:25.6383281Z"
+        ],
+        "faults": [],
+        "handoffProfiles": 0,
+        "profiles": [],
+        "timerLateMicros": 9017
+      }
+    ],
+    "doctor": "healthy"
+  }
+}
