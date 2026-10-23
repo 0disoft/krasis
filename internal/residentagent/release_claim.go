@@ -7,7 +7,10 @@ import (
 	"github.com/0disoft/krasis/internal/localapi"
 )
 
-type releaseClaimLifetime struct{ timer *time.Timer }
+type releaseClaimLifetime struct {
+	timer      *time.Timer
+	peerExpiry func() bool
+}
 
 // A claim shares the Connect/Pair/peer-update mutex. It never disconnects input.
 // The request ID binds rollback to this owner; a crashed UI cannot fence forever.
@@ -43,7 +46,13 @@ func (o *Operations) expireReleaseClaim(claim *releaseClaimLifetime) {
 	// Stop cannot retract a callback already waiting for mu. An independent
 	// lifetime also fences release/reacquire with the same external request ID.
 	if o.releaseClaim == claim {
+		if claim.peerExpiry != nil && !claim.peerExpiry() {
+			return
+		}
 		o.clearReleaseClaimLocked()
+		if claim.peerExpiry != nil {
+			o.recordLocked("peer_update_apply_timeout")
+		}
 	}
 }
 

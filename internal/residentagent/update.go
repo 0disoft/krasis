@@ -56,11 +56,9 @@ func (o *Operations) Update(ctx context.Context, r localapi.UpdateRequest) (loca
 	case "APPLY_FAILED":
 		o.mu.Lock()
 		status := o.updates.Status()
-		if o.updateApplying && status.ID == r.ID && status.Peer == r.Peer {
+		if o.updateApplying && o.releaseClaim != nil && o.releaseClaimID == "" && status.State == "APPLYING" && status.ID == r.ID && status.Peer == r.Peer {
 			o.updates.ApplyFailed()
-			o.updateApplying = false
-			o.updateTargetGeneration = 0
-			o.updateTargetRevision = ""
+			o.clearReleaseClaimLocked()
 			result.Code = "apply_failed"
 		} else if !o.updateApplying && o.updates.RejectReady(r.ID, r.Peer) {
 			result.Code = "apply_failed"
@@ -111,27 +109,21 @@ func (o *Operations) Update(ctx context.Context, r localapi.UpdateRequest) (loca
 		o.updateTargetRevision = revision
 		// Allow the bounded installer/replacement to finish, but never fence
 		// local input and management forever after a replacement UI crashes.
-		time.AfterFunc(5*time.Minute, func() {
-			o.mu.Lock()
-			defer o.mu.Unlock()
-			if o.updateApplying && o.releaseClaimID == "" && o.updates.ExpireClaim(r.ID, r.Peer) {
-				o.clearReleaseClaimLocked()
-				o.recordLocked("peer_update_apply_timeout")
-			}
-		})
+		claim := &releaseClaimLifetime{peerExpiry: func() bool { return o.updates.ExpireClaim(r.ID, r.Peer) }}
+		o.releaseClaim = claim
+		claim.timer = time.AfterFunc(5*time.Minute, func() { o.expireReleaseClaim(claim) })
 		idle := o.sessionDone == nil
 		o.mu.Unlock()
 		stop := completed("no_active_session")
 		if !idle {
 			stop, err = o.disconnect(ctx, false)
 		}
-		if err != nil || stop.Status != "COMPLETED" {
-			o.updates.ApplyFailed()
-			o.mu.Lock()
-			o.updateApplying = false
-			o.updateTargetGeneration = 0
-			o.updateTargetRevision = ""
-			o.mu.Unlock()
+		ready := err == nil && stop.Status == "COMPLETED"
+		if !o.finishPeerUpdatePreparation(claim, ready) {
+			result.Code = "apply_claim_failed"
+			return result, nil
+		}
+		if !ready {
 			result.Code = "cleanup_failed"
 			return result, nil
 		}
@@ -143,6 +135,22 @@ func (o *Operations) Update(ctx context.Context, r localapi.UpdateRequest) (loca
 	}
 	result.Status = o.updates.Status()
 	return result, nil
+}
+
+func (o *Operations) finishPeerUpdatePreparation(claim *releaseClaimLifetime, ready bool) bool {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	// Session shutdown runs outside mu. A cancellation or replacement can
+	// retire this claim while that wait is in progress. Neither late success
+	// nor failure may authorize a launch or clear the newer claim's fence.
+	if claim == nil || o.releaseClaim != claim || !o.updateApplying || o.releaseClaimID != "" {
+		return false
+	}
+	if !ready || o.root.Err() != nil {
+		o.updates.ApplyFailed()
+		o.clearReleaseClaimLocked()
+	}
+	return o.root.Err() == nil
 }
 
 func (o *Operations) updateAuthorized(ctx context.Context, alias, fp string) bool {
