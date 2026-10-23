@@ -5,6 +5,7 @@ package inputworker
 import (
 	"context"
 	"errors"
+	"os"
 	"sync/atomic"
 	"time"
 
@@ -152,7 +153,17 @@ func (w *sourceWriter) SendAction(ctx context.Context, action control.InputActio
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	return w.writePacketContext(ctx, sourcePacket{kind: sourceAction, reply: w.epoch.Load(), action: action}, current, false, false)
+	err := w.writePacketContext(ctx, sourcePacket{kind: sourceAction, reply: w.epoch.Load(), action: action}, current, false, false)
+	var failure *sourceIOFailure
+	if action.Kind == control.InputPointerMove && ctx.Err() == nil && (w.ctx == nil || w.ctx.Err() == nil) &&
+		errors.As(err, &failure) && failure.unsubmitted && errors.Is(failure, os.ErrDeadlineExceeded) {
+		// A native pre-submission proof means this relative movement never
+		// reached the pipe or consumed a sequence. Drop only this stale sample,
+		// as the pointer queue already does under load. Never replay it or hide
+		// key/button transitions, authority failures, or attempted writes.
+		return nil
+	}
+	return err
 }
 func (w *sourceWriter) Interrupt(error) error {
 	return sourceTransportFailure(w.channel.stream.SetWriteDeadline(time.Now()))
