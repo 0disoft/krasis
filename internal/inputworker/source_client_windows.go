@@ -405,7 +405,7 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 		}
 		return err
 	}
-	defer channel.Close()
+	var live *sourceClient
 	startupStage := "lease_deadline"
 	defer func() {
 		if startupStage != "" && result != nil && c.observe != nil {
@@ -413,6 +413,13 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 			c.observe("installed_source_stage_" + startupStage)
 			c.observe(connectionNativeFailureEvent(result, "installed_source_native_"))
 			c.observe(sourceStartupFailureCode(result))
+		}
+	}()
+	defer func() {
+		if live == nil {
+			result = closeSourceChannelResult(channel, result)
+		} else {
+			result = live.closeResult(result)
 		}
 	}()
 	startup, stopStartup := context.WithTimeout(ctx, startupTimeout)
@@ -456,7 +463,7 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 		return errors.Join(ErrAuthority, err)
 	}
 	startupStage = ""
-	live := &sourceClient{channel: channel, binding: binding, replies: make(chan sourcePacket, 1), done: make(chan struct{}), failed: make(chan struct{})}
+	live = &sourceClient{channel: channel, binding: binding, replies: make(chan sourcePacket, 1), done: make(chan struct{}), failed: make(chan struct{})}
 	live.timing = timingSampler{emit: c.observe, source: true}
 	live.heartbeatTiming = timingSampler{emit: c.observe, source: true, heartbeat: true}
 	go func() {
@@ -519,7 +526,6 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 			}
 		}
 	}()
-	defer func() { result = live.closeResult(result) }()
 	if _, err = live.call(ctx, sourceStart); err != nil {
 		if CleanSourceRetirement(err) && c.observe != nil {
 			c.observe("installed_source_startup_retired")
