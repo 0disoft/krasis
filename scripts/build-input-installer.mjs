@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { verifyExecutableIcon } from './check-windows-icon.mjs';
 import { signExecutable, signingEnabled } from './authenticode.mjs';
+import { offlineGo } from './offline-go.mjs';
 
 // Build only: no elevation, SCM changes, installer execution or certificates.
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -23,12 +24,13 @@ assert.ok(!fs.existsSync(output), 'Never overwrite an existing installer artifac
 assert.ok(!fs.existsSync(resource), 'Unexpected existing generated resource.');
 fs.mkdirSync(output, { recursive: true });
 fs.mkdirSync(payload, { recursive: true });
-const env = {
+const go = offlineGo({
   ...process.env, GOOS: 'windows', GOARCH: 'amd64', CGO_ENABLED: '0',
-  GOPROXY: 'off', GOSUMDB: 'off', GOFLAGS: '',
+  GOPROXY: 'off', GOFLAGS: '',
   GOMODCACHE: path.join(root, '.cache/go-mod'), GOCACHE: path.join(root, '.cache/go-build'),
-};
-const build = (name, destination, tags = []) => execFileSync('go', [
+});
+const env = go.env;
+const build = (name, destination, tags = []) => execFileSync(go.command, [
   'build', '-trimpath', '-buildvcs=true', ...tags,
   name === 'krasis-agent' ? '-ldflags=-s -w -H=windowsgui' : '-ldflags=-s -w',
   '-o', destination, `./cmd/${name}`,

@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { verifyExecutableIcon } from './check-windows-icon.mjs';
 import { signExecutable, signingEnabled } from './authenticode.mjs';
+import { offlineGo } from './offline-go.mjs';
 
 // The experimental probe is an optional, atomic pair. A normal product update
 // must not require new test-signing evidence for a probe that is not deployed.
@@ -24,12 +25,13 @@ const directory = bundleRoot;
 for (const name of ['krasis.exe','krasis-agent.exe','krasis-cli.exe','krasis-install.exe','BUILD.json','SHA256SUMS.txt']) {
   if (fs.existsSync(path.join(directory,name))) throw Error('Distribution already contains build artifacts; never overwrite it');
 }
+const go = offlineGo({ ...process.env, GOFLAGS: '', GOOS: 'windows', GOARCH: 'amd64', CGO_ENABLED: '0' });
 for (const name of ['krasis','krasis-agent','krasis-cli']) {
   const tags = name === 'krasis' ? ['-tags','desktop,production'] : [];
   const publicKey = process.env.KRASIS_RELEASE_PUBLIC_KEY ?? '';
   if (publicKey && (!/^[A-Za-z0-9+/]{43}=$/u.test(publicKey) || Buffer.from(publicKey,'base64').length !== 32)) throw Error('Invalid release public key');
   const ldflags = (name === 'krasis-cli' ? '-s -w' : '-s -w -H=windowsgui') + (publicKey ? ` -X=github.com/0disoft/krasis/internal/releaseupdate.PublicKey=${publicKey}` : '');
-  execFileSync('go',['build','-trimpath','-buildvcs=true',...tags,`-ldflags=${ldflags}`,'-o',path.join(directory,`${name}.exe`),`./cmd/${name}`],{stdio:'inherit',env:{...process.env,GOFLAGS:'',GOOS:'windows',GOARCH:'amd64',CGO_ENABLED:'0',GOPROXY:'off',GOSUMDB:'off'}});
+  execFileSync(go.command,['build','-trimpath','-buildvcs=true',...tags,`-ldflags=${ldflags}`,'-o',path.join(directory,`${name}.exe`),`./cmd/${name}`],{stdio:'inherit',env:go.env});
   verifyExecutableIcon(fs.readFileSync(path.join(directory,`${name}.exe`)));
   if(name!=='krasis-agent')signExecutable(path.join(directory,`${name}.exe`));
 }
@@ -136,4 +138,4 @@ if (uiAccessTest) {
   }
 }
 fs.writeFileSync(path.join(directory,'SHA256SUMS.txt'),names.map(name=>crypto.createHash('sha256').update(fs.readFileSync(path.join(directory,name))).digest('hex')+'  '+name).join('\n')+'\n');
-execFileSync('go',['test','-v','-count=1','-timeout','60s','-run','^TestWorkspaceUpdatePackage$','./internal/productpanel'],{stdio:'inherit',env:{...process.env,KRASIS_WORKSPACE_UPDATE:path.resolve(directory),KRASIS_UPDATE_REVISION:revision}});
+execFileSync(go.command,['test','-v','-count=1','-timeout','60s','-run','^TestWorkspaceUpdatePackage$','./internal/productpanel'],{stdio:'inherit',env:{...go.env,KRASIS_WORKSPACE_UPDATE:path.resolve(directory),KRASIS_UPDATE_REVISION:revision}});
