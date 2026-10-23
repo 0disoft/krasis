@@ -178,6 +178,18 @@ func (m *Manager) handler(peer string, authorized func() bool) http.Handler {
 	clipboardStatusGate := make(chan struct{}, 1)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
+		// Server.Close interrupts sockets but does not join handlers. Admit
+		// each request under the manager's shutdown fence so its root outlives
+		// authorization, body reads and any final storage/callback work.
+		m.mu.Lock()
+		if m.closed {
+			m.mu.Unlock()
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		m.workers.Add(1)
+		m.mu.Unlock()
+		defer m.workers.Done()
 		// TLS config verifies the one pinned certificate. Recheck current trust
 		// on every request, not just the handshake. Input state is independent.
 		if !authorized() {
