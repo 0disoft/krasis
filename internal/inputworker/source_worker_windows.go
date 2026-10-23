@@ -262,22 +262,10 @@ func runSourceCapture(ctx context.Context, channel, service *Channel, lease Leas
 		emergency := errors.Is(errors.Join(result, capture, sender), wininput.ErrEmergencyRelease)
 		result = sourceCaptureFinal(result, capture, sender, run.Err() == context.DeadlineExceeded)
 		result = sourceCaptureQueryRetirement(result, channel, service)
-		if stopping != nil {
-			response := sourcePacket{kind: sourceReply, op: sourceStop, reply: stopping.sequence}
-			response.status = sourceRetirementStatus(result)
-			delivery := writer.write(response, nil, true)
-			exit.Retirement = sourceRetirementOutcome(response.status, delivery)
-			result = sourceRetirementDelivery(result, delivery)
-		} else {
-			response := sourcePacket{kind: sourceRetired}
-			response.status = sourceRetirementStatus(result)
-			if emergency && result == nil {
-				response.op = 1
-			}
-			delivery := writer.write(response, nil, true)
-			exit.Retirement = sourceRetirementOutcome(response.status, delivery)
-			result = sourceRetirementDelivery(result, delivery)
-		}
+		response := sourceFinalPacket(stopping, result, emergency)
+		delivery := writer.write(response, nil, true)
+		exit.Retirement = sourceRetirementOutcome(response.status, delivery)
+		result = sourceRetirementDelivery(result, delivery)
 		if closeErr := channel.Close(); closeErr != nil {
 			result = errors.Join(result, ErrRecovery, &workerReportFailure{operation: "source-channel-close", cause: closeErr})
 		}

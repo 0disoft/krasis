@@ -139,6 +139,21 @@ func sourceRetirementStatus(result error) byte {
 	return 0
 }
 
+func sourceFinalPacket(stopping *sourcePacket, result error, emergency bool) sourcePacket {
+	status := sourceRetirementStatus(result)
+	// A confirmed emergency remains terminal even if sourceStop arrived first
+	// or a command was rejected earlier. Use the existing emergency packet;
+	// never acknowledge it as an ordinary restartable shutdown. Uncertain
+	// cleanup still takes priority and cannot claim clean retirement.
+	if emergency && status == 0 {
+		return sourcePacket{kind: sourceRetired, op: 1}
+	}
+	if stopping != nil {
+		return sourcePacket{kind: sourceReply, op: sourceStop, reply: stopping.sequence, status: status}
+	}
+	return sourcePacket{kind: sourceRetired, status: status}
+}
+
 // Delivery failure cannot replace cleanup failure in the operation that was
 // just executed. A safely rejected operation may continue after its reply.
 func sourceCommandCompletion(operation, delivery error) error {
