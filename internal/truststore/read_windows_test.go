@@ -3,11 +3,35 @@
 package truststore
 
 import (
+	"errors"
+	"os"
 	"path/filepath"
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/0disoft/krasis/internal/securefs"
 )
+
+func TestStoreReadOpenTraceRetainsNativeFailure(t *testing.T) {
+	directory, err := securefs.OpenReadDirectory(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer directory.Close()
+	trace := NewReadTrace()
+	trace.enter("store_read")
+	_, err = readVerified(directory, trace, func(*os.File) error {
+		t.Fatal("missing file reached ACL validation")
+		return nil
+	})
+	snapshot := trace.Snapshot()
+	_, enclosing := snapshot.Durations["store_read_open"]
+	_, independent := snapshot.Durations["store_read_open_native"]
+	if !errors.Is(err, ErrStoreNotFound) || snapshot.Phase != "store_read_open_native" || !enclosing || independent {
+		t.Fatal("native failure lost its active call or enclosing interval", snapshot, err)
+	}
+}
 
 func TestStoreReadWorksWithReadOnlySharing(t *testing.T) {
 	for _, target := range []string{"directory", "lock"} {

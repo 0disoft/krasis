@@ -301,3 +301,20 @@ func TestTrustTraceReportsActiveLockFileCallWithoutInventingDuration(t *testing.
 		}
 	}
 }
+
+func TestTrustTraceReportsActiveStoreOpenCall(t *testing.T) {
+	for _, detail := range []string{"native", "info", "wrap"} {
+		phase := "store_read_open_" + detail
+		var codes []string
+		recordTrustTrace(truststore.ReadTraceSnapshot{
+			Phase: phase,
+			Durations: map[string]time.Duration{
+				"store_read": time.Second, "store_read_open": time.Second,
+			},
+		}, func(code string) { codes = append(codes, code) })
+		if len(codes) != 3 || codes[0] != "trust_timing_store_read_ge1s" ||
+			codes[1] != "trust_timing_store_read_open_ge1s" || codes[2] != "trust_active_"+phase {
+			t.Fatal("active store open call lost or independent duration invented", codes)
+		}
+	}
+}

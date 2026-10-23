@@ -85,3 +85,18 @@ func TestLockFileDetailsExportOnlyFixedProgressCodes(t *testing.T) {
 		t.Fatal("unknown lock file detail exported")
 	}
 }
+
+func TestStoreOpenDetailsExportOnlyFixedProgressCodes(t *testing.T) {
+	for _, detail := range []string{"native", "info", "wrap"} {
+		code := "trust_active_store_read_open_" + detail
+		result := sanitizeLog("agent.jsonl", strings.NewReader(`{"time":"2026-10-23T00:00:00Z","code":"`+code+`","path":"private","error":"private"}`+"\n"))
+		encoded, _ := json.Marshal(result)
+		if result.Incomplete || len(result.Events) != 1 || result.Events[0].Code != code || strings.Contains(string(encoded), "private") {
+			t.Fatal("store open detail lost or private data exported", detail)
+		}
+	}
+	result := sanitizeLog("agent.jsonl", strings.NewReader("{\"time\":\"2026-10-23T00:00:00Z\",\"code\":\"trust_active_store_read_open_private\"}\n"))
+	if !result.Incomplete || len(result.Events) != 0 {
+		t.Fatal("unknown store open detail exported")
+	}
+}

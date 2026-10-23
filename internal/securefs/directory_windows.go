@@ -168,7 +168,13 @@ func (directory *Directory) Handle() uintptr {
 }
 
 func (directory *Directory) Open(name string) (*os.File, error) {
-	return directory.openExisting(name, fileGenericRead)
+	return directory.OpenObserved(name, nil)
+}
+
+// OpenObserved reports fixed operation names before the synchronous open,
+// metadata query and Go file wrapping. It preserves Open's checks and access.
+func (directory *Directory) OpenObserved(name string, observe func(string)) (*os.File, error) {
+	return directory.openExistingObserved(name, fileGenericRead, observe)
 }
 
 func (directory *Directory) OpenReadWrite(name string) (*os.File, error) {
@@ -236,8 +242,15 @@ func (directory *Directory) CreateDirectory(name string, _ os.FileMode) (*Direct
 }
 
 func (directory *Directory) openExisting(name string, access uint32) (*os.File, error) {
+	return directory.openExistingObserved(name, access, nil)
+}
+
+func (directory *Directory) openExistingObserved(name string, access uint32, observe func(string)) (*os.File, error) {
 	if err := directory.ready(name); err != nil {
 		return nil, err
+	}
+	if observe != nil {
+		observe("native")
 	}
 	handle, err := ntCreate(
 		directory.handle,
@@ -248,6 +261,9 @@ func (directory *Directory) openExisting(name string, access uint32) (*os.File, 
 	)
 	if err != nil {
 		return nil, err
+	}
+	if observe != nil {
+		observe("info")
 	}
 	var info syscall.ByHandleFileInformation
 	if err := syscall.GetFileInformationByHandle(handle, &info); err != nil {
@@ -261,6 +277,9 @@ func (directory *Directory) openExisting(name string, access uint32) (*os.File, 
 	if info.NumberOfLinks != 1 {
 		_ = syscall.CloseHandle(handle)
 		return nil, ErrHardLink
+	}
+	if observe != nil {
+		observe("wrap")
 	}
 	file := os.NewFile(uintptr(handle), filepath.Join(directory.path, name))
 	if file == nil {

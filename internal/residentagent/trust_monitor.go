@@ -33,6 +33,7 @@ var trustReadPhases = [...]string{
 	"prelock_directory_open", "prelock_lockfile_open", "prelock_lockfile_acl",
 	"prelock_lockfile_info", "prelock_lockfile_owner", "prelock_lockfile_acl_query", "prelock_lockfile_acl_check",
 	"lock", "store_read", "store_read_open", "store_read_acl", "store_read_bytes",
+	"store_read_open_native", "store_read_open_info", "store_read_open_wrap",
 	"store_read_decode", "store_read_close", "certificate", "certificate_open", "certificate_acl", "certificate_bytes", "certificate_close", "certificate_validate", "certificate_match", "retry_wait",
 }
 

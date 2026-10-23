@@ -36,7 +36,12 @@ func (directory *Directory) Close() error { return nil }
 func (directory *Directory) Handle() uintptr { return 0 }
 
 func (directory *Directory) Open(name string) (*os.File, error) {
-	return directory.openExisting(name, os.O_RDONLY)
+	return directory.OpenObserved(name, nil)
+}
+
+// OpenObserved reports fixed operation names without changing Open's checks.
+func (directory *Directory) OpenObserved(name string, observe func(string)) (*os.File, error) {
+	return directory.openExistingObserved(name, os.O_RDONLY, observe)
 }
 
 func (directory *Directory) OpenReadWrite(name string) (*os.File, error) {
@@ -85,6 +90,10 @@ func (directory *Directory) CreateDirectory(name string, mode os.FileMode) (*Dir
 }
 
 func (directory *Directory) openExisting(name string, flag int) (*os.File, error) {
+	return directory.openExistingObserved(name, flag, nil)
+}
+
+func (directory *Directory) openExistingObserved(name string, flag int, observe func(string)) (*os.File, error) {
 	if directory == nil {
 		return nil, errors.New("secure directory is closed")
 	}
@@ -92,12 +101,18 @@ func (directory *Directory) openExisting(name string, flag int) (*os.File, error
 		return nil, err
 	}
 	path := filepath.Join(directory.path, name)
+	if observe != nil {
+		observe("info")
+	}
 	info, err := os.Lstat(path)
 	if err != nil {
 		return nil, err
 	}
 	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
 		return nil, ErrUnsafePath
+	}
+	if observe != nil {
+		observe("native")
 	}
 	return os.OpenFile(path, flag, 0)
 }

@@ -480,7 +480,11 @@ func (store *Store) read(directory *securefs.Directory, trace *ReadTrace) (Docum
 
 func readVerified(directory *securefs.Directory, trace *ReadTrace, validate func(*os.File) error) (Document, error) {
 	trace.enterStep("store_read_open")
-	file, err := directory.Open(storeFilename)
+	var observe func(string)
+	if trace != nil {
+		observe = func(step string) { trace.enterDetail("store_read_open_" + step) }
+	}
+	file, err := directory.OpenObserved(storeFilename, observe)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return Document{}, ErrStoreNotFound
