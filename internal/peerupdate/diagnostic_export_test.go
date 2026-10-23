@@ -106,6 +106,29 @@ func TestDiagnosticExportPreservesCauseAndUsesContextCallback(t *testing.T) {
 	}
 }
 
+func TestCompletedDiagnosticExportSurvivesCleanupCancellation(t *testing.T) {
+	for _, result := range []error{nil, errors.New("storage failure")} {
+		run, cancel := context.WithCancel(context.Background())
+		job := &diagnosticExport{ctx: run, done: make(chan struct{}), err: result}
+		close(job.done)
+		cancel() // Export worker cleanup after publishing its result.
+		for range 32 {
+			if err := waitDiagnosticExport(context.Background(), job); !errors.Is(err, result) {
+				t.Fatalf("completed export returned %v, want %v", err, result)
+			}
+		}
+	}
+}
+
+func TestPendingDiagnosticExportStillReturnsCancellation(t *testing.T) {
+	run, cancel := context.WithCancel(context.Background())
+	job := &diagnosticExport{ctx: run, done: make(chan struct{})}
+	cancel()
+	if err := waitDiagnosticExport(context.Background(), job); !errors.Is(err, context.Canceled) {
+		t.Fatalf("pending export ignored cancellation: %v", err)
+	}
+}
+
 func TestManagerCloseCancelsDiagnosticExport(t *testing.T) {
 	m := testManager(t)
 	entered := make(chan struct{})

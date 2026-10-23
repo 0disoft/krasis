@@ -97,7 +97,14 @@ func waitDiagnosticExport(ctx context.Context, job *diagnosticExport) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-job.ctx.Done():
-		return job.ctx.Err()
+		// The worker cancels this context during cleanup after publishing
+		// done. That cancellation must not replace a completed result.
+		select {
+		case <-job.done:
+			return job.err
+		default:
+			return job.ctx.Err()
+		}
 	case <-job.done:
 		return job.err
 	}
