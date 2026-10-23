@@ -519,7 +519,7 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 			}
 		}
 	}()
-	defer func() { _ = channel.Close(); <-live.done }()
+	defer func() { result = live.closeResult(result) }()
 	if _, err = live.call(ctx, sourceStart); err != nil {
 		if CleanSourceRetirement(err) && c.observe != nil {
 			c.observe("installed_source_startup_retired")
