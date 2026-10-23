@@ -31,6 +31,7 @@ type productConnection struct {
 	tls      *tls.Config
 	deadline time.Time
 	anchor   *x509.Certificate
+	localKey string
 }
 
 func prepareProductConnection(identities *productidentity.Store, trust *truststore.Store, alias string, selected ...string) (productConnection, error) {
@@ -95,7 +96,7 @@ func prepareProductConnection(identities *productidentity.Store, trust *truststo
 		return productConnection{}, err
 	}
 	transport.EnableInputPreparation(config)
-	return productConnection{profile: profile, peer: peer, tls: config, anchor: leaf}, nil
+	return productConnection{profile: profile, peer: peer, tls: config, anchor: leaf, localKey: localKey}, nil
 }
 
 func productRunner(identities *productidentity.Store, trust *truststore.Store, log *productlog.Logger, auxiliary ...func(context.Context, string, productConnection)) SessionRunner {
