@@ -41,3 +41,17 @@ func TestChannelConcurrentClosePreservesFirstFailure(t *testing.T) {
 		t.Fatal("channel resources closed more than once")
 	}
 }
+
+func TestChannelCloseRetainsPreviouslyFailedProofCleanup(t *testing.T) {
+	server, conn := net.Pipe()
+	defer server.Close()
+	channel := clientChannel(conn, authorityService)
+	closes := 0
+	channel.authority.closeHandles = func() error { closes++; return ErrAuthority }
+	if err := channel.authority.Close(); err != ErrAuthority {
+		t.Fatal("failed native proof cleanup was accepted", err)
+	}
+	if err := channel.Close(); err != ErrAuthority || closes != 1 {
+		t.Fatal("channel disguised an earlier proof cleanup failure", closes, err)
+	}
+}

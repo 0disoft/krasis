@@ -24,6 +24,7 @@ type Authority struct {
 	agentStarted       uint64 // Kernel process creation time, immutable auth evidence.
 	mu                 sync.RWMutex
 	closed             bool
+	closeErr           error       // Terminal cleanup verdict; never retry closed native handles.
 	fenced             atomic.Bool // Deny immediately while a timed-out query still owns handles.
 	checkInput         func() error
 	checkInputObserved func(context.Context) error
@@ -135,14 +136,14 @@ func (authority *Authority) Close() error {
 	authority.mu.Lock()
 	defer authority.mu.Unlock()
 	if authority.closed {
-		return nil
+		return authority.closeErr
 	}
 	authority.closed = true
 	if authority.closeHandles == nil {
 		return nil
 	}
 	if authority.closeHandles() != nil {
-		return ErrAuthority
+		authority.closeErr = ErrAuthority
 	}
-	return nil
+	return authority.closeErr
 }

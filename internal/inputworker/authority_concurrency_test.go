@@ -7,6 +7,27 @@ import (
 	"time"
 )
 
+func TestAuthorityConcurrentClosePreservesFirstFailure(t *testing.T) {
+	closes := 0
+	authority := &Authority{
+		checkInput:    func() error { return nil },
+		checkRecovery: func() error { return nil },
+		closeHandles:  func() error { closes++; return errors.New("private native close failure") },
+	}
+	var callers sync.WaitGroup
+	for range 8 {
+		callers.Go(func() {
+			if err := authority.Close(); err != ErrAuthority {
+				t.Error("repeated close erased failure or leaked native details", err)
+			}
+		})
+	}
+	callers.Wait()
+	if closes != 1 || authority.check(false) != ErrAuthority || authority.check(true) != ErrAuthority {
+		t.Fatal("failed retirement retried handles or revived authority", closes)
+	}
+}
+
 func TestSourceAuthorityDoesNotWaitForClosingProof(t *testing.T) {
 	queried := false
 	a := &Authority{checkInput: func() error { queried = true; return nil }, checkRecovery: func() error { return nil }, closeHandles: func() error { return nil }}
