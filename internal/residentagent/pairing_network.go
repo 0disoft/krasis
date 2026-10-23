@@ -48,6 +48,7 @@ type pairJob struct {
 	allow                         bool
 	cancel                        context.CancelFunc
 	done                          chan struct{}
+	advertisementDone             <-chan struct{}
 	ready                         chan struct{}
 	session                       *pairing.Session
 	confirmed                     bool
@@ -196,7 +197,12 @@ func (service *networkPairing) Handle(ctx context.Context, request localapi.Oper
 					listener.Close()
 					return failed("discovery_unavailable"), nil
 				}
-				context.AfterFunc(jobContext, func() { advertisement.Close() })
+				advertisementDone := make(chan struct{})
+				job.advertisementDone = advertisementDone
+				context.AfterFunc(jobContext, func() {
+					defer close(advertisementDone)
+					_ = advertisement.Close()
+				})
 			}
 			job.code = "pin_waiting"
 		}
@@ -276,12 +282,20 @@ func pairResult(job *pairJob) localapi.OperationResult {
 
 func (service *networkPairing) run(ctx context.Context, job *pairJob, listener net.Listener, address string, identity tls.Certificate, role transport.AuthenticatedPeerRole) {
 	err := service.exchange(ctx, job, listener, address, identity, role)
+	expired := errors.Is(ctx.Err(), context.DeadlineExceeded) || errors.Is(err, context.DeadlineExceeded)
+	job.cancel()
+	// Cancel schedules advertisement cleanup; it does not join it. Keep the
+	// job active until its discovery socket is released, outside service.mu
+	// so Close callers retain their own bounded wait and status remains usable.
+	if job.advertisementDone != nil {
+		<-job.advertisementDone
+	}
 	service.mu.Lock()
 	if err == nil {
 		job.code = "pairing_completed"
 	} else if job.code != "pairing_cancelled" && job.code != "pairing_expired" {
 		job.code = "pairing_failed"
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) || errors.Is(err, context.DeadlineExceeded) {
+		if expired {
 			job.code = "pairing_expired"
 		}
 		// A failed finalizer may have persisted state before returning an error.
@@ -296,7 +310,6 @@ func (service *networkPairing) run(ctx context.Context, job *pairJob, listener n
 		service.nextStart = time.Now().Add(pairingRetryDelay)
 	}
 	job.session = nil
-	job.cancel()
 	close(job.done)
 	service.mu.Unlock()
 }
