@@ -119,7 +119,10 @@ func run(ctx context.Context, localAppData string, dependencies runDependencies)
 	}
 	var identities *productidentity.Store
 	if dependencies.productAdapters {
-		traceRecorder := runtimestall.Start(lifecycle.Context(), localAppData, dependencies.log.Event)
+		// Session cleanup can report a failure after lifecycle cancellation.
+		// Keep recording through operations cleanup below. The deferred Close
+		// runs afterward; the recorder's own lifetime and Close wait stay bounded.
+		traceRecorder := runtimestall.Start(context.WithoutCancel(lifecycle.Context()), localAppData, dependencies.log.Event)
 		defer traceRecorder.Close()
 		identities, err = productidentity.New(paths.Identity)
 		if err != nil {

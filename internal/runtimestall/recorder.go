@@ -51,24 +51,36 @@ func start(parent context.Context, source traceSource, save func(traceSource) er
 		defer source.Stop()
 		timer := time.NewTimer(ttl)
 		defer timer.Stop()
+		writeSnapshot := func(terminal bool) {
+			if err := save(source); err != nil {
+				event(saveFailureCode(err))
+			} else if terminal {
+				event("runtime_trace_saved")
+			} else {
+				event("runtime_trace_sample_saved")
+			}
+		}
 		for {
 			select {
 			case <-ctx.Done():
+				// Normal teardown joins failure producers before Close. Preserve their
+				// terminal request even when cancellation wins the select.
+				if r.requested.Load() {
+					writeSnapshot(true)
+				}
 				return
 			case <-timer.C:
-				event("runtime_trace_expired")
+				if r.requested.Load() {
+					writeSnapshot(true)
+				} else {
+					event("runtime_trace_expired")
+				}
 				return
 			case terminal := <-r.request:
 				if !terminal && r.requested.Load() {
 					continue // A queued sample cannot precede a requested failure.
 				}
-				if err := save(source); err != nil {
-					event(saveFailureCode(err))
-				} else if terminal {
-					event("runtime_trace_saved")
-				} else {
-					event("runtime_trace_sample_saved")
-				}
+				writeSnapshot(terminal)
 				if terminal {
 					return
 				}
