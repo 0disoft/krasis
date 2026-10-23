@@ -121,6 +121,7 @@ type pipeConn struct {
 	closeDone                   chan struct{}
 	active                      sync.WaitGroup
 	readMu, writeMu             sync.Mutex
+	readEvent, writeEvent       windows.Handle // Owned by each serialized I/O side until Close joins active operations.
 	readDeadline, writeDeadline time.Time
 	closeErr                    error
 }
@@ -210,6 +211,8 @@ func (pipe *pipeConn) deadline(read bool) time.Time {
 }
 
 func (pipe *pipeConn) connect(ctx context.Context) error {
+	pipe.readMu.Lock()
+	defer pipe.readMu.Unlock()
 	if err := pipe.start(); err != nil {
 		return err
 	}
@@ -284,11 +287,10 @@ func (pipe *pipeConn) overlapped(ctx context.Context, read bool, data []byte, be
 	if !deadline.IsZero() && !time.Now().Before(deadline) {
 		return 0, pipeAdmissionFailure(read, os.ErrDeadlineExceeded)
 	}
-	event, err := windows.CreateEvent(nil, 1, 0, nil)
+	event, err := pipe.completionEvent(read)
 	if err != nil {
 		return 0, errors.Join(ErrProtocol, err)
 	}
-	defer windows.CloseHandle(event)
 	overlap := windows.Overlapped{HEvent: event}
 	var pinned runtime.Pinner
 	pinned.Pin(&overlap)
@@ -388,6 +390,26 @@ func (pipe *pipeConn) overlapped(ctx context.Context, read bool, data []byte, be
 	}
 }
 
+// The caller owns its read/write mutex and an active-operation reference.
+// Reuse only the event: each operation still owns a fresh, pinned OVERLAPPED
+// and drains kernel completion plus cancellation callbacks before returning.
+func (pipe *pipeConn) completionEvent(read bool) (windows.Handle, error) {
+	slot := &pipe.writeEvent
+	if read {
+		slot = &pipe.readEvent
+	}
+	if *slot == 0 {
+		event, err := windows.CreateEvent(nil, 1, 0, nil)
+		if err != nil {
+			return 0, err
+		}
+		*slot = event
+	} else if err := windows.ResetEvent(*slot); err != nil {
+		return 0, err
+	}
+	return *slot, nil
+}
+
 func (pipe *pipeConn) Close() error {
 	pipe.mu.Lock()
 	if pipe.closing {
@@ -403,6 +425,11 @@ func (pipe *pipeConn) Close() error {
 	_ = windows.CancelIoEx(pipe.handle, nil)
 	pipe.active.Wait()
 	err := windows.CloseHandle(pipe.handle)
+	for _, event := range [...]windows.Handle{pipe.readEvent, pipe.writeEvent} {
+		if event != 0 {
+			err = errors.Join(err, windows.CloseHandle(event))
+		}
+	}
 	pipe.mu.Lock()
 	if err != nil {
 		pipe.closeErr = errors.Join(net.ErrClosed, err)
