@@ -51,17 +51,7 @@ func (m *Manager) clipboardHTTP(w http.ResponseWriter, r *http.Request, peer str
 			w.WriteHeader(http.StatusConflict)
 			return
 		}
-		interrupted := make(chan struct{})
-		interrupt := context.AfterFunc(transfer, func() {
-			defer close(interrupted)
-			_ = http.NewResponseController(w).SetWriteDeadline(time.Now())
-		})
-		defer func() {
-			// Do not let a late cancellation alter a reused HTTP connection.
-			if !interrupt() {
-				<-interrupted
-			}
-		}()
+		defer interruptClipboardIO(transfer, http.NewResponseController(w).SetWriteDeadline)()
 		w.Header().Set("Content-Type", clipboardContentType(value.Format))
 		var err error
 		if value.Format == "" {
@@ -78,8 +68,7 @@ func (m *Manager) clipboardHTTP(w http.ResponseWriter, r *http.Request, peer str
 		}
 		transfer, stop, current := m.clipboardTransferContext(r.Context(), peer, id, remote.ClipboardFormat, remote.ClipboardSize, false)
 		defer stop()
-		interrupt := context.AfterFunc(transfer, func() { _ = http.NewResponseController(w).SetReadDeadline(time.Now()) })
-		defer interrupt()
+		defer interruptClipboardIO(transfer, http.NewResponseController(w).SetReadDeadline)()
 		if err := m.receiveClipboardPayload(peer, id, remote.ClipboardFormat, r.Body, func() bool { return transfer.Err() == nil && current() && authorized() }, true); err != nil {
 			w.WriteHeader(409)
 			return
@@ -96,6 +85,22 @@ func (m *Manager) clipboardHTTP(w http.ResponseWriter, r *http.Request, peer str
 		w.WriteHeader(405)
 	}
 }
+
+// AfterFunc's stop does not wait for a callback that already started. Join it
+// before the handler returns so it cannot change a reused connection's deadline.
+func interruptClipboardIO(ctx context.Context, setDeadline func(time.Time) error) func() {
+	finished := make(chan struct{})
+	stop := context.AfterFunc(ctx, func() {
+		defer close(finished)
+		_ = setDeadline(time.Now())
+	})
+	return func() {
+		if !stop() {
+			<-finished
+		}
+	}
+}
+
 func (m *Manager) pollClipboard(ctx context.Context, c *http.Client, address, peer string, authorized func() bool) {
 	remote, ok := m.remoteClipboard(peer)
 	local, _, _ := m.ClipboardInfo(peer)
