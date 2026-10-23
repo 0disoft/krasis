@@ -35,8 +35,16 @@ func monitorProductSessionObserved(ctx context.Context, ticks <-chan time.Time, 
 		if recordTrace != nil {
 			var pending <-chan trustCheckCompletion
 			var trace *truststore.ReadTrace
-			if current != nil && current.reading {
-				pending, trace = make(chan trustCheckCompletion), current.trace
+			if current != nil {
+				if current.reading {
+					pending, trace = make(chan trustCheckCompletion), current.trace
+				} else if current.serial != 0 {
+					// Preserve a published completion as terminal evidence too.
+					// This local probe cannot renew freshness or wait on the reader.
+					completed := make(chan trustCheckCompletion, 1)
+					completed <- current.completed
+					pending, trace = completed, current.completedTrace
+				}
 			}
 			recordTrustExpiry(deadline, pending, trace, record)
 			if trace != nil {
@@ -95,8 +103,7 @@ func monitorProductSessionObserved(ctx context.Context, ticks <-chan time.Time, 
 						reobserve = true
 						continue
 					}
-					record("session_trust_freshness_expired")
-					cancel()
+					expire(current)
 					return
 				}
 				deadline = completed.finished.Add(trustValidationMaxAge)
@@ -108,13 +115,15 @@ func monitorProductSessionObserved(ctx context.Context, ticks <-chan time.Time, 
 			} else if deferredTrustRead(err) {
 				markDeferred()
 			} else {
+				if errors.Is(err, context.DeadlineExceeded) {
+					expire(current)
+					return
+				}
 				if recordTrace != nil && current.completedTrace != nil {
 					recordTrace(current.completedTrace.Snapshot())
 				}
 				code := "session_trust_check_failed"
 				switch {
-				case errors.Is(err, context.DeadlineExceeded):
-					code = "session_trust_freshness_expired"
 				case errors.Is(err, truststore.ErrPeerRevoked):
 					code = "session_trust_revoked"
 				case errors.Is(err, truststore.ErrPeerNotFound):
