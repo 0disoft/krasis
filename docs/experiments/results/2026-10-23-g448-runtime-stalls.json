@@ -1,0 +1,447 @@
+{
+  "date": "2026-10-23",
+  "generation": 448,
+  "revision": "b8f73fa6b4f2abeecf7871007e0e6d30bd3e237c",
+  "source": {
+    "name": "agent.jsonl",
+    "bytes": 1010279,
+    "sha256": "abebc7490eb5d81a2ac6544c672708c514f5f550e36e04c39334489aa8b66d71",
+    "malformedLines": 0
+  },
+  "intervalUTC": {
+    "from": "2026-10-23T10:17:00Z",
+    "toExclusive": "2026-10-23T10:24:01Z"
+  },
+  "histogramBucketsMicros": [
+    "<=100",
+    "<=1000",
+    "<=10000",
+    "<=100000",
+    "<=1000000",
+    ">1000000"
+  ],
+  "faults": [
+    {
+      "time": "2026-10-23T10:17:49.4627963Z",
+      "code": "fault_source_hook_failed"
+    },
+    {
+      "time": "2026-10-23T10:22:36.4533765Z",
+      "code": "fault_source_hook_failed"
+    },
+    {
+      "time": "2026-10-23T10:23:09.7777031Z",
+      "code": "fault_source_hook_failed"
+    },
+    {
+      "time": "2026-10-23T10:23:15.2589435Z",
+      "code": "fault_guard_close_exit_timeout"
+    },
+    {
+      "time": "2026-10-23T10:23:58.9186357Z",
+      "code": "fault_source_hook_failed"
+    },
+    {
+      "time": "2026-10-23T10:24:00.6273791Z",
+      "code": "fault_trust_freshness_expired"
+    }
+  ],
+  "runtime": [
+    {
+      "time": "2026-10-23T10:17:44.0882177Z",
+      "intervalMicros": 60009933,
+      "timerLateMicros": 713424,
+      "gcPauses": [
+        63,
+        8,
+        8,
+        4,
+        1,
+        0
+      ],
+      "runnableDelays": [
+        1393,
+        194,
+        152,
+        1,
+        4,
+        0
+      ],
+      "heapBytes": 1841640,
+      "allocatedBytes": 41576560,
+      "cpuMicros": 7281250
+    },
+    {
+      "time": "2026-10-23T10:17:49.4627963Z",
+      "intervalMicros": 5374578,
+      "timerLateMicros": 360852,
+      "gcPauses": [
+        4,
+        0,
+        1,
+        3,
+        2,
+        0
+      ],
+      "runnableDelays": [
+        90,
+        5,
+        8,
+        2,
+        1,
+        0
+      ],
+      "heapBytes": 1788408,
+      "allocatedBytes": 3516664,
+      "cpuMicros": 515625
+    },
+    {
+      "time": "2026-10-23T10:19:02.5655401Z",
+      "intervalMicros": 60051118,
+      "timerLateMicros": 398608,
+      "gcPauses": [
+        53,
+        10,
+        21,
+        7,
+        1,
+        0
+      ],
+      "runnableDelays": [
+        1205,
+        105,
+        82,
+        7,
+        0,
+        0
+      ],
+      "heapBytes": 1410680,
+      "allocatedBytes": 44994512,
+      "cpuMicros": 6375000
+    },
+    {
+      "time": "2026-10-23T10:20:02.5179642Z",
+      "intervalMicros": 59953937,
+      "timerLateMicros": 1488834,
+      "gcPauses": [
+        51,
+        3,
+        18,
+        12,
+        4,
+        0
+      ],
+      "runnableDelays": [
+        1159,
+        57,
+        86,
+        14,
+        3,
+        0
+      ],
+      "heapBytes": 1425376,
+      "allocatedBytes": 39016976,
+      "cpuMicros": 7328125
+    },
+    {
+      "time": "2026-10-23T10:21:02.5173446Z",
+      "intervalMicros": 59999380,
+      "timerLateMicros": 623312,
+      "gcPauses": [
+        47,
+        4,
+        24,
+        13,
+        6,
+        0
+      ],
+      "runnableDelays": [
+        1063,
+        77,
+        132,
+        21,
+        3,
+        0
+      ],
+      "heapBytes": 1445192,
+      "allocatedBytes": 39361712,
+      "cpuMicros": 6843750
+    },
+    {
+      "time": "2026-10-23T10:22:02.5309419Z",
+      "intervalMicros": 60013597,
+      "timerLateMicros": 255570,
+      "gcPauses": [
+        58,
+        13,
+        11,
+        8,
+        2,
+        0
+      ],
+      "runnableDelays": [
+        1237,
+        68,
+        69,
+        9,
+        0,
+        0
+      ],
+      "heapBytes": 1958848,
+      "allocatedBytes": 39891024,
+      "cpuMicros": 5531250
+    },
+    {
+      "time": "2026-10-23T10:22:36.4533765Z",
+      "intervalMicros": 33922434,
+      "timerLateMicros": 3288243,
+      "gcPauses": [
+        14,
+        0,
+        3,
+        13,
+        5,
+        1
+      ],
+      "runnableDelays": [
+        2045,
+        18,
+        64,
+        17,
+        5,
+        4
+      ],
+      "heapBytes": 2406128,
+      "allocatedBytes": 16518768,
+      "cpuMicros": 2375000
+    },
+    {
+      "time": "2026-10-23T10:23:09.7777031Z",
+      "intervalMicros": 7150889,
+      "timerLateMicros": 385563,
+      "gcPauses": [
+        3,
+        0,
+        0,
+        0,
+        3,
+        0
+      ],
+      "runnableDelays": [
+        87,
+        1,
+        12,
+        3,
+        2,
+        0
+      ],
+      "heapBytes": 2164360,
+      "allocatedBytes": 3495760,
+      "cpuMicros": 281250
+    },
+    {
+      "time": "2026-10-23T10:23:58.9186357Z",
+      "intervalMicros": 20836683,
+      "timerLateMicros": 3228081,
+      "gcPauses": [
+        3,
+        1,
+        0,
+        6,
+        2,
+        2
+      ],
+      "runnableDelays": [
+        2226,
+        3,
+        23,
+        15,
+        4,
+        0
+      ],
+      "heapBytes": 11827808,
+      "allocatedBytes": 17513288,
+      "cpuMicros": 1156250
+    }
+  ],
+  "gcTrails": [
+    {
+      "time": "2026-10-23T10:22:36.4523768Z",
+      "fault": "fault_source_hook_failed",
+      "triggerObservedAt": "2026-10-23T10:22:36.4523768Z",
+      "triggerMicros": 273942777,
+      "slowWindows": [
+        {
+          "beginBeforeTriggerMicros": 4692067,
+          "endBeforeTriggerMicros": 1350531,
+          "beginMicros": 269250710,
+          "endMicros": 272592246,
+          "readMicros": 0,
+          "lateMicros": 3288243,
+          "known": 255,
+          "gcPauses": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          "gcStopping": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          "runnable": [
+            3,
+            0,
+            0,
+            0,
+            0,
+            3
+          ],
+          "allocatedBytes": 96704,
+          "heapBytes": 3891096,
+          "cycles": 0,
+          "assistMicros": 0,
+          "gcCPUMicros": 30915823
+        }
+      ]
+    },
+    {
+      "time": "2026-10-23T10:23:08.4265721Z",
+      "fault": "fault_source_hook_failed",
+      "triggerObservedAt": "2026-10-23T10:23:08.4265721Z",
+      "triggerMicros": 5803860,
+      "slowWindows": [
+        {
+          "beginBeforeTriggerMicros": 1386045,
+          "endBeforeTriggerMicros": 952201,
+          "beginMicros": 4417815,
+          "endMicros": 4851659,
+          "readMicros": 0,
+          "lateMicros": 347557,
+          "known": 255,
+          "gcPauses": [
+            0,
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          "gcStopping": [
+            0,
+            0,
+            0,
+            1,
+            0,
+            0
+          ],
+          "runnable": [
+            1,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "allocatedBytes": 30208,
+          "heapBytes": 1466000,
+          "cycles": 0,
+          "assistMicros": 0,
+          "gcCPUMicros": 2404458
+        }
+      ]
+    },
+    {
+      "time": "2026-10-23T10:23:47.4989427Z",
+      "fault": "fault_source_hook_failed",
+      "triggerObservedAt": "2026-10-23T10:23:47.4989427Z",
+      "triggerMicros": 9440076,
+      "slowWindows": [
+        {
+          "beginBeforeTriggerMicros": 4762338,
+          "endBeforeTriggerMicros": 4437491,
+          "beginMicros": 4677738,
+          "endMicros": 5002585,
+          "readMicros": 0,
+          "lateMicros": 279499,
+          "known": 255,
+          "gcPauses": [
+            0,
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          "gcStopping": [
+            0,
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          "runnable": [
+            7,
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          "allocatedBytes": 153648,
+          "heapBytes": 1991192,
+          "cycles": 0,
+          "assistMicros": 0,
+          "gcCPUMicros": 1287792
+        }
+      ]
+    }
+  ],
+  "finalTrustExpiry": [
+    {
+      "time": "2026-10-23T10:23:42.090019Z",
+      "code": "trust_active_prelock_parent_reparse"
+    },
+    {
+      "time": "2026-10-23T10:23:48.3940473Z",
+      "code": "trust_active_store_read_decode"
+    },
+    {
+      "time": "2026-10-23T10:23:48.3940473Z",
+      "code": "trust_expiry_reading"
+    },
+    {
+      "time": "2026-10-23T10:23:48.3940473Z",
+      "code": "trust_expiry_late_ge1s"
+    },
+    {
+      "time": "2026-10-23T10:23:48.3940473Z",
+      "code": "trust_active_store_read_decode"
+    },
+    {
+      "time": "2026-10-23T10:23:48.3940473Z",
+      "code": "session_trust_freshness_expired"
+    },
+    {
+      "time": "2026-10-23T10:24:00.6273791Z",
+      "code": "fault_trust_freshness_expired"
+    }
+  ],
+  "interpretation": {
+    "processPauseAndTimerLatenessObserved": true,
+    "aclAsExclusiveCauseEstablished": false,
+    "gcAsRootCauseEstablished": false,
+    "osSchedulingAsRootCauseEstablished": false,
+    "histogramBucketsProvideExactPauseDurations": false,
+    "physicalCursorLatencyMeasured": false,
+    "localFollowUpFixesPresentInObservedBuild": false,
+    "liveConfigurationChanged": false
+  }
+}
