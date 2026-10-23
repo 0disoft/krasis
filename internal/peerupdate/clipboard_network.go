@@ -43,6 +43,25 @@ func (m *Manager) clipboardHTTP(w http.ResponseWriter, r *http.Request, peer str
 			w.WriteHeader(204)
 			return
 		}
+		transfer, timeout := context.WithTimeout(r.Context(), clipboardTransferTimeout(value.Format))
+		defer timeout()
+		transfer, stop, current := m.clipboardTransferContext(transfer, peer, id, value.Format, len(value.Data)+len(value.Text), true)
+		defer stop()
+		if transfer.Err() != nil || !current() || !authorized() {
+			w.WriteHeader(http.StatusConflict)
+			return
+		}
+		interrupted := make(chan struct{})
+		interrupt := context.AfterFunc(transfer, func() {
+			defer close(interrupted)
+			_ = http.NewResponseController(w).SetWriteDeadline(time.Now())
+		})
+		defer func() {
+			// Do not let a late cancellation alter a reused HTTP connection.
+			if !interrupt() {
+				<-interrupted
+			}
+		}()
 		w.Header().Set("Content-Type", clipboardContentType(value.Format))
 		var err error
 		if value.Format == "" {
