@@ -2,6 +2,8 @@ module github.com/0disoft/krasis
 
 go 1.26.0
 
+toolchain go1.27.3
+
 require (
 	github.com/schollz/pake/v3 v3.2.0
 	github.com/wailsapp/wails/v3 v3.0.0-beta.23

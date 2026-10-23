@@ -7,6 +7,14 @@
 
 The Go version is declared in `go.mod`. PowerShell 7 is required for probe-kit scripts. Windows is required to build and exercise the Win32 input, launcher, lifecycle, credential-permission, and path-security implementations.
 
+The `toolchain` directive selects Go 1.27.3 or a newer installed toolchain by default;
+CI and release jobs follow stable 1.27 patches. Go 1.27.2 fixed a Windows
+[`LockOSThread` stack-corruption risk](https://github.com/golang/go/commit/87b06e2c18bf96180ff1cdd1f285cb18768d39d0)
+on paths used by the input workers. This is not proof that it caused the recorded
+g448 stalls. Keep automatic toolchain selection enabled for local builds.
+Before offline workspace packaging, populate its module cache with
+`$env:GOMODCACHE = Join-Path (Get-Location) '.cache/go-mod'; go mod download`.
+
 Non-Windows hosts can work on pure state, transport, trust-store, report-schema, and application packages, but they cannot claim Windows behavior or physical-device acceptance.
 
 ## Repository entry points
