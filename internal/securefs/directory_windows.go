@@ -106,8 +106,8 @@ var (
 
 type Directory struct {
 	path   string
+	mu     sync.RWMutex
 	handle syscall.Handle
-	once   sync.Once
 }
 
 func OpenDirectory(path string) (*Directory, error) {
@@ -152,18 +152,27 @@ func openDirectory(path string, access uint32) (*Directory, error) {
 }
 
 func (directory *Directory) Close() error {
-	if directory == nil || directory.handle == syscall.InvalidHandle || directory.handle == 0 {
+	if directory == nil {
 		return nil
 	}
-	var err error
-	directory.once.Do(func() { err = syscall.CloseHandle(directory.handle) })
-	return err
+	directory.mu.Lock()
+	defer directory.mu.Unlock()
+	handle := directory.handle
+	directory.handle = 0
+	if handle == syscall.InvalidHandle || handle == 0 {
+		return nil
+	}
+	return syscall.CloseHandle(handle)
 }
 
+// Handle borrows the native handle. The caller must keep the Directory open
+// until its own native operation has finished; a closed Directory returns zero.
 func (directory *Directory) Handle() uintptr {
 	if directory == nil {
 		return 0
 	}
+	directory.mu.RLock()
+	defer directory.mu.RUnlock()
 	return uintptr(directory.handle)
 }
 
@@ -182,15 +191,12 @@ func (directory *Directory) OpenReadWrite(name string) (*os.File, error) {
 }
 
 func (directory *Directory) CreateExclusive(name string, mode os.FileMode) (*os.File, error) {
-	if err := directory.ready(name); err != nil {
-		return nil, err
-	}
-	handle, err := ntCreate(
-		directory.handle,
+	handle, err := directory.openChild(
 		name,
 		fileGenericRead|fileGenericWrite|deleteAccess|writeDAC,
 		fileCreate,
 		fileNonDirectoryFile|fileOpenReparsePoint|fileSynchronousNonAlert|fileWriteThrough,
+		nil,
 	)
 	if err != nil {
 		return nil, err
@@ -225,15 +231,12 @@ func (directory *Directory) CreateTemporary(prefix string, mode os.FileMode) (*o
 }
 
 func (directory *Directory) CreateDirectory(name string, _ os.FileMode) (*Directory, error) {
-	if err := directory.ready(name); err != nil {
-		return nil, err
-	}
-	handle, err := ntCreate(
-		directory.handle,
+	handle, err := directory.openChild(
 		name,
 		standardRightsRead|fileListDirectory|fileReadAttributes|synchronizeAccess|deleteAccess|writeDAC,
 		fileCreate,
 		fileDirectoryFile|fileOpenForBackupIntent|fileOpenReparsePoint|fileSynchronousNonAlert,
+		nil,
 	)
 	if err != nil {
 		return nil, err
@@ -246,18 +249,12 @@ func (directory *Directory) openExisting(name string, access uint32) (*os.File, 
 }
 
 func (directory *Directory) openExistingObserved(name string, access uint32, observe func(string)) (*os.File, error) {
-	if err := directory.ready(name); err != nil {
-		return nil, err
-	}
-	if observe != nil {
-		observe("native")
-	}
-	handle, err := ntCreate(
-		directory.handle,
+	handle, err := directory.openChild(
 		name,
 		access|fileReadAttributes|synchronizeAccess,
 		fileOpen,
 		fileNonDirectoryFile|fileOpenReparsePoint|fileSynchronousNonAlert,
+		observe,
 	)
 	if err != nil {
 		return nil, err
@@ -298,15 +295,12 @@ func (directory *Directory) PromoteNoReplace(source, destination string) error {
 }
 
 func (directory *Directory) Remove(name string) error {
-	if err := directory.ready(name); err != nil {
-		return err
-	}
-	handle, err := ntCreate(
-		directory.handle,
+	handle, err := directory.openChild(
 		name,
 		deleteAccess|fileReadAttributes|synchronizeAccess,
 		fileOpen,
 		fileNonDirectoryFile|fileOpenReparsePoint|fileSynchronousNonAlert,
+		nil,
 	)
 	if err != nil {
 		return err
@@ -322,27 +316,34 @@ func (directory *Directory) Remove(name string) error {
 }
 
 func (directory *Directory) RemoveSelf() error {
-	if directory == nil || directory.handle == syscall.InvalidHandle || directory.handle == 0 {
-		return errors.New("secure directory is closed")
+	root, err := directory.pin()
+	if err != nil {
+		return err
 	}
+	defer directory.mu.RUnlock()
 	info := dispositionInformationEx{Flags: fileDispositionDelete | fileDispositionPOSIX | fileDispositionIgnoreRO}
-	if status := ntSetInformation(directory.handle, unsafe.Pointer(&info), uint32(unsafe.Sizeof(info)), fileDispositionInfoEx); status == 0 {
+	if status := ntSetInformation(root, unsafe.Pointer(&info), uint32(unsafe.Sizeof(info)), fileDispositionInfoEx); status == 0 {
 		return nil
 	}
 	fallback := dispositionInformation{DeleteFile: true}
-	status := ntSetInformation(directory.handle, unsafe.Pointer(&fallback), uint32(unsafe.Sizeof(fallback)), fileDispositionInfo)
+	status := ntSetInformation(root, unsafe.Pointer(&fallback), uint32(unsafe.Sizeof(fallback)), fileDispositionInfo)
 	return ntStatusError(status)
 }
 
 func (directory *Directory) rename(source, destination string, replace bool) error {
-	if err := directory.ready(source); err != nil {
+	if err := validateLeaf(source); err != nil {
 		return err
 	}
 	if err := validateLeaf(destination); err != nil {
 		return err
 	}
+	root, err := directory.pin()
+	if err != nil {
+		return err
+	}
+	defer directory.mu.RUnlock()
 	handle, err := ntCreate(
-		directory.handle,
+		root,
 		source,
 		deleteAccess|fileReadAttributes|synchronizeAccess,
 		fileOpen,
@@ -370,25 +371,47 @@ func (directory *Directory) rename(source, destination string, replace bool) err
 	if replace {
 		flags |= fileRenameReplace
 	}
-	ex := renameInformationEx{Flags: flags, RootDirectory: directory.handle}
+	ex := renameInformationEx{Flags: flags, RootDirectory: root}
 	copy(ex.FileName[:], name)
 	ex.FileNameLength = uint32((len(name) - 1) * 2)
 	status := ntSetInformation(handle, unsafe.Pointer(&ex), uint32(unsafe.Sizeof(ex)), fileRenameInformationEx)
 	if status == 0 {
 		return nil
 	}
-	basic := renameInformation{ReplaceIfExists: replace, RootDirectory: directory.handle}
+	basic := renameInformation{ReplaceIfExists: replace, RootDirectory: root}
 	copy(basic.FileName[:], name)
 	basic.FileNameLength = ex.FileNameLength
 	status = ntSetInformation(handle, unsafe.Pointer(&basic), uint32(unsafe.Sizeof(basic)), fileRenameInformation)
 	return ntStatusError(status)
 }
 
-func (directory *Directory) ready(name string) error {
-	if directory == nil || directory.handle == syscall.InvalidHandle || directory.handle == 0 {
-		return errors.New("secure directory is closed")
+// pin holds the root handle alive through a native operation. A successful
+// caller must RUnlock; never retain this lease while working only on a child.
+func (directory *Directory) pin() (syscall.Handle, error) {
+	if directory == nil {
+		return 0, os.ErrClosed
 	}
-	return validateLeaf(name)
+	directory.mu.RLock()
+	if directory.handle == syscall.InvalidHandle || directory.handle == 0 {
+		directory.mu.RUnlock()
+		return 0, os.ErrClosed
+	}
+	return directory.handle, nil
+}
+
+func (directory *Directory) openChild(name string, access, disposition, options uint32, observe func(string)) (syscall.Handle, error) {
+	if err := validateLeaf(name); err != nil {
+		return syscall.InvalidHandle, err
+	}
+	root, err := directory.pin()
+	if err != nil {
+		return syscall.InvalidHandle, err
+	}
+	defer directory.mu.RUnlock()
+	if observe != nil {
+		observe("native")
+	}
+	return ntCreate(root, name, access, disposition, options)
 }
 
 func ntCreate(root syscall.Handle, name string, access, disposition, options uint32) (syscall.Handle, error) {

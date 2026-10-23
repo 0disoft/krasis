@@ -10,15 +10,19 @@ import (
 // ReadNames enumerates the pinned directory, including while its secure handle
 // holds DELETE access. A path-based os.Open would omit delete sharing.
 func (directory *Directory) ReadNames() ([]string, error) {
-	if err := directory.ready("listing"); err != nil {
+	root, err := directory.pin()
+	if err != nil {
 		return nil, err
 	}
 	process, err := syscall.GetCurrentProcess()
 	if err != nil {
+		directory.mu.RUnlock()
 		return nil, err
 	}
 	var handle syscall.Handle
-	if err = syscall.DuplicateHandle(process, directory.handle, process, &handle, 0, false, syscall.DUPLICATE_SAME_ACCESS); err != nil {
+	err = syscall.DuplicateHandle(process, root, process, &handle, 0, false, syscall.DUPLICATE_SAME_ACCESS)
+	directory.mu.RUnlock()
+	if err != nil {
 		return nil, err
 	}
 	f := os.NewFile(uintptr(handle), directory.path)
