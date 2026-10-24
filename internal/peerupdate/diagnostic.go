@@ -100,14 +100,23 @@ func (m *Manager) DiagnosticRequestHandled(peer, id string) bool {
 }
 
 func (m *Manager) diagnosticRequestHandledLocked(peer, id string) bool {
-	if m.diagnostic.out != nil && time.Now().After(m.diagnostic.out.expires) {
-		if m.diagnostic.out.requestID != "" && m.diagnostic.handled[m.diagnostic.out.peer] == m.diagnostic.out.requestID {
-			delete(m.diagnostic.handled, m.diagnostic.out.peer)
-		}
-		m.diagnostic.out = nil
-		m.diagnostic.state = "EXPIRED"
-	}
+	m.expireDiagnosticOfferLocked(time.Now())
 	return validID(peer, 64) && validID(id, 32) && m.diagnostic.handled[peer] == id
+}
+
+// Caller owns diagnostic.mu. Retire the payload and its unsent request marker
+// together, regardless of which observation or queue operation detects expiry.
+// Confirmed receipts and markers for a different request must remain intact.
+func (m *Manager) expireDiagnosticOfferLocked(now time.Time) {
+	out := m.diagnostic.out
+	if out == nil || !now.After(out.expires) {
+		return
+	}
+	if out.requestID != "" && m.diagnostic.handled[out.peer] == out.requestID {
+		delete(m.diagnostic.handled, out.peer)
+	}
+	m.diagnostic.out = nil
+	m.diagnostic.state = "EXPIRED"
 }
 
 func (m *Manager) diagnosticRequestOffer(peer string) string {
@@ -139,13 +148,7 @@ func (m *Manager) QueueDiagnosticForRequest(peer, requestID string, data []byte)
 	if job := m.diagnostic.export; job != nil && job.peer == peer && job.id == requestID && job.ctx.Err() != nil {
 		return job.ctx.Err()
 	}
-	if m.diagnostic.out != nil && time.Now().After(m.diagnostic.out.expires) {
-		if m.diagnostic.out.requestID != "" && m.diagnostic.handled[m.diagnostic.out.peer] == m.diagnostic.out.requestID {
-			delete(m.diagnostic.handled, m.diagnostic.out.peer)
-		}
-		m.diagnostic.out = nil
-		m.diagnostic.state = "EXPIRED"
-	}
+	m.expireDiagnosticOfferLocked(time.Now())
 	if m.diagnostic.handled[peer] == requestID {
 		return nil
 	}
@@ -170,6 +173,7 @@ func (m *Manager) QueueDiagnostic(peer string, data []byte) error {
 	}
 	m.diagnostic.mu.Lock()
 	defer m.diagnostic.mu.Unlock()
+	m.expireDiagnosticOfferLocked(time.Now())
 	if m.diagnostic.out != nil && time.Now().Before(m.diagnostic.out.expires) {
 		return ErrBusy
 	}
@@ -180,13 +184,7 @@ func (m *Manager) QueueDiagnostic(peer string, data []byte) error {
 func (m *Manager) diagnosticOffer(peer string) *diagnosticOffer {
 	m.diagnostic.mu.Lock()
 	defer m.diagnostic.mu.Unlock()
-	if m.diagnostic.out != nil && time.Now().After(m.diagnostic.out.expires) {
-		if m.diagnostic.out.requestID != "" && m.diagnostic.handled[m.diagnostic.out.peer] == m.diagnostic.out.requestID {
-			delete(m.diagnostic.handled, m.diagnostic.out.peer)
-		}
-		m.diagnostic.out = nil
-		m.diagnostic.state = "EXPIRED"
-	}
+	m.expireDiagnosticOfferLocked(time.Now())
 	if m.diagnostic.out == nil || m.diagnostic.out.peer != peer {
 		return nil
 	}

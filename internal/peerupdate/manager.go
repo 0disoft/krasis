@@ -268,10 +268,7 @@ func (m *Manager) Status() Status {
 	s.ClipboardPeer = m.ClipboardPeer()
 	s.ClipboardTransfer = m.ClipboardTransferStatus()
 	m.diagnostic.mu.Lock()
-	if m.diagnostic.out != nil && time.Now().After(m.diagnostic.out.expires) {
-		m.diagnostic.out = nil
-		m.diagnostic.state = "EXPIRED"
-	}
+	m.expireDiagnosticOfferLocked(time.Now())
 	s.Diagnostic = m.diagnostic.state
 	s.ReceivedDiagnostic = m.diagnostic.received
 	m.diagnostic.mu.Unlock()
