@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/0disoft/krasis/internal/ziplimit"
 )
 
 func clipboardEntryZIP(t testing.TB, count int, comment string) []byte {
@@ -88,11 +90,17 @@ func TestClipboardZIPEntryLimitPreservesCommentsPrefixesAndZIP64(t *testing.T) {
 	if !ValidClipboardFiles(zip64) {
 		t.Fatal("valid ZIP64 directory rejected")
 	}
+	if _, err := ziplimit.NewReader(bytes.NewReader(zip64), int64(len(zip64)), MaxClipboardFiles); err != nil {
+		t.Fatal("ReaderAt rejected valid ZIP64 directory", err)
+	}
 	for _, offset := range []uint64{^uint64(0), uint64(len(zip64))} {
 		broken := bytes.Clone(zip64)
 		binary.LittleEndian.PutUint64(broken[len(broken)-34:], offset)
 		if clipboardZIPWithinEntryLimit(broken) {
 			t.Fatal("out-of-bounds ZIP64 locator accepted")
+		}
+		if _, err := ziplimit.NewReader(bytes.NewReader(broken), int64(len(broken)), MaxClipboardFiles); err == nil {
+			t.Fatal("ReaderAt accepted out-of-bounds ZIP64 locator")
 		}
 	}
 }

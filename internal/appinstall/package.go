@@ -3,13 +3,13 @@
 package appinstall
 
 import (
-	"archive/zip"
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"github.com/0disoft/krasis/internal/updatebundle"
+	"github.com/0disoft/krasis/internal/ziplimit"
 	"io"
 	"slices"
 )
@@ -34,7 +34,10 @@ type Package struct {
 }
 
 func Read(data []byte) (Package, error) {
-	z, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if int64(len(data)) > updatebundle.MaxArchiveBytes {
+		return Package{}, ErrInvalid
+	}
+	z, err := ziplimit.NewReader(bytes.NewReader(data), int64(len(data)), len(files))
 	if err != nil || len(z.File) != len(files) {
 		return Package{}, ErrInvalid
 	}

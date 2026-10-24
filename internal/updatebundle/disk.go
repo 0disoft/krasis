@@ -1,12 +1,13 @@
 package updatebundle
 
 import (
-	"archive/zip"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"io"
 	"os"
+
+	"github.com/0disoft/krasis/internal/ziplimit"
 )
 
 type diskDigest struct {
@@ -47,7 +48,7 @@ func readStaged(source io.ReaderAt, size int64, parent *os.Root, directory strin
 	if source == nil || size <= 0 || size > MaxArchiveBytes || parent == nil || !validHex(directory, 32) {
 		return nil, ErrInvalid
 	}
-	archive, err := zip.NewReader(source, size)
+	archive, err := ziplimit.NewReader(source, size, len(installerNames)+len(probeNames)+len(uiAccessProbeNames))
 	if err != nil || len(archive.File) < len(legacyNames) || len(archive.File) > len(installerNames)+len(probeNames)+len(uiAccessProbeNames) || !archiveWithinExpandedLimit(archive.File) {
 		return nil, ErrInvalid
 	}

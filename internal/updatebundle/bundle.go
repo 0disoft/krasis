@@ -15,6 +15,8 @@ import (
 	"io"
 	"os"
 	"strings"
+
+	"github.com/0disoft/krasis/internal/ziplimit"
 )
 
 const MaxArchiveBytes int64 = 96 << 20
@@ -126,7 +128,7 @@ func read(source io.ReaderAt, size int64, executable func(string, []byte, string
 	if source == nil || size <= 0 || size > MaxArchiveBytes {
 		return nil, ErrInvalid
 	}
-	r, err := zip.NewReader(source, size)
+	r, err := ziplimit.NewReader(source, size, len(installerNames)+len(probeNames)+len(uiAccessProbeNames))
 	if err != nil || len(r.File) < len(legacyNames) || len(r.File) > len(installerNames)+len(probeNames)+len(uiAccessProbeNames) || !archiveWithinExpandedLimit(r.File) {
 		return nil, ErrInvalid
 	}
