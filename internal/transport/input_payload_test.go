@@ -32,6 +32,40 @@ func TestInputPayloadRoundTrip(t *testing.T) {
 		if !reflect.DeepEqual(gotEnvelope, envelope) || !reflect.DeepEqual(gotAction, action) {
 			t.Fatalf("round trip = (%+v, %+v), want (%+v, %+v)", gotEnvelope, gotAction, envelope, action)
 		}
+		previous := envelope
+		previous.Sequence = 999
+		gotEnvelope, gotAction, err = DecodeInputPayloadReusingIdentifiers(payload, previous)
+		if err != nil || gotEnvelope != envelope || gotAction != action {
+			t.Fatalf("reused round trip = (%+v, %+v, %v), want (%+v, %+v)", gotEnvelope, gotAction, err, envelope, action)
+		}
+	}
+}
+
+func TestInputPayloadReusedIdentifiersFollowWireAndOwnStorage(t *testing.T) {
+	previous := control.InputEnvelope{SessionID: "session-1", Epoch: "epoch-1", Sequence: 99}
+	for _, envelope := range []control.InputEnvelope{
+		{SessionID: "session-1", Epoch: "epoch-1", Sequence: 2},
+		{SessionID: "session-2", Epoch: "epoch-1", Sequence: 3},
+		{SessionID: "session-1", Epoch: "epoch-2", Sequence: 4},
+		{SessionID: "short", Epoch: "longer-epoch", Sequence: 5},
+	} {
+		t.Run(envelope.SessionID+"/"+envelope.Epoch, func(t *testing.T) {
+			action := control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}
+			payload, err := EncodeInputPayload(envelope, action)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, gotAction, err := DecodeInputPayloadReusingIdentifiers(payload, previous)
+			if err != nil || got != envelope || gotAction != action {
+				t.Fatalf("wire identity/sequence changed: %+v, %+v, %v", got, gotAction, err)
+			}
+			for i := inputPayloadHeaderSize; i < len(payload); i++ {
+				payload[i] = 'x'
+			}
+			if got != envelope {
+				t.Fatal("decoded identifiers borrow mutable payload storage", got)
+			}
+		})
 	}
 }
 
@@ -73,6 +107,9 @@ func TestInputPayloadDecoderRejectsMalformedPayload(t *testing.T) {
 		want   error
 	}{
 		{name: "truncated", mutate: func(payload []byte) []byte { return payload[:inputPayloadHeaderSize-1] }, want: ErrInvalidInputPayload},
+		{name: "truncated identifier", mutate: func(payload []byte) []byte { return payload[:len(payload)-1] }, want: ErrInvalidInputPayload},
+		{name: "empty session", mutate: func(payload []byte) []byte { payload[24] = 0; return payload }, want: ErrInvalidInputPayload},
+		{name: "empty epoch", mutate: func(payload []byte) []byte { payload[25] = 0; return payload }, want: ErrInvalidInputPayload},
 		{name: "version", mutate: func(payload []byte) []byte { payload[0]++; return payload }, want: ErrUnsupportedInputPayload},
 		{name: "kind", mutate: func(payload []byte) []byte { payload[1] = 99; return payload }, want: ErrUnsupportedInputPayload},
 		{name: "flags", mutate: func(payload []byte) []byte { payload[2] = 1; return payload }, want: ErrUnsupportedInputPayload},
@@ -93,6 +130,10 @@ func TestInputPayloadDecoderRejectsMalformedPayload(t *testing.T) {
 			_, _, err := DecodeInputPayload(payload)
 			if !errors.Is(err, test.want) {
 				t.Fatalf("error = %v, want %v", err, test.want)
+			}
+			_, _, err = DecodeInputPayloadReusingIdentifiers(payload, envelope)
+			if !errors.Is(err, test.want) {
+				t.Fatalf("reused identifiers error = %v, want %v", err, test.want)
 			}
 		})
 	}

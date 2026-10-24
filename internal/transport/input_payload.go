@@ -40,6 +40,14 @@ func EncodeInputPayload(envelope control.InputEnvelope, action control.InputActi
 }
 
 func DecodeInputPayload(payload []byte) (control.InputEnvelope, control.InputAction, error) {
+	return DecodeInputPayloadReusingIdentifiers(payload, control.InputEnvelope{})
+}
+
+// DecodeInputPayloadReusingIdentifiers reuses previous identifiers only when
+// their bytes match exactly. Changed identifiers are copied from payload; all
+// fields are validated normally, and sequence is always read from the payload.
+// The returned strings never borrow mutable payload storage.
+func DecodeInputPayloadReusingIdentifiers(payload []byte, previous control.InputEnvelope) (control.InputEnvelope, control.InputAction, error) {
 	if len(payload) < inputPayloadHeaderSize {
 		return control.InputEnvelope{}, control.InputAction{}, errors.Join(ErrInvalidInputPayload, errors.New("payload is truncated"))
 	}
@@ -59,8 +67,8 @@ func DecodeInputPayload(payload []byte) (control.InputEnvelope, control.InputAct
 		return control.InputEnvelope{}, control.InputAction{}, errors.Join(ErrInvalidInputPayload, errors.New("identifier lengths do not match payload"))
 	}
 	envelope := control.InputEnvelope{
-		SessionID: string(payload[inputPayloadHeaderSize : inputPayloadHeaderSize+sessionSize]),
-		Epoch:     string(payload[inputPayloadHeaderSize+sessionSize:]),
+		SessionID: reuseInputIdentifier(payload[inputPayloadHeaderSize:inputPayloadHeaderSize+sessionSize], previous.SessionID),
+		Epoch:     reuseInputIdentifier(payload[inputPayloadHeaderSize+sessionSize:], previous.Epoch),
 		Sequence:  binary.BigEndian.Uint64(payload[4:12]),
 	}
 	action := control.InputAction{
@@ -73,6 +81,13 @@ func DecodeInputPayload(payload []byte) (control.InputEnvelope, control.InputAct
 		return control.InputEnvelope{}, control.InputAction{}, err
 	}
 	return envelope, action, nil
+}
+
+func reuseInputIdentifier(payload []byte, previous string) string {
+	if string(payload) == previous {
+		return previous
+	}
+	return string(payload)
 }
 
 func validateInputPayload(envelope control.InputEnvelope, action control.InputAction) error {

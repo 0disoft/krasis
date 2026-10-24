@@ -158,3 +158,45 @@ func TestPointerBatchReusePreservesLimitBarriersAndPendingError(t *testing.T) {
 		t.Fatal("pending read failure changed or was retained", err)
 	}
 }
+
+func TestPointerBatchIdentifierReusePreservesIdentityBarrier(t *testing.T) {
+	for _, field := range []string{"session", "epoch"} {
+		t.Run(field, func(t *testing.T) {
+			r := &inputReadAhead{ctx: context.Background(), frames: make(chan queuedSessionFrame, 2)}
+			identity := control.InputEnvelope{SessionID: "session-1", Epoch: "epoch-1", Sequence: 2}
+			if field == "session" {
+				identity.SessionID = "session-2"
+			} else {
+				identity.Epoch = "epoch-2"
+			}
+			action := control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}
+			payload, err := transport.EncodeInputPayload(identity, action)
+			if err != nil {
+				t.Fatal(err)
+			}
+			barrier := transport.Frame{Kind: transport.MessageInput, Payload: payload}
+			r.frames <- queuedSessionFrame{frame: barrier}
+			identity.Sequence++
+			payload, err = transport.EncodeInputPayload(identity, action)
+			if err != nil {
+				t.Fatal(err)
+			}
+			r.frames <- queuedSessionFrame{frame: transport.Frame{Kind: transport.MessageInput, Payload: payload}}
+			envelopes, move := r.pointerBatch(batchInputFrame(t, 1, control.InputPointerMove, 1))
+			if len(envelopes) != 1 || move.DeltaX != 1 {
+				t.Fatal("batch crossed identity barrier")
+			}
+			got, err := r.ReadFrame()
+			if err != nil || got.Kind != barrier.Kind || string(got.Payload) != string(barrier.Payload) {
+				t.Fatal("identity barrier consumed or changed", err)
+			}
+			envelopes, move = r.pointerBatch(got)
+			if len(envelopes) != 2 || move.DeltaX != 2 || envelopes[0].Sequence != 2 || envelopes[1] != identity {
+				t.Fatal("new identity lost frames or reused stale identifiers", envelopes, move)
+			}
+			if envelopes[0].SessionID != identity.SessionID || envelopes[0].Epoch != identity.Epoch || r.hasPending {
+				t.Fatal("new batch retained old identity or pending frame")
+			}
+		})
+	}
+}

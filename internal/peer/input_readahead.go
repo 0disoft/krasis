@@ -70,7 +70,7 @@ func (r *inputReadAhead) pointerBatch(first transport.Frame) ([]control.InputEnv
 	if first.Kind != transport.MessageInput {
 		return nil, control.InputAction{}
 	}
-	envelope, move, err := transport.DecodeInputPayload(first.Payload)
+	envelope, move, err := transport.DecodeInputPayloadReusingIdentifiers(first.Payload, r.batch[0])
 	if err != nil || move.Kind != control.InputPointerMove {
 		return nil, control.InputAction{}
 	}
@@ -86,8 +86,8 @@ func (r *inputReadAhead) pointerBatch(first transport.Frame) ([]control.InputEnv
 				r.pending, r.hasPending = p, true
 				return envelopes, move
 			}
-			next, action, err := transport.DecodeInputPayload(p.frame.Payload)
 			last := envelopes[len(envelopes)-1]
+			next, action, err := transport.DecodeInputPayloadReusingIdentifiers(p.frame.Payload, last)
 			dx, dy := int64(move.DeltaX)+int64(action.DeltaX), int64(move.DeltaY)+int64(action.DeltaY)
 			if err != nil || action.Kind != control.InputPointerMove || next.SessionID != last.SessionID || next.Epoch != last.Epoch || last.Sequence == ^uint64(0) || next.Sequence != last.Sequence+1 || dx < -control.MaxInputDelta || dx > control.MaxInputDelta || dy < -control.MaxInputDelta || dy > control.MaxInputDelta || dx == 0 && dy == 0 {
 				r.pending, r.hasPending = p, true
