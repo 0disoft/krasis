@@ -423,13 +423,15 @@ func (m *Manager) pollDiagnostic(ctx context.Context, c *http.Client, address, p
 		resp, err := c.Do(req)
 		if err == nil {
 			resp.Body.Close()
-			if resp.StatusCode == 200 {
+			switch resp.StatusCode {
+			case http.StatusOK:
 				m.diagnosticDone(offer.id, "SENT")
-			} else if resp.StatusCode == 404 {
+			case http.StatusNotFound:
 				m.diagnosticDone(offer.id, "UNSUPPORTED")
-			} else if resp.StatusCode == http.StatusServiceUnavailable {
+			case http.StatusTooManyRequests, http.StatusServiceUnavailable:
+				// Handler admission (429) and receive admission (503) are temporary.
 				// Retry the same transfer at the next poll until its existing deadline.
-			} else {
+			default:
 				m.diagnosticDone(offer.id, "REJECTED")
 			}
 		}
