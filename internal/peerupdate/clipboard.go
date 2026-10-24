@@ -184,6 +184,18 @@ func (m *Manager) SyncClipboardLocalChange(peer string, local *ClipboardValue, a
 	if local != nil {
 		return ClipboardValue{}, m.queueClipboardLocal(peer, local, prepareClipboardLocal)
 	}
+	value, err := m.clipboardIncomingSnapshot(peer, ack, changed)
+	if err == nil {
+		// The queue owns immutable bytes. Copy for the caller only after the
+		// state locks are released, including when an ACK retires the queue.
+		value.Data = bytes.Clone(value.Data)
+	}
+	return value, err
+}
+
+// Internal snapshot only: its Data remains read-only until cloned by the public
+// API. Queue replacement/retirement never mutates an admitted payload's bytes.
+func (m *Manager) clipboardIncomingSnapshot(peer, ack string, changed bool) (ClipboardValue, error) {
 	if changed {
 		m.mu.Lock()
 		defer m.mu.Unlock()
@@ -210,9 +222,7 @@ func (m *Manager) SyncClipboardLocalChange(peer string, local *ClipboardValue, a
 	if m.clipboard.in == nil {
 		return ClipboardValue{}, nil
 	}
-	value := *m.clipboard.in
-	value.Data = append([]byte(nil), value.Data...)
-	return value, nil
+	return *m.clipboard.in, nil
 }
 
 // Queued payloads are copied on admission and never mutated afterward. Each
