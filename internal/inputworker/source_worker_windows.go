@@ -109,6 +109,11 @@ func (w *sourceWriter) writePacketContext(ctx context.Context, p sourcePacket, c
 	if err != nil {
 		return err
 	}
+	// The native presence query above can outlive the source generation.
+	// Recheck after that wait and encoding, before any bytes or sequence escape.
+	if current != nil && !current() {
+		return control.ErrSourceActionDiscarded
+	}
 	writeDone := func() {}
 	if progress != nil {
 		writeDone = progress.measure(heartbeatReplyWrite)
