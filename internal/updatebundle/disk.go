@@ -48,7 +48,7 @@ func readStaged(source io.ReaderAt, size int64, parent *os.Root, directory strin
 		return nil, ErrInvalid
 	}
 	archive, err := zip.NewReader(source, size)
-	if err != nil || len(archive.File) < len(legacyNames) || len(archive.File) > len(installerNames)+len(probeNames)+len(uiAccessProbeNames) {
+	if err != nil || len(archive.File) < len(legacyNames) || len(archive.File) > len(installerNames)+len(probeNames)+len(uiAccessProbeNames) || !archiveWithinExpandedLimit(archive.File) {
 		return nil, ErrInvalid
 	}
 	if err = parent.Mkdir(directory, 0700); err != nil {

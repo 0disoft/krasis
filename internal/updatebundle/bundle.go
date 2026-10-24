@@ -127,7 +127,7 @@ func read(source io.ReaderAt, size int64, executable func(string, []byte, string
 		return nil, ErrInvalid
 	}
 	r, err := zip.NewReader(source, size)
-	if err != nil || len(r.File) < len(legacyNames) || len(r.File) > len(installerNames)+len(probeNames)+len(uiAccessProbeNames) {
+	if err != nil || len(r.File) < len(legacyNames) || len(r.File) > len(installerNames)+len(probeNames)+len(uiAccessProbeNames) || !archiveWithinExpandedLimit(r.File) {
 		return nil, ErrInvalid
 	}
 	files := make(map[string][]byte, len(legacyNames))
@@ -153,6 +153,19 @@ func read(source io.ReaderAt, size int64, executable func(string, []byte, string
 		hash := sha256.Sum256(files[name])
 		return hex.EncodeToString(hash[:])
 	}, executable)
+}
+
+// Reject an impossible expansion budget before opening any entry. The actual
+// byte counts, CRCs and file limits remain independently checked during reads.
+func archiveWithinExpandedLimit(entries []*zip.File) bool {
+	var total uint64
+	for _, entry := range entries {
+		if entry.UncompressedSize64 > uint64(MaxExpandedBytes)-total {
+			return false
+		}
+		total += entry.UncompressedSize64
+	}
+	return true
 }
 
 // Disk-backed validation supplies only presence markers and small metadata
