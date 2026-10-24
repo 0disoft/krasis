@@ -342,12 +342,22 @@ func (store *Store) mutatePrepared(create bool, now time.Time, change func(*Docu
 	if err := document.Validate(); err != nil {
 		return err
 	}
+	// Readers reject larger stores. Encode and bound the exact publication
+	// before preparing certificates or replacing the last readable document.
+	data, err := json.MarshalIndent(document, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode trust store: %w", err)
+	}
+	data = append(data, '\n')
+	if len(data) > maxStoreBytes {
+		return errors.New("trust store exceeds size limit")
+	}
 	if prepare != nil {
 		if err := prepare(directory); err != nil {
 			return err
 		}
 	}
-	return store.write(directory, document)
+	return store.write(directory, data)
 }
 
 func (store *Store) readLocked() (Document, error) {
@@ -523,12 +533,7 @@ func readVerified(directory *securefs.Directory, trace *ReadTrace, validate func
 	return document, nil
 }
 
-func (store *Store) write(directory *securefs.Directory, document Document) error {
-	data, err := json.MarshalIndent(document, "", "  ")
-	if err != nil {
-		return fmt.Errorf("encode trust store: %w", err)
-	}
-	data = append(data, '\n')
+func (store *Store) write(directory *securefs.Directory, data []byte) error {
 	temporary, temporaryName, err := directory.CreateTemporary(".trust-", 0o600)
 	if err != nil {
 		return fmt.Errorf("create trust store temporary file: %w", err)
