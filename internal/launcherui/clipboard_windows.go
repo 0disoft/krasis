@@ -266,6 +266,7 @@ func (p *clipboardPump) sync(ctx context.Context, hwnd uintptr, control, peer st
 	if peer != p.peer {
 		*p = clipboardPump{peer: peer, sequence: current}
 	}
+	previousSequence := p.sequence
 	client, err := localapi.OpenClient(control)
 	if err != nil {
 		return
@@ -309,13 +310,9 @@ func (p *clipboardPump) sync(ctx context.Context, hwnd uintptr, control, peer st
 		}
 	}
 	request.LocalChanged = p.localChanged
-	if ctx.Err() != nil {
-		return
-	}
-	result, err := client.Clipboard(ctx, request)
-	if err == nil && result.Code == "ok" {
-		p.localChanged = false
-	}
+	result, err := p.exchangeClipboard(ctx, previousSequence, request, func(request localapi.ClipboardRequest) (localapi.ClipboardResult, error) {
+		return client.Clipboard(ctx, request)
+	})
 	if err != nil || result.Code != "ok" || result.Value.ID == "" {
 		return
 	}
