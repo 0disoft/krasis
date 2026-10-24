@@ -1,11 +1,9 @@
 package peerupdate
 
 import (
-	"bytes"
 	"context"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -45,7 +43,7 @@ func (m *Manager) clipboardHTTP(w http.ResponseWriter, r *http.Request, peer str
 		}
 		transfer, timeout := context.WithTimeout(r.Context(), clipboardTransferTimeout(value.Format))
 		defer timeout()
-		transfer, stop, current := m.clipboardTransferContext(transfer, peer, id, value.Format, len(value.Data)+len(value.Text), true)
+		transfer, stop, current := m.clipboardTransferContext(transfer, peer, id, value.Format, value.size, true)
 		defer stop()
 		if transfer.Err() != nil || !current() || !authorized() {
 			w.WriteHeader(http.StatusConflict)
@@ -57,7 +55,7 @@ func (m *Manager) clipboardHTTP(w http.ResponseWriter, r *http.Request, peer str
 		if value.Format == "" {
 			_, err = io.WriteString(w, value.Text)
 		} else {
-			reader := &progressReader{Reader: bytes.NewReader(value.Data), update: func(n int64) { m.clipboardProgress(peer, id, "SEND", value.Format, n, int64(len(value.Data))) }}
+			reader := &progressReader{Reader: value.body, update: func(n int64) { m.clipboardProgress(peer, id, "SEND", value.Format, n, int64(value.size)) }}
 			_, err = io.Copy(w, reader)
 		}
 		_ = err // A GET write is not receipt or application confirmation; await PUT.
@@ -150,20 +148,16 @@ func clipboardTransferTimeout(format string) time.Duration {
 	return 12 * time.Second
 }
 
-func (m *Manager) sendClipboard(ctx context.Context, c *http.Client, url, peer string, value *ClipboardValue, authorized func() bool) {
+func (m *Manager) sendClipboard(ctx context.Context, c *http.Client, url, peer string, value *clipboardSnapshot, authorized func() bool) {
 	ctx, timeout := context.WithTimeout(ctx, clipboardTransferTimeout(value.Format))
 	defer timeout()
-	ctx, stop, current := m.clipboardTransferContext(ctx, peer, value.ID, value.Format, len(value.Data)+len(value.Text), true)
+	ctx, stop, current := m.clipboardTransferContext(ctx, peer, value.ID, value.Format, value.size, true)
 	defer stop()
 	if !current() || !authorized() {
 		return
 	}
-	var body io.Reader = strings.NewReader(value.Text)
-	if value.Format != "" {
-		body = bytes.NewReader(value.Data)
-	}
-	body = &progressReader{Reader: body, update: func(n int64) {
-		m.clipboardProgress(peer, value.ID, "SEND", value.Format, n, int64(len(value.Data)+len(value.Text)))
+	body := &progressReader{Reader: value.body, update: func(n int64) {
+		m.clipboardProgress(peer, value.ID, "SEND", value.Format, n, int64(value.size))
 	}}
 	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
 	req.Header.Set("Content-Type", clipboardContentType(value.Format))

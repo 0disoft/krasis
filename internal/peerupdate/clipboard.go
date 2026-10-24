@@ -1,6 +1,7 @@
 package peerupdate
 
 import (
+	"bytes"
 	"io"
 	"os"
 	"strings"
@@ -235,15 +236,32 @@ func (m *Manager) SyncClipboardLocalChange(peer string, local *ClipboardValue, a
 	value.Data = append([]byte(nil), value.Data...)
 	return value, nil
 }
-func (m *Manager) clipboardOutgoing(peer, id string) *ClipboardValue {
+
+// Queued payloads are copied on admission and never mutated afterward. Each
+// transfer gets its own reader, retaining the old bytes if the queue changes
+// without exposing a writable slice or copying up to 64MiB under the mutex.
+type clipboardSnapshot struct {
+	ID, Text, Format string
+	size             int
+	legacyFiles      bool
+	body             io.Reader
+}
+
+func (m *Manager) clipboardOutgoing(peer, id string) *clipboardSnapshot {
 	m.clipboard.mu.Lock()
 	defer m.clipboard.mu.Unlock()
 	if m.clipboard.peer != peer || m.clipboard.out == nil || m.clipboard.out.ID != id || time.Now().After(m.clipboard.out.expires) {
 		return nil
 	}
-	copy := *m.clipboard.out
-	copy.Data = append([]byte(nil), copy.Data...)
-	return &copy
+	out := m.clipboard.out
+	var body io.Reader
+	if out.Format == "" {
+		body = strings.NewReader(out.Text)
+	} else {
+		body = bytes.NewReader(out.Data)
+	}
+	return &clipboardSnapshot{ID: out.ID, Text: out.Text, Format: out.Format,
+		size: len(out.Text) + len(out.Data), legacyFiles: out.legacyFiles, body: body}
 }
 func (m *Manager) clipboardSent(peer, id string) {
 	m.clipboard.mu.Lock()
