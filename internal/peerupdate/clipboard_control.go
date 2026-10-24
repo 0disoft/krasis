@@ -54,6 +54,9 @@ func (m *Manager) runClipboardControl(ctx context.Context, client *http.Client, 
 			if response.StatusCode == http.StatusOK {
 				info, readErr := readPeerInfo(response.Body)
 				if readErr == nil {
+					// A successful response without a usable revision cannot sustain
+					// long polling. Discard an older token and use bounded polling.
+					remoteRevision = ""
 					if version := response.Header.Get("X-Krasis-Clipboard-Revision"); version != "" {
 						if _, parseErr := strconv.ParseUint(version, 10, 64); parseErr == nil {
 							remoteRevision = version
@@ -75,9 +78,9 @@ func (m *Manager) runClipboardControl(ctx context.Context, client *http.Client, 
 		if ok && authorized() {
 			m.pollClipboard(ctx, client, address, peer, authorized)
 		}
-		// Legacy peers and failed requests use bounded backoff. A newly queued
-		// local copy interrupts it; repeated failures cannot spin the worker.
-		if path != clipboardStatusPath || !ok {
+		// Legacy peers, failed requests and responses without a usable revision
+		// use bounded backoff. A newly queued local copy interrupts the wait.
+		if path != clipboardStatusPath || !ok || remoteRevision == "" {
 			current, _ := m.ClipboardChanges()
 			if current != revision && ctx.Err() == nil {
 				continue
