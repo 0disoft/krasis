@@ -296,9 +296,21 @@ func (m *Manager) receiveClipboardPayload(peer, id, format string, r io.Reader, 
 	if !active {
 		return ErrDenied
 	}
+	if advertised {
+		m.mu.Lock()
+		remote := m.peers[peer].info
+		m.mu.Unlock()
+		if !remote.Clipboard || remote.ClipboardID != id || remote.ClipboardFormat != format ||
+			remote.ClipboardSize < 0 || remote.ClipboardSize > limit {
+			return ErrDenied
+		}
+		// Enforce the advertised size before reading, not just before publication.
+		// The extra byte distinguishes an exact body from an oversized one.
+		limit = remote.ClipboardSize
+	}
 	progress := &progressReader{Reader: r, update: func(n int64) { m.clipboardProgress(peer, id, "RECEIVE", format, n, 0) }}
 	data, err := io.ReadAll(io.LimitReader(progress, int64(limit)+1))
-	if err != nil || !authorized() || format == "" && !validClipboardText(string(data)) ||
+	if err != nil || advertised && len(data) != limit || !authorized() || format == "" && !validClipboardText(string(data)) ||
 		format != "" && !ValidClipboardPayload(format, data) {
 		return ErrDenied
 	}
