@@ -37,6 +37,7 @@ type clipboardState struct {
 	transfer     ClipboardTransfer
 	transferID   string
 	mu           sync.Mutex
+	prepareMu    sync.Mutex // Bound media preparation without blocking shared state.
 	receiving    bool
 	peer         string
 	imageAllowed bool
@@ -180,7 +181,10 @@ func (m *Manager) SyncClipboardPayload(peer string, local *ClipboardValue, ack s
 
 // Local copy order is independent of whether its content is shareable.
 func (m *Manager) SyncClipboardLocalChange(peer string, local *ClipboardValue, ack string, changed bool) (ClipboardValue, error) {
-	if changed || local != nil {
+	if local != nil {
+		return ClipboardValue{}, m.queueClipboardLocal(peer, local, prepareClipboardLocal)
+	}
+	if changed {
 		m.mu.Lock()
 		defer m.mu.Unlock()
 	}
@@ -190,36 +194,8 @@ func (m *Manager) SyncClipboardLocalChange(peer string, local *ClipboardValue, a
 		return ClipboardValue{}, ErrDenied
 	}
 	m.clipboard.activeUntil = time.Now().Add(5 * time.Second)
-	if changed || local != nil {
-		if remoteID := m.peers[peer].info.ClipboardID; remoteID != "" {
-			m.clipboard.seen = append(m.clipboard.seen, remoteID)
-			if len(m.clipboard.seen) > 64 {
-				m.clipboard.seen = m.clipboard.seen[1:]
-			}
-		}
-		m.clipboard.localEpoch++
-		m.clipboard.out, m.clipboard.in = nil, nil
-		m.clipboardChanged()
-	}
-	if local != nil {
-		if local.Format != "" && !m.clipboard.imageAllowed || local.Format == "files" && !m.clipboard.filesAllowed {
-			return ClipboardValue{}, ErrDenied
-		}
-		if local.Format == "" && (len(local.Data) != 0 || !validClipboardText(local.Text)) ||
-			local.Format != "" && (local.Text != "" || !ValidClipboardPayload(local.Format, local.Data)) {
-			return ClipboardValue{}, ErrDenied
-		}
-		expires := 15 * time.Second
-		if local.Format == "files" {
-			expires = 75 * time.Second
-		}
-		m.clipboard.out = &ClipboardValue{ID: randomID(), Text: local.Text, Format: local.Format,
-			Data: append([]byte(nil), local.Data...), expires: time.Now().Add(expires),
-			legacyFiles: local.Format == "files" && clipboardFilesFitLegacy(local.Data)}
-		m.clipboard.in = nil // A new local copy supersedes a pending remote copy.
-		m.clipboard.transferID = m.clipboard.out.ID
-		m.clipboard.transfer = ClipboardTransfer{State: "QUEUED", Format: local.Format, Direction: "SEND", Total: int64(len(local.Data) + len(local.Text))}
-		m.clipboardChanged()
+	if changed {
+		m.noteClipboardLocalChangeLocked(peer)
 	}
 	if m.clipboard.in != nil && (m.clipboard.in.ID == ack || time.Now().After(m.clipboard.in.expires)) {
 		if m.clipboard.transferID == m.clipboard.in.ID {
