@@ -41,9 +41,7 @@ func (m *Manager) clipboardHTTP(w http.ResponseWriter, r *http.Request, peer str
 			w.WriteHeader(204)
 			return
 		}
-		transfer, timeout := context.WithTimeout(r.Context(), clipboardTransferTimeout(value.Format))
-		defer timeout()
-		transfer, stop, current := m.clipboardTransferContext(transfer, peer, id, value.Format, value.size, true)
+		transfer, stop, current := m.clipboardTransferContext(r.Context(), peer, id, value.Format, value.size, true)
 		defer stop()
 		if transfer.Err() != nil || !current() || !authorized() {
 			w.WriteHeader(http.StatusConflict)
@@ -118,8 +116,6 @@ func (m *Manager) pollClipboard(ctx context.Context, c *http.Client, address, pe
 	if !ok || remote.ClipboardID == "" || !authorized() || ctx.Err() != nil {
 		return
 	}
-	ctx, timeout := context.WithTimeout(ctx, clipboardTransferTimeout(remote.ClipboardFormat))
-	defer timeout()
 	ctx, stop, current := m.clipboardTransferContext(ctx, peer, remote.ClipboardID, remote.ClipboardFormat, remote.ClipboardSize, false)
 	defer stop()
 	if !m.clipboardSeen(peer, remote.ClipboardID) {
@@ -156,8 +152,6 @@ func clipboardTransferTimeout(format string) time.Duration {
 }
 
 func (m *Manager) sendClipboard(ctx context.Context, c *http.Client, url, peer string, value *clipboardSnapshot, authorized func() bool) {
-	ctx, timeout := context.WithTimeout(ctx, clipboardTransferTimeout(value.Format))
-	defer timeout()
 	ctx, stop, current := m.clipboardTransferContext(ctx, peer, value.ID, value.Format, value.size, true)
 	defer stop()
 	if !current() || !authorized() {

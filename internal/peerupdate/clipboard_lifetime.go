@@ -8,6 +8,8 @@ import (
 // Notifications alone do not invalidate a transfer: progress and application
 // acknowledgements can wake the same channel. Its copy/selection epoch must
 // actually change. Keep the established global -> clipboard lock order.
+// Own the format-specific timeout here so every upload and download is bounded,
+// including inbound POSTs whose request context has no deadline of its own.
 func (m *Manager) clipboardTransferContext(ctx context.Context, peer, id, format string, size int, send bool) (context.Context, func(), func() bool) {
 	m.clipboard.mu.Lock()
 	epoch := m.clipboard.localEpoch
@@ -27,7 +29,7 @@ func (m *Manager) clipboardTransferContext(ctx context.Context, peer, id, format
 		}
 		return remote.ClipboardID == id && remote.ClipboardFormat == format && remote.ClipboardSize == size
 	}
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithTimeout(ctx, clipboardTransferTimeout(format))
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
