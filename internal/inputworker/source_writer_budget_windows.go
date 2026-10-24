@@ -11,6 +11,9 @@ import (
 // Completed outcomes and joined retirement may report after run cancellation;
 // they still have a fresh one-second deadline and cannot grant new authority.
 func (w *sourceWriter) operation(ctx context.Context, outcome bool) (context.Context, context.CancelFunc) {
+	// A missing caller inherits owner cancellation through WithDeadline below.
+	// Only an explicit caller needs an additional link to the source owner.
+	bridgeOwner := ctx != nil && w.ctx != nil && !outcome
 	if ctx == nil {
 		ctx = w.ctx
 	}
@@ -27,7 +30,7 @@ func (w *sourceWriter) operation(ctx context.Context, outcome bool) (context.Con
 		}
 	}
 	op, cancel := context.WithDeadline(ctx, deadline)
-	if !outcome && w.ctx != nil {
+	if bridgeOwner {
 		if w.ctx.Err() != nil {
 			cancel()
 			return op, cancel

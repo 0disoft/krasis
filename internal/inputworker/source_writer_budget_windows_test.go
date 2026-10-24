@@ -120,6 +120,41 @@ func TestSourceWriterOwnerCancellationDoesNotBlockJoinedRetirement(t *testing.T)
 	}
 }
 
+func TestSourceWriterInheritedOperationLifetime(t *testing.T) {
+	for _, action := range []string{"cancel_owner", "owner_deadline", "cancel_operation"} {
+		t.Run(action, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				owner, cancelOwner := context.WithTimeout(context.Background(), 50*time.Millisecond)
+				defer cancelOwner()
+				w := &sourceWriter{ctx: owner}
+				op, cancel := w.operation(nil, false)
+				defer cancel()
+				ownerDeadline, _ := owner.Deadline()
+				if deadline, ok := op.Deadline(); !ok || !deadline.Equal(ownerDeadline) {
+					t.Fatal("operation did not inherit the earlier owner deadline")
+				}
+				want := context.Canceled
+				switch action {
+				case "cancel_owner":
+					cancelOwner()
+				case "owner_deadline":
+					time.Sleep(50 * time.Millisecond)
+					want = context.DeadlineExceeded
+				case "cancel_operation":
+					cancel()
+					if owner.Err() != nil {
+						t.Fatal("canceling one operation canceled its source owner")
+					}
+				}
+				synctest.Wait()
+				if !errors.Is(op.Err(), want) {
+					t.Fatalf("operation error = %v, want %v", op.Err(), want)
+				}
+			})
+		})
+	}
+}
+
 func TestSourceBoundaryBatchReauthorizesAfterGateContention(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		server, pipe := net.Pipe()
