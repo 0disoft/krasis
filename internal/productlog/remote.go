@@ -26,7 +26,7 @@ func SanitizeSupport(data []byte) ([]byte, error) {
 		Schema                       string                    `json:"schema"`
 		Created                      string                    `json:"created"`
 		Scope                        string                    `json:"scope"`
-		Logs                         []exportLog               `json:"logs"`
+		Logs                         boundedSupportLogs        `json:"logs"`
 		Installation                 *installationdiag.Summary `json:"installation,omitempty"`
 		InstallationIncomplete       bool                      `json:"installationIncomplete,omitempty"`
 		Recovery                     *RecoverySummary          `json:"recovery,omitempty"`
@@ -35,7 +35,7 @@ func SanitizeSupport(data []byte) ([]byte, error) {
 		CleanupIncomplete            bool                      `json:"cleanupIncomplete,omitempty"`
 		LoginConfiguration           *logindiag.Summary        `json:"loginConfiguration,omitempty"`
 		LoginConfigurationIncomplete bool                      `json:"loginConfigurationIncomplete,omitempty"`
-		LoginRuntime                 *logindiag.Runtime        `json:"loginRuntime,omitempty"`
+		LoginRuntime                 *boundedLoginRuntime      `json:"loginRuntime,omitempty"`
 		LoginRuntimeIncomplete       bool                      `json:"loginRuntimeIncomplete,omitempty"`
 		InputHealth                  *InputHealthSummary       `json:"inputHealth,omitempty"`
 		InputHealthIncomplete        bool                      `json:"inputHealthIncomplete,omitempty"`
