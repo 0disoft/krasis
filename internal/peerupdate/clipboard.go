@@ -37,6 +37,7 @@ type clipboardState struct {
 	transfer     ClipboardTransfer
 	transferID   string
 	mu           sync.Mutex
+	receiving    bool
 	peer         string
 	imageAllowed bool
 	filesAllowed bool
@@ -293,7 +294,6 @@ func (m *Manager) clipboardReceivePayload(peer, id, format string, r io.Reader, 
 }
 
 func (m *Manager) receiveClipboardPayload(peer, id, format string, r io.Reader, authorized func() bool, advertised bool) error {
-	defer m.clipboardReceiveFailed(peer, id)
 	if !validID(id, 32) || !authorized() {
 		return ErrDenied
 	}
@@ -326,6 +326,16 @@ func (m *Manager) receiveClipboardPayload(peer, id, format string, r io.Reader, 
 		}
 		return nil
 	}
+	if !m.beginClipboardReceive() {
+		return ErrBusy
+	}
+	defer func() {
+		m.clipboard.mu.Lock()
+		m.clipboard.receiving = false
+		m.clipboard.mu.Unlock()
+	}()
+	// Only the admitted receiver owns failure reporting for its active copy.
+	defer m.clipboardReceiveFailed(peer, id)
 	progress := &progressReader{Reader: r, update: func(n int64) { m.clipboardProgress(peer, id, "RECEIVE", format, n, 0) }}
 	data, err := io.ReadAll(io.LimitReader(progress, int64(limit)+1))
 	if err != nil || advertised && len(data) != limit || !authorized() || format == "" && !validClipboardText(string(data)) ||
@@ -373,4 +383,17 @@ func (m *Manager) receiveClipboardPayload(peer, id, format string, r io.Reader, 
 		m.clipboard.seen = m.clipboard.seen[1:]
 	}
 	return nil
+}
+
+// HTTP uploads, polling downloads and replacement handlers share one body read
+// and validation slot. Selection changes must not free a slot still in use.
+// Keep the mutex out of body reads; UI changes can still cancel the transfer.
+func (m *Manager) beginClipboardReceive() bool {
+	m.clipboard.mu.Lock()
+	defer m.clipboard.mu.Unlock()
+	if m.clipboard.receiving {
+		return false
+	}
+	m.clipboard.receiving = true
+	return true
 }
