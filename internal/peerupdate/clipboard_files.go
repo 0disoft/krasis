@@ -13,7 +13,7 @@ const MaxClipboardFileBytes = 64 << 20
 const legacyMaxClipboardFileBytes = 40 << 20
 
 func clipboardFilesFitLegacy(data []byte) bool {
-	if len(data) == 0 || len(data) > legacyMaxClipboardFileBytes {
+	if len(data) == 0 || len(data) > legacyMaxClipboardFileBytes || !clipboardZIPWithinEntryLimit(data) {
 		return false
 	}
 	r, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
@@ -33,7 +33,7 @@ func clipboardFilesFitLegacy(data []byte) bool {
 // ValidClipboardFiles validates the metadata before a peer can advertise or
 // receive a file copy. Extraction must separately enforce these byte limits.
 func ValidClipboardFiles(data []byte) bool {
-	if len(data) == 0 || len(data) > MaxClipboardFileBytes {
+	if len(data) == 0 || len(data) > MaxClipboardFileBytes || !clipboardZIPWithinEntryLimit(data) {
 		return false
 	}
 	r, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
