@@ -192,7 +192,9 @@ func runSession(
 				}
 				defer func() { complete(dispatchErr); recorded = true }()
 				handoff.Record(inputCtx, handoff.InputCoordinator, time.Since(queued))
-				if len(envelopes) > 1 {
+				// Even one pointer move is already decoded by pointerBatch.
+				// Reuse it rather than decoding its identifiers a second time.
+				if len(envelopes) > 0 {
 					err := runtime.HandlePointerMoveBatch(inputCtx, envelopes, move, now, peerTimeout)
 					if errors.Is(err, application.ErrInputLivenessExpired) {
 						return errors.Join(ErrPeerLivenessExpired, err)
