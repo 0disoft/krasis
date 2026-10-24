@@ -179,21 +179,5 @@ func (client *Client) requestHeadersLimit(ctx context.Context, method, path stri
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return fmt.Errorf("%w: HTTP status %d", ErrProtocol, response.StatusCode)
 	}
-	data, err := io.ReadAll(io.LimitReader(response.Body, responseLimit+1))
-	if err != nil {
-		return &requestError{ErrTransport, "read response", err}
-	}
-	if int64(len(data)) > responseLimit {
-		return fmt.Errorf("%w: response exceeds size limit", ErrProtocol)
-	}
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(target); err != nil {
-		return &requestError{ErrProtocol, "decode response", err}
-	}
-	var extra any
-	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
-		return &requestError{ErrProtocol, "trailing response", err}
-	}
-	return nil
+	return decodeResponse(response.Body, target, responseLimit)
 }
