@@ -69,7 +69,7 @@ func (m *Manager) Run(ctx context.Context, address, peer string, listener bool, 
 		m.runClipboardControl(clipboardCtx, clipboardClient, address, peer, authorized)
 	}()
 	defer func() { stopClipboard(); <-clipboardDone }()
-	diagnosticTransport := t.Clone()
+	diagnosticTransport := newControlTransport(t)
 	defer diagnosticTransport.CloseIdleConnections()
 	diagnosticClient := &http.Client{Transport: diagnosticTransport, Timeout: diagnosticPollTimeout, CheckRedirect: client.CheckRedirect}
 	diagnosticCtx, stopDiagnostic := context.WithCancel(ctx)

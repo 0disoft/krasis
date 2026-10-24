@@ -7,7 +7,7 @@ import (
 
 const auxiliaryIdleTimeout = time.Second
 
-// Reuse only the control lane's immediate status/app-open exchanges. Its idle
+// Reuse immediate status, app-open and diagnostic exchanges. The idle
 // bound matches the existing server policy; bulk transfer retains its own
 // transport. TLS pinning and each handler's fresh trust check are unchanged.
 func newControlTransport(base *http.Transport) *http.Transport {
