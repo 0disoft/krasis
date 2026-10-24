@@ -59,10 +59,12 @@ func ValidClipboardFiles(data []byte) bool {
 		if parent := path.Dir(name); parent != "." && !seen[strings.ToUpper(parent)] {
 			return false // Directory entries must precede their contents.
 		}
-		total += f.UncompressedSize64
-		if total > MaxClipboardFileBytes {
+		// Check the remaining budget before adding untrusted ZIP64 sizes.
+		// Addition first could wrap uint64 and admit an oversized archive.
+		if f.UncompressedSize64 > uint64(MaxClipboardFileBytes)-total {
 			return false
 		}
+		total += f.UncompressedSize64
 	}
 	return true
 }
