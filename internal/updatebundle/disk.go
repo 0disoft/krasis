@@ -123,6 +123,38 @@ func readStaged(source io.ReaderAt, size int64, parent *os.Root, directory strin
 // Stage rechecks the disk contents before publishing. Caller authorization must
 // still be held; a failed check never publishes a partially validated directory.
 func (b *DiskBundle) Stage(parent *os.Root, directory string) error {
+	publish, err := b.PrepareStage(parent, directory)
+	if err != nil {
+		return err
+	}
+	return publish()
+}
+
+// PrepareStage rechecks all file contents without publishing. The caller must
+// exclusively own the bundle and its private directory until publication or
+// Close. The returned function only rechecks the target and renames; call it
+// under the final authorization fence, or discard it and Close the bundle.
+func (b *DiskBundle) PrepareStage(parent *os.Root, directory string) (func() error, error) {
+	if err := b.verifyStage(parent, directory); err != nil {
+		return nil, err
+	}
+	source := b.directory
+	return func() error {
+		if b.directory != source {
+			return ErrInvalid
+		}
+		if _, err := parent.Lstat(directory); !errors.Is(err, os.ErrNotExist) {
+			return errors.Join(ErrInvalid, err)
+		}
+		if err := parent.Rename(source, directory); err != nil {
+			return err
+		}
+		b.directory = ""
+		return nil
+	}, nil
+}
+
+func (b *DiskBundle) verifyStage(parent *os.Root, directory string) error {
 	if b == nil || b.parent != parent || b.directory == "" || !validHex(directory, 32) || directory == b.directory {
 		return ErrInvalid
 	}
@@ -160,12 +192,5 @@ func (b *DiskBundle) Stage(parent *os.Root, directory string) error {
 			return errors.Join(ErrInvalid, statErr, copyErr, closeErr, root.Close())
 		}
 	}
-	if err = root.Close(); err != nil {
-		return err
-	}
-	if err = parent.Rename(b.directory, directory); err != nil {
-		return err
-	}
-	b.directory = ""
-	return nil
+	return root.Close()
 }

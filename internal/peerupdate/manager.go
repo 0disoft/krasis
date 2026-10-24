@@ -54,7 +54,7 @@ type offer struct {
 }
 type stagedBundle interface {
 	Metadata() updatebundle.Metadata
-	Stage(*os.Root, string) error
+	PrepareStage(*os.Root, string) (func() error, error)
 	Close() error
 }
 type Manager struct {
@@ -455,6 +455,15 @@ func (m *Manager) receive(peer, id, expected string, reader io.Reader, authorize
 		failure = err
 		return failure
 	}
+	if !authorized() || !m.permitted(peer) {
+		return ErrDenied
+	}
+	// Hashing can read the entire expanded bundle. Keep it outside the manager
+	// lock so status, permission revocation and shutdown remain available.
+	publish, err := received.PrepareStage(m.root, id)
+	if err != nil {
+		return errors.Join(ErrStorage, err)
+	}
 	if !authorized() {
 		failure = ErrDenied
 		return failure
@@ -465,7 +474,7 @@ func (m *Manager) receive(peer, id, expected string, reader io.Reader, authorize
 		failure = ErrDenied
 		return failure
 	}
-	if err = received.Stage(m.root, id); err != nil {
+	if err = publish(); err != nil {
 		failure = errors.Join(ErrStorage, err)
 		return failure
 	}

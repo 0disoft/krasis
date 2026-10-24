@@ -129,8 +129,10 @@ type fakeBundle struct {
 func (b *fakeBundle) Metadata() updatebundle.Metadata {
 	return updatebundle.Metadata{Generation: b.generation, Revision: strings.Repeat("d", 40)}
 }
-func (b *fakeBundle) Stage(*os.Root, string) error { b.staged = true; return nil }
-func (b *fakeBundle) Close() error                 { b.closed++; return nil }
+func (b *fakeBundle) PrepareStage(*os.Root, string) (func() error, error) {
+	return func() error { b.staged = true; return nil }, nil
+}
+func (b *fakeBundle) Close() error { b.closed++; return nil }
 func TestReceiveRechecksPermissionAndGenerationBeforeStaging(t *testing.T) {
 	for _, scenario := range []string{"success", "revoked", "stale", "connection_lost"} {
 		t.Run(scenario, func(t *testing.T) {

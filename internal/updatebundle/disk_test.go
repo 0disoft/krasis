@@ -44,6 +44,77 @@ func TestDiskBundleValidatesLayoutsAndTransfersStageOwnership(t *testing.T) {
 	}
 }
 
+func TestPreparedDiskStagePublishesOnceOrCleansUp(t *testing.T) {
+	for _, mode := range []string{"publish", "discard", "target appeared", "tampered"} {
+		t.Run(mode, func(t *testing.T) {
+			parent, err := os.OpenRoot(t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer parent.Close()
+			source, target := strings.Repeat("a", 32), strings.Repeat("b", 32)
+			data := fixtureLayout(t, currentNames)
+			bundle, err := readStaged(bytes.NewReader(data), int64(len(data)), parent, source, func(string, io.ReaderAt, string) error { return nil })
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer bundle.Close()
+			if mode == "tampered" {
+				if err := parent.WriteFile(source+"/krasis.exe", []byte("modified"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			publish, err := bundle.PrepareStage(parent, target)
+			if mode == "tampered" {
+				if !errors.Is(err, ErrInvalid) || publish != nil {
+					t.Fatal("preparation accepted altered files", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := parent.Stat(target); !errors.Is(err, os.ErrNotExist) {
+				t.Fatal("preparation published before authorization", err)
+			}
+			switch mode {
+			case "discard":
+				if err := bundle.Close(); err != nil {
+					t.Fatal(err)
+				}
+				if !errors.Is(publish(), ErrInvalid) {
+					t.Fatal("discarded preparation published")
+				}
+			case "target appeared":
+				if err := parent.Mkdir(target, 0700); err != nil {
+					t.Fatal(err)
+				}
+				if !errors.Is(publish(), ErrInvalid) {
+					t.Fatal("publication replaced a newly created target")
+				}
+			default:
+				if err := publish(); err != nil {
+					t.Fatal(err)
+				}
+				if !errors.Is(publish(), ErrInvalid) {
+					t.Fatal("publication replay accepted")
+				}
+			}
+			if err := bundle.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := parent.Stat(source); !errors.Is(err, os.ErrNotExist) {
+				t.Fatal("private staging directory retained", err)
+			}
+			if mode == "publish" {
+				if _, err := parent.Stat(target + "/BUILD.json"); err != nil {
+					t.Fatal("cleanup removed published files", err)
+				}
+			}
+		})
+	}
+}
+
 func TestDiskBundleRejectsTamperingAndCleansPrivateFiles(t *testing.T) {
 	for _, scenario := range []string{"invalid_hash", "invalid_executable", "modified_stage", "extra_stage"} {
 		t.Run(scenario, func(t *testing.T) {
