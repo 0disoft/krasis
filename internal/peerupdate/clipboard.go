@@ -318,6 +318,14 @@ func (m *Manager) receiveClipboardPayload(peer, id, format string, r io.Reader, 
 		// The extra byte distinguishes an exact body from an oversized one.
 		limit = remote.ClipboardSize
 	}
+	// A terminal copy needs only a receipt, as in the GET retry path. Keep
+	// selection/advertisement checks above and recheck live transfer authority.
+	if m.clipboardSeen(peer, id) {
+		if !authorized() {
+			return ErrDenied
+		}
+		return nil
+	}
 	progress := &progressReader{Reader: r, update: func(n int64) { m.clipboardProgress(peer, id, "RECEIVE", format, n, 0) }}
 	data, err := io.ReadAll(io.LimitReader(progress, int64(limit)+1))
 	if err != nil || advertised && len(data) != limit || !authorized() || format == "" && !validClipboardText(string(data)) ||
