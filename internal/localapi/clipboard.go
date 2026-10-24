@@ -1,7 +1,6 @@
 package localapi
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -102,22 +101,22 @@ func (h *handler) clipboard(w http.ResponseWriter, r *http.Request) {
 
 func decodeClipboardRequest(r io.Reader, value *ClipboardRequest) error {
 	// JSON may encode each text byte as six bytes (for example '<' as \u003c).
-	const limit = maxClipboardJSONBytes
-	data, err := io.ReadAll(io.LimitReader(r, limit+1))
-	if err != nil {
-		return err
-	}
-	if len(data) > limit {
-		return errors.New("clipboard request too large")
-	}
-	d := json.NewDecoder(bytes.NewReader(data))
+	// Decode directly from the bounded stream instead of retaining a second
+	// full JSON buffer in addition to the decoder and decoded base64 payload.
+	limited := &io.LimitedReader{R: r, N: maxClipboardJSONBytes + 1}
+	d := json.NewDecoder(limited)
 	d.DisallowUnknownFields()
-	if err = d.Decode(value); err != nil {
+	if err := d.Decode(value); err != nil {
 		return err
 	}
 	var extra any
-	if d.Decode(&extra) != io.EOF {
-		return errors.New("trailing clipboard request")
+	if err := d.Decode(&extra); err != io.EOF {
+		return errors.Join(errors.New("trailing clipboard request"), err)
+	}
+	// EOF from LimitedReader alone does not prove the body fit. The extra
+	// sentinel byte also counts when it is only trailing JSON whitespace.
+	if limited.N == 0 {
+		return errors.New("clipboard request too large")
 	}
 	return nil
 }
