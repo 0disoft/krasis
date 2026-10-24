@@ -148,17 +148,27 @@ func copyCLI(destination *securefs.Directory, source string) error {
 	if err != nil || info.Size() <= 0 || info.Size() > maxExecutable {
 		return ErrInvalid
 	}
-	data, err := io.ReadAll(io.LimitReader(file, maxExecutable+1))
-	if err != nil || len(data) > maxExecutable {
-		return ErrInvalid
-	}
+	// Hash an unchanged recovery CLI without retaining the whole executable.
+	// The pinned source handle stays open through comparison and replacement.
 	if old, err := destination.Open("krasis-cli.exe"); err == nil {
 		hash, readErr := digest(old)
 		old.Close()
-		want := sha256.Sum256(data)
-		if readErr == nil && hash == hex.EncodeToString(want[:]) {
-			return nil
+		if readErr == nil {
+			want, err := digest(file)
+			if err != nil {
+				return err
+			}
+			if hash == want {
+				return nil
+			}
+			if _, err := file.Seek(0, io.SeekStart); err != nil {
+				return err
+			}
 		}
+	}
+	data, err := io.ReadAll(io.LimitReader(file, maxExecutable+1))
+	if err != nil || len(data) > maxExecutable {
+		return ErrInvalid
 	}
 	return replace(destination, "krasis-cli.exe", data)
 }
