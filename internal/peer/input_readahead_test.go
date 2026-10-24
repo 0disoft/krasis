@@ -122,3 +122,39 @@ func TestPointerBatchKeepsMalformedAndSequenceBarrier(t *testing.T) {
 		})
 	}
 }
+
+func TestPointerBatchReusePreservesLimitBarriersAndPendingError(t *testing.T) {
+	r := &inputReadAhead{ctx: context.Background(), frames: make(chan queuedSessionFrame, application.MaxPointerMoveBatch)}
+	for seq := uint64(2); seq <= application.MaxPointerMoveBatch; seq++ {
+		r.frames <- queuedSessionFrame{frame: batchInputFrame(t, seq, control.InputPointerMove, 1)}
+	}
+	key := batchInputFrame(t, application.MaxPointerMoveBatch+1, control.InputKeyDown, 0)
+	r.frames <- queuedSessionFrame{frame: key}
+	envelopes, move := r.pointerBatch(batchInputFrame(t, 1, control.InputPointerMove, 1))
+	if len(envelopes) != application.MaxPointerMoveBatch || move.DeltaX != application.MaxPointerMoveBatch || envelopes[len(envelopes)-1].Sequence != application.MaxPointerMoveBatch {
+		t.Fatal("full batch exceeded its limit or lost an envelope")
+	}
+	got, err := r.ReadFrame()
+	if err != nil || string(got.Payload) != string(key.Payload) {
+		t.Fatal("full batch lost or reordered the key barrier", err)
+	}
+	heartbeat := transport.Frame{Kind: transport.MessageHeartbeat, Payload: []byte("heartbeat")}
+	r.frames <- queuedSessionFrame{frame: batchInputFrame(t, 67, control.InputPointerMove, 1)}
+	r.frames <- queuedSessionFrame{frame: heartbeat}
+	envelopes, move = r.pointerBatch(batchInputFrame(t, 66, control.InputPointerMove, 1))
+	if len(envelopes) != 2 || move.DeltaX != 2 || envelopes[0].Sequence != 66 || envelopes[1].Sequence != 67 {
+		t.Fatal("reused batch retained stale envelopes")
+	}
+	got, err = r.ReadFrame()
+	if err != nil || got.Kind != heartbeat.Kind || string(got.Payload) != string(heartbeat.Payload) || r.hasPending || r.pending.frame.Payload != nil {
+		t.Fatal("pending heartbeat changed or its storage was retained", err)
+	}
+	r.frames <- queuedSessionFrame{err: io.ErrUnexpectedEOF}
+	envelopes, move = r.pointerBatch(batchInputFrame(t, 68, control.InputPointerMove, 1))
+	if len(envelopes) != 1 || move.DeltaX != 1 || envelopes[0].Sequence != 68 {
+		t.Fatal("reused batch crossed a read failure")
+	}
+	if _, err = r.ReadFrame(); !errors.Is(err, io.ErrUnexpectedEOF) || r.hasPending || r.pending.err != nil {
+		t.Fatal("pending read failure changed or was retained", err)
+	}
+}
