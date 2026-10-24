@@ -176,6 +176,7 @@ func (m *Manager) handler(peer string, authorized func() bool) http.Handler {
 	controlGate := make(chan struct{}, 1)
 	clipboardGate := make(chan struct{}, 1)
 	clipboardStatusGate := make(chan struct{}, 1)
+	diagnosticGate := make(chan struct{}, 1)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		// Server.Close interrupts sockets but does not join handlers. Admit
@@ -203,6 +204,8 @@ func (m *Manager) handler(peer string, authorized func() bool) http.Handler {
 			requestGate = clipboardGate
 		} else if r.URL.Path == clipboardStatusPath {
 			requestGate = clipboardStatusGate
+		} else if r.URL.Path == "/v1/diagnostic-transfer" || r.URL.Path == "/v1/diagnostic-request" {
+			requestGate = diagnosticGate
 		}
 		select {
 		case requestGate <- struct{}{}:
