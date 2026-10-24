@@ -233,6 +233,7 @@ func writeRemoteClipboardText(hwnd, expected uintptr, text, id string) (uintptr,
 // record their exact native sequence, so they never become a new outbound copy.
 type clipboardPump struct {
 	localChanged bool
+	pendingAck   string
 	peer         string
 	sequence     uintptr
 }
@@ -310,9 +311,10 @@ func (p *clipboardPump) sync(ctx context.Context, hwnd uintptr, control, peer st
 		}
 	}
 	request.LocalChanged = p.localChanged
-	result, err := p.exchangeClipboard(ctx, previousSequence, request, func(request localapi.ClipboardRequest) (localapi.ClipboardResult, error) {
+	send := func(request localapi.ClipboardRequest) (localapi.ClipboardResult, error) {
 		return client.Clipboard(ctx, request)
-	})
+	}
+	result, err := p.exchangeClipboard(ctx, previousSequence, request, send)
 	if err != nil || result.Code != "ok" || result.Value.ID == "" {
 		return
 	}
@@ -334,7 +336,8 @@ func (p *clipboardPump) sync(ctx context.Context, hwnd uintptr, control, peer st
 		return
 	}
 	p.sequence = sequence
-	_, _ = client.Clipboard(ctx, localapi.ClipboardRequest{Action: "SYNC", Peer: peer, Ack: result.Value.ID})
+	p.pendingAck = result.Value.ID
+	_, _ = p.exchangeClipboard(ctx, p.sequence, localapi.ClipboardRequest{Action: "SYNC", Peer: peer, Ack: result.Value.ID}, send)
 }
 
 func (a *productWindow) toggleClipboard() {
