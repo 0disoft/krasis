@@ -206,6 +206,15 @@ func (m *Manager) receiveDiagnostic(peer, id, requestID string, r io.Reader, aut
 	if !validID(peer, 64) || !validID(id, 32) || (requestID != "" && !validID(requestID, 32)) || !authorized() || (m.ReceiveDiagnostic == nil && (requestID == "" || m.ReceiveCollection == nil)) {
 		return ErrDenied
 	}
+	// HTTP handlers and outbound polls must share admission before body allocation.
+	if !m.beginDiagnosticReceive() {
+		return ErrBusy
+	}
+	defer func() {
+		m.diagnostic.mu.Lock()
+		m.diagnostic.receiving = false
+		m.diagnostic.mu.Unlock()
+	}()
 	data, err := io.ReadAll(io.LimitReader(r, MaxDiagnosticBytes+1))
 	if err != nil || len(data) > MaxDiagnosticBytes {
 		return ErrDenied
@@ -214,15 +223,10 @@ func (m *Manager) receiveDiagnostic(peer, id, requestID string, r io.Reader, aut
 		return ErrDenied
 	}
 	digest := sha256.Sum256(data)
-	replayed, err := m.reserveDiagnosticReceive(peer, id, requestID, digest)
+	replayed, err := m.validateDiagnosticReceive(peer, id, requestID, digest)
 	if err != nil || replayed {
 		return err
 	}
-	defer func() {
-		m.diagnostic.mu.Lock()
-		m.diagnostic.receiving = false
-		m.diagnostic.mu.Unlock()
-	}()
 	var path string
 	if requestID != "" && m.ReceiveCollection != nil {
 		path, err = m.ReceiveCollection(peer, requestID, data)
@@ -252,9 +256,21 @@ func (m *Manager) receiveDiagnostic(peer, id, requestID string, r io.Reader, aut
 	return nil
 }
 
-// Reserve one save without holding the state lock across filesystem operations.
-// New requests cannot replace the collection until this reservation is released.
-func (m *Manager) reserveDiagnosticReceive(peer, id, requestID string, digest [sha256.Size]byte) (bool, error) {
+// Own one body read and save across all receive paths. Do not hold the state
+// lock over network or filesystem I/O, and do not race local snapshot preparation.
+func (m *Manager) beginDiagnosticReceive() bool {
+	m.diagnostic.mu.Lock()
+	defer m.diagnostic.mu.Unlock()
+	if m.diagnostic.receiving || m.diagnostic.preparing {
+		return false
+	}
+	m.diagnostic.receiving = true
+	return true
+}
+
+// Caller owns the receive slot. Validate after reading so expiry, authorization
+// and exact replay content still govern acknowledgements.
+func (m *Manager) validateDiagnosticReceive(peer, id, requestID string, digest [sha256.Size]byte) (bool, error) {
 	m.diagnostic.mu.Lock()
 	defer m.diagnostic.mu.Unlock()
 	now := time.Now()
@@ -269,9 +285,6 @@ func (m *Manager) reserveDiagnosticReceive(peer, id, requestID string, digest [s
 		}
 		return false, ErrDenied
 	}
-	if m.diagnostic.receiving {
-		return false, ErrBusy
-	}
 	if requestID != "" {
 		request := m.diagnostic.request
 		if request == nil || request.peer != peer || request.id != requestID || request.state != "PENDING" || now.After(request.expires) {
@@ -281,7 +294,6 @@ func (m *Manager) reserveDiagnosticReceive(peer, id, requestID string, digest [s
 	if _, known := m.diagnostic.last[peer]; !known && len(m.diagnostic.last) >= 32 {
 		return false, ErrBusy
 	}
-	m.diagnostic.receiving = true
 	return false, nil
 }
 func (m *Manager) diagnosticHTTP(w http.ResponseWriter, r *http.Request, peer string, authorized func() bool) {
