@@ -158,6 +158,11 @@ func (m *Manager) exchangeStatus(client *http.Client, request *http.Request, pee
 		return false
 	}
 	defer response.Body.Close()
+	if response.StatusCode == http.StatusTooManyRequests {
+		// A shared handler slot is temporarily occupied. Keep the queued archive
+		// and its deadline, but require a fresh successful preflight before sending.
+		return false
+	}
 	if response.StatusCode != http.StatusOK {
 		reason := "PEER_UNREACHABLE"
 		if response.StatusCode == http.StatusNotFound {
@@ -165,9 +170,6 @@ func (m *Manager) exchangeStatus(client *http.Client, request *http.Request, pee
 		}
 		if response.StatusCode == http.StatusForbidden {
 			reason = "PEER_NOT_ALLOWED"
-		}
-		if response.StatusCode == http.StatusTooManyRequests {
-			reason = "PEER_BUSY"
 		}
 		m.failOffer(peer, reason)
 		return false
