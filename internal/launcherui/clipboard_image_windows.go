@@ -92,23 +92,25 @@ func dibFromPNG(encoded []byte) ([]byte, error) {
 	if width <= 0 || height <= 0 || int64(width)*int64(height)*4+40 > peerupdate.MaxClipboardImageBytes {
 		return nil, errClipboardUnavailable
 	}
-	rgba := image.NewRGBA(image.Rect(0, 0, width, height))
-	draw.Draw(rgba, rgba.Bounds(), decoded, bounds.Min, draw.Src)
 	dib := make([]byte, 40+width*height*4)
+	// Draw into the final pixel buffer so conversion needs no second RGBA image.
+	rgba := &image.RGBA{Pix: dib[40:], Stride: width * 4, Rect: image.Rect(0, 0, width, height)}
+	draw.Draw(rgba, rgba.Bounds(), decoded, bounds.Min, draw.Src)
 	binary.LittleEndian.PutUint32(dib[:4], 40)
 	binary.LittleEndian.PutUint32(dib[4:8], uint32(width))
 	binary.LittleEndian.PutUint32(dib[8:12], uint32(height))
 	binary.LittleEndian.PutUint16(dib[12:14], 1)
 	binary.LittleEndian.PutUint16(dib[14:16], 32)
 	binary.LittleEndian.PutUint32(dib[20:24], uint32(width*height*4))
-	for y := 0; y < height; y++ {
+	// Convert RGBA to bottom-up BGRA in place. Save the top pixel before either
+	// write so the middle row of an odd-height image is converted only once.
+	for y := 0; y < (height+1)/2; y++ {
 		for x := 0; x < width; x++ {
-			source := rgba.PixOffset(x, y)
-			target := 40 + ((height-1-y)*width+x)*4
-			dib[target+0] = rgba.Pix[source+2]
-			dib[target+1] = rgba.Pix[source+1]
-			dib[target+2] = rgba.Pix[source+0]
-			dib[target+3] = rgba.Pix[source+3]
+			top := 40 + (y*width+x)*4
+			bottom := 40 + ((height-1-y)*width+x)*4
+			r, g, b, a := dib[top], dib[top+1], dib[top+2], dib[top+3]
+			dib[top], dib[top+1], dib[top+2], dib[top+3] = dib[bottom+2], dib[bottom+1], dib[bottom], dib[bottom+3]
+			dib[bottom], dib[bottom+1], dib[bottom+2], dib[bottom+3] = b, g, r, a
 		}
 	}
 	return dib, nil
