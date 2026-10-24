@@ -122,18 +122,25 @@ func (m *Manager) pollClipboard(ctx context.Context, c *http.Client, address, pe
 	defer timeout()
 	ctx, stop, current := m.clipboardTransferContext(ctx, peer, remote.ClipboardID, remote.ClipboardFormat, remote.ClipboardSize, false)
 	defer stop()
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	req.Header.Set("X-Krasis-ID", remote.ClipboardID)
-	resp, err := c.Do(req)
-	if err != nil {
+	if !m.clipboardSeen(peer, remote.ClipboardID) {
+		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		req.Header.Set("X-Krasis-ID", remote.ClipboardID)
+		resp, err := c.Do(req)
+		if err != nil {
+			return
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != 200 || resp.Header.Get("Content-Type") != clipboardContentType(remote.ClipboardFormat) ||
+			!authorized() || m.receiveClipboardPayload(peer, remote.ClipboardID, remote.ClipboardFormat, resp.Body, func() bool { return ctx.Err() == nil && current() && authorized() }, true) != nil {
+			return
+		}
+		resp.Body.Close()
+	}
+	// Receipt retries still require the current selection, advertised copy and
+	// trust; a cached terminal ID must not bypass the transfer's authority fence.
+	if ctx.Err() != nil || !current() || !authorized() {
 		return
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 || resp.Header.Get("Content-Type") != clipboardContentType(remote.ClipboardFormat) ||
-		!authorized() || m.receiveClipboardPayload(peer, remote.ClipboardID, remote.ClipboardFormat, resp.Body, func() bool { return ctx.Err() == nil && current() && authorized() }, true) != nil {
-		return
-	}
-	resp.Body.Close()
 	ack, _ := http.NewRequestWithContext(ctx, http.MethodPut, url, nil)
 	ack.Header.Set("X-Krasis-ID", remote.ClipboardID)
 	if resp, err := c.Do(ack); err == nil {

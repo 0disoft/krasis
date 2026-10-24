@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -275,6 +276,15 @@ func (m *Manager) clipboardSent(peer, id string) {
 		m.clipboardChanged()
 	}
 }
+
+// Seen IDs include received copies and copies superseded by local input. Both
+// are terminal for this peer and need only a receipt retry, not another body.
+func (m *Manager) clipboardSeen(peer, id string) bool {
+	m.clipboard.mu.Lock()
+	defer m.clipboard.mu.Unlock()
+	return m.clipboard.peer == peer && time.Now().Before(m.clipboard.activeUntil) && slices.Contains(m.clipboard.seen, id)
+}
+
 func (m *Manager) clipboardReceive(peer, id string, r io.Reader, authorized func() bool) error {
 	return m.clipboardReceivePayload(peer, id, "", r, authorized)
 }
