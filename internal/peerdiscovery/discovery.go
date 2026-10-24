@@ -17,6 +17,7 @@ import (
 
 const Port = 45874
 const prefix = "krasis-peer-discover-v1:"
+const probeInterval = 250 * time.Millisecond
 
 type announcement struct {
 	Nonce string `json:"nonce"`
@@ -142,20 +143,43 @@ func discoverAt(ctx context.Context, targets []*net.UDPAddr) ([]string, error) {
 	if err = conn.SetDeadline(deadline); err != nil {
 		return nil, err
 	}
-	for _, target := range targets {
-		_, _ = conn.WriteToUDP([]byte(prefix+nonce), target)
-	}
+	request := []byte(prefix + nonce)
+	var nextProbe time.Time
 	seen := map[string]bool{}
 	var candidates []string
 	var buffer [512]byte
 	for len(candidates) < 8 {
-		n, sender, err := conn.ReadFromUDP(buffer[:])
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		now := time.Now()
+		if !now.Before(deadline) {
+			return candidates, nil
+		}
+		// UDP probes/replies can be lost. Retry within the original budget,
+		// retaining the nonce, candidate cap and duplicate filtering.
+		if !now.Before(nextProbe) {
+			for _, target := range targets {
+				_, _ = conn.WriteToUDP(request, target)
+			}
+			nextProbe = now.Add(probeInterval)
+		}
+		readDeadline := nextProbe
+		if deadline.Before(readDeadline) {
+			readDeadline = deadline
+		}
+		var n int
+		var sender *net.UDPAddr
+		err = conn.SetReadDeadline(readDeadline)
+		if err == nil {
+			n, sender, err = conn.ReadFromUDP(buffer[:])
+		}
 		if err != nil {
 			if ctx.Err() != nil {
 				return nil, ctx.Err()
 			}
 			if e, ok := err.(net.Error); ok && e.Timeout() {
-				return candidates, nil
+				continue // The loop distinguishes a probe interval from final expiry.
 			}
 			return nil, err
 		}
