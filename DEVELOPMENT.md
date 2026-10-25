@@ -8,7 +8,12 @@
 The Go version is declared in `go.mod`. PowerShell 7 is required for probe-kit scripts. Windows is required to build and exercise the Win32 input, launcher, lifecycle, credential-permission, and path-security implementations.
 
 The `toolchain` directive selects Go 1.27.3 or a newer installed toolchain by default;
-CI and release jobs follow stable 1.27 patches. Go 1.27.2 fixed a Windows
+CI and release jobs select the toolchain reviewed in `scripts/runtime/stw-retake.json`
+while the temporary runtime backport is required. Promote a stable patch by validating
+its original sources, updating that manifest and `go.mod`, and passing the runtime
+regression checks. Remove this selection exception together with the backport once
+the upstream fix passes those checks, then resume following stable patches.
+Go 1.27.2 fixed a Windows
 [`LockOSThread` stack-corruption risk](https://github.com/golang/go/commit/87b06e2c18bf96180ff1cdd1f285cb18768d39d0)
 on paths used by the input workers. This is not proof that it caused the recorded
 g448 stalls. Keep automatic toolchain selection enabled for local builds.
