@@ -283,6 +283,9 @@ func runInstalledConsoleInputMode(ctx context.Context, agentDigest, serviceDiges
 	var packet [bootstrapSize]byte
 	if prepareNative {
 		packet, err = readPreparedBootstrap(startup, stopControl, control.readContext)
+		if err != nil {
+			return errors.Join(ErrProtocol, reportPreparationFailure(control, preparationBootstrapFailure, err))
+		}
 	} else {
 		_, err = io.ReadFull(control, packet[:])
 	}

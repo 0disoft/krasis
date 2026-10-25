@@ -152,6 +152,10 @@ func (c *unboundRetirementConn) SetDeadline(deadline time.Time) error {
 	return c.deadlineErr
 }
 
+func (c *unboundRetirementConn) SetWriteDeadline(deadline time.Time) error {
+	return c.SetDeadline(deadline)
+}
+
 func (c *unboundRetirementConn) Write(data []byte) (int, error) {
 	if c.writeErr != nil {
 		return 0, c.writeErr
@@ -181,8 +185,15 @@ func TestUnboundRetirementCannotAcknowledgeExpiredFailedOrUnconfirmedCleanup(t *
 			conn := &unboundRetirementConn{deadlineErr: tc.deadlineErr, writeErr: tc.writeErr}
 			retired, stopped := 0, 0
 			err := retireUnboundNative(startup, conn, func() bool { stopped++; return !tc.callbackRunning }, func() error { retired++; return tc.retireErr })
-			if !errors.Is(err, ErrRecovery) || tc.want != nil && !errors.Is(err, tc.want) || stopped != 1 || retired != tc.retireCalls || conn.written.Len() != 0 {
+			if !errors.Is(err, ErrRecovery) || tc.want != nil && !errors.Is(err, tc.want) || stopped != 1 || retired != tc.retireCalls || bytes.Equal(conn.written.Bytes(), unboundRetiredFrame[:]) {
 				t.Fatal("uncertain startup/retirement became an acknowledgement", err, stopped, retired, conn.written.Len())
+			}
+			wantBytes := 0
+			if tc.retireErr != nil {
+				wantBytes = 12 // A negative report never certifies cleanup.
+			}
+			if conn.written.Len() != wantBytes {
+				t.Fatal("unexpected cleanup report", conn.written.Len(), wantBytes)
 			}
 		})
 	}

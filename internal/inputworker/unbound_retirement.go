@@ -25,7 +25,7 @@ func retireUnboundNative(startup context.Context, control net.Conn, stopStartupI
 		return errors.Join(ErrRecovery, err)
 	}
 	if err := retire(); err != nil {
-		return errors.Join(ErrRecovery, err)
+		return errors.Join(ErrRecovery, reportPreparationFailure(control, preparationNativeFailure, err))
 	}
 	if err := writeFrame(control, unboundRetiredFrame[:]); err != nil {
 		return errors.Join(ErrRecovery, err)

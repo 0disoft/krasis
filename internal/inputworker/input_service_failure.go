@@ -102,7 +102,7 @@ func retireInputPreparation(stream inputRetirementStream, authenticated, retired
 	if err := stream.SetDeadline(time.Now().Add(startupTimeout)); err != nil {
 		return inputServiceAt("input-retire-deadline", errors.Join(ErrRecovery, err))
 	}
-	if err := readInputServiceFrame(stream, retired); err != nil {
+	if err := readPreparationRetirement(stream, retired); err != nil {
 		return inputServiceTransportFailure("input-retire-receipt", errors.Join(ErrRecovery, err))
 	}
 	return nil

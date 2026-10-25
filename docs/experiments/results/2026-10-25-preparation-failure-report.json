@@ -1,0 +1,30 @@
+{
+  "schema": "krasis.experiment/v1",
+  "purpose": "Preserve the authenticated unbound worker's failure before control-pipe closure instead of conflating bootstrap or native cleanup failure with an empty retirement receipt.",
+  "baseline": {
+    "generation": 458,
+    "failure": "B: input-retire-receipt-eof with parent RUNNING. This does not establish whether bootstrap cancellation, native cleanup failure or process shutdown caused the missing receipt.",
+    "postRepairCollection": "88075609171578cda193124c87afe55e",
+    "aCollectedAtUtc": "2026-10-25T12:30:59Z",
+    "bCollectedAtUtc": "2026-10-25T12:31:01Z",
+    "both": "READY, no lastFailure; A doctor healthy, connected, matching g458 protected installation and running service."
+  },
+  "change": {
+    "failureOnlyBytes": 12,
+    "successfulPathExtraFrames": 0,
+    "maximumDiagnosticWriteWaitMillis": 250,
+    "phases": ["bootstrap read", "native child cleanup"],
+    "classes": ["other", "exit pending", "timeout", "cancelled", "truncated", "EOF", "closed", "Win32"],
+    "content": "Fixed enums and an optional exact uint32 Win32 result; no stderr, key or clipboard data.",
+    "controlFraming": "Private service-to-owned-worker control pipe adds a negative report. The authentication frame and exact positive native-retirement receipt are unchanged.",
+    "security": "A negative report remains ErrRecovery. Malformed, partial and foreign frames remain failures; no replacement worker, authority reuse, input replay or retirement confirmation is permitted by the report. An old receiver also rejects the new negative frame.",
+    "limit": "Diagnostic correction only. It does not fix or reproduce the field retirement failure. Pipe closure before reporting or a failed diagnostic write can still leave an EOF. A's separate source-startup-ready failure is not attributed to the same cause."
+  },
+  "validation": {
+    "focused": "PASS: preparation failure transport, negative-report rejection, unbound retirement and existing exact-receipt tests; inputworker 0.055s, logindiag 0.043s.",
+    "packages": "PASS: go test ./internal/inputworker ./internal/logindiag -count=1 -timeout=180s; inputworker 25.267s, logindiag 0.049s.",
+    "vet": "PASS: go vet ./internal/inputworker ./internal/logindiag",
+    "cases": "Bootstrap timeout/cancellation/truncation/EOF and native closed/unknown/Win32/exit-pending reach the runtime recorder while retaining ErrRecovery. Malformed and all truncated report lengths are rejected. A negative report cannot replace authentication. An unread report is bounded to 250ms and retains the original child cause."
+  },
+  "publicPushOrRelease": false
+}
