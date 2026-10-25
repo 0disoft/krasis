@@ -463,10 +463,17 @@ func (m *Manager) pollDiagnostic(ctx context.Context, c *http.Client, address, p
 		return
 	}
 	id := resp.Header.Get("X-Krasis-ID")
-	if m.receiveDiagnostic(peer, id, resp.Header.Get("X-Krasis-Request-ID"), resp.Body, authorized) != nil {
+	// HTTP cancellation interrupts network reads, but cannot preempt a storage
+	// callback after EOF. Fence both save admission and success publication with
+	// this poll's lifetime, just as the inbound upload path does.
+	live := func() bool { return ctx.Err() == nil && authorized() }
+	if m.receiveDiagnostic(peer, id, resp.Header.Get("X-Krasis-Request-ID"), resp.Body, live) != nil {
 		return
 	}
 	resp.Body.Close()
+	if !live() {
+		return
+	}
 	ack, _ := http.NewRequestWithContext(ctx, http.MethodPut, url, nil)
 	ack.Header.Set("X-Krasis-ID", id)
 	if result, err := c.Do(ack); err == nil {

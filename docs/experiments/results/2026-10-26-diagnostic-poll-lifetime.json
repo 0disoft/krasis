@@ -1,0 +1,26 @@
+{
+  "schema": "krasis.experiment/v1",
+  "purpose": "Prevent a canceled diagnostic download poll from saving or publishing a successful collection result after its own lifetime ends.",
+  "baseline": {
+    "revision": "b5ff34f",
+    "path": "pollDiagnostic supplied the trust callback alone to receiveDiagnostic. The 15-second HTTP context constrained network I/O, but post-read and post-storage checks could not observe poll cancellation while the 1-minute collection request remained valid.",
+    "reproduction": "FAIL in three deterministic cases: parent canceled at body EOF, parent canceled during storage, and storage finished at diagnosticPollTimeout plus one nanosecond. All published RECEIVED, peer.json and a receipt. Body-EOF cancellation also invoked storage once after cancellation. The deadline uses testing/synctest virtual time; no physical 15-second disk stall is claimed."
+  },
+  "change": {
+    "authority": "Pass a combined poll-context-and-trust predicate to the existing receiveDiagnostic lifecycle checks. A cancellation observed after the body prevents storage; a cancellation observed after storage prevents receipt/path/state publication. Recheck the predicate before constructing the ACK too.",
+    "cost": "Constant-time context.Err checks at the existing authorization checks plus one pre-ACK check. No new goroutines, body copies, digest passes, database calls or storage callbacks.",
+    "interfaces": "No HTTP routes, JSON schemas, DB, installer, repository hygiene, runner or source-of-truth documents changed. Existing HTTP upload cancellation handling remains unchanged."
+  },
+  "validation": {
+    "regression": "PASS: all three cancellations preserve PENDING without a path, receipt or ACK, and release receive admission. Body-EOF cancellation reduces storage callback calls from 1 to 0. Cancellation after storage does not pretend to undo the callback.",
+    "recovery": "PASS in each case: a live retry for the same request/transfer succeeds; its exact replay adds no second storage call. The two successful polls produce two ACKs and one new save.",
+    "focused": "PASS: go test -v -timeout 45s -run '^TestDiagnosticPollDoesNotPublishAfterCancellation$' ./internal/peerupdate, 0.112s.",
+    "packages": "PASS: go test -timeout 3m ./internal/peerupdate ./internal/residentagent, 17.583s and 8.392s, Go 1.27.3 windows/amd64 with repository runtime STW overlay.",
+    "vet": "PASS: go vet ./internal/peerupdate ./internal/residentagent.",
+    "hygiene": "PASS: changed Go files formatted with gofmt; git diff --check.",
+    "skipped": "Full repository, frontend, installer/release packaging and physical two-PC acceptance: only internal download-result lifetime validation changed; no program installation or public release was performed."
+  },
+  "remainingRisk": "A storage callback already in progress may still finish creating a file after cancellation. This patch rejects its late success publication; it does not preempt filesystem I/O or delete callback-owned output. Input-service recovery error 1066 and cursor handoff latency are outside this verification.",
+  "installedOnEitherPC": false,
+  "publicPushOrRelease": false
+}
