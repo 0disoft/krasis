@@ -1,0 +1,40 @@
+{
+  "schema": "krasis.experiment/v1",
+  "purpose": "Resolve concrete build and clipboard-reporting defects from the g459 review without claiming the intermittent input recovery failure is fixed.",
+  "sourceChanges": {
+    "toolchainCommit": "6c9c5f8",
+    "toolchain": "CI and release select the exact reviewed runtime manifest toolchain. Stable patch promotion updates the reviewed backport manifest and go.mod together; the exception ends with removal of the temporary backport.",
+    "clipboardCommit": "0a37616",
+    "clipboard": "Native text/image preparation and application failures reach local API, authorized transfer status and the UI. Report formats match payload wire formats: empty text, png, dib and files. Application reports still require the current peer, incoming ID and exact format. No clipboard contents, paths or native error strings are projected to the UI.",
+    "limits": "Existing 64KiB text, 40MiB image and 64MiB file limits are unchanged. Image pixel-limit violations remain a bounded generic preparation failure."
+  },
+  "localTraceInspection": {
+    "traceSha256": "e6ea2a487e7ff1e399e245dbd45b87a423f2833c2cae1d683dd38011195606bd",
+    "traceBytes": 2187464,
+    "startWall": "2026-10-25T21:39:45.889088+09:00",
+    "observedEventSpanMillis": 6852.461049,
+    "completedStopTheWorldRanges": 6,
+    "maximumStopTheWorldMicros": 340.625,
+    "aggregateSchedulerDelayMicros": 26247.69,
+    "profileMethod": "go tool trace -pprof=sched, -pprof=syscall and -pprof=sync; go tool pprof -top; parsed RangeBegin/RangeEnd events matched by range name and scope.",
+    "interpretation": "The recorded resident-agent interval has sub-millisecond GC stop-the-world ranges. Scheduler and blocking profiles aggregate goroutines; their totals are not an individual handoff or end-to-end latency.",
+    "correlationLimit": "This trace ends before the 2026-10-25T12:41:19Z baseline cutoff of the 13 g459 crossings. Its generation is not established. It cannot explain or disprove the later 324277us capture activation, a separate worker's native call delay, or the intermittent recovery failure. No runtime policy, safety timeout or authorization was relaxed based on it.",
+    "privacy": "Raw trace, parsed events and profiles remain local ignored artifacts; only bounded observations and the trace hash are recorded here."
+  },
+  "validation": {
+    "runtimeOverlay": "PASS: six runtime-stw-overlay Node tests, workflow selector resolves 1.27.3 and matches go.mod.",
+    "goPackages": "PASS: go test -timeout 3m ./internal/localapi ./internal/peerupdate ./internal/launcherui with the verified runtime overlay; 9.472s, 26.113s and 3.061s.",
+    "goVet": "PASS: go vet ./internal/localapi ./internal/peerupdate ./internal/launcherui.",
+    "desktopIntegration": "PASS: go test -tags desktop -timeout 3m ./internal/workspacehost ./cmd/krasis ./cmd/krasis-control ./cmd/krasis-workspace. krasis and krasis-control compile but have no test files.",
+    "frontend": "PASS: settings-contract freshness check, 104 Node tests and native Vite build.",
+    "hygiene": "PASS: gofmt on changed Go files; git diff --check; generated frontend and trace analysis artifacts remain ignored.",
+    "initialAttempt": "The first Go test command failed before tests ran because an auto-downloaded Go toolchain was inside GOMODCACHE, where Go forbids overlays. Reran successfully using the already installed 1.27.3 toolchain outside the selected module cache. This failure is not counted as a pass.",
+    "skipped": "Full repository and release suites, GitHub-hosted runs, installer packaging and physical two-PC acceptance were not executed: this slice changes clipboard failure reporting and workflow selection, with focused packages, desktop integration and UI build checked locally. Installed PCs remain on their existing g459 binaries."
+  },
+  "remainingWork": [
+    "Correlate a new recovery or long capture sample with the same process, generation and time window, including the isolated native worker rather than only the resident agent.",
+    "Clipboard helper lifetime, multi-monitor layout and active-session disconnect/revoke remain separate unimplemented review items."
+  ],
+  "installedOnEitherPC": false,
+  "publicPushOrRelease": false
+}
