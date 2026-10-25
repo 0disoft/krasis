@@ -32,7 +32,22 @@
     "vet": "PASS: ./internal/inputworker",
     "securityCases": "Reject service restart during file verification, proof closure, wrong authority kind and changed image without publishing image ownership or a recovery process pin. Valid adoption and recovery pinning each perform one final live query. Existing native retirement and cancellation coverage passes."
   },
-  "localRollout": "Pending a new local generation and paired installation.",
-  "physicalAcceptance": "Pending; no millisecond improvement or attribution of the full 98 ms tail is claimed.",
+  "localRollout": {
+    "generation": 457,
+    "revision": "47b08a467c52f604417f10c0a7f4414c21eb3078",
+    "workspacePackaging": "PASS: frontend 103 tests, native UI build, update package test and workspace verification",
+    "setup": "PASS: setup package verified; A installed with exit 0",
+    "setupSha256": "0f62c9c8e6e6edc20126290201366faea507c057397a9db91704f95ca174c27d",
+    "bUpdateJob": "3f67dacc4f8135b908d907dd24f2edf1",
+    "bUpdate": "UPDATED: generation and revision matched",
+    "readinessCollection": "b64fa96025d32e0a05a3217de04da5c2",
+    "verifiedAtUtc": "2026-10-25T11:53:14Z",
+    "a": "Matched g457 protected installation; service running, input health READY, connected",
+    "b": "Matched g457 revision; service READY, input health READY, connected"
+  },
+  "physicalAcceptance": {
+    "state": "Pending requested physical crossings; no millisecond improvement or attribution of the full 98 ms tail is claimed.",
+    "cutoffUtc": "2026-10-25T11:53:14Z"
+  },
   "publicPushOrRelease": false
 }
