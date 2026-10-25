@@ -91,6 +91,43 @@ func TestProtectedReturnCursorStaleActionCannotHideNewEntry(t *testing.T) {
 	}
 }
 
+func TestProtectedReturnCursorSkipsBusyInputWithoutWaiting(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		client := &testCursorClient{}
+		identity := application.LeaseIdentity{SessionID: "s", LeaseID: "l", Epoch: "e"}
+		input := &privilegedLeaseInput{client: client, identity: identity, leaseExpires: time.Now().Add(time.Minute)}
+		input.cursor.root = context.Background()
+		input.cursor.open = func(context.Context, inputworker.Lease) (func() error, error) {
+			t.Error("snapshot preparation opened a presentation worker")
+			return nil, inputworker.ErrAuthority
+		}
+		// Model an in-flight input/native owner retaining the admission gate.
+		input.mu.Lock()
+		released := make(chan struct{})
+		go func() {
+			time.Sleep(application.InputInjectionTimeout)
+			input.mu.Unlock()
+			close(released)
+		}()
+		started := time.Now()
+		if action := input.PrepareReturnCursor(); action != nil || time.Since(started) != 0 || client.reads != 0 {
+			t.Error("optional cursor snapshot waited behind input or performed a query", time.Since(started), client.reads)
+		}
+		if input.mu.TryLock() {
+			input.mu.Unlock()
+			t.Error("snapshot waited for or released the active input owner's gate")
+		}
+		<-released
+		if input.client != client || input.identity != identity || client.closes.Load() != 0 {
+			t.Fatal("skipping optional presentation changed the active input lease")
+		}
+		before := client.reads
+		if action := input.PrepareReturnCursor(); action == nil || client.reads != before+1 {
+			t.Fatal("idle input no longer permits the normal cursor snapshot", client.reads)
+		}
+	})
+}
+
 func TestReentryCancellationDoesNotReportCursorStartupFailure(t *testing.T) {
 	started := make(chan struct{})
 	input := &privilegedLeaseInput{client: &testCursorClient{}, identity: application.LeaseIdentity{SessionID: "s", LeaseID: "l", Epoch: "e"}, leaseExpires: time.Now().Add(time.Minute)}

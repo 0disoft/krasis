@@ -27,7 +27,11 @@ func (input *privilegedLeaseInput) PrepareReturnCursor() func() {
 	p.mu.Lock()
 	generation := p.generation
 	p.mu.Unlock()
-	input.mu.Lock()
+	// Optional presentation runs before mandatory lease revocation. Never queue
+	// behind an input/native owner while the return controller holds its gate.
+	if !input.mu.TryLock() {
+		return nil
+	}
 	client, identity, expires := input.client, input.identity, input.leaseExpires
 	port, ok := client.(application.CursorPositionPort)
 	if input.stopped || !ok {

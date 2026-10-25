@@ -1,0 +1,26 @@
+{
+  "schema": "krasis.experiment/v1",
+  "purpose": "Keep optional protected return-cursor snapshot preparation from waiting behind the active input owner before mandatory lease revocation.",
+  "baseline": {
+    "revision": "8bd749a",
+    "path": "ReturnController.revoke invokes PrepareReturnCursor while owning its write coordinator, before runtime revocation and the revoke frame. The protected cursor fallback used input.mu.Lock, then created its 100ms query context only after acquiring the mutex. That query timeout did not bound lock admission.",
+    "reproduction": "FAIL: testing/synctest kept input.mu owned for InputInjectionTimeout (2 seconds). PrepareReturnCursor waited the full 2 seconds and made one cursor-position query instead of skipping optional presentation. This models lock contention, not a physical two-PC latency measurement."
+  },
+  "change": {
+    "admission": "Use TryLock for optional snapshot preparation. If an input/native owner holds the gate, return nil immediately without querying cursor position or opening a presentation worker. Existing active input ownership and required cleanup are untouched.",
+    "idle": "Uncontended preparation retains the same locked snapshot, capability/stopped checks, 100ms cursor-query budget, generation invalidation and deferred presentation action.",
+    "cost": "Busy-input virtual regression: lock wait 2s to 0s and cursor-position query calls 1 to 0. Admission is one nonblocking gate attempt; no new timers, goroutines, caches or I/O are introduced. This does not bound required retirement or an uncooperative native query.",
+    "interfaces": "The existing presentation contract permits nil and affects only the idle pointer, not control ownership. No API, wire schema, DB, installer, repository hygiene, runner or source-of-truth document changes."
+  },
+  "validation": {
+    "regression": "PASS: busy snapshot returns nil without virtual-time advancement or a cursor read, does not acquire/release the existing owner's gate, leaves client/identity intact and does not close its channel. After owner release, normal preparation returns an action and makes exactly one query.",
+    "focused": "PASS: five return-cursor tests covering pending-open joins, retirement timing, stale actions, busy admission and startup cancellation, 0.151s package time.",
+    "packages": "PASS: go test -timeout 3m ./internal/residentagent ./internal/peer, 7.425s and 2.689s, Go 1.27.3 windows/amd64 with repository runtime STW overlay.",
+    "vet": "PASS: go vet ./internal/residentagent ./internal/peer.",
+    "hygiene": "PASS: gofmt on changed Go files; git diff --check.",
+    "skipped": "Full repository, GUI/installer builds and physical two-PC acceptance: only optional protected cursor snapshot admission changed; installed programs were not updated."
+  },
+  "remainingRisk": "During contention the optional idle-pointer presentation may be omitted. Required revocation, input completion and native cleanup still follow their existing rules and can take time. No claim is made to fix every handoff delay or historical service error 1066.",
+  "installedOnEitherPC": false,
+  "publicPushOrRelease": false
+}
