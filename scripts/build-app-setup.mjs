@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { verifyExecutableIcon } from './check-windows-icon.mjs';
 import { signExecutable, signingEnabled } from './authenticode.mjs';
+import { offlineGo } from './offline-go.mjs';
 
 assert.equal(process.argv.length,2,'Run from the checkout without arguments.');
 const git=args=>execFileSync('git',args,{encoding:'utf8'}).trim();
@@ -30,8 +31,9 @@ execFileSync(path.join(tools,'llvm-rc.exe'),['/FO',res,'krasis-setup.rc'],{cwd:p
 try {
   execFileSync(path.join(tools,'llvm-cvtres.exe'),['/MACHINE:X64','/TIMESTAMP:0',`/OUT:${resource}`,res],{stdio:'inherit'});
   const exe=path.join(output,`KrasisSetup-g${generation}.exe`);
-  execFileSync('go',['build','-trimpath','-buildvcs=true','-tags','appsetup','-ldflags=-s -w -H=windowsgui','-o',exe,'./cmd/krasis-setup'],
-    {env:{...process.env,GOOS:'windows',GOARCH:'amd64',CGO_ENABLED:'0',GOPROXY:'off',GOFLAGS:''},stdio:'inherit'});
+  const go = offlineGo({...process.env,GOOS:'windows',GOARCH:'amd64',CGO_ENABLED:'0',GOPROXY:'off',GOFLAGS:''});
+  execFileSync(go.command,['build','-trimpath','-buildvcs=true','-tags','appsetup','-ldflags=-s -w -H=windowsgui','-o',exe,'./cmd/krasis-setup'],
+    {env:go.env,stdio:'inherit'});
   const signed=signExecutable(exe);
   verifyExecutableIcon(fs.readFileSync(exe));
   const verification=JSON.parse(execFileSync(exe,['--verify','--json'],{encoding:'utf8',timeout:30000,windowsHide:true}));

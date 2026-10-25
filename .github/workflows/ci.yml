@@ -29,6 +29,15 @@ jobs:
         with:
           node-version: '24'
 
+      - name: Prepare and verify temporary Go runtime backport
+        shell: pwsh
+        run: |
+          node --test scripts/runtime-stw-overlay.test.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $runtimeOverlay = node scripts/runtime-stw-overlay.mjs | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "GOFLAGS=$($runtimeOverlay.GOFLAGS)" >> $env:GITHUB_ENV
+
       - name: Test and build native frontend
         shell: pwsh
         run: |

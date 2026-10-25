@@ -1,0 +1,48 @@
+{
+  "date": "2026-10-25",
+  "scope": "Temporary build-only Go runtime backport; no installed Go tree changes, trust-policy changes, public release or push.",
+  "upstream": "https://github.com/golang/go/pull/81835",
+  "upstreamHead": "e5dd594826676e28d2ad51ef21738775befb6b74",
+  "upstreamStatus": "Open and unmerged at inspection; this is not an official Go release fix.",
+  "toolchain": "go1.27.3 windows/amd64",
+  "controlledReproducer": {
+    "command": "node scripts/check-runtime-stw.mjs",
+    "condition": "A syscall goroutine temporarily holds its scan bit during the initial stop-the-world sweep. The original wait loop cannot retake its P and waits for sysmon. A pending one-second timer bounds the original failure.",
+    "baseline": { "exitCode": 1, "expectedFailure": true, "stwMicroseconds": 1002732 },
+    "backport": { "exitCode": 0, "stwMicroseconds": [12468.7, 13901.3, 14485, 14789.7, 14407.2] },
+    "interpretation": "This proves the runtime defect and its correction in the controlled Windows reproducer. It does not prove that this exact scan-bit race caused every Krasis recovery incident."
+  },
+  "implementation": {
+    "manifest": "scripts/runtime/stw-retake.json",
+    "buildOnlyOverlay": true,
+    "upstreamAdaptation": "Omit a context-only preemptall line absent from Go 1.27.3; add duration logging to the regression fixture.",
+    "integrity": "Check the exact toolchain, canonical original source SHA-256, patched source SHA-256, unique hunk contexts and existing overlay cache contents. Unknown compiler versions require revalidation instead of silently dropping the backport.",
+    "buildCoverage": ["workspace UI/agent/CLI", "protected input service and installer", "application setup", "legacy product smoke", "Windows CI Go commands"],
+    "securityPolicy": "Existing five-second trust freshness, fail-closed behavior, GC configuration and processor count are unchanged.",
+    "maintenance": "Revalidate this temporary backport when updating Go; remove it after an official stable runtime fix passes the same reproducer.",
+    "rollback": "Revert the build integration and create a newer generation using stock Go; do not overwrite running generations or bypass installer generation checks."
+  },
+  "additionalIncident": {
+    "collectionID": "3107656a27a22caff94ced08948478e3",
+    "created": "2026-10-25T09:40:44Z",
+    "aTrustExpiry": "2026-10-25T09:30:00.0524979Z",
+    "aLargestRecentSamplerLatenessMicroseconds": 3609990,
+    "aRecentGCPausesAboveOneSecond": 1,
+    "aRecentGCStoppingAboveOneSecond": 1,
+    "aLaterFault": "fault_source_hook_failed",
+    "aLaterFaultAt": "2026-10-25T09:31:15.3784639Z",
+    "aInputHealth": "SERVICE_RECOVERY_REQUIRED",
+    "aServiceError": 1066,
+    "bInputHealth": "READY",
+    "limitation": "The later protected-input failure is a separate observed failure; its causality is not established by this runtime reproduction."
+  },
+  "validation": {
+    "overlayGuardTests": "6 passed",
+    "runtimeRegressionPassed": ["TestStopTheWorldDeadlock", "TestGCFairness", "TestGCFairness2", "TestPreemptionAfterSyscall", "TestSyscallStackUsage"],
+    "runtimeRegressionSkipped": { "TestSyscallN": "GCC is unavailable; the upstream test skipped." },
+    "productTests": "Patched-runtime go test ./internal/residentagent ./internal/runtimestall passed.",
+    "productVet": "Patched-runtime go vet ./internal/residentagent ./internal/runtimestall passed.",
+    "syntaxAndWhitespace": "Node syntax checks and git diff --check passed.",
+    "physicalCrossingAcceptance": "Pending new-generation installation and user physical input; no claim of a resolved field incident."
+  }
+}

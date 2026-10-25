@@ -22,6 +22,8 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 New-Item -ItemType Directory -Path $bundle | Out-Null
 Copy-Item -LiteralPath 'frontend/README.md' -Destination (Join-Path $bundle 'START-HERE.md')
 $notice = [Collections.Generic.List[string]]::new()
+$notice.Add('Go runtime with temporary syscall-P retake backport (golang/go#81835)')
+$notice.Add([IO.File]::ReadAllText((Join-Path (Get-Location) 'scripts/runtime/GO-LICENSE.txt')))
 foreach ($line in Get-Content -LiteralPath 'go.mod') {
  if ($line -match '^\s*(\S+)\s+(v\S+)') {
   $module = $Matches[1]; $version = $Matches[2]

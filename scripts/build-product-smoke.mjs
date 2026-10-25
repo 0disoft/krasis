@@ -3,6 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { verifyExecutableIcon } from './check-windows-icon.mjs';
+import { offlineGo } from './offline-go.mjs';
 
 // Local manual-test artifact only: never starts an agent or sends input.
 const root = process.cwd();
@@ -13,10 +14,11 @@ const destination = path.join(root, 'dist', 'product-smoke', revision);
 if (fs.existsSync(destination)) throw new Error('Artifact already exists; do not overwrite it.');
 fs.mkdirSync(destination, { recursive: true });
 const environment = { ...process.env, GOOS: 'windows', GOARCH: 'amd64', CGO_ENABLED: '0', GOPROXY: 'off', GOSUMDB: 'off', GOCACHE: path.join(root, '.cache', 'go-build'), GOMODCACHE: path.join(root, '.cache', 'go-mod') };
+const go = offlineGo(environment);
 for (const name of ['krasis', 'krasis-agent', 'krasis-control']) {
   const executable = path.join(destination, `${name}.exe`);
   const flags = name === 'krasis-control' ? ['-ldflags=-H=windowsgui'] : [];
-  execFileSync('go', ['build', '-trimpath', ...flags, '-o', executable, `./cmd/${name}`], { env: environment, stdio: 'inherit' });
+  execFileSync(go.command, ['build', '-trimpath', ...flags, '-o', executable, `./cmd/${name}`], { env: go.env, stdio: 'inherit' });
   const bytes = fs.readFileSync(executable);
   const pe = bytes.readUInt32LE(0x3c);
   if (bytes.toString('ascii', 0, 2) !== 'MZ' || bytes.readUInt32LE(pe) !== 0x4550 || bytes.readUInt16LE(pe + 4) !== 0x8664) {
