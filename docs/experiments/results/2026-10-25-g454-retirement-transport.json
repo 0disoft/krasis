@@ -40,6 +40,17 @@
     "aAndBService": "READY",
     "aRuntimeTrace": "runtime_trace_enabled at 2026-10-25T10:54:02.802407Z, matching g454 revision; existing bounded fifteen-minute recorder"
   },
-  "physicalAcceptance": "Pending user crossing exercise. This is a diagnostic improvement, not a confirmed fix for retirement failures or cursor latency.",
+  "physicalAcceptance": "FAILED: user reports stutter and latency after crossing; B failed again. Diagnostic classification succeeded and identified EOF rather than timeout.",
+  "followup": {
+    "collection": "53955969678bb36d10e3f4b0505ceebf",
+    "created": "2026-10-25T10:56:26Z / 10:56:28Z",
+    "bFailureTime": "2026-10-25T10:54:44.3902351Z",
+    "bFailureOperation": "input-retire-receipt-eof",
+    "bWorkerExit": "RUNNING, unknown exit code",
+    "bHealthAndService": "SERVICE_RECOVERY_REQUIRED / FAILED",
+    "aHealthAndService": "READY / READY",
+    "localExclusion": "A native Windows named-pipe test preserves a fully written receipt when the client closes before the service reads. Plain client close alone did not reproduce the field failure.",
+    "reproducedRace": "TestUnboundRetirementHonorsCompletedStopAfterStartupExpires fails on g454: a completed authenticated stop and disarmed close callback are rejected solely because startup expires before retirement runs. Field attribution remains provisional until paired verification."
+  },
   "publicPushOrRelease": false
 }

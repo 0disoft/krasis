@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -248,7 +249,7 @@ func runInstalledConsoleInputMode(ctx context.Context, agentDigest, serviceDiges
 	}
 	lifetime := &workerControlLifetime{stream: control}
 	defer lifetime.Close()
-	stopControl := context.AfterFunc(startup, func() { _ = control.Close() })
+	stopControl := sync.OnceValue(context.AfterFunc(startup, func() { _ = control.Close() }))
 	defer stopControl()
 	started = time.Now()
 	proof, err := authenticateServiceInstalled(startup, uintptr(control.handle), serviceDigest, installation)
@@ -280,7 +281,12 @@ func runInstalledConsoleInputMode(ctx context.Context, agentDigest, serviceDiges
 		return ErrAuthority
 	}
 	var packet [bootstrapSize]byte
-	if _, err := io.ReadFull(control, packet[:]); err != nil {
+	if prepareNative {
+		packet, err = readPreparedBootstrap(startup, stopControl, control.readContext)
+	} else {
+		_, err = io.ReadFull(control, packet[:])
+	}
+	if err != nil {
 		return ErrProtocol
 	}
 	if prepareNative && zeroBytes(packet[:]) {

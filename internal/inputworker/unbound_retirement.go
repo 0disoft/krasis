@@ -18,9 +18,9 @@ func retireUnboundNative(startup context.Context, control net.Conn, stopStartupI
 	if !stopStartupIO() {
 		return errors.Join(ErrRecovery, startup.Err())
 	}
-	if err := startup.Err(); err != nil {
-		return errors.Join(ErrRecovery, err)
-	}
+	// The exact authenticated stop was fully consumed. A late startup expiry
+	// cannot invalidate cleanup or its receipt once its pipe-close callback is
+	// disarmed. No input binding/authority is admitted by this reserved frame.
 	if err := control.SetDeadline(time.Now().Add(startupTimeout)); err != nil {
 		return errors.Join(ErrRecovery, err)
 	}

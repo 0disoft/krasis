@@ -13,6 +13,23 @@ import (
 	"time"
 )
 
+func TestUnboundRetirementHonorsCompletedStopAfterStartupExpires(t *testing.T) {
+	// The exact authenticated zero bootstrap was fully read, and its startup
+	// callback disarmed, before the worker was descheduled past startup expiry.
+	// Retirement grants no input; rejecting it here loses the final receipt.
+	startup, cancel := context.WithCancel(context.Background())
+	cancel()
+	conn := &unboundRetirementConn{}
+	retired := false
+	err := retireUnboundNative(startup, conn, func() bool { return true }, func() error {
+		retired = true
+		return nil
+	})
+	if err != nil || !retired || !bytes.Equal(conn.written.Bytes(), unboundRetiredFrame[:]) {
+		t.Fatal("completed authenticated stop lost to late startup cancellation", err, retired)
+	}
+}
+
 func TestUnboundRetirementReceiptSurvivesStartupExpiryDuringCleanup(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		service, worker := net.Pipe()
@@ -149,7 +166,7 @@ func TestUnboundRetirementCannotAcknowledgeExpiredFailedOrUnconfirmedCleanup(t *
 		deadlineErr, retireErr, writeErr, want error
 		retireCalls                            int
 	}{
-		{name: "startup already cancelled", cancelled: true, want: context.Canceled},
+		{name: "startup already cancelled and callback running", cancelled: true, callbackRunning: true, want: context.Canceled},
 		{name: "startup callback already running", callbackRunning: true},
 		{name: "deadline rejected", deadlineErr: syscall.Errno(6), want: syscall.Errno(6)},
 		{name: "unconfirmed native exit", retireErr: syscall.Errno(5), want: syscall.Errno(5), retireCalls: 1},

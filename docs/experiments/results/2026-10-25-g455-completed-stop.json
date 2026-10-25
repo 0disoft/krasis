@@ -1,0 +1,30 @@
+{
+  "schema": "krasis.experiment/v1",
+  "generation": 455,
+  "purpose": "Preserve an authenticated, completed unbound stop when startup expires after kernel read completion.",
+  "fieldTrigger": {
+    "collection": "53955969678bb36d10e3f4b0505ceebf",
+    "previousGeneration": 454,
+    "bOperation": "input-retire-receipt-eof",
+    "bTime": "2026-10-25T10:54:44.3902351Z",
+    "userResult": "Crossings still stutter and lag.",
+    "limit": "EOF establishes loss before exact receipt delivery, not the precise child branch. The completed-read cancellation race is locally reproduced; its contribution to this field failure requires paired acceptance."
+  },
+  "mechanism": {
+    "before": "Bootstrap startup used a context callback that closed the entire duplex control pipe. A completed bootstrap read could lose its retirement response to late startup cancellation. Retirement also rejected an already consumed stop solely because startup.Err became non-nil.",
+    "after": "After successful authentication, the prepared path disarms and memoizes the pipe-close callback before a context-aware native bootstrap read. Cancellation drains only that exact read. A fully consumed reserved zero frame may retire after startup expiry if callback ownership is retained.",
+    "authority": "Real leases retain startup.Err, service proof, lease freshness and exact image checks before activation. Partial, missing or already cancelled bootstraps cannot enter retirement.",
+    "retirement": "Both native exits and the exact existing retirement frame remain required; the independent five-second cleanup deadline and recovery fence remain. No retry, cached authority or new success frame is introduced."
+  },
+  "validation": {
+    "before": "TestUnboundRetirementHonorsCompletedStopAfterStartupExpires FAILED on g454: context canceled, native retirement callback never called.",
+    "focusedAfter": "PASS: UnboundRetirement, PreparedBootstrap, PreparedStop, CancelledPreparedRead and native completed-read regressions (0.160s before full package run).",
+    "goTest": "PASS: ./internal/inputworker (24.902s), ./internal/crashguard (1.520s), ./internal/localapi (6.310s), -count=1 -timeout=180s",
+    "goVet": "PASS: ./internal/inputworker ./internal/crashguard ./internal/localapi",
+    "nativePipe": "Real Windows named-pipe tests verify completed zero bootstrap survives cancellation, cancelled reads retain duplex transport, and written receipts survive client close before service read.",
+    "negativeCases": "Already cancelled startup, running close callback, partial stop, EOF, failed native cleanup, lost receipt, expired retirement budget and unknown exit stay rejected."
+  },
+  "localRollout": "Pending g455 packaging and paired installation.",
+  "physicalAcceptance": "Pending; no field resolution or latency improvement claimed.",
+  "publicPushOrRelease": false
+}
