@@ -66,5 +66,25 @@
     "bPreparedCandidatesUsed": 12,
     "interpretation": "The removed RPC count is deterministic, but this sample does not establish lower field latency. Candidates aged 16.646/18.059 ms still needed 116.806/132.332 ms of native binding/readiness; candidates aged 156.047/213.523 ms needed 9.784/9.648 ms. Unfinished native loading is a candidate cause, not a demonstrated attribution. Movement cadence differed from the g456 run, and startup spans overlap."
   },
+  "followupImageHash": {
+    "finding": "Both unbound native children independently load their protected installation and fully hash krasis-input.exe before reading the binding bootstrap. PrepareLocalInputCommandContext returns after process creation, not after that load completes. Parent-side native readiness can therefore include unfinished image hashing.",
+    "change": "Use bounded 256 KiB streaming reads instead of the io.Copy default 32 KiB buffer. Keep every byte, exact size plus growth/EOF check, constant-time SHA-256 comparison, protected file handle and write/delete exclusion.",
+    "installedImageSizeBytes": 9014272,
+    "installedImageReadCallsBefore": 277,
+    "installedImageReadCallsAfter": 36,
+    "additionalBufferBytesPerHash": 229376,
+    "benchmark": {
+      "cpu": "AMD Ryzen 5 7430U",
+      "imageBytes": 9437184,
+      "iterationsPerSample": 10,
+      "samplesPerSize": 2,
+      "read32KiBNanos": [22873510, 19341110],
+      "read256KiBNanos": [15786840, 16915670],
+      "read1MiBNanos": [17160890, 16701720],
+      "limit": "Local cached synthetic-image full hashes, including a fresh buffer per pin. This does not measure B's native process startup or establish the cause of its full 132 ms tail. 1 MiB showed no advantage worth quadrupling the 256 KiB allocation."
+    },
+    "validation": "PASS: ./internal/inputworker -count=1 -timeout=180s (25.220s) and go vet ./internal/inputworker. Coverage checks the exact bounded read count, short successful reads, corrupt bytes, truncation, growth, read errors and invalid size.",
+    "localRollout": "Local generation 458 prepared; paired installation pending."
+  },
   "publicPushOrRelease": false
 }

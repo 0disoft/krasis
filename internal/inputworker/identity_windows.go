@@ -5,9 +5,7 @@ package inputworker
 import (
 	"context"
 	"crypto/sha256"
-	"crypto/subtle"
 	"encoding/binary"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -412,9 +410,7 @@ func lockImage(path string, expected [sha256.Size]byte) (*os.File, error) {
 	if size == 0 || size > 64<<20 {
 		return nil, ErrAuthority
 	}
-	hash := sha256.New()
-	n, err := io.Copy(hash, io.LimitReader(file, int64(size)+1))
-	if err != nil || n != int64(size) || subtle.ConstantTimeCompare(hash.Sum(nil), expected[:]) != 1 {
+	if verifyImageHash(file, int64(size), expected) != nil {
 		return nil, ErrAuthority
 	}
 	accepted = true
