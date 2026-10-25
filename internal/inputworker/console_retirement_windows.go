@@ -50,6 +50,9 @@ func (w *ConsoleWorker) tryRetire(waitMilliseconds uint32) error {
 	}
 	w.retiring, w.err = true, ErrAuthority
 	ops := w.retirementOps()
+	// Job drain and exact process exit share one wait budget. Native calls may
+	// consume it too; never grant a fresh timeout after the first phase.
+	deadline := time.Now().Add(time.Duration(waitMilliseconds) * time.Millisecond)
 	if w.job != 0 {
 		if w.pairJob {
 			// Force cleanup through the exact job, but require the worker's
@@ -69,7 +72,6 @@ func (w *ConsoleWorker) tryRetire(waitMilliseconds uint32) error {
 				w.poisoned, w.err = true, ErrRecovery
 				return w.err
 			}
-			deadline := time.Now().Add(time.Duration(waitMilliseconds) * time.Millisecond)
 			for {
 				active, err := ops.activeProcesses(w.job)
 				if err != nil {
@@ -92,7 +94,8 @@ func (w *ConsoleWorker) tryRetire(waitMilliseconds uint32) error {
 		w.job = 0
 	}
 	if w.process != 0 {
-		state, err := ops.wait(w.process, waitMilliseconds)
+		remaining := max(time.Duration(0), time.Until(deadline))
+		state, err := ops.wait(w.process, uint32(remaining/time.Millisecond))
 		if err == nil && state == uint32(windows.WAIT_TIMEOUT) {
 			return w.err
 		}

@@ -1,0 +1,33 @@
+{
+  "schema": "krasis.experiment/v1",
+  "purpose": "Keep console-worker retirement from renewing its wait budget between Job drain and exact process-exit observation.",
+  "baseline": {
+    "revision": "dfd1cea",
+    "path": "ConsoleWorker.tryRetire created the Job drain deadline after termination, then passed the full original waitMilliseconds to the process wait after Job polling and handle close. Close supplies 5000ms and login-worker cleanup supplies 1000ms; the second phase could renew the supplied budget.",
+    "reproduction": "FAIL: deterministic synctest callbacks consumed 30ms polling a Job with a 50ms budget, then received another 50ms process wait, totaling 80ms. A 70ms native Job close received another 50ms, totaling 120ms; an ordinary 15ms Job close plus process wait totaled 65ms."
+  },
+  "change": {
+    "deadline": "Create one deadline before native retirement operations. Reuse it for Job polling and pass only max(0, time.Until(deadline)) rounded down to milliseconds to WaitForSingleObject. An exhausted budget still permits a nonblocking observation of exact exit.",
+    "ownership": "WAIT_TIMEOUT still retains the exact process handle, image pin and pending retirement; it cannot publish Done or authorize another launch. Missing native-child receipts and failed handle operations retain their existing fail-closed behavior. A later zero-budget reap can observe exact exit and close resources once.",
+    "complexity": "O(1) deadline arithmetic added; Job polling and native handle-operation counts retain their existing structure. No new timers, goroutines or I/O paths.",
+    "interfaces": "No API, wire schema, DB, source-of-truth document, repository hygiene, runner, dependency or version changes."
+  },
+  "measurements": [
+    {"case": "pair_drains", "budgetMs": 50, "jobDrainMs": 30, "beforeProcessWaitMs": 50, "afterProcessWaitMs": 20, "beforeElapsedMs": 80, "afterElapsedMs": 50},
+    {"case": "job_close_consumes_budget", "budgetMs": 50, "nativeJobCloseMs": 70, "beforeProcessWaitMs": 50, "afterProcessWaitMs": 0, "beforeElapsedMs": 120, "afterElapsedMs": 70},
+    {"case": "ordinary_job", "budgetMs": 50, "nativeJobCloseMs": 15, "beforeProcessWaitMs": 50, "afterProcessWaitMs": 35, "beforeElapsedMs": 65, "afterElapsedMs": 50},
+    {"case": "nonblocking_reap", "budgetMs": 0, "beforeProcessWaitMs": 0, "afterProcessWaitMs": 0, "beforeElapsedMs": 0, "afterElapsedMs": 0}
+  ],
+  "validation": {
+    "environment": "Go 1.27.3 windows/amd64 with repository runtime STW overlay; deterministic consoleCloseOps callbacks and synctest virtual time.",
+    "before": "go test -timeout 2m ./internal/inputworker -run '^TestConsoleRetirementSharesOneWaitBudget$' -count=1 failed in the first three cases before the implementation change.",
+    "after": "PASS: the same regression, 0.042s. All four cases also verify retained process ownership after timeout and exactly-once successful retirement after a later nonblocking exact-exit observation.",
+    "packages": "PASS: go test -timeout 3m ./internal/inputworker ./internal/crashguard; 27.053s and 2.886s. This includes existing native Windows process/Job retirement and recovery-receipt checks.",
+    "lint": "PASS: go vet ./internal/inputworker ./internal/crashguard.",
+    "formatAndCheck": "PASS: gofmt on changed Go files and git diff --check.",
+    "skipped": "Full repository, GUI/installer/release builds and physical two-PC tests: only console-worker retirement wait accounting changed. Installed services and applications were not updated."
+  },
+  "remainingRisk": "This accounts for elapsed native-call time but cannot preempt a native call itself or bound mutex admission. The 70ms Job-close case intentionally exceeds its 50ms budget and receives no additional process wait. Measurements use injected callbacks, not observed laptop shutdown timings, and do not establish a fix for historical input-service error 1066.",
+  "installedOnEitherPC": false,
+  "publicPushOrRelease": false
+}
