@@ -29,6 +29,7 @@ var clipUnlock = clipKernel.NewProc("GlobalUnlock")
 var clipSize = clipKernel.NewProc("GlobalSize")
 var clipCopy = syscall.NewLazyDLL("ntdll.dll").NewProc("RtlMoveMemory")
 var errClipboardUnavailable = errors.New("clipboard unavailable")
+var errClipboardSize = errors.New("clipboard size limit")
 
 const (
 	cfUnicodeText = 13
@@ -132,7 +133,10 @@ func readClipboardText(hwnd uintptr) (string, uintptr, error) {
 		return "", sequence, errClipboardUnavailable
 	}
 	size, _, _ := clipSize.Call(handle)
-	if size < 2 || size > 2*(peerupdate.MaxClipboardBytes+1) || size%2 != 0 {
+	if size > 2*(peerupdate.MaxClipboardBytes+1) {
+		return "", sequence, errClipboardSize
+	}
+	if size < 2 || size%2 != 0 {
 		return "", sequence, errClipboardUnavailable
 	}
 	ptr, _, _ := clipLock.Call(handle)
@@ -155,7 +159,7 @@ func readClipboardText(hwnd uintptr) (string, uintptr, error) {
 	}
 	text := string(unicode16.Decode(data[:end]))
 	if len(text) > peerupdate.MaxClipboardBytes {
-		return "", sequence, errClipboardUnavailable
+		return "", sequence, errClipboardSize
 	}
 	return text, sequence, nil
 }
@@ -272,24 +276,28 @@ func (p *clipboardPump) sync(ctx context.Context, hwnd uintptr, control, peer st
 	if err != nil {
 		return
 	}
-	report := func(id, code string) {
-		_, _ = client.Clipboard(ctx, localapi.ClipboardRequest{Action: "REPORT", Peer: peer, Format: "files", Ack: id, Report: code})
+	report := func(id, format, code string) {
+		_, _ = client.Clipboard(ctx, localapi.ClipboardRequest{Action: "REPORT", Peer: peer, Format: format, Ack: id, Report: code})
 	}
 	request := localapi.ClipboardRequest{Action: "SYNC", Peer: peer}
 	if current != p.sequence {
 		if !clipboardHasFormat(clipboardFormat("Krasis.RemoteClipboard.v1")) {
 			p.localChanged = true
 		}
-		fileCandidate := clipboardHasFormat(cfHDROP) && !clipboardHasFormat(clipboardFormat("Krasis.RemoteClipboard.v1")) && !clipboardHasFormat(clipboardFormat("ExcludeClipboardContentFromMonitorProcessing"))
+		localCandidate := !clipboardHasFormat(clipboardFormat("Krasis.RemoteClipboard.v1")) && !clipboardHasFormat(clipboardFormat("ExcludeClipboardContentFromMonitorProcessing"))
+		fileCandidate := localCandidate && clipboardHasFormat(cfHDROP)
 		if fileCandidate {
-			report("", "preparing")
+			report("", "files", "preparing")
 		}
 		format, data, sequence, present, err := readClipboardFiles(ctx, hwnd)
 		if fileCandidate && err != nil {
-			report("", clipboardFileFailure(err))
+			report("", "files", clipboardFileFailure(err))
 		}
 		if !present {
 			format, data, sequence, present, err = readClipboardImage(hwnd)
+			if localCandidate && present && err != nil && (format == "png" || format == "dib") {
+				report("", format, clipboardPreparationFailure(err))
+			}
 		}
 		if sequence != 0 {
 			p.sequence = sequence
@@ -307,6 +315,8 @@ func (p *clipboardPump) sync(ctx context.Context, hwnd uintptr, control, peer st
 			if textErr == nil {
 				request.Text = &text
 				current = textSequence
+			} else if localCandidate && clipboardHasFormat(cfUnicodeText) {
+				report("", "", clipboardPreparationFailure(textErr))
 			}
 		}
 	}
@@ -330,14 +340,19 @@ func (p *clipboardPump) sync(ctx context.Context, hwnd uintptr, control, peer st
 		sequence, err = writeRemoteClipboardImage(hwnd, current, result.Value.Format, result.Value.Data, result.Value.ID)
 	}
 	if err != nil {
-		if result.Value.Format == "files" {
-			report(result.Value.ID, "apply_failed")
-		}
+		report(result.Value.ID, result.Value.Format, "apply_failed")
 		return
 	}
 	p.sequence = sequence
 	p.pendingAck = result.Value.ID
 	_, _ = p.exchangeClipboard(ctx, p.sequence, localapi.ClipboardRequest{Action: "SYNC", Peer: peer, Ack: result.Value.ID}, send)
+}
+
+func clipboardPreparationFailure(err error) string {
+	if errors.Is(err, errClipboardSize) {
+		return "size_limit"
+	}
+	return "prepare_failed"
 }
 
 func (a *productWindow) toggleClipboard() {

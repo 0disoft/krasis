@@ -76,7 +76,7 @@ func (m *Manager) clipboardReceiveFailed(peer, id string) {
 func (m *Manager) ReportClipboard(peer, id, format, code string) error {
 	m.clipboard.mu.Lock()
 	defer m.clipboard.mu.Unlock()
-	if m.clipboard.peer != peer || format != "files" {
+	if peer == "" || m.clipboard.peer != peer || !ValidClipboardReportFormat(format) {
 		return ErrDenied
 	}
 	if code == "apply_failed" {
@@ -103,4 +103,15 @@ func (m *Manager) ReportClipboard(peer, id, format, code string) error {
 	m.clipboard.transfer = ClipboardTransfer{State: state, Format: format, Direction: "SEND", Code: code}
 	m.clipboardChanged()
 	return nil
+}
+
+// Report formats are the exact wire formats, including empty for Unicode text.
+// Keep application failures bound to the received payload's format and ID.
+func ValidClipboardReportFormat(format string) bool {
+	switch format {
+	case "", "png", "dib", "files":
+		return true
+	default:
+		return false
+	}
 }

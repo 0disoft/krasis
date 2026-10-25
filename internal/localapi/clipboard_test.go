@@ -63,3 +63,36 @@ func TestClipboardImageRequestCannotMasqueradeAsTextOrPermission(t *testing.T) {
 		}
 	}
 }
+
+func TestClipboardFailureReportsAreContentFreeAndUseExactWireFormats(t *testing.T) {
+	peer, id := strings.Repeat("a", 64), strings.Repeat("b", 32)
+	for _, format := range []string{"", "png", "dib", "files"} {
+		r := ClipboardRequest{Action: "REPORT", Peer: peer, Format: format, Report: "prepare_failed"}
+		if !r.Valid() {
+			t.Fatalf("preparation report rejected for %q", format)
+		}
+		r.Report, r.Ack = "apply_failed", id
+		if !r.Valid() {
+			t.Fatalf("application report rejected for %q", format)
+		}
+		for _, mutate := range []func(*ClipboardRequest){
+			func(r *ClipboardRequest) { r.Ack = "" },
+			func(r *ClipboardRequest) { r.Peer = "unknown" },
+			func(r *ClipboardRequest) { r.Text = new(string) },
+			func(r *ClipboardRequest) { r.Data = []byte("private") },
+			func(r *ClipboardRequest) { r.LocalChanged = true },
+			func(r *ClipboardRequest) { r.Report = "private native error" },
+		} {
+			bad := r
+			mutate(&bad)
+			if bad.Valid() {
+				t.Fatalf("invalid report accepted for %q", format)
+			}
+		}
+	}
+	for _, format := range []string{"text", "image", "jpeg", "private path"} {
+		if (ClipboardRequest{Action: "REPORT", Peer: peer, Format: format, Report: "prepare_failed"}).Valid() {
+			t.Fatalf("unknown wire format %q accepted", format)
+		}
+	}
+}

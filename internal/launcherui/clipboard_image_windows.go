@@ -5,6 +5,7 @@ package launcherui
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"image"
 	"image/draw"
 	"image/png"
@@ -47,6 +48,7 @@ func readClipboardImage(hwnd uintptr) (string, []byte, uintptr, bool, error) {
 	}
 	pngFormat := clipboardFormat("PNG")
 	present := false
+	failedFormat, failure := "", errClipboardUnavailable
 	for _, item := range []struct {
 		format uintptr
 		kind   string
@@ -59,8 +61,15 @@ func readClipboardImage(hwnd uintptr) (string, []byte, uintptr, bool, error) {
 		if err == nil && peerupdate.ValidClipboardImage(item.kind, data) {
 			return item.kind, data, sequence, true, nil
 		}
+		if failedFormat == "" || errors.Is(err, errClipboardSize) {
+			failedFormat = item.kind
+			failure = errClipboardUnavailable
+			if err != nil {
+				failure = err
+			}
+		}
 	}
-	return "", nil, sequence, present, errClipboardUnavailable
+	return failedFormat, nil, sequence, present, failure
 }
 
 func readClipboardGlobalBytes(format uintptr) ([]byte, error) {
@@ -69,7 +78,10 @@ func readClipboardGlobalBytes(format uintptr) ([]byte, error) {
 		return nil, errClipboardUnavailable
 	}
 	size, _, _ := clipSize.Call(handle)
-	if size == 0 || size > peerupdate.MaxClipboardImageBytes {
+	if size > peerupdate.MaxClipboardImageBytes {
+		return nil, errClipboardSize
+	}
+	if size == 0 {
 		return nil, errClipboardUnavailable
 	}
 	pointer, _, _ := clipLock.Call(handle)

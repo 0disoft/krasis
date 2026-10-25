@@ -13,7 +13,7 @@
   import WindowTitlebar from './WindowTitlebar.svelte';
   import monitor from './assets/monitor.png';
   import { createBridge } from './bridge.js';
-  import { createClipboardBridge } from './clipboard-bridge.js';
+  import { createClipboardBridge, clipboardTransferLabelKey } from './clipboard-bridge.js';
   import { createPairingBridge } from './pairing-bridge.js';
   import { createLayoutBridge } from './layout-bridge.js';
   import { createLayoutController } from './layout-controller.js';
@@ -145,7 +145,7 @@
   const clipboardEnabled = $derived(clipboardKnown && !!clipboard.peer);
   const clipboardAlias = $derived(snapshot.peers.find(p => p.fingerprint === clipboard.peer)?.alias ?? '');
 	const fileTransfer = $derived(clipboardEnabled ? clipboard.transfer : null);
-	const fileTransferLabel = $derived(fileTransfer ? t('clipboard_files_' + (fileTransfer.state === 'FAILED' && fileTransfer.code ? fileTransfer.code : fileTransfer.state.toLowerCase())) : '');
+	const fileTransferLabel = $derived(fileTransfer ? t(clipboardTransferLabelKey(fileTransfer)) : '');
   const canDisconnect = $derived(['CONNECTING','CONNECTED','RECONNECTING'].includes(snapshot.state));
   const shownEdge = $derived(layoutPeer && layoutPeer === selected ? layout.edge : null);
   const canPlace = $derived(snapshot.state === 'LOCAL' && !!selectedPeer && layoutPeer === selected && ['ok','unconfigured'].includes(layout.code) && !pairing.job && !busy);

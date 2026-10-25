@@ -36,7 +36,7 @@ func (r ClipboardRequest) Valid() bool {
 		return false
 	}
 	if r.Action == "REPORT" {
-		if r.Text != nil || len(r.Data) != 0 || r.Format != "files" {
+		if r.Text != nil || len(r.Data) != 0 || !peerupdate.ValidClipboardReportFormat(r.Format) {
 			return false
 		}
 		if r.Report == "apply_failed" {
