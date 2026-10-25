@@ -30,7 +30,7 @@
     "vet": "PASS: ./internal/inputworker",
     "packageTests": "PASS: ./internal/inputworker -count=1 -timeout=180s (25.291 seconds)",
     "additionalBoundaries": "Slow authentication still times out; oversized cleanup still times out; receipt deadline setup failure preserves ErrRecovery and does not consume the receipt.",
-    "physicalAcceptance": "Pending a new crossing test on corrected g453."
+    "physicalAcceptance": "g453 short crossing test completed with 12 matching complete handoffs per PC, all end=ok. Sustained acceptance FAILED: B later stopped with input-retire-receipt and error 1066."
   },
   "localRollout": {
     "generation": 453,
@@ -46,6 +46,30 @@
     "aAndBInputHealth": "READY",
     "aAndBService": "READY",
     "aTracing": "Restarted exact protected g453 agent with the existing fifteen-minute opt-in recorder; requested reconnection after maintenance pause."
+  },
+  "g453Followup": {
+    "crossingCollection": "918fbe289a39554abeadaacd5a27f9b5",
+    "exerciseStart": "2026-10-25T10:38:07Z",
+    "matchedExchangeTags": 12,
+    "allProfilesCompleteAndEndOk": true,
+    "timingsMicros": {
+      "g452ASourceFirstOffer": {"n": 12, "median": 63557.5, "max": 277641},
+      "g453ASourceFirstOffer": {"n": 12, "median": 102373, "max": 389289},
+      "g452BReceiverReadyWait": {"n": 12, "median": 28714, "max": 84341},
+      "g453BReceiverReadyWait": {"n": 12, "median": 32887, "max": 319893},
+      "g453BEntryDispatch": {"n": 12, "median": 5430.5, "max": 7250},
+      "g453ABoundaryToBegin": {"n": 12, "median": 6860.5, "max": 240552}
+    },
+    "comparisonLimit": "Different physical runs, not a controlled latency benchmark. No latency improvement is established. ReadyWait includes stages outside ServiceBootstrapReady; do not attribute all 320ms to native child startup.",
+    "subsequentFailureCollection": "a4d326300fe26d3a7be11241c49fcb70",
+    "bFailure": {"time": "2026-10-25T10:41:44.0229943Z", "operation": "input-retire-receipt", "workerExit": "RUNNING", "inputHealth": "SERVICE_RECOVERY_REQUIRED", "win32Error": 1066},
+    "aFailure": {"time": "2026-10-25T10:41:47.7516118Z", "fault": "fault_remote_eof", "service": "READY"},
+    "attribution": "The independent cleanup budget fixes a controlled defect but is insufficient to resolve field retirement failures. The current receipt does not distinguish EOF, truncated frame, cancellation, closed transport or timeout when no Win32 code exists.",
+    "aTerminalTrace": {"saved": "2026-10-25T10:41:47.9057532Z", "completeSTWSpans": 6, "maxSTWMillis": 66.694944, "limit": "This is an A agent trace, not B service/child execution. No B native retirement cause is established."},
+    "afterUserRepairedBCollection": "96e5743093496da68a02b31f6aef4d0a",
+    "afterRepairCreated": "2026-10-25T10:46:47Z / 10:46:48Z",
+    "afterRepairBothHealthAndService": "READY",
+    "afterRepairADoctor": "healthy, CONNECTED, matching protected g453"
   },
   "publicPushOrRelease": false
 }

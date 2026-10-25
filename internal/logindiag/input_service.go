@@ -12,12 +12,24 @@ func validInputServiceOperation(operation string) bool {
 		"input-close-control", "input-close-worker":
 		return true
 	}
-	stage, kind, ok := strings.Cut(strings.TrimPrefix(operation, "input-startup-"), "-")
-	if !ok || !strings.HasPrefix(operation, "input-startup-") {
+	prefix := "input-startup-"
+	if strings.HasPrefix(operation, "input-retire-") {
+		prefix = "input-retire-"
+	}
+	stage, kind, ok := strings.Cut(strings.TrimPrefix(operation, prefix), "-")
+	if !ok || !strings.HasPrefix(operation, prefix) {
 		return false
 	}
-	switch stage {
-	case "validation", "prepare", "authentication", "transfer", "ready", "publish":
+	validStage := false
+	if prefix == "input-retire-" {
+		validStage = stage == "authentication" || stage == "stop" || stage == "receipt"
+	} else {
+		switch stage {
+		case "validation", "prepare", "authentication", "transfer", "ready", "publish":
+			validStage = true
+		}
+	}
+	if validStage {
 		switch kind {
 		case "timeout", "cancelled", "truncated", "eof", "closed":
 			return true

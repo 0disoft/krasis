@@ -36,7 +36,10 @@ func inputServiceAt(operation string, cause error) error {
 // A fixed transport class remains useful when no Win32 result exists. Keep
 // more specific worker/authority operations through inputServiceAt as before.
 func inputStartupFailure(stage string, cause error) error {
-	operation := "input-startup-" + stage
+	return inputServiceTransportFailure("input-startup-"+stage, cause)
+}
+
+func inputServiceTransportFailure(operation string, cause error) error {
 	switch {
 	case errors.Is(cause, context.DeadlineExceeded), errors.Is(cause, os.ErrDeadlineExceeded):
 		operation += "-timeout"
@@ -86,11 +89,11 @@ func retireInputPreparation(stream inputRetirementStream, authenticated, retired
 		return inputServiceAt("input-retire-deadline", errors.Join(ErrRecovery, err))
 	}
 	if err := readInputServiceFrame(stream, authenticated); err != nil {
-		return inputServiceAt("input-retire-authentication", errors.Join(ErrRecovery, err))
+		return inputServiceTransportFailure("input-retire-authentication", errors.Join(ErrRecovery, err))
 	}
 	var stop [bootstrapSize]byte // Same reserved all-zero stop bootstrap.
 	if err := writeInputServiceFrame(stream, stop[:]); err != nil {
-		return inputServiceAt("input-retire-stop", errors.Join(ErrRecovery, err))
+		return inputServiceTransportFailure("input-retire-stop", errors.Join(ErrRecovery, err))
 	}
 	// Preparation/authentication may consume most of the first IO budget.
 	// The authenticated stop starts the child's independent native cleanup
@@ -100,7 +103,7 @@ func retireInputPreparation(stream inputRetirementStream, authenticated, retired
 		return inputServiceAt("input-retire-deadline", errors.Join(ErrRecovery, err))
 	}
 	if err := readInputServiceFrame(stream, retired); err != nil {
-		return inputServiceAt("input-retire-receipt", errors.Join(ErrRecovery, err))
+		return inputServiceTransportFailure("input-retire-receipt", errors.Join(ErrRecovery, err))
 	}
 	return nil
 }

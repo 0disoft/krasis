@@ -41,18 +41,18 @@ func (f *inputRetirementFixture) Write(data []byte) (int, error) {
 func TestInputRetirementPreservesStageCauseAndRecoveryFence(t *testing.T) {
 	retired := [8]byte{'K', 'R', 'U', '1', 1, 0, 0, 0}
 	for _, tc := range []struct {
-		name, stage                 string
+		name, stage, suffix         string
 		response                    []byte
 		deadlineErr, writeErr, want error
 		shortWrite                  bool
 	}{
 		{name: "deadline", stage: "deadline", deadlineErr: os.ErrDeadlineExceeded, want: os.ErrDeadlineExceeded},
 		{name: "foreign authentication", stage: "authentication", response: retired[:], want: ErrProtocol},
-		{name: "truncated authentication", stage: "authentication", response: workerAuthenticatedFrame[:3], want: io.ErrUnexpectedEOF},
+		{name: "truncated authentication", stage: "authentication", suffix: "-truncated", response: workerAuthenticatedFrame[:3], want: io.ErrUnexpectedEOF},
 		{name: "stop", stage: "stop", response: workerAuthenticatedFrame[:], writeErr: syscall.Errno(109), want: syscall.Errno(109)},
 		{name: "short stop", stage: "stop", response: workerAuthenticatedFrame[:], shortWrite: true, want: io.ErrShortWrite},
-		{name: "missing receipt", stage: "receipt", response: workerAuthenticatedFrame[:], want: io.EOF},
-		{name: "truncated receipt", stage: "receipt", response: append(append([]byte{}, workerAuthenticatedFrame[:]...), retired[:3]...), want: io.ErrUnexpectedEOF},
+		{name: "missing receipt", stage: "receipt", suffix: "-eof", response: workerAuthenticatedFrame[:], want: io.EOF},
+		{name: "truncated receipt", stage: "receipt", suffix: "-truncated", response: append(append([]byte{}, workerAuthenticatedFrame[:]...), retired[:3]...), want: io.ErrUnexpectedEOF},
 		{name: "foreign receipt", stage: "receipt", response: append(append([]byte{}, workerAuthenticatedFrame[:]...), workerAuthenticatedFrame[:]...), want: ErrProtocol},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -64,7 +64,7 @@ func TestInputRetirementPreservesStageCauseAndRecoveryFence(t *testing.T) {
 			r := newLoginRuntimeRecorder(func(logindiag.Runtime) error { return nil })
 			r.record("service", "FAILED", serviceEndpointFailure(result, "input"))
 			failure := r.value.LastFailure
-			if failure == nil || failure.Operation != "input-retire-"+tc.stage || failure.Reason != "input" || !r.value.Valid() {
+			if failure == nil || failure.Operation != "input-retire-"+tc.stage+tc.suffix || failure.Reason != "input" || !r.value.Valid() {
 				t.Fatal("retirement stage did not reach runtime", failure)
 			}
 			if tc.stage == "deadline" || tc.stage == "authentication" {
