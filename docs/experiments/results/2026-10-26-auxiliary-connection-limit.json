@@ -1,0 +1,28 @@
+{
+  "schema": "krasis.experiment/v1",
+  "purpose": "Bound auxiliary HTTPS connection ownership before TLS authentication and HTTP handler admission.",
+  "baseline": {
+    "revision": "5fbd4d9",
+    "path": "tls.Listen admitted raw connections without a cap. Five HTTP handler gates run after TLS authentication and could not bound unauthenticated connection ownership.",
+    "reproduction": "FAIL: eight raw TCP clients withheld ClientHello; the ninth also entered net/http, peak ownership reached 9, and its read hit the 1-second deadline instead of immediate rejection. No HTTP authorization callback ran. The production TLS handshake deadline is already 3 seconds; the defect is simultaneous admission, not an absent timeout."
+  },
+  "change": {
+    "admission": "Wrap net.Listen with an 8-slot raw listener, then wrap that with tls.NewListener. Overflow connections close in the accept loop without a TLS/HTTP owner. net/http still receives *tls.Conn, preserving its TLS handling and deadlines.",
+    "release": "Each admitted connection closes its underlying socket and returns its slot exactly once with sync.Once. A duplicate Close returns the original close result without consuming another slot. Listener.Close still unblocks Accept through the underlying listener.",
+    "configuration": "Preserve fail-closed validation of a missing TLS identity before binding. Existing TLS settings and request authorization are unchanged.",
+    "bound": "For N concurrent attempts, net/http connection owners and TLS handshake work are bounded by min(N, 8), instead of N. Overflow socket acceptance/closure still incurs O(N) work; one transient accepted overflow socket and the OS backlog are outside the 8-owner bound. The limit is per listener and includes authenticated active/idle connections.",
+    "interfaces": "No HTTP route, status code contract, JSON schema, DB, installer, repository hygiene, runner or source-of-truth document changes."
+  },
+  "validation": {
+    "regression": "PASS: 8 silent TCP clients occupy capacity; ninth is closed before TLS; peak HTTP ownership is at most 8 and no HTTP handler runs for silent clients. Closing clients releases capacity; subsequent HTTPS requests return 204 while trusted and 403 after revocation, with exactly two per-request trust checks.",
+    "lifecycle": "PASS: repeated Close releases capacity once; nil and empty TLS configs do not open a listener.",
+    "focused": "PASS: go test -v -timeout 40s -run '^TestAuxiliary' ./internal/peerupdate, including existing route authorization coverage, 0.876s.",
+    "packages": "PASS: go test -timeout 3m ./internal/peerupdate ./internal/residentagent, 18.229s and 9.967s, with the repository runtime STW overlay and Go 1.27.3.",
+    "vet": "PASS: go vet ./internal/peerupdate ./internal/residentagent.",
+    "hygiene": "PASS: changed Go files formatted with gofmt; git diff --check.",
+    "skipped": "Full repository, frontend, installer/release packaging and physical two-PC acceptance: only internal auxiliary listener admission changed; neither installed program was updated."
+  },
+  "remainingRisk": "Saturation can temporarily refuse legitimate clients. This bounds process-owned TLS/HTTP concurrency, not network bandwidth or accept-loop CPU, and does not guarantee availability during sustained attacks. Input-service error 1066 and cursor handoff latency were not exercised or claimed fixed.",
+  "installedOnEitherPC": false,
+  "publicPushOrRelease": false
+}

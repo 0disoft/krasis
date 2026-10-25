@@ -30,7 +30,7 @@ func (m *Manager) Run(ctx context.Context, address, peer string, listener bool, 
 	cfg.NextProtos = []string{"http/1.1"}
 	cfg.SessionTicketsDisabled = true
 	if listener {
-		ln, err := tls.Listen("tcp4", address, cfg)
+		ln, err := listenAuxiliary(address, cfg)
 		if err != nil {
 			return
 		}
