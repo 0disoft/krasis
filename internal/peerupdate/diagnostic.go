@@ -244,6 +244,11 @@ func (m *Manager) receiveDiagnostic(peer, id, requestID string, r io.Reader, aut
 	}
 	m.diagnostic.mu.Lock()
 	defer m.diagnostic.mu.Unlock()
+	// Storage may outlive the request. Revalidate under the publication lock;
+	// a late callback must not revive an expired collection or publish a receipt.
+	if replayed, err := m.validateDiagnosticReceiveLocked(peer, id, requestID, digest); err != nil || replayed {
+		return err
+	}
 	if m.diagnostic.last == nil {
 		m.diagnostic.last = map[string]diagnosticReceipt{}
 	}
@@ -268,11 +273,16 @@ func (m *Manager) beginDiagnosticReceive() bool {
 	return true
 }
 
-// Caller owns the receive slot. Validate after reading so expiry, authorization
-// and exact replay content still govern acknowledgements.
+// Caller owns the receive slot. Validate after reading, then use the same rules
+// under the publication lock again after the potentially slow storage callback.
 func (m *Manager) validateDiagnosticReceive(peer, id, requestID string, digest [sha256.Size]byte) (bool, error) {
 	m.diagnostic.mu.Lock()
 	defer m.diagnostic.mu.Unlock()
+	return m.validateDiagnosticReceiveLocked(peer, id, requestID, digest)
+}
+
+// Caller owns diagnostic.mu. No body read or storage callback runs here.
+func (m *Manager) validateDiagnosticReceiveLocked(peer, id, requestID string, digest [sha256.Size]byte) (bool, error) {
 	now := time.Now()
 	for key, receipt := range m.diagnostic.last {
 		if !now.Before(receipt.expires) {

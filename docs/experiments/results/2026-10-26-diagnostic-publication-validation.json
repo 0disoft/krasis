@@ -1,0 +1,26 @@
+{
+  "schema": "krasis.experiment/v1",
+  "purpose": "Prevent a slow diagnostic save from publishing success for an expired collection request.",
+  "baseline": {
+    "revision": "2857d9c",
+    "path": "receiveDiagnostic validated request identity/state/expiry before invoking storage, then unconditionally published a receipt and RECEIVED state after storage if trust still held. The polling download path uses this shared function too.",
+    "reproduction": "FAIL in both deterministic synctest cases: a save completing one nanosecond beyond the 1-minute request lifetime revived the request as RECEIVED, both without a status poll and after a status poll had already made it EXPIRED. A success receipt and path were also published. No physical minute-long disk stall was reproduced."
+  },
+  "change": {
+    "validation": "Extract validateDiagnosticReceiveLocked and reuse the same request/receipt rules before storage and under diagnostic.mu immediately before success publication. No network or storage I/O runs under this lock.",
+    "publication": "An expired, mismatched or non-PENDING collection cannot be marked RECEIVED or publish a new success receipt/path. The existing receive slot is released on rejection.",
+    "cost": "Reuse the existing content digest; no additional body read, hash pass or save callback. The additional validation scans at most the existing 32 receipt records plus constant-time request checks.",
+    "interfaces": "Preserves the existing request lifetime, HTTP routes, response status codes and JSON schemas. No DB, installer, repository hygiene, task runner or source-of-truth document changes."
+  },
+  "validation": {
+    "regression": "PASS: both expiry cases reject the late save, preserve EXPIRED, publish no receipt/path, release admission, and allow a new collection and its exact replay with one save callback.",
+    "focused": "PASS: TestDiagnostic suite, 4.530s, including replay identity/content, post-save revocation, receive admission, upload deadlines and request correlation in both network roles.",
+    "packages": "PASS: go test -timeout 3m ./internal/peerupdate ./internal/residentagent, 11.304s and 6.816s, using Go 1.27.3 with the repository runtime STW overlay.",
+    "vet": "PASS: go vet ./internal/peerupdate ./internal/residentagent.",
+    "hygiene": "PASS: changed Go files formatted with gofmt; git diff --check.",
+    "skipped": "Full repository, frontend, installer/release packaging and physical two-PC acceptance: only internal diagnostic success publication validation changed, with no installed program update."
+  },
+  "remainingRisk": "The save callback may already have created a file before the final rejection. This change rejects late success publication; it does not preempt filesystem I/O or delete callback-owned output. Historical input-service recovery and cursor handoff problems were not exercised.",
+  "installedOnEitherPC": false,
+  "publicPushOrRelease": false
+}
