@@ -84,7 +84,67 @@
       "limit": "Local cached synthetic-image full hashes, including a fresh buffer per pin. This does not measure B's native process startup or establish the cause of its full 132 ms tail. 1 MiB showed no advantage worth quadrupling the 256 KiB allocation."
     },
     "validation": "PASS: ./internal/inputworker -count=1 -timeout=180s (25.220s) and go vet ./internal/inputworker. Coverage checks the exact bounded read count, short successful reads, corrupt bytes, truncation, growth, read errors and invalid size.",
-    "localRollout": "Local generation 458 prepared; paired installation pending."
+    "localRollout": {
+      "generation": 458,
+      "revision": "8e471618ef39f705011145be8972c55ee4a20b46",
+      "setupSha256": "9150ba6f9062ce2e5c10e59f75c903583ad1aa236d8e75eaa1f7064f71527069",
+      "packaging": "PASS: frontend 103 tests, native UI build, update-package test, workspace and setup verification",
+      "aInstall": "Installed, exit 0",
+      "bUpdateJob": "83f0a2e1660d354cdab94bde7b79ec32",
+      "bUpdate": "UPDATED with matching g458 revision",
+      "postRepairCollection": "35ae1f8c67835c80c545671fd990f790",
+      "postRepairVerifiedUtc": "2026-10-25T12:07:46Z",
+      "postRepairState": "Both PCs READY, protected A installation matched, connected"
+    },
+    "physicalAcceptance": {
+      "collection": "7529274f9b133984cb2de5af3672ce7d",
+      "cutoffUtc": "2026-10-25T12:07:46Z",
+      "collectedAtUtc": "2026-10-25T12:08:31Z",
+      "matchedExchanges": 11,
+      "aCompletedOk": 11,
+      "bCompletedOk": 11,
+      "bNativePairReadyMedianMicros": 15051,
+      "bNativePairReadyMaxMicros": 55139,
+      "bReadyWaitMedianMicros": 39241,
+      "bReadyWaitMaxMicros": 75537,
+      "bCursorEntryMedianMicros": 4035,
+      "bCursorEntryMaxMicros": 7104,
+      "bPreparationWaitMaxMicros": 0,
+      "bPreparedCandidatesUsed": 11,
+      "bWorstInputDispatchMaxMicros": 160867,
+      "aService": "READY",
+      "bService": "FAILED",
+      "interpretation": "Readiness tails were lower than g457 in this sequential field run, but the independent retirement failure recurred after the successful handoffs. This run is not a stability pass, and not a controlled attribution of elapsed improvement to the hash buffer alone."
+    },
+    "retirementFailure": {
+      "preG458": {"generation": 457, "pc": "B", "timeUtc": "2026-10-25T12:04:20.4373166Z", "operation": "input-retire-receipt-eof"},
+      "g458": {"pc": "B", "timeUtc": "2026-10-25T12:08:27.5398322Z", "operation": "input-retire-receipt-eof", "workerObserved": "RUNNING"},
+      "state": "Unresolved; retain the exact native-retirement receipt and recovery fence. No claim that the latency changes fix this failure.",
+      "pipeSemanticsCheck": "PASS: TestNativeRetirementReceiptSurvivesImmediateWriterClose performs 20 Windows named-pipe writes followed by immediate writer close and a delayed reader. All exact final receipts survived. This rules out unconditional loss on Close in this fixture; it does not reproduce or explain the field EOF.",
+      "packageAfterPipeCheck": "PASS: go test ./internal/inputworker -count=1 -timeout=180s (38.864s)",
+      "latestObservation": {
+        "collection": "ee6d0bfba433d39887c9f0b8590c836b",
+        "aCollectedAtUtc": "2026-10-25T12:21:46Z",
+        "bCollectedAtUtc": "2026-10-25T12:21:49Z",
+        "a": {
+          "service": "FAILED",
+          "inputHealth": "SERVICE_RECOVERY_REQUIRED",
+          "win32Error": 1066,
+          "failureTimeUtc": "2026-10-25T12:10:25.9856424Z",
+          "operation": "source-startup-ready",
+          "workerObserved": "RUNNING"
+        },
+        "b": {
+          "service": "FAILED",
+          "inputHealth": "SERVICE_RECOVERY_REQUIRED",
+          "win32Error": 1066,
+          "failureTimeUtc": "2026-10-25T12:08:27.5398322Z",
+          "operation": "input-retire-receipt-eof",
+          "workerObserved": "RUNNING"
+        },
+        "interpretation": "Both endpoints now require administrator recovery. A failed later with a missing source-startup readiness/report; do not infer the same root cause as B from RUNNING alone. Successful crossing samples are earlier than these failures and establish neither current readiness nor stability. Further latency comparisons require restored service health."
+      }
+    }
   },
   "publicPushOrRelease": false
 }
