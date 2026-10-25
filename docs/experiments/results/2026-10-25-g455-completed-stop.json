@@ -24,7 +24,23 @@
     "nativePipe": "Real Windows named-pipe tests verify completed zero bootstrap survives cancellation, cancelled reads retain duplex transport, and written receipts survive client close before service read.",
     "negativeCases": "Already cancelled startup, running close callback, partial stop, EOF, failed native cleanup, lost receipt, expired retirement budget and unknown exit stay rejected."
   },
-  "localRollout": "Pending g455 packaging and paired installation.",
+  "localRollout": {
+    "revision": "7d75abe19a9421c90ca5d90af51be350dcb850cb",
+    "fixCommit": "e972ada",
+    "workspaceAndSetup": "PASS: frontend 103 tests and native build, update-bundle test (11.24s), executable icons, input installer and setup verification",
+    "bTransferId": "e7e3c201bf621f0729fee40655fb3e41",
+    "bResult": "UPDATED, generation 455, matching revision, 28438566 bytes",
+    "aSetup": "Exit 0, state installed",
+    "aStartup": "First immediate doctor probe preceded agent readiness; subsequent doctor reports healthy, CONNECTED, protected g455 agent and all build checks MATCHED",
+    "collection": "2883191566dde598bd4ab09e646e577f",
+    "created": "2026-10-25T11:09:27Z on both PCs",
+    "aAndBInputHealth": "READY",
+    "aAndBService": "READY",
+    "bInstallation": "Install completed 2026-10-25T11:08:50.9848463Z, result 0, recovery not_needed; no additional user administrator confirmation requested",
+    "aProtectedInputSha256": "18825176ada0b1547b5e3111fe5859f9d76df8c5f8d6cf1fd1eda8a3832f6952",
+    "aProtectedInputMatchesEmbeddedInstaller": true,
+    "aRuntimeTrace": "runtime_trace_enabled at 2026-10-25T11:09:21.0864679Z, matching g455 revision; existing bounded fifteen-minute recorder"
+  },
   "physicalAcceptance": "Pending; no field resolution or latency improvement claimed.",
   "publicPushOrRelease": false
 }
