@@ -1,0 +1,35 @@
+{
+  "schema": "krasis.experiment/v1",
+  "purpose": "Ensure terminal peer-session close interrupts I/O without spending the session shutdown budget sending a TLS close_notify to an unreading peer.",
+  "baseline": {
+    "revision": "5495a71",
+    "path": "PeerConnection.Close called tls.Conn.Close. Go 1.27.3 crypto/tls/conn.go closeNotify sets a fresh five-second write deadline for the alert. A bounded 500ms MessageDisconnect notification in residentagent does not bound this subsequent Close. DefaultSessionStopTimeout is five seconds.",
+    "reproduction": "FAIL: an authenticated TLS connection over net.Pipe, with its peer not reading, took exactly five seconds of synctest virtual time to close in both idle and pending-read cases. Close returned a TLS closeNotify timeout error. The pending-write case already closed promptly through the TLS implementation's active-write fast path.",
+    "terminalAlertWaitNanoseconds": 5000000000
+  },
+  "change": {
+    "terminalClose": "Close the TLS connection's underlying NetConn directly, as the existing failed-write path already does. This terminal operation interrupts local reads and writes and lets the peer observe EOF without a second outbound TLS alert exchange.",
+    "intent": "The existing explicit MessageDisconnect frame and its 500ms write budget remain unchanged. TLS authentication, encryption, frame validation and completed-operation acknowledgements remain unchanged. EOF is a failure/termination signal, never evidence that an operation succeeded.",
+    "measuredVirtualAlertWaitNanoseconds": 0,
+    "addedTimers": 0,
+    "addedGoroutines": 0,
+    "interfaces": "No exported API signature, application wire schema, DB, source-of-truth document, repository hygiene, runner, dependency or version changes. Terminal teardown deliberately no longer sends TLS close_notify."
+  },
+  "validation": {
+    "environment": "Go 1.27.3 windows/amd64 with the repository runtime STW overlay.",
+    "regressionBefore": "go test -timeout 2m ./internal/transport -run '^TestPeerCloseInterruptsIOWithoutWaitingForRemoteRead$' -count=1 failed in idle and reading cases at exactly 5s of virtual time.",
+    "regressionAfter": "PASS: the final test covers idle, pending local read, pending local write and a completed MessageDisconnect. Close returns nil without virtual-time advancement; pending operations terminate with errors, the remote reader observes termination and subsequent writes fail. The complete disconnect frame is received before close in the fourth case.",
+    "packages": "PASS: peer (8.849s), residentagent (8.828s) and agent (2.796s) in the related-package run. transport initially failed three TLS authentication fixture checks on their real-time handshake deadlines; a standalone uncached full transport run passed in 0.485s. No unrelated test timeouts were changed.",
+    "commands": [
+      "go test -timeout 3m ./internal/transport ./internal/peer ./internal/residentagent ./internal/agent",
+      "go test -timeout 2m ./internal/transport -count=1",
+      "go vet ./internal/transport ./internal/peer ./internal/residentagent ./internal/agent"
+    ],
+    "initialRunStatus": "The first combined test command exited unsuccessfully due to the three transport authentication timeouts. The subsequent standalone transport command and the vet command exited successfully.",
+    "formatAndCheck": "PASS: gofmt on changed Go files and git diff --check.",
+    "skipped": "Full repository, GUI/installer/release builds and physical two-PC tests: only peer transport terminal teardown changed. The installed programs were not updated."
+  },
+  "remainingRisk": "A real congested TCP peer was not measured; net.Pipe deterministically models an unreading peer with no send-buffer capacity. The zero value is virtual network-wait time, not a claim of zero CPU time or a universal shutdown bound. Native input-worker retirement and other session shutdown stages retain their existing budgets. No claim is made that this reproduces or fixes historical input-service error 1066.",
+  "installedOnEitherPC": false,
+  "publicPushOrRelease": false
+}

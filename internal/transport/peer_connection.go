@@ -186,5 +186,9 @@ func (connection *PeerConnection) Close() error {
 	if connection == nil || connection.connection == nil {
 		return nil
 	}
-	return connection.connection.Close()
+	// Session teardown must interrupt I/O without waiting for the peer to read
+	// TLS close_notify (tls.Conn.Close can spend another five seconds on it).
+	// User-stop intent is carried by the bounded MessageDisconnect write before
+	// this terminal close; transport EOF never authorizes a successful operation.
+	return connection.connection.NetConn().Close()
 }
