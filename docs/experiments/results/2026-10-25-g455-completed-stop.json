@@ -41,6 +41,55 @@
     "aProtectedInputMatchesEmbeddedInstaller": true,
     "aRuntimeTrace": "runtime_trace_enabled at 2026-10-25T11:09:21.0864679Z, matching g455 revision; existing bounded fifteen-minute recorder"
   },
-  "physicalAcceptance": "Pending; no field resolution or latency improvement claimed.",
+  "physicalAcceptance": {
+    "collection": "abf0afd87dff99a57c073b41fd93c545",
+    "created": "2026-10-25T11:10:42Z / 11:10:43Z",
+    "cutoff": "2026-10-25T11:09:27Z, after both installations and reconnect",
+    "aProfileWindow": "2026-10-25T11:10:05.9552599Z through 11:10:22.9316418Z",
+    "aSourceProfiles": 12,
+    "bReceiverProfiles": 12,
+    "matchedUniqueExchangeTags": 12,
+    "completeAndEndOkOnEachPc": 12,
+    "triggeredFailuresInExerciseWindow": 0,
+    "aAndBInputHealthAndService": "READY / READY",
+    "retirementResult": "No service recovery or retirement failure recurred in the captured exercise. This short sample does not establish long-term elimination or prove this was the only EOF cause.",
+    "latencyResult": "NOT IMPROVED in this sample. Receiver readiness and cursor entry still have substantial tails.",
+    "timingsMicros": {
+      "g453ASourceFirstOffer": {"n": 12, "median": 102373, "max": 389289},
+      "g455ASourceFirstOffer": {"n": 12, "median": 235471, "max": 1874792},
+      "g453BReadyWait": {"n": 12, "median": 32887, "max": 319893},
+      "g455BReadyWait": {"n": 12, "median": 144947.5, "max": 1369015},
+      "g453BEntryDispatch": {"n": 12, "median": 5430.5, "max": 7250},
+      "g455BEntryDispatch": {"n": 12, "median": 16211, "max": 339341},
+      "g455ASourceBoundaryToBegin": {"n": 12, "median": 2794.5, "max": 71231},
+      "g455CaptureActivate": {"n": 12, "median": 18336, "max": 94173},
+      "g455BWorstInputDispatchPerProfile": {"n": 12, "median": 39340, "max": 98948},
+      "g455BWorstWorkerApplyPerProfile": {"n": 12, "median": 28917, "max": 47675}
+    },
+    "dispatchHistogram": {
+      "bucketsMillis": ["less than 1", "1 to less than 10", "10 to less than 100", "100 to less than 1000", "at least 1000"],
+      "g453B": [0, 420, 0, 0, 0],
+      "g455B": [0, 425, 142, 0, 0]
+    },
+    "worstReadyWaitBreakdownMicros": {
+      "readyWait": 1369015,
+      "serviceBootstrapReady": 700830,
+      "workerDesktopReady": 445124,
+      "entryPrepare": 339341,
+      "preparationWait": 184327,
+      "preparedAge": 398422,
+      "limit": "Nested spans are not additive. Warm ownership does not prove all native startup work had completed before activation."
+    },
+    "bRuntimeSummary": {
+      "time": "2026-10-25T11:10:23.2021158Z",
+      "intervalMicros": 60000637,
+      "timerLateMicros": 1403880,
+      "slowControlDispatchMicros": 1821459,
+      "maxInjectionMicros": 98364,
+      "limit": "Agent scheduling delay and worker/native startup overlap; these aggregates cannot identify a specific OS or runtime cause."
+    },
+    "comparisonLimits": "Separate physical exercises, 12 captured transitions per PC, not a controlled benchmark. Exclude earlier startup/maintenance faults and incomplete profiles, including B's pre-reconnect 1.29-second input sample. Source first-offer spans are software timing, not input-to-display latency. No cross-PC timestamp subtraction is used.",
+    "nextFocus": "B receiver readiness, prepared native binding and cursor entry; distinguish native startup/desktop work from scheduler delay before further tuning."
+  },
   "publicPushOrRelease": false
 }
