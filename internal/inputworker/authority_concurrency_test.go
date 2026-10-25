@@ -1,11 +1,64 @@
 package inputworker
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"testing"
 	"time"
 )
+
+func TestAuthorityInputAndRecoveryDoNotWaitForClosingHandles(t *testing.T) {
+	entered, release := make(chan struct{}), make(chan struct{})
+	queries := 0
+	a := &Authority{
+		checkInput:         func() error { queries++; return nil },
+		checkInputObserved: func(context.Context) error { queries++; return nil },
+		checkRecovery:      func() error { queries++; return nil },
+		closeHandles:       func() error { close(entered); <-release; return nil },
+	}
+	closing := make(chan error, 1)
+	go func() { closing <- a.Close() }()
+	<-entered // Close owns the write lock and is still retiring native handles.
+	type result struct {
+		name string
+		err  error
+	}
+	done := make(chan result, 3)
+	for name, check := range map[string]func() error{
+		"input":    func() error { return a.check(false) },
+		"observed": func() error { return a.checkObserved(context.Background(), false) },
+		"recovery": func() error { return a.check(true) },
+	} {
+		go func() { done <- result{name, check()} }()
+	}
+	returned := 0
+	timer := time.NewTimer(time.Second)
+	defer timer.Stop()
+waiting:
+	for returned < 3 {
+		select {
+		case r := <-done:
+			returned++
+			if r.err != ErrAuthority {
+				t.Errorf("%s accepted a closing proof: %v", r.name, r.err)
+			}
+		case <-timer.C:
+			t.Errorf("%d/3 checks waited for native handle retirement", 3-returned)
+			break waiting
+		}
+	}
+	close(release)
+	if err := <-closing; err != nil {
+		t.Fatal(err)
+	}
+	for ; returned < 3; returned++ {
+		<-done
+	} // Join fixtures even against the old code.
+	if queries != 0 {
+		t.Fatal("closing proof queried native handles", queries)
+	}
+}
 
 func TestAuthorityConcurrentClosePreservesFirstFailure(t *testing.T) {
 	closes := 0

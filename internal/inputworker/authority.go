@@ -100,10 +100,12 @@ func (authority *Authority) checkResult(ctx context.Context, recovery bool) erro
 	if ctx != nil && !recovery {
 		started = time.Now()
 	}
-	// Checks only query immutable pinned handles; independent readers must not
-	// queue behind a slow SCM/WTS query. Close still joins every reader before
-	// releasing those handles.
-	authority.mu.RLock()
+	// Independent checks may share pinned handles, but a pending/active Close
+	// revokes admission. Never queue input or recovery behind its native cleanup.
+	// Already admitted readers still pin every handle until their check returns.
+	if !authority.mu.TryRLock() {
+		return ErrAuthority
+	}
 	defer authority.mu.RUnlock()
 	if !started.IsZero() {
 		handoff.RecordAuthority(ctx, handoff.AuthorityLock, time.Since(started))

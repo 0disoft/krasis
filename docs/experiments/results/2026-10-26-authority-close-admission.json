@@ -1,0 +1,25 @@
+{
+  "schema": "krasis.experiment/v1",
+  "purpose": "Reject new input and recovery authority checks without waiting behind proof retirement.",
+  "baseline": {
+    "revision": "bf41d8f",
+    "reproduction": "FAIL: with Authority.Close inside a blocked native-handle cleanup callback, ordinary input, observed input and recovery checks all remained blocked for the full 1-second observation (3/3). The fixture released cleanup and joined all goroutines afterward."
+  },
+  "change": {
+    "admission": "checkResult uses TryRLock instead of RLock, matching the existing source-input and heartbeat admission policy. A pending or active Close rejects the check with ErrAuthority instead of adding a reader behind the writer.",
+    "ownership": "Already admitted readers retain their read lock throughout the native query. Close still joins them before releasing handles, preserves its terminal error and closes handles once.",
+    "checks": "An available authority still performs the original fresh native input/recovery check; no success is cached or substituted by a heartbeat.",
+    "interfaces": "No API, DB, peer protocol, installer, repository hygiene, task runner, public signature or source-of-truth contract changes."
+  },
+  "validation": {
+    "focused": "PASS: authority/input/recovery regression suite, 0.110s total. All three new checks returned ErrAuthority while cleanup remained blocked, with zero native-check callback invocations. This is a controlled synchronization test, not a measured field latency or guaranteed wall-clock deadline.",
+    "preserved": "PASS: concurrent readers still overlap and Close joins both; repeated Close preserves its first failure; observed checks cannot bypass guards or recovery; zero and service proofs remain rejected.",
+    "package": "PASS: go test -timeout 3m ./internal/inputworker, 25.599s, using Go 1.27.3 and the repository's runtime STW overlay.",
+    "vet": "PASS: go vet ./internal/inputworker.",
+    "hygiene": "PASS: gofmt on both changed Go files; git diff --check.",
+    "skipped": "Full repository, frontend, installer/release packaging and physical two-PC acceptance: this slice changes only internal authority lock admission, with no installed application changes."
+  },
+  "remainingRisk": "Already admitted native queries and Close itself may still wait for native work to finish; this change removes new-check queuing behind retirement. It does not establish the cause of historical error 1066 incidents or prove that handoff stutter is resolved.",
+  "installedOnEitherPC": false,
+  "publicPushOrRelease": false
+}
