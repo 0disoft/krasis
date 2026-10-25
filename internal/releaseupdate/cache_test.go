@@ -1,6 +1,8 @@
 package releaseupdate
 
 import (
+	"bytes"
+	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
@@ -9,6 +11,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -139,7 +143,14 @@ func TestReadyCacheRoundTripWithPackagedProduct(t *testing.T) {
 	m.URL = fmt.Sprintf("https://github.com/0disoft/krasis/releases/download/g%d/krasis-g%d-windows-amd64.zip", meta.Generation, meta.Generation)
 	envelope, key := signed(t, m)
 	base := t.TempDir()
-	first, _, err := SaveReady(base, envelope, archive, key)
+	c := &http.Client{Transport: transportFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: 200, ContentLength: m.Size, Body: io.NopCloser(bytes.NewReader(archive))}, nil
+	})}
+	downloaded, err := DownloadArchiveBytes(context.Background(), c, m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, _, err := SaveReady(base, envelope, downloaded, key)
 	if err != nil {
 		t.Fatal(err)
 	}

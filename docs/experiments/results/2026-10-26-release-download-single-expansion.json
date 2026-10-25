@@ -1,0 +1,48 @@
+{
+  "schema": "krasis.experiment/v1",
+  "purpose": "Remove the discarded full bundle verification and ZIP expansion from automatic release downloads while retaining full validation before cache publication.",
+  "baseline": {
+    "revision": "af078eb",
+    "path": "WorkspaceService.checkRelease discarded the Bundle returned by DownloadArchive, then SaveReady verified the signed envelope and called verifyArchive again. Each verifyArchive expanded all ZIP entries and validated bundle metadata and PE executables.",
+    "fullBundleVerificationsPerDownloadedUpdate": 2,
+    "archiveSHA256PassesPerDownloadedUpdate": 2,
+    "httpDownloadsPerDownloadedUpdate": 1
+  },
+  "change": {
+    "download": "DownloadArchiveBytes rejects sizes outside (0, 96 MiB], uses the existing bounded HTTP fetch, and checks exact length and SHA-256 without expanding entries. It returns bytes only, never an installation authorization or staged executable.",
+    "publication": "The desktop caller still rechecks cancellation and AutoUpdate before the unchanged SaveReady verifies the signed envelope and complete archive, before any cache writes. Receipt atomicity, rollback, restoration and original Download/DownloadArchive contracts remain unchanged.",
+    "fullBundleVerificationsPerDownloadedUpdate": 1,
+    "archiveSHA256PassesPerDownloadedUpdate": 2,
+    "httpDownloadsPerDownloadedUpdate": 1,
+    "complexity": "Asymptotic time and live-space bounds remain O(A + E), where A is compressed archive size and E is expanded payload size. One full expansion, payload hash and PE validation pass is eliminated. The archive and one expanded bundle are still held in memory.",
+    "interfaces": "One exported helper added inside the repository-internal Go package; no external API, wire schema, DB, source-of-truth document, repository hygiene, runner, dependency or version changes."
+  },
+  "measurement": {
+    "command": "go test -timeout 3m ./internal/releaseupdate -run '^TestReadyCacheRoundTripWithPackagedProduct$' -bench '^BenchmarkDownloadBeforeSaveReady$' -benchtime=3x -count=3",
+    "environment": "Go 1.27.3 windows/amd64; AMD Ryzen 5 7430U; repository runtime STW overlay; KRASIS_RELEASE_SMOKE=dist/workspace/g459",
+    "fixture": "Existing g459 product package used only as test input, not as design evidence or certification of a newly built product. HTTP responses are served from memory without a network connection. Both paths subsequently use the same unchanged SaveReady; its work is excluded from this benchmark.",
+    "baselineBytesPerOp": [215040722, 215025269, 215025773],
+    "changedBytesPerOp": [57624112, 57624149, 57624149],
+    "baselineAllocsPerOp": [39059, 39057, 39056],
+    "changedAllocsPerOp": [49, 49, 49],
+    "baselineNanosecondsPerOp": [1506851433, 1304508300, 1233188833],
+    "changedNanosecondsPerOp": [66444667, 39907600, 38675833],
+    "medianAllocationReductionBytes": 157401624,
+    "medianAllocationReductionMiB": 150.1098861694336,
+    "medianDownloadPhaseAllocationReductionPercent": 73.20128271321225,
+    "interpretation": "These are cumulative allocation measurements of the differing download phase, not peak resident memory or a measured end-to-end updater improvement. Three short runs establish a large removed allocation cost; timing is informational and does not predict network performance."
+  },
+  "validation": {
+    "regression": "PASS: matching bytes accepted, wrong digest and short/long bodies rejected, invalid/overflowing manifest sizes cause zero network calls, a correctly hashed malformed ZIP cannot publish or create cache files, and existing DownloadArchive still rejects it.",
+    "smoke": "PASS: three packaged-product download, SaveReady, RestoreReady and tampered-stage rejection runs with g459 fixture data in temporary directories. Full releaseupdate tests also exercise archive/receipt publication fault injection and rollback using that package.",
+    "packages": "PASS: go test -timeout 3m ./internal/releaseupdate ./internal/updatebundle with the packaged-product fixture; go test -tags desktop -timeout 3m ./internal/workspacehost.",
+    "correctedInvocation": "An initial combined invocation omitted the desktop tag for workspacehost and exited unsuccessfully with build constraints excluding its files. releaseupdate and updatebundle passed individually in that run. workspacehost was then tested with -tags desktop; the two other packages were rerun separately to obtain a successful command exit.",
+    "desktopCancellation": "PASS: focused desktop release cancellation, offline recheck and disabling-updates tests.",
+    "lint": "PASS: go vet -tags desktop ./internal/releaseupdate ./internal/updatebundle ./internal/workspacehost.",
+    "formatAndCheck": "PASS: gofmt on changed Go files and git diff --check.",
+    "skipped": "Full repository, installer/release builds, real GitHub downloads and physical two-PC acceptance: this is a local updater allocation change. No installed applications or publisher keys were changed."
+  },
+  "remainingRisk": "Compressed and expanded data still reside in memory up to their existing bounds. DownloadArchiveBytes requires a verified manifest and must be followed by SaveReady before installation. This change makes no claim about cursor latency or input-service error 1066.",
+  "installedOnEitherPC": false,
+  "publicPushOrRelease": false
+}

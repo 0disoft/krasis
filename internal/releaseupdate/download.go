@@ -84,9 +84,34 @@ func DownloadArchive(ctx context.Context, c *http.Client, m Manifest) (*updatebu
 	b, err := verifyArchive(data, m)
 	return b, data, err
 }
-func verifyArchive(data []byte, m Manifest) (*updatebundle.Bundle, error) {
+
+// DownloadArchiveBytes fetches bytes matching a previously verified manifest,
+// without expanding the ZIP. The bytes do not authorize staging or installation:
+// SaveReady must verify the signed envelope and complete bundle before publishing.
+func DownloadArchiveBytes(ctx context.Context, c *http.Client, m Manifest) ([]byte, error) {
+	if m.Size <= 0 || m.Size > updatebundle.MaxArchiveBytes {
+		return nil, ErrInvalid
+	}
+	data, err := fetch(ctx, c, m.URL, m.Size)
+	if err != nil {
+		return nil, err
+	}
+	if !archiveMatchesManifest(data, m) {
+		return nil, ErrInvalid
+	}
+	return data, nil
+}
+
+func archiveMatchesManifest(data []byte, m Manifest) bool {
+	if int64(len(data)) != m.Size {
+		return false
+	}
 	hash := sha256.Sum256(data)
-	if int64(len(data)) != m.Size || hex.EncodeToString(hash[:]) != m.SHA256 {
+	return hex.EncodeToString(hash[:]) == m.SHA256
+}
+
+func verifyArchive(data []byte, m Manifest) (*updatebundle.Bundle, error) {
+	if !archiveMatchesManifest(data, m) {
 		return nil, ErrInvalid
 	}
 	bundle, err := updatebundle.Read(bytes.NewReader(data), int64(len(data)))

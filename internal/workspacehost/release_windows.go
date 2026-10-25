@@ -123,7 +123,9 @@ func (s *WorkspaceService) checkRelease() bool {
 		return true
 	}
 	s.setRelease("DOWNLOADING", m.Generation)
-	_, archive, err := releaseupdate.DownloadArchive(parent, releaseupdate.Client(), m)
+	// SaveReady validates the signed envelope and expands the complete bundle
+	// before any cache writes. Do not expand a discarded bundle here as well.
+	archive, err := releaseupdate.DownloadArchiveBytes(parent, releaseupdate.Client(), m)
 	if err != nil {
 		return fail(err, m.Generation)
 	}
