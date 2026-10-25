@@ -52,15 +52,65 @@
     "limit": "The earlier 12 successful g455 exchanges did not establish long-term stability. This later capture failure is distinct from the prior B retirement-ack failure; this cursor-entry change does not claim to fix it."
   },
   "physicalAcceptance": {
-    "state": "Pending requested physical crossings; no measured field latency improvement claimed.",
+    "state": "PASS: 12 matched physical exchanges completed successfully on both PCs after the user reported crossing completion.",
     "cutoffUtc": "2026-10-25T11:35:02Z",
     "initialCollection": "5af423c92acb4bb7b4b69efcfd3218f9",
-    "collectedAtUtc": "2026-10-25T11:36:34Z",
+    "collection": "989504f1f4324b93e00b453ba6327dd8",
+    "collectedAtUtc": "2026-10-25T11:39:17Z",
+    "aSampleUtc": ["2026-10-25T11:38:56.0323885Z", "2026-10-25T11:39:06.3598478Z"],
+    "bSampleUtc": ["2026-10-25T11:38:54.2172139Z", "2026-10-25T11:39:04.5401858Z"],
     "aInputHealth": "READY",
     "bInputHealth": "READY",
-    "matchedExchanges": 0,
-    "limit": "Zero post-recovery handoff profiles cannot demonstrate reduced latency or absence of crossing failures. Startup spans overlap and must not be added."
+    "matchedExchanges": 12,
+    "aSourceProfiles": 12,
+    "bReceiverProfiles": 12,
+    "aCompletedOk": 12,
+    "bCompletedOk": 12,
+    "incompleteProfiles": 0,
+    "observedFaultOrSessionFailureEvents": 0,
+    "bPreparedCandidatesUsed": 12,
+    "bMeasuredPreparationWaits": 8,
+    "bPreparationWaitMaxMicros": 0,
+    "measurements": {
+      "units": "microseconds",
+      "samplesPerVersion": 12,
+      "bReadyWait": {
+        "g455": {"median": 144947.5, "max": 1369015},
+        "g456": {"median": 39803.5, "max": 139888}
+      },
+      "bCursorEntryDispatch": {
+        "g455": {"median": 16211, "max": 339341},
+        "g456": {"median": 4332.5, "max": 10524}
+      },
+      "bCursorEntryWorkerApply": {
+        "g455": {"median": 12708, "max": 284247},
+        "g456": {"median": 3446, "max": 10524}
+      },
+      "bServiceBootstrapReady": {
+        "g455": {"median": 70453, "max": 700830},
+        "g456": {"median": 25348, "max": 114750}
+      },
+      "bNativePairDesktopReady": {
+        "g455": {"median": 37410.5, "max": 445124},
+        "g456": {"median": 14541.5, "max": 98020}
+      },
+      "aFirstOfferSinceBegin": {
+        "g455": {"median": 235471, "max": 1874792},
+        "g456": {"median": 72983, "max": 200156}
+      }
+    },
+    "residualWorstReadyProfile": {
+      "bTimeUtc": "2026-10-25T11:38:55.2724013Z",
+      "readyWaitMicros": 139888,
+      "serviceBootstrapReadyMicros": 114750,
+      "nativePairDesktopReadyMicros": 98020,
+      "cursorEntryDispatchMicros": 10524,
+      "preparedAgeMicros": 108497,
+      "preparationWaitMicros": 0,
+      "interpretation": "The remaining readiness tail includes authenticated native-pair binding/readiness. A prepared candidate was used and its measured service preparation join was zero. The desktop-ready span is nested within bootstrap readiness; these timings must not be added."
+    },
+    "limit": "Sequential short field runs, not a controlled benchmark. Lower readiness/bootstrap times cannot all be attributed to the cursor-entry IPC reduction. The protocol transaction count is deterministically reduced, but long-term stability and the separate A wheel-capture failure remain unproven. Cross-PC timestamps are not subtracted; exchange tags match the paired profiles."
   },
-  "remainingInvestigation": "B's earlier native/service readiness and timer-lateness tails remain distinct from entry IPC; identify their stages rather than attributing them to network RTT or cursor submission without evidence.",
+  "remainingInvestigation": "For the worst g456 readiness sample, authenticated native-pair binding/readiness takes 98.020 ms within the 114.750 ms service bootstrap, versus 10.524 ms cursor entry. All 12 samples used prepared candidates, and eight measured service preparation joins were zero. Investigate binding/authentication scheduling if the remaining tail is still perceptible; this data does not establish GC/STW, network RTT, or process-loading causation. Preserve the independent A wheel-capture failure investigation.",
   "publicPushOrRelease": false
 }
