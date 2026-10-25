@@ -1,0 +1,36 @@
+{
+  "schema": "krasis.experiment/v1",
+  "generation": 456,
+  "purpose": "Remove the journal owner's redundant second native IPC and desktop admission during cursor entry.",
+  "baseline": {
+    "generation": 455,
+    "collection": "abf0afd87dff99a57c073b41fd93c545",
+    "bReadyWaitMedianMicros": 144947.5,
+    "bReadyWaitMaxMicros": 1369015,
+    "bEntryDispatchMedianMicros": 16211,
+    "bEntryDispatchMaxMicros": 339341,
+    "limit": "Separate preparation readiness and cursor entry costs. This change cannot remove earlier service/native bootstrap latency."
+  },
+  "before": "enterCursorResponse on isolatedInput issued CursorPosition followed by PlaceCursor, despite the native child already implementing the combined cursor entry command.",
+  "after": "Forward the existing combined entry/probe command only to the concrete isolated native transport. Preserve the outer pressed-state guard and the child's single fresh authority/desktop transaction, original context, observation and one-shot acknowledgement.",
+  "quantitativeEffect": {
+    "nativeTransactionsPerEntryBefore": 2,
+    "nativeTransactionsPerEntryAfter": 1,
+    "nativeDesktopAdmissionsPerEntryBefore": 2,
+    "nativeDesktopAdmissionsPerEntryAfter": 1,
+    "placementsPerEntry": 1,
+    "automaticReplay": false,
+    "wireFormatChanged": false
+  },
+  "validation": {
+    "before": "TestIsolatedEntryUsesOneNativeAdmissionAndPreservesProbe failed on g455, observing two native operations/admissions for entry and probe.",
+    "focusedAfter": "PASS: IsolatedEntry, CursorEntry, EntryTransition and IsolatedMove (0.492s)",
+    "package": "PASS: ./internal/inputworker -count=1 -timeout=180s (29.791s)",
+    "vet": "PASS: ./internal/inputworker",
+    "safety": "Pressed input and failed snapshot do not move; snapshot/target/readback/probe metadata stay aligned; native placement failure or lost ACK remains unknown and cannot replay. Existing original-budget and transition-drain checks pass."
+  },
+  "localRollout": "Pending packaging and paired installation.",
+  "physicalAcceptance": "Pending; no measured field latency improvement claimed.",
+  "remainingInvestigation": "B's earlier native/service readiness and timer-lateness tails remain distinct from entry IPC; identify their stages rather than attributing them to network RTT or cursor submission without evidence.",
+  "publicPushOrRelease": false
+}
