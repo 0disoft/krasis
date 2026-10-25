@@ -315,7 +315,14 @@ func (m *Manager) diagnosticHTTP(w http.ResponseWriter, r *http.Request, peer st
 			w.WriteHeader(400)
 			return
 		}
-		if err := m.receiveDiagnostic(peer, r.Header.Get("X-Krasis-ID"), r.Header.Get("X-Krasis-Request-ID"), r.Body, authorized); err != nil {
+		// Match the sender's budget instead of retaining the single receive slot
+		// until the server's bulk-transfer ReadTimeout. Context cancellation alone
+		// does not interrupt a blocked body Read; join the deadline callback too.
+		ctx, cancel := context.WithTimeout(r.Context(), diagnosticPollTimeout)
+		defer cancel()
+		defer interruptHTTPIO(ctx, http.NewResponseController(w).SetReadDeadline)()
+		live := func() bool { return ctx.Err() == nil && authorized() }
+		if err := m.receiveDiagnostic(peer, r.Header.Get("X-Krasis-ID"), r.Header.Get("X-Krasis-Request-ID"), r.Body, live); err != nil {
 			if errors.Is(err, ErrBusy) {
 				w.WriteHeader(http.StatusServiceUnavailable)
 				return

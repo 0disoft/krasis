@@ -1,0 +1,25 @@
+{
+  "schema": "krasis.experiment/v1",
+  "purpose": "Bound stalled diagnostic upload body reads so the sole receive slot can serve a retry.",
+  "baseline": {
+    "revision": "8e4186a",
+    "mismatch": "Outbound diagnostic clients use a 15-second timeout, while inbound uploads relied on the auxiliary HTTP server's 90-second bulk-transfer ReadTimeout.",
+    "reproduction": "FAIL: deterministic synctest uploads remained blocked at both the 15-second diagnostic budget and a shorter 1-second request-context deadline. Fixtures explicitly interrupted and joined those body reads afterward. These are virtual deadlines, not field latency measurements."
+  },
+  "change": {
+    "deadline": "The diagnostic POST handler derives a context with diagnosticPollTimeout, preserving any shorter parent deadline. Its lifetime is checked by the existing receive authorization fence before storage and receipt publication.",
+    "bodyRead": "Reuse the existing context-triggered SetReadDeadline interrupt, renamed interruptHTTPIO to cover both clipboard and diagnostic handlers. A context timeout alone does not interrupt an HTTP body Read.",
+    "cleanup": "Stop or join the deadline callback before returning the handler, preserving reused-connection deadline ownership. Existing shared receive admission and size/replay/trust validation remain in place.",
+    "interfaces": "Diagnostic POST receive timing changes; HTTP routes, JSON schemas and response status codes are unchanged. No DB, installer, repository hygiene, runner or source-of-truth document changes."
+  },
+  "validation": {
+    "focused": "PASS: diagnostic own-budget and shorter-parent cases release the blocked read at the virtual deadline, perform no save, and accept the next upload through the same handler. Callback-join test prevents handler return until a started interrupt finishes. Existing clipboard upload timeout and join regressions also pass; focused suite 0.279s.",
+    "packages": "PASS: go test -timeout 3m ./internal/peerupdate ./internal/residentagent, 12.972s and 7.144s, using Go 1.27.3 and the repository runtime STW overlay.",
+    "vet": "PASS: go vet ./internal/peerupdate ./internal/residentagent.",
+    "hygiene": "PASS: changed Go files formatted with gofmt; git diff --check.",
+    "skipped": "Full repository, frontend, installer/release packaging and physical two-PC acceptance: only the internal diagnostic body-read deadline and shared interrupt naming changed; no installed program was modified."
+  },
+  "remainingRisk": "An already running filesystem save callback remains owned until it returns and cannot be preempted by this network read deadline. Physical network-loss behavior and historical input-service error 1066 were not reproduced or fixed by this slice.",
+  "installedOnEitherPC": false,
+  "publicPushOrRelease": false
+}

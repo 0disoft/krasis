@@ -47,7 +47,7 @@ func (m *Manager) clipboardHTTP(w http.ResponseWriter, r *http.Request, peer str
 			w.WriteHeader(http.StatusConflict)
 			return
 		}
-		defer interruptClipboardIO(transfer, http.NewResponseController(w).SetWriteDeadline)()
+		defer interruptHTTPIO(transfer, http.NewResponseController(w).SetWriteDeadline)()
 		w.Header().Set("Content-Type", clipboardContentType(value.Format))
 		var err error
 		if value.Format == "" {
@@ -64,7 +64,7 @@ func (m *Manager) clipboardHTTP(w http.ResponseWriter, r *http.Request, peer str
 		}
 		transfer, stop, current := m.clipboardTransferContext(r.Context(), peer, id, remote.ClipboardFormat, remote.ClipboardSize, false)
 		defer stop()
-		defer interruptClipboardIO(transfer, http.NewResponseController(w).SetReadDeadline)()
+		defer interruptHTTPIO(transfer, http.NewResponseController(w).SetReadDeadline)()
 		if err := m.receiveClipboardPayload(peer, id, remote.ClipboardFormat, r.Body, func() bool { return transfer.Err() == nil && current() && authorized() }, true); err != nil {
 			w.WriteHeader(409)
 			return
@@ -84,7 +84,7 @@ func (m *Manager) clipboardHTTP(w http.ResponseWriter, r *http.Request, peer str
 
 // AfterFunc's stop does not wait for a callback that already started. Join it
 // before the handler returns so it cannot change a reused connection's deadline.
-func interruptClipboardIO(ctx context.Context, setDeadline func(time.Time) error) func() {
+func interruptHTTPIO(ctx context.Context, setDeadline func(time.Time) error) func() {
 	finished := make(chan struct{})
 	stop := context.AfterFunc(ctx, func() {
 		defer close(finished)
