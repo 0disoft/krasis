@@ -46,8 +46,25 @@
     "b": "Matched g457 revision; service READY, input health READY, connected"
   },
   "physicalAcceptance": {
-    "state": "Pending requested physical crossings; no millisecond improvement or attribution of the full 98 ms tail is claimed.",
-    "cutoffUtc": "2026-10-25T11:53:14Z"
+    "state": "12 paired exchanges completed successfully, but native readiness latency did not improve in this short sequential run.",
+    "cutoffUtc": "2026-10-25T11:53:14Z",
+    "collection": "4587212d5a73293f00602861db041a23",
+    "collectedAtUtc": "2026-10-25T11:55:08Z",
+    "matchedExchanges": 12,
+    "aCompletedOk": 12,
+    "bCompletedOk": 12,
+    "aHealth": "READY",
+    "bHealth": "READY",
+    "observedFaultOrSessionFailureEvents": 0,
+    "bNativePairReadyMedianMicros": 18712,
+    "bNativePairReadyMaxMicros": 132332,
+    "bReadyWaitMedianMicros": 59699.5,
+    "bReadyWaitMaxMicros": 269976,
+    "bCursorEntryMedianMicros": 4433,
+    "bCursorEntryMaxMicros": 7335,
+    "bPreparationWaitMaxMicros": 94957,
+    "bPreparedCandidatesUsed": 12,
+    "interpretation": "The removed RPC count is deterministic, but this sample does not establish lower field latency. Candidates aged 16.646/18.059 ms still needed 116.806/132.332 ms of native binding/readiness; candidates aged 156.047/213.523 ms needed 9.784/9.648 ms. Unfinished native loading is a candidate cause, not a demonstrated attribution. Movement cadence differed from the g456 run, and startup spans overlap."
   },
   "publicPushOrRelease": false
 }
