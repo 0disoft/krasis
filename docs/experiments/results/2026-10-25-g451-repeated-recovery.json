@@ -1,0 +1,57 @@
+{
+  "date": "2026-10-25",
+  "generation": 451,
+  "revision": "265d8c9a31fd16199d1a9ec0c5a4fe3d7a5aedb2",
+  "toolchain": "go1.27.3 windows/amd64",
+  "userReport": "Agent recovery appears frequently after repeated A/B cursor crossings.",
+  "beforeTrace": {
+    "collectionID": "aeb204ac8e0f04f4fec463792ead9dd6",
+    "aCreated": "2026-10-25T09:07:10Z",
+    "aInputHealth": "READY",
+    "aTerminalFault": "fault_trust_freshness_expired",
+    "aFaultObservedAt": "2026-10-25T09:05:29.0209797Z",
+    "aSamplerLateMicros": 5389639,
+    "aSamplerIntervalMicros": 5477765,
+    "aGCStoppingHistogram": [0, 0, 0, 0, 0, 1],
+    "aGCPauseHistogram": [0, 0, 0, 0, 0, 1],
+    "trustValidationMaxAgeSeconds": 5,
+    "activeTrustReadPhase": "prelock_parent_reparse",
+    "bTerminalFault": "fault_remote_eof",
+    "bFaultObservedAt": "2026-10-25T09:05:28.4035889Z",
+    "interpretation": "A lost trust-validation freshness while runtime samples also show a delayed timer and a GC stopping/pause observation above one second. B observed remote EOF on the matching connection. Different PC wall clocks do not establish subsecond event ordering.",
+    "limitations": [
+      "5389639 microseconds measures sampler lateness, not an exact GC stop duration.",
+      "A trust read active in a native open does not establish that filesystem or ACL work caused the process delay.",
+      "The two clean source retirements before expiry are not themselves proof of failed native cleanup."
+    ]
+  },
+  "traceExperiment": {
+    "scope": "A resident agent only; existing opt-in flight recorder, no binary changes",
+    "enabledAt": "2026-10-25T09:12:49.6401328Z",
+    "automaticLifetimeMinutes": 15,
+    "sampleTraceFirstWallTime": "2026-10-25T18:14:52.8310787+09:00",
+    "sampleDurationNanoseconds": 7357785783,
+    "sampleLargestCompleteSTWMicroseconds": 202.318,
+    "userResult": "Crossings completed without a recovery notice during this exercise.",
+    "afterCollectionID": "02c8251cb320513f9d20d0c1358649e7",
+    "aAfterCreated": "2026-10-25T09:17:43Z",
+    "bAfterCreated": "2026-10-25T09:17:44Z",
+    "aAfterInputHealth": "READY",
+    "bAfterInputHealth": "READY",
+    "terminalFaultEventsSinceTraceInTheseReports": { "A": 0, "B": 0 },
+    "interpretation": "A short trace-enabled exercise did not reproduce the terminal failure. This is not a fix or a controlled comparison: the agent was also restarted, and tracing changes runtime behavior. The saved latency sample does not contain the earlier five-second lapse."
+  },
+  "runtimeCandidate": {
+    "issue": "https://github.com/golang/go/issues/81759",
+    "proposedFix": "https://github.com/golang/go/pull/81835",
+    "statusAtInspection": "Both upstream issue and proposed fix were open.",
+    "inference": "The upstream report includes Windows syscall/GC stopping stalls, making it a candidate for a controlled reproducer. It has not been reproduced or causally identified in Krasis.",
+    "noWorkaroundApplied": "No custom Go runtime, GOMAXPROCS restriction, GC-disable flag, relaxed trust deadline or cached authorization verdict was introduced."
+  },
+  "validation": {
+    "passed": ["Both-PC sanitized diagnostic collection", "A doctor healthy and connection CONNECTED after restart", "Both-PC protected-input health READY", "Offline parsing of saved runtime traces"],
+    "notEstablished": ["Root cause of the GC stopping delay", "A permanent recovery fix", "Long-term crossing stability"],
+    "skipped": ["CPU/GC stress on the active input-control PCs, to avoid perturbing the user's physical crossing exercise", "Product build and unit tests: no implementation changed"]
+  },
+  "boundaries": { "apiChanged": false, "databaseChanged": false, "securityPolicyChanged": false, "runnerChanged": false, "publicRelease": false }
+}
