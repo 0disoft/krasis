@@ -26,5 +26,19 @@
     "vet": "PASS: go vet ./internal/inputworker ./internal/logindiag",
     "cases": "Bootstrap timeout/cancellation/truncation/EOF and native closed/unknown/Win32/exit-pending reach the runtime recorder while retaining ErrRecovery. Malformed and all truncated report lengths are rejected. A negative report cannot replace authentication. An unread report is bounded to 250ms and retains the original child cause."
   },
+  "localRollout": {
+    "generation": 459,
+    "revision": "5b9544c13c0d6b8a8c85a935e4a6ac690084cfdf",
+    "setupSha256": "5646b6c0693e45ddffd053ae8965dedc65d8c8653bf0f8450adb5dc08e2b0178",
+    "packaging": "PASS: frontend 103 tests, native build, update-package test, workspace and application setup verification.",
+    "a": "Installed with matching g459 UI, launch record, protected agent and running service; doctor healthy. No installer exit-code receipt was captured, so installation is established by current-state verification.",
+    "bUpdateJob": "838c8ee7c12b65c03c5ef7d22eb5c296",
+    "b": "UPDATED; peer reports matching g459 generation and revision.",
+    "collection": "7f13656ecacd6f6d5cdab55118862619",
+    "aCollectedAtUtc": "2026-10-25T12:41:18Z",
+    "bCollectedAtUtc": "2026-10-25T12:41:19Z",
+    "both": "Input health READY, service READY, lastFailure absent; A doctor confirms CONNECTED.",
+    "physicalReproduction": "Pending user crossings. This readiness snapshot is not proof that the retirement fault is fixed."
+  },
   "publicPushOrRelease": false
 }
