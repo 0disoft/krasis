@@ -1,0 +1,28 @@
+{
+  "schema": "krasis.experiment/v1",
+  "purpose": "Prevent a disposable clipboard file-packing helper from surviving an unexpected management-app exit while blocked in native I/O.",
+  "baseline": {
+    "revision": "36dec58",
+    "existingProtection": "CommandContext kills and joins the helper on normal cancellation. It cannot execute its cancellation code after its owning process has died.",
+    "reproduction": "PASS: the regression fixture killed its owned intermediary process while its helper was in an unsignaled Win32 wait. On the unchanged implementation the helper remained alive for the full 2000ms observation (WAIT_TIMEOUT=258). The fixture terminated that helper during cleanup."
+  },
+  "change": {
+    "ownership": "Parent duplicates its own real process handle with SYNCHRONIZE access only and transfers it through os/exec's explicit inherited-handle allowlist. The helper removes inheritance before any path parsing or filesystem work and never resolves the owner by PID.",
+    "death": "A dedicated native wait monitors that process reference. Owner death or a failed wait exits this disposable helper, including its blocked native thread. Existing CommandContext cancellation and stdout byte limits remain in place.",
+    "normalCompletion": "Signals a private stop event, joins the monitor, then closes both owned handles. No polling timer is added.",
+    "interfaces": "Private same-image child bootstrap adds KRASIS_CLIPBOARD_PACK_PARENT. No peer protocol, local HTTP API, database, input ownership or installer generation changes.",
+    "scope": "This helper owns no input or product state. Its process reference is lifetime ownership only and grants no peer, service or desktop authority."
+  },
+  "validation": {
+    "focused": "PASS: owner-death regression (0.15s), normal packing and context cancellation (0.23s). The 0.15s includes fixture startup and is not a field performance benchmark or guaranteed exit deadline.",
+    "lifetime": "PASS: missing/malformed parent bootstrap rejected before input is read; 16 adoption/stop cycles join their monitors and close adopted process handles.",
+    "package": "PASS: go test -timeout 3m ./internal/launcherui; 2.297s, using the verified runtime overlay.",
+    "vet": "PASS: go vet ./internal/launcherui.",
+    "integration": "PASS: desktop-tag tests/builds for internal/workspacehost, cmd/krasis, cmd/krasis-control and cmd/krasis-workspace. krasis and krasis-control have no test files.",
+    "hygiene": "PASS: changed Go files formatted with gofmt; git diff --check.",
+    "skipped": "Full repository, release packaging, frontend rerun and physical two-PC acceptance: this slice changes only private Windows helper lifetime; UI assets, transport and input handling are unchanged. No installed app or running product process was modified."
+  },
+  "remainingRisk": "Physical UNC-device hangs were not exercised. Whole-process native-wait termination was checked with owned test processes only. Clipboard synchronization still belongs to the management app; continuing it after that app exits is separate work. The intermittent protected-input recovery failure and handoff latency are not fixed by this change.",
+  "installedOnEitherPC": false,
+  "publicPushOrRelease": false
+}

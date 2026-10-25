@@ -36,6 +36,11 @@ func runClipboardFilePacker(ctx context.Context, command *exec.Cmd, paths []stri
 		return nil, err
 	}
 	command.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
+	closeParent, err := inheritClipboardPackParent(command)
+	if err != nil {
+		return nil, errClipboardUnavailable
+	}
+	defer closeParent()
 	command.Stdin = bytes.NewReader(data)
 	command.WaitDelay = time.Second
 	var result clipboardPackBuffer
@@ -71,8 +76,14 @@ func (b *clipboardPackBuffer) Write(p []byte) (int, error) {
 }
 
 // An internal helper, not a resident background agent. Native I/O is isolated
-// here; parent cancellation terminates this process even inside a blocked open.
+// here; parent cancellation or death terminates this process even inside a
+// blocked open. Only the parent's inherited wait-only bootstrap is accepted.
 func RunClipboardFilePacker(input io.Reader, output io.Writer) int {
+	stopParent, err := watchClipboardPackParent(os.Getenv(clipboardPackParentEnvironment))
+	if err != nil {
+		return 2
+	}
+	defer stopParent()
 	var paths []string
 	decoder := json.NewDecoder(io.LimitReader(input, 8<<20))
 	if decoder.Decode(&paths) != nil {
