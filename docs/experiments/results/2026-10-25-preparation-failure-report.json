@@ -38,7 +38,67 @@
     "aCollectedAtUtc": "2026-10-25T12:41:18Z",
     "bCollectedAtUtc": "2026-10-25T12:41:19Z",
     "both": "Input health READY, service READY, lastFailure absent; A doctor confirms CONNECTED.",
-    "physicalReproduction": "Pending user crossings. This readiness snapshot is not proof that the retirement fault is fixed."
+    "physicalReproduction": "User completed crossings; see physicalAcceptance."
+  },
+  "physicalAcceptance": {
+    "collection": "0fea84ddccd69c40becbe364dc7c9eba",
+    "cutoffUtc": "2026-10-25T12:41:19Z",
+    "aCollectedAtUtc": "2026-10-25T12:45:29Z",
+    "bCollectedAtUtc": "2026-10-25T12:45:31Z",
+    "matchedExchanges": 13,
+    "aCompletedOk": 13,
+    "bCompletedOk": 13,
+    "observedFaultOrSessionFailureEvents": 0,
+    "aHealth": "READY",
+    "bHealth": "READY",
+    "aService": "READY",
+    "bService": "READY",
+    "aLastFailure": null,
+    "bLastFailure": null,
+    "bNativePairReadyMedianMicros": 11864,
+    "bNativePairReadyMaxMicros": 17622,
+    "bServiceBootstrapReadyMaxMicros": 29923,
+    "bReadyWaitMedianMicros": 30032,
+    "bReadyWaitMaxMicros": 47249,
+    "bCursorEntryMedianMicros": 4222,
+    "bCursorEntryMaxMicros": 6242,
+    "bPreparedCandidatesUsed": 13,
+    "g458Comparison": {
+      "matchedExchanges": 11,
+      "bNativePairReadyMedianMicros": 15051,
+      "bNativePairReadyMaxMicros": 55139,
+      "bReadyWaitMedianMicros": 39241,
+      "bReadyWaitMaxMicros": 75537,
+      "bCursorEntryMedianMicros": 4035,
+      "bCursorEntryMaxMicros": 7104,
+      "limit": "Sequential field samples with different movement cadence. g459 adds failure-only diagnostics and makes no intentional successful-path latency change; these lower tails are not an established speedup from its negative report. Nested startup spans must not be added."
+    },
+    "remainingLatency": {
+      "aCaptureActivationMedianMicros": 35342,
+      "aCaptureActivationMaxMicros": 324277,
+      "aSlowCaptureSample": {
+        "exchangeTag": "355c7e41cdb82f60c0baf638ba15bbbe4e9a366371e927249df2c9fdca1767ba",
+        "captureIPCLockMicros": 0,
+        "captureIPCAuthorityMicros": 3276,
+        "captureIPCWriteMicros": 0,
+        "captureIPCResponseMicros": 321000,
+        "workerScopeBucket": "10-100ms",
+        "workerApplyBucket": "100-1000ms",
+        "interpretation": "Almost all this activation span is waiting for A's local capture worker reply. The matching worker reports slow scope and activation work, which includes boundary guards and native calls. This is not a measurement of B authentication, and does not identify a specific Windows API or scheduler pause."
+      },
+      "bWorstInputDispatchMaxMicros": 117354,
+      "bSlowInputWorkerApplyMicros": 108475,
+      "bSlowInputClientResponseMicros": 111313,
+      "bDispatchHistogramBuckets": ["<1ms", "1-10ms", "10-100ms", "100-1000ms", ">=1000ms"],
+      "bDispatchHistogramCounts": [0, 3047, 146, 2, 0]
+    },
+    "laterHealthCheck": {
+      "collection": "0c459a974de9aa97df7aa1197a9b9de0",
+      "aCollectedAtUtc": "2026-10-25T12:48:43Z",
+      "bCollectedAtUtc": "2026-10-25T12:48:45Z",
+      "both": "Input health READY, service READY, lastFailure absent."
+    },
+    "conclusion": "No retirement or capture-startup failure reproduced in these 13 matched exchanges or the later health snapshot. The new negative report was not exercised in this field run; the underlying intermittent recovery failure remains unconfirmed and is not claimed fixed. Local capture activation and isolated input application still have latency outliers."
   },
   "publicPushOrRelease": false
 }
