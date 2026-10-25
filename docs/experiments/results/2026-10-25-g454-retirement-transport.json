@@ -1,0 +1,45 @@
+{
+  "schema": "krasis.experiment/v1",
+  "generation": 454,
+  "revision": "7fa5678ea79af7ba79a635625f918939794a3964",
+  "changeCommit": "f19da77",
+  "purpose": "Distinguish transport failures during authenticated unbound native retirement without changing authority, cleanup or receipt validation.",
+  "trigger": {
+    "previousCollection": "a4d326300fe26d3a7be11241c49fcb70",
+    "bFailureTime": "2026-10-25T10:41:44.0229943Z",
+    "bFailureOperation": "input-retire-receipt",
+    "cause": "Unknown: g453 omitted the I/O class when the failure had no Win32 code. The fresh retirement budget did not prevent recurrence."
+  },
+  "behavior": {
+    "stages": ["authentication", "stop", "receipt"],
+    "boundedTransportSuffixes": ["timeout", "cancelled", "truncated", "eof", "closed"],
+    "legacyUnsuffixedOperationsAccepted": true,
+    "moreSpecificWorkerOperationsPreserved": true,
+    "errorsIsCausesPreserved": true,
+    "privateErrorTextExported": false,
+    "authorityTimeoutsOrRecoveryFencesChanged": false,
+    "exactNativeReceiptStillRequired": true
+  },
+  "validation": {
+    "goTest": "PASS: ./internal/inputworker (26.518s), ./internal/logindiag (0.134s), ./internal/productlog (4.755s), -count=1 -timeout=180s",
+    "goVet": "PASS: ./internal/inputworker ./internal/logindiag",
+    "newCoverage": "21 stage/cause combinations reach a valid runtime receipt; specific operation precedence is preserved; 18 legacy/current retirement codes are accepted; 8 invalid codes are rejected; private cause text stays out of JSON.",
+    "frontend": "PASS: 103 tests and native production build",
+    "packaging": "PASS: workspace 8-file bundle, executable icons, input installer, TestWorkspaceUpdatePackage, setup --verify --json",
+    "format": "PASS: gofmt, git diff --check, evidence JSON parse"
+  },
+  "localRollout": {
+    "bTransferId": "06dcb2c7f206ef54290b0aacfc5daf0b",
+    "bTransferResult": "UPDATED, generation 454, matching revision, 28436027 bytes",
+    "aSetup": "Exit 0, state installed",
+    "aDoctor": "healthy, CONNECTED, protected input configured, service RUNNING, all generation/build checks MATCHED",
+    "peerStatus": "ONLINE, generation 454, matching revision",
+    "collection": "a5ee19b458941f54a4429fbb50f0acd3",
+    "created": "2026-10-25T10:54:05Z / 10:54:06Z",
+    "aAndBInputHealth": "READY",
+    "aAndBService": "READY",
+    "aRuntimeTrace": "runtime_trace_enabled at 2026-10-25T10:54:02.802407Z, matching g454 revision; existing bounded fifteen-minute recorder"
+  },
+  "physicalAcceptance": "Pending user crossing exercise. This is a diagnostic improvement, not a confirmed fix for retirement failures or cursor latency.",
+  "publicPushOrRelease": false
+}
