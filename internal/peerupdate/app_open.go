@@ -32,6 +32,7 @@ type appOpenReceipt struct {
 
 type appOpenState struct {
 	mu       sync.Mutex
+	readyMu  sync.Mutex // At most one live image/readiness check; no queued waiters.
 	out      *appOpenRequest
 	received map[string]appOpenReceipt
 }
@@ -115,9 +116,8 @@ func (m *Manager) acceptAppOpen(peer, id string, authorized func() bool) string 
 	now := time.Now()
 	if old, ok := m.appOpen.received[peer]; ok {
 		if old.id == id && now.Sub(old.at) < 2*time.Minute {
-			if old.code == "launch_requested" && m.UIReady != nil && m.UIReady(old.at) {
-				old.code = "window_ready"
-				m.appOpen.received[peer] = old
+			if old.code == "launch_requested" && m.UIReady != nil {
+				return m.appOpenReadyLocked(peer, old, authorized)
 			}
 			return old.code
 		}
@@ -170,6 +170,30 @@ func (m *Manager) acceptAppOpen(peer, id string, authorized func() bool) string 
 		}
 	}()
 	return "launch_accepted"
+}
+
+// Caller holds appOpen.mu and still owns it on return. The process/image check
+// may do native and filesystem I/O; only the short receipt commit owns mu.
+func (m *Manager) appOpenReadyLocked(peer string, old appOpenReceipt, authorized func() bool) string {
+	if !m.appOpen.readyMu.TryLock() {
+		return old.code // A live check already owns its slot; retry on the next poll.
+	}
+	defer m.appOpen.readyMu.Unlock()
+	ready, allowed := func() (bool, bool) {
+		m.appOpen.mu.Unlock()
+		defer m.appOpen.mu.Lock() // Restore the caller's lock even if a callback panics.
+		ready := m.UIReady(old.at)
+		return ready, authorized()
+	}()
+	current, ok := m.appOpen.received[peer]
+	if !allowed || !ok || current.id != old.id || !current.at.Equal(old.at) || time.Since(old.at) >= 2*time.Minute {
+		return "rejected"
+	}
+	if ready && current.code == "launch_requested" {
+		current.code = "window_ready"
+		m.appOpen.received[peer] = current
+	}
+	return current.code
 }
 
 func (m *Manager) appOpenHTTP(w http.ResponseWriter, r *http.Request, peer string, authorized func() bool) {

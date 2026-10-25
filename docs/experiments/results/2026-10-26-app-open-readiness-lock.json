@@ -1,0 +1,25 @@
+{
+  "schema": "krasis.experiment/v1",
+  "purpose": "Keep app-open queue/status state available while a readiness callback verifies the UI process and image.",
+  "baseline": {
+    "revision": "d35c312",
+    "path": "acceptAppOpen -> UIReady -> residentagent.uiReadySince -> launchrecord.UIProcessMatches -> Inspect -> openExecutable/digest. The full image hash, bounded at 64 MiB, ran while appOpen.mu was held.",
+    "reproduction": "FAIL: while the readiness callback was blocked, an unrelated QueueAppOpen followed by AppOpenStatus failed to return during the full 1-second observation. The fixture released and joined both calls afterward."
+  },
+  "change": {
+    "lockScope": "Run readiness and post-I/O authorization callbacks outside appOpen.mu; restore the caller's lock before checking and committing the receipt. This removes image-size-dependent O(B) I/O from this readiness critical section; state operations remain O(1). Full image verification itself remains O(B).",
+    "capacity": "A separate TryLock gate permits at most one readiness callback per Manager. Contending polls return their observed launch_requested receipt instead of queuing behind image I/O. No detached worker, hash cache or additional native permission is introduced.",
+    "publication": "Recheck trust, receipt ID, request timestamp, the 2-minute retention limit and current status after I/O. A replacement/expired request or terminal status cannot be overwritten by an older successful check.",
+    "interfaces": "No HTTP route, JSON schema, DB, installer, repository hygiene, task runner or source-of-truth document changes."
+  },
+  "validation": {
+    "focused": "PASS: TestAppOpen suite, 0.113s. Queue/status return while readiness is blocked; concurrent checks retain one I/O owner; a later poll obtains a fresh verification; replacement, expiry, revocation and terminal-result cases prevent stale publication. Existing deduplication, authorization, window-readiness and timeout tests pass. Test timings include fixtures and are not physical-PC performance measurements.",
+    "packages": "PASS: go test -timeout 3m ./internal/peerupdate ./internal/residentagent, 10.513s and 6.529s, with Go 1.27.3 and the repository runtime STW overlay.",
+    "vet": "PASS: go vet ./internal/peerupdate ./internal/residentagent.",
+    "hygiene": "PASS: changed Go files formatted with gofmt; git diff --check.",
+    "skipped": "Full repository, frontend, installer/release packaging and physical two-PC acceptance: only internal app-open readiness lock scope changed, with no installed program update."
+  },
+  "remainingRisk": "The callback already owning readiness can still wait on native/filesystem I/O. This change keeps shared app-open state available and bounds concurrent verification; it does not preempt that I/O or prove that input-service error 1066 or cursor handoff stutter is resolved.",
+  "installedOnEitherPC": false,
+  "publicPushOrRelease": false
+}
