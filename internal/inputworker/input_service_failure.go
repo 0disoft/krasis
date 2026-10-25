@@ -92,6 +92,13 @@ func retireInputPreparation(stream inputRetirementStream, authenticated, retired
 	if err := writeInputServiceFrame(stream, stop[:]); err != nil {
 		return inputServiceAt("input-retire-stop", errors.Join(ErrRecovery, err))
 	}
+	// Preparation/authentication may consume most of the first IO budget.
+	// The authenticated stop starts the child's independent native cleanup
+	// budget; its receipt must get the same full bounded window here. Until
+	// that exact receipt arrives the owning job and recovery fence stay held.
+	if err := stream.SetDeadline(time.Now().Add(startupTimeout)); err != nil {
+		return inputServiceAt("input-retire-deadline", errors.Join(ErrRecovery, err))
+	}
 	if err := readInputServiceFrame(stream, retired); err != nil {
 		return inputServiceAt("input-retire-receipt", errors.Join(ErrRecovery, err))
 	}

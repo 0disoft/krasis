@@ -15,12 +15,19 @@ import (
 
 type inputRetirementFixture struct {
 	io.Reader
-	written               bytes.Buffer
-	deadlineErr, writeErr error
-	shortWrite            bool
+	written                         bytes.Buffer
+	deadlineErr, writeErr           error
+	shortWrite                      bool
+	deadlineCalls, failDeadlineCall int
 }
 
-func (f *inputRetirementFixture) SetDeadline(time.Time) error { return f.deadlineErr }
+func (f *inputRetirementFixture) SetDeadline(time.Time) error {
+	f.deadlineCalls++
+	if f.failDeadlineCall == 0 || f.deadlineCalls == f.failDeadlineCall {
+		return f.deadlineErr
+	}
+	return nil
+}
 func (f *inputRetirementFixture) Write(data []byte) (int, error) {
 	if f.writeErr != nil {
 		return 0, f.writeErr
@@ -73,6 +80,21 @@ func TestInputRetirementPreservesStageCauseAndRecoveryFence(t *testing.T) {
 	f := &inputRetirementFixture{Reader: io.MultiReader(bytes.NewReader(workerAuthenticatedFrame[:]), bytes.NewReader(retired[:]))}
 	if err := retireInputPreparation(f, workerAuthenticatedFrame, retired); err != nil || f.written.Len() != bootstrapSize || !zeroBytes(f.written.Bytes()) {
 		t.Fatal("exact receipt rejected or lease data sent", err)
+	}
+}
+
+func TestInputRetirementReceiptDeadlineFailureKeepsRecoveryFence(t *testing.T) {
+	f := &inputRetirementFixture{
+		Reader:      bytes.NewReader(append(append([]byte{}, workerAuthenticatedFrame[:]...), unboundRetiredFrame[:]...)),
+		deadlineErr: syscall.Errno(6), failDeadlineCall: 2,
+	}
+	err := retireInputPreparation(f, workerAuthenticatedFrame, unboundRetiredFrame)
+	if !errors.Is(err, ErrRecovery) || !errors.Is(err, syscall.Errno(6)) || f.deadlineCalls != 2 || f.written.Len() != bootstrapSize || !zeroBytes(f.written.Bytes()) {
+		t.Fatal("receipt deadline rejection lost the fence or stop", err)
+	}
+	remaining, _ := io.ReadAll(f.Reader)
+	if !bytes.Equal(remaining, unboundRetiredFrame[:]) {
+		t.Fatal("receipt consumed after deadline setup failed")
 	}
 }
 

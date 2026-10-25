@@ -61,11 +61,73 @@ func TestUnboundRetirementReceiptSurvivesStartupExpiryDuringCleanup(t *testing.T
 	})
 }
 
+func TestUnboundRetirementReceiptHasFullBudgetAfterSlowAuthentication(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		service, worker := net.Pipe()
+		defer service.Close()
+		defer worker.Close()
+		startup, cancel := context.WithTimeout(context.Background(), startupTimeout)
+		defer cancel()
+		stopStartupIO := context.AfterFunc(startup, func() { _ = worker.Close() })
+		defer stopStartupIO()
+		finished := make(chan error, 1)
+		go func() {
+			// Native preparation can finish after the service starts retiring.
+			time.Sleep(2 * time.Second)
+			if err := writeFrame(worker, workerAuthenticatedFrame[:]); err != nil {
+				finished <- err
+				return
+			}
+			var stop [bootstrapSize]byte
+			if _, err := io.ReadFull(worker, stop[:]); err != nil || !zeroBytes(stop[:]) {
+				finished <- errors.Join(ErrProtocol, err)
+				return
+			}
+			finished <- retireUnboundNative(startup, worker, stopStartupIO, func() error {
+				// Valid cleanup within the native four-second close bound.
+				time.Sleep(3500 * time.Millisecond)
+				return nil
+			})
+		}()
+		started := time.Now()
+		parentErr := retireInputPreparation(service, workerAuthenticatedFrame, unboundRetiredFrame)
+		childErr := <-finished
+		if parentErr != nil || childErr != nil {
+			t.Fatal("authentication consumed the native retirement receipt budget", parentErr, childErr)
+		}
+		if time.Since(started) != 5500*time.Millisecond {
+			t.Fatal("fixture did not cross the original shared deadline")
+		}
+	})
+}
+
 type unboundRetirementConn struct {
 	net.Conn
 	written               bytes.Buffer
 	deadline              time.Time
 	deadlineErr, writeErr error
+}
+
+func TestUnboundRetirementSlowAuthenticationStillExpires(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		service, worker := net.Pipe()
+		defer service.Close()
+		defer worker.Close()
+		finished := make(chan error, 1)
+		go func() {
+			time.Sleep(startupTimeout + time.Second)
+			finished <- writeFrame(worker, workerAuthenticatedFrame[:])
+		}()
+		started := time.Now()
+		err := retireInputPreparation(service, workerAuthenticatedFrame, unboundRetiredFrame)
+		if !errors.Is(err, ErrRecovery) || !errors.Is(err, os.ErrDeadlineExceeded) || time.Since(started) != startupTimeout {
+			t.Fatal("authentication timeout was extended", err)
+		}
+		_ = service.Close()
+		if <-finished == nil {
+			t.Fatal("late authentication was accepted")
+		}
+	})
 }
 
 func (c *unboundRetirementConn) SetDeadline(deadline time.Time) error {

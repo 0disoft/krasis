@@ -1,0 +1,36 @@
+{
+  "date": "2026-10-25",
+  "generationUnderInvestigation": 452,
+  "collections": {
+    "priorBFailure": "bca1801865bc3d9098a834fa7554d835",
+    "afterUserRepairedBAndCrossedAgain": "88812553c7c1a5d78fdf7a88894d0d6e",
+    "bothInputHealth": "READY at 2026-10-25T10:13:55Z",
+    "bRecoveryOperation": "input-retire-receipt",
+    "bExitObservationBeforeCleanup": "RUNNING"
+  },
+  "confirmedDefect": {
+    "location": "internal/inputworker/input_service_failure.go:retireInputPreparation",
+    "before": "One five-second deadline covers waiting for worker authentication, writing the reserved unbound stop, and waiting for native retirement. The child instead starts its own five-second receipt deadline after consuming the stop.",
+    "controlledReproducer": "TestUnboundRetirementReceiptHasFullBudgetAfterSlowAuthentication",
+    "timing": {"authenticationDelayMs": 2000, "nativeCleanupMs": 3500, "totalMs": 5500, "nativeCloseBoundMs": 4000},
+    "baseline": "Fails with ErrRecovery and pipe timeout although native cleanup completes within its own bound.",
+    "correction": "Rearm the service deadline only after its authenticated reserved stop has been written. Authentication and stop delivery retain the initial five-second bound; exact retirement receipt gets a fresh five-second bound matching the child.",
+    "maximumParentProtocolMs": 10000,
+    "preserved": "No input lease is issued here. Keep exact authenticated receipt validation, owned job lifetime, pending retirement fence, native exit requirement, and timeout failure behavior.",
+    "attributionLimit": "The field failure has a matching missing-receipt stage, but lacks per-phase durations. The race is reproduced and fixed; this does not prove it caused every recovery or the cursor latency."
+  },
+  "remaining": {
+    "aFirstOfferMaxMicrosInLatest12Profiles": 277641,
+    "aFirstTriggeredSessionFailure": "2026-10-25T10:14:26.5330726Z peer-liveness timeout",
+    "trace": "Saved locally in ignored .cache/rollouts/g452/analysis/runtime-stall.trace; do not commit raw traces or support reports.",
+    "traceLimit": "The retained trace begins around the failure and contains diagnostic receipt processing. Its later approximately 7.3-second concurrent GC cycle is not a seven-second stop-the-world pause and cannot explain an earlier failure by itself."
+  },
+  "validation": {
+    "focusedTests": "PASS: UnboundRetirement, InputRetirement, InputPreparationExit",
+    "vet": "PASS: ./internal/inputworker",
+    "packageTests": "PASS: ./internal/inputworker -count=1 -timeout=180s (25.291 seconds)",
+    "additionalBoundaries": "Slow authentication still times out; oversized cleanup still times out; receipt deadline setup failure preserves ErrRecovery and does not consume the receipt.",
+    "physicalAcceptance": "Pending corrected local build installation and new crossing test."
+  },
+  "publicPushOrRelease": false
+}
