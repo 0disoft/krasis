@@ -30,7 +30,22 @@
     "vet": "PASS: ./internal/inputworker",
     "packageTests": "PASS: ./internal/inputworker -count=1 -timeout=180s (25.291 seconds)",
     "additionalBoundaries": "Slow authentication still times out; oversized cleanup still times out; receipt deadline setup failure preserves ErrRecovery and does not consume the receipt.",
-    "physicalAcceptance": "Pending corrected local build installation and new crossing test."
+    "physicalAcceptance": "Pending a new crossing test on corrected g453."
+  },
+  "localRollout": {
+    "generation": 453,
+    "revision": "f0a0f4be2a3999c7f50d473ebac4dfe730ebae70",
+    "fixCommit": "159c372",
+    "workspaceAndSetup": "PASS: frontend 103 tests, build, executable icons, update-bundle package test and setup verification.",
+    "bUpdate": "UPDATED, generation 453, matching revision.",
+    "aSetup": "code 0, installed; doctor verifies UI, launch record, protected agent and running service.",
+    "aProtectedInputSHA256": "e9bed7b98e51705e96d6656f0d4a96417c5fb14ce0b2fdf48918a59e176767ee",
+    "aProtectedInputMatchesEmbeddedInstaller": true,
+    "bothPcCollection": "c8ad656607287acb42748e8c2511b51e",
+    "bothPcCollectionCreated": "2026-10-25T10:28:28Z / 10:28:29Z",
+    "aAndBInputHealth": "READY",
+    "aAndBService": "READY",
+    "aTracing": "Restarted exact protected g453 agent with the existing fifteen-minute opt-in recorder; requested reconnection after maintenance pause."
   },
   "publicPushOrRelease": false
 }
