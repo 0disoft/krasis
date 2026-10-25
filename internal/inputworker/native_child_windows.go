@@ -127,7 +127,7 @@ func runInstalledNativeInput(ctx context.Context, installation *Installation, re
 // Pin the exact fully authenticated service before input admission. Cleanup
 // tolerates SCM StopPending, but never another/reused service process or pipe.
 func pinNativeRecoveryService(pipe windows.Handle, proof *Authority) (windows.Handle, error) {
-	if proof == nil || proof.kind != authorityService || proof.check(false) != nil {
+	if proof == nil || proof.kind != authorityService {
 		return 0, ErrAuthority
 	}
 	var pid uint32
@@ -138,6 +138,9 @@ func pinNativeRecoveryService(pipe windows.Handle, proof *Authority) (windows.Ha
 	if err != nil {
 		return 0, ErrAuthority
 	}
+	// No recovery capability is published until the exact process has been
+	// pinned AND a fresh pipe/SCM check succeeds. An initial SCM query would
+	// repeat that RPC without detecting exits that this final check misses.
 	if !nativeParentAlive(handle) || proof.check(false) != nil {
 		_ = windows.CloseHandle(handle)
 		return 0, ErrAuthority

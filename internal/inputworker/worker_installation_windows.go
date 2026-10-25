@@ -27,7 +27,22 @@ func (installation *Installation) workerDigests() ([sha256.Size]byte, [sha256.Si
 // The caller owns file on failure; ownership transfers only on success. Never
 // accept a handle before independent service-image, pipe-owner and SCM checks.
 func (installation *Installation) adoptWorkerAgentImage(proof *Authority, file *os.File) error {
-	if installation == nil || file == nil || proof == nil || proof.kind != authorityService || proof.check(false) != nil {
+	return installation.adoptWorkerAgentImageChecked(proof, file, func(path string) bool {
+		fixed, err := openProtected(path, false)
+		if err != nil {
+			return false
+		}
+		matched := samePinnedImage(file, fixed) && protectedHandle(windows.Handle(file.Fd())) == nil
+		return fixed.Close() == nil && matched
+	})
+}
+
+// Verification grants no authority and transfers no ownership. Check the live
+// service once, AFTER exact file/ACL validation and immediately before commit.
+// A service exit/restart during verification must reject adoption; an earlier
+// SCM query cannot replace this final check and only repeats the same RPC.
+func (installation *Installation) adoptWorkerAgentImageChecked(proof *Authority, file *os.File, verify func(string) bool) error {
+	if installation == nil || file == nil || proof == nil || proof.kind != authorityService || verify == nil {
 		return ErrAuthority
 	}
 	installation.mu.Lock()
@@ -39,13 +54,7 @@ func (installation *Installation) adoptWorkerAgentImage(proof *Authority, file *
 	// Reopening the protected fixed name only checks exact file identity. No
 	// path/digest cache authorizes bytes; the authenticated service owns the
 	// original full-hash pin and DuplicateHandle preserves that file object.
-	fixed, err := openProtected(path, false)
-	if err != nil {
-		return ErrAuthority
-	}
-	matched := samePinnedImage(file, fixed) && protectedHandle(windows.Handle(file.Fd())) == nil
-	closeErr := fixed.Close()
-	if !matched || closeErr != nil || proof.check(false) != nil {
+	if !verify(path) || proof.check(false) != nil {
 		return ErrAuthority
 	}
 	installation.images[0] = installationImage{path: path, digest: installation.agentDigest, file: file}

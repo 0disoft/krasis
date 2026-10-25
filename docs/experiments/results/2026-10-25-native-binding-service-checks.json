@@ -1,0 +1,38 @@
+{
+  "schema": "krasis.experiment/v1",
+  "purpose": "Remove redundant SCM RPCs during native binding without reusing stale authority or granting capabilities before the final live check.",
+  "baseline": {
+    "generation": 456,
+    "collection": "989504f1f4324b93e00b453ba6327dd8",
+    "matchedSuccessfulExchanges": 12,
+    "bNativePairReadyMedianMicros": 14541.5,
+    "bNativePairReadyMaxMicros": 98020,
+    "bReadyWaitMedianMicros": 39803.5,
+    "bReadyWaitMaxMicros": 139888,
+    "limit": "Native-pair readiness is elapsed parent-side binding and readiness for concurrent input/release children. It includes any remaining child loading, authentication, desktop initialization and heartbeat. The 98.020 ms sample is not a measurement of SCM alone."
+  },
+  "finding": "Agent-image adoption checked the service immediately before file verification and again immediately before committing ownership. Recovery-process pinning likewise queried before acquiring the exact process handle and again before returning it. The first query in each transaction cannot detect a restart that the mandatory final fresh query would miss.",
+  "change": {
+    "imageAdoptionServiceQueriesBefore": 2,
+    "imageAdoptionServiceQueriesAfter": 1,
+    "recoveryProcessPinServiceQueriesBefore": 2,
+    "recoveryProcessPinServiceQueriesAfter": 1,
+    "nativePairQueriesRemoved": 3,
+    "journalWorkerQueriesRemoved": 1,
+    "nativePairParallelismUnchanged": true,
+    "freshFinalChecksRetained": true,
+    "fileIdentityAclAndHashPinningUnchanged": true,
+    "noAuthorityCache": true,
+    "noInputReplay": true,
+    "protocolChanged": false
+  },
+  "validation": {
+    "focused": "PASS: worker-image adoption, pending image rejection, exact transferred file, recovery-service pin, prepared native child and native-pair tests (0.246s)",
+    "package": "PASS: ./internal/inputworker -count=1 -timeout=180s (30.577s)",
+    "vet": "PASS: ./internal/inputworker",
+    "securityCases": "Reject service restart during file verification, proof closure, wrong authority kind and changed image without publishing image ownership or a recovery process pin. Valid adoption and recovery pinning each perform one final live query. Existing native retirement and cancellation coverage passes."
+  },
+  "localRollout": "Pending a new local generation and paired installation.",
+  "physicalAcceptance": "Pending; no millisecond improvement or attribution of the full 98 ms tail is claimed.",
+  "publicPushOrRelease": false
+}
