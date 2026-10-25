@@ -122,6 +122,11 @@ func (input *privilegedLeaseInput) open(ctx context.Context, identity applicatio
 	started = time.Now()
 	client, err := input.connect(ctx, identity, expires)
 	handoff.Record(ctx, handoff.ConnectTotal, time.Since(started))
+	// Connection completion can race cancellation after its final check. Retire
+	// a late client through the existing failure path before publishing authority.
+	if err == nil {
+		err = ctx.Err()
+	}
 	if err != nil || client == nil {
 		if client != nil {
 			input.closeErr = errors.Join(input.closeErr, client.Close())

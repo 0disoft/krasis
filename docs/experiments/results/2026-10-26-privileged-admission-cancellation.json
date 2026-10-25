@@ -1,0 +1,25 @@
+{
+  "schema": "krasis.experiment/v1",
+  "purpose": "Reject a privileged input channel whose successful connection completion is observed after entry cancellation, before publishing input authority and heartbeat ownership.",
+  "baseline": {
+    "revision": "2f69a41",
+    "path": "privilegedLeaseInput.open checked the entry context before connection establishment, then accepted any non-nil client with a nil connection error without rechecking cancellation. A connector's own last context check cannot close the return-to-publication race.",
+    "reproduction": "FAIL: controlled connector completion after explicit cancellation, after a 1ms deadline plus one nanosecond, and after cancellation with a client Close failure. All three returned lease approval with no error, emitted READY, published client/identity/heartbeat ownership, and had not closed the late candidate at admission return. These are deterministic boundary tests, not reproduction of a native service failure."
+  },
+  "change": {
+    "validation": "If connection establishment returned no error, recheck ctx.Err before observing/publishing the client. Route a canceled successful completion into the existing connection-failure path, which closes the partial client once, preserves cancellation and cleanup errors, and fences reentry if cleanup failed.",
+    "cost": "One additional constant-time context.Err check after successful connection establishment. No new goroutine, timer, I/O roundtrip, lease renewal, connection retry or input replay. A rejected non-nil channel receives one required Close instead of being published.",
+    "interfaces": "No API, wire schema, DB, installer, repository hygiene, runner or source-of-truth document changes. No changes to native connection authentication, expiry budgets or cleanup ownership."
+  },
+  "validation": {
+    "focused": "PASS: TestPrivilegedAdmissionRejectsConnectionCompletingAfterCancellation, three subtests, 1.151s package time. Each returns an empty lease ID and accepted=false, preserves the cancellation/deadline cause, closes the late candidate exactly once, publishes no input/heartbeat/profile/observer/READY, and leaves no active lease identity.",
+    "recovery": "PASS: clean late-channel rejection allows a fresh approved entry. A Close failure is preserved in both the return error and closeErr; the next entry is refused without invoking the connector again.",
+    "packages": "PASS: go test -timeout 3m ./internal/residentagent ./internal/agent, 13.182s and 3.548s, Go 1.27.3 windows/amd64 with repository runtime STW overlay.",
+    "vet": "PASS: go vet ./internal/residentagent ./internal/agent.",
+    "hygiene": "PASS: gofmt on changed Go files; git diff --check.",
+    "skipped": "Full repository, GUI/installer builds, installed native service acceptance and physical two-PC testing: only resident-agent admission validation changed; the installed programs were not updated."
+  },
+  "remainingRisk": "This check rejects cancellation already observable after connector completion. It does not interrupt a blocked connector or make cancellation atomic with every subsequent instruction. Client.Close retains its existing cleanup semantics and may return an error; that error still prevents reentry. Historical error 1066 and cursor handoff latency are not claimed fixed.",
+  "installedOnEitherPC": false,
+  "publicPushOrRelease": false
+}
