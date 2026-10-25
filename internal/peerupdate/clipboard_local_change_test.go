@@ -1,6 +1,7 @@
 package peerupdate
 
 import (
+	"context"
 	"io"
 	"strings"
 	"testing"
@@ -16,7 +17,7 @@ func TestUnshareableLocalCopyDiscardsPendingAndInFlightRemoteCopy(t *testing.T) 
 	if err := m.clipboardReceive(peer, id, strings.NewReader("remote old"), func() bool { return true }); err != nil {
 		t.Fatal(err)
 	}
-	if v, err := m.SyncClipboardLocalChange(peer, nil, "", true); err != nil || v.ID != "" {
+	if v, err := m.SyncClipboardLocalChange(context.Background(), peer, nil, "", true); err != nil || v.ID != "" {
 		t.Fatal("older pending copy returned", v, err)
 	}
 	reader, writer := io.Pipe()
@@ -26,7 +27,7 @@ func TestUnshareableLocalCopyDiscardsPendingAndInFlightRemoteCopy(t *testing.T) 
 		done <- m.clipboardReceive(peer, strings.Repeat("c", 32), &signalClipboardReader{Reader: reader, started: started}, func() bool { return true })
 	}()
 	<-started
-	_, _ = m.SyncClipboardLocalChange(peer, nil, "", true)
+	_, _ = m.SyncClipboardLocalChange(context.Background(), peer, nil, "", true)
 	_, _ = writer.Write([]byte("remote late"))
 	writer.Close()
 	if err := <-done; err == nil {

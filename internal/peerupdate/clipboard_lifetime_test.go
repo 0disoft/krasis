@@ -121,7 +121,7 @@ func TestIgnoredAdvertisedCopyCannotBeFetchedAgainAfterLocalChange(t *testing.T)
 	}
 	_, _ = m.SyncClipboard(peer, nil, "")
 	m.observePeer(peer, PeerInfo{Clipboard: true, ClipboardID: id, ClipboardSize: 3})
-	_, _ = m.SyncClipboardLocalChange(peer, nil, "", true)
+	_, _ = m.SyncClipboardLocalChange(context.Background(), peer, nil, "", true)
 	if err := m.receiveClipboardPayload(peer, id, "", strings.NewReader("old"), func() bool { return true }, true); err != nil {
 		t.Fatal(err)
 	}

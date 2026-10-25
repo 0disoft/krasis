@@ -2,6 +2,7 @@ package peerupdate
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"strings"
@@ -17,7 +18,7 @@ func TestClipboardLocalPreparationReleasesSharedLocks(t *testing.T) {
 	}
 	data := testClipboardZip(t, "file.txt", false, "original contents")
 	want := bytes.Clone(data)
-	err := m.queueClipboardLocal(peer, &ClipboardValue{Format: "files", Data: data}, func(local *ClipboardValue) (*ClipboardValue, error) {
+	err := m.queueClipboardLocal(context.Background(), peer, &ClipboardValue{Format: "files", Data: data}, func(local *ClipboardValue) (*ClipboardValue, error) {
 		if !m.mu.TryLock() {
 			t.Fatal("payload preparation holds the shared connection-manager lock")
 		}
@@ -57,7 +58,7 @@ func TestClipboardLocalPreparationCannotPublishSupersededCopy(t *testing.T) {
 				t.Fatal(err)
 			}
 			local := &ClipboardValue{Format: "files", Data: testClipboardZip(t, "old.txt", false, "old")}
-			err := m.queueClipboardLocal(peer, local, func(local *ClipboardValue) (*ClipboardValue, error) {
+			err := m.queueClipboardLocal(context.Background(), peer, local, func(local *ClipboardValue) (*ClipboardValue, error) {
 				switch action {
 				case "selection-away-and-back":
 					for _, selected := range []string{strings.Repeat("b", 64), peer} {
@@ -71,7 +72,7 @@ func TestClipboardLocalPreparationCannotPublishSupersededCopy(t *testing.T) {
 						t.Fatal(err)
 					}
 				case "unshareable-copy":
-					if _, err := m.SyncClipboardLocalChange(peer, nil, "", true); err != nil {
+					if _, err := m.SyncClipboardLocalChange(context.Background(), peer, nil, "", true); err != nil {
 						t.Fatal(err)
 					}
 				case "preparation-failure":
@@ -101,7 +102,7 @@ func TestClipboardLocalPreparationCannotPublishSupersededCopy(t *testing.T) {
 
 func TestClipboardLocalPreparationRejectsUnselectedPeerBeforePayloadWork(t *testing.T) {
 	m := testManager(t)
-	err := m.queueClipboardLocal(strings.Repeat("a", 64), &ClipboardValue{Text: "copy"}, func(*ClipboardValue) (*ClipboardValue, error) {
+	err := m.queueClipboardLocal(context.Background(), strings.Repeat("a", 64), &ClipboardValue{Text: "copy"}, func(*ClipboardValue) (*ClipboardValue, error) {
 		t.Fatal("unselected peer reached payload preparation")
 		return nil, nil
 	})

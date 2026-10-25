@@ -2,6 +2,7 @@ package peerupdate
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"os"
 	"slices"
@@ -9,6 +10,8 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
+
+	"github.com/0disoft/krasis/internal/syncgate"
 )
 
 const MaxClipboardBytes = 64 << 10
@@ -37,7 +40,7 @@ type clipboardState struct {
 	transfer     ClipboardTransfer
 	transferID   string
 	mu           sync.Mutex
-	prepareMu    sync.Mutex // Bound media preparation without blocking shared state.
+	prepareMu    syncgate.Mutex // Bound media preparation; departed requests need not wait for its owner.
 	receiving    bool
 	peer         string
 	imageAllowed bool
@@ -176,13 +179,19 @@ func (m *Manager) SyncClipboard(peer string, text *string, ack string) (Clipboar
 	return m.SyncClipboardPayload(peer, local, ack)
 }
 func (m *Manager) SyncClipboardPayload(peer string, local *ClipboardValue, ack string) (ClipboardValue, error) {
-	return m.SyncClipboardLocalChange(peer, local, ack, false)
+	return m.SyncClipboardLocalChange(context.Background(), peer, local, ack, false)
 }
 
 // Local copy order is independent of whether its content is shareable.
-func (m *Manager) SyncClipboardLocalChange(peer string, local *ClipboardValue, ack string, changed bool) (ClipboardValue, error) {
+func (m *Manager) SyncClipboardLocalChange(ctx context.Context, peer string, local *ClipboardValue, ack string, changed bool) (ClipboardValue, error) {
+	if ctx == nil {
+		return ClipboardValue{}, ErrDenied
+	}
+	if err := ctx.Err(); err != nil {
+		return ClipboardValue{}, err
+	}
 	if local != nil {
-		return ClipboardValue{}, m.queueClipboardLocal(peer, local, prepareClipboardLocal)
+		return ClipboardValue{}, m.queueClipboardLocal(ctx, peer, local, prepareClipboardLocal)
 	}
 	value, err := m.clipboardIncomingSnapshot(peer, ack, changed)
 	if err == nil {

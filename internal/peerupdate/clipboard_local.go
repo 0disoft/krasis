@@ -2,6 +2,7 @@ package peerupdate
 
 import (
 	"bytes"
+	"context"
 	"time"
 )
 
@@ -37,7 +38,10 @@ func (m *Manager) reserveClipboardLocal(peer, format string) (uint64, error) {
 // Reserve order before expensive preparation, then publish only if the same
 // selection and local copy still own the slot. No payload work holds m.mu or
 // clipboard.mu. The callback permits deterministic tests of concurrent changes.
-func (m *Manager) queueClipboardLocal(peer string, local *ClipboardValue, prepare func(*ClipboardValue) (*ClipboardValue, error)) error {
+func (m *Manager) queueClipboardLocal(ctx context.Context, peer string, local *ClipboardValue, prepare func(*ClipboardValue) (*ClipboardValue, error)) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	epoch, err := m.reserveClipboardLocal(peer, local.Format)
 	if err != nil {
 		return err
@@ -45,7 +49,9 @@ func (m *Manager) queueClipboardLocal(peer string, local *ClipboardValue, prepar
 	if local.Format != "" {
 		// Keep at most one large copy/validation in flight. Text and selection
 		// changes remain responsive and can invalidate a waiting media copy.
-		m.clipboard.prepareMu.Lock()
+		if err := m.clipboard.prepareMu.LockContext(ctx); err != nil {
+			return err
+		}
 		defer m.clipboard.prepareMu.Unlock()
 		m.clipboard.mu.Lock()
 		current := m.clipboard.peer == peer && m.clipboard.localEpoch == epoch
@@ -54,12 +60,20 @@ func (m *Manager) queueClipboardLocal(peer string, local *ClipboardValue, prepar
 			return ErrDenied
 		}
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	value, err := prepare(local)
 	if err != nil {
 		return err
 	}
 	m.clipboard.mu.Lock()
 	defer m.clipboard.mu.Unlock()
+	// Bounded preparation may finish after cancellation; only a live caller may
+	// publish. Check under the same lock that commits selection/epoch ownership.
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if m.clipboard.peer != peer || m.clipboard.localEpoch != epoch ||
 		value.Format != "" && !m.clipboard.imageAllowed || value.Format == "files" && !m.clipboard.filesAllowed {
 		return ErrDenied

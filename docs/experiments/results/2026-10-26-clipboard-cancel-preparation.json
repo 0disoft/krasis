@@ -1,0 +1,25 @@
+{
+  "schema": "krasis.experiment/v1",
+  "purpose": "Propagate request cancellation through clipboard payload preparation and prevent departed callers from publishing prepared copies.",
+  "baseline": {
+    "revision": "24b9ebc",
+    "reproduction": "FAIL on the unchanged implementation: a cancelled media waiter remained blocked for the full 1-second observation (test completed at 1.18s), subsequently reached payload cloning/validation and published. Cancellation during text or file preparation also allowed publication."
+  },
+  "change": {
+    "context": "Resident-agent Clipboard passes its request context into SyncClipboardLocalChange. Expired calls return before reserving or clearing a local copy.",
+    "serialization": "Reuse syncgate.Mutex.LockContext for the one-media-preparation gate. No polling or detached lock-waiting goroutine is added.",
+    "publication": "Check cancellation before preparation and again under clipboard.mu before publishing. Keep peer, local epoch and payload permission checks.",
+    "interfaces": "Internal Go method signature changes only. No HTTP/JSON API, peer protocol, DB, installer, repository hygiene or runner changes. Existing SyncClipboardPayload convenience callers retain their background-context behavior."
+  },
+  "validation": {
+    "focused": "PASS: cancelled media waiter 0.05s; cancellation during text/file preparation 0.08s total; expired request preserving an existing copy 0.03s. Durations include fixtures, not production latency measurements or guarantees.",
+    "packages": "PASS: go test -timeout 3m ./internal/peerupdate ./internal/residentagent ./internal/localapi ./internal/syncgate (12.943s, 8.134s, 7.332s, 0.169s), using the runtime STW overlay and local toolchain.",
+    "operationPath": "PASS: TestClipboardOperationPreservesCancellationAfterAuthorization (0.09s), added after package validation to verify that the actual resident-agent call preserves cancellation even after its first authorization check.",
+    "vet": "PASS: go vet for the same four packages; residentagent vet repeated after adding its operation-path regression.",
+    "hygiene": "PASS: changed Go files formatted with gofmt; git diff --check.",
+    "skipped": "Frontend, full repository, installer/release packaging and physical two-PC acceptance: no UI, wire, installer or input-worker changes. Existing unchanged package checks were reused."
+  },
+  "remainingRisk": "Preparation already running is bounded by existing size/validation limits and is not preempted internally. Cancellation is observed before publication, not atomically synchronized with a later context cancellation. This does not fix or verify intermittent input recovery or handoff latency.",
+  "installedOnEitherPC": false,
+  "publicPushOrRelease": false
+}
