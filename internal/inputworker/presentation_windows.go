@@ -72,6 +72,6 @@ func runCursorPresentation(ctx context.Context, channel, service *Channel, lease
 		<-done
 	}()
 	return wininput.RunProtectedReturnCursor(run, func() error {
-		return authorizeCursorPresentation(run, channel, service)
+		return authorizeWorkerOwners(run, channel, service)
 	}, lease.CursorX, lease.CursorY, ready)
 }

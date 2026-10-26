@@ -3,27 +3,7 @@ package inputworker
 import (
 	"context"
 	"errors"
-	"time"
 )
-
-// Both fresh proofs share one budget and retain their native handles through
-// query retirement. Neither a lease cancellation nor a wedged SCM/WTS call may
-// keep the passive window's OS thread inside an unbounded authorization call.
-func authorizeCursorPresentation(ctx context.Context, agent, service *Channel) error {
-	if ctx == nil || agent == nil || service == nil || agent.authority == nil || service.authority == nil ||
-		agent.authority.kind != authorityAgent || service.authority.kind != authorityService {
-		return ErrAuthority
-	}
-	ctx, cancel := context.WithTimeout(ctx, time.Second)
-	defer cancel()
-	if err := agent.authorizeInput(ctx, false); err != nil {
-		return errors.Join(ErrAuthority, err, ctx.Err())
-	}
-	if err := service.authorizeInput(ctx, false); err != nil {
-		return errors.Join(ErrAuthority, err, ctx.Err())
-	}
-	return nil
-}
 
 // Query admission ends before the final worker report. A pending proof cannot
 // certify retirement; its channel retains exact handles until actual return.

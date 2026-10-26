@@ -227,9 +227,17 @@ func validNativeParent(handle windows.Handle, installation *Installation, digest
 	return pin.Close() == nil
 }
 
-func startIsolatedInput(ctx context.Context, control *pipeConn, channel *Channel, proof *Authority, lease Lease, installation *Installation, profile *handoff.StartupProfile, prepared ...*preparedNativePair) (*isolatedInput, error) {
+func startIsolatedInput(ctx context.Context, control *pipeConn, channel, service *Channel, lease Lease, installation *Installation, profile *handoff.StartupProfile, prepared ...*preparedNativePair) (*isolatedInput, error) {
 	agentDigest, serviceDigest, err := installation.digests()
-	if err != nil || control == nil || channel == nil || channel.authority == nil || proof == nil || proof.kind != authorityService || proof.check(false) != nil || channel.authority.check(false) != nil || lease.Capture || lease.Presentation || !fixedInstalledInputProcess(serviceDigest, true, installation) {
+	if err != nil || ctx == nil || control == nil || lease.Capture || lease.Presentation {
+		return nil, ErrAuthority
+	}
+	startup, cancel := context.WithDeadline(ctx, lease.ExpiresAt)
+	defer cancel()
+	if err := authorizeWorkerOwners(startup, channel, service); err != nil {
+		return nil, err
+	}
+	if !fixedInstalledInputProcess(serviceDigest, true, installation) {
 		return nil, ErrAuthority
 	}
 	agentPipe, ok := channel.stream.(*pipeConn)

@@ -342,10 +342,8 @@ func runInstalledConsoleInputMode(ctx context.Context, agentDigest, serviceDiges
 	if err := control.SetDeadline(time.Time{}); err != nil {
 		return errors.Join(ErrAuthority, err)
 	}
-	var queryService *Channel
-	if lease.Capture || lease.Presentation {
-		queryService = lifetime.captureChannel()
-	}
+	// All worker modes retain service proof queries separately from final reports.
+	queryService := lifetime.captureChannel()
 	run, cancel := context.WithCancel(ctx)
 	defer cancel()
 	var requested atomic.Bool
@@ -397,20 +395,14 @@ func runInstalledConsoleInputMode(ctx context.Context, agentDigest, serviceDiges
 	var input application.InputPort = wininput.NewInjectionPort()
 	var isolated *isolatedInput
 	if installation != nil {
-		isolated, err = startIsolatedInput(run, control, channel, proof, lease, installation, &profile, native)
+		isolated, err = startIsolatedInput(run, control, channel, queryService, lease, installation, &profile, native)
 		if err != nil {
 			return finishWorkerReport(control, Report{}, errors.Join(err, ErrRecovery))
 		}
 		input = isolated
 	}
 	announceReady := func() error {
-		if err := proof.check(false); err != nil {
-			return errors.Join(ErrAuthority, err)
-		}
-		if err := control.SetWriteDeadline(time.Now().Add(startupTimeout)); err != nil {
-			return errors.Join(ErrAuthority, err)
-		}
-		return writeStartupReady(control, profile)
+		return publishWorkerReady(run, queryService, control, lease.ExpiresAt, profile)
 	}
 	var report Report
 	if isolated != nil && isolated.recoveryRetire != nil {
@@ -428,6 +420,8 @@ func runInstalledConsoleInputMode(ctx context.Context, agentDigest, serviceDiges
 	if isolated != nil {
 		result = errors.Join(result, isolated.finishRecovery())
 	}
+	// A live startup proof cannot certify cleanup, even with an empty journal.
+	result = errors.Join(result, serviceRecoveryFailure(nil, queryService.Close()))
 	result = normalizeWorkerStop(requested.Load(), report, result)
 	return finishWorkerReport(control, report, result)
 }

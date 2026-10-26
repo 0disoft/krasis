@@ -42,8 +42,8 @@ func (ref *sourceControlReference) Close() error {
 	return ref.err
 }
 
-// workerControlLifetime owns bootstrap's control pipe and service proof. Capture
-// and passive presentation transfer proof retirement to Channel, retaining reports.
+// workerControlLifetime owns bootstrap's control pipe and service proof. Workers
+// transfer proof retirement to Channel, retaining final reports independently.
 // Close may return before a pending native query retires; it cannot certify it.
 type workerControlLifetime struct {
 	stream net.Conn

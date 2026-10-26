@@ -44,7 +44,7 @@ func TestPresentationAuthorityHonorsOwnerBudget(t *testing.T) {
 						defer cancel()
 					}
 					started := time.Now()
-					err := authorizeCursorPresentation(ctx, agent, service)
+					err := authorizeWorkerOwners(ctx, agent, service)
 					if !errors.Is(err, ErrAuthority) || time.Since(started) != budget {
 						t.Errorf("presentation exceeded budget: elapsed=%s err=%v", time.Since(started), err)
 					}
@@ -79,7 +79,7 @@ func TestPresentationAuthoritySharesBudgetBetweenBothProofs(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 		defer cancel()
 		started := time.Now()
-		if err := authorizeCursorPresentation(ctx, agent, service); err == nil || time.Since(started) != 50*time.Millisecond {
+		if err := authorizeWorkerOwners(ctx, agent, service); err == nil || time.Since(started) != 50*time.Millisecond {
 			t.Errorf("second proof restarted the budget: elapsed=%s err=%v", time.Since(started), err)
 		}
 		time.Sleep(100 * time.Millisecond)
@@ -99,19 +99,19 @@ func TestPresentationAuthorityAlwaysChecksFreshProofsAndRejectsCanceledOwner(t *
 	agent.authority.checkInput = func() error { agentChecks.Add(1); return nil }
 	service.authority.checkInput = func() error { serviceChecks.Add(1); return nil }
 	for range 2 {
-		if err := authorizeCursorPresentation(context.Background(), agent, service); err != nil {
+		if err := authorizeWorkerOwners(context.Background(), agent, service); err != nil {
 			t.Fatal(err)
 		}
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if err := authorizeCursorPresentation(ctx, agent, service); !errors.Is(err, context.Canceled) {
+	if err := authorizeWorkerOwners(ctx, agent, service); !errors.Is(err, context.Canceled) {
 		t.Fatal("canceled owner received presentation authority", err)
 	}
 	if agentChecks.Load() != 2 || serviceChecks.Load() != 2 {
 		t.Fatal("proof was cached or canceled request started native work")
 	}
-	if err := authorizeCursorPresentation(context.Background(), service, agent); !errors.Is(err, ErrAuthority) {
+	if err := authorizeWorkerOwners(context.Background(), service, agent); !errors.Is(err, ErrAuthority) {
 		t.Fatal("swapped owner roles accepted", err)
 	}
 	if err := retireCursorPresentation(nil, agent, service); err != nil {
@@ -138,7 +138,7 @@ func TestPresentationAuthorityRetainsFinalReportDuringPendingProof(t *testing.T)
 		proof.checkInput = func() error { time.Sleep(3 * time.Second); return nil }
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 		defer cancel()
-		failure := authorizeCursorPresentation(ctx, agent, service)
+		failure := authorizeWorkerOwners(ctx, agent, service)
 		retiring := time.Now()
 		failure = retireCursorPresentation(failure, agent, service)
 		if !errors.Is(failure, ErrRecovery) || time.Since(retiring) != RecoveryTimeout || closed.Load() != 0 || stream.closes.Load() != 0 {
@@ -178,7 +178,7 @@ func TestPresentationAuthorityCannotBypassNativeCapacity(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 		defer cancel()
 		started := time.Now()
-		err := authorizeCursorPresentation(ctx, agent, service)
+		err := authorizeWorkerOwners(ctx, agent, service)
 		if !errors.Is(err, context.DeadlineExceeded) || time.Since(started) != 50*time.Millisecond || checks.Load() != 0 {
 			t.Fatal("presentation bypassed process-wide native query capacity", err)
 		}
@@ -203,7 +203,7 @@ func TestPresentationAuthorityCancellationInterruptsInFlightProof(t *testing.T) 
 			return nil
 		}
 		started := time.Now()
-		err := authorizeCursorPresentation(ctx, agent, service)
+		err := authorizeWorkerOwners(ctx, agent, service)
 		if !errors.Is(err, context.Canceled) || !time.Now().Equal(started) {
 			t.Fatal("presentation cancellation waited for the native proof", err)
 		}
