@@ -26,5 +26,26 @@
     "vet": "PASS: go vet ./internal/handoff ./internal/inputworker ./internal/productlog; go vet -unsafeptr=false ./internal/wininput",
     "vetLimit": "Default wininput vet reports eight existing unsafe.Pointer diagnostics in unchanged callback/surface files. Those warnings were not fixed by this diagnostic change.",
     "physical": "PENDING: collect new matched source handoffs with the updated protected owner. No foreground bottleneck, latency improvement or intermittent failure fix is claimed."
+  },
+  "localRollout": {
+    "generation": 461,
+    "revision": "e3291a94285bf95f83571c14099f8e4ac9e32094",
+    "packaging": "PASS: frontend 104/104, native build, TestWorkspaceUpdatePackage, 8-file workspace verification and application setup verification.",
+    "baselineCollection": "afd0fabd86ecb8dfa853913326a2d13c",
+    "aBaseline": "34 source profiles from g460; capture reply maximum 57321us. Detailed native stages absent. This is not a matched comparison to the previous day's 324277us outlier.",
+    "aInstallResult": 0,
+    "a": "Matching g461 UI, agent, launch record and protected installation; doctor healthy, connected, input health READY.",
+    "bUpdate": "fca11c521c331e604f25805746ac8899",
+    "bApp": "UPDATED; peer reports g461 and matching revision.",
+    "postUpdateCollection": "9abe739c73f4d838a5fe75d0d29438b0",
+    "bProtectedInput": "SERVICE_RECOVERY_REQUIRED (1066), predating the g461 update. Awaiting local administrator repair; updated app metadata is not proof of a healthy updated protected worker.",
+    "bExistingFailure": {
+      "timeUtc": "2026-10-26T08:52:48.5415576Z",
+      "operation": "input-retire-native-win32",
+      "win32Error": 5,
+      "limit": "The negative preparation report identifies native-child cleanup and ERROR_ACCESS_DENIED, not the exact failing native API. This field failure is not attributed to capture focus or claimed fixed."
+    },
+    "physicalAcceptance": "PENDING: repair B, verify both protected owners, then collect physical crossings.",
+    "publicPushOrRelease": false
   }
 }
