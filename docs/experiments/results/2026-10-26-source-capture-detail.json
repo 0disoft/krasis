@@ -25,7 +25,7 @@
     "packages": "PASS: go test ./internal/handoff ./internal/inputworker ./internal/productlog ./internal/wininput -count=1 -timeout=180s",
     "vet": "PASS: go vet ./internal/handoff ./internal/inputworker ./internal/productlog; go vet -unsafeptr=false ./internal/wininput",
     "vetLimit": "Default wininput vet reports eight existing unsafe.Pointer diagnostics in unchanged callback/surface files. Those warnings were not fixed by this diagnostic change.",
-    "physical": "PENDING: collect new matched source handoffs with the updated protected owner. No foreground bottleneck, latency improvement or intermittent failure fix is claimed."
+    "physical": "PASS: 13 matched g461 crossings have native activation detail; see 2026-10-26-g461-physical-acceptance.json. This establishes diagnostic delivery, not a latency improvement or intermittent failure fix."
   },
   "localRollout": {
     "generation": 461,
@@ -53,7 +53,7 @@
       "win32Error": 5,
       "limit": "The negative preparation report identifies native-child cleanup and ERROR_ACCESS_DENIED, not the exact failing native API. This field failure is not attributed to capture focus or claimed fixed."
     },
-    "physicalAcceptance": "PENDING: repair and readiness checks complete; requested ten physical round trips including rapid returns. Await user completion before collecting the acceptance cohort.",
+    "physicalAcceptance": "User completed round trips; collection ebd635fe6b0af11fcf11c6e84ab3b7fc contains 13 matched successful crossings. Both services remain READY. Earlier post-repair session faults and remaining latency are separately recorded in 2026-10-26-g461-physical-acceptance.json.",
     "publicPushOrRelease": false
   }
 }

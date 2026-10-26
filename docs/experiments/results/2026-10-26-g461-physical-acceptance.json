@@ -1,0 +1,110 @@
+{
+  "schema": "krasis.experiment/v1",
+  "purpose": "Compare the user-completed g461 physical round trips with matched local source/receiver profiles.",
+  "collection": "ebd635fe6b0af11fcf11c6e84ab3b7fc",
+  "revision": "e3291a94285bf95f83571c14099f8e4ac9e32094",
+  "cutoffUtc": "2026-10-26T10:11:42Z",
+  "method": "Filter exact build, source/receiver roles and cutoff, then match exchangeTag; use local elapsed spans, never subtract clocks across laptops. Zero timing with a measured bit is a valid sub-resolution observation. Startup/native spans overlap and are not additive.",
+  "matchedExchanges": 13,
+  "aCompletedOk": 13,
+  "bCompletedOk": 13,
+  "aHealth": "READY",
+  "bHealth": "READY",
+  "aService": "READY",
+  "bService": "READY",
+  "aCaptureActivateMicros": {
+    "count": 13,
+    "median": 15063,
+    "max": 106724
+  },
+  "aCaptureResponseMicros": {
+    "count": 13,
+    "median": 14509,
+    "max": 105708
+  },
+  "aNativeForegroundBuckets": [
+    {
+      "bucket": 2,
+      "count": 9
+    },
+    {
+      "bucket": 3,
+      "count": 4
+    }
+  ],
+  "aNativeBoundaryBeforeBuckets": [
+    {
+      "bucket": 1,
+      "count": 13
+    }
+  ],
+  "aNativeBoundaryAfterBuckets": [
+    {
+      "bucket": 1,
+      "count": 8
+    },
+    {
+      "bucket": 2,
+      "count": 5
+    }
+  ],
+  "bReadyWaitMicros": {
+    "count": 13,
+    "median": 32460,
+    "max": 976788
+  },
+  "bNativePairReadyMicros": {
+    "count": 13,
+    "median": 13946,
+    "max": 427246
+  },
+  "bCursorEntryMicros": {
+    "count": 13,
+    "median": 4722,
+    "max": 67038
+  },
+  "bWorstDispatchMicros": {
+    "count": 13,
+    "median": 11541,
+    "max": 337300
+  },
+  "bPreparedUsed": 11,
+  "bNoCandidate": 2,
+  "bColdReadyWaitMicros": [
+    976788,
+    660475
+  ],
+  "bPreparedReadyWaitMicros": {
+    "count": 11,
+    "median": 32194,
+    "max": 108645
+  },
+  "bSlowestApplyWorkerMillis": 334,
+  "cohortFailures": [],
+  "precedingFaults": [
+    {
+      "time": "2026-10-26T10:04:18.8636289Z",
+      "code": "fault_source_hook_failed"
+    },
+    {
+      "time": "2026-10-26T10:11:13.2412259Z",
+      "code": "fault_trust_freshness_expired"
+    }
+  ],
+  "interpretation": {
+    "coldPreparation": "Two unprepared entries dominate readiness outliers; prepared entries still wait for authenticated native-pair readiness. Persistent warm workers are a candidate, not an implemented or validated fix.",
+    "capture": "Foreground takes 1-10ms or 10-100ms in this cohort; no fallback observed. Capture is not zero-cost, but it cannot explain the cold B readiness outliers.",
+    "apply": "The 337300us receiver dispatch contains a 334ms worker apply span. That span can include nested child IPC and authority work; it does not isolate SendInput or prove a pointer queue backlog.",
+    "failures": "No fault/session_failed/poison event inside the actual crossing cohort. Earlier post-repair faults are reported separately; current READY does not establish a fix for intermittent disconnects.",
+    "safety": "Do not suppress authority checks, ignore retirement failures, extend trust freshness or preserve a TLS connection without verified input release merely to reduce timings.",
+    "comparison": "g459 sample and g461 sample have different cadence and system conditions. This diagnostic-only change establishes no causal latency improvement."
+  },
+  "validation": {
+    "pairedData": "All 13 exchange tags uniquely pair source and receiver; all complete with end=ok.",
+    "runtime": "Both collected protected services and input health READY.",
+    "software": "No runtime source changed in this acceptance analysis; rebuild, package tests and reinstall skipped.",
+    "pending": "No latency fix or additional deployment performed."
+  },
+  "apiDbRunnerChanges": "None",
+  "pushOrRelease": false
+}
