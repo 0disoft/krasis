@@ -79,7 +79,9 @@ func (input *privilegedLeaseInput) open(ctx context.Context, identity applicatio
 	}
 	input.entryWaiting.Add(1)
 	defer input.entryWaiting.Add(-1)
-	input.RestoreReturnCursor()
+	if err := input.restoreReturnCursor(ctx); err != nil {
+		return errors.Join(errPrivilegedInput, err)
+	}
 	started := time.Now()
 	joined := input.finishPreparationForEntry(ctx)
 	if err := input.mu.LockContext(ctx); err != nil {

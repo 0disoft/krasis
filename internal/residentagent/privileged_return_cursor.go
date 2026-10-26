@@ -97,6 +97,14 @@ func (input *privilegedLeaseInput) PrepareReturnCursor() func() {
 }
 
 func (input *privilegedLeaseInput) RestoreReturnCursor() {
+	// Explicit restoration/shutdown still joins the native owner completely.
+	_ = input.restoreReturnCursor(context.Background())
+}
+
+// Entry may stop waiting on its own budget, but cancellation is never proof of
+// native retirement. Keep cancel/done published until a later waiter joins the
+// same owner; no new presentation or input lease may bypass that fence.
+func (input *privilegedLeaseInput) restoreReturnCursor(ctx context.Context) error {
 	started := time.Now()
 	p := &input.cursor
 	p.mu.Lock()
@@ -108,7 +116,11 @@ func (input *privilegedLeaseInput) RestoreReturnCursor() {
 	}
 	p.mu.Unlock()
 	if done != nil {
-		<-done
+		select {
+		case <-done:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 	p.mu.Lock()
 	if p.done == done {
@@ -118,6 +130,7 @@ func (input *privilegedLeaseInput) RestoreReturnCursor() {
 	if cancel != nil || done != nil {
 		input.observeHandoffTiming("cursor_retire", started)
 	}
+	return nil
 }
 
 // One process-local monotonic duration per attempted admission/open/retirement.
