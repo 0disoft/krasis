@@ -79,7 +79,11 @@ func (c *sourceClient) pollHeartbeat(ctx context.Context) (bool, error) {
 	// command/input checks, not keepalive traffic that can otherwise starve its
 	// own two-second reader while waiting for a broker. Kernel-owner checks are
 	// still performed outside the gate, so capture commands can pass maintenance.
-	check, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+	// No request exists yet: owner cancellation must stop admission/preflight
+	// immediately so retirement can proceed. Optional query ownership retains
+	// any in-flight native handles until completion. Only the sent request below
+	// detaches cancellation to preserve its exact ACK/retirement contract.
+	check, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 	started := time.Now()
 	err := c.channel.authorizeHeartbeatPresence(check)
