@@ -36,8 +36,8 @@ func (service *AgentService) PresentReturnCursorObserved(ctx context.Context, le
 			_ = channel.Close()
 		}
 	}()
-	stop := context.AfterFunc(ctx, func() { _ = channel.Close() })
-	defer stop()
+	finish := startupCancellation(ctx, channel)
+	defer finish()
 	deadline := time.Now().Add(time.Second)
 	if limit, ok := ctx.Deadline(); ok && limit.Before(deadline) {
 		deadline = limit
@@ -51,6 +51,9 @@ func (service *AgentService) PresentReturnCursorObserved(ctx context.Context, le
 	}
 	observePresentationStartup(emit, profile)
 	if channel.stream.SetDeadline(time.Time{}) != nil {
+		return nil, ErrAuthority
+	}
+	if finish() != nil {
 		return nil, ErrAuthority
 	}
 	accepted = true

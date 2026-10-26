@@ -37,8 +37,8 @@ func connectInstalledLease(ctx context.Context, serviceDigest [sha256.Size]byte,
 			_ = channel.Close()
 		}
 	}()
-	stop := context.AfterFunc(ctx, func() { _ = channel.Close() })
-	defer stop()
+	finish := startupCancellation(ctx, channel)
+	defer finish()
 	deadline := time.Now().Add(startupTimeout)
 	if limit, ok := ctx.Deadline(); ok && limit.Before(deadline) {
 		deadline = limit
@@ -71,6 +71,9 @@ func connectInstalledLease(ctx context.Context, serviceDigest [sha256.Size]byte,
 	if err != nil {
 		return nil, connectionFailed("client_validation", err)
 	}
+	if err := finish(); err != nil {
+		return nil, connectionFailed("client_validation", err)
+	}
 	accepted = true
 	return client, nil
 }
@@ -95,8 +98,8 @@ func receiveAgentRequest(ctx context.Context, channel *Channel) (Lease, bool, er
 	if channel.authorizeInput(ctx, false) != nil {
 		return Lease{}, false, ErrAuthority
 	}
-	stop := context.AfterFunc(ctx, func() { _ = channel.Close() })
-	defer stop()
+	finish := startupCancellation(ctx, channel)
+	defer finish()
 	deadline, _ := ctx.Deadline()
 	if channel.stream.SetReadDeadline(deadline) != nil {
 		return Lease{}, false, ErrAuthority
@@ -106,6 +109,9 @@ func receiveAgentRequest(ctx context.Context, channel *Channel) (Lease, bool, er
 		return Lease{}, false, ErrAuthority
 	}
 	if ctx.Err() != nil || channel.authorizeInput(ctx, false) != nil || channel.stream.SetReadDeadline(time.Time{}) != nil {
+		return Lease{}, false, ErrAuthority
+	}
+	if finish() != nil {
 		return Lease{}, false, ErrAuthority
 	}
 	if isPreparation(data) {
