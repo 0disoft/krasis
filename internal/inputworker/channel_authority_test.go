@@ -76,10 +76,10 @@ func TestAuthorityQueryCapacityIncludesExpiredNativeOwners(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		defer isolateAuthorityCapacity(t)()
 		release := make(chan struct{})
-		entered := make(chan struct{}, cap(authorityQueries))
-		done := make(chan error, cap(authorityQueries))
+		entered := make(chan struct{}, cap(authorityProofQueries))
+		done := make(chan error, cap(authorityProofQueries))
 		var checks, closes atomic.Int32
-		channels := make([]*Channel, cap(authorityQueries))
+		channels := make([]*Channel, cap(authorityProofQueries))
 		for i := range channels {
 			server, pipe := net.Pipe()
 			defer server.Close()
@@ -112,7 +112,7 @@ func TestAuthorityQueryCapacityIncludesExpiredNativeOwners(t *testing.T) {
 		replacement.authority.checkInputObserved = func(context.Context) error { t.Error("over-capacity native query started"); return nil }
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 		defer cancel()
-		if !errors.Is(replacement.authorizeInput(ctx, true), context.DeadlineExceeded) || len(authorityQueries) != cap(authorityQueries) || closes.Load() != 0 {
+		if !errors.Is(replacement.authorizeInput(ctx, true), context.DeadlineExceeded) || len(authorityQueries) != cap(authorityProofQueries) || len(authorityProofQueries) != cap(authorityProofQueries) || closes.Load() != 0 {
 			t.Fatal("expired query abandoned its resource slot")
 		}
 		_ = replacement.Close()

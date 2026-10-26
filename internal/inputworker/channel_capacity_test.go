@@ -17,18 +17,21 @@ import (
 func isolateAuthorityCapacity(t *testing.T) func() {
 	t.Helper()
 	previous := authorityQueries
-	if len(previous) != 0 {
+	previousProofs := authorityProofQueries
+	if len(previous) != 0 || len(previousProofs) != 0 {
 		t.Fatal("preceding native query still owns global capacity")
 	}
 	authorityQueries = make(chan struct{}, cap(previous))
+	authorityProofQueries = make(chan struct{}, cap(previousProofs))
 	return func() {
 		// A published query result precedes its deferred slot release. Join
 		// that final goroutine work before restoring the shared test fixture.
 		synctest.Wait()
-		if len(authorityQueries) != 0 {
+		if len(authorityQueries) != 0 || len(authorityProofQueries) != 0 {
 			t.Error("test left an unretired capacity owner")
 		}
 		authorityQueries = previous
+		authorityProofQueries = previousProofs
 	}
 }
 

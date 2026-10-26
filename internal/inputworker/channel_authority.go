@@ -12,6 +12,12 @@ import (
 // callers expired. A stuck SCM call cannot create unbounded replacement work.
 var authorityQueries = make(chan struct{}, 4)
 
+// Reserve one of those four slots for presence. Full SCM/WTS input checks
+// and advisory preflights may own at most three; they cannot consume
+// the last slot required by a fresh service/agent heartbeat. This is admission
+// only, never a cached proof or permission to exceed the native-query limit.
+var authorityProofQueries = make(chan struct{}, 3)
+
 type authorityQuery struct {
 	done   chan struct{}
 	err    error
@@ -117,17 +123,17 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 		// nor its old admission decision survives that wait. The reserved slot
 		// authorizes no work; the native query below still obtains a fresh proof.
 		if channel.closing || channel.authority.fenced.Load() {
-			<-authorityQueries
+			releaseQueryCapacity(kind)
 			channel.queryMu.Unlock()
 			return queryAdmissionFailure(kind, "closed", nil)
 		}
 		if err := ctx.Err(); err != nil {
-			<-authorityQueries
+			releaseQueryCapacity(kind)
 			channel.queryMu.Unlock()
 			return queryCapacityFailure(kind, err)
 		}
 		if *current != nil {
-			<-authorityQueries
+			releaseQueryCapacity(kind)
 			channel.queryMu.Unlock()
 			continue
 		}
@@ -138,7 +144,7 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 		*current = query
 		queryCtx, merge := handoff.ForkAuthority(ctx)
 		go func() {
-			defer func() { <-authorityQueries }()
+			defer releaseQueryCapacity(kind)
 			query.phase.Store(queryChecking)
 			if query.timing != nil {
 				query.timing.started = time.Now()

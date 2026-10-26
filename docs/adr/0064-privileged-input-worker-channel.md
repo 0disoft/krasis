@@ -4,6 +4,38 @@
 - 결정일: 2026-09-30
 - 관련: ADR 0062, ADR 0063, ADR 0036
 
+## Presence admission under authority-query pressure
+
+The process-wide ceiling remains four outstanding native queries, including
+expired queries that still own handles. Full input authorization and advisory
+preflights now also require one of three restricted reservations. They acquire
+that reservation before shared capacity, leaving one shared slot available to
+fresh presence checks. Client heartbeat preflight, worker read-side presence and
+reply presence can use that slot; they still check the authenticated owner.
+Presence cannot authorize capture, inject input, extend trust or renew an idle
+deadline without an actual matching reply.
+
+Both reservation waits retain the caller's deadline and observe channel close
+without holding queryMu. After waiting, admission rechecks channel closure,
+fencing and the lane owner. Every started query obtains a new proof. Both
+reservations remain owned until the native query and resource retirement return;
+timeout alone never releases a slot or certifies cleanup.
+
+A virtual-clock regression starts four blocked full-proof requests. Previously
+all four entered native work and service/agent heartbeat admission expired at
+20ms without running either presence check. Now three enter native work and
+both fresh presence checks complete without advancing fake time. Additional
+checks retain the full-proof timeout, close cancellation, reservation cleanup
+and expired-native-owner fencing behavior. Full-proof concurrency falls from
+four to three, so sustained input authorization pressure may wait longer.
+
+This addresses a reproduced admission starvation mechanism consistent with the
+g462 capacity failures; it does not prove their individual field cause or fix
+the separately observed boundary-write/gate timeouts. Native presence itself,
+its lane, OS scheduling and wire writes remain bounded waits that can still
+fail. No wire format, authorization rule, generation or installed binary changes
+are part of this local change.
+
 ## 입력 worker
 
 `internal/inputworker`는 이미 승인된 한 원격 lease의 입력과 해제를 소유합니다.
