@@ -1,0 +1,45 @@
+{
+  "schema": "krasis.experiment/v1",
+  "purpose": "Record g463 installation and current protected-input readiness on both authorized laptops.",
+  "verifiedAtUtc": "2026-10-26T15:51:38.3354552Z",
+  "generation": 463,
+  "revision": "d7c44b7f8a22b4a04f543b998738a94600b94a0e",
+  "collection": "3fbbc8e8d459cd6ff9996cb9fdefd51d",
+  "updateJob": "791ad54213a2bf406495e9960b508269",
+  "a": {
+    "installation": "local_setup",
+    "doctor": "healthy",
+    "connection": "CONNECTED",
+    "uiGeneration": 463,
+    "agentGeneration": 463,
+    "service": "RUNNING",
+    "inputHealth": "READY",
+    "installationResult": 0,
+    "diagnosticsCollectedAtUtc": "2026-10-26T15:50:46Z"
+  },
+  "b": {
+    "installation": "trusted_peer_update",
+    "peerState": "ONLINE",
+    "agentGeneration": 463,
+    "agentBuild": "d7c44b7f8a22b4a04f543b998738a94600b94a0e",
+    "transferState": "UPDATED",
+    "transferBytes": 28480512,
+    "transferTotal": 28480512,
+    "service": "READY",
+    "inputHealth": "READY",
+    "installationResult": 0,
+    "diagnosticsCollectedAtUtc": "2026-10-26T15:50:45Z"
+  },
+  "validation": [
+    "Frontend: 104/104 tests passed during packaging.",
+    "Go tests and vet passed for inputworker, residentagent, agent and peer before packaging.",
+    "Workspace update archive test passed; 28,480,512-byte bundle verified.",
+    "Setup embedded payload verification passed.",
+    "Local doctor healthy, trusted peer UPDATED at the matching g463 revision, paired diagnostics report input health READY."
+  ],
+  "limitations": [
+    "Current readiness is a snapshot; no new user-performed g463 round-trip latency or soak result is available.",
+    "Go race tests were not run because this build uses CGO_ENABLED=0.",
+    "No public release or git push was performed."
+  ]
+}
