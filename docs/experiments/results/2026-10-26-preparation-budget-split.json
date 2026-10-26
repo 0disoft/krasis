@@ -30,7 +30,7 @@
     "generation": "PASS: go test ./internal/localapi -run Test.*(Runtime|Generation) -count=1 -timeout=60s",
     "format": "PASS: gofmt and git diff --check",
     "packaging": "PASS: frontend 104/104 tests; native build; TestWorkspaceUpdatePackage; eight-file update bundle and setup verification.",
-    "physical": "PENDING: both g462 installations and protected readiness verified after manual B installation. Requested three idle first entries and ten rapid round trips. No field improvement claimed."
+    "physical": "PARTIAL: user completed the requested test; 12 matched successful crossings all reused prepared input, including three measured 5-10s reentry gaps. B readiness maximum fell from 976788us to 186723us in sequential cohorts, but median rose from 32460us to 35906.5us. Five failed A source exits and a session_failed event were retained after installation verification and before the later successful paired interval; stability is not accepted. See 2026-10-26-g462-physical-acceptance.json."
   },
   "localRollout": {
     "revision": "7108b93954d4c7034d2129af009e8fad31d5e5ab",
@@ -53,7 +53,9 @@
     "verificationCollection": "3f565da472795f33a972510619849818",
     "aCollectedAtUtc": "2026-10-26T14:01:04Z",
     "bCollectedAtUtc": "2026-10-26T14:01:03Z",
-    "next": "Await the requested physical test completion, collect fresh diagnostics and compare idle first-entry against rapid returns. No additional installation or repair required at this verification point."
+    "physicalAcceptanceCollection": "2a5fca77653f44377b612ea563c2026a",
+    "physicalAcceptanceReport": "2026-10-26-g462-physical-acceptance.json",
+    "next": "Investigate A source boundary/heartbeat write-gate and authority-query deadline/capacity failures. Current protected readiness does not establish continuous session health; no repair or further deployment performed during acceptance analysis."
   },
   "apiDbRunnerChanges": "None",
   "pushOrRelease": false

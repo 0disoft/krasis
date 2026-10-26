@@ -1,0 +1,173 @@
+{
+  "schema": "krasis.experiment/v1",
+  "purpose": "Validate g462 preparation budget separation against the requested idle-entry and rapid-return physical test.",
+  "collection": "2a5fca77653f44377b612ea563c2026a",
+  "generation": 462,
+  "revision": "7108b93954d4c7034d2129af009e8fad31d5e5ab",
+  "cutoffUtc": "2026-10-26T14:19:33Z",
+  "aCollectedAtUtc": "2026-10-26T14:27:33Z",
+  "bCollectedAtUtc": "2026-10-26T14:27:33Z",
+  "method": "Filter exact revision and post-install verification cutoff, then match source/receiver exchangeTag. Use measured local elapsed spans; never subtract laptop clocks. Nested spans are not additive. The retained paired profiles cover a later successful interval; report earlier post-verification failures separately.",
+  "matchedExchanges": 12,
+  "aCompletedOk": 12,
+  "bCompletedOk": 12,
+  "bPreparedUsed": 12,
+  "bNoCandidate": 0,
+  "aHealth": "READY",
+  "bHealth": "READY",
+  "aService": "READY",
+  "bService": "READY",
+  "aCaptureActivateMicros": {
+    "count": 12,
+    "median": 29830,
+    "max": 87636
+  },
+  "bReadyWaitMicros": {
+    "count": 12,
+    "median": 35906.5,
+    "max": 186723
+  },
+  "bNativePairReadyMicros": {
+    "count": 12,
+    "median": 14711.5,
+    "max": 117869
+  },
+  "bCursorEntryMicros": {
+    "count": 12,
+    "median": 4172,
+    "max": 7515
+  },
+  "bWorstDispatchMicros": {
+    "count": 12,
+    "median": 4787,
+    "max": 10762
+  },
+  "idleEntry": {
+    "definition": "Measured local receiver reentry gap between 5 and 10 seconds.",
+    "count": 3,
+    "preparedUsed": 3,
+    "gapsMicros": [
+      5341579,
+      6993071,
+      6793365
+    ],
+    "bReadyWaitMicros": {
+      "count": 3,
+      "median": 129903,
+      "max": 148174
+    }
+  },
+  "rapidReturn": {
+    "definition": "Measured receiver reentry gap below one second; this is a numeric proxy, not a user-labelled gesture.",
+    "count": 7,
+    "preparedUsed": 7,
+    "bReadyWaitMicros": {
+      "count": 7,
+      "median": 29989,
+      "max": 186723
+    }
+  },
+  "observedHints": {
+    "bAcknowledged": 91,
+    "bMissed": 0,
+    "limit": "Receipts establish a completed request, not readiness or future claim. Rolling diagnostic files are a retained window, not an exhaustive lifetime history."
+  },
+  "g461Comparison": {
+    "matchedExchanges": 13,
+    "bPreparedUsed": 11,
+    "bNoCandidate": 2,
+    "bReadyWaitMicros": {
+      "count": 13,
+      "median": 32460,
+      "max": 976788
+    },
+    "bPreparedReadyWaitMicros": {
+      "count": 11,
+      "median": 32194,
+      "max": 108645
+    },
+    "bCursorEntryMicros": {
+      "count": 13,
+      "median": 4722,
+      "max": 67038
+    },
+    "bWorstDispatchMicros": {
+      "count": 13,
+      "median": 11541,
+      "max": 337300
+    },
+    "aCaptureActivateMicros": {
+      "count": 13,
+      "median": 15063,
+      "max": 106724
+    },
+    "limit": "Sequential field cohorts differ in cadence, system load and time. Smaller observed maxima and complete preparation reuse support the mechanism, but do not establish a causal speedup or reliability improvement."
+  },
+  "stability": {
+    "postVerificationFaults": [
+      {
+        "time": "2026-10-26T14:21:17.3332965Z",
+        "code": "fault_source_hook_failed"
+      },
+      {
+        "time": "2026-10-26T14:21:17.4986096Z",
+        "code": "session_failed"
+      }
+    ],
+    "sourceExitFailures": 5,
+    "sourceFailures": [
+      {
+        "time": "2026-10-26T14:21:17.0945385Z",
+        "operation": "source-write-boundary-timeout",
+        "reader": "cancelled",
+        "retirement": "delivery_failed",
+        "heartbeatSlowStage": "reply_gate",
+        "heartbeatSlowBucket": 4
+      },
+      {
+        "time": "2026-10-26T14:21:48.8276349Z",
+        "operation": "source-gate-boundary-write",
+        "reader": "failed",
+        "retirement": "clean_sent",
+        "heartbeatSlowStage": "reply_gate",
+        "heartbeatSlowBucket": 5
+      },
+      {
+        "time": "2026-10-26T14:22:01.1592949Z",
+        "operation": "source-service-query-deadline-completed",
+        "reader": "authority",
+        "retirement": "clean_sent",
+        "heartbeatSlowStage": "service_presence",
+        "heartbeatSlowBucket": 2
+      },
+      {
+        "time": "2026-10-26T14:22:44.7868588Z",
+        "operation": "source-agent-query-capacity",
+        "reader": "authority",
+        "retirement": "clean_sent",
+        "heartbeatSlowStage": "agent_presence",
+        "heartbeatSlowBucket": 4
+      },
+      {
+        "time": "2026-10-26T14:23:01.2082335Z",
+        "operation": "source-agent-query-capacity",
+        "reader": "authority",
+        "retirement": "clean_sent",
+        "heartbeatSlowStage": "agent_presence",
+        "heartbeatSlowBucket": 5
+      }
+    ],
+    "pairedIntervalStartsAtReceiverUtc": "2026-10-26T14:26:28.1620757Z",
+    "pairedIntervalObservedFaults": 0,
+    "limit": "READY is a current state, not evidence of an uninterrupted session. Five new failed source exits and one retained session_failed event prevent claiming the disconnect problem fixed. Worker diagnostics identify write-gate timeouts and authority query deadlines/capacity, not a proven common native cause or g462 regression."
+  },
+  "nextPriority": "Investigate A source boundary/heartbeat write admission and service/agent authority-query capacity, using the preserved exit stages. Keep release, authority and cleanup guarantees.",
+  "validation": {
+    "pairedData": "PASS: 12 unique matched pairs, all source/receiver end=ok; preparation/dispatch measurement bits present; all 12 reuse prepared input; three measured idle gaps.",
+    "syntax": "PASS: JSON parsing and git diff --check.",
+    "runtime": "Both service and input health READY in the collected snapshots.",
+    "skipped": "No executable source changed; rebuild, software tests and reinstall not repeated. No new deployment or public push."
+  },
+  "apiDbRunnerChanges": "None",
+  "pushOrRelease": false
+}
