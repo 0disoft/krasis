@@ -166,21 +166,29 @@ func copyCLI(destination *securefs.Directory, source string) error {
 			}
 		}
 	}
-	data, err := io.ReadAll(io.LimitReader(file, maxExecutable+1))
-	if err != nil || len(data) > maxExecutable {
-		return ErrInvalid
-	}
-	return replace(destination, "krasis-cli.exe", data)
+	return replaceWith(destination, "krasis-cli.exe", func(output *os.File) error {
+		return copyCLIStream(output, file, info.Size())
+	})
 }
 
 func replace(dir *securefs.Directory, name string, data []byte) error {
+	return replaceWith(dir, name, func(file *os.File) error {
+		n, err := file.Write(data)
+		if err == nil && n != len(data) {
+			err = io.ErrShortWrite
+		}
+		return err
+	})
+}
+
+func replaceWith(dir *securefs.Directory, name string, write func(*os.File) error) error {
 	file, temporary, err := dir.CreateTemporary(".launch-", 0600)
 	if err != nil {
 		return err
 	}
 	defer dir.Remove(temporary)
 	if err = peercredentials.ProtectSecurityFileHandle(file); err == nil {
-		_, err = file.Write(data)
+		err = write(file)
 	}
 	if err == nil {
 		err = file.Sync()

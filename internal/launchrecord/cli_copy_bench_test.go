@@ -30,3 +30,38 @@ func BenchmarkCopyUnchangedCLI8MiB(b *testing.B) {
 		}
 	}
 }
+
+func BenchmarkCopyNewCLI(b *testing.B) {
+	for _, tc := range []struct {
+		name string
+		size int64
+	}{{"8MiB", 8 << 20}, {"64MiB", maxExecutable}} {
+		b.Run(tc.name, func(b *testing.B) {
+			source := b.TempDir()
+			file, err := os.Create(filepath.Join(source, "krasis-cli.exe"))
+			if err != nil {
+				b.Fatal(err)
+			}
+			truncateErr := file.Truncate(tc.size)
+			closeErr := file.Close()
+			if truncateErr != nil || closeErr != nil {
+				b.Fatal(truncateErr, closeErr)
+			}
+			destination, err := productidentity.PrepareLaunch(b.TempDir())
+			if err != nil {
+				b.Fatal(err)
+			}
+			defer destination.Close()
+			b.ReportAllocs()
+			b.SetBytes(tc.size)
+			for b.Loop() {
+				if err := copyCLI(destination, source); err != nil {
+					b.Fatal(err)
+				}
+				if err := destination.Remove("krasis-cli.exe"); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
