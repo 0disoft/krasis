@@ -1,12 +1,34 @@
 package peerupdate
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 )
+
+func TestClipboardReceiveRejectsTransportFailureAtExactAdvertisedSize(t *testing.T) {
+	for _, failure := range []error{io.ErrUnexpectedEOF, context.Canceled} {
+		t.Run(failure.Error(), func(t *testing.T) {
+			m := testManager(t)
+			peer, id := strings.Repeat("a", 64), strings.Repeat("b", 32)
+			if err := m.SetClipboardPeer(peer); err != nil {
+				t.Fatal(err)
+			}
+			_, _ = m.SyncClipboard(peer, nil, "")
+			m.observePeer(peer, PeerInfo{Clipboard: true, ClipboardID: id, ClipboardSize: 3})
+			body := &clipboardBodyErrorReader{remaining: 3, failure: failure}
+			if err := m.receiveClipboardPayload(peer, id, "", body, func() bool { return true }, true); err != ErrDenied {
+				t.Fatal("body length masked failed transport", err)
+			}
+			if value, err := m.SyncClipboard(peer, nil, ""); err != nil || value.ID != "" {
+				t.Fatal("failed transport published a clipboard value", value.ID, err)
+			}
+		})
+	}
+}
 
 func TestClipboardReceiveStopsAtAdvertisedSize(t *testing.T) {
 	for _, format := range []string{"", "png", "dib", "files"} {

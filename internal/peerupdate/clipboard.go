@@ -332,7 +332,15 @@ func (m *Manager) receiveClipboardPayload(peer, id, format string, r io.Reader, 
 	// Only the admitted receiver owns failure reporting for its active copy.
 	defer m.clipboardReceiveFailed(peer, id)
 	progress := &progressReader{Reader: r, update: func(n int64) { m.clipboardProgress(peer, id, "RECEIVE", format, n, 0) }}
-	data, err := io.ReadAll(io.LimitReader(progress, int64(limit)+1))
+	var data []byte
+	var err error
+	if advertised {
+		data, err = readClipboardBody(progress, limit)
+	} else {
+		// Legacy callers do not know the actual size. Do not reserve the
+		// entire format limit for a potentially small local payload.
+		data, err = io.ReadAll(io.LimitReader(progress, int64(limit)+1))
+	}
 	if err != nil || advertised && len(data) != limit || !authorized() || format == "" && !validClipboardText(string(data)) ||
 		format != "" && !ValidClipboardPayload(format, data) {
 		return ErrDenied
