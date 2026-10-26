@@ -51,18 +51,32 @@ func (input *privilegedLeaseInput) PrepareReturnCursor() func() {
 		if p.generation != generation || p.cancel != nil || p.root.Err() != nil {
 			return
 		}
-		run, cancel := context.WithCancel(p.root)
+		limit := time.Now().Add(60 * time.Second)
+		if expires.Before(limit) {
+			limit = expires
+		}
+		// The parent owns the presentation channel too. Its lifetime must end
+		// with the same lease as the service worker, even without another entry.
+		run, cancel := context.WithDeadline(p.root, limit)
 		done := make(chan struct{})
 		p.cancel, p.done = cancel, done
 		go func() {
-			defer close(done)
+			defer cancel()
+			clean := false
+			defer func() {
+				p.mu.Lock()
+				defer p.mu.Unlock()
+				// Publish completion and release admission in one transaction.
+				// Failure keeps its fence; stale callbacks lose their generation.
+				if clean && p.done == done {
+					p.generation++
+					p.cancel, p.done = nil, nil
+				}
+				close(done)
+			}()
 			binding, err := inputworker.NewBinding()
 			if err != nil {
 				return
-			}
-			limit := time.Now().Add(60 * time.Second)
-			if expires.Before(limit) {
-				limit = expires
 			}
 			lease := inputworker.Lease{Identity: identity, Binding: binding, ExpiresAt: limit, Presentation: true, CursorX: x, CursorY: y}
 			start, stop := context.WithTimeout(run, 750*time.Millisecond)
@@ -91,7 +105,9 @@ func (input *privilegedLeaseInput) PrepareReturnCursor() func() {
 				if input.event != nil {
 					input.event("installed_return_cursor_close_failed")
 				}
+				return
 			}
+			clean = true
 		}()
 	}
 }
