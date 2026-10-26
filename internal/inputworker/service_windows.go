@@ -174,9 +174,8 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 						}
 					}
 				}
-				if err == nil && channel.authority.check(false) == nil {
-					_ = channel.stream.SetWriteDeadline(time.Now().Add(time.Second))
-					err = writeFrame(channel.stream, preparationReceipt[:])
+				if err == nil {
+					err = acknowledgePreparation(ctx, channel)
 				}
 				closeErr := channel.Close()
 				if failure := serviceRecoveryFailure(err, closeErr); failure != nil {
