@@ -12,10 +12,11 @@ import (
 )
 
 const (
-	// Shared with approved entry admission: only this already bounded optional
-	// operation may finish before its candidate is claimed by a real lease.
-	InputPreparationTimeout = 300 * time.Millisecond
-	preparationHintLifetime = 500 * time.Millisecond
+	// Optional construction needs room for service authentication and child
+	// startup. It must not also determine how long an approved entry waits.
+	InputPreparationTimeout   = 750 * time.Millisecond
+	InputPreparationEntryWait = 300 * time.Millisecond
+	preparationHintLifetime   = 500 * time.Millisecond
 	// Keep margin beyond the independent two-second sender/receiver gates.
 	// Renewal is driven only by fresh physical movement, never a timer.
 	preparationHintRenewal = 2*time.Second + 100*time.Millisecond

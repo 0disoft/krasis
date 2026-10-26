@@ -774,6 +774,26 @@ remains a subset, not an additional duration. The fixed preparation-joined event
 records waiting for completion, not successful reuse; the service's startup
 decision owns the latter. See the g331 engineering evidence for reproduction.
 
+### g462: Separate idle construction from approved-entry waiting
+
+The optional receiver now allows 750ms for the existing authenticated preparation
+request, matching the local preparation API's existing upper bound. An approved
+entry still waits at most 300ms for useful construction before canceling it.
+Shorter original deadlines and shutdown cancellation remain in force. Cleanup
+still owns the admission mutex until joined, so native retirement can extend
+elapsed admission beyond the preparation wait; it is never skipped to meet a timer.
+
+The g461 field sample contains repeated missed hints before two cold entries;
+those entries spent 279–361ms on service child launch/connect alone. A 300ms
+whole-request budget can discard useful preparation in that range. The fixed
+missed event does not identify each request's failing stage, so this is a bounded
+fix for a reproduced cancellation mechanism, not proof that every field miss had
+that cause. Warm lifetime, claim, request cooldown, trust, bootstrap and ownership
+are unchanged. No background renewal or peer protocol change is introduced.
+
+Deterministic tests cover 500ms construction, the 750ms idle deadline, reuse after
+250ms of prior work, the separate 300ms entry cap and joined delayed cleanup.
+
 ## g292: Keep capture off Go's non-terminating startup thread
 
 B's g291 capture failure reported desktop-thread-exit without a native number.

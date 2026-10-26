@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	// Leave room for the existing 300ms preparation budget and hint delivery.
+	// Lead plus the bounded entry wait can cover the optional startup budget.
 	// The region cap and launch cooldown still bound unused preparation.
 	preparationPreviewLead = 500 * time.Millisecond
 	previewSampleMinimum   = 4 * time.Millisecond

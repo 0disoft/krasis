@@ -1,0 +1,36 @@
+{
+  "schema": "krasis.experiment/v1",
+  "purpose": "Avoid discarding slow optional input preparation without increasing approved-entry preparation waiting.",
+  "generation": 462,
+  "baseline": {
+    "report": "2026-10-26-g461-physical-acceptance.json",
+    "matchedExchanges": 13,
+    "bNoCandidate": 2,
+    "bColdReadyWaitMicros": [976788, 660475],
+    "bColdLaunchPlusConnectMicros": [360868, 279350],
+    "bPreparedReadyWaitMedianMicros": 32194,
+    "missedHints": "B repeatedly logged installed_input_preparation_missed before the two cold entries. These fixed events do not identify the exact failure stage of each request.",
+    "causalLimit": "The old whole-request timeout can cancel useful construction in this measured startup range. The field logs alone do not prove that it caused every missed request or either entire cold-entry delay."
+  },
+  "change": {
+    "optionalRequestBudgetMillisBefore": 300,
+    "optionalRequestBudgetMillisAfter": 750,
+    "approvedEntryWaitCapMillisBefore": 300,
+    "approvedEntryWaitCapMillisAfter": 300,
+    "localPreparationAPIUpperBoundMillis": 750,
+    "unboundLifetimeMillis": 2000,
+    "scope": "Separate the receiver's optional construction deadline from the approved-entry wait cap. Keep the original preparation deadline; shorter caller deadlines win.",
+    "ownership": "Expired entry waiting cancels longer preparation. Owned native cleanup is still joined under the admission mutex before cold fallback; cleanup can extend wall time beyond the wait cap.",
+    "unchanged": "Fresh trust and service authentication, one-claim same-console warm ownership, two-second launch cooldown, wire formats, peer-disconnect cancellation and shutdown cleanup. No success cache, background renewal or new input authority."
+  },
+  "validation": {
+    "focused": "PASS: slow idle preparation, original deadline, approved/rejected entry, entry cancellation, delayed native cleanup and moderate-approach lead regressions.",
+    "packages": "PASS: go test ./internal/agent ./internal/residentagent ./internal/inputworker -count=1 -timeout=180s",
+    "vet": "PASS: go vet ./internal/agent ./internal/residentagent ./internal/inputworker",
+    "generation": "PASS: go test ./internal/localapi -run Test.*(Runtime|Generation) -count=1 -timeout=60s",
+    "format": "PASS: gofmt and git diff --check",
+    "physical": "PENDING: build and install matching g462 packages, then compare idle first-entry and rapid returns. No field improvement claimed."
+  },
+  "apiDbRunnerChanges": "None",
+  "pushOrRelease": false
+}

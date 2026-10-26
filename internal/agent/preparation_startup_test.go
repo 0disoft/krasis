@@ -30,8 +30,8 @@ func TestPreparationModerateApproachLeavesTheExistingPreparationBudget(t *testin
 				break
 			}
 		}
-		if hinted.IsZero() || edgeAt.IsZero() || hinted.Add(InputPreparationTimeout).After(edgeAt) {
-			t.Fatalf("moderate approach still puts the existing preparation budget on entry: hint=%v edge=%v", hinted.Sub(at), edgeAt.Sub(at))
+		if hinted.IsZero() || edgeAt.IsZero() || hinted.Add(InputPreparationTimeout-InputPreparationEntryWait).After(edgeAt) {
+			t.Fatalf("moderate approach exceeds the bounded entry wait: hint=%v edge=%v", hinted.Sub(at), edgeAt.Sub(at))
 		}
 	}
 }

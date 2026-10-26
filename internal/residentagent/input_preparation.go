@@ -25,8 +25,9 @@ func (input *privilegedLeaseInput) cancelPreparation() {
 }
 
 // Only an already-approved entry may finish existing authenticated preparation.
-// No new work is started and the hint's deadline is never renewed. Missing,
-// expired or unexpectedly long deadlines retain the old immediate cancellation.
+// No new work is started and the hint's deadline is never renewed. Entry waits
+// at most its independent 300ms budget before canceling longer construction.
+// Missing, expired or unexpectedly long deadlines retain immediate cancellation.
 // Shutdown always uses cancelPreparation instead of joining optional work.
 func (input *privilegedLeaseInput) finishPreparationForEntry(ctx context.Context) bool {
 	p := input.preparationCancel.Load()
@@ -38,9 +39,18 @@ func (input *privilegedLeaseInput) finishPreparationForEntry(ctx context.Context
 		p.cancel()
 		return false
 	}
+	var wait <-chan time.Time
+	if remaining > agent.InputPreparationEntryWait {
+		timer := time.NewTimer(agent.InputPreparationEntryWait)
+		defer timer.Stop()
+		wait = timer.C
+	}
 	select {
 	case <-p.done:
 		return true
+	case <-wait:
+		p.cancel()
+		return false
 	case <-ctx.Done():
 		p.cancel()
 		return false
