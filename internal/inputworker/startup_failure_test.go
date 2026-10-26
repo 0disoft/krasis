@@ -99,6 +99,16 @@ func (f *startupPublishFixture) Write(data []byte) (int, error) {
 	return f.Buffer.Write(data)
 }
 
+type startupPublishConn struct {
+	net.Conn
+	fixture *startupPublishFixture
+}
+
+func (c *startupPublishConn) Write(data []byte) (int, error) { return c.fixture.Write(data) }
+func (c *startupPublishConn) SetWriteDeadline(at time.Time) error {
+	return c.fixture.SetWriteDeadline(at)
+}
+
 func TestStartupPublicationStopsOnAuthorityDeadlineAndWriteFailures(t *testing.T) {
 	for _, tc := range []struct {
 		name               string
@@ -115,14 +125,18 @@ func TestStartupPublicationStopsOnAuthorityDeadlineAndWriteFailures(t *testing.T
 		{name: "ready", deadlines: 2, written: 8},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			peer, pipe := net.Pipe()
+			defer peer.Close()
+			stream := &startupPublishConn{Conn: pipe, fixture: &tc.fixture}
+			agent := clientChannel(stream, authorityAgent)
+			defer agent.Close()
 			calls := 0
-			err := publishStartupReady(&tc.fixture, func(recovery bool) error {
+			agent.authority.checkInput = func() error {
 				calls++
-				if recovery {
-					t.Fatal("recovery check authorized readiness")
-				}
 				return tc.denied
-			}, handoff.StartupProfile{})
+			}
+			agent.authority.checkRecovery = func() error { t.Error("recovery check authorized readiness"); return ErrAuthority }
+			err := publishStartupReady(context.Background(), agent, time.Now().Add(time.Minute), handoff.StartupProfile{})
 			if calls != 1 || tc.fixture.deadlines != tc.deadlines || tc.fixture.Len() != tc.written {
 				t.Fatal("startup proceeded after rejection", calls, tc.fixture.deadlines, tc.fixture.Len())
 			}

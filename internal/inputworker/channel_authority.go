@@ -35,12 +35,19 @@ const (
 	sourcePresenceAuthorityQuery
 	sourceAdvisoryAuthorityQuery
 	sourceAdvisoryPresenceAuthorityQuery
+	startupAuthorityQuery
 )
 
 // Only read-only proof queries run here. Input injection stays on its original
 // ordered worker. Every command obtains a fresh query; no success is cached.
 func (channel *Channel) authorizeInput(ctx context.Context, observed bool) error {
 	return channel.queryAuthority(ctx, observed, inputAuthorityQuery)
+}
+
+// Service-local startup needs the full fresh proof and its original native
+// failure, under the same capacity, cancellation and handle-retirement owner.
+func (channel *Channel) authorizeStartup(ctx context.Context) error {
+	return channel.queryAuthority(ctx, false, startupAuthorityQuery)
 }
 
 // Presence has independent admission so a slow full SCM authorization cannot
@@ -153,6 +160,8 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 				query.err = channel.authority.checkSource()
 			} else if kind == sourcePresenceAuthorityQuery || kind == sourceAdvisoryPresenceAuthorityQuery {
 				query.err = channel.authority.checkSourceHeartbeat()
+			} else if kind == startupAuthorityQuery {
+				query.err = channel.authority.checkResult(nil, false)
 			} else if kind != inputAuthorityQuery {
 				query.err = channel.authority.checkHeartbeat()
 			} else if observed {

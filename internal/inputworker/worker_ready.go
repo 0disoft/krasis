@@ -11,8 +11,15 @@ import (
 // Readiness may spend only the remaining lease/owner budget on a fresh proof
 // and its bytes together. Interrupt writes without closing the independent
 // report transport; join cancellation before that transport can be reused.
-func publishWorkerReady(ctx context.Context, service *Channel, stream startupPublisher, expires time.Time, profile handoff.StartupProfile) (result error) {
-	if ctx == nil || service == nil || service.authority == nil || service.authority.kind != authorityService || stream == nil {
+func publishWorkerReady(ctx context.Context, service *Channel, stream startupPublisher, expires time.Time, profile handoff.StartupProfile) error {
+	return publishAuthorizedReady(ctx, service, authorityService, stream, expires, profile)
+}
+
+// Each fixed caller selects its required peer role; neither role permits a
+// presence-only check to authorize a READY receipt.
+func publishAuthorizedReady(ctx context.Context, owner *Channel, role authorityKind, stream startupPublisher, expires time.Time, profile handoff.StartupProfile) (result error) {
+	if ctx == nil || owner == nil || owner.authority == nil || owner.authority.kind != role ||
+		(role != authorityAgent && role != authorityService) || stream == nil {
 		return ErrAuthority
 	}
 	deadline := time.Now().Add(time.Second)
@@ -41,7 +48,13 @@ func publishWorkerReady(ctx context.Context, service *Channel, stream startupPub
 			result = errors.Join(ErrAuthority, result, err)
 		}
 	}()
-	if err := service.authorizeInput(ctx, false); err != nil {
+	var err error
+	if role == authorityAgent {
+		err = owner.authorizeStartup(ctx)
+	} else {
+		err = owner.authorizeInput(ctx, false)
+	}
+	if err != nil {
 		return errors.Join(ErrAuthority, err)
 	}
 	if err := stream.SetWriteDeadline(deadline); err != nil {

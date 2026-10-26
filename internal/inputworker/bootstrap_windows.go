@@ -181,7 +181,7 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 	}
 	mergeWorkerStartup(&profile, childProfile)
 	startupStage = "publish"
-	if publishErr := publishStartupReady(channel.stream, checkAgent, profile); publishErr != nil {
+	if publishErr := publishStartupReady(ctx, channel, lease.ExpiresAt, profile); publishErr != nil {
 		// The child is ready but no readiness receipt reached the agent. Still
 		// request shutdown and consume recovery before killing the job.
 		stopped, stop := context.WithCancel(context.Background())

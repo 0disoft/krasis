@@ -1,7 +1,7 @@
 package inputworker
 
 import (
-	"errors"
+	"context"
 	"io"
 	"time"
 
@@ -15,18 +15,9 @@ type startupPublisher interface {
 
 // Failure remains failure even if the worker later supplies a clean recovery
 // receipt. The caller still owns shutdown and consumption of that receipt.
-func publishStartupReady(stream startupPublisher, authorized func(bool) error, profile handoff.StartupProfile) error {
-	if err := authorized(false); err != nil {
-		return errors.Join(ErrAuthority, err)
+func publishStartupReady(ctx context.Context, agent *Channel, expires time.Time, profile handoff.StartupProfile) error {
+	if agent == nil {
+		return ErrAuthority
 	}
-	if err := stream.SetWriteDeadline(time.Now().Add(time.Second)); err != nil {
-		return errors.Join(ErrAuthority, err)
-	}
-	if err := writeStartupReady(stream, profile); err != nil {
-		return errors.Join(ErrAuthority, err)
-	}
-	if err := stream.SetWriteDeadline(time.Time{}); err != nil {
-		return errors.Join(ErrAuthority, err)
-	}
-	return nil
+	return publishAuthorizedReady(ctx, agent, authorityAgent, agent.stream, expires, profile)
 }
