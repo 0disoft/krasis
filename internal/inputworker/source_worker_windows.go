@@ -403,10 +403,12 @@ func runSourceCapture(ctx context.Context, channel, service *Channel, lease Leas
 							writer.epoch.Store(0)
 							return err
 						}
-						if err := hook.SourceCapture().Activate(); err != nil {
+						var activationErr error
+						response.capture, activationErr = activateSourceCaptureProfile(hook.SourceCapture())
+						if activationErr != nil {
 							session.Deactivate()
 							writer.epoch.Store(0)
-							return err
+							return activationErr
 						}
 					case sourceDeactivate:
 						session.Deactivate()

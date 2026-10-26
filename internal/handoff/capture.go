@@ -38,14 +38,15 @@ type CaptureProfile struct {
 	Schema   uint8                     `json:"schema"`
 	Micros   [CaptureStageCount]uint32 `json:"micros"`
 	Measured uint32                    `json:"measured"`
-	Worker   [3]byte                   `json:"worker"` // Matching activation ACK buckets; 0 is unobserved.
+	Worker   [3]byte                   `json:"worker"`          // Matching activation ACK buckets; 0 is unobserved.
+	Native   CaptureNative             `json:"native,omitzero"` // Matching owner-thread stages, separate from agent spans.
 }
 
 func (p CaptureProfile) Valid() bool {
 	if p.Schema != 1 || p.Measured>>CaptureStageCount != 0 {
 		return false
 	}
-	if p.Worker[0] != 0 || p.Worker != ([3]byte{}) && p.Measured&(1<<CaptureIPCResponse) == 0 {
+	if p.Worker[0] != 0 || !p.Native.Valid() || (p.Worker != ([3]byte{}) || p.Native != (CaptureNative{})) && p.Measured&(1<<CaptureIPCResponse) == 0 {
 		return false
 	}
 	for _, bucket := range p.Worker {
@@ -65,8 +66,12 @@ func (p CaptureProfile) Valid() bool {
 // rejection. This preserves the original attempt rather than a 15s maximum
 // from unrelated admit/activate/heartbeat operations. No wire probe is added.
 func RecordCaptureWorker(ctx context.Context, worker [3]byte) {
+	RecordCaptureWorkerDetails(ctx, worker, CaptureNative{})
+}
+
+func RecordCaptureWorkerDetails(ctx context.Context, worker [3]byte, native CaptureNative) {
 	s, a := getSession(ctx), getAttempt(ctx)
-	if s == nil || a == nil || worker == ([3]byte{}) {
+	if s == nil || a == nil || worker == ([3]byte{}) && native == (CaptureNative{}) {
 		return
 	}
 	s.collector.mu.Lock()
@@ -75,13 +80,14 @@ func RecordCaptureWorker(ctx context.Context, worker [3]byte) {
 		return
 	}
 	p := a.summary.Capture
-	if p.Worker != ([3]byte{}) {
+	if p.Worker != ([3]byte{}) || p.Native != (CaptureNative{}) {
 		return
 	}
 	next := *p
 	next.Worker = worker
+	next.Native = native
 	if next.Valid() {
-		p.Worker = worker
+		*p = next
 	}
 }
 
@@ -89,6 +95,10 @@ func RecordCaptureWorker(ctx context.Context, worker [3]byte) {
 // Retire freezes that attempt before emitting, so late command completion can
 // neither mutate its receipt nor attach measurements to a later attempt.
 func RecordCapture(ctx context.Context, stage CaptureStage, elapsed time.Duration) {
+	if probe := captureProbeFrom(ctx); probe != nil {
+		probe.record(stage, elapsed)
+		return
+	}
 	s, a := getSession(ctx), getAttempt(ctx)
 	if s == nil || a == nil || stage >= CaptureStageCount {
 		return
@@ -116,6 +126,10 @@ func RecordCapture(ctx context.Context, stage CaptureStage, elapsed time.Duratio
 }
 
 func CaptureSpan(ctx context.Context, stage CaptureStage) func() {
+	if captureProbeFrom(ctx) != nil && stage < CaptureIPCLock {
+		started := time.Now()
+		return func() { RecordCapture(ctx, stage, time.Since(started)) }
+	}
 	s, a := getSession(ctx), getAttempt(ctx)
 	if s == nil || a == nil || stage >= CaptureStageCount || s.collector.stopped.Load() {
 		return func() {}

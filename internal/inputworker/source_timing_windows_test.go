@@ -77,6 +77,7 @@ func TestSourceClientObservesWorkerTimingOnlyAfterMatchingReply(t *testing.T) {
 			p, err := readSourcePacket(server)
 			if err == nil {
 				reply := sourcePacket{kind: sourceReply, op: p.op, reply: p.sequence, status: 1, timing: [3]byte{0, 3, 4}}
+				reply.capture[handoff.CaptureForeground] = 4
 				if foreign {
 					reply.reply++
 				}
@@ -99,6 +100,9 @@ func TestSourceClientObservesWorkerTimingOnlyAfterMatchingReply(t *testing.T) {
 		}
 		if !profile.Valid() || profile.Capture == nil || foreign && profile.Capture.Worker != ([3]byte{}) || !foreign && profile.Capture.Worker != ([3]byte{0, 3, 4}) {
 			t.Fatal("matching rejection detail lost or foreign ACK contaminated attempt", profile)
+		}
+		if foreign && profile.Capture.Native != (handoff.CaptureNative{}) || !foreign && profile.Capture.Native[handoff.CaptureForeground] != 4 {
+			t.Fatal("native stages escaped reply matching or lost known rejection", profile)
 		}
 	}
 }

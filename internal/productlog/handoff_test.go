@@ -130,6 +130,7 @@ func TestCaptureExportProjectsNumericDetailAndRejectsInvalidPresence(t *testing.
 	p := &handoff.CaptureProfile{Schema: 1, Measured: 1 << handoff.CaptureShow}
 	p.Measured |= 1 << handoff.CaptureIPCResponse
 	p.Worker = [3]byte{0, 3, 4}
+	p.Native[handoff.CaptureForeground] = 4
 	s := handoff.Summary{Schema: 1, Attempt: 1, Role: "source", Backend: "none", End: "incomplete", Incomplete: true, Capture: p}
 	r := record{Time: "2026-10-04T00:00:00Z", Code: "handoff_profile", Handoff: &s}
 	data, _ := json.Marshal(r)

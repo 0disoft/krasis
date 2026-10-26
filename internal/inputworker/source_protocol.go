@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/0disoft/krasis/internal/control"
+	"github.com/0disoft/krasis/internal/handoff"
 	"github.com/0disoft/krasis/internal/peer"
 )
 
@@ -40,11 +41,15 @@ type sourcePacket struct {
 	x                int32
 	decision         peer.BoundaryAdmissionDecision
 	pressedEvidence  byte
-	timing           [3]byte // Activation or heartbeat reply; fixed operation-specific buckets.
+	timing           [3]byte               // Activation or heartbeat reply; fixed operation-specific buckets.
+	capture          handoff.CaptureNative // Only an activation reply; never input or authority.
 }
 
 func (p sourcePacket) valid() bool {
 	if p.sequence == 0 || p.binding == (Binding{}) || p.status > 1 {
+		return false
+	}
+	if !p.capture.Valid() || p.capture != (handoff.CaptureNative{}) && (p.kind != sourceReply || p.op != sourceActivate) {
 		return false
 	}
 	if p.pressedEvidence != 0 && (p.pressedEvidence > 3 || p.kind != sourceReply || p.op != sourceAdmit || p.status != 0 || p.decision != peer.BoundaryAdmissionBlockedPressedInput) {
@@ -103,6 +108,11 @@ func encodeSourcePacket(p sourcePacket) ([sourcePacketSize]byte, error) {
 	binary.BigEndian.PutUint32(data[52:56], uint32(p.x))
 	data[56] = p.pressedEvidence
 	copy(data[57:60], p.timing[:])
+	if p.kind == sourceReply && p.op == sourceActivate {
+		bits := packSourceCapture(p.capture)
+		binary.BigEndian.PutUint32(data[52:56], uint32(bits>>32))
+		binary.BigEndian.PutUint32(data[60:64], uint32(bits))
+	}
 	return data, nil
 }
 
@@ -111,10 +121,21 @@ func readSourcePacket(r io.Reader) (sourcePacket, error) {
 	if _, err := io.ReadFull(r, data[:]); err != nil {
 		return sourcePacket{}, err
 	}
-	if string(data[:4]) != "KSC1" || !zeroBytes(data[60:]) || data[7] > 6 {
+	if string(data[:4]) != "KSC1" || data[7] > 6 {
 		return sourcePacket{}, ErrProtocol
 	}
 	p := sourcePacket{kind: data[4], op: data[5], status: data[6], sequence: binary.BigEndian.Uint64(data[8:16]), reply: binary.BigEndian.Uint64(data[32:40]), x: int32(binary.BigEndian.Uint32(data[52:56]))}
+	if p.kind == sourceReply && p.op == sourceActivate {
+		bits := uint64(binary.BigEndian.Uint32(data[52:56]))<<32 | uint64(binary.BigEndian.Uint32(data[60:64]))
+		var ok bool
+		p.capture, ok = unpackSourceCapture(bits)
+		if !ok {
+			return sourcePacket{}, ErrProtocol
+		}
+		p.x = 0
+	} else if !zeroBytes(data[60:]) {
+		return sourcePacket{}, ErrProtocol
+	}
 	p.pressedEvidence = data[56]
 	copy(p.timing[:], data[57:60])
 	copy(p.binding[:], data[16:32])

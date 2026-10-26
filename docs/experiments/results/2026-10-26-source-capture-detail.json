@@ -1,0 +1,30 @@
+{
+  "schema": "krasis.experiment/v1",
+  "purpose": "Carry the protected capture owner's existing native timing stages into its exact activation reply before attributing the observed 324ms activation outlier to a particular Windows API.",
+  "baseline": {
+    "report": "2026-10-25-preparation-failure-report.json",
+    "captureActivationMaxMicros": 324277,
+    "captureIPCResponseMicros": 321000,
+    "gap": "Protected capture called Activate without a profiling context. Only scope/apply buckets crossed the worker pipe; the detailed owner stages already present in wininput did not reach the agent."
+  },
+  "change": {
+    "activationReplyBytesBefore": 64,
+    "activationReplyBytesAfter": 64,
+    "additionalIPCFrames": 0,
+    "nativeStageBits": 51,
+    "storage": "Activation replies alone reuse bytes 52..55 and 60..63; other operations retain zero padding and their existing pointer fields.",
+    "nativeStageOrder": ["serialization", "admission", "post", "owner_queue", "position", "touchpad_register", "show", "update", "foreground", "fallback", "active_commit", "handler_total", "result_wait", "rollback", "total", "boundary_before", "boundary_after"],
+    "buckets": ["unobserved", "<1ms", "1-10ms", "10-100ms", "100-1000ms", ">=1000ms"],
+    "projection": "capture.native is separate from agent capture.micros and measured. Nested stages are not additive. A sealed owner probe cannot mutate an emitted reply or a later command.",
+    "privacy": "Fixed numeric buckets only; no window handles, titles, paths, keys, clipboard data or authority identifiers.",
+    "compatibility": "All-zero legacy detail remains valid. Older decoders reject nonzero reserved bytes. Deploy the agent and protected capture worker as one matching installed revision; this is not a mixed-revision IPC upgrade.",
+    "security": "Malformed buckets, unused bits, truncated frames and detail on non-activation packets remain protocol errors. Only an exactly matched activation reply can attach details. Negative replies remain failures; timings grant no input or retirement authority."
+  },
+  "validation": {
+    "focused": "PASS: capture probes, fixed-size source protocol, native activation success/rejection, reply identity and diagnostic export tests.",
+    "packages": "PASS: go test ./internal/handoff ./internal/inputworker ./internal/productlog ./internal/wininput -count=1 -timeout=180s",
+    "vet": "PASS: go vet ./internal/handoff ./internal/inputworker ./internal/productlog; go vet -unsafeptr=false ./internal/wininput",
+    "vetLimit": "Default wininput vet reports eight existing unsafe.Pointer diagnostics in unchanged callback/surface files. Those warnings were not fixed by this diagnostic change.",
+    "physical": "PENDING: collect new matched source handoffs with the updated protected owner. No foreground bottleneck, latency improvement or intermittent failure fix is claimed."
+  }
+}
