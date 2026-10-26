@@ -186,7 +186,11 @@ func (q *sourcePointerQueue) Observe(a control.InputAction, x int32) error {
 		q.session.Abort(wininput.ErrEmergencyRelease)
 		return wininput.ErrEmergencyRelease
 	}
-	if a.Kind == control.InputPointerMove {
+	// Active movement already travels as sourceAction. Boundary decisions are
+	// local-only: the orchestrator cannot begin another lease while this source
+	// is active. Keep emergency detection above this filter and resume ordered
+	// edge/rearm samples immediately when local control returns.
+	if a.Kind == control.InputPointerMove && !q.session.Active() {
 		select {
 		case q.events <- sourcePacket{kind: sourceBoundary, action: a, x: x}:
 		default:

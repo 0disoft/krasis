@@ -36,6 +36,32 @@ its lane, OS scheduling and wire writes remain bounded waits that can still
 fail. No wire format, authorization rule, generation or installed binary changes
 are part of this local change.
 
+## Advisory boundary traffic during active capture
+
+The worker's boundary queue now emits pointer samples only while its source
+session is inactive. During active capture, movement already travels through
+the ordered sourceAction stream, and BidirectionalBoundary.Ready rejects a new
+boundary lease while that source is active. Sending another boundary frame for
+each move only consumed the shared authority budget and reply/action pipe.
+Emergency-chord detection remains before the filter. Fresh local edge/rearm
+samples resume in their original order when the source deactivates.
+
+The serial boundary sender also discards validated, unsent batches while the
+writer has an active epoch, including after a native proof yields across
+activation. No sequence is assigned and no pipe write is attempted for a
+discarded batch. Invalid batches still fail validation. Actual input, native
+authorization, exact command replies and joined retirement are unchanged;
+attempted/partial write failures remain fatal and are never replayed.
+
+A virtual-clock regression routes 1,000 active moves: all 1,000 units of input
+reach the sink while the 64-entry advisory queue remains empty. Before the
+change that queue filled. Another regression activates capture during a blocked
+advisory proof: previously the stale batch attempted a write and timed out;
+now it consumes neither a sequence nor a write. Local edge/rearm and emergency
+release are checked through the real source session. This removes redundant
+active traffic, not all possible OS scheduling or inactive-pipe stalls; field
+stability still requires a new installed-build test.
+
 ## 입력 worker
 
 `internal/inputworker`는 이미 승인된 한 원격 lease의 입력과 해제를 소유합니다.

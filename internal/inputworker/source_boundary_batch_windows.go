@@ -65,6 +65,9 @@ func (w *sourceWriter) sendBoundaries(batch []sourcePacket) error {
 		}
 		copy(wire[i*sourcePacketSize:], data[:])
 	}
+	if w.epoch.Load() != 0 {
+		return nil // Queued local observations cannot start another active lease.
+	}
 	if err := w.lockAuthorized(ctx, true); err != nil {
 		if ctx.Err() == context.DeadlineExceeded && errors.Is(err, context.DeadlineExceeded) && (w.ctx == nil || w.ctx.Err() == nil) {
 			// No gate or bytes were acquired. Drop this stale observation just
@@ -76,6 +79,11 @@ func (w *sourceWriter) sendBoundaries(batch []sourcePacket) error {
 	}
 	w.gateStage(sourceBoundary, sourceGatePrepare)
 	defer w.unlockGate()
+	// A native proof may have yielded across activation. Drop only this unsent
+	// advisory batch, before assigning sequences or entering the shared pipe.
+	if w.epoch.Load() != 0 {
+		return nil
+	}
 	next := w.sequence
 	for i := range batch {
 		next++
