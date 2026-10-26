@@ -60,18 +60,18 @@ func (service *AgentService) PresentReturnCursorObserved(ctx context.Context, le
 	return channel.Close, nil
 }
 
-func runCursorPresentation(ctx context.Context, channel *Channel, proof *Authority, lease Lease, ready func() error) (result error) {
+func runCursorPresentation(ctx context.Context, channel, service *Channel, lease Lease, ready func() error) (result error) {
 	run, cancel := context.WithDeadline(ctx, lease.ExpiresAt)
 	defer cancel()
 	done := make(chan struct{})
 	// Presentation accepts EOF/cancellation only. Any request bytes retire it;
 	// there is no input decoder or InputPort in this branch.
 	go func() { defer close(done); var b [1]byte; _, _ = io.ReadFull(channel.stream, b[:]); cancel() }()
-	defer func() { _ = channel.Close(); <-done }()
+	defer func() {
+		result = retireCursorPresentation(result, channel, service)
+		<-done
+	}()
 	return wininput.RunProtectedReturnCursor(run, func() error {
-		if channel.authority.check(false) != nil || proof.check(false) != nil {
-			return ErrAuthority
-		}
-		return nil
+		return authorizeCursorPresentation(run, channel, service)
 	}, lease.CursorX, lease.CursorY, ready)
 }

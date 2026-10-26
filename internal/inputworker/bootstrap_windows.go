@@ -342,9 +342,9 @@ func runInstalledConsoleInputMode(ctx context.Context, agentDigest, serviceDiges
 	if err := control.SetDeadline(time.Time{}); err != nil {
 		return errors.Join(ErrAuthority, err)
 	}
-	var sourceService *Channel
-	if lease.Capture {
-		sourceService = lifetime.captureChannel()
+	var queryService *Channel
+	if lease.Capture || lease.Presentation {
+		queryService = lifetime.captureChannel()
 	}
 	run, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -364,7 +364,7 @@ func runInstalledConsoleInputMode(ctx context.Context, agentDigest, serviceDiges
 	}()
 	if lease.Capture {
 		var exit logindiag.SourceExit
-		result := runSourceCapture(run, channel, sourceService, lease, func() error {
+		result := runSourceCapture(run, channel, queryService, lease, func() error {
 			if err := control.SetWriteDeadline(time.Now().Add(startupTimeout)); err != nil {
 				return errors.Join(ErrAuthority, err)
 			}
@@ -374,7 +374,7 @@ func runInstalledConsoleInputMode(ctx context.Context, agentDigest, serviceDiges
 	}
 	if lease.Presentation {
 		desktopStarted := time.Now()
-		result := runCursorPresentation(run, channel, proof, lease, func() error {
+		result := runCursorPresentation(run, channel, queryService, lease, func() error {
 			profile.Record(handoff.WorkerDesktopReady, time.Since(desktopStarted))
 			if err := control.SetWriteDeadline(time.Now().Add(startupTimeout)); err != nil {
 				return errors.Join(ErrAuthority, err)
