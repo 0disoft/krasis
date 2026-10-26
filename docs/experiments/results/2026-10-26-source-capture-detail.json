@@ -38,14 +38,22 @@
     "bUpdate": "fca11c521c331e604f25805746ac8899",
     "bApp": "UPDATED; peer reports g461 and matching revision.",
     "postUpdateCollection": "9abe739c73f4d838a5fe75d0d29438b0",
-    "bProtectedInput": "SERVICE_RECOVERY_REQUIRED (1066), predating the g461 update. Awaiting local administrator repair; updated app metadata is not proof of a healthy updated protected worker.",
+    "bProtectedInputBeforeRepair": "SERVICE_RECOVERY_REQUIRED (1066), predating the g461 update; updated app metadata alone did not prove protected worker health.",
+    "postRepairCollection": "d972dfda69cd9f57fa6963135bd056ed",
+    "postRepairVerification": {
+      "a": "Input health READY; login service READY; doctor healthy and CONNECTED. CLI, agent, UI and installed agent match revision e3291a94285bf95f83571c14099f8e4ac9e32094.",
+      "b": "Input health READY; login service READY; no lastFailure in this collected runtime status. Peer update status reports generation 461 and the matching revision.",
+      "bInstallTimeUtc": "2026-10-26T09:50:59.6330017Z",
+      "bInstallResult": 0,
+      "limit": "This verifies recovery and current readiness, not a fix for the earlier retirement failure or improved crossing latency."
+    },
     "bExistingFailure": {
       "timeUtc": "2026-10-26T08:52:48.5415576Z",
       "operation": "input-retire-native-win32",
       "win32Error": 5,
       "limit": "The negative preparation report identifies native-child cleanup and ERROR_ACCESS_DENIED, not the exact failing native API. This field failure is not attributed to capture focus or claimed fixed."
     },
-    "physicalAcceptance": "PENDING: repair B, verify both protected owners, then collect physical crossings.",
+    "physicalAcceptance": "PENDING: repair and readiness checks complete; requested ten physical round trips including rapid returns. Await user completion before collecting the acceptance cohort.",
     "publicPushOrRelease": false
   }
 }
