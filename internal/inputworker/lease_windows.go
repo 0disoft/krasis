@@ -84,19 +84,28 @@ func receiveLease(ctx context.Context, channel *Channel) (Lease, error) {
 }
 
 func receiveAgentRequest(ctx context.Context, channel *Channel) (Lease, bool, error) {
-	if ctx == nil || ctx.Err() != nil || channel == nil || channel.authority == nil || channel.authority.kind != authorityAgent || channel.authority.check(false) != nil {
+	if ctx == nil || ctx.Err() != nil || channel == nil || channel.authority == nil || channel.authority.kind != authorityAgent {
 		return Lease{}, false, ErrAuthority
 	}
-	stop := context.AfterFunc(ctx, func() { _ = channel.stream.Close() })
+	// One budget covers both fresh native proofs and the request bytes. Native
+	// checks must use owned admission: a stuck SCM/WTS call retains its handles
+	// and capacity after timeout, without blocking this serial service endpoint.
+	ctx, cancel := context.WithTimeout(ctx, startupTimeout)
+	defer cancel()
+	if channel.authorizeInput(ctx, false) != nil {
+		return Lease{}, false, ErrAuthority
+	}
+	stop := context.AfterFunc(ctx, func() { _ = channel.Close() })
 	defer stop()
-	if channel.stream.SetReadDeadline(time.Now().Add(startupTimeout)) != nil {
+	deadline, _ := ctx.Deadline()
+	if channel.stream.SetReadDeadline(deadline) != nil {
 		return Lease{}, false, ErrAuthority
 	}
 	var data [leaseSize]byte
 	if _, err := io.ReadFull(channel.stream, data[:]); err != nil {
 		return Lease{}, false, ErrAuthority
 	}
-	if ctx.Err() != nil || channel.authority.check(false) != nil || channel.stream.SetReadDeadline(time.Time{}) != nil {
+	if ctx.Err() != nil || channel.authorizeInput(ctx, false) != nil || channel.stream.SetReadDeadline(time.Time{}) != nil {
 		return Lease{}, false, ErrAuthority
 	}
 	if isPreparation(data) {
