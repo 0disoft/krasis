@@ -29,7 +29,26 @@
     "vet": "PASS: go vet ./internal/agent ./internal/residentagent ./internal/inputworker",
     "generation": "PASS: go test ./internal/localapi -run Test.*(Runtime|Generation) -count=1 -timeout=60s",
     "format": "PASS: gofmt and git diff --check",
-    "physical": "PENDING: build and install matching g462 packages, then compare idle first-entry and rapid returns. No field improvement claimed."
+    "packaging": "PASS: frontend 104/104 tests; native build; TestWorkspaceUpdatePackage; eight-file update bundle and setup verification.",
+    "physical": "PENDING: A installed and verified; B transfer interrupted. Do not compare as a matching-version sample until B has g462. No field improvement claimed."
+  },
+  "localRollout": {
+    "revision": "7108b93954d4c7034d2129af009e8fad31d5e5ab",
+    "setupSha256": "31bb112e5f9fb9bdbed6cb066f8edee94e1b2dab8b12e36e0685629c20ccb2a6",
+    "aSetupExitCode": 0,
+    "aSetupState": "installed",
+    "a": "Doctor healthy, CONNECTED; CLI, UI, launch record, agent and protected installed agent match g462 revision. Service and input health READY.",
+    "b": "Still g461. Latest collected service and input health READY, lastFailure absent. This is not a completed g462 update.",
+    "firstUpdateJob": "ff25d7880660ef6bafae28fedf1e18bf",
+    "firstUpdateOutcome": "Outcome unknown after partial sending; sender receipt later IDLE/transfer_replaced, and peer still g461 before retry.",
+    "secondUpdateJob": "c3fa7aedc018d47262b5aba903a5d0fa",
+    "secondUpdateState": "TRANSFER_INTERRUPTED",
+    "secondUpdateBytes": 26705920,
+    "secondUpdateTotal": 28476923,
+    "verificationCollection": "3f565da472795f33a972510619849818",
+    "aCollectedAtUtc": "2026-10-26T14:01:04Z",
+    "bCollectedAtUtc": "2026-10-26T14:01:03Z",
+    "next": "Await user network improvement or manual B installation from the verified g462 setup. Resume the existing task, verify B version/health, then request idle first-entry and rapid-return comparison."
   },
   "apiDbRunnerChanges": "None",
   "pushOrRelease": false
