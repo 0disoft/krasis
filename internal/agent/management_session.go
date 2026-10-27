@@ -68,12 +68,18 @@ func (session *managedPeerSession) Revoke(ctx context.Context, request LeaseRevo
 		return ErrManagementPeerMismatch
 	}
 	return session.coordinator.Execute(ctx, func(writer peer.FrameWriter) error {
-		current, active := activeLeaseIdentity(session.runtime.Snapshot())
+		// Management admission shares its caller's deadline. Do not retain
+		// the semantic writer or mutate the session after a native-input wait.
+		snapshot, err := session.runtime.SnapshotContext(ctx)
+		if err != nil {
+			return err
+		}
+		current, active := activeLeaseIdentity(snapshot)
 		if !active || current != request.Lease {
 			return ErrManagementLeaseMismatch
 		}
 
-		inbound := session.runtime.Snapshot().Control.State == control.StateInboundActive
+		inbound := snapshot.Control.State == control.StateInboundActive
 		session.source.Deactivate()
 		if _, err := session.runtime.RevokePeer(
 			ctx,
