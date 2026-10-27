@@ -7,10 +7,12 @@ import (
 	"io"
 	"math"
 	"sync/atomic"
+	"time"
 
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/crashguard"
+	"github.com/0disoft/krasis/internal/handoff"
 )
 
 // NewPortableClient shares input/cursor validation and decoding with Client,
@@ -67,6 +69,12 @@ func (client *Client) performPortable(ctx context.Context, process portableTrans
 	if client.failed || ctx.Err() != nil || client.sequence == math.MaxUint64 {
 		return notSent(ErrExpired)
 	}
+	// Forward only an existing bounded parent probe on the same input exchange.
+	// The child measures SendInput; the parent retains its containing IPC span.
+	probe := handoff.WorkerApplyProbe(ctx)
+	if probe != nil && command.op != opHeartbeat && command.op != opClose {
+		command.applyDetail, command.submissionDetail = true, true
+	}
 	command.sequence, command.binding = client.sequence, binding
 	data, err := encodeRequest(command)
 	if err != nil {
@@ -99,6 +107,10 @@ func (client *Client) performPortable(ctx context.Context, process portableTrans
 		return unknownInput(err)
 	}
 	client.sequence++
+	if probe != nil && ack.applyDetail != nil && ack.applyDetail.SubmissionCalls == 1 {
+		probe.RecordSubmission(time.Duration(ack.applyDetail.SubmissionMicros) * time.Microsecond)
+		probe.SubmissionSaturated = probe.SubmissionSaturated || ack.applyDetail.SubmissionSaturated
+	}
 	if ack.status != 0 {
 		client.failed = true
 		client.observeFailure("portable_input_failure_acknowledged")
@@ -150,7 +162,7 @@ func portableInputHandler(input application.InputPort, execute func(context.Cont
 	failed := false
 	return func(reader io.Reader, writer io.Writer) error {
 		command, err := readRequest(reader)
-		if err != nil || input == nil || execute == nil || command.binding == (Binding{}) || command.sequence != sequence || sequence == math.MaxUint64 || command.op == opClose || command.applyDetail || releaseOnly && command.op != opRelease && command.op != opHeartbeat {
+		if err != nil || input == nil || execute == nil || command.binding == (Binding{}) || command.sequence != sequence || sequence == math.MaxUint64 || command.op == opClose || releaseOnly && (command.applyDetail || command.op != opRelease && command.op != opHeartbeat) {
 			return ErrProtocol
 		}
 		if binding == (Binding{}) {

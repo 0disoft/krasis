@@ -105,12 +105,7 @@ func runInstalledNativeInput(ctx context.Context, installation *Installation, re
 		serviceCheck = func() error { return checkNativeRecoveryService(recoveryService, proof) }
 	}
 	return inputdesktop.RunInteractive(ctx, func() error { return authority.check(releaseOnly) }, func(scope *inputdesktop.Scope) error {
-		execute := func(ctx context.Context, work func() error) error {
-			if (!releaseOnly && !time.Now().Before(lease.ExpiresAt)) || authority.check(releaseOnly) != nil || serviceCheck() != nil || !nativeParentAlive(handles[3]) {
-				return ErrAuthority
-			}
-			return scope.Do(ctx, work)
-		}
+		execute := nativeInputExecutor(scope.Do, serviceCheck, func() bool { return nativeParentAlive(handles[3]) }, lease.ExpiresAt, releaseOnly)
 		if releaseOnly {
 			// Guard-side commands have no native release capability. Only the
 			// release-only framed handler executes within fresh authority/scope.

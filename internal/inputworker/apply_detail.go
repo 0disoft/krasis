@@ -31,6 +31,10 @@ func applyCommand(ctx context.Context, input application.InputPort, pressed *con
 	if command.applyDetail {
 		ack.applyDetail = &handoff.WorkerApplyProfile{}
 	}
+	applyCtx := ctx
+	if command.submissionDetail {
+		applyCtx = handoff.WithWorkerApply(ctx, ack.applyDetail)
+	}
 	if command.op == opCursorRead {
 		stage = failureStageCursorReadback
 		return measureApplyPart(ack.applyDetail, 1, func() error { return readCursorResponse(ctx, input, ack) })
@@ -52,14 +56,10 @@ func applyCommand(ctx context.Context, input application.InputPort, pressed *con
 			// instead of two child exchanges and two desktop transactions.
 			return measureApplyPart(ack.applyDetail, 0, func() error {
 				var err error
-				ack.x, ack.y, err = isolated.MoveWithPosition(ctx, command.x, command.y)
+				ack.x, ack.y, err = isolated.MoveWithPosition(applyCtx, command.x, command.y)
 				return err
 			})
 		}
-	}
-	applyCtx := ctx
-	if command.submissionDetail {
-		applyCtx = handoff.WithWorkerApply(ctx, ack.applyDetail)
 	}
 	err := measureApplyPart(ack.applyDetail, 0, func() error { return apply(applyCtx, input, pressed, command) })
 	if err != nil {
