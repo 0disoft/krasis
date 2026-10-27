@@ -16,11 +16,10 @@ var ErrPendingLeaseExpired = errors.New("pending lease preparation expired")
 // active liveness. Call again after native preparation: cancellation or expiry
 // must never turn a late native success into a new active lease.
 func (runtime *SessionRuntime) ValidateOutboundPreparation(ctx context.Context, sessionID, leaseID, epoch string, observedAt time.Time) error {
-	runtime.mu.Lock()
-	defer runtime.mu.Unlock()
-	if err := ctx.Err(); err != nil {
+	if err := runtime.mu.LockContext(ctx); err != nil {
 		return err
 	}
+	defer runtime.mu.Unlock()
 	if runtime.control.State != control.StatePending || runtime.outbound.SessionID != sessionID || runtime.outbound.Epoch != epoch || sessionID == "" || leaseID == "" {
 		return errors.New("outbound preparation does not match a pending grant")
 	}

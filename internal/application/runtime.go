@@ -161,7 +161,9 @@ func (runtime *SessionRuntime) BeginOutbound(
 	sessionID string,
 	epoch string,
 ) (ControlOutcome, error) {
-	runtime.mu.Lock()
+	if err := runtime.mu.LockContext(ctx); err != nil {
+		return ControlOutcome{}, err
+	}
 	defer runtime.mu.Unlock()
 
 	stream, err := control.NewOutboundStream(sessionID, epoch)
@@ -190,7 +192,9 @@ func (runtime *SessionRuntime) GrantOutbound(
 	epoch string,
 	observedAt time.Time,
 ) (ControlOutcome, error) {
-	runtime.mu.Lock()
+	if err := runtime.mu.LockContext(ctx); err != nil {
+		return ControlOutcome{}, err
+	}
 	defer runtime.mu.Unlock()
 
 	if runtime.control.State != control.StatePending || runtime.outbound.SessionID == "" {
@@ -221,7 +225,9 @@ func (runtime *SessionRuntime) GrantOutbound(
 }
 
 func (runtime *SessionRuntime) NextOutboundEnvelope(ctx context.Context) (control.InputEnvelope, error) {
-	runtime.mu.Lock()
+	if err := runtime.mu.LockContext(ctx); err != nil {
+		return control.InputEnvelope{}, err
+	}
 	defer runtime.mu.Unlock()
 	if runtime.control.State != control.StateOutboundActive || runtime.outbound.SessionID == "" {
 		return control.InputEnvelope{}, errors.New("outbound input requires an outbound-active stream")
@@ -371,7 +377,9 @@ func (runtime *SessionRuntime) PrepareInbound(
 	leaseID string,
 	epoch string,
 ) (ControlOutcome, error) {
-	runtime.mu.Lock()
+	if err := runtime.mu.LockContext(ctx); err != nil {
+		return ControlOutcome{}, err
+	}
 	defer runtime.mu.Unlock()
 
 	stream, err := control.NewInputStream(sessionID, epoch)
@@ -402,7 +410,9 @@ func (runtime *SessionRuntime) CommitInbound(
 	epoch string,
 	observedAt time.Time,
 ) (ControlOutcome, error) {
-	runtime.mu.Lock()
+	if err := runtime.mu.LockContext(ctx); err != nil {
+		return ControlOutcome{}, err
+	}
 	defer runtime.mu.Unlock()
 
 	if runtime.control.State != control.StateInboundPending || runtime.stream.SessionID == "" {
