@@ -213,6 +213,29 @@ the 39-stage vectors are unchanged; older profiles without this detail remain va
 
 ## g162 additive exchange detail
 
+### Control-frame queue detail (after g469)
+
+Optional `controlQueue: {schema: 1, micros: uint32}` records complete control-frame
+read to dispatcher dequeue for the matching receiver request or source grant.
+It includes read-ahead channel backpressure and a pending control barrier retained
+by pointer batching. Only the read-ahead goroutine observes the complete read;
+the existing exchange and predecessor fields retain their **dequeue** origins.
+No absolute timestamp or additional input/network authority is exported. An absent
+field is unobserved, not zero; the duration must be within the 120-second window.
+The synchronous reader records an observed zero. Input frames add no clock read.
+
+For an exact matched exchange, let S be source exchange[0], B be receiver
+exchange[3], and QA/QB the source/receiver controlQueue values. S - B still includes
+both application queues. Only when both queue observations are present can
+S - B - QA - QB exclude those queues. This remainder still includes transport,
+TCP retransmission, kernel buffering and reader scheduling; it is **not pure
+network RTT**. Discard negative/overlapping differences instead of clamping them
+into zero-latency evidence. Source exchange[1] and coordinator/capture waits are
+separate later local processing, not part of S. Never subtract device wall clocks.
+
+The regression with an 80ms preceding handler preserves frame order and abort
+semantics, reports 80ms in controlQueue and zero in the following receiver work.
+
 `Summary` gains optional `exchange`, schema 1, with a fixed `micros [4]uint32`
 array and a `uint8` `measured` mask. The indices are owned by
 `internal/handoff/exchange.go`:

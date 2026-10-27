@@ -1,0 +1,233 @@
+{
+  "schema": "krasis.experiment/v1",
+  "generation": 469,
+  "revision": "3800a68100d33abb9d4e7a642b3dd43aa030714a",
+  "collection": "6b58a4d8e3efe9bb7e590ff7fdb13944",
+  "devices": {
+    "A": {
+      "sourceSha256": "b35dc2bc8fe134411280353bad15f85680afb65ffaa75056e000e1c2b00b8db5",
+      "inputHealth": "READY",
+      "service": "READY"
+    },
+    "B": {
+      "sourceSha256": "3f34f7be4295dc625e2a1c42af2849ea9f467cf6a9a4a8bb749154e6bca08549",
+      "inputHealth": "READY",
+      "service": "READY"
+    }
+  },
+  "successfulDirection": "A->B",
+  "successfulPairs": 13,
+  "method": "Filter exact build and match unique exchange tags; use process-local elapsed durations only. Queue observations were absent in g469. Do not call the residual pure network time. Old and new physical cohorts differ; no causal speedup claim.",
+  "statisticsMicros": {
+    "sourceWriteToGrantDequeueMicros": {
+      "count": 13,
+      "median": 227935,
+      "max": 616661,
+      "min": 39901
+    },
+    "receiverRequestDequeueToGrantWriteMicros": {
+      "count": 13,
+      "median": 37355,
+      "max": 245316,
+      "min": 33409
+    },
+    "unattributedIncludingQueuesMicros": {
+      "count": 13,
+      "median": 67654,
+      "max": 580434,
+      "min": 6492
+    },
+    "sourceGrantDequeueToHandlerMicros": {
+      "count": 13,
+      "median": 0,
+      "max": 0,
+      "min": 0
+    }
+  },
+  "successfulExchanges": [
+    {
+      "index": 1,
+      "sourceWriteToGrantDequeueMicros": 227935,
+      "receiverRequestDequeueToGrantWriteMicros": 219630,
+      "unattributedIncludingQueuesMicros": 8305,
+      "sourceGrantDequeueToHandlerMicros": 0,
+      "queuesMeasured": false
+    },
+    {
+      "index": 2,
+      "sourceWriteToGrantDequeueMicros": 39901,
+      "receiverRequestDequeueToGrantWriteMicros": 33409,
+      "unattributedIncludingQueuesMicros": 6492,
+      "sourceGrantDequeueToHandlerMicros": 0,
+      "queuesMeasured": false
+    },
+    {
+      "index": 3,
+      "sourceWriteToGrantDequeueMicros": 163297,
+      "receiverRequestDequeueToGrantWriteMicros": 155828,
+      "unattributedIncludingQueuesMicros": 7469,
+      "sourceGrantDequeueToHandlerMicros": 0,
+      "queuesMeasured": false
+    },
+    {
+      "index": 4,
+      "sourceWriteToGrantDequeueMicros": 98737,
+      "receiverRequestDequeueToGrantWriteMicros": 35638,
+      "unattributedIncludingQueuesMicros": 63099,
+      "sourceGrantDequeueToHandlerMicros": 0,
+      "queuesMeasured": false
+    },
+    {
+      "index": 5,
+      "sourceWriteToGrantDequeueMicros": 76435,
+      "receiverRequestDequeueToGrantWriteMicros": 37355,
+      "unattributedIncludingQueuesMicros": 39080,
+      "sourceGrantDequeueToHandlerMicros": 0,
+      "queuesMeasured": false
+    },
+    {
+      "index": 6,
+      "sourceWriteToGrantDequeueMicros": 616661,
+      "receiverRequestDequeueToGrantWriteMicros": 36227,
+      "unattributedIncludingQueuesMicros": 580434,
+      "sourceGrantDequeueToHandlerMicros": 0,
+      "queuesMeasured": false
+    },
+    {
+      "index": 7,
+      "sourceWriteToGrantDequeueMicros": 169390,
+      "receiverRequestDequeueToGrantWriteMicros": 117655,
+      "unattributedIncludingQueuesMicros": 51735,
+      "sourceGrantDequeueToHandlerMicros": 0,
+      "queuesMeasured": false
+    },
+    {
+      "index": 8,
+      "sourceWriteToGrantDequeueMicros": 397891,
+      "receiverRequestDequeueToGrantWriteMicros": 126528,
+      "unattributedIncludingQueuesMicros": 271363,
+      "sourceGrantDequeueToHandlerMicros": 0,
+      "queuesMeasured": false
+    },
+    {
+      "index": 9,
+      "sourceWriteToGrantDequeueMicros": 364337,
+      "receiverRequestDequeueToGrantWriteMicros": 110457,
+      "unattributedIncludingQueuesMicros": 253880,
+      "sourceGrantDequeueToHandlerMicros": 0,
+      "queuesMeasured": false
+    },
+    {
+      "index": 10,
+      "sourceWriteToGrantDequeueMicros": 416769,
+      "receiverRequestDequeueToGrantWriteMicros": 36127,
+      "unattributedIncludingQueuesMicros": 380642,
+      "sourceGrantDequeueToHandlerMicros": 0,
+      "queuesMeasured": false
+    },
+    {
+      "index": 11,
+      "sourceWriteToGrantDequeueMicros": 168023,
+      "receiverRequestDequeueToGrantWriteMicros": 36278,
+      "unattributedIncludingQueuesMicros": 131745,
+      "sourceGrantDequeueToHandlerMicros": 0,
+      "queuesMeasured": false
+    },
+    {
+      "index": 12,
+      "sourceWriteToGrantDequeueMicros": 312970,
+      "receiverRequestDequeueToGrantWriteMicros": 245316,
+      "unattributedIncludingQueuesMicros": 67654,
+      "sourceGrantDequeueToHandlerMicros": 0,
+      "queuesMeasured": false
+    },
+    {
+      "index": 13,
+      "sourceWriteToGrantDequeueMicros": 233927,
+      "receiverRequestDequeueToGrantWriteMicros": 34768,
+      "unattributedIncludingQueuesMicros": 199159,
+      "sourceGrantDequeueToHandlerMicros": 0,
+      "queuesMeasured": false
+    }
+  ],
+  "independentNetworkProbe": {
+    "date": "2026-10-27",
+    "peerSelection": "Actual established Krasis agent input TCP remote, not the saved alias address (the saved address equaled the current host and self-ping was excluded).",
+    "peer": {
+      "rttMs": [
+        85,
+        694,
+        428,
+        44,
+        94,
+        335,
+        27,
+        48,
+        203,
+        179,
+        146,
+        22,
+        87,
+        220,
+        273,
+        418,
+        229,
+        99,
+        152,
+        172,
+        227,
+        194,
+        135,
+        197,
+        6,
+        76,
+        14,
+        7,
+        15,
+        30,
+        7,
+        7
+      ],
+      "statisticsMs": {
+        "count": 32,
+        "median": 117.0,
+        "max": 694,
+        "min": 6
+      },
+      "lost": 0,
+      "timeoutMs": 1000,
+      "intervalAfterReplyMs": 100
+    },
+    "gateway": {
+      "rttMs": [
+        7,
+        4,
+        5,
+        7,
+        5,
+        7,
+        81,
+        null,
+        32,
+        63,
+        117,
+        87,
+        144,
+        55,
+        37,
+        45
+      ],
+      "statisticsMs": {
+        "count": 15,
+        "median": 37,
+        "max": 144,
+        "min": 4
+      },
+      "lost": 1,
+      "timeoutMs": 1000,
+      "intervalAfterReplyMs": 100
+    },
+    "limits": "ICMP probes were separate from the physical run and from each other. ICMP scheduling and AP handling can differ from TLS. They prove delay independent of Krasis lease processing, not which radio/driver/AP caused it. Gateway and peer jitter implicate the wireless path but do not locate all delay. No adapter or power settings changed."
+  },
+  "changes": "Add per-matching-control-frame queue elapsed duration while retaining old exchange boundaries. No physical acceptance of this change yet."
+}

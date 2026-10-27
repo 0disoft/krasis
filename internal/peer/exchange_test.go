@@ -72,6 +72,32 @@ func (*slowPreparationResponder) HandleInputPreparation(context.Context, time.Ti
 	time.Sleep(80 * time.Millisecond)
 }
 
+func TestReadAheadSeparatesRequestQueueFromReceiverWork(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var summaries []handoff.Summary
+		ctx := handoff.WithSession(context.Background(), handoff.New(func(s handoff.Summary) { summaries = append(summaries, s) }))
+		defer handoff.EndSession(ctx)
+		runtime := newLocalRuntime(t)
+		coordinator := testWriteCoordinator(t, &recordingFrameWriter{})
+		entry := &recordingCursorEntry{}
+		responder := &slowPreparationResponder{&LeaseResponder{Coordinator: coordinator, Runtime: runtime,
+			Authorizer: staticLeaseAuthorizer{leaseID: "lease", accepted: true}, Peer: testAuthenticatedPeer(), Entry: entry, Returns: entry}}
+		connection := &scriptedConnection{frames: []transport.Frame{
+			controlFrame(t, transport.ControlCommand{Kind: transport.ControlPrepareInput}),
+			controlFrame(t, transport.ControlCommand{Kind: transport.ControlLeaseRequest, SessionID: "session", Epoch: "epoch", Edge: control.ScreenEdgeRight}),
+			controlFrame(t, transport.ControlCommand{Kind: transport.ControlLeaseAbort, SessionID: "session", Epoch: "epoch", LeaseID: "lease"}),
+		}}
+		err := runSession(ctx, connection, coordinator, runtime, responder, nil, time.Now, 2*time.Second, nil)
+		if !errors.Is(err, io.ErrUnexpectedEOF) || len(summaries) != 1 || !summaries[0].Valid() {
+			t.Fatal("queue observation changed protocol", err, summaries)
+		}
+		s := summaries[0]
+		if s.ControlQueue == nil || s.ControlQueue.Micros != 80000 || s.Exchange.Micros[handoff.RequestReadToGrantWritten] != 0 {
+			t.Fatal("80ms receiver backlog attributed to transport/authorization", s.ControlQueue, s.Exchange)
+		}
+	})
+}
+
 func TestSessionRequestRetainsSlowPrecedingDispatchWithoutReordering(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		var summaries []handoff.Summary

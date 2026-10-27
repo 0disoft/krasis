@@ -91,6 +91,7 @@ func recordGrantRead(ctx context.Context, handledAt time.Time) {
 		return
 	}
 	a.grantRead = readAt
+	recordControlQueue(ctx, a)
 	finishGrantProgress(s, a, handledAt, true)
 	putExchange(a, GrantReadToHandler, handledAt.Sub(readAt))
 	recordGrantWait(a)
@@ -122,6 +123,9 @@ func recordReceiverExchange(ctx context.Context, stage ExchangeStage, at time.Ti
 	defer s.collector.mu.Unlock()
 	if exchangeActive(s, a) && a.summary.Role == "receiver" && !at.Before(readAt) {
 		putExchange(a, stage, at.Sub(readAt))
+		if stage == RequestReadToHandler {
+			recordControlQueue(ctx, a)
+		}
 		if stage == RequestReadToHandler && a.summary.ReadPredecessor == nil {
 			if p, ok := ctx.Value(readPredecessorKey{}).(ReadPredecessorProfile); ok && p.Valid("receiver") {
 				a.summary.ReadPredecessor = &p

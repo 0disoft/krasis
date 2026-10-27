@@ -167,6 +167,25 @@ func TestExchangeExportProjectsOnlyValidNumericDetail(t *testing.T) {
 	}
 }
 
+func TestControlQueueExportProjectsOnlyBoundedNumericEvidence(t *testing.T) {
+	p := &handoff.ControlQueueProfile{Schema: 1, Micros: 80000}
+	s := handoff.Summary{Schema: 1, Attempt: 1, Role: "source", Backend: "none", End: "incomplete", Incomplete: true, ControlQueue: p}
+	r := record{Time: "2026-10-27T00:00:00Z", Code: "handoff_profile", Handoff: &s}
+	data, _ := json.Marshal(r)
+	data = []byte(strings.Replace(string(data), `"controlQueue":{`, `"controlQueue":{"timestamp":"private-marker",`, 1))
+	got := sanitizeLog("agent.jsonl", strings.NewReader(string(data)+"\n"))
+	encoded, _ := json.Marshal(got)
+	if got.Incomplete || len(got.Events) != 1 || got.Events[0].Handoff.ControlQueue == nil || *got.Events[0].Handoff.ControlQueue != *p || strings.Contains(string(encoded), "private-marker") {
+		t.Fatal("queue projection lost evidence or leaked data")
+	}
+	p.Micros = uint32(handoff.Window.Microseconds()) + 1
+	data, _ = json.Marshal(r)
+	got = sanitizeLog("agent.jsonl", strings.NewReader(string(data)+"\n"))
+	if !got.Incomplete || len(got.Events) != 0 {
+		t.Fatal("unbounded queue exported")
+	}
+}
+
 func TestPreparationLockExportPreservesPresenceAndBounds(t *testing.T) {
 	s := handoff.Summary{Schema: 1, Attempt: 1, Role: "receiver", Backend: "installed", End: "incomplete", Incomplete: true, PreparationLockMeasured: true, PreparationLockMicros: 4000}
 	s.Preparation.Measured = 1 << handoff.OpenLock

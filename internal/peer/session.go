@@ -118,8 +118,10 @@ func runSession(
 		}
 		var frame transport.Frame
 		var err error
+		var controlReadAt time.Time
 		if ahead != nil {
-			frame, err = ahead.ReadFrame()
+			p := ahead.readFrame()
+			frame, err, controlReadAt = p.frame, p.err, p.controlReadAt
 		} else {
 			frame, err = ownedConnection.ReadFrame()
 		}
@@ -141,6 +143,10 @@ func runSession(
 		handoff.ReadProgress(ctx, handoff.ReadBetweenFrames, readCompleted, true)
 		if frame.Kind == transport.MessageControl {
 			controlCtx = handoff.WithControlRead(ctx, readCompleted)
+			if ahead == nil {
+				controlReadAt = readCompleted
+			}
+			controlCtx = handoff.WithControlQueue(controlCtx, controlReadAt, readCompleted)
 			controlCtx = handoff.WithReadPredecessor(controlCtx, uint8(previousKind), previousDispatchStarted, previousDispatchCompleted, readStarted)
 		}
 		if progress != nil {

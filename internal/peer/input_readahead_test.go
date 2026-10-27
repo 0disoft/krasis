@@ -19,6 +19,17 @@ type slowBatchInput struct {
 	pressAt int32
 }
 
+func TestPointerBatchPreservesControlBarrierReadTime(t *testing.T) {
+	r := &inputReadAhead{ctx: context.Background(), frames: make(chan queuedSessionFrame, 1)}
+	at := time.Now()
+	r.frames <- queuedSessionFrame{frame: transport.Frame{Kind: transport.MessageControl}, controlReadAt: at}
+	r.pointerBatch(batchInputFrame(t, 1, control.InputPointerMove, 1))
+	p := r.readFrame()
+	if p.frame.Kind != transport.MessageControl || !p.controlReadAt.Equal(at) || r.hasPending || !r.pending.controlReadAt.IsZero() {
+		t.Fatal("batch barrier lost its read boundary or retained storage", p)
+	}
+}
+
 func (p *slowBatchInput) Move(ctx context.Context, x, y int32) error {
 	time.Sleep(20 * time.Millisecond)
 	p.order = append(p.order, "move")

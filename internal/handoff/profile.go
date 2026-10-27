@@ -92,6 +92,7 @@ type Summary struct {
 	Capture                 *CaptureProfile         `json:"capture,omitempty"`
 	Focus                   *FocusProfile           `json:"focus,omitempty"`
 	Exchange                *ExchangeProfile        `json:"exchange,omitempty"`
+	ControlQueue            *ControlQueueProfile    `json:"controlQueue,omitempty"`
 	ReadPredecessor         *ReadPredecessorProfile `json:"readPredecessor,omitempty"`
 	TCPInfo                 *TCPInfoProfile         `json:"tcpInfo,omitempty"`
 	GrantProgress           *GrantProgressProfile   `json:"grantProgress,omitempty"`
@@ -126,6 +127,9 @@ func (s Summary) Valid() bool {
 		return false
 	}
 	if s.Exchange != nil && !s.Exchange.Valid(s.Role) {
+		return false
+	}
+	if s.ControlQueue != nil && !s.ControlQueue.Valid() {
 		return false
 	}
 	if s.ReadPredecessor != nil && !s.ReadPredecessor.Valid(s.Role) {
