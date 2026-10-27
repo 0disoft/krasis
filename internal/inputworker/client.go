@@ -1,6 +1,7 @@
 package inputworker
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"io"
@@ -23,6 +24,7 @@ import (
 type Client struct {
 	mu                  syncgate.Mutex
 	channel             *Channel
+	ackReader           *bufio.Reader // Owned by mu; retain any prefetched bytes across requests.
 	lease               Lease
 	sequence            uint64
 	failed              bool
@@ -276,7 +278,10 @@ func (client *Client) performResponse(ctx context.Context, command request, obse
 	if command.applyDetail {
 		ackRead = &handoff.ACKReadProfile{}
 	}
-	ack, err := readResponseObserved(stream, ackRead)
+	if client.ackReader == nil {
+		client.ackReader = newACKReader(stream)
+	}
+	ack, err := readResponseObserved(client.ackReader, ackRead)
 	elapsed3 := time.Since(start)
 	sample[3] = timingBucket(elapsed3)
 	if command.op != opHeartbeat {

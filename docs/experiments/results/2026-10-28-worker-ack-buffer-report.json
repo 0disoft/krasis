@@ -1,0 +1,35 @@
+{
+  "generation": 471,
+  "revision": "7ea59622092aa2e999ea03bdbb402375684d059a",
+  "collection": "831c8f7b7d4a3a87b85ba75377f56ea5",
+  "observed": {
+    "receiverInputDispatchMicros": 1771910,
+    "receiverResponseMicros": 1771909,
+    "ackFirstPositiveReadMicros": 992174,
+    "ackHeaderDecodeMicros": 0,
+    "ackSuffixMicros": 779735,
+    "ackProgress": "header_only",
+    "receiverFault": "fault_heartbeat_timeout",
+    "sourceFault": "fault_remote_eof",
+    "receiverService": "READY"
+  },
+  "sourceFacts": {
+    "responseWriterCallsPerAck": 1,
+    "unbufferedReadsForAvailableHeaderAndSuffix": 2,
+    "bufferedReadsForAvailableHeaderAndSuffix": 1,
+    "bufferBytesPerClient": 70,
+    "scope": "authenticated service client; retained reader; unchanged framing, deadlines, sequence and failure certainty"
+  },
+  "regression": {
+    "condition": "whole ACK available on first read; second underlying read fails at deadline",
+    "before": "suffix loss / unconfirmed input",
+    "after": "complete matching ACK from one underlying read",
+    "additionalCoverage": "prefetched next response retained; truncated header rejected; existing fragmented/foreign/failed ACK tests"
+  },
+  "limitations": [
+    "The g471 trace measures client observation, not kernel arrival or native worker scheduling.",
+    "The exact cause of the 992174us first-read delay remains unproven.",
+    "Buffering removes a redundant kernel read when bytes are available; genuine fragmented or lost responses still fail safely.",
+    "No post-change physical-device latency or stability claim has been made."
+  ]
+}
