@@ -72,14 +72,13 @@ func (b *inputRefresh) status() string {
 // Native startup needs a completed observation before deciding whether to
 // pause an existing session. Waiting for a read never repeats installation.
 func (b *inputRefresh) probe(ctx context.Context) string {
-	if !b.lock(ctx, false) {
-		if state := b.state.Load(); state != nil {
-			return *state
-		}
-		return "UNKNOWN"
+	if state, err := b.readHealth(ctx); err == nil {
+		return state
 	}
-	defer b.mu.Unlock()
-	return b.inspectLocked()
+	if state := b.state.Load(); state != nil {
+		return *state
+	}
+	return "UNKNOWN"
 }
 
 func (b *inputRefresh) inspectLocked() string {
@@ -135,6 +134,33 @@ func (b *inputRefresh) lock(ctx context.Context, explicit bool) bool {
 	return true
 }
 
+// Startup and restoration share the renderer's read-only worker. A canceled
+// waiter leaves the native inspection and installation gate owned until the
+// reader actually returns; no replacement inspection or installer may race it.
+func (b *inputRefresh) readHealth(ctx context.Context) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	var reader *inputHealthReader
+	if b.mu.TryLock() {
+		reader = b.startHealthReaderLocked()
+	} else {
+		reader = b.reader.Load()
+		if reader == nil {
+			return "", ErrInputRefreshPending
+		}
+	}
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	case <-reader.done:
+	}
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	return reader.state, nil
+}
+
 // An explicit read requests fresh health without installation. Concurrent
 // requests coalesce into the reader already holding the installation gate.
 func (b *inputRefresh) recheck() string {
@@ -168,27 +194,10 @@ func (b *inputRefresh) explicit(ctx context.Context) error  { return b.apply(ctx
 
 // Read fresh health under the installation gate; never repeats consent.
 func (b *inputRefresh) restoreCheck(ctx context.Context) error {
-	if err := ctx.Err(); err != nil {
+	state, err := b.readHealth(ctx)
+	if err != nil {
 		return err
 	}
-	var reader *inputHealthReader
-	if b.mu.TryLock() {
-		reader = b.startHealthReaderLocked()
-	} else {
-		reader = b.reader.Load()
-		if reader == nil {
-			return ErrInputRefreshPending
-		}
-	}
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-reader.done:
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	state := reader.state
 	if state != "READY" && state != "UPDATE_REQUIRED" && state != "NOT_INSTALLED" {
 		return ErrInputRefreshPending
 	}
