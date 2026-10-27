@@ -29,7 +29,11 @@ func (executor *SafetyEffectExecutor) Execute(ctx context.Context, effect contro
 	if effect != control.EffectReleaseAll {
 		return executor.delegate.Execute(ctx, effect)
 	}
-	report, err := ReleaseAll(ctx, executor.pressed, executor.release)
+	// Stopping control can cancel the session or exhaust its deadline before
+	// key-up begins. Recovery owns a fresh bounded budget, never live input.
+	cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), InputFailureCleanupTimeout)
+	defer cancel()
+	report, err := ReleaseAll(cleanup, executor.pressed, executor.release)
 	if err != nil {
 		return err
 	}
