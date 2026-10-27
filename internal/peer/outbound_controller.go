@@ -203,9 +203,15 @@ func (controller *OutboundController) RevokePeer(ctx context.Context, command tr
 	observeControlFlow(controller.Observer, ControlFlowRevokeReceived)
 	var emitProfile func()
 	err := controller.Coordinator.Execute(ctx, func(FrameWriter) error {
-		inbound := controller.Runtime.Snapshot().Control.State == control.StateInboundActive
+		// Waiting for native input must not retain the semantic writer after
+		// this revoke request expires. Runtime rechecks admission below too.
+		snapshot, err := controller.Runtime.SnapshotContext(ctx)
+		if err != nil {
+			return err
+		}
+		inbound := snapshot.Control.State == control.StateInboundActive
 		controller.Source.Deactivate()
-		_, err := controller.Runtime.RevokePeer(ctx, command.SessionID, command.LeaseID, command.Epoch)
+		_, err = controller.Runtime.RevokePeer(ctx, command.SessionID, command.LeaseID, command.Epoch)
 		if err == nil {
 			role := "source"
 			if inbound {

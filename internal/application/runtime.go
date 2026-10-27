@@ -294,7 +294,9 @@ func (runtime *SessionRuntime) RevokePeer(
 	leaseID string,
 	epoch string,
 ) (ControlOutcome, error) {
-	runtime.mu.Lock()
+	if err := runtime.mu.LockContext(ctx); err != nil {
+		return ControlOutcome{}, err
+	}
 	defer runtime.mu.Unlock()
 	if runtime.control.State != control.StateInboundActive && runtime.control.State != control.StateOutboundActive {
 		return ControlOutcome{}, errors.New("peer revocation requires an active lease")

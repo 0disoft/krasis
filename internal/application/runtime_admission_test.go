@@ -26,6 +26,13 @@ func TestLeaseAdmissionCancellationCannotChangeAuthorityOrSequence(t *testing.T)
 		return err
 	}
 	operations := []operation{
+		{name: "revoke", setup: func(r *SessionRuntime) error {
+			_, err := r.GrantInbound(context.Background(), control.Event{Kind: control.EventInboundLeaseGranted, SessionID: "s", LeaseID: "l"}, "e", time.Now())
+			return err
+		}, run: func(ctx context.Context, r *SessionRuntime) error {
+			_, err := r.RevokePeer(ctx, "s", "l", "e")
+			return err
+		}},
 		{name: "begin", run: func(ctx context.Context, r *SessionRuntime) error {
 			_, err := r.BeginOutbound(ctx, "s", "e")
 			return err
