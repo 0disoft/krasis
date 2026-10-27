@@ -267,7 +267,10 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 	observeControlFlow(responder.Observer, ControlFlowRequestReceived)
 	return responder.Coordinator.Execute(ctx, func(writer FrameWriter) error {
 		handoff.Record(ctx, handoff.RequestCoordinator, time.Since(queued))
-		if responder.Runtime.Snapshot().Control.State != control.StateLocal {
+		// This view can only reject contention; authorization and PrepareInbound
+		// still validate every accepted lease. Never retain the semantic writer
+		// behind a native input owner just to discover that its lease is busy.
+		if responder.Runtime.LeaseWatch().State != control.StateLocal {
 			rejected = true
 			// A concurrent outbound request or an existing lease is ordinary
 			// contention, not a malformed frame or a broken connection.
