@@ -243,6 +243,19 @@ func registerStartMenuLink(target, link string) error {
 		filepath.Base(link) != "Krasis.lnk" || strings.ContainsAny(target+link, "\x00\r\n\"") {
 		return errors.New("invalid start menu paths")
 	}
+	// WScript.Shell expands 8.3 directory aliases when saving a shortcut.
+	// CI and installed users may inherit a short-name TEMP/LOCALAPPDATA path;
+	// compare the same long spelling rather than rejecting the saved target.
+	name, err := windows.UTF16PtrFromString(target)
+	if err != nil {
+		return err
+	}
+	buffer := make([]uint16, 32768)
+	n, err := windows.GetLongPathName(name, &buffer[0], uint32(len(buffer)))
+	if err != nil || n == 0 || n >= uint32(len(buffer)) {
+		return errors.New("invalid start menu target")
+	}
+	target = windows.UTF16ToString(buffer[:n])
 	system, err := windows.GetSystemDirectory()
 	if err != nil {
 		return err

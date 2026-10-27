@@ -12,7 +12,41 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"golang.org/x/sys/windows"
 )
+
+func TestStartMenuShortcutAcceptsShortDirectoryAlias(t *testing.T) {
+	root := t.TempDir()
+	long := filepath.Join(root, "directory with spaces")
+	if err := os.Mkdir(long, 0700); err != nil {
+		t.Fatal(err)
+	}
+	name, err := windows.UTF16PtrFromString(long)
+	if err != nil {
+		t.Fatal(err)
+	}
+	buf := make([]uint16, 32768)
+	n, err := windows.GetShortPathName(name, &buf[0], uint32(len(buf)))
+	if err != nil || n == 0 || n >= uint32(len(buf)) {
+		t.Fatal("cannot read directory alias", err)
+	}
+	short := windows.UTF16ToString(buf[:n])
+	if strings.EqualFold(short, long) {
+		t.Skip("volume has no short directory names")
+	}
+	target := filepath.Join(short, "krasis-cli.exe")
+	if err := os.WriteFile(target, []byte("MZ-test"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(root, "Krasis.lnk")
+	if err := registerStartMenuLink(target, link); err != nil {
+		t.Fatal(err)
+	}
+	if err := registerStartMenuLink(target, link); err != nil {
+		t.Fatal("existing alias shortcut rejected", err)
+	}
+}
 
 func TestStartMenuCOMFailureRetainsSafeDiagnostics(t *testing.T) {
 	root := t.TempDir()
