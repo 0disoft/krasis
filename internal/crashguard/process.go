@@ -129,6 +129,7 @@ type Process struct {
 
 	mu      sync.Mutex
 	waitErr error
+	exited  bool
 	stderr  *limitedBuffer
 }
 
@@ -188,6 +189,7 @@ func startCommand(command *exec.Cmd) (*Process, error) {
 		waitErr := errors.Join(waitProcess(command), finishStderr())
 		process.mu.Lock()
 		process.waitErr = waitErr
+		process.exited = command.ProcessState != nil
 		process.mu.Unlock()
 		close(process.done)
 	}()

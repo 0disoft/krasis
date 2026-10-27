@@ -101,7 +101,7 @@ func (p *Process) closeUnbound() error {
 			// cleanup/native failures but do not classify its exit code as a
 			// failed input recovery. Unknown exit still uses ExitPending.
 			waitErr := unboundWaitFailure(p.waitErr)
-			p.closeErr = errors.Join(waitErr, p.abortErr, p.stdinErr, p.stdoutErr)
+			p.closeErr = errors.Join(waitErr, confirmedExitAbort(p.abortErr, p.exited), p.stdinErr, p.stdoutErr)
 			p.mu.Unlock()
 			close(p.closeDone)
 		}()

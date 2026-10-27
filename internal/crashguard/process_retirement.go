@@ -79,7 +79,7 @@ func (process *Process) closeOwned() {
 	if waitErr != nil && stderr != "" {
 		waitErr = fmt.Errorf("crash guard exited: %w: %s", waitErr, stderr)
 	}
-	process.closeErr = errors.Join(process.closeCause, process.stdinErr, process.stdoutErr, process.abortErr, waitErr)
+	process.closeErr = errors.Join(process.closeCause, process.stdinErr, process.stdoutErr, confirmedExitAbort(process.abortErr, process.exited), waitErr)
 	process.mu.Unlock()
 	close(process.closeDone)
 }

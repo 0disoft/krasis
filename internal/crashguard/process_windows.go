@@ -20,6 +20,17 @@ func configureProcess(command *exec.Cmd) {
 	command.SysProcAttr.HideWindow = true
 }
 
+// Windows also returns ACCESS_DENIED when an exact process has already exited,
+// before our waiter reaps it. Go reports EINVAL if Wait already released its
+// handle. Only that child's ProcessState proves its exit; a released handle
+// alone cannot. Call after joining exit and pipe cleanup.
+func confirmedExitAbort(terminationErr error, exited bool) error {
+	if exited && (errors.Is(terminationErr, windows.ERROR_ACCESS_DENIED) || errors.Is(terminationErr, syscall.EINVAL)) {
+		return nil
+	}
+	return terminationErr
+}
+
 func waitProcess(command *exec.Cmd) error {
 	// os.Process.Wait uses an infinite Windows wait. First wait in bounded
 	// native calls so Go's GC can take a missed syscall P (go#81759). Once

@@ -4,6 +4,8 @@ package crashguard
 
 import "os/exec"
 
+func confirmedExitAbort(err error, _ bool) error { return err }
+
 func configureProcess(_ *exec.Cmd) {}
 
 func waitProcess(command *exec.Cmd) error { return command.Wait() }
