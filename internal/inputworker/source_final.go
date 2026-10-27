@@ -105,16 +105,25 @@ func sourceCaptureFinal(loop, capture, sender error, ownExpiry bool) error {
 // A rejected read-only query cannot grant a clean retirement while a native
 // query still owns either channel. Check before publishing status, not just
 // after the agent's retirement notification has already been sent.
-func sourceCaptureQueryRetirement(result error, owners ...*Channel) error {
+func sourceCaptureQueriesRetired(result error, owners ...*Channel) error {
 	for _, owner := range owners {
 		pending := owner == nil
+		closing := false
 		if owner != nil {
 			owner.queryMu.Lock()
 			pending = owner.pendingQueriesLocked()
+			closing = owner.closing
 			owner.queryMu.Unlock()
 		}
 		if pending {
 			return errors.Join(result, ErrRecovery, &workerReportFailure{operation: "source-channel-close", cause: ErrAuthority})
+		}
+		// A completed canceled query may already have retired its handles.
+		// Its failed Close is still uncertain cleanup, even after done closes.
+		if closing {
+			if err := owner.Close(); err != nil {
+				return errors.Join(result, ErrRecovery, &workerReportFailure{operation: "source-channel-close", cause: err})
+			}
 		}
 	}
 	return result

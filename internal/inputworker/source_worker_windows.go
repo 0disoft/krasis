@@ -293,7 +293,7 @@ func runSourceCapture(ctx context.Context, channel, service *Channel, lease Leas
 		// Both command/watchdog callers have joined. A service query may still
 		// own native handles, so the service report must not claim cleanup yet.
 		// Keep its control pipe open for the final report; bootstrap retires it.
-		result = sourceCaptureQueryRetirement(result, service)
+		result = sourceCaptureQueriesRetired(result, service)
 	}()
 	select {
 	case <-hookReady:
