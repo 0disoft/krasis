@@ -19,10 +19,7 @@ func authorizeSourceReadProgress(ctx context.Context, service, agent *Channel, o
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 	full := func() error {
-		if err := service.authorizeSourceInput(ctx); err != nil {
-			return sourceQueryOwner("service", err)
-		}
-		return sourceQueryOwner("agent", agent.authorizeSourceInput(ctx))
+		return authorizeSourceExecution(ctx, service, agent)
 	}
 	present := func() error {
 		check := func(owner *Channel, stage byte) error {

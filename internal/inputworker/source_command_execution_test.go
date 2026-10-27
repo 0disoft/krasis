@@ -67,7 +67,7 @@ func TestSourceCommandRetainsReadChecksAndCleanupDesktopPolicy(t *testing.T) {
 	for op := sourceStart; op <= sourceCursorRestore; op++ {
 		full, presence := 0, 0
 		err := sourceCommandReadAuthorization(op, func() error { full++; return ErrAuthority }, func() error { presence++; return ErrProtocol })
-		if op == sourceActivate || op == sourceHeartbeat {
+		if op == sourceActivate || op == sourceHeartbeat || op == sourceAdmit {
 			if presence != 1 || full != 0 || err != ErrProtocol {
 				t.Fatal("missing pinned presence", op, presence, full, err)
 			}

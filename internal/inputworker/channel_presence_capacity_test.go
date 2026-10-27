@@ -68,7 +68,7 @@ func TestSourceHeartbeatRetainsCapacityUnderFullProofLoad(t *testing.T) {
 		full, stopFull := context.WithTimeout(context.Background(), 20*time.Millisecond)
 		defer stopFull()
 		started = time.Now()
-		err := authorizeSourceRead(full, peers[0], peers[1], sourceAdmit)
+		err := authorizeSourceExecution(full, peers[0], peers[1])
 		if !errors.Is(err, context.DeadlineExceeded) || time.Since(started) != 20*time.Millisecond || presenceChecks.Load() != 3 || peers[0].authority.fenced.Load() {
 			t.Error("full proof bypassed reserve or unsent expiry fenced owner", err)
 		}

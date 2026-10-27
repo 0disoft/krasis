@@ -5,11 +5,11 @@ import (
 	"time"
 )
 
-// Activation's protected command desktop reauthorizes it immediately before
+// Admission and activation reauthorize on the protected command desktop before
 // native work. Frame admission still checks the pinned agent/service presence;
 // other commands retain their existing read-side authorization.
 func sourceCommandReadAuthorization(op byte, full, present func() error) error {
-	if op == sourceHeartbeat || op == sourceActivate {
+	if op == sourceHeartbeat || op == sourceActivate || op == sourceAdmit {
 		return present()
 	}
 	return full()
@@ -22,7 +22,7 @@ func executeSourceCommand(ctx context.Context, op byte, desktop executor, work f
 	if op == sourceDeactivate || op == sourceHeartbeat || op == sourceCursorRestore {
 		return timing, work()
 	}
-	if op != sourceActivate {
+	if op != sourceActivate && op != sourceAdmit {
 		return timing, desktop(ctx, work)
 	}
 	started := time.Now()

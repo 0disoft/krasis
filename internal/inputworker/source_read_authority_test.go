@@ -11,7 +11,7 @@ import (
 )
 
 func TestSourceReaderBoundsBothNativeOwnersAndRetainsHandles(t *testing.T) {
-	for _, op := range []byte{sourceAdmit, sourceHeartbeat} {
+	for _, op := range []byte{sourceStart, sourceHeartbeat} {
 		for _, stalled := range []int{0, 1} {
 			synctest.Test(t, func(t *testing.T) {
 				owners := make([]*Channel, 2)
@@ -72,7 +72,7 @@ func TestSourceReaderUsesOneBudgetAcrossBothOwners(t *testing.T) {
 			owners[i].authority.checkInput = func() error { time.Sleep(600 * time.Millisecond); return nil }
 		}
 		started := time.Now()
-		err := authorizeSourceRead(context.Background(), owners[0], owners[1], sourceAdmit)
+		err := authorizeSourceExecution(context.Background(), owners[0], owners[1])
 		if !errors.Is(err, context.DeadlineExceeded) || time.Since(started) != time.Second {
 			t.Fatal("owners received separate budgets", err, time.Since(started))
 		}
