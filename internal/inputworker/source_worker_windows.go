@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -17,16 +18,19 @@ import (
 )
 
 type sourceWriter struct {
-	ctx       context.Context
-	mu        syncgate.Mutex
-	gateOwner atomic.Uint32 // Fixed holder/stage sample, diagnostics only.
-	channel   *Channel
-	binding   Binding
-	sequence  uint64
-	broken    bool // Under mu; an attempted failed write cannot carry further frames.
-	epoch     atomic.Uint64
-	started   atomic.Bool
-	heartbeat *sourceHeartbeatProgress
+	ctx          context.Context
+	mu           syncgate.Mutex
+	gateOwner    atomic.Uint32 // Fixed holder/stage sample, diagnostics only.
+	channel      *Channel
+	binding      Binding
+	sequence     uint64
+	broken       bool       // Under mu; an attempted failed write cannot carry further frames.
+	interruptMu  sync.Mutex // Only write admission and interruption; never held during I/O.
+	writeOrigin  byte
+	inputStopped bool
+	epoch        atomic.Uint64
+	started      atomic.Bool
+	heartbeat    *sourceHeartbeatProgress
 }
 
 func (w *sourceWriter) send(p sourcePacket, current func() bool) error {
@@ -139,7 +143,7 @@ func (w *sourceWriter) writeSequenced(ctx context.Context, data []byte, sequence
 		return sourceTransportFailure(err)
 	}
 	deadline, _ := ctx.Deadline()
-	err := writeSourceCommand(w.channel.stream, data, deadline)
+	err := w.writeFrame(data, deadline, origin)
 	if failure, ok := err.(*sourceIOFailure); ok {
 		failure.origin = origin // The failed local call has one owner.
 	}
@@ -169,9 +173,6 @@ func (w *sourceWriter) SendAction(ctx context.Context, action control.InputActio
 		return nil
 	}
 	return err
-}
-func (w *sourceWriter) Interrupt(error) error {
-	return sourceTransportFailure(w.channel.stream.SetWriteDeadline(time.Now()))
 }
 func (w *sourceWriter) Fail(context.Context, error) error { return nil }
 

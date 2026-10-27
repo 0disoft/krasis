@@ -38,27 +38,28 @@ func (e *sourceIOFailure) Error() string { return "source command write failed" 
 func (e *sourceIOFailure) Unwrap() error { return e.cause }
 
 func writeSourceCommand(stream net.Conn, data []byte, deadline time.Time) error {
-	stage := "deadline"
+	if err := stream.SetWriteDeadline(deadline); err != nil {
+		return &sourceIOFailure{stage: "deadline", cause: errors.Join(ErrAuthority, err)}
+	}
+	return writeSourceBytes(stream, data)
+}
+
+// The caller has configured its deadline and owns the serial write gate.
+func writeSourceBytes(stream net.Conn, data []byte) error {
 	unsubmitted := false
-	partial := false
-	err := stream.SetWriteDeadline(deadline)
-	if err == nil {
-		stage = "write"
-		var n int
-		n, err = stream.Write(data)
-		partial = n > 0 && n < len(data)
-		if n == 0 && err != nil {
-			var proof *unsubmittedPipeWrite
-			unsubmitted = errors.As(err, &proof)
-		}
-		if err == nil && n != len(data) {
-			err = io.ErrShortWrite
-		}
+	n, err := stream.Write(data)
+	partial := n > 0 && n < len(data)
+	if n == 0 && err != nil {
+		var proof *unsubmittedPipeWrite
+		unsubmitted = errors.As(err, &proof)
+	}
+	if err == nil && n != len(data) {
+		err = io.ErrShortWrite
 	}
 	if err == nil {
 		return nil
 	}
-	return &sourceIOFailure{stage: stage, cause: errors.Join(ErrAuthority, err), unsubmitted: unsubmitted, partial: partial}
+	return &sourceIOFailure{stage: "write", cause: errors.Join(ErrAuthority, err), unsubmitted: unsubmitted, partial: partial}
 }
 
 // Closed labels only. Partial/attempted writes remain fatal; these observations
