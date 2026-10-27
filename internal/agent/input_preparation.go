@@ -86,9 +86,12 @@ func runPreparationSender(ctx context.Context, hints <-chan time.Time, runtime *
 				continue
 			}
 			last = now
-			// Waiting for the semantic write gate is bounded. Hint expiry
-			// before admission is harmless; an actual TLS write error is fatal.
-			writeCtx, cancel := context.WithTimeout(ctx, preparationHintLifetime)
+			// Queue admission and I/O share the original hint's lifetime.
+			// Using the session context for I/O can hold the semantic gate for
+			// the full frame timeout after this optional hint is already stale.
+			// Expiry before admission is harmless; a started TLS write failure
+			// remains fatal because its outcome can be partial/unknown.
+			writeCtx, cancel := context.WithDeadline(ctx, at.Add(preparationHintLifetime))
 			attempted := false
 			err := coordinator.Execute(writeCtx, func(writer peer.FrameWriter) error {
 				// Preparation is only a hint. Never hold the network write gate
@@ -98,7 +101,7 @@ func runPreparationSender(ctx context.Context, hints <-chan time.Time, runtime *
 					return nil
 				}
 				attempted = true
-				return writer.WriteFrameContext(ctx, transport.Frame{Kind: transport.MessageControl, Payload: payload})
+				return writer.WriteFrameContext(writeCtx, transport.Frame{Kind: transport.MessageControl, Payload: payload})
 			})
 			cancel()
 			if err != nil && attempted {
