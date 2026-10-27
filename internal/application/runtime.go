@@ -63,8 +63,9 @@ type InputInjectionObserver interface {
 	ObserveDestinationInjectionCompleted(time.Time)
 }
 
-// SessionRuntime is the single serialized owner of one peer session's mutable
-// control, ordering, liveness, and pressed-input state.
+// SessionRuntime serializes control, ordering, input and recovery. An immutable
+// lease proof additionally admits exact active heartbeats without waiting for
+// native input; expiry is sealed before recovery can release that authority.
 type SessionRuntime struct {
 	watch          atomic.Pointer[LeaseWatch]
 	mu             syncgate.Mutex
@@ -215,6 +216,7 @@ func (runtime *SessionRuntime) GrantOutbound(
 		return outcome, err
 	}
 	runtime.liveness = liveness
+	runtime.recordLivenessLocked(liveness, time.Now())
 	return outcome, nil
 }
 
@@ -426,6 +428,7 @@ func (runtime *SessionRuntime) CommitInbound(
 		return runtime.faultLocked(ctx, errors.New("inbound commit did not produce inbound-active state"))
 	}
 	runtime.liveness = liveness
+	runtime.recordLivenessLocked(liveness, time.Now())
 	return outcome, nil
 }
 
@@ -580,8 +583,7 @@ func (runtime *SessionRuntime) handleInputActions(
 	stopInjection()
 	if err == nil {
 		if now != nil {
-			runtime.liveness = progress
-			runtime.watch.Store(&LeaseWatch{State: runtime.control.State, SessionID: runtime.control.SessionID, Progress: admittedAt})
+			runtime.recordLivenessLocked(progress, admittedAt)
 		}
 		disposition = InputDispositionApplied
 		return nil
@@ -629,13 +631,16 @@ func (runtime *SessionRuntime) ObserveHeartbeat(
 	if runtime.control.State != control.StateInboundActive && runtime.control.State != control.StateOutboundActive {
 		return ErrRuntimeNoLiveness
 	}
+	if watch := runtime.watch.Load(); watch != nil && watch.Sealed {
+		return ErrInputLivenessExpired
+	}
 	next, err := runtime.liveness.Observe(sessionID, observedAt)
 	if err != nil {
 		_, faultErr := runtime.faultLocked(ctx, err)
 		return faultErr
 	}
 	runtime.liveness = next
-	runtime.publishLeaseWatchLocked(true)
+	runtime.recordLivenessLocked(next, time.Now())
 	return nil
 }
 
@@ -658,6 +663,17 @@ func (runtime *SessionRuntime) CheckLiveness(
 	now time.Time,
 	timeout time.Duration,
 ) (bool, error) {
+	return runtime.checkLiveness(ctx, func() time.Time { return now }, timeout)
+}
+
+func (runtime *SessionRuntime) CheckLivenessNow(ctx context.Context, clock func() time.Time, timeout time.Duration) (bool, error) {
+	return runtime.checkLiveness(ctx, clock, timeout)
+}
+
+func (runtime *SessionRuntime) checkLiveness(ctx context.Context, clock func() time.Time, timeout time.Duration) (bool, error) {
+	if clock == nil {
+		return false, control.ErrInvalidLiveness
+	}
 	if err := runtime.mu.LockContext(ctx); err != nil {
 		return false, err
 	}
@@ -666,11 +682,26 @@ func (runtime *SessionRuntime) CheckLiveness(
 	if runtime.control.State != control.StateInboundActive && runtime.control.State != control.StateOutboundActive {
 		return false, ErrRuntimeNoLiveness
 	}
+	var observedAt time.Time
+	for {
+		watch := runtime.watch.Load()
+		runtime.syncLivenessLocked()
+		observedAt = clock()
+		if watch != nil && watch.Sealed {
+			outcome, err := HandleControlEvent(ctx, runtime.control, control.Event{Kind: control.EventFaultDetected}, runtime.executor)
+			runtime.applyOutcomeLocked(outcome)
+			return true, err
+		}
+		_, expired, _ := runtime.liveness.FaultEventIfExpired(observedAt, timeout)
+		if !expired || watch == nil || runtime.sealLeaseWatch(watch) {
+			break
+		}
+	}
 	outcome, faulted, err := HandleLiveness(
 		ctx,
 		runtime.control,
 		runtime.liveness,
-		now,
+		observedAt,
 		timeout,
 		runtime.executor,
 	)
@@ -727,6 +758,7 @@ func (runtime *SessionRuntime) applyOutcomeLocked(outcome ControlOutcome) {
 }
 
 func (runtime *SessionRuntime) snapshotLocked() RuntimeSnapshot {
+	runtime.syncLivenessLocked()
 	return RuntimeSnapshot{
 		Control:           runtime.control,
 		InputStream:       runtime.stream,

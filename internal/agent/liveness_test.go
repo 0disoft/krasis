@@ -39,9 +39,10 @@ func TestRunLivenessTicksExpiresSilentActivePeer(t *testing.T) {
 	ticks := make(chan time.Time, 2)
 	ticks <- time.Unix(1, 0)
 	ticks <- time.Unix(2, 0)
-	times := make(chan time.Time, 2)
+	times := make(chan time.Time, 3)
 	times <- time.Unix(101, 0)
 	times <- time.Unix(103, 0)
+	times <- time.Unix(103, 0) // Expired proof is rechecked under the runtime owner.
 	err = runLivenessTicks(context.Background(), coordinator, runtime, policy, func() time.Time { return <-times }, observer, ticks)
 	if !errors.Is(err, peer.ErrPeerLivenessExpired) {
 		t.Fatalf("runLivenessTicks() error = %v", err)

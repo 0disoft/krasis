@@ -32,3 +32,12 @@ func TestHeartbeatFailureRetainsBoundedCauseInExportedCode(t *testing.T) {
 		}
 	}
 }
+
+func TestInputBacklogIsExportedWithoutLosingCauseBehindInjectionFailure(t *testing.T) {
+	err := errors.Join(peer.ErrInputDispatchBacklog, peer.ErrPeerInputDispatch,
+		&application.InjectionError{Certainty: application.InjectionOutcomeUnknown, Cause: context.Canceled})
+	d := DescribeSessionFailure(err)
+	if code := failurecode.ReconnectCode("session", d.Component, d.Phase, d.Code); code != "reconnect_input_queue_timeout" {
+		t.Fatal("input backlog misclassified", d, code)
+	}
+}

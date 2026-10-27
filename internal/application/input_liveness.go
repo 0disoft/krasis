@@ -27,8 +27,12 @@ func (runtime *SessionRuntime) inputLivenessLocked(ctx context.Context, now func
 		return control.PeerLiveness{}, time.Time{}, nil
 	}
 	admittedAt := time.Now()
+	runtime.syncLivenessLocked()
 	observedAt := now()
 	_, expired, err := runtime.liveness.FaultEventIfExpired(observedAt, timeout)
+	if watch := runtime.watch.Load(); watch != nil && watch.Sealed {
+		expired = true
+	}
 	if expired {
 		err = ErrInputLivenessExpired
 	}

@@ -7,6 +7,7 @@ import (
 	"github.com/0disoft/krasis/internal/transport"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
@@ -36,42 +37,45 @@ func (o *progressTestObserver) ObserveHeartbeatSent(string, time.Time)     {}
 func (o *progressTestObserver) ObserveHeartbeatReceived(string, time.Time) { o.heartbeat.Add(1) }
 
 func TestProgressSeparatesReceivedFrameFromStalledInjection(t *testing.T) {
-	input := &stalledProgressInput{entered: make(chan struct{}), release: make(chan struct{})}
-	runtime, _ := application.NewSessionRuntime(effectExecutor{}, input)
-	_, err := runtime.GrantInbound(context.Background(), control.Event{Kind: control.EventInboundLeaseGranted, SessionID: "s", LeaseID: "l"}, "e", time.Unix(100, 0))
-	if err != nil {
-		t.Fatal(err)
-	}
-	payload, _ := transport.EncodeInputPayload(control.InputEnvelope{SessionID: "s", Epoch: "e", Sequence: 1}, control.InputAction{Kind: control.InputPointerMove, DeltaX: 1})
-	heartbeat, _ := transport.EncodeHeartbeatPayload("s")
-	connection := &scriptedConnection{frames: []transport.Frame{{Kind: transport.MessageInput, Payload: payload}, {Kind: transport.MessageHeartbeat, Payload: heartbeat}}}
-	observer := &progressTestObserver{}
-	done := make(chan error, 1)
-	go func() {
-		done <- runSession(context.Background(), connection, nil, runtime, nil, nil, fixedClock(time.Unix(101, 0)), 3*time.Second, observer)
-	}()
-	select {
-	case <-input.entered:
-	case <-time.After(time.Second):
+	synctest.Test(t, func(t *testing.T) {
+		input := &stalledProgressInput{entered: make(chan struct{}), release: make(chan struct{})}
+		runtime, _ := application.NewSessionRuntime(effectExecutor{}, input)
+		_, err := runtime.GrantInbound(context.Background(), control.Event{Kind: control.EventInboundLeaseGranted, SessionID: "s", LeaseID: "l"}, "e", time.Unix(100, 0))
+		if err != nil {
+			t.Fatal(err)
+		}
+		payload, _ := transport.EncodeInputPayload(control.InputEnvelope{SessionID: "s", Epoch: "e", Sequence: 1}, control.InputAction{Kind: control.InputPointerMove, DeltaX: 1})
+		heartbeat, _ := transport.EncodeHeartbeatPayload("s")
+		connection := &scriptedConnection{frames: []transport.Frame{{Kind: transport.MessageInput, Payload: payload}, {Kind: transport.MessageHeartbeat, Payload: heartbeat}}}
+		observer := &progressTestObserver{}
+		done := make(chan error, 1)
+		go func() {
+			done <- runSession(context.Background(), connection, nil, runtime, nil, nil, fixedClock(time.Unix(101, 0)), 3*time.Second, observer)
+		}()
+		select {
+		case <-input.entered:
+		case <-time.After(time.Second):
+			close(input.release)
+			t.Fatal("input did not start")
+		}
+		synctest.Wait()
+		read, dispatch, complete, accepted := observer.read.Load(), observer.dispatch.Load(), observer.complete.Load(), observer.heartbeat.Load()
 		close(input.release)
-		t.Fatal("input did not start")
-	}
-	read, dispatch, complete, accepted := observer.read.Load(), observer.dispatch.Load(), observer.complete.Load(), observer.heartbeat.Load()
-	close(input.release)
-	select {
-	case <-done:
-	case <-time.After(time.Second):
-		t.Fatal("session did not finish")
-	}
-	if read != 1 || dispatch != 1 || complete != 0 || accepted != 0 {
-		t.Fatalf("stalled injection mislabeled: %d %d %d %d", read, dispatch, complete, accepted)
-	}
-	if observer.waiting.Load() != 2 || observer.acquired.Load() != 2 {
-		t.Fatal("input or heartbeat coordinator markers missing")
-	}
-	if observer.heartbeat.Load() != 1 || observer.complete.Load() != 2 || runtime.Snapshot().PressedCount != 0 || runtime.Snapshot().Control.State != control.StateLocal {
-		t.Fatal("ordered dispatch/cleanup changed")
-	}
+		select {
+		case <-done:
+		case <-time.After(time.Second):
+			t.Fatal("session did not finish")
+		}
+		if read != 1 || dispatch != 1 || complete != 0 || accepted != 1 {
+			t.Fatalf("stalled injection mislabeled: %d %d %d %d", read, dispatch, complete, accepted)
+		}
+		if observer.waiting.Load() != 1 || observer.acquired.Load() != 1 {
+			t.Fatal("input or heartbeat coordinator markers missing")
+		}
+		if observer.heartbeat.Load() != 1 || observer.complete.Load() != 2 || runtime.Snapshot().PressedCount != 0 || runtime.Snapshot().Control.State != control.StateLocal {
+			t.Fatal("ordered dispatch/cleanup changed")
+		}
+	})
 }
 
 type queuedDispatchObserver struct {
@@ -84,7 +88,7 @@ func (o *queuedDispatchObserver) ObserveDispatchCoordinatorWaiting(at time.Time)
 	o.queued <- struct{}{}
 }
 
-func TestDispatchTimingDistinguishesWaitingForGateFromAdmittedInjection(t *testing.T) {
+func TestInputAdmissionDoesNotWaitForSemanticWriter(t *testing.T) {
 	input := &stalledProgressInput{entered: make(chan struct{}), release: make(chan struct{})}
 	runtime, _ := application.NewSessionRuntime(effectExecutor{}, input)
 	if _, err := runtime.GrantInbound(context.Background(), control.Event{Kind: control.EventInboundLeaseGranted, SessionID: "s", LeaseID: "l"}, "e", time.Unix(100, 0)); err != nil {
@@ -108,14 +112,13 @@ func TestDispatchTimingDistinguishesWaitingForGateFromAdmittedInjection(t *testi
 		close(input.release)
 		t.Fatal("reader did not reach gate")
 	}
-	acquiredBeforeRelease := observer.acquired.Load()
-	coordinator.permit <- struct{}{}
 	select {
 	case <-input.entered:
 	case <-time.After(time.Second):
 		close(input.release)
 		t.Fatal("admitted reader did not inject")
 	}
+	coordinator.permit <- struct{}{}
 	acquiredDuringInjection, completeDuringInjection := observer.acquired.Load(), observer.complete.Load()
 	close(input.release)
 	select {
@@ -123,7 +126,7 @@ func TestDispatchTimingDistinguishesWaitingForGateFromAdmittedInjection(t *testi
 	case <-time.After(time.Second):
 		t.Fatal("reader did not finish")
 	}
-	if acquiredBeforeRelease != 0 || acquiredDuringInjection != 1 || completeDuringInjection != 0 || observer.complete.Load() != 1 {
-		t.Fatal("gate wait, body and completion collapsed", acquiredBeforeRelease, acquiredDuringInjection, completeDuringInjection)
+	if acquiredDuringInjection != 1 || completeDuringInjection != 0 || observer.complete.Load() != 1 {
+		t.Fatal("input lane admission/completion collapsed", acquiredDuringInjection, completeDuringInjection)
 	}
 }

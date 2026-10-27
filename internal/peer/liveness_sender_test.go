@@ -3,6 +3,7 @@ package peer
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -70,14 +71,14 @@ func TestPulseLivenessDoesNotWaitForUncooperativeInjection(t *testing.T) {
 	}()
 	select {
 	case err := <-done:
-		if !errors.Is(err, context.DeadlineExceeded) || len(writer.frames) != 0 {
-			t.Fatal("blocked injection produced a heartbeat", err)
+		if err != nil || len(writer.frames) != 1 || writer.frames[0].Kind != transport.MessageHeartbeat {
+			t.Fatal("native input blocked the independent heartbeat", err)
 		}
 	case <-time.After(time.Second):
 		t.Fatal("pulse retained coordinator behind native input")
 	}
-	// The departed waiter releases serialization while the native owner remains
-	// joined; no second input backend or unverified liveness update is started.
+	// Heartbeats retain semantic write ordering while the native owner stays
+	// joined; sending does not advance receive-side liveness or acknowledge input.
 	if err := coordinator.Execute(context.Background(), func(FrameWriter) error { return nil }); err != nil {
 		t.Fatal(err)
 	}
@@ -188,11 +189,13 @@ func TestPulseLivenessReadsDeadlineClockAfterCoordinatorWait(t *testing.T) {
 
 	clockCalled := make(chan struct{})
 	clockValue := make(chan time.Time, 1)
+	var clockOnce sync.Once
+	var observedClock time.Time
 	pulseDone := make(chan error, 1)
 	go func() {
 		_, err := PulseLiveness(context.Background(), coordinator, runtime, func() time.Time {
-			close(clockCalled)
-			return <-clockValue
+			clockOnce.Do(func() { close(clockCalled); observedClock = <-clockValue })
+			return observedClock
 		}, 3*time.Second)
 		pulseDone <- err
 	}()

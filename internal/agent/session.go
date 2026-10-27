@@ -266,7 +266,7 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 				source.Retire()
 				cancel(cause)
 				_ = connection.InterruptLocal(cause)
-			})
+			}, runtime.ClaimLeaseExpiry)
 		}})
 		components = append(components, component{name: "peer-liveness", run: func() error {
 			return runLiveness(runContext, coordinator, runtime, policy, config.Now, config.LivenessObserver)

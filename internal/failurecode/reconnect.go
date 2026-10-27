@@ -35,6 +35,7 @@ var reconnectReasons = map[[3]string]string{
 	{"peer-writer", "revoke-write", "outcome_unknown"}:                 "reconnect_revoke_write_failed",
 	{"peer-dispatch", "control", "failed"}:                             "reconnect_control_dispatch_failed",
 	{"peer-dispatch", "input", "failed"}:                               "reconnect_input_dispatch_failed",
+	{"peer-dispatch", "input-queue", "backlog_timeout"}:                "reconnect_input_queue_timeout",
 	{"peer-dispatch", "heartbeat", "failed"}:                           "reconnect_heartbeat_dispatch_failed",
 	{"outbound-control", "grant-apply", "state_transition_failed"}:     "reconnect_grant_apply_failed",
 	{"boundary-admission", "request-begin", "state_transition_failed"}: "reconnect_boundary_begin_failed",

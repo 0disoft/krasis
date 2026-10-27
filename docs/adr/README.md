@@ -45,5 +45,6 @@
 
 - `0069-pre-login-connection-owner.md`: 로그인 전 서비스 연결의 수명 관리 기반과 단계별 통합 계획
 - `0071-applied-input-peer-progress.md`: 정상 처리한 현재 inbound 입력을 생존 근거로 반영하고 만료·실패 입력은 제외
+- `0072-independent-active-lease-heartbeat.md`: independent exact active-lease heartbeat admission during joined native input
 
 새 결정은 `0000-template.md`를 복사해 다음 번호로 추가한다. 이미 Accepted인 결정의 의미를 바꿀 때는 기존 문서를 조용히 덮어쓰지 말고 새 ADR에서 대체 관계와 migration 영향을 기록한다.

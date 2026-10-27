@@ -163,66 +163,34 @@ func TestRunSessionObservedRejectsHeartbeatAtExpiredDeadline(t *testing.T) {
 	}
 }
 
-func TestRunSessionObservedReadsHeartbeatClockAfterCoordinatorWait(t *testing.T) {
+func TestRunSessionObservedAdmitsHeartbeatBeforeCoordinatorWait(t *testing.T) {
 	runtime, _ := newInboundRuntime(t)
-	payload, err := transport.EncodeHeartbeatPayload("session-1")
-	if err != nil {
-		t.Fatalf("EncodeHeartbeatPayload() error = %v", err)
-	}
+	payload, _ := transport.EncodeHeartbeatPayload("session-1")
 	connection := newObservedFrameConnection(transport.Frame{Kind: transport.MessageHeartbeat, Payload: payload})
 	coordinator := testWriteCoordinator(t, &recordingFrameWriter{})
-	coordinatorAcquired := make(chan struct{})
-	releaseCoordinator := make(chan struct{})
-	coordinatorDone := make(chan error, 1)
+	<-coordinator.permit
+	received := make(chan struct{}, 1)
+	observer := &laneHeartbeatObserver{received: received}
+	done := make(chan error, 1)
 	go func() {
-		coordinatorDone <- coordinator.Execute(context.Background(), func(FrameWriter) error {
-			close(coordinatorAcquired)
-			<-releaseCoordinator
-			return nil
-		})
+		done <- RunSessionWithLifecycleObserved(context.Background(), connection, coordinator, runtime, nil, nil, fixedClock(time.Unix(101, 0)), 3*time.Second, observer)
 	}()
 	select {
-	case <-coordinatorAcquired:
-	case <-time.After(time.Second):
-		t.Fatal("blocking coordinator operation did not acquire coordinator")
-	}
-
-	sessionDone := make(chan error, 1)
-	go func() {
-		sessionDone <- RunSessionWithLifecycleObserved(
-			context.Background(), connection, coordinator, runtime, nil, nil,
-			func() time.Time {
-				select {
-				case <-releaseCoordinator:
-					return time.Unix(103, 0)
-				default:
-					return time.Unix(101, 0)
-				}
-			},
-			3*time.Second, nil,
-		)
-	}()
-	select {
-	case <-connection.read:
-	case <-time.After(time.Second):
-		t.Fatal("session did not read heartbeat frame")
-	}
-	close(releaseCoordinator)
-	select {
-	case err := <-coordinatorDone:
-		if err != nil {
-			t.Fatalf("blocking coordinator operation error = %v", err)
+	case <-received:
+		if !runtime.LeaseWatch().Liveness.LastObserved.Equal(time.Unix(101, 0)) {
+			t.Error("heartbeat not admitted before write permit")
 		}
 	case <-time.After(time.Second):
-		t.Fatal("blocking coordinator operation did not finish")
+		t.Error("heartbeat waited for writer permit")
 	}
+	coordinator.permit <- struct{}{}
 	select {
-	case err := <-sessionDone:
-		if !errors.Is(err, ErrPeerLivenessExpired) {
-			t.Fatalf("RunSessionWithLifecycleObserved() error = %v, want peer liveness expired", err)
+	case err := <-done:
+		if !errors.Is(err, io.ErrUnexpectedEOF) {
+			t.Fatal(err)
 		}
 	case <-time.After(time.Second):
-		t.Fatal("session did not reject expired heartbeat")
+		t.Fatal("session cleanup did not join")
 	}
 }
 
@@ -329,8 +297,9 @@ func TestLifecycleSessionCoordinatesInboundFaultTransitions(t *testing.T) {
 		wantConnectionClose bool
 	}{
 		{
-			name:  "input dispatch waits for coordinator",
-			frame: transport.Frame{Kind: transport.MessageInput, Payload: []byte{1}},
+			name:                "input fault retains its own serialized owner",
+			frame:               transport.Frame{Kind: transport.MessageInput, Payload: []byte{1}},
+			wantConnectionClose: true,
 		},
 		{
 			name:                "control decode closes before coordinated cleanup",
@@ -369,8 +338,12 @@ func TestLifecycleSessionCoordinatesInboundFaultTransitions(t *testing.T) {
 					t.Fatal("control decode failure did not close connection before cleanup")
 				}
 			}
-			if state := runtime.Snapshot().Control.State; state != control.StateInboundActive {
-				t.Fatalf("runtime changed outside coordinator: %s", state)
+			wantState := control.StateInboundActive
+			if test.frame.Kind == transport.MessageInput {
+				wantState = control.StateLocal
+			}
+			if state := runtime.Snapshot().Control.State; state != wantState {
+				t.Fatalf("fault owner state: got %s want %s", state, wantState)
 			}
 			select {
 			case err := <-done:

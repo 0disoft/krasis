@@ -114,6 +114,9 @@ func DescribeSessionFailure(err error) FailureDescriptor {
 	case errors.Is(err, ErrSourceSessionActivation):
 		return FailureDescriptor{Component: "source-session", Phase: "source-activate", Code: "activation_failed"}
 	}
+	if errors.Is(err, peer.ErrInputDispatchBacklog) {
+		return FailureDescriptor{Component: "peer-dispatch", Phase: "input-queue", Code: "backlog_timeout"}
+	}
 	if certainty, ok := application.InjectionCertaintyOf(err); ok {
 		code := "outcome_unknown"
 		switch certainty {

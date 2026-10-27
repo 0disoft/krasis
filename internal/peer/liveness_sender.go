@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/0disoft/krasis/internal/application"
-	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/transport"
 )
 
@@ -45,30 +44,26 @@ func PulseLivenessObserved(ctx context.Context, coordinator *SessionWriteCoordin
 	observe(HeartbeatStart)
 	err := coordinator.Execute(ctx, func(writer FrameWriter) error {
 		observe(HeartbeatGate)
-		admissionCtx, stopAdmission := context.WithTimeout(ctx, CleanupTimeout)
-		defer stopAdmission()
-		snapshot, err := runtime.SnapshotContext(admissionCtx)
-		if err != nil {
-			return err
-		}
-		if snapshot.Control.State != control.StateInboundActive && snapshot.Control.State != control.StateOutboundActive {
+		// Input retains its own ordered owner, but a healthy heartbeat reads
+		// only the immutable lease proof. Semantic control writes still own
+		// this coordinator, so no heartbeat overtakes a revoke/grant write.
+		watch, active, observedAt, err := runtime.HeartbeatLease(now, timeout)
+		if !active {
 			return nil
 		}
-		pulse.Active = true
-		pulse.SessionID = snapshot.Control.SessionID
-		pulse.ObservedAt = now()
-		// Recovery after an observed timeout must retain its own budget even
-		// when session cancellation races the observation clock.
-		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), CleanupTimeout)
-		defer cancel()
-		faulted, err := runtime.CheckLiveness(cleanupCtx, pulse.ObservedAt, timeout)
+		pulse.Active, pulse.SessionID, pulse.ObservedAt = true, watch.SessionID, observedAt
 		if err != nil {
-			return err
+			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), CleanupTimeout)
+			defer cancel()
+			faulted, checkErr := runtime.CheckLivenessNow(cleanupCtx, now, timeout)
+			if checkErr != nil {
+				return checkErr
+			}
+			if faulted {
+				return ErrPeerLivenessExpired
+			}
 		}
-		if faulted {
-			return ErrPeerLivenessExpired
-		}
-		payload, err := transport.EncodeHeartbeatPayload(snapshot.Control.SessionID)
+		payload, err := transport.EncodeHeartbeatPayload(watch.SessionID)
 		if err != nil {
 			return failRuntime(ctx, runtime, err)
 		}

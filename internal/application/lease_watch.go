@@ -11,6 +11,8 @@ type LeaseWatch struct {
 	State     control.State
 	SessionID string
 	Progress  time.Time
+	Liveness  control.PeerLiveness
+	Sealed    bool // An expiry decision fences future heartbeat CAS before cleanup starts.
 }
 
 func (runtime *SessionRuntime) LeaseWatch() LeaseWatch {

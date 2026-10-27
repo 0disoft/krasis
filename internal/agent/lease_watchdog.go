@@ -12,13 +12,13 @@ import (
 
 var ErrLeaseHandshakeExpired = errors.New("lease handshake deadline expired")
 
-func runLeaseWatchdog(ctx context.Context, read func() application.LeaseWatch, policy LivenessPolicy, stop func(error)) error {
+func runLeaseWatchdog(ctx context.Context, read func() application.LeaseWatch, policy LivenessPolicy, stop func(error), claim ...func(application.LeaseWatch, time.Duration) bool) error {
 	ticker := time.NewTicker(policy.HeartbeatInterval)
 	defer ticker.Stop()
-	return runLeaseWatchdogTicks(ctx, read, policy, stop, ticker.C, time.Now)
+	return runLeaseWatchdogTicks(ctx, read, policy, stop, ticker.C, time.Now, claim...)
 }
 
-func runLeaseWatchdogTicks(ctx context.Context, read func() application.LeaseWatch, policy LivenessPolicy, stop func(error), ticks <-chan time.Time, clock func() time.Time) error {
+func runLeaseWatchdogTicks(ctx context.Context, read func() application.LeaseWatch, policy LivenessPolicy, stop func(error), ticks <-chan time.Time, clock func() time.Time, claim ...func(application.LeaseWatch, time.Duration) bool) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -42,6 +42,9 @@ func runLeaseWatchdogTicks(ctx context.Context, read func() application.LeaseWat
 				continue
 			}
 			if !watch.Progress.IsZero() && now.Sub(watch.Progress) >= budget {
+				if len(claim) > 0 && !claim[0](watch, budget) {
+					continue
+				}
 				stop(cause)
 				return cause
 			}

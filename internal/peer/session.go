@@ -96,10 +96,10 @@ func runSession(
 	}()
 	var ahead *inputReadAhead
 	if peerTimeout > 0 {
-		readCtx, stopRead := context.WithCancel(ctx)
-		ahead = startInputReadAhead(readCtx, ownedConnection)
+		readCtx, stopRead := context.WithCancelCause(ctx)
+		ahead = startInputReadAheadWithHeartbeat(readCtx, ownedConnection, heartbeatReadLane(readCtx, runtime, now, peerTimeout, observer), stopRead)
 		defer func() {
-			stopRead()
+			stopRead(context.Canceled)
 			_ = ownedConnection.Close()
 			<-ahead.done
 		}()
@@ -119,9 +119,11 @@ func runSession(
 		var frame transport.Frame
 		var err error
 		var controlReadAt time.Time
+		var heartbeatObserved bool
 		if ahead != nil {
 			p := ahead.readFrame()
 			frame, err, controlReadAt = p.frame, p.err, p.controlReadAt
+			heartbeatObserved = p.heartbeatObserved
 		} else {
 			frame, err = ownedConnection.ReadFrame()
 		}
@@ -137,7 +139,7 @@ func runSession(
 		}
 		controlCtx := ctx
 		readCompleted := time.Now()
-		if frame.Kind == transport.MessageHeartbeat && heartbeatProgress != nil {
+		if frame.Kind == transport.MessageHeartbeat && !heartbeatObserved && heartbeatProgress != nil {
 			heartbeatProgress.ObserveHeartbeatReceive(HeartbeatStart, readCompleted)
 		}
 		handoff.ReadProgress(ctx, handoff.ReadBetweenFrames, readCompleted, true)
@@ -185,14 +187,21 @@ func runSession(
 					}
 				}
 			}
-			inputCtx, complete := handoff.Input(ctx, "receiver")
+			inputParent := ctx
+			if ahead != nil {
+				inputParent = ahead.ctx
+			}
+			inputCtx, complete := handoff.Input(inputParent, "receiver")
 			inputCtx, stopInput := context.WithTimeout(inputCtx, application.InputInjectionTimeout)
 			queued := time.Now()
 			recorded := false
 			if coordinatorProgress != nil {
 				coordinatorProgress.ObserveDispatchCoordinatorWaiting(queued)
 			}
-			err = coordinateDispatch(inputCtx, coordinator, func() (dispatchErr error) {
+			// Runtime owns sequence, pressed state and joined native cleanup.
+			// Input performs no peer write and must not retain the semantic
+			// writer permit while awaiting a local worker ACK.
+			err = func() (dispatchErr error) {
 				if coordinatorProgress != nil {
 					coordinatorProgress.ObserveDispatchCoordinatorAcquired(time.Now())
 				}
@@ -208,15 +217,21 @@ func runSession(
 					return err
 				}
 				return DispatchInputFrame(inputCtx, frame, observedInputRuntime{runtime, now, peerTimeout})
-			})
+			}()
 			if !recorded {
 				complete(err)
 			}
 			stopInput()
 			if err != nil {
 				err = errors.Join(ErrPeerInputDispatch, err)
+				if ahead != nil {
+					err = errors.Join(err, context.Cause(ahead.ctx))
+				}
 			}
 		case transport.MessageHeartbeat:
+			if heartbeatObserved {
+				break
+			} // Already validated on this exact active lease.
 			if heartbeatProgress != nil {
 				heartbeatProgress.ObserveHeartbeatReceive(HeartbeatGate, time.Now())
 			}
@@ -230,7 +245,6 @@ func runSession(
 				if coordinatorProgress != nil {
 					coordinatorProgress.ObserveDispatchCoordinatorAcquired(time.Now())
 				}
-				observedAt = now()
 				// After normal return, the dispatcher must still validate and
 				// drain the exact retired heartbeat (ADR 0020). Only active
 				// leases have a deadline; other identities remain rejected.
@@ -241,8 +255,9 @@ func runSession(
 					return snapshotErr
 				}
 				state := snapshot.Control.State
+				observedAt = now()
 				if peerTimeout > 0 && (state == control.StateInboundActive || state == control.StateOutboundActive) {
-					faulted, livenessErr := runtime.CheckLiveness(cleanupCtx, observedAt, peerTimeout)
+					faulted, livenessErr := runtime.CheckLivenessNow(cleanupCtx, now, peerTimeout)
 					if livenessErr != nil {
 						return livenessErr
 					}
@@ -278,7 +293,7 @@ func runSession(
 			err = errors.Join(err, abortPendingLease(ctx, requests))
 			return failSessionWithLifecycle(ctx, coordinator, runtime, outbound, err)
 		}
-		if frame.Kind == transport.MessageHeartbeat && observer != nil {
+		if frame.Kind == transport.MessageHeartbeat && !heartbeatObserved && observer != nil {
 			observer.ObserveHeartbeatReceived(heartbeat.SessionID, heartbeat.ObservedAt)
 		}
 	}

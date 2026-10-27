@@ -1,0 +1,55 @@
+{
+  "baselineGeneration": 471,
+  "baselineRevision": "7ea59622092aa2e999ea03bdbb402375684d059a",
+  "baselineEvidence": "2026-10-28-worker-ack-buffer-report.json",
+  "physicalVerification": "pending",
+  "observedBaseline": {
+    "inputDispatchMicros": 1771910,
+    "ackFirstPositiveReadMicros": 992174,
+    "ackSuffixReadMicros": 779735,
+    "heartbeatTimeoutBeforeAckClosedMillis": 310,
+    "workerSilenceProven": false,
+    "firstAckReadDelayRootCause": "unresolved"
+  },
+  "structuralCorrection": {
+    "heartbeatReceiveWaitsForNativeInputMutex": false,
+    "heartbeatSendWaitsForNativeInputAck": false,
+    "inputRetainsSemanticWriterPermit": false,
+    "nativeInputDeadlineMillis": 2000,
+    "queueEntriesMaximum": 64,
+    "adjacentMoveSequencesPerEntryMaximum": 64,
+    "queueSaturationDeadlineMillis": 100,
+    "queueSaturationFailureCode": "reconnect_input_queue_timeout",
+    "inputCleanupRemainsJoined": true,
+    "wireProtocolChanged": false
+  },
+  "deterministicRegression": {
+    "blockedInputMillis": 1500,
+    "heartbeatIntervalMillis": 250,
+    "heartbeatSendCycles": 6,
+    "heartbeatReceiveCycles": 6,
+    "staleInputReceiptCannotOverwriteHeartbeat": "passed",
+    "staleWatchdogCannotExpireRenewedProof": "passed",
+    "sealedLeaseCannotBeRevived": "passed",
+    "foreignExpiredPendingCanceledHeartbeatsRejected": "passed",
+    "continuingHeartbeatsCannotExtendInputDeadline": "passed",
+    "queueSaturationCancelsWithDistinctCause": "passed",
+    "oscillatingMoveSequenceCount": 2000,
+    "oscillatingMoveQueueEntriesMaximum": 40,
+    "oscillatingMoveInjectionCallsMaximum": 64,
+    "oscillatingMoveNetDisplacement": 0,
+    "sequenceAndControlBarriersPreserved": "passed"
+  },
+  "validation": {
+    "goTest": ["inputworker", "application", "peer", "agent", "control", "transport", "residentagent", "productlog", "failurecode"],
+    "goVet": ["application", "peer", "agent", "inputworker", "residentagent", "productlog", "failurecode"],
+    "goBuild": ["cmd/krasis-agent", "cmd/krasis-cli"],
+    "raceDetector": "skipped: CGO_ENABLED=0"
+  },
+  "limitations": [
+    "The first ACK-read delay is a client observation, not proof of native-worker or kernel scheduling latency.",
+    "A saturated noncoalescible queue fails after 100ms and can disconnect a severely overloaded peer.",
+    "Heartbeat independence does not repair a native input operation that genuinely exceeds its deadline.",
+    "No changed binaries have been installed on either notebook and no physical latency improvement is claimed."
+  ]
+}
