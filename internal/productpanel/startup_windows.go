@@ -11,6 +11,7 @@ import (
 	"github.com/0disoft/krasis/internal/inputworker"
 	"github.com/0disoft/krasis/internal/launchrecord"
 	"github.com/0disoft/krasis/internal/localapi"
+	"github.com/0disoft/krasis/internal/securefs"
 	"io"
 	"os"
 	"os/exec"
@@ -104,20 +105,37 @@ func NewStartup(control string, recovery ...string) (Startup, error) {
 }
 
 func verifyAgentBundle(base, self string) error {
-	read := func(name string, limit int64) ([]byte, error) {
-		path := filepath.Join(base, name)
-		info, err := os.Lstat(path)
+	directory, err := securefs.OpenReadDirectory(base)
+	if err != nil {
+		return err
+	}
+	defer directory.Close()
+	open := func(name string, limit int64) (*os.File, error) {
+		file, err := directory.Open(name)
 		if err != nil {
 			return nil, err
 		}
-		if !info.Mode().IsRegular() || info.Size() > limit {
-			return nil, errors.New("invalid bundle file")
+		info, err := file.Stat()
+		if err != nil {
+			_ = file.Close()
+			return nil, err
 		}
-		return os.ReadFile(path)
+		if !info.Mode().IsRegular() || info.Size() > limit {
+			_ = file.Close()
+			return nil, errStartupBundleFile
+		}
+		return file, nil
 	}
-	manifest, err := read("SHA256SUMS.txt", 8192)
+	manifestFile, err := open("SHA256SUMS.txt", 8192)
 	if err != nil {
 		return err
+	}
+	manifest, readErr := io.ReadAll(io.LimitReader(manifestFile, 8193))
+	if err := errors.Join(readErr, manifestFile.Close()); err != nil {
+		return err
+	}
+	if len(manifest) > 8192 {
+		return errStartupBundleFile
 	}
 	for _, name := range []string{self, "krasis-agent.exe"} {
 		count, want := 0, ""
@@ -131,11 +149,14 @@ func verifyAgentBundle(base, self string) error {
 		if count != 1 || len(want) != 64 {
 			return errors.New("missing bundle checksum")
 		}
-		data, err := read(name, 64<<20)
+		file, err := open(name, maxStartupImageBytes)
 		if err != nil {
 			return err
 		}
-		hash := sha256.Sum256(data)
+		hash, hashErr := hashStartupBundleImage(file)
+		if err := errors.Join(hashErr, file.Close()); err != nil {
+			return err
+		}
 		if hex.EncodeToString(hash[:]) != want {
 			return errors.New("bundle checksum mismatch")
 		}
