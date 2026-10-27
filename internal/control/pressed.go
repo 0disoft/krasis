@@ -20,8 +20,13 @@ type PressedToken struct {
 }
 
 type PressedState struct {
-	pressed map[PressedToken]struct{}
-	order   []PressedToken
+	pressed     map[PressedToken]*pressedEntry
+	first, last *pressedEntry
+}
+
+type pressedEntry struct {
+	token          PressedToken
+	previous, next *pressedEntry
 }
 
 func (state *PressedState) RecordPress(token PressedToken) (bool, error) {
@@ -29,13 +34,19 @@ func (state *PressedState) RecordPress(token PressedToken) (bool, error) {
 		return false, err
 	}
 	if state.pressed == nil {
-		state.pressed = make(map[PressedToken]struct{})
+		state.pressed = make(map[PressedToken]*pressedEntry)
 	}
 	if _, exists := state.pressed[token]; exists {
 		return false, nil
 	}
-	state.pressed[token] = struct{}{}
-	state.order = append(state.order, token)
+	entry := &pressedEntry{token: token, previous: state.last}
+	if state.last == nil {
+		state.first = entry
+	} else {
+		state.last.next = entry
+	}
+	state.last = entry
+	state.pressed[token] = entry
 	return true, nil
 }
 
@@ -43,15 +54,21 @@ func (state *PressedState) RecordRelease(token PressedToken) (bool, error) {
 	if err := token.Validate(); err != nil {
 		return false, err
 	}
-	if _, exists := state.pressed[token]; !exists {
+	entry, exists := state.pressed[token]
+	if !exists {
 		return false, nil
 	}
 	delete(state.pressed, token)
-	for index, candidate := range state.order {
-		if candidate == token {
-			state.order = append(state.order[:index], state.order[index+1:]...)
-			break
-		}
+	// Unlink directly, including when newer entries remain after failed releases.
+	if entry.previous == nil {
+		state.first = entry.next
+	} else {
+		entry.previous.next = entry.next
+	}
+	if entry.next == nil {
+		state.last = entry.previous
+	} else {
+		entry.next.previous = entry.previous
 	}
 	return true, nil
 }
@@ -66,9 +83,9 @@ func (state *PressedState) Count() int {
 }
 
 func (state *PressedState) ReleasePlan() []PressedToken {
-	plan := make([]PressedToken, 0, len(state.order))
-	for index := len(state.order) - 1; index >= 0; index-- {
-		plan = append(plan, state.order[index])
+	plan := make([]PressedToken, 0, len(state.pressed))
+	for entry := state.last; entry != nil; entry = entry.previous {
+		plan = append(plan, entry.token)
 	}
 	return plan
 }

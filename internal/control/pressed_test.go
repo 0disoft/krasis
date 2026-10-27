@@ -77,6 +77,43 @@ func TestPressedStateReleasePlanDoesNotExposeInternalSlice(t *testing.T) {
 	}
 }
 
+func TestPressedStateRecoveryKeepsFailedReleasesAndRepressedOrder(t *testing.T) {
+	var state PressedState
+	a := PressedToken{Kind: PressedKeyboardKey, Code: 17}
+	b := PressedToken{Kind: PressedKeyboardKey, Code: 65}
+	c := PressedToken{Kind: PressedMouseButton, Code: 1}
+	d := PressedToken{Kind: PressedKeyboardKey, Code: 66}
+	press := func(token PressedToken) {
+		t.Helper()
+		if added, err := state.RecordPress(token); !added || err != nil {
+			t.Fatal("press was not recorded", err)
+		}
+	}
+	release := func(token PressedToken) {
+		t.Helper()
+		if removed, err := state.RecordRelease(token); !removed || err != nil {
+			t.Fatal("release was not recorded", err)
+		}
+	}
+	for _, token := range []PressedToken{a, b, c, d} {
+		press(token)
+	}
+	release(b) // Ordinary key-up can remove an interior entry.
+	// Simulate a failed native release of d: it must remain tracked while the
+	// recovery proceeds with c, and a new press of b must become the newest.
+	release(c)
+	press(b)
+	if want := []PressedToken{b, d, a}; !reflect.DeepEqual(state.ReleasePlan(), want) || state.Count() != len(want) {
+		t.Fatal("failed release or re-press lost chronological order", state.ReleasePlan())
+	}
+	for _, token := range state.ReleasePlan() {
+		release(token)
+	}
+	if state.Count() != 0 || len(state.ReleasePlan()) != 0 {
+		t.Fatal("recovery left tracked input")
+	}
+}
+
 func TestPressedStateRejectsUnknownKind(t *testing.T) {
 	var state PressedState
 	_, err := state.RecordPress(PressedToken{Kind: "TOUCH_CONTACT", Code: 1})
