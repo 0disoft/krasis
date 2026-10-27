@@ -73,7 +73,9 @@ jobs:
 
       - name: Test
         shell: pwsh
-        run: go test -timeout 3m ./...
+        # Bound contention between packages that spawn PowerShell/COM helpers.
+        # Keep the same job and test coverage without replaying OS mutations.
+        run: go test -p 2 -timeout 3m ./...
 
       - name: Vet
         shell: pwsh

@@ -45,14 +45,20 @@ func TestRecoveryTaskRegistrationIsUserScopedAndReversible(t *testing.T) {
 	}
 	legacy := strings.ReplaceAll(recoveryTaskScript, "Krasis recovery v2", "Krasis recovery v1")
 	legacy = strings.ReplaceAll(legacy, RecoveryArgument, "app ensure --json")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// Only the legacy fixture may include a cold Windows PowerShell/COM start
+	// on a busy runner. Keep production registration's 10-second deadline and
+	// all migration assertions unchanged; never retry a possibly applied task.
+	const fixtureTimeout = 30 * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), fixtureTimeout)
 	defer cancel()
 	command := recoveryScriptCommand(ctx, system, legacy)
 	cli := filepath.Join(base, "Krasis", "launch", "krasis-cli.exe")
 	command.Env = append(os.Environ(), "KRASIS_RECOVERY_TARGET="+cli, "KRASIS_RECOVERY_LEGACY_TARGET="+cli, "KRASIS_RECOVERY_PREVIOUS=[]", "KRASIS_RECOVERY_SUFFIX="+suffix, "KRASIS_RECOVERY_ENABLED=1", "KRASIS_RECOVERY_CHECK=0")
+	started := time.Now()
 	if err := windowsscript.Run(ctx, command, "legacy recovery fixture"); err != nil {
-		t.Fatalf("legacy fixture: %v", err)
+		t.Fatalf("legacy fixture (budget=%s elapsed=%s): %v", fixtureTimeout, time.Since(started), err)
 	}
+	t.Logf("legacy fixture completed in %s (budget=%s)", time.Since(started), fixtureTimeout)
 	if err := runRecoveryTask(base, suffix, false, true); !errors.Is(err, errRecoveryTaskInactive) {
 		t.Fatal("console action considered migrated", err)
 	}
