@@ -1,0 +1,389 @@
+{
+  "schema": "krasis.experiment/v1",
+  "generation": 468,
+  "revision": "a099877b37d91cd790738db5082814a4b530e76d",
+  "collection": "8c1728bab123d4178b72f598c9beec0b",
+  "method": "Filter exact build in all retained log segments; deduplicate by source, run, sequence and code. Match exchanges only by unique tags across source and receiver. Software-local timings only; overlapping spans are not additive. Successful and failed profiles are separate; portable and installed receiver paths are separate.",
+  "installationVerificationCollection": "349866d8edbd5b42099e9d177330c149",
+  "installationVerificationUtc": {
+    "A": "2026-10-27T12:53:49Z",
+    "B": "2026-10-27T12:53:56Z"
+  },
+  "pairedProfiles": {
+    "successful": 7,
+    "failed": 1,
+    "direction": "A->B",
+    "receiverBackend": "installed",
+    "matching": "Unique exchangeTag on each device; tags omitted from this report.",
+    "limit": "Eight retained leases are not proof of ten complete physical round trips or separately measured B-source crossings."
+  },
+  "devices": {
+    "A": {
+      "collectedUtc": "2026-10-27T13:09:20Z",
+      "sourceSha256": "3fe17d487c322a3de3752b147430a70e8e90ba54599ce2e67f80fa0a17424aca",
+      "logs": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false,
+          "events": 2253
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false,
+          "events": 322
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true,
+          "events": 0
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false,
+          "events": 648
+        }
+      ],
+      "inputHealth": {
+        "time": "2026-10-27T13:08:53.3317612Z",
+        "state": "SERVICE_RECOVERY_REQUIRED",
+        "stage": "service_recovery",
+        "win32Error": 1066,
+        "win32Known": true
+      },
+      "service": "FAILED",
+      "lastServiceFailure": {
+        "time": "2026-10-27T13:08:35.8627256Z",
+        "stage": "service",
+        "reason": "capture",
+        "operation": "source-agent-query-capacity",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "sourceExits": [
+        {
+          "time": "2026-10-27T12:57:45.7591299Z",
+          "command": "ok",
+          "reader": "stopped",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "clean_sent",
+          "report": "ok",
+          "heartbeatStage": "replied",
+          "heartbeatSlowStage": "service_presence",
+          "heartbeatSlowBucket": 2
+        },
+        {
+          "time": "2026-10-27T13:08:35.8583374Z",
+          "command": "authority",
+          "reader": "authority",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "delivery_failed",
+          "report": "recovery",
+          "failure": {
+            "operation": "source-agent-query-capacity",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "heartbeatStage": "replied",
+          "heartbeatSlowStage": "service_presence",
+          "heartbeatSlowBucket": 4
+        }
+      ],
+      "failureEvents": [
+        {
+          "time": "2026-10-27T13:08:35.8136487Z",
+          "code": "installed_source_command_failed_activate"
+        },
+        {
+          "time": "2026-10-27T13:08:35.8136487Z",
+          "code": "installed_source_response_timeout"
+        },
+        {
+          "time": "2026-10-27T13:08:35.8136487Z",
+          "code": "activation_capture_activation_failed"
+        },
+        {
+          "time": "2026-10-27T13:08:35.8342396Z",
+          "code": "fault_source_hook_failed"
+        },
+        {
+          "time": "2026-10-27T13:08:35.8644196Z",
+          "code": "session_failed"
+        }
+      ]
+    },
+    "B": {
+      "collectedUtc": "2026-10-27T13:09:27Z",
+      "sourceSha256": "59b1c398643ad745f3dc6ebaac9a41a0f683f66037d8dd9b561dcb0ae96e96dd",
+      "logs": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false,
+          "events": 2515
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false,
+          "events": 815
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true,
+          "events": 0
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false,
+          "events": 498
+        }
+      ],
+      "inputHealth": {
+        "time": "2026-10-27T13:08:59.2346482Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "service": "READY",
+      "lastServiceFailure": null,
+      "sourceExits": [
+        {
+          "time": "2026-10-27T12:57:51.2477179Z",
+          "command": "ok",
+          "reader": "eof",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "delivery_failed",
+          "report": "failed",
+          "failure": {
+            "operation": "source-reader-eof",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "heartbeatStage": "replied",
+          "heartbeatSlowStage": "service_presence",
+          "heartbeatSlowBucket": 3
+        },
+        {
+          "time": "2026-10-27T13:08:41.198712Z",
+          "command": "ok",
+          "reader": "stopped",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "clean_sent",
+          "report": "ok",
+          "heartbeatStage": "replied",
+          "heartbeatSlowStage": "service_presence",
+          "heartbeatSlowBucket": 2
+        }
+      ],
+      "failureEvents": [
+        {
+          "time": "2026-10-27T12:57:47.6424554Z",
+          "code": "installed_source_command_failed_heartbeat"
+        },
+        {
+          "time": "2026-10-27T12:57:47.6424554Z",
+          "code": "installed_source_response_timeout"
+        },
+        {
+          "time": "2026-10-27T12:57:50.7035419Z",
+          "code": "installed_source_command_failed_stop"
+        },
+        {
+          "time": "2026-10-27T12:57:50.7689122Z",
+          "code": "fault_source_hook_failed"
+        },
+        {
+          "time": "2026-10-27T12:57:50.9857128Z",
+          "code": "session_failed"
+        },
+        {
+          "time": "2026-10-27T13:08:48.2230889Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-10-27T13:08:53.5123877Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-10-27T13:08:59.1157653Z",
+          "code": "reconnect_acquire_network_timeout"
+        }
+      ]
+    }
+  },
+  "successfulSoftwareTimingsMicros": {
+    "A.preparationMicros.CaptureActivate": {
+      "count": 7,
+      "median": 19123,
+      "max": 1368775
+    },
+    "A.preparationMicros.RequestToGrant": {
+      "count": 7,
+      "median": 82007,
+      "max": 180526
+    },
+    "A.firstMicros.FirstOfferSinceBegin": {
+      "count": 7,
+      "median": 98637,
+      "max": 425039
+    },
+    "A.worstMicros.Dispatch": {
+      "count": 7,
+      "median": 749,
+      "max": 1433
+    },
+    "B.preparationMicros.ReadyWait": {
+      "count": 7,
+      "median": 40011,
+      "max": 137196
+    },
+    "B.firstMicros.Dispatch": {
+      "count": 7,
+      "median": 2303,
+      "max": 3853
+    },
+    "B.worstMicros.Dispatch": {
+      "count": 7,
+      "median": 6138,
+      "max": 20067
+    },
+    "B.workerApplyFunctionMicros": {
+      "count": 21,
+      "median": 2892,
+      "max": 14284
+    },
+    "B.nativeSendInputMicros": {
+      "count": 14,
+      "median": 993.5,
+      "max": 10998
+    }
+  },
+  "failedActivation": {
+    "timeUtc": "2026-10-27T13:08:35.8136487Z",
+    "captureActivateMicros": 2867530,
+    "ipcResponseMicros": 1984119,
+    "ipcAuthorityMicros": 31730,
+    "nativeStageReplyObserved": false,
+    "firstInputObserved": false,
+    "serviceFailureOperation": "source-agent-query-capacity",
+    "captureSenderInterruptJoined": true,
+    "retirement": "delivery_failed",
+    "report": "recovery"
+  },
+  "comparison": {
+    "baselineGeneration": 466,
+    "baselineRevision": "cde44325",
+    "baselineCollection": "349866d8edbd5b42099e9d177330c149",
+    "baselineSuccessfulProfiles": 5,
+    "currentSuccessfulProfiles": 7,
+    "unit": "microseconds",
+    "metrics": {
+      "A.CaptureActivate": {
+        "baseline": {
+          "count": 5,
+          "median": 19468,
+          "max": 117382
+        },
+        "current": {
+          "count": 7,
+          "median": 19123,
+          "max": 1368775
+        }
+      },
+      "A.FirstOfferSinceBegin": {
+        "baseline": {
+          "count": 5,
+          "median": 144470,
+          "max": 560869
+        },
+        "current": {
+          "count": 7,
+          "median": 98637,
+          "max": 425039
+        }
+      },
+      "B.ReadyWait": {
+        "baseline": {
+          "count": 5,
+          "median": 42540,
+          "max": 213157
+        },
+        "current": {
+          "count": 7,
+          "median": 40011,
+          "max": 137196
+        }
+      },
+      "B.Dispatch": {
+        "baseline": {
+          "count": 5,
+          "median": 58823,
+          "max": 253607
+        },
+        "current": {
+          "count": 7,
+          "median": 6138,
+          "max": 20067
+        }
+      }
+    },
+    "limit": "Sequential small cohorts; no causal speedup or visible cursor latency is established. First/worst/entry worker samples are selected summaries, not all input events."
+  },
+  "findings": [
+    "g468 stability acceptance failed: A activation response timeout and recovery-required service stop occurred after installation verification. B also retains a separate earlier heartbeat response timeout after verification.",
+    "A source-agent-query-capacity identifies failure at authority-query capacity admission, including caller cancellation or expiry observed immediately after reservation. channel_authority.go bounds all native query owners at four and full proofs at three. This code alone proves neither occupancy duration nor a native authority denial, handle leak, or the identity of retained owners.",
+    "A capture, sender and interrupt owners all joined on the failing source exit. The retirement report delivery failed; this is not the earlier unjoined-capture-thread failure signature.",
+    "One successful A activation took 1368775us; its native owner handler/result/total buckets are >=1s and foreground is 100ms to <1s. The next failed activation has no native ACK, so it cannot be assigned to foreground or an OS syscall from these diagnostics.",
+    "B native SendInput nested samples: 14 measured calls, median 993.5us, max 10998us. Full apply samples: 21, median 2892us, max 14284us. No absent cursor-snapshot timing is interpreted as zero.",
+    "No g468 source-command-loop framing failure is retained. This does not establish long-term absence; the distinct source query-capacity and activation failures remain unresolved."
+  ],
+  "nextWork": [
+    "Reproduce authority capacity starvation with real retained query owners and attribute occupied slots before changing capacity or fencing. Preserve fresh authority checks and mandatory cleanup proof.",
+    "Separate successful long owner activation from the failed no-ACK attempt; capture returned buckets cannot identify the failed native stage.",
+    "User repaired A; doctor confirms service RUNNING, protected input CONFIGURED, connection CONNECTING. Verify full readiness before another protected-input test."
+  ],
+  "validations": {
+    "passed": [
+      "Fresh paired diagnostics RECEIVED on exact g468 build",
+      "Build-filtered profile extraction with presence-bit checks",
+      "Unique exchange-tag pairing: seven complete successful pairs and one incomplete failed pair",
+      "Source hash provenance and retained service failure comparison",
+      "g466 baseline extraction: five successful exact-build profiles per side"
+    ],
+    "skipped": [
+      {
+        "check": "Unit tests and rebuild",
+        "reason": "Diagnostic analysis and evidence report only; runtime source unchanged."
+      },
+      {
+        "check": "Physical display timing and long soak",
+        "reason": "Only user exercise and software-local counters available; A protection service failed."
+      }
+    ]
+  },
+  "changes": {
+    "runtimeSource": false,
+    "publicAPI": false,
+    "DB": false,
+    "dependencies": false,
+    "repositoryHygiene": false,
+    "CIRunner": false,
+    "productOrArchitectureSourceOfTruth": false,
+    "officialRelease": false
+  },
+  "afterUserRepair": {
+    "device": "A",
+    "service": "RUNNING",
+    "connection": "CONNECTING",
+    "agentGeneration": 468,
+    "protectedInput": "CONFIGURED",
+    "limit": "Service recovery confirmed by doctor; connected protected-input acceptance still pending."
+  }
+}
