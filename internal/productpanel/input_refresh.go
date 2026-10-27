@@ -182,13 +182,6 @@ func (b *inputRefresh) setState(state string) {
 	b.state.Store(&state)
 }
 
-func (b *inputRefresh) refreshPendingLocked() {
-	if state := b.state.Load(); state != nil && *state == "PENDING" {
-		// Observe completion; never automatically start a second installer.
-		b.inspectLocked()
-	}
-}
-
 func (b *inputRefresh) automatic(ctx context.Context) error { return b.apply(ctx, false) }
 func (b *inputRefresh) explicit(ctx context.Context) error  { return b.apply(ctx, true) }
 
@@ -211,8 +204,23 @@ func (b *inputRefresh) apply(ctx context.Context, explicit bool) error {
 		}
 		return ErrStartupBusy
 	}
-	defer b.mu.Unlock()
-	b.refreshPendingLocked()
+	owned := true
+	defer func() {
+		if owned {
+			b.mu.Unlock()
+		}
+	}()
+	inspect := func() (string, error) {
+		var state string
+		var err error
+		state, owned, err = b.inspectForApply(ctx)
+		return state, err
+	}
+	if state := b.state.Load(); state != nil && *state == "PENDING" {
+		if _, err := inspect(); err != nil {
+			return err
+		}
+	}
 	if state := b.state.Load(); state != nil && *state == "PENDING" {
 		return ErrInputRefreshPending
 	}
@@ -227,7 +235,10 @@ func (b *inputRefresh) apply(ctx context.Context, explicit bool) error {
 		}
 		return nil
 	}
-	state := b.inspect()
+	state, err := inspect()
+	if err != nil {
+		return err
+	}
 	if state == "PENDING" {
 		b.attempted = true
 		b.setState(state)
@@ -260,7 +271,7 @@ func (b *inputRefresh) apply(ctx context.Context, explicit bool) error {
 		}
 		runner = b.repair
 	}
-	err := runner(ctx)
+	err = runner(ctx)
 	switch {
 	case errors.Is(err, ErrInputRefreshPending):
 		b.setState("PENDING")
@@ -275,13 +286,22 @@ func (b *inputRefresh) apply(ctx context.Context, explicit bool) error {
 		if !errors.Is(err, ErrInputRefreshFailed) {
 			err = errors.Join(ErrInputRefreshFailed, err)
 		}
-	case b.inspect() != "READY":
-		b.setState("FAILED")
-		b.setAttemptResult("input_refresh_failed")
-		err = ErrInputRefreshFailed
 	default:
-		b.setState("READY")
-		b.setAttemptResult("ok")
+		// Installation finished, but its verification is still unconfirmed.
+		// A late read-only completion can resolve this result without replaying it.
+		b.setAttemptResult("input_refresh_pending")
+		state, verifyErr := inspect()
+		if verifyErr != nil {
+			return verifyErr
+		}
+		if state != "READY" {
+			b.setState("FAILED")
+			b.setAttemptResult("input_refresh_failed")
+			err = ErrInputRefreshFailed
+		} else {
+			b.setState("READY")
+			b.setAttemptResult("ok")
+		}
 	}
 	// Preserve the installer result. Startup may restore ordinary input without
 	// treating this result as successful or repeating the consent prompt.
