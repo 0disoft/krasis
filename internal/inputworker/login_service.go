@@ -19,12 +19,16 @@ type loginServiceGate struct {
 }
 
 func (g *loginServiceGate) reconcile(ctx context.Context) error {
-	g.mu.Lock()
-	defer g.mu.Unlock()
+	// The single policy poller reads protected metadata without owning input
+	// admission. A delayed file/ACL query has no worker or input authority.
+	// Serialize only the resulting owner transition; Reconcile and Start still
+	// independently revalidate the current console and protected grant.
 	selection, err := g.selection()
 	if err != nil {
 		selection = loginagent.Selection{}
 	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	return errors.Join(err, g.owner.Reconcile(ctx, selection))
 }
 
