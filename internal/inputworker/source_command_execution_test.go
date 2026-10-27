@@ -7,7 +7,44 @@ import (
 	"testing"
 	"testing/synctest"
 	"time"
+
+	"github.com/0disoft/krasis/internal/peer"
 )
+
+func TestSourceExecutedCommandReplyRetainsProtocolShape(t *testing.T) {
+	for op := sourceStart; op <= sourceCursorRestore; op++ {
+		if op == sourceStop {
+			continue
+		} // Stop sends a retirement frame instead.
+		for _, rejected := range []bool{false, true} {
+			synctest.Test(t, func(t *testing.T) {
+				calls := 0
+				timing, err := executeSourceCommand(context.Background(), op, func(_ context.Context, work func() error) error {
+					time.Sleep(20 * time.Millisecond)
+					return work()
+				}, func() error {
+					calls++
+					time.Sleep(20 * time.Millisecond)
+					if rejected {
+						return ErrAuthority
+					}
+					return nil
+				})
+				reply := sourcePacket{kind: sourceReply, op: op, sequence: 1, reply: 1, binding: Binding{1}, timing: timing}
+				if err != nil {
+					reply.status = 1
+				} else if op == sourceAdmit {
+					reply.decision = peer.BoundaryAdmissionAllowed
+				}
+				wire, encodeErr := encodeSourcePacket(reply)
+				got, readErr := readSourcePacket(bytes.NewReader(wire[:]))
+				if encodeErr != nil || readErr != nil || got != reply || calls != 1 || (err != nil) != rejected {
+					t.Fatal("execution produced an invalid/mutated reply", op, rejected, timing, encodeErr, readErr)
+				}
+			})
+		}
+	}
+}
 
 func TestSourceActivationDefersFullAuthorizationUntilDesktopExecution(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {

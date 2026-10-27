@@ -22,7 +22,7 @@ func executeSourceCommand(ctx context.Context, op byte, desktop executor, work f
 	if op == sourceDeactivate || op == sourceHeartbeat || op == sourceCursorRestore {
 		return timing, work()
 	}
-	if op != sourceActivate && op != sourceAdmit {
+	if op != sourceActivate {
 		return timing, desktop(ctx, work)
 	}
 	started := time.Now()
