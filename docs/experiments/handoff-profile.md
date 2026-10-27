@@ -333,6 +333,44 @@ message handling, actual display presentation. Missing spans must not be filled
 from older 15-second maxima or assumed to be zero. No stage maxima, overlapping
 spans or opposite-PC wall clocks may be summed into end-to-end latency.
 
+## Service readiness outside bootstrap
+
+Optional `startup.serviceReadiness` has a fixed five-element `micros` array
+and a five-bit `measured` mask. Indices are owned by
+`internal/handoff/service_readiness.go`:
+
+| Index | Span | Measurement boundary |
+|---|---|---|
+| 0 | ServiceAgentAuthentication | Connected service pipe through authenticating the actual agent process/image |
+| 1 | ServiceLoginAdmission | Login gate admission, including lock wait, console checks and old login-owner retirement |
+| 2 | ServiceLeaseReceive | Request authorization, fixed request read and final fresh authorization |
+| 3 | ServiceBootstrapValidation | Entry to `runPreparedAgentLease` through candidate selection/cold fallback and pre-bootstrap checks |
+| 4 | ServiceReadyAuthorization | Final fresh authorization, including query-capacity wait, immediately before writing the readiness receipt |
+
+These spans use the service's monotonic clock. They do not partition the
+agent's `ReadyWait`: authentication/request reading can begin before the
+agent's readiness read, and validation includes cold launch/connect work
+when no warm candidate is usable. Do not add these to existing nested spans
+or subtract their sum from another process's duration to label an IPC delay.
+Pipe write completion, agent read scheduling and other gaps remain unmeasured.
+`preparationWait` still separately measures the builder join before admission.
+
+All values saturate at 120 seconds, unknown mask bits/unmeasured nonzero values
+are invalid, and an observed zero remains distinct from missing evidence.
+The service attaches a copy; child startup data cannot replace service spans.
+Collection retains the existing 12-attempt/120-second limits and export projects
+only the fixed numeric fields. No paths, identities, policy contents or new
+per-input probes are exported. These numbers do not grant input authority.
+
+The service sends a fixed 100-byte `KRD7` local readiness receipt, extending
+the previous 72-byte `KRD6` by 28 bytes. No extra frame, roundtrip or peer wire
+change is introduced. New readers accept `KRD1` through `KRD7`; old readers
+cannot consume `KRD7`, so the installed service, agent and owned workers must
+be updated together before physical acceptance. `KRD7` permits unobserved
+preparation metadata while still requiring measured service detail. Truncated
+or malformed envelopes fail; invalid numeric diagnostics in an otherwise
+valid envelope are fully consumed and discarded without changing readiness.
+
 ## g139 installed startup detail
 
 An installed receiver profile can additionally contain `startup`, schema 1,

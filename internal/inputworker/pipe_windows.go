@@ -72,13 +72,16 @@ func acceptAgentNamed(ctx context.Context, agentDigest [sha256.Size]byte, ready 
 		_ = pipe.Close()
 		return nil, ErrAuthority
 	}
+	started := time.Now()
 	proof, err := authenticateAgentInstalled(uintptr(pipe.handle), agentDigest, installation)
 	if err != nil {
 		_ = pipe.Close()
 		return nil, ErrAuthority
 	}
 	accepted = true
-	return &Channel{stream: pipe, authority: proof}, nil
+	channel := &Channel{stream: pipe, authority: proof}
+	channel.serviceReadiness.Record(handoff.ServiceAgentAuthentication, time.Since(started))
+	return channel, nil
 }
 
 // ConnectService trusts neither the pipe name nor a claimed server identity.

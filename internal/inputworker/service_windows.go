@@ -140,6 +140,7 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 		}
 		if err == nil {
 			if admit != nil {
+				started := time.Now()
 				if err = admit(ctx); err != nil {
 					_ = channel.Close()
 					if errors.Is(err, ErrRecovery) {
@@ -147,8 +148,11 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 					}
 					continue
 				}
+				channel.serviceReadiness.Record(handoff.ServiceLoginAdmission, time.Since(started))
 			}
+			started := time.Now()
 			lease, prepare, leaseErr := receiveAgentRequest(ctx, channel)
+			channel.serviceReadiness.Record(handoff.ServiceLeaseReceive, time.Since(started))
 			if leaseErr == nil && prepare {
 				// No lease is created and no agent handle is transferred. A
 				// duplicate hint cannot extend expiry. A fresh, rate-limited hint

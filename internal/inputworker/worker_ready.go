@@ -48,6 +48,7 @@ func publishAuthorizedReady(ctx context.Context, owner *Channel, role authorityK
 			result = errors.Join(ErrAuthority, result, err)
 		}
 	}()
+	started := time.Now()
 	var err error
 	if role == authorityAgent {
 		err = owner.authorizeStartup(ctx)
@@ -56,6 +57,9 @@ func publishAuthorizedReady(ctx context.Context, owner *Channel, role authorityK
 	}
 	if err != nil {
 		return errors.Join(ErrAuthority, err)
+	}
+	if role == authorityAgent {
+		profile.ServiceReadiness.Record(handoff.ServiceReadyAuthorization, time.Since(started))
 	}
 	if err := stream.SetWriteDeadline(deadline); err != nil {
 		return errors.Join(ErrAuthority, err)

@@ -38,6 +38,7 @@ func runInstalledAgentLease(ctx context.Context, channel *Channel, lease Lease, 
 }
 
 func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, agentDigest, serviceDigest [sha256.Size]byte, installation *Installation, candidate *preparedConsole, afterReady ...func()) (report Report, result error) {
+	validationStarted := time.Now()
 	startupStage := "validation"
 	defer func() {
 		if lease.Capture {
@@ -88,6 +89,7 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 		}
 	}
 	worker, control, pid, profile := prepared.worker, prepared.control, prepared.pid, prepared.profile
+	profile.ServiceReadiness = channel.serviceReadiness
 	profile.PreparationDecision = decision
 	if channel.preparationWaitMeasured {
 		profile.RecordPreparationWait(channel.preparationWait)
@@ -123,6 +125,7 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 	}
 	stopStartup := context.AfterFunc(startup, func() { _ = control.Close() })
 	defer stopStartup()
+	profile.ServiceReadiness.Record(handoff.ServiceBootstrapValidation, time.Since(validationStarted))
 	started := time.Now()
 	// The worker cannot acknowledge before full service-image validation and
 	// SCM/actual pipe-owner authentication. No agent handle is transferred yet.

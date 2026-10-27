@@ -37,10 +37,11 @@ type StartupProfile struct {
 	PreparationDecision     PreparationDecision       `json:"preparationDecision,omitempty"`
 	PreparationWaitMicros   uint32                    `json:"preparationWaitMicros,omitempty"`
 	PreparationWaitMeasured bool                      `json:"preparationWaitMeasured,omitempty"`
+	ServiceReadiness        ServiceReadinessProfile   `json:"serviceReadiness,omitzero"`
 }
 
 func (p StartupProfile) Valid() bool {
-	if p.Schema != 1 || !validPreparationDecision(p) {
+	if p.Schema != 1 || !validPreparationDecision(p) || !p.ServiceReadiness.Valid() {
 		return false
 	}
 	if (!p.Prepared && p.PreparedAgeMicros != 0) || (p.Prepared && (p.PreparedAgeMicros >= 2_000_000 || p.Measured&3 != 3)) {

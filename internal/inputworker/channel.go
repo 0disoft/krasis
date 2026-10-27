@@ -4,12 +4,15 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	"github.com/0disoft/krasis/internal/handoff"
 )
 
 // Channel ties one authenticated kernel pipe to its process proof. Its private
 // fields prevent callers from pairing a proof with an unrelated input stream.
 type Channel struct {
-	preparationWait         time.Duration // Service-local remaining join wait, never authority.
+	serviceReadiness        handoff.ServiceReadinessProfile // Serial service-owned diagnostics, never authority.
+	preparationWait         time.Duration                   // Service-local remaining join wait, never authority.
 	preparationWaitMeasured bool
 	stream                  net.Conn
 	authority               *Authority
