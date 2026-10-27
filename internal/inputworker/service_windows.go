@@ -139,6 +139,14 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 			return err
 		}
 		if err == nil {
+			started := time.Now()
+			lease, prepare, leaseErr := receiveAgentRequest(ctx, channel)
+			channel.serviceReadiness.Record(handoff.ServiceLeaseReceive, time.Since(started))
+			if leaseErr == nil && !prepare {
+				if err := preparation.admit(channel); err != nil {
+					return err
+				}
+			}
 			if admit != nil {
 				started := time.Now()
 				if err = admit(ctx); err != nil {
@@ -150,40 +158,21 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 				}
 				channel.serviceReadiness.Record(handoff.ServiceLoginAdmission, time.Since(started))
 			}
-			started := time.Now()
-			lease, prepare, leaseErr := receiveAgentRequest(ctx, channel)
-			channel.serviceReadiness.Record(handoff.ServiceLeaseReceive, time.Since(started))
 			if leaseErr == nil && prepare {
-				// No lease is created and no agent handle is transferred. A
-				// duplicate hint cannot extend expiry. A fresh, rate-limited hint
-				// may retire a nearly expired child before preparing a new one.
-				if preparation.next == nil || preparation.next.retired() || preparationRefreshDue(lastPreparation, preparation.next.preparedAt, time.Now()) {
-					if closeErr := preparation.next.close(); closeErr != nil {
-						_ = channel.Close()
-						return errors.Join(ErrRecovery, closeErr)
-					}
-					preparation.next = nil
-					if preparationAllowed(lastPreparation, time.Now()) {
-						lastPreparation = time.Now()
-						err = watchPreparationPeer(ctx, channel.stream, func(run context.Context) error {
-							var preparationErr error
-							preparation.next, preparationErr = prepareServiceConsole(run, installation, service)
-							return preparationErr
-						})
-						if err != nil && preparation.next != nil {
-							if closeErr := preparation.next.close(); closeErr != nil {
-								err = errors.Join(err, ErrRecovery, closeErr)
-							}
-							preparation.next = nil
-						}
-					}
-				}
-				if err == nil {
-					err = acknowledgePreparation(ctx, channel)
-				}
+				// Release the agent's optional-preparation mutex before native
+				// construction. No lease or input authority is acknowledged here.
+				err = acknowledgePreparation(ctx, channel)
 				closeErr := channel.Close()
 				if failure := serviceRecoveryFailure(err, closeErr); failure != nil {
 					return failure
+				}
+				if err == nil && closeErr == nil {
+					now := time.Now()
+					if preparation.hint(ctx, lastPreparation, now, func(run context.Context) (*preparedConsole, error) {
+						return prepareServiceConsole(run, installation, service)
+					}) {
+						lastPreparation = now
+					}
 				}
 				// Preparation failures leave ordinary lease fallback usable.
 				continue

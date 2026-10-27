@@ -37,6 +37,26 @@ func (p *serviceInputPreparation) start(ctx context.Context, prepare func(contex
 	return true
 }
 
+// Called only after an authenticated hint's receipt and channel close. The
+// receipt acknowledges demand, not readiness. Keep one bounded builder, and
+// retain the existing cooldown/expiry policy without tying work to an ACK wait.
+func (p *serviceInputPreparation) hint(ctx context.Context, last, now time.Time, prepare func(context.Context) (*preparedConsole, error)) bool {
+	if ctx == nil || ctx.Err() != nil || p.warming != nil || !preparationAllowed(last, now) {
+		return false
+	}
+	if p.next != nil && !p.next.retired() && !preparationRefreshDue(last, p.next.preparedAt, now) {
+		return false
+	}
+	retiring := p.next
+	p.next = nil
+	return p.start(ctx, func(run context.Context) (*preparedConsole, error) {
+		if err := retiring.close(); err != nil {
+			return nil, errors.Join(ErrRecovery, err)
+		}
+		return prepare(run)
+	})
+}
+
 func (p *serviceInputPreparation) join() error {
 	if p.warming == nil {
 		return nil
@@ -66,18 +86,23 @@ func (p *serviceInputPreparation) accept(accept func() (*Channel, error)) (*Chan
 	}
 	// A builder collected before authentication has zero remaining join wait.
 	channel.preparationWaitMeasured = hadPreparation
-	// Authentication can overlap construction, but admission, request handling
-	// and all subsequent launches remain behind this recovery fence.
+	return channel, nil
+}
+
+// Decode the authenticated request before joining: another optional hint must
+// not block behind construction. Every actual lease still joins before login
+// admission, candidate transfer or native input, including presentation leases.
+func (p *serviceInputPreparation) admit(channel *Channel) error {
 	if p.warming != nil {
 		started := time.Now()
-		err = p.join()
+		err := p.join()
 		channel.preparationWait = time.Since(started)
 		channel.preparationWaitMeasured = true
 		if err != nil {
-			return nil, serviceRecoveryFailure(err, channel.Close())
+			return serviceRecoveryFailure(err, channel.Close())
 		}
 	}
-	return channel, nil
+	return nil
 }
 
 func (p *serviceInputPreparation) close() error {

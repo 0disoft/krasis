@@ -39,6 +39,9 @@ func TestServiceAuthenticatesDuringPreparationButJoinsBeforeAdmission(t *testing
 			}()
 			return channel, nil
 		})
+		if err == nil {
+			err = slot.admit(got)
+		}
 		if err != nil || got != channel || slot.warming != nil || slot.next != child || builds != 1 {
 			t.Fatal("admission lost the single prepared child", err)
 		}
@@ -84,7 +87,10 @@ func TestServicePreparationRecoveryFailureFencesAuthenticatedChannel(t *testing.
 					close(release)
 					return channel, nil
 				})
-				if got != nil || !errors.Is(err, ErrRecovery) || !errors.Is(err, cause) || slot.next != nil || slot.warming != nil {
+				if err == nil {
+					err = slot.admit(got)
+				}
+				if !errors.Is(err, ErrRecovery) || !errors.Is(err, cause) || slot.next != nil || slot.warming != nil {
 					t.Fatal("uncertain cleanup passed admission or lost its cause", err)
 				}
 				if !completed && !channel.closing {
@@ -133,6 +139,9 @@ func TestServicePreparationConstructionFailureKeepsColdFallback(t *testing.T) {
 			close(release)
 			return channel, nil
 		})
+		if err == nil {
+			err = slot.admit(got)
+		}
 		if got != channel || err != nil || slot.next != nil || slot.warming != nil || channel.closing {
 			t.Fatal("ordinary construction failure blocked cold fallback", err)
 		}
@@ -155,6 +164,58 @@ func TestServicePreparationCompletedBeforeAuthenticationRecordsZeroWait(t *testi
 		}
 		if err := slot.close(); err != nil {
 			t.Fatal(err)
+		}
+	})
+}
+
+func TestPreparationHintReceiptDoesNotJoinNativeConstruction(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var slot serviceInputPreparation
+		release := make(chan struct{})
+		child := &preparedConsole{}
+		builds := 0
+		build := func(context.Context) (*preparedConsole, error) {
+			builds++
+			<-release
+			return child, nil
+		}
+		now := time.Now()
+		if !slot.hint(context.Background(), time.Time{}, now, build) {
+			t.Fatal("acknowledged hint did not schedule preparation")
+		}
+		synctest.Wait()
+		started := time.Now()
+		channel, err := slot.accept(func() (*Channel, error) { return &Channel{}, nil })
+		if err != nil || time.Since(started) != 0 || slot.warming == nil {
+			t.Fatal("optional request waited for the pending child", err)
+		}
+		if slot.hint(context.Background(), now.Add(-time.Minute), now, build) || builds != 1 {
+			t.Fatal("duplicate hint replaced a pending builder")
+		}
+		go func() { time.Sleep(144 * time.Millisecond); close(release) }()
+		if err := slot.admit(channel); err != nil || channel.preparationWait != 144*time.Millisecond || slot.next != child {
+			t.Fatal("actual entry skipped the construction fence", err)
+		}
+		if err := slot.close(); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
+func TestPreparationHintRetirementFailureStillFencesNextLease(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		now := time.Now()
+		slot := serviceInputPreparation{next: &preparedConsole{worker: failedConsoleCloseForTest(), preparedAt: now.Add(-time.Minute)}}
+		started := slot.hint(context.Background(), time.Time{}, now, func(context.Context) (*preparedConsole, error) {
+			t.Error("replacement started before old child retirement was confirmed")
+			return nil, nil
+		})
+		if !started || slot.warming == nil {
+			t.Fatal("refresh lost cleanup ownership")
+		}
+		channel := &Channel{}
+		if err := slot.admit(channel); !errors.Is(err, ErrRecovery) || !channel.closing {
+			t.Fatal("asynchronous hint hid a native cleanup failure", err)
 		}
 	})
 }
