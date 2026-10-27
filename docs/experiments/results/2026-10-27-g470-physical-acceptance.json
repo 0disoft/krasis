@@ -1,0 +1,250 @@
+{
+  "schema": "krasis.experiment/v1",
+  "generation": 470,
+  "revision": "dd198b666fc780cd1862ccb210c4a25c44ab1151",
+  "collection": "381e0708d616f3fc486afb2187aa78bc",
+  "baselineCollection": "13192fa404aa5863d9ef46b8af445c00",
+  "selection": "Exact build; subtract event keys already present in the post-repair/pre-test baseline independently on each device. Pair unique exchange tags. Only complete ok/ok A-source to B-receiver profiles. Device wall clocks are never subtracted.",
+  "successfulPairedLeases": 12,
+  "direction": "A->B",
+  "unmatchedSourceProfiles": 1,
+  "afterBaseline": {
+    "A": {
+      "inputHealth": "READY",
+      "service": "READY",
+      "recoveryFailures": 0,
+      "reconnects": 0
+    },
+    "B": {
+      "inputHealth": "READY",
+      "service": "READY",
+      "recoveryFailures": 0,
+      "reconnects": 0
+    }
+  },
+  "statistics": {
+    "sourceWait": {
+      "medianMicros": 124948.5,
+      "maxMicros": 1236148
+    },
+    "Bwork": {
+      "medianMicros": 40893.0,
+      "maxMicros": 417507
+    },
+    "Aqueue": {
+      "medianMicros": 0.0,
+      "maxMicros": 947
+    },
+    "Bqueue": {
+      "medianMicros": 0.0,
+      "maxMicros": 6954
+    },
+    "residual": {
+      "medianMicros": 83151.5,
+      "maxMicros": 818641
+    },
+    "capture": {
+      "medianMicros": 13588.0,
+      "maxMicros": 35776
+    },
+    "Bready": {
+      "medianMicros": 30506.0,
+      "maxMicros": 390802
+    },
+    "Bdispatch": {
+      "medianMicros": 4511.5,
+      "maxMicros": 24602
+    }
+  },
+  "worstSourceWait": {
+    "time": "2026-10-27T14:05:26.3259971Z",
+    "sourceWait": 1236148,
+    "Bwork": 417507,
+    "Aqueue": 0,
+    "Bqueue": 0,
+    "residual": 818641,
+    "capture": 28269,
+    "Bready": 390802,
+    "Bdispatch": 4152
+  },
+  "receiverSlowCases": [
+    {
+      "readyWaitMicros": 306345,
+      "preparation": "Expired candidate; cold fallback"
+    },
+    {
+      "readyWaitMicros": 390802,
+      "preparation": "Warm candidate used; no isolated cause for the entire readiness wait",
+      "serviceBootstrapReadyMicros": 73852,
+      "nativeDesktopReadyMicros": 37327
+    }
+  ],
+  "tcpEvidenceAtWorstSourceWait": {
+    "retransmittedBytesDelta": 296,
+    "timeoutEpisodesDelta": 1,
+    "limit": "Source socket counters over this attempt; not proof which application frame was retransmitted."
+  },
+  "limitations": [
+    "12 paired one-way leases do not prove 12 independent physical round trips.",
+    "Transport residual excludes measured application queues and B dequeue-to-grant work; it still includes kernel/socket buffering and reader scheduling, not just radio flight time.",
+    "391ms B readiness wait includes service/IPC readiness and overlapping startup work; 37ms native readiness and 74ms service bootstrap are nested, not additive.",
+    "Comparison with g469 uses different physical/network conditions; reduced median is not causal proof of a code speedup."
+  ],
+  "comparisonG469": {
+    "sourceWaitMedianMicros": 227935,
+    "sourceWaitMaxMicros": 616661,
+    "captureMedianMicros": 12734,
+    "captureMaxMicros": 210823,
+    "readyWaitMedianMicros": 28115,
+    "readyWaitMaxMicros": 142924
+  },
+  "pairs": [
+    {
+      "time": "2026-10-27T14:05:01.4364464Z",
+      "sourceWait": 194668,
+      "Bwork": 40186,
+      "Aqueue": 947,
+      "Bqueue": 940,
+      "residual": 152595,
+      "capture": 25855,
+      "Bready": 28963,
+      "Bdispatch": 24602,
+      "exchangeTag": "992618b14bbbc81f1252abab826c0aad64005ce1d57b4eed617d17ec856bed96"
+    },
+    {
+      "time": "2026-10-27T14:05:23.409355Z",
+      "sourceWait": 406950,
+      "Bwork": 314960,
+      "Aqueue": 549,
+      "Bqueue": 0,
+      "residual": 91441,
+      "capture": 12390,
+      "Bready": 306345,
+      "Bdispatch": 2512,
+      "exchangeTag": "a608d0844d231be7b6b8fd63d781e5d6ed0affc2a2a84ddd57d65ed076d37585"
+    },
+    {
+      "time": "2026-10-27T14:05:26.3259971Z",
+      "sourceWait": 1236148,
+      "Bwork": 417507,
+      "Aqueue": 0,
+      "Bqueue": 0,
+      "residual": 818641,
+      "capture": 28269,
+      "Bready": 390802,
+      "Bdispatch": 4152,
+      "exchangeTag": "c6e07f0b8fe4b3bdbc4213384b62bc37e6920ea26e64bbca27314395eaf597ed"
+    },
+    {
+      "time": "2026-10-27T14:05:28.4562815Z",
+      "sourceWait": 115109,
+      "Bwork": 40247,
+      "Aqueue": 0,
+      "Bqueue": 0,
+      "residual": 74862,
+      "capture": 35776,
+      "Bready": 30686,
+      "Bdispatch": 3342,
+      "exchangeTag": "c44757dc0ab2f9d86f25527409b232fad825b91ad8664f09535159c1b1e35ce0"
+    },
+    {
+      "time": "2026-10-27T14:05:30.8290106Z",
+      "sourceWait": 166968,
+      "Bwork": 45145,
+      "Aqueue": 0,
+      "Bqueue": 0,
+      "residual": 121823,
+      "capture": 20840,
+      "Bready": 34863,
+      "Bdispatch": 4871,
+      "exchangeTag": "f0e8762f89b9bb3af4729cbeaaa9bc83ded1b0d2928b485899cc66ad67a18689"
+    },
+    {
+      "time": "2026-10-27T14:05:32.2074784Z",
+      "sourceWait": 103937,
+      "Bwork": 41539,
+      "Aqueue": 0,
+      "Bqueue": 393,
+      "residual": 62005,
+      "capture": 11548,
+      "Bready": 30326,
+      "Bdispatch": 2482,
+      "exchangeTag": "fd0f4cebd135315d754fb5fb6a895867b726509372092dda24f3826ae6aa043e"
+    },
+    {
+      "time": "2026-10-27T14:05:35.2502646Z",
+      "sourceWait": 64977,
+      "Bwork": 34998,
+      "Aqueue": 0,
+      "Bqueue": 735,
+      "residual": 29244,
+      "capture": 14786,
+      "Bready": 26790,
+      "Bdispatch": 6008,
+      "exchangeTag": "6dc483f30f2a7fe9b6d61a3aa279a0fb2d62db1e3ef8883a3b0045ee9b86677f"
+    },
+    {
+      "time": "2026-10-27T14:05:36.0816444Z",
+      "sourceWait": 45829,
+      "Bwork": 39732,
+      "Aqueue": 0,
+      "Bqueue": 0,
+      "residual": 6097,
+      "capture": 11766,
+      "Bready": 29419,
+      "Bdispatch": 11754,
+      "exchangeTag": "1ceff4db0a3f6140bb41625c716cc05a0d009157ee83d4f19320e1fd901649f6"
+    },
+    {
+      "time": "2026-10-27T14:05:36.8415443Z",
+      "sourceWait": 70384,
+      "Bwork": 52496,
+      "Aqueue": 0,
+      "Bqueue": 0,
+      "residual": 17888,
+      "capture": 11361,
+      "Bready": 43784,
+      "Bdispatch": 1750,
+      "exchangeTag": "1d76d7b7c76551703eed18f360e02e5b6e5b1ef48311776610af697ad701088f"
+    },
+    {
+      "time": "2026-10-27T14:05:37.8758166Z",
+      "sourceWait": 134788,
+      "Bwork": 39412,
+      "Aqueue": 0,
+      "Bqueue": 0,
+      "residual": 95376,
+      "capture": 10475,
+      "Bready": 28320,
+      "Bdispatch": 6181,
+      "exchangeTag": "1c509f4329a3348fc0546e074806ae60c7729fa80126e39d691dc59975df3997"
+    },
+    {
+      "time": "2026-10-27T14:05:39.1125776Z",
+      "sourceWait": 214541,
+      "Bwork": 38654,
+      "Aqueue": 0,
+      "Bqueue": 6954,
+      "residual": 168933,
+      "capture": 11746,
+      "Bready": 29741,
+      "Bdispatch": 3709,
+      "exchangeTag": "2b225b7e682cb2b77091e7e7ef3a24965e6f6c97086b34d9afc75cc40bf3d51e"
+    },
+    {
+      "time": "2026-10-27T14:05:40.3244235Z",
+      "sourceWait": 56512,
+      "Bwork": 45576,
+      "Aqueue": 0,
+      "Bqueue": 544,
+      "residual": 10392,
+      "capture": 16729,
+      "Bready": 36149,
+      "Bdispatch": 7966,
+      "exchangeTag": "a34596f178485aba106d2ad1e8e9182167b05caacc023488db24b73af5b950ae"
+    }
+  ],
+  "residualFormulaMicros": "sourceWait - Bwork - Aqueue - Bqueue",
+  "validation": "All 12 pair tags, successful outcomes, exchange durations, control queue durations, readiness waits, residual formula and aggregate statistics rechecked against original exported JSON.",
+  "scope": "Physical acceptance evidence only; no runtime, API, database, repository hygiene or runner changes."
+}
