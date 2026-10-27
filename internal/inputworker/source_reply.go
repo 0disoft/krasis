@@ -38,7 +38,7 @@ func sourceReplyResult(request, reply sourcePacket) (sourcePacket, error) {
 	if reply.kind != sourceReply || reply.reply != request.sequence || reply.op != request.op {
 		return sourcePacket{}, ErrProtocol
 	}
-	if reply.status != 0 {
+	if reply.status != 0 && !(request.op == sourceCursorPrepare && reply.status == sourceCursorUnavailable) {
 		return reply, ErrAuthority
 	}
 	return reply, nil

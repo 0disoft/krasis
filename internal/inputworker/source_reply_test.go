@@ -1,6 +1,7 @@
 package inputworker
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -8,6 +9,29 @@ import (
 
 	"github.com/0disoft/krasis/internal/peer"
 )
+
+func TestUnavailableCursorReplyCannotGrantOtherOperations(t *testing.T) {
+	for op := sourceStart; op <= sourceCursorRestore; op++ {
+		p := sourcePacket{kind: sourceReply, op: op, status: sourceCursorUnavailable, sequence: 4, reply: 3, binding: Binding{1}}
+		data, err := encodeSourcePacket(p)
+		if op != sourceCursorPrepare {
+			if err == nil {
+				t.Fatal("degraded status accepted for input authority", op)
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		decoded, err := readSourcePacket(bytes.NewReader(data[:]))
+		if err != nil || decoded != p {
+			t.Fatal("unavailable snapshot lost in transit", err)
+		}
+		if got, err := sourceReplyResult(sourcePacket{op: op, sequence: 3}, decoded); err != nil || got.status != sourceCursorUnavailable {
+			t.Fatal("optional snapshot became an authority failure", err)
+		}
+	}
+}
 
 func TestSourceBufferedReplySurvivesEOFTimeoutAndCancellation(t *testing.T) {
 	request := sourcePacket{kind: sourceCommand, op: sourceAdmit, sequence: 3}

@@ -34,6 +34,12 @@ func (c *CaptureSource) PrepareReturnCursor() func() {
 	if err != nil {
 		return nil
 	}
+	if response.status == sourceCursorUnavailable {
+		if c.observe != nil {
+			c.observe("installed_return_cursor_capture_unavailable")
+		}
+		return nil
+	}
 	return func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 		defer cancel()

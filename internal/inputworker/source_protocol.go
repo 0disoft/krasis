@@ -10,6 +10,9 @@ import (
 )
 
 const sourcePacketSize = 64
+
+// A successful optional request with no usable snapshot grants no cursor show.
+const sourceCursorUnavailable byte = 2
 const (
 	sourceCommand byte = iota + 1
 	sourceReply
@@ -46,7 +49,8 @@ type sourcePacket struct {
 }
 
 func (p sourcePacket) valid() bool {
-	if p.sequence == 0 || p.binding == (Binding{}) || p.status > 1 {
+	if p.sequence == 0 || p.binding == (Binding{}) || p.status > 1 &&
+		!(p.status == sourceCursorUnavailable && p.kind == sourceReply && p.op == sourceCursorPrepare) {
 		return false
 	}
 	if !p.capture.Valid() || p.capture != (handoff.CaptureNative{}) && (p.kind != sourceReply || p.op != sourceActivate) {

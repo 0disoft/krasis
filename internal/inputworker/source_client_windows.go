@@ -337,7 +337,7 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 			c.lastReplyRequestAt = requestStarted
 			switch op {
 			case sourceCursorPrepare:
-				c.cursorPrepared = true
+				c.cursorPrepared = reply.status == 0
 			case sourceCursorShow, sourceCursorRestore:
 				c.cursorPrepared = false
 			}

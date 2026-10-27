@@ -47,7 +47,7 @@ func init() {
 			allowed["installed_return_cursor_capture_"+stage+"_"+bucket] = true
 		}
 	}
-	for _, code := range []string{"installed_return_cursor_route_capture", "installed_return_cursor_capture_queued", "installed_return_cursor_capture_failed"} {
+	for _, code := range []string{"installed_return_cursor_route_capture", "installed_return_cursor_capture_queued", "installed_return_cursor_capture_failed", "installed_return_cursor_capture_unavailable"} {
 		allowed[code] = true
 	}
 	for _, stage := range []string{"admission", "cursor_open", "cursor_retire"} {

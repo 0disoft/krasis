@@ -427,11 +427,15 @@ func runSourceCapture(ctx context.Context, channel, service *Channel, lease Leas
 					case sourceHeartbeat:
 					case sourceCursorPrepare:
 						hook.RestoreReturnCursor()
-						cursorPrepared = hook.PrepareReturnCursor()
+						var prepareErr error
+						cursorPrepared, prepareErr = hook.PrepareReturnCursorChecked()
+						if prepareErr != nil {
+							return prepareErr
+						}
 						cursorSequence = p.sequence
 						cursorPending.Store(cursorPrepared != nil)
 						if cursorPrepared == nil {
-							return ErrAuthority
+							response.status = sourceCursorUnavailable
 						}
 					case sourceCursorShow:
 						if cursorPrepared == nil || p.reply != cursorSequence {

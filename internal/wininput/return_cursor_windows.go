@@ -116,6 +116,12 @@ var (
 func (hook *SourceHook) PrepareReturnCursor() func() { return hook.returnCursor.prepare() }
 func (hook *SourceHook) RestoreReturnCursor()        { hook.returnCursor.restore() }
 
+// A moved/superseded snapshot is optional. Failed native cleanup is not.
+func (hook *SourceHook) PrepareReturnCursorChecked() (func(), error) {
+	prepared := hook.PrepareReturnCursor()
+	return prepared, hook.returnCursor.failureResult()
+}
+
 func (shield *returnCursorShield) prepare() func() {
 	generation := shield.generation.Load()
 	position, ok := shield.requestPosition(generation)
