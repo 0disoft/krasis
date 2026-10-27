@@ -9,10 +9,11 @@ import (
 )
 
 type Client struct {
-	mu     sync.Mutex
-	writer io.Writer
-	reader io.Reader
-	closed bool
+	mu      sync.Mutex
+	writer  io.Writer
+	reader  io.Reader
+	closed  bool
+	failure error
 }
 
 func NewClient(writer io.Writer, reader io.Reader) (*Client, error) {
@@ -40,33 +41,42 @@ func (client *Client) CancelPreparedPress(token control.PressedToken) error {
 func (client *Client) Disarm() error {
 	client.mu.Lock()
 	defer client.mu.Unlock()
-	if client.closed {
-		return nil
+	if client.closed || client.failure != nil {
+		return client.failure
 	}
 	client.closed = true
-	payload, err := encodeCommand(operationDisarm, control.PressedToken{})
-	if err != nil {
-		return err
-	}
-	if _, err := client.writer.Write(payload[:]); err != nil {
-		return err
-	}
-	_, err = readAck(client.reader, operationDisarm)
+	_, err := client.exchangeLocked(operationDisarm, control.PressedToken{})
 	return err
 }
 
 func (client *Client) roundTrip(current operation, token control.PressedToken) (status, error) {
 	client.mu.Lock()
 	defer client.mu.Unlock()
+	if client.failure != nil {
+		return statusRejected, client.failure
+	}
 	if client.closed {
 		return statusRejected, errors.New("crash guard client is closed")
 	}
+	return client.exchangeLocked(current, token)
+}
+
+// Caller holds mu. Once a command may have reached the peer, a failed exchange
+// permanently fences this stream: ACKs carry no token or sequence identifier.
+func (client *Client) exchangeLocked(current operation, token control.PressedToken) (status, error) {
 	payload, err := encodeCommand(current, token)
 	if err != nil {
 		return statusRejected, err
 	}
-	if _, err := client.writer.Write(payload[:]); err != nil {
+	n, err := client.writer.Write(payload[:])
+	if err == nil && n != len(payload) {
+		err = io.ErrShortWrite
+	}
+	if err != nil {
+		client.failure = err
 		return statusRejected, err
 	}
-	return readAck(client.reader, current)
+	result, err := readAck(client.reader, current)
+	client.failure = err
+	return result, err
 }
