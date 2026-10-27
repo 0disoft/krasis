@@ -6,6 +6,7 @@ import (
 )
 
 const WorkerApplyProbeLimit = 2048
+const workerApplyProbeInterval = 100 * time.Millisecond
 
 // WorkerApplyProfile contains two disjoint worker-local parts of WorkerApply:
 // the existing apply function and the subsequent cursor snapshot. It records
@@ -66,8 +67,10 @@ func (p *WorkerApplyProfile) Record(slot int, elapsed time.Duration) {
 	p.Measured |= 1 << slot
 }
 
-// One request per actual input or cursor-entry sample, bounded across reentry
-// and reconnect. No bootstrap, heartbeat, recovery or untracked input requests it.
+// Keep two initial probes per entry, then spread probes over the entire 120s
+// window. A 1000Hz pointer otherwise consumes all 2048 probes in about 2s,
+// leaving later stalls without ACK/submission details. The unchanged global
+// cap spans reentry/reconnect; no maintenance or untracked input requests it.
 func WantWorkerApply(ctx context.Context) bool {
 	if ctx == nil {
 		return false
@@ -82,7 +85,13 @@ func WantWorkerApply(ctx context.Context) bool {
 	if v.workerApplyRequested || a.finished || a.summary.Role != "receiver" || a.summary.Backend != "installed" || time.Since(s.collector.started) >= Window || s.collector.workerApplyProbes >= WorkerApplyProbeLimit {
 		return false
 	}
+	now := time.Now()
+	if a.workerApplyProbes >= 2 && now.Sub(s.collector.workerApplyLast) < workerApplyProbeInterval {
+		return false
+	}
 	s.collector.workerApplyProbes++
+	s.collector.workerApplyLast = now
+	a.workerApplyProbes++
 	v.workerApplyRequested = true
 	return true
 }

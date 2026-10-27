@@ -201,9 +201,11 @@ type Collector struct {
 	stopped               atomic.Bool
 	pipeOwnerProbes       atomic.Uint32
 	workerApplyProbes     uint32
+	workerApplyLast       time.Time
 	cursorPlacementProbes uint32
 }
 type attempt struct {
+	workerApplyProbes         uint32
 	summary                   Summary
 	started, request          time.Time
 	requestWritten, grantRead time.Time
