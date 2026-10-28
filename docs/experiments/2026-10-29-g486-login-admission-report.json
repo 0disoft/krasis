@@ -26,7 +26,7 @@
     "race": "Focused login admission and service concurrency tests passed",
     "deterministic": "A simulated 40ms console observation now completes idle admission in 40ms instead of two sequential observations (80ms). The test checks repeated admissions still read again. Real retirement plus console change is rejected.",
     "full": "go test -p 2 -timeout 3m ./... passed on verified Go 1.27.3 with repository runtime overlay",
-    "physical": "pending paired installation and user crossings"
+    "physical": "Both g486 apps and protected services installed, matching UI builds, input READY, doctor healthy and connection CONNECTED; actual crossing test pending"
   },
   "limits": [
     "The 82.743ms service span includes gate admission and both observations; this incident does not identify each individual WTS query duration.",

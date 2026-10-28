@@ -1,0 +1,176 @@
+{
+  "schema": "krasis.installation-comparison/v1",
+  "generation": 486,
+  "revision": "01ce7b7d51d786a55b91412f21fa002bf48766c5",
+  "collection": "c8b1af30db883dd18134626cd6dccb6c",
+  "scope": "Installation and service health only; physical crossing timings pending.",
+  "BUpdate": {
+    "id": "f153b7632ff580eb017c1f32cf53d43c",
+    "state": "UPDATED",
+    "bytes": 28743841,
+    "total": 28743841
+  },
+  "BUI": {
+    "code": "window_ready"
+  },
+  "setup": {
+    "schema": "krasis.setup-build/v1",
+    "generation": 486,
+    "revision": "01ce7b7d51d786a55b91412f21fa002bf48766c5",
+    "signed": false,
+    "installed": false,
+    "sha256": "ba4ef44fdca7c9b3547d7afb1b1ca0542d2cede4f27b30c0cc6269e8e6c8f824"
+  },
+  "sides": {
+    "A": {
+      "collectedAt": "2026-10-28T15:58:13Z",
+      "diagnosticSha256": "7617778460eaa3a607d448968e6af2b8b46569b7bccd2baee33bdd2278dc2beb",
+      "installation": {
+        "time": "2026-10-28T15:57:40.1588686Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "inputHealth": {
+        "time": "2026-10-28T15:58:12.6273727Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "serviceStartedAt": "2026-10-28T15:57:41.0386535Z",
+      "service": "READY",
+      "matchingUIReady": true,
+      "exactBuildFailures": []
+    },
+    "B": {
+      "collectedAt": "2026-10-28T15:58:14Z",
+      "diagnosticSha256": "b7045e43cd5f1a8064b382d9a736773929e741f608b36f264bcd71be9bc0506c",
+      "installation": {
+        "time": "2026-10-28T15:58:02.2879829Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "inputHealth": {
+        "time": "2026-10-28T15:58:07.3515632Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "serviceStartedAt": "2026-10-28T15:58:04.9723462Z",
+      "service": "READY",
+      "matchingUIReady": true,
+      "exactBuildFailures": []
+    }
+  },
+  "localDoctor": {
+    "schemaVersion": "krasis.cli.doctor/v1",
+    "agent": "RUNNING",
+    "connection": "CONNECTED",
+    "peerAlias": "B",
+    "cliGeneration": 486,
+    "agentGeneration": 486,
+    "protocol": "COMPATIBLE",
+    "code": "healthy",
+    "cliBuild": "01ce7b7d51d786a55b91412f21fa002bf48766c5",
+    "agentBuild": "01ce7b7d51d786a55b91412f21fa002bf48766c5",
+    "ui": {
+      "state": "RUNNING",
+      "generation": 486,
+      "build": "01ce7b7d51d786a55b91412f21fa002bf48766c5",
+      "pathStatus": "MATCHED"
+    },
+    "launchRecord": {
+      "state": "VERIFIED",
+      "generation": 486,
+      "build": "01ce7b7d51d786a55b91412f21fa002bf48766c5",
+      "pathStatus": "MATCHED"
+    },
+    "installedAgent": {
+      "state": "VERIFIED",
+      "build": "01ce7b7d51d786a55b91412f21fa002bf48766c5"
+    },
+    "service": {
+      "state": "RUNNING",
+      "pathStatus": "MATCHED"
+    },
+    "agentLocation": "PROTECTED",
+    "protectedInput": "CONFIGURED",
+    "checks": [
+      {
+        "name": "agent",
+        "state": "RUNNING"
+      },
+      {
+        "name": "connection",
+        "state": "CONNECTED"
+      },
+      {
+        "name": "protocol",
+        "state": "COMPATIBLE"
+      },
+      {
+        "name": "cli_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "ui_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "installed_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "ui",
+        "state": "RUNNING"
+      },
+      {
+        "name": "launch_record",
+        "state": "VERIFIED"
+      },
+      {
+        "name": "installed_agent",
+        "state": "VERIFIED"
+      },
+      {
+        "name": "service",
+        "state": "RUNNING"
+      },
+      {
+        "name": "update_stage_cleanup",
+        "state": "COMPLETED"
+      }
+    ],
+    "nextActions": []
+  },
+  "validation": {
+    "Go": "Full suite passed",
+    "race": "Targeted login admission/service concurrency passed",
+    "vet": "loginagent, inputworker and residentagent passed",
+    "frontend": "104 tests passed; native UI build passed",
+    "package": "Workspace archive transfer, icon, bundle and setup verification passed",
+    "physical": "Awaiting user crossings",
+    "CI": "Not run; no push"
+  },
+  "APIChanges": "Internal loginagent Owner.Retire method; no external HTTP or peer protocol change",
+  "DBChanges": "none",
+  "runnerChanges": "none",
+  "sourceOfTruthChanged": "docs/architecture/02-runtime-flow.md"
+}
