@@ -1,0 +1,209 @@
+{
+  "schema": "krasis.installation-comparison/v1",
+  "generation": 485,
+  "revision": "bde7465c436a1c161989e90b1fe8a8b5a35b6181",
+  "collection": "5a815530714ba35818ebbafc19ef189a",
+  "scope": "A and B app update confirmed. A protected input READY and control connection CONNECTED. B old g484 service still FAILED; user Windows UAC recovery pending. No physical test after update.",
+  "BUpdate": {
+    "id": "e2aefb2d3dfcc31ad64a2a68651ccb6d",
+    "state": "UPDATED",
+    "bytes": 28719496,
+    "total": 28719496
+  },
+  "BUI": {
+    "code": "window_ready"
+  },
+  "sides": {
+    "A": {
+      "collectedAt": "2026-10-28T15:20:02Z",
+      "diagnosticSha256": "aaae4b7bd84881115f73cdf3d3164d0c20eca7de54bae2786b936120083d4da9",
+      "installation": {
+        "time": "2026-10-28T15:19:07.8892343Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "inputHealth": {
+        "time": "2026-10-28T15:19:39.9764215Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-28T15:19:08.6042381Z",
+        "time": "2026-10-28T15:19:08.6231374Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      },
+      "matchingUIReady": true
+    },
+    "B": {
+      "collectedAt": "2026-10-28T15:20:04Z",
+      "diagnosticSha256": "7a19b73435aa3201f213e1465830ff7729633222abd4ded48d4f5c57ac726012",
+      "installation": {
+        "time": "2026-10-28T14:57:39.1320072Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "inputHealth": {
+        "time": "2026-10-28T15:19:48.5735063Z",
+        "state": "SERVICE_RECOVERY_REQUIRED",
+        "stage": "service_recovery",
+        "win32Error": 1066,
+        "win32Known": true
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-28T14:57:42.3950122Z",
+        "time": "2026-10-28T15:01:46.3414849Z",
+        "service": "FAILED",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE",
+        "lastFailure": {
+          "time": "2026-10-28T15:01:46.3414849Z",
+          "stage": "service",
+          "reason": "input",
+          "operation": "input-startup-ready",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "source": {
+          "total": 1,
+          "exits": [
+            {
+              "time": "2026-10-28T15:01:46.1655798Z",
+              "command": "ok",
+              "reader": "authority",
+              "capture": "joined",
+              "sender": "joined",
+              "interrupt": "joined",
+              "retirement": "clean_sent",
+              "report": "failed",
+              "failure": {
+                "operation": "source-service-query-cancelled",
+                "win32Error": 0,
+                "win32Known": false
+              },
+              "heartbeatStage": "service_presence",
+              "heartbeatSlowStage": "service_presence",
+              "heartbeatSlowBucket": 2
+            }
+          ]
+        }
+      },
+      "matchingUIReady": true
+    }
+  },
+  "validation": {
+    "Go": "Full suite passed",
+    "race": "Focused affected tests passed",
+    "vet": "inputworker and residentagent passed; wininput passed with existing unsafeptr exclusion",
+    "frontend": "104 tests passed and native UI build passed",
+    "package": "Workspace and installer verification passed",
+    "physical": "Pending B UAC recovery and user crossings",
+    "CI": "Not run; no push"
+  },
+  "APIChanges": "Existing final report envelope accepted before startup READY; no peer protocol or HTTP API change",
+  "DBChanges": "none",
+  "runnerChanges": "none",
+  "sourceOfTruthChanged": "docs/architecture/02-runtime-flow.md",
+  "localDoctor": {
+    "schemaVersion": "krasis.cli.doctor/v1",
+    "agent": "RUNNING",
+    "connection": "CONNECTED",
+    "peerAlias": "B",
+    "cliGeneration": 485,
+    "agentGeneration": 485,
+    "protocol": "COMPATIBLE",
+    "code": "healthy",
+    "cliBuild": "bde7465c436a1c161989e90b1fe8a8b5a35b6181",
+    "agentBuild": "bde7465c436a1c161989e90b1fe8a8b5a35b6181",
+    "ui": {
+      "state": "RUNNING",
+      "generation": 485,
+      "build": "bde7465c436a1c161989e90b1fe8a8b5a35b6181",
+      "pathStatus": "MATCHED"
+    },
+    "launchRecord": {
+      "state": "VERIFIED",
+      "generation": 485,
+      "build": "bde7465c436a1c161989e90b1fe8a8b5a35b6181",
+      "pathStatus": "MATCHED"
+    },
+    "installedAgent": {
+      "state": "VERIFIED",
+      "build": "bde7465c436a1c161989e90b1fe8a8b5a35b6181"
+    },
+    "service": {
+      "state": "RUNNING",
+      "pathStatus": "MATCHED"
+    },
+    "agentLocation": "PROTECTED",
+    "protectedInput": "CONFIGURED",
+    "checks": [
+      {
+        "name": "agent",
+        "state": "RUNNING"
+      },
+      {
+        "name": "connection",
+        "state": "CONNECTED"
+      },
+      {
+        "name": "protocol",
+        "state": "COMPATIBLE"
+      },
+      {
+        "name": "cli_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "ui_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "installed_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "ui",
+        "state": "RUNNING"
+      },
+      {
+        "name": "launch_record",
+        "state": "VERIFIED"
+      },
+      {
+        "name": "installed_agent",
+        "state": "VERIFIED"
+      },
+      {
+        "name": "service",
+        "state": "RUNNING"
+      },
+      {
+        "name": "update_stage_cleanup",
+        "state": "COMPLETED"
+      }
+    ],
+    "nextActions": []
+  }
+}
