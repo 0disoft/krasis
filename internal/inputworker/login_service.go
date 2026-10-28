@@ -39,12 +39,19 @@ func (g *loginServiceGate) admit(ctx context.Context) error {
 	if err != nil || before.State != loginagent.UserSession || before.Session == 0 || before.Session == ^uint32(0) {
 		return ErrAuthority
 	}
-	if err := g.owner.Reconcile(ctx, loginagent.Selection{}); err != nil {
+	retired, err := g.owner.Retire(ctx)
+	if err != nil {
 		return errors.Join(ErrRecovery, err)
 	}
-	after, err := g.console()
-	if err != nil || after != before {
-		return ErrAuthority
+	// With no owner there was no lifetime transition to outlive the fresh
+	// console observation. Avoid a second WTS RPC on every ordinary lease/hint.
+	// g.mu excludes policy reconciliation/starts until admission returns.
+	// Actual retirement can take seconds and always requires a new observation.
+	if retired {
+		after, err := g.console()
+		if err != nil || after != before {
+			return ErrAuthority
+		}
 	}
 	return ctx.Err()
 }

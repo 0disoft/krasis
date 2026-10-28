@@ -165,6 +165,25 @@ func (o *Owner) Reconcile(ctx context.Context, selection Selection) error {
 	return nil
 }
 
+// Retire joins an existing pre-login owner without starting a replacement.
+// The boolean reports whether retirement work was required under the owner
+// lock. It is not a console observation or permission to inject input.
+func (o *Owner) Retire(ctx context.Context) (bool, error) {
+	if o == nil || ctx == nil {
+		return false, ErrInvalid
+	}
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if o.fenced {
+		return false, ErrRecovery
+	}
+	if o.closed {
+		return false, ErrInvalid
+	}
+	hadWorker := o.worker != nil
+	return hadWorker, errors.Join(ctx.Err(), o.retire())
+}
+
 func (o *Owner) retire() error {
 	if o.worker == nil {
 		return nil

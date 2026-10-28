@@ -1,0 +1,37 @@
+{
+  "schema": "krasis.login-admission-investigation/v1",
+  "baselineGeneration": 485,
+  "targetGeneration": 486,
+  "baselineCollection": "b9783aab04bd198bb5d71c55e64d27e1",
+  "observed": {
+    "pairedLeases": 12,
+    "slowestRequestToGrantMs": 414.582,
+    "receiverReadToGrantWrittenMs": 375.484,
+    "receiverAuthorizationMs": 290.971,
+    "preparationLockOverlapMs": 88.587,
+    "serviceLoginAdmissionMs": 82.743,
+    "receiverReadyWaitMs": 189.374,
+    "receiverWorstDispatchMs": 111.619
+  },
+  "finding": "Login admission always read the console both before and after disabled-owner reconciliation, even when no owner existed. Each ReadConsole makes three WTS queries and checks the active session before and after those queries.",
+  "change": {
+    "owner": "Retire returns whether an existing owner needed retirement under the owner lock, preserving cancellation cleanup, closed/fenced rejection and permanent failure fences.",
+    "admission": "While the service gate excludes starts/reconciliation, idle admissions use one fresh console observation. Actual owner retirement still requires a second fresh matching observation before admission.",
+    "nativeIO": "No-owner admission: ReadConsole 2 to 1, WTS session information calls 6 to 3. Existing-owner retirement remains 2 observations and 6 calls.",
+    "unchanged": "Every request independently observes the console; lease/image/process/input authorization and retirement recovery remain mandatory. No cached authorization, peer protocol, database or CI changes."
+  },
+  "validation": {
+    "focused": "loginagent, inputworker and residentagent package suites passed",
+    "vet": "loginagent, inputworker and residentagent passed",
+    "race": "Focused login admission and service concurrency tests passed",
+    "deterministic": "A simulated 40ms console observation now completes idle admission in 40ms instead of two sequential observations (80ms). The test checks repeated admissions still read again. Real retirement plus console change is rejected.",
+    "full": "go test -p 2 -timeout 3m ./... passed on verified Go 1.27.3 with repository runtime overlay",
+    "physical": "pending paired installation and user crossings"
+  },
+  "limits": [
+    "The 82.743ms service span includes gate admission and both observations; this incident does not identify each individual WTS query duration.",
+    "The measured input response and native readiness tails are not fully explained or eliminated by this change.",
+    "Synthetic call-count improvement is not a measured end-to-end laptop improvement."
+  ],
+  "sourceOfTruthChanged": "docs/architecture/02-runtime-flow.md"
+}
