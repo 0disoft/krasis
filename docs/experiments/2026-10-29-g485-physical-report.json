@@ -1,0 +1,431 @@
+{
+  "schema": "krasis.physical-comparison/v1",
+  "userObservation": "Not perfect but much improved; no separate cursor residue or failure count supplied.",
+  "method": {
+    "build": "Filter exact build, deduplicate by run and sequence, complete successful profiles only.",
+    "pairing": "Match opaque exchangeTag; compare per-side profiles for the same recorded exchange.",
+    "window": "g485 events after previous paired-health collection at 2026-10-28T15:31:32Z",
+    "units": "Process-local durations in microseconds converted to milliseconds; measured bit masks checked with BigInt.",
+    "median": "Arithmetic mean of the middle two for even samples.",
+    "caution": "Small separate sessions, no controlled benchmark or causal speedup claim. Each collector retains at most 12 profiles; more boundary events may be present. Dispatch worst is a per-lease worst sample, not all-frame median. FirstOfferSinceBegin is local source offer timing, not input-to-display latency."
+  },
+  "versions": {
+    "g484": {
+      "collection": "f6a9d4c6f69694a7e232a856d8ce9169",
+      "revision": "46ac081ea9818ab625f3d0d8fab9a15c2a070194",
+      "sides": {
+        "A": {
+          "created": "2026-10-28T15:02:09Z",
+          "diagnosticSha256": "fafceaf5df8b7596f60351637b2a8f3a748c6197d772ae338e6dda1de0dbf70e",
+          "inputHealth": {
+            "time": "2026-10-28T15:01:40.0238775Z",
+            "state": "READY",
+            "stage": "complete",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "service": "READY",
+          "serviceStartedAt": "2026-10-28T14:57:03.772844Z",
+          "agentSources": [
+            {
+              "source": "agent.previous.jsonl",
+              "incomplete": false
+            },
+            {
+              "source": "agent.jsonl",
+              "incomplete": false
+            }
+          ],
+          "boundaryAdmitted": 25,
+          "failuresInWindow": [
+            {
+              "time": "2026-10-28T14:57:28.1558913Z",
+              "code": "session_end_detail",
+              "fault": "fault_peer_session_failed"
+            },
+            {
+              "time": "2026-10-28T15:01:45.4736578Z",
+              "code": "session_end_detail",
+              "fault": "fault_remote_eof"
+            },
+            {
+              "time": "2026-10-28T15:01:45.4887707Z",
+              "code": "reconnect_remote_eof"
+            }
+          ],
+          "metrics": {
+            "preparation.RequestToGrant": {
+              "n": 12,
+              "medianMs": 80.0805,
+              "maxMs": 286.318
+            },
+            "preparation.CaptureActivate": {
+              "n": 12,
+              "medianMs": 13.538,
+              "maxMs": 39.545
+            },
+            "first.FirstOfferSinceBegin": {
+              "n": 12,
+              "medianMs": 99.5015,
+              "maxMs": 327.658
+            },
+            "worst.Dispatch": {
+              "n": 12,
+              "medianMs": 0.6865,
+              "maxMs": 2.013
+            }
+          },
+          "activeFrames": 872,
+          "activeDispatchHistogram": [
+            869,
+            3,
+            0,
+            0,
+            0
+          ]
+        },
+        "B": {
+          "created": "2026-10-28T15:02:11Z",
+          "diagnosticSha256": "a9a452c0564f97e3576aed3cee5d5268f57cbaa2a172ecf2f1f4ee01e981defc",
+          "inputHealth": {
+            "time": "2026-10-28T15:02:02.9461864Z",
+            "state": "SERVICE_RECOVERY_REQUIRED",
+            "stage": "service_recovery",
+            "win32Error": 1066,
+            "win32Known": true
+          },
+          "service": "FAILED",
+          "serviceStartedAt": "2026-10-28T14:57:42.3950122Z",
+          "agentSources": [
+            {
+              "source": "agent.previous.jsonl",
+              "incomplete": false
+            },
+            {
+              "source": "agent.jsonl",
+              "incomplete": false
+            }
+          ],
+          "boundaryAdmitted": 0,
+          "failuresInWindow": [
+            {
+              "time": "2026-10-28T14:57:56.694894Z",
+              "code": "reconnect_acquire_network_timeout"
+            },
+            {
+              "time": "2026-10-28T14:58:01.9653501Z",
+              "code": "reconnect_acquire_network_timeout"
+            },
+            {
+              "time": "2026-10-28T14:58:07.5088246Z",
+              "code": "reconnect_acquire_network_timeout"
+            },
+            {
+              "time": "2026-10-28T14:58:15.0470093Z",
+              "code": "reconnect_acquire_network_timeout"
+            },
+            {
+              "time": "2026-10-28T14:58:22.3486732Z",
+              "code": "reconnect_acquire_network_timeout"
+            },
+            {
+              "time": "2026-10-28T14:58:32.7485956Z",
+              "code": "reconnect_acquire_network_timeout"
+            },
+            {
+              "time": "2026-10-28T14:58:44.5252467Z",
+              "code": "reconnect_acquire_network_timeout"
+            },
+            {
+              "time": "2026-10-28T15:01:45.8440486Z",
+              "code": "installed_input_connect_failed"
+            },
+            {
+              "time": "2026-10-28T15:01:45.9315301Z",
+              "code": "installed_source_connect_failed"
+            },
+            {
+              "time": "2026-10-28T15:01:45.9315301Z",
+              "code": "session_end_detail",
+              "fault": "fault_control_request_authorize_failed"
+            },
+            {
+              "time": "2026-10-28T15:01:47.4116094Z",
+              "code": "session_failed"
+            }
+          ],
+          "metrics": {
+            "preparation.ReadyWait": {
+              "n": 12,
+              "medianMs": 49.0945,
+              "maxMs": 262.941
+            },
+            "preparation.AuthorizeTotal": {
+              "n": 12,
+              "medianMs": 55.237,
+              "maxMs": 269.219
+            },
+            "first.FirstOfferSinceBegin": {
+              "n": 12,
+              "medianMs": 99.3965,
+              "maxMs": 371.968
+            },
+            "worst.Dispatch": {
+              "n": 12,
+              "medianMs": 39.3075,
+              "maxMs": 151.832
+            },
+            "worst.ClientResponse": {
+              "n": 12,
+              "medianMs": 37.0635,
+              "maxMs": 139.769
+            }
+          },
+          "activeFrames": 452,
+          "activeDispatchHistogram": [
+            16,
+            253,
+            181,
+            2,
+            0
+          ]
+        }
+      },
+      "pairedCompleteLeases": 12
+    },
+    "g485": {
+      "collection": "b9783aab04bd198bb5d71c55e64d27e1",
+      "revision": "bde7465c436a1c161989e90b1fe8a8b5a35b6181",
+      "sides": {
+        "A": {
+          "created": "2026-10-28T15:43:47Z",
+          "diagnosticSha256": "1920515505056fca4f3ab381087cb82b36251996ede8debecb14c13bd92bf4bd",
+          "inputHealth": {
+            "time": "2026-10-28T15:43:40.572636Z",
+            "state": "READY",
+            "stage": "complete",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "service": "READY",
+          "serviceStartedAt": "2026-10-28T15:19:08.6042381Z",
+          "agentSources": [
+            {
+              "source": "agent.previous.jsonl",
+              "incomplete": false
+            },
+            {
+              "source": "agent.jsonl",
+              "incomplete": false
+            }
+          ],
+          "boundaryAdmitted": 16,
+          "failuresInWindow": [],
+          "metrics": {
+            "preparation.RequestToGrant": {
+              "n": 12,
+              "medianMs": 49.854,
+              "maxMs": 414.582
+            },
+            "preparation.CaptureActivate": {
+              "n": 12,
+              "medianMs": 17.374,
+              "maxMs": 34.85
+            },
+            "first.FirstOfferSinceBegin": {
+              "n": 12,
+              "medianMs": 69.2425,
+              "maxMs": 438.583
+            },
+            "worst.Dispatch": {
+              "n": 12,
+              "medianMs": 0.837,
+              "maxMs": 1.014
+            }
+          },
+          "activeFrames": 573,
+          "activeDispatchHistogram": [
+            571,
+            2,
+            0,
+            0,
+            0
+          ]
+        },
+        "B": {
+          "created": "2026-10-28T15:43:49Z",
+          "diagnosticSha256": "829bb05cbd24f8dad6d388abb8927f90a10732e2c85a797b91cedfb123989876",
+          "inputHealth": {
+            "time": "2026-10-28T15:43:33.3687376Z",
+            "state": "READY",
+            "stage": "complete",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "service": "READY",
+          "serviceStartedAt": "2026-10-28T15:25:29.339877Z",
+          "agentSources": [
+            {
+              "source": "agent.previous.jsonl",
+              "incomplete": false
+            },
+            {
+              "source": "agent.jsonl",
+              "incomplete": false
+            }
+          ],
+          "boundaryAdmitted": 0,
+          "failuresInWindow": [],
+          "metrics": {
+            "preparation.ReadyWait": {
+              "n": 12,
+              "medianMs": 32.3535,
+              "maxMs": 189.374
+            },
+            "preparation.AuthorizeTotal": {
+              "n": 12,
+              "medianMs": 36.827,
+              "maxMs": 290.971
+            },
+            "first.FirstOfferSinceBegin": {
+              "n": 12,
+              "medianMs": 68.9275,
+              "maxMs": 407.865
+            },
+            "worst.Dispatch": {
+              "n": 12,
+              "medianMs": 7.241,
+              "maxMs": 111.619
+            },
+            "worst.ClientResponse": {
+              "n": 12,
+              "medianMs": 6.443,
+              "maxMs": 110.868
+            }
+          },
+          "activeFrames": 471,
+          "activeDispatchHistogram": [
+            2,
+            456,
+            12,
+            1,
+            0
+          ]
+        }
+      },
+      "pairedCompleteLeases": 12
+    }
+  },
+  "slowestPairedGrant": {
+    "attempt": 4,
+    "sourceRequestToGrantMs": 414.582,
+    "receiverReadToGrantWrittenMs": 375.484,
+    "receiverAuthorizationMs": 290.971,
+    "receiverReadyWaitMs": 189.374,
+    "tcpRttSnapshotsMs": [
+      7.337,
+      8.536
+    ],
+    "receiverWorstDispatchMs": 111.619,
+    "receiverWorstClientResponseMs": 110.868,
+    "workerApplyMillis": 52,
+    "workerApplyMeasured": true,
+    "prepared": true,
+    "preparedAgeMs": 800.432
+  },
+  "findings": {
+    "health": "Both services READY, local doctor healthy/CONNECTED. No trigger, reconnect, session failure, installed connect failure or clean startup rejection in the g485 post-health window.",
+    "improved": "Source first-offer median and receiver per-lease worst dispatch median are lower in this sample.",
+    "remaining": "Source maximum first-offer time increased from 327.658 to 438.583ms. Slowest grant contains 375.484ms receiver processing against 414.582ms source wait and 7.337/8.536ms RTT snapshots. Receiver startup/readiness and input response remain the priority.",
+    "limits": "The 52ms worker apply detail is rounded milliseconds, not proof that SendInput alone consumed the whole time. TCP RTT is a snapshot, not the measured duration of this control request. No cross-machine timestamps subtracted. Cursor residue frequency is not machine-measured."
+  },
+  "localDoctor": {
+    "schemaVersion": "krasis.cli.doctor/v1",
+    "agent": "RUNNING",
+    "connection": "CONNECTED",
+    "peerAlias": "B",
+    "cliGeneration": 485,
+    "agentGeneration": 485,
+    "protocol": "COMPATIBLE",
+    "code": "healthy",
+    "cliBuild": "bde7465c436a1c161989e90b1fe8a8b5a35b6181",
+    "agentBuild": "bde7465c436a1c161989e90b1fe8a8b5a35b6181",
+    "ui": {
+      "state": "RUNNING",
+      "generation": 485,
+      "build": "bde7465c436a1c161989e90b1fe8a8b5a35b6181",
+      "pathStatus": "MATCHED"
+    },
+    "launchRecord": {
+      "state": "VERIFIED",
+      "generation": 485,
+      "build": "bde7465c436a1c161989e90b1fe8a8b5a35b6181",
+      "pathStatus": "MATCHED"
+    },
+    "installedAgent": {
+      "state": "VERIFIED",
+      "build": "bde7465c436a1c161989e90b1fe8a8b5a35b6181"
+    },
+    "service": {
+      "state": "RUNNING",
+      "pathStatus": "MATCHED"
+    },
+    "agentLocation": "PROTECTED",
+    "protectedInput": "CONFIGURED",
+    "checks": [
+      {
+        "name": "agent",
+        "state": "RUNNING"
+      },
+      {
+        "name": "connection",
+        "state": "CONNECTED"
+      },
+      {
+        "name": "protocol",
+        "state": "COMPATIBLE"
+      },
+      {
+        "name": "cli_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "ui_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "installed_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "ui",
+        "state": "RUNNING"
+      },
+      {
+        "name": "launch_record",
+        "state": "VERIFIED"
+      },
+      {
+        "name": "installed_agent",
+        "state": "VERIFIED"
+      },
+      {
+        "name": "service",
+        "state": "RUNNING"
+      },
+      {
+        "name": "update_stage_cleanup",
+        "state": "COMPLETED"
+      }
+    ],
+    "nextActions": []
+  },
+  "changes": {
+    "runtime": "none; diagnosis and evidence only",
+    "architecture": "unchanged this turn",
+    "API": "none",
+    "DB": "none",
+    "CI": "none; no push",
+    "tests": "No new tests or builds; no runtime changes. JSON schema fields, sample pairing, measured masks and diff whitespace checked."
+  }
+}
