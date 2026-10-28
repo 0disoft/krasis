@@ -132,9 +132,11 @@
       }
     },
     "builderJoin": {
-      "count": 15,
+      "count": 13,
       "medianMs": 0,
-      "maxMs": 94.538
+      "maxMs": 94.538,
+      "positiveWaitCount": 5,
+      "unmeasuredPairCount": 2
     },
     "startupStages": {
       "ServiceLaunch": {
@@ -348,6 +350,7 @@
     "Next implementation target is readiness lead time for both native owners, while preserving bounded expiry and fresh lease authentication."
   ],
   "limitations": [
+    "Builder-join statistics include only the 13 successful pairs with preparationWaitMeasured=true; 2 unmeasured successful pairs are excluded rather than filled with zero.",
     "Software timings are not cursor-visible end-to-end latency.",
     "Different runs and sample counts do not isolate the patch as the sole cause.",
     "One paired profile ended incomplete on both sides; it is excluded from successful latency statistics and does not itself demonstrate a fault.",
