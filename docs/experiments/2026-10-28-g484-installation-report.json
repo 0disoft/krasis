@@ -1,0 +1,148 @@
+{
+  "schema": "krasis.installation-comparison/v1",
+  "generation": 484,
+  "revision": "46ac081ea9818ab625f3d0d8fab9a15c2a070194",
+  "collection": "edb093cf59e5d59f11ddd5312169ef4f",
+  "scope": "Installation and health only. Updated A and B, opened matching B UI, and explicitly reconnected A after the peer/UI restart. Physical regression test is pending.",
+  "AInstall": {
+    "result": 0,
+    "state": "installed"
+  },
+  "BUpdate": {
+    "id": "5a4d11b35f8e7a3f7a2e727b71145f26",
+    "state": "UPDATED",
+    "bytes": 28605310,
+    "total": 28605310
+  },
+  "BUI": {
+    "code": "window_ready"
+  },
+  "localDoctor": {
+    "code": "healthy",
+    "connection": "CONNECTED",
+    "agentGeneration": 484,
+    "uiGeneration": 484,
+    "protectedInput": "CONFIGURED",
+    "service": "RUNNING"
+  },
+  "sides": {
+    "A": {
+      "collectedAt": "2026-10-28T14:59:10Z",
+      "diagnosticSha256": "f633dfd3112964a54a3b1ecc30a4934947ebf30521c4d20844dacaed152f6bdd",
+      "installation": {
+        "time": "2026-10-28T14:57:03.0515011Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "inputHealth": {
+        "time": "2026-10-28T14:59:06.8034024Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-28T14:57:03.772844Z",
+        "time": "2026-10-28T14:57:28.2966722Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE",
+        "source": {
+          "total": 1,
+          "exits": [
+            {
+              "time": "2026-10-28T14:57:28.1702635Z",
+              "command": "ok",
+              "reader": "stopped",
+              "capture": "joined",
+              "sender": "joined",
+              "interrupt": "joined",
+              "retirement": "clean_sent",
+              "report": "ok",
+              "heartbeatStage": "replied",
+              "heartbeatSlowStage": "service_presence",
+              "heartbeatSlowBucket": 1
+            }
+          ]
+        }
+      },
+      "recovery": {
+        "time": "2026-10-28T14:58:31.2553765Z",
+        "code": "agent_present",
+        "agentState": "LOCAL",
+        "lastFailure": {
+          "time": "2026-10-28T12:48:39.3095476Z",
+          "code": "agent_faulted",
+          "agentState": "FAULTED"
+        }
+      },
+      "exactBuildFailures": [],
+      "matchingUIReady": true
+    },
+    "B": {
+      "collectedAt": "2026-10-28T14:59:12Z",
+      "diagnosticSha256": "a161141b95ad058752d5eea2af6ff7499292de9e30bb7d4eda7c43d33f498818",
+      "installation": {
+        "time": "2026-10-28T14:57:39.1320072Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "inputHealth": {
+        "time": "2026-10-28T14:58:46.6168276Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-28T14:57:42.3950122Z",
+        "time": "2026-10-28T14:57:42.4414426Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      },
+      "recovery": {
+        "time": "2026-10-28T14:59:08.5053633Z",
+        "code": "agent_present",
+        "agentState": "CONNECTED",
+        "lastFailure": {
+          "time": "2026-10-28T13:49:10.0136388Z",
+          "code": "agent_faulted",
+          "agentState": "FAULTED"
+        }
+      },
+      "exactBuildFailures": [],
+      "matchingUIReady": true
+    }
+  },
+  "validation": {
+    "Go": "full suite passed",
+    "race": "targeted input-worker concurrency tests passed",
+    "vet": "affected packages passed",
+    "frontend": "104 tests passed; native build passed",
+    "package": "workspace update transfer, icon and installer verification passed",
+    "physical": "awaiting user crossing test",
+    "CI": "not run; no push"
+  },
+  "APIChanges": "none",
+  "DBChanges": "none",
+  "runnerChanges": "none"
+}
