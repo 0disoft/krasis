@@ -1,0 +1,1243 @@
+{
+  "schema": "krasis.physical-comparison/v1",
+  "collectedAt": "2026-10-28T13:17:14Z",
+  "generation": 481,
+  "revision": "2c366da26fa9d0f2a7f2fa721cc0a39f65050e2b",
+  "collection": "5bfb685f4bbbc5744533d69a4529347e",
+  "windowStart": "2026-10-28T13:10:53Z",
+  "method": "Exact build, deduplicated rotated logs; exclude installation and pre-test samples before 13:10:53 UTC. Pair only unique exchange tags; measured local monotonic spans. First/last halves refer to retained successful profiles, not all physical crossings. Residual is not pure network RTT.",
+  "baseline": {
+    "generation": 480,
+    "collection": "32a77ca892ac08c4f4077a585de8e2a5",
+    "matchedSuccessfulLeases": 15,
+    "preparedLeases": 15,
+    "grantWait": {
+      "count": 15,
+      "medianMs": 118.22,
+      "maxMs": 255.916
+    },
+    "receiverReady": {
+      "count": 15,
+      "medianMs": 103.984,
+      "maxMs": 242.521
+    },
+    "captureActivation": {
+      "count": 15,
+      "medianMs": 12.315,
+      "maxMs": 46.76
+    },
+    "receiverFirstDispatch": {
+      "count": 15,
+      "medianMs": 1.908,
+      "maxMs": 3.245
+    },
+    "receiverWorstDispatch": {
+      "count": 15,
+      "medianMs": 3.262,
+      "maxMs": 24.108
+    },
+    "nativePairRemaining": {
+      "count": 15,
+      "medianMs": 77.994,
+      "maxMs": 120.322
+    }
+  },
+  "current": {
+    "matchedSuccessfulLeases": 12,
+    "preparedLeases": 12,
+    "grantWait": {
+      "count": 12,
+      "medianMs": 47.561,
+      "maxMs": 259.795
+    },
+    "receiverReady": {
+      "count": 12,
+      "medianMs": 27.9825,
+      "maxMs": 108.346
+    },
+    "captureActivation": {
+      "count": 12,
+      "medianMs": 23.4265,
+      "maxMs": 367.51
+    },
+    "receiverFirstDispatch": {
+      "count": 12,
+      "medianMs": 1.7295,
+      "maxMs": 3.088
+    },
+    "receiverWorstDispatch": {
+      "count": 12,
+      "medianMs": 4.698,
+      "maxMs": 8.792
+    },
+    "matchedPairs": 12,
+    "incompletePairsExcluded": 0,
+    "direction": "A->B lease entries; B->A returns do not create separate source leases",
+    "expiredPreparationEntries": 0,
+    "preparedAge": {
+      "count": 12,
+      "medianMs": 851.813,
+      "maxMs": 1966.196
+    },
+    "nativePairRemaining": {
+      "count": 12,
+      "medianMs": 10.2955,
+      "maxMs": 11.99
+    },
+    "builderJoin": {
+      "count": 1,
+      "medianMs": 0,
+      "maxMs": 0,
+      "unmeasuredPairCount": 11,
+      "positiveWaitCount": 0
+    },
+    "startupStages": {
+      "ServiceLaunch": {
+        "count": 12,
+        "medianMs": 21.0445,
+        "maxMs": 29.349
+      },
+      "ServiceChildConnect": {
+        "count": 12,
+        "medianMs": 126.801,
+        "maxMs": 158.27
+      },
+      "ServiceBootstrapReady": {
+        "count": 12,
+        "medianMs": 16.9545,
+        "maxMs": 19.123
+      },
+      "WorkerInstalledValidation": {
+        "count": 12,
+        "medianMs": 66.2795,
+        "maxMs": 88.143
+      },
+      "WorkerIdentity": {
+        "count": 12,
+        "medianMs": 0,
+        "maxMs": 0.604
+      },
+      "WorkerServiceAuth": {
+        "count": 12,
+        "medianMs": 3.0245,
+        "maxMs": 4.979
+      },
+      "WorkerAgentAuth": {
+        "count": 12,
+        "medianMs": 3.612,
+        "maxMs": 5.627
+      },
+      "WorkerDesktopReady": {
+        "count": 12,
+        "medianMs": 10.2955,
+        "maxMs": 11.99
+      }
+    },
+    "firstHalf": {
+      "matchedSuccessfulLeases": 6,
+      "preparedLeases": 6,
+      "grantWait": {
+        "count": 6,
+        "medianMs": 49.1455,
+        "maxMs": 74.654
+      },
+      "receiverReady": {
+        "count": 6,
+        "medianMs": 27.9155,
+        "maxMs": 40.531
+      },
+      "captureActivation": {
+        "count": 6,
+        "medianMs": 26,
+        "maxMs": 104.612
+      },
+      "receiverFirstDispatch": {
+        "count": 6,
+        "medianMs": 1.7295,
+        "maxMs": 3.014
+      },
+      "receiverWorstDispatch": {
+        "count": 6,
+        "medianMs": 5.308,
+        "maxMs": 8.792
+      }
+    },
+    "lastHalf": {
+      "matchedSuccessfulLeases": 6,
+      "preparedLeases": 6,
+      "grantWait": {
+        "count": 6,
+        "medianMs": 47.561,
+        "maxMs": 259.795
+      },
+      "receiverReady": {
+        "count": 6,
+        "medianMs": 28.2115,
+        "maxMs": 108.346
+      },
+      "captureActivation": {
+        "count": 6,
+        "medianMs": 17.8765,
+        "maxMs": 367.51
+      },
+      "receiverFirstDispatch": {
+        "count": 6,
+        "medianMs": 1.7245,
+        "maxMs": 3.088
+      },
+      "receiverWorstDispatch": {
+        "count": 6,
+        "medianMs": 4.335,
+        "maxMs": 7.89
+      }
+    },
+    "exchangeResidual": {
+      "count": 12,
+      "medianMs": 9.4385,
+      "maxMs": 221.84
+    },
+    "tcp": {
+      "counterDeltasKnown": true,
+      "sampledRetransmittedBytesSum": 106,
+      "sampledRetransmissionPairs": 1,
+      "timeoutEpisodes": 0
+    },
+    "worstCapture": {
+      "at": "2026-10-28T13:16:36.0160552Z",
+      "captureMs": 367.51,
+      "ipcAuthorityMs": 22.137,
+      "ipcResponseMs": 345.372,
+      "nativeBuckets": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        1,
+        2,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        3
+      ],
+      "nativeTotalBucket": 3,
+      "nativeForegroundBucket": 2,
+      "nativePostAuthorityBucket": 3,
+      "workerBuckets": [
+        0,
+        3,
+        4
+      ],
+      "bReadyMs": 28.541,
+      "grantWaitMs": 259.795,
+      "receiverHandlingMs": 37.403,
+      "exchangeResidualMs": 221.84,
+      "tcpRetransmittedBytes": 106
+    },
+    "worstBReady": {
+      "at": "2026-10-28T13:16:39.2149513Z",
+      "readyMs": 108.346,
+      "nativePairRemainingMs": 11.99,
+      "serviceReadiness": {
+        "micros": [
+          35385,
+          42897,
+          33488,
+          517,
+          8211
+        ],
+        "measured": 31
+      },
+      "grantWaitMs": 221.949,
+      "serviceAuthAgentMs": 61.925
+    }
+  },
+  "sides": {
+    "A": {
+      "created": "2026-10-28T13:17:14Z",
+      "diagnosticSha256": "ab9f4eca722b6759fda62ca45a9a7c989dd01eac49aea8a30d3f87d70af1b438",
+      "health": {
+        "time": "2026-10-28T13:17:06.339194Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "service": "READY",
+      "failures": [],
+      "logCompleteness": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false,
+          "events": 2866
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false,
+          "events": 467
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true,
+          "events": 0
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false,
+          "events": 661
+        }
+      ]
+    },
+    "B": {
+      "created": "2026-10-28T13:17:15Z",
+      "diagnosticSha256": "e42ba29ff9162f366147afada928bebf454921da8e1a1ce0f6e189ec77a38995",
+      "health": {
+        "time": "2026-10-28T13:17:11.4723418Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "service": "READY",
+      "failures": [],
+      "logCompleteness": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false,
+          "events": 2874
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false,
+          "events": 1829
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true,
+          "events": 0
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false,
+          "events": 511
+        }
+      ]
+    }
+  },
+  "findings": [
+    "B readiness median/max decreased from 103.984/242.521ms to 27.9825/108.346ms in the retained exact-build successful pairs.",
+    "B native remaining pair readiness median/max decreased from 77.994/120.322ms to 10.2955/11.990ms. All 12 sampled entries used prepared candidates; no expired fallback was observed.",
+    "Only one successful pair has a measured builder join, equal to zero. The other 11 joins are unmeasured, not measured zero.",
+    "B first input dispatch median/max decreased; worst-dispatch median increased from 3.262 to 4.698ms while its sampled maximum decreased from 24.108 to 8.792ms. These runs do not prove that spare construction has no active-input cost.",
+    "A capture activation median/max increased from 12.315/46.760ms to 23.4265/367.510ms. Overall stutter is not resolved.",
+    "The worst A activation spends 345.372ms in local worker IPC response wait and 22.137ms in IPC authority; exact worker subphase costs are not available. Native foreground bucket is under 10ms and native total bucket is 10-100ms, so do not attribute the entire IPC wait to foreground calls.",
+    "The same crossing has 106 sampled TCP retransmitted bytes and 221.840ms exchange residual; transport/endpoint delay and local activation delay are separate measurements, and one does not prove the cause of the other.",
+    "The largest B readiness sample has only 11.990ms native pair remaining time; its longer service-local admission/authentication/receive waits are separate from native readiness and can overlap broader spans.",
+    "No matching-build failure events or new recovery failures were found in retained logs; both input services remain READY."
+  ],
+  "limitations": [
+    "Software spans are not cursor-visible end-to-end latency. Different trajectories, intervals and sample counts do not isolate the patch as the sole cause.",
+    "All 12 detailed retained pairs lie in the fast burst ending around 13:16:39 UTC (A clock). Subsequent coarse input events exist, but the collector retains at most 12 attempts per 120-second window. The later requested 3-5 second dwell cases cannot be separately quantified from these profiles.",
+    "Native activation stages and worker stages are timing buckets, not exact durations. The worker IPC response includes work not fully covered by native activation timing.",
+    "Exchange residual includes transport and endpoint scheduling/read loops, not pure network RTT. Never subtract B ReadyWait from source grant wait to name the difference network latency.",
+    "Input dispatch maxima describe retained per-attempt records, not a percentile across every physical input event.",
+    "TCP counter snapshots are per-attempt deltas; their sampled sum does not establish complete connection traffic totals.",
+    "Empty incomplete rotated control logs do not establish complete UI history."
+  ],
+  "samples": [
+    {
+      "sample": 1,
+      "at": "2026-10-28T13:16:26.1190838Z",
+      "grantMs": 44.36,
+      "readyMs": 28.083,
+      "captureMs": 25.556,
+      "firstDispatchMs": 3.014,
+      "worstDispatchMs": 4.854,
+      "preparedAgeMs": 571.105,
+      "nativePairRemainingMs": 11.956,
+      "serviceReadiness": {
+        "micros": [
+          554,
+          8956,
+          1736,
+          0,
+          0
+        ],
+        "measured": 31
+      },
+      "captureIPC": [
+        0,
+        0,
+        0,
+        25009
+      ],
+      "captureIPCMeasured": 15,
+      "captureNativeBuckets": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        2,
+        1,
+        3,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        1
+      ],
+      "captureWorkerBuckets": [
+        0,
+        1,
+        3
+      ],
+      "sourceExchange": {
+        "schema": 1,
+        "micros": [
+          43797,
+          0,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "receiverExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          0,
+          38718
+        ],
+        "measured": 12
+      },
+      "tcpRetransmittedBytes": 0,
+      "tcpTimeoutEpisodes": 0
+    },
+    {
+      "sample": 2,
+      "at": "2026-10-28T13:16:26.9333271Z",
+      "grantMs": 45.26,
+      "readyMs": 27.748,
+      "captureMs": 96.765,
+      "firstDispatchMs": 1.665,
+      "worstDispatchMs": 3.042,
+      "preparedAgeMs": 915.639,
+      "nativePairRemainingMs": 10.102,
+      "serviceReadiness": {
+        "micros": [
+          630,
+          10545,
+          1171,
+          603,
+          0
+        ],
+        "measured": 31
+      },
+      "captureIPC": [
+        0,
+        399,
+        0,
+        96365
+      ],
+      "captureIPCMeasured": 15,
+      "captureNativeBuckets": [
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        2,
+        1,
+        2,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        2
+      ],
+      "captureWorkerBuckets": [
+        0,
+        3,
+        3
+      ],
+      "sourceExchange": {
+        "schema": 1,
+        "micros": [
+          45260,
+          0,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "receiverExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          0,
+          35491
+        ],
+        "measured": 12
+      },
+      "tcpRetransmittedBytes": 0,
+      "tcpTimeoutEpisodes": 0
+    },
+    {
+      "sample": 3,
+      "at": "2026-10-28T13:16:27.9324114Z",
+      "grantMs": 56.861,
+      "readyMs": 40.531,
+      "captureMs": 26.444,
+      "firstDispatchMs": 1.721,
+      "worstDispatchMs": 8.364,
+      "preparedAgeMs": 632.874,
+      "nativePairRemainingMs": 10.988,
+      "serviceReadiness": {
+        "micros": [
+          1895,
+          19728,
+          1986,
+          613,
+          0
+        ],
+        "measured": 31
+      },
+      "captureIPC": [
+        0,
+        611,
+        0,
+        25833
+      ],
+      "captureIPCMeasured": 15,
+      "captureNativeBuckets": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        2,
+        1,
+        3,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        1
+      ],
+      "captureWorkerBuckets": [
+        0,
+        1,
+        3
+      ],
+      "sourceExchange": {
+        "schema": 1,
+        "micros": [
+          56351,
+          0,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "receiverExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          0,
+          51163
+        ],
+        "measured": 12
+      },
+      "tcpRetransmittedBytes": 0,
+      "tcpTimeoutEpisodes": 0
+    },
+    {
+      "sample": 4,
+      "at": "2026-10-28T13:16:29.878386Z",
+      "grantMs": 42.175,
+      "readyMs": 28.204,
+      "captureMs": 20.103,
+      "firstDispatchMs": 1.738,
+      "worstDispatchMs": 4.542,
+      "preparedAgeMs": 1682.266,
+      "nativePairRemainingMs": 9.988,
+      "serviceReadiness": {
+        "micros": [
+          0,
+          10174,
+          1748,
+          576,
+          0
+        ],
+        "measured": 31
+      },
+      "captureIPC": [
+        0,
+        0,
+        0,
+        18220
+      ],
+      "captureIPCMeasured": 15,
+      "captureNativeBuckets": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        2,
+        1,
+        2,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        2
+      ],
+      "captureWorkerBuckets": [
+        0,
+        1,
+        3
+      ],
+      "sourceExchange": {
+        "schema": 1,
+        "micros": [
+          41592,
+          0,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "receiverExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          0,
+          37548
+        ],
+        "measured": 12
+      },
+      "tcpRetransmittedBytes": 0,
+      "tcpTimeoutEpisodes": 0
+    },
+    {
+      "sample": 5,
+      "at": "2026-10-28T13:16:30.7239797Z",
+      "grantMs": 53.031,
+      "readyMs": 26.274,
+      "captureMs": 104.612,
+      "firstDispatchMs": 1.704,
+      "worstDispatchMs": 5.762,
+      "preparedAgeMs": 787.987,
+      "nativePairRemainingMs": 9.594,
+      "serviceReadiness": {
+        "micros": [
+          617,
+          10091,
+          1306,
+          0,
+          538
+        ],
+        "measured": 31
+      },
+      "captureIPC": [
+        0,
+        8385,
+        0,
+        96226
+      ],
+      "captureIPCMeasured": 15,
+      "captureNativeBuckets": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        2,
+        1,
+        2,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        3
+      ],
+      "captureWorkerBuckets": [
+        0,
+        3,
+        3
+      ],
+      "sourceExchange": {
+        "schema": 1,
+        "micros": [
+          52521,
+          0,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "receiverExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          0,
+          35936
+        ],
+        "measured": 12
+      },
+      "tcpRetransmittedBytes": 0,
+      "tcpTimeoutEpisodes": 0
+    },
+    {
+      "sample": 6,
+      "at": "2026-10-28T13:16:31.3141504Z",
+      "grantMs": 74.654,
+      "readyMs": 26.108,
+      "captureMs": 15.794,
+      "firstDispatchMs": 2.389,
+      "worstDispatchMs": 8.792,
+      "preparedAgeMs": 612.072,
+      "nativePairRemainingMs": 8.551,
+      "serviceReadiness": {
+        "micros": [
+          1523,
+          9003,
+          628,
+          629,
+          570
+        ],
+        "measured": 31
+      },
+      "captureIPC": [
+        0,
+        0,
+        0,
+        15794
+      ],
+      "captureIPCMeasured": 15,
+      "captureNativeBuckets": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        2,
+        1,
+        2,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        2
+      ],
+      "captureWorkerBuckets": [
+        0,
+        1,
+        3
+      ],
+      "sourceExchange": {
+        "schema": 1,
+        "micros": [
+          74107,
+          547,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "receiverExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          0,
+          35769
+        ],
+        "measured": 12
+      },
+      "tcpRetransmittedBytes": 0,
+      "tcpTimeoutEpisodes": 0
+    },
+    {
+      "sample": 7,
+      "at": "2026-10-28T13:16:32.5212323Z",
+      "grantMs": 45.527,
+      "readyMs": 27.092,
+      "captureMs": 89.601,
+      "firstDispatchMs": 3.088,
+      "worstDispatchMs": 6.775,
+      "preparedAgeMs": 621.444,
+      "nativePairRemainingMs": 9.496,
+      "serviceReadiness": {
+        "micros": [
+          578,
+          9744,
+          1680,
+          643,
+          0
+        ],
+        "measured": 31
+      },
+      "captureIPC": [
+        0,
+        6219,
+        511,
+        82870
+      ],
+      "captureIPCMeasured": 15,
+      "captureNativeBuckets": [
+        1,
+        1,
+        1,
+        2,
+        2,
+        1,
+        2,
+        1,
+        2,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        2
+      ],
+      "captureWorkerBuckets": [
+        0,
+        3,
+        3
+      ],
+      "sourceExchange": {
+        "schema": 1,
+        "micros": [
+          43999,
+          1013,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "receiverExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          0,
+          34497
+        ],
+        "measured": 12
+      },
+      "tcpRetransmittedBytes": 0,
+      "tcpTimeoutEpisodes": 0
+    },
+    {
+      "sample": 8,
+      "at": "2026-10-28T13:16:34.2176149Z",
+      "grantMs": 40.657,
+      "readyMs": 27.664,
+      "captureMs": 14.456,
+      "firstDispatchMs": 1.766,
+      "worstDispatchMs": 3.654,
+      "preparedAgeMs": 931.108,
+      "nativePairRemainingMs": 9.571,
+      "serviceReadiness": {
+        "micros": [
+          667,
+          10359,
+          1372,
+          0,
+          0
+        ],
+        "measured": 31
+      },
+      "captureIPC": [
+        0,
+        556,
+        0,
+        13899
+      ],
+      "captureIPCMeasured": 15,
+      "captureNativeBuckets": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        2,
+        1,
+        2,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        1
+      ],
+      "captureWorkerBuckets": [
+        0,
+        1,
+        3
+      ],
+      "sourceExchange": {
+        "schema": 1,
+        "micros": [
+          40657,
+          0,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "receiverExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          7484,
+          42632
+        ],
+        "measured": 12
+      },
+      "tcpRetransmittedBytes": 0,
+      "tcpTimeoutEpisodes": 0
+    },
+    {
+      "sample": 9,
+      "at": "2026-10-28T13:16:36.0160552Z",
+      "grantMs": 259.795,
+      "readyMs": 28.541,
+      "captureMs": 367.51,
+      "firstDispatchMs": 1.081,
+      "worstDispatchMs": 2.75,
+      "preparedAgeMs": 1966.196,
+      "nativePairRemainingMs": 10.921,
+      "serviceReadiness": {
+        "micros": [
+          605,
+          10377,
+          1813,
+          571,
+          0
+        ],
+        "measured": 31
+      },
+      "captureIPC": [
+        0,
+        22137,
+        0,
+        345372
+      ],
+      "captureIPCMeasured": 15,
+      "captureNativeBuckets": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        1,
+        2,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        3
+      ],
+      "captureWorkerBuckets": [
+        0,
+        3,
+        4
+      ],
+      "sourceExchange": {
+        "schema": 1,
+        "micros": [
+          259243,
+          0,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "receiverExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          0,
+          37403
+        ],
+        "measured": 12
+      },
+      "tcpRetransmittedBytes": 106,
+      "tcpTimeoutEpisodes": 0
+    },
+    {
+      "sample": 10,
+      "at": "2026-10-28T13:16:36.7769035Z",
+      "grantMs": 43.136,
+      "readyMs": 27.882,
+      "captureMs": 21.297,
+      "firstDispatchMs": 1.683,
+      "worstDispatchMs": 7.89,
+      "preparedAgeMs": 1150.356,
+      "nativePairRemainingMs": 11.086,
+      "serviceReadiness": {
+        "micros": [
+          599,
+          8934,
+          1972,
+          582,
+          0
+        ],
+        "measured": 31
+      },
+      "captureIPC": [
+        0,
+        1069,
+        0,
+        19719
+      ],
+      "captureIPCMeasured": 15,
+      "captureNativeBuckets": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        2,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        2
+      ],
+      "captureWorkerBuckets": [
+        0,
+        2,
+        3
+      ],
+      "sourceExchange": {
+        "schema": 1,
+        "micros": [
+          42599,
+          0,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "receiverExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          0,
+          36907
+        ],
+        "measured": 12
+      },
+      "tcpRetransmittedBytes": 0,
+      "tcpTimeoutEpisodes": 0
+    },
+    {
+      "sample": 11,
+      "at": "2026-10-28T13:16:38.143753Z",
+      "grantMs": 49.595,
+      "readyMs": 30.488,
+      "captureMs": 11.319,
+      "firstDispatchMs": 2.43,
+      "worstDispatchMs": 4.132,
+      "preparedAgeMs": 1156.058,
+      "nativePairRemainingMs": 10.489,
+      "serviceReadiness": {
+        "micros": [
+          596,
+          10310,
+          1939,
+          571,
+          0
+        ],
+        "measured": 31
+      },
+      "captureIPC": [
+        0,
+        0,
+        0,
+        11319
+      ],
+      "captureIPCMeasured": 15,
+      "captureNativeBuckets": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        2,
+        0,
+        1,
+        2,
+        2,
+        0,
+        2,
+        0,
+        1
+      ],
+      "captureWorkerBuckets": [
+        0,
+        1,
+        3
+      ],
+      "sourceExchange": {
+        "schema": 1,
+        "micros": [
+          49047,
+          0,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "receiverExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          0,
+          39672
+        ],
+        "measured": 12
+      },
+      "tcpRetransmittedBytes": 0,
+      "tcpTimeoutEpisodes": 0
+    },
+    {
+      "sample": 12,
+      "at": "2026-10-28T13:16:39.2149513Z",
+      "grantMs": 221.949,
+      "readyMs": 108.346,
+      "captureMs": 11.39,
+      "firstDispatchMs": 1.612,
+      "worstDispatchMs": 4.538,
+      "preparedAgeMs": 637.809,
+      "nativePairRemainingMs": 11.99,
+      "serviceReadiness": {
+        "micros": [
+          35385,
+          42897,
+          33488,
+          517,
+          8211
+        ],
+        "measured": 31
+      },
+      "captureIPC": [
+        0,
+        554,
+        0,
+        10836
+      ],
+      "captureIPCMeasured": 15,
+      "captureNativeBuckets": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        2,
+        0,
+        1,
+        2,
+        2,
+        0,
+        2,
+        0,
+        1
+      ],
+      "captureWorkerBuckets": [
+        0,
+        1,
+        3
+      ],
+      "sourceExchange": {
+        "schema": 1,
+        "micros": [
+          221649,
+          0,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "receiverExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          0,
+          210338
+        ],
+        "measured": 12
+      },
+      "tcpRetransmittedBytes": 0,
+      "tcpTimeoutEpisodes": 0
+    }
+  ]
+}

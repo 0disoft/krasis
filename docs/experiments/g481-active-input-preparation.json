@@ -21,7 +21,7 @@
     "Completed recovery failure cannot disappear during clean reentry.",
     "Existing cancellation, lease expiry, session/authority and exact-owner retirement checks remain in force."
   ],
-  "physicalRetest": "pending",
+  "physicalRetest": "2026-10-28-g481-physical-report.json",
   "localValidation": {
     "targetedPreparationTests": "passed",
     "targetedPreparationRaceTests": "passed",
