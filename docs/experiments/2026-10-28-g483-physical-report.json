@@ -1,0 +1,239 @@
+{
+  "schema": "krasis.physical-comparison/v1",
+  "generation": 483,
+  "revision": "8be2af34a1a35c26bac0d87574a9347cfc0a2e0e",
+  "collection": "ff3e2e8d78b631974922d56ddbc180c5",
+  "baselineCollection": "93fdabc11c2a2f4809c215a49a00f37a",
+  "userObservation": "Completed crossings; no recovery warning",
+  "method": "Exact build; deduplicate rotated events by run/sequence/code/time; exclude already retained pre-test profiles; join unique exchange tags for A source and B receiver. These local software spans do not measure physical input-to-display latency. B-to-A returns do not create a separate lease entry.",
+  "sides": {
+    "A": {
+      "collectedAt": "2026-10-28T14:21:16Z",
+      "diagnosticSha256": "e380b02d21f0a4b0177015b9b383004fe399b2824ac8eb775f7bde1223c11837",
+      "inputHealth": {
+        "time": "2026-10-28T14:21:16.3896291Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-28T14:07:25.5508739Z",
+        "time": "2026-10-28T14:07:25.5721416Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      },
+      "connection": "CONNECTED",
+      "exactBuildFailureEvents": [],
+      "retainedHistoricalFailure": {
+        "time": "2026-10-28T12:48:39.3095476Z",
+        "code": "agent_faulted",
+        "agentState": "FAULTED"
+      },
+      "newCompletedProfiles": 11,
+      "newIncompleteProfiles": 0,
+      "inputFrames": 663,
+      "physicalWindowRuntime": [
+        {
+          "time": "2026-10-28T14:16:26.9853534Z",
+          "intervalMicros": 59999466,
+          "timerLateMicros": 109633,
+          "dispatchMaxMicros": 67771,
+          "gcPauses": [
+            84,
+            8,
+            3,
+            3,
+            0,
+            0
+          ],
+          "runnableDelays": [
+            1738,
+            65,
+            22,
+            5,
+            0,
+            0
+          ],
+          "queueMaxResidenceMicros": 3998
+        },
+        {
+          "time": "2026-10-28T14:17:26.9856387Z",
+          "intervalMicros": 60000285,
+          "timerLateMicros": 28115,
+          "dispatchMaxMicros": 28448,
+          "gcPauses": [
+            75,
+            6,
+            1,
+            0,
+            0,
+            0
+          ],
+          "runnableDelays": [
+            1877,
+            53,
+            6,
+            0,
+            0,
+            0
+          ],
+          "queueMaxResidenceMicros": 7304
+        }
+      ],
+      "gcFailureTrails": 0
+    },
+    "B": {
+      "collectedAt": "2026-10-28T14:21:18Z",
+      "diagnosticSha256": "7467160c9c1b17ea7f3cc563c01d4305dfd6b7dc9cbc980454de7777c4ce8e1f",
+      "inputHealth": {
+        "time": "2026-10-28T14:21:00.5529436Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-28T14:08:04.1106488Z",
+        "time": "2026-10-28T14:08:04.1583641Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      },
+      "connection": "CONNECTED",
+      "exactBuildFailureEvents": [],
+      "retainedHistoricalFailure": {
+        "time": "2026-10-28T13:49:10.0136388Z",
+        "code": "agent_faulted",
+        "agentState": "FAULTED"
+      },
+      "newCompletedProfiles": 11,
+      "newIncompleteProfiles": 0,
+      "inputFrames": 584,
+      "physicalWindowRuntime": [
+        {
+          "time": "2026-10-28T14:17:10.9042654Z",
+          "intervalMicros": 60000310,
+          "timerLateMicros": 26018,
+          "dispatchMaxMicros": 175917,
+          "gcPauses": [
+            90,
+            17,
+            1,
+            0,
+            0,
+            0
+          ],
+          "runnableDelays": [
+            2360,
+            87,
+            6,
+            0,
+            0,
+            0
+          ],
+          "queueMaxResidenceMicros": 0
+        }
+      ],
+      "gcFailureTrails": 0
+    }
+  },
+  "current": {
+    "matchedSuccessfulLeases": 11,
+    "preparedLeases": 11,
+    "grantWait": {
+      "count": 11,
+      "medianMs": 47.665,
+      "maxMs": 69.688
+    },
+    "captureActivation": {
+      "count": 11,
+      "medianMs": 13.069,
+      "maxMs": 67.771
+    },
+    "receiverReady": {
+      "count": 11,
+      "medianMs": 28.008,
+      "maxMs": 37.935
+    },
+    "receiverFirstDispatch": {
+      "count": 11,
+      "medianMs": 2.314,
+      "maxMs": 3.154
+    },
+    "receiverWorstDispatch": {
+      "count": 11,
+      "medianMs": 6.823,
+      "maxMs": 175.917
+    },
+    "nativePairRemaining": {
+      "count": 11,
+      "medianMs": 10.484,
+      "maxMs": 13.003
+    }
+  },
+  "g481Reference": {
+    "collection": "5bfb685f4bbbc5744533d69a4529347e",
+    "grantWait": {
+      "count": 12,
+      "medianMs": 47.561,
+      "maxMs": 259.795
+    },
+    "captureActivation": {
+      "count": 12,
+      "medianMs": 23.4265,
+      "maxMs": 367.51
+    },
+    "receiverReady": {
+      "count": 12,
+      "medianMs": 27.9825,
+      "maxMs": 108.346
+    },
+    "receiverWorstDispatch": {
+      "count": 12,
+      "medianMs": 4.698,
+      "maxMs": 8.792
+    }
+  },
+  "remainingSpikes": {
+    "BInput": {
+      "attempt": 2,
+      "dispatchMs": 175.917,
+      "clientAuthorityMs": 10.274,
+      "clientResponseMs": 165.643,
+      "serviceStatusMs": 10.274,
+      "workerApplyReportedMillis": 139,
+      "workerApplyMeasured": true,
+      "interpretation": "Dominant wait is after submission on the local worker response path, including ~139ms reported worker apply. This aggregate does not isolate SendInput, journal/guard IPC, owner-thread scheduling or return receipt delay."
+    },
+    "ACapture": {
+      "attempt": 3,
+      "totalMs": 67.771,
+      "ipcAuthorityMs": 1.014,
+      "ipcResponseMs": 63.342,
+      "interpretation": "A capture outlier remains on the installed source response path; no pure network or foreground-only causal claim."
+    }
+  },
+  "conclusions": [
+    "No exact-build failure or reconnect event in either retained history, and all 11 matched entries completed.",
+    "The previous 5.177s readiness wait and 2s input authority timeout did not recur in this sample.",
+    "Compared with g481, capture and readiness maxima decreased in this sample, but receiver input dispatch maximum increased from 8.792ms to 175.917ms.",
+    "This short uncontrolled run neither proves the g483 hint fix caused the difference nor rules out recurrence of the earlier independent stall."
+  ],
+  "nextInvestigation": "B worker apply path: retain detailed phases for the slow operation itself to separate native SendInput, input/release journal and crash-guard round trips, and owner-thread scheduling.",
+  "validation": {
+    "pairedCollection": "passed",
+    "localDoctor": "healthy CONNECTED and matching g483 UI/agent/installed image",
+    "measuredBitAndPairChecks": "passed",
+    "sourceChanges": "none; report only",
+    "tests": "not rerun; no runtime source change",
+    "CI": "not run; no push"
+  },
+  "sourceOfTruthChanges": "none",
+  "APIChanges": "none",
+  "DBChanges": "none",
+  "runnerChanges": "none"
+}
