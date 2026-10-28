@@ -58,3 +58,83 @@ func TestPreparationWriteSharesHintExpiryAndReleasesSemanticGate(t *testing.T) {
 		})
 	}
 }
+
+// Model the transport's separate write gate. A hint may enter the semantic
+// coordinator while an earlier wire operation still owns that gate.
+type queuedHintWriter struct {
+	calls chan struct{}
+	err   error
+}
+
+func (w *queuedHintWriter) WriteFrameContext(ctx context.Context, _ transport.Frame) error {
+	w.calls <- struct{}{}
+	<-ctx.Done()
+	return w.err
+}
+
+func TestPreparationUnsentWireAdmissionExpiryKeepsSessionUsable(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		writer := &queuedHintWriter{calls: make(chan struct{}, 2), err: &transport.FrameWriteFailure{
+			Kind: transport.MessageControl, Phase: "admission", Cause: context.DeadlineExceeded,
+		}}
+		coordinator, _ := peer.NewSessionWriteCoordinator(writer)
+		runtime, _ := application.NewSessionRuntime(noopEffects{}, newTestInput(false))
+		hints := make(chan time.Time, 1)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		done := make(chan error, 1)
+		go func() { done <- runPreparationSender(ctx, hints, runtime, coordinator) }()
+		started := time.Now()
+		hints <- started
+		<-writer.calls
+		synctest.Wait()
+		time.Sleep(preparationHintLifetime)
+		synctest.Wait()
+		select {
+		case err := <-done:
+			t.Fatalf("zero-byte admission expiry disconnected session: %v", err)
+		default:
+		}
+		// Essential semantic work can still acquire the gate after the hint.
+		if err := coordinator.Execute(ctx, func(peer.FrameWriter) error { return nil }); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(2*time.Second - time.Since(started))
+		hints <- time.Now()
+		<-writer.calls // A fresh hint still runs; no retry of the old frame.
+		cancel()
+		if err := <-done; !errors.Is(err, context.Canceled) {
+			t.Fatal("session cancellation was not joined", err)
+		}
+		if runtime.Snapshot().Control.State != control.StateLocal {
+			t.Fatal("unsent hint changed input authority")
+		}
+	})
+}
+
+func TestPreparationWriteReceiptCannotHideUncertainOrInvalidFailure(t *testing.T) {
+	for _, failure := range []error{
+		context.DeadlineExceeded, // No receipt proves that zero bytes were sent.
+		&transport.FrameWriteFailure{Kind: transport.MessageControl, Phase: "io", Cause: context.DeadlineExceeded},
+		&transport.FrameWriteFailure{Kind: transport.MessageControl, Phase: "deadline", Cause: context.Canceled},
+		&transport.FrameWriteFailure{Kind: transport.MessageInput, Phase: "admission", Cause: context.DeadlineExceeded},
+		&transport.FrameWriteFailure{Kind: transport.MessageControl, Phase: "admission", Cause: errors.New("broken transport")},
+	} {
+		t.Run(failure.Error(), func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				writer := &queuedHintWriter{calls: make(chan struct{}, 1), err: failure}
+				coordinator, _ := peer.NewSessionWriteCoordinator(writer)
+				runtime, _ := application.NewSessionRuntime(noopEffects{}, newTestInput(false))
+				hints := make(chan time.Time, 1)
+				hints <- time.Now()
+				done := make(chan error, 1)
+				go func() { done <- runPreparationSender(context.Background(), hints, runtime, coordinator) }()
+				<-writer.calls
+				time.Sleep(preparationHintLifetime)
+				if err := <-done; !errors.Is(err, failure) {
+					t.Fatal("uncertain write failure was hidden", err)
+				}
+			})
+		})
+	}
+}

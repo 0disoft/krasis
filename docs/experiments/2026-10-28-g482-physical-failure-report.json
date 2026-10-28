@@ -1,0 +1,108 @@
+{
+  "schema": "krasis.physical-failure/v1",
+  "generation": 482,
+  "revision": "2f21da349b21983b869aa3c3bd442055145e7fad",
+  "collection": "6142ff011d63aa4ad722078bc9e33596",
+  "userObservation": "Recovery warning after physical crossing test",
+  "method": "Deduplicate exact-build events by run, sequence, code and time. Local monotonic durations are not physical input-to-display latency. Histogram final bucket is >=1s with no upper bound.",
+  "sides": {
+    "A": {
+      "diagnosticSha256": "ac506be0bb95de7311800ec8f9d57becaada733675f3dc9f6553d1f74c80e6c2",
+      "profiles": 4,
+      "complete": 2,
+      "incomplete": 2,
+      "failures": [
+        {
+          "time": "2026-10-28T13:48:57.2629516Z",
+          "code": "reconnect_remote_eof"
+        },
+        {
+          "time": "2026-10-28T13:49:30.9597821Z",
+          "code": "installed_source_command_failed_deactivate"
+        },
+        {
+          "time": "2026-10-28T13:49:30.9603516Z",
+          "code": "reconnect_session_unknown"
+        }
+      ],
+      "gcSampleLimitSeconds": [
+        0.0001,
+        0.001,
+        0.01,
+        0.1,
+        1
+      ]
+    },
+    "B": {
+      "diagnosticSha256": "628fedb25300c4695c0f388a330eb1e3cff8098bdd89b7fef43b5e7008c7f471",
+      "profiles": 4,
+      "complete": 2,
+      "incomplete": 2,
+      "failures": [
+        {
+          "time": "2026-10-28T13:48:58.4725913Z",
+          "code": "fault_injection_not_applied"
+        },
+        {
+          "time": "2026-10-28T13:49:01.4238505Z",
+          "code": "fault_guard_close_timeout"
+        },
+        {
+          "time": "2026-10-28T13:49:31.6583237Z",
+          "code": "installed_input_connect_failed"
+        },
+        {
+          "time": "2026-10-28T13:49:32.028303Z",
+          "code": "installed_source_command_failed_deactivate"
+        },
+        {
+          "time": "2026-10-28T13:49:32.04632Z",
+          "code": "fault_write_deadline_failed"
+        }
+      ],
+      "gcSampleLimitSeconds": [
+        0.0001,
+        0.001,
+        0.01,
+        0.1,
+        1
+      ]
+    }
+  },
+  "findings": {
+    "serviceStateAtCollection": "Both READY and CONNECTED; warning is not proof of a currently stopped service",
+    "bWorstInputAuthorityMs": 2000.711,
+    "bControlAuthorizeMs": 5348.555,
+    "bConnectMs": 5333.518,
+    "bReadyWaitMs": 5177.492,
+    "bLongControlDispatchMs": 5348.556,
+    "bTimerLateMs": 4965.591,
+    "bEarlierGCSample": {
+      "windowMs": 1711.364,
+      "lateMs": 1616.686,
+      "totalPauseAtLeastOneSecond": 1,
+      "stoppingPauseAtLeastOneSecond": 1,
+      "causalLimit": "This sample precedes the later fault and does not establish that GC caused either the authority deadline or the separate 5.35s readiness wait."
+    },
+    "aSourceRetirement": "Capture, sender and interrupt joined; clean_sent and report ok",
+    "bSourceRetirement": "Joined cancellation with source-query-cancelled; not uncertain native cleanup",
+    "bPreparationFailure": "fault_write_deadline_failed; remains fatal in g483. The fix below does not claim to explain this observed failure."
+  },
+  "g483Change": {
+    "problem": "Optional hint sender treated zero-byte transport admission timeout as a terminal TLS write failure.",
+    "fix": "Drop only an explicitly identified MessageControl admission cancellation/deadline receipt; preserve session and future fresh hints.",
+    "originalFailureReproduced": true,
+    "tests": [
+      "Original implementation fails new zero-byte admission regression",
+      "Hint expiry remains 500ms; no new network frames or retries",
+      "Fresh hints remain usable after 2s cooldown",
+      "Plain timeout, wrong-kind receipt, deadline setup failure and I/O failure stay fatal",
+      "Real transport admission test proves timed-out waiter leaves connection reusable"
+    ],
+    "limitation": "Prevents one independently reproduced disconnection path; 5s B stall and physical recovery recurrence remain unverified."
+  },
+  "validation": {
+    "targetedAgentPeerTransportResidentagent": "passed",
+    "physicalAfterG483": "pending"
+  }
+}

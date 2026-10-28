@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/0disoft/krasis/internal/application"
@@ -105,6 +106,14 @@ func runPreparationSender(ctx context.Context, hints <-chan time.Time, runtime *
 			})
 			cancel()
 			if err != nil && attempted {
+				// Calling the writer does not prove TLS I/O started: its own
+				// gate may expire first (including after a scheduling pause).
+				// Only its explicit admission receipt establishes zero bytes.
+				var failure *transport.FrameWriteFailure
+				if errors.As(err, &failure) && failure.Kind == transport.MessageControl && failure.Phase == "admission" &&
+					(errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)) {
+					continue
+				}
 				// A frame writer failure may have partially written TLS data.
 				// It cannot be treated as a harmless preparation rejection.
 				return err
