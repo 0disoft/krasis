@@ -10,10 +10,15 @@ import (
 func authorizeSourceExecution(ctx context.Context, service, agent *Channel) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
-	if err := service.authorizeSourceInput(ctx); err != nil {
+	// Independent, read-only proofs retain their per-channel native owners.
+	// Join both bounded callers before returning; neither success is cached.
+	serviceResult := make(chan error, 1)
+	go func() { serviceResult <- service.authorizeSourceInput(ctx) }()
+	agentErr := agent.authorizeSourceInput(ctx)
+	if err := <-serviceResult; err != nil {
 		return sourceQueryOwner("service", err)
 	}
-	return sourceQueryOwner("agent", agent.authorizeSourceInput(ctx))
+	return sourceQueryOwner("agent", agentErr)
 }
 
 func sourceCaptureAuthorization(ctx context.Context, service, agent *Channel) func() error {

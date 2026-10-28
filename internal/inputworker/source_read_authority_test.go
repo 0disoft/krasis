@@ -69,16 +69,18 @@ func TestSourceReaderUsesOneBudgetAcrossBothOwners(t *testing.T) {
 			server, pipe := net.Pipe()
 			defer server.Close()
 			owners[i] = clientChannel(pipe, authorityService)
-			owners[i].authority.checkInput = func() error { time.Sleep(600 * time.Millisecond); return nil }
+			owners[i].authority.checkInput = func() error { time.Sleep(1200 * time.Millisecond); return nil }
 		}
 		started := time.Now()
 		err := authorizeSourceExecution(context.Background(), owners[0], owners[1])
 		if !errors.Is(err, context.DeadlineExceeded) || time.Since(started) != time.Second {
 			t.Fatal("owners received separate budgets", err, time.Since(started))
 		}
-		// The second native owner still runs for 200ms after admission expires.
-		if owners[1].Close() != ErrAuthority {
-			t.Fatal("unfinished second owner reported cleanup")
+		// Both native owners still run for 200ms after the shared budget expires.
+		for _, owner := range owners {
+			if owner.Close() != ErrAuthority {
+				t.Fatal("unfinished owner reported cleanup")
+			}
 		}
 		time.Sleep(200 * time.Millisecond)
 		synctest.Wait()
@@ -88,4 +90,71 @@ func TestSourceReaderUsesOneBudgetAcrossBothOwners(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestSourceExecutionOverlapsIndependentFreshProofs(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		owners := make([]*Channel, 2)
+		defer func() {
+			// A failing assertion must also join an expired native query.
+			time.Sleep(time.Second)
+			synctest.Wait()
+			for _, owner := range owners {
+				if owner.Close() != nil {
+					t.Error("completed proof retained native resources")
+				}
+			}
+		}()
+		var calls [2]atomic.Int32
+		for i := range owners {
+			server, pipe := net.Pipe()
+			defer server.Close()
+			owners[i] = clientChannel(pipe, authorityService)
+			owners[i].authority.checkInput = func() error {
+				calls[i].Add(1)
+				time.Sleep(600 * time.Millisecond)
+				return nil
+			}
+		}
+		for attempt := int32(1); attempt <= 2; attempt++ {
+			started := time.Now()
+			if err := authorizeSourceExecution(context.Background(), owners[0], owners[1]); err != nil || time.Since(started) != 600*time.Millisecond {
+				t.Fatal("independent proofs serialized or inherited separate budgets", err, time.Since(started))
+			}
+			if calls[0].Load() != attempt || calls[1].Load() != attempt {
+				t.Fatal("execution reused a previous authority proof")
+			}
+		}
+	})
+}
+
+func TestSourceExecutionRejectsEitherOwnerAndJoinsBothProofs(t *testing.T) {
+	for _, rejected := range []int{0, 1} {
+		synctest.Test(t, func(t *testing.T) {
+			owners := make([]*Channel, 2)
+			var completed [2]atomic.Bool
+			for i := range owners {
+				server, pipe := net.Pipe()
+				defer server.Close()
+				owners[i] = clientChannel(pipe, authorityService)
+				owners[i].authority.checkInput = func() error {
+					time.Sleep(time.Duration(i+1) * 10 * time.Millisecond)
+					completed[i].Store(true)
+					if i == rejected {
+						return ErrAuthority
+					}
+					return nil
+				}
+			}
+			err := authorizeSourceExecution(context.Background(), owners[0], owners[1])
+			if !errors.Is(err, ErrAuthority) || !completed[0].Load() || !completed[1].Load() {
+				t.Fatal("denied or unfinished proof granted capture", rejected, err)
+			}
+			for _, owner := range owners {
+				if owner.Close() != nil {
+					t.Fatal("proof resources leaked")
+				}
+			}
+		})
+	}
 }

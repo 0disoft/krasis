@@ -3,6 +3,7 @@ package inputworker
 import (
 	"context"
 	"net"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -11,7 +12,8 @@ import (
 func TestSourceAdmissionDefersSlowProofButRejectsRevocationAtExecution(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		var owners [2]*Channel
-		full, presence, applied := 0, 0, 0
+		var full atomic.Int32
+		presence, applied := 0, 0
 		revoked := false
 		for i := range owners {
 			server, pipe := net.Pipe()
@@ -20,7 +22,7 @@ func TestSourceAdmissionDefersSlowProofButRejectsRevocationAtExecution(t *testin
 			defer owners[i].Close()
 			owners[i].authority.checkPresent = func() error { presence++; return nil }
 			owners[i].authority.checkInput = func() error {
-				full++
+				full.Add(1)
 				time.Sleep(400 * time.Millisecond)
 				if revoked {
 					return ErrAuthority
@@ -29,8 +31,8 @@ func TestSourceAdmissionDefersSlowProofButRejectsRevocationAtExecution(t *testin
 			}
 		}
 		started := time.Now()
-		if err := authorizeSourceRead(context.Background(), owners[0], owners[1], sourceAdmit); err != nil || full != 0 || presence != 2 || time.Since(started) != 0 {
-			t.Fatal("reader repeated execution RPCs", err, full, presence)
+		if err := authorizeSourceRead(context.Background(), owners[0], owners[1], sourceAdmit); err != nil || full.Load() != 0 || presence != 2 || time.Since(started) != 0 {
+			t.Fatal("reader repeated execution RPCs", err, full.Load(), presence)
 		}
 		authorize := sourceCaptureAuthorization(context.Background(), owners[0], owners[1])
 		desktop := func(_ context.Context, work func() error) error {
@@ -40,13 +42,13 @@ func TestSourceAdmissionDefersSlowProofButRejectsRevocationAtExecution(t *testin
 			return work()
 		}
 		timing, err := executeSourceCommand(context.Background(), sourceAdmit, desktop, func() error { applied++; return nil })
-		if err != nil || applied != 1 || full != 2 || time.Since(started) != 800*time.Millisecond || timing != ([3]byte{}) {
-			t.Fatal("execution lost fresh proofs or changed reply shape", err, full, applied, timing)
+		if err != nil || applied != 1 || full.Load() != 2 || time.Since(started) != 400*time.Millisecond || timing != ([3]byte{}) {
+			t.Fatal("execution lost fresh proofs or changed reply shape", err, full.Load(), applied, timing)
 		}
 		revoked = true // A prior successful read/proof must not authorize another command.
 		_, err = executeSourceCommand(context.Background(), sourceAdmit, desktop, func() error { applied++; return nil })
-		if err == nil || applied != 1 || full != 3 {
-			t.Fatal("revoked owner reached admission work", err, full, applied)
+		if err == nil || applied != 1 || full.Load() != 4 {
+			t.Fatal("revoked owner reached admission work", err, full.Load(), applied)
 		}
 	})
 }
