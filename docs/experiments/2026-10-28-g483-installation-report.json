@@ -1,0 +1,136 @@
+{
+  "schema": "krasis.installation-comparison/v1",
+  "generation": 483,
+  "revision": "8be2af34a1a35c26bac0d87574a9347cfc0a2e0e",
+  "collection": "93fdabc11c2a2f4809c215a49a00f37a",
+  "scope": "Post-installation health; physical latency and recurrence not yet verified.",
+  "AInstall": {
+    "state": "installed",
+    "result": 0
+  },
+  "BUpdate": {
+    "id": "1e219e7427d55ab1d0f5e3f11cc38ae4",
+    "state": "UPDATED",
+    "bytes": 28571845,
+    "total": 28571845
+  },
+  "BUI": {
+    "code": "window_ready"
+  },
+  "localDoctor": {
+    "code": "healthy",
+    "connection": "CONNECTED",
+    "agentGeneration": 483,
+    "uiGeneration": 483,
+    "protectedInput": "CONFIGURED",
+    "service": "RUNNING"
+  },
+  "sides": {
+    "A": {
+      "collectedAt": "2026-10-28T14:09:45Z",
+      "diagnosticSha256": "0e67f6eb153f4d63af998396076a7170d4fbf6cd6911d5594298c7970c523eb9",
+      "installation": {
+        "time": "2026-10-28T14:07:24.7943158Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "inputHealth": {
+        "time": "2026-10-28T14:09:28.9492887Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-28T14:07:25.5508739Z",
+        "time": "2026-10-28T14:07:25.5721416Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      },
+      "recovery": {
+        "time": "2026-10-28T14:09:31.9617591Z",
+        "code": "agent_present",
+        "agentState": "CONNECTED",
+        "lastFailure": {
+          "time": "2026-10-28T12:48:39.3095476Z",
+          "code": "agent_faulted",
+          "agentState": "FAULTED"
+        }
+      },
+      "launchRecordReadyForRevision": true,
+      "exactBuildFailureEvents": []
+    },
+    "B": {
+      "collectedAt": "2026-10-28T14:09:46Z",
+      "diagnosticSha256": "3f80423ebf3431609866aac3f1b03a6fc5b86685ccf700692cf6c39e1017e328",
+      "installation": {
+        "time": "2026-10-28T14:08:01.4284982Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "inputHealth": {
+        "time": "2026-10-28T14:09:38.9509241Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-28T14:08:04.1106488Z",
+        "time": "2026-10-28T14:08:04.1583641Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      },
+      "recovery": {
+        "time": "2026-10-28T14:09:08.216869Z",
+        "code": "agent_present",
+        "agentState": "CONNECTED",
+        "lastFailure": {
+          "time": "2026-10-28T13:49:10.0136388Z",
+          "code": "agent_faulted",
+          "agentState": "FAULTED"
+        }
+      },
+      "launchRecordReadyForRevision": true,
+      "exactBuildFailureEvents": []
+    }
+  },
+  "validation": {
+    "originalRegression": "reproduced with HEAD source overlay before fix",
+    "agentPeerTransportResidentagent": "passed",
+    "goVetAgentTransport": "passed",
+    "frontendTests": 104,
+    "workspaceAndSetupPackage": "passed",
+    "allGoTests": "not rerun; affected packages and bundle smoke passed",
+    "hostedCI": "not run; not pushed",
+    "physicalCrossing": "pending"
+  },
+  "changes": {
+    "API": "none",
+    "DB": "none",
+    "CI": "none",
+    "runtimeOverlay": "unchanged",
+    "sourceOfTruth": "docs/architecture/02-runtime-flow.md"
+  },
+  "remainingRisk": "Independent B 5.35s readiness/scheduling stall remains unexplained. Observed deadline-setup failure is intentionally still fatal; g483 fixes a separately reproduced pre-write admission cancellation."
+}
