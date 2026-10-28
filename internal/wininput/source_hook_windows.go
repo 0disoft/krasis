@@ -24,6 +24,7 @@ type SourceHook struct {
 	presentationReport SourcePresentationReporter
 	admissionReport    func(string)
 	physicalSession    atomic.Pointer[SourceSession]
+	commandProof       atomic.Pointer[sourceCommandProof]
 	capture            *sourceWheelCapture
 	returnCursor       returnCursorShield
 }
@@ -61,10 +62,17 @@ func (hook *SourceHook) SourceCapture() SourceActivation {
 	if hook == nil {
 		return nil
 	}
-	if hook.boundaryGuard != nil {
-		return &guardedSourceActivation{SourceActivation: hook.capture, check: hook.boundaryGuard}
+	var capture SourceActivation = hook.capture
+	if hook.interactiveSource && hook.loginAuthorize != nil {
+		// ExecuteSourceDesktop has already obtained a fresh full proof while
+		// inside Scope.Do. Only that live same-thread callback may reuse its
+		// pre-check; the native desktop check and independent post-proof remain.
+		capture = &guardedSourceActivation{SourceActivation: capture, check: hook.loginAuthorize, beforeAuthorized: hook.sourceCommandAuthorized}
 	}
-	return hook.capture
+	if hook.boundaryGuard != nil {
+		capture = &guardedSourceActivation{SourceActivation: capture, check: hook.boundaryGuard}
+	}
+	return capture
 }
 
 func (hook *SourceHook) Run(ctx context.Context, session *SourceSession, ready func()) error {

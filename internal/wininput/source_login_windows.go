@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"runtime"
+	"sync/atomic"
 
 	"github.com/0disoft/krasis/internal/inputdesktop"
 )
@@ -15,6 +16,29 @@ type sourceCommandDesktopKey struct{}
 type sourceCommandScope struct {
 	owner *SourceHook
 	scope *inputdesktop.Scope
+}
+
+type sourceCommandProof struct {
+	thread     uint32
+	ctx        context.Context
+	activation atomic.Bool
+}
+
+// Called only as Scope.Do's operation, after its fresh full authorization.
+// Publish no result cache: the marker exists only for this callback and thread.
+func (hook *SourceHook) sourceCommandWork(ctx context.Context, callback func() error) func() error {
+	return func() error {
+		proof := &sourceCommandProof{thread: sourceWheelCaptureCurrentThread(), ctx: ctx}
+		if proof.thread != 0 && hook.commandProof.CompareAndSwap(nil, proof) {
+			defer hook.commandProof.CompareAndSwap(proof, nil)
+		}
+		return callback()
+	}
+}
+
+func (hook *SourceHook) sourceCommandAuthorized() bool {
+	proof := hook.commandProof.Load()
+	return proof != nil && proof.ctx.Err() == nil && proof.thread == sourceWheelCaptureCurrentThread() && proof.activation.CompareAndSwap(false, true)
 }
 
 // WithSourceCommandDesktop keeps only the window-free command dispatcher on
@@ -73,7 +97,7 @@ func (hook *SourceHook) ExecuteSourceDesktop(ctx context.Context, callback func(
 		if command.owner != hook {
 			return inputdesktop.ErrInvalid
 		}
-		return command.scope.Do(ctx, callback)
+		return command.scope.Do(ctx, hook.sourceCommandWork(ctx, callback))
 	}
 	if hook.interactiveSource {
 		// These commands create no windows or hooks: activation and cursor work
@@ -81,7 +105,7 @@ func (hook *SourceHook) ExecuteSourceDesktop(ctx context.Context, callback func(
 		// rather than creating and joining a disposable capture thread per call.
 		// The actual hook/window owners still use RunCapture below.
 		return sourceCommandDesktop(context.Background(), hook.loginAuthorize, func(scope *inputdesktop.Scope) error {
-			return scope.Do(ctx, callback)
+			return scope.Do(ctx, hook.sourceCommandWork(ctx, callback))
 		})
 	}
 	return hook.onDesktop(ctx, func(owned context.Context) error {

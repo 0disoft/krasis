@@ -21,7 +21,8 @@ func (h *SourceHook) SetBoundaryGuard(check func() error) { h.boundaryGuard = ch
 
 type guardedSourceActivation struct {
 	SourceActivation
-	check func() error
+	check            func() error
+	beforeAuthorized func() bool // Live command scope only; never a retained proof.
 }
 
 func (s *guardedSourceActivation) Activate() error {
@@ -29,11 +30,14 @@ func (s *guardedSourceActivation) Activate() error {
 }
 
 func (s *guardedSourceActivation) ActivateProfile(ctx context.Context) error {
-	stopBefore := handoff.CaptureSpan(ctx, handoff.CaptureBoundaryBefore)
-	err := s.check()
-	stopBefore()
-	if err != nil {
-		return err
+	var err error
+	if s.beforeAuthorized == nil || !s.beforeAuthorized() {
+		stopBefore := handoff.CaptureSpan(ctx, handoff.CaptureBoundaryBefore)
+		err = s.check()
+		stopBefore()
+		if err != nil {
+			return err
+		}
 	}
 	if capture, ok := s.SourceActivation.(SourceProfiledActivation); ok {
 		err = capture.ActivateProfile(ctx)

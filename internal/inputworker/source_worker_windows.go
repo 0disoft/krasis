@@ -225,7 +225,6 @@ func runSourceCapture(ctx context.Context, channel, service *Channel, lease Leas
 	if err != nil {
 		return err
 	}
-	hook.SetBoundaryGuard(authorize)
 	var pressedEvidence atomic.Uint32
 	hook.SetAdmissionReporter(func(code string) { pressedEvidence.Store(uint32(sourcePressedEvidence(code))) })
 	writer := &sourceWriter{ctx: run, channel: channel, binding: lease.Binding, heartbeat: &heartbeat}

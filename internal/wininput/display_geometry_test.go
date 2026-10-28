@@ -41,6 +41,22 @@ func TestGeometryGuardRollsBackCaptureChangedDuringActivation(t *testing.T) {
 	}
 }
 
+func TestOwnerAuthorizedCaptureStillChecksFreshPostProofAndRollsBack(t *testing.T) {
+	denied := false
+	checks := 0
+	native := &geometryCapture{onActivate: func() { denied = true }}
+	capture := &guardedSourceActivation{SourceActivation: native, beforeAuthorized: func() bool { return true }, check: func() error {
+		checks++
+		if !native.active || !denied {
+			t.Fatal("owner-authorized guard repeated a pre-activation query")
+		}
+		return ErrDisplayGeometryChanged
+	}}
+	if err := capture.Activate(); !errors.Is(err, ErrDisplayGeometryChanged) || native.active || checks != 1 {
+		t.Fatal("post-activation denial kept capture active", err, checks)
+	}
+}
+
 type profiledGeometryCapture struct{ geometryCapture }
 
 func (capture *profiledGeometryCapture) ActivateProfile(ctx context.Context) error {

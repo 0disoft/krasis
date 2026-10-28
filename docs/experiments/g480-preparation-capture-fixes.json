@@ -1,0 +1,34 @@
+{
+  "schema": "krasis.experiment/v1",
+  "generation": 480,
+  "baselineReport": "2026-10-28-g479-physical-report.json",
+  "physicalBaseline": {
+    "matchedLeases": 11,
+    "expiredPreparationEntries": 1,
+    "expiredEntryReadyMs": 287.915,
+    "sourceCaptureMaxMs": 94.871
+  },
+  "preparation": {
+    "cause": "Builder completes and expires while accept blocks; warming is not collected after authentication, so the next optional hint is ignored.",
+    "fix": "Nonblocking collect before and after accept; close authenticated channel on completed recovery failure.",
+    "controlledIdleSeconds": 3,
+    "before": "Completed builder still blocks fresh hint.",
+    "after": "Fresh hint replaces expired candidate before the actual lease joins.",
+    "expirySeconds": 2,
+    "launchCooldownChanged": false,
+    "backgroundIdleRefreshAdded": false
+  },
+  "capture": {
+    "cause": "A fresh command-desktop authorization is immediately repeated by the pre-activation boundary guard.",
+    "fix": "Consume one live same-thread command-scope marker instead of repeating the pre-check; retain native desktop check and fresh post-check.",
+    "usualCommandProofPairsBefore": 3,
+    "usualCommandProofPairsAfter": 2,
+    "cachedSuccessAdded": false,
+    "threadBound": true,
+    "singleUse": true,
+    "cancelledCommandAccepted": false,
+    "customGeometryGuardsChanged": false,
+    "windowsForegroundWaitEliminated": false
+  },
+  "physicalG480Retest": "pending"
+}
