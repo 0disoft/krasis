@@ -130,13 +130,24 @@ func TestSourceCommandExpiresDuringAuthenticationWithoutStartingRequest(t *testi
 		if _, err := c.call(ctx, sourceActivate); err != context.DeadlineExceeded || time.Since(started) != 100*time.Millisecond {
 			t.Fatal("expired authentication did not retain the caller outcome", err)
 		}
-		if c.sequence != 0 || c.epoch.Load() != 0 || c.channel.authority.closed || !c.channel.authority.fenced.Load() {
+		// The native owner still holds authority.mu until its query returns.
+		// Observe pending ownership through queryMu, not its unsynchronized closed flag.
+		c.channel.queryMu.Lock()
+		pending := c.channel.pendingQueriesLocked()
+		c.channel.queryMu.Unlock()
+		if c.sequence != 0 || c.epoch.Load() != 0 || !pending || !c.channel.authority.fenced.Load() {
 			t.Error("unsent activation consumed an epoch or discarded pending native ownership")
 		}
 		time.Sleep(100 * time.Millisecond)
 		synctest.Wait()
-		if !c.channel.authority.closed || c.channel.Close() != nil {
+		if c.channel.Close() != nil {
 			t.Fatal("late authentication did not retire its fenced owner")
+		}
+		c.channel.authority.mu.Lock()
+		closed := c.channel.authority.closed
+		c.channel.authority.mu.Unlock()
+		if !closed {
+			t.Fatal("joined retirement did not close authority")
 		}
 	})
 }

@@ -31,6 +31,7 @@ type sourceWriter struct {
 	epoch        atomic.Uint64
 	started      atomic.Bool
 	heartbeat    *sourceHeartbeatProgress
+	activation   atomic.Pointer[sourceActivationFence]
 }
 
 func (w *sourceWriter) send(p sourcePacket, current func() bool) error {
@@ -161,6 +162,9 @@ func (w *sourceWriter) writeSequenced(ctx context.Context, data []byte, sequence
 func (w *sourceWriter) SendAction(ctx context.Context, action control.InputAction, current func() bool) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
+	}
+	if err := w.awaitActivation(ctx, current); err != nil {
+		return err
 	}
 	err := w.writePacketContext(ctx, sourcePacket{kind: sourceAction, reply: w.epoch.Load(), action: action}, current, false, false)
 	var failure *sourceIOFailure
@@ -391,6 +395,10 @@ func runSourceCapture(ctx context.Context, channel, service *Channel, lease Leas
 					return nil
 				}
 				response := sourcePacket{kind: sourceReply, op: p.op, reply: p.sequence}
+				var activation *sourceActivationFence
+				if p.op == sourceActivate {
+					activation = writer.beginActivation(p.sequence)
+				}
 				operation := func() error {
 					switch p.op {
 					case sourceAdmit:
@@ -482,7 +490,7 @@ func runSourceCapture(ctx context.Context, channel, service *Channel, lease Leas
 					response.decision = 0
 					response.pressedEvidence = 0
 				}
-				if failure := sourceCommandCompletion(err, writer.sendCompletedReply(p, response)); failure != nil {
+				if failure := writer.completeSourceCommand(p, response, err, activation); failure != nil {
 					return failure
 				}
 				select {

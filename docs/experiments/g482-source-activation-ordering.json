@@ -1,0 +1,46 @@
+{
+  "schema": "krasis.experiment/v1",
+  "generation": 482,
+  "baselineReport": "2026-10-28-g481-physical-report.json",
+  "problem": "Source suppression publishes active before native window activation/post-authorization completes. Queued input can therefore start full authority queries on the same channel and writes on the same pipe before the actual activation ACK.",
+  "change": "Hold the existing ordered sender on one activation-epoch fence before any input authority/wire work. Release only after the operation and its exact successful ACK write both complete. Keep suppression and the bounded/coalescing input queue active during this wait.",
+  "evidence": {
+    "g481WorstCaptureMs": 367.51,
+    "g481WorstCaptureIPCResponseMs": 345.372,
+    "g481WorstCaptureNativeTotalBucket": "10-100ms",
+    "originalOrderingReproduced": "Removing the sender fence makes the regression fail because input starts full authority/wire work before activation completion.",
+    "causalLimit": "This proves an avoidable concurrency dependency, not that all of the physical 345.372ms response wait is caused by it. Native execution, authorization and reply scheduling still require physical comparison."
+  },
+  "limits": {
+    "extraWireFrames": 0,
+    "sourcePacketBytes": 64,
+    "maximumPublishedActivationFencesPerWriter": 1,
+    "preACKInputProofsAndWrites": 0,
+    "sourceInputQueueCapacityUnchanged": 1024,
+    "inputCallbacksWaitOnFence": false,
+    "heartbeatRepliesWaitOnFence": false,
+    "authorityChecksRemovedOrCached": false,
+    "earlyActivationACK": false,
+    "mTLSOrLocalAPISchemaChanged": false
+  },
+  "verificationFocus": [
+    "A pending activation starts zero input proofs/writes and its real ACK precedes every queued input packet.",
+    "1000 queued relative move deltas survive coalescing, followed by exact key-down/key-up order and fresh per-frame authority.",
+    "Negative activation, epoch change, replaced fence and obsolete session input never reach the pipe.",
+    "Operation/owner cancellation releases a waiting sender without requiring activation completion.",
+    "Native failure, ACK failure and uncertain retirement keep their existing failure/cleanup classification."
+  ],
+  "physicalRetest": "pending",
+  "remainingLimitations": [
+    "A native activation or independent authority/OS call can still be slow; no timeout or security boundary is weakened.",
+    "A sufficiently long activation plus discrete-event flood can still exhaust the existing bounded input queue.",
+    "Existing detailed-profile retention is at most 12 attempts per 120-second window; use a new window to distinguish later dwell tests."
+  ],
+  "localValidation": {
+    "originalOrderingRegression": "reproduced without fence",
+    "goTestAllWithPackageParallelism2": "passed",
+    "targetedSourceRaceTests": "passed",
+    "goVetInputworkerAndLocalapi": "passed",
+    "raceFixtureRepair": "Existing expired-authentication test read Authority.closed without its mutex. It now observes pending query ownership under queryMu and reads closed only after joined retirement under authority.mu."
+  }
+}

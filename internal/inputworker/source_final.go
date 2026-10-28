@@ -20,8 +20,9 @@ func sourceTransportFailure(err error) error {
 	return &sourceTransportError{cause: err}
 }
 
-// SourceSession.Activate only checks/updates Go session state. A rejection
-// occurs before the separate native capture activation is attempted.
+// SourceSession.Activate checks physical state (including its native held-input
+// probe) and publishes suppression. A rejection occurs before native window
+// activation; queued input is held until that activation's real ACK is written.
 type sourceActivationRejected struct{ cause error }
 
 func (e *sourceActivationRejected) Error() string { return "source session activation rejected" }
