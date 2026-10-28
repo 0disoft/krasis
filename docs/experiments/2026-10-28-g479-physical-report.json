@@ -1,0 +1,267 @@
+{
+  "schema": "krasis.physical-comparison/v1",
+  "collectedAt": "2026-10-28T11:03:22Z",
+  "generation": 479,
+  "revision": "08a32ea662281b4dc87c782f3d7e880208958a65",
+  "collection": "fb29e4e51ae872b7ad30149494d4f971",
+  "windowStart": "2026-10-28T11:02:00Z",
+  "method": "Exact build, deduplicated rotated logs; exclude installation and pre-test samples before 11:02 UTC. Pair only unique exchange tags; measured local monotonic spans. First/last halves refer to retained successful profiles, not all physical crossings. Residual is not pure network RTT.",
+  "baseline": {
+    "generation": 478,
+    "collection": "128eca1dd5b2c744c8a458d439908c4f",
+    "matchedSuccessfulLeases": 12,
+    "grantWait": {
+      "count": 12,
+      "medianMs": 58.5895,
+      "maxMs": 430.457
+    },
+    "receiverReady": {
+      "count": 12,
+      "medianMs": 33.4835,
+      "maxMs": 403.434
+    },
+    "captureActivation": {
+      "count": 12,
+      "medianMs": 11.329,
+      "maxMs": 14.203
+    },
+    "receiverFirstDispatch": {
+      "count": 12,
+      "medianMs": 2.771,
+      "maxMs": 8.837
+    },
+    "receiverWorstDispatch": {
+      "count": 12,
+      "medianMs": 6.0615,
+      "maxMs": 26.017
+    }
+  },
+  "current": {
+    "matchedSuccessfulLeases": 11,
+    "preparedLeases": 10,
+    "grantWait": {
+      "count": 11,
+      "medianMs": 45.62,
+      "maxMs": 299.522
+    },
+    "receiverReady": {
+      "count": 11,
+      "medianMs": 28.37,
+      "maxMs": 287.915
+    },
+    "captureActivation": {
+      "count": 11,
+      "medianMs": 15.892,
+      "maxMs": 94.871
+    },
+    "receiverFirstDispatch": {
+      "count": 11,
+      "medianMs": 2.316,
+      "maxMs": 3.285
+    },
+    "receiverWorstDispatch": {
+      "count": 11,
+      "medianMs": 3.728,
+      "maxMs": 31.212
+    },
+    "firstSix": {
+      "source": {
+        "count": 6,
+        "grant": {
+          "count": 6,
+          "medianMs": 47.4915,
+          "maxMs": 299.522
+        },
+        "ready": {
+          "count": 0
+        },
+        "capture": {
+          "count": 6,
+          "medianMs": 29.6615,
+          "maxMs": 94.871
+        },
+        "dispatch": {
+          "count": 6,
+          "medianMs": 0.915,
+          "maxMs": 95.335
+        },
+        "firstDispatch": {
+          "count": 6,
+          "medianMs": 13.2635,
+          "maxMs": 72.784
+        },
+        "prepared": 0
+      },
+      "receiver": {
+        "count": 6,
+        "grant": {
+          "count": 0
+        },
+        "ready": {
+          "count": 6,
+          "medianMs": 30.575,
+          "maxMs": 287.915
+        },
+        "capture": {
+          "count": 0
+        },
+        "dispatch": {
+          "count": 6,
+          "medianMs": 3.6425,
+          "maxMs": 5.203
+        },
+        "firstDispatch": {
+          "count": 6,
+          "medianMs": 1.711,
+          "maxMs": 2.316
+        },
+        "prepared": 5
+      }
+    },
+    "lastFive": {
+      "source": {
+        "count": 5,
+        "grant": {
+          "count": 5,
+          "medianMs": 41.106,
+          "maxMs": 55.47
+        },
+        "ready": {
+          "count": 0
+        },
+        "capture": {
+          "count": 5,
+          "medianMs": 12.965,
+          "maxMs": 30.723
+        },
+        "dispatch": {
+          "count": 5,
+          "medianMs": 0.636,
+          "maxMs": 6.252
+        },
+        "firstDispatch": {
+          "count": 5,
+          "medianMs": 5.62,
+          "maxMs": 23.542
+        },
+        "prepared": 0
+      },
+      "receiver": {
+        "count": 5,
+        "grant": {
+          "count": 0
+        },
+        "ready": {
+          "count": 5,
+          "medianMs": 27.613,
+          "maxMs": 43.092
+        },
+        "capture": {
+          "count": 0
+        },
+        "dispatch": {
+          "count": 5,
+          "medianMs": 4.196,
+          "maxMs": 31.212
+        },
+        "firstDispatch": {
+          "count": 5,
+          "medianMs": 3.033,
+          "maxMs": 3.285
+        },
+        "prepared": 5
+      }
+    },
+    "coldEntry": {
+      "readyMs": 287.915,
+      "grantWaitMs": 299.522,
+      "decision": "expired",
+      "sourceExchangeMs": 299.522,
+      "receiverHandlingMs": 295.893,
+      "residualMs": 3.629
+    },
+    "tcp": {
+      "counterDeltasKnown": true,
+      "retransmittedBytes": 0,
+      "timeoutEpisodes": 0
+    }
+  },
+  "sides": {
+    "A": {
+      "created": "2026-10-28T11:03:22Z",
+      "diagnosticSha256": "a5a6619586d8148e02ca0dd3f685c8a52c7ac893b71e8bc96c218b7a88f4c765",
+      "health": {
+        "time": "2026-10-28T11:03:07.6536016Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "service": "READY",
+      "failures": [],
+      "logCompleteness": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false,
+          "events": 2560
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false,
+          "events": 741
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true,
+          "events": 0
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false,
+          "events": 659
+        }
+      ]
+    },
+    "B": {
+      "created": "2026-10-28T11:03:23Z",
+      "diagnosticSha256": "25e0e93b3c49585c5b3711c05cfa554ac3a2a553708c738240faef59d69f0998",
+      "health": {
+        "time": "2026-10-28T11:03:11.6335985Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "service": "READY",
+      "failures": [],
+      "logCompleteness": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false,
+          "events": 2655
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false,
+          "events": 1423
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true,
+          "events": 0
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false,
+          "events": 509
+        }
+      ]
+    }
+  },
+  "limitations": [
+    "Software spans are not cursor-visible end-to-end latency.",
+    "Different physical runs do not isolate the patch as the sole cause of differences.",
+    "A capture activation and B worst dispatch maxima increased relative to g478; warm behavior is not uniformly improved.",
+    "Empty incomplete rotated UI logs do not establish historic UI completeness; service health and retained agent events are observed."
+  ]
+}
