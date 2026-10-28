@@ -1,0 +1,197 @@
+{
+  "schema": "krasis.startup-retirement-investigation/v1",
+  "baselineGeneration": 484,
+  "targetGeneration": 485,
+  "collection": "f6a9d4c6f69694a7e232a856d8ce9169",
+  "sides": {
+    "A": {
+      "diagnosticSha256": "fafceaf5df8b7596f60351637b2a8f3a748c6197d772ae338e6dda1de0dbf70e",
+      "inputHealth": {
+        "time": "2026-10-28T15:01:40.0238775Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-28T14:57:03.772844Z",
+        "time": "2026-10-28T15:01:45.5464803Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE",
+        "source": {
+          "total": 2,
+          "exits": [
+            {
+              "time": "2026-10-28T14:57:28.1702635Z",
+              "command": "ok",
+              "reader": "stopped",
+              "capture": "joined",
+              "sender": "joined",
+              "interrupt": "joined",
+              "retirement": "clean_sent",
+              "report": "ok",
+              "heartbeatStage": "replied",
+              "heartbeatSlowStage": "service_presence",
+              "heartbeatSlowBucket": 1
+            },
+            {
+              "time": "2026-10-28T15:01:45.4983494Z",
+              "command": "ok",
+              "reader": "stopped",
+              "capture": "joined",
+              "sender": "joined",
+              "interrupt": "joined",
+              "retirement": "clean_sent",
+              "report": "ok",
+              "heartbeatStage": "replied",
+              "heartbeatSlowStage": "service_presence",
+              "heartbeatSlowBucket": 1
+            }
+          ]
+        }
+      },
+      "failures": [
+        {
+          "time": "2026-10-28T15:01:45.4736578Z",
+          "code": "session_end_detail",
+          "sessionEnd": {
+            "observedAt": "2026-10-28T15:01:45.4736578Z",
+            "trigger": true,
+            "component": "peer-session",
+            "fault": "fault_remote_eof",
+            "canceled": false,
+            "timeout": false,
+            "closed": false,
+            "nativeError": 0,
+            "nativeKnown": false,
+            "networkError": "not_observed",
+            "networkPolicy": "unknown",
+            "lastLifecycle": "unknown",
+            "lifecycleAgeMicros": 0,
+            "captureMode": "protected"
+          }
+        },
+        {
+          "time": "2026-10-28T15:01:45.4887707Z",
+          "code": "reconnect_remote_eof"
+        }
+      ]
+    },
+    "B": {
+      "diagnosticSha256": "a9a452c0564f97e3576aed3cee5d5268f57cbaa2a172ecf2f1f4ee01e981defc",
+      "inputHealth": {
+        "time": "2026-10-28T15:02:02.9461864Z",
+        "state": "SERVICE_RECOVERY_REQUIRED",
+        "stage": "service_recovery",
+        "win32Error": 1066,
+        "win32Known": true
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-28T14:57:42.3950122Z",
+        "time": "2026-10-28T15:01:46.3414849Z",
+        "service": "FAILED",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE",
+        "lastFailure": {
+          "time": "2026-10-28T15:01:46.3414849Z",
+          "stage": "service",
+          "reason": "input",
+          "operation": "input-startup-ready",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "source": {
+          "total": 1,
+          "exits": [
+            {
+              "time": "2026-10-28T15:01:46.1655798Z",
+              "command": "ok",
+              "reader": "authority",
+              "capture": "joined",
+              "sender": "joined",
+              "interrupt": "joined",
+              "retirement": "clean_sent",
+              "report": "failed",
+              "failure": {
+                "operation": "source-service-query-cancelled",
+                "win32Error": 0,
+                "win32Known": false
+              },
+              "heartbeatStage": "service_presence",
+              "heartbeatSlowStage": "service_presence",
+              "heartbeatSlowBucket": 2
+            }
+          ]
+        }
+      },
+      "failures": [
+        {
+          "time": "2026-10-28T15:01:45.8440486Z",
+          "code": "installed_input_connect_failed"
+        },
+        {
+          "time": "2026-10-28T15:01:45.8544675Z",
+          "code": "installed_input_stage_worker_ready"
+        },
+        {
+          "time": "2026-10-28T15:01:45.9315301Z",
+          "code": "installed_source_command_failed_heartbeat"
+        },
+        {
+          "time": "2026-10-28T15:01:45.9315301Z",
+          "code": "session_end_detail",
+          "sessionEnd": {
+            "observedAt": "2026-10-28T15:01:45.9315301Z",
+            "trigger": true,
+            "component": "peer-session",
+            "fault": "fault_control_request_authorize_failed",
+            "canceled": false,
+            "timeout": false,
+            "closed": false,
+            "nativeError": 0,
+            "nativeKnown": false,
+            "networkError": "not_observed",
+            "networkPolicy": "unknown",
+            "lastLifecycle": "unknown",
+            "lifecycleAgeMicros": 0,
+            "captureMode": "protected"
+          }
+        },
+        {
+          "time": "2026-10-28T15:01:47.4116094Z",
+          "code": "session_failed"
+        }
+      ]
+    }
+  },
+  "userObservation": {
+    "cursorRemainsAtBLeftEdge": "about half of B to A returns; user estimate, not a measured event rate",
+    "reconnect": "recurred after the initial crossing test"
+  },
+  "findings": {
+    "observed": "B failed input startup at the ready stage, then stopped the service with error 1066. A observed remote EOF. This incident did not start with the input heartbeat admission failure addressed in g484.",
+    "reproduced": [
+      "The READY-only parser rejects an otherwise valid final worker report as ErrProtocol.",
+      "An identical delayed mouse coordinate between a valid snapshot and show invalidates pending cursor hiding."
+    ],
+    "inferenceLimit": "The original unexpected startup frame was not retained, so the observed ready-stage failure is consistent with, but does not uniquely prove, an early final report. The initiating native preparation failure is not established."
+  },
+  "changes": {
+    "startup": "Consume authenticated early final reports; join unbound native owners before reporting; confirm empty recovery and exact job retirement before forwarding rejection. A confirmed rejection rejects only the lease. Missing, malformed, wrong-mode or uncertain recovery still fails.",
+    "cursor": "Preserve pending hiding only for an identical coordinate with a valid current-generation snapshot. Real movement, button/key input and unobserved snapshots still cancel."
+  },
+  "validation": {
+    "startup": "Affected package suites and focused regressions passed.",
+    "cursor": "Regression failed on old source; full wininput suite passed after the fix.",
+    "race": "Focused inputworker, residentagent and wininput race tests passed.",
+    "physical": "Awaiting installation and user test; B existing g484 service failure requires Windows administrator recovery.",
+    "Go": "Full Go suite passed.",
+    "vet": "inputworker and residentagent passed; wininput passed with the existing callback-pointer analyzer exclusion. Default wininput vet reports eight pre-existing unsafeptr warnings in unchanged native callback files."
+  },
+  "APIChanges": "Input startup IPC now accepts the existing final-report envelope before READY; no peer protocol or HTTP API change.",
+  "DBChanges": "none",
+  "runnerChanges": "none"
+}

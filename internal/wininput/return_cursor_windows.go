@@ -243,8 +243,19 @@ func (shield *returnCursorShield) beforeIgnoredInput(check func() error) error {
 // Repeated boundary coordinates from clipping or delayed input must not reveal
 // a stationary cursor. Actual movement and buttons/wheels still restore it.
 func (shield *returnCursorShield) beforeMouseInput(message uint32, position point) error {
-	if shield != nil && shield.visible && message == wmMouseMove && position == shield.position {
-		return shield.failureResult()
+	if shield != nil && message == wmMouseMove {
+		if shield.visible && position == shield.position {
+			return shield.failureResult()
+		}
+		// Snapshot and show are separate native messages. A delayed identical
+		// injected/clipped coordinate between them is still stationary; it
+		// must not invalidate a valid pending shield just because it is not
+		// visible yet. Unobserved, moved, superseded and real input still win.
+		request := shield.snapshotRequest.Load()
+		if request != nil && request.valid && request.generation == shield.generation.Load() &&
+			position == request.position && shield.snapshotRequest.Load() == request {
+			return shield.failureResult()
+		}
 	}
 	return shield.beforeInput()
 }
