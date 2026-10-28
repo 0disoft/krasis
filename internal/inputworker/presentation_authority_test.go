@@ -64,7 +64,7 @@ func TestPresentationAuthorityHonorsOwnerBudget(t *testing.T) {
 	}
 }
 
-func TestPresentationAuthoritySharesBudgetBetweenBothProofs(t *testing.T) {
+func TestWorkerAuthorityOverlapsBothFreshProofsWithinOneBudget(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		defer isolateAuthorityCapacity(t)()
 		aPeer, aPipe := net.Pipe()
@@ -79,44 +79,76 @@ func TestPresentationAuthoritySharesBudgetBetweenBothProofs(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 		defer cancel()
 		started := time.Now()
-		if err := authorizeWorkerOwners(ctx, agent, service); err == nil || time.Since(started) != 50*time.Millisecond {
-			t.Errorf("second proof restarted the budget: elapsed=%s err=%v", time.Since(started), err)
+		if err := authorizeWorkerOwners(ctx, agent, service); err != nil || time.Since(started) != 40*time.Millisecond {
+			t.Errorf("independent proofs were serialized or escaped the shared budget: elapsed=%s err=%v", time.Since(started), err)
 		}
 		time.Sleep(100 * time.Millisecond)
 		synctest.Wait()
 	})
 }
 
+func TestWorkerAuthorityJoinsBothOwnersBeforeRejecting(t *testing.T) {
+	for _, failedService := range []bool{false, true} {
+		t.Run(map[bool]string{false: "agent", true: "service"}[failedService], func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				defer isolateAuthorityCapacity(t)()
+				aPeer, aPipe := net.Pipe()
+				defer aPeer.Close()
+				sPeer, sPipe := net.Pipe()
+				defer sPeer.Close()
+				agent, service := clientChannel(aPipe, authorityAgent), clientChannel(sPipe, authorityService)
+				defer agent.Close()
+				defer service.Close()
+				var checks atomic.Int32
+				failed, slow := agent, service
+				if failedService {
+					failed, slow = service, agent
+				}
+				failed.authority.checkInput = func() error { checks.Add(1); return ErrAuthority }
+				slow.authority.checkInput = func() error { time.Sleep(40 * time.Millisecond); checks.Add(1); return nil }
+				started := time.Now()
+				err := authorizeWorkerOwners(context.Background(), agent, service)
+				if !errors.Is(err, ErrAuthority) || checks.Load() != 2 || time.Since(started) != 40*time.Millisecond {
+					t.Fatal("owner rejection skipped joining the other fresh proof", err, checks.Load(), time.Since(started))
+				}
+			})
+		})
+	}
+}
+
 func TestPresentationAuthorityAlwaysChecksFreshProofsAndRejectsCanceledOwner(t *testing.T) {
-	aPeer, aPipe := net.Pipe()
-	defer aPeer.Close()
-	sPeer, sPipe := net.Pipe()
-	defer sPeer.Close()
-	agent, service := clientChannel(aPipe, authorityAgent), clientChannel(sPipe, authorityService)
-	defer agent.Close()
-	defer service.Close()
-	var agentChecks, serviceChecks atomic.Int32
-	agent.authority.checkInput = func() error { agentChecks.Add(1); return nil }
-	service.authority.checkInput = func() error { serviceChecks.Add(1); return nil }
-	for range 2 {
-		if err := authorizeWorkerOwners(context.Background(), agent, service); err != nil {
-			t.Fatal(err)
+	synctest.Test(t, func(t *testing.T) {
+		defer isolateAuthorityCapacity(t)()
+		aPeer, aPipe := net.Pipe()
+		defer aPeer.Close()
+		sPeer, sPipe := net.Pipe()
+		defer sPeer.Close()
+		agent, service := clientChannel(aPipe, authorityAgent), clientChannel(sPipe, authorityService)
+		defer agent.Close()
+		defer service.Close()
+		var agentChecks, serviceChecks atomic.Int32
+		agent.authority.checkInput = func() error { agentChecks.Add(1); return nil }
+		service.authority.checkInput = func() error { serviceChecks.Add(1); return nil }
+		for range 2 {
+			if err := authorizeWorkerOwners(context.Background(), agent, service); err != nil {
+				t.Fatal(err)
+			}
 		}
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	if err := authorizeWorkerOwners(ctx, agent, service); !errors.Is(err, context.Canceled) {
-		t.Fatal("canceled owner received presentation authority", err)
-	}
-	if agentChecks.Load() != 2 || serviceChecks.Load() != 2 {
-		t.Fatal("proof was cached or canceled request started native work")
-	}
-	if err := authorizeWorkerOwners(context.Background(), service, agent); !errors.Is(err, ErrAuthority) {
-		t.Fatal("swapped owner roles accepted", err)
-	}
-	if err := retireCursorPresentation(nil, agent, service); err != nil {
-		t.Fatal("confirmed retirement became recovery failure", err)
-	}
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		if err := authorizeWorkerOwners(ctx, agent, service); !errors.Is(err, context.Canceled) {
+			t.Fatal("canceled owner received presentation authority", err)
+		}
+		if agentChecks.Load() != 2 || serviceChecks.Load() != 2 {
+			t.Fatal("proof was cached or canceled request started native work")
+		}
+		if err := authorizeWorkerOwners(context.Background(), service, agent); !errors.Is(err, ErrAuthority) {
+			t.Fatal("swapped owner roles accepted", err)
+		}
+		if err := retireCursorPresentation(nil, agent, service); err != nil {
+			t.Fatal("confirmed retirement became recovery failure", err)
+		}
+	})
 }
 
 func TestPresentationAuthorityRetainsFinalReportDuringPendingProof(t *testing.T) {

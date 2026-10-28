@@ -38,7 +38,7 @@ func TestNativeStartupBoundsBothOwnersBeforeProcessCreation(t *testing.T) {
 					budget = time.Second
 				}
 				agent.authority.checkInput = func() error { time.Sleep(3 * budget / 5); return nil }
-				service.authority.checkInput = func() error { time.Sleep(4 * budget / 5); return nil }
+				service.authority.checkInput = func() error { time.Sleep(6 * budget / 5); return nil }
 				// Only satisfy digests(): the test must fail before opening an
 				// installed image or creating any native process/handle.
 				installation := &Installation{files: make([]*os.File, 5), agentDigest: [32]byte{1}, serviceDigest: [32]byte{2}}

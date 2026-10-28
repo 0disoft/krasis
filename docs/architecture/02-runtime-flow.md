@@ -38,6 +38,11 @@ destination의 cursor entry는 return detector arm 뒤 `PrepareEntry`로 이동 
 병렬 조회한다. 두 호출이 모두 반환하고 모두 성공해야 실행한다. 매번 새 증명을 얻으며, 실패한
 증명이나 만료 뒤 남은 네이티브 조회의 자원 소유권·동시 실행 상한·생존 확인용 예약 슬롯은 유지한다.
 
+입력 네이티브 워커의 시작과 수동 커서 프레젠테이션도 `authorizeWorkerOwners`에서 서비스·에이전트의
+새 증명을 같은 1초 이내에서 병렬 조회한다. 호출자·리스의 더 짧은 제한 시간이 우선하며, 두 호출을
+모두 합류하고 성공한 뒤에만 워커를 시작한다. 한쪽 실패·취소·만료는 계속 실행을 거절하고,
+진행 중인 네이티브 조회의 핸들은 해당 조회가 끝날 때까지 기존 소유자가 유지한다.
+
 상태 변경은 `internal/control` transition table에서만 결정한다. table이 반환한 effect는 Application이 순서대로 실행하고 성공 또는 실패 event를 다시 상태 머신에 넣는다. 현재 구현은 순수 transition core, authenticated peer transport, Raw Input과 low-level hook을 결합한 Win32 source, `SendInput` 기반 Win32 destination adapter를 포함한다.
 
 활성 inbound lease에서 받은 입력은 실행 전에 `InputStream` gate를 통과한다. session, epoch 또는 정확한 다음 sequence가 하나라도 맞지 않으면 해당 payload를 실행하지 않고 `FAULT_DETECTED` cleanup으로 넘긴다. stream과 lease의 session이 서로 다르거나 non-local 상태에서 lease 방향과 맞지 않는 입력을 받은 경우도 동일하게 fail-safe 처리한다. 재연결은 새 session과 epoch, sequence `1`에서 시작한다.

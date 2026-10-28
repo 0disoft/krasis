@@ -16,11 +16,17 @@ func authorizeWorkerOwners(ctx context.Context, agent, service *Channel) error {
 	}
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
-	if err := agent.authorizeInput(ctx, false); err != nil {
-		return errors.Join(ErrAuthority, err, ctx.Err())
+	if err := ctx.Err(); err != nil {
+		return errors.Join(ErrAuthority, err)
 	}
-	if err := service.authorizeInput(ctx, false); err != nil {
-		return errors.Join(ErrAuthority, err, ctx.Err())
+	// Independent proofs retain separate pinned handles. Join both bounded
+	// callers before starting a worker; neither fresh proof may be skipped.
+	serviceResult := make(chan error, 1)
+	go func() { serviceResult <- service.authorizeInput(ctx, false) }()
+	agentErr := agent.authorizeInput(ctx, false)
+	serviceErr := <-serviceResult
+	if agentErr != nil || serviceErr != nil || ctx.Err() != nil {
+		return errors.Join(ErrAuthority, agentErr, serviceErr, ctx.Err())
 	}
 	return nil
 }
