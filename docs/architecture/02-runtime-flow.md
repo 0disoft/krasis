@@ -54,6 +54,15 @@ destination의 cursor entry는 return detector arm 뒤 `PrepareEntry`로 이동 
 교체 준비를 막지 않는다. 미완료 작업은 실제 리스 입장 때 합류하며, 정리 실패는 인증된
 채널도 닫고 복구 실패로 전파한다. 2초 만료와 준비 횟수 제한은 유지한다.
 
+입력 또는 수동 커서 리스의 실제 READY를 에이전트에 전달한 뒤, 다음 입력용 unbound 세트를
+최대 하나만 비동기로 준비한다. 활성 입력 시간과 콘솔·네이티브 input/release 준비를 겹치되,
+예비 세트에는 현재 리스·epoch·에이전트 핸들·입력 journal을 전달하지 않는다. 활성 세트와
+예비 세트는 각각 별도 3-process Job에 속하며, 합계 최대 6개 프로세스가 일시적으로 존재한다.
+예비 후보가 2초 뒤 만료돼도 활성 리스 중 주기적으로 재생성하지 않는다. 정상 입력 종료와
+정확한 기존 owner 정리가 끝나면 완료된 준비 결과를 회수하고, 살아 있는 후보는 재사용하며
+만료된 후보는 종료 확인 후 한 번 교체한다. 미완료 builder는 그대로 다음 요청 인증과 겹치고,
+예비 세트의 정리 실패는 다음 입장을 차단한다. 첫 진입·긴 유휴 후 생성 비용은 여전히 남는다.
+
 상태 변경은 `internal/control` transition table에서만 결정한다. table이 반환한 effect는 Application이 순서대로 실행하고 성공 또는 실패 event를 다시 상태 머신에 넣는다. 현재 구현은 순수 transition core, authenticated peer transport, Raw Input과 low-level hook을 결합한 Win32 source, `SendInput` 기반 Win32 destination adapter를 포함한다.
 
 활성 inbound lease에서 받은 입력은 실행 전에 `InputStream` gate를 통과한다. session, epoch 또는 정확한 다음 sequence가 하나라도 맞지 않으면 해당 payload를 실행하지 않고 `FAULT_DETECTED` cleanup으로 넘긴다. stream과 lease의 session이 서로 다르거나 non-local 상태에서 lease 방향과 맞지 않는 입력을 받은 경우도 동일하게 fail-safe 처리한다. 재연결은 새 session과 epoch, sequence `1`에서 시작한다.

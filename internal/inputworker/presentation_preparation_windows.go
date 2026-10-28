@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// At most one unbound input child prepares alongside one acknowledged passive
+// At most one unbound input child prepares alongside one acknowledged lease
 // owner. Joining transfers its ownership back to the serial service loop.
 type cursorInputPreparation struct {
 	done   chan struct{}
@@ -23,10 +23,14 @@ type cursorInputPreparation struct {
 // rate-limited movement hints. No lease or agent handle enters the warm child.
 // Construction is joined before admission, after the next agent authenticates.
 func prepareInputReentry(ctx context.Context, lease Lease, result error, prepare func(context.Context) (*preparedConsole, error)) *cursorInputPreparation {
-	if ctx == nil || ctx.Err() != nil || result != nil || lease.Capture || lease.Presentation || !lease.ExpiresAt.After(time.Now()) {
+	if !inputReentryAllowed(ctx, lease, result) {
 		return nil
 	}
 	return startCursorInputPreparation(ctx, prepare)
+}
+
+func inputReentryAllowed(ctx context.Context, lease Lease, result error) bool {
+	return ctx != nil && ctx.Err() == nil && result == nil && !lease.Capture && !lease.Presentation && lease.ExpiresAt.After(time.Now())
 }
 
 func startCursorInputPreparation(ctx context.Context, prepare func(context.Context) (*preparedConsole, error)) *cursorInputPreparation {

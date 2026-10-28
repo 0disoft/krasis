@@ -194,11 +194,10 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 				}
 				candidate := takeInputPreparation(&preparation.next, lease)
 				_, err = runPreparedAgentLease(ctx, channel, lease, agent, service, installation, candidate, func() {
-					if !lease.Presentation {
-						return
-					}
 					// Readiness has reached the agent before any next-input work.
-					// Neither a warm child nor its cleanup delays cursor hiding.
+					// Overlap one unbound set with active input as well as passive
+					// presentation. No current lease, journal or agent handles enter
+					// this set; its two-second expiry is not extended or renewed.
 					if preparation.start(ctx, func(run context.Context) (*preparedConsole, error) {
 						return prepareServiceConsole(run, installation, service)
 					}) {
@@ -209,13 +208,13 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 					returned = presentationReturn{lease: lease, pid: agentPID, started: channel.authority.agentStarted, at: time.Now()}
 				}
 				if !lease.Presentation {
-					// Capture-owned cursor hiding does not open a passive lease,
-					// so it cannot trigger the preparation callback above. Prepare
-					// once after clean recovery instead of cold-launching on every
-					// rapid reentry suppressed by the movement-hint cooldown.
-					preparation.reenter(ctx, lease, err, func(run context.Context) (*preparedConsole, error) {
+					// Reuse a still-live spare, keep an unfinished builder, or
+					// replace an expired spare only after exact active retirement.
+					if preparationErr := preparation.reenter(ctx, lease, err, func(run context.Context) (*preparedConsole, error) {
 						return prepareServiceConsole(run, installation, service)
-					})
+					}); preparationErr != nil {
+						return serviceRecoveryFailure(preparationErr, channel.Close())
+					}
 				}
 				if errors.Is(err, ErrRecovery) {
 					return serviceRecoveryFailure(err, channel.Close())

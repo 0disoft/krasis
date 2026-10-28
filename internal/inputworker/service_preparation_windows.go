@@ -15,11 +15,18 @@ type serviceInputPreparation struct {
 	warming *cursorInputPreparation
 }
 
-func (p *serviceInputPreparation) reenter(ctx context.Context, lease Lease, result error, prepare func(context.Context) (*preparedConsole, error)) {
-	if p.warming != nil || p.next != nil {
-		return
+func (p *serviceInputPreparation) reenter(ctx context.Context, lease Lease, result error, prepare func(context.Context) (*preparedConsole, error)) error {
+	if !inputReentryAllowed(ctx, lease, result) {
+		return nil
 	}
-	p.warming = prepareInputReentry(ctx, lease, result, prepare)
+	// A long active lease can outlive the one speculative candidate. Harvest
+	// only completed work, then replace an expired candidate through start's
+	// existing retirement fence. Never restart periodically while input runs.
+	if err := p.collectReady(); err != nil {
+		return err
+	}
+	p.start(ctx, prepare)
+	return nil
 }
 
 func (p *serviceInputPreparation) start(ctx context.Context, prepare func(context.Context) (*preparedConsole, error)) bool {

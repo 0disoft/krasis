@@ -1,0 +1,43 @@
+{
+  "schema": "krasis.experiment/v1",
+  "generation": 481,
+  "baselineReport": "2026-10-28-g480-physical-report.json",
+  "problem": "Ordinary input reentry construction begins after active lease cleanup, leaving native readiness on the next fast crossing path.",
+  "change": "Start one unbound spare after actual readiness publication for ordinary input as well as passive presentation. At clean return collect completed work and replace an expired spare through the existing retirement fence.",
+  "limits": {
+    "maximumSpareSets": 1,
+    "maximumProcessesPerJob": 3,
+    "maximumProcessesAcrossActiveAndSpareJobs": 6,
+    "unboundExpirySeconds": 2,
+    "periodicRefreshAdded": false,
+    "leaseBindingBeforeExactActiveRetirement": false,
+    "readyReceiptPublishedEarly": false,
+    "wireOrLocalAPISchemaChanged": false
+  },
+  "verificationFocus": [
+    "Short active lease builds a spare without duplicating it at return.",
+    "Long active lease allows spare expiry and only replaces it after return.",
+    "Unconfirmed spare retirement fences the authenticated next channel.",
+    "Completed recovery failure cannot disappear during clean reentry.",
+    "Existing cancellation, lease expiry, session/authority and exact-owner retirement checks remain in force."
+  ],
+  "physicalRetest": "pending",
+  "localValidation": {
+    "targetedPreparationTests": "passed",
+    "targetedPreparationRaceTests": "passed",
+    "goTestAllWithPackageParallelism2": "passed",
+    "goVetInputworkerAndLocalapi": "passed",
+    "defaultParallelismFirstRun": "Existing TLS certificate-time classification test hit its one-second handshake deadline during concurrent compilation. Isolated rerun and complete -p 2 rerun passed; test and timeout are unchanged."
+  },
+  "comparisonPlan": [
+    "Compare B ReadyWait, prepared age and WorkerDesktopReady using exact-build matched lease profiles.",
+    "Compare first and worst input dispatch to detect contention from overlapping spare construction.",
+    "Distinguish measured-zero builder joins from unmeasured joins; startup spans may overlap.",
+    "Do not infer individual native owner load/authentication costs from console load or aggregate pair elapsed."
+  ],
+  "remainingLimitations": [
+    "Initial entry and long-idle construction costs remain.",
+    "Speculative process/image validation can compete with current input; physical regression comparison is required.",
+    "Individual input/release startup phases remain unmeasured; no new owner-specific wire telemetry is added in this bounded change."
+  ]
+}
