@@ -3,7 +3,7 @@
   "generation": 485,
   "revision": "bde7465c436a1c161989e90b1fe8a8b5a35b6181",
   "collection": "5a815530714ba35818ebbafc19ef189a",
-  "scope": "A and B app update confirmed. A protected input READY and control connection CONNECTED. B old g484 service still FAILED; user Windows UAC recovery pending. No physical test after update.",
+  "scope": "Initial paired app update is recorded below. postRecovery records both protected input services READY after user UAC recovery on B, matching UI builds, and connected local doctor. Physical crossing verification remains pending.",
   "BUpdate": {
     "id": "e2aefb2d3dfcc31ad64a2a68651ccb6d",
     "state": "UPDATED",
@@ -118,7 +118,7 @@
     "vet": "inputworker and residentagent passed; wininput passed with existing unsafeptr exclusion",
     "frontend": "104 tests passed and native UI build passed",
     "package": "Workspace and installer verification passed",
-    "physical": "Pending B UAC recovery and user crossings",
+    "physical": "Awaiting physical B to A and rapid crossing test; B UAC recovery and paired READY health verification completed",
     "CI": "Not run; no push"
   },
   "APIChanges": "Existing final report envelope accepted before startup READY; no peer protocol or HTTP API change",
@@ -205,5 +205,155 @@
       }
     ],
     "nextActions": []
+  },
+  "postRecovery": {
+    "collection": "8f635e5cc18c93d9776f2d497eb05923",
+    "localDoctor": {
+      "schemaVersion": "krasis.cli.doctor/v1",
+      "agent": "RUNNING",
+      "connection": "CONNECTED",
+      "peerAlias": "B",
+      "cliGeneration": 485,
+      "agentGeneration": 485,
+      "protocol": "COMPATIBLE",
+      "code": "healthy",
+      "cliBuild": "bde7465c436a1c161989e90b1fe8a8b5a35b6181",
+      "agentBuild": "bde7465c436a1c161989e90b1fe8a8b5a35b6181",
+      "ui": {
+        "state": "RUNNING",
+        "generation": 485,
+        "build": "bde7465c436a1c161989e90b1fe8a8b5a35b6181",
+        "pathStatus": "MATCHED"
+      },
+      "launchRecord": {
+        "state": "VERIFIED",
+        "generation": 485,
+        "build": "bde7465c436a1c161989e90b1fe8a8b5a35b6181",
+        "pathStatus": "MATCHED"
+      },
+      "installedAgent": {
+        "state": "VERIFIED",
+        "build": "bde7465c436a1c161989e90b1fe8a8b5a35b6181"
+      },
+      "service": {
+        "state": "RUNNING",
+        "pathStatus": "MATCHED"
+      },
+      "agentLocation": "PROTECTED",
+      "protectedInput": "CONFIGURED",
+      "checks": [
+        {
+          "name": "agent",
+          "state": "RUNNING"
+        },
+        {
+          "name": "connection",
+          "state": "CONNECTED"
+        },
+        {
+          "name": "protocol",
+          "state": "COMPATIBLE"
+        },
+        {
+          "name": "cli_agent_version",
+          "state": "MATCHED"
+        },
+        {
+          "name": "ui_agent_version",
+          "state": "MATCHED"
+        },
+        {
+          "name": "installed_agent_version",
+          "state": "MATCHED"
+        },
+        {
+          "name": "ui",
+          "state": "RUNNING"
+        },
+        {
+          "name": "launch_record",
+          "state": "VERIFIED"
+        },
+        {
+          "name": "installed_agent",
+          "state": "VERIFIED"
+        },
+        {
+          "name": "service",
+          "state": "RUNNING"
+        },
+        {
+          "name": "update_stage_cleanup",
+          "state": "COMPLETED"
+        }
+      ],
+      "nextActions": []
+    },
+    "sides": {
+      "A": {
+        "collectedAt": "2026-10-28T15:31:30Z",
+        "diagnosticSha256": "d66ead794a364f8b4f09a3ab1576ea2fff715708d9fdefefe5b284ac576c22d6",
+        "installation": {
+          "time": "2026-10-28T15:19:07.8892343Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-28T15:31:24.6229719Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "serviceStartedAt": "2026-10-28T15:19:08.6042381Z",
+        "service": "READY",
+        "matchingUIReady": true,
+        "postServiceStartFailureEvents": [
+          {
+            "time": "2026-10-28T15:25:22.0776997Z",
+            "code": "session_end_detail",
+            "component": "peer-session",
+            "fault": "fault_peer_session_failed"
+          }
+        ]
+      },
+      "B": {
+        "collectedAt": "2026-10-28T15:31:31Z",
+        "diagnosticSha256": "99271f4b899b872cf2d280041bf7dd4032bc5ef852c9cff06995ed081d385475",
+        "installation": {
+          "time": "2026-10-28T15:25:26.4218071Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "inputHealth": {
+          "time": "2026-10-28T15:31:12.2591227Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "serviceStartedAt": "2026-10-28T15:25:29.339877Z",
+        "service": "READY",
+        "matchingUIReady": true,
+        "postServiceStartFailureEvents": []
+      }
+    },
+    "interpretation": "B service restart and installation completed successfully after user UAC recovery. Both services READY and A control connection CONNECTED. A recorded session end during B recovery. No B trigger/session failure appears after its new service start in the collected logs. This is health verification only; user crossings still required."
   }
 }
