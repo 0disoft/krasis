@@ -1,0 +1,129 @@
+{
+  "schema": "krasis.installation-comparison/v1",
+  "generation": 482,
+  "revision": "2f21da349b21983b869aa3c3bd442055145e7fad",
+  "collection": "0d8b1e273c80428c08d2d4f7feeee7c6",
+  "scope": "Post-installation health only; no claim of improved physical crossing latency.",
+  "AInstall": {
+    "code": 0,
+    "state": "installed"
+  },
+  "BUpdate": {
+    "code": "updated",
+    "state": "UPDATED",
+    "bytes": 28570544,
+    "total": 28570544
+  },
+  "BUI": {
+    "code": "window_ready"
+  },
+  "localDoctor": {
+    "code": "healthy",
+    "connection": "CONNECTED",
+    "agentGeneration": 482,
+    "uiGeneration": 482,
+    "protectedInput": "CONFIGURED",
+    "service": "RUNNING"
+  },
+  "sides": {
+    "A": {
+      "collectedAt": "2026-10-28T13:46:50Z",
+      "diagnosticSha256": "395878d3d4a57c7f0a7aed0287bef7fcf91483f319bc1113ae91d911da960d2e",
+      "installation": {
+        "time": "2026-10-28T13:44:52.5779472Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "inputHealth": {
+        "time": "2026-10-28T13:46:28.9852319Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-28T13:44:55.4241222Z",
+        "time": "2026-10-28T13:44:55.4991867Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      },
+      "connection": "CONNECTED",
+      "launchRecordReadyForRevision": true,
+      "exactBuildFailureEvents": [],
+      "retainedHistoricalRecoveryFailure": {
+        "time": "2026-10-28T12:48:39.3095476Z",
+        "code": "agent_faulted",
+        "agentState": "FAULTED"
+      },
+      "historicalFailurePrecedesThisInstall": true,
+      "physicalProfilesObserved": 0
+    },
+    "B": {
+      "collectedAt": "2026-10-28T13:46:52Z",
+      "diagnosticSha256": "b5f80690f858867ca467d3132abc18c2f85d354cf4b9c824fc6eee09fb67fe7a",
+      "installation": {
+        "time": "2026-10-28T13:45:35.8185038Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "inputHealth": {
+        "time": "2026-10-28T13:46:43.2832747Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-28T13:45:38.5597697Z",
+        "time": "2026-10-28T13:45:38.6060137Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      },
+      "connection": "CONNECTED",
+      "launchRecordReadyForRevision": true,
+      "exactBuildFailureEvents": [],
+      "retainedHistoricalRecoveryFailure": {
+        "time": "2026-10-27T12:40:08.2393867Z",
+        "code": "agent_faulted",
+        "agentState": "FAULTED"
+      },
+      "historicalFailurePrecedesThisInstall": true,
+      "physicalProfilesObserved": 0
+    }
+  },
+  "validation": {
+    "goTestAllWithPackageParallelism2": "passed",
+    "targetedSourceRaceTests": "passed",
+    "goVetInputworkerAndLocalapi": "passed",
+    "frontendTests": {
+      "passed": 104,
+      "total": 104
+    },
+    "workspacePackage": "passed",
+    "applicationSetupPackage": "passed"
+  },
+  "physicalRetest": "pending",
+  "push": false,
+  "officialReleasePublished": false,
+  "apiDBCIChanged": false
+}

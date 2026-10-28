@@ -42,5 +42,6 @@
     "targetedSourceRaceTests": "passed",
     "goVetInputworkerAndLocalapi": "passed",
     "raceFixtureRepair": "Existing expired-authentication test read Authority.closed without its mutex. It now observes pending query ownership under queryMu and reads closed only after joined retirement under authority.mu."
-  }
+  },
+  "installationReport": "2026-10-28-g482-installation-report.json"
 }
