@@ -105,3 +105,44 @@ func TestSourceMouseProgressCannotBeRenewedByInjectedTraffic(t *testing.T) {
 		t.Fatal("physical hook progress not observed")
 	}
 }
+
+func TestReturnCursorRepeatedBoundaryMouseReportsStayHidden(t *testing.T) {
+	oldHide := returnCursorHideWindow
+	t.Cleanup(func() { returnCursorHideWindow = oldHide })
+	for _, flags := range []uint32{0, llmhfInjected} {
+		for _, tag := range []uintptr{0, krasisInjectedExtraInfo, selfTestExtraInfo} {
+			session := newInactiveSourceSession(t)
+			position := point{X: 0, Y: 400}
+			shield := &returnCursorShield{visible: true, position: position}
+			pointer := newSourcePointerState(position)
+			hidden, checked, continued := 0, 0, 0
+			returnCursorHideWindow = func(uintptr) error { hidden++; return nil }
+			callbacks := newSourceLowLevelCallbacks(session, nil, nil, nil, pointer, nil, shield,
+				func() error { checked++; return nil },
+				func(int, uintptr, uintptr) uintptr { continued++; return 42 })
+			mouse := mouseHookData{Point: position, Flags: flags, ExtraInfo: tag}
+			for i := 0; i < 3; i++ {
+				if callbacks.mouse(hcAction, wmMouseMove, uintptr(unsafe.Pointer(&mouse))) != 42 {
+					t.Fatal("stationary input was swallowed")
+				}
+			}
+			wantChecks := 3
+			if tag != 0 {
+				wantChecks = 0 // No native cursor operation for a tagged stationary report.
+			}
+			if hidden != 0 || !shield.visible || shield.generation.Load() != 0 || checked != wantChecks {
+				t.Fatal("stationary edge reports revealed cursor or performed unnecessary desktop work")
+			}
+			mouse.Point.X++
+			callbacks.mouse(hcAction, wmMouseMove, uintptr(unsafe.Pointer(&mouse)))
+			if hidden != 1 || shield.visible || shield.generation.Load() != 1 || continued != 4 {
+				t.Fatal("actual movement did not restore cursor before hook continuation")
+			}
+			shield.visible, mouse.Point = true, position
+			callbacks.mouse(hcAction, wmLButtonDown, uintptr(unsafe.Pointer(&mouse)))
+			if hidden != 2 || shield.visible {
+				t.Fatal("click at unchanged coordinates did not restore cursor")
+			}
+		}
+	}
+}

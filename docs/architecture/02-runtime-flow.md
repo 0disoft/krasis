@@ -21,6 +21,13 @@ destination의 cursor entry는 return detector arm 뒤 `PrepareEntry`로 이동 
 취소를 상속하지 않는 bounded cleanup에서 `RollbackEntry`를 호출하며, 현재 cursor가 확인된 entry 좌표에
 그대로 있을 때만 이전 좌표로 복원한다. 이미 움직인 cursor는 오래된 snapshot으로 덮어쓰지 않는다.
 
+제어권 반환 시 destination의 커서 숨김은 네이티브 소유 스레드의 같은 메시지 큐에 snapshot과 show를
+순서대로 게시한다. show는 revoke 전송 성공 후에만 게시한다. peer 스레드는 snapshot을 기다리지 않으며,
+20ms 지연만으로 숨김 요청을 버리지 않는다. 최신 요청 ID, 입력 generation, 현재 데스크톱과 좌표를
+확인하므로 이전 요청이나 반환 중 실제 입력은 뒤늦게 커서를 숨길 수 없다. 이미 숨긴 경계 좌표와 같은
+이동 보고는 숨김을 유지하며, 좌표가 달라진 이동·클릭·휠·키 입력 또는 새 진입은 커서를 복원한다.
+태그된 동일 좌표 보고는 네이티브 처리를 하지 않으므로 데스크톱 조회도 추가하지 않는다.
+
 상태 변경은 `internal/control` transition table에서만 결정한다. table이 반환한 effect는 Application이 순서대로 실행하고 성공 또는 실패 event를 다시 상태 머신에 넣는다. 현재 구현은 순수 transition core, authenticated peer transport, Raw Input과 low-level hook을 결합한 Win32 source, `SendInput` 기반 Win32 destination adapter를 포함한다.
 
 활성 inbound lease에서 받은 입력은 실행 전에 `InputStream` gate를 통과한다. session, epoch 또는 정확한 다음 sequence가 하나라도 맞지 않으면 해당 payload를 실행하지 않고 `FAULT_DETECTED` cleanup으로 넘긴다. stream과 lease의 session이 서로 다르거나 non-local 상태에서 lease 방향과 맞지 않는 입력을 받은 경우도 동일하게 fail-safe 처리한다. 재연결은 새 session과 epoch, sequence `1`에서 시작한다.

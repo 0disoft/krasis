@@ -37,13 +37,13 @@ func TestReturnCursorCancelsStalePresentationAndRestoresBeforeInput(t *testing.T
 	}
 	shield.prepare()()
 	shield.beforeInput()
-	shield.show(queued[0])
+	shield.showPrepared(queued[0])
 	if shown != 0 {
 		t.Fatal("queued presentation ignored local input")
 	}
 	queued = nil
 	shield.prepare()()
-	shield.show(queued[0])
+	shield.showPrepared(queued[0])
 	if shown != 1 || !shield.visible {
 		t.Fatal("return did not present")
 	}
@@ -58,14 +58,14 @@ func TestReturnCursorCancelsStalePresentationAndRestoresBeforeInput(t *testing.T
 	queued = nil
 	shield.prepare()()
 	shield.restore()
-	shield.show(queued[0])
+	shield.showPrepared(queued[0])
 	if shown != 1 {
 		t.Fatal("new entry failed to invalidate presentation")
 	}
 	queued = nil
 	shield.prepare()()
 	position.X++
-	shield.show(queued[0])
+	shield.showPrepared(queued[0])
 	if shown != 1 {
 		t.Fatal("cursor moved before presentation")
 	}

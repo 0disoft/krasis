@@ -55,7 +55,7 @@ func newSourceLowLevelCallbacks(session *SourceSession, boundary BoundaryObserve
 			// Wheels retain existing foreground ownership/suppression. Untagged
 			// synthesized wheels can also come from precision touchpads.
 			if isTaggedMouseInput(data) && message != wmMouseWheel && message != wmMouseHWheel {
-				if err := shield.beforeIgnoredInput(check); err != nil {
+				if err := shield.beforeIgnoredMouseInput(message, data.Point, check); err != nil {
 					session.Abort(err)
 				} else if message == wmMouseMove {
 					pointerState.observe(data.Point)
@@ -66,7 +66,7 @@ func newSourceLowLevelCallbacks(session *SourceSession, boundary BoundaryObserve
 				session.Abort(err)
 				return next(code, wParam, lParam)
 			}
-			if err := shield.beforeInput(); err != nil {
+			if err := shield.beforeMouseInput(message, data.Point); err != nil {
 				session.Abort(err)
 				return next(code, wParam, lParam)
 			}

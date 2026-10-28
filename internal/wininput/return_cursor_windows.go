@@ -28,9 +28,8 @@ type returnCursorShield struct {
 	generation      atomic.Uint64
 	snapshotID      atomic.Uint64
 	snapshotRequest atomic.Pointer[returnCursorSnapshotRequest]
-	mu              sync.Mutex
-	position        point
-	visible         bool // accessed only on the owning hook thread
+	position        point // accessed only on the owning hook thread
+	visible         bool  // accessed only on the owning hook thread
 	failure         atomic.Pointer[returnCursorFailure]
 }
 
@@ -94,7 +93,7 @@ var (
 				shield.snapshotPosition(uint64(wParam))
 				return 0
 			case wmReturnCursorShow:
-				shield.show(uint64(wParam))
+				shield.showPrepared(uint64(wParam))
 				return 0
 			case wmReturnCursorHide:
 				if shield.generation.Load() == uint64(wParam) {
@@ -124,20 +123,25 @@ func (hook *SourceHook) PrepareReturnCursorChecked() (func(), error) {
 
 func (shield *returnCursorShield) prepare() func() {
 	generation := shield.generation.Load()
-	position, ok := shield.requestPosition(generation)
-	if !ok {
+	window := shield.window.Load()
+	if window == 0 {
 		return nil
 	}
+	request := &returnCursorSnapshotRequest{id: shield.snapshotID.Add(1), generation: generation}
+	shield.snapshotRequest.Store(request)
+	if err := returnCursorPost(window, wmReturnCursorSnapshot, request.id); err != nil {
+		shield.snapshotRequest.CompareAndSwap(request, nil)
+		shield.record("cursor-present", err)
+		return nil
+	}
+	// Snapshot and show go to the same native queue in that order. Do not wait
+	// for the snapshot on the peer worker or discard it after an arbitrary 20ms.
 	return func() {
-		shield.mu.Lock()
-		if shield.generation.Load() != generation {
-			shield.mu.Unlock()
+		if shield.generation.Load() != generation || shield.snapshotRequest.Load() != request {
 			return
 		}
-		shield.position = position
-		shield.mu.Unlock()
-		if window := shield.window.Load(); window != 0 {
-			shield.record("cursor-present", returnCursorPost(window, wmReturnCursorShow, generation))
+		if shield.window.Load() == window {
+			shield.record("cursor-present", returnCursorPost(window, wmReturnCursorShow, request.id))
 		}
 	}
 }
@@ -149,9 +153,7 @@ func (shield *returnCursorShield) show(generation uint64) {
 		result = "inactive"
 		return
 	}
-	shield.mu.Lock()
 	expectedPosition := shield.position
-	shield.mu.Unlock()
 	if shield.generation.Load() != generation {
 		result = "superseded"
 		return
@@ -236,6 +238,25 @@ func (shield *returnCursorShield) beforeIgnoredInput(check func() error) error {
 		}
 	}
 	return shield.beforeInput()
+}
+
+// Repeated boundary coordinates from clipping or delayed input must not reveal
+// a stationary cursor. Actual movement and buttons/wheels still restore it.
+func (shield *returnCursorShield) beforeMouseInput(message uint32, position point) error {
+	if shield != nil && shield.visible && message == wmMouseMove && position == shield.position {
+		return shield.failureResult()
+	}
+	return shield.beforeInput()
+}
+
+func (shield *returnCursorShield) beforeIgnoredMouseInput(message uint32, position point, check func() error) error {
+	// A stationary report performs no native work and needs no desktop query.
+	if shield != nil && shield.visible && (message != wmMouseMove || position != shield.position) {
+		if err := check(); err != nil {
+			return err
+		}
+	}
+	return shield.beforeMouseInput(message, position)
 }
 
 func (shield *returnCursorShield) restore() {
