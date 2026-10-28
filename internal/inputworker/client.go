@@ -35,6 +35,7 @@ type Client struct {
 	desktopObservations uint8
 	localExchange       func(context.Context, request, func(response)) error
 	localClose          func() error
+	heartbeatExpired    atomic.Bool
 }
 
 // SetTimingObserver enables bounded diagnostic summaries. The observer must
@@ -96,7 +97,7 @@ func (client *Client) Heartbeat(ctx context.Context) error {
 	// Best-effort idle maintenance, not a liveness receipt. An in-flight
 	// operation owns bounded I/O and worker recovery; never queue maintenance
 	// behind it or add a roundtrip after a recent matching acknowledgement.
-	return client.perform(ctx, request{op: opHeartbeat})
+	return client.pollInputHeartbeat(ctx)
 }
 func (client *Client) delta(ctx context.Context, op operation, x, y int32) error {
 	if x < -maxDelta || x > maxDelta || y < -maxDelta || y > maxDelta || (x == 0 && y == 0) {
@@ -110,6 +111,10 @@ func (client *Client) perform(ctx context.Context, command request) error {
 }
 
 func (client *Client) performResponse(ctx context.Context, command request, observed func(response)) error {
+	return client.performResponseChecked(ctx, command, observed, nil)
+}
+
+func (client *Client) performResponseChecked(ctx context.Context, command request, observed func(response), heartbeat *inputHeartbeatCheck) error {
 	if client != nil && client.localExchange != nil {
 		return client.localExchange(ctx, command, observed)
 	}
@@ -194,7 +199,10 @@ func (client *Client) performResponse(ctx context.Context, command request, obse
 		return nil
 	}
 	start = time.Now()
-	if authorityErr == nil {
+	if heartbeat != nil {
+		authorityErr = heartbeat.validate(client, ctx, command.op)
+		authorityElapsed += heartbeat.elapsed
+	} else if authorityErr == nil {
 		// Maintenance checks only the pinned pipe owner. Input has just
 		// completed full authorization without waiting for this gate; still
 		// reject a closed/exited owner before submitting any request.

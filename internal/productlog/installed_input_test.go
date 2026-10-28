@@ -30,7 +30,7 @@ func TestInputConnectionDiagnosticAllowlistRejectsDynamicStages(t *testing.T) {
 			t.Fatal("dynamic source command/outcome admitted")
 		}
 	}
-	for _, code := range []string{"installed_source_timing_client_response_lt1s", "installed_source_timing_worker_scope_lt100ms", "installed_source_timing_worker_apply_lt1s", "installed_source_heartbeat_timing_client_authority_ge1s", "installed_source_failure_protocol", "installed_source_command_preflight_expired", "installed_input_preparation_joined"} {
+	for _, code := range []string{"installed_input_heartbeat_preflight_expired", "installed_input_heartbeat_presence_failed", "installed_source_timing_client_response_lt1s", "installed_source_timing_worker_scope_lt100ms", "installed_source_timing_worker_apply_lt1s", "installed_source_heartbeat_timing_client_authority_ge1s", "installed_source_failure_protocol", "installed_source_command_preflight_expired", "installed_input_preparation_joined"} {
 		line := `{"time":"2026-10-15T09:40:00Z","code":"` + code + `","error":"PRIVATE"}` + "\n"
 		result := sanitizeLog("agent.jsonl", strings.NewReader(line))
 		if result.Incomplete || len(result.Events) != 1 || result.Events[0].Code != code {

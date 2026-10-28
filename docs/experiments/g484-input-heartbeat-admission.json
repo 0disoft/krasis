@@ -1,0 +1,102 @@
+{
+  "schema": "krasis.heartbeat-admission-investigation/v1",
+  "generation": 484,
+  "baselineGeneration": 483,
+  "collection": "2ab90740a0a15b45212b61219314cb19",
+  "sides": [
+    {
+      "side": "A",
+      "sha256": "c33b9671a53f814a9c81c043375c1d37e141105f36d2f7bb8342ddae8cf0845a",
+      "inputHealth": {
+        "time": "2026-10-28T14:41:11.9617606Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "events": [
+        {
+          "time": "2026-10-28T14:32:53.0412875Z",
+          "code": "reconnect_remote_eof"
+        }
+      ]
+    },
+    {
+      "side": "B",
+      "sha256": "709f892e96a65e9a1ee5ccbc4d6be844fe54daeda10700c0ad599a7d8a1d48be",
+      "inputHealth": {
+        "time": "2026-10-28T14:41:19.735842Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "events": [
+        {
+          "time": "2026-10-28T14:32:52.3258373Z",
+          "code": "installed_input_heartbeat_timing_client_lock_lt1ms"
+        },
+        {
+          "time": "2026-10-28T14:32:52.3258373Z",
+          "code": "installed_input_heartbeat_timing_client_authority_lt1ms"
+        },
+        {
+          "time": "2026-10-28T14:32:52.3258373Z",
+          "code": "installed_input_heartbeat_timing_client_write_lt1ms"
+        },
+        {
+          "time": "2026-10-28T14:32:52.3258373Z",
+          "code": "installed_input_heartbeat_timing_client_response_ge1s"
+        },
+        {
+          "time": "2026-10-28T14:32:52.3258373Z",
+          "code": "installed_input_heartbeat_timing_worker_apply_lt1ms"
+        },
+        {
+          "time": "2026-10-28T14:32:53.4412835Z",
+          "code": "installed_input_heartbeat_timing_client_lock_lt1ms"
+        },
+        {
+          "time": "2026-10-28T14:32:53.4412835Z",
+          "code": "installed_input_heartbeat_timing_client_authority_lt1ms"
+        },
+        {
+          "time": "2026-10-28T14:32:53.4412835Z",
+          "code": "installed_input_heartbeat_failed"
+        },
+        {
+          "time": "2026-10-28T14:32:53.8589867Z",
+          "code": "fault_session_unknown"
+        }
+      ]
+    }
+  ],
+  "assessment": {
+    "confirmed": "B input heartbeat failure ended the session; A observed remote EOF. Both later reconnected with services READY.",
+    "reproduced": [
+      "A blocked maintenance presence check owns the input gate and blocks fresh input.",
+      "A two-second unsent maintenance presence timeout fences the channel and rejects subsequent live input."
+    ],
+    "uncertain": "The incident has no exact heartbeat error phase. Runtime GC stopping and timer lateness are correlated, not proof of the initiating native failure or a Go runtime root cause.",
+    "change": "Perform fresh optional presence preflight outside the input gate and mandatory presence lane. Discard only unsent preflight timeout after one second; keep the total two-second budget and sent ACK failure policy.",
+    "unchanged": [
+      "fresh input authorization",
+      "immutable lease expiry",
+      "bounded query ownership",
+      "no replay of input or heartbeat requests",
+      "sent failure retires the channel"
+    ],
+    "remaining": "Runtime pauses exceeding the worker idle deadline and genuine owner/ACK failures can still reconnect."
+  },
+  "validation": {
+    "oldSource": "Both focused regressions failed before implementation.",
+    "current": "Full Go suite, affected packages, targeted race tests and go vet passed.",
+    "physical": "Not yet verified; installation follows the source commit."
+  },
+  "sourceOfTruthChanges": [
+    "docs/architecture/02-runtime-flow.md"
+  ],
+  "apiChanges": "none",
+  "dbChanges": "none",
+  "runnerChanges": "none"
+}
