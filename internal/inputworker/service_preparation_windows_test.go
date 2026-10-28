@@ -10,6 +10,41 @@ import (
 	"time"
 )
 
+func TestServicePreparationReapsIdleExpiredBuilderBeforeFreshHint(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var slot serviceInputPreparation
+		ctx := context.Background()
+		old := &preparedConsole{preparedAt: time.Now()}
+		release := make(chan struct{})
+		slot.start(ctx, func(context.Context) (*preparedConsole, error) { <-release; return old, nil })
+		last := time.Now()
+		channel, err := slot.accept(func() (*Channel, error) {
+			close(release)
+			// Construction finishes and expires while accept waits for physical
+			// movement. No periodic refresh or synthetic client wakes the service.
+			time.Sleep(3 * time.Second)
+			if err := old.expireUnbound(); err != nil {
+				t.Fatal(err)
+			}
+			return &Channel{}, nil
+		})
+		if err != nil || slot.warming != nil || slot.next != old || !channel.preparationWaitMeasured || channel.preparationWait != 0 {
+			t.Fatal("completed idle builder blocked the authenticated hint", err)
+		}
+		fresh := &preparedConsole{preparedAt: time.Now()}
+		builds := 0
+		if !slot.hint(ctx, last, time.Now(), func(context.Context) (*preparedConsole, error) { builds++; return fresh, nil }) {
+			t.Fatal("fresh movement retained an expired candidate")
+		}
+		if err := slot.admit(channel); err != nil || slot.next != fresh || builds != 1 {
+			t.Fatal("entry did not receive the single replacement builder", err)
+		}
+		if err := slot.close(); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
 func TestServiceAuthenticatesDuringPreparationButJoinsBeforeAdmission(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		var slot serviceInputPreparation

@@ -68,21 +68,32 @@ func (p *serviceInputPreparation) join() error {
 	return serviceRecoveryFailure(err, nil)
 }
 
-func (p *serviceInputPreparation) accept(accept func() (*Channel, error)) (*Channel, error) {
-	hadPreparation := p.warming != nil
-	// A failure already known at loop entry must not wait for another client.
+// Harvest only a completed builder. Neither optional demand nor authentication
+// may wait for native construction, but completed errors must fence admission.
+func (p *serviceInputPreparation) collectReady() error {
 	if p.warming != nil {
 		select {
 		case <-p.warming.done:
-			if err := p.join(); err != nil {
-				return nil, err
-			}
+			return p.join()
 		default:
 		}
+	}
+	return nil
+}
+
+func (p *serviceInputPreparation) accept(accept func() (*Channel, error)) (*Channel, error) {
+	hadPreparation := p.warming != nil
+	if err := p.collectReady(); err != nil {
+		return nil, err
 	}
 	channel, err := accept()
 	if err != nil {
 		return channel, err
+	}
+	// Accept can sleep past both construction and expiry. Reap before decoding
+	// the next hint, or warming remains occupied and drops the renewal demand.
+	if err := p.collectReady(); err != nil {
+		return nil, serviceRecoveryFailure(err, channel.Close())
 	}
 	// A builder collected before authentication has zero remaining join wait.
 	channel.preparationWaitMeasured = hadPreparation

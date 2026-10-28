@@ -43,6 +43,11 @@ destination의 cursor entry는 return detector arm 뒤 `PrepareEntry`로 이동 
 모두 합류하고 성공한 뒤에만 워커를 시작한다. 한쪽 실패·취소·만료는 계속 실행을 거절하고,
 진행 중인 네이티브 조회의 핸들은 해당 조회가 끝날 때까지 기존 소유자가 유지한다.
 
+입력 서비스는 요청 수락 전후에 완료된 준비 작업만 비차단 회수한다. 요청 대기 중 워커가
+완성·만료됐더라도 다음 인증된 준비 힌트를 처리하기 전에 회수하므로, 완료된 builder가
+교체 준비를 막지 않는다. 미완료 작업은 실제 리스 입장 때 합류하며, 정리 실패는 인증된
+채널도 닫고 복구 실패로 전파한다. 2초 만료와 준비 횟수 제한은 유지한다.
+
 상태 변경은 `internal/control` transition table에서만 결정한다. table이 반환한 effect는 Application이 순서대로 실행하고 성공 또는 실패 event를 다시 상태 머신에 넣는다. 현재 구현은 순수 transition core, authenticated peer transport, Raw Input과 low-level hook을 결합한 Win32 source, `SendInput` 기반 Win32 destination adapter를 포함한다.
 
 활성 inbound lease에서 받은 입력은 실행 전에 `InputStream` gate를 통과한다. session, epoch 또는 정확한 다음 sequence가 하나라도 맞지 않으면 해당 payload를 실행하지 않고 `FAULT_DETECTED` cleanup으로 넘긴다. stream과 lease의 session이 서로 다르거나 non-local 상태에서 lease 방향과 맞지 않는 입력을 받은 경우도 동일하게 fail-safe 처리한다. 재연결은 새 session과 epoch, sequence `1`에서 시작한다.
