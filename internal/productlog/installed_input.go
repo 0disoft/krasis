@@ -32,6 +32,7 @@ func init() {
 	allowed["installed_source_heartbeat_preflight_expired"] = true
 	allowed["installed_input_heartbeat_preflight_expired"] = true
 	allowed["installed_input_heartbeat_presence_failed"] = true
+	allowed["installed_input_startup_retired"] = true
 	allowed["installed_source_heartbeat_unsent_expired"] = true
 	allowed["installed_source_command_preflight_expired"] = true
 	allowed["installed_source_heartbeat_failed"] = true

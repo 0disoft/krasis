@@ -53,7 +53,7 @@ func connectInstalledLease(ctx context.Context, serviceDigest [sha256.Size]byte,
 		return nil, connectionFailed("lease_write", err)
 	}
 	started = time.Now()
-	profile, readyErr := readStartupReady(channel.stream)
+	profile, readyErr := readInputLeaseReady(channel.stream)
 	handoff.Record(ctx, handoff.ReadyWait, time.Since(started))
 	if err := readyErr; err != nil {
 		return nil, connectionFailed("worker_ready", err)

@@ -160,11 +160,27 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 		if lease.Capture {
 			childProfile, report, finished, readyErr = readSourceWorkerStartup(control)
 		} else {
-			childProfile, readyErr = readStartupReady(control)
+			childProfile, report, finished, readyErr = readInputWorkerStartup(control)
 		}
 	}
 	profile.Record(handoff.ServiceBootstrapReady, time.Since(started))
 	if finished {
+		if !lease.Capture {
+			// An early final report is not READY. Only its complete empty
+			// recovery receipt can certify the native children; then join the
+			// exact owned job before telling the agent this lease was rejected.
+			stopStartup()
+			if !errors.Is(readyErr, ErrRecovery) && !errors.Is(readyErr, ErrProtocol) {
+				worker.confirmNativeRetirement()
+				if closeErr := prepared.close(); closeErr != nil {
+					return report, errors.Join(readyErr, closeErr, ErrRecovery)
+				}
+				readyErr = errors.Join(ErrStartupRetired, readyErr)
+				if err := publishInputStartupRetired(ctx, channel.stream, report, readyErr); err != nil {
+					return report, errors.Join(readyErr, err)
+				}
+			}
+		}
 		// No readiness is published. Native retirement reached the agent on
 		// its own authenticated pipe; retain the independent service report.
 		return report, observeMissingWorkerReport(readyErr, worker.reportExit)
@@ -400,7 +416,11 @@ func runInstalledConsoleInputMode(ctx context.Context, agentDigest, serviceDiges
 	if installation != nil {
 		isolated, err = startIsolatedInput(run, control, channel, queryService, lease, installation, &profile, native)
 		if err != nil {
-			return finishWorkerReport(control, Report{}, errors.Join(err, ErrRecovery))
+			// Failed startup published neither a journal nor input authority.
+			// Preserve real pending-owner failures; clean rejection is not a
+			// fabricated recovery failure. Close all read-only proof owners too.
+			err = errors.Join(err, serviceRecoveryFailure(nil, channel.Close()), serviceRecoveryFailure(nil, queryService.Close()))
+			return finishInputWorkerReport(control, Report{}, err, native.Close)
 		}
 		input = isolated
 	}
@@ -426,7 +446,7 @@ func runInstalledConsoleInputMode(ctx context.Context, agentDigest, serviceDiges
 	// A live startup proof cannot certify cleanup, even with an empty journal.
 	result = errors.Join(result, serviceRecoveryFailure(nil, queryService.Close()))
 	result = normalizeWorkerStop(requested.Load(), report, result)
-	return finishWorkerReport(control, report, result)
+	return finishInputWorkerReport(control, report, result, native.Close)
 }
 
 // No PID reopening: worker.process is the handle returned for the exact

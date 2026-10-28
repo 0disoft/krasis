@@ -66,6 +66,13 @@ func (a privilegedAuthorizer) AuthorizeLease(ctx context.Context, p transport.Au
 	}
 	identity := application.LeaseIdentity{SessionID: session, LeaseID: id, Epoch: epoch}
 	if err := a.input.open(ctx, identity, now); err != nil {
+		if errors.Is(err, inputworker.ErrStartupRetired) && !errors.Is(err, inputworker.ErrRecovery) &&
+			!errors.Is(err, inputworker.ErrProtocol) && ctx.Err() == nil {
+			if a.input.event != nil {
+				a.input.event("installed_input_startup_retired")
+			}
+			return "", false, nil // Authenticated, fully retired startup; reject this lease only.
+		}
 		return "", false, err
 	}
 	return id, true, nil

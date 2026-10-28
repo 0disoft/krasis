@@ -18,3 +18,14 @@ func finishWorkerReport(control net.Conn, report Report, result error) error {
 	}
 	return result
 }
+
+// Unbound prepared children are not covered by a bound journal's recovery.
+// Join their exact owners before publishing the final recovery receipt.
+func finishInputWorkerReport(control net.Conn, report Report, result error, retire func() error) error {
+	if retire != nil {
+		if err := retire(); err != nil {
+			result = errors.Join(result, err, ErrRecovery)
+		}
+	}
+	return finishWorkerReport(control, report, result)
+}
