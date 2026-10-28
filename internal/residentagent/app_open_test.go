@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0disoft/krasis/internal/launchrecord"
 	"github.com/0disoft/krasis/internal/truststore"
 )
 
@@ -29,5 +30,22 @@ func TestPeerUIOpenRequiresInboundPermissionAndLiveTrust(t *testing.T) {
 	o.updateApplying = true
 	if code := o.openUIForPeer(peer); code != "rejected" {
 		t.Fatal(code)
+	}
+}
+
+func TestUIReadinessRequiresTheRunningAgentsExactBuild(t *testing.T) {
+	revision := strings.Repeat("a", 40)
+	for _, record := range []launchrecord.Record{
+		{Generation: 477, Revision: revision},
+		{Generation: 478, Revision: strings.Repeat("b", 40)},
+		{Generation: 479, Revision: revision},
+		{},
+	} {
+		if matchingUIRecord(record, 478, revision) {
+			t.Fatal("mismatched UI could acknowledge a current window", record.Generation)
+		}
+	}
+	if !matchingUIRecord(launchrecord.Record{Generation: 478, Revision: revision}, 478, revision) {
+		t.Fatal("matching UI was rejected")
 	}
 }

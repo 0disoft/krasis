@@ -6,13 +6,14 @@ import (
 	"os"
 	"time"
 
+	"github.com/0disoft/krasis/internal/buildinfo"
 	"github.com/0disoft/krasis/internal/launchrecord"
 	"github.com/0disoft/krasis/internal/localapi"
 	"github.com/0disoft/krasis/internal/peerupdate"
 )
 
 func (o *Operations) UIReady(ctx context.Context, pid uint32) (localapi.OperationResult, error) {
-	if ctx.Err() != nil || !launchrecord.UIProcessMatches(o.localAppData, pid) {
+	if ctx.Err() != nil || !o.currentUIRecord() || !launchrecord.UIProcessMatches(o.localAppData, pid) {
 		return rejected("ui_unverified"), nil
 	}
 	o.mu.Lock()
@@ -24,7 +25,16 @@ func (o *Operations) uiReadySince(since time.Time) bool {
 	o.mu.Lock()
 	at, pid := o.uiReadyAt, o.uiReadyPID
 	o.mu.Unlock()
-	return at.After(since) && time.Since(at) < time.Minute && launchrecord.UIProcessMatches(o.localAppData, pid)
+	return at.After(since) && time.Since(at) < time.Minute && o.currentUIRecord() && launchrecord.UIProcessMatches(o.localAppData, pid)
+}
+
+func (o *Operations) currentUIRecord() bool {
+	record, err := launchrecord.Load(o.localAppData)
+	return err == nil && matchingUIRecord(record, localapi.AgentGeneration, buildinfo.Read().Revision)
+}
+
+func matchingUIRecord(record launchrecord.Record, generation int, revision string) bool {
+	return len(revision) == 40 && record.Generation == generation && record.Revision == revision
 }
 
 func (o *Operations) OpenApp(ctx context.Context, r localapi.AppOpenRequest) (localapi.AppOpenResult, error) {
@@ -55,7 +65,19 @@ func (o *Operations) openUIForPeer(peer string) string {
 	if !ok || !p.AllowInboundControl || !o.updateAuthorized(o.root, p.Alias, peer) {
 		return "rejected"
 	}
-	_, err := launchrecord.Relaunch(o.localAppData, "", nil)
+	var err error
+	if o.currentUIRecord() {
+		_, err = launchrecord.Relaunch(o.localAppData, "", nil)
+	} else if o.updates != nil {
+		err = o.updates.RelaunchCurrentUI(o.root, func(path string) error {
+			if !o.updateAuthorized(o.root, p.Alias, peer) {
+				return peerupdate.ErrDenied
+			}
+			return launchrecord.Start(path)
+		})
+	} else {
+		err = launchrecord.ErrMissing
+	}
 	if err == nil {
 		return "launch_requested"
 	}

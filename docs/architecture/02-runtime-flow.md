@@ -8,6 +8,12 @@
 2. Windows 입력 adapter와 로컬 projection API를 시작한다.
 3. 연결이 없거나 peer 인증이 끝나지 않으면 `LOCAL`을 유지한다.
 
+g478의 상대 관리 창 열기는 에이전트와 실행 기록의 generation/revision을 함께
+확인한다. 불일치하면 로컬 peer-update staging에서 정확히 같은 빌드만 전체 검증하고
+실행한다. 수신 권한은 실행 직전에 다시 확인하며, 메타데이터·EXE의 쓰기/교체와
+폴더 이름 변경을 실행 완료까지 차단한다. 새 UI는 기존 인계·시작 성공 등록을 거치며,
+이전 버전 창의 준비 보고로 현재 창의 `window_ready`를 대신하지 않는다.
+
 ## 경계 전환
 
 1. Windows adapter가 경계 의도를 감지한다.
