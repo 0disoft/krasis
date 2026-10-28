@@ -132,7 +132,7 @@ func (adapter *InputAdapter) PrepareEntry(ctx context.Context, sourceEdge contro
 	state.enteredY = position.Y
 	stage = "mismatch"
 	if position.X != x || position.Y != y {
-		return fmt.Errorf("%w: cursor entry position does not match", ErrInputInjection)
+		return fmt.Errorf("%w: %w", ErrInputInjection, application.ErrCursorEntryMismatch)
 	}
 	return nil
 }

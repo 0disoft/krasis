@@ -44,7 +44,8 @@ func TestEntryMismatchObservationRemainsAttachedToFailureAndRollback(t *testing.
 	}
 	err = adapter.PrepareEntry(context.Background(), control.ScreenEdgeRight)
 	var failure *application.CursorTransactionFailure
-	if !errors.As(err, &failure) || failure.Stage != "mismatch" || failure.Observation != port.observation || !adapter.entry.enteredKnown {
+	if !errors.Is(err, application.ErrCursorEntryMismatch) || !errors.Is(err, ErrInputInjection) ||
+		!errors.As(err, &failure) || failure.Stage != "mismatch" || failure.Observation != port.observation || !adapter.entry.enteredKnown {
 		t.Fatal("mismatch observation detached or transaction lost", err)
 	}
 	if _, err := adapter.RollbackEntry(context.Background()); err != nil || port.places != 1 {

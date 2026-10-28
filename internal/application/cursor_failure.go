@@ -1,5 +1,13 @@
 package application
 
+import "errors"
+
+// ErrCursorEntryMismatch means placement returned a snapshot and a readback,
+// but the readback differs from the allowed target. It does not authorize input
+// or a placement retry. Only successful conditional rollback can make this a
+// rejected request rather than a failed connection, before granting a lease.
+var ErrCursorEntryMismatch = errors.New("cursor entry readback differs from target")
+
 // CursorTransactionFailure identifies a local transaction stage, not the native
 // cause or an input outcome. The original error remains available to recovery.
 type CursorTransactionFailure struct {

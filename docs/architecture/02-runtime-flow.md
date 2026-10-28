@@ -81,7 +81,7 @@ normalized discrete input의 code domain은 `PressedToken.Validate`가 단일 so
 
 `BoundaryOrchestrator`는 용량 1 intent queue를 순차 소비하고 각 새 outbound 요청에 `crypto/rand` 기반 128-bit session ID와 별도 128-bit epoch를 생성한다. runtime이 `LOCAL`이 아니거나 source suppression이 이미 활성화된 동안 도착한 intent는 현재 session을 건드리지 않고 버린다. entropy 생성 실패와 최초 request write 실패는 orchestrator error로 supervisor에 전달한다.
 
-`LeaseRequest`는 source가 넘은 `LEFT` 또는 `RIGHT` edge를 포함한다. destination `CursorEntryPort`는 승인된 `RIGHT` request를 virtual desktop 왼쪽에서 1px 안쪽, `LEFT` request를 오른쪽에서 1px 안쪽, 세로 중앙에 배치한다. cursor 배치가 성공한 뒤에만 inbound runtime을 활성화하고 grant를 쓴다. authorization reject는 cursor를 움직이지 않으며 cursor 배치 실패는 inbound lease나 grant를 만들지 않고 session failure로 처리한다.
+`LeaseRequest`는 source가 넘은 `LEFT` 또는 `RIGHT` edge를 포함한다. destination `CursorEntryPort`는 승인된 `RIGHT` request를 virtual desktop 왼쪽에서 1px 안쪽, `LEFT` request를 오른쪽에서 1px 안쪽, 세로 중앙에 배치한다. cursor 배치가 성공한 뒤에만 inbound runtime을 활성화하고 grant를 쓴다. authorization reject는 cursor를 움직이지 않는다. 배치 snapshot과 readback을 확보한 좌표 불일치는 grant 전에 조건부 rollback이 정상 완료된 경우에만 해당 요청을 `LeaseReject`로 거절하고 연결을 유지한다. 결과 불명, rollback 실패·미분류, 취소 또는 reject 전송 실패는 계속 session failure로 처리한다. 입력을 재생하거나 커서 배치를 재시도하지 않는다. 세부 계약은 [진입 불일치 거절](../experiments/cursor-entry-mismatch-rejection.md)에 기록한다.
 
 destination input adapter는 현재 inbound session·epoch로 return detector를 arm하되 entry 직후에는
 return-ready로 보지 않는다. source `RIGHT` 진입은 destination 왼쪽에서 오른쪽으로, source `LEFT`

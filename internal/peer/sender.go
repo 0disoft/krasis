@@ -306,15 +306,14 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 			return err
 		}
 		observeControlFlow(responder.Observer, ControlFlowReturnArmSucceeded)
-		rollbackEntry := func(cause error) error {
+		rollbackEntry := func() (application.CursorRollbackOutcome, error) {
 			// Installed DisarmReturn retires cursor access along with the lease.
 			// Keep that backend alive for rollback, even after request cancellation.
 			defer responder.Returns.DisarmReturn(returnIntent)
 			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), CleanupTimeout)
 			defer cancel()
 			observeControlFlow(responder.Observer, ControlFlowEntryRollbackAttempted)
-			_, rollbackErr := responder.Entry.RollbackEntry(cleanupCtx)
-			return errors.Join(cause, rollbackErr)
+			return responder.Entry.RollbackEntry(cleanupCtx)
 		}
 		observeControlFlow(responder.Observer, ControlFlowEntryPrepareAttempted)
 		if responder.Cursor != nil {
@@ -327,7 +326,19 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 		completeEntry(entryErr)
 		handoff.Record(ctx, handoff.EntryPrepare, time.Since(started))
 		if err := entryErr; err != nil {
-			return rollbackEntry(err)
+			outcome, rollbackErr := rollbackEntry()
+			// No grant, stream or remote input exists yet. A known cursor
+			// mismatch with completed conditional rollback rejects this request;
+			// uncertain placement/cleanup still fails the connection. Never replay.
+			if errors.Is(err, application.ErrCursorEntryMismatch) && rollbackErr == nil && ctx.Err() == nil &&
+				(outcome == application.CursorRollbackRestored || outcome == application.CursorRollbackNotRestored) {
+				rejected = true
+				stage = "entry-reject"
+				return writeControlOrFail(ctx, writer, responder.Runtime, transport.ControlCommand{
+					Kind: transport.ControlLeaseReject, SessionID: command.SessionID, Epoch: command.Epoch,
+				})
+			}
+			return errors.Join(err, rollbackErr)
 		}
 		observeControlFlow(responder.Observer, ControlFlowEntryPrepared)
 		started = time.Now()
@@ -335,7 +346,8 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 		_, prepareErr := responder.Runtime.PrepareInbound(ctx, command.SessionID, leaseID, command.Epoch)
 		handoff.Record(ctx, handoff.PrepareInbound, time.Since(started))
 		if err := prepareErr; err != nil {
-			return rollbackEntry(err)
+			_, rollbackErr := rollbackEntry()
+			return errors.Join(err, rollbackErr)
 		}
 		responder.pending = &pendingInboundLease{
 			command: transport.ControlCommand{
