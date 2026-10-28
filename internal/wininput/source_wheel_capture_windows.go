@@ -702,10 +702,14 @@ func (current *sourceWheelCaptureRun) activateWindowProfile(profile context.Cont
 // Run only on the capture window's owner thread. Inactive windows retain the
 // normal class cursor; no global cursor resource or ShowCursor count is changed.
 func (current *sourceWheelCaptureRun) hideActiveCursor() bool {
-	if sourceLoginDesktopCheck(current.loginContext) != nil {
+	if !current.active.Load() {
 		return false
 	}
-	if !current.active.Load() {
+	// WM_SETCURSOR can run synchronously inside ShowWindow/SetForegroundWindow
+	// and during return cleanup. This only paints our owned window's cursor;
+	// it must not run Scope.Do's native desktop-activity query on the UI
+	// thread. Activation and wheel forwarding retain their independent checks.
+	if current.loginContext != nil && current.loginContext.Err() != nil {
 		return false
 	}
 	callSetSourceCaptureCursor(0)

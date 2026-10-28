@@ -18,3 +18,19 @@ and disconnect. The user-confirmed generation 14 behavior must remain intact.
 Agent generation is 15.
 
 Reference: [WM_SETCURSOR](https://learn.microsoft.com/en-us/windows/win32/menurc/wm-setcursor).
+
+## Keep cursor painting outside input authorization
+
+The owned capture window's `WM_SETCURSOR` callback and initial null-cursor paint
+use the already-activated owner's atomic state and cancellation only. They do
+not call `sourceLoginDesktopCheck` / `Scope.Do`: the fixed capture scope runs a
+native desktop-activity query, including while Windows is delivering
+messages inside a foreground transition. Inactive/returning owners make no
+such queries either. Cursor painting emits no input, activates no window and
+does not grant or renew a lease. Activation, geometry admission, desktop
+selection and wheel forwarding keep their existing live checks.
+
+Regression tests verify repeated active painting with an unusable input scope,
+rejection of activation on that same scope, and no painting after deactivation,
+cancellation or native failure. This removes one scope check per cursor callback;
+the effect on physical handoff latency still requires a new two-PC run.
