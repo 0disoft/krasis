@@ -1,0 +1,138 @@
+{
+  "schema": "krasis.paired-installation/v1",
+  "generation": 501,
+  "revision": "6aa04b9d69d94d0a7db3dfee2565b3c3010e2693",
+  "collection": "e3f053d4ff0ebd680787f6608dbb8dbd",
+  "sides": {
+    "A": {
+      "created": "2026-10-29T18:10:33Z",
+      "sha256": "6bb28a936ad8f826eee1ce6b47c466988429d899ff19bdb6ca43026e6c0b5046",
+      "installation": {
+        "time": "2026-10-29T18:09:17.0380538Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-29T18:09:17.6539536Z",
+        "time": "2026-10-29T18:09:17.67142Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      },
+      "inputHealth": {
+        "time": "2026-10-29T18:10:19.4496026Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "matchingBuildUILaunch": [
+        {
+          "time": "2026-10-29T18:09:18.4498011Z",
+          "code": "launch_record_ready"
+        }
+      ],
+      "connection": [
+        {
+          "time": "2026-10-29T18:10:10.9217719Z",
+          "code": "CONNECTED"
+        }
+      ],
+      "currentBuildFaults": []
+    },
+    "B": {
+      "created": "2026-10-29T18:10:34Z",
+      "sha256": "7722e8e6c708db1b95ee523c678f0a45da7a21613524ff66093b06e3410675a8",
+      "installation": {
+        "time": "2026-10-29T18:09:58.6875252Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-29T18:10:01.725714Z",
+        "time": "2026-10-29T18:10:01.7776981Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      },
+      "inputHealth": {
+        "time": "2026-10-29T18:10:04.6577801Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "matchingBuildUILaunch": [
+        {
+          "time": "2026-10-29T18:10:05.5007091Z",
+          "code": "launch_record_ready"
+        }
+      ],
+      "connection": [
+        {
+          "time": "2026-10-29T18:10:10.5956453Z",
+          "code": "CONNECTED"
+        }
+      ],
+      "currentBuildFaults": []
+    }
+  },
+  "setupSha256": "d63c9f4799d360c8d1eb1df4981a2f792d67a9eef567872940639bda244d389a",
+  "transfer": {
+    "schemaVersion": "krasis.cli.update-wait/v1",
+    "peerAlias": "B",
+    "id": "d6546ed1d3d267e9f30be77efe33d299",
+    "code": "updated",
+    "transferState": "UPDATED",
+    "generation": 501,
+    "revision": "6aa04b9d69d94d0a7db3dfee2565b3c3010e2693",
+    "bytes": 28746217,
+    "total": 28746217
+  },
+  "previousAttempt": {
+    "generation": 500,
+    "result": {
+      "schema": "krasis.setup-result/v1",
+      "code": 1,
+      "state": "install_failed",
+      "installStage": "receipt_preflight"
+    },
+    "effect": "receipt_preflight rejected before shutdown; g499 stayed healthy/CONNECTED"
+  },
+  "changes": "Includes g500 overlapped fresh native authority/scope and pinned unbound launch ownership, plus g501 bounded installation-history expansion.",
+  "validation": {
+    "go": "Full go test ./... passed for g500 runtime changes with deployment runtime overlay; g501 installer follow-up passed appinstall, krasis-setup, localapi and new 65th-upgrade/128-bound regressions.",
+    "frontend": "104/104 tests and native production build passed",
+    "package": "Workspace package, input installer, executable icons and offline setup verification passed",
+    "regression": "g499 native proof overlap test failed at 37ms; updated executor passed at 27ms. Late proof reentry, cancellation/lease expiry, failure certainty, joined cleanup and sanitized panic passed.",
+    "smoke": "Both g501 UI/agent/protected installation builds match; services/input READY; authenticated connection established; no collected current-build fault events after install.",
+    "check": "git diff --check passed",
+    "race": "Skipped: CGO disabled in deployment environment",
+    "remoteCI": "Skipped: no new push requested"
+  },
+  "scope": "Installation/startup snapshot only. Physical preparation/input latency and recovery recurrence under crossings remain unverified until user test.",
+  "sourceOfTruthChanged": "docs/architecture/02-runtime-flow.md (runtime commits)",
+  "apiChanges": "No network or API endpoint changes; same 8KiB installation receipt schema accepts up to 128 folder records",
+  "dbChanges": "none",
+  "repositoryHygieneChanges": "none",
+  "runnerChanges": "none",
+  "remotePush": "not performed"
+}
