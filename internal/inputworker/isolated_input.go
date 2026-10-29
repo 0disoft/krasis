@@ -103,12 +103,16 @@ func journalExecution(input application.InputPort, owner executor, timing *worke
 		if err := ctx.Err(); err != nil {
 			return err
 		}
+		before, _ := isolated.Client.nativeTimingSnapshot()
 		started := time.Now()
 		err := operation()
 		if timing != nil {
-			// This measures IPC completion, not the child's individual native
-			// queries. Leave authority/scope/desktop unobserved in this owner.
+			// IPC contains native work. Only a matching single native ACK may
+			// supply its nested service/desktop timings; never add them to IPC.
 			timing.record(2, time.Since(started))
+			if err == nil {
+				isolated.Client.recordNativeTiming(before, timing)
+			}
 		}
 		return err
 	})

@@ -105,7 +105,8 @@ func runInstalledNativeInput(ctx context.Context, installation *Installation, re
 		serviceCheck = func() error { return checkNativeRecoveryService(recoveryService, proof) }
 	}
 	return inputdesktop.RunInteractive(ctx, func() error { return authority.check(releaseOnly) }, func(scope *inputdesktop.Scope) error {
-		execute := nativeInputExecutor(scope.Do, serviceCheck, func() bool { return nativeParentAlive(handles[3]) }, lease.ExpiresAt, releaseOnly)
+		timing := &workerTiming{}
+		execute := nativeInputExecutor(scope.Do, serviceCheck, func() bool { return nativeParentAlive(handles[3]) }, lease.ExpiresAt, releaseOnly, timing)
 		if releaseOnly {
 			// Guard-side commands have no native release capability. Only the
 			// release-only framed handler executes within fresh authority/scope.
@@ -114,7 +115,7 @@ func runInstalledNativeInput(ctx context.Context, installation *Installation, re
 		}
 		// The parent worker owns the authoritative journal. This child's guard
 		// journal stays empty; retirement must precede the parent's key-up.
-		_, err := crashguard.ServeWithInput(os.Stdin, os.Stdout, input, PortableInputHandler(input, execute))
+		_, err := crashguard.ServeWithInput(os.Stdin, os.Stdout, input, portableInputHandler(input, execute, false, timing))
 		return err
 	})
 }

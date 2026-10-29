@@ -125,6 +125,9 @@ func (client *Client) performPortable(ctx context.Context, process portableTrans
 	if observed != nil {
 		observed(ack)
 	}
+	if command.op != opHeartbeat {
+		client.nativeReply = nativeReplyTiming{sequence: ack.sequence, timing: workerTiming{buckets: ack.timing, millis: ack.millis, measured: ack.measured}}
+	}
 	return nil
 }
 
@@ -155,7 +158,7 @@ func (releaseOnlyInput) Press(context.Context, control.PressedToken) error {
 func (releaseOnlyInput) Move(context.Context, int32, int32) error  { return notSent(ErrAuthority) }
 func (releaseOnlyInput) Wheel(context.Context, int32, int32) error { return notSent(ErrAuthority) }
 
-func portableInputHandler(input application.InputPort, execute func(context.Context, func() error) error, releaseOnly bool) func(io.Reader, io.Writer) error {
+func portableInputHandler(input application.InputPort, execute func(context.Context, func() error) error, releaseOnly bool, timings ...*workerTiming) func(io.Reader, io.Writer) error {
 	var binding Binding
 	sequence := uint64(1)
 	var pressed control.PressedState
@@ -176,6 +179,9 @@ func portableInputHandler(input application.InputPort, execute func(context.Cont
 		ctx, cancel := context.WithTimeout(context.Background(), IdleTimeout)
 		defer cancel()
 		var applyErr error
+		if len(timings) == 1 && timings[0] != nil {
+			*timings[0] = workerTiming{}
+		}
 		if failed {
 			applyErr = notSent(ErrAuthority)
 		} else {
@@ -191,6 +197,9 @@ func portableInputHandler(input application.InputPort, execute func(context.Cont
 		if applyErr != nil {
 			failed, ack.status = true, 1
 			ack.certainty, ack.requested, ack.inserted = describeFailure(applyErr)
+		}
+		if len(timings) == 1 && timings[0] != nil {
+			ack.timing, ack.millis, ack.measured = timings[0].buckets, timings[0].millis, timings[0].measured
 		}
 		// Keep guard commands available to cancel an unapplied prepared press
 		// and to release the independent journal, even after native failure.

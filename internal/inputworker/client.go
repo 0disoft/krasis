@@ -35,7 +35,8 @@ type Client struct {
 	desktopObservations uint8
 	localExchange       func(context.Context, request, func(response)) error
 	localClose          func() error
-	isolatedDelivery    bool // Fixed installed lease only; native child retains full per-input authority.
+	isolatedDelivery    bool              // Fixed installed lease only; native child retains full per-input authority.
+	nativeReply         nativeReplyTiming // Numeric observation only, owned by mu; never authority.
 	heartbeatExpired    atomic.Bool
 }
 
