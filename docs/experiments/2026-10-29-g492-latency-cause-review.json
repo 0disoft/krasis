@@ -1,0 +1,100 @@
+{
+  "schema": "krasis.latency-cause-review/v1",
+  "generation": 492,
+  "baselineCollection": "82c318896a8932715bfef3d985cf0b7d",
+  "sides": {
+    "A": {
+      "created": "2026-10-29T11:58:09Z",
+      "sha256": "9005be44a697384aa7691bdc34a49ab11f8b6bc2699d50774e8ba0b712804aa8",
+      "service": "READY",
+      "inputHealth": {
+        "time": "2026-10-29T11:57:48.5140203Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "failures": [],
+      "detailedProfiles": 0,
+      "readyEntries": 0
+    },
+    "B": {
+      "created": "2026-10-29T11:58:07Z",
+      "sha256": "85fe9c5006f1c8b055ff35c12f1ace9e77ee5e2e418bf4e533b46fecb9313b22",
+      "service": "READY",
+      "inputHealth": {
+        "time": "2026-10-29T11:57:57.2739223Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "failures": [],
+      "detailedProfiles": 0,
+      "readyEntries": 1
+    }
+  },
+  "preparation": {
+    "evidence": "g490 attempts 10/12 used very young candidates, joined construction 84.177/57.162ms and then waited 102.480/96.001ms for native readiness. Exact retired candidate timestamps are unavailable.",
+    "confirmedCodeDefect": "A fresh hint destroyed a still-usable candidate once its remaining lifetime fell below 750ms, putting retirement/construction on an immediate entry path.",
+    "change": "Retain the candidate until actual 3s expiry; leave its fixed timer, cleanup fencing and maximum process count unchanged.",
+    "regression": "At age 2.4s a hint followed by entry performs zero replacement builds and zero builder join wait. Truly expired candidates still replace."
+  },
+  "input": {
+    "baselineWorstMs": 134.372,
+    "parentApplyMs": 106.601,
+    "nestedSubmissionMs": 16.236,
+    "interpretation": "Parent apply includes IPC, child authorization/desktop work and native call. The residual is not a direct measurement of scheduler or network time.",
+    "change": "Reuse a process-local serialized IPC execution owner and response slot rather than spawning and allocating both on every command.",
+    "benchmark": {
+      "scope": "Synthetic IPC execution bridge, excluding native I/O and common context/deadline work",
+      "before": {
+        "nsPerOp": 1393,
+        "bytesPerOp": 152,
+        "allocsPerOp": 4
+      },
+      "after": {
+        "nsPerOp": 1755,
+        "bytesPerOp": 0,
+        "allocsPerOp": 0
+      },
+      "interpretation": "Allocation reduction is measured; this microbenchmark is slower by 362ns/op. No claim that the observed 106ms stall has been resolved."
+    }
+  },
+  "writeTimeout": {
+    "collection": "4faaa778c52203b7712f3a39998ae206",
+    "observedAtUTC": "2026-10-29T11:45:04.7699383Z",
+    "component": "preparation-sender",
+    "fault": "fault_write_io_timeout",
+    "runtimeSample": {
+      "intervalMicros": 3150127,
+      "lateMicros": 3058547,
+      "gcCycles": 1,
+      "gcPauseBucketAtLeast1s": 1,
+      "gcStoppingBucketAtLeast1s": 1
+    },
+    "interpretation": "A has a multi-second runtime observation gap and a GC/STW bucket of at least 1s. B reports remote EOF on the same connection. Host scheduling/GC delay is implicated; this is not evidence of pure network latency, nor exact proof of which native call delayed GC.",
+    "confirmedCodeDefect": "A context could expire during deadline setup/encoding, then still enter TLS Write and irreversibly poison an untouched stream.",
+    "change": "Final zero-byte admission check after encoding and before first TLS Write; cleanup joins cancellation and clears deadline. Actual TLS write failure remains fatal.",
+    "regression": "Old source fails the delayed-deadline TLS test with phase io; patched source reports admission and the next heartbeat succeeds without an expired frame."
+  },
+  "remaining": [
+    "True expired/cold preparation still needs native startup.",
+    "No new g491 detailed profiles were recorded in the latest collection; physical improvement cannot yet be compared.",
+    "The exact cause of the native/IPC 106ms input tail and the multi-second A GC stop remains unresolved; these bounded changes must be verified with fresh physical crossings."
+  ],
+  "sourceOfTruth": "docs/architecture/02-runtime-flow.md",
+  "apiChanges": "no public/wire schema change; generation increases for paired package matching",
+  "dbChanges": "none",
+  "runnerChanges": "none",
+  "remotePush": "not performed",
+  "validation": {
+    "fullGoSuite": "passed using repository offline runtime overlay",
+    "targeted": "transport, agent, crashguard and inputworker passed; late-response fencing and joined retirement coverage retained",
+    "oldSourceReproduction": "delayed deadline setup test fails on c739b16c transport source as expected; patched source passes",
+    "benchmark": "IPCExecution benchmem recorded; not a physical latency claim",
+    "diffCheck": "passed",
+    "race": "not run; bundled build disables CGO and native timeout/retirement regressions are covered",
+    "physical": "pending g492 paired installation and user crossings"
+  }
+}
