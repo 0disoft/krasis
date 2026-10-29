@@ -1,0 +1,168 @@
+{
+  "schema": "krasis.installation-comparison/v1",
+  "generation": 487,
+  "revision": "6d81f6e5f2a6dd613e6afe6a34d5611511f05f80",
+  "collection": "9159485cc9e6225f2031a17a1eefe497",
+  "scope": "Paired installation and health verification; no new physical crossing latency measurement.",
+  "BUpdate": {
+    "id": "e028c1eb83b87bd820626c9ad184fb53",
+    "state": "UPDATED",
+    "bytes": 28723858,
+    "total": 28723858
+  },
+  "BUI": {
+    "code": "window_ready"
+  },
+  "sides": {
+    "A": {
+      "created": "2026-10-29T09:48:14Z",
+      "diagnosticSha256": "9a37422f52343a9f34f86dbce8bcb1fbaa85886d3cb6e21dcd1436206a4e9ec0",
+      "installation": {
+        "time": "2026-10-29T09:47:18.6221527Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "inputHealth": {
+        "time": "2026-10-29T09:47:50.5820911Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "service": "READY",
+      "serviceStartedAt": "2026-10-29T09:47:19.3087312Z",
+      "matchingUIReady": true,
+      "exactBuildFailures": []
+    },
+    "B": {
+      "created": "2026-10-29T09:48:14Z",
+      "diagnosticSha256": "8a5b5599e593830efd4d2511df772ad87611ee4cb4c689115454c85ca1cd117e",
+      "installation": {
+        "time": "2026-10-29T09:48:02.3642325Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "inputHealth": {
+        "time": "2026-10-29T09:48:06.6962632Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "service": "READY",
+      "serviceStartedAt": "2026-10-29T09:48:04.7896819Z",
+      "matchingUIReady": true,
+      "exactBuildFailures": []
+    }
+  },
+  "localDoctor": {
+    "schemaVersion": "krasis.cli.doctor/v1",
+    "agent": "RUNNING",
+    "connection": "CONNECTED",
+    "peerAlias": "B",
+    "cliGeneration": 487,
+    "agentGeneration": 487,
+    "protocol": "COMPATIBLE",
+    "code": "healthy",
+    "cliBuild": "6d81f6e5f2a6dd613e6afe6a34d5611511f05f80",
+    "agentBuild": "6d81f6e5f2a6dd613e6afe6a34d5611511f05f80",
+    "ui": {
+      "state": "RUNNING",
+      "generation": 487,
+      "build": "6d81f6e5f2a6dd613e6afe6a34d5611511f05f80",
+      "pathStatus": "MATCHED"
+    },
+    "launchRecord": {
+      "state": "VERIFIED",
+      "generation": 487,
+      "build": "6d81f6e5f2a6dd613e6afe6a34d5611511f05f80",
+      "pathStatus": "MATCHED"
+    },
+    "installedAgent": {
+      "state": "VERIFIED",
+      "build": "6d81f6e5f2a6dd613e6afe6a34d5611511f05f80"
+    },
+    "service": {
+      "state": "RUNNING",
+      "pathStatus": "MATCHED"
+    },
+    "agentLocation": "PROTECTED",
+    "protectedInput": "CONFIGURED",
+    "checks": [
+      {
+        "name": "agent",
+        "state": "RUNNING"
+      },
+      {
+        "name": "connection",
+        "state": "CONNECTED"
+      },
+      {
+        "name": "protocol",
+        "state": "COMPATIBLE"
+      },
+      {
+        "name": "cli_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "ui_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "installed_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "ui",
+        "state": "RUNNING"
+      },
+      {
+        "name": "launch_record",
+        "state": "VERIFIED"
+      },
+      {
+        "name": "installed_agent",
+        "state": "VERIFIED"
+      },
+      {
+        "name": "service",
+        "state": "RUNNING"
+      },
+      {
+        "name": "update_stage_cleanup",
+        "state": "COMPLETED"
+      }
+    ],
+    "nextActions": []
+  },
+  "validation": {
+    "Go": "full suite passed",
+    "race": "targeted crashguard shared-reader and actual portable input/cursor/guard IPC passed",
+    "vet": "crashguard and inputworker passed",
+    "frontend": "104 tests and native UI build passed",
+    "packaging": "update archive transfer, icon, bundle and setup verification passed",
+    "physical": "not measured after g487 update",
+    "CI": "not run; no push"
+  },
+  "APIChanges": "none",
+  "DBChanges": "none",
+  "runnerChanges": "none",
+  "sourceOfTruthChanged": "docs/architecture/02-runtime-flow.md"
+}

@@ -25,7 +25,8 @@
     "green": "crashguard and inputworker full package suites passed; their vet checks passed.",
     "full": "go test -p 2 -timeout 3m ./... passed",
     "race": "Targeted crashguard shared-reader and real portable input/cursor/guard IPC tests passed under -race",
-    "physical": "pending installation and crossings"
+    "physical": "Both g487 UI/agent builds verified, both input services READY, local doctor healthy and connection CONNECTED; physical latency change still unmeasured.",
+    "packaging": "104 UI tests, native build, workspace transfer and application setup verification passed"
   },
   "limits": [
     "The fixture counts underlying io.Reader calls under complete-contiguous-delivery conditions. Fragmented delivery may require more reads.",
