@@ -1,0 +1,39 @@
+{
+  "schema": "krasis.latency-change-review/v1",
+  "generation": 495,
+  "baseline": "2026-10-29-g494-physical-crossing-review.json",
+  "evidence": {
+    "pairedSuccessfulProfiles": 12,
+    "receiverConnectMaxMs": 497.886,
+    "serviceBootstrapValidationAtSlowEntryMs": 318.593,
+    "nativePairReadinessAtSlowEntryMs": 109.547,
+    "receiverDispatchMaxMs": 172.664,
+    "matchingNativeIPCCompletionMillis": 138,
+    "note": "ServiceBootstrapValidation begins before candidate retirement/construction. It is not pure authentication. IPC completion includes native authorization, desktop work and pipe scheduling; it is not direct SendInput duration."
+  },
+  "changes": [
+    {
+      "commit": "9524f719",
+      "change": "Cold installed ordinary input uses the same genuine SYSTEM service-owned unbound launch as speculative preparation.",
+      "quantified": "The successful cold prepareLeaseConsole launch subpath performs one full agent admission instead of seven: its six creation checkpoints use protected service-owner checks rather than WTSQueryUserToken agent queries. Subsequent fresh bootstrap/transfer/native checks are unchanged.",
+      "bounds": "No input handles, lease or image binding before existing authenticated transfer. No expiry extension, periodic worker renewal, authority cache, process-limit change or premature retirement. Generic/capture/presentation policies unchanged."
+    },
+    {
+      "commit": "189edaf4",
+      "change": "Native service-query and desktop/agent-scope timings travel in the existing fixed 24-byte ACK metadata and are published only for exactly one successful matching native input exchange during the current journal command.",
+      "quantified": "Zero added ACK bytes, input probes, round trips or native authority queries. One bounded numeric reply slot per client; diagnostic snapshot uses TryLock and cannot wait behind input/cleanup.",
+      "bounds": "Idle, composite, rejected and lost ACKs do not reuse earlier stages. Parent apply remains containing IPC completion, so child stages are nested and cannot be added. The existing detailed SendInput probe budget remains unchanged.",
+      "limitation": "This is diagnostic attribution, not a claimed performance fix for the remaining 138ms native IPC stall."
+    }
+  ],
+  "validation": {
+    "inputworker": "Full package passed; full cold agent admission, missing installed pins, unchanged native authority/expiry failures, same-command timings, idle/composite/revoked/lost ACK rejection and nonblocking diagnostic admission covered.",
+    "physical": "g495 crossing comparison pending; no measured latency reduction claimed from static tests."
+  },
+  "sourceOfTruth": "docs/architecture/02-runtime-flow.md",
+  "apiChanges": "Agent generation only; existing ACK metadata reused without public/wire schema change",
+  "dbChanges": "none",
+  "repositoryHygieneChanges": "none",
+  "runnerChanges": "none",
+  "remotePush": "not performed"
+}
