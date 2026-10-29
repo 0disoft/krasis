@@ -65,9 +65,11 @@ func (process *Process) closeOwned() {
 	timer.Stop()
 	// Disarm admission has joined the protocol gate; closing now rejects all
 	// later callers, so no Add can race this Wait.
-	process.callMu.Lock()
-	process.callMu.Unlock()
+	process.stopIPCExecutor()
 	process.active.Wait()
+	if process.executor != nil {
+		<-process.executor.done
+	}
 	<-process.closeInputPipe()
 	<-process.closeOutputPipe()
 	if process.failed.Load() {

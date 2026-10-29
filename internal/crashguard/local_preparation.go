@@ -91,9 +91,11 @@ func (p *Process) closeUnbound() error {
 		go func() {
 			<-p.requestAbort()
 			<-p.done
-			p.callMu.Lock()
-			p.callMu.Unlock()
+			p.stopIPCExecutor()
 			p.active.Wait()
+			if p.executor != nil {
+				<-p.executor.done
+			}
 			<-p.closeInputPipe()
 			<-p.closeOutputPipe()
 			p.mu.Lock()

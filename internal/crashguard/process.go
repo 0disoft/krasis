@@ -113,6 +113,7 @@ type Process struct {
 	failed      atomic.Bool
 	closing     atomic.Bool
 	active      sync.WaitGroup
+	executor    *ipcExecutor // Created and stopped only while callMu is held.
 	closeOnce   sync.Once
 	closeDone   chan struct{}
 	closeErr    error
@@ -301,9 +302,20 @@ func (process *Process) invokeContext(parent context.Context, operation func() e
 	if process.failed.Load() || process.closing.Load() && !shutdown {
 		return ErrIPCTimeout
 	}
-	result := make(chan error, 1)
-	process.active.Add(1)
-	go func() { defer process.active.Done(); result <- operation() }()
+	var result <-chan error
+	if shutdown {
+		// Disarm must still read retained protocol failure/ACK evidence after
+		// process exit. It runs once and is joined by retirement as before.
+		reply := make(chan error, 1)
+		process.active.Add(1)
+		go func() { defer process.active.Done(); reply <- operation() }()
+		result = reply
+	} else {
+		if process.executor == nil {
+			process.executor = newIPCExecutor(process.done)
+		}
+		result = process.executor.start(ctx, operation, &process.active)
+	}
 	select {
 	case err := <-result:
 		if ctx.Err() == nil && !process.failed.Load() && (!process.closing.Load() || shutdown) {
