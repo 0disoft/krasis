@@ -32,6 +32,18 @@ func SourceFailureStage(err error) string {
 // Keep the native cause attached to its deepest operation when sibling errors
 // are joined. Only operation codes/numeric native errors enter support output.
 func SourceFailureDetails(err error) (string, error) {
+	operation, cause := sourceFailureDetails(err)
+	if operation == "hook-callback-stalled" || operation == "hook-mouse-progress" {
+		// Progress triggered retirement, but it does not explain why native
+		// cleanup remained uncertain. Preserve that independent concrete cause.
+		if cleanup, native := sourceRetirementFailureDetails(err); cleanup != "" {
+			return cleanup, native
+		}
+	}
+	return operation, cause
+}
+
+func sourceFailureDetails(err error) (string, error) {
 	var stage *sourceStageError
 	if !errors.As(err, &stage) {
 		return inputdesktop.FailureDetails(err)
@@ -47,6 +59,43 @@ func SourceFailureDetails(err error) (string, error) {
 		"hook-callback-stalled", "hook-mouse-progress",
 		"raw-read", "raw-buffer", "raw-route", "message-loop", "pointer-snapshot", "cursor-present", "cursor-restore", "cursor-release", "raw-size", "raw-packet", "raw-desktop", "raw-window-create", "raw-window-destroy", "raw-ready":
 		return stage.stage, stage.cause
+	}
+	return "", nil
+}
+
+func sourceRetirementFailureDetails(err error) (string, error) {
+	if err == nil {
+		return "", nil
+	}
+	if stage, ok := err.(*sourceStageError); ok {
+		if operation, cause := sourceRetirementFailureDetails(stage.cause); operation != "" {
+			return operation, cause
+		}
+		switch stage.stage {
+		case "thread-join", "thread-join-low-level-hook", "thread-join-raw-mouse", "thread-join-wheel-capture", "thread-join-multiple",
+			"hook-release", "raw-release", "raw-window-destroy", "cursor-release":
+			return stage.stage, stage.cause
+		}
+	}
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		for _, child := range joined.Unwrap() {
+			if operation, cause := sourceRetirementFailureDetails(child); operation != "" {
+				return operation, cause
+			}
+		}
+		return "", nil
+	}
+	if operation, cause := inputdesktop.FailureDetails(err); operation != "" {
+		switch operation {
+		case "desktop-restore", "desktop-close", "desktop-thread-exit":
+			return operation, cause
+		}
+		if inputdesktop.ValidCaptureThreadFailureOperation(operation) {
+			return operation, cause
+		}
+	}
+	if wrapped, ok := err.(interface{ Unwrap() error }); ok {
+		return sourceRetirementFailureDetails(wrapped.Unwrap())
 	}
 	return "", nil
 }
