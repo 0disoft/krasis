@@ -1,0 +1,179 @@
+{
+  "schema": "krasis.paired-installation/v1",
+  "generation": 492,
+  "revision": "9924a1fe1febc47ff349e2ed397a714882eeac8a",
+  "collection": "2a16cdc1c40cdcf0ca3c21868d164303",
+  "sides": {
+    "A": {
+      "created": "2026-10-29T12:11:10Z",
+      "sha256": "e61e134f05b20c0963f4109df8c4c60e21891e22d9049497c54b3db6b5b6f8e8",
+      "inputHealth": {
+        "time": "2026-10-29T12:11:04.3165114Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "service": "READY",
+      "installation": {
+        "time": "2026-10-29T12:10:01.5910467Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "lastConnection": {
+        "time": "2026-10-29T12:10:45.4422587Z",
+        "code": "CONNECTED"
+      },
+      "failures": []
+    },
+    "B": {
+      "created": "2026-10-29T12:11:08Z",
+      "sha256": "74c9018874bdbb0e5956a5a18c2a8d769234a6bbdc2b851d8035ccff6cdf57b3",
+      "inputHealth": {
+        "time": "2026-10-29T12:10:39.1756139Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "service": "READY",
+      "installation": {
+        "time": "2026-10-29T12:10:34.4785882Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "lastConnection": {
+        "time": "2026-10-29T12:10:43.4736129Z",
+        "code": "CONNECTED"
+      },
+      "failures": []
+    }
+  },
+  "setupSha256": "83432260ffe3febe122f5872bd30481b87c71924b7fc1f03b73062baa0a29abe",
+  "transfer": {
+    "id": "81be53b31ebd68b74648cce04329b287",
+    "state": "UPDATED",
+    "bytes": 28723499,
+    "total": 28723499
+  },
+  "peerUI": {
+    "code": "window_ready",
+    "id": "03230bc051329e8251dde7595ff4f7ee"
+  },
+  "doctor": {
+    "schemaVersion": "krasis.cli.doctor/v1",
+    "agent": "RUNNING",
+    "connection": "CONNECTED",
+    "peerAlias": "B",
+    "cliGeneration": 492,
+    "agentGeneration": 492,
+    "protocol": "COMPATIBLE",
+    "code": "healthy",
+    "cliBuild": "9924a1fe1febc47ff349e2ed397a714882eeac8a",
+    "agentBuild": "9924a1fe1febc47ff349e2ed397a714882eeac8a",
+    "ui": {
+      "state": "RUNNING",
+      "generation": 492,
+      "build": "9924a1fe1febc47ff349e2ed397a714882eeac8a",
+      "pathStatus": "MATCHED"
+    },
+    "launchRecord": {
+      "state": "VERIFIED",
+      "generation": 492,
+      "build": "9924a1fe1febc47ff349e2ed397a714882eeac8a",
+      "pathStatus": "MATCHED"
+    },
+    "installedAgent": {
+      "state": "VERIFIED",
+      "build": "9924a1fe1febc47ff349e2ed397a714882eeac8a"
+    },
+    "service": {
+      "state": "RUNNING",
+      "pathStatus": "MATCHED"
+    },
+    "agentLocation": "PROTECTED",
+    "protectedInput": "CONFIGURED",
+    "checks": [
+      {
+        "name": "agent",
+        "state": "RUNNING"
+      },
+      {
+        "name": "connection",
+        "state": "CONNECTED"
+      },
+      {
+        "name": "protocol",
+        "state": "COMPATIBLE"
+      },
+      {
+        "name": "cli_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "ui_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "installed_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "ui",
+        "state": "RUNNING"
+      },
+      {
+        "name": "launch_record",
+        "state": "VERIFIED"
+      },
+      {
+        "name": "installed_agent",
+        "state": "VERIFIED"
+      },
+      {
+        "name": "service",
+        "state": "RUNNING"
+      },
+      {
+        "name": "update_stage_cleanup",
+        "state": "COMPLETED"
+      }
+    ],
+    "nextActions": []
+  },
+  "validation": {
+    "go": "full suite passed using repository offline runtime overlay",
+    "frontend": "104 tests passed",
+    "package": "workspace archive transfer, icons/manifest and offline setup verification passed",
+    "installation": "both g492 input services READY; install result 0 and recovery not_needed; paired connection established; no g492 faults at collection time",
+    "race": "not run: CGO disabled build; native timeout/retirement tests passed",
+    "physical": "user crossing test requested after installation; no post-change latency improvement claimed yet"
+  },
+  "sourceOfTruth": "docs/architecture/02-runtime-flow.md",
+  "causeReview": "docs/experiments/2026-10-29-g492-latency-cause-review.json",
+  "remainingRisk": [
+    "Truly expired/cold preparation still requires construction.",
+    "The 106ms parent apply tail and exact native cause of A GC stop need new physical profiling.",
+    "The zero-byte preflight fix cannot recover a TLS connection after an actual partial/unknown write failure."
+  ],
+  "apiChanges": "generation increment; no wire schema change",
+  "dbChanges": "none",
+  "runnerChanges": "none",
+  "remotePush": "not performed"
+}
