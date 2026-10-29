@@ -25,7 +25,8 @@ type preparedNativeChild struct {
 }
 
 type preparedNativePair struct {
-	children [2]*preparedNativeChild
+	children    [2]*preparedNativeChild
+	preparation *nativePairPreparation // Exact asynchronous constructor; never input authority.
 }
 
 // The service-authenticated journal worker launches within its existing job.
@@ -64,6 +65,9 @@ func (p *preparedNativePair) Close() error {
 	if p == nil {
 		return nil
 	}
+	if p.preparation != nil {
+		return p.preparation.close()
+	}
 	var joined sync.WaitGroup
 	var failures [2]error
 	for i, child := range p.children {
@@ -83,7 +87,17 @@ func (p *preparedNativePair) bind(ctx context.Context, release bool, handles []w
 	if release {
 		i = 1
 	}
-	if p == nil || p.children[i] == nil || len(handles) != 4 || len(bootstrap) != nativeBootstrapSize || ctx == nil || ctx.Err() != nil {
+	if p == nil || len(handles) != 4 || len(bootstrap) != nativeBootstrapSize || ctx == nil || ctx.Err() != nil {
+		return nil, ErrAuthority
+	}
+	ready, err := p.awaitPreparation(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if ready != p {
+		return ready.bind(ctx, release, handles, bootstrap)
+	}
+	if p.children[i] == nil {
 		return nil, ErrAuthority
 	}
 	child := p.children[i]
@@ -95,7 +109,7 @@ func (p *preparedNativePair) bind(ctx context.Context, release bool, handles []w
 	// child and is retired before any replacement can be admitted.
 	data := append([]byte(nil), bootstrap...)
 	var transferErr error
-	err := child.process.WithHandle(func(target uintptr) {
+	err = child.process.WithHandle(func(target uintptr) {
 		var values [4]uint64
 		for i, source := range handles {
 			var transferred windows.Handle

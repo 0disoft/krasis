@@ -287,7 +287,7 @@ func runInstalledConsoleInputMode(ctx context.Context, agentDigest, serviceDiges
 		if err := awaitNativePreparation(control); err != nil {
 			return err
 		}
-		native, err = prepareNativePair(startup)
+		native, err = startNativePairPreparation(startup, prepareNativePair)
 		if err != nil {
 			return err
 		}

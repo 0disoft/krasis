@@ -1,0 +1,45 @@
+{
+  "schema": "krasis.preparation-fix/v1",
+  "generation": 499,
+  "baseline": "2026-10-30-g498-physical-crossing-review.json",
+  "observation": {
+    "receiverReadToGrantWrittenMs": 176.742,
+    "receiverConnectMs": 169.609,
+    "remainingServicePreparationJoinMs": 44.738,
+    "candidateAgeMs": 6.605,
+    "otherNineNativePairReadinessMaxMs": 10.682,
+    "nativePairBindingReadinessMs": 98.428
+  },
+  "rootCause": "The service-authenticated journal worker synchronously joined creation of both unbound native children before sending workerAuthenticatedFrame. The service-to-worker bootstrap and subsequent independent agent authentication could not overlap that construction. A very young candidate can therefore expose child startup on the entry path.",
+  "limitation": "The collected nativePair readiness span includes loading and authentication and does not isolate CreateProcess time. This serial dependency is a proven contributor, not proof that it explains all 176.742ms.",
+  "change": "Start exactly one owned asynchronous native-pair constructor only after the existing service permit. Continue existing service/bootstrap authentication concurrently. Join the exact constructor before any child binding/handle transfer, and join it unconditionally before final retirement or pin disposal.",
+  "quantifiedModel": {
+    "note": "Deterministic synctest using production constructor ownership helper; not a physical B performance result.",
+    "afterMs": 60,
+    "reductionPercent": 40,
+    "reductionMs": 40,
+    "constructorMs": 60,
+    "independentBootstrapMs": 40,
+    "beforeMs": 100
+  },
+  "safety": {
+    "handleTransfer": "Both direct and asynchronous actual subprocess fixtures pass exact handle transfer, one-time binding, heartbeat and retirement checks",
+    "unchanged": "Fresh per-input authority, independent native authentication, original startup context/deadlines, 3-process prepared job, one spare candidate, candidate expiry/cooldowns, 4 total and 3 restricted query slots",
+    "cancellation": "Expired binding denied immediately; late native constructor joined before retirement; a new context cannot revive expired preparation",
+    "failure": "Ordinary construction rejection remains local after confirmed partial cleanup; ErrRecovery and child cleanup failures retained"
+  },
+  "validation": {
+    "go": "Full go test ./... passed with repository deployment runtime overlay",
+    "regressionAfter": "Passed at 60ms, plus cancellation, missing/failed constructors, final receipt ordering and real subprocess binding checks",
+    "format": "gofmt and git diff --check passed",
+    "regressionBefore": "TestNativePreparationOverlapsAuthenticatedBootstrap failed at 100ms with synchronous constructor",
+    "physical": "Pending g499 installation and user crossings"
+  },
+  "rollback": "Keep g498 bundles and setup; if new startup or cleanup failures occur, preserve paired diagnostics and restore via normal verified installer with required Windows administrator confirmation. Never delete active generations or suppress cleanup uncertainty.",
+  "sourceOfTruthChanged": "none",
+  "apiChanges": "none",
+  "dbChanges": "none",
+  "repositoryHygieneChanges": "none",
+  "runnerChanges": "none",
+  "remotePush": "not performed"
+}

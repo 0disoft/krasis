@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -83,6 +84,14 @@ func TestPreparedNativeChildHelper(t *testing.T) {
 }
 
 func TestPreparedNativePairTransfersExactHandlesOnlyAtBinding(t *testing.T) {
+	for _, asynchronous := range []bool{false, true} {
+		t.Run(fmt.Sprint(asynchronous), func(t *testing.T) {
+			testPreparedNativePairBinding(t, asynchronous)
+		})
+	}
+}
+
+func testPreparedNativePairBinding(t *testing.T, asynchronous bool) {
 	pair := &preparedNativePair{}
 	t.Cleanup(func() { _ = pair.Close() })
 	for i := range pair.children {
@@ -105,18 +114,26 @@ func TestPreparedNativePairTransfersExactHandlesOnlyAtBinding(t *testing.T) {
 	}
 	var bootstrap [nativeBootstrapSize]byte
 	bootstrap[24] = 93
+	binding := pair
+	if asynchronous {
+		var err error
+		binding, err = startNativePairPreparation(context.Background(), func(context.Context) (*preparedNativePair, error) { return pair, nil })
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
 	input, err := startNativePair(context.Background(), func(ctx context.Context, release bool) (*isolatedInput, error) {
-		return pair.bind(ctx, release, handles, bootstrap[:])
+		return binding.bind(ctx, release, handles, bootstrap[:])
 	}, nil)
 	if err != nil {
 		t.Fatal("target-handle bootstrap or readiness failed", err)
 	}
 	defer input.finishRecovery()
 	defer input.retireForRecovery()
-	if _, err := pair.bind(context.Background(), false, handles, bootstrap[:]); err == nil {
+	if _, err := binding.bind(context.Background(), false, handles, bootstrap[:]); err == nil {
 		t.Fatal("prepared child accepted a second binding")
 	}
-	if err := pair.Close(); err != nil || input.Heartbeat(context.Background()) != nil {
+	if err := binding.Close(); err != nil || input.Heartbeat(context.Background()) != nil {
 		t.Fatal("preparation retained ownership after transfer", err)
 	}
 	if retired, err := input.retireForRecovery(); !retired || err != nil {
