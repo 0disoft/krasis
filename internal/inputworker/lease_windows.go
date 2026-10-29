@@ -74,6 +74,10 @@ func connectInstalledLease(ctx context.Context, serviceDigest [sha256.Size]byte,
 	if err := finish(); err != nil {
 		return nil, connectionFailed("client_validation", err)
 	}
+	// The protected installed ordinary worker always routes through its
+	// independently authenticated native pair. Delivery need not repeat that
+	// child's live SCM RPC. Readiness diagnostics never select this policy.
+	client.isolatedDelivery = nativeLeasePreparation(installation != nil, lease)
 	accepted = true
 	return client, nil
 }

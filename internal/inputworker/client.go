@@ -35,6 +35,7 @@ type Client struct {
 	desktopObservations uint8
 	localExchange       func(context.Context, request, func(response)) error
 	localClose          func() error
+	isolatedDelivery    bool // Fixed installed lease only; native child retains full per-input authority.
 	heartbeatExpired    atomic.Bool
 }
 
@@ -140,10 +141,10 @@ func (client *Client) performResponseChecked(ctx context.Context, command reques
 			if err := ctx.Err(); err != nil {
 				return notSent(errors.Join(ErrAuthority, err))
 			}
-			// SCM queries are not wire demand. Keep the serial input gate
-			// free for maintenance until full authorization has completed.
+			// Delivery proof queries are not wire demand. Keep the serial
+			// input gate free for maintenance until that fresh check completes.
 			start = time.Now()
-			authorityErr = client.channel.authorizeInput(ctx, true)
+			authorityErr = client.authorizeDelivery(ctx)
 			authorityElapsed += time.Since(start)
 			if ctx.Err() != nil {
 				handoff.Record(ctx, handoff.ClientAuthority, authorityElapsed)
