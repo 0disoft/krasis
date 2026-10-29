@@ -277,10 +277,12 @@ func (process *Process) invoke(operation func() error) error {
 // ExchangeInput serializes one whole input frame/reply with guard ledger IPC.
 // A caller cannot supply another process, pipe, executable or desktop.
 func (process *Process) ExchangeInput(ctx context.Context, exchange func(io.Writer, io.Reader) error) error {
-	if process == nil || !process.portable || ctx == nil || exchange == nil {
+	if process == nil || process.client == nil || !process.portable || ctx == nil || exchange == nil {
 		return ErrUnexpectedExit
 	}
-	return process.invokeContext(ctx, func() error { return exchange(process.stdin, process.stdout) }, false)
+	// invokeContext holds callMu across ledger and input exchanges. Bypassing
+	// this shared reader would lose bytes prefetched by a preceding guard ACK.
+	return process.invokeContext(ctx, func() error { return exchange(process.stdin, process.client.reader) }, false)
 }
 
 func (process *Process) invokeOwned(operation func() error, shutdown bool) error {

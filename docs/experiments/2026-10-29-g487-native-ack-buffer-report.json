@@ -1,0 +1,38 @@
+{
+  "schema": "krasis.native-ack-buffer-investigation/v1",
+  "baselineGeneration": 486,
+  "targetGeneration": 487,
+  "selectedProblem": "Native child IPC read an input ACK header and suffix directly from raw stdout even though the outer service client already buffers ACKs.",
+  "productionPath": [
+    "inputworker.Client.performPortable",
+    "crashguard.Process.ExchangeInput",
+    "inputworker.readResponse"
+  ],
+  "change": "Create one bounded 128-byte reader in crashguard.NewClient, then route Process.ExchangeInput through the same client reader. Guard ledger and native input retain prefetched bytes across exchanges.",
+  "quantitative": {
+    "fixture": "48 contiguous ACK bytes decoded as a 24-byte header plus 24-byte suffix",
+    "beforeUnderlyingReads": 2,
+    "afterUnderlyingReads": 1,
+    "reductionPercent": 50,
+    "mixedLedgerInputLedgerBeforeReads": 3,
+    "mixedLedgerInputLedgerAfterReads": 1,
+    "bufferBytesPerClient": 128,
+    "perInputBufferAllocation": 0,
+    "complexity": "Time O(n) in bytes remains unchanged; additional buffer memory O(1) per process, not per frame."
+  },
+  "validation": {
+    "red": "Both new regressions failed on unmodified production code with 2 and 3 underlying Reads respectively.",
+    "green": "crashguard and inputworker full package suites passed; their vet checks passed.",
+    "full": "go test -p 2 -timeout 3m ./... passed",
+    "race": "Targeted crashguard shared-reader and real portable input/cursor/guard IPC tests passed under -race",
+    "physical": "pending installation and crossings"
+  },
+  "limits": [
+    "The fixture counts underlying io.Reader calls under complete-contiguous-delivery conditions. Fragmented delivery may require more reads.",
+    "This is not a measured 50 percent end-to-end latency improvement or proof that the full 111.619ms delay came from ACK reads."
+  ],
+  "sourceOfTruthChanged": "docs/architecture/02-runtime-flow.md",
+  "APIChanges": "none; wire formats and public signatures unchanged",
+  "DBChanges": "none",
+  "runnerChanges": "none"
+}

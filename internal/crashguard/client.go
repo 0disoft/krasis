@@ -1,12 +1,17 @@
 package crashguard
 
 import (
+	"bufio"
 	"errors"
 	"io"
 	"sync"
 
 	"github.com/0disoft/krasis/internal/control"
 )
+
+// One bounded reader owns both ledger ACKs and native input ACKs for the
+// process lifetime. Input ACK headers and suffixes arrive in one child Write.
+const processReadBufferSize = 128
 
 type Client struct {
 	mu      sync.Mutex
@@ -20,7 +25,7 @@ func NewClient(writer io.Writer, reader io.Reader) (*Client, error) {
 	if writer == nil || reader == nil {
 		return nil, errors.New("crash guard client reader and writer are required")
 	}
-	return &Client{writer: writer, reader: reader}, nil
+	return &Client{writer: writer, reader: bufio.NewReaderSize(reader, processReadBufferSize)}, nil
 }
 
 func (client *Client) PreparePress(token control.PressedToken) (bool, error) {
