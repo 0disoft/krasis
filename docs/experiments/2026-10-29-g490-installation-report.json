@@ -1,0 +1,187 @@
+{
+  "schema": "krasis.paired-installation/v1",
+  "generation": 490,
+  "revision": "0adac30f3cef4033656004c3ce4c4ff8d0a6f8fc",
+  "collection": "0104729bc5174e6766906b3a29d7bbbe",
+  "sides": {
+    "A": {
+      "created": "2026-10-29T11:37:52Z",
+      "diagnosticSha256": "644878ddbe3e94a9dbf5969d83ec0cb8cb8d04ec49e3482e8f39100bdd1e641f",
+      "installation": {
+        "time": "2026-10-29T11:36:28.7561204Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "inputHealth": {
+        "time": "2026-10-29T11:37:32.568839Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "service": "READY",
+      "serviceStartedAt": "2026-10-29T11:36:30.0781143Z",
+      "lastConnection": [
+        {
+          "time": "2026-10-29T11:37:45.2065112Z",
+          "code": "CONNECTED"
+        }
+      ],
+      "exactBuildFailures": []
+    },
+    "B": {
+      "created": "2026-10-29T11:37:53Z",
+      "diagnosticSha256": "1ada65a11efbcf91aaa931c6673260561b783eaf54c7c3ba41f86969f700387c",
+      "installation": {
+        "time": "2026-10-29T11:36:42.3875095Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "inputHealth": {
+        "time": "2026-10-29T11:37:49.2237788Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "service": "READY",
+      "serviceStartedAt": "2026-10-29T11:36:45.4639817Z",
+      "lastConnection": [
+        {
+          "time": "2026-10-29T11:37:44.4741536Z",
+          "code": "CONNECTED"
+        }
+      ],
+      "exactBuildFailures": []
+    }
+  },
+  "localDoctor": {
+    "schemaVersion": "krasis.cli.doctor/v1",
+    "agent": "RUNNING",
+    "connection": "CONNECTED",
+    "peerAlias": "B",
+    "cliGeneration": 490,
+    "agentGeneration": 490,
+    "protocol": "COMPATIBLE",
+    "code": "healthy",
+    "cliBuild": "0adac30f3cef4033656004c3ce4c4ff8d0a6f8fc",
+    "agentBuild": "0adac30f3cef4033656004c3ce4c4ff8d0a6f8fc",
+    "ui": {
+      "state": "RUNNING",
+      "generation": 490,
+      "build": "0adac30f3cef4033656004c3ce4c4ff8d0a6f8fc",
+      "pathStatus": "MATCHED"
+    },
+    "launchRecord": {
+      "state": "VERIFIED",
+      "generation": 490,
+      "build": "0adac30f3cef4033656004c3ce4c4ff8d0a6f8fc",
+      "pathStatus": "MATCHED"
+    },
+    "installedAgent": {
+      "state": "VERIFIED",
+      "build": "0adac30f3cef4033656004c3ce4c4ff8d0a6f8fc"
+    },
+    "service": {
+      "state": "RUNNING",
+      "pathStatus": "MATCHED"
+    },
+    "agentLocation": "PROTECTED",
+    "protectedInput": "CONFIGURED",
+    "checks": [
+      {
+        "name": "agent",
+        "state": "RUNNING"
+      },
+      {
+        "name": "connection",
+        "state": "CONNECTED"
+      },
+      {
+        "name": "protocol",
+        "state": "COMPATIBLE"
+      },
+      {
+        "name": "cli_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "ui_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "installed_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "ui",
+        "state": "RUNNING"
+      },
+      {
+        "name": "launch_record",
+        "state": "VERIFIED"
+      },
+      {
+        "name": "installed_agent",
+        "state": "VERIFIED"
+      },
+      {
+        "name": "service",
+        "state": "RUNNING"
+      },
+      {
+        "name": "update_stage_cleanup",
+        "state": "COMPLETED"
+      }
+    ],
+    "nextActions": []
+  },
+  "peerVersion": {
+    "schemaVersion": "krasis.cli.update-status/v1",
+    "peerAlias": "B",
+    "localGeneration": 490,
+    "localBuild": "0adac30f3cef4033656004c3ce4c4ff8d0a6f8fc",
+    "peerState": "ONLINE",
+    "peerGeneration": 490,
+    "peerBuild": "0adac30f3cef4033656004c3ce4c4ff8d0a6f8fc",
+    "peerAllowsUpdate": true,
+    "receiveAllowed": true,
+    "transferState": "IDLE"
+  },
+  "peerUI": "window_ready; c51167895e24a7f9a1c1ac4cbf4c3289",
+  "updateTransfer": {
+    "id": "90a3228762aa9a6935a350e0a189d27f",
+    "totalBytes": 28740875,
+    "observed": "DELIVERED before local agent restart; wait receipt no longer present after restart; peer build and fresh diagnostic independently confirm installation"
+  },
+  "physical": "awaiting user crossings; no post-update latency improvement claimed",
+  "sourceOfTruth": "docs/architecture/02-runtime-flow.md updated in source commit",
+  "validation": [
+    "full Go suite passed with offline runtime overlay",
+    "final targeted preparation tests passed",
+    "frontend 104 tests passed",
+    "workspace package transfer verification passed",
+    "setup offline verification passed",
+    "paired service READY and connection CONNECTED confirmed"
+  ],
+  "remotePush": "not performed",
+  "apiChanges": "none",
+  "dbChanges": "none",
+  "runnerChanges": "none"
+}
