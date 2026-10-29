@@ -21,6 +21,7 @@ type Channel struct {
 	queryMu                 sync.Mutex
 	query                   *authorityQuery
 	presenceQuery           *authorityQuery
+	watchdogQuery           *authorityQuery // Restricted background monitoring cannot occupy the sent-reply lane.
 	maintenanceQuery        *authorityQuery // Optional heartbeat/advisory proof; never input.
 	queryClosed             chan struct{}   // Lazily allocated only for capacity waiters; queryMu.
 	closing                 bool
@@ -58,7 +59,7 @@ func (channel *Channel) closeQueryAdmissionLocked() {
 }
 
 func (channel *Channel) pendingQueriesLocked() bool {
-	return channel.query != nil || channel.presenceQuery != nil || channel.maintenanceQuery != nil
+	return channel.query != nil || channel.presenceQuery != nil || channel.watchdogQuery != nil || channel.maintenanceQuery != nil
 }
 
 func (channel *Channel) closeResources() error {

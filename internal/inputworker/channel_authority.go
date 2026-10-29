@@ -116,7 +116,9 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 			return queryAdmissionFailure(kind, "closed", nil)
 		}
 		current := &channel.query
-		if kind == presenceAuthorityQuery || kind == sourcePresenceAuthorityQuery || kind == sourceWatchdogAuthorityQuery {
+		if kind == sourceWatchdogAuthorityQuery {
+			current = &channel.watchdogQuery
+		} else if kind == presenceAuthorityQuery || kind == sourcePresenceAuthorityQuery {
 			current = &channel.presenceQuery
 		} else if optional {
 			current = &channel.maintenanceQuery
@@ -236,7 +238,7 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 func (channel *Channel) cancelQuery(query *authorityQuery) {
 	channel.queryMu.Lock()
 	defer channel.queryMu.Unlock()
-	if channel.query != query && channel.presenceQuery != query && channel.maintenanceQuery != query {
+	if channel.query != query && channel.presenceQuery != query && channel.watchdogQuery != query && channel.maintenanceQuery != query {
 		return
 	}
 	channel.closeQueryAdmissionLocked()

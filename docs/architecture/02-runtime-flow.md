@@ -81,6 +81,14 @@ g496의 보호 캡처 보조 감시는 전체 4개 조회 슬롯 중 제한된 3
 최종 보고에는 후자의 닫힌 operation 코드와 그 오류 가지의 Windows 코드를 남긴다.
 진행 감시 오류 자체와 복구 여부 판단은 원래 error tree에 그대로 유지한다.
 
+The source watchdog also owns a separate per-channel query lane. Reserving global
+capacity alone does not prevent a mandatory heartbeat from waiting behind the
+same channel's background query. Both lanes obtain fresh pinned-owner checks;
+neither can reuse the other's result. Watchdogs still consume restricted capacity
+and retain the existing one-second deadline. Close, cancellation and final source
+retirement include all four lanes and retain native handles until every submitted
+query actually returns. No input authority, idle deadline or process limit changes.
+
 입력 워커가 READY 전에 종료하면 서비스는 READY와 최종 보고를 구별한다. 입력 처리 횟수·복구
 저널이 비어 있고, 네이티브 소유자와 정확한 Job/process의 정리가 모두 확인된 보고만 에이전트에
 전달한다. 에이전트는 이를 입력 허가로 쓰지 않고 해당 리스를 거절한다. 보고 유실·절단·다른 워커

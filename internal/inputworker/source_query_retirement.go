@@ -15,7 +15,7 @@ func sourceCaptureQueryRetirement(result error, owners ...*Channel) error {
 			continue
 		}
 		owner.queryMu.Lock()
-		queries := [3]*authorityQuery{owner.query, owner.presenceQuery, owner.maintenanceQuery}
+		queries := [4]*authorityQuery{owner.query, owner.presenceQuery, owner.watchdogQuery, owner.maintenanceQuery}
 		owner.queryMu.Unlock()
 		for _, query := range queries {
 			if query == nil {
