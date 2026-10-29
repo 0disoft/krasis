@@ -1,0 +1,220 @@
+{
+  "schema": "krasis.paired-installation/v1",
+  "generation": 496,
+  "revision": "0ccf7db69d232b52bc86809fb438653d61b266d9",
+  "collection": "c8e28b23ab13e0f33ea7b47ef83fbacf",
+  "appInstallA": {
+    "schema": "krasis.setup-result/v1",
+    "code": 0,
+    "state": "installed"
+  },
+  "transferB": {
+    "schemaVersion": "krasis.cli.update-wait/v1",
+    "peerAlias": "B",
+    "id": "a1436fe8336b64817441950b19e24abc",
+    "code": "updated",
+    "transferState": "UPDATED",
+    "generation": 496,
+    "revision": "0ccf7db69d232b52bc86809fb438653d61b266d9",
+    "bytes": 28742758,
+    "total": 28742758
+  },
+  "peerUI": {
+    "schemaVersion": "krasis.cli.app-open/v1",
+    "code": "window_ready",
+    "peerAlias": "B",
+    "id": "159d97f998068db2792c337cb8279af4"
+  },
+  "peerRuntime": {
+    "schemaVersion": "krasis.cli.update-status/v1",
+    "peerAlias": "B",
+    "localGeneration": 496,
+    "localBuild": "0ccf7db69d232b52bc86809fb438653d61b266d9",
+    "peerState": "ONLINE",
+    "peerGeneration": 496,
+    "peerBuild": "0ccf7db69d232b52bc86809fb438653d61b266d9",
+    "peerAllowsUpdate": true,
+    "receiveAllowed": true,
+    "transferState": "UPDATED",
+    "transferBytes": 28742758,
+    "transferTotal": 28742758
+  },
+  "localDoctor": {
+    "schemaVersion": "krasis.cli.doctor/v1",
+    "agent": "RUNNING",
+    "connection": "LOCAL",
+    "cliGeneration": 496,
+    "agentGeneration": 496,
+    "protocol": "COMPATIBLE",
+    "code": "connection_not_ready",
+    "cliBuild": "0ccf7db69d232b52bc86809fb438653d61b266d9",
+    "agentBuild": "0ccf7db69d232b52bc86809fb438653d61b266d9",
+    "ui": {
+      "state": "RUNNING",
+      "generation": 496,
+      "build": "0ccf7db69d232b52bc86809fb438653d61b266d9",
+      "pathStatus": "MATCHED"
+    },
+    "launchRecord": {
+      "state": "VERIFIED",
+      "generation": 496,
+      "build": "0ccf7db69d232b52bc86809fb438653d61b266d9",
+      "pathStatus": "MATCHED"
+    },
+    "installedAgent": {
+      "state": "VERIFIED",
+      "build": "40262cf112269b922496a85749ec89e049d01f5c"
+    },
+    "service": {
+      "state": "STOPPED",
+      "pathStatus": "MATCHED"
+    },
+    "agentLocation": "PORTABLE",
+    "protectedInput": "PORTABLE",
+    "checks": [
+      {
+        "name": "agent",
+        "state": "RUNNING"
+      },
+      {
+        "name": "connection",
+        "state": "LOCAL"
+      },
+      {
+        "name": "protocol",
+        "state": "COMPATIBLE"
+      },
+      {
+        "name": "cli_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "ui_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "installed_agent_version",
+        "state": "MISMATCH"
+      },
+      {
+        "name": "ui",
+        "state": "RUNNING"
+      },
+      {
+        "name": "launch_record",
+        "state": "VERIFIED"
+      },
+      {
+        "name": "installed_agent",
+        "state": "VERIFIED"
+      },
+      {
+        "name": "service",
+        "state": "STOPPED"
+      },
+      {
+        "name": "update_stage_cleanup",
+        "state": "COMPLETED"
+      }
+    ],
+    "nextActions": [
+      {
+        "code": "update_input_installation",
+        "message": "앱의 보호 입력 갱신 버튼으로 설치를 맞추세요. Windows 관리자 확인 후 자동으로 진행합니다."
+      },
+      {
+        "code": "inspect_input_service",
+        "message": "입력 서비스가 중지돼 있습니다. 서비스 진단을 확인하세요."
+      },
+      {
+        "code": "portable_input",
+        "message": "일반 입력 경로입니다. 관리자 창 제어에는 같은 버전의 보호된 입력 설치와 실행 경로를 확인하세요."
+      },
+      {
+        "code": "check_connection",
+        "message": "krasis-cli status와 connection show <상대 별칭>으로 연결 설정을 확인하세요."
+      }
+    ]
+  },
+  "sides": {
+    "A": {
+      "created": "2026-10-29T14:33:46Z",
+      "sha256": "63b9a9e44f9db8af43cc6f7a7301c945a88e8762118f5b3ce086e63b0ef27532",
+      "service": "FAILED",
+      "inputHealth": {
+        "time": "2026-10-29T14:33:16.3521367Z",
+        "state": "SERVICE_RECOVERY_REQUIRED",
+        "stage": "service_recovery",
+        "win32Error": 1066,
+        "win32Known": true
+      },
+      "installedInputReceipt": {
+        "time": "2026-10-29T14:01:01.5539786Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "oldServiceFailure": {
+        "time": "2026-10-29T14:11:35.0352292Z",
+        "stage": "service",
+        "reason": "capture",
+        "operation": "hook-callback-stalled",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "currentBuildFaults": []
+    },
+    "B": {
+      "created": "2026-10-29T14:33:47Z",
+      "sha256": "5ac81f7f5fc4352393855d80108d55eb5225e5a0500bd512880f421f6af1a97f",
+      "service": "READY",
+      "inputHealth": {
+        "time": "2026-10-29T14:33:34.3401672Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "installedInputReceipt": {
+        "time": "2026-10-29T14:32:58.9720761Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "oldServiceFailure": null,
+      "currentBuildFaults": []
+    }
+  },
+  "state": "A_SERVICE_RECOVERY_PENDING",
+  "requiredUserAction": "A: approve Windows administrator confirmation through the g496 protected input update/agent repair button. Do not start physical tests yet.",
+  "validation": {
+    "go": "Full go test ./... passed with the offline runtime overlay after safe-stop; full inputworker, wininput, inputdesktop and targeted watchdog regression tests passed.",
+    "frontend": "104 tests and native production build passed.",
+    "package": "Workspace transfer test, icon/package checks and offline setup verification passed.",
+    "race": "Skipped: CGO disabled.",
+    "remoteCI": "Skipped: no push requested.",
+    "physical": "Pending: A protected input service has not been recovered; no g496 crossing or latency claim."
+  },
+  "remainingRisk": "The old A g495 service failure remains. Native hook stall and uncertain retirement require fresh evidence; g496 fixes watchdog capacity contention and reveals concrete cleanup causes, not all scheduling stalls.",
+  "sourceOfTruthChanged": "docs/architecture/02-runtime-flow.md",
+  "causeReview": "2026-10-29-g495-recovery-review.json",
+  "apiChanges": "Generation only; no public/wire layout changes.",
+  "dbChanges": "none",
+  "repositoryHygieneChanges": "none",
+  "runnerChanges": "none",
+  "remotePush": "not performed"
+}

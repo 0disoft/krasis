@@ -9,9 +9,24 @@
       "service": "FAILED",
       "serviceExitCode": 1066,
       "sourceExits": [
-        {"time": "2026-10-29T14:10:44.9461573Z", "operation": "source-write-boundary-timeout", "capture": "joined", "report": "failed"},
-        {"time": "2026-10-29T14:11:25.356227Z", "operation": "source-agent-query-capacity", "capture": "joined", "report": "failed"},
-        {"time": "2026-10-29T14:11:34.7118177Z", "operation": "hook-callback-stalled", "capture": "failed", "report": "recovery"}
+        {
+          "time": "2026-10-29T14:10:44.9461573Z",
+          "operation": "source-write-boundary-timeout",
+          "capture": "joined",
+          "report": "failed"
+        },
+        {
+          "time": "2026-10-29T14:11:25.356227Z",
+          "operation": "source-agent-query-capacity",
+          "capture": "joined",
+          "report": "failed"
+        },
+        {
+          "time": "2026-10-29T14:11:34.7118177Z",
+          "operation": "hook-callback-stalled",
+          "capture": "failed",
+          "report": "recovery"
+        }
       ],
       "largestObservedAgentSampleLatenessMicros": 1959534,
       "associatedGCStoppingBucket": "greater_than_1s",
@@ -20,7 +35,12 @@
     "B": {
       "created": "2026-10-29T14:11:55Z",
       "service": "READY",
-      "events": ["reconnect_remote_eof", "RECONNECTING", "reconnect_acquire_network_timeout", "reconnect_acquire_network_reset"],
+      "events": [
+        "reconnect_remote_eof",
+        "RECONNECTING",
+        "reconnect_acquire_network_timeout",
+        "reconnect_acquire_network_reset"
+      ],
       "attribution": "Remote EOF follows the A source-channel failure; these events do not establish network loss as the initiating cause."
     }
   },
@@ -30,8 +50,16 @@
     "sourceRequestToGrantMaxMs": 174.827,
     "sourceCaptureActivationMaxMs": 88.606,
     "receiverInputDispatchMaxMs": 85.642,
-    "matchingWorstNativeMillis": [15, 2, 85],
-    "nativeMillisOrder": ["service_query", "desktop_agent_scope", "containing_native_IPC"],
+    "matchingWorstNativeMillis": [
+      15,
+      2,
+      85
+    ],
+    "nativeMillisOrder": [
+      "service_query",
+      "desktop_agent_scope",
+      "containing_native_IPC"
+    ],
     "comparison": "Too few completed pairs and interrupted/restarted sessions; do not claim a latency improvement against g494. Native stage measurements are nested in IPC, not independent additive durations."
   },
   "g496": {
@@ -49,7 +77,8 @@
     "initialFullGoRun": "All packages except inputworker passed. The portable recovery fixture rejected a live product input owner; safe-stop followed by a full inputworker rerun passed.",
     "race": "Not run: CGO disabled.",
     "physicalG496": "Pending installation and new crossings.",
-    "remoteCI": "Not run: no remote push requested."
+    "remoteCI": "Not run: no remote push requested.",
+    "fullGoRun": "Full go test ./... passed after safe-stop using the offline runtime overlay."
   },
   "sourceOfTruthChanged": "docs/architecture/02-runtime-flow.md",
   "apiChanges": "Generation increment only; no public/wire layout or authority policy changes.",
