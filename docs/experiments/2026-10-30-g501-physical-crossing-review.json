@@ -1,0 +1,1520 @@
+{
+  "schema": "krasis.physical-crossing-review/v1",
+  "generation": 501,
+  "revision": "6aa04b9d69d94d0a7db3dfee2565b3c3010e2693",
+  "collection": "3ac384c0aa2af6c0a5d7026a0c300235",
+  "sides": {
+    "A": {
+      "created": "2026-10-29T18:45:12Z",
+      "sha256": "f329403b4cba57e2c51a9c4633919b217fe5e866adcfabd9268344c740b11e84",
+      "cutoff": "2026-10-29T18:10:33Z",
+      "service": "READY",
+      "inputHealth": {
+        "time": "2026-10-29T18:44:59.6909603Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "failures": [],
+      "additionalConnections": [],
+      "profiles": 14,
+      "profileOutcomes": [
+        {
+          "attempt": 1,
+          "role": "source",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 1,
+          "role": "source",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 1,
+          "role": "source",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 2,
+          "role": "source",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 3,
+          "role": "source",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 4,
+          "role": "source",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 5,
+          "role": "source",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 6,
+          "role": "source",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 7,
+          "role": "source",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 8,
+          "role": "source",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 9,
+          "role": "source",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 10,
+          "role": "source",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 11,
+          "role": "source",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 12,
+          "role": "source",
+          "end": "ok",
+          "incomplete": false
+        }
+      ],
+      "inputReadiness": 0,
+      "incompleteLogSources": [
+        "control.previous.jsonl"
+      ]
+    },
+    "B": {
+      "created": "2026-10-29T18:45:14Z",
+      "sha256": "60b25ccc19466c801eb4c998e6f02dad072dc9fa729aadf467a29c9c02770cf2",
+      "cutoff": "2026-10-29T18:10:34Z",
+      "service": "READY",
+      "inputHealth": {
+        "time": "2026-10-29T18:45:02.8344295Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "failures": [],
+      "additionalConnections": [],
+      "profiles": 14,
+      "profileOutcomes": [
+        {
+          "attempt": 1,
+          "role": "receiver",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 1,
+          "role": "receiver",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 1,
+          "role": "receiver",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 2,
+          "role": "receiver",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 3,
+          "role": "receiver",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 4,
+          "role": "receiver",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 5,
+          "role": "receiver",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 6,
+          "role": "receiver",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 7,
+          "role": "receiver",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 8,
+          "role": "receiver",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 9,
+          "role": "receiver",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 10,
+          "role": "receiver",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 11,
+          "role": "receiver",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 12,
+          "role": "receiver",
+          "end": "ok",
+          "incomplete": false
+        }
+      ],
+      "inputReadiness": 18,
+      "incompleteLogSources": [
+        "control.previous.jsonl"
+      ]
+    }
+  },
+  "profilePairs": 14,
+  "comparison": {
+    "g499": {
+      "requestToGrant": {
+        "count": 12,
+        "minimumMs": 40.84,
+        "medianMs": 51.8845,
+        "maximumMs": 294.414
+      },
+      "captureActivation": {
+        "count": 12,
+        "minimumMs": 14.713,
+        "medianMs": 19.9485,
+        "maximumMs": 33.608
+      },
+      "receiverConnect": {
+        "count": 12,
+        "minimumMs": 23.931,
+        "medianMs": 27.684,
+        "maximumMs": 261.319
+      },
+      "receiverFirstDispatch": {
+        "count": 12,
+        "minimumMs": 1.646,
+        "medianMs": 1.8585,
+        "maximumMs": 6.11
+      },
+      "receiverWorstDispatch": {
+        "count": 12,
+        "minimumMs": 3.012,
+        "medianMs": 5.2715,
+        "maximumMs": 110.222
+      },
+      "receiverWorstAuthority": {
+        "count": 12,
+        "minimumMs": 0,
+        "medianMs": 0,
+        "maximumMs": 0.936
+      },
+      "receiverWorstResponse": {
+        "count": 12,
+        "minimumMs": 2.414,
+        "medianMs": 4.9665,
+        "maximumMs": 110.222
+      },
+      "nativePairReadiness": {
+        "count": 12,
+        "minimumMs": 9.582,
+        "medianMs": 11.152,
+        "maximumMs": 106.567
+      },
+      "preparationDecisions": {
+        "1": 10,
+        "3": 2
+      },
+      "reusedCandidateConnect": {
+        "count": 10,
+        "minimumMs": 23.931,
+        "medianMs": 26.5415,
+        "maximumMs": 154.051
+      },
+      "expiredCandidateConnect": {
+        "count": 2,
+        "minimumMs": 256.085,
+        "medianMs": 258.702,
+        "maximumMs": 261.319
+      }
+    },
+    "g501": {
+      "requestToGrant": {
+        "count": 14,
+        "minimumMs": 41.828,
+        "medianMs": 125.928,
+        "maximumMs": 399.935
+      },
+      "captureActivation": {
+        "count": 14,
+        "minimumMs": 13.886,
+        "medianMs": 18.7185,
+        "maximumMs": 29.192
+      },
+      "receiverConnect": {
+        "count": 14,
+        "minimumMs": 23.93,
+        "medianMs": 44.8755,
+        "maximumMs": 379.141
+      },
+      "receiverFirstDispatch": {
+        "count": 14,
+        "minimumMs": 1.648,
+        "medianMs": 2.2744999999999997,
+        "maximumMs": 4.17
+      },
+      "receiverWorstDispatch": {
+        "count": 14,
+        "minimumMs": 2.978,
+        "medianMs": 5.7059999999999995,
+        "maximumMs": 24.528
+      },
+      "receiverWorstAuthority": {
+        "count": 14,
+        "minimumMs": 0,
+        "medianMs": 0,
+        "maximumMs": 0.772
+      },
+      "receiverWorstResponse": {
+        "count": 14,
+        "minimumMs": 2.433,
+        "medianMs": 5.339,
+        "maximumMs": 24.528
+      },
+      "nativePairReadiness": {
+        "count": 14,
+        "minimumMs": 8.919,
+        "medianMs": 17.253999999999998,
+        "maximumMs": 180.472
+      },
+      "preparationDecisions": {
+        "1": 10,
+        "3": 4
+      },
+      "reusedCandidateConnect": {
+        "count": 10,
+        "minimumMs": 23.93,
+        "medianMs": 29.067999999999998,
+        "maximumMs": 298.373
+      },
+      "expiredCandidateConnect": {
+        "count": 4,
+        "minimumMs": 281.068,
+        "medianMs": 294.6,
+        "maximumMs": 379.141
+      }
+    }
+  },
+  "samples": [
+    {
+      "attempt": 1,
+      "sourceTime": "2026-10-29T18:15:31.3843353Z",
+      "receiverTime": "2026-10-29T18:15:31.0518123Z",
+      "exchangeTag": "f3fc47f97f2ea8df5b49a3df95d19142d9f18bb1c1a0062411cd941454be56a5",
+      "sourceOutcome": "ok",
+      "receiverOutcome": "ok",
+      "requestToGrantMs": 266.64,
+      "captureActivationMs": 28.869,
+      "sourceTCP": {
+        "schema": 1,
+        "rttMicros": [
+          12928,
+          12163
+        ],
+        "minRttMicros": [
+          6440,
+          6440
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "exchange": {
+        "source": {
+          "schema": 1,
+          "micros": [
+            266640,
+            0,
+            0,
+            0
+          ],
+          "measured": 3
+        },
+        "receiver": {
+          "schema": 1,
+          "micros": [
+            0,
+            0,
+            0,
+            253906
+          ],
+          "measured": 12
+        }
+      },
+      "receiverConnectMs": 247.126,
+      "receiverReadyWaitMs": 240.998,
+      "preparationDecision": 1,
+      "preparedAgeMs": 15.076,
+      "preparationJoinMs": 82.783,
+      "nativePairReadinessMs": 108.461,
+      "serviceBootstrapValidationMs": 1.022,
+      "receiverFirstDispatchMs": 2.25,
+      "receiverWorstDispatchMs": 3.116,
+      "receiverWorstAuthorityMs": 0,
+      "receiverWorstResponseMs": 2.433,
+      "receiverEntryDispatchMs": 2.971,
+      "receiverWorstWorkerMillis": [
+        0,
+        0,
+        2
+      ],
+      "receiverFirstWorkerApply": {
+        "micros": [
+          1735,
+          0
+        ],
+        "measured": 1,
+        "submissionMicros": 1154,
+        "submissionCalls": 1
+      },
+      "receiverEntryWorkerApply": {
+        "micros": [
+          2393,
+          0
+        ],
+        "measured": 1
+      }
+    },
+    {
+      "attempt": 1,
+      "sourceTime": "2026-10-29T18:37:55.0994049Z",
+      "receiverTime": "2026-10-29T18:37:54.7077629Z",
+      "exchangeTag": "3d8cdeada7a11e12d573bfb57fc3d2df18a42aa6f2b3dc024a09e379eb8da420",
+      "sourceOutcome": "ok",
+      "receiverOutcome": "ok",
+      "requestToGrantMs": 92.61,
+      "captureActivationMs": 14.819,
+      "sourceTCP": {
+        "schema": 1,
+        "rttMicros": [
+          20435,
+          24142
+        ],
+        "minRttMicros": [
+          6128,
+          6128
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "exchange": {
+        "source": {
+          "schema": 1,
+          "micros": [
+            92610,
+            0,
+            0,
+            0
+          ],
+          "measured": 3
+        }
+      },
+      "receiverConnectMs": 26.282,
+      "receiverReadyWaitMs": 24.178,
+      "preparationDecision": 1,
+      "preparedAgeMs": 2809.492,
+      "preparationJoinMs": null,
+      "nativePairReadinessMs": 10.722,
+      "serviceBootstrapValidationMs": 0.596,
+      "receiverFirstDispatchMs": 2.299,
+      "receiverWorstDispatchMs": 8.009,
+      "receiverWorstAuthorityMs": 0,
+      "receiverWorstResponseMs": 8.009,
+      "receiverEntryDispatchMs": 4.793,
+      "receiverWorstWorkerMillis": [
+        0,
+        0,
+        5
+      ],
+      "receiverFirstWorkerApply": {
+        "micros": [
+          1747,
+          0
+        ],
+        "measured": 1,
+        "submissionMicros": 621,
+        "submissionCalls": 1
+      },
+      "receiverEntryWorkerApply": {
+        "micros": [
+          3564,
+          0
+        ],
+        "measured": 1
+      }
+    },
+    {
+      "attempt": 1,
+      "sourceTime": "2026-10-29T18:43:15.8241668Z",
+      "receiverTime": "2026-10-29T18:43:15.457324Z",
+      "exchangeTag": "5d77197d6f087b4bb2d6d0c7f19caef5c530df0eac57bfb2b720b67d5c72e6d5",
+      "sourceOutcome": "ok",
+      "receiverOutcome": "ok",
+      "requestToGrantMs": 41.828,
+      "captureActivationMs": 19.809,
+      "sourceTCP": {
+        "schema": 1,
+        "rttMicros": [
+          16025,
+          15528
+        ],
+        "minRttMicros": [
+          6128,
+          6128
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "exchange": {
+        "source": {
+          "schema": 1,
+          "micros": [
+            41828,
+            0,
+            0,
+            0
+          ],
+          "measured": 3
+        }
+      },
+      "receiverConnectMs": 23.93,
+      "receiverReadyWaitMs": 21.484,
+      "preparationDecision": 1,
+      "preparedAgeMs": 1467.221,
+      "preparationJoinMs": 0,
+      "nativePairReadinessMs": 8.919,
+      "serviceBootstrapValidationMs": 0.569,
+      "receiverFirstDispatchMs": 3.203,
+      "receiverWorstDispatchMs": 2.978,
+      "receiverWorstAuthorityMs": 0,
+      "receiverWorstResponseMs": 2.978,
+      "receiverEntryDispatchMs": 3.088,
+      "receiverWorstWorkerMillis": [
+        0,
+        0,
+        2
+      ],
+      "receiverFirstWorkerApply": {
+        "micros": [
+          3203,
+          0
+        ],
+        "measured": 1,
+        "submissionMicros": 1533,
+        "submissionCalls": 1
+      },
+      "receiverEntryWorkerApply": {
+        "micros": [
+          2492,
+          0
+        ],
+        "measured": 1
+      }
+    },
+    {
+      "attempt": 2,
+      "sourceTime": "2026-10-29T18:43:53.4656311Z",
+      "receiverTime": "2026-10-29T18:43:53.1045112Z",
+      "exchangeTag": "0e5195c0487effe6b349b7a460bec0af33f1dab636e2c7b8557e9631583dc711",
+      "sourceOutcome": "ok",
+      "receiverOutcome": "ok",
+      "requestToGrantMs": 159.246,
+      "captureActivationMs": 13.886,
+      "sourceTCP": {
+        "schema": 1,
+        "rttMicros": [
+          14436,
+          23353
+        ],
+        "minRttMicros": [
+          6128,
+          6128
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "exchange": {
+        "source": {
+          "schema": 1,
+          "micros": [
+            158694,
+            0,
+            0,
+            0
+          ],
+          "measured": 3
+        },
+        "receiver": {
+          "schema": 1,
+          "micros": [
+            0,
+            0,
+            0,
+            34290
+          ],
+          "measured": 12
+        }
+      },
+      "receiverConnectMs": 27.081,
+      "receiverReadyWaitMs": 24.083,
+      "preparationDecision": 1,
+      "preparedAgeMs": 1754.029,
+      "preparationJoinMs": 0,
+      "nativePairReadinessMs": 11.124,
+      "serviceBootstrapValidationMs": 0.615,
+      "receiverFirstDispatchMs": 1.7,
+      "receiverWorstDispatchMs": 4.967,
+      "receiverWorstAuthorityMs": 0,
+      "receiverWorstResponseMs": 4.967,
+      "receiverEntryDispatchMs": 3.621,
+      "receiverWorstWorkerMillis": [
+        0,
+        1,
+        4
+      ],
+      "receiverFirstWorkerApply": {
+        "micros": [
+          1132,
+          0
+        ],
+        "measured": 1,
+        "submissionMicros": 602,
+        "submissionCalls": 1
+      },
+      "receiverEntryWorkerApply": {
+        "micros": [
+          3621,
+          0
+        ],
+        "measured": 1
+      }
+    },
+    {
+      "attempt": 3,
+      "sourceTime": "2026-10-29T18:43:57.1962215Z",
+      "receiverTime": "2026-10-29T18:43:56.8263657Z",
+      "exchangeTag": "0946b85f9de6ca297d453d0fb3d50ce36c79a6d15725843d3abcd39158083adf",
+      "sourceOutcome": "ok",
+      "receiverOutcome": "ok",
+      "requestToGrantMs": 399.935,
+      "captureActivationMs": 20.703,
+      "sourceTCP": {
+        "schema": 1,
+        "rttMicros": [
+          29778,
+          27852
+        ],
+        "minRttMicros": [
+          6128,
+          6128
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "exchange": {
+        "source": {
+          "schema": 1,
+          "micros": [
+            399379,
+            0,
+            0,
+            0
+          ],
+          "measured": 3
+        },
+        "receiver": {
+          "schema": 1,
+          "micros": [
+            0,
+            0,
+            0,
+            386395
+          ],
+          "measured": 12
+        }
+      },
+      "receiverConnectMs": 379.141,
+      "receiverReadyWaitMs": 376.786,
+      "preparationDecision": 3,
+      "preparedAgeMs": null,
+      "preparationJoinMs": null,
+      "nativePairReadinessMs": 180.472,
+      "serviceBootstrapValidationMs": 176.216,
+      "receiverFirstDispatchMs": 1.74,
+      "receiverWorstDispatchMs": 3.444,
+      "receiverWorstAuthorityMs": 0.772,
+      "receiverWorstResponseMs": 2.672,
+      "receiverEntryDispatchMs": 4.381,
+      "receiverWorstWorkerMillis": [
+        0,
+        0,
+        1
+      ],
+      "receiverFirstWorkerApply": {
+        "micros": [
+          1740,
+          0
+        ],
+        "measured": 1,
+        "submissionMicros": 585,
+        "submissionCalls": 1
+      },
+      "receiverEntryWorkerApply": {
+        "micros": [
+          3156,
+          0
+        ],
+        "measured": 1
+      }
+    },
+    {
+      "attempt": 4,
+      "sourceTime": "2026-10-29T18:44:02.9375228Z",
+      "receiverTime": "2026-10-29T18:44:02.5714322Z",
+      "exchangeTag": "08527485ff2b2dbe826a8379a733a4357f350df91a287f4071a1d2937ec5680f",
+      "sourceOutcome": "ok",
+      "receiverOutcome": "ok",
+      "requestToGrantMs": 323.907,
+      "captureActivationMs": 20.391,
+      "sourceTCP": {
+        "schema": 1,
+        "rttMicros": [
+          12158,
+          11907
+        ],
+        "minRttMicros": [
+          6128,
+          6128
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "exchange": {
+        "source": {
+          "schema": 1,
+          "micros": [
+            323317,
+            0,
+            0,
+            0
+          ],
+          "measured": 3
+        },
+        "receiver": {
+          "schema": 1,
+          "micros": [
+            0,
+            0,
+            0,
+            291642
+          ],
+          "measured": 12
+        }
+      },
+      "receiverConnectMs": 285.604,
+      "receiverReadyWaitMs": 283.322,
+      "preparationDecision": 3,
+      "preparedAgeMs": null,
+      "preparationJoinMs": null,
+      "nativePairReadinessMs": 116.015,
+      "serviceBootstrapValidationMs": 151.001,
+      "receiverFirstDispatchMs": 2.085,
+      "receiverWorstDispatchMs": 4.919,
+      "receiverWorstAuthorityMs": 0,
+      "receiverWorstResponseMs": 4.318,
+      "receiverEntryDispatchMs": 3.695,
+      "receiverWorstWorkerMillis": [
+        1,
+        2,
+        3
+      ],
+      "receiverFirstWorkerApply": {
+        "micros": [
+          1493,
+          0
+        ],
+        "measured": 1,
+        "submissionMicros": 686,
+        "submissionCalls": 1
+      },
+      "receiverEntryWorkerApply": {
+        "micros": [
+          3099,
+          0
+        ],
+        "measured": 1
+      }
+    },
+    {
+      "attempt": 5,
+      "sourceTime": "2026-10-29T18:44:06.8228858Z",
+      "receiverTime": "2026-10-29T18:44:06.459646Z",
+      "exchangeTag": "843a288858ec5e4e7ed6e2ff08156f0fe95465174d4174ac1626a23a39860de0",
+      "sourceOutcome": "ok",
+      "receiverOutcome": "ok",
+      "requestToGrantMs": 324.328,
+      "captureActivationMs": 18.807,
+      "sourceTCP": {
+        "schema": 1,
+        "rttMicros": [
+          8952,
+          9340
+        ],
+        "minRttMicros": [
+          5053,
+          5053
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "exchange": {
+        "source": {
+          "schema": 1,
+          "micros": [
+            323759,
+            0,
+            0,
+            0
+          ],
+          "measured": 3
+        },
+        "receiver": {
+          "schema": 1,
+          "micros": [
+            0,
+            0,
+            0,
+            312388
+          ],
+          "measured": 12
+        }
+      },
+      "receiverConnectMs": 303.596,
+      "receiverReadyWaitMs": 300.695,
+      "preparationDecision": 3,
+      "preparedAgeMs": null,
+      "preparationJoinMs": null,
+      "nativePairReadinessMs": 128.437,
+      "serviceBootstrapValidationMs": 152.309,
+      "receiverFirstDispatchMs": 1.659,
+      "receiverWorstDispatchMs": 24.528,
+      "receiverWorstAuthorityMs": 0,
+      "receiverWorstResponseMs": 24.528,
+      "receiverEntryDispatchMs": 5.035,
+      "receiverWorstWorkerMillis": [
+        0,
+        1,
+        20
+      ],
+      "receiverFirstWorkerApply": {
+        "micros": [
+          1659,
+          0
+        ],
+        "measured": 1,
+        "submissionMicros": 581,
+        "submissionCalls": 1
+      },
+      "receiverEntryWorkerApply": {
+        "micros": [
+          3479,
+          0
+        ],
+        "measured": 1
+      }
+    },
+    {
+      "attempt": 6,
+      "sourceTime": "2026-10-29T18:44:11.7706507Z",
+      "receiverTime": "2026-10-29T18:44:11.408798Z",
+      "exchangeTag": "6a7a23fd62061c8ef529a1b312fd2bd50b17a0016a19ad41e149c41dacffdcc1",
+      "sourceOutcome": "ok",
+      "receiverOutcome": "ok",
+      "requestToGrantMs": 297.377,
+      "captureActivationMs": 15.241,
+      "sourceTCP": {
+        "schema": 1,
+        "rttMicros": [
+          14336,
+          14158
+        ],
+        "minRttMicros": [
+          5053,
+          5053
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "exchange": {
+        "source": {
+          "schema": 1,
+          "micros": [
+            296834,
+            0,
+            0,
+            0
+          ],
+          "measured": 3
+        },
+        "receiver": {
+          "schema": 1,
+          "micros": [
+            0,
+            0,
+            0,
+            286313
+          ],
+          "measured": 12
+        }
+      },
+      "receiverConnectMs": 281.068,
+      "receiverReadyWaitMs": 278.255,
+      "preparationDecision": 3,
+      "preparedAgeMs": null,
+      "preparationJoinMs": null,
+      "nativePairReadinessMs": 113.943,
+      "serviceBootstrapValidationMs": 148.53,
+      "receiverFirstDispatchMs": 1.708,
+      "receiverWorstDispatchMs": 4.378,
+      "receiverWorstAuthorityMs": 0.571,
+      "receiverWorstResponseMs": 3.807,
+      "receiverEntryDispatchMs": 3.471,
+      "receiverWorstWorkerMillis": [
+        0,
+        0,
+        3
+      ],
+      "receiverFirstWorkerApply": {
+        "micros": [
+          1114,
+          0
+        ],
+        "measured": 1,
+        "submissionMicros": 1114,
+        "submissionCalls": 1
+      },
+      "receiverEntryWorkerApply": {
+        "micros": [
+          2896,
+          0
+        ],
+        "measured": 1
+      }
+    },
+    {
+      "attempt": 7,
+      "sourceTime": "2026-10-29T18:44:15.2922098Z",
+      "receiverTime": "2026-10-29T18:44:14.9298921Z",
+      "exchangeTag": "9b5a2b80285d93dfa61c9bbd69d96492b9ae7a0ae0528400b424f916f29429ab",
+      "sourceOutcome": "ok",
+      "receiverOutcome": "ok",
+      "requestToGrantMs": 354.458,
+      "captureActivationMs": 18.444,
+      "sourceTCP": {
+        "schema": 1,
+        "rttMicros": [
+          13099,
+          13454
+        ],
+        "minRttMicros": [
+          5053,
+          5053
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "exchange": {
+        "source": {
+          "schema": 1,
+          "micros": [
+            353889,
+            0,
+            0,
+            0
+          ],
+          "measured": 3
+        },
+        "receiver": {
+          "schema": 1,
+          "micros": [
+            0,
+            0,
+            0,
+            305810
+          ],
+          "measured": 12
+        }
+      },
+      "receiverConnectMs": 298.373,
+      "receiverReadyWaitMs": 295.075,
+      "preparationDecision": 1,
+      "preparedAgeMs": 5.997,
+      "preparationJoinMs": 146.966,
+      "nativePairReadinessMs": 133.161,
+      "serviceBootstrapValidationMs": 0.568,
+      "receiverFirstDispatchMs": 4.17,
+      "receiverWorstDispatchMs": 9.1,
+      "receiverWorstAuthorityMs": 0,
+      "receiverWorstResponseMs": 9.1,
+      "receiverEntryDispatchMs": 4.345,
+      "receiverWorstWorkerMillis": [
+        0,
+        1,
+        2
+      ],
+      "receiverFirstWorkerApply": {
+        "micros": [
+          3265,
+          0
+        ],
+        "measured": 1,
+        "submissionMicros": 1646,
+        "submissionCalls": 1
+      },
+      "receiverEntryWorkerApply": {
+        "micros": [
+          3785,
+          0
+        ],
+        "measured": 1
+      }
+    },
+    {
+      "attempt": 8,
+      "sourceTime": "2026-10-29T18:44:16.5655018Z",
+      "receiverTime": "2026-10-29T18:44:16.2027749Z",
+      "exchangeTag": "d9d718d4e9f7a29c5f4a8d9892e304bfc66db74497aa4bace23e25d2a19873f3",
+      "sourceOutcome": "ok",
+      "receiverOutcome": "ok",
+      "requestToGrantMs": 52.297,
+      "captureActivationMs": 29.192,
+      "sourceTCP": {
+        "schema": 1,
+        "rttMicros": [
+          12075,
+          11896
+        ],
+        "minRttMicros": [
+          5053,
+          5053
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "exchange": {
+        "source": {
+          "schema": 1,
+          "micros": [
+            49710,
+            573,
+            0,
+            0
+          ],
+          "measured": 3
+        },
+        "receiver": {
+          "schema": 1,
+          "micros": [
+            0,
+            0,
+            0,
+            39937
+          ],
+          "measured": 12
+        }
+      },
+      "receiverConnectMs": 30.506,
+      "receiverReadyWaitMs": 28.137,
+      "preparationDecision": 1,
+      "preparedAgeMs": 1204.776,
+      "preparationJoinMs": null,
+      "nativePairReadinessMs": 12.575,
+      "serviceBootstrapValidationMs": 0.595,
+      "receiverFirstDispatchMs": 2.691,
+      "receiverWorstDispatchMs": 6.958,
+      "receiverWorstAuthorityMs": 0.683,
+      "receiverWorstResponseMs": 5.711,
+      "receiverEntryDispatchMs": 4.673,
+      "receiverWorstWorkerMillis": [
+        0,
+        0,
+        5
+      ],
+      "receiverFirstWorkerApply": {
+        "micros": [
+          2178,
+          0
+        ],
+        "measured": 1,
+        "submissionMicros": 582,
+        "submissionCalls": 1
+      },
+      "receiverEntryWorkerApply": {
+        "micros": [
+          4673,
+          0
+        ],
+        "measured": 1
+      }
+    },
+    {
+      "attempt": 9,
+      "sourceTime": "2026-10-29T18:44:17.7097301Z",
+      "receiverTime": "2026-10-29T18:44:17.3477531Z",
+      "exchangeTag": "1b053df58c18908823cd41f78e72e7bb759e4bc80eeb1e2d5c3c03096bc9b082",
+      "sourceOutcome": "ok",
+      "receiverOutcome": "ok",
+      "requestToGrantMs": 84.3,
+      "captureActivationMs": 22.677,
+      "sourceTCP": {
+        "schema": 1,
+        "rttMicros": [
+          11178,
+          10874
+        ],
+        "minRttMicros": [
+          5053,
+          5053
+        ],
+        "queryMicros": [
+          541,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "exchange": {
+        "source": {
+          "schema": 1,
+          "micros": [
+            83758,
+            0,
+            0,
+            0
+          ],
+          "measured": 3
+        },
+        "receiver": {
+          "schema": 1,
+          "micros": [
+            0,
+            0,
+            580,
+            73722
+          ],
+          "measured": 12
+        }
+      },
+      "receiverConnectMs": 59.245,
+      "receiverReadyWaitMs": 55.793,
+      "preparationDecision": 1,
+      "preparedAgeMs": 919.786,
+      "preparationJoinMs": null,
+      "nativePairReadinessMs": 21.601,
+      "serviceBootstrapValidationMs": 1.186,
+      "receiverFirstDispatchMs": 3.178,
+      "receiverWorstDispatchMs": 12.713,
+      "receiverWorstAuthorityMs": 0.658,
+      "receiverWorstResponseMs": 12.054,
+      "receiverEntryDispatchMs": 8.152,
+      "receiverWorstWorkerMillis": [
+        0,
+        2,
+        6
+      ],
+      "receiverFirstWorkerApply": {
+        "micros": [
+          2538,
+          0
+        ],
+        "measured": 1,
+        "submissionMicros": 1200,
+        "submissionCalls": 1
+      },
+      "receiverEntryWorkerApply": {
+        "micros": [
+          7597,
+          0
+        ],
+        "measured": 1
+      }
+    },
+    {
+      "attempt": 10,
+      "sourceTime": "2026-10-29T18:44:18.7086085Z",
+      "receiverTime": "2026-10-29T18:44:18.3481349Z",
+      "exchangeTag": "b2f35a7ecfa50ce5c4224dd3c709941f99134202fb6588f5f2cc640dd4d2d363",
+      "sourceOutcome": "ok",
+      "receiverOutcome": "ok",
+      "requestToGrantMs": 47.989,
+      "captureActivationMs": 17.141,
+      "sourceTCP": {
+        "schema": 1,
+        "rttMicros": [
+          11657,
+          12135
+        ],
+        "minRttMicros": [
+          5053,
+          5053
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "exchange": {
+        "source": {
+          "schema": 1,
+          "micros": [
+            47989,
+            0,
+            0,
+            0
+          ],
+          "measured": 3
+        },
+        "receiver": {
+          "schema": 1,
+          "micros": [
+            0,
+            0,
+            0,
+            36978
+          ],
+          "measured": 12
+        }
+      },
+      "receiverConnectMs": 29.573,
+      "receiverReadyWaitMs": 27.841,
+      "preparationDecision": 1,
+      "preparedAgeMs": 776.414,
+      "preparationJoinMs": null,
+      "nativePairReadinessMs": 12.907,
+      "serviceBootstrapValidationMs": 0.582,
+      "receiverFirstDispatchMs": 1.648,
+      "receiverWorstDispatchMs": 14.643,
+      "receiverWorstAuthorityMs": 0,
+      "receiverWorstResponseMs": 14.643,
+      "receiverEntryDispatchMs": 4.475,
+      "receiverWorstWorkerMillis": [
+        1,
+        3,
+        14
+      ],
+      "receiverFirstWorkerApply": {
+        "micros": [
+          1648,
+          0
+        ],
+        "measured": 1,
+        "submissionMicros": 596,
+        "submissionCalls": 1
+      },
+      "receiverEntryWorkerApply": {
+        "micros": [
+          3947,
+          0
+        ],
+        "measured": 1
+      }
+    },
+    {
+      "attempt": 11,
+      "sourceTime": "2026-10-29T18:44:19.6486349Z",
+      "receiverTime": "2026-10-29T18:44:19.2900018Z",
+      "exchangeTag": "f532edba93c775755ccee683ef2b989672e47c2c7b5fe2d01bbcdb66aef5de43",
+      "sourceOutcome": "ok",
+      "receiverOutcome": "ok",
+      "requestToGrantMs": 44.277,
+      "captureActivationMs": 18.63,
+      "sourceTCP": {
+        "schema": 1,
+        "rttMicros": [
+          9804,
+          9754
+        ],
+        "minRttMicros": [
+          5053,
+          5053
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "exchange": {
+        "source": {
+          "schema": 1,
+          "micros": [
+            44277,
+            0,
+            0,
+            0
+          ],
+          "measured": 3
+        },
+        "receiver": {
+          "schema": 1,
+          "micros": [
+            0,
+            0,
+            0,
+            36879
+          ],
+          "measured": 12
+        }
+      },
+      "receiverConnectMs": 28.563,
+      "receiverReadyWaitMs": 25.996,
+      "preparationDecision": 1,
+      "preparedAgeMs": 744.179,
+      "preparationJoinMs": null,
+      "nativePairReadinessMs": 11.768,
+      "serviceBootstrapValidationMs": 0.575,
+      "receiverFirstDispatchMs": 2.338,
+      "receiverWorstDispatchMs": 4.8,
+      "receiverWorstAuthorityMs": 0,
+      "receiverWorstResponseMs": 4.8,
+      "receiverEntryDispatchMs": 4.825,
+      "receiverWorstWorkerMillis": [
+        1,
+        0,
+        4
+      ],
+      "receiverFirstWorkerApply": {
+        "micros": [
+          2338,
+          0
+        ],
+        "measured": 1,
+        "submissionMicros": 1828,
+        "submissionCalls": 1
+      },
+      "receiverEntryWorkerApply": {
+        "micros": [
+          4246,
+          0
+        ],
+        "measured": 1
+      }
+    },
+    {
+      "attempt": 12,
+      "sourceTime": "2026-10-29T18:44:20.5924295Z",
+      "receiverTime": "2026-10-29T18:44:20.2289649Z",
+      "exchangeTag": "24bcc5181717b51462bc375ca721116f60c3e4d2190a2d88a6d50b0e329b9263",
+      "sourceOutcome": "ok",
+      "receiverOutcome": "ok",
+      "requestToGrantMs": 43.362,
+      "captureActivationMs": 17.678,
+      "sourceTCP": {
+        "schema": 1,
+        "rttMicros": [
+          10676,
+          10248
+        ],
+        "minRttMicros": [
+          5053,
+          5053
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "exchange": {
+        "source": {
+          "schema": 1,
+          "micros": [
+            42745,
+            0,
+            0,
+            0
+          ],
+          "measured": 3
+        },
+        "receiver": {
+          "schema": 1,
+          "micros": [
+            0,
+            0,
+            0,
+            34190
+          ],
+          "measured": 12
+        }
+      },
+      "receiverConnectMs": 27.224,
+      "receiverReadyWaitMs": 24.827,
+      "preparationDecision": 1,
+      "preparedAgeMs": 735.311,
+      "preparationJoinMs": null,
+      "nativePairReadinessMs": 10.947,
+      "serviceBootstrapValidationMs": 0.641,
+      "receiverFirstDispatchMs": 2.313,
+      "receiverWorstDispatchMs": 6.445,
+      "receiverWorstAuthorityMs": 0,
+      "receiverWorstResponseMs": 6.445,
+      "receiverEntryDispatchMs": 3.876,
+      "receiverWorstWorkerMillis": [
+        0,
+        0,
+        5
+      ],
+      "receiverFirstWorkerApply": {
+        "micros": [
+          2313,
+          0
+        ],
+        "measured": 1,
+        "submissionMicros": 589,
+        "submissionCalls": 1
+      },
+      "receiverEntryWorkerApply": {
+        "micros": [
+          3876,
+          0
+        ],
+        "measured": 1
+      }
+    }
+  ],
+  "findings": {
+    "observedFaults": 0,
+    "observedReconnects": 0,
+    "expiredCandidateEntries": 4,
+    "expiredReceiverPreparationMs": [
+      281.068,
+      285.604,
+      303.596,
+      379.141
+    ],
+    "expiredEntriesRetransmittedBytes": 0,
+    "captureActivationMs": {
+      "min": 13.886,
+      "max": 29.192
+    },
+    "worstInputResponseMs": 24.528,
+    "interpretation": "The four expired candidates put cold console and remaining native pair construction on B entry. Read-to-grant on B is 286.313-386.395ms in these samples; this receiver-local work accounts for most of request-to-grant. TCP RTT was about 9-30ms with no retransmitted bytes for these entries. Other entries contain additional unassigned transport/dispatch delay; do not call that pure one-way network latency.",
+    "structuralCause": "residentagent.prepareIdle discarded fresh authenticated movement hints whenever passive cursor presentation was alive. That presentation occupies the serial input endpoint, while its one speculative candidate still expires at 3s. Service cannot process ordinary endpoint hints until presentation retires. A new preparation-only endpoint can rebuild the same one bounded unbound slot on demand during presentation.",
+    "nativeTimingLimit": "Native pair elapsed is remaining loading plus independently authenticated binding/desktop readiness, not pure SCM time. Existing 74/24/10ms worker timings are nested; no fresh-proof cache or input retry is justified.",
+    "scope": "14 matched complete profiles; detailed profiles include 2 earlier entries plus 12 entries in the latest physical sequence. Both control.previous.jsonl log sources are marked incomplete, so zero observed faults is limited to collected evidence. No claim of measured g502 improvement yet."
+  }
+}

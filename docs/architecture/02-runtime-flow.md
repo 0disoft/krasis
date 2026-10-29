@@ -16,6 +16,24 @@ g478의 상대 관리 창 열기는 에이전트와 실행 기록의 generation/
 
 ## 경계 전환
 
+g502 separates optional preparation demand from the serial input/presentation
+endpoint with the fixed local `Krasis.Preparation.v1` pipe. It authenticates the
+exact installed agent and service, repeats fresh request/receipt authority and
+the existing login admission gate, and accepts only the fixed preparation
+envelope. Input, capture and presentation leases are rejected without an ACK.
+The installed agent can request an unbound spare while its passive cursor owner
+remains alive. Actual entry still joins that cursor's exact retirement first.
+
+Both endpoints share one mutex-protected candidate/builder and a single 2s
+launch cooldown. Authentication and active input do not own that mutex. A fresh
+hint harvests a completed builder even while presentation occupies the input
+endpoint. Admission joins and transfers the exact candidate atomically, including
+a hint arriving during login admission. Cleanup uncertainty is sticky across
+endpoints; service shutdown cancels and joins both endpoints before closing the
+shared builder and installation pins. The fixed 3s candidate expiry, three-process
+job, one active plus one speculative set, native proof slots, fresh input proofs
+and no-replay policy remain unchanged. There is no periodic idle refresh.
+
 1. Windows adapter가 경계 의도를 감지한다.
 2. Application이 destination 연결, 세션과 제어권 가능 여부를 확인한다.
 3. destination이 수신 준비를 확인한다.

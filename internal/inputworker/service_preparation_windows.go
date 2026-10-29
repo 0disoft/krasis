@@ -5,14 +5,18 @@ package inputworker
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 )
 
-// Only the serial service loop owns this slot. A builder owns the unbound child
-// until join; accepting/authenticating a channel does not transfer input rights.
+// Input admission and the preparation-only endpoint share exactly one slot.
+// The mutex protects ownership, not authentication or an active input lease.
 type serviceInputPreparation struct {
+	mu      sync.Mutex
 	next    *preparedConsole
 	warming *cursorInputPreparation
+	last    time.Time
+	failure error // Uncertain retirement is terminal, including across endpoints.
 }
 
 func (p *serviceInputPreparation) reenter(ctx context.Context, lease Lease, result error, prepare func(context.Context) (*preparedConsole, error)) error {
@@ -30,7 +34,13 @@ func (p *serviceInputPreparation) reenter(ctx context.Context, lease Lease, resu
 }
 
 func (p *serviceInputPreparation) start(ctx context.Context, prepare func(context.Context) (*preparedConsole, error)) bool {
-	if p.warming != nil || p.next != nil && !p.next.retired() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.startLocked(ctx, prepare)
+}
+
+func (p *serviceInputPreparation) startLocked(ctx context.Context, prepare func(context.Context) (*preparedConsole, error)) bool {
+	if p.failure != nil || ctx == nil || ctx.Err() != nil || p.warming != nil || p.next != nil && !p.next.retired() {
 		return false
 	}
 	retiring := p.next
@@ -41,6 +51,7 @@ func (p *serviceInputPreparation) start(ctx context.Context, prepare func(contex
 		}
 		return prepare(run)
 	})
+	p.last = time.Now()
 	return true
 }
 
@@ -48,6 +59,14 @@ func (p *serviceInputPreparation) start(ctx context.Context, prepare func(contex
 // receipt acknowledges demand, not readiness. Keep one bounded builder, and
 // retain the existing cooldown/expiry policy without tying work to an ACK wait.
 func (p *serviceInputPreparation) hint(ctx context.Context, last, now time.Time, prepare func(context.Context) (*preparedConsole, error)) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.last.After(last) {
+		last = p.last
+	}
+	if p.collectReadyLocked() != nil {
+		return false
+	}
 	if ctx == nil || ctx.Err() != nil || p.warming != nil || !preparationAllowed(last, now) {
 		return false
 	}
@@ -56,7 +75,7 @@ func (p *serviceInputPreparation) hint(ctx context.Context, last, now time.Time,
 	}
 	retiring := p.next
 	p.next = nil
-	return p.start(ctx, func(run context.Context) (*preparedConsole, error) {
+	return p.startLocked(ctx, func(run context.Context) (*preparedConsole, error) {
 		if err := retiring.close(); err != nil {
 			return nil, errors.Join(ErrRecovery, err)
 		}
@@ -65,23 +84,39 @@ func (p *serviceInputPreparation) hint(ctx context.Context, last, now time.Time,
 }
 
 func (p *serviceInputPreparation) join() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.joinLocked()
+}
+
+func (p *serviceInputPreparation) joinLocked() error {
 	if p.warming == nil {
-		return nil
+		return p.failure
 	}
 	var err error
 	p.next, err = p.warming.join()
 	p.warming = nil
 	// Ordinary construction failure still permits the existing cold fallback.
-	return serviceRecoveryFailure(err, nil)
+	p.failure = errors.Join(p.failure, serviceRecoveryFailure(err, nil))
+	return p.failure
 }
 
 // Harvest only a completed builder. Neither optional demand nor authentication
 // may wait for native construction, but completed errors must fence admission.
 func (p *serviceInputPreparation) collectReady() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.collectReadyLocked()
+}
+
+func (p *serviceInputPreparation) collectReadyLocked() error {
+	if p.failure != nil {
+		return p.failure
+	}
 	if p.warming != nil {
 		select {
 		case <-p.warming.done:
-			return p.join()
+			return p.joinLocked()
 		default:
 		}
 	}
@@ -89,8 +124,11 @@ func (p *serviceInputPreparation) collectReady() error {
 }
 
 func (p *serviceInputPreparation) accept(accept func() (*Channel, error)) (*Channel, error) {
+	p.mu.Lock()
 	hadPreparation := p.warming != nil
-	if err := p.collectReady(); err != nil {
+	err := p.collectReadyLocked()
+	p.mu.Unlock()
+	if err != nil {
 		return nil, err
 	}
 	channel, err := accept()
@@ -111,10 +149,19 @@ func (p *serviceInputPreparation) accept(accept func() (*Channel, error)) (*Chan
 // not block behind construction. Every actual lease still joins before login
 // admission, candidate transfer or native input, including presentation leases.
 func (p *serviceInputPreparation) admit(channel *Channel) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.admitLocked(channel)
+}
+
+func (p *serviceInputPreparation) admitLocked(channel *Channel) error {
+	if p.failure != nil {
+		return serviceRecoveryFailure(p.failure, channel.Close())
+	}
 	if p.warming != nil {
 		started := time.Now()
-		err := p.join()
-		channel.preparationWait = time.Since(started)
+		err := p.joinLocked()
+		channel.preparationWait += time.Since(started)
 		channel.preparationWaitMeasured = true
 		if err != nil {
 			return serviceRecoveryFailure(err, channel.Close())
@@ -124,11 +171,25 @@ func (p *serviceInputPreparation) admit(channel *Channel) error {
 }
 
 func (p *serviceInputPreparation) close() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	if p.warming != nil {
 		p.warming.cancel()
 	}
-	err := p.join()
+	err := p.joinLocked()
 	closeErr := p.next.close()
 	p.next = nil
-	return serviceRecoveryFailure(err, closeErr)
+	p.failure = serviceRecoveryFailure(err, closeErr)
+	return p.failure
+}
+
+func (p *serviceInputPreparation) take(channel *Channel, lease Lease) (*preparedConsole, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	// A demand can arrive during login admission. Join it and transfer under
+	// one lock; a nil candidate must not bypass its old owner's retirement.
+	if err := p.admitLocked(channel); err != nil {
+		return nil, err
+	}
+	return takeInputPreparation(&p.next, lease), nil
 }

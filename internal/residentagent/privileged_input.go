@@ -33,6 +33,7 @@ type privilegedLeaseInput struct {
 	done                                    chan struct{}
 	connect                                 func(context.Context, application.LeaseIdentity, time.Time) (privilegedClient, error)
 	prepare                                 func(context.Context) error
+	prepareDuringPresentation               bool // Only the installed preparation-only endpoint.
 	failed                                  func(error)
 	event                                   func(string)
 	expires                                 time.Time

@@ -22,7 +22,7 @@ func (service *AgentService) PrepareConsole(ctx context.Context) error {
 	}
 	ctx, cancel := context.WithTimeout(ctx, 750*time.Millisecond)
 	defer cancel()
-	channel, err := connectInstalledService(ctx, digest, service.installation)
+	channel, err := connectInstalledNamed(ctx, digest, service.installation, preparationPipeName)
 	if err != nil {
 		return err
 	}

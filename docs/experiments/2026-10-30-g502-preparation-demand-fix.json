@@ -1,0 +1,36 @@
+{
+  "schema": "krasis.preparation-demand-fix/v1",
+  "generation": 502,
+  "baseline": "docs/experiments/2026-10-30-g501-physical-crossing-review.json",
+  "problem": "The passive return-cursor presentation monopolized the serial input endpoint; prepareIdle dropped fresh movement hints while its 3s spare expired. Cold controller load (69.616ms in the slowest entry) and remaining native pair loading/binding (180.472ms) then occurred during actual entry.",
+  "change": "A dedicated authenticated local preparation-only endpoint shares one synchronized candidate/builder and cooldown with input admission. The installed resident agent may request preparation alongside presentation; actual input still waits for confirmed presentation retirement, native construction and fresh bootstrap.",
+  "bounds": {
+    "candidateExpiryMs": 3000,
+    "launchCooldownMs": 2000,
+    "speculativeCandidates": 1,
+    "processesPerPreparedJob": 3,
+    "nativeQuerySlots": 4,
+    "restrictedProofSlots": 3,
+    "periodicRefresh": false,
+    "serviceQueryDeadlineMs": 1000,
+    "activeIdleDeadlineMs": 2000
+  },
+  "security": "Same fixed pipe ACL, exact installed process authentication, live service configuration and login gate, fresh request/receipt proofs. The new endpoint rejects every lease mode before login admission/ACK. No input data, input authority or agent handles enter unbound preparation. Retirement failure stays terminal across both endpoints and shutdown.",
+  "validation": {
+    "fullGo": "go test ./... passed with deployment runtime overlay, CGO_ENABLED=0",
+    "regressionBefore": "TestSeparateDemandPreparesDuringPresentationButInputStillJoinsRetirement failed with the previous presenting guard restored: fresh demand still waits for cursor restoration false <nil>. Source restored in finally.",
+    "regressionAfter": "Inputworker and residentagent suites passed, including fresh proof/login gate, rejection of input/capture/presentation leases, concurrent demand single construction and atomic transfer, sticky cleanup failure and input blocked until presentation retirement.",
+    "frontendAndPackage": "Pending generation build",
+    "installation": "Pending both laptops",
+    "race": "Skipped: deployment environment uses CGO_ENABLED=0",
+    "remoteCI": "Skipped: no new push requested"
+  },
+  "performanceClaim": "Moves rebuild demand ahead of entry when fresh physical approach gives enough lead. No claimed reduction in OS process loading or measured g502 physical latency yet. Immediate movement/warp after idle can still outrun preparation.",
+  "rollback": "Keep g501 setup and bundles. Preserve paired diagnostics on regression and use the verified installer with Windows administrator approval if required. Do not delete active cache/generation directories.",
+  "sourceOfTruthChanged": "docs/architecture/02-runtime-flow.md",
+  "apiChanges": "Adds fixed local preparation-only named pipe Krasis.Preparation.v1; uses existing request/receipt envelopes. No network protocol or public API change.",
+  "dbChanges": "none",
+  "repositoryHygieneChanges": "none",
+  "runnerChanges": "none",
+  "remotePush": "not performed"
+}

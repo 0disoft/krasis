@@ -72,8 +72,8 @@ func TestActivePreparationExpiresWithoutRefreshThenReplacesAfterReturn(t *testin
 				} else if err != nil || channel.closing || slot.next != fresh || calls != 2 {
 					t.Fatal("long active lease left an expired spare blocking reentry", err)
 				}
-				if err := slot.close(); err != nil {
-					t.Fatal(err)
+				if err := slot.close(); errors.Is(err, ErrRecovery) != cleanupFailure {
+					t.Fatal("shared slot lost or invented its terminal retirement fence", err)
 				}
 			})
 		})

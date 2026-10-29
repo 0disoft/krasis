@@ -96,12 +96,26 @@ func runServiceLoop(ctx context.Context, installation *Installation, ready func(
 }
 
 func runServiceLoopWithGate(ctx context.Context, installation *Installation, ready func() error, admit func(context.Context) error, first ...*pipeConn) (result error) {
+	var preparation serviceInputPreparation
+	run, cancel := context.WithCancel(ctx)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		err := runPreparationService(run, installation, admit, &preparation)
+		cancel()
+		done <- err
+	}()
+	err := runInputServiceLoop(run, installation, ready, admit, &preparation, first...)
+	cancel()
+	// Both endpoints join before the shared builder and installation pins close.
+	return errors.Join(err, <-done, preparation.close())
+}
+
+func runInputServiceLoop(ctx context.Context, installation *Installation, ready func() error, admit func(context.Context) error, preparation *serviceInputPreparation, first ...*pipeConn) (result error) {
 	agent, service, err := installation.digests()
 	if err != nil {
 		return ErrAuthority
 	}
-	var preparation serviceInputPreparation
-	var lastPreparation time.Time
 	var returned presentationReturn
 	var initial *pipeConn
 	if len(first) != 0 {
@@ -112,9 +126,6 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 		return err
 	}
 	defer func() {
-		if closeErr := preparation.close(); closeErr != nil {
-			result = errors.Join(result, ErrRecovery, closeErr)
-		}
 		result = errors.Join(result, listener.Close())
 	}()
 	for ctx.Err() == nil {
@@ -168,11 +179,9 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 				}
 				if err == nil && closeErr == nil {
 					now := time.Now()
-					if preparation.hint(ctx, lastPreparation, now, func(run context.Context) (*preparedConsole, error) {
+					preparation.hint(ctx, time.Time{}, now, func(run context.Context) (*preparedConsole, error) {
 						return prepareServiceConsole(run, installation, service)
-					}) {
-						lastPreparation = now
-					}
+					})
 				}
 				// Preparation failures leave ordinary lease fallback usable.
 				continue
@@ -192,17 +201,18 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 				if !lease.Presentation {
 					returned = presentationReturn{}
 				}
-				candidate := takeInputPreparation(&preparation.next, lease)
+				candidate, preparationErr := preparation.take(channel, lease)
+				if preparationErr != nil {
+					return preparationErr
+				}
 				_, err = runPreparedAgentLease(ctx, channel, lease, agent, service, installation, candidate, func() {
 					// Readiness has reached the agent before any next-input work.
 					// Overlap one unbound set with active input as well as passive
 					// presentation. No current lease, journal or agent handles enter
 					// this set; its fixed expiry is not extended or renewed.
-					if preparation.start(ctx, func(run context.Context) (*preparedConsole, error) {
+					preparation.start(ctx, func(run context.Context) (*preparedConsole, error) {
 						return prepareServiceConsole(run, installation, service)
-					}) {
-						lastPreparation = time.Now()
-					}
+					})
 				})
 				if err == nil && !lease.Presentation {
 					returned = presentationReturn{lease: lease, pid: agentPID, started: channel.authority.agentStarted, at: time.Now()}
