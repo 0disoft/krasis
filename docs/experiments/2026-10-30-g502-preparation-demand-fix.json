@@ -20,10 +20,11 @@
     "fullGo": "go test ./... passed with deployment runtime overlay, CGO_ENABLED=0",
     "regressionBefore": "TestSeparateDemandPreparesDuringPresentationButInputStillJoinsRetirement failed with the previous presenting guard restored: fresh demand still waits for cursor restoration false <nil>. Source restored in finally.",
     "regressionAfter": "Inputworker and residentagent suites passed, including fresh proof/login gate, rejection of input/capture/presentation leases, concurrent demand single construction and atomic transfer, sticky cleanup failure and input blocked until presentation retirement.",
-    "frontendAndPackage": "Pending generation build",
-    "installation": "Pending both laptops",
+    "frontendAndPackage": "104/104 tests and native production build passed. Workspace archive, icons, input installer and offline app setup verification passed.",
+    "installation": "Both setup result 0, recovery not_needed, matching g502 UI/agent/installed build, protected input READY and authenticated CONNECTED.",
     "race": "Skipped: deployment environment uses CGO_ENABLED=0",
-    "remoteCI": "Skipped: no new push requested"
+    "remoteCI": "Skipped: no new push requested",
+    "finalFollowup": "Full go test ./... passed with deployment runtime overlay; generation/final timing follow-up Preparation|SeparateDemand|Runtime tests passed for inputworker, residentagent, localapi."
   },
   "performanceClaim": "Moves rebuild demand ahead of entry when fresh physical approach gives enough lead. No claimed reduction in OS process loading or measured g502 physical latency yet. Immediate movement/warp after idle can still outrun preparation.",
   "rollback": "Keep g501 setup and bundles. Preserve paired diagnostics on regression and use the verified installer with Windows administrator approval if required. Do not delete active cache/generation directories.",

@@ -1,0 +1,128 @@
+{
+  "schema": "krasis.paired-installation/v1",
+  "generation": 502,
+  "revision": "fc7b2aca83b969f62fb9d7eda875954207648b99",
+  "collection": "555f50a12bd0d2041de633784a09ad3f",
+  "sides": {
+    "A": {
+      "created": "2026-10-29T18:58:37Z",
+      "sha256": "d6950ef98fe83d54aef0767566ad793fa083ce38e20a951cb1b0dd7bd10dfd6a",
+      "installation": {
+        "time": "2026-10-29T18:57:22.5933555Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-29T18:57:23.2198464Z",
+        "time": "2026-10-29T18:57:23.2397499Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      },
+      "inputHealth": {
+        "time": "2026-10-29T18:58:25.1382177Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "matchingBuildUILaunch": [
+        {
+          "time": "2026-10-29T18:57:24.2358589Z",
+          "code": "launch_record_ready"
+        }
+      ],
+      "connection": [
+        {
+          "time": "2026-10-29T18:58:25.8141215Z",
+          "code": "CONNECTED"
+        }
+      ],
+      "currentBuildFaults": []
+    },
+    "B": {
+      "created": "2026-10-29T18:58:38Z",
+      "sha256": "f85b56c5f7ec4b28a5066779f18a561487ceab3b4373a29eaa0f36749b6caf54",
+      "installation": {
+        "time": "2026-10-29T18:58:08.0503682Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-29T18:58:10.9058049Z",
+        "time": "2026-10-29T18:58:10.9580932Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      },
+      "inputHealth": {
+        "time": "2026-10-29T18:58:20.6931659Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "matchingBuildUILaunch": [
+        {
+          "time": "2026-10-29T18:58:21.6416853Z",
+          "code": "launch_record_ready"
+        }
+      ],
+      "connection": [
+        {
+          "time": "2026-10-29T18:58:25.44161Z",
+          "code": "CONNECTED"
+        }
+      ],
+      "currentBuildFaults": []
+    }
+  },
+  "setupSha256": "d9491e94d8d17a838930bad6cb000c194cf866b40ee71043e2515144b77b035b",
+  "transfer": {
+    "schemaVersion": "krasis.cli.update-wait/v1",
+    "peerAlias": "B",
+    "id": "fec54247f6559ea363e2addb77fd40da",
+    "code": "updated",
+    "transferState": "UPDATED",
+    "generation": 502,
+    "revision": "fc7b2aca83b969f62fb9d7eda875954207648b99",
+    "bytes": 28755693,
+    "total": 28755693
+  },
+  "changes": "Authenticated preparation-only local endpoint permits bounded unbound re-preparation during passive cursor presentation. Actual input retains retirement/authority fences.",
+  "validation": {
+    "go": "Full go test ./... passed with deployment runtime overlay; generation/final timing follow-up Preparation|SeparateDemand|Runtime tests passed for inputworker, residentagent, localapi.",
+    "regression": "Old presenting guard fails the new regression; updated path passes. Fresh proof/login gate, all lease rejection, single concurrent builder, exact atomic ownership transfer, sticky retirement failure and input waiting for presentation retirement passed.",
+    "frontend": "104/104 tests and native production build passed.",
+    "package": "Workspace archive, icons, input installer and offline app setup verification passed.",
+    "installation": "Both setup result 0, recovery not_needed, matching g502 UI/agent/installed build, protected input READY and authenticated CONNECTED.",
+    "check": "git diff --check passed",
+    "race": "Skipped: CGO disabled in deployment environment",
+    "remoteCI": "Skipped: no new push requested"
+  },
+  "scope": "Installation/startup snapshot only; g502 physical crossing latency and recovery recurrence remain pending user test.",
+  "sourceOfTruthChanged": "docs/architecture/02-runtime-flow.md",
+  "apiChanges": "Fixed local named pipe Krasis.Preparation.v1; no network protocol or public API changes.",
+  "dbChanges": "none",
+  "repositoryHygieneChanges": "none",
+  "runnerChanges": "none",
+  "remotePush": "not performed"
+}
