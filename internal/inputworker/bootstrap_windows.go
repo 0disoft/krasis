@@ -83,7 +83,7 @@ func runPreparedAgentLease(ctx context.Context, channel *Channel, lease Lease, a
 		if closeErr := candidate.close(); closeErr != nil {
 			return Report{}, errors.Join(ErrRecovery, closeErr)
 		}
-		prepared, err = prepareAgentConsole(ctx, channel.authority, serviceDigest, installation)
+		prepared, err = prepareLeaseConsole(ctx, channel.authority, serviceDigest, installation, lease)
 		if err != nil {
 			return Report{}, err
 		}

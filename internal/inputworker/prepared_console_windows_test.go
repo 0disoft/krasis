@@ -39,6 +39,16 @@ func TestServicePreparationRejectsPortableAndMissingInstallationWithoutInput(t *
 	}
 }
 
+func TestColdNativePreparationRejectsBeforeLaunchingWithoutAuthority(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	for _, ctx := range []context.Context{nil, ctx, context.Background()} {
+		if p, err := prepareLeaseConsole(ctx, nil, [sha256.Size]byte{}, &Installation{}, Lease{}); p != nil || !errors.Is(err, ErrAuthority) {
+			t.Fatal("cold native preparation accepted unauthenticated demand", err)
+		}
+	}
+}
+
 func TestAgentServicePreparationRejectsMissingPinsWithoutConnecting(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

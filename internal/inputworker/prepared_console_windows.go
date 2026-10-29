@@ -142,6 +142,24 @@ func prepareAgentConsole(ctx context.Context, agent *Authority, digest [sha256.S
 	})
 }
 
+// A cold installed input lease needs the same native pair as a warm candidate.
+// Permit its unbound children as soon as the owned control pipe connects,
+// overlapping their loading with parent/service bootstrap authentication.
+// Capture and passive presentation never acquire native input children.
+func prepareLeaseConsole(ctx context.Context, agent *Authority, digest [sha256.Size]byte, installation *Installation, lease Lease) (*preparedConsole, error) {
+	if !nativeLeasePreparation(installation != nil, lease) {
+		return prepareAgentConsole(ctx, agent, digest, installation)
+	}
+	if ctx == nil || ctx.Err() != nil || agent == nil || agent.kind != authorityAgent || agent.check(false) != nil {
+		return nil, ErrAuthority
+	}
+	return prepareConsoleMode(ctx, true, func(prepare func(windows.Handle, uint32) error) (*ConsoleWorker, error) {
+		return launchManagedConsoleMode(ctx, digest, prepare, installation, preparedInputConsole, func() bool {
+			return agent.check(false) == nil
+		})
+	})
+}
+
 func prepareConsole(ctx context.Context, launch consoleLauncher) (prepared *preparedConsole, result error) {
 	return prepareConsoleMode(ctx, false, launch)
 }
