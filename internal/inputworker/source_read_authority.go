@@ -11,6 +11,20 @@ func authorizeSourceRead(ctx context.Context, service, agent *Channel, op byte) 
 	return authorizeSourceReadProgress(ctx, service, agent, op, nil)
 }
 
+func authorizeSourceWatchdog(ctx context.Context, service, agent *Channel) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	for _, owner := range []struct {
+		name    string
+		channel *Channel
+	}{{"service", service}, {"agent", agent}} {
+		if err := owner.channel.authorizeSourceWatchdogPresence(ctx); err != nil {
+			return sourceQueryOwner(owner.name, err)
+		}
+	}
+	return nil
+}
+
 func authorizeSourceReadProgress(ctx context.Context, service, agent *Channel, op byte, progress *sourceHeartbeatProgress) error {
 	if progress != nil && op == sourceHeartbeat {
 		progress.presence, progress.gateBucket = sourcePresenceTiming{}, 0

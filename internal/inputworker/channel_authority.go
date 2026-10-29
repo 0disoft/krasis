@@ -36,6 +36,7 @@ const (
 	sourceAdvisoryAuthorityQuery
 	sourceAdvisoryPresenceAuthorityQuery
 	startupAuthorityQuery
+	sourceWatchdogAuthorityQuery
 )
 
 // Only read-only proof queries run here. Input injection stays on its original
@@ -70,6 +71,13 @@ func (channel *Channel) authorizeSourceInput(ctx context.Context) error {
 
 func (channel *Channel) authorizeSourcePresence(ctx context.Context) error {
 	return channel.queryAuthority(ctx, false, sourcePresenceAuthorityQuery)
+}
+
+// Background monitoring cannot consume the slot reserved for an actual sent
+// heartbeat. It still obtains a fresh pinned-owner proof and retains native
+// handles until completion; input authorization never uses this result.
+func (channel *Channel) authorizeSourceWatchdogPresence(ctx context.Context) error {
+	return channel.queryAuthority(ctx, false, sourceWatchdogAuthorityQuery)
 }
 
 func (channel *Channel) authorizeSourceAdvisory(ctx context.Context) error {
@@ -108,7 +116,7 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 			return queryAdmissionFailure(kind, "closed", nil)
 		}
 		current := &channel.query
-		if kind == presenceAuthorityQuery || kind == sourcePresenceAuthorityQuery {
+		if kind == presenceAuthorityQuery || kind == sourcePresenceAuthorityQuery || kind == sourceWatchdogAuthorityQuery {
 			current = &channel.presenceQuery
 		} else if optional {
 			current = &channel.maintenanceQuery
@@ -158,7 +166,7 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 			}
 			if kind == sourceInputAuthorityQuery || kind == sourceAdvisoryAuthorityQuery {
 				query.err = channel.authority.checkSource()
-			} else if kind == sourcePresenceAuthorityQuery || kind == sourceAdvisoryPresenceAuthorityQuery {
+			} else if kind == sourcePresenceAuthorityQuery || kind == sourceAdvisoryPresenceAuthorityQuery || kind == sourceWatchdogAuthorityQuery {
 				query.err = channel.authority.checkSourceHeartbeat()
 			} else if kind == startupAuthorityQuery {
 				query.err = channel.authority.checkResult(nil, false)

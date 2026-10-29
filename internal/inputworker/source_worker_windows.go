@@ -343,7 +343,7 @@ func runSourceCapture(ctx context.Context, channel, service *Channel, lease Leas
 	close(boundaryStart)
 	presenceDone := make(chan error, 1)
 	go func() {
-		err := watchSourcePresence(run, func() error { return authorizeSourceRead(run, service, channel, sourceHeartbeat) })
+		err := watchSourcePresence(run, func() error { return authorizeSourceWatchdog(run, service, channel) })
 		presenceDone <- err
 		if err != nil {
 			cancel()

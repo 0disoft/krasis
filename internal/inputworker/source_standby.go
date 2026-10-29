@@ -55,6 +55,13 @@ func watchSourcePresence(ctx context.Context, check func() error) error {
 				return nil
 			}
 			if err := check(); err != nil {
+				// Capacity expiry happened before this owner's native query began.
+				// It is neither failed presence nor a successful liveness sample.
+				// Sent heartbeat/read deadlines remain independently mandatory.
+				if query, ok := err.(*sourceQueryFailure); ok && ctx.Err() == nil &&
+					query.reason == "capacity" && errors.Is(query.cause, context.DeadlineExceeded) && sourceQueryRejectionOnly(query.cause) {
+					continue
+				}
 				// Stop may interrupt the query after the pre-check above. Only
 				// that exact local cancellation is normal; a concurrent native
 				// denial or query deadline must survive. Channel fencing and the
