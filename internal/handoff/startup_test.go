@@ -6,11 +6,11 @@ import (
 )
 
 func TestPreparedStartupDiagnosticRequiresBoundedAgeAndServiceSpans(t *testing.T) {
-	p := StartupProfile{Schema: 1, Measured: 3, Prepared: true, PreparedAgeMicros: 1_999_999}
+	p := StartupProfile{Schema: 1, Measured: 3, Prepared: true, PreparedAgeMicros: 2_999_999}
 	if !p.Valid() {
 		t.Fatal("bounded prepared diagnostic rejected")
 	}
-	p.PreparedAgeMicros = 2_000_000
+	p.PreparedAgeMicros = 3_000_000
 	if p.Valid() {
 		t.Fatal("expired prepared diagnostic accepted")
 	}

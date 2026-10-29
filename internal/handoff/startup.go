@@ -44,7 +44,7 @@ func (p StartupProfile) Valid() bool {
 	if p.Schema != 1 || !validPreparationDecision(p) || !p.ServiceReadiness.Valid() {
 		return false
 	}
-	if (!p.Prepared && p.PreparedAgeMicros != 0) || (p.Prepared && (p.PreparedAgeMicros >= 2_000_000 || p.Measured&3 != 3)) {
+	if (!p.Prepared && p.PreparedAgeMicros != 0) || (p.Prepared && (p.PreparedAgeMicros >= 3_000_000 || p.Measured&3 != 3)) {
 		return false
 	}
 	if p.PreparationWaitMicros > uint32(Window.Microseconds()) ||

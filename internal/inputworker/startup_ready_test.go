@@ -122,6 +122,31 @@ func FuzzStartupReady(f *testing.F) {
 	})
 }
 
+// The diagnostic age ceiling must cover exactly the runtime's candidate
+// lifetime. A stale diagnostic bound must not silently discard a valid 2–3s
+// candidate; expired diagnostics still yield readiness without a profile.
+func TestPreparedStartupReadyCoversRuntimeLifetime(t *testing.T) {
+	for _, age := range []time.Duration{0, 2 * time.Second, preparedConsoleWindow - time.Microsecond, preparedConsoleWindow, preparedConsoleWindow + time.Microsecond} {
+		t.Run(age.String(), func(t *testing.T) {
+			profile := handoff.StartupProfile{Prepared: true, PreparedAgeMicros: uint32(age.Microseconds()), PreparationDecision: handoff.PreparationUsed}
+			profile.Record(handoff.ServiceLaunch, time.Millisecond)
+			profile.Record(handoff.ServiceChildConnect, time.Millisecond)
+			want := age < preparedConsoleWindow
+			if profile.Valid() != want {
+				t.Fatal("diagnostic age bound differs from runtime candidate lifetime")
+			}
+			var packet bytes.Buffer
+			if err := writeStartupReady(&packet, profile); err != nil {
+				t.Fatal(err)
+			}
+			got, err := readStartupReady(&packet)
+			if err != nil || (got != nil) != want || got != nil && *got != profile {
+				t.Fatal("readiness/profile roundtrip disagrees with candidate lifetime", got, err)
+			}
+		})
+	}
+}
+
 func TestPreparedStartupReadyRoundtripRejectsMalformedAndDropsStaleDiagnostics(t *testing.T) {
 	var profile handoff.StartupProfile
 	profile.Record(handoff.ServiceLaunch, time.Millisecond)
