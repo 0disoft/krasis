@@ -295,6 +295,14 @@
     "Nested startup/apply spans overlap and must not be added. No cross-device wall timestamps are used as pure one-way network latency.",
     "The age-validation discrepancy affects diagnostics, not input authority or the worker expiry timer."
   ],
+  "postCollectionObservation": {
+    "timeUTC": "2026-10-29T11:45:05.7755524Z",
+    "side": "A",
+    "code": "fault_write_io_timeout",
+    "evidence": "Observed in the current local agent JSONL after this collection. The protected input health remained READY at 11:45:21Z. This is a later connection failure; the earlier collection's zero-failure window must not be generalized beyond 11:39:55Z.",
+    "followupCollection": "4faaa778c52203b7712f3a39998ae206",
+    "resolution": "Connection restored by restarting the installed protected agent; no claim that the diagnostic-only g491 change fixes this timeout."
+  },
   "validation": {
     "physical": "user completed crossings; paired fresh diagnostics collected",
     "sourceChanges": "none for this comparison",

@@ -1,0 +1,179 @@
+{
+  "schema": "krasis.paired-installation/v1",
+  "generation": 491,
+  "revision": "33e0457b1018123d19b08329293eef8c615432e9",
+  "collection": "8cc7985e0d891be7fc1d385369a51e3f",
+  "change": "Diagnostic prepared-age ceiling corrected from 2s to 3s; runtime preparation/authority behavior unchanged from g490",
+  "regression": "Old source rejected both 2s and 2.999999s startup profiles. Cross-package runtime-lifetime/receipt roundtrip regression now passes and expired profiles still drop without affecting readiness.",
+  "sides": {
+    "A": {
+      "created": "2026-10-29T11:51:36Z",
+      "diagnosticSha256": "122e21111dbea51213b4c66d636ec6d71b85f293f2e4b0d15c2a13d18acba3ab",
+      "inputHealth": {
+        "time": "2026-10-29T11:51:09.4506941Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "service": "READY",
+      "installation": {
+        "time": "2026-10-29T11:50:05.7845Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "lastConnection": [
+        {
+          "time": "2026-10-29T11:50:51.9560968Z",
+          "code": "CONNECTED"
+        }
+      ],
+      "faults": []
+    },
+    "B": {
+      "created": "2026-10-29T11:51:36Z",
+      "diagnosticSha256": "98b870ca75779bfb77c99ffbad0d3626c773f6701415639da1bca15361feef12",
+      "inputHealth": {
+        "time": "2026-10-29T11:51:18.0422684Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "service": "READY",
+      "installation": {
+        "time": "2026-10-29T11:50:42.5696677Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "lastConnection": [
+        {
+          "time": "2026-10-29T11:50:51.2134045Z",
+          "code": "CONNECTED"
+        }
+      ],
+      "faults": []
+    }
+  },
+  "peerUI": "window_ready: 074cd36d9f61e525aee1f59b4c370d29",
+  "transfer": {
+    "id": "7a563ee34d7661c34faf8612a0724c67",
+    "state": "UPDATED",
+    "bytes": 28740850,
+    "total": 28740850
+  },
+  "doctor": {
+    "schemaVersion": "krasis.cli.doctor/v1",
+    "agent": "RUNNING",
+    "connection": "CONNECTED",
+    "peerAlias": "B",
+    "cliGeneration": 491,
+    "agentGeneration": 491,
+    "protocol": "COMPATIBLE",
+    "code": "healthy",
+    "cliBuild": "33e0457b1018123d19b08329293eef8c615432e9",
+    "agentBuild": "33e0457b1018123d19b08329293eef8c615432e9",
+    "ui": {
+      "state": "RUNNING",
+      "generation": 491,
+      "build": "33e0457b1018123d19b08329293eef8c615432e9",
+      "pathStatus": "MATCHED"
+    },
+    "launchRecord": {
+      "state": "VERIFIED",
+      "generation": 491,
+      "build": "33e0457b1018123d19b08329293eef8c615432e9",
+      "pathStatus": "MATCHED"
+    },
+    "installedAgent": {
+      "state": "VERIFIED",
+      "build": "33e0457b1018123d19b08329293eef8c615432e9"
+    },
+    "service": {
+      "state": "RUNNING",
+      "pathStatus": "MATCHED"
+    },
+    "agentLocation": "PROTECTED",
+    "protectedInput": "CONFIGURED",
+    "checks": [
+      {
+        "name": "agent",
+        "state": "RUNNING"
+      },
+      {
+        "name": "connection",
+        "state": "CONNECTED"
+      },
+      {
+        "name": "protocol",
+        "state": "COMPATIBLE"
+      },
+      {
+        "name": "cli_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "ui_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "installed_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "ui",
+        "state": "RUNNING"
+      },
+      {
+        "name": "launch_record",
+        "state": "VERIFIED"
+      },
+      {
+        "name": "installed_agent",
+        "state": "VERIFIED"
+      },
+      {
+        "name": "service",
+        "state": "RUNNING"
+      },
+      {
+        "name": "update_stage_cleanup",
+        "state": "COMPLETED"
+      }
+    ],
+    "nextActions": []
+  },
+  "validation": {
+    "targeted": "passed: complete handoff, inputworker, productlog, residentagent packages with repository offline runtime overlay",
+    "frontend": "104 tests passed",
+    "package": "workspace archive transfer, icons/manifest and offline setup verification passed",
+    "fullGoSuite": "not rerun for diagnostic-only change; g490 passed full Go suite and changed consumers were tested",
+    "physical": "g490 physical comparison is committed separately; no g491 crossing latency measurement claimed"
+  },
+  "sourceOfTruth": "docs/architecture/02-runtime-flow.md",
+  "remainingRisk": [
+    "Cold replacement entries still reach 180-226ms in g490",
+    "One receiver input dispatch reached 134ms in g490",
+    "Later g490 A write timeout was observed after the first collection and the connection was restored; root cause remains unresolved"
+  ],
+  "apiChanges": "none",
+  "dbChanges": "none",
+  "runnerChanges": "none",
+  "remotePush": "not performed"
+}
