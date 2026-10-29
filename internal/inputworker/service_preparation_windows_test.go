@@ -76,6 +76,31 @@ func TestServicePreparationReapsIdleExpiredBuilderBeforeFreshHint(t *testing.T) 
 	})
 }
 
+// A renewal 2.4s after preparation used to destroy a live candidate, placing
+// both retirement and construction before the next authenticated entry.
+func TestServicePreparationNearExpiryHintKeepsCandidateForImmediateEntry(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		child := &preparedConsole{preparedAt: time.Now()}
+		child.warmTimer = time.AfterFunc(preparedConsoleWindow, func() { _ = child.expireUnbound() })
+		defer child.close()
+		slot := serviceInputPreparation{next: child}
+		time.Sleep(2400 * time.Millisecond)
+		if slot.hint(context.Background(), time.Time{}, time.Now(), func(context.Context) (*preparedConsole, error) {
+			t.Error("fresh candidate was replaced on approach")
+			return nil, ErrAuthority
+		}) {
+			t.Fatal("hint scheduled unnecessary replacement")
+		}
+		channel := &Channel{}
+		if err := slot.admit(channel); err != nil || slot.warming != nil || channel.preparationWait != 0 {
+			t.Fatal("entry joined replacement work", err)
+		}
+		if got := takeInputPreparation(&slot.next, Lease{}); got != child || got.retired() {
+			t.Fatal("entry lost its usable candidate")
+		}
+	})
+}
+
 func TestServiceAuthenticatesDuringPreparationButJoinsBeforeAdmission(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		var slot serviceInputPreparation

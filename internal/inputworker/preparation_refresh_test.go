@@ -7,7 +7,7 @@ import (
 	"github.com/0disoft/krasis/internal/handoff"
 )
 
-func TestPreparationFreshHintReplacesNearExpiryButNeverRecentOrRateLimitedChild(t *testing.T) {
+func TestPreparationFreshHintReplacesOnlyExpiredChild(t *testing.T) {
 	now := time.Unix(100, 0)
 	for _, test := range []struct {
 		name                  string
@@ -16,8 +16,9 @@ func TestPreparationFreshHintReplacesNearExpiryButNeverRecentOrRateLimitedChild(
 	}{
 		{"retain warm child across renewal", now.Add(-2257 * time.Millisecond), now.Add(-2107 * time.Millisecond), now, false},
 		{"recent reentry preparation", now.Add(-time.Minute), now.Add(-100 * time.Millisecond), now, false},
-		{"reserve remains", now.Add(-time.Minute), now.Add(-preparedConsoleWindow + preparedConsoleEntryReserve), now, false},
-		{"reserve exhausted", now.Add(-time.Minute), now.Add(-preparedConsoleWindow + preparedConsoleEntryReserve - time.Nanosecond), now, true},
+		{"750ms remains", now.Add(-time.Minute), now.Add(-2250 * time.Millisecond), now, false},
+		{"approach with 600ms remaining", now.Add(-time.Minute), now.Add(-2400 * time.Millisecond), now, false},
+		{"last live instant", now.Add(-time.Minute), now.Add(-preparedConsoleWindow + time.Nanosecond), now, false},
 		{"rate limited", now.Add(-time.Second), now.Add(-1900 * time.Millisecond), now, false},
 		{"already expired", now.Add(-4 * time.Second), now.Add(-preparedConsoleWindow), now, true},
 		{"future preparation", now.Add(-time.Minute), now.Add(time.Second), now, false},
