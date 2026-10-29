@@ -30,7 +30,7 @@ type Client struct {
 	failed              bool
 	timing              timingSampler
 	heartbeatTiming     timingSampler
-	lastAcknowledged    time.Time
+	lastAcknowledged    time.Time // Request start of the last matching successful ACK, never read completion.
 	lastDesktop         inputdesktop.DesktopClass
 	desktopObservations uint8
 	localExchange       func(context.Context, request, func(response)) error
@@ -261,6 +261,7 @@ func (client *Client) performResponseChecked(ctx context.Context, command reques
 	defer joinCancellation()
 	client.sequence++
 	start = time.Now()
+	requestStarted := start
 	n, err := stream.Write(data[:])
 	if err == nil && n == len(data) {
 		submitted.Store(true)
@@ -316,7 +317,10 @@ func (client *Client) performResponseChecked(ctx context.Context, command reques
 		}
 	}
 	if ack.status == 0 {
-		client.lastAcknowledged = time.Now()
+		// The worker can renew its idle deadline as soon as it writes this ACK,
+		// before our reader resumes. A delayed read must not postpone keepalive.
+		// Request start is a conservative local lower bound on that renewal.
+		client.lastAcknowledged = requestStarted
 		if observed != nil {
 			observed(ack)
 		}

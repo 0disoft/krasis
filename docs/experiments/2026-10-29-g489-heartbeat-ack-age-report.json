@@ -1,0 +1,44 @@
+{
+  "schema": "krasis.input-heartbeat-ack-age/v1",
+  "baselineGeneration": 488,
+  "targetGeneration": 489,
+  "selectedProblem": "Client records successful ACK processing time as fresh worker traffic. When ACK delivery has completed but the reader resumes late, the 250ms quiet window can suppress required maintenance after the worker has already renewed its 2s idle deadline.",
+  "reproduction": {
+    "clock": "Go testing/synctest virtual clock, actual serve loop over net.Pipe; not physical laptop latency",
+    "delayPoint": "After the first pipe Read copied the worker ACK, before returning bytes to Client",
+    "cases": [
+      {
+        "ackProcessingDelayMs": 0,
+        "expectedImmediateHeartbeatWrites": 0
+      },
+      {
+        "ackProcessingDelayMs": 300,
+        "beforeImmediateHeartbeatWrites": 0,
+        "expectedImmediateHeartbeatWrites": 1
+      },
+      {
+        "ackProcessingDelayMs": 1900,
+        "beforeImmediateHeartbeatWrites": 0,
+        "expectedImmediateHeartbeatWrites": 1,
+        "beforeResult": "worker idle expiry at 2000ms; next scheduled heartbeat at 2150ms failed"
+      }
+    ],
+    "red": "Unmodified source failed 300ms and 1900ms cases; the actual worker returned ErrExpired in the 1900ms case and independently released its held key."
+  },
+  "change": "Record request transmission start only after a matching successful ACK, instead of ACK processing completion. Both existing heartbeat freshness checks use this conservative timestamp.",
+  "ownership": "No request replay, authority caching, extra input event, idle/lease extension or recovery bypass. A recent fast ACK still suppresses an unnecessary heartbeat. Worker-owned key-up recovery remains required and tested.",
+  "validation": {
+    "targeted": "passed: heartbeat tests including 0ms, 300ms and 1900ms ACK processing delays; no idle expiry and exactly one key release",
+    "full": "passed: go test -p 2 -timeout 3m ./...",
+    "race": "passed: targeted heartbeat tests with CGO_ENABLED=1 and bundled clang",
+    "vet": "passed: go vet ./internal/inputworker",
+    "physical": "not measured"
+  },
+  "limits": [
+    "This reproduces one avoidable idle-expiry path; it does not prove this caused previously observed physical laptop disconnects or all service error 1066 cases."
+  ],
+  "sourceOfTruthChanged": "docs/architecture/02-runtime-flow.md",
+  "APIChanges": "none",
+  "DBChanges": "none",
+  "runnerChanges": "none"
+}
