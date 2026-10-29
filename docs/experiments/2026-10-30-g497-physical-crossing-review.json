@@ -1,0 +1,600 @@
+{
+  "schema": "krasis.physical-crossing-review/v1",
+  "generation": 497,
+  "revision": "047bf580df193c434c37bbb271a187c56104f052",
+  "collection": "1dc7a11737a42f259e57cd015f22fe32",
+  "baseline": "2026-10-30-g496-recovery-review.json",
+  "sides": {
+    "A": {
+      "created": "2026-10-29T15:11:54Z",
+      "sha256": "87ca4246aaea0ea0d1ea2fc74973a7e023344305bbb1cf65d9fe7718be0d386b",
+      "cutoff": "2026-10-29T15:09:23Z",
+      "service": "READY",
+      "inputHealth": {
+        "time": "2026-10-29T15:11:32.9736767Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "failures": [],
+      "additionalConnections": [],
+      "profiles": 12,
+      "profileOutcomes": [
+        {
+          "attempt": 1,
+          "role": "source",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 2,
+          "role": "source",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 3,
+          "role": "source",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 4,
+          "role": "source",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 5,
+          "role": "source",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 6,
+          "role": "source",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 7,
+          "role": "source",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 8,
+          "role": "source",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 9,
+          "role": "source",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 10,
+          "role": "source",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 11,
+          "role": "source",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 12,
+          "role": "source",
+          "end": "ok",
+          "incomplete": false
+        }
+      ],
+      "inputReadiness": 0,
+      "incompleteLogSources": [
+        "control.previous.jsonl"
+      ]
+    },
+    "B": {
+      "created": "2026-10-29T15:11:55Z",
+      "sha256": "ac3b804d3cce01e6b8db03cb36c378fa7ad2544901932ebc023adc8df926e101",
+      "cutoff": "2026-10-29T15:09:23Z",
+      "service": "READY",
+      "inputHealth": {
+        "time": "2026-10-29T15:11:39.9387311Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "failures": [],
+      "additionalConnections": [],
+      "profiles": 12,
+      "profileOutcomes": [
+        {
+          "attempt": 1,
+          "role": "receiver",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 2,
+          "role": "receiver",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 3,
+          "role": "receiver",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 4,
+          "role": "receiver",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 5,
+          "role": "receiver",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 6,
+          "role": "receiver",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 7,
+          "role": "receiver",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 8,
+          "role": "receiver",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 9,
+          "role": "receiver",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 10,
+          "role": "receiver",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 11,
+          "role": "receiver",
+          "end": "ok",
+          "incomplete": false
+        },
+        {
+          "attempt": 12,
+          "role": "receiver",
+          "end": "ok",
+          "incomplete": false
+        }
+      ],
+      "inputReadiness": 13,
+      "incompleteLogSources": [
+        "control.previous.jsonl"
+      ]
+    }
+  },
+  "profilePairs": 12,
+  "unmatchedSourceProfiles": 0,
+  "comparison": {
+    "requestToGrantMs": {
+      "g496": {
+        "count": 4,
+        "minMs": 42.083,
+        "medianMs": 169.64849999999998,
+        "maxMs": 307.045
+      },
+      "g497": {
+        "count": 12,
+        "minMs": 38.685,
+        "medianMs": 45.9525,
+        "maxMs": 362.966
+      }
+    },
+    "captureActivationMs": {
+      "g496": {
+        "count": 4,
+        "minMs": 18.153,
+        "medianMs": 60.352000000000004,
+        "maxMs": 159.398
+      },
+      "g497": {
+        "count": 12,
+        "minMs": 14.795,
+        "medianMs": 17.118000000000002,
+        "maxMs": 31.111
+      }
+    },
+    "receiverConnectMs": {
+      "g496": {
+        "count": 4,
+        "minMs": 25.283,
+        "medianMs": 149.468,
+        "maxMs": 275.448
+      },
+      "g497": {
+        "count": 12,
+        "minMs": 23.264,
+        "medianMs": 26.5815,
+        "maxMs": 304.747
+      }
+    },
+    "receiverWorstDispatchMs": {
+      "g496": {
+        "count": 4,
+        "minMs": 3.521,
+        "medianMs": 12.66,
+        "maxMs": 248.149
+      },
+      "g497": {
+        "count": 12,
+        "minMs": 2.467,
+        "medianMs": 3.3585000000000003,
+        "maxMs": 41.483
+      }
+    }
+  },
+  "samples": [
+    {
+      "attempt": 1,
+      "exchangeTag": "bd40eef10249054eea8c5f51a38103395eba29901055ba62b52f6d85651e4710",
+      "sourceTime": "2026-10-29T15:11:12.1863169Z",
+      "receiverTime": "2026-10-29T15:11:12.0278133Z",
+      "sourceOutcome": "ok",
+      "receiverOutcome": "ok",
+      "preparationDecision": 1,
+      "preparedAgeMs": 1210.092,
+      "requestToGrantMs": 48.671,
+      "captureActivationMs": 31.111,
+      "receiverConnectMs": 26.198,
+      "receiverReadyWaitMs": 23.712,
+      "serviceBootstrapValidationMs": 0.578,
+      "nativePairReadinessMs": 10.737,
+      "receiverFirstDispatchMs": 1.704,
+      "receiverWorstDispatchMs": 41.483,
+      "receiverWorstResponseMs": 41.483,
+      "requestWrittenToGrantReadMs": 48.671,
+      "receiverReadToGrantWriteMs": 33.383,
+      "remainderAfterReceiverMs": 15.287999999999997
+    },
+    {
+      "attempt": 2,
+      "exchangeTag": "44c851037b8098a3a4d997d6d64da72de2397eab57d670aeee11f49b128db434",
+      "sourceTime": "2026-10-29T15:11:16.1639561Z",
+      "receiverTime": "2026-10-29T15:11:16.0147433Z",
+      "sourceOutcome": "ok",
+      "receiverOutcome": "ok",
+      "preparationDecision": 3,
+      "preparedAgeMs": null,
+      "requestToGrantMs": 362.966,
+      "captureActivationMs": 17.148,
+      "receiverConnectMs": 287.766,
+      "receiverReadyWaitMs": 285.19,
+      "serviceBootstrapValidationMs": 144.371,
+      "nativePairReadinessMs": 105.945,
+      "receiverFirstDispatchMs": 2.761,
+      "receiverWorstDispatchMs": 3.153,
+      "receiverWorstResponseMs": 2.564,
+      "requestWrittenToGrantReadMs": 362.966,
+      "receiverReadToGrantWriteMs": 293.749,
+      "remainderAfterReceiverMs": 69.21699999999998
+    },
+    {
+      "attempt": 3,
+      "exchangeTag": "5254028800ebf7364cb269d547828ffca3f7aad71b610af6912807405bc7016b",
+      "sourceTime": "2026-10-29T15:11:20.5405911Z",
+      "receiverTime": "2026-10-29T15:11:20.3919693Z",
+      "sourceOutcome": "ok",
+      "receiverOutcome": "ok",
+      "preparationDecision": 3,
+      "preparedAgeMs": null,
+      "requestToGrantMs": 310.304,
+      "captureActivationMs": 18.439,
+      "receiverConnectMs": 286.581,
+      "receiverReadyWaitMs": 284.06,
+      "serviceBootstrapValidationMs": 158.13,
+      "nativePairReadinessMs": 95.976,
+      "receiverFirstDispatchMs": 3.184,
+      "receiverWorstDispatchMs": 4.4,
+      "receiverWorstResponseMs": 3.208,
+      "requestWrittenToGrantReadMs": 309.747,
+      "receiverReadToGrantWriteMs": 292.551,
+      "remainderAfterReceiverMs": 17.196000000000026
+    },
+    {
+      "attempt": 4,
+      "exchangeTag": "66e0ea2d245607629f1e23b480bdb446acb2b0139503acc8c3b97dbe6f7e2053",
+      "sourceTime": "2026-10-29T15:11:25.6400138Z",
+      "receiverTime": "2026-10-29T15:11:25.4827274Z",
+      "sourceOutcome": "ok",
+      "receiverOutcome": "ok",
+      "preparationDecision": 3,
+      "preparedAgeMs": null,
+      "requestToGrantMs": 328.089,
+      "captureActivationMs": 19.607,
+      "receiverConnectMs": 304.747,
+      "receiverReadyWaitMs": 302.942,
+      "serviceBootstrapValidationMs": 153.089,
+      "nativePairReadinessMs": 106.357,
+      "receiverFirstDispatchMs": 1.826,
+      "receiverWorstDispatchMs": 10.02,
+      "receiverWorstResponseMs": 9.223,
+      "requestWrittenToGrantReadMs": 327.543,
+      "receiverReadToGrantWriteMs": 310.81,
+      "remainderAfterReceiverMs": 16.733000000000004
+    },
+    {
+      "attempt": 5,
+      "exchangeTag": "aceddef1ee20ee40027c90db902e636d4aeb728e961d8bc8a219fea80a5607c0",
+      "sourceTime": "2026-10-29T15:11:30.6928165Z",
+      "receiverTime": "2026-10-29T15:11:30.543331Z",
+      "sourceOutcome": "ok",
+      "receiverOutcome": "ok",
+      "preparationDecision": 1,
+      "preparedAgeMs": 764.172,
+      "requestToGrantMs": 43.443,
+      "captureActivationMs": 18.839,
+      "receiverConnectMs": 26.584,
+      "receiverReadyWaitMs": 23.528,
+      "serviceBootstrapValidationMs": 0.658,
+      "nativePairReadinessMs": 10.259,
+      "receiverFirstDispatchMs": 1.73,
+      "receiverWorstDispatchMs": 4.706,
+      "receiverWorstResponseMs": 4.019,
+      "requestWrittenToGrantReadMs": 42.89,
+      "receiverReadToGrantWriteMs": 33.493,
+      "remainderAfterReceiverMs": 9.396999999999998
+    },
+    {
+      "attempt": 6,
+      "exchangeTag": "2e1742eece88467aebe9545c91b2d7ecd921eddcbbd86430dd1b90dc167f71df",
+      "sourceTime": "2026-10-29T15:11:34.8925082Z",
+      "receiverTime": "2026-10-29T15:11:34.7431824Z",
+      "sourceOutcome": "ok",
+      "receiverOutcome": "ok",
+      "preparationDecision": 3,
+      "preparedAgeMs": null,
+      "requestToGrantMs": 293.463,
+      "captureActivationMs": 14.795,
+      "receiverConnectMs": 276.541,
+      "receiverReadyWaitMs": 274.706,
+      "serviceBootstrapValidationMs": 136.15,
+      "nativePairReadinessMs": 108.407,
+      "receiverFirstDispatchMs": 2.359,
+      "receiverWorstDispatchMs": 2.987,
+      "receiverWorstResponseMs": 2.448,
+      "requestWrittenToGrantReadMs": 293.463,
+      "receiverReadToGrantWriteMs": 283.028,
+      "remainderAfterReceiverMs": 10.435000000000002
+    },
+    {
+      "attempt": 7,
+      "exchangeTag": "1616c6473f0a939933d207c57818e789506b15a868a1e99f4b7289ae20010751",
+      "sourceTime": "2026-10-29T15:11:36.4521355Z",
+      "receiverTime": "2026-10-29T15:11:36.3053091Z",
+      "sourceOutcome": "ok",
+      "receiverOutcome": "ok",
+      "preparationDecision": 1,
+      "preparedAgeMs": 2559.589,
+      "requestToGrantMs": 38.685,
+      "captureActivationMs": 15.302,
+      "receiverConnectMs": 24.426,
+      "receiverReadyWaitMs": 22.66,
+      "serviceBootstrapValidationMs": 0.672,
+      "nativePairReadinessMs": 10.274,
+      "receiverFirstDispatchMs": 2.395,
+      "receiverWorstDispatchMs": 3.07,
+      "receiverWorstResponseMs": 3.07,
+      "requestWrittenToGrantReadMs": 38.685,
+      "receiverReadToGrantWriteMs": 30.353,
+      "remainderAfterReceiverMs": 8.332
+    },
+    {
+      "attempt": 8,
+      "exchangeTag": "dee037f58ef6b66f801b84c547552af9f8e9710314183393e52224733494b144",
+      "sourceTime": "2026-10-29T15:11:37.2815734Z",
+      "receiverTime": "2026-10-29T15:11:37.1363252Z",
+      "sourceOutcome": "ok",
+      "receiverOutcome": "ok",
+      "preparationDecision": 1,
+      "preparedAgeMs": 755.587,
+      "requestToGrantMs": 40.191,
+      "captureActivationMs": 16.47,
+      "receiverConnectMs": 23.264,
+      "receiverReadyWaitMs": 21.501,
+      "serviceBootstrapValidationMs": 0.561,
+      "nativePairReadinessMs": 10.315,
+      "receiverFirstDispatchMs": 3.206,
+      "receiverWorstDispatchMs": 3.074,
+      "receiverWorstResponseMs": 2.454,
+      "requestWrittenToGrantReadMs": 39.634,
+      "receiverReadToGrantWriteMs": 29.875,
+      "remainderAfterReceiverMs": 9.759
+    },
+    {
+      "attempt": 9,
+      "exchangeTag": "a4f1e1ec03af1eb4ff9ed6a1f1ca2f62a35fa5d21a5e1f118ccad72543016087",
+      "sourceTime": "2026-10-29T15:11:38.024303Z",
+      "receiverTime": "2026-10-29T15:11:37.8783791Z",
+      "sourceOutcome": "ok",
+      "receiverOutcome": "ok",
+      "preparationDecision": 1,
+      "preparedAgeMs": 692.122,
+      "requestToGrantMs": 47.099,
+      "captureActivationMs": 17.232,
+      "receiverConnectMs": 30.665,
+      "receiverReadyWaitMs": 28.068,
+      "serviceBootstrapValidationMs": 0,
+      "nativePairReadinessMs": 13.136,
+      "receiverFirstDispatchMs": 1.824,
+      "receiverWorstDispatchMs": 3.084,
+      "receiverWorstResponseMs": 3.084,
+      "requestWrittenToGrantReadMs": 46.549,
+      "receiverReadToGrantWriteMs": 38.67,
+      "remainderAfterReceiverMs": 7.878999999999998
+    },
+    {
+      "attempt": 10,
+      "exchangeTag": "e46e59b92d5ef680e9beccacd9a68f6e086e2c4d9e5328490a069a53e03c186f",
+      "sourceTime": "2026-10-29T15:11:39.202971Z",
+      "receiverTime": "2026-10-29T15:11:39.0526123Z",
+      "sourceOutcome": "ok",
+      "receiverOutcome": "ok",
+      "preparationDecision": 1,
+      "preparedAgeMs": 561.707,
+      "requestToGrantMs": 44.806,
+      "captureActivationMs": 17.088,
+      "receiverConnectMs": 24.166,
+      "receiverReadyWaitMs": 21.824,
+      "serviceBootstrapValidationMs": 0.564,
+      "nativePairReadinessMs": 9.9,
+      "receiverFirstDispatchMs": 1.47,
+      "receiverWorstDispatchMs": 2.467,
+      "receiverWorstResponseMs": 1.8,
+      "requestWrittenToGrantReadMs": 44.261,
+      "receiverReadToGrantWriteMs": 30.466,
+      "remainderAfterReceiverMs": 13.795000000000002
+    },
+    {
+      "attempt": 11,
+      "exchangeTag": "757f9f3565730376be406398d150ca580c26aa99ebc1dcd769ad85286689054d",
+      "sourceTime": "2026-10-29T15:11:40.0717522Z",
+      "receiverTime": "2026-10-29T15:11:39.9229902Z",
+      "sourceOutcome": "ok",
+      "receiverOutcome": "ok",
+      "preparationDecision": 1,
+      "preparedAgeMs": 1020.831,
+      "requestToGrantMs": 44.314,
+      "captureActivationMs": 16.4,
+      "receiverConnectMs": 25.694,
+      "receiverReadyWaitMs": 22.744,
+      "serviceBootstrapValidationMs": 0,
+      "nativePairReadinessMs": 10.225,
+      "receiverFirstDispatchMs": 2.32,
+      "receiverWorstDispatchMs": 11.98,
+      "receiverWorstResponseMs": 11.98,
+      "requestWrittenToGrantReadMs": 43.758,
+      "receiverReadToGrantWriteMs": 33.246,
+      "remainderAfterReceiverMs": 10.512
+    },
+    {
+      "attempt": 12,
+      "exchangeTag": "4a9e4079d2c32b982986fbe29ef801971a024918e7a75938f6fb3a6158cc42fa",
+      "sourceTime": "2026-10-29T15:11:41.1517492Z",
+      "receiverTime": "2026-10-29T15:11:41.0050593Z",
+      "sourceOutcome": "ok",
+      "receiverOutcome": "ok",
+      "preparationDecision": 1,
+      "preparedAgeMs": 987.247,
+      "requestToGrantMs": 41.267,
+      "captureActivationMs": 16.439,
+      "receiverConnectMs": 26.579,
+      "receiverReadyWaitMs": 23.465,
+      "serviceBootstrapValidationMs": 0.561,
+      "nativePairReadinessMs": 10,
+      "receiverFirstDispatchMs": 2.524,
+      "receiverWorstDispatchMs": 3.564,
+      "receiverWorstResponseMs": 3.05,
+      "requestWrittenToGrantReadMs": 41.267,
+      "receiverReadToGrantWriteMs": 33.812,
+      "remainderAfterReceiverMs": 7.455000000000005
+    }
+  ],
+  "preparationGroups": {
+    "reused": {
+      "count": 8,
+      "connect": {
+        "count": 8,
+        "minMs": 23.264,
+        "medianMs": 25.945999999999998,
+        "maxMs": 30.665
+      },
+      "grant": {
+        "count": 8,
+        "minMs": 38.685,
+        "medianMs": 43.8785,
+        "maxMs": 48.671
+      }
+    },
+    "expired": {
+      "count": 4,
+      "connect": {
+        "count": 4,
+        "minMs": 276.541,
+        "medianMs": 287.1735,
+        "maxMs": 304.747
+      },
+      "grant": {
+        "count": 4,
+        "minMs": 293.463,
+        "medianMs": 319.1965,
+        "maxMs": 362.966
+      },
+      "bootstrapValidation": {
+        "count": 4,
+        "minMs": 136.15,
+        "medianMs": 148.73000000000002,
+        "maxMs": 158.13
+      },
+      "nativePairReadiness": {
+        "count": 4,
+        "minMs": 95.976,
+        "medianMs": 106.151,
+        "maxMs": 108.407
+      },
+      "receiverReadToGrantWrite": {
+        "count": 4,
+        "minMs": 283.028,
+        "medianMs": 293.15,
+        "maxMs": 310.81
+      },
+      "remainderAfterReceiver": {
+        "count": 4,
+        "minMs": 10.435000000000002,
+        "medianMs": 16.964500000000015,
+        "maxMs": 69.21699999999998
+      }
+    }
+  },
+  "findings": {
+    "recovery": "No current-build fault, failed session, reconnect or additional connection event after installation cutoff in either agent history. Both services and input health remain READY. No source exit recorded in the collected login runtime.",
+    "latency": "Observed capture activation and worst receiver dispatch are lower than g496. Overall grant median is lower, but maximum is higher. These are small non-controlled samples, not proof of a causal latency reduction.",
+    "remainingBottleneck": "All four expired-candidate entries have 276.541-304.747ms receiver connect; eight reused-candidate entries take 23.264-30.665ms. Receiver request-read-to-grant-write is 283.028-310.810ms for expired entries, so receiver-local processing accounts for most measured grant wait.",
+    "network": "The difference between source request-written-to-grant-read and receiver request-read-to-grant-write contains network transit and source/other scheduling. It is not pure network RTT. No cross-device wall-clock subtraction is used.",
+    "limits": "Handoff profiles cap at 12 per collector. The 12 paired completed entries are measured samples, not proof that the user performed exactly 12 crossings or that future recurrence is impossible. Historical control.previous.jsonl is incomplete; both current agent log sources were complete. Nested service readiness and worker readiness spans must not be added."
+  },
+  "validation": {
+    "docs": "Schema, generation, revision, unique exchange tags, 12/12 matching successful complete profiles, cutoff filtering and measured-bit stage extraction checked.",
+    "smoke": "Live local doctor healthy; paired collected services/input health READY; no test-window failures or reconnections.",
+    "check": "git diff --check passed.",
+    "unitTests": "Skipped: report-only change; runtime code unchanged.",
+    "remoteCI": "Skipped: no push requested.",
+    "physical": "User performed dwell and fast crossings; report uses 12 paired software timings."
+  },
+  "sourceOfTruthChanged": "none",
+  "apiChanges": "none",
+  "dbChanges": "none",
+  "repositoryHygieneChanges": "none",
+  "runnerChanges": "none",
+  "remotePush": "not performed"
+}
