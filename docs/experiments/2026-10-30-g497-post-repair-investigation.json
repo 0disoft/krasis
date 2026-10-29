@@ -1,0 +1,48 @@
+{
+  "schema": "krasis.recovery-investigation/v1",
+  "generation": 497,
+  "collection": "1fcf654b3e3f34e97979310f3e220f3d",
+  "sides": {
+    "A": {
+      "created": "2026-10-29T16:46:49Z",
+      "sha256": "abce935c7bb35cea8b8d67dbf0d440a4c9958822c0bfaf299e61c15b717ee91c",
+      "service": "READY",
+      "startedAt": "2026-10-29T16:46:04.0169799Z",
+      "inputHealth": {
+        "time": "2026-10-29T16:46:34.5203542Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      }
+    },
+    "B": {
+      "created": "2026-10-29T16:46:49Z",
+      "sha256": "62106dde162d5563c3ea02376acbfad0cb13120ba7e4dee9e2101d7280a65f35",
+      "service": "READY",
+      "startedAt": "2026-10-29T15:09:03.4368838Z",
+      "inputHealth": {
+        "time": "2026-10-29T16:46:37.6993705Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      }
+    }
+  },
+  "finding": "A recovered after user-approved Windows service repair. Both protected input states READY and connected g497 before further physical crossing tests.",
+  "reproduced": "A clean joined source read timeout remains a worker-local failure. An independent pending native query or failed channel cleanup promotes recovery, but the original diagnostic selected the earlier source-reader-timeout and obscured source-channel-close.",
+  "fix": "Report the concrete channel-close branch only when a source transport-read diagnostic coexists with ErrRecovery. Keep original error tree, wire layout, failure status, native cleanup fences and authority checks.",
+  "validation": {
+    "regressionAfter": "16 lifecycle cases and 10 operation/native-code wire cases passed",
+    "scope": "Diagnostic attribution only; this does not establish which hidden sibling caused the earlier physical A failure.",
+    "regressionBefore": "8 failing cases: pending query or failed close across all four query lanes",
+    "go": "Full go test ./... passed; deployment runtime overlay tests passed for internal/inputworker and internal/localapi after g498 generation change."
+  },
+  "remaining": "Deploy the diagnostic fix, then collect fresh physical failure evidence before changing cleanup classification or native lifetimes.",
+  "sourceOfTruthChanged": "none",
+  "apiChanges": "none",
+  "dbChanges": "none",
+  "runnerChanges": "none",
+  "remotePush": "not performed"
+}

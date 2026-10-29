@@ -78,7 +78,6 @@ func reportFailureDetails(err error) (byte, uint32) {
 			operation, selected = sourceCommandOperation(command.op), command
 		}
 	}
-	var code byte
 	// Refine only the selected transport container. Searching all siblings here
 	// would let a later failed retirement hide the original command/native cause.
 	switch operation {
@@ -95,6 +94,19 @@ func reportFailureDetails(err error) (byte, uint32) {
 			operation, selected = gate.operation, gate
 		}
 	}
+	// A joined transport read failure does not itself require service repair.
+	// When a separate channel retirement did, expose that exact branch instead
+	// of reporting an ordinary read timeout as the cause of recovery. Concrete
+	// native, command and authority diagnostics retain their existing priority.
+	switch operation {
+	case "source-reader-read", "source-reader-eof", "source-reader-truncated", "source-reader-timeout", "source-reader-closed":
+		if errors.Is(err, ErrRecovery) {
+			if cleanup := sourceChannelFailureDetails(err); cleanup != nil {
+				operation, selected = cleanup.operation, cleanup
+			}
+		}
+	}
+	var code byte
 	for index, name := range reportOperations {
 		if name == operation {
 			code = byte(index)
@@ -112,6 +124,22 @@ func reportFailureDetails(err error) (byte, uint32) {
 		return code, uint32(native)
 	}
 	return code, 0
+}
+
+func sourceChannelFailureDetails(err error) *workerReportFailure {
+	if failure, ok := err.(*workerReportFailure); ok && failure.operation == "source-channel-close" {
+		return failure
+	}
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		for _, cause := range joined.Unwrap() {
+			if failure := sourceChannelFailureDetails(cause); failure != nil {
+				return failure
+			}
+		}
+	} else if wrapped, ok := err.(interface{ Unwrap() error }); ok {
+		return sourceChannelFailureDetails(wrapped.Unwrap())
+	}
+	return nil
 }
 
 func reportFailure(status, operation byte, native uint32) error {
