@@ -20,6 +20,10 @@ var ErrOlder = errors.New("use the latest application setup")
 
 const Schema = "krasis.app-install/v1"
 
+// 128 fixed 32-hex folder IDs plus metadata fit the unchanged 8KiB receipt
+// budget. Retain rollback/uninstall ownership without deleting older images.
+const maxInstallFolders = 128
+
 var files = []string{"BUILD.json", "SHA256SUMS.txt", "START-HERE.md", "THIRD-PARTY-NOTICES.txt", "krasis.exe", "krasis-agent.exe", "krasis-cli.exe", "krasis-install.exe"}
 
 type Receipt struct {
@@ -57,7 +61,7 @@ func DecodeReceipt(data []byte) (Receipt, error) {
 	var r Receipt
 	d := json.NewDecoder(bytes.NewReader(data))
 	d.DisallowUnknownFields()
-	if len(data) > 8192 || d.Decode(&r) != nil || d.Decode(new(any)) != io.EOF || r.Schema != Schema || r.Generation < 234 || r.Generation > 1000000 || len(r.Revision) != 40 || len(r.Folders) < 1 || len(r.Folders) > 64 {
+	if len(data) > 8192 || d.Decode(&r) != nil || d.Decode(new(any)) != io.EOF || r.Schema != Schema || r.Generation < 234 || r.Generation > 1000000 || len(r.Revision) != 40 || len(r.Folders) < 1 || len(r.Folders) > maxInstallFolders {
 		return Receipt{}, ErrInvalid
 	}
 	if _, err := hex.DecodeString(r.Revision); err != nil {

@@ -1,0 +1,16 @@
+{
+  "schema": "krasis.install-fix/v1",
+  "generation": 501,
+  "runtimeChanges": "Includes g500 fresh native input proof overlap and transaction-pinned unbound launch ownership; see 2026-10-30-g500-preparation-input-fix.json",
+  "observedFailure": "g500 setup rejected A at receipt_preflight before shutdown. A installation receipt listed exactly 64 existing generation folders; g499 remained healthy and CONNECTED.",
+  "cause": "Merging a new generation with the 64-folder installation ownership receipt exceeded the shared fixed history limit. Actual old directories were present, so removing missing entries could not solve this failure.",
+  "change": "Use one maxInstallFolders constant set to 128 across receipt decode, merged-plan validation and repair-folder reservation. Keep the existing 8192-byte receipt read/decode ceiling, path/hex/uniqueness checks and pre-shutdown rejection at the new bound. No old directory or ownership record is removed.",
+  "tests": "65th generation preserves all 64 prior rollback/uninstall ownership entries without publishing during preflight. Full 128-folder receipt fits the unchanged byte budget; 129 entries rejected. Existing limit and repair preflight tests use the shared bound.",
+  "remainingRisk": "This provides bounded additional upgrade capacity, not automatic old-image retention/pruning. At 128 folders installation will again reject safely before shutdown; reviewed cleanup of inactive owned images remains separate work.",
+  "validation": "appinstall, krasis-setup and localapi tests passed; g501 package and paired installation pending",
+  "sourceOfTruthChanged": "none",
+  "apiChanges": "Same receipt schema and byte cap; accepted folder count grows from 64 to 128",
+  "dbChanges": "none",
+  "runnerChanges": "none",
+  "remotePush": "not performed"
+}

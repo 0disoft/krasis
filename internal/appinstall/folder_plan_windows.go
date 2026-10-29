@@ -60,7 +60,7 @@ func selectInstallFolder(next Receipt, ops installFolderOps) (Receipt, error) {
 	}
 	// Reserve the additional repair entry before creating a directory or
 	// asking the running product to stop. Preserve every existing entry.
-	if len(next.Folders) >= 64 {
+	if len(next.Folders) >= maxInstallFolders {
 		return Receipt{}, ErrInvalid
 	}
 	id, err := ops.newID()

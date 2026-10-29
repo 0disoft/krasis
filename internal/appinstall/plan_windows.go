@@ -44,7 +44,7 @@ func prepareInstallPlan(ctx context.Context, dir *securefs.Directory, self strin
 		return installPlan{}, err
 	}
 	// The package and old receipt own identity validation; bound merged history.
-	if next.Schema != Schema || len(next.Folders) > 64 {
+	if next.Schema != Schema || len(next.Folders) > maxInstallFolders {
 		return installPlan{}, ErrInvalid
 	}
 	if inspect != nil {

@@ -62,7 +62,7 @@ func TestRepairPreflightAtHistoryLimitLeavesProductAndFilesUntouched(t *testing.
 	}
 	defer dir.Close()
 	next := Receipt{Schema: Schema, Generation: 252, Revision: strings.Repeat("c", 40)}
-	for i := range 64 {
+	for i := range maxInstallFolders {
 		next.Folders = append(next.Folders, fmt.Sprintf("%032x", i))
 	}
 	data, _ := json.Marshal(next)

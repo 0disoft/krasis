@@ -42,7 +42,7 @@ func TestInstallPreflightDoesNotCloseProductOnBadReceiptSourceOrCancellation(t *
 			case "folder_limit":
 				old := next
 				old.Folders = nil
-				for i := range 64 {
+				for i := range maxInstallFolders {
 					old.Folders = append(old.Folders, fmt.Sprintf("%032x", i))
 				}
 				previous, _ = json.Marshal(old)
@@ -117,5 +117,34 @@ func TestInstallUsesPreflightSourceSnapshotAndReleasesCancelledShutdownLease(t *
 		}
 		cancel()
 		dir.Close()
+	}
+}
+
+func TestInstallUpgradesAfterSixtyFourGenerationsWithoutDroppingRollbackOwnership(t *testing.T) {
+	dir, _, err := directory(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dir.Close()
+	old := Receipt{Schema: Schema, Generation: 499, Revision: strings.Repeat("a", 40)}
+	for i := range 64 {
+		old.Folders = append(old.Folders, fmt.Sprintf("%032x", i))
+	}
+	body, _ := json.Marshal(old)
+	if err := replace(dir, "installation.json", body); err != nil {
+		t.Fatal(err)
+	}
+	source := filepath.Join(t.TempDir(), "setup.exe")
+	if err := os.WriteFile(source, []byte("verified next setup"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	next := Receipt{Schema: Schema, Generation: 501, Revision: strings.Repeat("b", 40), Folders: []string{strings.Repeat("f", 32)}}
+	plan, err := prepareInstallPlan(context.Background(), dir, source, next, nil, nil, nil)
+	if err != nil || len(plan.receipt.Folders) != 65 || plan.receipt.Folders[1] != old.Folders[0] || plan.receipt.Folders[64] != old.Folders[63] {
+		t.Fatal("65th upgrade blocked or discarded previous installed folders", err)
+	}
+	data, err := read(dir, "installation.json", 8192)
+	if err != nil || string(data) != string(body) {
+		t.Fatal("preflight published or removed history before installation", err)
 	}
 }
