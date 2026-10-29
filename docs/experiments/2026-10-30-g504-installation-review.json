@@ -1,0 +1,181 @@
+{
+  "schema": "krasis.paired-installation/v1",
+  "generation": 504,
+  "revision": "99395b165d7ad46c355bf449c7ef794903cbc0b1",
+  "collection": "0b55e321022815cd31603ce4ccf0bd11",
+  "sides": {
+    "A": {
+      "created": "2026-10-29T20:29:00Z",
+      "sha256": "a8394ae7fab093f0c583807c231b22f8855fde6138381f1eb33163ab30ed4ac0",
+      "installation": {
+        "time": "2026-10-29T20:27:51.5406193Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-29T20:27:52.177493Z",
+        "time": "2026-10-29T20:27:52.2026811Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      },
+      "inputHealth": {
+        "time": "2026-10-29T20:28:54.0616044Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "matchingBuildUILaunch": [
+        {
+          "time": "2026-10-29T20:27:53.2385942Z",
+          "code": "launch_record_ready"
+        }
+      ],
+      "connection": [
+        {
+          "time": "2026-10-29T20:28:32.7596852Z",
+          "code": "CONNECTED"
+        }
+      ],
+      "currentBuildFaults": [],
+      "incompleteLogSources": [
+        "control.previous.jsonl"
+      ]
+    },
+    "B": {
+      "created": "2026-10-29T20:29:01Z",
+      "sha256": "527e0aa1c9211b247243b7d6a5f79f56b0e4128cd04518552d3d719e4c486b16",
+      "installation": {
+        "time": "2026-10-29T20:28:24.1609479Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-29T20:28:26.3497563Z",
+        "time": "2026-10-29T20:28:26.3963707Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      },
+      "inputHealth": {
+        "time": "2026-10-29T20:28:58.9743635Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "matchingBuildUILaunch": [
+        {
+          "time": "2026-10-29T20:28:28.8092208Z",
+          "code": "launch_record_ready"
+        }
+      ],
+      "connection": [
+        {
+          "time": "2026-10-29T20:28:32.2986388Z",
+          "code": "CONNECTED"
+        }
+      ],
+      "currentBuildFaults": [],
+      "incompleteLogSources": [
+        "control.previous.jsonl"
+      ]
+    }
+  },
+  "setupSha256": "4be408944f5ed61048179f31551d47e598a51329394e2f9cc2e8d5bb90870a94",
+  "transfer": {
+    "schemaVersion": "krasis.cli.update-wait/v1",
+    "peerAlias": "B",
+    "id": "467a35c0de427ecbfbc0898f054a007f",
+    "code": "updated",
+    "transferState": "UPDATED",
+    "generation": 504,
+    "revision": "99395b165d7ad46c355bf449c7ef794903cbc0b1",
+    "bytes": 28877678,
+    "total": 28877678
+  },
+  "changes": [
+    "Retain independent full-image SHA256 for every installation load. On Windows amd64 without AVX, use a fresh fixed OS CNG SHA256 object instead of Go generic compression. Other CPUs/platforms retain Go SHA256. Every create/write/finish/destroy failure rejects verification; objects are destroyed on digest/read failure.",
+    "Separate whole-image read duration from digest lifecycle/write duration in fixed KRD9 local diagnostics. Includes journal and both native children and selected backend. Does not grant readiness, replace a fresh heartbeat or change any input authority."
+  ],
+  "investigation": {
+    "readOnlyInstalledImageBytes": 9185792,
+    "host": "A, AMD Ryzen 5 7430U",
+    "fullImageProbes": "5 bounded read-only installed-image probes: memory SHA256 10.051-13.185ms, file hash+ACL 14.5-64.846ms; directory opens 0.509-1.724ms, metadata open/decode 0-0.568ms. Wall durations include scheduling.",
+    "discarded": "256KiB/1MiB/4MiB reads and sequential-scan combinations produced no clear broad improvement; retained the original 256KiB read bound.",
+    "benchmarks": {
+      "syntheticBytes": 9437184,
+      "normal": {
+        "go": {
+          "iterations": 3,
+          "meanMs": 10.500967,
+          "MBps": 898.7
+        },
+        "windows": {
+          "iterations": 3,
+          "meanMs": 10.1777,
+          "MBps": 927.24
+        }
+      },
+      "purego": {
+        "go": {
+          "iterations": 3,
+          "meanMs": 128.014867,
+          "MBps": 73.72
+        },
+        "windows": {
+          "iterations": 3,
+          "meanMs": 10.9358,
+          "MBps": 862.96
+        }
+      },
+      "scope": "Three iterations per backend on A. purego forces software Go SHA256 while Windows retains OS feature selection. Not a B benchmark or a controlled simulation of its CPU. GODEBUG runs did not reproduce a slower Go hash here and are not used as fallback evidence."
+    },
+    "targetCPU": "Non-AVX amd64 uses generic Go SHA256 in the selected runtime. Whether B uses the alternative path and how much it helps remain pending physical profiles."
+  },
+  "validation": {
+    "go": "Full go test ./... -timeout=120s passed with CGO_ENABLED=0 and the deployment offlineGo runtime overlay.",
+    "hash": "CNG agrees with Go across block/chunk boundaries and 9MiB images; corruption, truncation, growth and reader errors rejected. Provider create/write/finish/destroy failure rejection and exactly-once close tested.",
+    "framing": "KRD9 journal/input/release roundtrip, truncated payloads, reserved bytes, invalid numeric diagnostics, following-frame alignment and old native startup/heartbeat tests passed.",
+    "frontend": "104/104 tests and native production build passed.",
+    "package": "Workspace archive, icon, native installer and offline application setup verification passed.",
+    "installation": "Both installed g504, matching UI/agent build, protected input READY, authenticated CONNECTED and exact peer UPDATED receipt.",
+    "check": "git diff --check passed",
+    "race": "Skipped: CGO disabled in deployment environment.",
+    "remoteCI": "Skipped: no source push requested."
+  },
+  "limitations": [
+    "Installation/startup snapshot only; g504 physical latency effect and recurrence require the next crossing test.",
+    "Both control.previous.jsonl sources are incomplete; no fault means none observed in this current-build collection.",
+    "Local software-path benchmark does not prove the B CPU cause or improvement; split hash read/compute profiles are required."
+  ],
+  "sourceOfTruthChanged": "docs/architecture/02-runtime-flow.md",
+  "apiChanges": "Fixed local KRD9 diagnostic extension; no network protocol/public API changes.",
+  "dbChanges": "none",
+  "repositoryHygieneChanges": "none",
+  "runnerChanges": "none",
+  "remotePush": "not performed",
+  "references": [
+    "Go 1.27.3 src/crypto/internal/fips140/sha256/sha256block_amd64.go",
+    "https://learn.microsoft.com/en-us/windows/win32/api/bcrypt/nf-bcrypt-bcryptcreatehash"
+  ]
+}
