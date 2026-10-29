@@ -17,6 +17,7 @@ type serviceInputPreparation struct {
 	warming *cursorInputPreparation
 	last    time.Time
 	failure error // Uncertain retirement is terminal, including across endpoints.
+	reentry *reentryPreparation
 }
 
 func (p *serviceInputPreparation) reenter(ctx context.Context, lease Lease, result error, prepare func(context.Context) (*preparedConsole, error)) error {
@@ -26,10 +27,13 @@ func (p *serviceInputPreparation) reenter(ctx context.Context, lease Lease, resu
 	// A long active lease can outlive the one speculative candidate. Harvest
 	// only completed work, then replace an expired candidate through start's
 	// existing retirement fence. Never restart periodically while input runs.
-	if err := p.collectReady(); err != nil {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if err := p.collectReadyLocked(); err != nil {
 		return err
 	}
-	p.start(ctx, prepare)
+	p.startLocked(ctx, prepare)
+	p.armReentryLocked(ctx, lease.ExpiresAt, prepare)
 	return nil
 }
 
@@ -75,6 +79,7 @@ func (p *serviceInputPreparation) hint(ctx context.Context, last, now time.Time,
 	}
 	retiring := p.next
 	p.next = nil
+	p.cancelReentryLocked() // Fresh physical demand supersedes the delayed opportunity.
 	return p.startLocked(ctx, func(run context.Context) (*preparedConsole, error) {
 		if err := retiring.close(); err != nil {
 			return nil, errors.Join(ErrRecovery, err)
@@ -173,6 +178,7 @@ func (p *serviceInputPreparation) admitLocked(channel *Channel) error {
 func (p *serviceInputPreparation) close() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	p.cancelReentryLocked()
 	if p.warming != nil {
 		p.warming.cancel()
 	}
@@ -186,6 +192,9 @@ func (p *serviceInputPreparation) close() error {
 func (p *serviceInputPreparation) take(channel *Channel, lease Lease) (*preparedConsole, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	if !lease.Presentation {
+		p.cancelReentryLocked()
+	}
 	// A demand can arrive during login admission. Join it and transfer under
 	// one lock; a nil candidate must not bypass its old owner's retirement.
 	if err := p.admitLocked(channel); err != nil {
