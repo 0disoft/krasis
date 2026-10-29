@@ -1,0 +1,59 @@
+{
+  "schema": "krasis.preparation-fix/v1",
+  "generation": 500,
+  "baseline": "2026-10-30-g499-physical-crossing-review.json",
+  "observations": {
+    "expiredReceiverReadToGrantWrittenMs": [262.599, 267.532],
+    "nativePairRemainingReadinessMs": [104.822, 106.567],
+    "coldServiceBootstrapValidationMs": [133.702, 137.597],
+    "worstReceiverResponseMs": 110.222,
+    "worstNativeServiceScopeAndContainingJournalIPCMillis": [10, 24, 74]
+  },
+  "attribution": {
+    "coldValidation": "ServiceBootstrapValidation starts before candidate claim/retirement/cold preparation. The 133-138ms values contain reconstruction, not just authentication RPC. ServiceLaunch and ServiceChildConnect retain their existing subspans.",
+    "input": "The 10ms service query and 24ms agent/desktop scope are nested within the 74ms journal-to-native IPC span, which is inside the 110.222ms receiver response. Do not sum the three workerMillis entries or call 74ms SendInput time.",
+    "nativeReadiness": "The about-100ms native pair span combines remaining construction, executable loading, independent authentication and startup heartbeat. g499 does not isolate those contributors. This change does not claim a measured 100ms loading reduction."
+  },
+  "changes": {
+    "unboundLaunch": "Pin the fully verified SYSTEM service process and protected image for one construction transaction. Replace six repeated full self-inspection callbacks with exact process liveness and matching live installation checks. Keep the initial full inspection, actual suspended-child inspection, session gates and final independent service/agent/lease bootstrap.",
+    "nativeInput": "Overlap exactly one fresh service query with the independent agent/desktop scope. No native operation runs before both succeed. If service is pending when the scope callback runs, discard that check, join the query and reenter the scope for fresh parent/lease/cancellation/desktop checks. An input callback is never retried.",
+    "queryOwnership": "Join the exact query even after desktop failure. Contain query goroutine panics with sanitized ErrAuthority/ErrCallbackPanic before closing its completion signal. Close cannot release proof handles ahead of the query.",
+    "timing": "Service and scope proof durations overlap. A late-service path may perform two scope checks; the scope field includes both while the journal apply field remains the containing IPC elapsed time."
+  },
+  "quantifiedValidation": {
+    "model": "Production native executor, deterministic synctest; not a physical laptop result.",
+    "serviceMs": 10,
+    "scopeMs": 24,
+    "nativeWorkMs": 3,
+    "g499Ms": 37,
+    "g500Ms": 27,
+    "reductionMs": 10,
+    "reductionPercent": 27.027,
+    "nativeFastPathBenchmark": "AMD Ryzen 5 7430U, Windows amd64, no-op proofs/native work, 200ms run: 3392ns/op, 274B/op, 6allocs/op. Includes parallel query dispatch/reentry overhead; not a real SCM/WTS/SendInput latency measurement.",
+    "lateService": "12ms service with 8ms scopes: 20ms containing IPC, native proof fields 12/16ms. No stale desktop reuse, service result reuse or duplicate input.",
+    "regression": "New overlap test failed against g499 production executor at 37ms, passed after change at 27ms. Cancellation, lease expiry, rejected agent/service/parent, joined late failures and sanitized panic tested."
+  },
+  "unchanged": [
+    "Fresh native authority before each injection; no proof cache or outcome-unknown input retry",
+    "Fixed 3s unbound candidate expiry, cooldowns and one speculative candidate",
+    "Three-process prepared job and confirmed native retirement before replacement",
+    "Four total native query slots, three restricted proof slots and existing query/idle/lease deadlines",
+    "Wire formats, peer authorization and release-only recovery"
+  ],
+  "validation": {
+    "targeted": "Passed native execution, delivery certainty, reply timing and unbound launch pin tests",
+    "fullGo": "Full go test ./... passed using the repository deployment runtime overlay",
+    "frontendAndPackage": "Pending generation build",
+    "physical": "Pending paired g500 installation and user crossings",
+    "race": "Not run: environment has CGO disabled",
+    "remoteCI": "Not run: push was not requested"
+  },
+  "remainingRisk": "A slow service query can require a second fresh scope check and performs one additional read-only scope transaction. Parallel dispatch allocates a goroutine/channel per command. Native loading, unsampled actual SendInput time and the separate TCP retransmission tail remain unresolved until paired physical measurements distinguish them.",
+  "rollback": "Keep g499 bundles/setup. On regression preserve paired diagnostics, then restore with the verified installer and normal Windows administrator confirmation when required. Never clear cleanup uncertainty or delete active cache/generation directories.",
+  "sourceOfTruthChanged": "docs/architecture/02-runtime-flow.md",
+  "apiChanges": "none",
+  "dbChanges": "none",
+  "repositoryHygieneChanges": "none",
+  "runnerChanges": "none",
+  "remotePush": "not performed"
+}

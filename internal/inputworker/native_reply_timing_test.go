@@ -80,14 +80,17 @@ func TestNativeReplyTimingMeasuresSameCommandWithoutReplayingOrCaching(t *testin
 					t.Fatal("native query skipped or input replayed", mode, checks, len(transport.commands))
 				}
 				if mode == "single" {
-					if parent.measured != 7 || parent.millis[0] != 12 || parent.millis[1] != 8 || parent.millis[2] != 20 || desktopChecks != 1 {
+					// The first 8ms scope overlaps the 12ms service check, then
+					// a second fresh 8ms scope precedes input. Nested spans are
+					// 12/16ms while the containing IPC remains 20ms, not 28ms.
+					if parent.measured != 7 || parent.millis[0] != 12 || parent.millis[1] != 16 || parent.millis[2] != 20 || desktopChecks != 2 {
 						t.Fatal("native stages lost or added to IPC", parent, desktopChecks)
 					}
 				} else if parent.measured != 4 || parent.buckets[0] != 0 || parent.buckets[1] != 0 {
 					t.Fatal("stale/composite/failed reply published native timing", mode, parent)
 				}
-				if mode == "revoked" && desktopChecks != 0 {
-					t.Fatal("revoked service entered desktop")
+				if mode == "revoked" && desktopChecks != 1 {
+					t.Fatal("rejected service retried a desktop or attempted input")
 				}
 			})
 		})

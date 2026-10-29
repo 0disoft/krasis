@@ -315,3 +315,22 @@ g495 shares the genuine installed SYSTEM service's unbound launch path between s
 The existing ServiceBootstrapValidation span starts before candidate retirement and cold construction. It includes that work and must not be described as pure authentication or SCM/WTS time. Its nested ServiceLaunch/ServiceChildConnect spans must not be added to it.
 
 Installed ordinary native input also publishes fresh service-query and desktop-scope timing in the existing 24-byte ACK fields. The journal copies those nested stages only if exactly one matching successful native input exchange occurred during the current command. Its apply stage still measures the containing IPC completion, so these stages are not additive. Idle/composite/failed/unmatched exchanges and contended diagnostic snapshot gates leave native stages unobserved. No input value, new frame, probe, query, authority cache or retry is added; native service, agent, parent, desktop and lease checks retain their order and failure behavior. This lets the same worst input ACK distinguish a slow service query from desktop/agent preparation even when detailed SendInput sampling did not select that input.
+
+g500 overlaps each native command's fresh service query with its independent
+agent/desktop check. Input waits for both. If the service query is unfinished at
+the desktop callback, that callback performs no input; after joining the query,
+the worker reenters the scope for fresh agent/desktop validation. Parent, lease
+and cancellation checks run again there. A desktop failure still joins the exact
+service query before proof handles can close. The serial dispatcher owns at most
+one such query; no proof is reused across commands and input is never replayed.
+Service and scope measurements now overlap; the journal apply field remains the
+containing IPC span and must not be added to those nested native measurements.
+
+Unbound console preparation pins the verified installed SYSTEM service's exact
+process and protected image for one launch transaction. Its six creation gates
+check that live process and the still-open matching installation instead of
+repeating full self-identity inspection at every gate. The initial full service
+inspection, actual suspended-child inspection, active-console checks, exact job
+ownership, final agent/lease bootstrap and independent native authentication
+remain mandatory. Capture/presentation launch policy and the fixed 3s candidate
+expiry are unchanged; a failed pin close rejects and retires the owned candidate.

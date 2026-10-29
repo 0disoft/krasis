@@ -7,6 +7,8 @@ import (
 	"testing"
 	"testing/synctest"
 	"time"
+
+	"github.com/0disoft/krasis/internal/inputdesktop"
 )
 
 func TestNativeExecutionUsesOneFreshDesktopAgentCheck(t *testing.T) {
@@ -103,6 +105,28 @@ func TestNativeExecutionJoinsFailedDesktopAndLateServiceBeforeReturning(t *testi
 			t.Fatal("authority handles could close before the late query returned", err, time.Since(started))
 		}
 	})
+}
+
+func TestNativeExecutionContainsServicePanicWithoutAdmittingInput(t *testing.T) {
+	execute := nativeInputExecutor(func(_ context.Context, work func() error) error { return work() },
+		func() error { panic("private native data must not escape") }, func() bool { return true }, time.Now().Add(time.Second), false)
+	err := execute(context.Background(), func() error { t.Fatal("panicking proof admitted input"); return nil })
+	if !errors.Is(err, ErrAuthority) || !errors.Is(err, inputdesktop.ErrCallbackPanic) {
+		t.Fatal("native proof panic lost the desktop cleanup fence", err)
+	}
+}
+
+func BenchmarkNativeExecutionFreshProofs(b *testing.B) {
+	execute := nativeInputExecutor(func(_ context.Context, work func() error) error { return work() },
+		func() error { return nil }, func() bool { return true }, time.Now().Add(time.Hour), false)
+	ctx := context.Background()
+	work := func() error { return nil }
+	b.ReportAllocs()
+	for b.Loop() {
+		if err := execute(ctx, work); err != nil {
+			b.Fatal(err)
+		}
+	}
 }
 
 func TestNativeExecutionRechecksExpiryAndCancellationAfterSlowProof(t *testing.T) {

@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"time"
+
+	"github.com/0disoft/krasis/internal/inputdesktop"
 )
 
 // desktop must be the native child's authenticated Scope.Do. Its binding
@@ -50,10 +52,17 @@ func overlapNativeProof(ctx context.Context, service func() error, desktop execu
 	var serviceErr error
 	var serviceElapsed time.Duration
 	go func() {
-		defer close(done)
 		started := time.Now()
+		defer func() {
+			// This query used to run inside the desktop callback's panic fence.
+			// Keep that fail-closed behavior when moving it to another goroutine.
+			if recover() != nil {
+				serviceErr = errors.Join(ErrAuthority, inputdesktop.ErrCallbackPanic)
+			}
+			serviceElapsed = time.Since(started)
+			close(done)
+		}()
 		serviceErr = service()
-		serviceElapsed = time.Since(started)
 	}()
 	var scopeElapsed, applied time.Duration
 	defer func() {

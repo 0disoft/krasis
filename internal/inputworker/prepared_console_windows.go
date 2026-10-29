@@ -62,18 +62,26 @@ func prepareServiceConsole(ctx context.Context, installation *Installation, dige
 // is owned by the genuine installed SYSTEM service, not by an agent lease.
 // Agent/session authority is freshly checked before bootstrap transfers input
 // handles; no authority result from this launch can be reused there.
-func prepareUnboundServiceConsole(ctx context.Context, installation *Installation, digest [sha256.Size]byte) (*preparedConsole, error) {
+func prepareUnboundServiceConsole(ctx context.Context, installation *Installation, digest [sha256.Size]byte) (prepared *preparedConsole, result error) {
 	if ctx == nil || ctx.Err() != nil || installation == nil {
 		return nil, ErrAuthority
 	}
 	_, service, err := installation.digests()
-	if err != nil || service != digest || !fixedInstalledInputProcess(service, false, installation) {
+	if err != nil || service != digest {
 		return nil, ErrAuthority
 	}
+	owner, err := pinServiceLaunchOwner(installation, digest)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := owner.Close(); err != nil {
+			result = errors.Join(result, ErrAuthority, err, prepared.close())
+			prepared = nil
+		}
+	}()
 	return prepareConsoleMode(ctx, true, func(prepare func(windows.Handle, uint32) error) (*ConsoleWorker, error) {
-		return launchManagedConsoleMode(ctx, digest, prepare, installation, preparedInputConsole, func() bool {
-			return fixedInstalledInputProcess(digest, false, installation)
-		})
+		return launchManagedConsoleMode(ctx, digest, prepare, installation, preparedInputConsole, owner.check)
 	})
 }
 
