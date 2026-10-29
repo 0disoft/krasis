@@ -1,0 +1,175 @@
+{
+  "schema": "krasis.paired-installation/v1",
+  "generation": 494,
+  "revision": "31e3a0f40823a74a73fa07dbfe4a05dd7f7375ba",
+  "collection": "ab80c87a9aedb58fb8eae89eecd97ab1",
+  "sides": {
+    "A": {
+      "created": "2026-10-29T13:19:46Z",
+      "sha256": "95524fe83252a8ea6c40aa0e9b62c70f37de04041ae044d8c7870b7026df0554",
+      "service": "READY",
+      "inputHealth": {
+        "time": "2026-10-29T13:19:16.9580945Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "installation": {
+        "time": "2026-10-29T13:17:12.7900917Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "uiLaunch": {
+        "time": "2026-10-29T13:17:15.0237899Z",
+        "code": "launch_record_ready"
+      },
+      "lastConnection": {
+        "time": "2026-10-29T13:19:29.0494644Z",
+        "code": "CONNECTED"
+      },
+      "currentBuildFaults": [],
+      "startupConnectionEvents": [],
+      "postConnectionFailures": [],
+      "incompleteLogSources": [
+        "control.previous.jsonl"
+      ]
+    },
+    "B": {
+      "created": "2026-10-29T13:19:48Z",
+      "sha256": "f237d32ff25557cacfa290a6ed6ed4e37068c1359f6d3391c70fbdf943839931",
+      "service": "READY",
+      "inputHealth": {
+        "time": "2026-10-29T13:19:34.6961033Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "installation": {
+        "time": "2026-10-29T13:18:27.7130458Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "uiLaunch": {
+        "time": "2026-10-29T13:18:33.2771417Z",
+        "code": "launch_record_ready"
+      },
+      "lastConnection": {
+        "time": "2026-10-29T13:19:29.0161656Z",
+        "code": "CONNECTED"
+      },
+      "currentBuildFaults": [],
+      "startupConnectionEvents": [
+        {
+          "time": "2026-10-29T13:18:43.8963107Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-10-29T13:18:43.8963107Z",
+          "code": "RECONNECTING"
+        },
+        {
+          "time": "2026-10-29T13:18:49.1979908Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-10-29T13:18:54.75278Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-10-29T13:19:02.3735536Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-10-29T13:19:09.4271351Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-10-29T13:19:19.900137Z",
+          "code": "reconnect_acquire_network_timeout"
+        }
+      ],
+      "postConnectionFailures": [],
+      "incompleteLogSources": [
+        "control.previous.jsonl"
+      ]
+    }
+  },
+  "setupSha256": "57f89bba48eb46b38c228f3b00729f3e2453dd1dbd8bb20b44cdca9c478b9d28",
+  "transfer": {
+    "schemaVersion": "krasis.cli.update-wait/v1",
+    "peerAlias": "B",
+    "id": "5b41de523ebf97bcf0c5f9d54bbb5643",
+    "code": "updated",
+    "transferState": "UPDATED",
+    "generation": 494,
+    "revision": "31e3a0f40823a74a73fa07dbfe4a05dd7f7375ba",
+    "bytes": 28749478,
+    "total": 28749478
+  },
+  "peerUI": {
+    "schemaVersion": "krasis.cli.app-open/v1",
+    "code": "window_ready",
+    "peerAlias": "B",
+    "id": "ec701160679a128aa80e41169f9173aa"
+  },
+  "peerRuntime": {
+    "schemaVersion": "krasis.cli.update-status/v1",
+    "peerAlias": "B",
+    "localGeneration": 494,
+    "localBuild": "31e3a0f40823a74a73fa07dbfe4a05dd7f7375ba",
+    "peerState": "ONLINE",
+    "peerGeneration": 494,
+    "peerBuild": "31e3a0f40823a74a73fa07dbfe4a05dd7f7375ba",
+    "peerAllowsUpdate": true,
+    "receiveAllowed": true,
+    "transferState": "UPDATED",
+    "transferBytes": 28749478,
+    "transferTotal": 28749478
+  },
+  "localDoctor": {
+    "code": "healthy",
+    "generation": 494,
+    "uiGeneration": 494,
+    "connection": "CONNECTED"
+  },
+  "connectionRestoration": "B update restarted its app. Its saved reconnect made six network-acquisition timeout observations before A explicitly connected to B. Both then established the same authenticated connection; no failures in either collected build after that connection. This is startup/installation evidence, not a crossing stability result.",
+  "validation": {
+    "go": "Full go test ./... passed using repository offline runtime overlay",
+    "inputworker": "Full package tests passed including native authority rejection and dead-owner denial",
+    "frontend": "104 tests passed; native production build passed",
+    "package": "Workspace transfer test, icons and offline setup verification passed",
+    "installation": "Both input services and protected input READY, install result 0, recovery not_needed; matching g494 UI/agent builds and connected runtime verified",
+    "race": "Not run; CGO disabled build",
+    "remoteCI": "Not run; no remote push requested",
+    "physical": "New crossing comparison pending; no latency improvement claimed from idle installation health"
+  },
+  "sourceOfTruth": "docs/architecture/02-runtime-flow.md",
+  "causeReview": "2026-10-29-g494-change-review.json",
+  "remainingRisk": [
+    "Native SCM/WTS and Windows scheduling tails remain to be measured on the new build",
+    "Actual native retirement failure, invalid/missing ACK or unresolved authority still closes the session"
+  ],
+  "apiChanges": "Agent generation only; no public/wire schema change",
+  "dbChanges": "none",
+  "repositoryHygieneChanges": "none",
+  "runnerChanges": "none",
+  "remotePush": "not performed"
+}
