@@ -145,6 +145,9 @@ func TestExpiredPreparationFallsBackWithoutExtendingOriginalBudget(t *testing.T)
 		start := time.Now()
 		err := input.open(ctx, application.LeaseIdentity{SessionID: "s", LeaseID: "l", Epoch: "e"}, time.Now())
 		<-prepared
+		// The cleanup cap and parent deadline fire at the same virtual time.
+		// Settle the parent's callback before inspecting its terminal cause.
+		synctest.Wait()
 		if err != nil || time.Since(start) != 300*time.Millisecond || prepareCtx.Err() != context.DeadlineExceeded {
 			t.Fatal("original preparation deadline changed or fallback failed", err, time.Since(start))
 		}
