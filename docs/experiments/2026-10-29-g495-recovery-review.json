@@ -1,0 +1,60 @@
+{
+  "schema": "krasis.recovery-review/v1",
+  "generation": 495,
+  "revision": "40262cf112269b922496a85749ec89e049d01f5c",
+  "collection": "675c7f214c68d4751934f4f56f415f62",
+  "sides": {
+    "A": {
+      "created": "2026-10-29T14:11:53Z",
+      "service": "FAILED",
+      "serviceExitCode": 1066,
+      "sourceExits": [
+        {"time": "2026-10-29T14:10:44.9461573Z", "operation": "source-write-boundary-timeout", "capture": "joined", "report": "failed"},
+        {"time": "2026-10-29T14:11:25.356227Z", "operation": "source-agent-query-capacity", "capture": "joined", "report": "failed"},
+        {"time": "2026-10-29T14:11:34.7118177Z", "operation": "hook-callback-stalled", "capture": "failed", "report": "recovery"}
+      ],
+      "largestObservedAgentSampleLatenessMicros": 1959534,
+      "associatedGCStoppingBucket": "greater_than_1s",
+      "attribution": "Agent process evidence only. It does not prove the capture child experienced the same GC pause, nor identify the callback or native cleanup that stalled."
+    },
+    "B": {
+      "created": "2026-10-29T14:11:55Z",
+      "service": "READY",
+      "events": ["reconnect_remote_eof", "RECONNECTING", "reconnect_acquire_network_timeout", "reconnect_acquire_network_reset"],
+      "attribution": "Remote EOF follows the A source-channel failure; these events do not establish network loss as the initiating cause."
+    }
+  },
+  "crossings": {
+    "matchingSourceReceiverPairs": 2,
+    "receiverConnectMaxMs": 143.988,
+    "sourceRequestToGrantMaxMs": 174.827,
+    "sourceCaptureActivationMaxMs": 88.606,
+    "receiverInputDispatchMaxMs": 85.642,
+    "matchingWorstNativeMillis": [15, 2, 85],
+    "nativeMillisOrder": ["service_query", "desktop_agent_scope", "containing_native_IPC"],
+    "comparison": "Too few completed pairs and interrupted/restarted sessions; do not claim a latency improvement against g494. Native stage measurements are nested in IPC, not independent additive durations."
+  },
+  "g496": {
+    "behaviorCommit": "da566176",
+    "diagnosticCommit": "ec906155",
+    "behavior": "Background source watchdogs use the restricted three-slot pool, leaving one of the existing four slots available to mandatory heartbeat presence. Only an exact capacity deadline before native query submission is skipped; it supplies no successful proof, ACK or idle renewal.",
+    "diagnostics": "A hook-progress trigger no longer masks a joined concrete native retirement failure in final operation/native-code reporting. Original errors and recovery decisions are retained.",
+    "reproduction": "Three blocked background presence checks retain three slots. A fourth watchdog expires without running native work or fencing the owner; fresh mandatory service/agent heartbeat checks still complete. Submitted timeout retains and fences its native owner until real retirement.",
+    "limits": "Four total native queries; three restricted queries; existing 1s owner-query budget, 2s active idle deadline and native cleanup requirements unchanged.",
+    "remainingRisk": "The true hook stall and uncertain native retirement are not solved by this capacity fix. Lost sent ACKs, real native query failures, unresolved cleanup and invalid authority still fail closed. New physical evidence is required."
+  },
+  "validation": {
+    "inputworker": "Full package passed after product safe-stop; targeted capacity/denial/cancellation/retirement tests passed.",
+    "wininputAndInputdesktop": "Full packages passed, including cleanup-cause selection with sibling native errors.",
+    "initialFullGoRun": "All packages except inputworker passed. The portable recovery fixture rejected a live product input owner; safe-stop followed by a full inputworker rerun passed.",
+    "race": "Not run: CGO disabled.",
+    "physicalG496": "Pending installation and new crossings.",
+    "remoteCI": "Not run: no remote push requested."
+  },
+  "sourceOfTruthChanged": "docs/architecture/02-runtime-flow.md",
+  "apiChanges": "Generation increment only; no public/wire layout or authority policy changes.",
+  "dbChanges": "none",
+  "repositoryHygieneChanges": "none",
+  "runnerChanges": "none",
+  "remotePush": "not performed"
+}
