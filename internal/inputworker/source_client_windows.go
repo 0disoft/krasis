@@ -44,7 +44,8 @@ type sourceClient struct {
 	epoch                   atomic.Uint64
 	retired                 atomic.Bool
 	retiring                atomic.Bool
-	pending                 sourcePacket // Under mu; only the fully written request being retired.
+	pending                 sourcePacket // Under mu; one fully written request being drained or retired.
+	admissionUntil          time.Time    // Under mu; bounded drain of one idle read-only query.
 	failed                  chan struct{}
 	replies                 chan sourcePacket
 	done                    chan struct{}
@@ -180,6 +181,19 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 	if c.retiring.Load() && op != sourceStop {
 		accepted = true // Only shutdown may follow an outcome still being drained.
 		return sourcePacket{}, ErrAuthority
+	}
+	if op != sourceStop {
+		if command != nil && command.err != nil {
+			return sourcePacket{}, command.err // Pending inspection cannot hide revoked authority.
+		}
+		pending, err := c.drainAdmission(ctx)
+		if err != nil {
+			return sourcePacket{}, err
+		}
+		if pending {
+			accepted = true
+			return sourcePacket{}, peer.ErrBoundaryInspectionUnavailable
+		}
 	}
 	if op == sourceStop && c.pending.sequence != 0 {
 		if err := c.drainPending(ctx); err != nil {
@@ -364,6 +378,27 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 			return sourcePacket{}, nil
 		}
 	default:
+	}
+	if op == sourceAdmit && observed == "timeout" && ctx.Err() != context.Canceled && c.epoch.Load() == 0 && !c.cursorPrepared {
+		select {
+		case <-c.done:
+			return sourcePacket{}, ErrAuthority // EOF is never a slow inspection.
+		default:
+		}
+		// This fully written request only observes local state; it cannot have
+		// activated capture or injected input. Reject this intent, retain just
+		// one pending reply, and forbid another command until it is drained.
+		c.pending = p
+		c.admissionUntil = time.Now().Add(RecoveryTimeout)
+		if !c.lastReplyRequestAt.IsZero() {
+			idle := c.lastReplyRequestAt.Add(sourceReadTimeout(true, false))
+			if idle.Before(c.admissionUntil) {
+				c.admissionUntil = idle
+			}
+		}
+		accepted = true
+		emitTiming(c.timing.emit, "installed_source_admission_drain_started")
+		return sourcePacket{}, peer.ErrBoundaryInspectionUnavailable
 	}
 	if drainableSourceResponse(op, c.epoch.Load()) && !time.Now().Before(limit) {
 		// No replay or further capture command is allowed. Keep the authenticated

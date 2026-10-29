@@ -96,7 +96,7 @@ func TestSourceHeartbeatBudgetDoesNotExtendOtherCommands(t *testing.T) {
 		defer c.channel.Close()
 		go func() { _, _ = readSourcePacket(server) }()
 		started := time.Now()
-		_, err := c.call(context.Background(), sourceAdmit)
+		_, err := c.call(context.Background(), sourceDeactivate)
 		if err == nil || time.Since(started) != time.Second || c.epoch.Load() != 0 || !c.channel.authority.closed {
 			t.Fatal("capture command inherited the heartbeat reply budget", err, time.Since(started))
 		}

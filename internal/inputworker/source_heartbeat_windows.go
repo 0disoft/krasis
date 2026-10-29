@@ -5,6 +5,8 @@ package inputworker
 import (
 	"context"
 	"time"
+
+	"github.com/0disoft/krasis/internal/peer"
 )
 
 // Start maintenance after a quarter of the active owner's idle budget. Replies
@@ -66,6 +68,14 @@ func (c *sourceClient) pollHeartbeat(ctx context.Context) (bool, error) {
 	if c.commandWaiting.Load() != 0 {
 		c.mu.Unlock()
 		return false, nil
+	}
+	if pending, err := c.drainAdmission(ctx); pending || err != nil {
+		if err != nil {
+			c.epoch.Store(0)
+			_ = c.channel.Close()
+		}
+		c.mu.Unlock()
+		return false, err // A skipped heartbeat supplies no ACK or idle renewal.
 	}
 	if !c.lastReplyRequestAt.IsZero() {
 		age := time.Since(c.lastReplyRequestAt)
@@ -132,6 +142,9 @@ func (c *sourceClient) pollHeartbeat(ctx context.Context) (bool, error) {
 	defer stopRequest()
 	sequence := c.sequence
 	_, err = c.callLockedChecked(request, sourceHeartbeat, proof)
+	if c.sequence == sequence && err == peer.ErrBoundaryInspectionUnavailable {
+		return false, nil // An admission started while presence preflight ran.
+	}
 	if c.sequence == sequence && (err == context.DeadlineExceeded || err == context.Canceled) {
 		// Admission expired before any frame existed. Actual sent requests and
 		// failed owner checks still take the ordinary failure/retirement path.
