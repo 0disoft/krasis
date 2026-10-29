@@ -1,0 +1,46 @@
+{
+  "schema": "krasis.latency-change-review/v1",
+  "generation": 494,
+  "baseline": "2026-10-29-g493-physical-crossing-review.json",
+  "evidence": {
+    "pairedSuccessfulProfiles": 12,
+    "expiredCandidateProfiles": 2,
+    "expiredReceiverConnectMs": [399.232, 345.353],
+    "expiredNativePairReadinessMs": [177.844, 148.790],
+    "expiredServiceBootstrapValidationMs": [193.657, 175.388],
+    "receiverInputDispatchMedianMs": 9.680,
+    "receiverInputDispatchMaxMs": 21.863,
+    "receiverControlDispatchMaxMs": 412.643,
+    "note": "Nested local stages must not be added. Control dispatch is not native SendInput time."
+  },
+  "changes": [
+    {
+      "commit": "cc38e0e8",
+      "problem": "An expired/missing candidate used ordinary console launch and started native input/release only after bootstrap.",
+      "change": "Cold installed ordinary input uses the same unbound native-pair prestart as warm candidates, overlapping child loading with parent/service authentication.",
+      "bounds": "Fixed 3s candidate lifetime, joined retirement, at most one active and one unbound three-process job; no periodic preparation during active input."
+    },
+    {
+      "commit": "46aa9209",
+      "problem": "Agent delivery performs a full service query, then the isolated native child repeats a full service query before the same input.",
+      "change": "Only a fully admitted installed ordinary client uses pinned-owner presence for delivery. Its native child still performs fresh service, desktop/agent, parent and lease checks before injection.",
+      "quantified": "One duplicate agent-side full service lookup removed per input command; native per-command lookup remains one. This is not a measured latency reduction or a reduction of every authorization query.",
+      "bounds": "No proof cache, new wire flag, replay, relaxed ACK validation or recovery normalization. Generic/direct clients and first admission retain full service authority."
+    }
+  ],
+  "validation": {
+    "inputworker": "Full package tests passed; initial full admission, generic full lookup, isolated presence delivery, native rejection certainty and pinned-owner death covered.",
+    "physical": "g494 comparison pending; installation health cannot prove lower crossing latency."
+  },
+  "remainingRisk": [
+    "The exact Windows SCM/WTS scheduling cause of the native and bootstrap tails remains unresolved.",
+    "The 21.863ms input dispatch tail includes worker response time; duplicate lookup removal alone may not remove it.",
+    "Actual native failure, unresolved ACK or retirement uncertainty still requires terminal cleanup."
+  ],
+  "sourceOfTruth": "docs/architecture/02-runtime-flow.md",
+  "apiChanges": "Agent generation only; no public or wire schema change",
+  "dbChanges": "none",
+  "repositoryHygieneChanges": "none",
+  "runnerChanges": "none",
+  "remotePush": "not performed"
+}
