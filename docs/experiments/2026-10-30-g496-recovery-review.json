@@ -1,0 +1,262 @@
+{
+  "schema": "krasis.recovery-review/v1",
+  "generation": 496,
+  "revision": "0ccf7db69d232b52bc86809fb438653d61b266d9",
+  "collection": "8d90f696063b486cd814ff721dd8842e",
+  "observationWindowStart": "2026-10-29T14:49:15Z",
+  "sides": {
+    "A": {
+      "created": "2026-10-29T15:00:46Z",
+      "sha256": "85813a2dd3591e76a712dfa5ff7c3b372ca2a6caf5ece310b8992216a6bfb145",
+      "service": "READY",
+      "inputHealth": {
+        "time": "2026-10-29T15:00:35.2659871Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "sourceExits": [
+        {
+          "time": "2026-10-29T15:00:26.506584Z",
+          "command": "ok",
+          "reader": "failed",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "delivery_failed",
+          "report": "failed",
+          "failure": {
+            "operation": "source-query-deadline-admission",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "heartbeatStage": "reply_gate",
+          "heartbeatSlowStage": "reply_gate",
+          "heartbeatSlowBucket": 5
+        }
+      ],
+      "failures": [
+        {
+          "time": "2026-10-29T15:00:26.0739681Z",
+          "code": "installed_source_failure_response"
+        },
+        {
+          "time": "2026-10-29T15:00:26.0739681Z",
+          "code": "installed_source_command_failed_heartbeat"
+        },
+        {
+          "time": "2026-10-29T15:00:26.0739681Z",
+          "code": "installed_source_heartbeat_failed"
+        },
+        {
+          "time": "2026-10-29T15:00:26.3215847Z",
+          "code": "fault_source_hook_failed"
+        },
+        {
+          "time": "2026-10-29T15:00:26.375298Z",
+          "code": "session_failed"
+        }
+      ],
+      "lastConnection": {
+        "time": "2026-10-29T15:00:41.6655141Z",
+        "code": "CONNECTED"
+      },
+      "incompleteLogSources": [
+        "control.previous.jsonl"
+      ]
+    },
+    "B": {
+      "created": "2026-10-29T15:00:47Z",
+      "sha256": "cdfbc7b0cb5ae44126acc74d89834220a02624f2620b2517b6f5dbb0230aa6b0",
+      "service": "READY",
+      "inputHealth": {
+        "time": "2026-10-29T15:00:20.2875196Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "sourceExits": [
+        {
+          "time": "2026-10-29T15:00:26.0009271Z",
+          "command": "ok",
+          "reader": "stopped",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "clean_sent",
+          "report": "ok",
+          "heartbeatStage": "replied",
+          "heartbeatSlowStage": "service_presence",
+          "heartbeatSlowBucket": 2
+        }
+      ],
+      "failures": [
+        {
+          "time": "2026-10-29T15:00:25.9881415Z",
+          "code": "reconnect_remote_eof"
+        },
+        {
+          "time": "2026-10-29T15:00:25.9881415Z",
+          "code": "RECONNECTING"
+        },
+        {
+          "time": "2026-10-29T15:00:32.7573365Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-10-29T15:00:37.9607905Z",
+          "code": "reconnect_acquire_network_timeout"
+        }
+      ],
+      "lastConnection": {
+        "time": "2026-10-29T15:00:41.5237666Z",
+        "code": "CONNECTED"
+      },
+      "incompleteLogSources": [
+        "control.previous.jsonl"
+      ]
+    }
+  },
+  "crossings": {
+    "matchingSourceReceiverPairs": 4,
+    "metrics": {
+      "requestToGrant": {
+        "count": 4,
+        "minimumMs": 42.083,
+        "medianMs": 169.64849999999998,
+        "maximumMs": 307.045
+      },
+      "captureActivation": {
+        "count": 4,
+        "minimumMs": 18.153,
+        "medianMs": 60.352000000000004,
+        "maximumMs": 159.398
+      },
+      "receiverConnect": {
+        "count": 4,
+        "minimumMs": 25.283,
+        "medianMs": 149.468,
+        "maximumMs": 275.448
+      },
+      "receiverFirstDispatch": {
+        "count": 4,
+        "minimumMs": 1.686,
+        "medianMs": 2.0545,
+        "maximumMs": 3.484
+      },
+      "receiverWorstDispatch": {
+        "count": 4,
+        "minimumMs": 3.521,
+        "medianMs": 12.66,
+        "maximumMs": 248.149
+      },
+      "receiverWorstAuthority": {
+        "count": 4,
+        "minimumMs": 0,
+        "medianMs": 0,
+        "maximumMs": 0
+      },
+      "receiverWorstResponse": {
+        "count": 4,
+        "minimumMs": 3.521,
+        "medianMs": 12.145,
+        "maximumMs": 247.15
+      },
+      "nativePairReadiness": {
+        "count": 4,
+        "minimumMs": 9.391,
+        "medianMs": 57.2855,
+        "maximumMs": 102.95
+      },
+      "preparationDecisions": {
+        "1": 2,
+        "3": 2
+      },
+      "reusedCandidateConnect": {
+        "count": 2,
+        "minimumMs": 25.283,
+        "medianMs": 28.011000000000003,
+        "maximumMs": 30.739
+      },
+      "expiredCandidateConnect": {
+        "count": 2,
+        "minimumMs": 268.197,
+        "medianMs": 271.8225,
+        "maximumMs": 275.448
+      }
+    },
+    "samples": [
+      {
+        "exchangeTag": "bb17426430bcf69f2da42371f0dddd66d974a73547eb91ed26210b22005583fa",
+        "sourceOutcome": "ok",
+        "receiverOutcome": "ok",
+        "requestToGrantMs": 42.083,
+        "captureActivationMs": 97.873,
+        "receiverConnectMs": 25.283,
+        "receiverWorstDispatchMs": 8.345,
+        "preparationDecision": 1
+      },
+      {
+        "exchangeTag": "fc1faab1e7134770b36b0558cb0c68d2f45061c2d14e4a144819700ec69fd17a",
+        "sourceOutcome": "ok",
+        "receiverOutcome": "ok",
+        "requestToGrantMs": 307.045,
+        "captureActivationMs": 18.153,
+        "receiverConnectMs": 268.197,
+        "receiverWorstDispatchMs": 248.149,
+        "preparationDecision": 3
+      },
+      {
+        "exchangeTag": "77f8563a2e183f7e7155077c88a55a4ba569f791da24ddc161fa53cd5ad6cfdd",
+        "sourceOutcome": "ok",
+        "receiverOutcome": "ok",
+        "requestToGrantMs": 46.082,
+        "captureActivationMs": 22.831,
+        "receiverConnectMs": 30.739,
+        "receiverWorstDispatchMs": 16.975,
+        "preparationDecision": 1
+      },
+      {
+        "exchangeTag": "a0f0707f9c3153f4d97178b08712a5945ce7129564a22c0815c0e2793fa44bfb",
+        "sourceOutcome": "ok",
+        "receiverOutcome": "ok",
+        "requestToGrantMs": 293.215,
+        "captureActivationMs": 159.398,
+        "receiverConnectMs": 275.448,
+        "receiverWorstDispatchMs": 3.521,
+        "preparationDecision": 3
+      }
+    ],
+    "comparison": "Four matched pairs, including a failed session. No latency improvement claim."
+  },
+  "attribution": {
+    "observed": "A sent heartbeat failed at source-query-deadline-admission; the source exit retains reply_gate >=1s as its lifetime slowest heartbeat stage. Capture/sender/interrupt joined. Both services remained READY; A agent faulted and then reconnected. This is not recurrence of service exit 1066.",
+    "limits": "The lifetime gate maximum does not prove the failed heartbeat had that same duration, nor identify the holder. Agent GC samples cannot establish capture-child pauses. Independent laptop wall clocks cannot order sub-second cross-device events.",
+    "reproduced": "Global capacity isolation did not isolate same-channel query lanes: an in-flight watchdog occupied presenceQuery and blocked mandatory heartbeat presence before its own fresh native check. Old code fails the deterministic 20ms test with only one native check; the fix completes mandatory presence with a second fresh check at zero simulated elapsed time, even when that check rejects authority."
+  },
+  "change": {
+    "behavior": "Dedicated per-channel watchdog query ownership, still bounded by the existing restricted pool. All four lanes participate in Close, cancellation and source retirement.",
+    "preserved": "4 total native queries, 3 restricted slots, 1s query deadlines, 2s active idle deadline, native ownership until actual return, per-input fresh authority, lease and process limits.",
+    "remainingRisk": "This removes a proven same-channel blocker. It does not establish that it was the sole cause of the recorded failure. Writer gate contention, process scheduling stalls, candidate expiry and B input delay require new physical evidence."
+  },
+  "validation": {
+    "regression": "Observed failure before fix; targeted watchdog, query, writer and gate tests passed after fix.",
+    "fullGo": "Full go test ./... passed after safe-stop with the offline runtime overlay; the strengthened independent-retirement regression also passed.",
+    "race": "Skipped: CGO disabled.",
+    "physical": "Pending installation of next generation.",
+    "remoteCI": "Skipped: no push requested."
+  },
+  "sourceOfTruthChanged": "docs/architecture/02-runtime-flow.md",
+  "apiChanges": "None; private query lifecycle field only.",
+  "dbChanges": "none",
+  "repositoryHygieneChanges": "none",
+  "runnerChanges": "none",
+  "remotePush": "not performed",
+  "nextGeneration": {
+    "generation": 497,
+    "behaviorCommit": "30403510",
+    "installation": "Pending"
+  }
+}
