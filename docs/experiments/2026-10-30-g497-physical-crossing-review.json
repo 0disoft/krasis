@@ -596,5 +596,11 @@
   "dbChanges": "none",
   "repositoryHygieneChanges": "none",
   "runnerChanges": "none",
-  "remotePush": "not performed"
+  "remotePush": "not performed",
+  "laterObservation": {
+    "report": "2026-10-30-g497-later-recovery-review.json",
+    "serviceFailureTimeUTC": "2026-10-29T15:26:37.2534857Z",
+    "service": "A FAILED (1066), B READY",
+    "scope": "Occurs after this earlier test-window cutoff; this report establishes only test-window stability."
+  }
 }

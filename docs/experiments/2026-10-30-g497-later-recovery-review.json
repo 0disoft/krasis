@@ -1,0 +1,421 @@
+{
+  "schema": "krasis.recovery-review/v1",
+  "generation": 497,
+  "revision": "047bf580df193c434c37bbb271a187c56104f052",
+  "collection": "0268d3ecd2d4b49fe06fc9d5f732dc20",
+  "sides": {
+    "A": {
+      "created": "2026-10-29T16:37:37Z",
+      "sha256": "5295a6410d68b3f1a31d36052e12a4fbcd5b41adb1aa542e5b14682f4044dd6d",
+      "loginRuntime": {
+        "startedAt": "2026-10-29T15:08:27.3173194Z",
+        "time": "2026-10-29T15:26:37.2534857Z",
+        "service": "FAILED",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE",
+        "lastFailure": {
+          "time": "2026-10-29T15:26:37.2534857Z",
+          "stage": "service",
+          "reason": "capture",
+          "operation": "source-reader-timeout",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "source": {
+          "total": 2,
+          "exits": [
+            {
+              "time": "2026-10-29T15:25:43.4305789Z",
+              "command": "ok",
+              "reader": "authority",
+              "capture": "joined",
+              "sender": "joined",
+              "interrupt": "joined",
+              "retirement": "clean_sent",
+              "report": "failed",
+              "failure": {
+                "operation": "source-service-query-deadline-admission",
+                "win32Error": 0,
+                "win32Known": false
+              },
+              "heartbeatStage": "service_presence",
+              "heartbeatSlowStage": "agent_presence",
+              "heartbeatSlowBucket": 4
+            },
+            {
+              "time": "2026-10-29T15:26:36.8769798Z",
+              "command": "ok",
+              "reader": "authority",
+              "capture": "joined",
+              "sender": "joined",
+              "interrupt": "joined",
+              "retirement": "failed_sent",
+              "report": "recovery",
+              "failure": {
+                "operation": "source-reader-timeout",
+                "win32Error": 0,
+                "win32Known": false
+              },
+              "heartbeatStage": "replied",
+              "heartbeatSlowStage": "service_presence",
+              "heartbeatSlowBucket": 4
+            }
+          ]
+        }
+      },
+      "inputHealth": {
+        "time": "2026-10-29T16:37:12.2992514Z",
+        "state": "SERVICE_RECOVERY_REQUIRED",
+        "stage": "service_recovery",
+        "win32Error": 1066,
+        "win32Known": true
+      },
+      "recovery": {
+        "time": "2026-10-29T16:37:31.4816974Z",
+        "code": "agent_faulted",
+        "agentState": "FAULTED",
+        "lastFailure": {
+          "time": "2026-10-29T16:37:31.4816974Z",
+          "code": "agent_faulted",
+          "agentState": "FAULTED"
+        }
+      },
+      "faultCount": 13,
+      "firstFaults": [
+        {
+          "time": "2026-10-29T15:26:36.7004783Z",
+          "code": "installed_source_heartbeat_failed"
+        },
+        {
+          "time": "2026-10-29T15:26:37.1807898Z",
+          "code": "fault_source_hook_failed"
+        },
+        {
+          "time": "2026-10-29T15:26:37.2258328Z",
+          "code": "session_failed"
+        },
+        {
+          "time": "2026-10-29T15:28:56.9604857Z",
+          "code": "protected_input_inspection_failed"
+        },
+        {
+          "time": "2026-10-29T15:29:08.928164Z",
+          "code": "fault_guard_ipc_timeout"
+        },
+        {
+          "time": "2026-10-29T15:29:08.928164Z",
+          "code": "session_failed"
+        },
+        {
+          "time": "2026-10-29T15:30:03.8564018Z",
+          "code": "protected_input_inspection_failed"
+        },
+        {
+          "time": "2026-10-29T15:30:10.3466698Z",
+          "code": "protected_input_inspection_failed"
+        },
+        {
+          "time": "2026-10-29T15:30:46.7384671Z",
+          "code": "fault_source_interrupted"
+        },
+        {
+          "time": "2026-10-29T15:30:46.9446483Z",
+          "code": "session_failed"
+        },
+        {
+          "time": "2026-10-29T15:31:29.9961315Z",
+          "code": "protected_input_inspection_failed"
+        },
+        {
+          "time": "2026-10-29T15:31:32.0555828Z",
+          "code": "fault_session_unknown"
+        },
+        {
+          "time": "2026-10-29T15:31:32.1389299Z",
+          "code": "session_failed"
+        }
+      ],
+      "lastFaults": [
+        {
+          "time": "2026-10-29T15:29:08.928164Z",
+          "code": "session_failed"
+        },
+        {
+          "time": "2026-10-29T15:30:03.8564018Z",
+          "code": "protected_input_inspection_failed"
+        },
+        {
+          "time": "2026-10-29T15:30:10.3466698Z",
+          "code": "protected_input_inspection_failed"
+        },
+        {
+          "time": "2026-10-29T15:30:46.7384671Z",
+          "code": "fault_source_interrupted"
+        },
+        {
+          "time": "2026-10-29T15:30:46.9446483Z",
+          "code": "session_failed"
+        },
+        {
+          "time": "2026-10-29T15:31:29.9961315Z",
+          "code": "protected_input_inspection_failed"
+        },
+        {
+          "time": "2026-10-29T15:31:32.0555828Z",
+          "code": "fault_session_unknown"
+        },
+        {
+          "time": "2026-10-29T15:31:32.1389299Z",
+          "code": "session_failed"
+        }
+      ],
+      "incompleteLogSources": [
+        "control.previous.jsonl"
+      ]
+    },
+    "B": {
+      "created": "2026-10-29T16:37:37Z",
+      "sha256": "1602bca78dcdf190d0f57aea04d34608f92499f5640f64ce282790c6273e2a72",
+      "loginRuntime": {
+        "startedAt": "2026-10-29T15:09:03.4368838Z",
+        "time": "2026-10-29T15:31:29.9935359Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE",
+        "source": {
+          "total": 7,
+          "exits": [
+            {
+              "time": "2026-10-29T15:26:36.5943261Z",
+              "command": "ok",
+              "reader": "stopped",
+              "capture": "joined",
+              "sender": "joined",
+              "interrupt": "joined",
+              "retirement": "clean_sent",
+              "report": "ok",
+              "heartbeatStage": "replied",
+              "heartbeatSlowStage": "reply_presence",
+              "heartbeatSlowBucket": 2
+            },
+            {
+              "time": "2026-10-29T15:28:56.8381612Z",
+              "command": "ok",
+              "reader": "stopped",
+              "capture": "joined",
+              "sender": "joined",
+              "interrupt": "joined",
+              "retirement": "clean_sent",
+              "report": "ok",
+              "heartbeatStage": "replied",
+              "heartbeatSlowStage": "service_presence",
+              "heartbeatSlowBucket": 1
+            },
+            {
+              "time": "2026-10-29T15:29:30.0237148Z",
+              "command": "ok",
+              "reader": "stopped",
+              "capture": "joined",
+              "sender": "joined",
+              "interrupt": "joined",
+              "retirement": "clean_sent",
+              "report": "ok",
+              "heartbeatStage": "replied",
+              "heartbeatSlowStage": "service_presence",
+              "heartbeatSlowBucket": 1
+            },
+            {
+              "time": "2026-10-29T15:30:03.7343749Z",
+              "command": "ok",
+              "reader": "stopped",
+              "capture": "joined",
+              "sender": "joined",
+              "interrupt": "joined",
+              "retirement": "clean_sent",
+              "report": "ok",
+              "heartbeatStage": "replied",
+              "heartbeatSlowStage": "service_presence",
+              "heartbeatSlowBucket": 1
+            },
+            {
+              "time": "2026-10-29T15:30:10.2649917Z",
+              "command": "ok",
+              "reader": "stopped",
+              "capture": "joined",
+              "sender": "joined",
+              "interrupt": "joined",
+              "retirement": "clean_sent",
+              "report": "ok",
+              "heartbeatStage": "replied",
+              "heartbeatSlowStage": "service_presence",
+              "heartbeatSlowBucket": 1
+            },
+            {
+              "time": "2026-10-29T15:30:46.5872028Z",
+              "command": "ok",
+              "reader": "stopped",
+              "capture": "joined",
+              "sender": "joined",
+              "interrupt": "joined",
+              "retirement": "clean_sent",
+              "report": "ok",
+              "heartbeatStage": "replied",
+              "heartbeatSlowStage": "service_presence",
+              "heartbeatSlowBucket": 1
+            },
+            {
+              "time": "2026-10-29T15:31:29.9879283Z",
+              "command": "ok",
+              "reader": "stopped",
+              "capture": "joined",
+              "sender": "joined",
+              "interrupt": "joined",
+              "retirement": "clean_sent",
+              "report": "ok",
+              "heartbeatStage": "replied",
+              "heartbeatSlowStage": "service_presence",
+              "heartbeatSlowBucket": 1
+            }
+          ]
+        }
+      },
+      "inputHealth": {
+        "time": "2026-10-29T16:37:23.4724974Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "recovery": {
+        "time": "2026-10-29T16:37:09.0193084Z",
+        "code": "agent_present",
+        "agentState": "RECONNECTING",
+        "lastFailure": {
+          "time": "2026-10-29T11:22:09.2471092Z",
+          "code": "agent_faulted",
+          "agentState": "FAULTED"
+        }
+      },
+      "faultCount": 14,
+      "firstFaults": [
+        {
+          "time": "2026-10-29T15:26:36.5777837Z",
+          "code": "reconnect_remote_eof"
+        },
+        {
+          "time": "2026-10-29T15:26:36.5777837Z",
+          "code": "RECONNECTING"
+        },
+        {
+          "time": "2026-10-29T15:28:56.8252197Z",
+          "code": "reconnect_remote_eof"
+        },
+        {
+          "time": "2026-10-29T15:28:56.8252197Z",
+          "code": "RECONNECTING"
+        },
+        {
+          "time": "2026-10-29T15:29:30.0136251Z",
+          "code": "reconnect_remote_eof"
+        },
+        {
+          "time": "2026-10-29T15:29:30.0136251Z",
+          "code": "RECONNECTING"
+        },
+        {
+          "time": "2026-10-29T15:30:03.7248976Z",
+          "code": "reconnect_remote_eof"
+        },
+        {
+          "time": "2026-10-29T15:30:03.7248976Z",
+          "code": "RECONNECTING"
+        },
+        {
+          "time": "2026-10-29T15:30:10.2529747Z",
+          "code": "reconnect_remote_eof"
+        },
+        {
+          "time": "2026-10-29T15:30:10.2529747Z",
+          "code": "RECONNECTING"
+        },
+        {
+          "time": "2026-10-29T15:30:46.5767098Z",
+          "code": "reconnect_remote_eof"
+        },
+        {
+          "time": "2026-10-29T15:30:46.5767098Z",
+          "code": "RECONNECTING"
+        },
+        {
+          "time": "2026-10-29T15:31:29.9747959Z",
+          "code": "reconnect_remote_eof"
+        },
+        {
+          "time": "2026-10-29T15:31:29.9747959Z",
+          "code": "RECONNECTING"
+        }
+      ],
+      "lastFaults": [
+        {
+          "time": "2026-10-29T15:30:03.7248976Z",
+          "code": "reconnect_remote_eof"
+        },
+        {
+          "time": "2026-10-29T15:30:03.7248976Z",
+          "code": "RECONNECTING"
+        },
+        {
+          "time": "2026-10-29T15:30:10.2529747Z",
+          "code": "reconnect_remote_eof"
+        },
+        {
+          "time": "2026-10-29T15:30:10.2529747Z",
+          "code": "RECONNECTING"
+        },
+        {
+          "time": "2026-10-29T15:30:46.5767098Z",
+          "code": "reconnect_remote_eof"
+        },
+        {
+          "time": "2026-10-29T15:30:46.5767098Z",
+          "code": "RECONNECTING"
+        },
+        {
+          "time": "2026-10-29T15:31:29.9747959Z",
+          "code": "reconnect_remote_eof"
+        },
+        {
+          "time": "2026-10-29T15:31:29.9747959Z",
+          "code": "RECONNECTING"
+        }
+      ],
+      "incompleteLogSources": [
+        "control.previous.jsonl"
+      ]
+    }
+  },
+  "findings": {
+    "recurrence": "A service failure 1066 occurred after the earlier 12-pair physical test window. The earlier report only described its collection cutoff; it was not a claim of permanent stability.",
+    "sequence": "First A source exit: source-service-query-deadline-admission with clean_sent retirement and failed command report. Later A source exit: source-reader-timeout, reader authority, capture/sender/interrupt joined, failed_sent retirement and recovery report. Service then entered FAILED. B service remained READY.",
+    "certainty": "Joined source fields do not independently certify all desktop scopes and native query handles. The final operation currently selects a source reader failure ahead of potential sibling classification/cleanup causes. The collected report does not expose the complete error tree, so it cannot prove that service recovery was unnecessary or that the previous same-channel fix was ineffective.",
+    "remainingInvestigation": "Reproduce the joined source timeout plus authority/desktop cleanup path and distinguish the branch promoting recovery before altering any classification. Preserve native cleanup fences, sent ACK failure semantics and original errors.",
+    "runtime": "The A agent fault GC trail had a largest sample lateness around 105ms for the service-stopping failure; this does not establish capture-child scheduling or native query latency. Later failed-start agent runs have separate larger GC samples and must not be used as proof of the initial cause."
+  },
+  "state": "A_SERVICE_RECOVERY_REQUIRED",
+  "requiredUserAction": "A: use agent repair/protected input update and approve the Windows administrator confirmation. Do not perform additional physical crossings yet.",
+  "validation": {
+    "diagnostics": "Both paired diagnostic payloads received and hashed; current generation, A FAILED/1066, B READY and final source exit fields checked.",
+    "smoke": "Local doctor observed FAULTED and service STOPPED; status FAULTED. Recovery has not been performed by the agent.",
+    "check": "git diff --check passed.",
+    "tests": "Not run: evidence-only change; no runtime policy modified.",
+    "remoteCI": "Not run: no new push requested."
+  },
+  "sourceOfTruthChanged": "none",
+  "apiChanges": "none",
+  "dbChanges": "none",
+  "repositoryHygieneChanges": "none",
+  "runnerChanges": "none",
+  "remotePush": "not performed"
+}
