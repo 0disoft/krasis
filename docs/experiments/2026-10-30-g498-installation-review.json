@@ -1,0 +1,125 @@
+{
+  "schema": "krasis.paired-installation/v1",
+  "generation": 498,
+  "revision": "530c9fb8d839acd77b99f9d266259c2fce2a1d7d",
+  "collection": "ae9f9997a80f099a66efd473ec153293",
+  "sides": {
+    "A": {
+      "created": "2026-10-29T16:56:30Z",
+      "sha256": "951bc9efdf38b788d3ded2948bce581240de448e562b4f2cfe200168df54783b",
+      "installation": {
+        "time": "2026-10-29T16:55:41.4033518Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-29T16:55:42.5216932Z",
+        "time": "2026-10-29T16:55:42.5437285Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      },
+      "inputHealth": {
+        "time": "2026-10-29T16:56:13.5592492Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "matchingBuildUILaunch": [
+        {
+          "time": "2026-10-29T16:55:43.4369445Z",
+          "code": "launch_record_ready"
+        }
+      ],
+      "connection": [
+        {
+          "time": "2026-10-29T16:56:26.0956938Z",
+          "code": "CONNECTED"
+        }
+      ],
+      "currentBuildFaults": []
+    },
+    "B": {
+      "created": "2026-10-29T16:56:32Z",
+      "sha256": "334ea40f099bf850f1dc4f213cf93cfbf86b6670b0ee676e80ffa79977a22b2d",
+      "installation": {
+        "time": "2026-10-29T16:56:06.1062336Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-29T16:56:08.9896323Z",
+        "time": "2026-10-29T16:56:09.0455711Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      },
+      "inputHealth": {
+        "time": "2026-10-29T16:56:21.4860893Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "matchingBuildUILaunch": [
+        {
+          "time": "2026-10-29T16:56:22.2420288Z",
+          "code": "launch_record_ready"
+        }
+      ],
+      "connection": [
+        {
+          "time": "2026-10-29T16:56:25.8452616Z",
+          "code": "CONNECTED"
+        }
+      ],
+      "currentBuildFaults": []
+    }
+  },
+  "setupSha256": "8687d95f40c7e0f13d3f883d3bfed0df7944c5cd20dda813edf15cfc7eee97fc",
+  "transfer": {
+    "schemaVersion": "krasis.cli.update-wait/v1",
+    "peerAlias": "B",
+    "id": "c9608a87c09b3ed50a0170e2820b1c5d",
+    "code": "updated",
+    "transferState": "UPDATED",
+    "generation": 498,
+    "revision": "530c9fb8d839acd77b99f9d266259c2fce2a1d7d",
+    "bytes": 28741376,
+    "total": 28741376
+  },
+  "validation": {
+    "go": "Full go test ./... passed before generation bump; inputworker and localapi passed with deployment runtime overlay after bump",
+    "smoke": "Both g498 UI launches, matching agent builds, protected input READY and authenticated connection verified",
+    "remoteCI": "Skipped: no new push performed",
+    "package": "Workspace update archive, icons and offline setup verification passed",
+    "frontend": "104 tests and native production build passed",
+    "check": "git diff --check passed"
+  },
+  "scope": "Post-install snapshot only, before physical crossings. This generation fixes failure attribution, not the underlying physical recovery recurrence or B preparation latency.",
+  "sourceOfTruthChanged": "none",
+  "apiChanges": "none",
+  "dbChanges": "none",
+  "repositoryHygieneChanges": "none",
+  "runnerChanges": "none",
+  "remotePush": "not performed"
+}
