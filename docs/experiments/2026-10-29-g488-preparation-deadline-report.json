@@ -1,0 +1,45 @@
+{
+  "schema": "krasis.preparation-deadline-investigation/v1",
+  "baselineGeneration": 487,
+  "targetGeneration": 488,
+  "selectedProblem": "finishPreparationForEntry leaves its timer channel nil when 0 < remaining <= 300ms, so optional waiting can last until cleanup or the unrelated caller deadline.",
+  "reproduction": {
+    "clock": "Go testing/synctest virtual clock; not wall-clock or laptop measurements",
+    "callerDeadlineMs": 1000,
+    "unfinishedCleanupReceipt": true,
+    "cases": [
+      {
+        "remainingMs": 50,
+        "beforeWaitMs": 1000,
+        "expectedAfterWaitMs": 50
+      },
+      {
+        "remainingMs": 300,
+        "beforeWaitMs": 1000,
+        "expectedAfterWaitMs": 300
+      },
+      {
+        "remainingMs": 600,
+        "beforeWaitMs": 300,
+        "expectedAfterWaitMs": 300
+      }
+    ]
+  },
+  "change": "Always create a timer for min(remaining preparation lifetime, InputPreparationEntryWait). Timer and caller cancellation share one cancellation exit.",
+  "ownership": "Cancellation does not clear preparationCancel, close done, release installation pins or bypass input.mu. Entry still joins native cleanup before connecting a new worker.",
+  "validation": {
+    "red": "Unmodified source failed the 50ms and 300ms cases: each waited for the 1000ms caller timeout.",
+    "full": "passed: go test -p 2 -timeout 3m ./...",
+    "race": "passed: targeted entry/preparation tests with -race -timeout 90s",
+    "vet": "passed: go vet ./internal/residentagent",
+    "physical": "not measured"
+  },
+  "limits": [
+    "The timer bounds only this optional completion wait. Native cleanup and the subsequent mutex acquisition retain their existing independent ownership and caller budget.",
+    "No claim that this alone resolves the observed worst-case physical handoff delay or service error 1066."
+  ],
+  "sourceOfTruthChanged": "docs/architecture/02-runtime-flow.md",
+  "APIChanges": "none",
+  "DBChanges": "none",
+  "runnerChanges": "none"
+}
