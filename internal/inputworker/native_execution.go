@@ -2,13 +2,15 @@ package inputworker
 
 import (
 	"context"
+	"errors"
 	"time"
 )
 
 // desktop must be the native child's authenticated Scope.Do. Its binding
 // freshly checks the agent/session; do not repeat that RPC before entering it.
-// Service authorization precedes desktop selection, so a slow SCM query cannot
-// leave the selected desktop stale. Parent/lease checks precede native work.
+// Fresh service authorization overlaps the independent desktop/agent check.
+// If it finishes later, reenter the desktop after joining it: a slow SCM query
+// must not leave the selected desktop stale. Parent/lease checks precede input.
 func nativeInputExecutor(desktop executor, service func() error, parent func() bool, expires time.Time, releaseOnly bool, timings ...*workerTiming) executor {
 	return func(ctx context.Context, work func() error) error {
 		if ctx == nil || work == nil || desktop == nil || service == nil || parent == nil {
@@ -29,12 +31,81 @@ func nativeInputExecutor(desktop executor, service func() error, parent func() b
 				return operation()
 			})
 		}
-		if len(timings) == 1 && timings[0] != nil {
-			return measureExecution(service, checkedDesktop, timings[0])(ctx, work)
+		var timing *workerTiming
+		if len(timings) == 1 {
+			timing = timings[0]
 		}
-		if err := service(); err != nil {
+		return overlapNativeProof(ctx, service, checkedDesktop, work, timing)
+	}
+}
+
+// One serial native dispatcher owns at most one query. Always join it, even
+// when desktop acquisition fails, before the caller can close authority pins.
+// This is fresh work for this command; neither an idle proof nor a cache.
+func overlapNativeProof(ctx context.Context, service func() error, desktop executor, work func() error, timing *workerTiming) error {
+	if timing != nil {
+		*timing = workerTiming{}
+	}
+	done := make(chan struct{})
+	var serviceErr error
+	var serviceElapsed time.Duration
+	go func() {
+		defer close(done)
+		started := time.Now()
+		serviceErr = service()
+		serviceElapsed = time.Since(started)
+	}()
+	var scopeElapsed, applied time.Duration
+	defer func() {
+		<-done
+		if timing != nil {
+			// These proof spans overlap. Apply remains actual native work here;
+			// the journal's containing IPC span is recorded by journalExecution.
+			timing.record(0, serviceElapsed)
+			timing.record(1, scopeElapsed-applied)
+		}
+	}()
+	deferred, entered := false, false
+	run := func() error {
+		entered = true
+		select {
+		case <-done:
+		default:
+			deferred = true
+			return nil // No input was attempted; discard this desktop check.
+		}
+		if serviceErr != nil {
+			return serviceErr
+		}
+		if err := ctx.Err(); err != nil {
 			return err
 		}
-		return checkedDesktop(ctx, work)
+		started := time.Now()
+		err := work()
+		applied = time.Since(started)
+		if timing != nil {
+			timing.record(2, applied)
+		}
+		return err
 	}
+	started := time.Now()
+	err := desktop(ctx, run)
+	scopeElapsed = time.Since(started)
+	<-done
+	if err != nil || serviceErr != nil {
+		return errors.Join(err, serviceErr)
+	}
+	if !entered {
+		return ErrAuthority
+	}
+	if deferred {
+		entered = false
+		started = time.Now()
+		err = desktop(ctx, run) // Fresh agent/desktop after the slow service query.
+		scopeElapsed += time.Since(started)
+		if err == nil && !entered {
+			return ErrAuthority
+		}
+	}
+	return err
 }
