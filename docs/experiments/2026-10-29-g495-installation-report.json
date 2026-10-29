@@ -1,0 +1,146 @@
+{
+  "schema": "krasis.paired-installation/v1",
+  "generation": 495,
+  "revision": "40262cf112269b922496a85749ec89e049d01f5c",
+  "collection": "69e5ab8291cbf032485738ec52891bb8",
+  "sides": {
+    "A": {
+      "created": "2026-10-29T14:02:52Z",
+      "sha256": "facbcd2d8bca6982b4b01226bd2687b753a5cd30d053617db24d16fa98f386a0",
+      "service": "READY",
+      "inputHealth": {
+        "time": "2026-10-29T14:02:34.8665749Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "installation": {
+        "time": "2026-10-29T14:01:01.5539786Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "uiLaunch": {
+        "time": "2026-10-29T14:01:03.0396451Z",
+        "code": "launch_record_ready"
+      },
+      "lastConnection": {
+        "time": "2026-10-29T14:01:39.672388Z",
+        "code": "CONNECTED"
+      },
+      "currentBuildFaults": [],
+      "startupConnectionEvents": [],
+      "postConnectionFailures": [],
+      "incompleteLogSources": [
+        "control.previous.jsonl"
+      ]
+    },
+    "B": {
+      "created": "2026-10-29T14:02:53Z",
+      "sha256": "1133a9ff64d8525f9567ab89187630a38594ebee5beed94083d8deaed3ef902f",
+      "service": "READY",
+      "inputHealth": {
+        "time": "2026-10-29T14:02:36.049166Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "installation": {
+        "time": "2026-10-29T14:01:29.0134691Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "uiLaunch": {
+        "time": "2026-10-29T14:01:35.0131579Z",
+        "code": "launch_record_ready"
+      },
+      "lastConnection": {
+        "time": "2026-10-29T14:01:39.5973742Z",
+        "code": "CONNECTED"
+      },
+      "currentBuildFaults": [],
+      "startupConnectionEvents": [],
+      "postConnectionFailures": [],
+      "incompleteLogSources": [
+        "control.previous.jsonl"
+      ]
+    }
+  },
+  "setupSha256": "a55045a0b9dfb7af51a544cb0c2d080fae8cbd1a24a9d7b0b7a5fed2a4e38d07",
+  "transfer": {
+    "schemaVersion": "krasis.cli.update-wait/v1",
+    "peerAlias": "B",
+    "id": "104cbc9a37eadd298c2a780c0947ae86",
+    "code": "updated",
+    "transferState": "UPDATED",
+    "generation": 495,
+    "revision": "40262cf112269b922496a85749ec89e049d01f5c",
+    "bytes": 28743159,
+    "total": 28743159
+  },
+  "peerUI": {
+    "schemaVersion": "krasis.cli.app-open/v1",
+    "code": "window_ready",
+    "peerAlias": "B",
+    "id": "714f2b2e627e99d6227ca59d0faa58ab"
+  },
+  "peerRuntime": {
+    "schemaVersion": "krasis.cli.update-status/v1",
+    "peerAlias": "B",
+    "localGeneration": 495,
+    "localBuild": "40262cf112269b922496a85749ec89e049d01f5c",
+    "peerState": "ONLINE",
+    "peerGeneration": 495,
+    "peerBuild": "40262cf112269b922496a85749ec89e049d01f5c",
+    "peerAllowsUpdate": true,
+    "receiveAllowed": true,
+    "transferState": "UPDATED",
+    "transferBytes": 28743159,
+    "transferTotal": 28743159
+  },
+  "localDoctor": {
+    "code": "healthy",
+    "generation": 495,
+    "uiGeneration": 495,
+    "connection": "CONNECTED"
+  },
+  "connectionRestoration": "Installation startup connection events are reported per host. Both matching builds established an authenticated connection; no failures after the last collected connection. This is installation health, not a physical latency result.",
+  "validation": {
+    "go": "Full go test ./... passed using repository offline runtime overlay",
+    "inputworker": "Full package tests passed including cold admission, native timing attribution, rejection and nonblocking diagnostic snapshots",
+    "frontend": "104 tests passed; native production build passed",
+    "package": "Workspace transfer test, icons and offline setup verification passed",
+    "installation": "Both input services and protected input READY, install result 0, recovery not_needed; matching g495 UI/agent builds and connected runtime verified",
+    "race": "Not run; CGO disabled build",
+    "remoteCI": "Not run; no remote push requested",
+    "physical": "New crossing comparison pending; no latency improvement claimed from idle installation health"
+  },
+  "sourceOfTruth": "docs/architecture/02-runtime-flow.md",
+  "causeReview": "2026-10-29-g495-change-review.json",
+  "remainingRisk": [
+    "Native SCM/WTS and Windows scheduling tails remain to be measured on the new build",
+    "Actual native retirement failure, invalid/missing ACK or unresolved authority still closes the session"
+  ],
+  "apiChanges": "Agent generation only; no public/wire schema change",
+  "dbChanges": "none",
+  "repositoryHygieneChanges": "none",
+  "runnerChanges": "none",
+  "remotePush": "not performed"
+}
