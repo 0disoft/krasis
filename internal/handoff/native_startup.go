@@ -3,11 +3,15 @@ package handoff
 // Native startup spans are child-local and may overlap the journal's startup.
 // They are diagnostic durations, never an authority or readiness verdict.
 type NativeStartupProfile struct {
-	Micros   [5]uint32 `json:"micros"` // installation/self, service, agent, parent, desktop
-	Measured uint8     `json:"measured"`
+	Micros    [5]uint32        `json:"micros"` // installation/self, service, agent, parent, desktop
+	Measured  uint8            `json:"measured"`
+	ImageHash ImageHashProfile `json:"imageHash,omitzero"`
 }
 
 func (p NativeStartupProfile) Valid() bool {
+	if !p.ImageHash.Valid() || p.Measured == 0 && p.ImageHash.Backend != 0 {
+		return false
+	}
 	if p.Measured != 0 && p.Measured != 31 {
 		return false
 	}
@@ -31,5 +35,6 @@ func NativeStartupFrom(p *StartupProfile) NativeStartupProfile {
 		result.Micros[i] = p.Micros[stage]
 	}
 	result.Measured = 31
+	result.ImageHash = p.ImageHash
 	return result
 }

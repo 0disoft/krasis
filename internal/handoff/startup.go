@@ -39,9 +39,13 @@ type StartupProfile struct {
 	PreparationWaitMeasured bool                      `json:"preparationWaitMeasured,omitempty"`
 	ServiceReadiness        ServiceReadinessProfile   `json:"serviceReadiness,omitzero"`
 	Native                  [2]NativeStartupProfile   `json:"native,omitzero"` // input, release-only
+	ImageHash               ImageHashProfile          `json:"imageHash,omitzero"`
 }
 
 func (p StartupProfile) Valid() bool {
+	if !p.ImageHash.Valid() {
+		return false
+	}
 	for _, native := range p.Native {
 		if !native.Valid() {
 			return false

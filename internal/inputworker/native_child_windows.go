@@ -46,6 +46,7 @@ func runInstalledNativeInput(ctx context.Context, installation *Installation, re
 	}
 	nativeProfile.Record(handoff.WorkerInstalledValidation, installation.loadElapsed+time.Since(started))
 	nativeProfile.RecordLoad(installation.loadElapsed)
+	nativeProfile.ImageHash = installation.imageHash
 	var data [nativeBootstrapSize]byte
 	if _, err := io.ReadFull(os.Stdin, data[:]); err != nil {
 		return ErrAuthority

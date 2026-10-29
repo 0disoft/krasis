@@ -15,6 +15,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/0disoft/krasis/internal/handoff"
 	"golang.org/x/sys/windows"
 )
 
@@ -28,6 +29,7 @@ type Installation struct {
 	files                      []*os.File
 	images                     [2]installationImage
 	loadElapsed                time.Duration
+	imageHash                  handoff.ImageHashProfile
 	workerPending              bool
 	observation                *os.File // Short-lived observer's transaction fence.
 }
@@ -103,7 +105,11 @@ func loadInstallationDirectoryMode(root, directory string, worker bool) (*Instal
 	if worker {
 		path := filepath.Clean(filepath.Join(directory, "krasis-input.exe"))
 		var file *os.File
-		file, err = lockImage(path, service)
+		var timing imageHashTimings
+		file, err = lockImageMeasured(path, service, &timing)
+		installation.imageHash = handoff.ImageHashProfile{Backend: timing.backend, Micros: [2]uint32{
+			uint32(min(timing.read, handoff.Window).Microseconds()), uint32(min(timing.compute, handoff.Window).Microseconds()),
+		}}
 		images[1] = installationImage{path: path, digest: service, file: file}
 	} else {
 		images, err = lockInstallationImages(directory, [2][sha256.Size]byte{agent, service})

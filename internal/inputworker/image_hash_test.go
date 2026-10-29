@@ -56,3 +56,44 @@ func TestImageHashRejectsCorruptionTruncationGrowthAndReadErrors(t *testing.T) {
 		}
 	}
 }
+
+func TestImageHashFailsClosedOnProviderErrorsAndAlwaysCloses(t *testing.T) {
+	data := []byte("protected image")
+	want := sha256.Sum256(data)
+	for _, stage := range []string{"create", "write", "finish", "close"} {
+		t.Run(stage, func(t *testing.T) {
+			closed := 0
+			create := func() (*imageDigest, error) {
+				if stage == "create" {
+					return nil, ErrAuthority
+				}
+				return &imageDigest{backend: 2,
+					write: func([]byte) error {
+						if stage == "write" {
+							return ErrAuthority
+						}
+						return nil
+					},
+					finish: func() ([32]byte, error) {
+						if stage == "finish" {
+							return want, ErrAuthority
+						}
+						return want, nil
+					},
+					close: func() error {
+						closed++
+						if stage == "close" {
+							return ErrAuthority
+						}
+						return nil
+					}}, nil
+			}
+			if err := verifyImageHashUsing(bytes.NewReader(data), int64(len(data)), want, nil, create); err != ErrAuthority {
+				t.Fatal("provider failure accepted", stage, err)
+			}
+			if stage != "create" && closed != 1 {
+				t.Fatal("hash handle leaked", stage, closed)
+			}
+		})
+	}
+}

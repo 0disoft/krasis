@@ -387,6 +387,10 @@ func tokenLogon(token windows.Token) (windows.LUID, error) {
 // digest read through a user-writable pathname alone cannot prove which image
 // was loaded, because rename/replacement races can decouple those identities.
 func lockImage(path string, expected [sha256.Size]byte) (*os.File, error) {
+	return lockImageMeasured(path, expected, nil)
+}
+
+func lockImageMeasured(path string, expected [sha256.Size]byte, timing *imageHashTimings) (*os.File, error) {
 	name, err := windows.UTF16PtrFromString(path)
 	if err != nil {
 		return nil, ErrAuthority
@@ -410,7 +414,7 @@ func lockImage(path string, expected [sha256.Size]byte) (*os.File, error) {
 	if size == 0 || size > 64<<20 {
 		return nil, ErrAuthority
 	}
-	if verifyImageHash(file, int64(size), expected) != nil {
+	if verifyImageHashMeasured(file, int64(size), expected, timing) != nil {
 		return nil, ErrAuthority
 	}
 	accepted = true

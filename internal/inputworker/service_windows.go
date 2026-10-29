@@ -88,6 +88,7 @@ func runInstalledWorker(ctx context.Context, installation *Installation, prepare
 	// span overlaps ServiceChildConnect; it must not be added to that span.
 	profile.Record(handoff.WorkerInstalledValidation, installation.loadElapsed+time.Since(started))
 	profile.RecordLoad(installation.loadElapsed)
+	profile.ImageHash = installation.imageHash
 	return runInstalledConsoleInputMode(ctx, agent, service, profile, installation, prepareNative)
 }
 

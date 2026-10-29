@@ -8,7 +8,7 @@ import (
 	"github.com/0disoft/krasis/internal/handoff"
 )
 
-// KRD2-KRD8 are fixed, one-shot local readiness envelopes, never an input ACK or
+// KRD2-KRD9 are fixed, one-shot local readiness envelopes, never an input ACK or
 // peer frame. Process/image authentication and desktop readiness still precede
 // it. Legacy KRD1 has no diagnostic payload and remains readable.
 const startupReadySize = 8 + int(handoff.StartupStageCount)*4
@@ -18,12 +18,13 @@ const startupReadyDecisionSize = startupReadyPreparedSize + 8
 const startupReadyWaitSize = startupReadyDecisionSize + 8
 const startupReadyServiceSize = startupReadyWaitSize + 8 + int(handoff.ServiceReadinessStageCount)*4
 const startupReadyNativeSize = startupReadyServiceSize + 48
+const startupReadyImageHashSize = startupReadyNativeSize + 36
 
 func writeStartupReady(writer io.Writer, profile handoff.StartupProfile) error {
 	if !profile.Valid() || profile.Measured == 0 {
 		return writeFrame(writer, readyFrame[:])
 	}
-	var data [startupReadyNativeSize]byte
+	var data [startupReadyImageHashSize]byte
 	copy(data[:5], []byte{'K', 'R', 'D', '2', 2})
 	size := startupReadySize
 	if profile.LoadMeasured {
@@ -72,6 +73,17 @@ func writeStartupReady(writer io.Writer, profile handoff.StartupProfile) error {
 	for i, n := range profile.Micros {
 		binary.BigEndian.PutUint32(data[8+i*4:12+i*4], n)
 	}
+	if profile.ImageHash.Backend != 0 || profile.Native[0].ImageHash.Backend != 0 || profile.Native[1].ImageHash.Backend != 0 {
+		copy(data[:5], []byte{'K', 'R', 'D', '9', 9})
+		size = startupReadyImageHashSize
+		for i, p := range [3]handoff.ImageHashProfile{profile.ImageHash, profile.Native[0].ImageHash, profile.Native[1].ImageHash} {
+			offset := startupReadyNativeSize + i*12
+			data[offset] = p.Backend
+			for j, n := range p.Micros {
+				binary.BigEndian.PutUint32(data[offset+4+j*4:], n)
+			}
+		}
+	}
 	return writeFrame(writer, data[:size])
 }
 
@@ -83,7 +95,8 @@ func readStartupReady(reader io.Reader) (*handoff.StartupProfile, error) {
 	if header == readyFrame {
 		return nil, nil
 	}
-	native := string(header[:4]) == "KRD8" && header[4] == 8
+	imageHash := string(header[:4]) == "KRD9" && header[4] == 9
+	native := imageHash || string(header[:4]) == "KRD8" && header[4] == 8
 	service := native || string(header[:4]) == "KRD7" && header[4] == 7
 	wait := service || (string(header[:4]) == "KRD6" && header[4] == 6)
 	decision := wait || (string(header[:4]) == "KRD5" && header[4] == 5)
@@ -171,6 +184,22 @@ func readStartupReady(reader io.Reader) (*handoff.StartupProfile, error) {
 			}
 		}
 	}
+	if imageHash {
+		var detail [36]byte
+		if _, err := io.ReadFull(reader, detail[:]); err != nil {
+			return nil, errors.Join(ErrProtocol, err)
+		}
+		for i, p := range [3]*handoff.ImageHashProfile{&profile.ImageHash, &profile.Native[0].ImageHash, &profile.Native[1].ImageHash} {
+			offset := i * 12
+			if !zeroBytes(detail[offset+1 : offset+4]) {
+				return nil, ErrProtocol
+			}
+			p.Backend = detail[offset]
+			for j := range p.Micros {
+				p.Micros[j] = binary.BigEndian.Uint32(detail[offset+4+j*4:])
+			}
+		}
+	}
 	// Numeric diagnostics are not readiness proof. Consume the fixed payload,
 	// but drop invalid/missing measurements without changing a valid receipt.
 	if !profile.Valid() || profile.Measured == 0 || decision && !service && profile.PreparationDecision == handoff.PreparationUnobserved || service && !native && profile.ServiceReadiness.Measured == 0 {
@@ -195,4 +224,5 @@ func mergeWorkerStartup(service *handoff.StartupProfile, worker *handoff.Startup
 		service.LoadMicros, service.LoadMeasured = worker.LoadMicros, true
 	}
 	service.Native = worker.Native
+	service.ImageHash = worker.ImageHash
 }
