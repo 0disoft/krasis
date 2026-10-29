@@ -1,0 +1,304 @@
+{
+  "schema": "krasis.physical-crossing-comparison/v1",
+  "generation": 490,
+  "revision": "0adac30f3cef4033656004c3ce4c4ff8d0a6f8fc",
+  "collection": "711d556c124d9fb909b0ecb6ecbc9332",
+  "sides": {
+    "A": {
+      "created": "2026-10-29T11:39:55Z",
+      "diagnosticSha256": "2ffb7e06d022c6ea0cf58c4b61e6bb65c09afb03ab4a4d99690aebfcf76a3c95",
+      "service": "READY",
+      "inputHealth": {
+        "time": "2026-10-29T11:39:35.5293917Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "lastConnectedAt": "2026-10-29T11:37:45.2065112Z",
+      "postConnectionFailures": [],
+      "successfulEntries": 0,
+      "detailedProfiles": 12
+    },
+    "B": {
+      "created": "2026-10-29T11:39:55Z",
+      "diagnosticSha256": "ca2e8a3ffc523c0edb4ad84a1af0604be719cbde2126379ffa1af898defbfbef",
+      "service": "READY",
+      "inputHealth": {
+        "time": "2026-10-29T11:39:52.4605869Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "lastConnectedAt": "2026-10-29T11:37:44.4741536Z",
+      "postConnectionFailures": [],
+      "successfulEntries": 15,
+      "detailedProfiles": 12
+    }
+  },
+  "baselineCollection": "ce85e0bbcdd1096af354eb1187156bb2",
+  "comparison": {
+    "firstReceiverConnectMs": {
+      "before": 199.127,
+      "after": 26.393,
+      "reductionPercent": 86.746
+    },
+    "requestToGrant": {
+      "before": {
+        "count": 12,
+        "minimumMs": 35.891,
+        "medianMs": 39.2805,
+        "maximumMs": 221.13
+      },
+      "after": {
+        "count": 12,
+        "minimumMs": 34.174,
+        "medianMs": 38.914,
+        "maximumMs": 246.237
+      }
+    },
+    "captureActivation": {
+      "before": {
+        "count": 12,
+        "minimumMs": 11.755,
+        "medianMs": 18.3445,
+        "maximumMs": 33.643
+      },
+      "after": {
+        "count": 12,
+        "minimumMs": 12.238,
+        "medianMs": 16.743,
+        "maximumMs": 28.012
+      }
+    },
+    "receiverConnect": {
+      "before": {
+        "count": 12,
+        "minimumMs": 23.763,
+        "medianMs": 24.9165,
+        "maximumMs": 199.127
+      },
+      "after": {
+        "count": 12,
+        "minimumMs": 22.872,
+        "medianMs": 25.682,
+        "maximumMs": 226.018
+      }
+    },
+    "worstProfiledDispatch": {
+      "before": {
+        "count": 12,
+        "minimumMs": 2.581,
+        "medianMs": 4.0615,
+        "maximumMs": 11.378
+      },
+      "after": {
+        "count": 12,
+        "minimumMs": 3.214,
+        "medianMs": 6.588,
+        "maximumMs": 134.372
+      }
+    }
+  },
+  "samples": [
+    {
+      "attempt": 1,
+      "requestToGrantMs": 44.249,
+      "captureActivationMs": 28.012,
+      "receiverConnectMs": 26.393,
+      "receiverReadyWaitMs": 22.493,
+      "preparationJoinMs": null,
+      "preparedAgeMs": 1203.827,
+      "nativePairReadyMs": 10.561,
+      "worstDispatchMs": 134.372,
+      "worstAuthorityMs": 19.014,
+      "worstResponseMs": 115.358,
+      "worstWorkerApplyMs": 106.601,
+      "worstSubmissionMs": 16.236
+    },
+    {
+      "attempt": 2,
+      "requestToGrantMs": 47.723,
+      "captureActivationMs": 16.626,
+      "receiverConnectMs": 27.568,
+      "receiverReadyWaitMs": 24.677,
+      "preparationJoinMs": null,
+      "preparedAgeMs": 707.673,
+      "nativePairReadyMs": 11.899,
+      "worstDispatchMs": 14.815,
+      "worstAuthorityMs": 0.573,
+      "worstResponseMs": 14.242,
+      "worstWorkerApplyMs": null,
+      "worstSubmissionMs": null
+    },
+    {
+      "attempt": 3,
+      "requestToGrantMs": 39.38,
+      "captureActivationMs": 18.353,
+      "receiverConnectMs": 25.604,
+      "receiverReadyWaitMs": 22.792,
+      "preparationJoinMs": null,
+      "preparedAgeMs": 615.941,
+      "nativePairReadyMs": 10.109,
+      "worstDispatchMs": 21.87,
+      "worstAuthorityMs": 0,
+      "worstResponseMs": 21.87,
+      "worstWorkerApplyMs": null,
+      "worstSubmissionMs": null
+    },
+    {
+      "attempt": 4,
+      "requestToGrantMs": 35.542,
+      "captureActivationMs": 16.859,
+      "receiverConnectMs": 24.238,
+      "receiverReadyWaitMs": 21.517,
+      "preparationJoinMs": null,
+      "preparedAgeMs": 820.384,
+      "nativePairReadyMs": 9.92,
+      "worstDispatchMs": 3.214,
+      "worstAuthorityMs": 0,
+      "worstResponseMs": 2.507,
+      "worstWorkerApplyMs": null,
+      "worstSubmissionMs": null
+    },
+    {
+      "attempt": 5,
+      "requestToGrantMs": 55.958,
+      "captureActivationMs": 13.87,
+      "receiverConnectMs": 25.759,
+      "receiverReadyWaitMs": 22.767,
+      "preparationJoinMs": null,
+      "preparedAgeMs": 561.108,
+      "nativePairReadyMs": 9.983,
+      "worstDispatchMs": 8.008,
+      "worstAuthorityMs": 5.631,
+      "worstResponseMs": 2.376,
+      "worstWorkerApplyMs": 2.376,
+      "worstSubmissionMs": 0.615
+    },
+    {
+      "attempt": 6,
+      "requestToGrantMs": 38.448,
+      "captureActivationMs": 15.13,
+      "receiverConnectMs": 25.524,
+      "receiverReadyWaitMs": 23.066,
+      "preparationJoinMs": null,
+      "preparedAgeMs": 527.301,
+      "nativePairReadyMs": 10.295,
+      "worstDispatchMs": 6.057,
+      "worstAuthorityMs": 0.566,
+      "worstResponseMs": 5.49,
+      "worstWorkerApplyMs": null,
+      "worstSubmissionMs": null
+    },
+    {
+      "attempt": 7,
+      "requestToGrantMs": 38.128,
+      "captureActivationMs": 18.202,
+      "receiverConnectMs": 25.83,
+      "receiverReadyWaitMs": 23.949,
+      "preparationJoinMs": null,
+      "preparedAgeMs": 593.811,
+      "nativePairReadyMs": 10.843,
+      "worstDispatchMs": 7.119,
+      "worstAuthorityMs": 0,
+      "worstResponseMs": 7.119,
+      "worstWorkerApplyMs": null,
+      "worstSubmissionMs": null
+    },
+    {
+      "attempt": 8,
+      "requestToGrantMs": 34.238,
+      "captureActivationMs": 23.001,
+      "receiverConnectMs": 23.867,
+      "receiverReadyWaitMs": 21.531,
+      "preparationJoinMs": null,
+      "preparedAgeMs": 564.623,
+      "nativePairReadyMs": 9.754,
+      "worstDispatchMs": 4.494,
+      "worstAuthorityMs": 0,
+      "worstResponseMs": 4.494,
+      "worstWorkerApplyMs": null,
+      "worstSubmissionMs": null
+    },
+    {
+      "attempt": 9,
+      "requestToGrantMs": 35.41,
+      "captureActivationMs": 18.616,
+      "receiverConnectMs": 24.246,
+      "receiverReadyWaitMs": 22.462,
+      "preparationJoinMs": null,
+      "preparedAgeMs": 135.746,
+      "nativePairReadyMs": 10.384,
+      "worstDispatchMs": 3.611,
+      "worstAuthorityMs": 0,
+      "worstResponseMs": 3.25,
+      "worstWorkerApplyMs": null,
+      "worstSubmissionMs": null
+    },
+    {
+      "attempt": 10,
+      "requestToGrantMs": 246.237,
+      "captureActivationMs": 14.049,
+      "receiverConnectMs": 226.018,
+      "receiverReadyWaitMs": 223.631,
+      "preparationJoinMs": 84.177,
+      "preparedAgeMs": 6.322,
+      "nativePairReadyMs": 102.48,
+      "worstDispatchMs": 10.317,
+      "worstAuthorityMs": 3.943,
+      "worstResponseMs": 5.753,
+      "worstWorkerApplyMs": 4.646,
+      "worstSubmissionMs": 3.982
+    },
+    {
+      "attempt": 11,
+      "requestToGrantMs": 34.174,
+      "captureActivationMs": 13.609,
+      "receiverConnectMs": 22.872,
+      "receiverReadyWaitMs": 19.978,
+      "preparationJoinMs": null,
+      "preparedAgeMs": 1045.854,
+      "nativePairReadyMs": 8.719,
+      "worstDispatchMs": 4.895,
+      "worstAuthorityMs": 0.769,
+      "worstResponseMs": 4.125,
+      "worstWorkerApplyMs": null,
+      "worstSubmissionMs": null
+    },
+    {
+      "attempt": 12,
+      "requestToGrantMs": 190.883,
+      "captureActivationMs": 12.238,
+      "receiverConnectMs": 179.72,
+      "receiverReadyWaitMs": 177.204,
+      "preparationJoinMs": 57.162,
+      "preparedAgeMs": 5.852,
+      "nativePairReadyMs": 96.001,
+      "worstDispatchMs": 5.296,
+      "worstAuthorityMs": 0,
+      "worstResponseMs": 5.296,
+      "worstWorkerApplyMs": null,
+      "worstSubmissionMs": null
+    }
+  ],
+  "findings": [
+    "15 successful entries; both services READY; no fault/reconnect/failure events after the last established connection in this collection. Earlier setup-related connection retries are excluded explicitly.",
+    "First preparation is faster, but attempts 10 and 12 still spend 226.018ms and 179.720ms connecting. Both use very young candidates, join pending construction, and then wait about 100ms for native pair readiness.",
+    "One input dispatch reaches 134.372ms: client authority 19.014ms, response 115.358ms, nested worker apply 106.601ms and submission 16.236ms. This is evidence of receiver-local delay, not proof of any specific scheduler/Win32 cause.",
+    "StartupProfile.Valid still has a 2s prepared-age ceiling while g490 candidates may live 3s. This can omit diagnostics at ages 2–3s; all 12 attached startup profiles in this collection are below 2s."
+  ],
+  "limitations": [
+    "Only the first 12 entries have detailed profiles; 15 entries succeeded. Detailed maxima are not whole-run maxima.",
+    "Different physical approaches prevent treating first-entry improvement as a controlled benchmark or a guarantee of every entry. Median grant wait is essentially unchanged and tail stalls remain.",
+    "Nested startup/apply spans overlap and must not be added. No cross-device wall timestamps are used as pure one-way network latency.",
+    "The age-validation discrepancy affects diagnostics, not input authority or the worker expiry timer."
+  ],
+  "validation": {
+    "physical": "user completed crossings; paired fresh diagnostics collected",
+    "sourceChanges": "none for this comparison",
+    "tests": "not rerun for analysis-only report; same runtime source passed full Go suite and frontend/package checks before installation"
+  },
+  "remotePush": "not performed"
+}
