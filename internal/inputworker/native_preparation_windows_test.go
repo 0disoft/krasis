@@ -76,6 +76,9 @@ func TestPreparedNativeChildHelper(t *testing.T) {
 		_ = windows.CloseHandle(handle)
 	}
 	input := &portableFixture{}
+	if err := writeFrame(os.Stdout, readyFrame[:]); err != nil {
+		os.Exit(5)
+	}
 	_, err = crashguard.ServeWithInput(os.Stdin, os.Stdout, input, PortableInputHandler(input, func(_ context.Context, work func() error) error { return work() }))
 	if err != nil {
 		os.Exit(5)

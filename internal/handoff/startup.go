@@ -38,9 +38,15 @@ type StartupProfile struct {
 	PreparationWaitMicros   uint32                    `json:"preparationWaitMicros,omitempty"`
 	PreparationWaitMeasured bool                      `json:"preparationWaitMeasured,omitempty"`
 	ServiceReadiness        ServiceReadinessProfile   `json:"serviceReadiness,omitzero"`
+	Native                  [2]NativeStartupProfile   `json:"native,omitzero"` // input, release-only
 }
 
 func (p StartupProfile) Valid() bool {
+	for _, native := range p.Native {
+		if !native.Valid() {
+			return false
+		}
+	}
 	if p.Schema != 1 || !validPreparationDecision(p) || !p.ServiceReadiness.Valid() {
 		return false
 	}

@@ -38,10 +38,14 @@ func RunInstalledNativeRelease(ctx context.Context, installation *Installation) 
 }
 
 func runInstalledNativeInput(ctx context.Context, installation *Installation, releaseOnly bool) error {
+	var nativeProfile handoff.StartupProfile
+	started := time.Now()
 	agentDigest, serviceDigest, err := installation.workerDigests()
 	if err != nil || !fixedInstalledInputProcess(serviceDigest, true, installation) {
 		return ErrAuthority
 	}
+	nativeProfile.Record(handoff.WorkerInstalledValidation, installation.loadElapsed+time.Since(started))
+	nativeProfile.RecordLoad(installation.loadElapsed)
 	var data [nativeBootstrapSize]byte
 	if _, err := io.ReadFull(os.Stdin, data[:]); err != nil {
 		return ErrAuthority
@@ -68,6 +72,7 @@ func runInstalledNativeInput(ctx context.Context, installation *Installation, re
 	}()
 	startup, cancel := context.WithTimeout(ctx, startupTimeout)
 	defer cancel()
+	started = time.Now()
 	proof, err := authenticateServiceInstalled(startup, uintptr(handles[2]), serviceDigest, installation)
 	if err != nil {
 		return err
@@ -84,15 +89,20 @@ func runInstalledNativeInput(ctx context.Context, installation *Installation, re
 	if installation.adoptWorkerAgentImage(proof, imageFile) != nil {
 		return ErrAuthority
 	}
+	nativeProfile.Record(handoff.WorkerServiceAuth, time.Since(started))
 	imageFile = nil
+	started = time.Now()
 	authority, err := authenticateAgentInstalled(uintptr(handles[0]), agentDigest, installation)
 	if err != nil {
 		return err
 	}
+	nativeProfile.Record(handoff.WorkerAgentAuth, time.Since(started))
 	defer authority.Close()
+	started = time.Now()
 	if !validNativeParent(handles[3], installation, serviceDigest) {
 		return ErrAuthority
 	}
+	nativeProfile.Record(handoff.WorkerIdentity, time.Since(started))
 	var leaseData [leaseSize]byte
 	copy(leaseData[:], packet[bootstrapLeaseOffset:])
 	lease, err := decodeLease(leaseData, time.Now())
@@ -104,7 +114,12 @@ func runInstalledNativeInput(ctx context.Context, installation *Installation, re
 	if releaseOnly {
 		serviceCheck = func() error { return checkNativeRecoveryService(recoveryService, proof) }
 	}
+	started = time.Now()
 	return inputdesktop.RunInteractive(ctx, func() error { return authority.check(releaseOnly) }, func(scope *inputdesktop.Scope) error {
+		nativeProfile.Record(handoff.WorkerDesktopReady, time.Since(started))
+		if err := writeStartupReady(os.Stdout, nativeProfile); err != nil {
+			return err
+		}
 		timing := &workerTiming{}
 		execute := nativeInputExecutor(scope.Do, serviceCheck, func() bool { return nativeParentAlive(handles[3]) }, lease.ExpiresAt, releaseOnly, timing)
 		if releaseOnly {
@@ -315,7 +330,13 @@ func startNativeChildClient(ctx context.Context, mode string, handles []windows.
 		}
 		return nil, err
 	}
-	client, err := newPortableClient(ctx, process)
+	var client *Client
+	var nativeProfile handoff.NativeStartupProfile
+	if mode == "--native-input-worker" || mode == "--native-release-worker" {
+		client, nativeProfile, err = newNativePortableClient(ctx, process)
+	} else {
+		client, err = newPortableClient(ctx, process)
+	}
 	if err != nil {
 		closeErr := process.Close()
 		var pending *crashguard.ExitPending
@@ -324,5 +345,7 @@ func startNativeChildClient(ctx context.Context, mode string, handles []windows.
 		}
 		return nil, errors.Join(err, closeErr)
 	}
-	return newIsolatedInput(client, process, wininput.NewInjectionPort()), nil
+	input := newIsolatedInput(client, process, wininput.NewInjectionPort())
+	input.nativeStartup = nativeProfile
+	return input, nil
 }

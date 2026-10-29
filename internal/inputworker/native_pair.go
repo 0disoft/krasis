@@ -81,5 +81,8 @@ func startNativePair(ctx context.Context, start func(context.Context, bool) (*is
 	// the desktop-ready span that the direct path already publishes; this is
 	// elapsed pair startup, never the sum of concurrent child measurements.
 	profile.Record(handoff.WorkerDesktopReady, time.Since(started))
+	if profile != nil {
+		profile.Native = [2]handoff.NativeStartupProfile{input.nativeStartup, release.nativeStartup}
+	}
 	return input, nil
 }

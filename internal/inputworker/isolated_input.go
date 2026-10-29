@@ -6,6 +6,7 @@ import (
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/crashguard"
+	"github.com/0disoft/krasis/internal/handoff"
 	"sync"
 	"time"
 )
@@ -16,6 +17,7 @@ import (
 // release-only child; direct test fixtures may supply their own recovery port.
 type isolatedInput struct {
 	*Client
+	nativeStartup     handoff.NativeStartupProfile
 	recovery          application.ReleasePort
 	retire            func() (bool, error)
 	recovering        bool

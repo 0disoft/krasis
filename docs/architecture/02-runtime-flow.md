@@ -16,6 +16,19 @@ g478의 상대 관리 창 열기는 에이전트와 실행 기록의 generation/
 
 ## 경계 전환
 
+g503 records native input/release startup separately. Each fully authenticated
+ordinary native child emits one fixed local startup envelope before its initial
+heartbeat. Five child-local durations cover installation/self validation,
+service authentication plus image adoption, agent authentication, parent
+validation, and initial desktop entry. The heartbeat retains fresh authority and
+the diagnostic read shares its original 2s budget; neither operation injects
+input. The journal carries both child vectors through optional KRD8 diagnostics.
+These child spans can overlap preparation and the journal's remaining readiness;
+they must not be added to those containing spans. OS loading before Go entry is
+not measured by the installation/self duration. Numeric diagnostics neither
+authorize input nor certify native retirement; malformed framing still rejects
+startup. Fixed login and direct/portable fixture protocols are unchanged.
+
 g502 separates optional preparation demand from the serial input/presentation
 endpoint with the fixed local `Krasis.Preparation.v1` pipe. It authenticates the
 exact installed agent and service, repeats fresh request/receipt authority and

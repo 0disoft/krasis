@@ -135,9 +135,11 @@ func (p *preparedNativePair) bind(ctx context.Context, release bool, handles []w
 	if err != nil {
 		return nil, err
 	}
-	client, err := newPortableClient(ctx, process)
+	client, nativeProfile, err := newNativePortableClient(ctx, process)
 	if err != nil {
 		return nil, errors.Join(err, process.Close())
 	}
-	return newIsolatedInput(client, process, wininput.NewInjectionPort()), nil
+	input := newIsolatedInput(client, process, wininput.NewInjectionPort())
+	input.nativeStartup = nativeProfile
+	return input, nil
 }
