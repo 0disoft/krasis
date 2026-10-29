@@ -1,0 +1,111 @@
+{
+  "schema": "krasis.paired-installation/v1",
+  "generation": 493,
+  "revision": "5a5a593092f79b192063ff4271def849f1cb131f",
+  "collection": "1da75739848ca59749d4bcf3f84097a7",
+  "sides": {
+    "A": {
+      "created": "2026-10-29T12:36:07Z",
+      "sha256": "c6826a6980cab04aec26605a43878106828394de4da5679031f1c6bc9fae384e",
+      "service": "READY",
+      "inputHealth": {
+        "time": "2026-10-29T12:35:52.8027363Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "installation": {
+        "time": "2026-10-29T12:34:50.3573219Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "lastConnection": {
+        "time": "2026-10-29T12:35:26.5211992Z",
+        "code": "CONNECTED"
+      },
+      "failures": []
+    },
+    "B": {
+      "created": "2026-10-29T12:36:07Z",
+      "sha256": "f3eddb304810b5e018772d582d72f35b2ec36a345e3a9c9425876ba61b40d036",
+      "service": "READY",
+      "inputHealth": {
+        "time": "2026-10-29T12:35:51.1672455Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "installation": {
+        "time": "2026-10-29T12:35:15.4684293Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "lastConnection": {
+        "time": "2026-10-29T12:35:24.5319535Z",
+        "code": "CONNECTED"
+      },
+      "failures": []
+    }
+  },
+  "setupSha256": "4ae0687837f28708811eeb9062f4087f5418a89b6e86a376c7507260a2db99bc",
+  "transfer": {
+    "schemaVersion": "krasis.cli.update-wait/v1",
+    "peerAlias": "B",
+    "id": "8025d6e17495e4eeca0412cbe1c72e65",
+    "code": "updated",
+    "transferState": "UPDATED",
+    "generation": 493,
+    "revision": "5a5a593092f79b192063ff4271def849f1cb131f",
+    "bytes": 28727352,
+    "total": 28727352
+  },
+  "peerUI": {
+    "schemaVersion": "krasis.cli.app-open/v1",
+    "code": "window_ready",
+    "peerAlias": "B",
+    "id": "d2e8ea8e0d37fd5bb96b86d49a5ca837"
+  },
+  "localDoctor": {
+    "code": "healthy",
+    "generation": 493,
+    "uiGeneration": 493,
+    "connection": "CONNECTED"
+  },
+  "validation": {
+    "go": "Full suite passed with repository offline runtime overlay",
+    "frontend": "104 tests passed; native production build passed",
+    "package": "Workspace transfer test, icons and offline setup verification passed",
+    "installation": "Both input services READY, protected input READY, install result 0, recovery not_needed and authenticated connection established; no g493 faults at collection time",
+    "race": "not run; CGO disabled build",
+    "physical": "New user crossing check pending; installation health alone is not proof of no recurrence or reduced physical latency"
+  },
+  "sourceOfTruth": "docs/architecture/02-runtime-flow.md",
+  "causeReview": "docs/experiments/2026-10-29-g492-recovery-review.json",
+  "remainingRisk": [
+    "B true-expired/cold native readiness tail remains",
+    "A long runtime observation gaps and the precise native cause are unresolved",
+    "Unresolved ACK past the bounded drain or an actual native authority/retirement failure still closes the session"
+  ],
+  "apiChanges": "generation increment; no public/wire schema change",
+  "dbChanges": "none",
+  "runnerChanges": "none",
+  "remotePush": "not performed"
+}
