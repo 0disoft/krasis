@@ -1,0 +1,149 @@
+{
+  "schema": "krasis.paired-installation/v1",
+  "generation": 503,
+  "revision": "71b68155af63d5399671a31bc210a4be446fbf9d",
+  "collection": "1d42f47c4543f6d473b762bfb48f9823",
+  "sides": {
+    "A": {
+      "created": "2026-10-29T19:28:54Z",
+      "sha256": "9e42439f9923fe1aa073b18fb185ebbe3b5146e2805a3ebaecc8d18e72ffac68",
+      "installation": {
+        "time": "2026-10-29T19:28:06.2116458Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-29T19:28:07.1129641Z",
+        "time": "2026-10-29T19:28:07.1376677Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      },
+      "inputHealth": {
+        "time": "2026-10-29T19:28:38.2512085Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "matchingBuildUILaunch": [
+        {
+          "time": "2026-10-29T19:28:08.3879139Z",
+          "code": "launch_record_ready"
+        }
+      ],
+      "connection": [
+        {
+          "time": "2026-10-29T19:28:41.41658Z",
+          "code": "CONNECTED"
+        }
+      ],
+      "currentBuildFaults": [],
+      "incompleteLogSources": [
+        "control.previous.jsonl"
+      ]
+    },
+    "B": {
+      "created": "2026-10-29T19:28:55Z",
+      "sha256": "7228b7f4645b27ad2fa7e1cf0e345d4ac18ccc2c71693e2baa3050770f9c4a62",
+      "installation": {
+        "time": "2026-10-29T19:28:30.4065119Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-29T19:28:33.1699519Z",
+        "time": "2026-10-29T19:28:33.215119Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      },
+      "inputHealth": {
+        "time": "2026-10-29T19:28:35.8123596Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "matchingBuildUILaunch": [
+        {
+          "time": "2026-10-29T19:28:36.4736663Z",
+          "code": "launch_record_ready"
+        }
+      ],
+      "connection": [
+        {
+          "time": "2026-10-29T19:28:41.01273Z",
+          "code": "CONNECTED"
+        }
+      ],
+      "currentBuildFaults": [],
+      "incompleteLogSources": [
+        "control.previous.jsonl"
+      ]
+    }
+  },
+  "setupSha256": "96dd943e6d18cf1b4827f215d329a3afa78de52eedea846e42ba084a4469a2fa",
+  "transfer": {
+    "schemaVersion": "krasis.cli.update-wait/v1",
+    "peerAlias": "B",
+    "id": "9ac842bd58e2d61454aed65e05015c3f",
+    "code": "updated",
+    "transferState": "UPDATED",
+    "generation": 503,
+    "revision": "71b68155af63d5399671a31bc210a4be446fbf9d",
+    "bytes": 28733690,
+    "total": 28733690
+  },
+  "baseline": {
+    "report": "2026-10-30-g502-physical-crossing-review.json",
+    "matchedEntries": 12,
+    "requestToGrantMaxMs": 333.77,
+    "receiverPreparationMaxMs": 303.916,
+    "tcpRttRangeMs": [
+      6.487,
+      8.85
+    ],
+    "rootCause": "A connected prepared console is not yet a fully loaded/authenticated/desktop-bound native input/release pair. Movement-triggered preparation after the fixed 3s expiry is too late for short idle reentry."
+  },
+  "changes": [
+    "Each native input/release child reports five local startup spans through fixed KRD8 diagnostics: installation/self validation, service authentication/image adoption, agent authentication, parent validation and initial desktop entry. OS loader time before Go entry is not attributed to a measured span.",
+    "One clean ordinary lease return creates one delayed construction opportunity at 3s. Retain any live initial spare until its exact original expiry, then retire it before constructing once. Physical hint/input take/shutdown supersedes the opportunity; cancellation, expired lease and cleanup uncertainty fence it."
+  ],
+  "validation": {
+    "go": "Full go test ./... -timeout=120s passed with CGO_ENABLED=0 and deployment offlineGo runtime overlay.",
+    "regression": "Disabling the delayed opportunity reproduces a failing 5s reentry regression; the fixed behavior passes. One-shot/cooldown, exact expiry, input/hint/shutdown/cancel/lease cancellation and uncertain retirement checks passed.",
+    "frontend": "Frontend tests and native production build passed in build-workspace.ps1.",
+    "package": "Workspace archive, icons, native installer and offline setup verification passed.",
+    "installation": "Both setup results 0, recovery not_needed; matching g503 UI/agent/installed build evidence, protected input READY and authenticated CONNECTED.",
+    "check": "git diff --check passed",
+    "race": "Skipped: CGO disabled in the deployment environment.",
+    "remoteCI": "Skipped: no source push requested."
+  },
+  "scope": "Installation/startup snapshot only. The g503 physical latency effect and recovery recurrence require the next user crossing trial.",
+  "tradeoff": "One additional unused three-process candidate may be built after each clean ordinary return; no periodic refresh. Longer idle and first-ever entry can still need movement-triggered preparation.",
+  "sourceOfTruthChanged": "docs/architecture/02-runtime-flow.md",
+  "apiChanges": "Fixed local KRD8 startup diagnostic envelope; network input protocol and public API unchanged.",
+  "dbChanges": "none",
+  "repositoryHygieneChanges": "none",
+  "runnerChanges": "none",
+  "remotePush": "not performed"
+}
