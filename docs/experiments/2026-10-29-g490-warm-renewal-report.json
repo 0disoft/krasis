@@ -1,0 +1,50 @@
+{
+  "schema": "krasis.warm-renewal-review/v1",
+  "generation": 490,
+  "baseline": {
+    "generation": 489,
+    "revision": "a7209b5f2101c65eb0103f787415a8edf45ab929",
+    "collection": "ce85e0bbcdd1096af354eb1187156bb2",
+    "receiverConnectMs": 199.127,
+    "preparationWaitMs": 64.549,
+    "nativePairReadyMs": 101.109,
+    "preparedAgeMs": 6.126,
+    "precedingHintTimesUTC": [
+      "2026-10-29T11:09:02.6350754Z",
+      "2026-10-29T11:09:04.8925054Z"
+    ],
+    "interpretation": "The first profiled entry used a just-created candidate, not a missing candidate. The previous 2s candidate lifetime is shorter than both the sender's 2.1s renewal and the observed 2.257s hint spacing. Nested startup spans overlap and must not be summed. Exact previous candidate completion/expiry times are not available; expiry followed by reconstruction is a supported explanation, not a fully timestamped causal trace."
+  },
+  "change": {
+    "unboundLifetimeMs": {
+      "before": 2000,
+      "after": 3000
+    },
+    "minimumRemainingOnHintMs": 750,
+    "renewOriginalExpiry": false,
+    "periodicIdleRecreation": false,
+    "maximumProcessCount": "unchanged: one active and one speculative 3-process job, at most six processes",
+    "security": "Actual lease approval, image hashing/pins, authentication, console/session/expiry checks and native retirement fences are unchanged. Only lifetime of a lease-free, input-free speculative candidate increases by 1s."
+  },
+  "regression": {
+    "simulation": "Construction completes 150ms after the preceding hint; renewal arrives 2257ms after that hint. The construction duration is a deterministic fixture, not an observed completion timestamp.",
+    "before": "The prior 2s lifetime expires at 2150ms; renewal starts another builder.",
+    "after": "The original candidate has 893ms remaining and is retained with zero replacement builders. It still expires at 3150ms, without extending the timer.",
+    "oldSourceTest": "failed as expected: renewal retired the warm owner and started replacement construction",
+    "currentTargetedTests": "passed: preparation, prepared-worker and reentry tests in inputworker, agent and residentagent"
+  },
+  "limitations": [
+    "No g490 physical crossing latency reduction is claimed before paired installation and user crossings.",
+    "Genuine cold startup, approach longer than candidate lifetime, or renewal with less than 750ms left still requires preparation/replacement.",
+    "A fresh collection fac94f81da880dda5f79301195e763e5 captured a later g489 A service failure and B reconnect attempts. This lifetime change does not claim to fix those separate failures."
+  ],
+  "apiChanges": "none",
+  "dbChanges": "none",
+  "runnerChanges": "none",
+  "validation": {
+    "fullGoSuite": "passed using repository offline runtime overlay",
+    "finalPreparationTests": "passed after reserve-boundary adjustment",
+    "diffCheck": "passed",
+    "physical": "pending paired installation and user crossings"
+  }
+}

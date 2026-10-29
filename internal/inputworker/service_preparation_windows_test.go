@@ -10,6 +10,37 @@ import (
 	"time"
 )
 
+// g489's hints were 2.257s apart. With 150ms of construction, the previous
+// 2s candidate expired before renewal. Retain the ready owner without extending
+// its timer; no child, journal, lease or input is needed by this test.
+func TestServicePreparationRetainsWarmOwnerAcrossRenewalWithoutExtendingExpiry(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		time.Sleep(150 * time.Millisecond)
+		child := &preparedConsole{preparedAt: time.Now()}
+		child.warmTimer = time.AfterFunc(preparedConsoleWindow, func() { _ = child.expireUnbound() })
+		defer child.close()
+		slot := serviceInputPreparation{next: child}
+		last := time.Now().Add(-150 * time.Millisecond)
+		time.Sleep(2107 * time.Millisecond)
+		builds := 0
+		if slot.hint(context.Background(), last, time.Now(), func(context.Context) (*preparedConsole, error) {
+			builds++
+			return &preparedConsole{}, nil
+		}) {
+			t.Fatal("renewal retired the warm owner and started replacement construction")
+		}
+		if slot.warming != nil || slot.next != child || builds != 0 || child.retired() {
+			t.Fatal("renewal lost the ready candidate or launched a replacement")
+		}
+		// Expiry remains anchored to preparation completion, not the hint.
+		time.Sleep(time.Until(child.preparedAt.Add(preparedConsoleWindow)))
+		synctest.Wait()
+		if !child.retired() || child.warmState.Load() != 3 || builds != 0 {
+			t.Fatal("fresh demand renewed the old child's fixed expiry")
+		}
+	})
+}
+
 func TestServicePreparationReapsIdleExpiredBuilderBeforeFreshHint(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		var slot serviceInputPreparation

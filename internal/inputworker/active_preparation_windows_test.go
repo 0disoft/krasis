@@ -55,7 +55,7 @@ func TestActivePreparationExpiresWithoutRefreshThenReplacesAfterReturn(t *testin
 				calls := 0
 				slot.start(ctx, func(context.Context) (*preparedConsole, error) { calls++; return old, nil })
 				synctest.Wait()
-				time.Sleep(3 * time.Second)
+				time.Sleep(preparedConsoleWindow + time.Millisecond)
 				if !old.retired() || calls != 1 {
 					t.Fatal("active lease extended expiry or refreshed its spare")
 				}

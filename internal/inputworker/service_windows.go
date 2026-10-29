@@ -197,7 +197,7 @@ func runServiceLoopWithGate(ctx context.Context, installation *Installation, rea
 					// Readiness has reached the agent before any next-input work.
 					// Overlap one unbound set with active input as well as passive
 					// presentation. No current lease, journal or agent handles enter
-					// this set; its two-second expiry is not extended or renewed.
+					// this set; its fixed expiry is not extended or renewed.
 					if preparation.start(ctx, func(run context.Context) (*preparedConsole, error) {
 						return prepareServiceConsole(run, installation, service)
 					}) {
