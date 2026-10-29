@@ -46,6 +46,23 @@ func takeInputPreparation(next **preparedConsole, lease Lease) *preparedConsole 
 // Only the installed service can prepare an unbound child. It receives no
 // agent pipe, lease, image pin or input. The ordinary launch API stays agent-only.
 func prepareServiceConsole(ctx context.Context, installation *Installation, digest [sha256.Size]byte) (*preparedConsole, error) {
+	p, err := prepareUnboundServiceConsole(ctx, installation, digest)
+	if err != nil {
+		return nil, err
+	}
+	// Expiry can only destroy an unbound child. Claim and expiry race through
+	// one atomic state; the callback can never close an active input lease.
+	p.warmTimer = time.AfterFunc(preparedConsoleWindow, func() {
+		_ = p.expireUnbound()
+	})
+	return p, nil
+}
+
+// Both speculative and cold preparation create the same unbound child. Launch
+// is owned by the genuine installed SYSTEM service, not by an agent lease.
+// Agent/session authority is freshly checked before bootstrap transfers input
+// handles; no authority result from this launch can be reused there.
+func prepareUnboundServiceConsole(ctx context.Context, installation *Installation, digest [sha256.Size]byte) (*preparedConsole, error) {
 	if ctx == nil || ctx.Err() != nil || installation == nil {
 		return nil, ErrAuthority
 	}
@@ -53,22 +70,11 @@ func prepareServiceConsole(ctx context.Context, installation *Installation, dige
 	if err != nil || service != digest || !fixedInstalledInputProcess(service, false, installation) {
 		return nil, ErrAuthority
 	}
-	p, err := prepareConsoleMode(ctx, true, func(prepare func(windows.Handle, uint32) error) (*ConsoleWorker, error) {
+	return prepareConsoleMode(ctx, true, func(prepare func(windows.Handle, uint32) error) (*ConsoleWorker, error) {
 		return launchManagedConsoleMode(ctx, digest, prepare, installation, preparedInputConsole, func() bool {
 			return fixedInstalledInputProcess(digest, false, installation)
 		})
 	})
-	if err != nil {
-		return nil, err
-	}
-	// Expiry can only destroy an unbound child. Claim and expiry race through
-	// one atomic state; the callback can never close an active input lease.
-	p.warmTimer = time.AfterFunc(preparedConsoleWindow, func() {
-		// Both Close methods retain cleanup errors. The owning service loop
-		// must join close() before another child or lease can be created.
-		_ = p.expireUnbound()
-	})
-	return p, nil
 }
 
 func preparedConsoleFresh(age time.Duration, session, current uint32, alive bool) bool {
@@ -153,11 +159,10 @@ func prepareLeaseConsole(ctx context.Context, agent *Authority, digest [sha256.S
 	if ctx == nil || ctx.Err() != nil || agent == nil || agent.kind != authorityAgent || agent.check(false) != nil {
 		return nil, ErrAuthority
 	}
-	return prepareConsoleMode(ctx, true, func(prepare func(windows.Handle, uint32) error) (*ConsoleWorker, error) {
-		return launchManagedConsoleMode(ctx, digest, prepare, installation, preparedInputConsole, func() bool {
-			return agent.check(false) == nil
-		})
-	})
+	// The child receives no agent handles or lease during this construction.
+	// Match speculative preparation's service-owned launch policy rather than
+	// repeating WTSQueryUserToken at each CreateProcess/Resume checkpoint.
+	return prepareUnboundServiceConsole(ctx, installation, digest)
 }
 
 func prepareConsole(ctx context.Context, launch consoleLauncher) (prepared *preparedConsole, result error) {

@@ -49,6 +49,26 @@ func TestColdNativePreparationRejectsBeforeLaunchingWithoutAuthority(t *testing.
 	}
 }
 
+func TestColdNativePreparationRetainsFullAgentAdmission(t *testing.T) {
+	for _, revoked := range []bool{false, true} {
+		checks := 0
+		a := &Authority{kind: authorityAgent, checkInput: func() error {
+			checks++
+			if revoked {
+				return ErrAuthority
+			}
+			return nil
+		}, checkPresent: func() error { t.Fatal("presence replaced cold agent admission"); return nil },
+			checkRecovery: func() error { return nil }, closeHandles: func() error { return nil }}
+		// Missing protected pins must reject even an admitted agent. Neither a
+		// portable caller nor an agent proof alone can launch the unbound child.
+		p, err := prepareLeaseConsole(context.Background(), a, [sha256.Size]byte{1}, &Installation{}, Lease{})
+		if p != nil || !errors.Is(err, ErrAuthority) || checks != 1 {
+			t.Fatal("cold launch bypassed full admission or trusted missing pins", revoked, checks, err)
+		}
+	}
+}
+
 func TestAgentServicePreparationRejectsMissingPinsWithoutConnecting(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
