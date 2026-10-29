@@ -1,0 +1,204 @@
+{
+  "schema": "krasis.paired-installation/v1",
+  "generation": 497,
+  "revision": "047bf580df193c434c37bbb271a187c56104f052",
+  "collection": "1b8cbc782ac86ef5240600a8b1e81d86",
+  "localDoctor": {
+    "schemaVersion": "krasis.cli.doctor/v1",
+    "agent": "RUNNING",
+    "connection": "CONNECTED",
+    "peerAlias": "B",
+    "cliGeneration": 497,
+    "agentGeneration": 497,
+    "protocol": "COMPATIBLE",
+    "code": "healthy",
+    "cliBuild": "047bf580df193c434c37bbb271a187c56104f052",
+    "agentBuild": "047bf580df193c434c37bbb271a187c56104f052",
+    "ui": {
+      "state": "RUNNING",
+      "generation": 497,
+      "build": "047bf580df193c434c37bbb271a187c56104f052",
+      "pathStatus": "MATCHED"
+    },
+    "launchRecord": {
+      "state": "VERIFIED",
+      "generation": 497,
+      "build": "047bf580df193c434c37bbb271a187c56104f052",
+      "pathStatus": "MATCHED"
+    },
+    "installedAgent": {
+      "state": "VERIFIED",
+      "build": "047bf580df193c434c37bbb271a187c56104f052"
+    },
+    "service": {
+      "state": "RUNNING",
+      "pathStatus": "MATCHED"
+    },
+    "agentLocation": "PROTECTED",
+    "protectedInput": "CONFIGURED",
+    "checks": [
+      {
+        "name": "agent",
+        "state": "RUNNING"
+      },
+      {
+        "name": "connection",
+        "state": "CONNECTED"
+      },
+      {
+        "name": "protocol",
+        "state": "COMPATIBLE"
+      },
+      {
+        "name": "cli_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "ui_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "installed_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "ui",
+        "state": "RUNNING"
+      },
+      {
+        "name": "launch_record",
+        "state": "VERIFIED"
+      },
+      {
+        "name": "installed_agent",
+        "state": "VERIFIED"
+      },
+      {
+        "name": "service",
+        "state": "RUNNING"
+      },
+      {
+        "name": "update_stage_cleanup",
+        "state": "COMPLETED"
+      }
+    ],
+    "nextActions": []
+  },
+  "peerRuntime": {
+    "schemaVersion": "krasis.cli.update-status/v1",
+    "peerAlias": "B",
+    "localGeneration": 497,
+    "localBuild": "047bf580df193c434c37bbb271a187c56104f052",
+    "peerState": "ONLINE",
+    "peerGeneration": 497,
+    "peerBuild": "047bf580df193c434c37bbb271a187c56104f052",
+    "peerAllowsUpdate": true,
+    "receiveAllowed": true,
+    "transferState": "UPDATED",
+    "transferBytes": 28743193,
+    "transferTotal": 28743193
+  },
+  "transferB": {
+    "schemaVersion": "krasis.cli.update-wait/v1",
+    "peerAlias": "B",
+    "id": "69969b374391f1f1dc76529389f08158",
+    "code": "updated",
+    "transferState": "UPDATED",
+    "generation": 497,
+    "revision": "047bf580df193c434c37bbb271a187c56104f052",
+    "bytes": 28743193,
+    "total": 28743193
+  },
+  "peerUI": {
+    "schemaVersion": "krasis.cli.app-open/v1",
+    "code": "window_ready",
+    "peerAlias": "B",
+    "id": "977a95b496be56874609806857cfb347"
+  },
+  "sides": {
+    "A": {
+      "created": "2026-10-29T15:09:23Z",
+      "sha256": "824d75055bedd15c369e62865cb2fb25d93617bc0ab5f54ca94c1426c9dab233",
+      "service": "READY",
+      "inputHealth": {
+        "time": "2026-10-29T15:08:58.5424745Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "installation": {
+        "time": "2026-10-29T15:08:26.519761Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "lastConnected": {
+        "time": "2026-10-29T15:09:12.3939835Z",
+        "code": "CONNECTED"
+      },
+      "currentBuildFaults": [],
+      "incompleteLogSources": [
+        "control.previous.jsonl"
+      ]
+    },
+    "B": {
+      "created": "2026-10-29T15:09:23Z",
+      "sha256": "84c4d8d6fede715bc1f2f5a144d189c2705521e1d0ab0c6da318343cf63b22a7",
+      "service": "READY",
+      "inputHealth": {
+        "time": "2026-10-29T15:09:06.1576367Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "installation": {
+        "time": "2026-10-29T15:09:00.5707912Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "lastConnected": {
+        "time": "2026-10-29T15:09:12.2517318Z",
+        "code": "CONNECTED"
+      },
+      "currentBuildFaults": [],
+      "incompleteLogSources": [
+        "control.previous.jsonl"
+      ]
+    }
+  },
+  "state": "BOTH_READY_PHYSICAL_TEST_PENDING",
+  "change": "Isolate per-channel background source watchdog from mandatory heartbeat presence, with all query ownership included in retirement.",
+  "validation": {
+    "go": "Full go test ./... passed using offline runtime overlay after safe-stop. New failing-before/passing-after regression and independent native retirement regression passed.",
+    "frontend": "104 tests and native production build passed.",
+    "package": "Workspace transfer, icon/package checks, offline setup build and verification passed.",
+    "installation": "Both input-install receipts result 0; both protected input states READY; A doctor healthy; B g497 ONLINE; no observed new-build failures at collection.",
+    "race": "Skipped: CGO disabled.",
+    "remoteCI": "Skipped: no push requested.",
+    "physical": "Pending new crossings; no latency or recurrence improvement claim from installation health."
+  },
+  "sourceOfTruthChanged": "docs/architecture/02-runtime-flow.md",
+  "apiChanges": "Generation only; no public or wire-layout changes.",
+  "dbChanges": "none",
+  "repositoryHygieneChanges": "none",
+  "runnerChanges": "none",
+  "remainingRisk": "Dedicated watchdog lane removes a deterministic blocker, not all writer contention or scheduling stalls. Four g496 pairs still showed up to 307.045ms request-to-grant and 248.149ms receiver dispatch.",
+  "remotePush": "not performed"
+}
