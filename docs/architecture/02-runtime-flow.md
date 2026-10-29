@@ -29,6 +29,21 @@ not measured by the installation/self duration. Numeric diagnostics neither
 authorize input nor certify native retirement; malformed framing still rejects
 startup. Fixed login and direct/portable fixture protocols are unchanged.
 
+A clean ordinary input lease retirement also grants one delayed unbound
+preparation opportunity, anchored 3s after that retirement. This targets the
+observed 3-5s local pause: waiting for fresh outward movement left native
+construction on the next entry. A still-live initial spare is retained until
+its exact original 3s expiry; replacement waits for confirmed retirement.
+One candidate/builder and the 2s launch cooldown are shared with real hints.
+An actual input take, accepted replacement hint, shutdown, cancellation, expired
+lease or known cleanup failure cancels/fences the opportunity. Passive cursor
+presentation alone does not cancel it. It is consumed before one asynchronous
+build and never schedules a second replacement or a periodic idle loop. It
+transfers no agent handles, journal or input authority. A return that is never
+followed by another entry may therefore pay for one unused three-process set;
+longer idle still falls back to movement-driven preparation. Fixed child expiry,
+fresh native checks, proof/query slot bounds and no-replay policy are unchanged.
+
 g502 separates optional preparation demand from the serial input/presentation
 endpoint with the fixed local `Krasis.Preparation.v1` pipe. It authenticates the
 exact installed agent and service, repeats fresh request/receipt authority and
