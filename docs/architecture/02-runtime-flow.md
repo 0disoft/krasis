@@ -16,6 +16,26 @@ g478의 상대 관리 창 열기는 에이전트와 실행 기록의 generation/
 
 ## 경계 전환
 
+g504 measures full-image file reads and SHA256 computation separately. KRD9
+adds exactly 36 diagnostic bytes (journal, input child and release child) to
+KRD8, including backend 1 (Go) or 2 (Windows CNG). The same bounded startup read
+and fresh heartbeat remain mandatory; malformed framing is rejected and invalid
+numeric diagnostics are discarded after consuming their fixed payload. Older
+readiness envelopes remain readable; the network protocol is unchanged.
+
+The existing whole-file SHA256 verifier retains its 256KiB buffer, 64MiB image
+bound, growth/EOF check, constant-time comparison and write/delete-excluding
+image pin. On Windows amd64 without AVX, a fresh fixed CNG SHA256 object replaces
+Go's generic SHA256 block loop. CPUs with AVX and other platforms retain Go
+SHA256. This reflects the selected Go runtime's requirement for AVX on both its
+amd64 accelerated SHA256 paths. Every CNG create/write/finish/destroy failure
+rejects verification; all initialized objects are destroyed, including after
+read/digest failures. No verified bytes, hash result, service/agent proof or
+input authority are cached or transferred by this change. CPU applicability and
+the B laptop's resulting latency must be established from the new diagnostics,
+not inferred from a local purego benchmark. Installation/self validation also
+contains directory/ACL/token work beyond these two hash spans.
+
 g503 records native input/release startup separately. Each fully authenticated
 ordinary native child emits one fixed local startup envelope before its initial
 heartbeat. Five child-local durations cover installation/self validation,
