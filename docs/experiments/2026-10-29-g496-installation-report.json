@@ -199,22 +199,180 @@
       "currentBuildFaults": []
     }
   },
-  "state": "A_SERVICE_RECOVERY_PENDING",
-  "requiredUserAction": "A: approve Windows administrator confirmation through the g496 protected input update/agent repair button. Do not start physical tests yet.",
+  "state": "BOTH_READY_PHYSICAL_TEST_PENDING",
+  "requiredUserAction": "Perform slow and fast A/B crossings, including 3-5 second dwell; report stutter, reconnection or recovery before pressing repair.",
   "validation": {
     "go": "Full go test ./... passed with the offline runtime overlay after safe-stop; full inputworker, wininput, inputdesktop and targeted watchdog regression tests passed.",
     "frontend": "104 tests and native production build passed.",
     "package": "Workspace transfer test, icon/package checks and offline setup verification passed.",
     "race": "Skipped: CGO disabled.",
     "remoteCI": "Skipped: no push requested.",
-    "physical": "Pending: A protected input service has not been recovered; no g496 crossing or latency claim."
+    "physical": "Pending fresh g496 crossings after A recovery; installation health alone does not establish latency improvement or absence of recurrence."
   },
-  "remainingRisk": "The old A g495 service failure remains. Native hook stall and uncertain retirement require fresh evidence; g496 fixes watchdog capacity contention and reveals concrete cleanup causes, not all scheduling stalls.",
+  "remainingRisk": "Both services are ready after A recovery. Native hook stalls and uncertain retirement still require fresh crossing evidence. Previous control log truncation is recorded; no complete historical absence-of-failure claim.",
   "sourceOfTruthChanged": "docs/architecture/02-runtime-flow.md",
   "causeReview": "2026-10-29-g495-recovery-review.json",
   "apiChanges": "Generation only; no public/wire layout changes.",
   "dbChanges": "none",
   "repositoryHygieneChanges": "none",
   "runnerChanges": "none",
-  "remotePush": "not performed"
+  "remotePush": "not performed",
+  "recoveryVerification": {
+    "collection": "69a78e44820ab084624aa876df439299",
+    "faultWindowStart": "2026-10-29T14:49:15Z",
+    "localDoctor": {
+      "schemaVersion": "krasis.cli.doctor/v1",
+      "agent": "RUNNING",
+      "connection": "CONNECTED",
+      "peerAlias": "B",
+      "cliGeneration": 496,
+      "agentGeneration": 496,
+      "protocol": "COMPATIBLE",
+      "code": "healthy",
+      "cliBuild": "0ccf7db69d232b52bc86809fb438653d61b266d9",
+      "agentBuild": "0ccf7db69d232b52bc86809fb438653d61b266d9",
+      "ui": {
+        "state": "RUNNING",
+        "generation": 496,
+        "build": "0ccf7db69d232b52bc86809fb438653d61b266d9",
+        "pathStatus": "MATCHED"
+      },
+      "launchRecord": {
+        "state": "VERIFIED",
+        "generation": 496,
+        "build": "0ccf7db69d232b52bc86809fb438653d61b266d9",
+        "pathStatus": "MATCHED"
+      },
+      "installedAgent": {
+        "state": "VERIFIED",
+        "build": "0ccf7db69d232b52bc86809fb438653d61b266d9"
+      },
+      "service": {
+        "state": "RUNNING",
+        "pathStatus": "MATCHED"
+      },
+      "agentLocation": "PROTECTED",
+      "protectedInput": "CONFIGURED",
+      "checks": [
+        {
+          "name": "agent",
+          "state": "RUNNING"
+        },
+        {
+          "name": "connection",
+          "state": "CONNECTED"
+        },
+        {
+          "name": "protocol",
+          "state": "COMPATIBLE"
+        },
+        {
+          "name": "cli_agent_version",
+          "state": "MATCHED"
+        },
+        {
+          "name": "ui_agent_version",
+          "state": "MATCHED"
+        },
+        {
+          "name": "installed_agent_version",
+          "state": "MATCHED"
+        },
+        {
+          "name": "ui",
+          "state": "RUNNING"
+        },
+        {
+          "name": "launch_record",
+          "state": "VERIFIED"
+        },
+        {
+          "name": "installed_agent",
+          "state": "VERIFIED"
+        },
+        {
+          "name": "service",
+          "state": "RUNNING"
+        },
+        {
+          "name": "update_stage_cleanup",
+          "state": "COMPLETED"
+        }
+      ],
+      "nextActions": []
+    },
+    "peerRuntime": {
+      "schemaVersion": "krasis.cli.update-status/v1",
+      "peerAlias": "B",
+      "localGeneration": 496,
+      "localBuild": "0ccf7db69d232b52bc86809fb438653d61b266d9",
+      "peerState": "ONLINE",
+      "peerGeneration": 496,
+      "peerBuild": "0ccf7db69d232b52bc86809fb438653d61b266d9",
+      "peerAllowsUpdate": true,
+      "receiveAllowed": true,
+      "transferState": "IDLE"
+    },
+    "sides": {
+      "A": {
+        "created": "2026-10-29T14:50:14Z",
+        "sha256": "e765bc93329e6f320db8b3ba8f77853c71b230aefb5b9c44d8e085dad26276b4",
+        "service": "READY",
+        "inputHealth": {
+          "time": "2026-10-29T14:49:47.5502855Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "installedInputReceipt": {
+          "time": "2026-10-29T14:49:15.063568Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "currentBuildFaults": [],
+        "incompleteLogSources": [
+          "control.previous.jsonl"
+        ]
+      },
+      "B": {
+        "created": "2026-10-29T14:50:15Z",
+        "sha256": "e7b05d44718007b1ef4a1eb1c4b13a592110d161ad4cc63e2962d272b55358dc",
+        "service": "READY",
+        "inputHealth": {
+          "time": "2026-10-29T14:50:04.9496284Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "installedInputReceipt": {
+          "time": "2026-10-29T14:32:58.9720761Z",
+          "action": "install",
+          "result": 0,
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false,
+          "recovery": "not_needed",
+          "recoveryWin32Error": 0,
+          "recoveryWin32Known": false,
+          "closeWin32Error": 0,
+          "closeWin32Known": false
+        },
+        "currentBuildFaults": [],
+        "incompleteLogSources": [
+          "control.previous.jsonl"
+        ]
+      }
+    },
+    "conclusion": "A recovery completed; both g496 apps and protected input services are ready. Physical crossing verification remains pending."
+  }
 }
