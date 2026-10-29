@@ -133,6 +133,12 @@ func NewWriter(destination io.Writer) (*Writer, error) {
 }
 
 func (writer *Writer) WriteFrame(frame Frame) error {
+	return writer.writeFrame(frame, nil)
+}
+
+// Admission runs after encoding, immediately before the first stream write.
+// Its rejection is the only proof that no TLS call has been made for this frame.
+func (writer *Writer) writeFrame(frame Frame, admit func() error) error {
 	if !frame.Kind.Valid() {
 		return fmt.Errorf("%w: message kind %d", ErrUnsupportedFrame, frame.Kind)
 	}
@@ -151,6 +157,11 @@ func (writer *Writer) WriteFrame(frame Frame) error {
 	header[5] = byte(frame.Kind)
 	binary.BigEndian.PutUint32(header[8:12], uint32(len(frame.Payload)))
 	copy(packet[headerSize:], frame.Payload)
+	if admit != nil {
+		if err := admit(); err != nil {
+			return err
+		}
+	}
 	if err := writeFull(writer.destination, packet); err != nil {
 		return fmt.Errorf("write frame: %w", err)
 	}

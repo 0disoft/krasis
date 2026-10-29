@@ -152,8 +152,24 @@ func (connection *PeerConnection) WriteFrameContext(ctx context.Context, frame F
 		}
 	}
 	finishWrite := interruptWriteOnCancel(ctx, connection.connection)
-	err := connection.writer.WriteFrame(frame)
+	expiredBeforeWrite := false
+	err := connection.writer.writeFrame(frame, func() error {
+		// Native deadline setup, encoding or scheduling may consume the budget
+		// after writeGate admission. An untouched TLS stream remains reusable.
+		cause := ctx.Err()
+		if cause == nil && hasDeadline && !time.Now().Before(deadline) {
+			cause = context.DeadlineExceeded
+		}
+		if cause != nil {
+			expiredBeforeWrite = true
+		}
+		return cause
+	})
 	finishWrite()
+	if expiredBeforeWrite {
+		admitted = time.Time{}
+		return failure("admission", err)
+	}
 	if err != nil {
 		// Failed TLS writes cannot be reused. Close the socket directly rather
 		// than spending another TLS close-notify timeout on an unusable stream.
