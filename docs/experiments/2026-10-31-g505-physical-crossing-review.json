@@ -1,0 +1,1458 @@
+{
+  "schema": "krasis.physical-crossing-review/v1",
+  "generation": 505,
+  "revision": "c77d44d8829d84d458f436ddb2a55bbf9f06a187",
+  "collection": "4df374088f83af6e5d9a450637b9a219",
+  "method": "Exact build after paired-installation collection; deduplicated source/run/sequence. Only uniquely matched A-source/B-receiver exchange tags, successful complete pairs for latency summary. B frames are bounded profiles, not all physical input. Local spans overlap and must not be added. Exchange residual includes network and endpoint scheduling, not pure RTT.",
+  "sides": {
+    "A": {
+      "created": "2026-10-31T09:29:06Z",
+      "sha256": "2b8d0157b3488f6406e54127079b949dca9c8fc68e6ceaecf0aa56714d4003bc",
+      "cutoff": "2026-10-31T09:20:19Z",
+      "inputHealth": {
+        "time": "2026-10-31T09:28:38.6201803Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "installation": {
+        "time": "2026-10-31T09:28:07.0185927Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-31T09:28:08.189157Z",
+        "time": "2026-10-31T09:28:08.2208137Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      },
+      "failures": [
+        {
+          "time": "2026-10-31T09:20:57.8058079Z",
+          "code": "installed_source_failure_response"
+        },
+        {
+          "time": "2026-10-31T09:20:57.8058079Z",
+          "code": "installed_source_command_failed_heartbeat"
+        },
+        {
+          "time": "2026-10-31T09:23:54.3497961Z",
+          "code": "installed_source_failure_response"
+        },
+        {
+          "time": "2026-10-31T09:23:54.3497961Z",
+          "code": "installed_source_command_failed_heartbeat"
+        },
+        {
+          "time": "2026-10-31T09:23:54.3497961Z",
+          "code": "installed_source_response_timeout"
+        },
+        {
+          "time": "2026-10-31T09:23:54.3535836Z",
+          "code": "installed_source_failure_context"
+        },
+        {
+          "time": "2026-10-31T09:23:54.3535836Z",
+          "code": "installed_source_command_failed_stop"
+        },
+        {
+          "time": "2026-10-31T09:23:54.7175531Z",
+          "code": "fault_source_hook_failed"
+        },
+        {
+          "time": "2026-10-31T09:23:54.7756293Z",
+          "code": "session_failed"
+        },
+        {
+          "time": "2026-10-31T09:24:19.181099Z",
+          "code": "process_failed"
+        }
+      ],
+      "connections": [
+        {
+          "time": "2026-10-31T09:24:25.6913592Z",
+          "code": "CONNECTED"
+        },
+        {
+          "time": "2026-10-31T09:28:13.5823205Z",
+          "code": "CONNECTED"
+        }
+      ],
+      "profiles": 9,
+      "profileOutcomes": [
+        {
+          "time": "2026-10-31T09:27:58.63448Z",
+          "attempt": 1,
+          "end": "ok",
+          "incomplete": false,
+          "frames": 86
+        },
+        {
+          "time": "2026-10-31T09:28:00.228582Z",
+          "attempt": 2,
+          "end": "ok",
+          "incomplete": false,
+          "frames": 56
+        },
+        {
+          "time": "2026-10-31T09:28:02.9128789Z",
+          "attempt": 3,
+          "end": "ok",
+          "incomplete": false,
+          "frames": 56
+        },
+        {
+          "time": "2026-10-31T09:28:17.0713333Z",
+          "attempt": 1,
+          "end": "ok",
+          "incomplete": false,
+          "frames": 60
+        },
+        {
+          "time": "2026-10-31T09:28:18.3205101Z",
+          "attempt": 2,
+          "end": "ok",
+          "incomplete": false,
+          "frames": 61
+        },
+        {
+          "time": "2026-10-31T09:28:25.8588997Z",
+          "attempt": 3,
+          "end": "ok",
+          "incomplete": false,
+          "frames": 212
+        },
+        {
+          "time": "2026-10-31T09:28:35.0229211Z",
+          "attempt": 4,
+          "end": "ok",
+          "incomplete": false,
+          "frames": 77
+        },
+        {
+          "time": "2026-10-31T09:28:43.8732007Z",
+          "attempt": 5,
+          "end": "ok",
+          "incomplete": false,
+          "frames": 89
+        },
+        {
+          "time": "2026-10-31T09:28:52.9539906Z",
+          "attempt": 6,
+          "end": "ok",
+          "incomplete": false,
+          "frames": 71
+        }
+      ],
+      "incompleteLogSources": [
+        "control.previous.jsonl"
+      ]
+    },
+    "B": {
+      "created": "2026-10-31T09:29:06Z",
+      "sha256": "95dd2a9f6a3b12855a1dcef4e02d2a171d4ec5516231c82220672a217b085f1a",
+      "cutoff": "2026-10-31T09:20:20Z",
+      "inputHealth": {
+        "time": "2026-10-31T09:28:40.0733087Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "installation": {
+        "time": "2026-10-31T09:18:50.3307247Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-31T09:18:53.0213717Z",
+        "time": "2026-10-31T09:28:04.5739283Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE",
+        "source": {
+          "total": 2,
+          "exits": [
+            {
+              "time": "2026-10-31T09:23:54.0261761Z",
+              "command": "ok",
+              "reader": "stopped",
+              "capture": "joined",
+              "sender": "joined",
+              "interrupt": "joined",
+              "retirement": "clean_sent",
+              "report": "ok",
+              "heartbeatStage": "replied",
+              "heartbeatSlowStage": "agent_presence",
+              "heartbeatSlowBucket": 3
+            },
+            {
+              "time": "2026-10-31T09:28:04.4591293Z",
+              "command": "ok",
+              "reader": "stopped",
+              "capture": "joined",
+              "sender": "joined",
+              "interrupt": "joined",
+              "retirement": "clean_sent",
+              "report": "ok",
+              "heartbeatStage": "replied",
+              "heartbeatSlowStage": "service_presence",
+              "heartbeatSlowBucket": 1
+            }
+          ]
+        }
+      },
+      "failures": [
+        {
+          "time": "2026-10-31T09:23:54.0142355Z",
+          "code": "reconnect_remote_eof"
+        },
+        {
+          "time": "2026-10-31T09:23:54.0142355Z",
+          "code": "RECONNECTING"
+        },
+        {
+          "time": "2026-10-31T09:23:55.8539679Z",
+          "code": "reconnect_acquire_network_reset"
+        },
+        {
+          "time": "2026-10-31T09:24:01.0582116Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-10-31T09:24:06.4725245Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-10-31T09:24:13.7998142Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-10-31T09:24:20.6194531Z",
+          "code": "reconnect_acquire_network_timeout"
+        }
+      ],
+      "connections": [
+        {
+          "time": "2026-10-31T09:24:25.2899271Z",
+          "code": "CONNECTED"
+        },
+        {
+          "time": "2026-10-31T09:28:13.1803817Z",
+          "code": "CONNECTED"
+        }
+      ],
+      "profiles": 9,
+      "profileOutcomes": [
+        {
+          "time": "2026-10-31T09:27:58.2249122Z",
+          "attempt": 1,
+          "end": "ok",
+          "incomplete": false,
+          "frames": 82
+        },
+        {
+          "time": "2026-10-31T09:27:59.8051908Z",
+          "attempt": 2,
+          "end": "ok",
+          "incomplete": false,
+          "frames": 54
+        },
+        {
+          "time": "2026-10-31T09:28:02.4899425Z",
+          "attempt": 3,
+          "end": "ok",
+          "incomplete": false,
+          "frames": 53
+        },
+        {
+          "time": "2026-10-31T09:28:16.660916Z",
+          "attempt": 4,
+          "end": "ok",
+          "incomplete": false,
+          "frames": 56
+        },
+        {
+          "time": "2026-10-31T09:28:17.9139178Z",
+          "attempt": 5,
+          "end": "ok",
+          "incomplete": false,
+          "frames": 53
+        },
+        {
+          "time": "2026-10-31T09:28:25.4480229Z",
+          "attempt": 6,
+          "end": "ok",
+          "incomplete": false,
+          "frames": 202
+        },
+        {
+          "time": "2026-10-31T09:28:34.6130114Z",
+          "attempt": 7,
+          "end": "ok",
+          "incomplete": false,
+          "frames": 72
+        },
+        {
+          "time": "2026-10-31T09:28:43.4636058Z",
+          "attempt": 8,
+          "end": "ok",
+          "incomplete": false,
+          "frames": 86
+        },
+        {
+          "time": "2026-10-31T09:28:52.5468843Z",
+          "attempt": 9,
+          "end": "ok",
+          "incomplete": false,
+          "frames": 66
+        }
+      ],
+      "incompleteLogSources": [
+        "control.previous.jsonl"
+      ]
+    }
+  },
+  "pairs": 9,
+  "successfulPairs": 9,
+  "summary": {
+    "requestToGrantMs": {
+      "count": 9,
+      "minMs": 38.069,
+      "medianMs": 42.566,
+      "maxMs": 163.095
+    },
+    "captureActivationMs": {
+      "count": 9,
+      "minMs": 11.126,
+      "medianMs": 21.278,
+      "maxMs": 40.161
+    },
+    "receiverPrepareMs": {
+      "count": 9,
+      "minMs": 24.325,
+      "medianMs": 26.459,
+      "maxMs": 151.991
+    },
+    "receiverReadyWaitMs": {
+      "count": 9,
+      "minMs": 21.458,
+      "medianMs": 24.756,
+      "maxMs": 149.107
+    },
+    "nativePairReadinessMs": {
+      "count": 9,
+      "minMs": 9.154,
+      "medianMs": 10.383,
+      "maxMs": 114.457
+    },
+    "receiverEntryMs": {
+      "count": 9,
+      "minMs": 3.266,
+      "medianMs": 3.819,
+      "maxMs": 5.056
+    },
+    "receiverFirstMs": {
+      "count": 9,
+      "minMs": 1.606,
+      "medianMs": 2.311,
+      "maxMs": 3.374
+    },
+    "receiverWorstMs": {
+      "count": 9,
+      "minMs": 3.681,
+      "medianMs": 5.096,
+      "maxMs": 11.784
+    },
+    "receiverWorstAuthorityMs": {
+      "count": 9,
+      "minMs": 0,
+      "medianMs": 0,
+      "maxMs": 0.579
+    },
+    "receiverWorstResponseMs": {
+      "count": 9,
+      "minMs": 1.778,
+      "medianMs": 4.517,
+      "maxMs": 11.784
+    },
+    "sourceWaitMs": {
+      "count": 9,
+      "minMs": 37.524,
+      "medianMs": 42.331,
+      "maxMs": 163.095
+    },
+    "receiverServiceMs": {
+      "count": 9,
+      "minMs": 30.175,
+      "medianMs": 33.886,
+      "maxMs": 157.989
+    },
+    "exchangeResidualMs": {
+      "count": 9,
+      "minMs": 1.448999999999998,
+      "medianMs": 10.266000000000002,
+      "maxMs": 23.830999999999996
+    },
+    "firstOfferFromSourceBeginMs": {
+      "count": 9,
+      "minMs": 49.152,
+      "medianMs": 66.946,
+      "maxMs": 205.478
+    }
+  },
+  "samples": [
+    {
+      "sourceTime": "2026-10-31T09:27:58.63448Z",
+      "receiverTime": "2026-10-31T09:27:58.2249122Z",
+      "sourceEnd": "ok",
+      "receiverEnd": "ok",
+      "incomplete": false,
+      "requestToGrantMs": 42.566,
+      "captureActivationMs": 35.508,
+      "receiverPrepareMs": 24.992,
+      "receiverReadyWaitMs": 22.709,
+      "sourceWaitMs": 42.018,
+      "receiverServiceMs": 31.752,
+      "exchangeResidualMs": 10.266000000000002,
+      "tcp": {
+        "schema": 1,
+        "rttMicros": [
+          9624,
+          9436
+        ],
+        "minRttMicros": [
+          4246,
+          4246
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "preparationDecision": 1,
+      "preparedAgeMs": 2749.692,
+      "nativeStartup": [
+        {
+          "micros": [
+            61952,
+            2848,
+            4046,
+            0,
+            565
+          ],
+          "measured": 31,
+          "imageHash": {
+            "micros": [
+              2683,
+              56436
+            ],
+            "backend": 1
+          }
+        },
+        {
+          "micros": [
+            61952,
+            3395,
+            3451,
+            0,
+            587
+          ],
+          "measured": 31,
+          "imageHash": {
+            "micros": [
+              1113,
+              58005
+            ],
+            "backend": 1
+          }
+        }
+      ],
+      "nativePairReadinessMs": 9.154,
+      "receiverEntryMs": 3.819,
+      "receiverFirstMs": 2.84,
+      "receiverWorstMs": 5.096,
+      "receiverWorstAuthorityMs": 0.579,
+      "receiverWorstResponseMs": 4.517,
+      "receiverWorstWorkerMillis": [
+        0,
+        0,
+        3
+      ],
+      "receiverWorstWorkerMeasured": 7,
+      "receiverWorstApply": null,
+      "receiverWorstACK": null,
+      "firstOfferFromSourceBeginMs": 49.152
+    },
+    {
+      "sourceTime": "2026-10-31T09:28:00.228582Z",
+      "receiverTime": "2026-10-31T09:27:59.8051908Z",
+      "sourceEnd": "ok",
+      "receiverEnd": "ok",
+      "incomplete": false,
+      "requestToGrantMs": 38.069,
+      "captureActivationMs": 11.126,
+      "receiverPrepareMs": 24.487,
+      "receiverReadyWaitMs": 21.458,
+      "sourceWaitMs": 37.524,
+      "receiverServiceMs": 30.219,
+      "exchangeResidualMs": 7.305,
+      "tcp": {
+        "schema": 1,
+        "rttMicros": [
+          8398,
+          8394
+        ],
+        "minRttMicros": [
+          4246,
+          4246
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "preparationDecision": 1,
+      "preparedAgeMs": 1740.268,
+      "nativeStartup": [
+        {
+          "micros": [
+            65413,
+            3623,
+            4041,
+            0,
+            1121
+          ],
+          "measured": 31,
+          "imageHash": {
+            "micros": [
+              1568,
+              60711
+            ],
+            "backend": 1
+          }
+        },
+        {
+          "micros": [
+            64393,
+            3623,
+            4041,
+            0,
+            1121
+          ],
+          "measured": 31,
+          "imageHash": {
+            "micros": [
+              2703,
+              59576
+            ],
+            "backend": 1
+          }
+        }
+      ],
+      "nativePairReadinessMs": 9.89,
+      "receiverEntryMs": 4.033,
+      "receiverFirstMs": 1.606,
+      "receiverWorstMs": 11.784,
+      "receiverWorstAuthorityMs": 0,
+      "receiverWorstResponseMs": 11.784,
+      "receiverWorstWorkerMillis": [
+        1,
+        1,
+        10
+      ],
+      "receiverWorstWorkerMeasured": 7,
+      "receiverWorstApply": null,
+      "receiverWorstACK": null,
+      "firstOfferFromSourceBeginMs": 50.774
+    },
+    {
+      "sourceTime": "2026-10-31T09:28:02.9128789Z",
+      "receiverTime": "2026-10-31T09:28:02.4899425Z",
+      "sourceEnd": "ok",
+      "receiverEnd": "ok",
+      "incomplete": false,
+      "requestToGrantMs": 41.818,
+      "captureActivationMs": 17.052,
+      "receiverPrepareMs": 24.325,
+      "receiverReadyWaitMs": 21.975,
+      "sourceWaitMs": 41.266,
+      "receiverServiceMs": 30.175,
+      "exchangeResidualMs": 11.090999999999998,
+      "tcp": {
+        "schema": 1,
+        "rttMicros": [
+          6247,
+          6608
+        ],
+        "minRttMicros": [
+          4044,
+          4044
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "preparationDecision": 1,
+      "preparedAgeMs": 2453.137,
+      "nativeStartup": [
+        {
+          "micros": [
+            61309,
+            3415,
+            3543,
+            0,
+            1137
+          ],
+          "measured": 31,
+          "imageHash": {
+            "micros": [
+              4680,
+              54929
+            ],
+            "backend": 1
+          }
+        },
+        {
+          "micros": [
+            65149,
+            3415,
+            2963,
+            580,
+            1137
+          ],
+          "measured": 31,
+          "imageHash": {
+            "micros": [
+              4359,
+              57568
+            ],
+            "backend": 1
+          }
+        }
+      ],
+      "nativePairReadinessMs": 9.257,
+      "receiverEntryMs": 3.498,
+      "receiverFirstMs": 1.803,
+      "receiverWorstMs": 5.103,
+      "receiverWorstAuthorityMs": 0,
+      "receiverWorstResponseMs": 4.548,
+      "receiverWorstWorkerMillis": [
+        0,
+        0,
+        4
+      ],
+      "receiverWorstWorkerMeasured": 7,
+      "receiverWorstApply": null,
+      "receiverWorstACK": null,
+      "firstOfferFromSourceBeginMs": 51.35
+    },
+    {
+      "sourceTime": "2026-10-31T09:28:17.0713333Z",
+      "receiverTime": "2026-10-31T09:28:16.660916Z",
+      "sourceEnd": "ok",
+      "receiverEnd": "ok",
+      "incomplete": false,
+      "requestToGrantMs": 163.095,
+      "captureActivationMs": 40.161,
+      "receiverPrepareMs": 151.991,
+      "receiverReadyWaitMs": 149.107,
+      "sourceWaitMs": 163.095,
+      "receiverServiceMs": 157.989,
+      "exchangeResidualMs": 5.1059999999999945,
+      "tcp": {
+        "schema": 1,
+        "rttMicros": [
+          7527,
+          7331
+        ],
+        "minRttMicros": [
+          5842,
+          5842
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "preparationDecision": 1,
+      "preparedAgeMs": 5.564,
+      "nativeStartup": [
+        {
+          "micros": [
+            63684,
+            3013,
+            3321,
+            0,
+            1001
+          ],
+          "measured": 31,
+          "imageHash": {
+            "micros": [
+              5941,
+              56016
+            ],
+            "backend": 1
+          }
+        },
+        {
+          "micros": [
+            67295,
+            3321,
+            3474,
+            0,
+            1145
+          ],
+          "measured": 31,
+          "imageHash": {
+            "micros": [
+              7177,
+              57351
+            ],
+            "backend": 1
+          }
+        }
+      ],
+      "nativePairReadinessMs": 114.457,
+      "receiverEntryMs": 3.266,
+      "receiverFirstMs": 3.374,
+      "receiverWorstMs": 3.685,
+      "receiverWorstAuthorityMs": 0,
+      "receiverWorstResponseMs": 3.685,
+      "receiverWorstWorkerMillis": [
+        1,
+        1,
+        3
+      ],
+      "receiverWorstWorkerMeasured": 7,
+      "receiverWorstApply": null,
+      "receiverWorstACK": null,
+      "firstOfferFromSourceBeginMs": 205.478
+    },
+    {
+      "sourceTime": "2026-10-31T09:28:18.3205101Z",
+      "receiverTime": "2026-10-31T09:28:17.9139178Z",
+      "sourceEnd": "ok",
+      "receiverEnd": "ok",
+      "incomplete": false,
+      "requestToGrantMs": 58.264,
+      "captureActivationMs": 23.734,
+      "receiverPrepareMs": 27.035,
+      "receiverReadyWaitMs": 25.315,
+      "sourceWaitMs": 57.717,
+      "receiverServiceMs": 33.886,
+      "exchangeResidualMs": 23.830999999999996,
+      "tcp": {
+        "schema": 1,
+        "rttMicros": [
+          8735,
+          13028
+        ],
+        "minRttMicros": [
+          4401,
+          4401
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "preparationDecision": 1,
+      "preparedAgeMs": 1096.394,
+      "nativeStartup": [
+        {
+          "micros": [
+            63184,
+            3200,
+            3733,
+            592,
+            1157
+          ],
+          "measured": 31,
+          "imageHash": {
+            "micros": [
+              2867,
+              57682
+            ],
+            "backend": 1
+          }
+        },
+        {
+          "micros": [
+            59110,
+            3765,
+            3733,
+            592,
+            1719
+          ],
+          "measured": 31,
+          "imageHash": {
+            "micros": [
+              3306,
+              52646
+            ],
+            "backend": 1
+          }
+        }
+      ],
+      "nativePairReadinessMs": 10.383,
+      "receiverEntryMs": 4.237,
+      "receiverFirstMs": 2.311,
+      "receiverWorstMs": 5.14,
+      "receiverWorstAuthorityMs": 0,
+      "receiverWorstResponseMs": 4.58,
+      "receiverWorstWorkerMillis": [
+        0,
+        0,
+        1
+      ],
+      "receiverWorstWorkerMeasured": 7,
+      "receiverWorstApply": null,
+      "receiverWorstACK": null,
+      "firstOfferFromSourceBeginMs": 84.74
+    },
+    {
+      "sourceTime": "2026-10-31T09:28:25.8588997Z",
+      "receiverTime": "2026-10-31T09:28:25.4480229Z",
+      "sourceEnd": "ok",
+      "receiverEnd": "ok",
+      "incomplete": false,
+      "requestToGrantMs": 101.91,
+      "captureActivationMs": 21.462,
+      "receiverPrepareMs": 73.505,
+      "receiverReadyWaitMs": 70.551,
+      "sourceWaitMs": 101.91,
+      "receiverServiceMs": 82.522,
+      "exchangeResidualMs": 19.38799999999999,
+      "tcp": {
+        "schema": 1,
+        "rttMicros": [
+          12849,
+          14322
+        ],
+        "minRttMicros": [
+          4401,
+          4401
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "preparationDecision": 1,
+      "preparedAgeMs": 88.627,
+      "nativeStartup": [
+        {
+          "micros": [
+            75146,
+            5240,
+            10450,
+            0,
+            4358
+          ],
+          "measured": 31,
+          "imageHash": {
+            "micros": [
+              6749,
+              65491
+            ],
+            "backend": 1
+          }
+        },
+        {
+          "micros": [
+            74565,
+            5240,
+            7524,
+            0,
+            6143
+          ],
+          "measured": 31,
+          "imageHash": {
+            "micros": [
+              4974,
+              66665
+            ],
+            "backend": 1
+          }
+        }
+      ],
+      "nativePairReadinessMs": 56.177,
+      "receiverEntryMs": 5.056,
+      "receiverFirstMs": 2.281,
+      "receiverWorstMs": 4.015,
+      "receiverWorstAuthorityMs": 0.54,
+      "receiverWorstResponseMs": 3.148,
+      "receiverWorstWorkerMillis": [
+        0,
+        0,
+        3
+      ],
+      "receiverWorstWorkerMeasured": 7,
+      "receiverWorstApply": {
+        "micros": [
+          3148,
+          0
+        ],
+        "measured": 1,
+        "submissionMicros": 2582,
+        "submissionCalls": 1
+      },
+      "receiverWorstACK": {
+        "micros": [
+          3148,
+          0,
+          0
+        ],
+        "measured": 7,
+        "progress": 4
+      },
+      "firstOfferFromSourceBeginMs": 127.326
+    },
+    {
+      "sourceTime": "2026-10-31T09:28:35.0229211Z",
+      "receiverTime": "2026-10-31T09:28:34.6130114Z",
+      "sourceEnd": "ok",
+      "receiverEnd": "ok",
+      "incomplete": false,
+      "requestToGrantMs": 39.94,
+      "captureActivationMs": 17.022,
+      "receiverPrepareMs": 26.459,
+      "receiverReadyWaitMs": 24.756,
+      "sourceWaitMs": 39.39,
+      "receiverServiceMs": 37.941,
+      "exchangeResidualMs": 1.448999999999998,
+      "tcp": {
+        "schema": 1,
+        "rttMicros": [
+          6857,
+          6638
+        ],
+        "minRttMicros": [
+          4360,
+          4360
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "preparationDecision": 1,
+      "preparedAgeMs": 1149.802,
+      "nativeStartup": [
+        {
+          "micros": [
+            64900,
+            3486,
+            4111,
+            0,
+            1539
+          ],
+          "measured": 31,
+          "imageHash": {
+            "micros": [
+              6013,
+              57133
+            ],
+            "backend": 1
+          }
+        },
+        {
+          "micros": [
+            63047,
+            2892,
+            4132,
+            574,
+            1125
+          ],
+          "measured": 31,
+          "imageHash": {
+            "micros": [
+              3970,
+              53921
+            ],
+            "backend": 1
+          }
+        }
+      ],
+      "nativePairReadinessMs": 11.427,
+      "receiverEntryMs": 3.482,
+      "receiverFirstMs": 2.232,
+      "receiverWorstMs": 3.681,
+      "receiverWorstAuthorityMs": 0,
+      "receiverWorstResponseMs": 1.778,
+      "receiverWorstWorkerMillis": [
+        0,
+        0,
+        1
+      ],
+      "receiverWorstWorkerMeasured": 7,
+      "receiverWorstApply": {
+        "micros": [
+          1778,
+          0
+        ],
+        "measured": 1,
+        "submissionMicros": 625,
+        "submissionCalls": 1
+      },
+      "receiverWorstACK": {
+        "micros": [
+          1778,
+          0,
+          0
+        ],
+        "measured": 7,
+        "progress": 4
+      },
+      "firstOfferFromSourceBeginMs": 59.729
+    },
+    {
+      "sourceTime": "2026-10-31T09:28:43.8732007Z",
+      "receiverTime": "2026-10-31T09:28:43.4636058Z",
+      "sourceEnd": "ok",
+      "receiverEnd": "ok",
+      "incomplete": false,
+      "requestToGrantMs": 56.216,
+      "captureActivationMs": 16.127,
+      "receiverPrepareMs": 40.891,
+      "receiverReadyWaitMs": 37.873,
+      "sourceWaitMs": 56.216,
+      "receiverServiceMs": 48.051,
+      "exchangeResidualMs": 8.165,
+      "tcp": {
+        "schema": 1,
+        "rttMicros": [
+          8562,
+          8315
+        ],
+        "minRttMicros": [
+          4141,
+          4141
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "preparationDecision": 1,
+      "preparedAgeMs": 1780.207,
+      "nativeStartup": [
+        {
+          "micros": [
+            62914,
+            4601,
+            7203,
+            0,
+            1507
+          ],
+          "measured": 31,
+          "imageHash": {
+            "micros": [
+              10751,
+              47212
+            ],
+            "backend": 1
+          }
+        },
+        {
+          "micros": [
+            62133,
+            5493,
+            5646,
+            0,
+            1507
+          ],
+          "measured": 31,
+          "imageHash": {
+            "micros": [
+              8503,
+              49460
+            ],
+            "backend": 1
+          }
+        }
+      ],
+      "nativePairReadinessMs": 16.935,
+      "receiverEntryMs": 4.208,
+      "receiverFirstMs": 3.128,
+      "receiverWorstMs": 9.391,
+      "receiverWorstAuthorityMs": 0,
+      "receiverWorstResponseMs": 2.307,
+      "receiverWorstWorkerMillis": [
+        0,
+        0,
+        2
+      ],
+      "receiverWorstWorkerMeasured": 7,
+      "receiverWorstApply": {
+        "micros": [
+          2307,
+          0
+        ],
+        "measured": 1,
+        "submissionMicros": 1731,
+        "submissionCalls": 1
+      },
+      "receiverWorstACK": {
+        "micros": [
+          2307,
+          0,
+          0
+        ],
+        "measured": 7,
+        "progress": 4
+      },
+      "firstOfferFromSourceBeginMs": 76.603
+    },
+    {
+      "sourceTime": "2026-10-31T09:28:52.9539906Z",
+      "receiverTime": "2026-10-31T09:28:52.5468843Z",
+      "sourceEnd": "ok",
+      "receiverEnd": "ok",
+      "incomplete": false,
+      "requestToGrantMs": 42.331,
+      "captureActivationMs": 21.278,
+      "receiverPrepareMs": 25.2,
+      "receiverReadyWaitMs": 22.352,
+      "sourceWaitMs": 42.331,
+      "receiverServiceMs": 31.711,
+      "exchangeResidualMs": 10.620000000000005,
+      "tcp": {
+        "schema": 1,
+        "rttMicros": [
+          8288,
+          8554
+        ],
+        "minRttMicros": [
+          4141,
+          4141
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "preparationDecision": 1,
+      "preparedAgeMs": 1678.482,
+      "nativeStartup": [
+        {
+          "micros": [
+            101780,
+            3162,
+            3695,
+            0,
+            1193
+          ],
+          "measured": 31,
+          "imageHash": {
+            "micros": [
+              5059,
+              95022
+            ],
+            "backend": 1
+          }
+        },
+        {
+          "micros": [
+            101780,
+            3717,
+            3140,
+            0,
+            1193
+          ],
+          "measured": 31,
+          "imageHash": {
+            "micros": [
+              7584,
+              91741
+            ],
+            "backend": 1
+          }
+        }
+      ],
+      "nativePairReadinessMs": 9.775,
+      "receiverEntryMs": 3.711,
+      "receiverFirstMs": 2.798,
+      "receiverWorstMs": 4.937,
+      "receiverWorstAuthorityMs": 0,
+      "receiverWorstResponseMs": 4.937,
+      "receiverWorstWorkerMillis": [
+        0,
+        0,
+        4
+      ],
+      "receiverWorstWorkerMeasured": 7,
+      "receiverWorstApply": null,
+      "receiverWorstACK": null,
+      "firstOfferFromSourceBeginMs": 66.946
+    }
+  ],
+  "ackTimeouts": {
+    "A": 0,
+    "B": 0
+  },
+  "nativeServiceWaitFailures": {
+    "A": 0,
+    "B": 0
+  },
+  "baseline": {
+    "generation": 504,
+    "scope": "One prior fault, not a matched latency distribution",
+    "BDispatchMs": 4173.291,
+    "workerStages": "unobserved"
+  },
+  "limitations": [
+    "Cannot attribute absence of service-query failure to the patch unless that blocked path was exercised.",
+    "A separate capture hook failure and B reconnect occurred in this post-install test window. Current READY state does not erase these events.",
+    "After A protected-service restart, earlier source-exit history may no longer be retained in its latest runtime snapshot.",
+    "Both control.previous.jsonl sources are incomplete.",
+    "Physical input-to-screen latency is not measured by software dispatch spans."
+  ],
+  "remotePush": "not performed",
+  "runtimeCodeChanges": "none",
+  "currentServiceEpoch": {
+    "cutoffUTC": "2026-10-31T09:28:08.189157Z",
+    "pairs": 6,
+    "summary": {
+      "requestToGrantMs": {
+        "count": 6,
+        "minMs": 39.94,
+        "medianMs": 57.24,
+        "maxMs": 163.095
+      },
+      "captureActivationMs": {
+        "count": 6,
+        "minMs": 16.127,
+        "medianMs": 21.369999999999997,
+        "maxMs": 40.161
+      },
+      "receiverPrepareMs": {
+        "count": 6,
+        "minMs": 25.2,
+        "medianMs": 33.963,
+        "maxMs": 151.991
+      },
+      "receiverReadyWaitMs": {
+        "count": 6,
+        "minMs": 22.352,
+        "medianMs": 31.594,
+        "maxMs": 149.107
+      },
+      "nativePairReadinessMs": {
+        "count": 6,
+        "minMs": 9.775,
+        "medianMs": 14.181,
+        "maxMs": 114.457
+      },
+      "receiverEntryMs": {
+        "count": 6,
+        "minMs": 3.266,
+        "medianMs": 3.9595000000000002,
+        "maxMs": 5.056
+      },
+      "receiverFirstMs": {
+        "count": 6,
+        "minMs": 2.232,
+        "medianMs": 2.5545,
+        "maxMs": 3.374
+      },
+      "receiverWorstMs": {
+        "count": 6,
+        "minMs": 3.681,
+        "medianMs": 4.476,
+        "maxMs": 9.391
+      },
+      "receiverWorstAuthorityMs": {
+        "count": 6,
+        "minMs": 0,
+        "medianMs": 0,
+        "maxMs": 0.54
+      },
+      "receiverWorstResponseMs": {
+        "count": 6,
+        "minMs": 1.778,
+        "medianMs": 3.4165,
+        "maxMs": 4.937
+      },
+      "sourceWaitMs": {
+        "count": 6,
+        "minMs": 39.39,
+        "medianMs": 56.966499999999996,
+        "maxMs": 163.095
+      },
+      "receiverServiceMs": {
+        "count": 6,
+        "minMs": 31.711,
+        "medianMs": 42.996,
+        "maxMs": 157.989
+      },
+      "exchangeResidualMs": {
+        "count": 6,
+        "minMs": 1.448999999999998,
+        "medianMs": 9.392500000000002,
+        "maxMs": 23.830999999999996
+      },
+      "firstOfferFromSourceBeginMs": {
+        "count": 6,
+        "minMs": 59.729,
+        "medianMs": 80.6715,
+        "maxMs": 205.478
+      }
+    }
+  },
+  "failureContext": {
+    "A": [
+      {
+        "time": "2026-10-31T09:23:54.3497961Z",
+        "code": "installed_source_heartbeat_timing_client_response_ge1s"
+      },
+      {
+        "time": "2026-10-31T09:23:54.3497961Z",
+        "code": "installed_source_heartbeat_timing_worker_presence_wait_lt1ms"
+      },
+      {
+        "time": "2026-10-31T09:23:54.3497961Z",
+        "code": "installed_source_heartbeat_timing_worker_presence_native_lt10ms"
+      },
+      {
+        "time": "2026-10-31T09:23:54.3497961Z",
+        "code": "installed_source_heartbeat_timing_worker_reply_gate_lt1s"
+      },
+      {
+        "time": "2026-10-31T09:23:54.3497961Z",
+        "code": "installed_source_response_timeout"
+      },
+      {
+        "time": "2026-10-31T09:23:54.3876749Z",
+        "code": "session_end_detail",
+        "sessionEnd": {
+          "observedAt": "2026-10-31T09:23:54.3876749Z",
+          "trigger": true,
+          "component": "source-hook",
+          "fault": "fault_source_hook_failed",
+          "canceled": false,
+          "timeout": false,
+          "closed": false,
+          "nativeError": 0,
+          "nativeKnown": false,
+          "networkError": "not_observed",
+          "networkPolicy": "unknown",
+          "lastLifecycle": "unknown",
+          "lifecycleAgeMicros": 0,
+          "captureMode": "protected"
+        }
+      },
+      {
+        "time": "2026-10-31T09:23:54.7175531Z",
+        "code": "fault_source_hook_failed"
+      }
+    ],
+    "B": [
+      {
+        "time": "2026-10-31T09:23:54.0021721Z",
+        "code": "session_end_detail",
+        "sessionEnd": {
+          "observedAt": "2026-10-31T09:23:54.0021721Z",
+          "trigger": true,
+          "component": "peer-session",
+          "fault": "fault_remote_eof",
+          "canceled": false,
+          "timeout": false,
+          "closed": false,
+          "nativeError": 0,
+          "nativeKnown": false,
+          "networkError": "not_observed",
+          "networkPolicy": "unknown",
+          "lastLifecycle": "unknown",
+          "lifecycleAgeMicros": 0,
+          "captureMode": "protected"
+        }
+      },
+      {
+        "time": "2026-10-31T09:23:54.0142355Z",
+        "code": "reconnect_remote_eof"
+      }
+    ]
+  },
+  "findings": [
+    {
+      "code": "b_ack_stall_not_observed",
+      "observed": "No installed_input_failure_ack_timeout, native_service_wait failure or injection failure in the retained post-install build window. Nine matched A-to-B entries ended ok. Worst B dispatch among their bounded worst samples: 11.784ms; first dispatch median 2.311ms.",
+      "limit": "No native_service_wait failure was exercised, so this does not prove the repaired blocked-query path caused the historical 4.173s event or establish non-recurrence."
+    },
+    {
+      "code": "a_source_failure_and_b_reconnect_observed",
+      "observed": "A source heartbeat response timeout at 09:23:54.349 UTC, followed by trigger component source-hook / fault_source_hook_failed; B recorded peer EOF and reconnect in the same connection. Recovery attempts included TCP timeouts before connection returned at about 09:24:25 UTC. A has another successful protected-input installation at 09:28:07 UTC and service restart at 09:28:08 UTC.",
+      "limit": "Cross-device wall clocks differ, so event ordering is established inside each device. The current A runtime receipt was overwritten by restart; it does not retain the prior service-stop reason or prove an error 1066 or recovery prompt for this episode."
+    },
+    {
+      "code": "residual_entry_wait_is_mainly_receiver_preparation",
+      "observed": "Longest grant wait 163.095ms: B request-read to grant-write 157.989ms, including prepare 151.991ms and remaining ready wait 149.107ms. Prepared candidate age 5.564ms; native pair readiness 114.457ms. The residual 5.106ms contains transport and endpoint scheduling, not pure network RTT. Other stages overlap and are not additive."
+    },
+    {
+      "code": "hash_cost_remains",
+      "observed": "In that long entry, native installation/self validation was 63.684/67.295ms; Go SHA256 computation 56.016/57.351ms with file reads 5.941/7.177ms. The backend remains 1 (Go); g504 non-AVX CNG selection is not exercised on B in these retained profiles."
+    },
+    {
+      "code": "priorities",
+      "observed": "Investigate A source heartbeat/reply delivery and hook retirement first; retain no-replay and exact native retirement. Then reduce how late B native preparation starts and verify the actual B hash backend rather than claiming the g504 CNG change helped it."
+    }
+  ],
+  "validation": {
+    "collection": "Both sanitized support files collected from authenticated paired devices.",
+    "checks": "Exact revision, post-install cutoff, per-run/sequence deduplication, unique exchange-tag pairing and measured-bit gating applied; latest service epoch separated from earlier profiles.",
+    "runtime": "A doctor healthy; B authenticated generation/revision matches g505; both latest inputHealth and loginRuntime READY.",
+    "tests": "No application tests rerun: this commit records read-only diagnostic analysis only.",
+    "sourceOfTruth": "No product, architecture or runtime contract changed.",
+    "apiDBRunnerChanges": "none"
+  }
+}
