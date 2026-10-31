@@ -1,0 +1,329 @@
+{
+  "schema": "krasis.pointer-proof-review/v1",
+  "generation": 507,
+  "revision": "ff31a8fc3064de4c33bae040c181be478b1b01e1",
+  "recurrence": {
+    "collection": "e6c58e9572443c671bb44bce9f659338",
+    "generation": 506,
+    "sourceExit": {
+      "time": "2026-10-31T10:13:10.9420419Z",
+      "command": "ok",
+      "reader": "cancelled",
+      "capture": "joined",
+      "sender": "joined",
+      "interrupt": "joined",
+      "retirement": "clean_sent",
+      "report": "failed",
+      "failure": {
+        "operation": "source-query-deadline-completed",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "heartbeatStage": "replied",
+      "heartbeatSlowStage": "reply_gate",
+      "heartbeatSlowBucket": 4
+    },
+    "sourceTimerLateMicros": 1554653,
+    "services": {
+      "A": "READY",
+      "B": "READY"
+    },
+    "matchedHandoffs": [
+      {
+        "sourceTime": "2026-10-31T10:13:03.2424294Z",
+        "sourceEnd": "ok",
+        "receiverEnd": "ok",
+        "requestToGrantMs": 43.519,
+        "captureActivationMs": 178.445,
+        "receiverPrepareMs": 24.772,
+        "receiverWorstDispatchMs": 2.77,
+        "frames": 65,
+        "incomplete": false
+      },
+      {
+        "sourceTime": "2026-10-31T10:13:04.9530559Z",
+        "sourceEnd": "ok",
+        "receiverEnd": "ok",
+        "requestToGrantMs": 59.962,
+        "captureActivationMs": 139.063,
+        "receiverPrepareMs": 25.678,
+        "receiverWorstDispatchMs": 4.898,
+        "frames": 62,
+        "incomplete": false
+      },
+      {
+        "sourceTime": "2026-10-31T10:13:06.0218007Z",
+        "sourceEnd": "ok",
+        "receiverEnd": "ok",
+        "requestToGrantMs": 46.81,
+        "captureActivationMs": 83.489,
+        "receiverPrepareMs": 27.473,
+        "receiverWorstDispatchMs": 9.079,
+        "frames": 63,
+        "incomplete": false
+      },
+      {
+        "sourceTime": "2026-10-31T10:13:08.1840726Z",
+        "sourceEnd": "ok",
+        "receiverEnd": "ok",
+        "requestToGrantMs": 42.287,
+        "captureActivationMs": 47.512,
+        "receiverPrepareMs": 28.977,
+        "receiverWorstDispatchMs": 5.162,
+        "frames": 113,
+        "incomplete": false
+      },
+      {
+        "sourceTime": "2026-10-31T10:13:11.1317359Z",
+        "sourceEnd": "incomplete",
+        "receiverEnd": "incomplete",
+        "requestToGrantMs": 45,
+        "captureActivationMs": 182.592,
+        "receiverPrepareMs": 26.319,
+        "receiverWorstDispatchMs": 3.621,
+        "frames": 6,
+        "incomplete": true
+      }
+    ],
+    "interpretation": "A source worker reports source-query-deadline-completed after clean observed native joins. Failure still tears down the peer session. Receiver input dispatch maxima in these five matched exchanges range from 2.770ms to 9.079ms; no B input-worker stall or stopped protected service is established for this recurrence. Absolute A/B timestamps do not establish cross-machine ordering without clock synchronization."
+  },
+  "change": "Only unsent relative pointer movement may discard a submitted read-only proof-query deadline. Its sequence and wire bytes remain unconsumed, native pins remain held until return, and the next sample needs independent full authority and presence. The independent heartbeat proof lane remains available.",
+  "safety": {
+    "globalNativeQueries": 4,
+    "restrictedQueries": 3,
+    "operationBudgetMillis": 1000,
+    "activeIdleMillis": 2000,
+    "candidateExpiryMillis": 3000,
+    "terminal": "Waiting on the same stuck query again, capacity/admission expiry, caller or owner cancellation, native rejection, discrete key/button/wheel transitions and attempted/partial writes retain failure behavior. Actual missing native owners still reject retirement; no unknown-outcome input is replayed."
+  },
+  "validation": {
+    "test": "Deployment runtime overlay: inputworker 23.851s, wininput 3.161s, inputdesktop 0.397s, logindiag 0.104s and localapi 7.840s passed. Final inputworker rerun passed in 23.317s.",
+    "regression": "The new pointer-expiry regression fails against the preceding writer implementation (source transport failed after 1s) and passes with this fix. Tests verify heartbeat and independently authorized key dispatch while the optional query remains pinned, no late movement replay, fresh next-sample proof, terminal repeated stuck query and preserved discrete-input/partial-write failure.",
+    "excludedTest": "TestPortablePairRetainsIndependentRecoveryAfterInputFailure excluded: an existing live global portable recovery owner prevents its fixture. No live child was killed and no ownership fence was bypassed.",
+    "frontend": "104/104 tests and native production build passed.",
+    "package": "TestWorkspaceUpdatePackage passed in 7.59s; 8-file update bundle, UI icon, setup archive and setup offline verification passed.",
+    "check": "git diff --check passed.",
+    "race": "Skipped: deployment configuration CGO_ENABLED=0.",
+    "remoteCI": "Skipped: no push requested.",
+    "physicalCrossings": "Pending user test; installed health and reconnection snapshot do not prove recurrence resolution or reduced latency."
+  },
+  "collection": "d33ae59526c4fa8eb0a216f421862842",
+  "setupSha256": "13881a1c81b1ba245da53c80af6792be407c8418d1ba8129ccd991a057888298",
+  "localSetup": {
+    "schema": "krasis.setup-result/v1",
+    "code": 0,
+    "state": "installed"
+  },
+  "peerUpdate": {
+    "schemaVersion": "krasis.cli.update-wait/v1",
+    "peerAlias": "B",
+    "id": "1df530f09012cf004f68bd37ab3e7fce",
+    "code": "updated",
+    "transferState": "UPDATED",
+    "generation": 507,
+    "revision": "ff31a8fc3064de4c33bae040c181be478b1b01e1",
+    "bytes": 28865236,
+    "total": 28865236
+  },
+  "doctorA": {
+    "schemaVersion": "krasis.cli.doctor/v1",
+    "agent": "RUNNING",
+    "connection": "CONNECTED",
+    "peerAlias": "B",
+    "cliGeneration": 507,
+    "agentGeneration": 507,
+    "protocol": "COMPATIBLE",
+    "code": "healthy",
+    "cliBuild": "ff31a8fc3064de4c33bae040c181be478b1b01e1",
+    "agentBuild": "ff31a8fc3064de4c33bae040c181be478b1b01e1",
+    "ui": {
+      "state": "RUNNING",
+      "generation": 507,
+      "build": "ff31a8fc3064de4c33bae040c181be478b1b01e1",
+      "pathStatus": "MATCHED"
+    },
+    "launchRecord": {
+      "state": "VERIFIED",
+      "generation": 507,
+      "build": "ff31a8fc3064de4c33bae040c181be478b1b01e1",
+      "pathStatus": "MATCHED"
+    },
+    "installedAgent": {
+      "state": "VERIFIED",
+      "build": "ff31a8fc3064de4c33bae040c181be478b1b01e1"
+    },
+    "service": {
+      "state": "RUNNING",
+      "pathStatus": "MATCHED"
+    },
+    "agentLocation": "PROTECTED",
+    "protectedInput": "CONFIGURED",
+    "checks": [
+      {
+        "name": "agent",
+        "state": "RUNNING"
+      },
+      {
+        "name": "connection",
+        "state": "CONNECTED"
+      },
+      {
+        "name": "protocol",
+        "state": "COMPATIBLE"
+      },
+      {
+        "name": "cli_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "ui_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "installed_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "ui",
+        "state": "RUNNING"
+      },
+      {
+        "name": "launch_record",
+        "state": "VERIFIED"
+      },
+      {
+        "name": "installed_agent",
+        "state": "VERIFIED"
+      },
+      {
+        "name": "service",
+        "state": "RUNNING"
+      },
+      {
+        "name": "update_stage_cleanup",
+        "state": "COMPLETED"
+      }
+    ],
+    "nextActions": []
+  },
+  "peerStatus": {
+    "schemaVersion": "krasis.cli.update-status/v1",
+    "peerAlias": "B",
+    "localGeneration": 507,
+    "localBuild": "ff31a8fc3064de4c33bae040c181be478b1b01e1",
+    "peerState": "ONLINE",
+    "peerGeneration": 507,
+    "peerBuild": "ff31a8fc3064de4c33bae040c181be478b1b01e1",
+    "peerAllowsUpdate": true,
+    "receiveAllowed": true,
+    "transferState": "IDLE"
+  },
+  "installedEvidence": {
+    "A": {
+      "created": "2026-10-31T10:25:58Z",
+      "supportSha256": "7b1f482bb261acb2c2723455397be13737f75d7a60aef049eb072b108a550aa1",
+      "installation": {
+        "time": "2026-10-31T10:25:45.4525868Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "inputHealth": {
+        "time": "2026-10-31T10:25:46.5739472Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-31T10:25:46.3617763Z",
+        "time": "2026-10-31T10:25:46.3870423Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      },
+      "matchingBuildUILaunches": [
+        {
+          "time": "2026-10-31T10:25:47.3877456Z",
+          "code": "launch_record_ready"
+        }
+      ],
+      "latestConnection": {
+        "time": "2026-10-31T10:25:48.4191949Z",
+        "code": "CONNECTED"
+      },
+      "settledFailures": [],
+      "incompleteSources": [
+        "control.previous.jsonl"
+      ]
+    },
+    "B": {
+      "created": "2026-10-31T10:25:59Z",
+      "supportSha256": "424fcfc0e425ed558305f5ca3ba9b13fbb75ddc7838952012dd1c81630c5b26f",
+      "installation": {
+        "time": "2026-10-31T10:25:18.6257279Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "inputHealth": {
+        "time": "2026-10-31T10:25:56.0507261Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-31T10:25:21.2719237Z",
+        "time": "2026-10-31T10:25:21.3138705Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      },
+      "matchingBuildUILaunches": [
+        {
+          "time": "2026-10-31T10:25:25.4546789Z",
+          "code": "launch_record_ready"
+        }
+      ],
+      "latestConnection": {
+        "time": "2026-10-31T10:25:47.959362Z",
+        "code": "CONNECTED"
+      },
+      "settledFailures": [],
+      "incompleteSources": [
+        "control.previous.jsonl"
+      ]
+    }
+  },
+  "limitations": [
+    "The original slow Windows call and the independent 1554.653ms runtime timer lateness remain unexplained.",
+    "A synchronous Windows query is still not interruptible. This fix bounds retained query ownership and prevents a single expired unsent pointer proof from fencing the capture channel; it does not remove the one-second wait.",
+    "Repeated stuck queries or genuine key, button, wheel, transport and native-retirement failures can still terminate a session.",
+    "Both control.previous.jsonl sources are incomplete; short post-install samples are not a complete fault history."
+  ],
+  "sourceOfTruthChanged": [
+    "docs/architecture/02-runtime-flow.md"
+  ],
+  "apiChanges": "none; no wire format change",
+  "dbChanges": "none",
+  "runnerChanges": "none",
+  "repositoryHygieneChanges": "none",
+  "remotePush": "not performed"
+}
