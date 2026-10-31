@@ -46,6 +46,13 @@ func (w *sourceWriter) writePacket(p sourcePacket, current func() bool, retireme
 }
 
 func (w *sourceWriter) writePacketContext(ctx context.Context, p sourcePacket, current func() bool, retirement, completedReply bool) error {
+	return w.writePacketContextChecked(ctx, p, current, retirement, completedReply, false)
+}
+
+func (w *sourceWriter) writePacketContextChecked(ctx context.Context, p sourcePacket, current func() bool, retirement, completedReply, pointer bool) error {
+	if pointer && (p.kind != sourceAction || p.action.Kind != control.InputPointerMove || retirement || completedReply) {
+		return ErrProtocol
+	}
 	if !w.started.Load() && (p.kind == sourceAction || p.kind == sourceBoundary || p.kind == sourceReturn) {
 		return nil
 	}
@@ -65,6 +72,10 @@ func (w *sourceWriter) writePacketContext(ctx context.Context, p sourcePacket, c
 	} else if completedReply || p.kind == sourceReply && p.op == sourceHeartbeat {
 		if err := w.lockReply(ctx, progress); err != nil {
 			return err
+		}
+	} else if pointer {
+		if err := w.lockPointer(ctx); err != nil {
+			return sourceTransportFailure(err)
 		}
 	} else {
 		// Full WTS/SCM authorization may block. It must not own the wire gate
@@ -149,7 +160,11 @@ func (w *sourceWriter) SendAction(ctx context.Context, action control.InputActio
 	if err := w.awaitActivation(ctx, current); err != nil {
 		return err
 	}
-	err := w.writePacketContext(ctx, sourcePacket{kind: sourceAction, reply: w.epoch.Load(), action: action}, current, false, false)
+	err := w.writePacketContextChecked(ctx, sourcePacket{kind: sourceAction, reply: w.epoch.Load(), action: action}, current, false, false, action.Kind == control.InputPointerMove)
+	var proof *sourcePointerProofExpired
+	if errors.As(err, &proof) && ctx.Err() == nil && (w.ctx == nil || w.ctx.Err() == nil) {
+		return nil // No bytes/sequence or input effect; never replay this stale delta.
+	}
 	var failure *sourceIOFailure
 	if action.Kind == control.InputPointerMove && ctx.Err() == nil && (w.ctx == nil || w.ctx.Err() == nil) &&
 		errors.As(err, &failure) && failure.unsubmitted && errors.Is(failure, os.ErrDeadlineExceeded) {

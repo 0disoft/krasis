@@ -43,7 +43,7 @@ func TestSourceWriterNativeChecksRespectSendActionBudget(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 			defer cancel()
 			started := time.Now()
-			err := w.SendAction(ctx, control.InputAction{Kind: control.InputPointerMove, DeltaX: 1}, nil)
+			err := w.SendAction(ctx, control.InputAction{Kind: control.InputKeyDown, Code: 1}, nil)
 			if !errors.Is(err, context.DeadlineExceeded) || time.Since(started) != 50*time.Millisecond {
 				t.Fatalf("writer native query ignored caller deadline: presence=%t elapsed=%s err=%v", presence, time.Since(started), err)
 			}
