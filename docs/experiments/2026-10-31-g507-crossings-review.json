@@ -1,0 +1,692 @@
+{
+  "schema": "krasis.g507-crossings-review/v1",
+  "generation": 507,
+  "revision": "ff31a8fc3064de4c33bae040c181be478b1b01e1",
+  "collection": "5edde0ee8e46c5d50a19beeda8264e83",
+  "created": "2026-10-31T10:46:28Z",
+  "scope": "Read-only paired diagnostic collection after user completion. No code, version, installer, service, settings or connection mutation.",
+  "sides": {
+    "A": {
+      "created": "2026-10-31T10:46:28Z",
+      "supportSha256": "027cbd09ae93338cd1e1c64e314264266b0ff9a3b136150647b589c25f0d4eb6",
+      "inputHealth": {
+        "time": "2026-10-31T10:46:16.8652774Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-31T10:25:46.3617763Z",
+        "time": "2026-10-31T10:25:46.3870423Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      },
+      "lastConnected": {
+        "time": "2026-10-31T10:25:48.4191949Z",
+        "code": "CONNECTED"
+      },
+      "postConnectionFailures": [],
+      "observedThrough": "2026-10-31T10:46:18.5735087Z",
+      "incompleteSources": [
+        "control.previous.jsonl"
+      ],
+      "allWindowProfiles": 17,
+      "allWindowIncompleteProfiles": 2
+    },
+    "B": {
+      "created": "2026-10-31T10:46:29Z",
+      "supportSha256": "2b39a34b80d65706ce78e1164597a2b5fcb1b9e5155f00e2e09523bff70a64ff",
+      "inputHealth": {
+        "time": "2026-10-31T10:46:07.122315Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-31T10:25:21.2719237Z",
+        "time": "2026-10-31T10:25:21.3138705Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      },
+      "lastConnected": {
+        "time": "2026-10-31T10:25:47.959362Z",
+        "code": "CONNECTED"
+      },
+      "postConnectionFailures": [],
+      "observedThrough": "2026-10-31T10:46:27.0345529Z",
+      "incompleteSources": [
+        "control.previous.jsonl"
+      ],
+      "allWindowProfiles": 17,
+      "allWindowIncompleteProfiles": 2
+    }
+  },
+  "latestBatch": {
+    "sourceProfileWindow": {
+      "firstFinished": "2026-10-31T10:45:17.9689182Z",
+      "lastFinished": "2026-10-31T10:46:10.0795767Z"
+    },
+    "matchedCompleteExchanges": 12,
+    "metricsMs": {
+      "requestGrantMs": {
+        "n": 12,
+        "min": 37.811,
+        "median": 51.0115,
+        "max": 278.714
+      },
+      "captureActivationMs": {
+        "n": 12,
+        "min": 15.636,
+        "median": 21.679000000000002,
+        "max": 44.554
+      },
+      "bAuthorizeMs": {
+        "n": 12,
+        "min": 25.673,
+        "median": 29.591,
+        "max": 262.348
+      },
+      "bReadyWaitMs": {
+        "n": 12,
+        "min": 22.453,
+        "median": 25.880499999999998,
+        "max": 255.997
+      },
+      "bFirstInputMs": {
+        "n": 12,
+        "min": 1.628,
+        "median": 1.9565,
+        "max": 4.029
+      },
+      "bWorstInputMs": {
+        "n": 12,
+        "min": 3.07,
+        "median": 6.087,
+        "max": 22.341
+      }
+    },
+    "rows": [
+      {
+        "time": "2026-10-31T10:45:17.9689182Z",
+        "attempt": 1,
+        "end": "ok",
+        "tag": "32a6aaf904e50acfc77cceefd0f13210ecda86c320eb588e574809ccf7a720a1",
+        "requestGrantMs": 206.722,
+        "captureActivationMs": 27.623,
+        "sourceActivateMs": 0,
+        "bAuthorizeMs": 188.641,
+        "bConnectMs": 187.441,
+        "bReadyWaitMs": 185.145,
+        "bEntryMs": 4.648,
+        "bFirstInputMs": 1.766,
+        "bWorstInputMs": 5.686,
+        "bClientAuthMs": 0.777,
+        "bClientWriteMs": 0,
+        "bClientResponseMs": 4.339,
+        "bWorkerMillis": [
+          0,
+          1,
+          4
+        ],
+        "bPrepared": true,
+        "bPreparedAgeMs": 6.302,
+        "bPreparationWaitMs": 37.459,
+        "bNativeDesktopMs": 131.778
+      },
+      {
+        "time": "2026-10-31T10:45:23.557899Z",
+        "attempt": 2,
+        "end": "ok",
+        "tag": "1b5c0ffb444572a664d23222a5a2615640f2306763dcf85119de00bab9098814",
+        "requestGrantMs": 278.714,
+        "captureActivationMs": 44.554,
+        "sourceActivateMs": 0,
+        "bAuthorizeMs": 262.348,
+        "bConnectMs": 260.613,
+        "bReadyWaitMs": 255.997,
+        "bEntryMs": 3.585,
+        "bFirstInputMs": 2.19,
+        "bWorstInputMs": 10.023,
+        "bClientAuthMs": 0,
+        "bClientWriteMs": 0,
+        "bClientResponseMs": 10.023,
+        "bWorkerMillis": [
+          0,
+          1,
+          6
+        ],
+        "bPrepared": true,
+        "bPreparedAgeMs": 7.541,
+        "bPreparationWaitMs": 127.923,
+        "bNativeDesktopMs": 111.801
+      },
+      {
+        "time": "2026-10-31T10:45:29.4958863Z",
+        "attempt": 3,
+        "end": "ok",
+        "tag": "c32152b4db5018bf961d95785d404eef30e9bad3989be18c1347639bee443e3d",
+        "requestGrantMs": 205.483,
+        "captureActivationMs": 19.835,
+        "sourceActivateMs": 0,
+        "bAuthorizeMs": 186.524,
+        "bConnectMs": 184.792,
+        "bReadyWaitMs": 183.115,
+        "bEntryMs": 3.264,
+        "bFirstInputMs": 2.147,
+        "bWorstInputMs": 22.341,
+        "bClientAuthMs": 0,
+        "bClientWriteMs": 0,
+        "bClientResponseMs": 22.341,
+        "bWorkerMillis": [
+          2,
+          4,
+          22
+        ],
+        "bPrepared": true,
+        "bPreparedAgeMs": 6.245,
+        "bPreparationWaitMs": 46.7,
+        "bNativeDesktopMs": 121.164
+      },
+      {
+        "time": "2026-10-31T10:45:37.4693765Z",
+        "attempt": 4,
+        "end": "ok",
+        "tag": "a649d0d3a0923ff409d2fcc07f24c31f0177b698591bb058f4a905b9ea9841cb",
+        "requestGrantMs": 37.811,
+        "captureActivationMs": 25.021,
+        "sourceActivateMs": 0,
+        "bAuthorizeMs": 26.668,
+        "bConnectMs": 25.253,
+        "bReadyWaitMs": 22.905,
+        "bEntryMs": 2.888,
+        "bFirstInputMs": 3.21,
+        "bWorstInputMs": 5.193,
+        "bClientAuthMs": 0.594,
+        "bClientWriteMs": 0,
+        "bClientResponseMs": 4.598,
+        "bWorkerMillis": [
+          0,
+          0,
+          4
+        ],
+        "bPrepared": true,
+        "bPreparedAgeMs": 1145.994,
+        "bPreparationWaitMs": null,
+        "bNativeDesktopMs": 10.387
+      },
+      {
+        "time": "2026-10-31T10:45:43.9151848Z",
+        "attempt": 5,
+        "end": "ok",
+        "tag": "406a49b185817cdf82535571eb16a2adec99c3e8876fc0bdb5e8e1b3b45d8f71",
+        "requestGrantMs": 42.941,
+        "captureActivationMs": 17.702,
+        "sourceActivateMs": 0,
+        "bAuthorizeMs": 26.838,
+        "bConnectMs": 25.578,
+        "bReadyWaitMs": 23.571,
+        "bEntryMs": 3.555,
+        "bFirstInputMs": 1.635,
+        "bWorstInputMs": 10.035,
+        "bClientAuthMs": 0,
+        "bClientWriteMs": 0,
+        "bClientResponseMs": 1.589,
+        "bWorkerMillis": [
+          0,
+          0,
+          1
+        ],
+        "bPrepared": true,
+        "bPreparedAgeMs": 452.738,
+        "bPreparationWaitMs": null,
+        "bNativeDesktopMs": 9.867
+      },
+      {
+        "time": "2026-10-31T10:45:49.3326458Z",
+        "attempt": 6,
+        "end": "ok",
+        "tag": "8ff9f4a3a92e331463bbcd64887d0e82aecf0938d84d29d39dabb6525700ccb1",
+        "requestGrantMs": 43.789,
+        "captureActivationMs": 15.636,
+        "sourceActivateMs": 0,
+        "bAuthorizeMs": 27.169,
+        "bConnectMs": 25.158,
+        "bReadyWaitMs": 23.467,
+        "bEntryMs": 4.696,
+        "bFirstInputMs": 1.65,
+        "bWorstInputMs": 6.141,
+        "bClientAuthMs": 0,
+        "bClientWriteMs": 1.291,
+        "bClientResponseMs": 4.85,
+        "bWorkerMillis": [
+          0,
+          0,
+          4
+        ],
+        "bPrepared": true,
+        "bPreparedAgeMs": 2518.086,
+        "bPreparationWaitMs": null,
+        "bNativeDesktopMs": 9.372
+      },
+      {
+        "time": "2026-10-31T10:45:53.256875Z",
+        "attempt": 7,
+        "end": "ok",
+        "tag": "7953ca84908f5cfd4f7288a13b2c06e19ca7e2e792e03ab28dec5a555e51691e",
+        "requestGrantMs": 197.928,
+        "captureActivationMs": 23.523,
+        "sourceActivateMs": 0,
+        "bAuthorizeMs": 179.925,
+        "bConnectMs": 178.307,
+        "bReadyWaitMs": 176.569,
+        "bEntryMs": 4.064,
+        "bFirstInputMs": 1.696,
+        "bWorstInputMs": 3.07,
+        "bClientAuthMs": 0,
+        "bClientWriteMs": 0.588,
+        "bClientResponseMs": 2.481,
+        "bWorkerMillis": [
+          0,
+          0,
+          2
+        ],
+        "bPrepared": true,
+        "bPreparedAgeMs": 5.802,
+        "bPreparationWaitMs": 49.106,
+        "bNativeDesktopMs": 112.994
+      },
+      {
+        "time": "2026-10-31T10:45:58.4912442Z",
+        "attempt": 8,
+        "end": "ok",
+        "tag": "baa57341d9788fae894baee241507ad457c560398b3eb144408b5848c2cc6748",
+        "requestGrantMs": 119.61,
+        "captureActivationMs": 19.243,
+        "sourceActivateMs": 0,
+        "bAuthorizeMs": 95.745,
+        "bConnectMs": 93.961,
+        "bReadyWaitMs": 92.133,
+        "bEntryMs": 4.765,
+        "bFirstInputMs": 2.604,
+        "bWorstInputMs": 9.749,
+        "bClientAuthMs": 0.717,
+        "bClientWriteMs": 0,
+        "bClientResponseMs": 9.031,
+        "bWorkerMillis": [
+          0,
+          3,
+          8
+        ],
+        "bPrepared": true,
+        "bPreparedAgeMs": 49.455,
+        "bPreparationWaitMs": null,
+        "bNativeDesktopMs": 76.471
+      },
+      {
+        "time": "2026-10-31T10:46:06.8143928Z",
+        "attempt": 9,
+        "end": "ok",
+        "tag": "aba7839935914d4c2ee4158ee9bfca763858ad9ba3d0df365445f2723edc08e2",
+        "requestGrantMs": 55.735,
+        "captureActivationMs": 27.224,
+        "sourceActivateMs": 0,
+        "bAuthorizeMs": 25.673,
+        "bConnectMs": 24.44,
+        "bReadyWaitMs": 22.453,
+        "bEntryMs": 4.968,
+        "bFirstInputMs": 1.678,
+        "bWorstInputMs": 4.63,
+        "bClientAuthMs": 0,
+        "bClientWriteMs": 0,
+        "bClientResponseMs": 4.63,
+        "bWorkerMillis": [
+          0,
+          1,
+          4
+        ],
+        "bPrepared": true,
+        "bPreparedAgeMs": 1291.506,
+        "bPreparationWaitMs": null,
+        "bNativeDesktopMs": 10.375
+      },
+      {
+        "time": "2026-10-31T10:46:08.6250668Z",
+        "attempt": 10,
+        "end": "ok",
+        "tag": "1602c5249f4fb6c63950c9e3e645f02f40adba330745b3638acd5ae695440dbd",
+        "requestGrantMs": 42.014,
+        "captureActivationMs": 18.218,
+        "sourceActivateMs": 0,
+        "bAuthorizeMs": 27.285,
+        "bConnectMs": 26.157,
+        "bReadyWaitMs": 23.868,
+        "bEntryMs": 4.167,
+        "bFirstInputMs": 4.029,
+        "bWorstInputMs": 4.64,
+        "bClientAuthMs": 0.576,
+        "bClientWriteMs": 0,
+        "bClientResponseMs": 4.063,
+        "bWorkerMillis": [
+          0,
+          0,
+          2
+        ],
+        "bPrepared": true,
+        "bPreparedAgeMs": 1002.225,
+        "bPreparationWaitMs": null,
+        "bNativeDesktopMs": 10.889
+      },
+      {
+        "time": "2026-10-31T10:46:09.4182488Z",
+        "attempt": 11,
+        "end": "ok",
+        "tag": "e1563826e4768756c73b9fd88239d4d81c25de67e3255092234fc178908d92b5",
+        "requestGrantMs": 46.288,
+        "captureActivationMs": 27.48,
+        "sourceActivateMs": 0,
+        "bAuthorizeMs": 31.343,
+        "bConnectMs": 30.195,
+        "bReadyWaitMs": 27.893,
+        "bEntryMs": 4.162,
+        "bFirstInputMs": 1.628,
+        "bWorstInputMs": 11.717,
+        "bClientAuthMs": 1.17,
+        "bClientWriteMs": 0,
+        "bClientResponseMs": 10.546,
+        "bWorkerMillis": [
+          0,
+          4,
+          9
+        ],
+        "bPrepared": true,
+        "bPreparedAgeMs": 652.209,
+        "bPreparationWaitMs": null,
+        "bNativeDesktopMs": 11.812
+      },
+      {
+        "time": "2026-10-31T10:46:10.0795767Z",
+        "attempt": 12,
+        "end": "ok",
+        "tag": "99b73e6711943d48f075802b114236bae2a9c41cf40bc90b2cc328afae9523a0",
+        "requestGrantMs": 41.06,
+        "captureActivationMs": 17.083,
+        "sourceActivateMs": 0,
+        "bAuthorizeMs": 27.839,
+        "bConnectMs": 26.185,
+        "bReadyWaitMs": 23.357,
+        "bEntryMs": 4.122,
+        "bFirstInputMs": 2.346,
+        "bWorstInputMs": 6.033,
+        "bClientAuthMs": 0.587,
+        "bClientWriteMs": 0,
+        "bClientResponseMs": 5.446,
+        "bWorkerMillis": [
+          0,
+          1,
+          4
+        ],
+        "bPrepared": true,
+        "bPreparedAgeMs": 495.814,
+        "bPreparationWaitMs": null,
+        "bNativeDesktopMs": 10.936
+      }
+    ],
+    "roundTripBreakdown": [
+      {
+        "attempt": 2,
+        "sourceWrittenToGrantReadMs": 277.713,
+        "receiverReadToGrantWrittenMs": 266.53,
+        "remainingRoundTripMs": 11.183
+      },
+      {
+        "attempt": 3,
+        "sourceWrittenToGrantReadMs": 205.483,
+        "receiverReadToGrantWrittenMs": 191.569,
+        "remainingRoundTripMs": 13.914
+      },
+      {
+        "attempt": 4,
+        "sourceWrittenToGrantReadMs": 37.811,
+        "receiverReadToGrantWrittenMs": 30.781,
+        "remainingRoundTripMs": 7.03
+      },
+      {
+        "attempt": 5,
+        "sourceWrittenToGrantReadMs": 42.393,
+        "receiverReadToGrantWrittenMs": 39.67,
+        "remainingRoundTripMs": 2.723
+      },
+      {
+        "attempt": 6,
+        "sourceWrittenToGrantReadMs": 43.789,
+        "receiverReadToGrantWrittenMs": 32.447,
+        "remainingRoundTripMs": 11.342
+      },
+      {
+        "attempt": 7,
+        "sourceWrittenToGrantReadMs": 197.928,
+        "receiverReadToGrantWrittenMs": 185.804,
+        "remainingRoundTripMs": 12.124
+      },
+      {
+        "attempt": 8,
+        "sourceWrittenToGrantReadMs": 119.61,
+        "receiverReadToGrantWrittenMs": 101.655,
+        "remainingRoundTripMs": 17.955
+      },
+      {
+        "attempt": 9,
+        "sourceWrittenToGrantReadMs": 55.18,
+        "receiverReadToGrantWrittenMs": 31.588,
+        "remainingRoundTripMs": 23.592
+      },
+      {
+        "attempt": 10,
+        "sourceWrittenToGrantReadMs": 41.451,
+        "receiverReadToGrantWrittenMs": 33.133,
+        "remainingRoundTripMs": 8.318
+      },
+      {
+        "attempt": 11,
+        "sourceWrittenToGrantReadMs": 45.775,
+        "receiverReadToGrantWrittenMs": 37.906,
+        "remainingRoundTripMs": 7.869
+      },
+      {
+        "attempt": 12,
+        "sourceWrittenToGrantReadMs": 41.06,
+        "receiverReadToGrantWrittenMs": 33.17,
+        "remainingRoundTripMs": 7.89
+      }
+    ]
+  },
+  "comparison": {
+    "baselineCollection": "e6c58e9572443c671bb44bce9f659338",
+    "g506MatchedExchanges": 5,
+    "g506IncompleteExchanges": 1,
+    "g506CaptureActivationMs": {
+      "n": 5,
+      "min": 47.512,
+      "median": 139.063,
+      "max": 182.592
+    },
+    "g506RequestToGrantMs": {
+      "n": 5,
+      "min": 42.287,
+      "median": 45,
+      "max": 59.962
+    },
+    "g506ReceiverPreparationMs": {
+      "n": 5,
+      "min": 24.772,
+      "median": 26.319,
+      "max": 28.977
+    },
+    "g506WorstInputDispatchPerExchangeMs": {
+      "n": 5,
+      "min": 2.77,
+      "median": 4.898,
+      "max": 9.079
+    },
+    "interpretation": "A capture activation is lower in this latest batch (median 21.679ms, max 44.554ms) than in the five retained g506 exchanges (median 139.063ms, max 182.592ms). This is an observational comparison with different workloads and sample sizes, not causal proof of the g507 fix. B input latency and preparation have not improved consistently."
+  },
+  "earlierSameInstallationStalls": [
+    {
+      "time": "2026-10-31T10:26:27.1077784Z",
+      "end": "ok",
+      "incomplete": false,
+      "dispatchMs": 701.363,
+      "clientLockMs": 655.756,
+      "clientResponseMs": 44.581,
+      "workerMillis": [
+        2,
+        6,
+        35
+      ],
+      "workerApply": {
+        "micros": [
+          35452,
+          0
+        ],
+        "measured": 1,
+        "submissionMicros": 13466,
+        "submissionCalls": 1
+      },
+      "ackRead": {
+        "micros": [
+          44581,
+          0,
+          0
+        ],
+        "measured": 7,
+        "progress": 4
+      }
+    },
+    {
+      "time": "2026-10-31T10:26:40.5639204Z",
+      "end": "ok",
+      "incomplete": false,
+      "dispatchMs": 1112.824,
+      "clientLockMs": 0,
+      "clientResponseMs": 1112.824,
+      "workerMillis": [
+        18,
+        47,
+        152
+      ],
+      "workerApply": {
+        "micros": [
+          152050,
+          0
+        ],
+        "measured": 1,
+        "submissionMicros": 38866,
+        "submissionCalls": 1
+      },
+      "ackRead": {
+        "micros": [
+          1112824,
+          0,
+          0
+        ],
+        "measured": 7,
+        "progress": 4
+      }
+    },
+    {
+      "time": "2026-10-31T10:28:09.6040761Z",
+      "end": "incomplete",
+      "incomplete": true,
+      "dispatchMs": 323.734,
+      "clientLockMs": 0,
+      "clientResponseMs": 323.734,
+      "workerMillis": [
+        100,
+        66,
+        289
+      ],
+      "workerApply": {
+        "micros": [
+          289026,
+          0
+        ],
+        "measured": 1,
+        "submissionMicros": 8118,
+        "submissionCalls": 1
+      },
+      "ackRead": {
+        "micros": [
+          323734,
+          0,
+          0
+        ],
+        "measured": 7,
+        "progress": 4
+      }
+    },
+    {
+      "time": "2026-10-31T10:44:08.3160344Z",
+      "end": "incomplete",
+      "incomplete": true,
+      "dispatchMs": 141.922,
+      "clientLockMs": 0,
+      "clientResponseMs": 141.922,
+      "workerMillis": [
+        4,
+        33,
+        99
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "code": "no_post_install_connection_failure_observed",
+      "evidence": "Both services retain their g507 startup epochs and report READY. Retained logs contain no source exits, session faults or reconnect events after their post-install CONNECTED markers. B reconnects before that marker occurred while A was being installed.",
+      "limit": "Absence in retained diagnostics does not establish permanent resolution; the pointer-proof-expiry branch has no dedicated drop counter, so this run does not prove it was exercised."
+    },
+    {
+      "code": "native_preparation_late_at_entry",
+      "evidence": "Latest attempts 1, 2, 3 and 7 acquired a prepared candidate only 5.802-7.541ms old. Source RequestToGrant was 197.928-278.714ms; receiver ReadyWait was 176.569-255.997ms. Native desktop/authenticated pair readiness was 111.801-131.778ms. These spans overlap and must not be summed.",
+      "nextFocus": "Distinguish candidate existence from completed native readiness and start fresh authenticated preparation earlier, preserving expiry and exact retirement ownership. Do not extend stale authority or accept an unready worker."
+    },
+    {
+      "code": "receiver_processing_dominates_slowest_grant",
+      "evidence": "Attempt 2 source write-to-grant-read was 277.713ms; receiver complete-request-read to completed grant write was 266.530ms. Remaining round-trip time was 11.183ms. Across 11 matching measured exchanges the remainder ranged 2.723-23.592ms.",
+      "limit": "The remainder includes transport, buffering and reader scheduling; it is not pure network RTT. Local elapsed spans avoid subtracting unsynchronized absolute machine timestamps."
+    },
+    {
+      "code": "earlier_input_stalls_still_present",
+      "evidence": "Earlier in the same g507 installation B recorded 701.363ms and 1112.824ms input dispatch. The first includes 655.756ms client-lock wait. The second includes 1112.824ms response observation, 152.050ms worker apply and a nested 38.866ms SendInput submission. Do not label the entire delay SendInput or infer a scheduler residual by subtracting child-local timings.",
+      "latestBatch": "Latest 12 exchanges have receiver first dispatch 1.628-4.029ms and per-exchange worst dispatch 3.070-22.341ms. These later results cannot erase the earlier stalls."
+    },
+    {
+      "code": "runtime_timer_lateness_remains",
+      "evidence": "Retained g507 summaries reach A 622.949ms and B 1092.227ms timer lateness. This does not identify a continuous process stop or establish a specific native OS call cause."
+    }
+  ],
+  "validation": {
+    "doctor": "A healthy, service RUNNING, UI/agent/installed image g507 matched; B ONLINE with exact g507 revision.",
+    "collection": "Both sanitized support files received; 12 exchange tags matched, all paired source/receiver outcomes ok; JSON assertions passed.",
+    "check": "git diff --check passed.",
+    "tests": "Not rerun: report-only change; runtime code and installed files unchanged.",
+    "remoteCI": "Not run: no push requested."
+  },
+  "limits": [
+    "Software handoff timings do not measure physical mouse-to-display latency.",
+    "Latest-batch selection uses source finish times beginning at 2026-10-31T10:45:00Z; exact interval start is not available from this report.",
+    "Older incomplete handoff summaries are retained separately; incomplete diagnostic summaries alone do not prove transport failure.",
+    "Incomplete control.previous.jsonl remains unavailable on both sides."
+  ],
+  "sourceOfTruthChanged": [],
+  "apiChanges": "none",
+  "dbChanges": "none",
+  "runnerChanges": "none",
+  "repositoryHygieneChanges": "none",
+  "remotePush": "not performed"
+}
