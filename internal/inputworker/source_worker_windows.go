@@ -58,14 +58,13 @@ func (w *sourceWriter) writePacketContext(ctx context.Context, p sourcePacket, c
 	if progress != nil {
 		ctx = progress.presence.context(ctx)
 	}
-	gateDone := func() {}
-	if progress != nil {
-		gateDone = progress.measure(heartbeatReplyGate)
-	}
-	if retirement || completedReply || p.kind == sourceReply && p.op == sourceHeartbeat {
+	if retirement {
 		if err := w.mu.LockContext(ctx); err != nil {
-			gateDone()
 			return w.gateFailure(err)
+		}
+	} else if completedReply || p.kind == sourceReply && p.op == sourceHeartbeat {
+		if err := w.lockReply(ctx, progress); err != nil {
+			return err
 		}
 	} else {
 		// Full WTS/SCM authorization may block. It must not own the wire gate
@@ -75,7 +74,6 @@ func (w *sourceWriter) writePacketContext(ctx context.Context, p sourcePacket, c
 			return sourceTransportFailure(err)
 		}
 	}
-	gateDone()
 	origin := p.kind
 	if retirement {
 		origin = sourceRetired
@@ -88,23 +86,8 @@ func (w *sourceWriter) writePacketContext(ctx context.Context, p sourcePacket, c
 	if current != nil && !current() {
 		return control.ErrSourceActionDiscarded
 	}
-	// Retirement grants no authority. It is sent only after native/sender join
-	// on the exact already authenticated channel, even if logon authority changed.
-	if !retirement {
-		// Input and observations retain their full check above. A completed
-		// command reply reports an already known outcome, not new authority.
-		// Recheck the pinned owner's presence after admission and before bytes.
-		presenceDone := func() {}
-		if progress != nil {
-			presenceDone = progress.measure(heartbeatReplyPresence)
-		}
-		w.gateStage(origin, sourceGatePresence)
-		err := w.channel.authorizeSourcePresence(ctx)
-		presenceDone()
-		if err != nil {
-			return sourceTransportFailure(err)
-		}
-	}
+	// All native proof work completed before immediate gate admission. No native
+	// query may hold serialization needed by a heartbeat or joined retirement.
 	w.gateStage(origin, sourceGatePrepare)
 	p.sequence, p.binding = w.sequence+1, w.binding
 	if progress != nil {

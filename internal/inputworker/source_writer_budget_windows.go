@@ -58,11 +58,51 @@ func (w *sourceWriter) lockAuthorized(ctx context.Context, advisory bool) error 
 		if err := check(ctx); err != nil {
 			return err
 		}
+		if !advisory {
+			if err := w.channel.authorizeSourceWritePresence(ctx); err != nil {
+				return err
+			}
+		}
 		if w.mu.TryLock() {
 			return nil
 		}
 		if err := w.mu.LockContext(ctx); err != nil {
 			return err
+		}
+		w.mu.Unlock()
+	}
+}
+
+// Outcome replies carry no new input authority. Obtain a fresh pinned-owner
+// check before immediate admission, never under the shared wire gate. A wait
+// discards the check and repeats it; retirement bypasses proof only after join.
+func (w *sourceWriter) lockReply(ctx context.Context, progress *sourceHeartbeatProgress) error {
+	for {
+		finish := func() {}
+		if progress != nil {
+			finish = progress.measure(heartbeatReplyPresence)
+		}
+		err := w.channel.authorizeSourcePresence(ctx)
+		finish()
+		if err != nil {
+			return sourceTransportFailure(err)
+		}
+		attempt := time.Now()
+		acquired := w.mu.TryLock()
+		if progress != nil {
+			progress.record(heartbeatReplyGate, time.Since(attempt))
+		}
+		if acquired {
+			return nil
+		}
+		finish = func() {}
+		if progress != nil {
+			finish = progress.measure(heartbeatReplyGate)
+		}
+		err = w.mu.LockContext(ctx)
+		finish()
+		if err != nil {
+			return w.gateFailure(err)
 		}
 		w.mu.Unlock()
 	}

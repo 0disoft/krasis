@@ -28,7 +28,7 @@ func (s *gateObservedStream) Write(p []byte) (int, error) {
 }
 
 func TestHeartbeatGateFailureRetainsObservedHolder(t *testing.T) {
-	for _, origin := range []string{"boundary", "action", "reply", "return", "retirement", "presence"} {
+	for _, origin := range []string{"boundary", "action", "reply", "return", "retirement"} {
 		t.Run(origin, func(t *testing.T) {
 			server, conn := net.Pipe()
 			defer server.Close()
@@ -37,13 +37,6 @@ func TestHeartbeatGateFailureRetainsObservedHolder(t *testing.T) {
 			defer w.channel.Close()
 			w.started.Store(true)
 			entered := stream.entered
-			release := make(chan struct{})
-			var releaseOnce sync.Once
-			defer releaseOnce.Do(func() { close(release) })
-			if origin == "presence" {
-				entered = make(chan struct{})
-				w.channel.authority.checkPresent = func() error { close(entered); <-release; return nil }
-			}
 			owner := make(chan error, 1)
 			go func() {
 				p := sourcePacket{kind: sourceReturn, reply: 1}
@@ -71,13 +64,9 @@ func TestHeartbeatGateFailureRetainsObservedHolder(t *testing.T) {
 			cancel()
 			var gate *sourceGateFailure
 			want := "source-gate-" + origin + "-write"
-			if origin == "presence" {
-				want = "source-gate-return-presence"
-			}
 			if !errors.Is(failure, context.DeadlineExceeded) || !errors.As(failure, &gate) || gate.operation != want {
 				t.Fatal("gate failure lost holder or deadline", failure, gate, want)
 			}
-			releaseOnce.Do(func() { close(release) })
 			_ = server.SetReadDeadline(time.Now().Add(time.Second))
 			packet, err := readSourcePacket(server)
 			ownerErr := <-owner

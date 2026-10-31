@@ -224,13 +224,10 @@ func collectSourceInputThreads(
 	expected int,
 	timeout time.Duration,
 ) (error, bool) {
-	deadline := time.Now().Add(timeout)
 	cancel()
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
-	late := false
 	accept := func(result sourceInputThreadResult) {
-		late = late || (!result.finished.IsZero() && result.finished.After(deadline))
 		collected = append(collected, result)
 	}
 
@@ -240,8 +237,8 @@ join:
 		case result := <-results:
 			accept(result)
 		case <-timer.C:
-			// Scheduling can deliver the timer alongside completions queued
-			// before its deadline. Drain those before declaring a live owner.
+			// Scheduling can deliver the timer alongside exact native completions.
+			// Drain those before declaring that an owner remains unjoined.
 			for len(collected) < expected {
 				select {
 				case result := <-results:
@@ -252,7 +249,11 @@ join:
 			}
 		}
 	}
-	if len(collected) < expected || late {
+	// The timer bounds how long we wait, not the validity of an exact native
+	// completion already received. After a scheduling stall all owners may
+	// have retired after the nominal deadline but before this collector runs.
+	// That proves join; errors from their native cleanup still remain errors.
+	if len(collected) < expected {
 		stage := sourceThreadJoinStage(collected, expected)
 		collected = append(collected, sourceInputThreadResult{component: stage, err: errSourceInputJoinTimeout})
 		return sourceInputThreadsError(parent, collected...), false

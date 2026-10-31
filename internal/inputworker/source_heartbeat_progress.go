@@ -33,7 +33,7 @@ func (p *sourceHeartbeatProgress) measure(stage byte) func() {
 func (p *sourceHeartbeatProgress) record(stage byte, elapsed time.Duration) {
 	bucket := timingBucket(elapsed)
 	if stage == heartbeatReplyGate {
-		p.gateBucket = bucket
+		p.gateBucket = max(p.gateBucket, bucket)
 	}
 	if bucket > p.slowBucket {
 		p.slowStage, p.slowBucket = stage, bucket

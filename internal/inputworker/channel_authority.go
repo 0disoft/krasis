@@ -37,6 +37,7 @@ const (
 	sourceAdvisoryPresenceAuthorityQuery
 	startupAuthorityQuery
 	sourceWatchdogAuthorityQuery
+	sourceWritePresenceAuthorityQuery
 )
 
 // Only read-only proof queries run here. Input injection stays on its original
@@ -71,6 +72,13 @@ func (channel *Channel) authorizeSourceInput(ctx context.Context) error {
 
 func (channel *Channel) authorizeSourcePresence(ctx context.Context) error {
 	return channel.queryAuthority(ctx, false, sourcePresenceAuthorityQuery)
+}
+
+// Input/return writers must not occupy the sent heartbeat's presence lane or
+// reserved capacity. This mandatory check shares the full-proof owner and
+// retains its handles/fencing semantics until native completion.
+func (channel *Channel) authorizeSourceWritePresence(ctx context.Context) error {
+	return channel.queryAuthority(ctx, false, sourceWritePresenceAuthorityQuery)
 }
 
 // Background monitoring cannot consume the slot reserved for an actual sent
@@ -168,7 +176,7 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 			}
 			if kind == sourceInputAuthorityQuery || kind == sourceAdvisoryAuthorityQuery {
 				query.err = channel.authority.checkSource()
-			} else if kind == sourcePresenceAuthorityQuery || kind == sourceAdvisoryPresenceAuthorityQuery || kind == sourceWatchdogAuthorityQuery {
+			} else if kind == sourcePresenceAuthorityQuery || kind == sourceAdvisoryPresenceAuthorityQuery || kind == sourceWatchdogAuthorityQuery || kind == sourceWritePresenceAuthorityQuery {
 				query.err = channel.authority.checkSourceHeartbeat()
 			} else if kind == startupAuthorityQuery {
 				query.err = channel.authority.checkResult(nil, false)

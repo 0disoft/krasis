@@ -114,7 +114,7 @@ func TestCollectSourceThreadsDrainsCompletedResultsAtDeadline(t *testing.T) {
 	})
 }
 
-func TestCollectSourceThreadsRejectsLateCompletionAndNamesMissingOwner(t *testing.T) {
+func TestCollectSourceThreadsAcceptsObservedLateJoinButRejectsMissingOwner(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -123,8 +123,19 @@ func TestCollectSourceThreadsRejectsLateCompletionAndNamesMissingOwner(t *testin
 			results <- sourceInputThreadResult{component: component, err: context.Canceled, finished: time.Now().Add(time.Second)}
 		}
 		err, joined := collectSourceInputThreads(ctx, cancel, results, nil, 3, 0)
-		if joined || !errors.Is(err, errSourceInputJoinTimeout) {
-			t.Fatal("late completion admitted", joined, err)
+		if !joined || errors.Is(err, errSourceInputJoinTimeout) || !errors.Is(err, context.Canceled) {
+			t.Fatal("observed exact native join became uncertain after scheduler delay", joined, err)
+		}
+		for _, component := range []string{"low-level-hook", "raw-mouse", "wheel-capture"} {
+			failure := context.Canceled
+			if component == "low-level-hook" {
+				failure = sourceStage("hook-release", errors.New("native cleanup failed"))
+			}
+			results <- sourceInputThreadResult{component: component, err: failure, finished: time.Now().Add(time.Second)}
+		}
+		err, joined = collectSourceInputThreads(ctx, cancel, results, nil, 3, 0)
+		if !joined || SourceFailureStage(err) != "hook-release" || cancellationOnly(err) {
+			t.Fatal("observed join hid a real native cleanup failure", joined, err)
 		}
 		for _, missing := range []string{"low-level-hook", "raw-mouse", "wheel-capture"} {
 			results := make(chan sourceInputThreadResult, 3)

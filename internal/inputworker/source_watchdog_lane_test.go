@@ -37,6 +37,7 @@ func TestSourceWatchdogDoesNotBlockSameChannelHeartbeat(t *testing.T) {
 			defer cancel()
 			started := time.Now()
 			err := owner.authorizeSourcePresence(ctx)
+			synctest.Wait() // Completion publication precedes the query slot's deferred release.
 			if checks.Load() != 2 || time.Since(started) != 0 || (err != nil) != reject || errors.Is(err, context.DeadlineExceeded) {
 				t.Error("sent heartbeat queued behind background query or reused its proof", err, checks.Load(), time.Since(started))
 			}

@@ -421,3 +421,7 @@ inspection, actual suspended-child inspection, active-console checks, exact job
 ownership, final agent/lease bootstrap and independent native authentication
 remain mandatory. Capture/presentation launch policy and the fixed 3s candidate
 expiry are unchanged; a failed pin close rejects and retires the owned candidate.
+
+Source capture writers obtain full proof and pinned-owner presence before immediate wire-gate admission. Input/return presence shares the restricted full-proof query owner, leaving the mandatory heartbeat presence lane and its reserved global slot independent. Completed replies obtain fresh presence before TryLock too. Any gate contention discards those proofs and rechecks them; no native authorization query runs while holding the writer gate. The existing single pipe, sequence order, one-second write budget, four global query slots and three restricted slots remain unchanged.
+
+Capture cleanup bounds waiting with its existing timer and drains queued exact native-owner completions when that timer fires. Observing all owner completions proves join even if their timestamps exceed the nominal deadline after scheduling delay. Missing completions still deny join; returned hook/window/desktop cleanup failures remain terminal. No timeout alone proves retirement and no expired capture generation is renewed.
