@@ -1,0 +1,247 @@
+{
+  "schema": "krasis.source-liveness-review/v1",
+  "generation": 506,
+  "revision": "72065fec2a9bea53242fd31f23e0c8e6589dedfa",
+  "collection": "1fa6b848ff8ddc03078a653d294e1e65",
+  "findings": [
+    {
+      "code": "native_presence_under_wire_gate",
+      "evidence": "Input/return full proof was outside the gate, but its following mandatory native presence query held the same wire gate and presence-query lane required by sent heartbeat replies. The check could consume the shared one-second operation budget.",
+      "change": "Move both full proof and mandatory writer presence before immediate gate admission; writer presence uses the restricted full-proof owner, independent of the sent heartbeat presence lane. Completed replies likewise check presence before TryLock. Contention discards proofs and rechecks."
+    },
+    {
+      "code": "observed_join_misclassified_after_deadline",
+      "evidence": "collectSourceInputThreads returned joined=false even after receiving all three native-owner outcomes when any outcome timestamp was later than its nominal deadline.",
+      "change": "Keep bounded waiting and drain queued completions on timer expiry; all observed exact completions prove join regardless of scheduling lateness. Missing owners and actual native cleanup errors remain failures."
+    },
+    {
+      "code": "historical_attribution_limit",
+      "evidence": "A heartbeat failure at 2026-10-31T09:23:54Z coincides with a retained runtime-summary timer-lateness maximum of 2457.263ms. Worker timing codes emitted on failure are maxima over a 15-second sample window, not stage measurements of the missing reply. Prior thread-join-low-level-hook means an owner was actually unobserved; the all-completions fix alone does not establish its resolution."
+    }
+  ],
+  "safety": {
+    "globalNativeQueries": 4,
+    "restrictedQueries": 3,
+    "operationBudgetMillis": 1000,
+    "activeIdleMillis": 2000,
+    "candidateExpiryMillis": 3000,
+    "unchanged": "Fresh authority, exact command/sequence binding, no input replay, failure fencing, pinned handles until native return and exact child/job/thread retirement. Neither timeout nor process EOF certifies cleanup."
+  },
+  "validation": {
+    "test": "Deployment runtime overlay: inputworker (22.742s), wininput (2.979s), inputdesktop, logindiag and localapi passed.",
+    "regressions": "Blocked input presence permits a real heartbeat ACK before input resumes; fresh presence is repeated after gate contention; existing generation/authority rejection, timeout handle retention, sequencing and retirement tests passed. Observed late completion accepted, missing owner rejected, real hook-release failure preserved.",
+    "excludedTest": "TestPortablePairRetainsIndependentRecoveryAfterInputFailure: live global portable recovery ownership prevented the initial fixture. Final suite explicitly excluded only this unrelated fixture; no ownership fence bypassed or live child killed.",
+    "testDevelopment": "Corrected a missing epoch in the new fixture and added synctest quiescence before an existing watchdog test inspected deferred slot release.",
+    "frontend": "104/104 tests and native production build passed.",
+    "package": "Workspace package test passed (13.40s); 8-file archive, UI icon and installer checks passed; application setup offline verification passed.",
+    "check": "git diff --check passed.",
+    "race": "Skipped: deployment configuration CGO_ENABLED=0.",
+    "remoteCI": "Skipped: no push requested.",
+    "physicalCrossings": "Pending user test; installation snapshot is not a recurrence or latency distribution."
+  },
+  "setupSha256": "4d993e856d2246f4f1c6efc67ee4552603c04aaf5ed549370c0c434ea8c515fd",
+  "localSetup": {
+    "schema": "krasis.setup-result/v1",
+    "code": 0,
+    "state": "installed"
+  },
+  "doctorA": {
+    "schemaVersion": "krasis.cli.doctor/v1",
+    "agent": "RUNNING",
+    "connection": "CONNECTED",
+    "peerAlias": "B",
+    "cliGeneration": 506,
+    "agentGeneration": 506,
+    "protocol": "COMPATIBLE",
+    "code": "healthy",
+    "cliBuild": "72065fec2a9bea53242fd31f23e0c8e6589dedfa",
+    "agentBuild": "72065fec2a9bea53242fd31f23e0c8e6589dedfa",
+    "ui": {
+      "state": "RUNNING",
+      "generation": 506,
+      "build": "72065fec2a9bea53242fd31f23e0c8e6589dedfa",
+      "pathStatus": "MATCHED"
+    },
+    "launchRecord": {
+      "state": "VERIFIED",
+      "generation": 506,
+      "build": "72065fec2a9bea53242fd31f23e0c8e6589dedfa",
+      "pathStatus": "MATCHED"
+    },
+    "installedAgent": {
+      "state": "VERIFIED",
+      "build": "72065fec2a9bea53242fd31f23e0c8e6589dedfa"
+    },
+    "service": {
+      "state": "RUNNING",
+      "pathStatus": "MATCHED"
+    },
+    "agentLocation": "PROTECTED",
+    "protectedInput": "CONFIGURED",
+    "checks": [
+      {
+        "name": "agent",
+        "state": "RUNNING"
+      },
+      {
+        "name": "connection",
+        "state": "CONNECTED"
+      },
+      {
+        "name": "protocol",
+        "state": "COMPATIBLE"
+      },
+      {
+        "name": "cli_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "ui_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "installed_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "ui",
+        "state": "RUNNING"
+      },
+      {
+        "name": "launch_record",
+        "state": "VERIFIED"
+      },
+      {
+        "name": "installed_agent",
+        "state": "VERIFIED"
+      },
+      {
+        "name": "service",
+        "state": "RUNNING"
+      },
+      {
+        "name": "update_stage_cleanup",
+        "state": "COMPLETED"
+      }
+    ],
+    "nextActions": []
+  },
+  "peerUpdateReceipt": {
+    "schemaVersion": "krasis.cli.update-wait/v1",
+    "peerAlias": "B",
+    "id": "e0df8ece0e0a6ab8fdadf95b49a5543b",
+    "code": "updated",
+    "transferState": "UPDATED",
+    "generation": 506,
+    "revision": "72065fec2a9bea53242fd31f23e0c8e6589dedfa",
+    "bytes": 28862621,
+    "total": 28862621
+  },
+  "sides": {
+    "A": {
+      "created": "2026-10-31T10:06:58Z",
+      "supportSha256": "bb6b2260b260d3e088886c33b19f4250cdded30519cc0aab6e5256f8b4c9b038",
+      "installation": {
+        "time": "2026-10-31T10:06:24.840166Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "inputHealth": {
+        "time": "2026-10-31T10:06:57.7349067Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-31T10:06:26.895596Z",
+        "time": "2026-10-31T10:06:26.933874Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      },
+      "matchingBuildUILaunches": [
+        {
+          "time": "2026-10-31T10:06:02.2931995Z",
+          "code": "launch_record_ready"
+        }
+      ],
+      "latestConnection": {
+        "time": "2026-10-31T10:06:31.0433392Z",
+        "code": "CONNECTED"
+      },
+      "settledFailures": [],
+      "incompleteSources": [
+        "control.previous.jsonl"
+      ]
+    },
+    "B": {
+      "created": "2026-10-31T10:06:59Z",
+      "supportSha256": "770b3996eb997ce0ff1388cc8ebc583ab2dbabfa59cf315967a42974dc949c3c",
+      "installation": {
+        "time": "2026-10-31T10:05:04.851409Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "inputHealth": {
+        "time": "2026-10-31T10:06:32.8427556Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-10-31T10:05:07.8253202Z",
+        "time": "2026-10-31T10:05:07.8703227Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      },
+      "matchingBuildUILaunches": [
+        {
+          "time": "2026-10-31T10:05:31.7348893Z",
+          "code": "launch_record_ready"
+        }
+      ],
+      "latestConnection": {
+        "time": "2026-10-31T10:06:30.6044515Z",
+        "code": "CONNECTED"
+      },
+      "settledFailures": [],
+      "incompleteSources": [
+        "control.previous.jsonl"
+      ]
+    }
+  },
+  "limitations": [
+    "Original Windows call or OS/process scheduling cause remains unconfirmed.",
+    "A genuine missing capture-thread completion still requires failure/recovery; no safe retirement receipt is invented.",
+    "Both control.previous.jsonl sources are incomplete; settled failure counts cover only the short retained post-install window."
+  ],
+  "sourceOfTruthChanged": [
+    "docs/architecture/02-runtime-flow.md"
+  ],
+  "apiChanges": "none; internal query classification only, no wire format change",
+  "dbChanges": "none",
+  "runnerChanges": "none",
+  "repositoryHygieneChanges": "none",
+  "remotePush": "not performed"
+}
