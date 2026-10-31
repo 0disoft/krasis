@@ -19,7 +19,7 @@ func TestInputFailurePhasesSurvivePersistenceAndExport(t *testing.T) {
 	}
 	logger := newLogger(dir, closer{}, "agent")
 	defer logger.Close()
-	stages := []string{"scope_admission", "apply", "cursor_readback", "scope_completion", "ack_mismatch", "ack_timeout", "ack_eof", "ack_closed", "ack_unclassified"}
+	stages := []string{"scope_admission", "apply", "cursor_readback", "scope_completion", "native_service_wait", "ack_mismatch", "ack_timeout", "ack_eof", "ack_closed", "ack_unclassified"}
 	for _, stage := range stages {
 		logger.Event("installed_input_failure_" + stage)
 	}

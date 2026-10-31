@@ -119,3 +119,50 @@ func TestApplyStageDoesNotMislabelFailureAsReadback(t *testing.T) {
 		t.Fatal("failed move fabricated a readback attempt")
 	}
 }
+
+func TestNativeProofTimeoutACKRetainsNegativeCertaintyAndPhase(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		release, done := make(chan struct{}), make(chan struct{})
+		calls := 0
+		execute := nativeInputExecutor(testExecute, func() error {
+			calls++
+			defer close(done)
+			<-release
+			return nil
+		}, func() bool { return true }, time.Now().Add(time.Hour), false)
+		input := &timedApplyInput{}
+		handler := portableInputHandler(input, execute, false)
+		binding := testLease().Binding
+		data, err := encodeRequest(request{op: opMove, sequence: 1, binding: binding, x: 1})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var wire bytes.Buffer
+		started := time.Now()
+		if err := handler(bytes.NewReader(data[:]), &wire); err != nil {
+			t.Fatal(err)
+		}
+		ack, err := readResponse(&wire)
+		if err != nil || ack.status != 1 || ack.certainty != 1 || ack.failureStage != failureStageNativeServiceWait || input.moves != 0 || time.Since(started) != time.Second {
+			t.Fatal("query timeout lost its early negative ACK", ack, err, input.moves, time.Since(started))
+		}
+		// The journal must preserve the native phase rather than relabel it as
+		// SendInput failure. Neither that diagnostic nor late success permits input.
+		var outer response
+		failure := notSent(errNativeProofPending)
+		failing := &timedApplyInput{moveErr: failure}
+		if err := applyCommand(context.Background(), failing, &control.PressedState{}, request{op: opMove, x: 1}, &outer); err == nil || outer.failureStage != failureStageNativeServiceWait {
+			t.Fatal("journal lost native query phase", err, outer)
+		}
+		close(release)
+		<-done
+		data, _ = encodeRequest(request{op: opMove, sequence: 2, binding: binding, x: 1})
+		if err := handler(bytes.NewReader(data[:]), &wire); err != nil {
+			t.Fatal(err)
+		}
+		ack, err = readResponse(&wire)
+		if err != nil || ack.status != 1 || ack.certainty != 1 || input.moves != 0 || calls != 1 {
+			t.Fatal("late proof reopened failed native handler", ack, err, input.moves, calls)
+		}
+	})
+}

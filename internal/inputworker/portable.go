@@ -114,13 +114,20 @@ func (client *Client) performPortable(ctx context.Context, process portableTrans
 	if ack.status != 0 {
 		client.failed = true
 		client.observeFailure("portable_input_failure_acknowledged")
+		if code := ack.failureStage.code(); code != "" {
+			client.observeFailure(code)
+		}
 		certainty := application.InjectionOutcomeUnknown
 		if ack.certainty == 1 {
 			certainty = application.InjectionNotApplied
 		} else if ack.certainty == 2 {
 			certainty = application.InjectionPartiallyApplied
 		}
-		return &application.InjectionError{Certainty: certainty, Requested: int(ack.requested), Inserted: int(ack.inserted), Cause: ErrAuthority}
+		cause := error(ErrAuthority)
+		if ack.failureStage == failureStageNativeServiceWait {
+			cause = errors.Join(cause, errNativeProofPending)
+		}
+		return &application.InjectionError{Certainty: certainty, Requested: int(ack.requested), Inserted: int(ack.inserted), Cause: cause}
 	}
 	if observed != nil {
 		observed(ack)
@@ -196,6 +203,9 @@ func portableInputHandler(input application.InputPort, execute func(context.Cont
 		}
 		if applyErr != nil {
 			failed, ack.status = true, 1
+			if errors.Is(applyErr, errNativeProofPending) {
+				ack.failureStage = failureStageNativeServiceWait
+			}
 			ack.certainty, ack.requested, ack.inserted = describeFailure(applyErr)
 		}
 		if len(timings) == 1 && timings[0] != nil {

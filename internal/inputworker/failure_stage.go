@@ -9,10 +9,11 @@ const (
 	failureStageApply
 	failureStageCursorReadback
 	failureStageExecutorCompletion
+	failureStageNativeServiceWait
 )
 
 func (stage failureStage) valid() bool {
-	return stage >= failureStageBeforeDispatch && stage <= failureStageExecutorCompletion
+	return stage >= failureStageBeforeDispatch && stage <= failureStageNativeServiceWait
 }
 
 func (stage failureStage) code() string {
@@ -25,6 +26,8 @@ func (stage failureStage) code() string {
 		return "installed_input_failure_cursor_readback"
 	case failureStageExecutorCompletion:
 		return "installed_input_failure_scope_completion"
+	case failureStageNativeServiceWait:
+		return "installed_input_failure_native_service_wait"
 	default:
 		return ""
 	}

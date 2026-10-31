@@ -2,6 +2,7 @@ package inputworker
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/0disoft/krasis/internal/application"
@@ -26,6 +27,9 @@ func applyCommand(ctx context.Context, input application.InputPort, pressed *con
 	defer func() {
 		if result != nil {
 			ack.failureStage = stage
+			if errors.Is(result, errNativeProofPending) {
+				ack.failureStage = failureStageNativeServiceWait
+			}
 		}
 	}()
 	if command.applyDetail {

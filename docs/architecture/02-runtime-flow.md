@@ -16,6 +16,27 @@ g478의 상대 관리 창 열기는 에이전트와 실행 기록의 generation/
 
 ## 경계 전환
 
+The native input dispatcher bounds its fresh service-proof wait to one second
+and the original caller deadline minus min(250ms, 25% of its initial remaining
+budget). Desktop acquisition consumes that same budget. A still-pending service
+proof returns a negative NOT_APPLIED ACK and permanently fences that serial
+dispatcher; its late result cannot run input, create another query, mutate the
+returned timing vector or authorize another command. Authority.Close still
+joins any admitted native query before releasing its handles, and exact child,
+IPC and job retirement still precede release recovery or replacement. This
+separates a bounded negative response from mandatory native retirement; it
+does not claim cancellation of an uncooperative Windows call or SendInput.
+The existing fixed failed-ACK phase carries native_service_wait through the
+native child and journal to the product log. A missing/malformed ACK remains
+OUTCOME_UNKNOWN and is never retried. Normal successful ACK framing is unchanged.
+
+The g504 B failure at 2026-10-31 08:30:52 UTC observed a 4.173s dispatch and
+3.263s ACK-prefix wait without worker-stage evidence. Agent GC-trail samples
+continued at approximately 100ms intervals. These observations locate the
+missing reply but do not prove the native service query, desktop check or
+SendInput as the original blocking OS operation. The bounded service-proof
+wait is a reproduced code defect, not a retrospective attribution of that event.
+
 g504 measures full-image file reads and SHA256 computation separately. KRD9
 adds exactly 36 diagnostic bytes (journal, input child and release child) to
 KRD8, including backend 1 (Go) or 2 (Windows CNG). The same bounded startup read

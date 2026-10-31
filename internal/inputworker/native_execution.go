@@ -3,19 +3,24 @@ package inputworker
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"time"
 
 	"github.com/0disoft/krasis/internal/inputdesktop"
 )
 
-// desktop must be the native child's authenticated Scope.Do. Its binding
-// freshly checks the agent/session; do not repeat that RPC before entering it.
-// Fresh service authorization overlaps the independent desktop/agent check.
-// If it finishes later, reenter the desktop after joining it: a slow SCM query
-// must not leave the selected desktop stale. Parent/lease checks precede input.
+const nativeProofReplyReserve = 250 * time.Millisecond
+
+var errNativeProofPending = errors.New("native service proof did not finish before reply budget")
+
+// Only the independently authenticated native child supplies these callbacks.
+// A timed-out proof permanently fences this serial dispatcher. Its Authority
+// still pins handles until the native query returns; exact process/IPC
+// retirement remains mandatory before recovery or a replacement worker starts.
 func nativeInputExecutor(desktop executor, service func() error, parent func() bool, expires time.Time, releaseOnly bool, timings ...*workerTiming) executor {
+	var fenced atomic.Bool
 	return func(ctx context.Context, work func() error) error {
-		if ctx == nil || work == nil || desktop == nil || service == nil || parent == nil {
+		if ctx == nil || work == nil || desktop == nil || service == nil || parent == nil || fenced.Load() {
 			return ErrAuthority
 		}
 		valid := func() bool { return releaseOnly || time.Now().Before(expires) }
@@ -37,57 +42,85 @@ func nativeInputExecutor(desktop executor, service func() error, parent func() b
 		if len(timings) == 1 {
 			timing = timings[0]
 		}
-		return overlapNativeProof(ctx, service, checkedDesktop, work, timing)
+		err := overlapNativeProof(ctx, service, checkedDesktop, work, timing)
+		if errors.Is(err, errNativeProofPending) {
+			fenced.Store(true)
+		}
+		return err
 	}
 }
 
-// One serial native dispatcher owns at most one query. Always join it, even
-// when desktop acquisition fails, before the caller can close authority pins.
-// This is fresh work for this command; neither an idle proof nor a cache.
+// Reserve ACK time from the original budget, never after desktop acquisition.
+// The one-second query bound also applies without a caller deadline.
+func nativeProofDeadline(ctx context.Context) time.Time {
+	now := time.Now()
+	deadline := now.Add(time.Second)
+	if caller, ok := ctx.Deadline(); ok {
+		remaining := caller.Sub(now)
+		reserve := min(nativeProofReplyReserve, max(0, remaining/4))
+		if bound := caller.Add(-reserve); bound.Before(deadline) {
+			deadline = bound
+		}
+	}
+	return deadline
+}
+
+// Fresh service and desktop proofs overlap. A pending service query cannot
+// hold an unapplied command's negative ACK hostage. Its goroutine publishes
+// only to its own buffered result slot, never timing memory or an input callback.
 func overlapNativeProof(ctx context.Context, service func() error, desktop executor, work func() error, timing *workerTiming) error {
 	if timing != nil {
 		*timing = workerTiming{}
 	}
-	done := make(chan struct{})
-	var serviceErr error
-	var serviceElapsed time.Duration
+	proofDeadline := nativeProofDeadline(ctx)
+	type proofResult struct {
+		err     error
+		elapsed time.Duration
+	}
+	done := make(chan proofResult, 1)
 	go func() {
 		started := time.Now()
+		result := proofResult{}
 		defer func() {
-			// This query used to run inside the desktop callback's panic fence.
-			// Keep that fail-closed behavior when moving it to another goroutine.
 			if recover() != nil {
-				serviceErr = errors.Join(ErrAuthority, inputdesktop.ErrCallbackPanic)
+				result.err = errors.Join(ErrAuthority, inputdesktop.ErrCallbackPanic)
 			}
-			serviceElapsed = time.Since(started)
-			close(done)
+			result.elapsed = time.Since(started)
+			done <- result
 		}()
-		serviceErr = service()
+		result.err = service()
 	}()
+	var proof proofResult
+	joined := false
 	var scopeElapsed, applied time.Duration
 	defer func() {
-		<-done
 		if timing != nil {
-			// These proof spans overlap. Apply remains actual native work here;
-			// the journal's containing IPC span is recorded by journalExecution.
-			timing.record(0, serviceElapsed)
+			if joined {
+				timing.record(0, proof.elapsed)
+			}
 			timing.record(1, scopeElapsed-applied)
 		}
 	}()
 	deferred, entered := false, false
 	run := func() error {
 		entered = true
-		select {
-		case <-done:
-		default:
-			deferred = true
-			return nil // No input was attempted; discard this desktop check.
+		if !joined {
+			select {
+			case proof = <-done:
+				joined = true
+			default:
+				deferred = true
+				return nil // Discard this desktop check without attempting input.
+			}
 		}
-		if serviceErr != nil {
-			return serviceErr
+		if proof.err != nil {
+			return proof.err
 		}
 		if err := ctx.Err(); err != nil {
 			return err
+		}
+		if !time.Now().Before(proofDeadline) {
+			return context.DeadlineExceeded
 		}
 		started := time.Now()
 		err := work()
@@ -100,9 +133,18 @@ func overlapNativeProof(ctx context.Context, service func() error, desktop execu
 	started := time.Now()
 	err := desktop(ctx, run)
 	scopeElapsed = time.Since(started)
-	<-done
-	if err != nil || serviceErr != nil {
-		return errors.Join(err, serviceErr)
+	if !joined {
+		proofCtx, cancel := context.WithDeadline(ctx, proofDeadline)
+		defer cancel()
+		select {
+		case proof = <-done:
+			joined = true
+		case <-proofCtx.Done():
+			return errors.Join(err, ErrAuthority, errNativeProofPending, proofCtx.Err())
+		}
+	}
+	if err != nil || proof.err != nil {
+		return errors.Join(err, proof.err)
 	}
 	if !entered {
 		return ErrAuthority
@@ -110,7 +152,7 @@ func overlapNativeProof(ctx context.Context, service func() error, desktop execu
 	if deferred {
 		entered = false
 		started = time.Now()
-		err = desktop(ctx, run) // Fresh agent/desktop after the slow service query.
+		err = desktop(ctx, run) // Fresh agent/desktop after the late service proof.
 		scopeElapsed += time.Since(started)
 		if err == nil && !entered {
 			return ErrAuthority
