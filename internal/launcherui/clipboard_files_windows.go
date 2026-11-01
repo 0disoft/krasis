@@ -124,7 +124,7 @@ func packClipboardFiles(paths []string) ([]byte, error) {
 			return nil, errClipboardUnavailable
 		}
 		parent := filepath.Dir(source)
-		err := filepath.WalkDir(source, func(current string, entry os.DirEntry, walkErr error) error {
+		err := walkClipboardFiles(source, peerupdate.MaxClipboardFiles-entries, func(current string, entry os.DirEntry, walkErr error) error {
 			if entries >= peerupdate.MaxClipboardFiles {
 				return errClipboardFileCount
 			}
