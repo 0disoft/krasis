@@ -184,6 +184,13 @@ func (server *Server) Close(ctx context.Context) error {
 		return nil
 	}
 	server.closeOnce.Do(func() {
+		// Shutdown only knows listeners already registered by Serve. This owner
+		// must also retire the socket when Close wins the startup race.
+		defer func() {
+			if err := server.listener.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+				server.closeErr = errors.Join(server.closeErr, err)
+			}
+		}()
 		if ctx == nil {
 			ctx = context.Background()
 		}
