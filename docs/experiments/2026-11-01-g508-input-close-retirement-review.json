@@ -387,7 +387,8 @@
     "check": "git diff --check passed.",
     "race": "Not run: deployment CGO_ENABLED=0.",
     "remoteCI": "Not run: no push requested.",
-    "physicalCrossings": "Not yet tested after g508 installation."
+    "physicalCrossings": "Not yet tested after g508 installation.",
+    "restoredConnection": "After the user selected Connect on B, A doctor reports healthy CONNECTED and both support files show READY protected services, matching g508 and no subsequent retained session faults/reconnects. JSON assertions passed."
   },
   "setupSha256": "70c46384dbbec598da8bc9e0ef1e06f825597f89a702a600d43ef8f7a1035bf6",
   "localSetup": {
@@ -632,19 +633,193 @@
     }
   },
   "connectionRestoration": {
-    "state": "awaiting_B_connect",
+    "state": "CONNECTED",
     "reason": "A installation sent an explicit peer disconnect after B had resumed. B stopped cleanly into LOCAL; A resumed CONNECTING. Existing remote management opens the B window but does not execute its Connect action.",
     "appOpen": {
       "schemaVersion": "krasis.cli.app-open/v1",
       "code": "window_ready",
       "peerAlias": "B",
       "id": "9a0d80a3e29755bc66678e7507c0be24"
-    }
+    },
+    "confirmedAfterUserConnect": true,
+    "collection": "00a3b480d6c1e2a4d136ebd7a5a1a812",
+    "doctorA": {
+      "schemaVersion": "krasis.cli.doctor/v1",
+      "agent": "RUNNING",
+      "connection": "CONNECTED",
+      "peerAlias": "B",
+      "cliGeneration": 508,
+      "agentGeneration": 508,
+      "protocol": "COMPATIBLE",
+      "code": "healthy",
+      "cliBuild": "980aa13b30ab4de38607a5893833764ed1c22cbf",
+      "agentBuild": "980aa13b30ab4de38607a5893833764ed1c22cbf",
+      "ui": {
+        "state": "RUNNING",
+        "generation": 508,
+        "build": "980aa13b30ab4de38607a5893833764ed1c22cbf",
+        "pathStatus": "MATCHED"
+      },
+      "launchRecord": {
+        "state": "VERIFIED",
+        "generation": 508,
+        "build": "980aa13b30ab4de38607a5893833764ed1c22cbf",
+        "pathStatus": "MATCHED"
+      },
+      "installedAgent": {
+        "state": "VERIFIED",
+        "build": "980aa13b30ab4de38607a5893833764ed1c22cbf"
+      },
+      "service": {
+        "state": "RUNNING",
+        "pathStatus": "MATCHED"
+      },
+      "agentLocation": "PROTECTED",
+      "protectedInput": "CONFIGURED",
+      "checks": [
+        {
+          "name": "agent",
+          "state": "RUNNING"
+        },
+        {
+          "name": "connection",
+          "state": "CONNECTED"
+        },
+        {
+          "name": "protocol",
+          "state": "COMPATIBLE"
+        },
+        {
+          "name": "cli_agent_version",
+          "state": "MATCHED"
+        },
+        {
+          "name": "ui_agent_version",
+          "state": "MATCHED"
+        },
+        {
+          "name": "installed_agent_version",
+          "state": "MATCHED"
+        },
+        {
+          "name": "ui",
+          "state": "RUNNING"
+        },
+        {
+          "name": "launch_record",
+          "state": "VERIFIED"
+        },
+        {
+          "name": "installed_agent",
+          "state": "VERIFIED"
+        },
+        {
+          "name": "service",
+          "state": "RUNNING"
+        },
+        {
+          "name": "update_stage_cleanup",
+          "state": "COMPLETED"
+        }
+      ],
+      "nextActions": []
+    },
+    "peerStatus": {
+      "schemaVersion": "krasis.cli.update-status/v1",
+      "peerAlias": "B",
+      "localGeneration": 508,
+      "localBuild": "980aa13b30ab4de38607a5893833764ed1c22cbf",
+      "peerState": "ONLINE",
+      "peerGeneration": 508,
+      "peerBuild": "980aa13b30ab4de38607a5893833764ed1c22cbf",
+      "peerAllowsUpdate": true,
+      "receiveAllowed": true,
+      "transferState": "IDLE"
+    },
+    "evidence": {
+      "A": {
+        "created": "2026-11-01T09:05:33Z",
+        "supportSha256": "aab52a195ae1ba6050d157d94c07f38151e52117d7afd9861da4591d4d117877",
+        "inputHealth": {
+          "time": "2026-11-01T09:05:32.1310229Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "loginRuntime": {
+          "startedAt": "2026-11-01T08:51:10.9898661Z",
+          "time": "2026-11-01T08:51:11.0059557Z",
+          "service": "READY",
+          "console": "USER_SESSION",
+          "grant": "PRESENT",
+          "lastWorker": "NONE"
+        },
+        "lastConnected": {
+          "time": "2026-11-01T09:05:18.7563548Z",
+          "code": "CONNECTED"
+        },
+        "observedThrough": "2026-11-01T09:05:19.1388368Z",
+        "postConnectionFailures": [],
+        "incompleteSources": [
+          "control.previous.jsonl"
+        ],
+        "handoffProfilesAfterConnect": 0
+      },
+      "B": {
+        "created": "2026-11-01T09:05:32Z",
+        "supportSha256": "87da58ac44d7ec3a3b4355ad2548133a5f6287bded929e08e40fdc5da8ebc00d",
+        "inputHealth": {
+          "time": "2026-11-01T09:05:12.6991136Z",
+          "state": "READY",
+          "stage": "complete",
+          "win32Error": 0,
+          "win32Known": false
+        },
+        "loginRuntime": {
+          "startedAt": "2026-11-01T08:50:48.0378671Z",
+          "time": "2026-11-01T08:51:03.3432329Z",
+          "service": "READY",
+          "console": "USER_SESSION",
+          "grant": "PRESENT",
+          "lastWorker": "NONE",
+          "source": {
+            "total": 1,
+            "exits": [
+              {
+                "time": "2026-11-01T08:51:03.1382825Z",
+                "command": "ok",
+                "reader": "stopped",
+                "capture": "joined",
+                "sender": "joined",
+                "interrupt": "joined",
+                "retirement": "clean_sent",
+                "report": "ok",
+                "heartbeatStage": "replied",
+                "heartbeatSlowStage": "service_presence",
+                "heartbeatSlowBucket": 1
+              }
+            ]
+          }
+        },
+        "lastConnected": {
+          "time": "2026-11-01T09:05:15.7138546Z",
+          "code": "CONNECTED"
+        },
+        "observedThrough": "2026-11-01T09:05:31.9073227Z",
+        "postConnectionFailures": [],
+        "incompleteSources": [
+          "control.previous.jsonl"
+        ],
+        "handoffProfilesAfterConnect": 0
+      }
+    },
+    "limit": "This is post-connect readiness and retained-log verification, not a physical crossing stress test or proof that the long delay is resolved."
   },
   "limitations": [
     "Original long native/IPC/scheduling delay remains unresolved.",
     "Both old control.previous.jsonl sources are incomplete.",
-    "Installed readiness is not evidence of sustained recovery; paired connection confirmation and a user crossing test remain pending."
+    "Paired connection is confirmed; sustained recovery and physical crossing stress verification remain pending."
   ],
   "sourceOfTruthChanged": [
     "docs/architecture/02-runtime-flow.md"
