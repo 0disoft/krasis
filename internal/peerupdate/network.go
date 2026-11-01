@@ -35,10 +35,7 @@ func (m *Manager) Run(ctx context.Context, address, peer string, listener bool, 
 			return
 		}
 		s := &http.Server{Handler: m.handler(peer, authorized), ReadHeaderTimeout: 3 * time.Second, ReadTimeout: 90 * time.Second, WriteTimeout: 90 * time.Second, IdleTimeout: auxiliaryIdleTimeout, MaxHeaderBytes: 4096}
-		stop := context.AfterFunc(ctx, func() { _ = s.Close() })
-		defer stop()
-		defer ln.Close()
-		_ = s.Serve(ln)
+		serveAuxiliary(ctx, s, ln)
 		return
 	}
 	t := &http.Transport{TLSClientConfig: cfg, DisableKeepAlives: true, DisableCompression: true, MaxConnsPerHost: 1, ResponseHeaderTimeout: 5 * time.Second, TLSHandshakeTimeout: 5 * time.Second, Proxy: nil}
@@ -169,6 +166,16 @@ func (m *Manager) Run(ctx context.Context, address, peer string, listener bool, 
 			}
 		}
 	}
+}
+
+func serveAuxiliary(ctx context.Context, server *http.Server, listener net.Listener) {
+	defer listener.Close()
+	// Serve closes its listener on an accept error, but leaves accepted sockets
+	// running. Close those sockets on every exit, not only context cancellation.
+	defer server.Close()
+	stop := context.AfterFunc(ctx, func() { _ = server.Close() })
+	defer stop()
+	_ = server.Serve(listener)
 }
 
 type auxiliaryRequestLane uint8
