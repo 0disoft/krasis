@@ -53,7 +53,7 @@ func TestServicePreparationReapsIdleExpiredBuilderBeforeFreshHint(t *testing.T) 
 			close(release)
 			// Construction finishes and expires while accept waits for physical
 			// movement. No periodic refresh or synthetic client wakes the service.
-			time.Sleep(3 * time.Second)
+			time.Sleep(preparedConsoleWindow)
 			if err := old.expireUnbound(); err != nil {
 				t.Fatal(err)
 			}

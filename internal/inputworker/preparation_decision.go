@@ -8,7 +8,7 @@ import (
 
 // Outlive the 2s launch gates and the sender's 2.1s renewal interval. A fresh
 // movement hint must not invariably arrive after its last candidate expired.
-const preparedConsoleWindow = 3 * time.Second
+const preparedConsoleWindow = handoff.PreparedLifetime
 
 // Same freshness predicate as before, with a bounded diagnostic for the first
 // rejected condition. The result never skips native authentication or cleanup.

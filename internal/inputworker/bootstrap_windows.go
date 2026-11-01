@@ -270,6 +270,13 @@ func runInstalledConsoleInputMode(ctx context.Context, agentDigest, serviceDiges
 	defer lifetime.Close()
 	stopControl := sync.OnceValue(context.AfterFunc(startup, func() { _ = control.Close() }))
 	defer stopControl()
+	var cancelBinding context.CancelFunc
+	defer func() {
+		if cancelBinding != nil {
+			stopControl()
+			cancelBinding()
+		}
+	}()
 	started = time.Now()
 	proof, err := authenticateServiceInstalled(startup, uintptr(control.handle), serviceDigest, installation)
 	profile.Record(handoff.WorkerServiceAuth, time.Since(started))
@@ -301,7 +308,17 @@ func runInstalledConsoleInputMode(ctx context.Context, agentDigest, serviceDiges
 	}
 	var packet [bootstrapSize]byte
 	if prepareNative {
-		packet, err = readPreparedBootstrap(startup, stopControl, control.readContext)
+		// Keep construction on its original five-second budget. Only a complete
+		// authenticated reservation may wait longer, without any input handles.
+		idle, cancelIdle := context.WithTimeout(ctx, preparedConsoleWindow+startupTimeout)
+		defer cancelIdle()
+		packet, err = readPreparedLeaseBootstrap(startup, idle, func() bool {
+			return stopControl() && control.SetDeadline(time.Time{}) == nil
+		}, control.readContext, func() (context.Context, error) {
+			startup, cancelBinding = context.WithTimeout(ctx, startupTimeout)
+			stopControl = sync.OnceValue(context.AfterFunc(startup, func() { _ = control.Close() }))
+			return startup, control.SetDeadline(time.Now().Add(startupTimeout))
+		})
 		if err != nil {
 			return errors.Join(ErrProtocol, reportPreparationFailure(control, preparationBootstrapFailure, err))
 		}

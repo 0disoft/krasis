@@ -5,6 +5,10 @@ import (
 	"time"
 )
 
+// PreparedLifetime bounds only an unbound process reservation, never a lease
+// or cached authority. Runtime expiry and diagnostic validation share one limit.
+const PreparedLifetime = 15 * time.Second
+
 // StartupStage spans are local to the service or child, not cross-process
 // timestamps. ServiceBootstrapReady contains child work and must not be added
 // to it. The existing handoff vector indices and schema remain unchanged.
@@ -54,7 +58,7 @@ func (p StartupProfile) Valid() bool {
 	if p.Schema != 1 || !validPreparationDecision(p) || !p.ServiceReadiness.Valid() {
 		return false
 	}
-	if (!p.Prepared && p.PreparedAgeMicros != 0) || (p.Prepared && (p.PreparedAgeMicros >= 3_000_000 || p.Measured&3 != 3)) {
+	if (!p.Prepared && p.PreparedAgeMicros != 0) || (p.Prepared && (p.PreparedAgeMicros >= uint32(PreparedLifetime.Microseconds()) || p.Measured&3 != 3)) {
 		return false
 	}
 	if p.PreparationWaitMicros > uint32(Window.Microseconds()) ||

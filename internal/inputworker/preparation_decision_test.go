@@ -15,8 +15,12 @@ func TestPreparationHealthReportsTheFirstRejectedExistingCondition(t *testing.T)
 		want             handoff.PreparationDecision
 	}{
 		{time.Millisecond, 1, 1, true, handoff.PreparationUsed},
+		{3 * time.Second, 1, 1, true, handoff.PreparationUsed},
+		{5 * time.Second, 1, 1, true, handoff.PreparationUsed},
+		{preparedConsoleWindow - time.Nanosecond, 1, 1, true, handoff.PreparationUsed},
 		{-1, 1, 1, true, handoff.PreparationInvalidAge},
 		{preparedConsoleWindow, 1, 1, true, handoff.PreparationExpired},
+		{preparedConsoleWindow + time.Nanosecond, 1, 1, true, handoff.PreparationExpired},
 		{preparedConsoleWindow, 1, 2, false, handoff.PreparationExpired},
 		{time.Millisecond, 1, 2, true, handoff.PreparationSessionChanged},
 		{time.Millisecond, 0, 0, true, handoff.PreparationSessionChanged},

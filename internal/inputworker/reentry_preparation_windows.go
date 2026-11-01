@@ -11,8 +11,8 @@ import (
 type reentryPreparation struct{ timer *time.Timer }
 
 // One clean lease retirement permits one delayed construction opportunity.
-// The original spare still expires at 3s. Rebuild once after a short local
-// pause, before the common 3-5s return, rather than waiting for outward motion.
+// The original spare keeps its fixed bounded expiry. Rebuild once after that
+// reservation expires rather than requiring another outward movement hint.
 // This never renews a child, repeats periodically, or grants input authority.
 func (p *serviceInputPreparation) armReentryLocked(ctx context.Context, expires time.Time, prepare func(context.Context) (*preparedConsole, error)) {
 	p.cancelReentryLocked()

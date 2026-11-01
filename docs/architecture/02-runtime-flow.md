@@ -445,3 +445,11 @@ Native attempted/partial writes remain fatal, unsent observations are not
 replayed, and the existing bounded observation queue may still drop on overflow.
 This contains advisory backpressure; it does not prove the A runtime stopping
 delay is fixed or prevent all active-input stalls during process-wide pauses.
+
+### Bounded unbound reservation after g510
+
+Prepared console reservations now retain their exact unbound owner for 15 seconds instead of 3 seconds. Runtime admission and startup-profile validation use the same `handoff.PreparedLifetime` ceiling; the instant at the ceiling is expired. Hints cannot renew that original timer. There is still at most one spare and one single delayed reentry construction opportunity, with exact retirement joined before replacement.
+
+Service authentication and native construction retain their original five-second startup budget. After service authentication, the console reads only the first bootstrap byte under a separate idle budget of reservation lifetime plus five seconds of bounded cleanup allowance. The remainder of the packet and actual lease binding start a fresh five-second budget. Partial packets, expired idle reads (including timer-delivery races), cancellation and failed deadline setup cannot bind. Every existing fresh agent/service/session, image-pin, lease-expiry and desktop check still runs before input authority is transferred. Capture/presentation and non-prepared console startup keep their existing timing policy.
+
+A successful native constructor can remain unbound after its construction context expires; an incomplete or late constructor still fails its original budget. This prevents increasing the reservation timer from silently creating dead five-second candidates. Maximum spare residency rises by twelve seconds; no periodic keepalive or process replacement loop is added. The previous 273-275ms expired-preparation cases motivate this change but are not a measurement of the new build.

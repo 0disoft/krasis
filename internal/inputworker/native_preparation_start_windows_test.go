@@ -31,6 +31,30 @@ func TestNativePreparationOverlapsAuthenticatedBootstrap(t *testing.T) {
 	})
 }
 
+func TestCompletedNativePreparationSurvivesOriginalStartupDeadline(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		construction, cancel := context.WithTimeout(context.Background(), startupTimeout)
+		defer cancel()
+		pair := &preparedNativePair{}
+		pending, err := startNativePairPreparation(construction, func(context.Context) (*preparedNativePair, error) {
+			time.Sleep(100 * time.Millisecond)
+			return pair, nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer pending.Close()
+		time.Sleep(startupTimeout + time.Second)
+		synctest.Wait()
+		binding, cancelBinding := context.WithTimeout(context.Background(), startupTimeout)
+		defer cancelBinding()
+		ready, err := pending.awaitPreparation(binding)
+		if construction.Err() == nil || err != nil || ready != pair {
+			t.Fatal("completed, unbound native preparation inherited expired construction budget", err)
+		}
+	})
+}
+
 func TestNativePreparationCancellationDeniesBindingButJoinsLateConstructor(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)

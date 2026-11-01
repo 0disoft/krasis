@@ -16,7 +16,7 @@ func reentrySpare() *preparedConsole {
 	return p
 }
 
-func TestReentryOpportunityPreparesBeforeFiveSecondEntryOnlyOnce(t *testing.T) {
+func TestReentryOpportunityRetainsOriginalSpareAcrossFiveSecondPause(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx := context.Background()
 		old := reentrySpare()
@@ -34,13 +34,13 @@ func TestReentryOpportunityPreparesBeforeFiveSecondEntryOnlyOnce(t *testing.T) {
 		synctest.Wait()
 		started := time.Now()
 		child, err := slot.take(&Channel{}, Lease{})
-		if err != nil || child == nil || child == old || child.retired() || builds != 1 || time.Since(started) != 0 {
-			t.Fatal("five-second entry still waits for replacement native loading", err, builds, time.Since(started))
+		if err != nil || child != old || child.retired() || builds != 0 || time.Since(started) != 0 {
+			t.Fatal("five-second entry rebuilt or lost its existing unbound spare", err, builds, time.Since(started))
 		}
 		_ = child.close()
-		time.Sleep(10 * time.Second)
+		time.Sleep(preparedConsoleWindow)
 		synctest.Wait()
-		if builds != 1 || slot.reentry != nil {
+		if builds != 0 || slot.reentry != nil {
 			t.Fatal("one return started periodic idle construction", builds)
 		}
 	})
@@ -63,7 +63,7 @@ func TestReentryOpportunityNeverRetiresTheInitialSpareEarly(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		time.Sleep(3 * time.Second)
+		time.Sleep(preparedConsoleWindow)
 		synctest.Wait()
 		if first == nil || first.retired() || builds != 1 {
 			t.Fatal("late-completed initial spare retired before its original expiry")
@@ -114,7 +114,7 @@ func TestReentryOpportunityCancelledByEntryFreshDemandShutdownOrExpiredLease(t *
 				case "cancel":
 					cancel()
 				}
-				time.Sleep(10 * time.Second)
+				time.Sleep(preparedConsoleWindow + time.Second)
 				synctest.Wait()
 				want := 0
 				if stop == "hint" {
@@ -138,7 +138,7 @@ func TestReentryOpportunityKeepsUncertainRetirementTerminal(t *testing.T) {
 		if err := slot.reenter(context.Background(), Lease{ExpiresAt: time.Now().Add(time.Minute)}, nil, func(context.Context) (*preparedConsole, error) { builds++; return reentrySpare(), nil }); err != nil {
 			t.Fatal(err)
 		}
-		time.Sleep(5 * time.Second)
+		time.Sleep(preparedConsoleWindow + time.Second)
 		synctest.Wait()
 		channel := &Channel{}
 		if child, err := slot.take(channel, Lease{}); child != nil || !errors.Is(err, ErrRecovery) || !channel.closing || builds != 0 {
