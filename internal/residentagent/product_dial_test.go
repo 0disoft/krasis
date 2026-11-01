@@ -3,12 +3,27 @@ package residentagent
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"net"
 	"testing"
 	"time"
 
 	"github.com/0disoft/krasis/internal/truststore"
 )
+
+func TestProductDialCanceledBeforeLoadDoesNoIO(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	loads := 0
+	source := &boundedProductDial{load: func() (truststore.ConnectionProfile, error) {
+		loads++
+		return truststore.ConnectionProfile{}, errors.New("unexpected disk read")
+	}}
+	connection, err := source.Next(ctx)
+	if connection != nil || !errors.Is(err, context.Canceled) || loads != 0 {
+		t.Fatalf("connection=%v err=%v loads=%d; want cancellation without I/O", connection, err, loads)
+	}
+}
 
 func TestProductDialReloadsEndpointWithoutChangingPeer(t *testing.T) {
 	first, err := net.Listen("tcp", "127.0.0.1:0")
