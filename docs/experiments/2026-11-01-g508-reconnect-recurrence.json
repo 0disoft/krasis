@@ -1,0 +1,511 @@
+{
+  "schema": "krasis.g508-reconnect-recurrence/v1",
+  "generation": 508,
+  "revision": "980aa13b30ab4de38607a5893833764ed1c22cbf",
+  "collection": "4d0fdaafba30329089f2d85ee5aa6246",
+  "scope": "Read-only collection after the user reported successful crossings followed by reconnection. No runtime code, installer, service, connection, or settings changes.",
+  "method": "Deduplicate exact-build events by run/sequence/code. Use each device own CONNECTED-to-failure interval. Pair handoff profiles by exchange tag; these profiles have no connection field. Never subtract timestamps from different devices.",
+  "sides": {
+    "A": {
+      "file": "support-request-4d0fdaafba30329089f2d85ee5aa6246-local.json",
+      "sha256": "d99bc601c18be38c92e5e3a82322292af184b9356511debd869087ec828410c7",
+      "created": "2026-11-01T09:20:06Z",
+      "inputHealth": {
+        "time": "2026-11-01T09:19:56.4776596Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "serviceStartedAt": "2026-11-01T08:51:10.9898661Z",
+      "service": "READY",
+      "sourceHistory": {
+        "total": 1,
+        "exits": [
+          {
+            "time": "2026-11-01T09:19:34.172913Z",
+            "command": "ok",
+            "reader": "cancelled",
+            "capture": "joined",
+            "sender": "joined",
+            "interrupt": "joined",
+            "retirement": "delivery_failed",
+            "report": "failed",
+            "failure": {
+              "operation": "source-write-boundary-timeout",
+              "win32Error": 0,
+              "win32Known": false
+            },
+            "heartbeatStage": "replied",
+            "heartbeatSlowStage": "service_presence",
+            "heartbeatSlowBucket": 4
+          }
+        ]
+      },
+      "connectedAt": "2026-11-01T09:05:18.7563548Z",
+      "trigger": {
+        "time": "2026-11-01T09:19:34.3924733Z",
+        "observedAt": "2026-11-01T09:19:34.3919003Z",
+        "trigger": true,
+        "component": "source-hook",
+        "fault": "fault_source_hook_failed",
+        "canceled": false,
+        "timeout": false,
+        "closed": false,
+        "nativeError": 0,
+        "nativeKnown": false,
+        "networkError": "not_observed",
+        "networkPolicy": "unknown",
+        "lastLifecycle": "unknown",
+        "lifecycleAgeMicros": 0,
+        "captureMode": "protected"
+      },
+      "restoredAt": "2026-11-01T09:19:48.8932082Z",
+      "agentRunChanged": true,
+      "reconnect": {
+        "milliseconds": 14501,
+        "clock": "same-device wall; agent run changed, so elapsed origins cannot be subtracted"
+      },
+      "peakPreFaultSamplerWindow": {
+        "beginMicros": 854302482,
+        "endMicros": 856484278,
+        "lateMicros": 2082860,
+        "known": 255,
+        "gcPauses": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "gcStopping": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "runnable": [
+          8,
+          0,
+          0,
+          0,
+          0,
+          3
+        ]
+      },
+      "gcSamplingNote": "Histogram counts are coarse upper-bound buckets, not exact pause lengths. Total-GC and stopping counts are independent, and cannot be subtracted. Sampling lateness is not an exact GC duration.",
+      "incompleteLogSources": [
+        "control.previous.jsonl"
+      ]
+    },
+    "B": {
+      "file": "support-request-4d0fdaafba30329089f2d85ee5aa6246-peer-1aeff94249a3a7a76cfa2765948a731e4b57cc898da1ab79f1bd64fa2583e3f0.json",
+      "sha256": "70af8de9a53a7f00ee221a118aed127b220ca52c7fb10dedd526aabe083b75f8",
+      "created": "2026-11-01T09:20:04Z",
+      "inputHealth": {
+        "time": "2026-11-01T09:19:35.2673886Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "serviceStartedAt": "2026-11-01T08:50:48.0378671Z",
+      "service": "READY",
+      "sourceHistory": {
+        "total": 2,
+        "exits": [
+          {
+            "time": "2026-11-01T08:51:03.1382825Z",
+            "command": "ok",
+            "reader": "stopped",
+            "capture": "joined",
+            "sender": "joined",
+            "interrupt": "joined",
+            "retirement": "clean_sent",
+            "report": "ok",
+            "heartbeatStage": "replied",
+            "heartbeatSlowStage": "service_presence",
+            "heartbeatSlowBucket": 1
+          },
+          {
+            "time": "2026-11-01T09:19:31.3743286Z",
+            "command": "ok",
+            "reader": "stopped",
+            "capture": "joined",
+            "sender": "joined",
+            "interrupt": "joined",
+            "retirement": "clean_sent",
+            "report": "ok",
+            "heartbeatStage": "replied",
+            "heartbeatSlowStage": "service_presence",
+            "heartbeatSlowBucket": 2
+          }
+        ]
+      },
+      "connectedAt": "2026-11-01T09:05:15.7138546Z",
+      "trigger": {
+        "time": "2026-11-01T09:19:31.3493456Z",
+        "observedAt": "2026-11-01T09:19:31.3493456Z",
+        "trigger": true,
+        "component": "peer-session",
+        "fault": "fault_remote_eof",
+        "canceled": false,
+        "timeout": false,
+        "closed": false,
+        "nativeError": 0,
+        "nativeKnown": false,
+        "networkError": "not_observed",
+        "networkPolicy": "unknown",
+        "lastLifecycle": "unknown",
+        "lifecycleAgeMicros": 0,
+        "captureMode": "protected"
+      },
+      "restoredAt": "2026-11-01T09:19:45.8248778Z",
+      "agentRunChanged": false,
+      "reconnect": {
+        "milliseconds": 14475.532,
+        "clock": "same-process elapsed"
+      },
+      "peakPreFaultSamplerWindow": {
+        "beginMicros": 853203088,
+        "endMicros": 853304922,
+        "lateMicros": 2302,
+        "known": 255,
+        "gcPauses": [
+          2,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "gcStopping": [
+          2,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "runnable": [
+          13,
+          1,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "gcSamplingNote": "Histogram counts are coarse upper-bound buckets, not exact pause lengths. Total-GC and stopping counts are independent, and cannot be subtracted. Sampling lateness is not an exact GC duration.",
+      "incompleteLogSources": [
+        "control.previous.jsonl"
+      ]
+    }
+  },
+  "crossings": {
+    "matched": 18,
+    "complete": 16,
+    "incompleteOrError": 2,
+    "requestToGrant": {
+      "count": 16,
+      "minimumMs": 40.458,
+      "medianMs": 49.3445,
+      "maximumMs": 325.149
+    },
+    "captureActivation": {
+      "count": 16,
+      "minimumMs": 12.102,
+      "medianMs": 34.683499999999995,
+      "maximumMs": 120.464
+    },
+    "receiverReady": {
+      "count": 16,
+      "minimumMs": 21.958,
+      "medianMs": 26.587,
+      "maximumMs": 273.876
+    },
+    "receiverFirstInput": {
+      "count": 16,
+      "minimumMs": 1.67,
+      "medianMs": 2.3114999999999997,
+      "maximumMs": 5.267
+    },
+    "receiverWorstInput": {
+      "count": 16,
+      "minimumMs": 2.712,
+      "medianMs": 7.662000000000001,
+      "maximumMs": 53.398
+    }
+  },
+  "samples": [
+    {
+      "exchangeTag": "f679e519870101d65a3945ba1e87ea01275a66c59f0e5a19ef7771c407ab653c",
+      "sourceTime": "2026-11-01T09:07:19.1192857Z",
+      "receiverTime": "2026-11-01T09:07:16.0702802Z",
+      "sourceEnd": "ok",
+      "receiverEnd": "ok",
+      "incomplete": false,
+      "requestToGrantMs": 293.906,
+      "captureActivationMs": 95.923,
+      "receiverReadyMs": 271.532,
+      "receiverFirstInputMs": 2.333,
+      "receiverWorstInputMs": 13.186
+    },
+    {
+      "exchangeTag": "73503dd5808f069bafaab042944a6d74679b12733815fd5d1a5d6f9125895395",
+      "sourceTime": "2026-11-01T09:07:51.6525133Z",
+      "receiverTime": "2026-11-01T09:07:48.6024451Z",
+      "sourceEnd": "ok",
+      "receiverEnd": "ok",
+      "incomplete": false,
+      "requestToGrantMs": 42.362,
+      "captureActivationMs": 14.93,
+      "receiverReadyMs": 21.981,
+      "receiverFirstInputMs": 1.746,
+      "receiverWorstInputMs": 19.335
+    },
+    {
+      "exchangeTag": "f53913ffde8ac06a7a244a8e9132a4312d5beefe1d07edf8a64705007635de50",
+      "sourceTime": "2026-11-01T09:10:43.570705Z",
+      "receiverTime": "2026-11-01T09:10:40.5204988Z",
+      "sourceEnd": "ok",
+      "receiverEnd": "ok",
+      "incomplete": false,
+      "requestToGrantMs": 168.178,
+      "captureActivationMs": 12.102,
+      "receiverReadyMs": 155.375,
+      "receiverFirstInputMs": 1.856,
+      "receiverWorstInputMs": 2.712
+    },
+    {
+      "exchangeTag": "7405f56442042e06d01a962ff673a696fd4cc20dfee8fc7e70f8864870b52b72",
+      "sourceTime": "2026-11-01T09:13:53.1299083Z",
+      "receiverTime": "2026-11-01T09:13:50.0756607Z",
+      "sourceEnd": "ok",
+      "receiverEnd": "ok",
+      "incomplete": false,
+      "requestToGrantMs": 49.54,
+      "captureActivationMs": 14.131,
+      "receiverReadyMs": 26.615,
+      "receiverFirstInputMs": 2.283,
+      "receiverWorstInputMs": 6.394
+    },
+    {
+      "exchangeTag": "61a7f09d81fe7951e8274b6e66988abb970becb4867776473c6056e2ad901d86",
+      "sourceTime": "2026-11-01T09:18:02.4195738Z",
+      "receiverTime": "2026-11-01T09:17:59.3598773Z",
+      "sourceEnd": "ok",
+      "receiverEnd": "ok",
+      "incomplete": false,
+      "requestToGrantMs": 325.149,
+      "captureActivationMs": 12.807,
+      "receiverReadyMs": 273.876,
+      "receiverFirstInputMs": 2.32,
+      "receiverWorstInputMs": 53.398
+    },
+    {
+      "exchangeTag": "97bcdbc0fd52248d39766bd4ff87c8feb15be3c8be41bfac8e0a385aeb50bbc7",
+      "sourceTime": "2026-11-01T09:18:16.8317161Z",
+      "receiverTime": "2026-11-01T09:18:13.7654797Z",
+      "sourceEnd": "ok",
+      "receiverEnd": "ok",
+      "incomplete": false,
+      "requestToGrantMs": 40.458,
+      "captureActivationMs": 24.363,
+      "receiverReadyMs": 21.958,
+      "receiverFirstInputMs": 3.386,
+      "receiverWorstInputMs": 3.809
+    },
+    {
+      "exchangeTag": "78eec955f98d4b99f8e7ee77182422e0299fe6f1844ade3a82a097191d838c82",
+      "sourceTime": "2026-11-01T09:18:18.0640833Z",
+      "receiverTime": "2026-11-01T09:18:14.9945338Z",
+      "sourceEnd": "ok",
+      "receiverEnd": "ok",
+      "incomplete": false,
+      "requestToGrantMs": 46.641,
+      "captureActivationMs": 37.241,
+      "receiverReadyMs": 24.751,
+      "receiverFirstInputMs": 3.547,
+      "receiverWorstInputMs": 8.836
+    },
+    {
+      "exchangeTag": "14f3164fd04a37caf2b07d900e0e43408fb1e47f1d2f17296f5b5ee23b0d4332",
+      "sourceTime": "2026-11-01T09:18:19.1442668Z",
+      "receiverTime": "2026-11-01T09:18:16.0763605Z",
+      "sourceEnd": "ok",
+      "receiverEnd": "ok",
+      "incomplete": false,
+      "requestToGrantMs": 49.149,
+      "captureActivationMs": 32.126,
+      "receiverReadyMs": 26.559,
+      "receiverFirstInputMs": 1.715,
+      "receiverWorstInputMs": 10.514
+    },
+    {
+      "exchangeTag": "625c6202723fab53eec6f24f9530b56662975cd66e10215aaa44fbcbda538e01",
+      "sourceTime": "2026-11-01T09:18:20.1186711Z",
+      "receiverTime": "2026-11-01T09:18:17.0257133Z",
+      "sourceEnd": "ok",
+      "receiverEnd": "ok",
+      "incomplete": false,
+      "requestToGrantMs": 63.658,
+      "captureActivationMs": 49.762,
+      "receiverReadyMs": 39.859,
+      "receiverFirstInputMs": 1.714,
+      "receiverWorstInputMs": 4.031
+    },
+    {
+      "exchangeTag": "00dce08e39fe55550a7976347cd3591c3ac41f8930327fb44ebf2e6980b93932",
+      "sourceTime": "2026-11-01T09:18:22.4471725Z",
+      "receiverTime": "2026-11-01T09:18:19.356908Z",
+      "sourceEnd": "error",
+      "receiverEnd": "error",
+      "incomplete": true,
+      "requestToGrantMs": null,
+      "captureActivationMs": null,
+      "receiverReadyMs": 25.1,
+      "receiverFirstInputMs": null,
+      "receiverWorstInputMs": null
+    },
+    {
+      "exchangeTag": "6775a4b3cac3da4f14840862215ef80de4331679dacf926b46ac32eb79f04f65",
+      "sourceTime": "2026-11-01T09:18:26.8524057Z",
+      "receiverTime": "2026-11-01T09:18:23.7707293Z",
+      "sourceEnd": "ok",
+      "receiverEnd": "ok",
+      "incomplete": false,
+      "requestToGrantMs": 62.037,
+      "captureActivationMs": 52.062,
+      "receiverReadyMs": 28.417,
+      "receiverFirstInputMs": 5.267,
+      "receiverWorstInputMs": 14.203
+    },
+    {
+      "exchangeTag": "7a274116e6ba43123e2d18f3be6908a54a31789f4a0229cf6d56ef7bb6977197",
+      "sourceTime": "2026-11-01T09:18:31.7930635Z",
+      "receiverTime": "2026-11-01T09:18:28.6590883Z",
+      "sourceEnd": "ok",
+      "receiverEnd": "ok",
+      "incomplete": false,
+      "requestToGrantMs": 54.502,
+      "captureActivationMs": 29.515,
+      "receiverReadyMs": 34.709,
+      "receiverFirstInputMs": 4.636,
+      "receiverWorstInputMs": 5.313
+    },
+    {
+      "exchangeTag": "87d4d5255b53553a78316c3cc7305afe1f506e5b2d59334b7a0ead148899c6d9",
+      "sourceTime": "2026-11-01T09:18:37.8721568Z",
+      "receiverTime": "2026-11-01T09:18:34.7775545Z",
+      "sourceEnd": "ok",
+      "receiverEnd": "ok",
+      "incomplete": false,
+      "requestToGrantMs": 41.687,
+      "captureActivationMs": 73.192,
+      "receiverReadyMs": 23.525,
+      "receiverFirstInputMs": 1.67,
+      "receiverWorstInputMs": 14.901
+    },
+    {
+      "exchangeTag": "e43859a6327f883ff7afbaca48b362bc55a85d0c8fa2c166bd34fd10b1e5df61",
+      "sourceTime": "2026-11-01T09:18:43.8818984Z",
+      "receiverTime": "2026-11-01T09:18:40.8139593Z",
+      "sourceEnd": "ok",
+      "receiverEnd": "ok",
+      "incomplete": false,
+      "requestToGrantMs": 46.478,
+      "captureActivationMs": 120.464,
+      "receiverReadyMs": 24.679,
+      "receiverFirstInputMs": 2.533,
+      "receiverWorstInputMs": 4.453
+    },
+    {
+      "exchangeTag": "2fbf1fdf4d740977cd72c56137328426a0f6f0e0707485fe43e7dfed640778a0",
+      "sourceTime": "2026-11-01T09:18:49.5666157Z",
+      "receiverTime": "2026-11-01T09:18:46.4389922Z",
+      "sourceEnd": "ok",
+      "receiverEnd": "ok",
+      "incomplete": false,
+      "requestToGrantMs": 48.342,
+      "captureActivationMs": 22.842,
+      "receiverReadyMs": 23.545,
+      "receiverFirstInputMs": 1.734,
+      "receiverWorstInputMs": 6.488
+    },
+    {
+      "exchangeTag": "0a29468cbcb960fb8acdac4025ba6dc6f2c49ede8be9354d81065cddbfc0b7e4",
+      "sourceTime": "2026-11-01T09:18:53.7091183Z",
+      "receiverTime": "2026-11-01T09:18:50.6902357Z",
+      "sourceEnd": "incomplete",
+      "receiverEnd": "incomplete",
+      "incomplete": true,
+      "requestToGrantMs": 41.408,
+      "captureActivationMs": 69.336,
+      "receiverReadyMs": 23.772,
+      "receiverFirstInputMs": 1.754,
+      "receiverWorstInputMs": 10.056
+    },
+    {
+      "exchangeTag": "028277dc76c5ac0a75e75fb97b3c29ce928be281ba3c5b0de7a0c6788f6b9825",
+      "sourceTime": "2026-11-01T09:19:03.1980359Z",
+      "receiverTime": "2026-11-01T09:19:00.1104337Z",
+      "sourceEnd": "ok",
+      "receiverEnd": "ok",
+      "incomplete": false,
+      "requestToGrantMs": 238.838,
+      "captureActivationMs": 102.32,
+      "receiverReadyMs": 216.875,
+      "receiverFirstInputMs": 2.303,
+      "receiverWorstInputMs": 5.515
+    },
+    {
+      "exchangeTag": "d1a12b845248bc2c6aa494fc1ad0b2231753c3264aeb544306f9a4ac70dc418b",
+      "sourceTime": "2026-11-01T09:19:08.0948983Z",
+      "receiverTime": "2026-11-01T09:19:04.8839583Z",
+      "sourceEnd": "ok",
+      "receiverEnd": "ok",
+      "incomplete": false,
+      "requestToGrantMs": 46.983,
+      "captureActivationMs": 47.351,
+      "receiverReadyMs": 23.9,
+      "receiverFirstInputMs": 2.464,
+      "receiverWorstInputMs": 9.605
+    }
+  ],
+  "findings": [
+    {
+      "code": "reconnection_recurred_without_service_recovery",
+      "evidence": "A source worker report records source-write-boundary-timeout with capture/sender/interrupt joined. The client observes reader EOF and heartbeat reader-ended, then source-hook session failure. A agent run changes before the restored connection; its protected service epoch does not change. B reports remote EOF and clean source retirement. Both original protected-service epochs remain READY and both reconnected automatically."
+    },
+    {
+      "code": "receiver_pause_and_local_pipe_backpressure",
+      "evidence": "A pre-failure sampler window spans 2181.796ms and is 2082.860ms late, with one count in each final aggregate total-GC and stopping bucket. B has no comparable long sampler window in its captured trail. The worker sends advisory boundary batches to the A agent on the shared source pipe; sourceWriter.operation gives authority/gate/write a single 1s budget.",
+      "inference": "A stalled reader is consistent with the attempted local boundary write timing out and closing the source transport. This is not proof of the exact OS/runtime cause of the GC stopping delay, nor proof of pure network loss."
+    },
+    {
+      "code": "do_not_suppress_attempted_writes",
+      "evidence": "source-write-boundary-timeout is distinct from native pre-submission proof. writeSequenced must fence attempted/partial writes because sequence delivery is uncertain; blindly retrying or swallowing this error can corrupt the stream.",
+      "nextFocus": "Investigate A runtime stopping delay and isolate or reduce advisory boundary traffic before submission. Preserve actual retirement checks and never renew stale authority or replay an attempted frame."
+    },
+    {
+      "code": "successful_crossings_do_not_establish_reliability",
+      "evidence": "Complete exchanges precede this later session failure. Samples are retained software timings, not physical mouse-to-display latency, and do not identify the exact user test start."
+    }
+  ],
+  "validation": {
+    "collection": "Both request-specific payloads received, parsed, SHA256 hashed; READY/service epochs, exact failure operation and subsequent CONNECTED markers asserted.",
+    "doctor": "A CLI reports healthy CONNECTED, g508 UI/agent/installed build match and service RUNNING after the event.",
+    "tests": "Skipped: investigation report only; no runtime or test changes.",
+    "remoteCI": "Skipped: no runtime change or push.",
+    "check": "git diff --cached --check passed before commit."
+  },
+  "sourceOfTruthChanged": [],
+  "apiChanges": "none",
+  "dbChanges": "none",
+  "runnerChanges": "none",
+  "repositoryHygieneChanges": "none"
+}
