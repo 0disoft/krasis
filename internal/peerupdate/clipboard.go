@@ -288,13 +288,59 @@ func (m *Manager) clipboardReceivePayload(peer, id, format string, r io.Reader, 
 	return m.receiveClipboardPayload(peer, id, format, r, authorized, false)
 }
 
-func (m *Manager) receiveClipboardPayload(peer, id, format string, r io.Reader, authorized func() bool, advertised bool) error {
-	if !validID(id, 32) || !authorized() {
+// Reader and authorization I/O are already supplied by callers. Optional clock
+// and abort dependencies retain their existing signatures and production defaults.
+type clipboardReceiveOptions struct {
+	now    func() time.Time
+	signal context.Context
+}
+
+type clipboardReceiveReader struct {
+	io.Reader
+	live func() bool
+}
+
+func (r clipboardReceiveReader) Read(data []byte) (int, error) {
+	if !r.live() {
+		return 0, ErrDenied
+	}
+	n, err := r.Reader.Read(data)
+	if !r.live() {
+		return n, ErrDenied
+	}
+	return n, err
+}
+
+func (m *Manager) receiveClipboardPayload(peer, id, format string, r io.Reader, authorized func() bool, advertised bool, options ...clipboardReceiveOptions) error {
+	opt := clipboardReceiveOptions{now: time.Now}
+	if len(options) > 0 {
+		if options[0].now != nil {
+			opt.now = options[0].now
+		}
+		opt.signal = options[0].signal
+	}
+	deadline := opt.now().Add(clipboardTransferTimeout(format))
+	live := func() bool {
+		now := opt.now()
+		if !now.Before(deadline) {
+			return false
+		}
+		if opt.signal != nil {
+			if opt.signal.Err() != nil {
+				return false
+			}
+			if until, ok := opt.signal.Deadline(); ok && !now.Before(until) {
+				return false
+			}
+		}
+		return true
+	}
+	if r == nil || authorized == nil || !validID(id, 32) || !live() || !authorized() || !live() {
 		return ErrDenied
 	}
 	limit := clipboardPayloadLimit(format)
 	m.clipboard.mu.Lock()
-	active := m.clipboard.peer == peer && time.Now().Before(m.clipboard.activeUntil) &&
+	active := m.clipboard.peer == peer && opt.now().Before(m.clipboard.activeUntil) &&
 		(format == "" || m.clipboard.imageAllowed) && (format != "files" || m.clipboard.filesAllowed)
 	epoch := m.clipboard.localEpoch
 	m.clipboard.mu.Unlock()
@@ -316,7 +362,7 @@ func (m *Manager) receiveClipboardPayload(peer, id, format string, r io.Reader, 
 	// A terminal copy needs only a receipt, as in the GET retry path. Keep
 	// selection/advertisement checks above and recheck live transfer authority.
 	if m.clipboardSeen(peer, id) {
-		if !authorized() {
+		if !live() || !authorized() || !live() {
 			return ErrDenied
 		}
 		return nil
@@ -331,7 +377,11 @@ func (m *Manager) receiveClipboardPayload(peer, id, format string, r io.Reader, 
 	}()
 	// Only the admitted receiver owns failure reporting for its active copy.
 	defer m.clipboardReceiveFailed(peer, id)
-	progress := &progressReader{Reader: r, update: func(n int64) { m.clipboardProgress(peer, id, "RECEIVE", format, n, 0) }}
+	// Lock/metadata waits cannot admit a late body allocation.
+	if !live() {
+		return ErrDenied
+	}
+	progress := &progressReader{Reader: clipboardReceiveReader{Reader: r, live: live}, update: func(n int64) { m.clipboardProgress(peer, id, "RECEIVE", format, n, 0) }}
 	var data []byte
 	var err error
 	if advertised {
@@ -341,7 +391,7 @@ func (m *Manager) receiveClipboardPayload(peer, id, format string, r io.Reader, 
 		// entire format limit for a potentially small local payload.
 		data, err = io.ReadAll(io.LimitReader(progress, int64(limit)+1))
 	}
-	if err != nil || advertised && len(data) != limit || !authorized() || format == "" && !validClipboardText(string(data)) ||
+	if err != nil || advertised && len(data) != limit || !live() || !authorized() || !live() || format == "" && !validClipboardText(string(data)) ||
 		format != "" && !ValidClipboardPayload(format, data) {
 		return ErrDenied
 	}
@@ -355,7 +405,10 @@ func (m *Manager) receiveClipboardPayload(peer, id, format string, r io.Reader, 
 	}
 	m.clipboard.mu.Lock()
 	defer m.clipboard.mu.Unlock()
-	if m.clipboard.peer != peer || m.clipboard.localEpoch != epoch ||
+	// Admission's GUI heartbeat may expire during an allowed transfer. The
+	// independent transfer budget and caller's earlier deadline may not: check
+	// after validation/lock waits, immediately before publishing bytes or a receipt.
+	if !live() || m.clipboard.peer != peer || m.clipboard.localEpoch != epoch ||
 		format != "" && !m.clipboard.imageAllowed || format == "files" && !m.clipboard.filesAllowed {
 		return ErrDenied
 	}
@@ -364,18 +417,21 @@ func (m *Manager) receiveClipboardPayload(peer, id, format string, r io.Reader, 
 			return nil
 		}
 	}
-	if m.clipboard.out != nil && time.Now().Before(m.clipboard.out.expires) {
+	if m.clipboard.out != nil && opt.now().Before(m.clipboard.out.expires) {
 		return ErrBusy
 	}
 	expires := 10 * time.Second
 	if format == "files" {
 		expires = 60 * time.Second
 	}
-	value := &ClipboardValue{ID: id, Format: format, expires: time.Now().Add(expires)}
+	value := &ClipboardValue{ID: id, Format: format, expires: opt.now().Add(expires)}
 	if format == "" {
 		value.Text = string(data)
 	} else {
 		value.Data = data
+	}
+	if !live() {
+		return ErrDenied
 	}
 	m.clipboard.in = value
 	m.clipboardChanged()

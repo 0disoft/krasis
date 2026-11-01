@@ -132,6 +132,13 @@ while a file request has a sixty-second deadline. Content copied
 before locking can therefore finish an already-admitted transfer, but locked
   desktop contents are never sampled. The GUI must remain running or in tray.
 
+Receive admission and publication check absolute transfer deadlines as well as
+cancellation, including the original network context's earlier deadline. A late
+read, validation or state-lock wait cannot publish a payload or receipt after
+that budget, even if a timer callback is delayed. Failed receives release their
+slot and leave the copy ID retryable; completed copies still require no body
+reread. This does not shorten admitted transfers to the GUI heartbeat lifetime.
+
 Unit tests cover opt-in, cross-peer denial, revocation, expiry, duplicate IDs,
 local-copy conflicts and malformed content. Native clipboard ownership, lock and
 unlock, and two-PC copy/paste remain manual checks.

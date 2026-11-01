@@ -65,7 +65,7 @@ func (m *Manager) clipboardHTTP(w http.ResponseWriter, r *http.Request, peer str
 		transfer, stop, current := m.clipboardTransferContext(r.Context(), peer, id, remote.ClipboardFormat, remote.ClipboardSize, false)
 		defer stop()
 		defer interruptHTTPIO(transfer, http.NewResponseController(w).SetReadDeadline)()
-		if err := m.receiveClipboardPayload(peer, id, remote.ClipboardFormat, r.Body, func() bool { return transfer.Err() == nil && current() && authorized() }, true); err != nil {
+		if err := m.receiveClipboardPayload(peer, id, remote.ClipboardFormat, r.Body, func() bool { return transfer.Err() == nil && current() && authorized() }, true, clipboardReceiveOptions{signal: transfer}); err != nil {
 			w.WriteHeader(409)
 			return
 		}
@@ -127,7 +127,7 @@ func (m *Manager) pollClipboard(ctx context.Context, c *http.Client, address, pe
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != 200 || resp.Header.Get("Content-Type") != clipboardContentType(remote.ClipboardFormat) ||
-			!authorized() || m.receiveClipboardPayload(peer, remote.ClipboardID, remote.ClipboardFormat, resp.Body, func() bool { return ctx.Err() == nil && current() && authorized() }, true) != nil {
+			!authorized() || m.receiveClipboardPayload(peer, remote.ClipboardID, remote.ClipboardFormat, resp.Body, func() bool { return ctx.Err() == nil && current() && authorized() }, true, clipboardReceiveOptions{signal: ctx}) != nil {
 			return
 		}
 		resp.Body.Close()
