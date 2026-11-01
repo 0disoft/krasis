@@ -365,13 +365,17 @@ func (client *Client) Close() error {
 	if client == nil || client.channel == nil {
 		return nil
 	}
-	err := client.channel.Close()
+	_ = client.channel.Close()
 	client.mu.Lock()
 	client.failed = true
 	client.timing.flush(time.Now())
 	client.heartbeatTiming.flush(time.Now())
 	client.mu.Unlock()
-	return err
+	// Joining the in-flight input may also let a retained query finish closing
+	// its pinned pipe/proof handles. Recheck that exact channel: an earlier
+	// pending verdict is not a permanent cleanup failure. Still-pending owners
+	// and actual resource-close failures remain errors; this proves no release ACK.
+	return client.channel.Close()
 }
 
 func (client *Client) fail() { client.failed = true; _ = client.channel.Close() }
