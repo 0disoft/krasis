@@ -2,7 +2,6 @@ package productpanel
 
 import (
 	"context"
-	"time"
 
 	"github.com/0disoft/krasis/internal/productlog"
 )
@@ -67,9 +66,9 @@ func (b *DiagnosticsBridge) startCollectionWorker(start bool) {
 	worker.collection = &record
 	save := b.saveCollection
 	go func() {
-		budget := 3 * time.Second
+		budget := diagnosticStatusTimeout
 		if start {
-			budget = 10 * time.Second
+			budget = diagnosticOperationTimeout
 		}
 		ctx, cancel := context.WithTimeout(b.lifetime, budget)
 		defer cancel()

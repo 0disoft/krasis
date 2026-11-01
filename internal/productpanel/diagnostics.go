@@ -12,6 +12,12 @@ import (
 
 const DiagnosticsSchema = "krasis.diagnostics/v1"
 
+const (
+	diagnosticOperationTimeout = 10 * time.Second
+	diagnosticStatusTimeout    = 3 * time.Second
+	diagnosticFingerprintSize  = 32
+)
+
 // DiagnosticsSnapshot exposes neither paths nor log contents. Transfer is the
 // agent's most recent transfer, not the currently selected device's status.
 type DiagnosticsSnapshot struct {
@@ -71,9 +77,9 @@ func (b *DiagnosticsBridge) execute(action, peer string) DiagnosticsSnapshot {
 		v.Code = "busy"
 		return v
 	}
-	budget := 10 * time.Second
+	budget := diagnosticOperationTimeout
 	if action == "status" {
-		budget = 3 * time.Second
+		budget = diagnosticStatusTimeout
 	}
 	ctx, cancel := context.WithTimeout(b.lifetime, budget)
 	defer cancel()
@@ -81,6 +87,11 @@ func (b *DiagnosticsBridge) execute(action, peer string) DiagnosticsSnapshot {
 		v.Code = "cancelled"
 		return v
 	}
+	return b.executeDiagnosticAction(ctx, action, peer, v)
+}
+
+// execute keeps the lock held across local effects and remote delivery.
+func (b *DiagnosticsBridge) executeDiagnosticAction(ctx context.Context, action, peer string, v DiagnosticsSnapshot) DiagnosticsSnapshot {
 	if action == "collect" {
 		return b.collectConnected(ctx)
 	}
@@ -100,27 +111,40 @@ func (b *DiagnosticsBridge) execute(action, peer string) DiagnosticsSnapshot {
 		return v
 	}
 	if action == "export" {
-		if peer != "" {
-			if len(peer) != 64 {
-				v.Code = "invalid_peer"
-				return v
-			}
-			decoded, err := hex.DecodeString(peer)
-			if err != nil || len(decoded) != 32 {
-				v.Code = "invalid_peer"
-				return v
-			}
-		}
-		if b.export() != nil {
-			v.Code = "save_failed"
-			return v
-		}
-		v.Saved = true
-		if peer == "" {
-			v.Code = "ok"
-			return v
-		}
+		return b.exportDiagnostic(ctx, peer, v)
 	}
+	return b.remoteDiagnostic(ctx, action, peer, v)
+}
+
+func validDiagnosticExportPeer(peer string) bool {
+	if peer == "" {
+		return true
+	}
+	if len(peer) != 2*diagnosticFingerprintSize {
+		return false
+	}
+	decoded, err := hex.DecodeString(peer)
+	return err == nil && len(decoded) == diagnosticFingerprintSize
+}
+
+func (b *DiagnosticsBridge) exportDiagnostic(ctx context.Context, peer string, v DiagnosticsSnapshot) DiagnosticsSnapshot {
+	if !validDiagnosticExportPeer(peer) {
+		v.Code = "invalid_peer"
+		return v
+	}
+	if b.export() != nil {
+		v.Code = "save_failed"
+		return v
+	}
+	v.Saved = true
+	if peer == "" {
+		v.Code = "ok"
+		return v
+	}
+	return b.remoteDiagnostic(ctx, "export", peer, v)
+}
+
+func (b *DiagnosticsBridge) remoteDiagnostic(ctx context.Context, action, peer string, v DiagnosticsSnapshot) DiagnosticsSnapshot {
 	if ctx.Err() != nil {
 		v.Code = "cancelled"
 		return v
@@ -134,21 +158,12 @@ func (b *DiagnosticsBridge) execute(action, peer string) DiagnosticsSnapshot {
 		if err != nil {
 			return v
 		}
-		if result.Code != "ok" {
-			if result.Code == "unsupported" {
-				v.Code = "unsupported"
-			}
-			return v
-		}
-		v.Code = "ok"
-		switch result.Status.Diagnostic {
-		case "":
-			v.Transfer = "NONE"
-		case "QUEUED", "SENT", "EXPIRED", "UNSUPPORTED", "REJECTED":
-			v.Transfer = result.Status.Diagnostic
-		}
-		return v
+		return projectDiagnosticStatus(v, result)
 	}
+	return sendDiagnostic(ctx, client, peer, v)
+}
+
+func sendDiagnostic(ctx context.Context, client DiagnosticClient, peer string, v DiagnosticsSnapshot) DiagnosticsSnapshot {
 	trust, err := client.Trust(ctx)
 	if err != nil {
 		return v
@@ -169,6 +184,28 @@ func (b *DiagnosticsBridge) execute(action, peer string) DiagnosticsSnapshot {
 		return v
 	}
 	result, err := client.SendDiagnostic(ctx, peer)
+	return projectDiagnosticSend(v, result, err)
+}
+
+// Projections change only their local value; paths and raw errors never escape.
+func projectDiagnosticStatus(v DiagnosticsSnapshot, result localapi.UpdateResult) DiagnosticsSnapshot {
+	if result.Code != "ok" {
+		if result.Code == "unsupported" {
+			v.Code = "unsupported"
+		}
+		return v
+	}
+	v.Code = "ok"
+	switch result.Status.Diagnostic {
+	case "":
+		v.Transfer = "NONE"
+	case "QUEUED", "SENT", "EXPIRED", "UNSUPPORTED", "REJECTED":
+		v.Transfer = result.Status.Diagnostic
+	}
+	return v
+}
+
+func projectDiagnosticSend(v DiagnosticsSnapshot, result localapi.DiagnosticTransferResult, err error) DiagnosticsSnapshot {
 	if err != nil {
 		v.Code = "outcome_unknown"
 		return v
