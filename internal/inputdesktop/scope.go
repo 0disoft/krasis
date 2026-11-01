@@ -7,6 +7,7 @@ import (
 	"errors"
 	"runtime"
 	"sync/atomic"
+	"time"
 )
 
 var (
@@ -44,37 +45,79 @@ type Scope struct {
 // The operation must not change desktops, retain native handles or start work
 // on another goroutine. It must return its original injection outcome unchanged.
 func (scope *Scope) Do(ctx context.Context, operation func() error) error {
+	return scope.do(ctx, operation)
+}
+
+// Keep Do's method signature for input adapters. The optional seams allow tests
+// to control scheduling, native desktop I/O and an additional abort context.
+type scopeOperationOptions struct {
+	now    func() time.Time
+	active func(context.Context, context.Context) error
+	signal context.Context
+}
+
+func (scope *Scope) do(ctx context.Context, operation func() error, options ...scopeOperationOptions) error {
 	if ctx == nil || operation == nil {
 		return ErrInvalid
 	}
 	if scope == nil || scope.closed.Load() {
 		return ErrClosed
 	}
-	if scope.owner == 0 || scope.thread() != scope.owner {
+	if scope.owner == 0 || scope.thread == nil || scope.thread() != scope.owner {
 		return ErrWrongThread
 	}
-	if err := scope.root.Err(); err != nil {
+	if scope.root == nil || scope.desktop == nil {
+		return ErrInvalid
+	}
+	opt := scopeOperationOptions{now: time.Now, active: func(ctx, root context.Context) error {
+		if interactive, ok := scope.desktop.(interface {
+			activeContext(context.Context, context.Context) error
+		}); ok {
+			return interactive.activeContext(ctx, root)
+		}
+		return scope.desktop.active()
+	}}
+	if len(options) > 0 {
+		if options[0].now != nil {
+			opt.now = options[0].now
+		}
+		if options[0].active != nil {
+			opt.active = options[0].active
+		}
+		opt.signal = options[0].signal
+	}
+	stopped := func() error {
+		// Err depends on callback delivery. Absolute deadlines also fence a
+		// native query which finishes before its delayed timer callback runs.
+		now := opt.now()
+		for _, run := range []context.Context{scope.root, ctx, opt.signal} {
+			if run == nil {
+				continue
+			}
+			if err := run.Err(); err != nil {
+				return err
+			}
+			if deadline, ok := run.Deadline(); ok && !now.Before(deadline) {
+				return context.DeadlineExceeded
+			}
+		}
+		return nil
+	}
+	if err := stopped(); err != nil {
 		return err
 	}
-	if err := ctx.Err(); err != nil {
-		return err
+	if opt.signal != nil {
+		observed, cancel := context.WithCancel(ctx)
+		stop := context.AfterFunc(opt.signal, cancel)
+		defer func() { stop(); cancel() }()
+		ctx = observed
 	}
-	var activeErr error
-	if interactive, ok := scope.desktop.(interface {
-		activeContext(context.Context, context.Context) error
-	}); ok {
-		activeErr = interactive.activeContext(ctx, scope.root)
-	} else {
-		activeErr = scope.desktop.active()
-	}
+	activeErr := opt.active(ctx, scope.root)
 	if activeErr != nil {
-		return errors.Join(ErrInactive, activeErr)
+		return errors.Join(ErrInactive, activeErr, stopped())
 	}
 	// Desktop queries can yield. Recheck cancellation before invoking the caller.
-	if err := scope.root.Err(); err != nil {
-		return err
-	}
-	if err := ctx.Err(); err != nil {
+	if err := stopped(); err != nil {
 		return err
 	}
 	return operation()
