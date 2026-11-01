@@ -9,7 +9,10 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 )
+
+const outputDrainTimeout = time.Second
 
 // Failure retains the process result for errors.As and the caller's deadline
 // for errors.Is. Untrusted helper output is never part of its error string.
@@ -39,6 +42,12 @@ func (e *Failure) Unwrap() error { return e.cause }
 func Run(ctx context.Context, command *exec.Cmd, operation string) error {
 	var output boundedOutput
 	command.Stdout, command.Stderr = &output, &output
+	// A descendant can retain these pipes after the helper exits or is killed.
+	// Bound pipe draining as well as process execution, retaining shorter caller
+	// budgets. An unconfirmed setup result is an error, never a reason to retry.
+	if command.WaitDelay <= 0 || command.WaitDelay > outputDrainTimeout {
+		command.WaitDelay = outputDrainTimeout
+	}
 	if err := command.Run(); err != nil {
 		failure := &Failure{Operation: operation, ExitCode: -1, Timeout: errors.Is(ctx.Err(), context.DeadlineExceeded), cause: errors.Join(err, ctx.Err())}
 		var exit *exec.ExitError
