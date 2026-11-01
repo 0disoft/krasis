@@ -149,6 +149,10 @@ JSON은 `krasis.cli.update-wait/v1`이며 `code`, `transferState`, 대상 genera
 초기 trust/runtime 조회 중에도 호출자의 취소·대기 한도 만료는 각각 `canceled`, `timeout`
 JSON과 exit `7`을 반환한다. 이 상태 역시 상대의 적용 여부를 확정하거나 전송을 취소하지 않는다.
 
+완료 관측의 runtime/status 조회 전후에도 취소와 원래 기한을 검사한다. 기한 정각 또는
+이후에 도착한 `UPDATED` 응답은 성공으로 확정하지 않으며 `timeout`, exit `7`을 반환한다.
+조회 중 취소된 경우도 `canceled`, exit `7`이며 새 전송이나 추가 상태 조회를 시작하지 않는다.
+
 `krasis-cli update allow ALIAS`와 `update deny ALIAS`는 **해당 상대가 이 PC로 업데이트를
 보낼 수 있는 권한**을 변경한다. 상대 PC의 수신 권한은 변경하지 않는다. 이미 원하는 상태면
 요청을 다시 보내지 않고, 변경 후에는 동일 에이전트의 응답 상태를 확인한다. 응답을 잃었거나

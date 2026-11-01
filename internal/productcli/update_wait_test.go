@@ -3,6 +3,7 @@ package productcli
 import (
 	"bytes"
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +13,15 @@ import (
 )
 
 type contextAwareWaitClient struct{ apiClient }
+
+type updateWaitReadClient struct {
+	apiClient
+	runtimeRead func(context.Context) (localapi.RuntimeInfo, error)
+}
+
+func (c updateWaitReadClient) Runtime(ctx context.Context) (localapi.RuntimeInfo, error) {
+	return c.runtimeRead(ctx)
+}
 
 func (c contextAwareWaitClient) Runtime(ctx context.Context) (localapi.RuntimeInfo, error) {
 	if ctx.Err() != nil {
@@ -111,6 +121,163 @@ func TestUpdateWaitTimeoutNeverResends(t *testing.T) {
 	v, exit, _ = waitUpdate(ctx, client, "B", peer, id, 0)
 	if exit != ExitUnsafeState || v.Code != "timeout" {
 		t.Fatalf("result=%+v", v)
+	}
+}
+
+func TestUpdateWaitDoesNotCertifyApplicationAfterCancellation(t *testing.T) {
+	peer, id, revision := strings.Repeat("b", 64), strings.Repeat("c", 32), strings.Repeat("d", 40)
+	client := updateFixture(peer, 119)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	client.updateFn = func(r localapi.UpdateRequest) (localapi.UpdateResult, error) {
+		cancel() // A completed read can still arrive after cancellation.
+		return localapi.UpdateResult{Code: "ok", Status: peerupdate.Status{
+			State: "UPDATED", Peer: peer, ID: id, Generation: 120, Revision: revision,
+			PeerGeneration: 120, PeerRevision: revision,
+		}}, nil
+	}
+	v, exit, err := waitUpdate(ctx, client, "B", peer, id, 0)
+	if err != nil || exit != ExitUnsafeState || v.Code != "canceled" || v.TransferState == "UPDATED" || len(client.requests) != 1 {
+		t.Fatalf("late application became success: result=%+v exit=%d err=%v requests=%d", v, exit, err, len(client.requests))
+	}
+}
+
+func TestUpdateWaitDeadlineFencesEveryReadAtExactBoundary(t *testing.T) {
+	peer, id, revision := strings.Repeat("b", 64), strings.Repeat("c", 32), strings.Repeat("d", 40)
+	for _, stage := range []string{"initial", "status", "final"} {
+		for _, offset := range []time.Duration{-time.Nanosecond, 0, time.Nanosecond} {
+			t.Run(stage+"/"+offset.String(), func(t *testing.T) {
+				start := time.Now()
+				ctx, cancel := context.WithDeadline(context.Background(), start.Add(time.Hour))
+				defer cancel()
+				deadline, _ := ctx.Deadline()
+				now, reads := start, 0
+				client := updateFixture(peer, 119)
+				client.updateFn = func(localapi.UpdateRequest) (localapi.UpdateResult, error) {
+					if stage == "status" {
+						now = deadline.Add(offset)
+					}
+					return localapi.UpdateResult{Code: "ok", Status: peerupdate.Status{
+						State: "UPDATED", Peer: peer, ID: id, Generation: 120, Revision: revision,
+						PeerGeneration: 120, PeerRevision: revision,
+					}}, nil
+				}
+				observed := updateWaitReadClient{client, func(context.Context) (localapi.RuntimeInfo, error) {
+					reads++
+					if stage == "initial" && reads == 1 || stage == "final" && reads == 2 {
+						now = deadline.Add(offset)
+					}
+					return client.runtime, nil
+				}}
+				v, exit, err := waitUpdate(ctx, observed, "B", peer, id, time.Second, updateWaitOptions{
+					now:   func() time.Time { return now },
+					pause: func(context.Context, time.Duration) error { t.Fatal("terminal result polled again"); return nil },
+				})
+				wantCode, wantExit, wantReads, wantRequests := "updated", ExitOK, 2, 1
+				if offset >= 0 {
+					wantCode, wantExit = "timeout", ExitUnsafeState
+					if stage != "final" {
+						wantReads = 1
+					}
+					if stage == "initial" {
+						wantRequests = 0
+					}
+				}
+				if ctx.Err() != nil || err != nil || exit != wantExit || v.Code != wantCode || reads != wantReads || len(client.requests) != wantRequests || offset >= 0 && v.TransferState == "UPDATED" {
+					t.Fatalf("result=%+v exit=%d err=%v reads=%d requests=%d", v, exit, err, reads, len(client.requests))
+				}
+			})
+		}
+	}
+}
+
+func TestUpdateWaitAbortBeforeReadAndDuringFinalRead(t *testing.T) {
+	peer, id, revision := strings.Repeat("b", 64), strings.Repeat("c", 32), strings.Repeat("d", 40)
+	for _, optional := range []bool{false, true} {
+		for _, preAborted := range []bool{false, true} {
+			parent, cancelParent := context.WithCancel(context.Background())
+			signal, abort := context.WithCancel(context.Background())
+			cancel := cancelParent
+			opt := updateWaitOptions{}
+			if optional {
+				opt.signal, cancel = signal, abort
+			}
+			if preAborted {
+				cancel()
+			}
+			client := updateFixture(peer, 119)
+			client.updateFn = func(localapi.UpdateRequest) (localapi.UpdateResult, error) {
+				return localapi.UpdateResult{Code: "ok", Status: peerupdate.Status{
+					State: "UPDATED", Peer: peer, ID: id, Generation: 120, Revision: revision,
+					PeerGeneration: 120, PeerRevision: revision,
+				}}, nil
+			}
+			reads := 0
+			observed := updateWaitReadClient{client, func(context.Context) (localapi.RuntimeInfo, error) {
+				reads++
+				if reads == 2 {
+					cancel()
+				}
+				return client.runtime, nil
+			}}
+			v, exit, err := waitUpdate(parent, observed, "B", peer, id, 0, opt)
+			if err != nil || exit != ExitUnsafeState || v.Code != "canceled" || v.TransferState == "UPDATED" || preAborted && (reads != 0 || len(client.requests) != 0) || !preAborted && (reads != 2 || len(client.requests) != 1) || optional && parent.Err() != nil {
+				t.Errorf("optional=%v preAborted=%v result=%+v exit=%d err=%v reads=%d requests=%d", optional, preAborted, v, exit, err, reads, len(client.requests))
+			}
+			cancelParent()
+			abort()
+		}
+	}
+}
+
+func TestUpdateWaitInjectedPauseAndReadFailuresNeverReplay(t *testing.T) {
+	peer, id := strings.Repeat("b", 64), strings.Repeat("c", 32)
+	for _, stage := range []string{"initial", "status", "final", "pause", "deadline"} {
+		t.Run(stage, func(t *testing.T) {
+			start := time.Now()
+			ctx, cancel := context.WithDeadline(context.Background(), start.Add(time.Hour))
+			defer cancel()
+			now, reads, pauses := start, 0, 0
+			fault := errors.New("private I/O failure")
+			client := updateFixture(peer, 119)
+			client.updateFn = func(r localapi.UpdateRequest) (localapi.UpdateResult, error) {
+				if r.Action != "STATUS" {
+					t.Fatal("observation changed state", r.Action)
+				}
+				if stage == "status" {
+					return localapi.UpdateResult{}, fault
+				}
+				return localapi.UpdateResult{Code: "ok", Status: peerupdate.Status{State: "DELIVERED", Peer: peer, ID: id}}, nil
+			}
+			observed := updateWaitReadClient{client, func(context.Context) (localapi.RuntimeInfo, error) {
+				reads++
+				if stage == "initial" && reads == 1 || stage == "final" && reads == 2 {
+					return localapi.RuntimeInfo{}, fault
+				}
+				return client.runtime, nil
+			}}
+			v, exit, err := waitUpdate(ctx, observed, "B", peer, id, 500*time.Millisecond, updateWaitOptions{
+				now: func() time.Time { return now },
+				pause: func(context.Context, time.Duration) error {
+					pauses++
+					if stage == "pause" {
+						return fault
+					}
+					now, _ = ctx.Deadline()
+					return nil
+				},
+			})
+			want, requests := "outcome_unknown", 1
+			if stage == "deadline" {
+				want = "timeout"
+			}
+			if stage == "initial" {
+				requests = 0
+			}
+			if err != nil || exit != ExitUnsafeState || v.Code != want || len(client.requests) != requests || pauses > 1 {
+				t.Fatalf("result=%+v exit=%d err=%v requests=%d pauses=%d", v, exit, err, len(client.requests), pauses)
+			}
+		})
 	}
 }
 

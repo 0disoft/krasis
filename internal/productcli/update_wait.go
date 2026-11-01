@@ -45,23 +45,66 @@ func dispatchUpdateWait(ctx context.Context, client apiClient, args []string) (a
 	return waitUpdate(ctx, client, args[1], peer, args[2], 500*time.Millisecond)
 }
 
+// The client already supplies injectable I/O. Nil options retain the real clock,
+// cancelable timer and caller context; signal is an optional additional abort.
+type updateWaitOptions struct {
+	now    func() time.Time
+	pause  func(context.Context, time.Duration) error
+	signal context.Context
+}
+
 // Observe one sender receipt. Never queue/retry SEND or treat delivery as application.
-func waitUpdate(ctx context.Context, client apiClient, alias, peer, id string, interval time.Duration) (updateWaitResult, int, error) {
+func waitUpdate(ctx context.Context, client apiClient, alias, peer, id string, interval time.Duration, options ...updateWaitOptions) (updateWaitResult, int, error) {
 	v := updateWaitResult{SchemaVersion: updateWaitSchema, PeerAlias: alias, ID: id, Code: "outcome_unknown"}
+	opt := updateWaitOptions{now: time.Now, pause: pauseUpdateWait}
+	if len(options) > 0 {
+		if options[0].now != nil {
+			opt.now = options[0].now
+		}
+		if options[0].pause != nil {
+			opt.pause = options[0].pause
+		}
+		opt.signal = options[0].signal
+	}
+	if opt.signal != nil {
+		observation, cancel := context.WithCancel(ctx)
+		stop := context.AfterFunc(opt.signal, cancel)
+		defer func() { stop(); cancel() }()
+		ctx = observation
+	}
+	stopped := func() bool {
+		if ctx.Err() != nil {
+			return true
+		}
+		// Abort callbacks and deadline timers can be delivered after a completed
+		// read. Check their source state/time before admitting any result or I/O.
+		if opt.signal != nil && opt.signal.Err() != nil {
+			v.Code = "canceled"
+			return true
+		}
+		if deadline, ok := ctx.Deadline(); ok && !opt.now().Before(deadline) {
+			v.Code = "timeout"
+			return true
+		}
+		return false
+	}
+	if stopped() {
+		return interruptedUpdateWait(ctx, v)
+	}
 	before, err := client.Runtime(ctx)
-	if err != nil {
+	if stopped() || err != nil {
 		return interruptedUpdateWait(ctx, v)
 	}
 	for {
-		if ctx.Err() != nil {
+		if stopped() {
 			break
 		}
 		result, err := client.Update(ctx, localapi.UpdateRequest{Schema: localapi.UpdateSchema, Action: "STATUS"})
-		if err != nil {
+		if stopped() || err != nil {
 			break
 		}
 		after, err := client.Runtime(ctx)
-		if err != nil {
+		if stopped() || err != nil {
 			break
 		}
 		if after.Instance != before.Instance {
@@ -91,14 +134,22 @@ func waitUpdate(ctx context.Context, client apiClient, alias, peer, id string, i
 			v.Code = "update_failed"
 			return v, ExitUnsafeState, nil
 		}
-		timer := time.NewTimer(interval)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-		case <-timer.C:
+		if err := opt.pause(ctx, interval); err != nil {
+			break
 		}
 	}
 	return interruptedUpdateWait(ctx, v)
+}
+
+func pauseUpdateWait(ctx context.Context, interval time.Duration) error {
+	timer := time.NewTimer(interval)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func interruptedUpdateWait(ctx context.Context, v updateWaitResult) (updateWaitResult, int, error) {
