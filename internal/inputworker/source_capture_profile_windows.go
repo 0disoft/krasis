@@ -9,7 +9,7 @@ import (
 	"github.com/0disoft/krasis/internal/wininput"
 )
 
-func activateSourceCaptureProfile(capture wininput.SourceActivation) (handoff.CaptureNative, error) {
+func activateSourceCaptureProfile(capture wininput.SourceActivation) (handoff.CaptureNative, handoff.CaptureNativeExact, error) {
 	ctx, probe := handoff.WithCaptureProbe(context.Background())
 	var err error
 	if profiled, ok := capture.(wininput.SourceProfiledActivation); ok {
@@ -17,5 +17,6 @@ func activateSourceCaptureProfile(capture wininput.SourceActivation) (handoff.Ca
 	} else {
 		err = capture.Activate()
 	}
-	return probe.Finish(), err
+	native, exact := probe.FinishDetailed()
+	return native, exact, err
 }

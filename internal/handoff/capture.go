@@ -40,14 +40,26 @@ type CaptureProfile struct {
 	Measured uint32                    `json:"measured"`
 	Worker   [3]byte                   `json:"worker"`          // Matching activation ACK buckets; 0 is unobserved.
 	Native   CaptureNative             `json:"native,omitzero"` // Matching owner-thread stages, separate from agent spans.
+	Exact    CaptureNativeExact        `json:"exact,omitzero"`  // Three matching owner spans; independent of the bucket mask.
 }
 
 func (p CaptureProfile) Valid() bool {
 	if p.Schema != 1 || p.Measured>>CaptureStageCount != 0 {
 		return false
 	}
-	if p.Worker[0] != 0 || !p.Native.Valid() || (p.Worker != ([3]byte{}) || p.Native != (CaptureNative{})) && p.Measured&(1<<CaptureIPCResponse) == 0 {
+	if p.Worker[0] != 0 || !p.Native.Valid() || !p.Exact.Valid() || (p.Worker != ([3]byte{}) || p.Native != (CaptureNative{})) && p.Measured&(1<<CaptureIPCResponse) == 0 {
 		return false
+	}
+	if p.Exact != (CaptureNativeExact{}) {
+		if p.Measured&(1<<CaptureIPCResponse) != 0 {
+			if p.Exact.Measured&(1<<CaptureExactQueueToHandle) != 0 && p.Native[CaptureQueueToHandle] == 0 ||
+				p.Exact.Measured&(1<<CaptureExactForegroundRequest|1<<CaptureExactForegroundVerify) != 0 && p.Native[CaptureForeground] == 0 {
+				return false
+			}
+		} else if p.Exact.Measured&(1<<CaptureExactQueueToHandle) != 0 && p.Measured&(1<<CaptureQueueToHandle) == 0 ||
+			p.Exact.Measured&(1<<CaptureExactForegroundRequest|1<<CaptureExactForegroundVerify) != 0 && p.Measured&(1<<CaptureForeground) == 0 {
+			return false
+		}
 	}
 	for _, bucket := range p.Worker {
 		if bucket > 5 {
@@ -70,8 +82,18 @@ func RecordCaptureWorker(ctx context.Context, worker [3]byte) {
 }
 
 func RecordCaptureWorkerDetails(ctx context.Context, worker [3]byte, native CaptureNative) {
+	recordCaptureWorkerDetails(ctx, worker, native, CaptureNativeExact{})
+}
+
+// RecordCaptureWorkerExactDetails attaches both legacy buckets and the exact
+// owner spans only from an already matched activation reply.
+func RecordCaptureWorkerExactDetails(ctx context.Context, worker [3]byte, native CaptureNative, exact CaptureNativeExact) {
+	recordCaptureWorkerDetails(ctx, worker, native, exact)
+}
+
+func recordCaptureWorkerDetails(ctx context.Context, worker [3]byte, native CaptureNative, exact CaptureNativeExact) {
 	s, a := getSession(ctx), getAttempt(ctx)
-	if s == nil || a == nil || worker == ([3]byte{}) && native == (CaptureNative{}) {
+	if s == nil || a == nil || worker == ([3]byte{}) && native == (CaptureNative{}) && exact == (CaptureNativeExact{}) {
 		return
 	}
 	s.collector.mu.Lock()
@@ -80,12 +102,16 @@ func RecordCaptureWorkerDetails(ctx context.Context, worker [3]byte, native Capt
 		return
 	}
 	p := a.summary.Capture
-	if p.Worker != ([3]byte{}) || p.Native != (CaptureNative{}) {
+	if p.Worker != ([3]byte{}) || p.Native != (CaptureNative{}) || p.Exact != (CaptureNativeExact{}) {
+		return
+	}
+	if (worker != ([3]byte{}) || native != (CaptureNative{}) || exact != (CaptureNativeExact{})) && p.Measured&(1<<CaptureIPCResponse) == 0 {
 		return
 	}
 	next := *p
 	next.Worker = worker
 	next.Native = native
+	next.Exact = exact
 	if next.Valid() {
 		*p = next
 	}

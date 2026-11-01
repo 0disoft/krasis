@@ -34,6 +34,8 @@ func TestCaptureDetailFreezesAndLateOwnerCannotPolluteNextAttempt(t *testing.T) 
 		func(p *CaptureProfile) { p.Worker = [3]byte{0, 3, 4} }, // Missing matching response span.
 		func(p *CaptureProfile) { p.Worker[0] = 1 },
 		func(p *CaptureProfile) { p.Worker[2] = 6 },
+		func(p *CaptureProfile) { p.Exact.Measured = 1 << CaptureExactStageCount },
+		func(p *CaptureProfile) { p.Exact.QueueToHandleMicros = 1 },
 	} {
 		bad := before
 		mutate(&bad)

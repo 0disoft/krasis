@@ -184,6 +184,7 @@ type sourceWheelCaptureCommand struct {
 	result   chan error
 	profile  context.Context
 	queuedAt time.Time
+	postedAt <-chan time.Time
 }
 
 func newSourceWheelCapture(observer SourcePipelineObserver) *sourceWheelCapture {
@@ -267,7 +268,11 @@ func (capture *sourceWheelCapture) executeProfile(profile context.Context, messa
 		// as a native cleanup failure and latch an otherwise clean stop FAULTED.
 		return fmt.Errorf("source wheel capture window is terminal: %w", terminalErr)
 	}
-	command := sourceWheelCaptureCommand{message: message, result: make(chan error, 1), profile: profile}
+	var postedAt chan time.Time
+	if profile != nil && message == wmSourceWheelCaptureActivate {
+		postedAt = make(chan time.Time, 1)
+	}
+	command := sourceWheelCaptureCommand{message: message, result: make(chan error, 1), profile: profile, postedAt: postedAt}
 	if profile != nil {
 		command.queuedAt = time.Now()
 	}
@@ -285,6 +290,9 @@ func (capture *sourceWheelCapture) executeProfile(profile context.Context, messa
 	}
 	stopAdmission()
 	stopPost := handoff.CaptureSpan(profile, handoff.CapturePost)
+	if postedAt != nil {
+		postedAt <- time.Now()
+	}
 	posted, _, postErr := procPostMessageWTouchpad.Call(current.window, uintptr(message), 0, 0)
 	stopPost()
 	if posted == 0 {
@@ -511,18 +519,26 @@ func (current *sourceWheelCaptureRun) handleCommand(message uint32) uintptr {
 		procPostQuitMessageTouchpad.Call(0)
 		return 0
 	}
-	if !command.queuedAt.IsZero() {
-		handoff.RecordCapture(command.profile, handoff.CaptureQueueToHandle, time.Since(command.queuedAt))
-	}
-	stopHandler := handoff.CaptureSpan(command.profile, handoff.CaptureHandlerTotal)
 	if command.message != message {
 		err := errors.New("source wheel capture command order mismatch")
 		current.setError(err)
-		stopHandler()
 		command.result <- err
 		procPostQuitMessageTouchpad.Call(0)
 		return 0
 	}
+	if !command.queuedAt.IsZero() {
+		handoff.RecordCapture(command.profile, handoff.CaptureQueueToHandle, time.Since(command.queuedAt))
+	}
+	if command.postedAt != nil {
+		select {
+		case postedAt := <-command.postedAt:
+			if !postedAt.IsZero() {
+				handoff.RecordCaptureExact(command.profile, handoff.CaptureExactQueueToHandle, time.Since(postedAt))
+			}
+		default: // Profiling metadata is optional and must never block the owner.
+		}
+	}
+	stopHandler := handoff.CaptureSpan(command.profile, handoff.CaptureHandlerTotal)
 	var err error
 	if terminalErr := current.err(); terminalErr != nil {
 		stopHandler()
@@ -629,9 +645,31 @@ func (current *sourceWheelCaptureRun) activateWindowProfile(profile context.Cont
 		return err
 	}
 	stopForeground := handoff.CaptureSpan(profile, handoff.CaptureForeground)
+	var requestStarted time.Time
+	if profile != nil {
+		requestStarted = time.Now()
+	}
 	foregroundErr := sourceWheelCaptureSetForeground(current.window)
-	if err := current.err(); err != nil {
+	if !requestStarted.IsZero() {
+		handoff.RecordCaptureExact(profile, handoff.CaptureExactForegroundRequest, time.Since(requestStarted))
+	}
+	var verifyStarted time.Time
+	if profile != nil {
+		verifyStarted = time.Now()
+	}
+	foregroundFinished := false
+	finishForeground := func() {
+		if foregroundFinished {
+			return
+		}
+		foregroundFinished = true
+		if !verifyStarted.IsZero() {
+			handoff.RecordCaptureExact(profile, handoff.CaptureExactForegroundVerify, time.Since(verifyStarted))
+		}
 		stopForeground()
+	}
+	defer finishForeground() // Early cancellation still closes the owner span.
+	if err := current.err(); err != nil {
 		return err
 	}
 	if foregroundErr == nil && sourceWheelCaptureGetForeground() != current.window {
@@ -639,12 +677,10 @@ func (current *sourceWheelCaptureRun) activateWindowProfile(profile context.Cont
 		// previous application's queue. A non-NULL previous foreground is
 		// also possible while activation is pending, not only a NULL owner.
 		if err := current.err(); err != nil {
-			stopForeground()
 			return err
 		}
 		sourceForegroundTransitionDispatch(current.window)
 		if err := current.err(); err != nil {
-			stopForeground()
 			return err
 		}
 	}
@@ -655,7 +691,7 @@ func (current *sourceWheelCaptureRun) activateWindowProfile(profile context.Cont
 		foregroundErr = nil
 	}
 	verificationLost := foregroundErr == nil && sourceWheelCaptureGetForeground() != current.window
-	stopForeground()
+	finishForeground()
 	if foregroundErr != nil || verificationLost {
 		stopFallback := handoff.CaptureSpan(profile, handoff.CaptureFallback)
 		fallbackResult, fallbackErr := current.activateForegroundFallback()

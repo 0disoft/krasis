@@ -47,6 +47,7 @@ type sourcePacket struct {
 	pressedEvidence  byte
 	timing           [3]byte               // Activation or heartbeat reply; fixed operation-specific buckets.
 	capture          handoff.CaptureNative // Only an activation reply; never input or authority.
+	captureExact     handoff.CaptureNativeExact
 }
 
 func (p sourcePacket) valid() bool {
@@ -55,6 +56,9 @@ func (p sourcePacket) valid() bool {
 		return false
 	}
 	if !p.capture.Valid() || p.capture != (handoff.CaptureNative{}) && (p.kind != sourceReply || p.op != sourceActivate) {
+		return false
+	}
+	if !p.captureExact.Valid() || p.captureExact != (handoff.CaptureNativeExact{}) && (p.kind != sourceReply || p.op != sourceActivate) {
 		return false
 	}
 	if p.pressedEvidence != 0 && (p.pressedEvidence > 3 || p.kind != sourceReply || p.op != sourceAdmit || p.status != 0 || p.decision != peer.BoundaryAdmissionBlockedPressedInput) {
@@ -117,6 +121,10 @@ func encodeSourcePacket(p sourcePacket) ([sourcePacketSize]byte, error) {
 		bits := packSourceCapture(p.capture)
 		binary.BigEndian.PutUint32(data[52:56], uint32(bits>>32))
 		binary.BigEndian.PutUint32(data[60:64], uint32(bits))
+		exact := p.captureExact.Wire()
+		binary.BigEndian.PutUint32(data[40:44], exact[handoff.CaptureExactQueueToHandle])
+		binary.BigEndian.PutUint32(data[44:48], exact[handoff.CaptureExactForegroundRequest])
+		binary.BigEndian.PutUint32(data[48:52], exact[handoff.CaptureExactForegroundVerify])
 	}
 	return data, nil
 }
@@ -130,10 +138,23 @@ func readSourcePacket(r io.Reader) (sourcePacket, error) {
 		return sourcePacket{}, ErrProtocol
 	}
 	p := sourcePacket{kind: data[4], op: data[5], status: data[6], sequence: binary.BigEndian.Uint64(data[8:16]), reply: binary.BigEndian.Uint64(data[32:40]), x: int32(binary.BigEndian.Uint32(data[52:56]))}
-	if p.kind == sourceReply && p.op == sourceActivate {
+	activationReply := p.kind == sourceReply && p.op == sourceActivate
+	if activationReply && data[7] != 0 {
+		return sourcePacket{}, ErrProtocol
+	}
+	if activationReply {
 		bits := uint64(binary.BigEndian.Uint32(data[52:56]))<<32 | uint64(binary.BigEndian.Uint32(data[60:64]))
 		var ok bool
 		p.capture, ok = unpackSourceCapture(bits)
+		if !ok {
+			return sourcePacket{}, ErrProtocol
+		}
+		exact := [handoff.CaptureExactStageCount]uint32{
+			binary.BigEndian.Uint32(data[40:44]),
+			binary.BigEndian.Uint32(data[44:48]),
+			binary.BigEndian.Uint32(data[48:52]),
+		}
+		p.captureExact, ok = handoff.CaptureNativeExactFromWire(exact)
 		if !ok {
 			return sourcePacket{}, ErrProtocol
 		}
@@ -144,15 +165,17 @@ func readSourcePacket(r io.Reader) (sourcePacket, error) {
 	p.pressedEvidence = data[56]
 	copy(p.timing[:], data[57:60])
 	copy(p.binding[:], data[16:32])
-	if data[7] != 0 {
+	if !activationReply && data[7] != 0 {
 		p.action.Kind = []control.InputActionKind{control.InputKeyDown, control.InputKeyUp, control.InputButtonDown, control.InputButtonUp, control.InputPointerMove, control.InputWheel}[data[7]-1]
 	}
-	p.action.Code = binary.BigEndian.Uint32(data[40:44])
-	if p.kind == sourceReply {
-		p.decision = peer.BoundaryAdmissionDecision(p.action.Code)
-		p.action.Code = 0
+	if !activationReply {
+		p.action.Code = binary.BigEndian.Uint32(data[40:44])
+		if p.kind == sourceReply {
+			p.decision = peer.BoundaryAdmissionDecision(p.action.Code)
+			p.action.Code = 0
+		}
+		p.action.DeltaX, p.action.DeltaY = int32(binary.BigEndian.Uint32(data[44:48])), int32(binary.BigEndian.Uint32(data[48:52]))
 	}
-	p.action.DeltaX, p.action.DeltaY = int32(binary.BigEndian.Uint32(data[44:48])), int32(binary.BigEndian.Uint32(data[48:52]))
 	if !p.valid() {
 		return sourcePacket{}, ErrProtocol
 	}

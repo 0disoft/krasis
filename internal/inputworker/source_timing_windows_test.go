@@ -63,46 +63,67 @@ func TestSourceHeartbeatTimingCannotContaminateCommands(t *testing.T) {
 }
 
 func TestSourceClientObservesWorkerTimingOnlyAfterMatchingReply(t *testing.T) {
-	for _, foreign := range []bool{false, true} {
-		var profile handoff.Summary
-		ctx := handoff.WithSession(context.Background(), handoff.New(func(s handoff.Summary) { profile = s }))
-		ctx = handoff.Begin(ctx, "source", "session", "epoch", time.Now())
-		server, conn := net.Pipe()
-		c := &sourceClient{channel: clientChannel(conn, authorityService), binding: Binding{1}, replies: make(chan sourcePacket, 1), done: make(chan struct{})}
-		var events []string
-		c.timing = timingSampler{source: true, emit: func(code string) { events = append(events, code) }}
-		joined := make(chan struct{})
-		go func() {
-			defer close(joined)
-			p, err := readSourcePacket(server)
-			if err == nil {
-				reply := sourcePacket{kind: sourceReply, op: p.op, reply: p.sequence, status: 1, timing: [3]byte{0, 3, 4}}
-				reply.capture[handoff.CaptureForeground] = 4
-				if foreign {
-					reply.reply++
+	for _, status := range []byte{0, 1} {
+		for _, foreign := range []bool{false, true} {
+			var profile handoff.Summary
+			ctx := handoff.WithSession(context.Background(), handoff.New(func(s handoff.Summary) { profile = s }))
+			ctx = handoff.Begin(ctx, "source", "session", "epoch", time.Now())
+			server, conn := net.Pipe()
+			c := &sourceClient{channel: clientChannel(conn, authorityService), binding: Binding{1}, replies: make(chan sourcePacket, 1), done: make(chan struct{})}
+			var events []string
+			c.timing = timingSampler{source: true, emit: func(code string) { events = append(events, code) }}
+			joined := make(chan struct{})
+			go func() {
+				defer close(joined)
+				p, err := readSourcePacket(server)
+				if err == nil {
+					reply := sourcePacket{kind: sourceReply, op: p.op, reply: p.sequence, status: status, timing: [3]byte{0, 3, 4}}
+					reply.capture[handoff.CaptureQueueToHandle] = 1
+					reply.capture[handoff.CaptureForeground] = 4
+					reply.captureExact = replyExactFixture()
+					if foreign {
+						reply.reply++
+					}
+					c.replies <- reply
 				}
-				c.replies <- reply
+			}()
+			_, err := c.call(ctx, sourceActivate)
+			handoff.Finish(ctx, "error")
+			<-joined
+			_ = server.Close()
+			_ = c.channel.Close()
+			seen := 0
+			for _, event := range events {
+				if strings.HasPrefix(event, "installed_source_timing_worker_") {
+					seen++
+				}
 			}
-		}()
-		_, err := c.call(ctx, sourceActivate)
-		handoff.Finish(ctx, "error")
-		<-joined
-		_ = server.Close()
-		_ = c.channel.Close()
-		seen := 0
-		for _, event := range events {
-			if strings.HasPrefix(event, "installed_source_timing_worker_") {
-				seen++
+			want := error(nil)
+			if foreign {
+				want = ErrProtocol
+			} else if status != 0 {
+				want = ErrAuthority
 			}
-		}
-		if foreign && (err != ErrProtocol || seen != 0) || !foreign && (err != ErrAuthority || seen != 2) {
-			t.Fatal("foreign timing accepted or rejection outcome changed", foreign, err, events)
-		}
-		if !profile.Valid() || profile.Capture == nil || foreign && profile.Capture.Worker != ([3]byte{}) || !foreign && profile.Capture.Worker != ([3]byte{0, 3, 4}) {
-			t.Fatal("matching rejection detail lost or foreign ACK contaminated attempt", profile)
-		}
-		if foreign && profile.Capture.Native != (handoff.CaptureNative{}) || !foreign && profile.Capture.Native[handoff.CaptureForeground] != 4 {
-			t.Fatal("native stages escaped reply matching or lost known rejection", profile)
+			wantSeen := 2
+			if foreign || status == 0 {
+				wantSeen = 0
+			}
+			if err != want || seen != wantSeen {
+				t.Fatal("foreign timing accepted or ACK outcome changed", status, foreign, err, events)
+			}
+			if !profile.Valid() || profile.Capture == nil || foreign && profile.Capture.Worker != ([3]byte{}) || !foreign && profile.Capture.Worker != ([3]byte{0, 3, 4}) {
+				t.Fatal("matching detail lost or foreign ACK contaminated attempt", status, foreign, profile)
+			}
+			if foreign && profile.Capture.Native != (handoff.CaptureNative{}) || !foreign && profile.Capture.Native[handoff.CaptureForeground] != 4 {
+				t.Fatal("native stages escaped reply matching or lost ACK detail", status, foreign, profile)
+			}
+			if foreign && profile.Capture.Exact != (handoff.CaptureNativeExact{}) || !foreign && profile.Capture.Exact != replyExactFixture() {
+				t.Fatal("exact stages escaped reply matching or lost ACK detail", status, foreign, profile.Capture.Exact)
+			}
 		}
 	}
+}
+
+func replyExactFixture() handoff.CaptureNativeExact {
+	return handoff.CaptureNativeExact{QueueToHandleMicros: 7, ForegroundRequestMicros: 11, ForegroundVerifyMicros: 13, Measured: 1<<handoff.CaptureExactQueueToHandle | 1<<handoff.CaptureExactForegroundRequest | 1<<handoff.CaptureExactForegroundVerify}
 }
