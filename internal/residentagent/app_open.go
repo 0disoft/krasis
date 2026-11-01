@@ -42,6 +42,19 @@ func (o *Operations) OpenApp(ctx context.Context, r localapi.AppOpenRequest) (lo
 	if o.updates == nil || !o.updateAuthorized(ctx, "", r.Peer) {
 		return result, nil
 	}
+	if r.Action == "CONNECT_STATUS" {
+		result.ID, result.Code = r.ID, o.updates.PeerConnectStatus(r.Peer, r.ID)
+		return result, nil
+	}
+	if r.Action == "CONNECT" && r.ID == "" {
+		id, err := o.updates.QueuePeerConnect(r.Peer)
+		if errors.Is(err, peerupdate.ErrBusy) {
+			result.Code = "busy"
+		} else if err == nil {
+			result.Code, result.ID = "queued", id
+		}
+		return result, nil
+	}
 	if r.Action == "STATUS" {
 		result.ID, result.Code = r.ID, o.updates.AppOpenStatus(r.Peer, r.ID)
 		return result, nil

@@ -1,6 +1,7 @@
 // Package peerupdate owns explicitly delegated development-bundle delivery.
-// It never sends input or applies updates. A narrow trusted callback can open
-// the locally recorded UI; callers cannot supply a program or arguments.
+// It never sends input or applies updates. Narrow trusted callbacks can open
+// the locally recorded UI or start a saved connection back to the caller;
+// callers cannot supply a program, network address or arbitrary arguments.
 package peerupdate
 
 import (
@@ -61,6 +62,8 @@ type Manager struct {
 	clipChanges       clipboardChanges
 	keyboard          keyboardObservation
 	appOpen           appOpenState
+	peerConnect       peerConnectState
+	ConnectPeer       func(context.Context, string) string
 	OpenUI            func(string) string
 	UIReady           func(time.Time) bool
 	clipboard         clipboardState

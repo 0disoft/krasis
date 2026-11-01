@@ -25,6 +25,8 @@ func commandHelp() helpResult {
 		{"app recovery-status", "Read the last automatic recovery receipt and scheduled task status", false, false},
 		{"app open ALIAS", "Open the remembered UI on a trusted PC and wait for window readiness", true, true},
 		{"app open-status ALIAS ID", "Read a peer UI launch request result", true, false},
+		{"app connect ALIAS", "Ask a trusted PC to connect back using its saved profile; wait for connected receipt", true, true},
+		{"app connect-status ALIAS ID", "Read the exact peer connection receipt without repeating the request", true, false},
 		{"doctor", "Check UI, agent, installation and service without changing state", false, false},
 		{"status", "Read connection state", true, false},
 		{"topology", "Read device layout", true, false},

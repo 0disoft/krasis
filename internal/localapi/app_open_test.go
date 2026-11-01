@@ -32,6 +32,10 @@ func TestAppOpenRequiresAuthenticationAndRejectsExecutableArguments(t *testing.T
 		{`{"action":"START","peer":"` + peer + `","id":"forged"}`, true, 400},
 		{`{"action":"STATUS","peer":"` + peer + `","id":"forged"}`, true, 400},
 		{`{"action":"START","peer":"` + peer + `"}`, true, 200},
+		{`{"action":"CONNECT","peer":"` + peer + `"}`, false, 401},
+		{`{"action":"CONNECT","peer":"` + peer + `","address":"other"}`, true, 400},
+		{`{"action":"CONNECT","peer":"` + peer + `"}`, true, 200},
+		{`{"action":"CONNECT_STATUS","peer":"` + peer + `","id":"bad"}`, true, 400},
 	} {
 		req := httptest.NewRequest(http.MethodPost, "/v1/app-open", strings.NewReader(test.body))
 		if test.auth {
@@ -43,7 +47,7 @@ func TestAppOpenRequiresAuthenticationAndRejectsExecutableArguments(t *testing.T
 			t.Fatalf("status=%d want=%d", response.Code, test.want)
 		}
 	}
-	if op.calls != 1 {
+	if op.calls != 2 {
 		t.Fatal("unauthorized operation")
 	}
 }

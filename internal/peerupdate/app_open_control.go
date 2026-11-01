@@ -27,6 +27,7 @@ func (m *Manager) runAppOpenControl(ctx context.Context, client *http.Client, ad
 			cancel()
 			if ok && authorized() {
 				m.pollAppOpen(ctx, client, address, peer, authorized)
+				m.pollPeerConnect(ctx, client, address, peer, authorized)
 			}
 		}
 	}

@@ -73,6 +73,7 @@ type Operations struct {
 	sessionFaulted       bool
 	sessionOutcome       *sessionOutcome
 	peerAlias            string
+	sessionFingerprint   string // Exact selected peer for this session; never inferred from a later alias lookup.
 	lastStopReason       string
 	manualStop           bool
 	resumeState          string
@@ -294,6 +295,15 @@ func (operations *Operations) Connect(requestContext context.Context, request lo
 			return rejected(code), nil
 		}
 	}
+	if requestContext.Err() != nil || operations.root.Err() != nil {
+		return rejected("operation_cancelled"), nil
+	}
+	if fp, remote := requestContext.Value(peerConnectPermissionKey{}).(string); remote {
+		p, ok := operations.updatePeer(fp)
+		if !ok || !p.AllowInboundControl || fp != request.Fingerprint || p.Alias != request.PeerAlias {
+			return rejected("selected_peer_changed"), nil
+		}
+	}
 	ctx, cancel := context.WithCancelCause(operations.root)
 	ctx = localapi.WithPeerFingerprint(ctx, request.Fingerprint)
 	done := make(chan struct{})
@@ -305,6 +315,7 @@ func (operations *Operations) Connect(requestContext context.Context, request lo
 	operations.inputBackend = "UNKNOWN"
 	operations.boundaryBlocked, operations.boundaryBlockedAt = "", time.Time{}
 	operations.peerAlias = request.PeerAlias
+	operations.sessionFingerprint = request.Fingerprint
 	operations.lastStopReason = ""
 	operations.manualStop = false
 	operations.recordLocked("connect_started")

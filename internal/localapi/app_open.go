@@ -29,7 +29,7 @@ func (h *handler) appOpen(w http.ResponseWriter, r *http.Request) {
 	}
 	var request AppOpenRequest
 	if decodeStrict(r.Body, &request) != nil || !validFingerprint(request.Peer) ||
-		!(request.Action == "START" && request.ID == "" || request.Action == "STATUS" && validCollectionID(request.ID)) {
+		!((request.Action == "START" || request.Action == "CONNECT") && request.ID == "" || (request.Action == "STATUS" || request.Action == "CONNECT_STATUS") && validCollectionID(request.ID)) {
 		writeJSON(w, http.StatusBadRequest, AppOpenResult{Code: "invalid_request"})
 		return
 	}

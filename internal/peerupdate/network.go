@@ -198,7 +198,7 @@ func (m *Manager) handler(peer string, authorized func() bool) http.Handler {
 			return
 		}
 		requestGate := gate
-		if r.URL.Path == "/v1/app-open" || r.URL.Path == "/v2/status" {
+		if r.URL.Path == "/v1/app-open" || r.URL.Path == peerConnectPath || r.URL.Path == "/v2/status" {
 			requestGate = controlGate
 		} else if r.URL.Path == "/v1/clipboard" {
 			requestGate = clipboardGate
@@ -219,6 +219,8 @@ func (m *Manager) handler(peer string, authorized func() bool) http.Handler {
 			return
 		}
 		switch {
+		case r.URL.Path == peerConnectPath:
+			m.peerConnectHTTP(w, r, peer, authorized)
 		case r.URL.Path == clipboardStatusPath:
 			m.clipboardStatusHTTP(w, r, peer, authorized)
 		case r.URL.Path == "/v1/app-open":

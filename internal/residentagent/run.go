@@ -165,6 +165,7 @@ func run(ctx context.Context, localAppData string, dependencies runDependencies)
 				return productlog.SaveRemoteSupportForRequest(localAppData, peer, id, data)
 			}
 			updates.OpenUI = operations.openUIForPeer
+			updates.ConnectPeer = operations.connectForPeer
 			updates.UIReady = operations.uiReadySince
 			defer updates.Close()
 			managementCtx, stopManagement := context.WithCancel(operations.Context())

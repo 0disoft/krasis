@@ -483,3 +483,29 @@ parent agent 강제 종료 뒤 별도 guard가 남긴 report 하나를 strict하
 ## 변경 규칙
 
 명령, flag, JSON field 또는 exit code를 바꾸면 이 문서와 `docs/cli/output-and-exit-codes.md`, 관련 test를 함께 변경한다.
+
+## g510 peer connection control
+
+`krasis-cli app connect ALIAS --json` submits one request for that trusted PC
+to connect back to the caller using its existing saved profile. It waits at
+most 70 seconds and reports `connected` only after the remote supervisor has
+observed CONNECTED for the exact request fingerprint. `app connect-status
+ALIAS ID` reads the same receipt once without submitting another request.
+The local authenticated `/v1/app-open` endpoint accepts `CONNECT` (no ID) and
+`CONNECT_STATUS` (exact ID); the separate paired mTLS management channel uses
+`/v1/peer-connect`. No input-transport messages, addresses, executable paths,
+credentials or arbitrary arguments are accepted. An old peer returns unsupported.
+
+The receiver must retain current trust and AllowInboundControl permission.
+Actual Connect admission rechecks the fingerprint, permission and cancellation
+after preflight. Another active session or one still disconnecting is busy;
+the request cannot stop it, elevate, repair, modify settings or install anything.
+An explicit delegated request can start a manually stopped saved connection;
+ordinary automatic resume retains its existing manual-stop gate.
+
+The sender owns one outstanding request with a nonrenewable 60-second deadline.
+The receiver owns at most one cancelable connect job and 64 exact receipts,
+retained for two minutes with a three-second per-peer new-request limit.
+Manager shutdown cancels and joins its job. Repeated polling of the same ID
+reads the receipt, never repeats Connect. Unknown delivery is not automatically
+resubmitted. Timeout means connection_unconfirmed, not proof of no side effect.

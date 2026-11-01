@@ -657,3 +657,13 @@ invalid/duplicate/missing device와 agent-recovery build mismatch가 포함된�
 ## 호환성
 
 현재 CLI가 출력하거나 저장하는 schema는 Phase 0 실험 계약이다. 정식 제품 API가 아니므로 변경될 수 있지만, 변경 시 schema version과 관련 test를 함께 검토한다.
+
+## g510 peer-connect result
+
+`app connect` and `app connect-status` return `krasis.cli.peer-connect/v1`
+with `peerAlias`, `code` and the exact `id` once acknowledged. Only `connected`
+returns exit 0. `pending`, `accepted`, `busy`, `rejected`, `unsupported`,
+`unknown_request`, `connection_unconfirmed` and `outcome_unknown` return a
+nonzero unsafe/policy result. Malformed or foreign receipts never report
+connected. An uncertain submission is not retried; the same ID may be queried.
+Existing app-open result codes and schema are unchanged.

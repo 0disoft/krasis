@@ -192,6 +192,9 @@ func writeOutput(stdout, stderr io.Writer, value any, code int, jsonOutput bool)
 func dispatch(ctx context.Context, client apiClient, args []string, executable string) (any, int, error) {
 	switch args[0] {
 	case "app":
+		if args[1] == "connect" || args[1] == "connect-status" {
+			return connectPeerApp(ctx, client, args[1:])
+		}
 		return openPeerApp(ctx, client, args[1:])
 	case "credential":
 		return dispatchCredential(ctx, client, args[1:])
@@ -334,10 +337,10 @@ func validateCommandArgs(args []string) error {
 		if len(args) == 2 && (args[1] == "repair" || args[1] == "ensure" || args[1] == "recovery-status") {
 			return nil
 		}
-		if len(args) == 3 && args[1] == "open" && validAlias(args[2]) || len(args) == 4 && args[1] == "open-status" && validAlias(args[2]) && validHex(args[3], 32) {
+		if len(args) == 3 && (args[1] == "open" || args[1] == "connect") && validAlias(args[2]) || len(args) == 4 && (args[1] == "open-status" || args[1] == "connect-status") && validAlias(args[2]) && validHex(args[3], 32) {
 			return nil
 		}
-		return usageError("app requires ensure, repair, open ALIAS or open-status ALIAS ID")
+		return usageError("app requires ensure, repair, open|connect ALIAS or open-status|connect-status ALIAS ID")
 	case "relaunch":
 		if len(args) != 1 && (len(args) != 2 || args[1] != "--startup") {
 			return usageError("relaunch accepts only --startup")
