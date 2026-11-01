@@ -143,7 +143,7 @@ func read(source io.ReaderAt, size int64, executable func(string, []byte, string
 		if err != nil {
 			return nil, ErrInvalid
 		}
-		data, readErr := io.ReadAll(io.LimitReader(stream, limit+1))
+		data, readErr := readEntry(stream, entry.UncompressedSize64)
 		closeErr := stream.Close()
 		total += int64(len(data))
 		if readErr != nil || closeErr != nil || int64(len(data)) > limit || total > MaxExpandedBytes || uint64(len(data)) != entry.UncompressedSize64 {
