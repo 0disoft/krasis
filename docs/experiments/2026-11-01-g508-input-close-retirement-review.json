@@ -1,0 +1,657 @@
+{
+  "schema": "krasis.input-close-retirement-review/v1",
+  "generation": 508,
+  "revision": "980aa13b30ab4de38607a5893833764ed1c22cbf",
+  "recurrence": {
+    "generation": 507,
+    "collection": "209f5d869d51251dfc4de2477f211f2a",
+    "services": {
+      "A": {
+        "time": "2026-11-01T08:42:53.0193162Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "B": {
+        "time": "2026-11-01T08:42:37.6900739Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      }
+    },
+    "appStateBefore": {
+      "A": "RECONNECTING",
+      "B": {
+        "time": "2026-11-01T08:42:08.4973619Z",
+        "code": "agent_faulted",
+        "agentState": "FAULTED",
+        "lastFailure": {
+          "time": "2026-11-01T08:42:08.4973619Z",
+          "code": "agent_faulted",
+          "agentState": "FAULTED"
+        }
+      }
+    },
+    "events": {
+      "A": [
+        {
+          "time": "2026-11-01T07:35:42.4508442Z",
+          "code": "session_end_detail",
+          "sessionEnd": {
+            "observedAt": "2026-11-01T07:35:42.4508442Z",
+            "trigger": true,
+            "component": "lease-watchdog",
+            "fault": "fault_heartbeat_timeout",
+            "canceled": false,
+            "timeout": false,
+            "closed": false,
+            "nativeError": 0,
+            "nativeKnown": false,
+            "networkError": "not_observed",
+            "networkPolicy": "unknown",
+            "lastLifecycle": "unknown",
+            "lifecycleAgeMicros": 0,
+            "captureMode": "protected"
+          }
+        },
+        {
+          "time": "2026-11-01T07:35:42.472284Z",
+          "code": "fault_heartbeat_timeout"
+        },
+        {
+          "time": "2026-11-01T07:35:42.4812559Z",
+          "code": "session_failed"
+        },
+        {
+          "time": "2026-11-01T07:36:00.7966743Z",
+          "code": "CONNECTED"
+        },
+        {
+          "time": "2026-11-01T07:46:25.9228767Z",
+          "code": "session_end_detail",
+          "sessionEnd": {
+            "observedAt": "2026-11-01T07:46:25.9228767Z",
+            "trigger": true,
+            "component": "peer-session",
+            "fault": "fault_remote_eof",
+            "canceled": false,
+            "timeout": false,
+            "closed": false,
+            "nativeError": 0,
+            "nativeKnown": false,
+            "networkError": "not_observed",
+            "networkPolicy": "unknown",
+            "lastLifecycle": "unknown",
+            "lifecycleAgeMicros": 0,
+            "captureMode": "protected"
+          }
+        },
+        {
+          "time": "2026-11-01T07:46:25.9337385Z",
+          "code": "reconnect_remote_eof"
+        },
+        {
+          "time": "2026-11-01T07:46:25.9337385Z",
+          "code": "RECONNECTING"
+        },
+        {
+          "time": "2026-11-01T07:46:52.8820736Z",
+          "code": "CONNECTED"
+        },
+        {
+          "time": "2026-11-01T07:47:17.267335Z",
+          "code": "session_end_detail",
+          "sessionEnd": {
+            "observedAt": "2026-11-01T07:47:17.267335Z",
+            "trigger": true,
+            "component": "peer-session",
+            "fault": "fault_read_io_failure",
+            "canceled": false,
+            "timeout": false,
+            "closed": false,
+            "nativeError": 10054,
+            "nativeKnown": true,
+            "networkError": "network_reset",
+            "networkPolicy": "unknown",
+            "lastLifecycle": "unknown",
+            "lifecycleAgeMicros": 0,
+            "captureMode": "protected"
+          }
+        },
+        {
+          "time": "2026-11-01T07:47:17.2901323Z",
+          "code": "reconnect_read_io_failure"
+        },
+        {
+          "time": "2026-11-01T07:47:17.2901323Z",
+          "code": "RECONNECTING"
+        }
+      ],
+      "B": [
+        {
+          "time": "2026-11-01T07:35:41.1249156Z",
+          "code": "session_end_detail",
+          "sessionEnd": {
+            "observedAt": "2026-11-01T07:35:41.1249156Z",
+            "trigger": true,
+            "component": "unknown",
+            "fault": "fault_trust_freshness_expired",
+            "canceled": false,
+            "timeout": false,
+            "closed": false,
+            "nativeError": 0,
+            "nativeKnown": false,
+            "networkError": "not_observed",
+            "networkPolicy": "unknown",
+            "lastLifecycle": "unknown",
+            "lifecycleAgeMicros": 0,
+            "captureMode": "protected"
+          }
+        },
+        {
+          "time": "2026-11-01T07:35:41.8714994Z",
+          "code": "fault_trust_freshness_expired"
+        },
+        {
+          "time": "2026-11-01T07:35:42.1147175Z",
+          "code": "session_failed"
+        },
+        {
+          "time": "2026-11-01T07:35:57.8397168Z",
+          "code": "CONNECTED"
+        },
+        {
+          "time": "2026-11-01T07:46:19.7947641Z",
+          "code": "installed_source_response_timeout"
+        },
+        {
+          "time": "2026-11-01T07:46:22.9547757Z",
+          "code": "session_end_detail",
+          "sessionEnd": {
+            "observedAt": "2026-11-01T07:46:22.9547757Z",
+            "trigger": true,
+            "component": "source-hook",
+            "fault": "fault_source_hook_failed",
+            "canceled": false,
+            "timeout": false,
+            "closed": false,
+            "nativeError": 0,
+            "nativeKnown": false,
+            "networkError": "not_observed",
+            "networkPolicy": "unknown",
+            "lastLifecycle": "unknown",
+            "lifecycleAgeMicros": 0,
+            "captureMode": "protected"
+          }
+        },
+        {
+          "time": "2026-11-01T07:46:22.9547757Z",
+          "code": "fault_source_hook_failed"
+        },
+        {
+          "time": "2026-11-01T07:46:23.1131256Z",
+          "code": "session_failed"
+        },
+        {
+          "time": "2026-11-01T07:46:49.9176607Z",
+          "code": "CONNECTED"
+        },
+        {
+          "time": "2026-11-01T07:46:59.7764738Z",
+          "code": "installed_source_response_timeout"
+        },
+        {
+          "time": "2026-11-01T07:47:14.2966579Z",
+          "code": "installed_input_heartbeat_presence_failed"
+        },
+        {
+          "time": "2026-11-01T07:47:14.2966579Z",
+          "code": "session_end_detail",
+          "sessionEnd": {
+            "observedAt": "2026-11-01T07:47:14.2966579Z",
+            "trigger": true,
+            "component": "unknown",
+            "fault": "fault_session_unknown",
+            "canceled": false,
+            "timeout": false,
+            "closed": false,
+            "nativeError": 0,
+            "nativeKnown": false,
+            "networkError": "not_observed",
+            "networkPolicy": "unknown",
+            "lastLifecycle": "unknown",
+            "lifecycleAgeMicros": 0,
+            "captureMode": "protected"
+          }
+        },
+        {
+          "time": "2026-11-01T07:47:15.3806785Z",
+          "code": "fault_input_dispatch_failed"
+        },
+        {
+          "time": "2026-11-01T07:47:15.5033265Z",
+          "code": "session_failed"
+        }
+      ]
+    },
+    "worstInput": {
+      "time": "2026-11-01T07:47:15.3806785Z",
+      "dispatchMs": 2131.722,
+      "responseMs": 2127.218,
+      "workerMillis": [
+        1,
+        30,
+        116
+      ],
+      "workerApply": {
+        "micros": [
+          116003,
+          0
+        ],
+        "measured": 1,
+        "submissionMicros": 54964,
+        "submissionCalls": 1
+      },
+      "ackRead": {
+        "micros": [
+          2127218,
+          0,
+          0
+        ],
+        "measured": 7,
+        "progress": 4
+      }
+    },
+    "sourceExitSummary": {
+      "A": [
+        {
+          "time": "2026-11-01T07:35:42.4839705Z",
+          "command": "ok",
+          "reader": "stopped",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "clean_sent",
+          "report": "failed",
+          "failure": {
+            "operation": "source-query-cancelled",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "heartbeatStage": "replied",
+          "heartbeatSlowStage": "service_presence",
+          "heartbeatSlowBucket": 2
+        },
+        {
+          "time": "2026-11-01T07:46:25.941536Z",
+          "command": "ok",
+          "reader": "stopped",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "clean_sent",
+          "report": "ok",
+          "heartbeatStage": "replied",
+          "heartbeatSlowStage": "reply_presence",
+          "heartbeatSlowBucket": 2
+        },
+        {
+          "time": "2026-11-01T07:47:17.3022432Z",
+          "command": "ok",
+          "reader": "stopped",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "clean_sent",
+          "report": "failed",
+          "failure": {
+            "operation": "source-query-cancelled",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "heartbeatStage": "replied",
+          "heartbeatSlowStage": "service_presence",
+          "heartbeatSlowBucket": 1
+        }
+      ],
+      "B": [
+        {
+          "time": "2026-11-01T07:46:24.1421128Z",
+          "command": "ok",
+          "reader": "failed",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "delivery_failed",
+          "report": "failed",
+          "failure": {
+            "operation": "source-write-reply-native",
+            "win32Error": 232,
+            "win32Known": true
+          },
+          "heartbeatStage": "reply_write",
+          "heartbeatSlowStage": "agent_presence",
+          "heartbeatSlowBucket": 3
+        },
+        {
+          "time": "2026-11-01T07:47:00.7191179Z",
+          "command": "ok",
+          "reader": "stopped",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "clean_sent",
+          "report": "ok",
+          "heartbeatStage": "replied",
+          "heartbeatSlowStage": "service_presence",
+          "heartbeatSlowBucket": 2
+        },
+        {
+          "time": "2026-11-01T07:47:15.79325Z",
+          "command": "ok",
+          "reader": "stopped",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "delivery_failed",
+          "report": "failed",
+          "failure": {
+            "operation": "source-write-retirement-native",
+            "win32Error": 232,
+            "win32Known": true
+          },
+          "heartbeatStage": "replied",
+          "heartbeatSlowStage": "service_presence",
+          "heartbeatSlowBucket": 2
+        }
+      ]
+    },
+    "interpretation": "B had a source cursor-show response timeout, then a failed input heartbeat presence check and a terminal input-dispatch failure. A observed a peer connection reset and remained RECONNECTING while B remained FAULTED. Both protected services reported READY. A prior heartbeat fault also occurred in the retained window; these are not a single proven repeated pointer-proof-expiry failure.",
+    "attributionLimit": "Raw A/B wall-clock timestamps are not synchronized. Input heartbeat presence failure currently preserves only an authority sentinel, so the first native failure is not identified. B recorded 2247.314ms runtime timer lateness in its terminal summary; this does not prove which Windows call or scheduler caused the stall."
+  },
+  "change": {
+    "path": "internal/inputworker/client.go",
+    "problem": "Client.Close retained the first Channel.Close error when a pending native query owned resources. Joining the in-flight input gate could allow exact pipe/proof retirement to complete, but the stale error survived.",
+    "fix": "Fence and interrupt immediately; join the existing input owner; then recheck the same channel resource-retirement verdict. No extra wait budget, authority renewal, input replay or inferred native release ACK.",
+    "safety": "A still-pending native query and any actual resource-close failure still return errors. Client.failed remains true. Independent worker release/job retirement and actual input failure policies are unchanged.",
+    "liveCausality": "This exact close-verdict race is reproduced locally, but current diagnostics do not establish it as the cause of this particular B session becoming FAULTED."
+  },
+  "validation": {
+    "before": "New TestClientCloseRechecksRetirementAfterInputJoin/retired fails against g507: input worker authority unavailable despite completed exact resource retirement.",
+    "after": "inputworker suite 22.739s and localapi 6.559s passed with the deployment runtime overlay. New test covers exact completed retirement, a still-pending query and native close failure, with once-only handle closure.",
+    "excludedTest": "TestPortablePairRetainsIndependentRecoveryAfterInputFailure excluded because the existing live portable recovery owner prevents its global fixture; no live child or safety fence changed.",
+    "frontend": "104/104 tests and native production build passed.",
+    "package": "TestWorkspaceUpdatePackage passed in 6.80s; 8-file bundle, UI icon, setup archive and offline setup verification passed.",
+    "check": "git diff --check passed.",
+    "race": "Not run: deployment CGO_ENABLED=0.",
+    "remoteCI": "Not run: no push requested.",
+    "physicalCrossings": "Not yet tested after g508 installation."
+  },
+  "setupSha256": "70c46384dbbec598da8bc9e0ef1e06f825597f89a702a600d43ef8f7a1035bf6",
+  "localSetup": {
+    "schema": "krasis.setup-result/v1",
+    "code": 0,
+    "state": "installed"
+  },
+  "peerUpdate": {
+    "schemaVersion": "krasis.cli.update-wait/v1",
+    "peerAlias": "B",
+    "id": "faf351f8b5b403e9df7e30b8d57bce6e",
+    "code": "updated",
+    "transferState": "UPDATED",
+    "generation": 508,
+    "revision": "980aa13b30ab4de38607a5893833764ed1c22cbf",
+    "bytes": 28881500,
+    "total": 28881500
+  },
+  "collection": "209b2f9912f578fd543e276ebda0966b",
+  "doctorA": {
+    "schemaVersion": "krasis.cli.doctor/v1",
+    "agent": "RUNNING",
+    "connection": "CONNECTING",
+    "peerAlias": "B",
+    "cliGeneration": 508,
+    "agentGeneration": 508,
+    "protocol": "COMPATIBLE",
+    "code": "connection_not_ready",
+    "cliBuild": "980aa13b30ab4de38607a5893833764ed1c22cbf",
+    "agentBuild": "980aa13b30ab4de38607a5893833764ed1c22cbf",
+    "ui": {
+      "state": "RUNNING",
+      "generation": 508,
+      "build": "980aa13b30ab4de38607a5893833764ed1c22cbf",
+      "pathStatus": "MATCHED"
+    },
+    "launchRecord": {
+      "state": "VERIFIED",
+      "generation": 508,
+      "build": "980aa13b30ab4de38607a5893833764ed1c22cbf",
+      "pathStatus": "MATCHED"
+    },
+    "installedAgent": {
+      "state": "VERIFIED",
+      "build": "980aa13b30ab4de38607a5893833764ed1c22cbf"
+    },
+    "service": {
+      "state": "RUNNING",
+      "pathStatus": "MATCHED"
+    },
+    "agentLocation": "PROTECTED",
+    "protectedInput": "CONFIGURED",
+    "checks": [
+      {
+        "name": "agent",
+        "state": "RUNNING"
+      },
+      {
+        "name": "connection",
+        "state": "CONNECTING"
+      },
+      {
+        "name": "protocol",
+        "state": "COMPATIBLE"
+      },
+      {
+        "name": "cli_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "ui_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "installed_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "ui",
+        "state": "RUNNING"
+      },
+      {
+        "name": "launch_record",
+        "state": "VERIFIED"
+      },
+      {
+        "name": "installed_agent",
+        "state": "VERIFIED"
+      },
+      {
+        "name": "service",
+        "state": "RUNNING"
+      },
+      {
+        "name": "update_stage_cleanup",
+        "state": "COMPLETED"
+      }
+    ],
+    "nextActions": [
+      {
+        "code": "check_connection",
+        "message": "krasis-cli status와 connection show <상대 별칭>으로 연결 설정을 확인하세요."
+      }
+    ]
+  },
+  "peerStatus": {
+    "schemaVersion": "krasis.cli.update-status/v1",
+    "peerAlias": "B",
+    "localGeneration": 508,
+    "localBuild": "980aa13b30ab4de38607a5893833764ed1c22cbf",
+    "peerState": "ONLINE",
+    "peerGeneration": 508,
+    "peerBuild": "980aa13b30ab4de38607a5893833764ed1c22cbf",
+    "peerAllowsUpdate": true,
+    "receiveAllowed": true,
+    "transferState": "IDLE"
+  },
+  "installedEvidence": {
+    "A": {
+      "created": "2026-11-01T08:52:12Z",
+      "supportSha256": "5b59f2d5829b2c6cb4a843c8de27a085a1e93e17c8b144b4d85282e13b05dbb3",
+      "installation": {
+        "time": "2026-11-01T08:51:10.4083388Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "inputHealth": {
+        "time": "2026-11-01T08:51:42.398561Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-11-01T08:51:10.9898661Z",
+        "time": "2026-11-01T08:51:11.0059557Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      },
+      "matchingBuildUILaunches": [
+        {
+          "time": "2026-11-01T08:51:11.7511828Z",
+          "code": "launch_record_ready"
+        }
+      ],
+      "connectionEvents": [
+        {
+          "time": "2026-11-01T08:51:12.3034165Z",
+          "code": "connect_started"
+        }
+      ],
+      "incompleteSources": [
+        "control.previous.jsonl"
+      ]
+    },
+    "B": {
+      "created": "2026-11-01T08:52:10Z",
+      "supportSha256": "090e2e1287531e214cb1cbcd84ca7cb7dc7bc6a1eebdaf90e45d6eb672b1236d",
+      "installation": {
+        "time": "2026-11-01T08:50:45.058132Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "inputHealth": {
+        "time": "2026-11-01T08:51:51.9867287Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "loginRuntime": {
+        "startedAt": "2026-11-01T08:50:48.0378671Z",
+        "time": "2026-11-01T08:51:03.3432329Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE",
+        "source": {
+          "total": 1,
+          "exits": [
+            {
+              "time": "2026-11-01T08:51:03.1382825Z",
+              "command": "ok",
+              "reader": "stopped",
+              "capture": "joined",
+              "sender": "joined",
+              "interrupt": "joined",
+              "retirement": "clean_sent",
+              "report": "ok",
+              "heartbeatStage": "replied",
+              "heartbeatSlowStage": "service_presence",
+              "heartbeatSlowBucket": 1
+            }
+          ]
+        }
+      },
+      "matchingBuildUILaunches": [
+        {
+          "time": "2026-11-01T08:50:51.4107198Z",
+          "code": "launch_record_ready"
+        }
+      ],
+      "connectionEvents": [
+        {
+          "time": "2026-11-01T08:50:55.7598935Z",
+          "code": "connect_started"
+        },
+        {
+          "time": "2026-11-01T08:50:56.0358888Z",
+          "code": "CONNECTED"
+        },
+        {
+          "time": "2026-11-01T08:51:03.125015Z",
+          "code": "peer_disconnect_requested"
+        },
+        {
+          "time": "2026-11-01T08:51:03.1357663Z",
+          "code": "session_stopped"
+        }
+      ],
+      "incompleteSources": [
+        "control.previous.jsonl"
+      ]
+    }
+  },
+  "connectionRestoration": {
+    "state": "awaiting_B_connect",
+    "reason": "A installation sent an explicit peer disconnect after B had resumed. B stopped cleanly into LOCAL; A resumed CONNECTING. Existing remote management opens the B window but does not execute its Connect action.",
+    "appOpen": {
+      "schemaVersion": "krasis.cli.app-open/v1",
+      "code": "window_ready",
+      "peerAlias": "B",
+      "id": "9a0d80a3e29755bc66678e7507c0be24"
+    }
+  },
+  "limitations": [
+    "Original long native/IPC/scheduling delay remains unresolved.",
+    "Both old control.previous.jsonl sources are incomplete.",
+    "Installed readiness is not evidence of sustained recovery; paired connection confirmation and a user crossing test remain pending."
+  ],
+  "sourceOfTruthChanged": [
+    "docs/architecture/02-runtime-flow.md"
+  ],
+  "apiChanges": "none",
+  "dbChanges": "none",
+  "runnerChanges": "none",
+  "repositoryHygieneChanges": "none",
+  "remotePush": "not performed"
+}
