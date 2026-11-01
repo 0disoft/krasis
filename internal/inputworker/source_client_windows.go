@@ -290,7 +290,7 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 		c.epoch.Store(0)
 	}
 	p := sourcePacket{kind: sourceCommand, op: op, sequence: c.sequence, binding: c.binding}
-	if op == sourceCursorShow && len(reference) == 1 {
+	if (op == sourceCursorShow || op == sourceBoundaryAck) && len(reference) == 1 {
 		p.reply = reference[0]
 	}
 	data, err := encodeSourcePacket(p)
@@ -501,6 +501,7 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 	live = &sourceClient{channel: channel, binding: binding, replies: make(chan sourcePacket, 1), done: make(chan struct{}), failed: make(chan struct{})}
 	live.timing = timingSampler{emit: c.observe, source: true}
 	live.heartbeatTiming = timingSampler{emit: c.observe, source: true, heartbeat: true}
+	boundaryAcks := make(chan uint64, 1)
 	go func() {
 		defer func() {
 			code := sourceClientReaderCode(live.err, live.retired.Load())
@@ -535,6 +536,14 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 					if err := boundary.Observe(p.action, p.x); err != nil && !errors.Is(err, control.ErrBoundaryIntentQueueFull) {
 						live.err = err
 						return
+					}
+					if p.reply != 0 {
+						select {
+						case boundaryAcks <- p.sequence:
+						default:
+							live.err = ErrProtocol
+							return
+						}
 					}
 				}
 			case sourceAction:
@@ -581,6 +590,15 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 	heartbeatDeferred := false
 	for {
 		select {
+		case reference := <-boundaryAcks:
+			if ctx.Err() != nil || live.retiring.Load() {
+				continue
+			}
+			// Join the bounded exact reply before stop; cancellation must not
+			// cut a submitted receipt frame or race retirement on this stream.
+			if _, err := live.call(context.WithoutCancel(ctx), sourceBoundaryAck, reference); err != nil {
+				return err
+			}
 		case <-live.failed:
 			cleanup, cancel := context.WithTimeout(context.Background(), RecoveryTimeout+time.Second)
 			_, err := live.call(cleanup, sourceStop)

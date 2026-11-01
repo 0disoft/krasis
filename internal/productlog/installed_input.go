@@ -19,7 +19,7 @@ func init() {
 	for _, reason := range []string{"timeout", "canceled", "closed", "short_write", "native", "other"} {
 		allowed["installed_source_io_"+reason] = true
 	}
-	for _, op := range []string{"start", "admit", "activate", "deactivate", "heartbeat", "stop", "cursor_prepare", "cursor_show", "cursor_restore", "unknown"} {
+	for _, op := range []string{"start", "admit", "activate", "deactivate", "heartbeat", "stop", "cursor_prepare", "cursor_show", "cursor_restore", "boundary_ack", "unknown"} {
 		allowed["installed_source_command_failed_"+op] = true
 	}
 	for _, outcome := range []string{"received", "cancelled", "timeout", "reader_ended", "protocol", "rejected"} {

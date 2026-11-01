@@ -67,7 +67,12 @@ func (c *sourceClient) call(ctx context.Context, op byte, reference ...uint64) (
 			return sourcePacket{}, err
 		}
 		started := time.Now()
-		err := c.channel.authorizeInput(ctx, false)
+		var err error
+		if op == sourceBoundaryAck {
+			err = c.channel.authorizePresence(ctx) // Receipts cannot grant input authority.
+		} else {
+			err = c.channel.authorizeInput(ctx, false)
+		}
 		authorization += time.Since(started)
 		if ctx.Err() != nil {
 			if !c.commandPreflightExpired.Swap(true) && c.timing.emit != nil {

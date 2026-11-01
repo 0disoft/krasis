@@ -46,8 +46,6 @@ func (w *sourceWriter) sendBoundaries(batch []sourcePacket) error {
 	// the shared writer gate needed by heartbeat replies. No input/actions or
 	// capture decisions enter this batch. Validate fully before admission, then
 	// obtain presence and the final full proof before immediate gate admission.
-	ctx, cancel := w.operation(nil, false)
-	defer cancel()
 	// Allocate, validate and encode the bounded observation payload before
 	// obtaining authority or the wire gate. Sequence 1 is a private placeholder;
 	// only the gate owner assigns real sequences immediately before the write.
@@ -55,10 +53,13 @@ func (w *sourceWriter) sendBoundaries(batch []sourcePacket) error {
 	// proof is still fresh at TryLock admission.
 	var wire [sourceBoundaryBatchLimit * sourcePacketSize]byte
 	for i, p := range batch {
-		if p.kind != sourceBoundary {
+		if p.kind != sourceBoundary || p.reply != 0 {
 			return ErrProtocol
 		}
 		p.sequence, p.binding = 1, w.binding
+		if w.boundary != nil && i == len(batch)-1 {
+			p.reply = 1 // Replaced with the exact ending sequence under the gate.
+		}
 		data, err := encodeSourcePacket(p)
 		if err != nil {
 			return err
@@ -68,6 +69,25 @@ func (w *sourceWriter) sendBoundaries(batch []sourcePacket) error {
 	if w.epoch.Load() != 0 {
 		return nil // Queued local observations cannot start another active lease.
 	}
+	var reservation *sourceBoundaryReservation
+	if w.boundary != nil {
+		owner := w.ctx
+		if owner == nil {
+			owner = context.Background()
+		}
+		var err error
+		reservation, err = w.boundary.acquire(owner)
+		if err != nil {
+			return sourceTransportFailure(err)
+		}
+		defer func() {
+			if reservation != nil {
+				w.boundary.release(reservation)
+			}
+		}()
+	}
+	ctx, cancel := w.operation(nil, false)
+	defer cancel()
 	if err := w.lockAuthorized(ctx, true); err != nil {
 		if ctx.Err() == context.DeadlineExceeded && errors.Is(err, context.DeadlineExceeded) && (w.ctx == nil || w.ctx.Err() == nil) {
 			// No gate or bytes were acquired. Drop this stale observation just
@@ -92,11 +112,18 @@ func (w *sourceWriter) sendBoundaries(batch []sourcePacket) error {
 		}
 		binary.BigEndian.PutUint64(wire[i*sourcePacketSize+8:i*sourcePacketSize+16], next)
 	}
+	if reservation != nil {
+		binary.BigEndian.PutUint64(wire[(len(batch)-1)*sourcePacketSize+32:], next)
+		reservation.sequence.Store(next)
+	}
 	if ctx.Err() == context.DeadlineExceeded && (w.ctx == nil || w.ctx.Err() == nil) {
 		return nil // Still before the write; no sequence or bytes escaped.
 	}
 	w.gateStage(sourceBoundary, sourceGateWrite)
 	err := w.writeSequenced(ctx, wire[:len(batch)*sourcePacketSize], next, sourceBoundary)
+	if err == nil {
+		reservation = nil // Only the exact receiver ACK may admit the next batch.
+	}
 	var failure *sourceIOFailure
 	if errors.As(err, &failure) && failure.unsubmitted && errors.Is(failure, os.ErrDeadlineExceeded) {
 		// These are advisory pointer samples, just like the bounded queue's

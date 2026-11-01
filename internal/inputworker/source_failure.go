@@ -70,6 +70,8 @@ func sourceCommandFailureCode(op byte) string {
 		name = "cursor_show"
 	case sourceCursorRestore:
 		name = "cursor_restore"
+	case sourceBoundaryAck:
+		name = "boundary_ack"
 	}
 	return "installed_source_command_failed_" + name
 }

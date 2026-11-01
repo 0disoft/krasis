@@ -91,7 +91,7 @@ func pumpSourceCommandsOrdered(run context.Context, read func() (sourcePacket, e
 			cancel()
 			return err
 		}
-		if heartbeat != nil && p.op == sourceHeartbeat {
+		if heartbeat != nil && (p.op == sourceHeartbeat || p.op == sourceBoundaryAck) {
 			if err := heartbeat(p); err != nil {
 				cancel()
 				return err

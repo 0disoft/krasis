@@ -429,3 +429,19 @@ Capture cleanup bounds waiting with its existing timer and drains queued exact n
 Only source InputPointerMove delivery may use the bounded optional full-proof/presence query owner before immediate wire-gate admission. Expiry of a submitted read-only query discards that unsent delta without consuming sequence, bytes or liveness. Native handles and the shared four-slot/three-restricted-slot limits remain owned until the query returns. The next sample requires fresh full authority and presence; no late result dispatches input. Repeated waiting on the same stuck query, capacity/admission expiry, caller/owner cancellation, native rejection, key/button/wheel transitions and attempted/partial writes retain failure behavior. This changes no command ACK, lease deadline, native retirement requirement or outcome-unknown replay policy.
 
 Input Client.Close first fences the channel and interrupts pending wire work, then joins the in-flight input gate. It rechecks that same channel's pipe/proof resource retirement after the join instead of retaining the earlier pending-query verdict. A native query still pending at that point, or any actual resource-close failure, remains an error. This check proves only channel cleanup; independent native release/job retirement receipts and terminal input outcomes remain mandatory, with no additional wait budget, replay or authority renewal.
+
+g509 bounds unsolicited source-boundary delivery to one unacknowledged batch
+(at most 16 ordered samples / 1KiB) on the existing 4KiB local source pipe.
+Its last packet carries its own exact sequence as a receipt request. The agent
+reader enqueues that receipt without waiting for command serialization; the
+capture control loop sends a presence-authorized boundary-ACK command and joins
+its exact reply before shutdown. The worker's ordered command reader handles
+this receipt without native desktop dispatch. Foreign, zero and duplicate
+receipts fail validation and never renew input authority. The next boundary
+batch waits outside the wire gate, proof queries and one-second write budget;
+fresh full authorization is still required after receiving credit. This bounds
+advisory pipe occupancy while leaving command replies/retirement room to proceed.
+Native attempted/partial writes remain fatal, unsent observations are not
+replayed, and the existing bounded observation queue may still drop on overflow.
+This contains advisory backpressure; it does not prove the A runtime stopping
+delay is fixed or prevent all active-input stalls during process-wide pauses.

@@ -9,7 +9,7 @@ import (
 // native work. Frame admission still checks the pinned agent/service presence;
 // other commands retain their existing read-side authorization.
 func sourceCommandReadAuthorization(op byte, full, present func() error) error {
-	if op == sourceHeartbeat || op == sourceActivate || op == sourceAdmit {
+	if op == sourceHeartbeat || op == sourceActivate || op == sourceAdmit || op == sourceBoundaryAck {
 		return present()
 	}
 	return full()

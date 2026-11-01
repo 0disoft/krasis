@@ -1,0 +1,27 @@
+{
+  "schema": "krasis.boundary-backpressure-fix/v1",
+  "generation": 509,
+  "priorEvidence": "2026-11-01-g508-reconnect-recurrence.json",
+  "finding": "A source-write-boundary-timeout followed an agent sampler lateness of 2082860us. An advisory boundary write can hold the source pipe writer while the agent reader is stalled, blocking heartbeat replies and retirement. The sampler does not establish an exact GC pause or OS cause.",
+  "change": {
+    "maxUnacknowledgedBoundaryBatches": 1,
+    "maxSamplesPerBatch": 16,
+    "maxBoundaryBytes": 1024,
+    "nativePipeBufferBytes": 4096,
+    "receipt": "Exact final packet sequence, bound to the authenticated source stream; presence only, never input authority.",
+    "waiting": "Before the shared writer gate and before the per-write deadline, cancellable by worker ownership.",
+    "failurePolicy": "Attempted or partial writes still fail; proven-unsent expired observations remain droppable. No replay or fabricated retirement."
+  },
+  "validation": {
+    "goPackagesPassed": ["inputworker", "localapi", "residentagent", "runtimestall", "productlog"],
+    "frontendTestsPassed": 111,
+    "regressions": [
+      "A second boundary batch remains outside the gate across a simulated 2s agent stall; a heartbeat reply still writes in sequence.",
+      "A real Windows named pipe accepts the full 1KiB boundary batch and a heartbeat reply before its reader starts.",
+      "Zero, foreign and duplicate receipts cannot release credit; canceled waiters join.",
+      "A boundary receipt uses presence without creating input authority; attempted writes remain fatal and failed reservations release."
+    ],
+    "realCrossings": "Pending after installation; no measured latency or recurrence improvement claimed yet."
+  },
+  "remainingRisk": "This isolates advisory boundary backpressure, not all active-input traffic. A process-wide pause can still delay input. Capture a fresh runtime trace to establish the source of the A execution stall."
+}

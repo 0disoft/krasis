@@ -32,6 +32,7 @@ type sourceWriter struct {
 	started      atomic.Bool
 	heartbeat    *sourceHeartbeatProgress
 	activation   atomic.Pointer[sourceActivationFence]
+	boundary     *sourceBoundaryWindow
 }
 
 func (w *sourceWriter) send(p sourcePacket, current func() bool) error {
@@ -229,7 +230,7 @@ func runSourceCapture(ctx context.Context, channel, service *Channel, lease Leas
 	}
 	var pressedEvidence atomic.Uint32
 	hook.SetAdmissionReporter(func(code string) { pressedEvidence.Store(uint32(sourcePressedEvidence(code))) })
-	writer := &sourceWriter{ctx: run, channel: channel, binding: lease.Binding, heartbeat: &heartbeat}
+	writer := &sourceWriter{ctx: run, channel: channel, binding: lease.Binding, heartbeat: &heartbeat, boundary: newSourceBoundaryWindow()}
 	session, err := wininput.NewSourceSession(1024, writer)
 	if err != nil {
 		return err
@@ -360,7 +361,12 @@ func runSourceCapture(ctx context.Context, channel, service *Channel, lease Leas
 	readDone := make(chan error, 1)
 	go func() {
 		readDone <- pumpSourceCommandsOrdered(run, read, requests, cancel, completed, func(p sourcePacket) error {
-			return sourceCommandFailed(sourceHeartbeat, writer.sendCompletedReply(p, sourcePacket{kind: sourceReply, op: sourceHeartbeat, reply: p.sequence}))
+			if p.op == sourceBoundaryAck {
+				if err := writer.boundary.acknowledge(p.reply); err != nil {
+					return err
+				}
+			}
+			return sourceCommandFailed(p.op, writer.sendCompletedReply(p, sourcePacket{kind: sourceReply, op: p.op, reply: p.sequence}))
 		})
 	}()
 	// Retire only this read; the final native response still needs the writer.
