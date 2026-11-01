@@ -7,12 +7,63 @@ import (
 	"github.com/0disoft/krasis/internal/localapi"
 )
 
+// Native I/O is supplied by client. Optional clock/ticker/abort dependencies keep
+// deadline admission testable without changing the existing command callers.
+type peerConnectOptions struct {
+	now    func() time.Time
+	ticker func(time.Duration) (<-chan time.Time, func())
+	signal context.Context
+}
+
 // Submit once, then observe only this exact receipt. Unknown delivery never retries START.
-func connectPeerApp(ctx context.Context, client apiClient, args []string) (any, int, error) {
+func connectPeerApp(ctx context.Context, client apiClient, args []string, options ...peerConnectOptions) (any, int, error) {
+	opt := peerConnectOptions{now: time.Now, ticker: func(interval time.Duration) (<-chan time.Time, func()) {
+		tick := time.NewTicker(interval)
+		return tick.C, tick.Stop
+	}}
+	if len(options) > 0 {
+		if options[0].now != nil {
+			opt.now = options[0].now
+		}
+		if options[0].ticker != nil {
+			opt.ticker = options[0].ticker
+		}
+		opt.signal = options[0].signal
+	}
 	ctx, cancel := context.WithTimeout(ctx, 70*time.Second)
 	defer cancel()
+	if opt.signal != nil {
+		observed, abort := context.WithCancel(ctx)
+		stop := context.AfterFunc(opt.signal, abort)
+		defer func() { stop(); abort() }()
+		ctx = observed
+	}
 	result := appOpenResult{SchemaVersion: "krasis.cli.peer-connect/v1", PeerAlias: args[1]}
+	statusOnly := args[0] == "connect-status"
+	if statusOnly {
+		result.ID = args[2]
+	}
+	stopped := func() bool {
+		if ctx.Err() != nil || opt.signal != nil && opt.signal.Err() != nil {
+			return true
+		}
+		deadline, ok := ctx.Deadline()
+		return ok && !opt.now().Before(deadline)
+	}
+	interrupted := func() (any, int, error) {
+		result.Code = "connection_unconfirmed"
+		if result.ID == "" && (ctx.Err() == context.Canceled || opt.signal != nil && opt.signal.Err() != nil) {
+			result.Code = "canceled"
+		}
+		return result, ExitUnsafeState, nil
+	}
+	if stopped() {
+		return interrupted()
+	}
 	peer, code, err := resolvePeer(ctx, client, args[1])
+	if stopped() {
+		return interrupted()
+	}
 	if err != nil {
 		return nil, ExitInternal, err
 	}
@@ -27,13 +78,9 @@ func connectPeerApp(ctx context.Context, client apiClient, args []string) (any, 
 		result.Code = "unsupported"
 		return result, ExitPolicyDenied, nil
 	}
-	statusOnly := args[0] == "connect-status"
-	if statusOnly {
-		result.ID = args[2]
-	} else {
-		if ctx.Err() != nil {
-			result.Code = "canceled"
-			return result, ExitUnsafeState, nil
+	if !statusOnly {
+		if stopped() {
+			return interrupted()
 		}
 		start, err := api.OpenApp(ctx, localapi.AppOpenRequest{Action: "CONNECT", Peer: peer})
 		if err != nil {
@@ -49,15 +96,17 @@ func connectPeerApp(ctx context.Context, client apiClient, args []string) (any, 
 		}
 		result.ID = start.ID
 	}
-	tick := time.NewTicker(time.Second)
-	defer tick.Stop()
+	if stopped() {
+		return interrupted()
+	}
+	ticks, stopTicks := opt.ticker(time.Second)
+	defer stopTicks()
 	for {
-		if ctx.Err() != nil {
-			result.Code = "connection_unconfirmed"
-			return result, ExitUnsafeState, nil
+		if stopped() {
+			return interrupted()
 		}
 		status, err := api.OpenApp(ctx, localapi.AppOpenRequest{Action: "CONNECT_STATUS", Peer: peer, ID: result.ID})
-		if err != nil || ctx.Err() != nil || status.ID != result.ID {
+		if stopped() || err != nil || status.ID != result.ID {
 			result.Code = "outcome_unknown"
 			return result, ExitUnsafeState, nil
 		}
@@ -79,7 +128,7 @@ func connectPeerApp(ctx context.Context, client apiClient, args []string) (any, 
 		case <-ctx.Done():
 			result.Code = "connection_unconfirmed"
 			return result, ExitUnsafeState, nil
-		case <-tick.C:
+		case <-ticks:
 		}
 	}
 }

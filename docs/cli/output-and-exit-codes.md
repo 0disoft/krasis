@@ -667,7 +667,13 @@ invalid/duplicate/missing device와 agent-recovery build mismatch가 포함된�
 `app connect` and `app connect-status` return `krasis.cli.peer-connect/v1`
 with `peerAlias`, `code` and the exact `id` once acknowledged. Only `connected`
 returns exit 0. `pending`, `accepted`, `busy`, `rejected`, `unsupported`,
-`unknown_request`, `connection_unconfirmed` and `outcome_unknown` return a
+`unknown_request`, `connection_unconfirmed`, `canceled` and `outcome_unknown` return a
 nonzero unsafe/policy result. Malformed or foreign receipts never report
 connected. An uncertain submission is not retried; the same ID may be queried.
 Existing app-open result codes and schema are unchanged.
+
+Connection admission and terminal observations check the absolute 70-second
+deadline (or an earlier caller deadline) around native I/O, including trust resolution. Timer delivery
+does not extend this deadline. Pre-canceled commands perform no trust or native
+connection queries. A late queued acknowledgement retains its exact ID for later
+inspection but cannot trigger another connection or be reported as connected.
