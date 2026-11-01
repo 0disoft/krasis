@@ -13,6 +13,16 @@ import (
 
 const UpdateSettingsSchema = "krasis.update-settings/v1"
 
+const (
+	updateSettingsTimeout      = 3 * time.Second
+	updateFingerprintHexLength = 64
+	updateBuildSHA1HexLength   = 40
+	updateBuildSHA256HexLength = 64
+	updateMinLocalGeneration   = 1
+	updateMinPeerGeneration    = 21
+	updateMaxGeneration        = 1000000
+)
+
 type UpdateSettingsSnapshot struct {
 	Schema           string `json:"schema"`
 	Code             string `json:"code"`
@@ -68,7 +78,7 @@ func (b *UpdateSettingsBridge) execute(peer, action string) UpdateSettingsSnapsh
 	if b == nil || b.ctx == nil || b.open == nil {
 		return v
 	}
-	if len(peer) != 64 {
+	if len(peer) != updateFingerprintHexLength {
 		v.Code = "invalid_peer"
 		return v
 	}
@@ -82,7 +92,7 @@ func (b *UpdateSettingsBridge) execute(peer, action string) UpdateSettingsSnapsh
 		return v
 	}
 	defer b.mu.Unlock()
-	ctx, cancel := context.WithTimeout(b.ctx, 3*time.Second)
+	ctx, cancel := context.WithTimeout(b.ctx, updateSettingsTimeout)
 	defer cancel()
 	if ctx.Err() != nil {
 		v.Code = "cancelled"
@@ -92,13 +102,18 @@ func (b *UpdateSettingsBridge) execute(peer, action string) UpdateSettingsSnapsh
 	if err != nil || c == nil {
 		return v
 	}
+	return executeUpdateSettings(ctx, c, v, action)
+}
+
+// execute holds the bridge lock throughout trust, the request and confirmation.
+func executeUpdateSettings(ctx context.Context, c UpdateSettingsClient, v UpdateSettingsSnapshot, action string) UpdateSettingsSnapshot {
 	trust, err := c.Trust(ctx)
 	if err != nil {
 		return v
 	}
 	trusted := false
 	for _, p := range trust.Peers {
-		if p.Fingerprint == peer && !p.Revoked {
+		if p.Fingerprint == v.Peer && !p.Revoked {
 			trusted = true
 			break
 		}
@@ -109,22 +124,34 @@ func (b *UpdateSettingsBridge) execute(peer, action string) UpdateSettingsSnapsh
 	}
 	before, runtimeErr := c.Runtime(ctx)
 	if runtimeErr == nil {
-		setLocalUpdateVersion(&v, before)
+		v = withLocalUpdateVersion(v, before)
 	}
 	r := localapi.UpdateRequest{Schema: localapi.UpdateSchema, Action: action}
 	if action != "STATUS" {
-		r.Peer = peer
+		r.Peer = v.Peer
 	}
 	if ctx.Err() != nil {
 		v.Code = "cancelled"
 		return v
 	}
 	result, err := c.Update(ctx, r)
+	v, accepted := projectUpdateSettingsReply(v, action, result, err)
+	if !accepted {
+		return v
+	}
+	if action != "STATUS" {
+		return confirmUpdatePermission(ctx, c, v, action, before, runtimeErr)
+	}
+	return inspectUpdateSettings(ctx, c, v, before, runtimeErr)
+}
+
+// Project a reply without changing the caller's snapshot or permission list.
+func projectUpdateSettingsReply(v UpdateSettingsSnapshot, action string, result localapi.UpdateResult, err error) (UpdateSettingsSnapshot, bool) {
 	if err != nil {
 		if action != "STATUS" {
 			v.Code = "outcome_unknown"
 		}
-		return v
+		return v, false
 	}
 	expected := "ok"
 	if action != "STATUS" {
@@ -135,36 +162,45 @@ func (b *UpdateSettingsBridge) execute(peer, action string) UpdateSettingsSnapsh
 		if result.Code == "unsupported" {
 			v.Code = "unsupported"
 		}
-		return v
+		return v, false
 	}
-	v.Permission = updatePermission(result.Status.Allowed, peer)
+	v.Permission = updatePermission(result.Status.Allowed, v.Peer)
 	v.Code = expected
-	if action != "STATUS" {
-		if runtimeErr == nil && before.Instance != "" {
-			after, err := c.Runtime(ctx)
-			if err != nil || after.Instance != before.Instance {
-				return updateSettingsFailure(peer, "agent_changed")
-			}
-		}
-		if (action == "ALLOW") != (v.Permission == "ALLOWED") {
-			v.Permission = "UNKNOWN"
-			v.Code = "outcome_unknown"
-		}
-		return v
+	return v, true
+}
+
+func confirmUpdatePermission(ctx context.Context, c UpdateSettingsClient, v UpdateSettingsSnapshot, action string, before localapi.RuntimeInfo, runtimeErr error) UpdateSettingsSnapshot {
+	if runtimeErr != nil || before.Instance == "" {
+		return projectUpdatePermissionAck(v, action)
 	}
+	after, err := c.Runtime(ctx)
+	if err != nil || after.Instance != before.Instance {
+		return updateSettingsFailure(v.Peer, "agent_changed")
+	}
+	return projectUpdatePermissionAck(v, action)
+}
+
+func projectUpdatePermissionAck(v UpdateSettingsSnapshot, action string) UpdateSettingsSnapshot {
+	if (action == "ALLOW") != (v.Permission == "ALLOWED") {
+		v.Permission = "UNKNOWN"
+		v.Code = "outcome_unknown"
+	}
+	return v
+}
+
+func inspectUpdateSettings(ctx context.Context, c UpdateSettingsClient, v UpdateSettingsSnapshot, before localapi.RuntimeInfo, runtimeErr error) UpdateSettingsSnapshot {
 	// New agents expose per-peer observations. Old agents reject INSPECT, while
 	// their existing permission protocol remains fully usable.
 	if runtimeErr == nil && before.Generation < localapi.UpdateInspectionGeneration {
 		v.Code = "peer_status_unavailable"
 		return v
 	}
-	inspection, err := c.Update(ctx, localapi.UpdateRequest{Schema: localapi.UpdateSchema, Action: "INSPECT", Peer: peer})
-	if err != nil || inspection.Code != "peer_status" || inspection.PeerInfo == nil || inspection.PeerInfo.Peer != peer {
+	inspection, err := c.Update(ctx, localapi.UpdateRequest{Schema: localapi.UpdateSchema, Action: "INSPECT", Peer: v.Peer})
+	if err != nil || inspection.Code != "peer_status" || inspection.PeerInfo == nil || inspection.PeerInfo.Peer != v.Peer {
 		v.Code = "peer_status_unavailable"
 		return v
 	}
-	projectUpdateInspection(&v, *inspection.PeerInfo)
-	return v
+	return projectUpdateInspection(v, *inspection.PeerInfo)
 }
 
 func updatePermission(allowed []string, peer string) string {
@@ -179,7 +215,7 @@ func safeUpdateBuild(build string) string {
 	if build == "development" {
 		return build
 	}
-	if len(build) != 40 && len(build) != 64 {
+	if len(build) != updateBuildSHA1HexLength && len(build) != updateBuildSHA256HexLength {
 		return ""
 	}
 	if _, err := hex.DecodeString(build); err != nil {
@@ -187,20 +223,21 @@ func safeUpdateBuild(build string) string {
 	}
 	return strings.ToLower(build)
 }
-func setLocalUpdateVersion(v *UpdateSettingsSnapshot, r localapi.RuntimeInfo) {
-	if r.Generation < 1 || r.Generation > 1000000 {
-		return
+func withLocalUpdateVersion(v UpdateSettingsSnapshot, r localapi.RuntimeInfo) UpdateSettingsSnapshot {
+	if r.Generation < updateMinLocalGeneration || r.Generation > updateMaxGeneration {
+		return v
 	}
 	v.LocalGeneration = r.Generation
 	v.LocalBuild = safeUpdateBuild(r.Build)
+	return v
 }
-func projectUpdateInspection(v *UpdateSettingsSnapshot, p peerupdate.PeerInspection) {
+func projectUpdateInspection(v UpdateSettingsSnapshot, p peerupdate.PeerInspection) UpdateSettingsSnapshot {
 	if p.State == "STALE" {
 		v.PeerState = "STALE"
-		return
+		return v
 	}
-	if p.State != "ONLINE" || p.Generation < 21 || p.Generation > 1000000 {
-		return
+	if p.State != "ONLINE" || p.Generation < updateMinPeerGeneration || p.Generation > updateMaxGeneration {
+		return v
 	}
 	v.PeerState = "ONLINE"
 	v.PeerGeneration = p.Generation
@@ -210,7 +247,7 @@ func projectUpdateInspection(v *UpdateSettingsSnapshot, p peerupdate.PeerInspect
 		v.RemotePermission = "ALLOWED"
 	}
 	if v.LocalGeneration == 0 {
-		return
+		return v
 	}
 	switch {
 	case v.LocalGeneration > p.Generation:
@@ -223,4 +260,5 @@ func projectUpdateInspection(v *UpdateSettingsSnapshot, p peerupdate.PeerInspect
 	default:
 		v.Comparison = "DIFFERENT_BUILD"
 	}
+	return v
 }
