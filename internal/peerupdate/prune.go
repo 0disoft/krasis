@@ -160,22 +160,31 @@ func (m *Manager) pruneFolders(folders []pruneFolder, keep []string, active stri
 	return removed, failures
 }
 
-// planPruneFolders receives newest-first metadata and does no I/O or mutation.
+// planPruneFolders receives newest-first metadata with validated lowercase hex
+// folder IDs from collectPruneFolders and does no I/O or mutation.
 func planPruneFolders(folders []pruneFolder, keep []string, active, base string, now time.Time) []string {
-	protected := make([]string, 0, len(keep)+1)
+	protected := make(map[string]struct{}, len(keep)+1)
+	protect := func(path string) {
+		name := strings.ToLower(filepath.Base(path))
+		// Collected IDs contain only lowercase hex. Compare the complete path
+		// once per protection hint so EqualFold's Unicode rules and the parent
+		// directory still decide whether that ID belongs to this stage root.
+		if strings.EqualFold(path, filepath.Join(base, name)) {
+			protected[name] = struct{}{}
+		}
+	}
 	for _, path := range keep {
-		protected = append(protected, filepath.Clean(path))
+		protect(filepath.Clean(path))
 	}
 	if active != "" {
-		protected = append(protected, active)
+		protect(active)
 	}
 	var names []string
 	for i, folder := range folders {
 		if i < pruneNewestToKeep || now.Sub(folder.at) < pruneRetentionAge {
 			continue
 		}
-		path := filepath.Join(base, folder.name)
-		if slices.ContainsFunc(protected, func(p string) bool { return strings.EqualFold(p, path) }) {
+		if _, found := protected[folder.name]; found {
 			continue
 		}
 		names = append(names, folder.name)
