@@ -35,23 +35,14 @@ type productConnection struct {
 }
 
 func prepareProductConnection(identities *productidentity.Store, trust *truststore.Store, alias string, selected ...string) (productConnection, error) {
-	profile, err := trust.Connection(alias)
+	profile, record, err := trust.ConnectionWithPeer(alias)
 	if err != nil {
 		return productConnection{}, err
 	}
 	if len(selected) > 0 && selected[0] != "" && profile.Fingerprint != selected[0] {
 		return productConnection{}, errors.New("selected peer changed")
 	}
-	document, err := trust.List()
-	if err != nil {
-		return productConnection{}, err
-	}
-	var peer transport.AuthenticatedPeerContext
-	for _, record := range document.Peers {
-		if record.Fingerprint == profile.Fingerprint && record.RevokedAt == nil {
-			peer = transport.AuthenticatedPeerContext{CertificateSHA256: record.Fingerprint, Role: record.Role}
-		}
-	}
+	peer := transport.AuthenticatedPeerContext{CertificateSHA256: record.Fingerprint, Role: record.Role}
 	leaf, err := trust.PeerKeyAnchor(peer, time.Now())
 	if err != nil {
 		return productConnection{}, err

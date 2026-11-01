@@ -172,19 +172,28 @@ func (store *Store) setConnection(alias, fingerprint string, settings Connection
 }
 
 func (store *Store) Connection(alias string) (ConnectionProfile, error) {
+	profile, _, err := store.ConnectionWithPeer(alias)
+	return profile, err
+}
+
+// ConnectionWithPeer returns the profile and the peer already resolved under
+// the same shared lock. It avoids a second full-store read just to recover the
+// peer's role; subsequent certificate/permission checks must still use live trust.
+func (store *Store) ConnectionWithPeer(alias string) (ConnectionProfile, PeerRecord, error) {
 	if store == nil {
-		return ConnectionProfile{}, errors.New("trust store is not initialized")
+		return ConnectionProfile{}, PeerRecord{}, errors.New("trust store is not initialized")
 	}
 	document, directory, release, err := store.openReadLocked()
 	if err != nil {
-		return ConnectionProfile{}, err
+		return ConnectionProfile{}, PeerRecord{}, err
 	}
 	defer release()
 	peer, err := resolveConnectionPeer(document, alias)
 	if err != nil {
-		return ConnectionProfile{}, err
+		return ConnectionProfile{}, PeerRecord{}, err
 	}
-	return readConnection(directory, peer.Fingerprint)
+	profile, err := readConnection(directory, peer.Fingerprint)
+	return profile, peer, err
 }
 
 func resolveConnectionPeer(document Document, alias string) (PeerRecord, error) {
