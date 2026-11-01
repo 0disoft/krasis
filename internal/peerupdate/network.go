@@ -171,25 +171,58 @@ func (m *Manager) Run(ctx context.Context, address, peer string, listener bool, 
 	}
 }
 
+type auxiliaryRequestLane uint8
+
+const (
+	auxiliaryBundleLane auxiliaryRequestLane = iota
+	auxiliaryControlLane
+	auxiliaryClipboardLane
+	auxiliaryClipboardStatusLane
+	auxiliaryDiagnosticLane
+	auxiliaryLaneCount
+)
+
+// Each independent lane admits one request without queuing another behind it.
+const auxiliaryLaneConcurrency = 1
+
+func auxiliaryLaneForPath(path string) auxiliaryRequestLane {
+	switch path {
+	case "/v1/app-open", peerConnectPath, "/v2/status":
+		return auxiliaryControlLane
+	case "/v1/clipboard":
+		return auxiliaryClipboardLane
+	case clipboardStatusPath:
+		return auxiliaryClipboardStatusLane
+	case "/v1/diagnostic-transfer", "/v1/diagnostic-request":
+		return auxiliaryDiagnosticLane
+	default:
+		return auxiliaryBundleLane
+	}
+}
+
+// Server.Close does not join handlers. Keep the root alive through authorization,
+// body reads, storage and callbacks, including when shutdown starts mid-request.
+func (m *Manager) admitAuxiliaryRequest() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.closed {
+		return false
+	}
+	m.workers.Add(1)
+	return true
+}
+
 func (m *Manager) handler(peer string, authorized func() bool) http.Handler {
-	gate := make(chan struct{}, 1)
-	controlGate := make(chan struct{}, 1)
-	clipboardGate := make(chan struct{}, 1)
-	clipboardStatusGate := make(chan struct{}, 1)
-	diagnosticGate := make(chan struct{}, 1)
+	var gates [auxiliaryLaneCount]chan struct{}
+	for i := range gates {
+		gates[i] = make(chan struct{}, auxiliaryLaneConcurrency)
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
-		// Server.Close interrupts sockets but does not join handlers. Admit
-		// each request under the manager's shutdown fence so its root outlives
-		// authorization, body reads and any final storage/callback work.
-		m.mu.Lock()
-		if m.closed {
-			m.mu.Unlock()
+		if !m.admitAuxiliaryRequest() {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
-		m.workers.Add(1)
-		m.mu.Unlock()
 		defer m.workers.Done()
 		// TLS config verifies the one pinned certificate. Recheck current trust
 		// on every request, not just the handshake. Input state is independent.
@@ -197,16 +230,7 @@ func (m *Manager) handler(peer string, authorized func() bool) http.Handler {
 			w.WriteHeader(http.StatusForbidden)
 			return
 		}
-		requestGate := gate
-		if r.URL.Path == "/v1/app-open" || r.URL.Path == peerConnectPath || r.URL.Path == "/v2/status" {
-			requestGate = controlGate
-		} else if r.URL.Path == "/v1/clipboard" {
-			requestGate = clipboardGate
-		} else if r.URL.Path == clipboardStatusPath {
-			requestGate = clipboardStatusGate
-		} else if r.URL.Path == "/v1/diagnostic-transfer" || r.URL.Path == "/v1/diagnostic-request" {
-			requestGate = diagnosticGate
-		}
+		requestGate := gates[auxiliaryLaneForPath(r.URL.Path)]
 		select {
 		case requestGate <- struct{}{}:
 			defer func() { <-requestGate }()
@@ -218,84 +242,112 @@ func (m *Manager) handler(peer string, authorized func() bool) http.Handler {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		switch {
-		case r.URL.Path == peerConnectPath:
-			m.peerConnectHTTP(w, r, peer, authorized)
-		case r.URL.Path == clipboardStatusPath:
-			m.clipboardStatusHTTP(w, r, peer, authorized)
-		case r.URL.Path == "/v1/app-open":
-			m.appOpenHTTP(w, r, peer, authorized)
-		case r.URL.Path == "/v1/clipboard":
-			m.clipboardHTTP(w, r, peer, authorized)
-		case r.URL.Path == "/v1/diagnostic-transfer":
-			m.diagnosticHTTP(w, r, peer, authorized)
-		case r.URL.Path == "/v1/diagnostic-request":
-			m.diagnosticRequestHTTP(w, r, peer, authorized)
-		case r.URL.Path == "/v2/status" && r.Method == http.MethodPost:
-			if r.Header.Get("Content-Type") != "application/json" {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-			info, err := readPeerInfo(r.Body)
-			if err != nil {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-			m.observePeer(peer, info)
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(m.info(peer))
-		case r.URL.Path == "/v1/bundle" && r.Method == http.MethodGet:
-			if r.ContentLength != 0 {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-			offer := m.offered(peer)
-			if offer == nil {
-				w.WriteHeader(http.StatusNoContent)
-				return
-			}
-			defer offer.Close()
-			w.Header().Set("Content-Type", "application/zip")
-			w.Header().Set("X-Krasis-ID", offer.id)
-			w.Header().Set("X-Krasis-SHA256", offer.hash)
-			w.Header().Set("Content-Length", strconv.FormatInt(offer.size, 10))
-			progress := &progressReader{Reader: offer.reader, update: func(n int64) { m.progress(peer, offer.id, "SENDING", n, offer.size) }}
-			_, _ = io.Copy(w, progress)
-		case r.URL.Path == "/v1/bundle" && r.Method == http.MethodPost:
-			if r.Header.Get("Content-Type") != "application/zip" {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-			err := m.receive(peer, r.Header.Get("X-Krasis-ID"), r.Header.Get("X-Krasis-SHA256"), r.Body, authorized)
-			if err != nil {
-				w.Header().Set("X-Krasis-Result", FailureCode(err))
-			}
-			if errors.Is(err, ErrDenied) {
-				w.WriteHeader(http.StatusForbidden)
-			} else if errors.Is(err, ErrBusy) {
-				w.WriteHeader(http.StatusConflict)
-			} else if err != nil {
-				w.WriteHeader(http.StatusUnprocessableEntity)
-			} else {
-				w.WriteHeader(http.StatusOK)
-				if http.NewResponseController(w).Flush() == nil && authorized() {
-					m.ready(r.Header.Get("X-Krasis-ID"))
-				}
-			}
-		case r.URL.Path == "/v1/receipt" && r.Method == http.MethodPost:
-			if r.ContentLength != 0 {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-			result := r.Header.Get("X-Krasis-Result")
-			if result != wireResult(result) {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-			m.sent(r.Header.Get("X-Krasis-ID"), result)
-			w.WriteHeader(http.StatusOK)
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
+		m.serveAuxiliaryRequest(w, r, peer, authorized)
 	})
+}
+
+// Admission, live trust, lane availability and query validation precede dispatch.
+func (m *Manager) serveAuxiliaryRequest(w http.ResponseWriter, r *http.Request, peer string, authorized func() bool) {
+	switch {
+	case r.URL.Path == peerConnectPath:
+		m.peerConnectHTTP(w, r, peer, authorized)
+	case r.URL.Path == clipboardStatusPath:
+		m.clipboardStatusHTTP(w, r, peer, authorized)
+	case r.URL.Path == "/v1/app-open":
+		m.appOpenHTTP(w, r, peer, authorized)
+	case r.URL.Path == "/v1/clipboard":
+		m.clipboardHTTP(w, r, peer, authorized)
+	case r.URL.Path == "/v1/diagnostic-transfer":
+		m.diagnosticHTTP(w, r, peer, authorized)
+	case r.URL.Path == "/v1/diagnostic-request":
+		m.diagnosticRequestHTTP(w, r, peer, authorized)
+	case r.URL.Path == "/v2/status" && r.Method == http.MethodPost:
+		m.statusHTTP(w, r, peer)
+	case r.URL.Path == "/v1/bundle" && r.Method == http.MethodGet:
+		m.bundleHTTP(w, r, peer)
+	case r.URL.Path == "/v1/bundle" && r.Method == http.MethodPost:
+		m.receiveBundleHTTP(w, r, peer, authorized)
+	case r.URL.Path == "/v1/receipt" && r.Method == http.MethodPost:
+		m.receiptHTTP(w, r)
+	default:
+		w.WriteHeader(http.StatusNotFound)
+	}
+}
+
+func (m *Manager) statusHTTP(w http.ResponseWriter, r *http.Request, peer string) {
+	if r.Header.Get("Content-Type") != "application/json" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	info, err := readPeerInfo(r.Body)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	m.observePeer(peer, info)
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(m.info(peer))
+}
+
+func (m *Manager) bundleHTTP(w http.ResponseWriter, r *http.Request, peer string) {
+	if r.ContentLength != 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	offer := m.offered(peer)
+	if offer == nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	defer offer.Close()
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("X-Krasis-ID", offer.id)
+	w.Header().Set("X-Krasis-SHA256", offer.hash)
+	w.Header().Set("Content-Length", strconv.FormatInt(offer.size, 10))
+	progress := &progressReader{Reader: offer.reader, update: func(n int64) { m.progress(peer, offer.id, "SENDING", n, offer.size) }}
+	_, _ = io.Copy(w, progress)
+}
+
+func bundleReceiveHTTPStatus(err error) int {
+	switch {
+	case errors.Is(err, ErrDenied):
+		return http.StatusForbidden
+	case errors.Is(err, ErrBusy):
+		return http.StatusConflict
+	case err != nil:
+		return http.StatusUnprocessableEntity
+	default:
+		return http.StatusOK
+	}
+}
+
+func (m *Manager) receiveBundleHTTP(w http.ResponseWriter, r *http.Request, peer string, authorized func() bool) {
+	if r.Header.Get("Content-Type") != "application/zip" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	err := m.receive(peer, r.Header.Get("X-Krasis-ID"), r.Header.Get("X-Krasis-SHA256"), r.Body, authorized)
+	if err != nil {
+		w.Header().Set("X-Krasis-Result", FailureCode(err))
+		w.WriteHeader(bundleReceiveHTTPStatus(err))
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	if http.NewResponseController(w).Flush() == nil && authorized() {
+		m.ready(r.Header.Get("X-Krasis-ID"))
+	}
+}
+
+func (m *Manager) receiptHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.ContentLength != 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	result := r.Header.Get("X-Krasis-Result")
+	if result != wireResult(result) {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	m.sent(r.Header.Get("X-Krasis-ID"), result)
+	w.WriteHeader(http.StatusOK)
 }
