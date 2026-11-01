@@ -1,0 +1,41 @@
+{
+  "schema": "krasis.runtime-trace-observation/v1",
+  "generation": 509,
+  "revision": "dffd528245c536c073c4aec40d81ff03756d50e5",
+  "pairedCollection": "8c0dde1bcfa23775fced60c09c6115d0",
+  "installation": {
+    "A": "Verified g509 UI, agent and protected installation; service RUNNING; paired input health READY.",
+    "B": "Update request 078106faeb63b5c3e8f8dc68bd1e2ea4 confirmed UPDATED with exact generation/revision; paired input health and service READY.",
+    "connection": "Both devices logged CONNECTED after replacement.",
+    "recovery": "Both installers reported recovery not_needed."
+  },
+  "trace": {
+    "device": "A",
+    "sha256": "143cb85cde2306e8b83be0ad3cc347d946befbd2d17d3c95d9e65c5cf8ff8e7d",
+    "event": "runtime_trace_sample_saved, not a terminal failure trace",
+    "savedAt": "2026-11-01T09:48:17.2578544Z",
+    "parser": "Go tool trace -d=parsed; same-process trace event timestamps only",
+    "range": "stop-the-world (GC sweep termination)",
+    "beginNanoseconds": 423685994866601,
+    "endNanoseconds": 423688006050204,
+    "rangeMilliseconds": 2011.183603,
+    "triggerStack": "peerupdate.Manager.Prepare -> updatebundle.ReadStaged -> ZIP/flate allocation",
+    "lastProcessor": {
+      "processor": 11,
+      "goroutine": 35,
+      "preemptedNanoseconds": 423687989573083,
+      "idleNanoseconds": 423688005168023,
+      "stack": "runtime.traceAdvance -> traceStackTable.dump -> dumpStacksRec -> makeTraceFrames -> Frames.Next -> funcline1 -> funcfile"
+    },
+    "otherStopTheWorldRangesMilliseconds": [27.607985, 8.841963, 3.334821]
+  },
+  "interpretation": "A long runtime stop-the-world interval is directly observed during update preparation with flight recording enabled. The final processor to stop was processing trace stack symbols. This is an instrumentation confound, not evidence that update preparation or tracing caused the earlier untraced g508 crossing recurrence. The trace proves neither a 2s heap scan nor a Windows/kernel root cause.",
+  "action": "Retained the local trace and relaunched A with KRASIS_RUNTIME_TRACE unset before the physical crossing comparison. The new A run has no runtime_trace_enabled event. Do not ship tracing enabled by default or add a speculative runtime patch from this observation.",
+  "afterTraceDisabled": {
+    "pairedCollection": "e3b69b05c4f15d231206708e17143ce0",
+    "A": "g509, input health and protected service READY; CONNECTING, listening for B.",
+    "B": "g509, input health READY; peer_disconnect_requested followed A installer shutdown. A manual B Connect action is pending because the authenticated remote management contract supports opening its UI but not starting a connection.",
+    "physicalCrossingValidation": "Pending reconnection; do not interpret the installer-initiated disconnect as a new crossing fault or claim recurrence resolved."
+  },
+  "remaining": "Fresh physical A/B crossings and longer idle observation are required to verify recurrence and latency after the boundary backpressure fix."
+}
