@@ -3,6 +3,7 @@ package peerupdate
 import (
 	"errors"
 	"io"
+	"io/fs"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -12,6 +13,18 @@ import (
 	"github.com/0disoft/krasis/internal/releaseupdate"
 	"github.com/0disoft/krasis/internal/securefs"
 )
+
+const (
+	pruneEntryLimit   = 1024
+	pruneNewestToKeep = 2
+	pruneRetentionAge = 24 * time.Hour
+	pruneBundleIDSize = 32
+)
+
+type pruneFolder struct {
+	name string
+	at   time.Time
+}
 
 // Prune runs before the agent exposes management endpoints. Shared UI stages
 // younger than a day are retained even when they have not published a receipt.
@@ -26,7 +39,10 @@ func (m *Manager) Prune(base string) (int, error) {
 			return nil, err
 		}
 		releases, err := releaseupdate.CachedDirectories(base)
-		return append(append(live, recovery...), releases...), err
+		keep := make([]string, 0, len(live)+len(recovery)+len(releases))
+		keep = append(keep, live...)
+		keep = append(keep, recovery...)
+		return append(keep, releases...), err
 	})
 }
 
@@ -44,76 +60,96 @@ func (m *Manager) prune(now time.Time, protected func() ([]string, error)) (int,
 	if len(m.cancels) != 0 {
 		return 0, ErrBusy
 	}
+	active := ""
 	if m.status.State == "READY" || m.status.State == "STAGED" || m.status.State == "APPLYING" {
-		keep = append(keep, filepath.Join(m.path, m.status.ID))
+		active = filepath.Join(m.path, m.status.ID)
 	}
-	f, err := m.root.Open(".")
+	entries, err := m.readPruneEntries()
 	if err != nil {
 		return 0, err
 	}
-	entries, readErr := f.ReadDir(1025)
+	folders, removed, failures, err := m.collectPruneFolders(entries, now)
+	if err != nil {
+		return 0, err
+	}
+	n, err := m.pruneFolders(folders, keep, active, now)
+	return removed + n, errors.Join(failures, err)
+}
+
+func (m *Manager) readPruneEntries() ([]fs.DirEntry, error) {
+	f, err := m.root.Open(".")
+	if err != nil {
+		return nil, err
+	}
+	entries, readErr := f.ReadDir(pruneEntryLimit + 1)
 	closeErr := f.Close()
 	if readErr != nil && !errors.Is(readErr, io.EOF) {
-		return 0, readErr
+		return nil, readErr
 	}
 	if closeErr != nil {
-		return 0, closeErr
+		return nil, closeErr
 	}
-	if len(entries) > 1024 {
-		return 0, ErrStorage
+	if len(entries) > pruneEntryLimit {
+		return nil, ErrStorage
 	}
-	type candidate struct {
-		name string
-		at   time.Time
-	}
-	var folders []candidate
-	removed := 0
-	var failures error
+	return entries, nil
+}
+
+// Archive errors accumulate; an unreadable stage aborts before any stage deletion.
+func (m *Manager) collectPruneFolders(entries []fs.DirEntry, now time.Time) (folders []pruneFolder, removed int, failures, fatal error) {
 	for _, entry := range entries {
 		name := entry.Name()
-		if strings.HasPrefix(name, "archive-") && strings.HasSuffix(name, ".zip") && validID(strings.TrimSuffix(strings.TrimPrefix(name, "archive-"), ".zip"), 32) && entry.Type().IsRegular() {
-			info, err := entry.Info()
-			if err != nil {
-				failures = errors.Join(failures, err)
-				continue
-			}
-			if now.Sub(info.ModTime()) >= 24*time.Hour {
-				if err := m.root.Remove(name); err != nil {
-					failures = errors.Join(failures, err)
-				} else {
-					removed++
-				}
-			}
+		if strings.HasPrefix(name, "archive-") && strings.HasSuffix(name, ".zip") && validID(strings.TrimSuffix(strings.TrimPrefix(name, "archive-"), ".zip"), pruneBundleIDSize) && entry.Type().IsRegular() {
+			n, err := m.pruneArchive(entry, now)
+			removed += n
+			failures = errors.Join(failures, err)
 			continue
 		}
-		if !validID(entry.Name(), 32) || !entry.IsDir() {
+		if !validID(name, pruneBundleIDSize) || !entry.IsDir() {
 			continue
 		}
 		info, err := entry.Info()
 		if err != nil {
-			return 0, err
+			return nil, 0, nil, err
 		}
-		folders = append(folders, candidate{entry.Name(), info.ModTime()})
+		folders = append(folders, pruneFolder{name, info.ModTime()})
 	}
-	slices.SortFunc(folders, func(a, b candidate) int {
+	// Sort only the locally collected metadata, never a caller-owned slice.
+	slices.SortFunc(folders, func(a, b pruneFolder) int {
 		if c := b.at.Compare(a.at); c != 0 {
 			return c
 		}
 		return strings.Compare(a.name, b.name)
 	})
-	for i, folder := range folders {
-		path := filepath.Join(m.path, folder.name)
-		if i < 2 || now.Sub(folder.at) < 24*time.Hour || slices.ContainsFunc(keep, func(p string) bool { return strings.EqualFold(filepath.Clean(p), path) }) {
-			continue
-		}
+	return folders, removed, failures, nil
+}
+
+func (m *Manager) pruneArchive(entry fs.DirEntry, now time.Time) (int, error) {
+	info, err := entry.Info()
+	if err != nil {
+		return 0, err
+	}
+	if now.Sub(info.ModTime()) < pruneRetentionAge {
+		return 0, nil
+	}
+	if err := m.root.Remove(entry.Name()); err != nil {
+		return 0, err
+	}
+	return 1, nil
+}
+
+func (m *Manager) pruneFolders(folders []pruneFolder, keep []string, active string, now time.Time) (int, error) {
+	removed := 0
+	var failures error
+	for _, name := range planPruneFolders(folders, keep, active, m.path, now) {
 		// Reject junctions/reparse points; deletion itself remains root-relative.
-		guard, err := securefs.OpenReadDirectory(path)
+		guard, err := securefs.OpenReadDirectory(filepath.Join(m.path, name))
 		if err != nil {
 			failures = errors.Join(failures, err)
 			continue
 		}
 		if err = guard.Close(); err == nil {
-			err = m.root.RemoveAll(folder.name)
+			err = m.root.RemoveAll(name)
 		}
 		if err != nil {
 			failures = errors.Join(failures, err)
@@ -122,4 +158,27 @@ func (m *Manager) prune(now time.Time, protected func() ([]string, error)) (int,
 		}
 	}
 	return removed, failures
+}
+
+// planPruneFolders receives newest-first metadata and does no I/O or mutation.
+func planPruneFolders(folders []pruneFolder, keep []string, active, base string, now time.Time) []string {
+	protected := make([]string, 0, len(keep)+1)
+	for _, path := range keep {
+		protected = append(protected, filepath.Clean(path))
+	}
+	if active != "" {
+		protected = append(protected, active)
+	}
+	var names []string
+	for i, folder := range folders {
+		if i < pruneNewestToKeep || now.Sub(folder.at) < pruneRetentionAge {
+			continue
+		}
+		path := filepath.Join(base, folder.name)
+		if slices.ContainsFunc(protected, func(p string) bool { return strings.EqualFold(p, path) }) {
+			continue
+		}
+		names = append(names, folder.name)
+	}
+	return names
 }
