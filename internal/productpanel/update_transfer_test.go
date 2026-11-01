@@ -10,6 +10,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -26,10 +28,27 @@ type transferClient struct {
 	sentDir    string
 	failSend   bool
 	rejectSend bool
+	calls      []string
+	sendReply  *localapi.UpdateResult
+	beforeSend func()
+}
+
+func (c *transferClient) Trust(ctx context.Context) (localapi.Trust, error) {
+	c.calls = append(c.calls, "TRUST")
+	return c.settingsClient.Trust(ctx)
+}
+
+func (c *transferClient) Runtime(ctx context.Context) (localapi.RuntimeInfo, error) {
+	c.calls = append(c.calls, "RUNTIME")
+	return c.settingsClient.Runtime(ctx)
 }
 
 func (c *transferClient) Update(ctx context.Context, r localapi.UpdateRequest) (localapi.UpdateResult, error) {
+	c.calls = append(c.calls, r.Action)
 	if r.Action == "SEND" {
+		if c.beforeSend != nil {
+			c.beforeSend()
+		}
 		c.sent++
 		c.sentDir = r.Directory
 		if c.failSend {
@@ -37,6 +56,9 @@ func (c *transferClient) Update(ctx context.Context, r localapi.UpdateRequest) (
 		}
 		if c.rejectSend {
 			return localapi.UpdateResult{Code: "rejected", Status: c.status}, nil
+		}
+		if c.sendReply != nil {
+			return *c.sendReply, nil
 		}
 		c.status = peerupdate.Status{Peer: r.Peer, ID: strings.Repeat("d", 32), State: "QUEUED", Generation: 34, Revision: strings.Repeat("c", 40), Total: 100}
 		return localapi.UpdateResult{Code: "queued", Status: c.status}, nil
@@ -52,6 +74,72 @@ func transferTestBridge() (*UpdateSettingsBridge, *transferClient, string) {
 	f := &transferClient{settingsClient: c, status: peerupdate.Status{State: "IDLE"}}
 	return NewUpdateTransferBridge(context.Background(), func() (UpdateSettingsClient, error) { return f, nil }, "native/bundle", "native/transition", "native/probe-transition", "native/installer-transition"), f, peer
 }
+
+func TestTransferSendPreservesCallOrderAndState(t *testing.T) {
+	for _, tc := range []struct {
+		name, want, calls, stored string
+		setup                     func(*UpdateSettingsBridge, *transferClient, string)
+	}{
+		{"revoked", "STALE_PEER", "TRUST", "", func(b *UpdateSettingsBridge, c *transferClient, peer string) { c.peers[0].Revoked = true }},
+		{"runtime missing", "UNAVAILABLE", "TRUST RUNTIME", "", func(b *UpdateSettingsBridge, c *transferClient, peer string) { c.missingRuntime = true }},
+		{"agent mismatch", "AGENT_MISMATCH", "TRUST RUNTIME", "", func(b *UpdateSettingsBridge, c *transferClient, peer string) { c.runtime.Generation-- }},
+		{"bundle missing", "BUNDLE_MISSING", "TRUST RUNTIME STATUS", "", func(b *UpdateSettingsBridge, c *transferClient, peer string) {
+			b.bundleDirectory = ""
+			c.status.State = "SENDING"
+		}},
+		{"busy", "PEER_BUSY", "TRUST RUNTIME STATUS", "", func(b *UpdateSettingsBridge, c *transferClient, peer string) { c.status.State = "SENDING" }},
+		{"inspection missing", "PEER_UNREACHABLE", "TRUST RUNTIME STATUS INSPECT", "", func(b *UpdateSettingsBridge, c *transferClient, peer string) { c.legacy = true }},
+		{"same build", "SAME_VERSION", "TRUST RUNTIME STATUS INSPECT", "", func(b *UpdateSettingsBridge, c *transferClient, peer string) {
+			c.info.Generation = c.runtime.Generation
+		}},
+		{"transition missing", "TRANSITION_REQUIRED", "TRUST RUNTIME STATUS INSPECT", "", func(b *UpdateSettingsBridge, c *transferClient, peer string) { b.transitionDirectory = "" }},
+		{"lost reply", "TRANSFER_UNKNOWN", "TRUST RUNTIME STATUS INSPECT SEND", "TRANSFER_UNKNOWN", func(b *UpdateSettingsBridge, c *transferClient, peer string) { c.failSend = true }},
+		{"rejected", "REJECTED", "TRUST RUNTIME STATUS INSPECT SEND", "REJECTED", func(b *UpdateSettingsBridge, c *transferClient, peer string) { c.rejectSend = true }},
+		{"invalid job", "TRANSFER_UNKNOWN", "TRUST RUNTIME STATUS INSPECT SEND", "TRANSFER_UNKNOWN", func(b *UpdateSettingsBridge, c *transferClient, peer string) {
+			c.sendReply = &localapi.UpdateResult{Code: "queued", Status: peerupdate.Status{Peer: peer, ID: "bad"}}
+		}},
+		{"own bundle failure", "INVALID_BUNDLE", "TRUST RUNTIME STATUS INSPECT SEND", "INVALID_BUNDLE", func(b *UpdateSettingsBridge, c *transferClient, peer string) {
+			c.sendReply = &localapi.UpdateResult{Code: "bundle_failed", Status: peerupdate.Status{Peer: peer, State: "INVALID_BUNDLE"}}
+		}},
+		{"foreign bundle failure", "REJECTED", "TRUST RUNTIME STATUS INSPECT SEND", "REJECTED", func(b *UpdateSettingsBridge, c *transferClient, peer string) {
+			c.sendReply = &localapi.UpdateResult{Code: "bundle_failed", Status: peerupdate.Status{Peer: "other", State: "INVALID_BUNDLE"}}
+		}},
+		{"agent replaced", "AGENT_CHANGED", "TRUST RUNTIME STATUS INSPECT SEND RUNTIME", "QUEUED", func(b *UpdateSettingsBridge, c *transferClient, peer string) { c.changed = true }},
+		{"queued", "QUEUED", "TRUST RUNTIME STATUS INSPECT SEND RUNTIME", "QUEUED", func(b *UpdateSettingsBridge, c *transferClient, peer string) {}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			b, c, peer := transferTestBridge()
+			tc.setup(b, c, peer)
+			c.beforeSend = func() {
+				if b.transfer.State != "TRANSFER_UNKNOWN" || b.transferInstance != c.runtime.Instance {
+					t.Fatal("send began without recording uncertainty and instance")
+				}
+				if b.mu.TryLock() {
+					b.mu.Unlock()
+					t.Fatal("send escaped the bridge lock")
+				}
+			}
+			got := b.Send(peer)
+			if got.State != tc.want || b.transfer.State != tc.stored || strings.Join(c.calls, " ") != tc.calls {
+				t.Fatalf("state=%s stored=%s calls=%v", got.State, b.transfer.State, c.calls)
+			}
+		})
+	}
+}
+
+func TestTransferSendProjectionPreservesInput(t *testing.T) {
+	peer := strings.Repeat("a", 64)
+	result := localapi.UpdateResult{Code: "queued", Status: peerupdate.Status{
+		Peer: peer, ID: strings.Repeat("d", 32), State: "QUEUED", Allowed: []string{peer},
+	}}
+	before := result
+	before.Status.Allowed = slices.Clone(result.Status.Allowed)
+	got, confirm := projectTransferSend(peer, result)
+	if got.State != "QUEUED" || !confirm || !reflect.DeepEqual(result, before) {
+		t.Fatalf("projection=%+v confirm=%v mutated=%v", got, confirm, !reflect.DeepEqual(result, before))
+	}
+}
+
 func TestUpdateTransferRefusesMismatchedResidentAgent(t *testing.T) {
 	b, c, peer := transferTestBridge()
 	c.runtime.Generation--

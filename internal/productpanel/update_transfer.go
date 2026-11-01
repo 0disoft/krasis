@@ -12,6 +12,18 @@ import (
 
 const UpdateTransferSchema = "krasis.update-transfer/v1"
 
+const (
+	transferCallTimeout         = 15 * time.Second
+	transferPeerHexLength       = 64
+	transferIDHexLength         = 32
+	transferBuildHexLength      = 40
+	transferMinGeneration       = 21
+	transferMaxGeneration       = 1000000
+	transferLegacyGeneration    = 75
+	transferProbeGeneration     = 90
+	transferProbeSendGeneration = 91
+)
+
 type UpdateTransferSnapshot struct {
 	Schema     string `json:"schema"`
 	Peer       string `json:"peer"`
@@ -54,7 +66,7 @@ func updateTransferActive(state string) bool {
 
 func (b *UpdateSettingsBridge) transferCall(peer string, send bool) UpdateTransferSnapshot {
 	fail := func(state string) UpdateTransferSnapshot { return transferSnapshot(peer, state) }
-	if len(peer) != 64 {
+	if len(peer) != transferPeerHexLength {
 		return fail("INVALID_PEER")
 	}
 	if _, err := hex.DecodeString(peer); err != nil {
@@ -67,15 +79,19 @@ func (b *UpdateSettingsBridge) transferCall(peer string, send bool) UpdateTransf
 		return fail("BUSY")
 	}
 	defer b.mu.Unlock()
-	ctx, cancel := context.WithTimeout(b.ctx, 15*time.Second)
+	ctx, cancel := context.WithTimeout(b.ctx, transferCallTimeout)
 	defer cancel()
 	c, err := b.open()
 	if err != nil || c == nil {
 		return fail("UNAVAILABLE")
 	}
+	return b.transferWithClient(ctx, c, peer, send)
+}
+
+func transferRuntime(ctx context.Context, c UpdateSettingsClient, peer string, send bool) (localapi.RuntimeInfo, string) {
 	trust, err := c.Trust(ctx)
 	if err != nil {
-		return fail("UNAVAILABLE")
+		return localapi.RuntimeInfo{}, "UNAVAILABLE"
 	}
 	trusted := false
 	for _, p := range trust.Peers {
@@ -84,14 +100,24 @@ func (b *UpdateSettingsBridge) transferCall(peer string, send bool) UpdateTransf
 		}
 	}
 	if !trusted {
-		return fail("STALE_PEER")
+		return localapi.RuntimeInfo{}, "STALE_PEER"
 	}
 	runtime, err := c.Runtime(ctx)
 	if err != nil || runtime.Instance == "" {
-		return fail("UNAVAILABLE")
+		return localapi.RuntimeInfo{}, "UNAVAILABLE"
 	}
 	if send && runtime.Generation != localapi.AgentGeneration {
-		return fail("AGENT_MISMATCH")
+		return localapi.RuntimeInfo{}, "AGENT_MISMATCH"
+	}
+	return runtime, ""
+}
+
+// The caller holds b.mu across admission, the request, and the instance recheck.
+func (b *UpdateSettingsBridge) transferWithClient(ctx context.Context, c UpdateSettingsClient, peer string, send bool) UpdateTransferSnapshot {
+	fail := func(state string) UpdateTransferSnapshot { return transferSnapshot(peer, state) }
+	runtime, state := transferRuntime(ctx, c, peer, send)
+	if state != "" {
+		return fail(state)
 	}
 	if !send && b.transfer.Peer != peer {
 		return fail("IDLE")
@@ -106,66 +132,99 @@ func (b *UpdateSettingsBridge) transferCall(peer string, send bool) UpdateTransf
 	if err != nil || result.Code != "ok" {
 		return fail("UNAVAILABLE")
 	}
-	if !send && b.transfer.ID == "" {
+	if send {
+		return b.sendTransfer(ctx, c, peer, runtime, result.Status)
+	}
+	return b.pollTransfer(ctx, c, peer, runtime, result.Status)
+}
+
+func (b *UpdateSettingsBridge) pollTransfer(ctx context.Context, c UpdateSettingsClient, peer string, runtime localapi.RuntimeInfo, status peerupdate.Status) UpdateTransferSnapshot {
+	if b.transfer.ID == "" {
 		inspection, err := c.Update(ctx, localapi.UpdateRequest{Schema: localapi.UpdateSchema, Action: "INSPECT", Peer: peer})
-		if err == nil && inspection.Code == "peer_status" && inspection.PeerInfo != nil && inspection.PeerInfo.Peer == peer && inspection.PeerInfo.State == "ONLINE" && peerBuildResult(runtime, inspection.PeerInfo.Generation, inspection.PeerInfo.Revision) == "SAME_VERSION" {
-			b.transfer = fail("SAME_VERSION")
+		if err == nil && transferInspectionMatches(inspection, peer) && peerBuildResult(runtime, inspection.PeerInfo.Generation, inspection.PeerInfo.Revision) == "SAME_VERSION" {
+			b.transfer = transferSnapshot(peer, "SAME_VERSION")
 		}
 		return b.transfer
 	}
-	if send {
-		if b.bundleDirectory == "" {
-			return fail("BUNDLE_MISSING")
-		}
-		if updateTransferActive(result.Status.State) {
-			return fail("PEER_BUSY")
-		}
-		inspection, err := c.Update(ctx, localapi.UpdateRequest{Schema: localapi.UpdateSchema, Action: "INSPECT", Peer: peer})
-		if err != nil || inspection.Code != "peer_status" || inspection.PeerInfo == nil || inspection.PeerInfo.Peer != peer || inspection.PeerInfo.State != "ONLINE" || inspection.PeerInfo.Generation < 21 || inspection.PeerInfo.Generation > 1000000 {
-			return fail("PEER_UNREACHABLE")
-		}
-		if state := peerBuildResult(runtime, inspection.PeerInfo.Generation, inspection.PeerInfo.Revision); state != "" {
-			return fail(state)
-		}
-		directory := b.transferDirectory(runtime.Generation, inspection.PeerInfo.Generation)
-		if directory == "" {
-			return fail("TRANSITION_REQUIRED")
-		}
-		b.transfer = fail("TRANSFER_UNKNOWN")
-		b.transferInstance = runtime.Instance
-		result, err = c.Update(ctx, localapi.UpdateRequest{Schema: localapi.UpdateSchema, Action: "SEND", Peer: peer, Directory: directory})
-		if err != nil {
-			return b.transfer
-		} // Never retry a request whose outcome is unknown.
-		if result.Code != "queued" {
-			b.transfer = fail("REJECTED")
-			if result.Code == "bundle_failed" && result.Status.Peer == peer {
-				b.transfer = projectTransfer(peer, result.Status, result.Status.State)
-			}
-			return b.transfer
-		}
-		if result.Status.Peer != peer || !validTransferID(result.Status.ID) {
-			return b.transfer
-		}
-		b.transfer = projectTransfer(peer, result.Status, result.Status.State)
-	} else {
-		if result.Status.Peer != peer || result.Status.ID != b.transfer.ID {
-			return fail("TRANSFER_UNKNOWN")
-		}
-		b.transfer = projectTransfer(peer, result.Status, result.Status.State)
+	if status.Peer != peer || status.ID != b.transfer.ID {
+		return transferSnapshot(peer, "TRANSFER_UNKNOWN")
 	}
+	b.transfer = projectTransfer(peer, status, status.State)
+	return b.confirmTransferRuntime(ctx, c, peer, runtime.Instance)
+}
+
+func (b *UpdateSettingsBridge) prepareTransferSend(ctx context.Context, c UpdateSettingsClient, peer string, runtime localapi.RuntimeInfo, status peerupdate.Status) (string, string) {
+	if b.bundleDirectory == "" {
+		return "", "BUNDLE_MISSING"
+	}
+	if updateTransferActive(status.State) {
+		return "", "PEER_BUSY"
+	}
+	inspection, err := c.Update(ctx, localapi.UpdateRequest{Schema: localapi.UpdateSchema, Action: "INSPECT", Peer: peer})
+	if err != nil || !transferInspectionMatches(inspection, peer) || inspection.PeerInfo.Generation < transferMinGeneration || inspection.PeerInfo.Generation > transferMaxGeneration {
+		return "", "PEER_UNREACHABLE"
+	}
+	if state := peerBuildResult(runtime, inspection.PeerInfo.Generation, inspection.PeerInfo.Revision); state != "" {
+		return "", state
+	}
+	directory := b.transferDirectory(runtime.Generation, inspection.PeerInfo.Generation)
+	if directory == "" {
+		return "", "TRANSITION_REQUIRED"
+	}
+	return directory, ""
+}
+
+func (b *UpdateSettingsBridge) sendTransfer(ctx context.Context, c UpdateSettingsClient, peer string, runtime localapi.RuntimeInfo, status peerupdate.Status) UpdateTransferSnapshot {
+	directory, state := b.prepareTransferSend(ctx, c, peer, runtime, status)
+	if state != "" {
+		return transferSnapshot(peer, state)
+	}
+	// Record uncertainty before I/O: a lost reply must never trigger a resend.
+	b.transfer = transferSnapshot(peer, "TRANSFER_UNKNOWN")
+	b.transferInstance = runtime.Instance
+	result, err := c.Update(ctx, localapi.UpdateRequest{Schema: localapi.UpdateSchema, Action: "SEND", Peer: peer, Directory: directory})
+	if err != nil {
+		return b.transfer
+	}
+	next, confirm := projectTransferSend(peer, result)
+	b.transfer = next
+	if !confirm {
+		return b.transfer
+	}
+	return b.confirmTransferRuntime(ctx, c, peer, runtime.Instance)
+}
+
+func (b *UpdateSettingsBridge) confirmTransferRuntime(ctx context.Context, c UpdateSettingsClient, peer, instance string) UpdateTransferSnapshot {
 	after, err := c.Runtime(ctx)
-	if err != nil || after.Instance != runtime.Instance {
-		return fail("AGENT_CHANGED")
+	if err != nil || after.Instance != instance {
+		return transferSnapshot(peer, "AGENT_CHANGED")
 	}
 	return b.transfer
 }
 
+func transferInspectionMatches(result localapi.UpdateResult, peer string) bool {
+	return result.Code == "peer_status" && result.PeerInfo != nil && result.PeerInfo.Peer == peer && result.PeerInfo.State == "ONLINE"
+}
+
+// projectTransferSend does not mutate result; confirm requests a runtime recheck.
+func projectTransferSend(peer string, result localapi.UpdateResult) (next UpdateTransferSnapshot, confirm bool) {
+	if result.Code == "bundle_failed" && result.Status.Peer == peer {
+		return projectTransfer(peer, result.Status, result.Status.State), false
+	}
+	if result.Code != "queued" {
+		return transferSnapshot(peer, "REJECTED"), false
+	}
+	if result.Status.Peer != peer || !validTransferID(result.Status.ID) {
+		return transferSnapshot(peer, "TRANSFER_UNKNOWN"), false
+	}
+	return projectTransfer(peer, result.Status, result.Status.State), true
+}
+
 func (b *UpdateSettingsBridge) transferDirectory(localGeneration, peerGeneration int) string {
-	if peerGeneration < 75 {
+	if peerGeneration < transferLegacyGeneration {
 		return b.transitionDirectory
 	}
-	if peerGeneration < 90 && localGeneration >= 91 {
+	if peerGeneration < transferProbeGeneration && localGeneration >= transferProbeSendGeneration {
 		return b.probeTransitionDirectory
 	}
 	if peerGeneration < updatebundle.InstallerLayoutGeneration && localGeneration >= updatebundle.InstallerBundleGeneration {
@@ -179,7 +238,7 @@ func peerBuildResult(local localapi.RuntimeInfo, generation int, revision string
 		return "PEER_NEWER"
 	}
 	localBuild, peerBuild := safeUpdateBuild(local.Build), safeUpdateBuild(revision)
-	if generation != local.Generation || len(localBuild) != 40 || len(peerBuild) != 40 {
+	if generation != local.Generation || len(localBuild) != transferBuildHexLength || len(peerBuild) != transferBuildHexLength {
 		return ""
 	}
 	if localBuild == peerBuild {
@@ -189,7 +248,7 @@ func peerBuildResult(local localapi.RuntimeInfo, generation int, revision string
 }
 
 func validTransferID(id string) bool {
-	if len(id) != 32 {
+	if len(id) != transferIDHexLength {
 		return false
 	}
 	_, err := hex.DecodeString(id)
@@ -204,11 +263,11 @@ func projectTransfer(peer string, s peerupdate.Status, state string) UpdateTrans
 	if validTransferID(s.ID) {
 		v.ID = s.ID
 	}
-	if s.Total > 0 && s.Total <= 96<<20 && s.Bytes >= 0 && s.Bytes <= s.Total {
+	if s.Total > 0 && s.Total <= updatebundle.MaxArchiveBytes && s.Bytes >= 0 && s.Bytes <= s.Total {
 		v.Bytes = s.Bytes
 		v.Total = s.Total
 	}
-	if s.Generation >= 21 && s.Generation <= 1000000 {
+	if s.Generation >= transferMinGeneration && s.Generation <= transferMaxGeneration {
 		v.Generation = s.Generation
 		v.Build = safeUpdateBuild(s.Revision)
 	}
