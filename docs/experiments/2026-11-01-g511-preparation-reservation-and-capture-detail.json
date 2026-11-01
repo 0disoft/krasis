@@ -1,0 +1,85 @@
+{
+  "schema": "krasis.preparation-reservation-and-capture-detail/v1",
+  "generation": 511,
+  "revision": "a298a834a1f5d8dcd99a6dc676c98c3ab1f72d10",
+  "sourceCommits": [
+    "8d2a56ef",
+    "a298a834"
+  ],
+  "baseline": "2026-11-01-g510-physical-crossing-review.json",
+  "changes": {
+    "B": "Single unbound reservation has a fixed 15s lifetime instead of 3s. Native construction still has 5s; the first bootstrap byte has a separate bounded idle context, followed by a fresh 5s complete-bootstrap/binding deadline. No timer renewal, authority reuse, periodic process spawn or skipped cleanup.",
+    "A": "Three exact bounded microsecond spans distinguish post-to-owner, foreground API request and subsequent verification. Fixed 64-byte activation ACK, original foreground span endpoint, exact reply matching and all authorization/focus/rollback behavior remain."
+  },
+  "validation": {
+    "goPackagesPassed": [
+      "inputworker",
+      "handoff",
+      "wininput",
+      "agent",
+      "localapi",
+      "peerupdate",
+      "residentagent",
+      "productcli"
+    ],
+    "frontendTestsPassed": 111,
+    "extraTests": "Focused owner-profiling, command-order and native message-loop cancellation regressions passed after isolating WM_QUIT to a private retiring test thread.",
+    "packageTransferTest": "TestWorkspaceUpdatePackage passed; 28908615 bytes, 8-file bundle verified.",
+    "setup": "Setup build and --verify passed; exact-build installations both report result 0.",
+    "gitDiffCheck": "Passed",
+    "remoteCI": "Not run; no push requested."
+  },
+  "update": {
+    "schemaVersion": "krasis.cli.update-wait/v1",
+    "peerAlias": "B",
+    "id": "b75f1d253d3737528a57531ac749a934",
+    "code": "updated",
+    "transferState": "UPDATED",
+    "generation": 511,
+    "revision": "a298a834a1f5d8dcd99a6dc676c98c3ab1f72d10",
+    "bytes": 28908615,
+    "total": 28908615
+  },
+  "remoteConnect": {
+    "schemaVersion": "krasis.cli.peer-connect/v1",
+    "code": "connected",
+    "peerAlias": "B",
+    "id": "f642adcac11d14d6391e66e312755401"
+  },
+  "pairedCollection": "7add5f40c0f7e554043cb54140060c49",
+  "sides": {
+    "A": {
+      "file": "support-request-7add5f40c0f7e554043cb54140060c49-local.json",
+      "sha256": "3c32e9a152d79190a84825e42055d446ad59b61472af3db79fd8edc61a6e6fe1",
+      "created": "2026-11-01T10:54:06Z",
+      "connectedAt": "2026-11-01T10:53:26.4960631Z",
+      "serviceStartedAt": "2026-11-01T10:52:42.7165471Z",
+      "inputHealth": "READY",
+      "service": "READY",
+      "installationResult": 0,
+      "installationRecovery": "not_needed",
+      "currentBuildProfiles": 0,
+      "runtimeTraceEvents": 0,
+      "postConnectionFailures": []
+    },
+    "B": {
+      "file": "support-request-7add5f40c0f7e554043cb54140060c49-peer-1aeff94249a3a7a76cfa2765948a731e4b57cc898da1ab79f1bd64fa2583e3f0.json",
+      "sha256": "50719438076159629a1ae56c795171f829ca72e123c6c676a2889503f2b77fa4",
+      "created": "2026-11-01T10:54:03Z",
+      "connectedAt": "2026-11-01T10:53:23.3402489Z",
+      "serviceStartedAt": "2026-11-01T10:53:17.4376268Z",
+      "inputHealth": "READY",
+      "service": "READY",
+      "installationResult": 0,
+      "installationRecovery": "not_needed",
+      "currentBuildProfiles": 0,
+      "runtimeTraceEvents": 0,
+      "postConnectionFailures": []
+    }
+  },
+  "limitations": [
+    "No new controlled physical-crossing latency improvement is claimed by installation or startup health. Await requested five-second-pause and rapid-crossing observations.",
+    "The 15s reservation is bounded: expiry or actual session/owner failure can still require construction and exact retirement before replacement. Maximum single-spare residency is twelve seconds longer.",
+    "A detailed timing is diagnostic only; the 160.287ms tail is not yet attributed to one Windows API. No skipped focus/authority verification is proposed."
+  ]
+}
