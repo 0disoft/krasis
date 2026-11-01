@@ -351,6 +351,10 @@ func (source *DialSource) Next(ctx context.Context) (Connection, error) {
 	if source == nil || source.address == "" || source.tlsConfig == nil || source.dialTimeout <= 0 {
 		return nil, errors.New("dial source is not initialized")
 	}
+	// TCP acceptance is not authentication. Keep both phases within one
+	// attempt budget so a silent TLS peer cannot retain a socket indefinitely.
+	ctx, cancel := context.WithTimeout(ctx, source.dialTimeout)
+	defer cancel()
 	dialer := net.Dialer{Timeout: source.dialTimeout}
 	started := time.Now()
 	connection, err := dialer.DialContext(ctx, "tcp", source.address)
