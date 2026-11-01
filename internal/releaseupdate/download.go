@@ -65,7 +65,7 @@ func CheckSigned(ctx context.Context, c *http.Client, key string) (Manifest, []b
 	if _, err := Verify(nil, key); errors.Is(err, ErrUnconfigured) {
 		return Manifest{}, nil, err
 	}
-	data, err := fetch(ctx, c, FeedURL, 16384)
+	data, err := readSignedMetadata(ctx, c)
 	if err != nil {
 		return Manifest{}, nil, err
 	}
