@@ -11,7 +11,9 @@ export function appOpenProgress(previous, status, expired) {
   }
   return {result, waiting};
 }
-export function createAppOpenBridge(binding, storage, clock = {wall:()=>Date.now(), elapsed:()=>performance.now()}) {
+export function createAppOpenBridge(binding, storage, clock = {wall:()=>Date.now(), elapsed:()=>performance.now()}, {
+  invoke = (peer, id) => binding.PeerAppOpen(peer, id),
+} = {}) {
   if(!storage){try{storage=globalThis.sessionStorage;}catch{}}
   const key=peer=>'krasis.app-open.'+peer;
   const budget = 70000;
@@ -53,20 +55,23 @@ export function createAppOpenBridge(binding, storage, clock = {wall:()=>Date.now
     }catch{}
   }
   const busyPeers = new Set();
-  async function call(peer, id) {
+  async function call(peer, id, signal) {
     const failure = code => ({schema,peer,id,code});
     if (!/^[a-f0-9]{64}$/i.test(peer ?? '') || typeof peer !== 'string' ||
         typeof id !== 'string' || (id !== '' && !/^[a-f0-9]{32}$/i.test(id))) return failure('invalid_peer');
+    if (signal?.aborted) return failure(id ? 'unavailable' : 'outcome_unknown');
     if (busyPeers.has(peer)) return failure('query_busy');
     busyPeers.add(peer);
     try {
-      const v = await binding.PeerAppOpen(peer, id);
+      const v = await invoke(peer, id, signal);
       if (!v || v.schema !== schema || v.peer !== peer || !codes.has(v.code) || typeof v.id !== 'string' ||
           (id && v.id !== id) || (v.id !== '' && !/^[a-f0-9]{32}$/i.test(v.id)) ||
           (v.code === 'pending' && !v.id) || (!id && ['launch_accepted','launch_requested','window_ready','window_unconfirmed'].includes(v.code))) {
         return failure(id ? 'unavailable' : 'outcome_unknown');
       }
       const result={schema,peer,code:v.code,id:v.id};
+      // Cancellation cannot undo submitted work. Keep its exact receipt and
+      // native-call fence until settlement, including a late launch ACK.
       remember(result, id === '');
       return result;
     } catch { return failure(id ? 'unavailable' : 'outcome_unknown'); }
@@ -75,16 +80,19 @@ export function createAppOpenBridge(binding, storage, clock = {wall:()=>Date.now
   return Object.freeze({resume,expired:(peer,id)=>{
     const pending=resume(peer);
     return !pending||pending.id!==id||pending.remaining===0;
-  },open: async peer => {
+  },open: async (peer, {signal, timeoutMs = budget} = {}) => {
+    if (signal?.aborted || !Number.isFinite(timeoutMs) || timeoutMs <= 0) return {schema,peer,id:'',code:'outcome_unknown'};
+    const deadline = clock.elapsed() + Math.min(budget, timeoutMs);
     const pending = resume(peer);
-    if(!pending)return call(peer,'');
+    if(!pending)return call(peer,'',signal);
     if(!records.get(peer).unconfirmed && pending.remaining>0)return pending;
-    const status=await call(peer,pending.id);
-    // A local timestamp is not proof that native work ended. Only an explicit
-    // new click and a native terminal receipt may start a replacement request.
-    return ['expired','unknown_request'].includes(status.code) ? call(peer,'') : status;
-  }, status: (peer,id) => {
+    const status=await call(peer,pending.id,signal);
+    // Recheck elapsed time too: an overdue timer may not have aborted the view
+    // yet. Only a live click and native terminal proof authorize replacement.
+    if (signal?.aborted || !(clock.elapsed() < deadline)) return status;
+    return ['expired','unknown_request'].includes(status.code) ? call(peer,'',signal) : status;
+  }, status: (peer,id, {signal} = {}) => {
     if (!id) return Promise.resolve({schema,peer,id:'',code:'invalid_peer'});
-    return call(peer,id);
+    return call(peer,id,signal);
   }});
 }

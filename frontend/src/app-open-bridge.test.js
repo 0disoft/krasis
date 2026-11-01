@@ -148,3 +148,55 @@ test('a delayed peer query does not block another peer or repeat the same peer r
   release();
   assert.equal((await pending).code,'pending');
 });
+
+test('injected transport checks both terminal codes against the exact elapsed budget',async()=>{
+  for(const code of ['expired','unknown_request']) for(const at of [299,300,301]){
+    let elapsed=0,resolve;
+    const reply=new Promise(done=>resolve=done),calls=[];
+    const values=new Map([['krasis.app-open.'+peer,JSON.stringify({id,expires:1})]]);
+    const storage={getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
+    const bridge=createAppOpenBridge(undefined,storage,{wall:()=>100000,elapsed:()=>elapsed},{
+      invoke:async(p,r)=>{calls.push(r);return r?reply:{...value,id:'c'.repeat(32)};},
+    });
+    const pending=bridge.open(peer,{timeoutMs:300});
+    elapsed=at;
+    resolve({...value,code});
+    await pending;
+    assert.deepEqual(calls,at<300?[id,'']:[id],`${code} at ${at}ms`);
+  }
+});
+
+test('pre-abort and invalid time budgets perform no transport I/O',async()=>{
+  const abort=new AbortController();abort.abort();
+  const bridge=createAppOpenBridge(undefined,undefined,undefined,{invoke:()=>assert.fail('unexpected I/O')});
+  assert.equal((await bridge.open(peer,{signal:abort.signal})).code,'outcome_unknown');
+  assert.equal((await bridge.status(peer,id,{signal:abort.signal})).code,'unavailable');
+  for(const timeoutMs of [0,-1,NaN,Infinity]){
+    assert.equal((await bridge.open(peer,{timeoutMs})).code,'outcome_unknown');
+  }
+});
+
+test('abort preserves the fence and late launch receipt until injected I/O actually settles',async()=>{
+  let resolve;const reply=new Promise(done=>resolve=done),abort=new AbortController(),calls=[];
+  const bridge=createAppOpenBridge(undefined,undefined,undefined,{invoke:(p,r,signal)=>{
+    calls.push(r);assert.equal(signal,abort.signal);return reply;
+  }});
+  const pending=bridge.open(peer,{signal:abort.signal});
+  abort.abort();
+  assert.equal((await bridge.status(peer,id)).code,'query_busy');
+  resolve(value);
+  assert.deepEqual(await pending,value);
+  assert.equal(bridge.resume(peer).id,id);
+  assert.equal((await bridge.open(peer)).id,id);
+  assert.deepEqual(calls,['']);
+});
+
+test('injected transport failures settle safely without retrying native work',async()=>{
+  for(const invoke of [()=>{throw Error('private');},async()=>{throw Error('private');}]){
+    let calls=0;
+    const bridge=createAppOpenBridge(undefined,undefined,undefined,{invoke:(...args)=>{calls++;return invoke(...args);}});
+    assert.deepEqual(await bridge.open(peer),{...value,id:'',code:'outcome_unknown'});
+    assert.deepEqual(await bridge.status(peer,id),{...value,code:'unavailable'});
+    assert.equal(calls,2);
+  }
+});

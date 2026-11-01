@@ -205,3 +205,65 @@ test('completion callbacks cannot mutate the adapter result', async () => {
   assert.deepEqual(external, receipt('window_ready'));
   assert.equal(f.timers.size, 0);
 });
+
+test('late native expiry cannot launch a replacement at or after the observation deadline', async () => {
+  for (const at of [69999, 70000, 70001]) {
+    const query = deferred(), calls = [];
+    let f;
+    const storage = { getItem: () => JSON.stringify({ id, expires: 1 }), setItem() {}, removeItem() {} };
+    const bridge = createAppOpenBridge({ PeerAppOpen: async (p, r) => {
+      calls.push(r);
+      return r ? query.promise : receipt();
+    } }, storage, { wall: () => 100000, elapsed: () => f.clock() });
+    f = fixture(bridge);
+    f.controller.open(peer);
+    await f.advance(at);
+    assert.deepEqual(calls, [id]);
+    query.resolve(receipt('expired'));
+    await flush();
+    assert.equal(calls.filter(r => r === '').length, at < 70000 ? 1 : 0, `completion at ${at}ms`);
+    f.controller.dispose();
+    assert.equal(f.timers.size, 0);
+  }
+});
+
+test('aborting or disposing while confirming expiry cannot start a replacement launch', async () => {
+  for (const mode of ['abort', 'dispose']) {
+    const query = deferred(), calls = [], abort = new AbortController();
+    let f;
+    const storage = { getItem: () => JSON.stringify({ id, expires: 1 }), setItem() {}, removeItem() {} };
+    const bridge = createAppOpenBridge({ PeerAppOpen: async (p, r) => {
+      calls.push(r);
+      return r ? query.promise : receipt();
+    } }, storage, { wall: () => 100000, elapsed: () => f.clock() });
+    f = fixture(bridge, { signal: abort.signal });
+    f.controller.open(peer);
+    await f.advance(1500);
+    if (mode === 'abort') abort.abort(); else f.controller.dispose();
+    assert.equal((await bridge.status(peer, id)).code, 'query_busy');
+    query.resolve(receipt('expired'));
+    await flush();
+    assert.deepEqual(calls, [id], mode);
+    assert.equal(f.timers.size, 0);
+  }
+});
+
+test('a delayed expiry timer cannot authorize a replacement after the elapsed deadline', async () => {
+  let elapsed = 0;
+  const query = deferred(), calls = [];
+  const bridge = createAppOpenBridge({ PeerAppOpen: async (p, r) => {
+    calls.push(r);
+    return r ? query.promise : receipt();
+  } }, { getItem: () => JSON.stringify({ id, expires: 1 }) }, {
+    wall: () => 100000, elapsed: () => elapsed,
+  });
+  const f = fixture(bridge, { clock: () => elapsed });
+  f.controller.open(peer);
+  await flush();
+  elapsed = 70000; // The native reply runs before the overdue timer callback.
+  query.resolve(receipt('expired'));
+  await flush();
+  assert.deepEqual(calls, [id]);
+  assert.equal(f.states.at(-1).result.code, 'outcome_unknown');
+  assert.equal(f.timers.size, 0);
+});

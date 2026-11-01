@@ -20,6 +20,7 @@ export function createAppOpenController(bridge, {
   // from the request identity and acknowledgement retained by this controller.
   const publish = (busy, result) => apply({ busy, result: { ...result } });
   function clear(job) {
+    job.abort.abort();
     scheduler.clearTimeout(job.poll);
     scheduler.clearTimeout(job.expiry);
   }
@@ -67,7 +68,8 @@ export function createAppOpenController(bridge, {
     // promises, without leaving unhandled rejections after disposal/timeout.
     Promise.resolve().then(() => {
       if (!current(job)) return;
-      return initial ? bridge.open(job.peer) : bridge.status(job.peer, job.result.id);
+      const options = { signal: job.abort.signal, timeoutMs: Math.max(0, job.deadline - clock()) };
+      return initial ? bridge.open(job.peer, options) : bridge.status(job.peer, job.result.id, options);
     }).then(status => {
       if (current(job)) accept(job, status, initial);
     }, () => {
@@ -84,7 +86,7 @@ export function createAppOpenController(bridge, {
     // A reloaded, locally expired receipt still needs native confirmation.
     // Give that one observation a bounded window; never issue a new launch.
     const left = receipt ? (remaining(receipt.remaining) || budget) : budget;
-    const job = { peer, result: receipt ? { ...receipt } : { peer, code: 'pending' }, deadline: clock() + left };
+    const job = { peer, result: receipt ? { ...receipt } : { peer, code: 'pending' }, deadline: clock() + left, abort: new AbortController() };
     active = job;
     job.expiry = scheduler.setTimeout(() => expire(job), left);
     publish(true, job.result);
