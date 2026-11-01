@@ -1,0 +1,34 @@
+{
+  "schema": "krasis.remote-connect-verification/v1",
+  "generation": 510,
+  "revision": "c86babc4d55cf3819b1467c6e4152b386bc3b2a5",
+  "includes": "g509 exact boundary-receipt backpressure isolation",
+  "update": {
+    "A": "Verified UI, launch record, agent and protected installation match g510 and the exact revision; doctor healthy.",
+    "B": "Request 2ce838f44acb3b91ce28abed54b90e5a confirmed UPDATED, 28874393 bytes, same generation and revision."
+  },
+  "remoteConnect": {
+    "command": "krasis-cli --json app connect B",
+    "schema": "krasis.cli.peer-connect/v1",
+    "id": "d919461c96873ba4684b0d4a75309a4c",
+    "code": "connected",
+    "exit": 0,
+    "observation": "The exact connect-status query also returned connected, without a second submission. Local doctor separately confirmed CONNECTED and healthy. No manual B connection click was needed."
+  },
+  "pairedCollection": "2a8efb785c3a9afdd4f3e23920b83fb0",
+  "pairedChecks": {
+    "A": {"inputHealth": "READY", "service": "READY", "installResult": 0, "connectedAt": "2026-11-01T10:10:56.7748786Z"},
+    "B": {"inputHealth": "READY", "service": "READY", "installResult": 0, "connectedAt": "2026-11-01T10:10:53.6554286Z"},
+    "runtimeTracing": "Disabled on both g510 runs; no runtime_trace events.",
+    "newSourceFailureOrTimeoutEvents": 0,
+    "clockPolicy": "Own-device timestamps only; do not derive network latency by subtracting A/B wall clocks."
+  },
+  "validation": {
+    "goPackagesPassed": ["peerupdate", "residentagent", "localapi", "productcli"],
+    "frontendTestsPassed": 111,
+    "packageTransferAndSetupVerification": "Passed",
+    "gitDiffCheck": "Passed",
+    "remoteCI": "Not run; no push requested in this task.",
+    "physicalCrossings": "Still require user input; initial installation/connection health does not prove no future recurrence or a measured latency improvement."
+  }
+}

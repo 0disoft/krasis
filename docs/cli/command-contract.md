@@ -504,8 +504,8 @@ An explicit delegated request can start a manually stopped saved connection;
 ordinary automatic resume retains its existing manual-stop gate.
 
 The sender owns one outstanding request with a nonrenewable 60-second deadline.
-The receiver owns at most one cancelable connect job and 64 exact receipts,
-retained for two minutes with a three-second per-peer new-request limit.
+The receiver owns at most one cancelable connect job and 64 process-local exact
+receipts, retained for two minutes with a three-second per-peer new-request limit.
 Manager shutdown cancels and joins its job. Repeated polling of the same ID
 reads the receipt, never repeats Connect. Unknown delivery is not automatically
 resubmitted. Timeout means connection_unconfirmed, not proof of no side effect.
