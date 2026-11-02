@@ -1,0 +1,369 @@
+{
+  "schema": "krasis.stutter-review/v1",
+  "generation": 518,
+  "revision": "5d6d58ca852691926f734ab97187f6bf5e4ed0b1",
+  "collection": "108cfc83f032c0c1373d84e8ef27b270",
+  "method": "Fresh authenticated paired diagnostic exports, exact revision, deduplicated run/sequence/code, original SHA-256 rechecked. Local elapsed durations only; no cross-machine timestamp subtraction.",
+  "scope": "Latest common connection begins around 2026-11-02T18:11Z. Also inspect all retained older exact-build connection events; this collection is not guaranteed to cover the whole installation lifetime.",
+  "sides": {
+    "A": {
+      "created": "2026-11-02T18:42:09Z",
+      "sha256": "9ca4c654c826d4b158faf6d6c07bbc7090e4f32595a02b0ec93011d3fb7d2714",
+      "connectedAt": "2026-11-02T18:11:01.0940882Z",
+      "service": "READY",
+      "inputHealth": "READY",
+      "console": "USER_SESSION",
+      "grant": "PRESENT",
+      "lastFailure": {
+        "time": "2026-11-02T16:52:31.951536Z",
+        "code": "agent_faulted",
+        "agentState": "FAULTED"
+      },
+      "postConnectionEvents": 1412,
+      "failures": [
+        {
+          "time": "2026-11-02T18:18:23.6306797Z",
+          "code": "installed_source_failure_response"
+        },
+        {
+          "time": "2026-11-02T18:18:23.6306797Z",
+          "code": "installed_source_command_failed_heartbeat"
+        },
+        {
+          "time": "2026-11-02T18:35:26.303635Z",
+          "code": "installed_source_failure_response"
+        },
+        {
+          "time": "2026-11-02T18:35:26.303635Z",
+          "code": "installed_source_command_failed_heartbeat"
+        }
+      ],
+      "preConnectionFailures": [
+        {
+          "time": "2026-11-02T18:10:50.9692443Z",
+          "code": "fault_source_hook_failed"
+        }
+      ],
+      "runtimeSummaryCount": 31
+    },
+    "B": {
+      "created": "2026-11-02T18:42:10Z",
+      "sha256": "5d42ff584f5a977de60f0759d8930948d3a6777c4583318974e34b3c2d27afa3",
+      "connectedAt": "2026-11-02T18:11:00.7869058Z",
+      "service": "READY",
+      "inputHealth": "READY",
+      "console": "USER_SESSION",
+      "grant": "PRESENT",
+      "lastFailure": {
+        "time": "2026-11-01T08:50:08.5779933Z",
+        "code": "agent_faulted",
+        "agentState": "FAULTED"
+      },
+      "postConnectionEvents": 1532,
+      "failures": [
+        {
+          "time": "2026-11-02T18:41:30.5722881Z",
+          "code": "installed_source_failure_response"
+        },
+        {
+          "time": "2026-11-02T18:41:30.5722881Z",
+          "code": "installed_source_command_failed_cursor_prepare"
+        },
+        {
+          "time": "2026-11-02T18:41:30.5722881Z",
+          "code": "installed_source_response_timeout"
+        }
+      ],
+      "preConnectionFailures": [
+        {
+          "time": "2026-11-02T18:10:50.6799438Z",
+          "code": "RECONNECTING"
+        },
+        {
+          "time": "2026-11-02T18:10:57.4793832Z",
+          "code": "reconnect_acquire_network_timeout"
+        }
+      ],
+      "runtimeSummaryCount": 32
+    }
+  },
+  "retained": {
+    "A": {
+      "firstRetainedEvent": "2026-11-02T17:03:22.011746Z",
+      "completeLog": false,
+      "connectionEvents": [
+        {
+          "time": "2026-11-02T18:10:50.9692443Z",
+          "code": "DISCONNECTING"
+        },
+        {
+          "time": "2026-11-02T18:11:01.0940882Z",
+          "code": "CONNECTED"
+        }
+      ],
+      "recentIssues": []
+    },
+    "B": {
+      "firstRetainedEvent": "2026-11-02T17:04:01.3662453Z",
+      "completeLog": false,
+      "connectionEvents": [
+        {
+          "time": "2026-11-02T18:10:50.6799438Z",
+          "code": "RECONNECTING"
+        },
+        {
+          "time": "2026-11-02T18:11:00.7869058Z",
+          "code": "CONNECTED"
+        }
+      ],
+      "recentIssues": [
+        {
+          "time": "2026-11-02T18:41:30.5722881Z",
+          "code": "installed_source_failure_response"
+        },
+        {
+          "time": "2026-11-02T18:41:30.5722881Z",
+          "code": "installed_source_command_failed_cursor_prepare"
+        },
+        {
+          "time": "2026-11-02T18:41:30.5722881Z",
+          "code": "installed_source_response_timeout"
+        }
+      ]
+    }
+  },
+  "matchedPairs": 14,
+  "completePairs": 14,
+  "stats": {
+    "grant": {
+      "n": 14,
+      "medianMs": 43.2395,
+      "maxMs": 293.405
+    },
+    "capture": {
+      "n": 14,
+      "medianMs": 19.4705,
+      "maxMs": 112.015
+    },
+    "prepare": {
+      "n": 14,
+      "medianMs": 29.1115,
+      "maxMs": 280.801
+    },
+    "ready": {
+      "n": 14,
+      "medianMs": 26.814500000000002,
+      "maxMs": 278.829
+    },
+    "first": {
+      "n": 14,
+      "medianMs": 2.793,
+      "maxMs": 109.034
+    },
+    "worst": {
+      "n": 14,
+      "medianMs": 7.9515,
+      "maxMs": 1469.05
+    },
+    "response": {
+      "n": 14,
+      "medianMs": 7.0885,
+      "maxMs": 1468.149
+    }
+  },
+  "recentWorst": {
+    "summaryAt": "2026-11-02T18:41:46.0825494Z",
+    "dispatchMicros": 1469050,
+    "responseMicros": 1468149,
+    "workerApply": {
+      "nativeIPC": {
+        "micros": [
+          18,
+          39783,
+          3,
+          110347,
+          1852,
+          8
+        ],
+        "parentMicros": [
+          9,
+          2,
+          30
+        ],
+        "parentMeasured": true
+      },
+      "micros": [
+        151812,
+        0
+      ],
+      "measured": 1,
+      "submissionMicros": 94527,
+      "submissionCalls": 1
+    },
+    "acknowledgementRead": {
+      "micros": [
+        1468149,
+        0,
+        0
+      ],
+      "measured": 7,
+      "progress": 4
+    },
+    "workerMillis": [
+      0,
+      15,
+      151
+    ],
+    "interpretation": "The 1.468149s wait is the resident client reading its local protected-worker acknowledgement, not a peer network round trip. Confirmed native apply is 151.812ms with 94.527ms submission; parent-local native IPC phases total 41us. Do not label the unmeasured remainder as scheduler, lock, GC or transmission time by subtraction."
+  },
+  "recentRuntime": {
+    "A": [
+      {
+        "time": "2026-11-02T18:41:00.8575361Z",
+        "intervalMicros": 59994693,
+        "timerLateMicros": 829912,
+        "gcPauses": [
+          72,
+          7,
+          3,
+          1,
+          1,
+          0
+        ],
+        "runnableDelays": [
+          1681,
+          62,
+          37,
+          2,
+          1,
+          0
+        ],
+        "heapBytes": 1947992,
+        "cpuMicros": 5546875,
+        "dispatchMaxMicros": 0,
+        "injectionMaxMicros": 0
+      },
+      {
+        "time": "2026-11-02T18:42:00.8573861Z",
+        "intervalMicros": 59999850,
+        "timerLateMicros": 919923,
+        "gcPauses": [
+          69,
+          15,
+          2,
+          3,
+          3,
+          0
+        ],
+        "runnableDelays": [
+          2734,
+          128,
+          76,
+          11,
+          3,
+          0
+        ],
+        "heapBytes": 1804456,
+        "cpuMicros": 6984375,
+        "dispatchMaxMicros": 112596,
+        "injectionMaxMicros": 0
+      }
+    ],
+    "B": [
+      {
+        "time": "2026-11-02T18:40:05.5528406Z",
+        "intervalMicros": 60000248,
+        "timerLateMicros": 7312,
+        "gcPauses": [
+          85,
+          22,
+          3,
+          0,
+          0,
+          0
+        ],
+        "runnableDelays": [
+          1754,
+          89,
+          8,
+          0,
+          0,
+          0
+        ],
+        "heapBytes": 1888568,
+        "cpuMicros": 7281250,
+        "dispatchMaxMicros": 0,
+        "injectionMaxMicros": 0
+      },
+      {
+        "time": "2026-11-02T18:41:05.553346Z",
+        "intervalMicros": 59999900,
+        "timerLateMicros": 5755,
+        "gcPauses": [
+          83,
+          23,
+          2,
+          0,
+          0,
+          0
+        ],
+        "runnableDelays": [
+          1720,
+          56,
+          3,
+          0,
+          0,
+          0
+        ],
+        "heapBytes": 1987520,
+        "cpuMicros": 7187500,
+        "dispatchMaxMicros": 547,
+        "injectionMaxMicros": 0
+      },
+      {
+        "time": "2026-11-02T18:42:05.5527018Z",
+        "intervalMicros": 59999960,
+        "timerLateMicros": 1299451,
+        "gcPauses": [
+          75,
+          17,
+          11,
+          16,
+          2,
+          1
+        ],
+        "runnableDelays": [
+          4747,
+          74,
+          72,
+          28,
+          2,
+          0
+        ],
+        "heapBytes": 2153616,
+        "cpuMicros": 8031250,
+        "dispatchMaxMicros": 1469050,
+        "injectionMaxMicros": 1469050
+      }
+    ]
+  },
+  "inference": "During the B summary interval ending 18:42:05Z, timer lateness reaches 1.299451s and the highest aggregate GC-pause bucket increases once. A timer lateness reaches 919.923ms in its corresponding local minute. These support local runtime/scheduling stalls occurring alongside the stutter, not proof of a specific GC defect or that one exact pause caused the entire acknowledgement delay.",
+  "histogramCaution": "Aggregation classifies underlying histogram buckets by upper bound; the highest aggregate bucket is not an exact measured >=1s pause. Runtime intervals are approximately one minute and are not atomic snapshots of the input request.",
+  "cursorPreparation": "B records source cursor_prepare response timeout at 18:41:30.5722881Z. Subsequent successful entries and current READY show this did not become a new connection fault in the recent burst.",
+  "reliability": "Retained older events show A source reader retirement and source-hook session failure around 18:10:50Z, B remote EOF/reconnect, then a shared new connection around 18:11Z. This is distinct from the recent stutter. Do not claim zero g518 lifetime reconnections from the earlier short trial.",
+  "observationLimitation": "A nonfatal trail budget was already consumed by eight os_read_slow observations by 18:25Z. Its later runtime-summary GC/timer spikes therefore lack a corresponding retained fine-grained nonfatal trail. B retains an os_read_slow trail at 18:41:23Z, before the worst input; that is not a same-request proof.",
+  "nextDiagnosticBoundary": "The outer protected journal worker request receipt, post-apply reply readiness/write, and resident first-read/resumption. Existing six native IPC phases and three parent phases observe the inner child exchange, not this entire outer acknowledgement wait.",
+  "changes": "Only this experiment report; runtime code, authorization, input outcomes and timeouts unchanged. No speculative timeout increase, input replay, restart or installation performed.",
+  "validation": [
+    "Fresh CLI doctor healthy, both protected services/input READY",
+    "Export SHA-256 and exact revision checked",
+    "Worst input and matching ACK/native metadata inspected",
+    "Existing runtime/worker/ACK code boundaries inspected",
+    "git diff --check"
+  ],
+  "skipped": [
+    "No application tests or rebuild: no executable code changed.",
+    "No push or remote CI requested. No new physical or long-term stability test."
+  ],
+  "impact": "No external API, DB, repository hygiene, runner or product/architecture source-of-truth change."
+}
