@@ -34,3 +34,12 @@ func TestNativeIPCEnvelopeMayExceedChildApply(t *testing.T) {
 		t.Fatal("parent-side stall incorrectly rejected against child apply")
 	}
 }
+
+func TestNativeIPCParentPresenceAndTotalBudget(t *testing.T) {
+	limit := uint32(Window.Microseconds())
+	if !(NativeIPCProfile{ParentMeasured: true, ParentMicros: [3]uint32{limit}}).Valid() ||
+		(NativeIPCProfile{ParentMicros: [3]uint32{1}}).Valid() ||
+		(NativeIPCProfile{Micros: [6]uint32{1}, ParentMeasured: true, ParentMicros: [3]uint32{limit}}).Valid() {
+		t.Fatal("parent presence or containing window budget lost")
+	}
+}

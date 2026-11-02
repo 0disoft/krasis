@@ -55,13 +55,18 @@ func TestNativeIPCSeparatesExecutorAndReplyDeliveryDelay(t *testing.T) {
 	if p.Micros[0] < 10_000 || p.Micros[3] < 10_000 || p.Micros[4] < 10_000 {
 		t.Fatal("executor, child handler or reply-delivery delay misattributed", p)
 	}
+	if !p.ParentMeasured || p.ParentMicros[2] < 10_000 {
+		t.Fatal("post-decode transport completion disappeared", p)
+	}
 }
 
 type ipcDelayedTransport struct{ net.Conn }
 
 func (p *ipcDelayedTransport) ExchangeInput(_ context.Context, exchange func(io.Writer, io.Reader) error) error {
 	time.Sleep(15 * time.Millisecond)
-	return exchange(p.Conn, p.Conn)
+	err := exchange(p.Conn, p.Conn)
+	time.Sleep(15 * time.Millisecond)
+	return err
 }
 
 type ipcDelayedWriter struct{ io.Writer }

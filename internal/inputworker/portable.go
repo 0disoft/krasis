@@ -62,16 +62,23 @@ func (client *Client) performPortable(ctx context.Context, process portableTrans
 	}
 	ctx, cancel := context.WithTimeout(ctx, IdleTimeout)
 	defer cancel()
+	probe := handoff.WorkerApplyProbe(ctx)
+	entered, locked := uint64(0), uint64(0)
+	if probe != nil && command.op != opHeartbeat && command.op != opClose {
+		entered = workerIPCTick()
+	}
 	if err := client.mu.LockContext(ctx); err != nil {
 		return notSent(err)
 	}
 	defer client.mu.Unlock()
+	if entered != 0 {
+		locked = workerIPCTick()
+	}
 	if client.failed || ctx.Err() != nil || client.sequence == math.MaxUint64 {
 		return notSent(ErrExpired)
 	}
 	// Forward only an existing bounded parent probe on the same input exchange.
 	// The child measures SendInput; the parent retains its containing IPC span.
-	probe := handoff.WorkerApplyProbe(ctx)
 	if probe != nil && command.op != opHeartbeat && command.op != opClose {
 		command.applyDetail, command.submissionDetail = true, true
 		command.ipcDetail = workerIPCTick() != 0
@@ -88,6 +95,15 @@ func (client *Client) performPortable(ctx context.Context, process portableTrans
 		started = workerIPCTick()
 	}
 	var ipcProfile *handoff.NativeIPCProfile
+	decoded := uint64(0)
+	confirmed := false
+	defer func() {
+		// The pointer is attached only after a confirmed matching exchange.
+		// Finalize before returning to apply, never from asynchronous work.
+		if confirmed && ipcProfile != nil && probe != nil && probe.NativeIPC == ipcProfile {
+			recordNativeIPCParent(ipcProfile, entered, locked, started, decoded, workerIPCTick())
+		}
+	}()
 	err = process.ExchangeInput(ctx, func(writer io.Writer, reader io.Reader) error {
 		if ctx.Err() != nil || !submission.CompareAndSwap(0, 1) {
 			return ErrExpired
@@ -109,6 +125,7 @@ func (client *Client) performPortable(ctx context.Context, process portableTrans
 			complete := workerIPCTick()
 			if err == nil && ack.sequence == command.sequence && ack.op == command.op {
 				ipcProfile = normalizeNativeIPC(started, admitted, submitted, ack.ipc, observed.first, complete)
+				decoded = complete
 			}
 		} else {
 			ack, err = readResponse(reader)
@@ -126,6 +143,7 @@ func (client *Client) performPortable(ctx context.Context, process portableTrans
 		}
 		return unknownInput(err)
 	}
+	confirmed = true
 	client.sequence++
 	if probe != nil && ipcProfile != nil {
 		probe.NativeIPC = ipcProfile

@@ -7,10 +7,22 @@ package handoff
 // survive normalization; no raw counter, input, identity or extra probe does.
 type NativeIPCProfile struct {
 	Micros [6]uint32 `json:"micros"`
+	// Disjoint parent-local spans outside Micros: client mutex acquisition,
+	// request preparation, and matched decode to portable-client completion.
+	// These contain scheduler delays; they are not proof of mutex contention.
+	ParentMicros   [3]uint32 `json:"parentMicros,omitzero"`
+	ParentMeasured bool      `json:"parentMeasured,omitempty"`
 }
 
 func (p NativeIPCProfile) Valid() bool {
-	return p.total() <= uint64(Window.Microseconds())
+	if !p.ParentMeasured && p.ParentMicros != ([3]uint32{}) {
+		return false
+	}
+	total := p.total()
+	for _, n := range p.ParentMicros {
+		total += uint64(n)
+	}
+	return total <= uint64(Window.Microseconds())
 }
 
 func (p NativeIPCProfile) total() uint64 {

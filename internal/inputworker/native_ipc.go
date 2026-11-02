@@ -7,7 +7,9 @@ import (
 	"github.com/0disoft/krasis/internal/handoff"
 )
 
-const nativeIPCSize = 32
+// Installed native parent/child images are hash-matched as one bundle.
+// Twelve fixed bytes add parent spans without another read/write/exchange.
+const nativeIPCSize = 44
 
 type nativeIPCWire struct {
 	stamps  [3]uint64 // child read complete, handler entry, immediately before Write
@@ -20,6 +22,12 @@ func (p *nativeIPCWire) encode(data []byte) {
 		for i, n := range p.profile.Micros {
 			binary.BigEndian.PutUint32(data[8+i*4:], n)
 		}
+		if p.profile.ParentMeasured {
+			data[0] = 3
+			for i, n := range p.profile.ParentMicros {
+				binary.BigEndian.PutUint32(data[32+i*4:], n)
+			}
+		}
 		return
 	}
 	data[0] = 1
@@ -29,7 +37,7 @@ func (p *nativeIPCWire) encode(data []byte) {
 }
 
 func decodeNativeIPC(data []byte) *nativeIPCWire {
-	if !zeroBytes(data[1:8]) {
+	if len(data) != nativeIPCSize || !zeroBytes(data[1:8]) || data[0] != 3 && !zeroBytes(data[32:]) {
 		return nil
 	}
 	p := &nativeIPCWire{}
@@ -38,10 +46,16 @@ func decodeNativeIPC(data []byte) *nativeIPCWire {
 		for i := range p.stamps {
 			p.stamps[i] = binary.BigEndian.Uint64(data[8+i*8:])
 		}
-	case 2:
+	case 2, 3:
 		profile := &handoff.NativeIPCProfile{}
 		for i := range profile.Micros {
 			profile.Micros[i] = binary.BigEndian.Uint32(data[8+i*4:])
+		}
+		if data[0] == 3 {
+			profile.ParentMeasured = true
+			for i := range profile.ParentMicros {
+				profile.ParentMicros[i] = binary.BigEndian.Uint32(data[32+i*4:])
+			}
 		}
 		if !profile.Valid() {
 			return nil
@@ -51,6 +65,23 @@ func decodeNativeIPC(data []byte) *nativeIPCWire {
 		return nil
 	}
 	return p
+}
+
+// All stamps belong to this synchronous exchange. Invalid/over-budget parent
+// metadata is dropped without replacing valid IPC timing or changing input.
+func recordNativeIPCParent(p *handoff.NativeIPCProfile, entered, locked, started, decoded, finished uint64) {
+	if p == nil || entered == 0 || locked < entered || started < locked || decoded < started || finished < decoded {
+		return
+	}
+	if finished-entered > uint64(handoff.Window.Microseconds()) {
+		return
+	}
+	parent := [3]uint32{uint32(locked - entered), uint32(started - locked), uint32(finished - decoded)}
+	copy := *p
+	copy.ParentMicros, copy.ParentMeasured = parent, true
+	if copy.Valid() {
+		*p = copy
+	}
 }
 
 func normalizeNativeIPC(started, admitted, submitted uint64, wire *nativeIPCWire, first, complete uint64) *handoff.NativeIPCProfile {

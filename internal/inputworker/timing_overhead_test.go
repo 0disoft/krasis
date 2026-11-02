@@ -16,6 +16,8 @@ func BenchmarkInputTimingSuffixCodec(b *testing.B) {
 		if detail {
 			name = "detailed"
 			ack.applyDetail = &handoff.WorkerApplyProfile{Measured: 1, Micros: [2]uint32{1000, 0}, SubmissionCalls: 1, SubmissionMicros: 900, NativeIPC: &handoff.NativeIPCProfile{Micros: [6]uint32{5, 10, 2, 950, 15, 18}}}
+			ack.applyDetail.NativeIPC.ParentMeasured = true
+			ack.applyDetail.NativeIPC.ParentMicros = [3]uint32{2, 3, 4}
 		}
 		b.Run(name, func(b *testing.B) {
 			var wire bytes.Buffer
