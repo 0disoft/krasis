@@ -1,0 +1,354 @@
+{
+  "schema": "krasis.paired-crossings-review/v1",
+  "generation": 518,
+  "revision": "5d6d58ca852691926f734ab97187f6bf5e4ed0b1",
+  "collection": "a4255e6f4b532d5c76e8a860cc5d8b65",
+  "method": {
+    "source": "Authenticated fresh paired diagnostic exports; SHA-256 recomputed from original exports; exact g518 revision and run/sequence/code deduplication.",
+    "period": "All exact-build connections since installation, including pre-connection failures. Both sides have exactly one shared CONNECTED event, so no recovered reconnect is excluded.",
+    "latency": "Local software elapsed durations. A source and B receiver pairs matched by exchange tag. Do not subtract timestamps across machines or equate this with physical mouse-to-screen latency.",
+    "comparison": "Uncontrolled trials of different duration and size. Lower observed maxima are not causal proof of a performance improvement."
+  },
+  "sides": {
+    "A": {
+      "created": "2026-11-02T17:06:46Z",
+      "sha256": "d6c3cf07f78e2c47a2391ac2d524852565843300566718fd83906b7d9bae1f30",
+      "connectedAt": "2026-11-02T17:04:05.8179484Z",
+      "service": "READY",
+      "inputHealth": "READY",
+      "console": "USER_SESSION",
+      "grant": "PRESENT",
+      "lastFailure": {
+        "time": "2026-11-02T16:52:31.951536Z",
+        "code": "agent_faulted",
+        "agentState": "FAULTED"
+      },
+      "postConnectionEvents": 195,
+      "failures": [],
+      "preConnectionFailures": [],
+      "runtimeSummaryCount": 3
+    },
+    "B": {
+      "created": "2026-11-02T17:06:46Z",
+      "sha256": "9d921a1e47ad8b5b232a516d6988cae956e77274174b4a506113171c02100b75",
+      "connectedAt": "2026-11-02T17:04:05.576408Z",
+      "service": "READY",
+      "inputHealth": "READY",
+      "console": "USER_SESSION",
+      "grant": "PRESENT",
+      "lastFailure": {
+        "time": "2026-11-01T08:50:08.5779933Z",
+        "code": "agent_faulted",
+        "agentState": "FAULTED"
+      },
+      "postConnectionEvents": 362,
+      "failures": [],
+      "preConnectionFailures": [],
+      "runtimeSummaryCount": 2
+    }
+  },
+  "observationSeconds": {
+    "A": 160.183,
+    "B": 160.424
+  },
+  "sharedConnectionMatched": true,
+  "matchedPairs": 12,
+  "completePairs": 12,
+  "stats": {
+    "grant": {
+      "n": 12,
+      "medianMs": 39.340500000000006,
+      "maxMs": 53.189
+    },
+    "capture": {
+      "n": 12,
+      "medianMs": 19.127499999999998,
+      "maxMs": 72.45
+    },
+    "prepare": {
+      "n": 12,
+      "medianMs": 26.119500000000002,
+      "maxMs": 30.701
+    },
+    "ready": {
+      "n": 12,
+      "medianMs": 23.625,
+      "maxMs": 27.992
+    },
+    "first": {
+      "n": 12,
+      "medianMs": 2.258,
+      "maxMs": 8.595
+    },
+    "worst": {
+      "n": 12,
+      "medianMs": 4.8235,
+      "maxMs": 50.041
+    },
+    "response": {
+      "n": 12,
+      "medianMs": 4.215999999999999,
+      "maxMs": 50.041
+    }
+  },
+  "previousG517": {
+    "matchedPairs": 6,
+    "completePairs": 5,
+    "stats": {
+      "grant": {
+        "n": 5,
+        "medianMs": 37.397,
+        "maxMs": 43.797
+      },
+      "capture": {
+        "n": 5,
+        "medianMs": 12.828,
+        "maxMs": 120.929
+      },
+      "prepare": {
+        "n": 5,
+        "medianMs": 26.251,
+        "maxMs": 27.485
+      },
+      "ready": {
+        "n": 5,
+        "medianMs": 23.939,
+        "maxMs": 24.653
+      },
+      "first": {
+        "n": 5,
+        "medianMs": 2.67,
+        "maxMs": 4.682
+      },
+      "worst": {
+        "n": 5,
+        "medianMs": 13.333,
+        "maxMs": 144.761
+      },
+      "response": {
+        "n": 5,
+        "medianMs": 13.333,
+        "maxMs": 144.761
+      }
+    },
+    "recurrence": "A boundary-receipt response timeout; B remote EOF and reconnects"
+  },
+  "remainingCapture": {
+    "time": "2026-11-02T17:06:02.9255883Z",
+    "activationMicros": 72450,
+    "responseMicros": 71607,
+    "nativeExact": {
+      "queueToHandleMicros": 1014,
+      "foregroundRequestMicros": 16037,
+      "measured": 7
+    },
+    "nativeBuckets": [
+      1,
+      1,
+      1,
+      2,
+      1,
+      2,
+      2,
+      1,
+      3,
+      0,
+      1,
+      3,
+      3,
+      0,
+      3,
+      0,
+      3
+    ],
+    "interpretation": "72.450ms activation contains 71.607ms source IPC response wait. The matching native foreground request is 16.037ms and queue-to-handler is 1.014ms. These nested/partial spans cannot be added to invent a scheduler or focus residual."
+  },
+  "remainingInput": {
+    "time": "2026-11-02T17:05:55.9264036Z",
+    "responseMicros": 50041,
+    "workerApply": {
+      "nativeIPC": {
+        "micros": [
+          24,
+          6639,
+          3,
+          37916,
+          694,
+          165
+        ],
+        "parentMicros": [
+          9,
+          2,
+          20
+        ],
+        "parentMeasured": true
+      },
+      "micros": [
+        45264,
+        0
+      ],
+      "measured": 1,
+      "submissionMicros": 30048,
+      "submissionCalls": 1
+    },
+    "interpretation": "50.041ms response contains 45.264ms worker apply and 30.048ms native submission. Parent-local IPC spans total 31us; they do not support mutex admission as the dominant tail. Contained spans overlap."
+  },
+  "runtimeObservations": {
+    "A": [
+      {
+        "time": "2026-11-02T17:05:37.9264113Z",
+        "observation": "os_read_slow",
+        "fault": "",
+        "maxOSReadMicros": 338628,
+        "slowSamples": [
+          {
+            "os": {
+              "readMicros": 338628,
+              "cpuMicros": 0,
+              "cpuKnown": true,
+              "pageFaults": 0,
+              "faultsKnown": true,
+              "systemBusyMicros": 3609375,
+              "systemTotalMicros": 3609375,
+              "systemKnown": true
+            },
+            "gcPauses": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "gcStopping": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "lateMicros": 7194
+          }
+        ]
+      },
+      {
+        "time": "2026-11-02T17:06:09.1258015Z",
+        "observation": "os_read_slow",
+        "fault": "",
+        "maxOSReadMicros": 127177,
+        "slowSamples": [
+          {
+            "os": {
+              "readMicros": 119953,
+              "cpuMicros": 0,
+              "cpuKnown": true,
+              "pageFaults": 0,
+              "faultsKnown": true,
+              "systemBusyMicros": 2562500,
+              "systemTotalMicros": 2562500,
+              "systemKnown": true
+            },
+            "gcPauses": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "gcStopping": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "lateMicros": 28509
+          },
+          {
+            "os": {
+              "readMicros": 127177,
+              "cpuMicros": 0,
+              "cpuKnown": true,
+              "pageFaults": 0,
+              "faultsKnown": true,
+              "systemBusyMicros": 1765625,
+              "systemTotalMicros": 1765625,
+              "systemKnown": true
+            },
+            "gcPauses": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "gcStopping": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "lateMicros": 17223
+          }
+        ]
+      },
+      {
+        "time": "2026-11-02T17:06:44.0237259Z",
+        "observation": "os_read_slow",
+        "fault": "",
+        "maxOSReadMicros": 138527,
+        "slowSamples": [
+          {
+            "os": {
+              "readMicros": 138527,
+              "cpuMicros": 0,
+              "cpuKnown": true,
+              "pageFaults": 0,
+              "faultsKnown": true,
+              "systemBusyMicros": 2296875,
+              "systemTotalMicros": 2296875,
+              "systemKnown": true
+            },
+            "gcPauses": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "gcStopping": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "lateMicros": 4094
+          }
+        ]
+      }
+    ],
+    "BTrailCount": 0
+  },
+  "conclusion": "No reconnect/fault/recovery recurrence in approximately 160 seconds and 12 complete paired crossings. Nonfatal A OS-read envelopes still reached 338.628ms under observed 100% processor-group busy counters; the connection remained intact. This supports resilience of the changed receipt path in this trial, not long-term reliability or elimination of host/native stalls.",
+  "historicalFailure": "A lastFailure at 2026-11-02T16:52:31.951536Z belongs to g517 and predates this installation/connection. B lastFailure is also historical; neither is counted as a fresh recovery fault.",
+  "validation": [
+    "Fresh CLI doctor healthy with exact revision",
+    "Both services/input READY and grant PRESENT",
+    "Original export hashes, shared connection and complete pairs checked by assertions",
+    "git diff --check"
+  ],
+  "skipped": [
+    "No application rebuild or repeated test suite: only this measured report was added.",
+    "No push or remote CI requested. No new physical latency benchmark or long-term soak test performed."
+  ],
+  "changes": "Only this experiment report; no product/architecture contract, API, DB, repository hygiene or runner change."
+}
