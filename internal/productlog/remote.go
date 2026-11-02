@@ -79,14 +79,10 @@ func SanitizeSupport(data []byte) ([]byte, error) {
 			return nil, errors.New("invalid support source")
 		}
 		seen[l.Source] = true
-		var lines bytes.Buffer
-		for _, event := range l.Events {
-			if err := json.NewEncoder(&lines).Encode(event); err != nil {
-				return nil, err
-			}
+		clean, err := sanitizeSupportLog(l)
+		if err != nil {
+			return nil, err
 		}
-		clean := sanitizeLog(l.Source, &lines)
-		clean.Incomplete = clean.Incomplete || l.Incomplete
 		doc.Logs[i] = clean
 	}
 	return json.Marshal(doc)

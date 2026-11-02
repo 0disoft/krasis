@@ -145,99 +145,17 @@ func sanitizeLog(name string, r io.Reader) exportLog {
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 	// GC trails contain at most 64 numeric windows. Other record kinds keep
 	// their original 4 KiB limit; the outer file limit remains unchanged.
-	scanner.Buffer(make([]byte, 1024), 64*1024)
+	scanner.Buffer(make([]byte, 1024), maxLogRecordBytes)
 	for scanner.Scan() {
 		var input record
-		if json.Unmarshal(scanner.Bytes(), &input) != nil || !allowed[input.Code] {
+		if json.Unmarshal(scanner.Bytes(), &input) != nil {
 			result.Incomplete = true
 			continue
 		}
-		if len(scanner.Bytes()) > 4096 && input.Code != "runtime_gc_trail" {
+		event, ok := sanitizeRecord(input, len(scanner.Bytes()))
+		if !ok {
 			result.Incomplete = true
 			continue
-		}
-		timestamp, err := time.Parse(time.RFC3339Nano, input.Time)
-		if err != nil {
-			result.Incomplete = true
-			continue
-		}
-		// Reproject only validated diagnostic identity. Never export arbitrary
-		// build strings, process IDs, TLS material, endpoint addresses or raw lines.
-		event := exportEvent{Time: timestamp.UTC().Format(time.RFC3339Nano), Code: input.Code}
-		if validHex(input.Build, 40) || validHex(input.Build, 64) || input.Build == "development" {
-			event.Build = input.Build
-			event.BuildDirty = input.BuildDirty
-		}
-		if validHex(input.Run, 32) && input.Sequence > 0 && input.ElapsedMicros >= 0 {
-			event.Run = input.Run
-			event.Sequence = input.Sequence
-			event.ElapsedMicros = input.ElapsedMicros
-		}
-		if input.Code != "handoff_profile" && validHex(input.Connection, 64) {
-			event.Connection = input.Connection
-		}
-		if input.Code == "injection_failure" {
-			if input.Injection == nil || !input.Injection.valid() {
-				result.Incomplete = true
-				continue
-			}
-			event.Injection = input.Injection
-		}
-		if input.Code == "session_end_detail" {
-			if input.SessionEnd == nil || !input.SessionEnd.valid() {
-				result.Incomplete = true
-				continue
-			}
-			event.SessionEnd = input.SessionEnd
-		}
-		if input.Code == "network_dial_observation" {
-			if input.Dial == nil || !input.Dial.Valid() {
-				result.Incomplete = true
-				continue
-			}
-			event.Dial = input.Dial
-		}
-		if input.Code == "network_wifi_observation" {
-			if input.WiFi == nil || !input.WiFi.Valid() {
-				result.Incomplete = true
-				continue
-			}
-			event.WiFi = input.WiFi
-		}
-		if input.Code == "retry_policy" {
-			if input.Retry == nil || !input.Retry.valid() {
-				result.Incomplete = true
-				continue
-			}
-			event.Retry = input.Retry
-		}
-		if input.Code == "runtime_summary" {
-			if input.Runtime == nil || !input.Runtime.valid() {
-				result.Incomplete = true
-				continue
-			}
-			event.Runtime = input.Runtime
-		}
-		if input.Code == "runtime_gc_trail" {
-			if input.GCTrail == nil || !input.GCTrail.valid() {
-				result.Incomplete = true
-				continue
-			}
-			event.GCTrail = input.GCTrail
-		}
-		if input.Code == "handoff_profile" {
-			if input.Handoff == nil || !input.Handoff.Valid() {
-				result.Incomplete = true
-				continue
-			}
-			event.Handoff = input.Handoff
-		}
-		if input.Code == "boundary_summary" {
-			if input.Boundary == nil || !input.Boundary.valid() {
-				result.Incomplete = true
-				continue
-			}
-			event.Boundary = input.Boundary
 		}
 		result.Events = append(result.Events, event)
 	}
