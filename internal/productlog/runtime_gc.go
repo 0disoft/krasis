@@ -40,8 +40,10 @@ type GCWindow struct {
 
 // This is a bounded observation trail, never exact GC start/end timestamps.
 // TriggerMicros is the monotonic callback-notification time in the agent run;
-// TriggerObservedAt is the original failure observation's wall time. A sample
-// ending after the trigger cannot be labelled as wholly preceding the failure.
+// TriggerObservedAt is the original failure or nonfatal observation's wall time.
+// A sample ending after the trigger cannot be labelled as wholly preceding it.
+// Fault and Observation are mutually exclusive; observations grant no authority
+// and must never be presented as connection/service failures.
 type GCTrail struct {
 	Schema            uint8              `json:"schema"`
 	TriggerMicros     int64              `json:"triggerMicros"`

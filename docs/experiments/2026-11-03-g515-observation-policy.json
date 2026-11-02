@@ -1,0 +1,43 @@
+{
+  "schema": "krasis.observation-policy/v1",
+  "generation": 515,
+  "purpose": "Preserve nonfatal A runtime stalls and the actual slow B command, without changing input authority, ordering, deadlines, retries or native submission count.",
+  "runtime": {
+    "samplerMilliseconds": 100,
+    "timerOrReadThresholdMilliseconds": 100,
+    "histograms": "Known GC total, GC stopping or runnable observations in aggregate bucket 4/5. Rounded buckets do not prove exact durations.",
+    "historySamples": 64,
+    "nonfatalRecordsPerAgentRun": 8,
+    "minimumRecordGapSeconds": 30,
+    "failureRecordsPerAgentRun": 8,
+    "failureBudget": "Independent and unchanged; nonfatal observations never call ObserveFailure, change health or start runtime tracing.",
+    "privacy": "Fixed numeric windows and whitelisted observation reasons. No stacks, input values, coordinates or identity data. Existing bounded export and sanitizer apply."
+  },
+  "input": {
+    "windowSeconds": 120,
+    "maximumDetailedCommandsPerWindow": 120000,
+    "selection": "Every tracked installed receiver command until the time/count limit; no heartbeat, maintenance or untracked commands. This is a total-window cap, not a per-second rate limiter.",
+    "rolling": "Freeze old attempts before resetting the timing count. Owner/cursor lifetime limits remain unchanged.",
+    "retention": "Existing first/worst profiles only; no per-command log and no extra round trip.",
+    "limits": "Detail is still unavailable outside a tracked window, after its count cap, or when an ACK is lost. This does not guarantee every future tail is retained."
+  },
+  "codecBenchmark": {
+    "platform": "windows/amd64, AMD Ryzen 5 7430U",
+    "baseNanosecondsPerOperation": 508.3,
+    "detailedNanosecondsPerOperation": 882.2,
+    "baseAllocatedBytesPerOperation": 216,
+    "detailedAllocatedBytesPerOperation": 304,
+    "baseAllocationsPerOperation": 3,
+    "detailedAllocationsPerOperation": 6,
+    "scope": "One ACK encode/decode, 200ms benchmark per variant. Excludes native timing reads, context/profile copies, real pipes, processes and Windows scheduling. Not a physical latency result."
+  },
+  "newG514Recurrence": {
+    "collection": "5acca7a693ed5e20636fa729dd8d0431",
+    "collectedAtUTC": "2026-11-02T15:45:50Z",
+    "health": "Both services and protected input READY, but A connection FAULTED. This is later than the previous 14:57Z snapshot, not evidence that its coverage was fault-free indefinitely.",
+    "A": "15:13:05Z source-hook failure has a 1366.549ms sampling interval, 1267.104ms timer lateness and >1s GC total/stopping observations. 15:43:48Z source-service-query-deadline-checking precedes source-hook failure and guard-close timeout; the GC trail includes a 1495.732ms interval with >1s total/stopping observations.",
+    "scope": "The association supports local GC world-stopping delay rather than proving heap-scanning work or a particular blocked Windows thread. Do not add independent histogram durations together. g515 improves evidence and does not claim this runtime defect fixed."
+  },
+  "validation": "GC observation boundary/cooldown/budget/privacy/export tests; actual 209ms third-command tail with native and ACK-read detail; cap and rolling tests; complete handoff/inputworker/productlog suites; resident runtime tests; go vet and diff checks.",
+  "deployment": "Build/install/connection receipts recorded separately. No push or public release requested."
+}
