@@ -1,0 +1,42 @@
+{
+  "schema": "krasis.service-submission-review/v1",
+  "generation": 520,
+  "baselineGeneration": 518,
+  "problem": "Matching B input in g518 waited 1468.149ms for the service response despite 151.812ms native apply. The inner worker profile cannot explain the outer service response path. Timer lateness of 1299.451ms and GC/runnable observations are correlated, not proof of the whole cause.",
+  "changes": [
+    "One zeroed ACK buffer belongs to each serial service connection, removing per-response buffer allocation. Input order, exact acknowledgements and fail-closed retirement remain unchanged.",
+    "The outer local IPC profile separates journal read, handling/serialization, native writer admission, submission-to-app-read, and remaining decode using same-host QPC.",
+    "g520 stamps pinned response bytes after writer mutex admission and event/pinning setup immediately before WriteFile. serviceNativeWrite distinguishes that observation from a generic io.Writer fallback.",
+    "Invalid suffix offsets and expired writes are rejected. A deadline is rechecked after stamping and before native submission; failed or short writes are not retried."
+  ],
+  "outerMicros": {
+    "0": "Zero; there is no distinct outer phase here.",
+    "1": "App request write submission to journal request read completion.",
+    "2": "Journal read completion through handling to reply serialization ready.",
+    "3": "Reply-ready to native WriteFile submission point, including writer admission and event/pinning setup.",
+    "4": "Native submission point to app first positive Read return; includes pipe delivery and app scheduling/resumption.",
+    "5": "Remaining app response decode."
+  },
+  "interpretation": "Phases 3 and 4 identify native admission/post-submission only with serviceNativeWrite=true. No raw timestamp is exported. Ordered timestamps and a 120-second maximum window are validated only after sequence/op match. Outer spans include and overlap inner native-child spans: never add the two profiles. A native submission timestamp is not Write completion or kernel arrival.",
+  "benchmark": {
+    "scope": "Serialization into io.Discard on AMD Ryzen 5 7430U, Go 1.27.3 windows/amd64; not a native-pipe or physical crossing latency benchmark.",
+    "command": "go test ./internal/inputworker -run ^$ -bench ^BenchmarkServiceACKSerialization$ -benchmem -benchtime=200ms -count=1",
+    "plainFresh": {"nsPerOp": 169.7, "bytesPerOp": 144, "allocationsPerOp": 1},
+    "plainOwned": {"nsPerOp": 31.2, "bytesPerOp": 0, "allocationsPerOp": 0},
+    "profiledFresh": {"nsPerOp": 277.3, "bytesPerOp": 144, "allocationsPerOp": 1},
+    "profiledOwned": {"nsPerOp": 159.7, "bytesPerOp": 0, "allocationsPerOp": 0},
+    "conditionalBenefit": "At 1000 service ACKs/second, this site saves 1000 allocations and 144000 allocated bytes/second. This does not establish that allocation caused the observed 1.47-second stall."
+  },
+  "validation": [
+    "Five full suites passed: inputworker, handoff, productlog, residentagent, localapi, count=1.",
+    "go vet passed for the same five packages.",
+    "Selected native submission, service IPC and buffer tests passed under -race in inputworker/handoff.",
+    "Actual Windows pipe test holds writer admission for 20ms and verifies it remains outside the post-submission phase.",
+    "Expired/invalid submission and orphan native-write metadata tests passed; git diff --check passed."
+  ],
+  "wire": "Profiled local ACK suffix is 68 bytes (g518 used 44); no extra request, ACK, network round trip or I/O is added. Peer network protocol is unchanged. Matching application/protected-service images must be installed together.",
+  "rollout": "g519 was built but not installed. Package g520 only from committed source. Preserve g518 evidence, install g520 on A and B and connect by CLI; record verified installation separately.",
+  "rollback": "Keep prior generation artifacts. If g520 regresses, use its installer/update flow to restore matching prior app/service images; do not mix local wire generations or bypass retirement confirmation.",
+  "remainingRisk": "Pipe delivery versus app scheduling remains ambiguous within phase 4. No physical latency improvement, long-term stability or elimination of the g518 stall is claimed before new user crossings.",
+  "apiDBRunner": "Optional local diagnostic metadata extended; no external API, DB, dependency, GitHub runner or repository hygiene rule changes. No remote push or public release."
+}

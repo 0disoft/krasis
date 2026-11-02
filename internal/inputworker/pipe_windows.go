@@ -263,6 +263,17 @@ func (pipe *pipeConn) readContext(ctx context.Context, data []byte) (int, error)
 }
 
 func (pipe *pipeConn) Write(data []byte) (int, error) {
+	return pipe.write(data, -1)
+}
+
+func (pipe *pipeConn) writeServiceResponse(data []byte, offset int) (int, error) {
+	if !validServiceSubmissionOffset(data, offset) {
+		return 0, ErrProtocol
+	}
+	return pipe.write(data, offset)
+}
+
+func (pipe *pipeConn) write(data []byte, serviceOffset int) (int, error) {
 	pipe.writeMu.Lock()
 	defer pipe.writeMu.Unlock()
 	if err := pipe.start(); err != nil {
@@ -274,6 +285,12 @@ func (pipe *pipeConn) Write(data []byte) (int, error) {
 	}
 	n, err := pipe.overlapped(context.Background(), false, data, func(o *windows.Overlapped) error {
 		var immediate uint32
+		if serviceOffset >= 0 {
+			stampServiceSubmission(data, serviceOffset, workerIPCTick())
+			if deadline := pipe.deadline(false); !deadline.IsZero() && !time.Now().Before(deadline) {
+				return pipeAdmissionFailure(false, os.ErrDeadlineExceeded)
+			}
+		}
 		return windows.WriteFile(pipe.handle, data, &immediate, o)
 	})
 	if err == nil && int(n) != len(data) {

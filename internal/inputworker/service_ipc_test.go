@@ -27,7 +27,7 @@ func TestServiceIPCKeepsInnerProfileAndNextACKAligned(t *testing.T) {
 		}
 		r := newACKReader(&wire)
 		got, err := readResponse(r)
-		if err != nil || got.ipc == nil || got.ipc.outer[0] != 100 || got.ipc.outer[1] != 110 || got.applyDetail == nil {
+		if err != nil || got.ipc == nil || got.ipc.outer[0] != 100 || got.ipc.outer[1] == 0 || got.applyDetail == nil {
 			t.Fatal("outer exchange displaced inner detail", got, err)
 		}
 		if inner != nil && (got.applyDetail.NativeIPC == nil || *got.applyDetail.NativeIPC != *inner) {
@@ -92,7 +92,7 @@ func TestServiceIPCSeparatesHandlerFromAppReadResumption(t *testing.T) {
 		t.Fatal("matching app read profile missing")
 	}
 	service := summaries[0].First.ACKRead.ServiceIPC
-	if service == nil || service.Micros[3] < 12000 || service.Micros[4] < 18000 || service.Micros[0] != 0 {
+	if service == nil || service.Micros[2] < 12000 || service.Micros[4] < 18000 || service.Micros[0] != 0 || summaries[0].First.ACKRead.ServiceNativeWrite {
 		t.Fatal("handler and app resumption mixed", service)
 	}
 }

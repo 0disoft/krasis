@@ -309,6 +309,7 @@ func (client *Client) performResponseChecked(ctx context.Context, command reques
 			ackRead.Progress = handoff.ACKReadMatched
 			if ack.ipc != nil {
 				ackRead.ServiceIPC = normalizeNativeIPC(requestTick, requestTick, requestTick, &nativeIPCWire{stamps: ack.ipc.outer}, ackTicks[0], ackTicks[1])
+				ackRead.ServiceNativeWrite = ackRead.ServiceIPC != nil && ack.ipc.nativeWrite
 			}
 		}
 		handoff.RecordACKRead(ctx, ackRead)

@@ -7,7 +7,7 @@ import (
 
 func TestServiceIPCRequiresMatchedACKAndOwnsItsSnapshot(t *testing.T) {
 	service := &NativeIPCProfile{Micros: [6]uint32{0, 10, 20, 30, 40, 50}}
-	profile := ACKReadProfile{Measured: 7, Progress: ACKReadMatched, ServiceIPC: service}
+	profile := ACKReadProfile{Measured: 7, Progress: ACKReadMatched, ServiceIPC: service, ServiceNativeWrite: true}
 	if !profile.Valid() {
 		t.Fatal("valid service exchange rejected")
 	}
@@ -16,6 +16,10 @@ func TestServiceIPCRequiresMatchedACKAndOwnsItsSnapshot(t *testing.T) {
 		t.Fatal("unmatched response supplied service timing")
 	}
 	profile.Progress = ACKReadMatched
+	profile.ServiceIPC = nil
+	if profile.Valid() {
+		t.Fatal("native write flag accepted without its exchange")
+	}
 	for _, invalid := range []NativeIPCProfile{
 		{Micros: [6]uint32{1}},
 		{ParentMeasured: true},

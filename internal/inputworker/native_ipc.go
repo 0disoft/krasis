@@ -13,16 +13,20 @@ import (
 const nativeIPCSize = 68
 
 type nativeIPCWire struct {
-	stamps  [3]uint64 // child read complete, handler entry, immediately before Write
-	profile *handoff.NativeIPCProfile
-	outer   [3]uint64 // journal read complete, handler entry, immediately before Write
+	stamps      [3]uint64 // child read complete, handler entry, immediately before Write
+	profile     *handoff.NativeIPCProfile
+	outer       [3]uint64 // journal read complete, reply ready, write submission
+	nativeWrite bool      // Outer submit was stamped after native pipe admission.
 }
 
 func (p *nativeIPCWire) encode(data []byte) {
 	if p.outer != ([3]uint64{}) {
 		data[0] = 4
+		if p.nativeWrite {
+			data[1] = 4
+		}
 		if p.profile != nil {
-			data[1] = 1
+			data[1] |= 1
 			if p.profile.ParentMeasured {
 				data[1] |= 2
 			}
@@ -63,7 +67,7 @@ func decodeNativeIPC(data []byte) *nativeIPCWire {
 		return nil
 	}
 	if data[0] == 4 {
-		if !zeroBytes(data[2:8]) || data[1] > 3 || data[1] == 2 || data[1]&2 == 0 && !zeroBytes(data[32:44]) || data[1] == 0 && !zeroBytes(data[8:44]) {
+		if !zeroBytes(data[2:8]) || data[1] > 7 || data[1]&3 == 2 || data[1]&2 == 0 && !zeroBytes(data[32:44]) || data[1]&1 == 0 && !zeroBytes(data[8:44]) {
 			return nil
 		}
 	} else if !zeroBytes(data[1:8]) || !zeroBytes(data[44:]) || data[0] != 3 && !zeroBytes(data[32:44]) {
@@ -71,10 +75,11 @@ func decodeNativeIPC(data []byte) *nativeIPCWire {
 	}
 	p := &nativeIPCWire{}
 	if data[0] == 4 {
+		p.nativeWrite = data[1]&4 != 0
 		for i := range p.outer {
 			p.outer[i] = binary.BigEndian.Uint64(data[44+i*8:])
 		}
-		if data[1] == 0 {
+		if data[1]&1 == 0 {
 			return p
 		}
 	}

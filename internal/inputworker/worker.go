@@ -261,7 +261,7 @@ func serve(ctx context.Context, stream net.Conn, input application.InputPort, le
 		operationCtx, cancel := context.WithDeadline(ctx, deadline)
 		ack := response{sequence: command.sequence, op: command.op}
 		if command.ipcDetail {
-			ack.ipc = &nativeIPCWire{outer: [3]uint64{readAt, workerIPCTick(), 0}}
+			ack.ipc = &nativeIPCWire{outer: [3]uint64{readAt, 0, 0}}
 		}
 		dispatched := false
 		operationErr := do(operationCtx, func() error {

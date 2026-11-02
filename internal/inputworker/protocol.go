@@ -267,14 +267,21 @@ func (data *responseBuffer) write(writer io.Writer, value response) error {
 	if ipc != nil {
 		data[4] += 14
 		if ipc.outer != ([3]uint64{}) {
-			ipc.outer[2] = workerIPCTick()
+			ipc.outer[1] = workerIPCTick()
+			ipc.outer[2] = ipc.outer[1] // io.Writer fallback, explicitly not native submission.
 		} else if ipc.profile == nil {
 			ipc.stamps[2] = workerIPCTick()
 		}
 		ipc.encode(data[size : size+nativeIPCSize])
 		size += nativeIPCSize
 	}
-	n, err := writer.Write(data[:size])
+	var n int
+	var err error
+	if native, ok := writer.(serviceSubmissionWriter); ok && ipc != nil && ipc.outer != ([3]uint64{}) {
+		n, err = native.writeServiceResponse(data[:size], size-nativeIPCSize)
+	} else {
+		n, err = writer.Write(data[:size])
+	}
 	if err == nil && n != size {
 		return io.ErrShortWrite
 	}
