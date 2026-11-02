@@ -30,7 +30,6 @@ func TestBoundaryReceiptSurvivesUnsentPresenceStallWithoutFencing(t *testing.T) 
 			p, err := readSourcePacket(server)
 			if err == nil {
 				got <- p
-				c.replies <- sourcePacket{kind: sourceReply, op: p.op, reply: p.sequence}
 			}
 		}()
 		start := time.Now()
@@ -71,7 +70,9 @@ func TestBoundaryReceiptNativeWaitLeavesHeartbeatRunnable(t *testing.T) {
 					return
 				}
 				frames <- p
-				c.replies <- sourcePacket{kind: sourceReply, op: p.op, reply: p.sequence}
+				if p.op == sourceHeartbeat {
+					c.replies <- sourcePacket{kind: sourceReply, op: p.op, reply: p.sequence}
+				}
 			}
 		}()
 		heartbeat := make(chan error, 1)

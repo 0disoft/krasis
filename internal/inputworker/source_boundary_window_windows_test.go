@@ -133,7 +133,6 @@ func TestBoundaryReceiptUsesPresenceWithoutGrantingInputAuthority(t *testing.T) 
 			return
 		}
 		seen <- p
-		client.replies <- sourcePacket{kind: sourceReply, op: sourceBoundaryAck, sequence: 1, reply: p.sequence, binding: p.binding}
 	}()
 	if _, err := client.call(context.Background(), sourceBoundaryAck, 16); err != nil {
 		t.Fatal(err)

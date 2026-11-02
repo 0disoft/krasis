@@ -320,6 +320,14 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 		_ = c.channel.Close()
 		return sourcePacket{}, writeErr
 	}
+	if op == sourceBoundaryAck {
+		// This is credit for already-read advisory events, not an input or
+		// retirement command. Full frame submission is its only local outcome:
+		// the serial authenticated reader validates/applies it without a reply.
+		// Never claim liveness, advance an epoch, or replay an uncertain write.
+		accepted = true
+		return sourcePacket{}, nil
+	}
 	timer := time.NewTimer(time.Until(limit))
 	defer timer.Stop()
 	stage = "response"

@@ -1,0 +1,41 @@
+{
+  "schema": "krasis.boundary-receipt-recurrence/v1",
+  "observedGeneration": 517,
+  "observedRevision": "2c4445618b4d866c2499fb9c0e1358836e8263e9",
+  "collection": "125617d7a6bf7b1d12f6767d82f5e427",
+  "sourceSHA256": {
+    "A": "c34d95f275e2f9f3c4553a15167079b692cd7ea8820855c12c7f89bd3e5942eb",
+    "B": "fbfd9a27195e53a64c51ec4b64dfdaa7f3a9f8b846ac3086f860e4baaddf5e2d"
+  },
+  "method": "Exact-build events deduplicated by run/sequence/code from both authenticated diagnostic exports. Examine all connections since g517 installation, not only the latest healthy connection. Do not subtract clocks across machines.",
+  "failure": {
+    "A": "At 2026-11-02T16:52:29.6851816Z, installed_source_command_failed_boundary_ack and installed_source_response_timeout follow client_write_lt1ms and client_response_ge1s. source-hook is the triggering session component. Agent later records FAULTED, but at collection the service/input are READY and a new connection is established.",
+    "B": "Records remote EOF, reconnect attempts and subsequent CONNECTED. Current service/input are READY. No new service-1066 or worker-poisoning failure is established by this collection.",
+    "osEvidence": [
+      {"readEnvelopeMicros": 353177, "processCPUMicros": 15625, "pageFaults": 1, "systemBusyMicros": 3375000, "systemTotalMicros": 3375000},
+      {"readEnvelopeMicros": 161761, "processCPUMicros": 31250, "pageFaults": 129, "systemBusyMicros": 3421875, "systemTotalMicros": 3421875},
+      {"readEnvelopeMicros": 106632, "processCPUMicros": 0, "pageFaults": 93, "systemBusyMicros": 1468750, "systemTotalMicros": 1468750}
+    ],
+    "interpretation": "These retained samples have zero GC pause/stopping increments and 100% observed processor-group busy time. They support host scheduling/load as a contributor, not a proven specific OS API defect or exclusion of all GC/scheduling stalls. Read envelopes include scheduling; process and OS counters are sequential observations."
+  },
+  "crossings": {
+    "matchedPairs": 6,
+    "completePairs": 5,
+    "completeMaxMilliseconds": {"AGrant": 43.797, "ACapture": 120.929, "BPreparation": 27.485, "BInputResponse": 144.761},
+    "BSlowApply": {"applyMicros": 144761, "nativeSubmissionMicros": 143121, "nativeSubmissionCalls": 1, "coreIPCPhasesMicros": [21, 58, 1, 144178, 80, 7], "parentIPCPhasesMicros": [9, 2, 26]},
+    "interpretation": "The 144.761ms input tail contains 143.121ms native submission; the three parent spans total 37us. Contained spans overlap and must not be added. This sample does not support parent mutex admission as the primary B input tail. Trials are uncontrolled and sample counts differ; do not claim a before/after physical latency improvement."
+  },
+  "fixGeneration": 518,
+  "singleTarget": "The ACK of advisory boundary-event credit is unnecessary. After a fully written authenticated credit frame, the parent releases its wire mutex without awaiting another ACK. The serial child validates the exact reserved sequence and releases only that reservation, without sending a reply.",
+  "quantitativeChange": "Per boundary batch: 2 local frames -> 1, 128 -> 64 bytes, 1 ACK wait -> 0. Eliminates the 1s receipt-response timeout path while leaving write deadlines unchanged.",
+  "safety": [
+    "Submission is not applied-input, heartbeat, permission or retirement proof. No epoch, pending request or lastReplyRequestAt is advanced by credit submission.",
+    "The ordinary pinned-owner authorization and serial authenticated sequence checks still precede processing. Foreign/duplicate reservation references fail closed.",
+    "Only requests proven unsent may retry. Attempted/partial/failed writes stay fatal and never replay.",
+    "Heartbeat, activation, native input and retirement retain exact reply matching and existing finite deadlines. Pipe advisory reservation remains at most 1KiB.",
+    "Both parent and child images must be updated as the existing matching, authenticated local bundle; there is no peer-network protocol change."
+  ],
+  "validation": "Boundary/native pipe tests and complete inputworker/handoff/residentagent/productlog/localapi suites plus go vet passed. New deterministic tests cover a 1.4s child delay, exact following heartbeat, unchanged active epoch/liveness, invalid/duplicate credit and fatal attempted write. Packaging, installation and subsequent physical results are recorded separately.",
+  "remainingRisk": "This removes one confirmed fatal waiting path. System saturation, native SendInput stalls and other finite liveness/retirement failures remain possible; no complete root-cause resolution or long-term reliability claim.",
+  "delivery": "Local g518 rollout to both PCs is authorized; no push or public release requested. No external API, DB, repository hygiene or runner change."
+}

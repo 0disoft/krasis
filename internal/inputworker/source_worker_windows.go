@@ -360,14 +360,7 @@ func runSourceCapture(ctx context.Context, channel, service *Channel, lease Leas
 	completed := make(chan struct{})
 	readDone := make(chan error, 1)
 	go func() {
-		readDone <- pumpSourceCommandsOrdered(run, read, requests, cancel, completed, func(p sourcePacket) error {
-			if p.op == sourceBoundaryAck {
-				if err := writer.boundary.acknowledge(p.reply); err != nil {
-					return err
-				}
-			}
-			return sourceCommandFailed(p.op, writer.sendCompletedReply(p, sourcePacket{kind: sourceReply, op: p.op, reply: p.sequence}))
-		})
+		readDone <- pumpSourceCommandsOrdered(run, read, requests, cancel, completed, writer.handleSourceMaintenance)
 	}()
 	// Retire only this read; the final native response still needs the writer.
 	defer func() {
