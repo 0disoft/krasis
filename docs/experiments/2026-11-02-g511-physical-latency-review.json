@@ -1,0 +1,563 @@
+{
+  "schema": "krasis.physical-latency-investigation/v1",
+  "generation": 511,
+  "revision": "a298a834a1f5d8dcd99a6dc676c98c3ab1f72d10",
+  "collection": "4bdb6e785b936ccc2eabccea4a449451",
+  "method": "Fresh authenticated paired collection. Deduplicate exact-build run/sequence/code. Match source/receiver by unique exchange tag and same connection. Summaries use only complete successful pairs and measured stage bits. Never subtract host wall clocks.",
+  "matchedPairs": 15,
+  "completePairs": 12,
+  "sides": {
+    "A": {
+      "created": "2026-11-02T09:25:39Z",
+      "sha256": "82c456e1969eb0d74ab27e6977981d1560335d179f6ffa309c4589aa42fb36eb",
+      "service": "READY",
+      "inputHealth": {
+        "time": "2026-11-02T09:25:15.2492372Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "recovery": {
+        "time": "2026-11-02T09:25:31.7254558Z",
+        "code": "agent_faulted",
+        "agentState": "FAULTED",
+        "lastFailure": {
+          "time": "2026-11-02T09:25:31.7254558Z",
+          "code": "agent_faulted",
+          "agentState": "FAULTED"
+        }
+      },
+      "recentFailureCounts": {
+        "fault_source_hook_failed": 2,
+        "installed_source_response_timeout": 1
+      },
+      "recentFailureEvents": [
+        {
+          "time": "2026-11-02T08:23:55.8805714Z",
+          "code": "fault_source_hook_failed"
+        },
+        {
+          "time": "2026-11-02T08:43:52.1664379Z",
+          "code": "installed_source_response_timeout"
+        },
+        {
+          "time": "2026-11-02T08:43:52.17579Z",
+          "code": "fault_source_hook_failed"
+        }
+      ],
+      "logCoverage": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false,
+          "first": "2026-11-02T06:48:24.0359574Z",
+          "last": "2026-11-02T08:23:55.5690225Z"
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false,
+          "first": "2026-11-02T08:23:55.5690225Z",
+          "last": "2026-11-02T08:43:52.2911166Z"
+        }
+      ],
+      "sourceExits": [
+        {
+          "time": "2026-11-02T08:23:55.8274177Z",
+          "command": "ok",
+          "reader": "eof",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "delivery_failed",
+          "report": "failed",
+          "failure": {
+            "operation": "source-reader-eof",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "heartbeatStage": "replied",
+          "heartbeatSlowStage": "service_presence",
+          "heartbeatSlowBucket": 2
+        },
+        {
+          "time": "2026-11-02T08:43:53.0397242Z",
+          "command": "ok",
+          "reader": "failed",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "delivery_failed",
+          "report": "failed",
+          "failure": {
+            "operation": "source-gate-action-write",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "heartbeatStage": "reply_gate",
+          "heartbeatSlowStage": "reply_gate",
+          "heartbeatSlowBucket": 5
+        }
+      ]
+    },
+    "B": {
+      "created": "2026-11-02T09:25:39Z",
+      "sha256": "5cea3c3d6de6a7e789c1413d83ef9ab9b02c5e43dc0f1b20ae8c070affffdcd8",
+      "service": "READY",
+      "inputHealth": {
+        "time": "2026-11-02T09:25:23.4280306Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "recovery": {
+        "time": "2026-11-02T09:25:08.6382696Z",
+        "code": "agent_present",
+        "agentState": "RECONNECTING",
+        "lastFailure": {
+          "time": "2026-11-01T08:50:08.5779933Z",
+          "code": "agent_faulted",
+          "agentState": "FAULTED"
+        }
+      },
+      "recentFailureCounts": {
+        "reconnect_remote_eof": 2,
+        "RECONNECTING": 2,
+        "reconnect_acquire_network_reset": 1,
+        "reconnect_acquire_network_timeout": 79
+      },
+      "recentFailureEvents": [
+        {
+          "time": "2026-11-02T08:23:55.1483773Z",
+          "code": "RECONNECTING"
+        },
+        {
+          "time": "2026-11-02T08:43:51.7205295Z",
+          "code": "RECONNECTING"
+        }
+      ],
+      "logCoverage": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false,
+          "first": "2026-11-02T07:20:24.6012794Z",
+          "last": "2026-11-02T08:38:42.232114Z"
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false,
+          "first": "2026-11-02T08:38:42.232114Z",
+          "last": "2026-11-02T09:25:31.3793657Z"
+        }
+      ],
+      "sourceExits": [
+        {
+          "time": "2026-11-02T08:23:55.1592342Z",
+          "command": "ok",
+          "reader": "stopped",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "clean_sent",
+          "report": "ok",
+          "heartbeatStage": "replied",
+          "heartbeatSlowStage": "service_presence",
+          "heartbeatSlowBucket": 3
+        },
+        {
+          "time": "2026-11-02T08:43:51.7336121Z",
+          "command": "ok",
+          "reader": "stopped",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "clean_sent",
+          "report": "ok",
+          "heartbeatStage": "replied",
+          "heartbeatSlowStage": "service_presence",
+          "heartbeatSlowBucket": 3
+        }
+      ]
+    }
+  },
+  "summary": {
+    "requestToGrantMs": {
+      "count": 12,
+      "minMs": 35.698,
+      "medianMs": 42.89,
+      "maxMs": 932.917
+    },
+    "captureActivationMs": {
+      "count": 12,
+      "minMs": 10.292,
+      "medianMs": 12.621,
+      "maxMs": 29.059
+    },
+    "receiverPrepareMs": {
+      "count": 12,
+      "minMs": 24.047,
+      "medianMs": 27.832,
+      "maxMs": 804.073
+    },
+    "receiverFirstInputMs": {
+      "count": 12,
+      "minMs": 1.691,
+      "medianMs": 2.376,
+      "maxMs": 4.761
+    },
+    "receiverWorstInputMs": {
+      "count": 12,
+      "minMs": 2.275,
+      "medianMs": 17.042,
+      "maxMs": 1116.742
+    }
+  },
+  "baseline": {
+    "generation": 510,
+    "collection": "8b9caed96a22c2fa780b862780c31861",
+    "summary": {
+      "requestToGrantMs": {
+        "count": 11,
+        "minMs": 38.36,
+        "medianMs": 45.989,
+        "maxMs": 291.595
+      },
+      "captureActivationMs": {
+        "count": 11,
+        "minMs": 11.061,
+        "medianMs": 12.988,
+        "maxMs": 160.287
+      },
+      "firstOfferSinceBeginMs": {
+        "count": 11,
+        "minMs": 52.206,
+        "medianMs": 70.28,
+        "maxMs": 416.495
+      },
+      "receiverPrepareMs": {
+        "count": 11,
+        "minMs": 24.424,
+        "medianMs": 26.23,
+        "maxMs": 277.745
+      },
+      "receiverReadyMs": {
+        "count": 11,
+        "minMs": 22.627,
+        "medianMs": 23.896,
+        "maxMs": 275.33
+      },
+      "receiverEntryMs": {
+        "count": 11,
+        "minMs": 2.868,
+        "medianMs": 3.55,
+        "maxMs": 6.232
+      },
+      "receiverFirstInputMs": {
+        "count": 11,
+        "minMs": 1.603,
+        "medianMs": 2.237,
+        "maxMs": 3.513
+      },
+      "receiverWorstInputMs": {
+        "count": 11,
+        "minMs": 3.541,
+        "medianMs": 5.817,
+        "maxMs": 48.755
+      },
+      "receiverWorstClientLockMs": {
+        "count": 11,
+        "minMs": 0,
+        "medianMs": 0,
+        "maxMs": 0
+      },
+      "receiverWorstAuthorityMs": {
+        "count": 11,
+        "minMs": 0,
+        "medianMs": 0,
+        "maxMs": 0.602
+      },
+      "receiverWorstResponseMs": {
+        "count": 11,
+        "minMs": 2.986,
+        "medianMs": 5.817,
+        "maxMs": 48.755
+      },
+      "receiverWorstPostMs": {
+        "count": 9,
+        "minMs": 0,
+        "medianMs": 0,
+        "maxMs": 0
+      },
+      "exchangeWaitMs": {
+        "count": 11,
+        "minMs": 38.36,
+        "medianMs": 45.989,
+        "maxMs": 291.039
+      },
+      "receiverServiceMs": {
+        "count": 10,
+        "minMs": 30.948,
+        "medianMs": 34.4275,
+        "maxMs": 283.969
+      },
+      "exchangeResidualMs": {
+        "count": 10,
+        "minMs": 6.686999999999998,
+        "medianMs": 9.7575,
+        "maxMs": 24.94700000000001
+      }
+    },
+    "limitation": "Different uncontrolled daily-use samples and log coverage; extrema do not prove a patch effect."
+  },
+  "samples": [
+    {
+      "sourceObservedAt": "2026-11-02T08:18:10.4964643Z",
+      "receiverObservedAt": "2026-11-02T08:18:10.0612329Z",
+      "complete": true,
+      "sourceGrantMs": 38.512,
+      "sourceCaptureMs": 20.765,
+      "receiverPrepareMs": 25.587,
+      "receiverReadyMs": 22.401,
+      "receiverFirstMs": 4.728,
+      "receiverWorstMs": 2.275,
+      "receiverWorstResponseMs": 2.275,
+      "preparationDecision": 1
+    },
+    {
+      "sourceObservedAt": "2026-11-02T08:23:23.3380949Z",
+      "receiverObservedAt": "2026-11-02T08:23:24.5968004Z",
+      "complete": true,
+      "sourceGrantMs": 35.698,
+      "sourceCaptureMs": 12.124,
+      "receiverPrepareMs": 24.047,
+      "receiverReadyMs": 21.062,
+      "receiverFirstMs": 4.761,
+      "receiverWorstMs": 460.814,
+      "receiverWorstResponseMs": 460.814,
+      "preparationDecision": 1
+    },
+    {
+      "sourceObservedAt": "2026-11-02T08:24:59.8136619Z",
+      "receiverObservedAt": "2026-11-02T08:24:59.4289264Z",
+      "complete": true,
+      "sourceGrantMs": 62.814,
+      "sourceCaptureMs": 29.059,
+      "receiverPrepareMs": 24.719,
+      "receiverReadyMs": 22.37,
+      "receiverFirstMs": 2.14,
+      "receiverWorstMs": 1116.742,
+      "receiverWorstResponseMs": 1116.742,
+      "preparationDecision": 1
+    },
+    {
+      "sourceObservedAt": "2026-11-02T08:25:03.9620831Z",
+      "receiverObservedAt": "2026-11-02T08:25:03.5074515Z",
+      "complete": true,
+      "sourceGrantMs": 932.917,
+      "sourceCaptureMs": 11.897,
+      "receiverPrepareMs": 804.073,
+      "receiverReadyMs": 733.05,
+      "receiverFirstMs": 2.814,
+      "receiverWorstMs": 20.528,
+      "receiverWorstResponseMs": 19.998,
+      "preparationDecision": 3
+    },
+    {
+      "sourceObservedAt": "2026-11-02T08:33:04.5202769Z",
+      "receiverObservedAt": "2026-11-02T08:33:04.056577Z",
+      "complete": true,
+      "sourceGrantMs": 100.13,
+      "sourceCaptureMs": 20.107,
+      "receiverPrepareMs": 83.356,
+      "receiverReadyMs": 80.135,
+      "receiverFirstMs": 2.546,
+      "receiverWorstMs": 4.636,
+      "receiverWorstResponseMs": 3.955,
+      "preparationDecision": 1
+    },
+    {
+      "sourceObservedAt": "2026-11-02T08:37:02.1275352Z",
+      "receiverObservedAt": "2026-11-02T08:37:01.6654292Z",
+      "complete": true,
+      "sourceGrantMs": 39.139,
+      "sourceCaptureMs": 10.292,
+      "receiverPrepareMs": 24.543,
+      "receiverReadyMs": 22.657,
+      "receiverFirstMs": 1.691,
+      "receiverWorstMs": 74.997,
+      "receiverWorstResponseMs": 71.276,
+      "preparationDecision": 1
+    },
+    {
+      "sourceObservedAt": "2026-11-02T08:37:13.6731919Z",
+      "receiverObservedAt": "2026-11-02T08:37:13.2109474Z",
+      "complete": true,
+      "sourceGrantMs": 276.913,
+      "sourceCaptureMs": 12.521,
+      "receiverPrepareMs": 266.926,
+      "receiverReadyMs": 265.247,
+      "receiverFirstMs": 1.964,
+      "receiverWorstMs": 9.692,
+      "receiverWorstResponseMs": 9.692,
+      "preparationDecision": 3
+    },
+    {
+      "sourceObservedAt": "2026-11-02T08:37:16.2187187Z",
+      "receiverObservedAt": "2026-11-02T08:37:15.751551Z",
+      "complete": true,
+      "sourceGrantMs": 42.344,
+      "sourceCaptureMs": 10.38,
+      "receiverPrepareMs": 24.325,
+      "receiverReadyMs": 21.979,
+      "receiverFirstMs": 2.296,
+      "receiverWorstMs": 2.94,
+      "receiverWorstResponseMs": 2.94,
+      "preparationDecision": 1
+    },
+    {
+      "sourceObservedAt": "2026-11-02T08:37:43.4294933Z",
+      "receiverObservedAt": "2026-11-02T08:37:42.9646969Z",
+      "complete": true,
+      "sourceGrantMs": 45.666,
+      "sourceCaptureMs": 13.927,
+      "receiverPrepareMs": 31.622,
+      "receiverReadyMs": 27.732,
+      "receiverFirstMs": 2.376,
+      "receiverWorstMs": 18.485,
+      "receiverWorstResponseMs": 17.784,
+      "preparationDecision": 1
+    },
+    {
+      "sourceObservedAt": "2026-11-02T08:38:04.8770102Z",
+      "receiverObservedAt": "2026-11-02T08:38:04.4104221Z",
+      "complete": true,
+      "sourceGrantMs": 43.435,
+      "sourceCaptureMs": 11.544,
+      "receiverPrepareMs": 30.069,
+      "receiverReadyMs": 27.367,
+      "receiverFirstMs": 2.399,
+      "receiverWorstMs": 265.879,
+      "receiverWorstResponseMs": 265.278,
+      "preparationDecision": 1
+    },
+    {
+      "sourceObservedAt": "2026-11-02T08:38:55.7965065Z",
+      "receiverObservedAt": "2026-11-02T08:38:55.3427917Z",
+      "complete": false,
+      "sourceGrantMs": 39.566,
+      "sourceCaptureMs": 16.182,
+      "receiverPrepareMs": 28.359,
+      "receiverReadyMs": 25.143,
+      "receiverFirstMs": 2.311,
+      "receiverWorstMs": 44.206,
+      "receiverWorstResponseMs": 44.206,
+      "preparationDecision": 1
+    },
+    {
+      "sourceObservedAt": "2026-11-02T08:41:49.2928054Z",
+      "receiverObservedAt": "2026-11-02T08:41:48.8355Z",
+      "complete": false,
+      "sourceGrantMs": 42.988,
+      "sourceCaptureMs": 12.16,
+      "receiverPrepareMs": 25.705,
+      "receiverReadyMs": 23.911,
+      "receiverFirstMs": 1.63,
+      "receiverWorstMs": 68.616,
+      "receiverWorstResponseMs": 38.037,
+      "preparationDecision": 1
+    },
+    {
+      "sourceObservedAt": "2026-11-02T08:42:46.8686398Z",
+      "receiverObservedAt": "2026-11-02T08:42:46.3954908Z",
+      "complete": true,
+      "sourceGrantMs": 41.299,
+      "sourceCaptureMs": 12.721,
+      "receiverPrepareMs": 29.884,
+      "receiverReadyMs": 25.681,
+      "receiverFirstMs": 1.753,
+      "receiverWorstMs": 4.011,
+      "receiverWorstResponseMs": 3.418,
+      "preparationDecision": 1
+    },
+    {
+      "sourceObservedAt": "2026-11-02T08:43:32.9296415Z",
+      "receiverObservedAt": "2026-11-02T08:43:32.4502974Z",
+      "complete": true,
+      "sourceGrantMs": 37.447,
+      "sourceCaptureMs": 14.435,
+      "receiverPrepareMs": 25.779,
+      "receiverReadyMs": 24.074,
+      "receiverFirstMs": 2.376,
+      "receiverWorstMs": 15.599,
+      "receiverWorstResponseMs": 15.599,
+      "preparationDecision": 1
+    },
+    {
+      "sourceObservedAt": "2026-11-02T08:43:52.1677091Z",
+      "receiverObservedAt": "2026-11-02T08:43:51.719891Z",
+      "complete": false,
+      "sourceGrantMs": 42.966,
+      "sourceCaptureMs": 26.699,
+      "receiverPrepareMs": 24.861,
+      "receiverReadyMs": 22.521,
+      "receiverFirstMs": 1.671,
+      "receiverWorstMs": 34.695,
+      "receiverWorstResponseMs": 34.114,
+      "preparationDecision": 1
+    }
+  ],
+  "largestObservedInputStall": {
+    "sourceObservedAt": "2026-11-02T08:24:59.8136619Z",
+    "receiverObservedAt": "2026-11-02T08:24:59.4289264Z",
+    "dispatchMs": 1116.742,
+    "responseMs": 1116.742,
+    "workerMillis": [
+      2,
+      69,
+      184
+    ],
+    "workerMeasured": 7,
+    "workerApply": {
+      "micros": [
+        184560,
+        0
+      ],
+      "measured": 1,
+      "submissionMicros": 45792,
+      "submissionCalls": 1
+    },
+    "ackRead": {
+      "micros": [
+        1116742,
+        0,
+        0
+      ],
+      "measured": 7,
+      "progress": 4
+    }
+  },
+  "findings": [
+    "Both service and input-health snapshots are READY. A has an agent_faulted recovery receipt and two source-hook faults in retained current-build logs. B has remote EOF and subsequent reconnect acquisition timeouts. Connection failure recurred; a new service error 1066 or worker poisoning is not established.",
+    "The last A trigger is a source heartbeat response timeout. Its retained exit reports reply_gate with a ge1s slow bucket and action-write gate failure. Capture, sender and interrupt joins succeeded. This localizes reply contention but does not identify why that writer stalled.",
+    "The largest complete-pair B input dispatch is 1116.742ms, entirely included in its response span and first-byte ACK wait. Native apply is 184.560ms, including one 45.792ms submission. These nested measurements cannot be summed or attributed wholly to SendInput or network latency.",
+    "Two expired-candidate preparations have connect spans of 804.073ms and 266.926ms. This cold construction is a separate bottleneck from the larger active-input response stall.",
+    "A complete-pair capture maximum is 29.059ms versus g510 160.287ms; the current B input and preparation tails are worse. Overall latency improvement is not established."
+  ],
+  "decision": {
+    "target": "B native input command-to-ACK response path.",
+    "runtimeChange": "none",
+    "reason": "The largest measured stall is localized, but collected spans cannot distinguish child dispatch/response-writing from parent ACK-read scheduling. Changing authority checks, deadlines or worker lifetime would be speculative.",
+    "nextEvidence": "Measure local request admission, child dispatch, post-apply response write and parent first-byte resume on the same authenticated exchange before selecting a fix."
+  },
+  "validation": {
+    "pairedCollection": "RECEIVED with both files",
+    "analysis": "Exact revision, deduplication, measured-bit filtering, unique matched connection and expected profile assertions passed",
+    "productionTests": "Skipped; no runtime code changed",
+    "remoteCI": "Skipped; no push or workflow change",
+    "physical": "Existing real-device handoffs; no controlled post-fix trial"
+  },
+  "sourceOfTruthChanges": "none",
+  "apiChanges": "none",
+  "dbChanges": "none",
+  "runnerChanges": "none"
+}
