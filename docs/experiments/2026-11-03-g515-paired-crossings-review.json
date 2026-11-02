@@ -1,0 +1,315 @@
+{
+  "schema": "krasis.paired-crossings-review/v1",
+  "generation": 515,
+  "revision": "bb5f8738e39d0220199f68e31d8684b90a5273c0",
+  "collection": "c93a402aac4234c62d524f40d4164f74",
+  "method": {
+    "source": "Authenticated new paired diagnostic exports; verified original SHA-256; exact build; deduplicated by run/sequence/code.",
+    "period": "Only events after each side logged the latest common CONNECTED event. Installation-time reconnect attempts and historical lastFailure are excluded from recurrence.",
+    "latency": "Local software elapsed durations only; no cross-machine timestamp subtraction and no physical mouse-to-screen claim.",
+    "comparison": "The g514 and g515 physical trials are uncontrolled and differ in duration/sample count; do not attribute changes in maxima to the instrumentation."
+  },
+  "sides": {
+    "A": {
+      "created": "2026-11-02T16:00:21Z",
+      "sha256": "ed3b72f0513138930643b67a69769c67da6a86d2d0ab83c7fdb3456bf561b3e9",
+      "connectedAt": "2026-11-02T15:53:19.5813588Z",
+      "service": "READY",
+      "inputHealth": "READY",
+      "console": "USER_SESSION",
+      "grant": "PRESENT",
+      "lastFailure": {
+        "time": "2026-11-02T15:51:31.4218231Z",
+        "code": "agent_faulted",
+        "agentState": "FAULTED"
+      },
+      "postConnectionEvents": 356,
+      "failures": [],
+      "preConnectionFailures": [],
+      "runtimeSummaryCount": 7
+    },
+    "B": {
+      "created": "2026-11-02T16:00:21Z",
+      "sha256": "ce78cc693bc02ff3fe03292fdc08c439a1fe911f8d0e897c4137481c4dbaa0ae",
+      "connectedAt": "2026-11-02T15:53:19.4079438Z",
+      "service": "READY",
+      "inputHealth": "READY",
+      "console": "USER_SESSION",
+      "grant": "PRESENT",
+      "lastFailure": {
+        "time": "2026-11-01T08:50:08.5779933Z",
+        "code": "agent_faulted",
+        "agentState": "FAULTED"
+      },
+      "postConnectionEvents": 651,
+      "failures": [],
+      "preConnectionFailures": [
+        {
+          "time": "2026-11-02T15:52:35.1459924Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-02T15:52:35.1459924Z",
+          "code": "RECONNECTING"
+        },
+        {
+          "time": "2026-11-02T15:52:40.3861104Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-02T15:52:45.8000244Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-02T15:52:53.473089Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-02T15:53:00.1904196Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-02T15:53:10.5538416Z",
+          "code": "reconnect_acquire_network_timeout"
+        }
+      ],
+      "runtimeSummaryCount": 7
+    }
+  },
+  "matchedPairs": 14,
+  "completePairs": 13,
+  "completePairMilliseconds": {
+    "grant": {
+      "n": 13,
+      "medianMs": 40.089,
+      "maxMs": 182.126
+    },
+    "capture": {
+      "n": 13,
+      "medianMs": 12.577,
+      "maxMs": 24.376
+    },
+    "prepare": {
+      "n": 13,
+      "medianMs": 26.838,
+      "maxMs": 168.293
+    },
+    "ready": {
+      "n": 13,
+      "medianMs": 23.796,
+      "maxMs": 166.123
+    },
+    "first": {
+      "n": 13,
+      "medianMs": 2.224,
+      "maxMs": 4.841
+    },
+    "worst": {
+      "n": 13,
+      "medianMs": 4.629,
+      "maxMs": 20.174
+    },
+    "response": {
+      "n": 13,
+      "medianMs": 4.022,
+      "maxMs": 20.174
+    }
+  },
+  "incomplete": [
+    {
+      "side": "A",
+      "time": "2026-11-02T15:56:03.3935598Z",
+      "end": "incomplete",
+      "captureMilliseconds": 11.696,
+      "prepareMilliseconds": null,
+      "worstMilliseconds": 1.72
+    },
+    {
+      "side": "B",
+      "time": "2026-11-02T15:56:03.2277107Z",
+      "end": "incomplete",
+      "captureMilliseconds": null,
+      "prepareMilliseconds": 31.62,
+      "worstMilliseconds": 125.365
+    }
+  ],
+  "detailedTiming": {
+    "retainedFirstAndWorstProfiles": 28,
+    "allRetainedReceiverProfilesHaveIPCAndACKRead": true,
+    "caveat": "First/worst may refer to the same command. Detail presence demonstrates retention in these profiles, not independent command count or guaranteed coverage beyond time/count caps.",
+    "normalCompleteMaximum": {
+      "responseMilliseconds": 20.174,
+      "nativeHandlerMilliseconds": 19.641,
+      "submissionMilliseconds": 18.347
+    },
+    "actualMaximum": {
+      "time": "2026-11-02T15:56:03.2277107Z",
+      "outcome": "incomplete",
+      "responseMilliseconds": 125.365,
+      "workerApplyMilliseconds": 119.815,
+      "nativeSubmissionMilliseconds": 6.243,
+      "ipcPhaseMilliseconds": [
+        0.038,
+        1.09,
+        0.003,
+        8.458,
+        5.652,
+        0.008
+      ],
+      "ackReadMilliseconds": [
+        125.365,
+        0,
+        0
+      ],
+      "interpretation": "The 125.365ms tail is in an incomplete diagnostic profile and must not be hidden by the 20.174ms complete-pair maximum. Its worker apply is 119.815ms, while native submission is 6.243ms and the inner IPC vector totals 15.249ms. These are distinct containing/overlapping measurements, not additive components or a proven scheduler residual."
+    },
+    "nextBoundary": "Source inspection places the native IPC start after portable Client.mu acquisition and request preparation. Containing apply also spans work after matched IPC completion. Measure pre-IPC lock/preparation and post-IPC completion separately before attributing this tail to transport, native submission or scheduler delay."
+  },
+  "runtime": {
+    "A": {
+      "summaryCount": 7,
+      "observations": [
+        {
+          "time": "2026-11-02T15:53:48.8779542Z",
+          "reason": "timer_late",
+          "fault": "",
+          "affectedWindows": [
+            {
+              "intervalMilliseconds": 1563.89,
+              "readMilliseconds": 0,
+              "lateMilliseconds": 1464.373,
+              "gcTotal": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                1
+              ],
+              "gcStopping": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                1
+              ],
+              "runnable": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1
+              ],
+              "heapBytes": 1968664,
+              "allocatedBytes": 4688,
+              "gcCPUMicroseconds": 16113741
+            }
+          ]
+        },
+        {
+          "time": "2026-11-02T15:56:55.1720676Z",
+          "reason": "timer_late",
+          "fault": "",
+          "affectedWindows": [
+            {
+              "intervalMilliseconds": 677.07,
+              "readMilliseconds": 0,
+              "lateMilliseconds": 577.471,
+              "gcTotal": [
+                0,
+                0,
+                0,
+                0,
+                1,
+                0
+              ],
+              "gcStopping": [
+                0,
+                0,
+                0,
+                0,
+                1,
+                0
+              ],
+              "runnable": [
+                3,
+                0,
+                2,
+                0,
+                1,
+                0
+              ],
+              "heapBytes": 1867960,
+              "allocatedBytes": 639072,
+              "gcCPUMicroseconds": 6522141
+            }
+          ]
+        },
+        {
+          "time": "2026-11-02T15:58:57.5870361Z",
+          "reason": "metrics_read_slow",
+          "fault": "",
+          "affectedWindows": [
+            {
+              "intervalMilliseconds": 290.101,
+              "readMilliseconds": 176.546,
+              "lateMilliseconds": 15.893,
+              "gcTotal": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "gcStopping": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "runnable": [
+                5,
+                0,
+                0,
+                1,
+                0,
+                0
+              ],
+              "heapBytes": 1873664,
+              "allocatedBytes": 26528,
+              "gcCPUMicroseconds": 0
+            }
+          ]
+        }
+      ]
+    },
+    "B": {
+      "summaryCount": 7,
+      "maxTimerLateMilliseconds": 42.372,
+      "nonfatalTrails": 0
+    },
+    "interpretation": [
+      "A retains a nonfatal 1563.890ms sample interval with 1464.373ms timer lateness and >1s aggregate GC-total, GC-stopping and runnable observations. The GC-stopping delay remains present while the connection stays healthy.",
+      "A also retains 577.471ms timer lateness with coarse GC-total/stopping observations. Bucket rounding does not prove an exact 577ms GC pause.",
+      "A metrics sampling envelope spans 176.546ms without new GC total/stopping observations. This is not proof that metrics.Read itself blocked or caused a global process stall.",
+      "GC CPU values are runtime accounting across processors, not observed OS CPU use. Independent histogram durations must not be added or subtracted.",
+      "A sampled heap was approximately 1.9MB in these windows. The evidence does not establish a large-heap scan, a memory leak, or the exact Windows thread/runtime mechanism.",
+      "The 1.46s timer lateness is not a measured 1.46s screen crossing. Complete-pair capture activation is 12.577ms median and 24.376ms maximum."
+    ]
+  },
+  "preparation": {
+    "maximumMilliseconds": 168.293,
+    "remainingReadyMilliseconds": 166.123,
+    "nativeDesktopReadyMilliseconds": 109.114,
+    "remainingBuilderJoinMilliseconds": 44.574,
+    "preparedAgeMilliseconds": 5.205,
+    "interpretation": "The slow complete entry claimed a freshly prepared candidate while native loading/readiness was still in progress. These startup spans overlap; do not sum them or label the source grant wait as pure network RTT."
+  },
+  "conclusion": "No post-connect reconnect/recovery fault in the approximately seven-minute retained g515 window. Both services/input READY. A runtime stopping and B preparation/apply tails remain; evidence capture is verified, root-cause resolution is not.",
+  "validation": "Raw export hashes, exact-build filtering, shared connection, 14 matched/13 complete pairs, all 28 first/worst native-IPC and ACK-read profiles, JSON and git diff checked. No executable change; code tests, rebuild, reinstall and remote CI skipped. No push."
+}
