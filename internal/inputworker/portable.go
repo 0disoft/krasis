@@ -60,13 +60,13 @@ func (client *Client) performPortable(ctx context.Context, process portableTrans
 	if ctx == nil || ctx.Err() != nil {
 		return notSent(ErrAuthority)
 	}
-	ctx, cancel := context.WithTimeout(ctx, IdleTimeout)
-	defer cancel()
 	probe := handoff.WorkerApplyProbe(ctx)
 	entered, locked := uint64(0), uint64(0)
 	if probe != nil && command.op != opHeartbeat && command.op != opClose {
 		entered = workerIPCTick()
 	}
+	ctx, cancel := context.WithTimeout(ctx, IdleTimeout)
+	defer cancel()
 	if err := client.mu.LockContext(ctx); err != nil {
 		return notSent(err)
 	}

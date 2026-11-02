@@ -1,0 +1,11 @@
+{
+  "schema": "krasis.native-admission-boundary/v1",
+  "generation": 517,
+  "inherits": "g516 OS-counter and native-parent diagnostic policy",
+  "refinement": "Parent phase zero now starts before context.WithTimeout, so timer creation and parent-context registration cannot be omitted from the client-admission measurement. It ends after mutex acquisition and includes scheduling; it does not prove contention.",
+  "otherParentPhases": ["locked request preparation", "matched decode to portable completion before deferred unlock/cancel"],
+  "wire": "Same 44-byte profiled local ACK suffix and three parent durations as g516; no additional requests, reads/writes or native input submissions.",
+  "validation": "Existing real-QPC delayed transport, matching ACK, parent timestamp ordering/budget, metadata rejection, canceled-admission tests and selected race tests apply; packages and setup are verified before deployment.",
+  "rollout": "A briefly received g516 during packaging. The paired rollout targets g517 on both machines; g516 is not used as the physical comparison baseline.",
+  "limits": "Diagnostic coverage only. Neither GC root cause nor physical latency improvement is claimed. No push or public release requested."
+}

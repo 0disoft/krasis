@@ -7,7 +7,7 @@ package handoff
 // survive normalization; no raw counter, input, identity or extra probe does.
 type NativeIPCProfile struct {
 	Micros [6]uint32 `json:"micros"`
-	// Disjoint parent-local spans outside Micros: client mutex acquisition,
+	// Disjoint parent-local spans outside Micros: context setup/mutex admission,
 	// request preparation, and matched decode to portable-client completion.
 	// These contain scheduler delays; they are not proof of mutex contention.
 	ParentMicros   [3]uint32 `json:"parentMicros,omitzero"`
