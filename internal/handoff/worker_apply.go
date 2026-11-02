@@ -5,8 +5,10 @@ import (
 	"time"
 )
 
-const WorkerApplyProbeLimit = 2048
-const workerApplyProbeInterval = 100 * time.Millisecond
+// At most 1000 tracked commands/second over a 120s diagnostic window.
+// Every admitted command is measured: selecting it before execution cannot
+// predict which unsampled command will become the entry's worst input.
+const WorkerApplyProbeLimit = 120000
 
 // WorkerApplyProfile contains two disjoint worker-local parts of WorkerApply:
 // the existing apply function and the subsequent cursor snapshot. It records
@@ -72,10 +74,11 @@ func (p *WorkerApplyProfile) Record(slot int, elapsed time.Duration) {
 	p.Measured |= 1 << slot
 }
 
-// Keep two initial probes per entry, then spread probes over the entire 120s
-// window. A 1000Hz pointer otherwise consumes all 2048 probes in about 2s,
-// leaving later stalls without ACK/submission details. The unchanged global
-// cap spans reentry/reconnect; no maintenance or untracked input requests it.
+// Measure tracked commands throughout the bounded window, retaining only the
+// existing first/worst summaries. This adds numeric suffixes to existing local
+// exchanges, never a request, native submission or additional round trip.
+// The cap spans all reentries/reconnects within a window. Rolling collection
+// renews it only after freezing every old attempt; stale contexts stay inert.
 func WantWorkerApply(ctx context.Context) bool {
 	if ctx == nil {
 		return false
@@ -90,13 +93,7 @@ func WantWorkerApply(ctx context.Context) bool {
 	if v.workerApplyRequested || a.finished || a.summary.Role != "receiver" || a.summary.Backend != "installed" || time.Since(s.collector.started) >= Window || s.collector.workerApplyProbes >= WorkerApplyProbeLimit {
 		return false
 	}
-	now := time.Now()
-	if a.workerApplyProbes >= 2 && now.Sub(s.collector.workerApplyLast) < workerApplyProbeInterval {
-		return false
-	}
 	s.collector.workerApplyProbes++
-	s.collector.workerApplyLast = now
-	a.workerApplyProbes++
 	v.workerApplyRequested = true
 	return true
 }

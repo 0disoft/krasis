@@ -15,9 +15,9 @@ func TestWorkerApplyProbesStayBoundedAndMatching(t *testing.T) {
 		if WantWorkerApply(nil) || WantWorkerApply(context.Background()) || WantWorkerApply(p) {
 			t.Fatal("untracked detail requested")
 		}
-		for i := 0; i < WorkerApplyProbeLimit+1; i++ {
+		for i := 0; i < 4; i++ {
 			x, complete := Input(ctx, "receiver")
-			if WantWorkerApply(x) != (i < 2) || WantWorkerApply(x) {
+			if !WantWorkerApply(x) || WantWorkerApply(x) {
 				t.Fatal("sample or session budget escaped")
 			}
 			detail := WorkerApplyProfile{Micros: [2]uint32{31001, 0}, Measured: 3}
@@ -65,8 +65,8 @@ func TestWorkerApplyProbesSurviveHighRateInputAndReentry(t *testing.T) {
 			complete(nil)
 			time.Sleep(time.Millisecond)
 		}
-		if probes != 32 || c.workerApplyProbes != uint32(probes) {
-			t.Fatal("high-rate input escaped periodic probe budget", probes)
+		if probes != 3002 || c.workerApplyProbes != uint32(probes) {
+			t.Fatal("high-rate input left unobserved commands", probes)
 		}
 		Finish(p, "ok")
 		p = Begin(ctx, "receiver", "s", "e2", time.Now())
@@ -107,4 +107,49 @@ func TestWorkerApplyPartsFitContainingSpanWhenMeasured(t *testing.T) {
 	if !p.ValidForWorker([3]uint16{}, 0) || !p.ValidForWorker([3]uint16{0, 0, MaxWorkerMillis}, 4) {
 		t.Fatal("missing/saturated parent invented a bound")
 	}
+}
+
+func TestWorkerApplyRetainsActualSlowThirdCommandBetweenPeriodicProbes(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		c, ctx, out := collected(t)
+		p := Begin(ctx, "receiver", "s", "e", time.Now())
+		Backend(p, "installed")
+		for i, elapsed := range []time.Duration{time.Millisecond, time.Millisecond, 209 * time.Millisecond} {
+			x, complete := Input(ctx, "receiver")
+			if !WantWorkerApply(x) {
+				t.Fatal("a command was skipped before its latency was known", i)
+			}
+			time.Sleep(elapsed)
+			Record(x, ClientResponse, elapsed)
+			millis := uint16(elapsed.Milliseconds())
+			WorkerDetail(x, [3]byte{0, 0, byte(bucket(elapsed))}, [3]uint16{0, 0, millis}, 4)
+			RecordWorkerApply(x, &WorkerApplyProfile{Measured: 1, Micros: [2]uint32{uint32(elapsed.Microseconds()), 0}, NativeIPC: &NativeIPCProfile{Micros: [6]uint32{0, 0, 0, uint32(elapsed.Microseconds()), 0, 0}}})
+			RecordACKRead(x, &ACKReadProfile{Measured: 7, Progress: ACKReadMatched, Micros: [3]uint32{uint32(elapsed.Microseconds()), 0, 0}})
+			complete(nil)
+		}
+		Finish(p, "ok")
+		s := (*out)[0]
+		if !s.Valid() || s.Worst.WorkerApply == nil || s.Worst.WorkerApply.Micros[0] != 209000 || s.Worst.WorkerApply.NativeIPC == nil || s.Worst.ACKRead == nil || s.Worst.ACKRead.Micros[0] != 209000 || s.Frames != 2 {
+			t.Fatal("actual tail lost its matching native/ACK phases", s)
+		}
+		c.expire()
+	})
+}
+
+func TestWorkerApplyWindowCapBeforeAndAfterBoundary(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		c, ctx, _ := collected(t)
+		p := Begin(ctx, "receiver", "s", "e", time.Now())
+		Backend(p, "installed")
+		c.workerApplyProbes = WorkerApplyProbeLimit - 1
+		for i := 0; i < 2; i++ {
+			x, complete := Input(ctx, "receiver")
+			if WantWorkerApply(x) != (i == 0) {
+				t.Fatal("per-window cap escaped", i)
+			}
+			complete(nil)
+		}
+		Finish(p, "ok")
+		c.expire()
+	})
 }

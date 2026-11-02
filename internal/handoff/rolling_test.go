@@ -83,8 +83,8 @@ func TestRollingProfilesKeepWindowAndLifetimeProbeBudgets(t *testing.T) {
 		if getAttempt(fresh) == nil || c.count != 1 {
 			t.Fatal("new window did not admit a bounded attempt")
 		}
-		if c.pipeOwnerProbes.Load() != PipeOwnerProbeLimit || c.workerApplyProbes != WorkerApplyProbeLimit || c.cursorPlacementProbes != CursorPlacementProbeLimit {
-			t.Fatal("rolling replenished native diagnostic probes")
+		if c.pipeOwnerProbes.Load() != PipeOwnerProbeLimit || c.workerApplyProbes != 0 || c.cursorPlacementProbes != CursorPlacementProbeLimit {
+			t.Fatal("window timing budget or lifetime owner/cursor limits changed")
 		}
 		Finish(fresh, "ok")
 		c.timer.Stop()

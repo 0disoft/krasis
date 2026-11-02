@@ -4,7 +4,8 @@ import "time"
 
 // NewRolling keeps later user-triggered handoffs observable without a polling
 // loop or an unbounded history. Each window retains at most Limit attempts.
-// Native diagnostic probe counters remain bounded for the collector lifetime.
+// Owner/cursor probe counters remain bounded for the collector lifetime.
+// Input timing is capped separately per window to retain the actual tail.
 func NewRolling(emit func(Summary)) *Collector {
 	return &Collector{emit: emit, rolling: true}
 }
@@ -21,6 +22,7 @@ func (c *Collector) advanceWindowLocked(now time.Time) []func() {
 	}
 	c.started = time.Time{}
 	c.count = 0
+	c.workerApplyProbes = 0
 	c.stopped.Store(false)
 	return flushed
 }
