@@ -31,6 +31,12 @@ func Client() *http.Client {
 	}}
 }
 func fetch(ctx context.Context, c *http.Client, url string, limit int64) ([]byte, error) {
+	return fetchBody(ctx, c, url, limit, func(body io.Reader, limit int64) ([]byte, error) {
+		return io.ReadAll(io.LimitReader(body, limit+1))
+	})
+}
+
+func fetchBody(ctx context.Context, c *http.Client, url string, limit int64, read func(io.Reader, int64) ([]byte, error)) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -47,7 +53,7 @@ func fetch(ctx context.Context, c *http.Client, url string, limit int64) ([]byte
 	if resp.ContentLength > limit {
 		return nil, ErrInvalid
 	}
-	data, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
+	data, err := read(resp.Body, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -55,6 +61,31 @@ func fetch(ctx context.Context, c *http.Client, url string, limit int64) ([]byte
 		return nil, ErrInvalid
 	}
 	return data, nil
+}
+
+// The signed manifest fixes the archive's size independently of Content-Length.
+// Allocate once, including one overflow byte, and read through EOF so a final
+// transport error cannot be mistaken for a complete, verified download. Callers
+// still verify the exact length and digest, including for a short EOF response.
+func fetchArchive(ctx context.Context, c *http.Client, url string, size int64) ([]byte, error) {
+	if size <= 0 || size > updatebundle.MaxArchiveBytes {
+		return nil, ErrInvalid
+	}
+	return fetchBody(ctx, c, url, size, func(body io.Reader, size int64) ([]byte, error) {
+		data := make([]byte, int(size)+1)
+		n := 0
+		for n < len(data) {
+			read, err := body.Read(data[n:])
+			n += read
+			if err != nil {
+				if err != io.EOF {
+					return nil, err
+				}
+				return data[:n], nil
+			}
+		}
+		return nil, ErrInvalid
+	})
 }
 func Check(ctx context.Context, c *http.Client, key string) (Manifest, error) {
 	m, _, err := CheckSigned(ctx, c, key)
@@ -77,7 +108,7 @@ func Download(ctx context.Context, c *http.Client, m Manifest) (*updatebundle.Bu
 	return b, err
 }
 func DownloadArchive(ctx context.Context, c *http.Client, m Manifest) (*updatebundle.Bundle, []byte, error) {
-	data, err := fetch(ctx, c, m.URL, m.Size)
+	data, err := fetchArchive(ctx, c, m.URL, m.Size)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -89,10 +120,7 @@ func DownloadArchive(ctx context.Context, c *http.Client, m Manifest) (*updatebu
 // without expanding the ZIP. The bytes do not authorize staging or installation:
 // SaveReady must verify the signed envelope and complete bundle before publishing.
 func DownloadArchiveBytes(ctx context.Context, c *http.Client, m Manifest) ([]byte, error) {
-	if m.Size <= 0 || m.Size > updatebundle.MaxArchiveBytes {
-		return nil, ErrInvalid
-	}
-	data, err := fetch(ctx, c, m.URL, m.Size)
+	data, err := fetchArchive(ctx, c, m.URL, m.Size)
 	if err != nil {
 		return nil, err
 	}
