@@ -78,7 +78,7 @@ func queryAdmissionFailure(kind authorityQueryKind, reason string, cause error) 
 	if cause != nil {
 		err = errors.Join(err, cause)
 	}
-	if kind != sourceInputAuthorityQuery && kind != sourcePresenceAuthorityQuery && kind != sourceAdvisoryAuthorityQuery && kind != sourceAdvisoryPresenceAuthorityQuery && kind != sourceWatchdogAuthorityQuery && kind != sourceWritePresenceAuthorityQuery {
+	if kind != sourceInputAuthorityQuery && kind != sourcePresenceAuthorityQuery && kind != sourceAdvisoryAuthorityQuery && kind != sourceAdvisoryPresenceAuthorityQuery && kind != sourceWatchdogAuthorityQuery && kind != sourceWritePresenceAuthorityQuery && kind != sourceReceiptAuthorityQuery {
 		return err
 	}
 	if cause == context.Canceled {

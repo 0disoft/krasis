@@ -38,6 +38,7 @@ const (
 	startupAuthorityQuery
 	sourceWatchdogAuthorityQuery
 	sourceWritePresenceAuthorityQuery
+	sourceReceiptAuthorityQuery
 )
 
 // Only read-only proof queries run here. Input injection stays on its original
@@ -64,6 +65,12 @@ func (channel *Channel) authorizePresence(ctx context.Context) error {
 // commands require independent fresh checks; Close still joins every lane.
 func (channel *Channel) authorizeHeartbeatPresence(ctx context.Context) error {
 	return channel.queryAuthority(ctx, false, heartbeatAuthorityQuery)
+}
+
+// An unsent credit receipt grants no input. Isolate its optional native owner
+// from heartbeat queries and keep it in the restricted three-slot proof pool.
+func (channel *Channel) authorizeReceiptPresence(ctx context.Context) error {
+	return channel.queryAuthority(ctx, false, sourceReceiptAuthorityQuery)
 }
 
 func (channel *Channel) authorizeSourceInput(ctx context.Context) error {
@@ -113,7 +120,7 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 	// An unsent advisory batch, like an unsent keepalive, grants no input.
 	// Keep its timed-out native query owned without fencing unrelated commands.
 	// Its caller must discard the batch; later work still needs a fresh check.
-	optional := kind == heartbeatAuthorityQuery || kind == sourceAdvisoryAuthorityQuery || kind == sourceAdvisoryPresenceAuthorityQuery
+	optional := kind == heartbeatAuthorityQuery || kind == sourceAdvisoryAuthorityQuery || kind == sourceAdvisoryPresenceAuthorityQuery || kind == sourceReceiptAuthorityQuery
 	for {
 		if err := ctx.Err(); err != nil {
 			return queryPhaseFailure(kind, "admission", err)
@@ -126,6 +133,8 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 		current := &channel.query
 		if kind == sourceWatchdogAuthorityQuery {
 			current = &channel.watchdogQuery
+		} else if kind == sourceReceiptAuthorityQuery {
+			current = &channel.receiptQuery
 		} else if kind == presenceAuthorityQuery || kind == sourcePresenceAuthorityQuery {
 			current = &channel.presenceQuery
 		} else if optional {
@@ -169,14 +178,19 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 		*current = query
 		queryCtx, merge := handoff.ForkAuthority(ctx)
 		go func() {
-			defer releaseQueryCapacity(kind)
+			released := false
+			defer func() {
+				if !released {
+					releaseQueryCapacity(kind)
+				}
+			}()
 			query.phase.Store(queryChecking)
 			if query.timing != nil {
 				query.timing.started = time.Now()
 			}
 			if kind == sourceInputAuthorityQuery || kind == sourceAdvisoryAuthorityQuery {
 				query.err = channel.authority.checkSource()
-			} else if kind == sourcePresenceAuthorityQuery || kind == sourceAdvisoryPresenceAuthorityQuery || kind == sourceWatchdogAuthorityQuery || kind == sourceWritePresenceAuthorityQuery {
+			} else if kind == sourcePresenceAuthorityQuery || kind == sourceAdvisoryPresenceAuthorityQuery || kind == sourceWatchdogAuthorityQuery || kind == sourceWritePresenceAuthorityQuery || kind == sourceReceiptAuthorityQuery {
 				query.err = channel.authority.checkSourceHeartbeat()
 			} else if kind == startupAuthorityQuery {
 				query.err = channel.authority.checkResult(nil, false)
@@ -212,6 +226,11 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 				}
 			}
 			query.phase.Store(queryCompleted)
+			// A done receipt must include its capacity retirement. Publishing
+			// done first could strand a supposedly finished slot across a pause
+			// and let a later owner/test replace pools before this release.
+			releaseQueryCapacity(kind)
+			released = true
 			close(query.done)
 			channel.queryMu.Unlock()
 		}()
@@ -246,7 +265,7 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 func (channel *Channel) cancelQuery(query *authorityQuery) {
 	channel.queryMu.Lock()
 	defer channel.queryMu.Unlock()
-	if channel.query != query && channel.presenceQuery != query && channel.watchdogQuery != query && channel.maintenanceQuery != query {
+	if channel.query != query && channel.presenceQuery != query && channel.watchdogQuery != query && channel.maintenanceQuery != query && channel.receiptQuery != query {
 		return
 	}
 	channel.closeQueryAdmissionLocked()

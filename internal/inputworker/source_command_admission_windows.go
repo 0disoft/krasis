@@ -28,6 +28,12 @@ func (check *sourceCommandCheck) validate(c *sourceClient, ctx context.Context, 
 	if check.err != nil {
 		return check.err
 	}
+	if op == sourceBoundaryAck {
+		// Its fresh presence check just returned before immediate TryLock.
+		// A credit receipt grants no input: match heartbeat's immutable-handle
+		// fence, without submitting a second native query under the wire gate.
+		return sourcePinnedOwnerPresent(c.channel.authority)
+	}
 	// Full SCM/WTS authorization just finished without waiting for the gate.
 	// Before bytes, still reject a closed or exited pinned service owner.
 	return c.channel.authorizePresence(ctx)
@@ -64,12 +70,12 @@ func (c *sourceClient) call(ctx context.Context, op byte, reference ...uint64) (
 			return sourcePacket{}, ErrAuthority
 		}
 		if err := ctx.Err(); err != nil {
-			return sourcePacket{}, err
+			return sourcePacket{}, deferSourceReceipt(op, err)
 		}
 		started := time.Now()
 		var err error
 		if op == sourceBoundaryAck {
-			err = c.channel.authorizePresence(ctx) // Receipts cannot grant input authority.
+			err = c.channel.authorizeReceiptPresence(ctx) // Unsent receipts grant no input; retain native ownership without fencing.
 		} else {
 			err = c.channel.authorizeInput(ctx, false)
 		}
@@ -80,8 +86,9 @@ func (c *sourceClient) call(ctx context.Context, op byte, reference ...uint64) (
 			}
 			if c.channel.authority.fenced.Load() {
 				c.epoch.Store(0)
+				return sourcePacket{}, ctx.Err()
 			}
-			return sourcePacket{}, ctx.Err() // No wire request or epoch exists.
+			return sourcePacket{}, deferSourceReceipt(op, ctx.Err()) // No wire request or epoch exists.
 		}
 		// Unsent native authorization is not wire demand: maintenance must
 		// continue while this query is blocked. Publish priority only now.
@@ -98,7 +105,7 @@ func (c *sourceClient) call(ctx context.Context, op byte, reference ...uint64) (
 		// that bounded request, then reauthorize outside the gate before retry.
 		if err := c.mu.LockContext(ctx); err != nil {
 			c.commandWaiting.Add(-1)
-			return sourcePacket{}, err
+			return sourcePacket{}, deferSourceReceipt(op, err)
 		}
 		c.mu.Unlock()
 		waited += time.Since(started)

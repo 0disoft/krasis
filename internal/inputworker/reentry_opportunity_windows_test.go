@@ -5,13 +5,17 @@ package inputworker
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
 )
 
-func reentrySpare() *preparedConsole {
+func reentrySpare(worker ...*ConsoleWorker) *preparedConsole {
 	p := &preparedConsole{preparedAt: time.Now()}
+	if len(worker) == 1 {
+		p.worker = worker[0]
+	}
 	p.warmTimer = time.AfterFunc(preparedConsoleWindow, func() { _ = p.expireUnbound() })
 	return p
 }
@@ -50,14 +54,14 @@ func TestReentryOpportunityNeverRetiresTheInitialSpareEarly(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		var slot serviceInputPreparation
 		defer slot.close()
-		builds := 0
-		var first *preparedConsole
+		var builds atomic.Int32
+		var first atomic.Pointer[preparedConsole]
 		if err := slot.reenter(context.Background(), Lease{ExpiresAt: time.Now().Add(time.Minute)}, nil, func(context.Context) (*preparedConsole, error) {
-			builds++
+			n := builds.Add(1)
 			time.Sleep(150 * time.Millisecond)
 			p := reentrySpare()
-			if builds == 1 {
-				first = p
+			if n == 1 {
+				first.Store(p)
 			}
 			return p, nil
 		}); err != nil {
@@ -65,13 +69,13 @@ func TestReentryOpportunityNeverRetiresTheInitialSpareEarly(t *testing.T) {
 		}
 		time.Sleep(preparedConsoleWindow)
 		synctest.Wait()
-		if first == nil || first.retired() || builds != 1 {
+		if p := first.Load(); p == nil || p.retired() || builds.Load() != 1 {
 			t.Fatal("late-completed initial spare retired before its original expiry")
 		}
 		time.Sleep(time.Second)
 		synctest.Wait()
-		if builds != 2 || !first.retired() {
-			t.Fatal("one opportunity missed the actual initial expiry", builds)
+		if p := first.Load(); builds.Load() != 2 || p == nil || !p.retired() {
+			t.Fatal("one opportunity missed the actual initial expiry", builds.Load())
 		}
 	})
 }
@@ -130,8 +134,7 @@ func TestReentryOpportunityCancelledByEntryFreshDemandShutdownOrExpiredLease(t *
 
 func TestReentryOpportunityKeepsUncertainRetirementTerminal(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		old := reentrySpare()
-		old.worker = failedConsoleCloseForTest()
+		old := reentrySpare(failedConsoleCloseForTest())
 		slot := serviceInputPreparation{next: old}
 		defer slot.close()
 		builds := 0

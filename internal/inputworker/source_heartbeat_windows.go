@@ -35,7 +35,10 @@ func (check *sourceHeartbeatCheck) validate(c *sourceClient, ctx context.Context
 	check.used = true
 	// The full immutable-handle check just completed. Closing the channel or
 	// its proof between preflight and immediate admission must still reject it.
-	a := c.channel.authority
+	return sourcePinnedOwnerPresent(c.channel.authority)
+}
+
+func sourcePinnedOwnerPresent(a *Authority) error {
 	if a == nil || a.fenced.Load() || !a.mu.TryRLock() {
 		return ErrAuthority
 	}

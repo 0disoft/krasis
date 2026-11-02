@@ -176,7 +176,7 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 	}
 	if err := ctx.Err(); err != nil {
 		accepted = true
-		return sourcePacket{}, err
+		return sourcePacket{}, deferSourceReceipt(op, err)
 	}
 	if c.retiring.Load() && op != sourceStop {
 		accepted = true // Only shutdown may follow an outcome still being drained.
@@ -233,8 +233,9 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 			accepted = true
 			if c.channel.authority.fenced.Load() {
 				c.epoch.Store(0)
+				return sourcePacket{}, ctx.Err()
 			}
-			return sourcePacket{}, ctx.Err()
+			return sourcePacket{}, deferSourceReceipt(op, ctx.Err())
 		}
 		if op == sourceStop && c.awaitRetirement(ctx) == nil {
 			accepted = true
@@ -246,7 +247,7 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 		// Cancellation can race fresh proof completion. No command was written:
 		// retain the sequence and never publish a new epoch from this proof.
 		accepted = true
-		return sourcePacket{}, ctx.Err()
+		return sourcePacket{}, deferSourceReceipt(op, ctx.Err())
 	}
 	select {
 	case <-c.done:
@@ -585,21 +586,34 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 	c.mu.Unlock()
 	defer func() { c.mu.Lock(); c.current = nil; c.mu.Unlock() }()
 	ready()
+	receiptContext, stopReceipts := context.WithCancel(ctx)
+	receiptDone := make(chan error, 1)
+	go func() {
+		defer close(receiptDone)
+		receiptDone <- runSourceBoundaryReceipts(receiptContext, boundaryAcks, func(run context.Context, reference uint64) error {
+			_, err := live.call(run, sourceBoundaryAck, reference)
+			return err
+		})
+	}()
+	joinReceipts := sync.OnceFunc(func() { stopReceipts(); <-receiptDone })
+	defer joinReceipts()
+	var receiptFailure <-chan error = receiptDone
 	ticker := time.NewTicker(250 * time.Millisecond)
 	defer ticker.Stop()
 	heartbeatDeferred := false
 	for {
 		select {
-		case reference := <-boundaryAcks:
+		case err := <-receiptFailure:
 			if ctx.Err() != nil || live.retiring.Load() {
+				receiptFailure = nil // Existing cancellation/retirement owns Stop and its exact ACK.
 				continue
 			}
-			// Join the bounded exact reply before stop; cancellation must not
-			// cut a submitted receipt frame or race retirement on this stream.
-			if _, err := live.call(context.WithoutCancel(ctx), sourceBoundaryAck, reference); err != nil {
+			if err != nil {
 				return err
 			}
+			return ErrProtocol
 		case <-live.failed:
+			joinReceipts()
 			cleanup, cancel := context.WithTimeout(context.Background(), RecoveryTimeout+time.Second)
 			_, err := live.call(cleanup, sourceStop)
 			cancel()
@@ -608,6 +622,7 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 			}
 			return errors.Join(wininput.ErrProtectedInput, ErrSourceCaptureRetired)
 		case <-ctx.Done():
+			joinReceipts()
 			// Native owners must acknowledge retirement before the resident may
 			// start ordinary desktop hooks. Missing proof forces full recovery.
 			if live.retired.Load() {
