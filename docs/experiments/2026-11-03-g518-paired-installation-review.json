@@ -1,0 +1,68 @@
+{
+  "schema": "krasis.paired-installation-review/v1",
+  "generation": 518,
+  "revision": "5d6d58ca852691926f734ab97187f6bf5e4ed0b1",
+  "collection": "dbfb2d3fae91cedb803da2f02cfdb070",
+  "devices": {
+    "A": {
+      "created": "2026-11-02T17:04:46Z",
+      "sha256": "2dc66f7dc918cd9d6af79db3948588918130b5a7f6ab3524eb22b7bae382ae20",
+      "connectedAt": "2026-11-02T17:04:05.8179484Z",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "installation": "complete",
+      "recovery": "not_needed",
+      "faultsSinceConnected": []
+    },
+    "B": {
+      "created": "2026-11-02T17:04:46Z",
+      "sha256": "089886cd129d29d4f2ea3590768a1b1c4efc3bd6ff967fe7b56fae8f1e424dca",
+      "connectedAt": "2026-11-02T17:04:05.576408Z",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "installation": "complete",
+      "recovery": "not_needed",
+      "faultsSinceConnected": []
+    }
+  },
+  "peerUpdate": {
+    "code": "updated",
+    "requestID": "d032b3981e0c39b3fa5bc61358feeb8d",
+    "bytes": 28995438,
+    "total": 28995438
+  },
+  "connection": {
+    "state": "CONNECTED",
+    "sharedConnectionMatched": true,
+    "method": "Existing app/agent automatic connection after installation; no manual connection or administrator recovery required."
+  },
+  "checks": [
+    "A exact-generation CLI/agent/UI/installed image and running service matched",
+    "B exact-generation/revision update receipt",
+    "Both protected services/input READY and grant PRESENT",
+    "Both exact-build latest CONNECTED events share one connection",
+    "No fault/disconnect/reconnect event after latest connection in this short installation observation"
+  ],
+  "limitations": [
+    "New physical crossings are pending. No latency improvement, root-cause resolution or long-term stability is claimed.",
+    "The g517 boundary-receipt timeout and host-load evidence were preserved before installation. Both sides now run g518; new physical validation is pending.",
+    "Historical failures and installation-time disconnects are excluded from post-connection recurrence.",
+    "Parent phase zero includes context setup, mutex admission and scheduling; it does not prove lock contention.",
+    "OS counters and Go runtime observations are sequential, not an atomic exact GC pause measurement. Public flight recording remains off."
+  ],
+  "sourceCommits": [
+    "5d6d58ca"
+  ],
+  "validation": [
+    "handoff/inputworker/productlog/residentagent/localapi suites passed with count=1 on g518",
+    "go vet for the same five packages and git diff --check passed",
+    "Selected one-way receipt/heartbeat tests passed under the race detector",
+    "111 frontend tests passed",
+    "Workspace update package and setup verification passed"
+  ],
+  "remoteCI": "Not run; local rollout only",
+  "push": "Not requested; not performed",
+  "apiDBRunner": "Advisory boundary credit is one-way: 2 local frames become 1, 128 bytes become 64, and the receipt-response wait is removed. Heartbeat/input/retirement still require exact replies. No external API, DB, runner or repository hygiene changes."
+}
