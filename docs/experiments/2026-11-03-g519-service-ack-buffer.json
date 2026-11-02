@@ -1,0 +1,21 @@
+{
+  "schema": "krasis.service-ack-buffer-review/v1",
+  "generation": 519,
+  "includes": "Outer journal ACK timing from commit 594b99a7; retains inner native-child and parent spans separately.",
+  "target": "The serial protected journal service allocated a fresh maximum-size response array for every ACK. Reuse one zeroed response buffer for the lifetime of serve instead.",
+  "ownership": "One buffer per serial connection, no shared global pool. io.Writer owns bytes only during Write. The service immediately exits on a failed/short write, so it never reuses a buffer after uncertain native I/O. The ordinary stateless helper remains for other callers.",
+  "invariants": "Clear the entire array before each encode. Preserve private cursor/desktop fields, failure certainty, framing, sequence order, one Write, original write errors, short-write handling, authority checks and deadlines. No input retry or asynchronous successful ACK.",
+  "benchmark": {
+    "command": "go test ./internal/inputworker -run ^$ -bench ^BenchmarkServiceACKSerialization$ -benchmem -benchtime=200ms -count=2",
+    "host": "Windows amd64, AMD Ryzen 5 7430U, Go 1.27.3",
+    "plainFresh": {"nanosecondsPerOperation": [104.4, 112.4], "allocatedBytesPerOperation": 144, "allocationsPerOperation": 1},
+    "plainOwned": {"nanosecondsPerOperation": [24.25, 21.85], "allocatedBytesPerOperation": 0, "allocationsPerOperation": 0},
+    "profiledFresh": {"nanosecondsPerOperation": [211.3, 226.1], "allocatedBytesPerOperation": 144, "allocationsPerOperation": 1},
+    "profiledOwned": {"nanosecondsPerOperation": [129.7, 131.7], "allocatedBytesPerOperation": 0, "allocationsPerOperation": 0},
+    "scope": "One response encode and io.Discard.Write. Same new codec, fresh-array helper versus connection-owned buffer. Excludes real pipes, new service timing allocations, native input, CPU saturation and GC pause behavior. Not a physical handoff benchmark or a whole-system allocation comparison."
+  },
+  "quantitativeEffect": "For this serialization site only, 1000 ACK/s removes 1000 transient allocations and 144000 allocated bytes/s. The connection buffer is allocated once. Does not establish that GC frequency or the prior 1.47s wait is fixed.",
+  "validation": "Five related package suites and vet passed for outer timing; full inputworker suite and vet rerun after buffer reuse. Selected outer-service/production-worker/snapshot/buffer tests passed under race detector. Byte-for-byte fresh/reused framing, detailed-to-plain clearing, following-ACK alignment, single attempted short/failed writes verified.",
+  "rollout": "Build and verify matching local g519 workspace/setup, install on A and B, verify READY and shared connection using CLI, then collect paired diagnostics. Physical latency and reliability remain pending the next user trial.",
+  "impact": "Only local profiled metadata and response-buffer ownership. No external API, DB, repository hygiene or runner change. No push or public release requested."
+}

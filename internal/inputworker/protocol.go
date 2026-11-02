@@ -164,7 +164,17 @@ type response struct {
 }
 
 func writeResponse(writer io.Writer, value response) error {
-	var data [responseSize + workerApplyDetailSize + workerSubmissionDetailSize + 26 + nativeIPCSize]byte
+	var data responseBuffer
+	return data.write(writer, value)
+}
+
+// A serial service loop owns one buffer until retirement. io.Writer must not
+// retain bytes after returning; the loop exits on any write error/short write.
+// Clear all fields so a short ACK cannot inherit private prior cursor/metadata.
+type responseBuffer [maxResponseSize]byte
+
+func (data *responseBuffer) write(writer io.Writer, value response) error {
+	clear(data[:])
 	size := responseSize
 	copy(data[:4], "KRA1")
 	data[4], data[5], data[6], data[7] = 1, byte(value.op), value.status, value.certainty

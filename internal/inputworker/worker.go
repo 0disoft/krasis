@@ -204,6 +204,7 @@ func serve(ctx context.Context, stream net.Conn, input application.InputPort, le
 	stopCancel := context.AfterFunc(ctx, func() { _ = stream.Close() })
 	defer stopCancel()
 	sequence := uint64(1)
+	var ackBuffer responseBuffer
 	deadline := now().Add(IdleTimeout)
 	if lease.ExpiresAt.Before(deadline) {
 		deadline = lease.ExpiresAt
@@ -291,7 +292,7 @@ func serve(ctx context.Context, stream net.Conn, input application.InputPort, le
 		if ack.ipc != nil && ack.applyDetail != nil {
 			ack.ipc.profile = ack.applyDetail.NativeIPC
 		}
-		if writeErr := writeResponse(stream, ack); writeErr != nil {
+		if writeErr := ackBuffer.write(stream, ack); writeErr != nil {
 			return report, ErrProtocol
 		}
 		if operationErr != nil {
