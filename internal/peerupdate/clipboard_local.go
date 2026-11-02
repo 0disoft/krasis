@@ -100,9 +100,14 @@ func prepareClipboardLocal(local *ClipboardValue) (*ClipboardValue, error) {
 		return nil, ErrDenied
 	}
 	value := &ClipboardValue{ID: randomID(), Text: local.Text, Format: local.Format, Data: bytes.Clone(local.Data)}
-	if value.Format != "" && !ValidClipboardPayload(value.Format, value.Data) {
+	if value.Format == "files" {
+		valid, expanded := validateClipboardFileMetadata(value.Data)
+		if !valid {
+			return nil, ErrDenied
+		}
+		value.legacyFiles = len(value.Data) <= legacyMaxClipboardFileBytes && expanded <= legacyMaxClipboardFileBytes
+	} else if value.Format != "" && !ValidClipboardPayload(value.Format, value.Data) {
 		return nil, ErrDenied
 	}
-	value.legacyFiles = value.Format == "files" && clipboardFilesFitLegacy(value.Data)
 	return value, nil
 }

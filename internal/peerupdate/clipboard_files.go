@@ -33,12 +33,19 @@ func clipboardFilesFitLegacy(data []byte) bool {
 // ValidClipboardFiles validates the metadata before a peer can advertise or
 // receive a file copy. Extraction must separately enforce these byte limits.
 func ValidClipboardFiles(data []byte) bool {
+	valid, _ := validateClipboardFileMetadata(data)
+	return valid
+}
+
+// Return the expanded byte count from the same validated directory traversal.
+// Outgoing preparation uses it for legacy admission without parsing ZIP again.
+func validateClipboardFileMetadata(data []byte) (bool, uint64) {
 	if len(data) == 0 || len(data) > MaxClipboardFileBytes || !clipboardZIPWithinEntryLimit(data) {
-		return false
+		return false, 0
 	}
 	r, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil || len(r.File) == 0 || len(r.File) > MaxClipboardFiles {
-		return false
+		return false, 0
 	}
 	seen := make(map[string]bool, len(r.File))
 	var total uint64
@@ -49,24 +56,24 @@ func ValidClipboardFiles(data []byte) bool {
 			(isDir && f.UncompressedSize64 != 0) ||
 			(!isDir && !f.Mode().IsRegular()) ||
 			(isDir && !f.Mode().IsDir()) {
-			return false
+			return false, 0
 		}
 		key := strings.ToUpper(name)
 		if _, exists := seen[key]; exists {
-			return false
+			return false, 0
 		}
 		seen[key] = isDir
 		if parent := path.Dir(name); parent != "." && !seen[strings.ToUpper(parent)] {
-			return false // Directory entries must precede their contents.
+			return false, 0 // Directory entries must precede their contents.
 		}
 		// Check the remaining budget before adding untrusted ZIP64 sizes.
 		// Addition first could wrap uint64 and admit an oversized archive.
 		if f.UncompressedSize64 > uint64(MaxClipboardFileBytes)-total {
-			return false
+			return false, 0
 		}
 		total += f.UncompressedSize64
 	}
-	return true
+	return true, total
 }
 
 func validClipboardFilePath(name string) bool {
