@@ -1,0 +1,71 @@
+{
+  "schema": "krasis.paired-installation-review/v1",
+  "generation": 520,
+  "revision": "65659a5161f94e59e903b6185739edfb793e02d4",
+  "collection": "878968cdb11c44b39beabf404ec9f0d1",
+  "devices": {
+    "A": {
+      "created": "2026-11-02T19:32:22Z",
+      "sha256": "3ce1612f66015874f851bd5339ab59f4eae648cc49d2a967ab7816e0abd529b8",
+      "connectedAt": "2026-11-02T19:31:50.9344143Z",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "installation": "complete",
+      "recovery": "not_needed",
+      "faultsSinceConnected": []
+    },
+    "B": {
+      "created": "2026-11-02T19:32:23Z",
+      "sha256": "f341038850bc33a9947ad1f0abc26cb2dc2f36cb19c85126c85ad55f69b34372",
+      "connectedAt": "2026-11-02T19:31:50.5438336Z",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "installation": "complete",
+      "recovery": "not_needed",
+      "faultsSinceConnected": []
+    }
+  },
+  "peerUpdate": {
+    "code": "updated",
+    "requestID": "b61f691fd22216884f6fe5f7500cccb1",
+    "bytes": 29011258,
+    "total": 29011258
+  },
+  "connection": {
+    "state": "CONNECTED",
+    "sharedConnectionMatched": true,
+    "method": "krasis-cli --json app connect B returned connected for this exact request receipt.",
+    "requestID": "64d9c18baede113203059dfd6e8c9860"
+  },
+  "checks": [
+    "A g520 CLI/agent/UI/installed image builds match with healthy doctor",
+    "B g520 exact-build update completed with matching full-byte receipt",
+    "Both protected services/input READY and grant PRESENT",
+    "Both exact-build latest CONNECTED events share one connection",
+    "No fault/disconnect/reconnect event after latest connection in this short installation observation"
+  ],
+  "limitations": [
+    "Physical crossings on g520 are pending. No physical latency improvement, root-cause resolution or long-term stability is claimed.",
+    "g519 was built but not installed; the paired baseline was g518.",
+    "The preinstallation A doctor returned agent_unavailable; after installation g520 doctor is healthy.",
+    "Historical failures and installation-time disconnects are excluded from post-connection recurrence.",
+    "Outer service phase 4 still combines pipe delivery and app resumption; only serviceNativeWrite=true confirms a native submission boundary. Inner and outer profiles overlap."
+  ],
+  "sourceCommits": [
+    "594b99a7",
+    "ae9b60d2",
+    "65659a5161f94e59e903b6185739edfb793e02d4"
+  ],
+  "validation": [
+    "Five related Go package suites passed with count=1",
+    "go vet for the same five packages and git diff --check passed",
+    "Selected service IPC/submission/ACK buffer tests passed under the race detector",
+    "Frontend tests/native build, workspace package transfer test and setup verification passed",
+    "Serialization benchmark confirms ACK buffer allocation reduction from 144 B/1 allocation to 0 B/0 allocations"
+  ],
+  "remoteCI": "Not run; local rollout only",
+  "push": "Not requested; not performed",
+  "apiDBRunner": "Optional local diagnostic metadata extended; profiled local ACK suffix 44 to 68 bytes. No extra round trip, external API, DB, dependency, runner or repository hygiene rule change."
+}
