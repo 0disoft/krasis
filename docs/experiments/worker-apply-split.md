@@ -94,3 +94,19 @@ worker timing fields remain separate, and must not be added to these spans.
 No retry, new input, authority cache, deadline extension or cleanup exemption
 is added. This is instrumentation; latency improvement requires fresh physical
 evidence and a subsequent cause-specific fix.
+
+### g513: Preserve parent stalls that exceed child apply
+
+The g512 artifact was built but not installed. g513 corrects acceptance of the
+same six IPC phases. Native IPC starts in the parent before executor admission
+and is not nested inside child WorkerApply. A 1,116ms parent envelope with
+184ms child apply is valid; acceptance must not depend on the child apply bound.
+The IPC envelope remains independently limited to 120 seconds. A regression test
+covers this real stall shape and preserves the separate child apply validation.
+
+A proposed post-Write receipt was deliberately excluded: waiting for a child
+scheduled after ACK Write would itself extend the input-critical path. The
+existing one-write ACK framing and 32-byte sampled extension remain unchanged.
+The reply-ready/first-read duration must not be described as pure write time:
+separating actual Write completion from receive scheduling requires Windows OS
+tracing after the six-phase measurements identify the affected path.

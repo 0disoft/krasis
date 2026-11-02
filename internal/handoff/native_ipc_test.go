@@ -26,3 +26,11 @@ func TestNativeIPCProfileBoundariesAndSampleOwnership(t *testing.T) {
 		t.Fatal("worker response mutated saved diagnostic")
 	}
 }
+
+func TestNativeIPCEnvelopeMayExceedChildApply(t *testing.T) {
+	p := WorkerApplyProfile{Micros: [2]uint32{184560}, Measured: 1,
+		NativeIPC: &NativeIPCProfile{Micros: [6]uint32{1000000, 100000, 10000, 5000, 1000, 742}}}
+	if !p.Valid() || !p.ValidForWorker([3]uint16{0, 0, 185}, 4) {
+		t.Fatal("parent-side stall incorrectly rejected against child apply")
+	}
+}

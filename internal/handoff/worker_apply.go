@@ -24,10 +24,8 @@ type WorkerApplyProfile struct {
 }
 
 func (p WorkerApplyProfile) Valid() bool {
-	// Independent QPC and Go monotonic clocks are floored separately. Permit
-	// one millisecond of observation overhead, never a fabricated large tail.
-	if p.NativeIPC != nil && (!p.NativeIPC.Valid() || p.Measured&1 == 0 ||
-		p.Saturated&1 == 0 && p.NativeIPC.total() > uint64(p.Micros[0])+1000) {
+	// IPC includes parent executor/transport wait; it is not nested in apply.
+	if p.NativeIPC != nil && (!p.NativeIPC.Valid() || p.Measured&1 == 0) {
 		return false
 	}
 	if p.Measured & ^uint8(3) != 0 || p.Saturated & ^p.Measured != 0 {
