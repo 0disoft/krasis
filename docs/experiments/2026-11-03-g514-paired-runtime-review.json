@@ -1,0 +1,694 @@
+{
+  "schema": "krasis.paired-runtime-review/v1",
+  "generation": 514,
+  "revision": "9f7f91d7f5e0a4cb2652d40dc9f6a278984cdcdc",
+  "collection": "328f17e8a27e557871dd81d2842a7dbe",
+  "collectedAtUTC": "2026-11-02T14:57:07Z",
+  "method": {
+    "source": "Authenticated paired diagnostic exports; exact revision; deduplicated by run/sequence/code.",
+    "latency": "Local elapsed software spans only. No subtraction of timestamps across machines and no physical mouse-to-screen measurement.",
+    "sampling": "14 complete successful A-source/B-receiver pairs out of 15 matches. Incomplete profiles are excluded from the distribution but reported separately.",
+    "comparison": "Different uncontrolled physical trials; distributions do not establish a performance improvement or regression."
+  },
+  "health": {
+    "A": {
+      "sha256": "021f9bd7c997cb74f99a19101b1f2e3144014ad5f780b6d0a31950b698b6d1af",
+      "coverage": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false,
+          "first": "2026-11-02T12:36:45.0592177Z",
+          "last": "2026-11-02T14:18:30.3715024Z"
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false,
+          "first": "2026-11-02T14:18:30.3715024Z",
+          "last": "2026-11-02T14:57:05.1472869Z"
+        }
+      ],
+      "service": "READY",
+      "inputHealth": "READY",
+      "failures": [],
+      "connection": "Both exports share the same connection. Original CONNECTED events rotated out; the earlier same-revision baseline retains them.",
+      "sourceRefreshes": "Four hourly refreshes report joined capture/sender/interrupt, clean_sent retirement and ok results; these are not reconnects."
+    },
+    "B": {
+      "sha256": "81b608d8f384d52d15e33e4c1c09a7719cd24e39929cefc92d5ab71d20f9d42d",
+      "coverage": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false,
+          "first": "2026-11-02T12:10:02.1428773Z",
+          "last": "2026-11-02T13:51:55.5831888Z"
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false,
+          "first": "2026-11-02T13:51:55.5831888Z",
+          "last": "2026-11-02T14:57:06.6059423Z"
+        }
+      ],
+      "service": "READY",
+      "inputHealth": "READY",
+      "failures": [],
+      "connection": "Both exports share the same connection. Original CONNECTED events rotated out; the earlier same-revision baseline retains them.",
+      "sourceRefreshes": "Four hourly refreshes report joined capture/sender/interrupt, clean_sent retirement and ok results; these are not reconnects."
+    }
+  },
+  "matchedPairs": 15,
+  "completePairs": 14,
+  "latencyMilliseconds": {
+    "grant": {
+      "n": 14,
+      "medianMs": 42.848,
+      "maxMs": 184.914
+    },
+    "capture": {
+      "n": 14,
+      "medianMs": 14.397,
+      "maxMs": 66.636
+    },
+    "prepare": {
+      "n": 14,
+      "medianMs": 29.0935,
+      "maxMs": 172.822
+    },
+    "ready": {
+      "n": 14,
+      "medianMs": 26.689,
+      "maxMs": 170.432
+    },
+    "first": {
+      "n": 14,
+      "medianMs": 2.3899999999999997,
+      "maxMs": 4.454
+    },
+    "worst": {
+      "n": 14,
+      "medianMs": 3.704,
+      "maxMs": 236.575
+    },
+    "response": {
+      "n": 14,
+      "medianMs": 3.5805,
+      "maxMs": 236.575
+    }
+  },
+  "incompleteA": [
+    {
+      "time": "2026-11-02T14:55:21.7301126Z",
+      "captureMilliseconds": 130.18,
+      "grantMilliseconds": 71.787,
+      "end": "incomplete"
+    }
+  ],
+  "nativeIPC": {
+    "retainedProfiles": 19,
+    "phases": [
+      {
+        "name": "parent admission/submission preparation",
+        "n": 19,
+        "medianMs": 0.03,
+        "maxMs": 1.265
+      },
+      {
+        "name": "request submission to child read",
+        "n": 19,
+        "medianMs": 0.14,
+        "maxMs": 0.27
+      },
+      {
+        "name": "child admission",
+        "n": 19,
+        "medianMs": 0.002,
+        "maxMs": 0.018
+      },
+      {
+        "name": "child handler through reply encoding",
+        "n": 19,
+        "medianMs": 1.339,
+        "maxMs": 7.531
+      },
+      {
+        "name": "reply ready to parent first-read return",
+        "n": 19,
+        "medianMs": 0.057,
+        "maxMs": 1.605
+      },
+      {
+        "name": "first read return to matching decode",
+        "n": 19,
+        "medianMs": 0.007,
+        "maxMs": 0.033
+      }
+    ],
+    "caveat": "First/worst profiles may describe the same command. These samples exclude the 236.575ms tail and cannot rule out IPC or scheduling in that tail."
+  },
+  "slowestB": {
+    "time": "2026-11-02T14:53:26.4184662Z",
+    "responseWaitMilliseconds": 236.575,
+    "firstInputMilliseconds": 4.454,
+    "preparationMilliseconds": 172.822,
+    "readyWaitMilliseconds": 170.432,
+    "exchangeServiceMilliseconds": 180.406,
+    "workerMillis": [
+      2,
+      69,
+      209
+    ],
+    "interpretation": "The matching ACK places approximately 209ms inside the worker apply span. Milliseconds are floored; spans may overlap and must not be added. No detailed apply/IPC profile was retained for this command, so native work, IPC waits and scheduler delay remain unresolved.",
+    "mainAgent": "B main-agent timer lateness was at most 24.575ms and its retained GC buckets did not exceed the <=10ms aggregate bucket. This does not observe the separate native worker process."
+  },
+  "runtime": {
+    "histogram": "Upper-bound aggregate buckets <=100us, <=1ms, <=10ms, <=100ms, <=1s, >1s. Raw runtime histogram buckets are rounded up; the <=1s aggregate is not an exact duration or proof of >=100ms.",
+    "A": {
+      "samples": 141,
+      "first": "2026-11-02T12:37:00.3035667Z",
+      "last": "2026-11-02T14:56:58.3612215Z",
+      "sumIntervalSec": 8459.999884,
+      "gcBuckets": [
+        11584,
+        1550,
+        31,
+        8,
+        1,
+        0
+      ],
+      "allocatedMB": 5264.094552,
+      "allocationMBPerSec": 0.6222334071133658,
+      "cpuCorePercent": 7.123411740699263,
+      "heapMaxMB": 2.336616,
+      "workingSetMaxMB": 116.236288,
+      "maxTimer": [
+        {
+          "time": "2026-11-02T14:54:58.3611679Z",
+          "intervalMs": 60000.111,
+          "cpuMs": 4296.875,
+          "allocMB": 37.745464,
+          "heapMB": 2.014912,
+          "gc": [
+            73,
+            16,
+            2,
+            2,
+            1,
+            0
+          ],
+          "runnable": [
+            1963,
+            50,
+            14,
+            4,
+            1,
+            0
+          ],
+          "lateMs": 332.238,
+          "dispatchMs": 130.18,
+          "queueMs": 7.943,
+          "slow": [
+            {
+              "kind": "control",
+              "startedMicros": 15422545239,
+              "durationMicros": 130180,
+              "readMeasured": true
+            }
+          ]
+        },
+        {
+          "time": "2026-11-02T13:16:58.3613722Z",
+          "intervalMs": 59999.815,
+          "cpuMs": 5078.125,
+          "allocMB": 37.660688,
+          "heapMB": 1.767976,
+          "gc": [
+            84,
+            8,
+            0,
+            0,
+            0,
+            0
+          ],
+          "runnable": [
+            1755,
+            40,
+            5,
+            0,
+            0,
+            0
+          ],
+          "lateMs": 42.794,
+          "dispatchMs": 0,
+          "queueMs": 0,
+          "slow": []
+        },
+        {
+          "time": "2026-11-02T14:36:58.3612256Z",
+          "intervalMs": 60000.04,
+          "cpuMs": 4750,
+          "allocMB": 37.332936,
+          "heapMB": 1.84532,
+          "gc": [
+            85,
+            10,
+            1,
+            2,
+            0,
+            0
+          ],
+          "runnable": [
+            1860,
+            34,
+            6,
+            1,
+            0,
+            0
+          ],
+          "lateMs": 38.325,
+          "dispatchMs": 0,
+          "queueMs": 0,
+          "slow": []
+        }
+      ],
+      "gcTrails": 0,
+      "traceCodes": [],
+      "trial": [
+        {
+          "time": "2026-11-02T14:53:58.3610561Z",
+          "intervalMs": 59999.578,
+          "cpuMs": 5546.875,
+          "allocMB": 40.747592,
+          "heapMB": 1.937112,
+          "gc": [
+            84,
+            13,
+            1,
+            0,
+            0,
+            0
+          ],
+          "runnable": [
+            2624,
+            63,
+            1,
+            0,
+            0,
+            0
+          ],
+          "lateMs": 6.354,
+          "dispatchMs": 23.283,
+          "queueMs": 0.724,
+          "slow": []
+        },
+        {
+          "time": "2026-11-02T14:54:58.3611679Z",
+          "intervalMs": 60000.111,
+          "cpuMs": 4296.875,
+          "allocMB": 37.745464,
+          "heapMB": 2.014912,
+          "gc": [
+            73,
+            16,
+            2,
+            2,
+            1,
+            0
+          ],
+          "runnable": [
+            1963,
+            50,
+            14,
+            4,
+            1,
+            0
+          ],
+          "lateMs": 332.238,
+          "dispatchMs": 130.18,
+          "queueMs": 7.943,
+          "slow": [
+            {
+              "kind": "control",
+              "startedMicros": 15422545239,
+              "durationMicros": 130180,
+              "readMeasured": true
+            }
+          ]
+        },
+        {
+          "time": "2026-11-02T14:55:58.3612075Z",
+          "intervalMs": 60000.039,
+          "cpuMs": 4531.25,
+          "allocMB": 37.950456,
+          "heapMB": 2.167512,
+          "gc": [
+            84,
+            13,
+            1,
+            0,
+            0,
+            0
+          ],
+          "runnable": [
+            1977,
+            31,
+            1,
+            0,
+            0,
+            0
+          ],
+          "lateMs": 1.675,
+          "dispatchMs": 0,
+          "queueMs": 0,
+          "slow": []
+        },
+        {
+          "time": "2026-11-02T14:56:58.3612215Z",
+          "intervalMs": 60000.014,
+          "cpuMs": 5390.625,
+          "allocMB": 43.615752,
+          "heapMB": 1.988984,
+          "gc": [
+            99,
+            17,
+            0,
+            2,
+            0,
+            0
+          ],
+          "runnable": [
+            3136,
+            107,
+            11,
+            5,
+            0,
+            0
+          ],
+          "lateMs": 37.6,
+          "dispatchMs": 66.637,
+          "queueMs": 2.408,
+          "slow": [
+            {
+              "kind": "control",
+              "startedMicros": 15595760436,
+              "durationMicros": 66637,
+              "readMeasured": true
+            }
+          ]
+        }
+      ]
+    },
+    "B": {
+      "samples": 168,
+      "first": "2026-11-02T12:10:02.1428773Z",
+      "last": "2026-11-02T14:57:02.1429665Z",
+      "sumIntervalSec": 10079.999622,
+      "gcBuckets": [
+        14893,
+        2980,
+        65,
+        0,
+        0,
+        0
+      ],
+      "allocatedMB": 7935.949568,
+      "allocationMBPerSec": 0.7872966136506071,
+      "cpuCorePercent": 13.082992802120167,
+      "heapMaxMB": 2.266328,
+      "workingSetMaxMB": 110.186496,
+      "maxTimer": [
+        {
+          "time": "2026-11-02T14:54:02.1429868Z",
+          "intervalMs": 59999.828,
+          "cpuMs": 8890.625,
+          "allocMB": 50.599232,
+          "heapMB": 1.785648,
+          "gc": [
+            94,
+            16,
+            0,
+            0,
+            0,
+            0
+          ],
+          "runnable": [
+            2344,
+            74,
+            5,
+            1,
+            0,
+            0
+          ],
+          "lateMs": 24.575,
+          "dispatchMs": 236.576,
+          "queueMs": 0,
+          "slow": [
+            {
+              "kind": "control",
+              "startedMicros": 15439484835,
+              "durationMicros": 180406,
+              "readMeasured": true
+            },
+            {
+              "kind": "input",
+              "startedMicros": 15440109535,
+              "durationMicros": 236576,
+              "readMeasured": true,
+              "afterCoordinatorMicros": 236576,
+              "coordinatorMeasured": true,
+              "injectionMicros": 236576,
+              "injectionMaxMicros": 236576,
+              "injections": 1
+            }
+          ]
+        },
+        {
+          "time": "2026-11-02T13:25:02.143603Z",
+          "intervalMs": 60000.149,
+          "cpuMs": 8046.875,
+          "allocMB": 46.902728,
+          "heapMB": 1.6974,
+          "gc": [
+            93,
+            16,
+            3,
+            0,
+            0,
+            0
+          ],
+          "runnable": [
+            1843,
+            40,
+            2,
+            0,
+            0,
+            0
+          ],
+          "lateMs": 17.545,
+          "dispatchMs": 0,
+          "queueMs": 0,
+          "slow": []
+        },
+        {
+          "time": "2026-11-02T14:23:02.1433145Z",
+          "intervalMs": 60000.387,
+          "cpuMs": 7437.5,
+          "allocMB": 46.826792,
+          "heapMB": 1.941504,
+          "gc": [
+            93,
+            20,
+            1,
+            0,
+            0,
+            0
+          ],
+          "runnable": [
+            1826,
+            76,
+            3,
+            0,
+            0,
+            0
+          ],
+          "lateMs": 16.841,
+          "dispatchMs": 0,
+          "queueMs": 0,
+          "slow": []
+        }
+      ],
+      "gcTrails": 0,
+      "traceCodes": [],
+      "trial": [
+        {
+          "time": "2026-11-02T14:53:02.1431583Z",
+          "intervalMs": 59997.866,
+          "cpuMs": 7750,
+          "allocMB": 47.520784,
+          "heapMB": 1.78416,
+          "gc": [
+            85,
+            21,
+            0,
+            0,
+            0,
+            0
+          ],
+          "runnable": [
+            1807,
+            42,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lateMs": 2.55,
+          "dispatchMs": 0,
+          "queueMs": 0,
+          "slow": []
+        },
+        {
+          "time": "2026-11-02T14:54:02.1429868Z",
+          "intervalMs": 59999.828,
+          "cpuMs": 8890.625,
+          "allocMB": 50.599232,
+          "heapMB": 1.785648,
+          "gc": [
+            94,
+            16,
+            0,
+            0,
+            0,
+            0
+          ],
+          "runnable": [
+            2344,
+            74,
+            5,
+            1,
+            0,
+            0
+          ],
+          "lateMs": 24.575,
+          "dispatchMs": 236.576,
+          "queueMs": 0,
+          "slow": [
+            {
+              "kind": "control",
+              "startedMicros": 15439484835,
+              "durationMicros": 180406,
+              "readMeasured": true
+            },
+            {
+              "kind": "input",
+              "startedMicros": 15440109535,
+              "durationMicros": 236576,
+              "readMeasured": true,
+              "afterCoordinatorMicros": 236576,
+              "coordinatorMeasured": true,
+              "injectionMicros": 236576,
+              "injectionMaxMicros": 236576,
+              "injections": 1
+            }
+          ]
+        },
+        {
+          "time": "2026-11-02T14:55:02.1433656Z",
+          "intervalMs": 60000.378,
+          "cpuMs": 8500,
+          "allocMB": 48.177184,
+          "heapMB": 1.838048,
+          "gc": [
+            93,
+            19,
+            2,
+            0,
+            0,
+            0
+          ],
+          "runnable": [
+            2019,
+            61,
+            10,
+            0,
+            0,
+            0
+          ],
+          "lateMs": 6.688,
+          "dispatchMs": 6.197,
+          "queueMs": 0,
+          "slow": []
+        },
+        {
+          "time": "2026-11-02T14:56:02.1431482Z",
+          "intervalMs": 59999.782,
+          "cpuMs": 8593.75,
+          "allocMB": 48.208392,
+          "heapMB": 1.716168,
+          "gc": [
+            86,
+            18,
+            2,
+            0,
+            0,
+            0
+          ],
+          "runnable": [
+            1908,
+            74,
+            7,
+            0,
+            0,
+            0
+          ],
+          "lateMs": 10.074,
+          "dispatchMs": 0,
+          "queueMs": 0,
+          "slow": []
+        },
+        {
+          "time": "2026-11-02T14:57:02.1429665Z",
+          "intervalMs": 59999.818,
+          "cpuMs": 9687.5,
+          "allocMB": 52.411032,
+          "heapMB": 1.83596,
+          "gc": [
+            100,
+            20,
+            0,
+            0,
+            0,
+            0
+          ],
+          "runnable": [
+            2800,
+            72,
+            5,
+            0,
+            0,
+            0
+          ],
+          "lateMs": 14.424,
+          "dispatchMs": 46.492,
+          "queueMs": 0,
+          "slow": []
+        }
+      ]
+    },
+    "findings": [
+      "A has a nonfatal scheduling/timer stall: 332.238ms maximum timer lateness in the minute ending 14:54:58.3611679Z, with one GC-pause and one runnable observation in aggregate bucket 4. No >1s aggregate observation is retained.",
+      "The same minute includes a 130.180ms control dispatch, equal to the incomplete handoff capture span. Minute aggregates cannot establish whether GC caused that capture delay or identify a blocking Windows thread.",
+      "The largest complete A capture span is 66.636ms in a different minute, whose timer lateness is 37.600ms. The 332ms timer stall is not a measured 332ms crossing.",
+      "A allocation averaged 0.622MB/s and sampled heap peaked at 2.337MB over 141 summaries. This does not support a large-heap explanation, nor establish which allocations or OS/runtime mechanism caused the stall.",
+      "Zero gcTrail records means no failure-triggered ring was exported; it does not mean no nonfatal runtime stall occurred.",
+      "Historical g513 evidence includes an approximately 1.49s local GC/runtime stall near receipt failure. Such a >1s event was not observed in this g514 window.",
+      "Existing g509 trace evidence is confounded by trace stack-symbol processing during update preparation; it cannot identify this untraced g514 stall."
+    ]
+  },
+  "nextEvidence": [
+    "Preserve runtime GC stopping/runnable windows for nonfatal stalls, not only terminal failure triggers, to separate timer scheduling from stop-the-world stopping/work.",
+    "Retain detailed apply/IPC timing for the actual slow B command; normal first-input samples cannot explain the missing tail.",
+    "Any follow-up flight recording must be bounded and compared with tracing disabled; do not infer a Windows thread/runtime cause from minute aggregates or an instrumentation-confounded old trace."
+  ],
+  "changes": "Diagnostic review only. No runtime, authorization, API, DB, dependency, runner or installation change. No push.",
+  "validation": "Recomputed exact-build sample distributions and runtime aggregates; verified both raw export SHA-256 hashes; checked report JSON and git diff. No code tests or remote CI: executable code is unchanged."
+}
