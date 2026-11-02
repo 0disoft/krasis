@@ -1,0 +1,33 @@
+{
+  "schema": "krasis.stall-observation-policy/v1",
+  "generation": 516,
+  "purpose": "Distinguish OS CPU/page faults from Go GC accounting on A, and retain portable-client boundaries missing from B's 125ms tail. This is diagnostic coverage, not a claimed latency/root-cause fix.",
+  "runtime": {
+    "cadenceMilliseconds": 100,
+    "addedOSQueriesPerSample": 3,
+    "fields": "OS process CPU delta, page-fault delta, Windows processor-group busy/total deltas; explicit known flags. Unknown, counter rollback/wrap and overflow do not become measured zero.",
+    "readTiming": "Runtime-metrics and OS-counter read envelopes are separate. A 100ms OS read can trigger os_read_slow without being mislabeled as metrics_read_slow.",
+    "limits": "Existing 64-sample ring and independent 8-record failure/nonfatal budgets remain. Sampler-side only; no native input/heartbeat work, stack trace, extra input or recovery action.",
+    "interpretation": "Adjacent sequential API observations, not atomic measurements of an exact GC pause. OS CPU is not Go's processor-summed GC CPU accounting. Page faults include soft faults; processor-group CPU is not every group on >64-CPU hosts.",
+    "benchmark": "Repeated OS/full-sampler benchmarks: approximately 0.285-0.448ms/op, 152B and 5 allocations/op on A. Initial full-sampler benchmark averaged 3.932ms/op. These are observed wall-time costs, not CPU utilization or production upper bounds."
+  },
+  "nativeIPC": {
+    "corePhases": "Existing six IPC phases unchanged.",
+    "parentPhases": ["client mutex acquisition including scheduling", "locked request preparation", "matched decode to portable-client completion before deferred unlock/cancel"],
+    "parentPresence": "parentMeasured distinguishes measured zero from unavailable timing; parentMicros contains only three durations.",
+    "budget": "Core and disjoint parent durations share the existing 120s observation bound. Invalid timing drops optional evidence without changing input outcomes.",
+    "wire": "Fixed suffix 32 -> 44 bytes, 12 additional bytes per profiled local ACK. Native images are rebuilt and hash-matched together; no extra input submission, read/write operation or round trip.",
+    "cancellation": "A failed/unconfirmed ExchangeInput return cannot inspect or publish the callback-owned profile. Parent completion is finalized synchronously only after matching confirmed exchange.",
+    "limits": "Does not observe time before portable-client entry or deferred unlock/cancel. Mutex-acquisition elapsed time does not prove lock contention. No subtraction from child apply to invent scheduler duration."
+  },
+  "codecBenchmark": {
+    "baseNanosecondsPerOperation": 530.6,
+    "detailedNanosecondsPerOperation": 911.8,
+    "baseAllocatedBytesPerOperation": 248,
+    "detailedAllocatedBytesPerOperation": 360,
+    "scope": "One ACK encode/decode, 100ms per variant; detailed variant includes parent spans. Excludes real pipes, QPC reads, Windows scheduling, OS sampler and native input."
+  },
+  "validation": "Full handoff/inputworker/productlog/residentagent tests; selected native IPC and canceled-admission race tests with local LLVM; timestamp/presence/budget, real-QPC post-decode delay, next-ACK alignment, unknown OS counters, max-size GC export, sanitizer round trips and go vet/diff checks passed.",
+  "unchanged": "Input authority, ordering, cancellation outcomes, lease/heartbeat deadlines and retries. No DB, external API or runner change. Public runtime flight recording remains off.",
+  "deployment": "Installation and actual physical observations recorded separately. No push/public release requested."
+}
