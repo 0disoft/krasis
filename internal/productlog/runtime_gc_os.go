@@ -4,6 +4,7 @@ package productlog
 // PageFaults includes soft faults. System times describe the processor group
 // returned by Windows, not necessarily every group on hosts with >64 CPUs.
 type GCOSWindow struct {
+	ReadMicros        uint64 `json:"readMicros"`
 	CPUMicros         uint64 `json:"cpuMicros"`
 	CPUKnown          bool   `json:"cpuKnown"`
 	PageFaults        uint64 `json:"pageFaults"`

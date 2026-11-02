@@ -16,6 +16,8 @@ func TestGCObservationThresholdAndUnknownHistograms(t *testing.T) {
 		{productlog.GCWindow{LateMicros: 100000}, "timer_late"},
 		{productlog.GCWindow{LateMicros: 100001}, "timer_late"},
 		{productlog.GCWindow{ReadMicros: 100000}, "metrics_read_slow"},
+		{productlog.GCWindow{OS: productlog.GCOSWindow{ReadMicros: 99999}}, ""},
+		{productlog.GCWindow{OS: productlog.GCOSWindow{ReadMicros: 100000}}, "os_read_slow"},
 		{productlog.GCWindow{GCPauses: [6]uint64{0, 0, 0, 0, 1}}, ""},
 		{productlog.GCWindow{Known: productlog.GCTotalKnown, GCPauses: [6]uint64{0, 0, 0, 1}}, ""},
 		{productlog.GCWindow{Known: productlog.GCTotalKnown, GCPauses: [6]uint64{0, 0, 0, 0, 1}}, "gc_pause_bucket"},

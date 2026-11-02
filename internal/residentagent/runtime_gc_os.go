@@ -3,12 +3,14 @@ package residentagent
 import "github.com/0disoft/krasis/internal/productlog"
 
 type gcOSCounters struct {
+	readMicros                                        uint64
 	cpu, faults, systemIdle, systemKernel, systemUser uint64
 	cpuKnown, faultsKnown, systemKnown                bool
 }
 
 // Rollback/wrap and unavailable reads are unknown, never measured zero.
 func gcOSInterval(p, c gcOSCounters) (w productlog.GCOSWindow) {
+	w.ReadMicros = c.readMicros
 	if p.cpuKnown && c.cpuKnown && c.cpu >= p.cpu {
 		w.CPUMicros, w.CPUKnown = c.cpu-p.cpu, true
 	}

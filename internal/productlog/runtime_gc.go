@@ -71,7 +71,7 @@ func (s GCTrail) valid() bool {
 	}
 	previous := int64(0)
 	for _, w := range s.Samples {
-		if !w.OS.valid() || w.BeginMicros < 1 || w.EndMicros <= w.BeginMicros || w.BeginMicros < previous || w.ReadMicros < 0 || w.ReadMicros > w.EndMicros-w.BeginMicros || w.LateMicros < 0 || w.Known & ^uint16(GCKnownMask) != 0 {
+		if !w.OS.valid() || w.BeginMicros < 1 || w.EndMicros <= w.BeginMicros || w.BeginMicros < previous || w.ReadMicros < 0 || w.ReadMicros > w.EndMicros-w.BeginMicros || w.OS.ReadMicros > uint64(w.EndMicros-w.BeginMicros) || w.LateMicros < 0 || w.Known & ^uint16(GCKnownMask) != 0 {
 			return false
 		}
 		if w.Known&GCTotalKnown == 0 && w.GCPauses != ([6]uint64{}) || w.Known&GCStoppingKnown == 0 && w.GCStopping != ([6]uint64{}) || w.Known&GCSchedulerKnown == 0 && w.Runnable != ([6]uint64{}) {
@@ -93,7 +93,7 @@ func (s GCTrail) valid() bool {
 // Observations preserve nonfatal stalls without inventing a fault or a cause.
 func validGCObservation(reason string) bool {
 	switch reason {
-	case "timer_late", "metrics_read_slow", "gc_pause_bucket", "gc_stopping_bucket", "runnable_bucket":
+	case "timer_late", "metrics_read_slow", "os_read_slow", "gc_pause_bucket", "gc_stopping_bucket", "runnable_bucket":
 		return true
 	}
 	return false

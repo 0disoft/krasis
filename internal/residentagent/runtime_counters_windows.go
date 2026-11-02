@@ -4,6 +4,7 @@ package residentagent
 
 import (
 	"golang.org/x/sys/windows"
+	"time"
 	"unsafe"
 )
 
@@ -43,6 +44,7 @@ func runtimeFiletimeTicks(v windows.Filetime) uint64 {
 }
 
 func processGCOSCounters() gcOSCounters {
+	started := time.Now()
 	memory, memoryKnown, cpu, cpuKnown := readRuntimeProcessCounters()
 	s := gcOSCounters{cpu: cpu, cpuKnown: cpuKnown, faults: uint64(memory.PageFaultCount), faultsKnown: memoryKnown}
 	var idle, kernel, user windows.Filetime
@@ -53,5 +55,6 @@ func processGCOSCounters() gcOSCounters {
 			s.systemKnown = true
 		}
 	}
+	s.readMicros = uint64(max(0, time.Since(started).Microseconds()))
 	return s
 }

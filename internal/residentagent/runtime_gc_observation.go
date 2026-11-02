@@ -21,6 +21,9 @@ func gcObservationReason(w productlog.GCWindow) string {
 	if w.ReadMicros >= gcObservationThreshold.Microseconds() {
 		return "metrics_read_slow"
 	}
+	if w.OS.ReadMicros >= uint64(gcObservationThreshold.Microseconds()) {
+		return "os_read_slow"
+	}
 	for _, h := range []struct {
 		known  uint16
 		counts [6]uint64

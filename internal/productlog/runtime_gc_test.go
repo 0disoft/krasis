@@ -68,7 +68,7 @@ func TestGCFailureTrailBoundedRoundTripAndInvalidWindows(t *testing.T) {
 }
 
 func TestGCNonfatalObservationRoundTripWithoutInventingFault(t *testing.T) {
-	for _, reason := range []string{"timer_late", "metrics_read_slow", "gc_pause_bucket", "gc_stopping_bucket", "runnable_bucket"} {
+	for _, reason := range []string{"timer_late", "metrics_read_slow", "os_read_slow", "gc_pause_bucket", "gc_stopping_bucket", "runnable_bucket"} {
 		s := GCTrail{Schema: 1, TriggerMicros: 500000, TriggerObservedAt: "2026-11-03T00:00:00Z", Observation: reason, Samples: []GCWindow{{BeginMicros: 1, EndMicros: 500000, LateMicros: 332238}}}
 		if !s.valid() {
 			t.Fatal("nonfatal observation rejected", reason)

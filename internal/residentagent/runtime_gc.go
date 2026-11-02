@@ -75,9 +75,9 @@ func newGCSampler() func() gcMetricSample {
 				}
 			}
 		}
+		s.read = time.Since(started)
 		s.os = processGCOSCounters()
 		s.at = time.Now()
-		s.read = s.at.Sub(started)
 		return s
 	}
 }
