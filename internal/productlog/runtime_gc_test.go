@@ -23,6 +23,7 @@ func TestGCFailureTrailBoundedRoundTripAndInvalidWindows(t *testing.T) {
 	s := GCTrail{Schema: 1, TriggerMicros: 7000000, TriggerObservedAt: "2026-10-17T01:00:00Z", Fault: "fault_source_hook_failed", Samples: make([]GCWindow, GCTraceLimit)}
 	for i := range s.Samples {
 		s.Samples[i] = GCWindow{BeginMicros: int64(i*100000 + 1), EndMicros: int64((i+1)*100000 + 1), Known: GCKnownMask, Allocated: math.MaxUint64, Heap: math.MaxUint64, Cycles: math.MaxUint64, AssistMicros: math.MaxUint64, GCCPUMicros: math.MaxUint64}
+		s.Samples[i].OS = GCOSWindow{CPUKnown: true, CPUMicros: math.MaxUint64, FaultsKnown: true, PageFaults: math.MaxUint64, SystemKnown: true, SystemBusyMicros: math.MaxUint64, SystemTotalMicros: math.MaxUint64}
 		for j := 0; j < 6; j++ {
 			s.Samples[i].GCPauses[j] = math.MaxUint64
 			s.Samples[i].GCStopping[j] = math.MaxUint64
@@ -88,6 +89,20 @@ func TestGCNonfatalObservationRoundTripWithoutInventingFault(t *testing.T) {
 		s.Fault, s.Observation = "", "PRIVATE"
 		if s.valid() {
 			t.Fatal("arbitrary observation text accepted")
+		}
+	}
+}
+
+func TestGCOSObservationRoundTripAndUnknownValues(t *testing.T) {
+	s := GCTrail{Schema: 1, TriggerMicros: 1500000, TriggerObservedAt: "2026-11-03T00:00:00Z", Observation: "timer_late", Samples: []GCWindow{{BeginMicros: 1, EndMicros: 1500000, OS: GCOSWindow{CPUKnown: true, CPUMicros: 15625, FaultsKnown: true, PageFaults: 2, SystemKnown: true, SystemBusyMicros: 900000, SystemTotalMicros: 18000000}}}}
+	raw, _ := json.Marshal(record{Time: s.TriggerObservedAt, Code: "runtime_gc_trail", GCTrail: &s})
+	out := sanitizeLog("agent.jsonl", strings.NewReader(string(raw)+"\n"))
+	if out.Incomplete || len(out.Events) != 1 || out.Events[0].GCTrail.Samples[0].OS != s.Samples[0].OS {
+		t.Fatal("OS evidence lost", out)
+	}
+	for _, bad := range []GCOSWindow{{CPUMicros: 1}, {PageFaults: 1}, {SystemTotalMicros: 1}, {SystemKnown: true, SystemBusyMicros: 2, SystemTotalMicros: 1}} {
+		if bad.valid() {
+			t.Fatal("invalid OS evidence accepted", bad)
 		}
 	}
 }

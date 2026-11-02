@@ -23,19 +23,20 @@ const (
 )
 
 type GCWindow struct {
-	BeginMicros  int64     `json:"beginMicros"`
-	EndMicros    int64     `json:"endMicros"`
-	ReadMicros   int64     `json:"readMicros"`
-	LateMicros   int64     `json:"lateMicros"`
-	Known        uint16    `json:"known"`
-	GCPauses     [6]uint64 `json:"gcPauses"`
-	GCStopping   [6]uint64 `json:"gcStopping"`
-	Runnable     [6]uint64 `json:"runnable"`
-	Allocated    uint64    `json:"allocatedBytes"`
-	Heap         uint64    `json:"heapBytes"`
-	Cycles       uint64    `json:"cycles"`
-	AssistMicros uint64    `json:"assistMicros"`
-	GCCPUMicros  uint64    `json:"gcCPUMicros"`
+	BeginMicros  int64      `json:"beginMicros"`
+	EndMicros    int64      `json:"endMicros"`
+	ReadMicros   int64      `json:"readMicros"`
+	LateMicros   int64      `json:"lateMicros"`
+	Known        uint16     `json:"known"`
+	GCPauses     [6]uint64  `json:"gcPauses"`
+	GCStopping   [6]uint64  `json:"gcStopping"`
+	Runnable     [6]uint64  `json:"runnable"`
+	Allocated    uint64     `json:"allocatedBytes"`
+	Heap         uint64     `json:"heapBytes"`
+	Cycles       uint64     `json:"cycles"`
+	AssistMicros uint64     `json:"assistMicros"`
+	GCCPUMicros  uint64     `json:"gcCPUMicros"`
+	OS           GCOSWindow `json:"os,omitzero"`
 }
 
 // This is a bounded observation trail, never exact GC start/end timestamps.
@@ -70,7 +71,7 @@ func (s GCTrail) valid() bool {
 	}
 	previous := int64(0)
 	for _, w := range s.Samples {
-		if w.BeginMicros < 1 || w.EndMicros <= w.BeginMicros || w.BeginMicros < previous || w.ReadMicros < 0 || w.ReadMicros > w.EndMicros-w.BeginMicros || w.LateMicros < 0 || w.Known & ^uint16(GCKnownMask) != 0 {
+		if !w.OS.valid() || w.BeginMicros < 1 || w.EndMicros <= w.BeginMicros || w.BeginMicros < previous || w.ReadMicros < 0 || w.ReadMicros > w.EndMicros-w.BeginMicros || w.LateMicros < 0 || w.Known & ^uint16(GCKnownMask) != 0 {
 			return false
 		}
 		if w.Known&GCTotalKnown == 0 && w.GCPauses != ([6]uint64{}) || w.Known&GCStoppingKnown == 0 && w.GCStopping != ([6]uint64{}) || w.Known&GCSchedulerKnown == 0 && w.Runnable != ([6]uint64{}) {

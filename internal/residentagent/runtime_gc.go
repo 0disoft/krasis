@@ -38,6 +38,7 @@ type gcMetricSample struct {
 	known    uint16
 	hist     [3][6]uint64
 	counters [5]uint64 // allocated bytes, heap bytes, cycles, assist us, GC CPU us
+	os       gcOSCounters
 }
 
 func newGCSampler() func() gcMetricSample {
@@ -74,6 +75,7 @@ func newGCSampler() func() gcMetricSample {
 				}
 			}
 		}
+		s.os = processGCOSCounters()
 		s.at = time.Now()
 		s.read = s.at.Sub(started)
 		return s
@@ -84,6 +86,7 @@ func newGCSampler() func() gcMetricSample {
 // Do not subtract their bucket maxima or call the difference GC work duration.
 func gcInterval(base time.Time, previous, current gcMetricSample, late time.Duration) productlog.GCWindow {
 	w := productlog.GCWindow{BeginMicros: max(1, previous.at.Sub(base).Microseconds()), EndMicros: max(1, current.at.Sub(base).Microseconds()), ReadMicros: max(0, current.read.Microseconds()), LateMicros: max(0, late.Microseconds()), Known: previous.known & current.known}
+	w.OS = gcOSInterval(previous.os, current.os)
 	hist := [3]*[6]uint64{&w.GCPauses, &w.GCStopping, &w.Runnable}
 	for i, target := range hist {
 		bit := uint16(1 << i)
