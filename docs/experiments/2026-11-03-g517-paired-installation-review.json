@@ -1,0 +1,71 @@
+{
+  "schema": "krasis.paired-installation-review/v1",
+  "generation": 517,
+  "revision": "2c4445618b4d866c2499fb9c0e1358836e8263e9",
+  "collection": "819cd6c0052eee028418c9fa65a95bca",
+  "devices": {
+    "A": {
+      "created": "2026-11-02T16:36:55Z",
+      "sha256": "7df66c64271c2b76101ee4d5a37acd462c1310d546769630d36b170312b1bd55",
+      "connectedAt": "2026-11-02T16:35:49.5429917Z",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "installation": "complete",
+      "recovery": "not_needed",
+      "faultsSinceConnected": []
+    },
+    "B": {
+      "created": "2026-11-02T16:36:57Z",
+      "sha256": "5d3bd3327751ef0a93210c09b89cb4bdcfad3b483bb6623361c48f6f26e5a04b",
+      "connectedAt": "2026-11-02T16:35:49.3266123Z",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "installation": "complete",
+      "recovery": "not_needed",
+      "faultsSinceConnected": []
+    }
+  },
+  "peerUpdate": {
+    "code": "updated",
+    "requestID": "87e83562937093b2b503758e6f35fcf0",
+    "bytes": 28995554,
+    "total": 28995554
+  },
+  "connection": {
+    "state": "CONNECTED",
+    "sharedConnectionMatched": true,
+    "method": "Existing app/agent automatic connection after installation; no manual connection or administrator recovery required."
+  },
+  "checks": [
+    "A exact-generation CLI/agent/UI/installed image and running service matched",
+    "B exact-generation/revision update receipt",
+    "Both protected services/input READY and grant PRESENT",
+    "Both exact-build latest CONNECTED events share one connection",
+    "No fault/disconnect/reconnect event after latest connection in this short installation observation"
+  ],
+  "limitations": [
+    "New physical crossings are pending. No latency improvement, root-cause resolution or long-term stability is claimed.",
+    "A briefly ran g516; both sides now run g517. Do not compare g516 as a paired physical trial.",
+    "Historical failures and installation-time disconnects are excluded from post-connection recurrence.",
+    "Parent phase zero includes context setup, mutex admission and scheduling; it does not prove lock contention.",
+    "OS counters and Go runtime observations are sequential, not an atomic exact GC pause measurement. Public flight recording remains off."
+  ],
+  "sourceCommits": [
+    "722f24c3",
+    "7581f1fc",
+    "45ce5d32",
+    "231fb484",
+    "2c444561"
+  ],
+  "validation": [
+    "handoff/inputworker/productlog/residentagent/localapi suites passed with count=1 on g517",
+    "go vet for the same five packages and git diff --check passed",
+    "111 frontend tests passed",
+    "Workspace update package and setup verification passed"
+  ],
+  "remoteCI": "Not run; local rollout only",
+  "push": "Not requested; not performed",
+  "apiDBRunner": "Profiled local native ACK adds 12 bytes, no extra round trip or input submission; additive local diagnostics only. No external API, DB, runner or repository hygiene changes."
+}
