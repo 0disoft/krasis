@@ -7,9 +7,9 @@
     "timerOrReadThresholdMilliseconds": 100,
     "histograms": "Known GC total, GC stopping or runnable observations in aggregate bucket 4/5. Rounded buckets do not prove exact durations.",
     "historySamples": 64,
-    "nonfatalRecordsPerAgentRun": 8,
+    "nonfatalRecordsPerRuntimeMonitor": 8,
     "minimumRecordGapSeconds": 30,
-    "failureRecordsPerAgentRun": 8,
+    "failureRecordsPerRuntimeMonitor": 8,
     "failureBudget": "Independent and unchanged; nonfatal observations never call ObserveFailure, change health or start runtime tracing.",
     "privacy": "Fixed numeric windows and whitelisted observation reasons. No stacks, input values, coordinates or identity data. Existing bounded export and sanitizer apply."
   },

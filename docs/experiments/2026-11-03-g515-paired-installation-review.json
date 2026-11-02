@@ -1,0 +1,68 @@
+{
+  "schema": "krasis.paired-installation-review/v1",
+  "generation": 515,
+  "revision": "bb5f8738e39d0220199f68e31d8684b90a5273c0",
+  "collection": "9e41506e9a08733128f4f71b5d65271f",
+  "devices": {
+    "A": {
+      "created": "2026-11-02T15:53:42Z",
+      "sha256": "10964aa6ce8da3d30a2fc8c2c670e30c081ccd178d86b980bd3c4ec5161abfa0",
+      "connectedAt": "2026-11-02T15:53:19.5813588Z",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "installation": "complete",
+      "recovery": "not_needed",
+      "faultsSinceConnected": []
+    },
+    "B": {
+      "created": "2026-11-02T15:53:43Z",
+      "sha256": "008e9039092adc358089c98b369d36556d2d9e7e5411f0b7143135348ca5b30a",
+      "connectedAt": "2026-11-02T15:53:19.4079438Z",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "installation": "complete",
+      "recovery": "not_needed",
+      "faultsSinceConnected": []
+    }
+  },
+  "peerUpdate": {
+    "code": "updated",
+    "requestID": "957460be9530534d31e4ac0c904e7dcd",
+    "bytes": 28955165,
+    "total": 28955165
+  },
+  "connection": {
+    "code": "connected",
+    "requestID": "efed33313bace69d68fb74bce2c04fae",
+    "sharedConnectionMatched": true
+  },
+  "checks": [
+    "A CLI/agent/UI/installed binary and service matched",
+    "B exact generation/revision update receipt",
+    "Both protected services/input READY and grant PRESENT",
+    "Both exact-build CONNECTED events share one connection",
+    "No new fault in the short post-connect baseline"
+  ],
+  "limitations": [
+    "No new physical crossings measured yet. User trial requested; no root-cause fix or long-term reliability claim.",
+    "Earlier g514 local GC-stopping recurrences were preserved before installation. Old lastFailure/recovery snapshots are historical and are not treated as current failure.",
+    "Observation budgets apply to one runtime monitor invocation, not the lifetime of the resident process. No runtime flight recording enabled."
+  ],
+  "sourceCommits": [
+    "d105ddab",
+    "f7e0067c",
+    "bb5f8738"
+  ],
+  "validation": [
+    "GC boundary/cooldown/budget and privacy/export tests passed",
+    "Complete productlog/handoff/inputworker/residentagent/localapi suites passed",
+    "Go vet and diff checks passed",
+    "111 frontend tests passed",
+    "Workspace package and setup verification passed"
+  ],
+  "remoteCI": "not run",
+  "push": "not requested; not performed",
+  "apiDBRunner": "Only additive local diagnostic observation metadata; no authorization, DB, external API or runner changes"
+}
