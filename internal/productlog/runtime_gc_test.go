@@ -65,3 +65,29 @@ func TestGCFailureTrailBoundedRoundTripAndInvalidWindows(t *testing.T) {
 		}
 	}
 }
+
+func TestGCNonfatalObservationRoundTripWithoutInventingFault(t *testing.T) {
+	for _, reason := range []string{"timer_late", "metrics_read_slow", "gc_pause_bucket", "gc_stopping_bucket", "runnable_bucket"} {
+		s := GCTrail{Schema: 1, TriggerMicros: 500000, TriggerObservedAt: "2026-11-03T00:00:00Z", Observation: reason, Samples: []GCWindow{{BeginMicros: 1, EndMicros: 500000, LateMicros: 332238}}}
+		if !s.valid() {
+			t.Fatal("nonfatal observation rejected", reason)
+		}
+		l := &Logger{queue: make(chan record, 1)}
+		l.GCTrail(s)
+		r := <-l.queue
+		r.Time = "2026-11-03T00:00:00Z"
+		raw, _ := json.Marshal(r)
+		out := sanitizeLog("agent.jsonl", strings.NewReader(string(raw)+"\n"))
+		if out.Incomplete || len(out.Events) != 1 || out.Events[0].GCTrail.Observation != reason || out.Events[0].GCTrail.Fault != "" {
+			t.Fatal("nonfatal evidence lost or mislabeled", reason)
+		}
+		s.Fault = "fault_source_hook_failed"
+		if s.valid() {
+			t.Fatal("ambiguous failure and observation accepted")
+		}
+		s.Fault, s.Observation = "", "PRIVATE"
+		if s.valid() {
+			t.Fatal("arbitrary observation text accepted")
+		}
+	}
+}

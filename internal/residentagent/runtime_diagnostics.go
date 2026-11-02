@@ -296,11 +296,14 @@ func (d *runtimeDiagnostics) run(ctx context.Context, log runtimeDiagnosticSink)
 	readGC := newGCSampler()
 	previousGC := readGC()
 	var ring gcEvidenceRing
+	var observations gcObservationLimit
 	trails := 0
-	sampleGC := func(late time.Duration) {
+	sampleGC := func(late time.Duration) productlog.GCWindow {
 		current := readGC()
-		ring.add(gcInterval(d.started, previousGC, current, late))
+		w := gcInterval(d.started, previousGC, current, late)
+		ring.add(w)
 		previousGC = current
+		return w
 	}
 	flushFailure := func(t gcFailureTrigger) {
 		if d.captureTrace != nil {
@@ -331,6 +334,9 @@ func (d *runtimeDiagnostics) run(ctx context.Context, log runtimeDiagnosticSink)
 			if d.gcSkipped.Load() > 0 {
 				log.Event("runtime_gc_trail_limited")
 			}
+			if observations.skipped > 0 {
+				log.Event("runtime_stall_trail_limited")
+			}
 			log.Runtime(d.sample(read(), previous))
 			return
 		case t := <-d.gcFailures:
@@ -338,7 +344,14 @@ func (d *runtimeDiagnostics) run(ctx context.Context, log runtimeDiagnosticSink)
 		case scheduled := <-gcTicker.C:
 			late := time.Since(scheduled)
 			d.ObserveTimerLateness(late)
-			sampleGC(late)
+			w := sampleGC(late)
+			if reason := gcObservationReason(w); reason != "" && observations.admit(previousGC.at) {
+				heartbeat := d.heartbeatSnapshot()
+				notified := d.stamp(previousGC.at)
+				heartbeat.AtMicros = notified
+				t := gcFailureTrigger{at: previousGC.at, notified: notified, observation: reason, heartbeat: heartbeat}
+				log.GCTrail(ring.snapshot(t, observations.skipped))
+			}
 		case scheduled := <-ticker.C:
 			d.ObserveTimerLateness(time.Since(scheduled))
 			current := read()

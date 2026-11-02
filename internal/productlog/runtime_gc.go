@@ -47,6 +47,7 @@ type GCTrail struct {
 	TriggerMicros     int64              `json:"triggerMicros"`
 	TriggerObservedAt string             `json:"triggerObservedAt"`
 	Fault             string             `json:"fault"`
+	Observation       string             `json:"observation,omitempty"`
 	Wrapped           bool               `json:"wrapped"`
 	SkippedTriggers   uint64             `json:"skippedTriggers"`
 	Samples           []GCWindow         `json:"samples"`
@@ -57,7 +58,9 @@ func (s GCTrail) valid() bool {
 	if s.Heartbeat != nil && (!s.Heartbeat.valid() || s.Heartbeat.AtMicros != s.TriggerMicros) {
 		return false
 	}
-	if s.Schema != 1 || s.TriggerMicros < 1 || !strings.HasPrefix(s.Fault, "fault_") || !allowed[s.Fault] || len(s.Samples) == 0 || len(s.Samples) > GCTraceLimit {
+	failure := s.Observation == "" && strings.HasPrefix(s.Fault, "fault_") && allowed[s.Fault]
+	observation := s.Fault == "" && validGCObservation(s.Observation)
+	if s.Schema != 1 || s.TriggerMicros < 1 || (!failure && !observation) || len(s.Samples) == 0 || len(s.Samples) > GCTraceLimit {
 		return false
 	}
 	if _, err := time.Parse(time.RFC3339Nano, s.TriggerObservedAt); err != nil || len(s.TriggerObservedAt) > 64 {
@@ -84,7 +87,20 @@ func (s GCTrail) valid() bool {
 	return true
 }
 
-func init() { allowed["runtime_gc_trail"] = true; allowed["runtime_gc_trail_limited"] = true }
+// Observations preserve nonfatal stalls without inventing a fault or a cause.
+func validGCObservation(reason string) bool {
+	switch reason {
+	case "timer_late", "metrics_read_slow", "gc_pause_bucket", "gc_stopping_bucket", "runnable_bucket":
+		return true
+	}
+	return false
+}
+
+func init() {
+	allowed["runtime_gc_trail"] = true
+	allowed["runtime_gc_trail_limited"] = true
+	allowed["runtime_stall_trail_limited"] = true
+}
 
 func (l *Logger) GCTrail(s GCTrail) {
 	if s.valid() {

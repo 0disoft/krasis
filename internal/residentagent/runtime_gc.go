@@ -12,10 +12,11 @@ const gcSampleInterval = 100 * time.Millisecond
 const gcTrailBudget = 8
 
 type gcFailureTrigger struct {
-	at        time.Time
-	notified  int64
-	fault     string
-	heartbeat productlog.HeartbeatProgress
+	at          time.Time
+	notified    int64
+	fault       string
+	observation string
+	heartbeat   productlog.HeartbeatProgress
 }
 
 // Observer callbacks enqueue bounded scalar evidence. No runtime/OS query,
@@ -140,7 +141,7 @@ func (r *gcEvidenceRing) add(w productlog.GCWindow) {
 }
 
 func (r *gcEvidenceRing) snapshot(t gcFailureTrigger, skipped uint64) productlog.GCTrail {
-	s := productlog.GCTrail{Schema: 1, TriggerMicros: t.notified, TriggerObservedAt: t.at.Format(time.RFC3339Nano), Fault: t.fault, Wrapped: r.wrapped, SkippedTriggers: skipped, Samples: make([]productlog.GCWindow, r.count)}
+	s := productlog.GCTrail{Schema: 1, TriggerMicros: t.notified, TriggerObservedAt: t.at.Format(time.RFC3339Nano), Fault: t.fault, Observation: t.observation, Wrapped: r.wrapped, SkippedTriggers: skipped, Samples: make([]productlog.GCWindow, r.count)}
 	if t.heartbeat.Schema != 0 {
 		s.Heartbeat = &t.heartbeat
 	}
