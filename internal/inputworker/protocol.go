@@ -47,6 +47,7 @@ type request struct {
 	x, y             int32
 	applyDetail      bool
 	submissionDetail bool
+	ipcDetail        bool
 }
 
 func readRequest(reader io.Reader) (request, error) {
@@ -54,12 +55,13 @@ func readRequest(reader io.Reader) (request, error) {
 	if _, err := io.ReadFull(reader, data[:]); err != nil {
 		return request{}, err
 	}
-	if string(data[:4]) != "KRI1" || (data[4] != 1 && data[4] != 2) || data[4] == 1 && data[7] != 0 || data[4] == 2 && data[7] != 1 && data[7] != 3 || binary.BigEndian.Uint64(data[40:]) != 0 {
+	if string(data[:4]) != "KRI1" || (data[4] != 1 && data[4] != 2) || data[4] == 1 && data[7] != 0 || data[4] == 2 && data[7] != 1 && data[7] != 3 && data[7] != 7 || binary.BigEndian.Uint64(data[40:]) != 0 {
 		return request{}, ErrProtocol
 	}
 	value := request{op: operation(data[5]), sequence: binary.BigEndian.Uint64(data[8:16])}
 	value.applyDetail = data[4] == 2
-	value.submissionDetail = value.applyDetail && data[7] == 3
+	value.submissionDetail = value.applyDetail && data[7]&2 != 0
+	value.ipcDetail = value.applyDetail && data[7]&4 != 0
 	if value.applyDetail && (value.op == opHeartbeat || value.op == opClose) {
 		return request{}, ErrProtocol
 	}
@@ -104,7 +106,7 @@ func encodeRequest(value request) ([requestSize]byte, error) {
 	var data [requestSize]byte
 	copy(data[:4], "KRI1")
 	data[4], data[5] = 1, byte(value.op)
-	if value.submissionDetail && !value.applyDetail {
+	if value.submissionDetail && !value.applyDetail || value.ipcDetail && !value.submissionDetail {
 		return data, ErrProtocol
 	}
 	if value.applyDetail {
@@ -114,6 +116,9 @@ func encodeRequest(value request) ([requestSize]byte, error) {
 		data[4], data[7] = 2, 1
 		if value.submissionDetail {
 			data[7] = 3
+			if value.ipcDetail {
+				data[7] = 7
+			}
 		}
 	}
 	binary.BigEndian.PutUint64(data[8:16], value.sequence)
@@ -140,6 +145,7 @@ func encodeRequest(value request) ([requestSize]byte, error) {
 }
 
 type response struct {
+	ipc                 *nativeIPCWire
 	beforeX, beforeY    int32
 	observation         *application.CursorPlacementObservation
 	x, y                int32
@@ -158,7 +164,7 @@ type response struct {
 }
 
 func writeResponse(writer io.Writer, value response) error {
-	var data [responseSize + workerApplyDetailSize + workerSubmissionDetailSize + 26]byte
+	var data [responseSize + workerApplyDetailSize + workerSubmissionDetailSize + 26 + nativeIPCSize]byte
 	size := responseSize
 	copy(data[:4], "KRA1")
 	data[4], data[5], data[6], data[7] = 1, byte(value.op), value.status, value.certainty
@@ -244,6 +250,18 @@ func writeResponse(writer io.Writer, value response) error {
 		}
 	}
 	attachDesktopDiagnostic(data[:size], value.desktop)
+	ipc := value.ipc
+	if ipc == nil && value.applyDetail != nil && value.applyDetail.NativeIPC != nil && value.applyDetail.NativeIPC.Valid() {
+		ipc = &nativeIPCWire{profile: value.applyDetail.NativeIPC}
+	}
+	if ipc != nil {
+		data[4] += 14
+		if ipc.profile == nil {
+			ipc.stamps[2] = workerIPCTick()
+		}
+		ipc.encode(data[size : size+nativeIPCSize])
+		size += nativeIPCSize
+	}
 	n, err := writer.Write(data[:size])
 	if err == nil && n != size {
 		return io.ErrShortWrite
@@ -252,6 +270,9 @@ func writeResponse(writer io.Writer, value response) error {
 }
 
 func decodeResponse(data [responseSize]byte) (response, error) {
+	if data[4] >= 15 && data[4] <= 28 {
+		data[4] -= 14
+	}
 	desktop := detachDesktopDiagnostic(&data)
 	if string(data[:4]) != "KRA1" || data[4] < 1 || data[4] > 7 || (data[4] < 3 && data[23] != 0) {
 		return response{}, ErrProtocol

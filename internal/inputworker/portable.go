@@ -74,6 +74,7 @@ func (client *Client) performPortable(ctx context.Context, process portableTrans
 	probe := handoff.WorkerApplyProbe(ctx)
 	if probe != nil && command.op != opHeartbeat && command.op != opClose {
 		command.applyDetail, command.submissionDetail = true, true
+		command.ipcDetail = workerIPCTick() != 0
 	}
 	command.sequence, command.binding = client.sequence, binding
 	data, err := encodeRequest(command)
@@ -82,9 +83,19 @@ func (client *Client) performPortable(ctx context.Context, process portableTrans
 	}
 	var submission atomic.Uint32 // 0: unstarted, 1: attempted, 2: permanently fenced.
 	var ack response
+	started := uint64(0)
+	if command.ipcDetail {
+		started = workerIPCTick()
+	}
+	var ipcProfile *handoff.NativeIPCProfile
 	err = process.ExchangeInput(ctx, func(writer io.Writer, reader io.Reader) error {
 		if ctx.Err() != nil || !submission.CompareAndSwap(0, 1) {
 			return ErrExpired
+		}
+		admitted, submitted := uint64(0), uint64(0)
+		if command.ipcDetail {
+			admitted = workerIPCTick()
+			submitted = workerIPCTick()
 		}
 		// Claiming the attempt before Write is conservative. A timeout can
 		// instead fence state 0; that late callback then cannot submit input.
@@ -92,7 +103,16 @@ func (client *Client) performPortable(ctx context.Context, process portableTrans
 			return errors.Join(ErrProtocol, err)
 		}
 		var err error
-		ack, err = readResponse(reader)
+		if command.ipcDetail {
+			observed := &nativeIPCReader{Reader: reader}
+			ack, err = readResponse(observed)
+			complete := workerIPCTick()
+			if err == nil && ack.sequence == command.sequence && ack.op == command.op {
+				ipcProfile = normalizeNativeIPC(started, admitted, submitted, ack.ipc, observed.first, complete)
+			}
+		} else {
+			ack, err = readResponse(reader)
+		}
 		if err != nil || ack.sequence != command.sequence || ack.op != command.op {
 			return errors.Join(ErrProtocol, err)
 		}
@@ -107,6 +127,9 @@ func (client *Client) performPortable(ctx context.Context, process portableTrans
 		return unknownInput(err)
 	}
 	client.sequence++
+	if probe != nil && ipcProfile != nil {
+		probe.NativeIPC = ipcProfile
+	}
 	if probe != nil && ack.applyDetail != nil && ack.applyDetail.SubmissionCalls == 1 {
 		probe.RecordSubmission(time.Duration(ack.applyDetail.SubmissionMicros) * time.Microsecond)
 		probe.SubmissionSaturated = probe.SubmissionSaturated || ack.applyDetail.SubmissionSaturated
@@ -172,6 +195,10 @@ func portableInputHandler(input application.InputPort, execute func(context.Cont
 	failed := false
 	return func(reader io.Reader, writer io.Writer) error {
 		command, err := readRequest(reader)
+		readAt := uint64(0)
+		if command.ipcDetail {
+			readAt = workerIPCTick()
+		}
 		if err != nil || input == nil || execute == nil || command.binding == (Binding{}) || command.sequence != sequence || sequence == math.MaxUint64 || command.op == opClose || releaseOnly && (command.applyDetail || command.op != opRelease && command.op != opHeartbeat) {
 			return ErrProtocol
 		}
@@ -183,6 +210,9 @@ func portableInputHandler(input application.InputPort, execute func(context.Cont
 		}
 		sequence++
 		ack := response{sequence: command.sequence, op: command.op}
+		if command.ipcDetail {
+			ack.ipc = &nativeIPCWire{stamps: [3]uint64{readAt, workerIPCTick(), 0}}
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), IdleTimeout)
 		defer cancel()
 		var applyErr error

@@ -7,6 +7,9 @@ import "github.com/0disoft/krasis/internal/inputdesktop"
 // added. Legacy peers reject the new version; installed image matching remains
 // the compatibility boundary. Unknown enum values drop metadata, not an ACK.
 func legacyResponseVersion(version byte) byte {
+	if version >= 15 && version <= 28 {
+		version -= 14
+	}
 	if version >= 8 && version <= 14 {
 		return version - 7
 	}

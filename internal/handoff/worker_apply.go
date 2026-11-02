@@ -12,9 +12,10 @@ const workerApplyProbeInterval = 100 * time.Millisecond
 // the existing apply function and the subsequent cursor snapshot. It records
 // durations only, never operation kinds, input values or cursor coordinates.
 type WorkerApplyProfile struct {
-	Micros    [2]uint32 `json:"micros"`
-	Measured  uint8     `json:"measured"`
-	Saturated uint8     `json:"saturated,omitempty"`
+	NativeIPC *NativeIPCProfile `json:"nativeIPC,omitempty"`
+	Micros    [2]uint32         `json:"micros"`
+	Measured  uint8             `json:"measured"`
+	Saturated uint8             `json:"saturated,omitempty"`
 	// Submission is nested inside apply, not an additional disjoint part.
 	// Calls is 0 (absent), 1 (measured), or 2 (ambiguous; drop diagnostics).
 	SubmissionMicros    uint32 `json:"submissionMicros,omitempty"`
@@ -23,6 +24,12 @@ type WorkerApplyProfile struct {
 }
 
 func (p WorkerApplyProfile) Valid() bool {
+	// Independent QPC and Go monotonic clocks are floored separately. Permit
+	// one millisecond of observation overhead, never a fabricated large tail.
+	if p.NativeIPC != nil && (!p.NativeIPC.Valid() || p.Measured&1 == 0 ||
+		p.Saturated&1 == 0 && p.NativeIPC.total() > uint64(p.Micros[0])+1000) {
+		return false
+	}
 	if p.Measured & ^uint8(3) != 0 || p.Saturated & ^p.Measured != 0 {
 		return false
 	}
@@ -109,6 +116,10 @@ func RecordWorkerApply(ctx context.Context, p *WorkerApplyProfile) {
 	v.workerApplyRecorded = true
 	if p != nil && p.ValidForWorker(v.vector.WorkerMillis, v.vector.WorkerMeasured) && p.Measured != 0 {
 		copy := *p
+		if p.NativeIPC != nil {
+			ipc := *p.NativeIPC
+			copy.NativeIPC = &ipc
+		}
 		v.vector.WorkerApply = &copy
 	}
 }

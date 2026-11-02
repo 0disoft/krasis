@@ -29,8 +29,9 @@ func encodeWorkerSubmission(data []byte, p handoff.WorkerApplyProfile) {
 // Read the diagnostic and private cursor suffix together. A profiled cursor
 // response retains two reads and one write, with no extra request or roundtrip.
 func readResponseSuffix(reader io.Reader, version byte, value *response) error {
+	hasIPC := version >= 15 && version <= 28
 	version = legacyResponseVersion(version)
-	var data [workerApplyDetailSize + workerSubmissionDetailSize + 26]byte
+	var data [workerApplyDetailSize + workerSubmissionDetailSize + 26 + nativeIPCSize]byte
 	size := 0
 	if version >= 4 {
 		size = workerApplyDetailSize
@@ -50,6 +51,10 @@ func readResponseSuffix(reader io.Reader, version byte, value *response) error {
 		if cursorEntryOperation(value.op) {
 			size += 8
 		}
+	}
+	baseSize := size
+	if hasIPC {
+		size += nativeIPCSize
 	}
 	if size == 0 {
 		return nil
@@ -106,6 +111,15 @@ func readResponseSuffix(reader io.Reader, version byte, value *response) error {
 			}
 			value.beforeX = int32(binary.BigEndian.Uint32(data[snapshot : snapshot+4]))
 			value.beforeY = int32(binary.BigEndian.Uint32(data[snapshot+4 : snapshot+8]))
+		}
+	}
+	if hasIPC {
+		value.ipc = decodeNativeIPC(data[baseSize:size])
+		if value.ipc != nil && value.ipc.profile != nil && value.applyDetail != nil {
+			value.applyDetail.NativeIPC = value.ipc.profile
+			if !value.applyDetail.ValidForWorker(value.millis, value.measured) {
+				value.applyDetail.NativeIPC = nil
+			}
 		}
 	}
 	return nil

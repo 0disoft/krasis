@@ -60,3 +60,37 @@ Client/worker transport checks cover flagged tracked input and unchanged idle
 or untracked traffic. Apply g178 to both devices, repeat ordinary crossings and
 PIN-open reentry, then export diagnostics to identify which measured part stalls.
 This build narrows evidence; it does not claim reduced latency.
+
+## g512: Same-PC native IPC phases
+
+Within the existing bounded receiver probe, `workerApply.nativeIPC.micros`
+contains six disjoint durations: parent executor admission/preparation,
+request submission to child read/decode completion, child validation/admission,
+child handler through reply encoding, reply-ready to parent's first positive
+read return, and that return through matching response decode. These span one
+exact sequence/op-matching exchange. Windows QPC provides a common monotonic
+clock within one PC; no cross-laptop clocks are subtracted. Failed, zero,
+unordered or over-120-second clock observations discard this metadata only.
+The [Windows QPC guidance](https://learn.microsoft.com/en-us/windows/win32/sysinfo/acquiring-high-resolution-time-stamps)
+also allows one counter tick of cross-thread ordering uncertainty. Durations
+here are floored to microseconds, not a claim of sub-microsecond precision.
+
+Request size stays 48 bytes; KRI1 v2 flag 7 requests apply, submission and IPC
+detail together. Only the local portable/native client requests IPC; heartbeat,
+close and release-only handlers cannot request it. KRA1 versions 15..28 mirror
+1..14 with a trailing 32-byte block after all private cursor bytes. Mode 1
+contains three child QPC microsecond stamps; mode 2 contains the six normalized
+uint32 durations. Seven reserved bytes are zero. The journal emits only mode 2;
+absolute counters never enter logs or peer support exports. Invalid optional
+metadata is consumed and dropped; truncated framing still fails normally.
+The ACK remains one write and one roundtrip, with 32 additional bytes only on
+sampled exchanges. Unprofiled input and liveness have no extra clock calls.
+
+Reply-ready is immediately before the existing Write call. The delivery span
+includes write submission, kernel transport and parent scheduling; it does not
+identify Write completion or kernel arrival. Child handler includes fresh
+service/desktop checks and existing application work; nested SendInput and
+worker timing fields remain separate, and must not be added to these spans.
+No retry, new input, authority cache, deadline extension or cleanup exemption
+is added. This is instrumentation; latency improvement requires fresh physical
+evidence and a subsequent cause-specific fix.
