@@ -5,6 +5,43 @@ import (
 	"time"
 )
 
+func TestServiceIPCRequiresMatchedACKAndOwnsItsSnapshot(t *testing.T) {
+	service := &NativeIPCProfile{Micros: [6]uint32{0, 10, 20, 30, 40, 50}}
+	profile := ACKReadProfile{Measured: 7, Progress: ACKReadMatched, ServiceIPC: service}
+	if !profile.Valid() {
+		t.Fatal("valid service exchange rejected")
+	}
+	profile.Progress = ACKReadComplete
+	if profile.Valid() {
+		t.Fatal("unmatched response supplied service timing")
+	}
+	profile.Progress = ACKReadMatched
+	for _, invalid := range []NativeIPCProfile{
+		{Micros: [6]uint32{1}},
+		{ParentMeasured: true},
+		{Micros: [6]uint32{0, uint32(Window.Microseconds()) + 1}},
+	} {
+		profile.ServiceIPC = &invalid
+		if profile.Valid() {
+			t.Fatal("invalid outer exchange accepted", invalid)
+		}
+	}
+	profile.ServiceIPC = service
+	_, ctx, out := collected(t)
+	p := Begin(ctx, "receiver", "s", "e", time.Now())
+	Backend(p, "installed")
+	i, done := Input(ctx, "receiver")
+	WantWorkerApply(i)
+	Record(i, ClientResponse, time.Second)
+	RecordACKRead(i, &profile)
+	service.Micros[3] = 999
+	done(nil)
+	Finish(p, "ok")
+	if len(*out) != 1 || (*out)[0].First.ACKRead == nil || (*out)[0].First.ACKRead.ServiceIPC == nil || (*out)[0].First.ACKRead.ServiceIPC.Micros[3] != 30 {
+		t.Fatal("caller mutation changed captured service timing")
+	}
+}
+
 func TestACKReadValidationRequiresObservedStagesAndParentBound(t *testing.T) {
 	for _, p := range []ACKReadProfile{
 		{Measured: 1, Progress: ACKReadNoData},

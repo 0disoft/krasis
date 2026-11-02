@@ -17,13 +17,19 @@ const (
 // positive Read return, then header decode, then suffix decode. It measures
 // observation by the client, not kernel byte arrival or worker scheduling.
 type ACKReadProfile struct {
-	Micros    [3]uint32 `json:"micros"`
-	Measured  uint8     `json:"measured"`
-	Saturated uint8     `json:"saturated,omitempty"`
-	Progress  uint8     `json:"progress"`
+	// Outer app/journal exchange. Phase 0 is zero; phase 4 includes sender
+	// submission, pipe delivery and app scheduling, not kernel arrival alone.
+	ServiceIPC *NativeIPCProfile `json:"serviceIPC,omitempty"`
+	Micros     [3]uint32         `json:"micros"`
+	Measured   uint8             `json:"measured"`
+	Saturated  uint8             `json:"saturated,omitempty"`
+	Progress   uint8             `json:"progress"`
 }
 
 func (p ACKReadProfile) Valid() bool {
+	if p.ServiceIPC != nil && (p.Progress != ACKReadMatched || !p.ServiceIPC.Valid() || p.ServiceIPC.ParentMeasured || p.ServiceIPC.Micros[0] != 0) {
+		return false
+	}
 	if p.Progress > ACKReadMatched || p.Measured>>3 != 0 || p.Saturated & ^p.Measured != 0 {
 		return false
 	}
@@ -84,6 +90,10 @@ func RecordACKRead(ctx context.Context, p *ACKReadProfile) {
 	v.ackReadRecorded = true
 	if p != nil && p.validForResponse(v.vector) {
 		copy := *p
+		if p.ServiceIPC != nil {
+			service := *p.ServiceIPC
+			copy.ServiceIPC = &service
+		}
 		v.vector.ACKRead = &copy
 	}
 }

@@ -8,26 +8,37 @@ import (
 )
 
 // Installed native parent/child images are hash-matched as one bundle.
-// Twelve fixed bytes add parent spans without another read/write/exchange.
-const nativeIPCSize = 44
+// The outer journal timestamps coexist with the normalized inner child spans.
+// One fixed suffix, no additional read/write/exchange.
+const nativeIPCSize = 68
 
 type nativeIPCWire struct {
 	stamps  [3]uint64 // child read complete, handler entry, immediately before Write
 	profile *handoff.NativeIPCProfile
+	outer   [3]uint64 // journal read complete, handler entry, immediately before Write
 }
 
 func (p *nativeIPCWire) encode(data []byte) {
+	if p.outer != ([3]uint64{}) {
+		data[0] = 4
+		if p.profile != nil {
+			data[1] = 1
+			if p.profile.ParentMeasured {
+				data[1] |= 2
+			}
+			encodeNormalizedIPC(data, p.profile)
+		}
+		for i, n := range p.outer {
+			binary.BigEndian.PutUint64(data[44+i*8:], n)
+		}
+		return
+	}
 	if p.profile != nil {
 		data[0] = 2
-		for i, n := range p.profile.Micros {
-			binary.BigEndian.PutUint32(data[8+i*4:], n)
-		}
 		if p.profile.ParentMeasured {
 			data[0] = 3
-			for i, n := range p.profile.ParentMicros {
-				binary.BigEndian.PutUint32(data[32+i*4:], n)
-			}
 		}
+		encodeNormalizedIPC(data, p.profile)
 		return
 	}
 	data[0] = 1
@@ -36,22 +47,48 @@ func (p *nativeIPCWire) encode(data []byte) {
 	}
 }
 
+func encodeNormalizedIPC(data []byte, p *handoff.NativeIPCProfile) {
+	for i, n := range p.Micros {
+		binary.BigEndian.PutUint32(data[8+i*4:], n)
+	}
+	if p.ParentMeasured {
+		for i, n := range p.ParentMicros {
+			binary.BigEndian.PutUint32(data[32+i*4:], n)
+		}
+	}
+}
+
 func decodeNativeIPC(data []byte) *nativeIPCWire {
-	if len(data) != nativeIPCSize || !zeroBytes(data[1:8]) || data[0] != 3 && !zeroBytes(data[32:]) {
+	if len(data) != nativeIPCSize {
+		return nil
+	}
+	if data[0] == 4 {
+		if !zeroBytes(data[2:8]) || data[1] > 3 || data[1] == 2 || data[1]&2 == 0 && !zeroBytes(data[32:44]) || data[1] == 0 && !zeroBytes(data[8:44]) {
+			return nil
+		}
+	} else if !zeroBytes(data[1:8]) || !zeroBytes(data[44:]) || data[0] != 3 && !zeroBytes(data[32:44]) {
 		return nil
 	}
 	p := &nativeIPCWire{}
+	if data[0] == 4 {
+		for i := range p.outer {
+			p.outer[i] = binary.BigEndian.Uint64(data[44+i*8:])
+		}
+		if data[1] == 0 {
+			return p
+		}
+	}
 	switch data[0] {
 	case 1:
 		for i := range p.stamps {
 			p.stamps[i] = binary.BigEndian.Uint64(data[8+i*8:])
 		}
-	case 2, 3:
+	case 2, 3, 4:
 		profile := &handoff.NativeIPCProfile{}
 		for i := range profile.Micros {
 			profile.Micros[i] = binary.BigEndian.Uint32(data[8+i*4:])
 		}
-		if data[0] == 3 {
+		if data[0] == 3 || data[0] == 4 && data[1]&2 != 0 {
 			profile.ParentMeasured = true
 			for i := range profile.ParentMicros {
 				profile.ParentMicros[i] = binary.BigEndian.Uint32(data[32+i*4:])

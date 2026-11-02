@@ -227,6 +227,10 @@ func serve(ctx context.Context, stream net.Conn, input application.InputPort, le
 			return report, ErrProtocol
 		}
 		command, readErr := readRequest(stream)
+		readAt := uint64(0)
+		if command.ipcDetail {
+			readAt = workerIPCTick()
+		}
 		if ctx.Err() != nil {
 			return report, ctx.Err()
 		}
@@ -255,6 +259,9 @@ func serve(ctx context.Context, stream net.Conn, input application.InputPort, le
 		}
 		operationCtx, cancel := context.WithDeadline(ctx, deadline)
 		ack := response{sequence: command.sequence, op: command.op}
+		if command.ipcDetail {
+			ack.ipc = &nativeIPCWire{outer: [3]uint64{readAt, workerIPCTick(), 0}}
+		}
 		dispatched := false
 		operationErr := do(operationCtx, func() error {
 			dispatched = true
@@ -280,6 +287,9 @@ func serve(ctx context.Context, stream net.Conn, input application.InputPort, le
 		}
 		if deadlineErr := stream.SetWriteDeadline(deadline); deadlineErr != nil {
 			return report, ErrProtocol
+		}
+		if ack.ipc != nil && ack.applyDetail != nil {
+			ack.ipc.profile = ack.applyDetail.NativeIPC
 		}
 		if writeErr := writeResponse(stream, ack); writeErr != nil {
 			return report, ErrProtocol

@@ -256,7 +256,9 @@ func writeResponse(writer io.Writer, value response) error {
 	}
 	if ipc != nil {
 		data[4] += 14
-		if ipc.profile == nil {
+		if ipc.outer != ([3]uint64{}) {
+			ipc.outer[2] = workerIPCTick()
+		} else if ipc.profile == nil {
 			ipc.stamps[2] = workerIPCTick()
 		}
 		ipc.encode(data[size : size+nativeIPCSize])

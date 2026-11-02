@@ -237,6 +237,7 @@ func (client *Client) performResponseChecked(ctx context.Context, command reques
 	if command.op != opHeartbeat {
 		command.applyDetail = handoff.WantWorkerApply(ctx)
 		command.submissionDetail = command.applyDetail
+		command.ipcDetail = command.applyDetail && workerIPCTick() != 0
 	}
 	deadline := time.Now().Add(IdleTimeout)
 	if client.lease.ExpiresAt.Before(deadline) {
@@ -264,6 +265,10 @@ func (client *Client) performResponseChecked(ctx context.Context, command reques
 	client.sequence++
 	start = time.Now()
 	requestStarted := start
+	requestTick := uint64(0)
+	if command.ipcDetail {
+		requestTick = workerIPCTick()
+	}
 	n, err := stream.Write(data[:])
 	if err == nil && n == len(data) {
 		submitted.Store(true)
@@ -292,7 +297,8 @@ func (client *Client) performResponseChecked(ctx context.Context, command reques
 	if client.ackReader == nil {
 		client.ackReader = newACKReader(stream)
 	}
-	ack, err := readResponseObserved(client.ackReader, ackRead)
+	var ackTicks [2]uint64
+	ack, err := readResponseObserved(client.ackReader, ackRead, &ackTicks)
 	elapsed3 := time.Since(start)
 	sample[3] = timingBucket(elapsed3)
 	if command.op != opHeartbeat {
@@ -301,6 +307,9 @@ func (client *Client) performResponseChecked(ctx context.Context, command reques
 	if ackRead != nil {
 		if err == nil && ack.sequence == command.sequence && ack.op == command.op {
 			ackRead.Progress = handoff.ACKReadMatched
+			if ack.ipc != nil {
+				ackRead.ServiceIPC = normalizeNativeIPC(requestTick, requestTick, requestTick, &nativeIPCWire{stamps: ack.ipc.outer}, ackTicks[0], ackTicks[1])
+			}
 		}
 		handoff.RecordACKRead(ctx, ackRead)
 	}
@@ -390,7 +399,7 @@ func readResponse(reader io.Reader) (response, error) {
 	return readResponseObserved(reader, nil)
 }
 
-func readResponseObserved(reader io.Reader, profile *handoff.ACKReadProfile) (response, error) {
+func readResponseObserved(reader io.Reader, profile *handoff.ACKReadProfile, ticks ...*[2]uint64) (response, error) {
 	var observer *ackReadObserver
 	if profile != nil {
 		observer = &ackReadObserver{reader: reader, profile: profile, started: time.Now()}
@@ -410,6 +419,9 @@ func readResponseObserved(reader io.Reader, profile *handoff.ACKReadProfile) (re
 	observer.suffixResult(err == nil)
 	if err != nil {
 		return response{}, err
+	}
+	if observer != nil && len(ticks) == 1 && ticks[0] != nil {
+		*ticks[0] = [2]uint64{observer.firstTick, workerIPCTick()}
 	}
 	return value, nil
 }

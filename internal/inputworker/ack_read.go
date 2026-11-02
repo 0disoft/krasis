@@ -14,11 +14,13 @@ type ackReadObserver struct {
 	reader                 io.Reader
 	profile                *handoff.ACKReadProfile
 	started, first, header time.Time
+	firstTick              uint64
 }
 
 func (r *ackReadObserver) Read(data []byte) (int, error) {
 	n, err := r.reader.Read(data)
 	if n > 0 && r.first.IsZero() {
+		r.firstTick = workerIPCTick()
 		r.first = time.Now()
 		r.profile.Record(0, r.first.Sub(r.started))
 		r.profile.Progress = handoff.ACKReadData
