@@ -1,0 +1,393 @@
+{
+  "schema": "krasis.paired-crossing-review/v1",
+  "generation": 522,
+  "revision": "cd8f524623b4ffd7451279e42f821f034e3c957d",
+  "collection": "3fa56959eb86b67e539a62746ae2470c",
+  "sides": {
+    "A": {
+      "created": "2026-11-03T09:21:27Z",
+      "sha256": "eca756b55d1d533d699c722102a96885c2e46706423a908725c33a8f622f5cf9",
+      "service": "READY",
+      "inputHealth": "READY",
+      "originalConnectionMatched": true,
+      "failureEvents": [],
+      "recovery": {
+        "time": "2026-11-03T09:20:32.0232278Z",
+        "code": "agent_present",
+        "agentState": "CONNECTED",
+        "lastFailure": {
+          "time": "2026-11-02T16:52:31.951536Z",
+          "code": "agent_faulted",
+          "agentState": "FAULTED"
+        }
+      },
+      "logs": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false,
+          "events": 2158,
+          "from": "2026-11-03T08:10:16.8432173Z",
+          "to": "2026-11-03T08:53:27.5825017Z"
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false,
+          "events": 1392,
+          "from": "2026-11-03T08:53:27.5825017Z",
+          "to": "2026-11-03T09:21:26.22094Z"
+        }
+      ]
+    },
+    "B": {
+      "created": "2026-11-03T09:21:27Z",
+      "sha256": "e6022beb88055dd343832eaa8d9edbd0759ffdb1636a65169ec94c3761f31f86",
+      "service": "READY",
+      "inputHealth": "READY",
+      "originalConnectionMatched": true,
+      "failureEvents": [],
+      "recovery": {
+        "time": "2026-11-03T09:21:08.6814084Z",
+        "code": "agent_present",
+        "agentState": "CONNECTED",
+        "lastFailure": {
+          "time": "2026-11-01T08:50:08.5779933Z",
+          "code": "agent_faulted",
+          "agentState": "FAULTED"
+        }
+      },
+      "logs": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false,
+          "events": 2637,
+          "from": "2026-11-03T08:01:00.7062455Z",
+          "to": "2026-11-03T08:50:36.7460968Z"
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false,
+          "events": 1601,
+          "from": "2026-11-03T08:50:36.7479032Z",
+          "to": "2026-11-03T09:21:26.4130984Z"
+        }
+      ]
+    }
+  },
+  "pairs": {
+    "matched": 10,
+    "complete": 10
+  },
+  "timezone": "Asia/Seoul",
+  "summaryCompletionWindowUTC": {
+    "from": "2026-11-03T09:19:18.2221281Z",
+    "to": "2026-11-03T09:21:11.6371282Z"
+  },
+  "userTrial": "Completed with no subjective issue reported; one-minute A idle after visiting B plus rapid crossings requested. Lease-summary completion times are not exact crossing initiation times.",
+  "metrics": {
+    "g521": {
+      "grant": {
+        "n": 15,
+        "medianMs": 41.137,
+        "maxMs": 236.176
+      },
+      "capture": {
+        "n": 15,
+        "medianMs": 17.598,
+        "maxMs": 40.353
+      },
+      "prepare": {
+        "n": 15,
+        "medianMs": 27.428,
+        "maxMs": 219.995
+      },
+      "ready": {
+        "n": 15,
+        "medianMs": 24.781,
+        "maxMs": 217.338
+      },
+      "first": {
+        "n": 15,
+        "medianMs": 1.83,
+        "maxMs": 5.122
+      },
+      "worst": {
+        "n": 15,
+        "medianMs": 5.644,
+        "maxMs": 18.739
+      },
+      "response": {
+        "n": 15,
+        "medianMs": 4.097,
+        "maxMs": 18.162
+      },
+      "nativeChildHandler": {
+        "n": 15,
+        "medianMs": 2.498,
+        "maxMs": 17.873
+      },
+      "sendInput": {
+        "n": 15,
+        "medianMs": 1.278,
+        "maxMs": 17.575
+      },
+      "serviceAdmission": {
+        "n": 15,
+        "medianMs": 0.099,
+        "maxMs": 1.564
+      },
+      "serviceNativeExchange": {
+        "n": 15,
+        "medianMs": 3.407,
+        "maxMs": 18.216
+      }
+    },
+    "g522": {
+      "grant": {
+        "n": 10,
+        "medianMs": 39.7725,
+        "maxMs": 57.395
+      },
+      "capture": {
+        "n": 10,
+        "medianMs": 13.736,
+        "maxMs": 31.56
+      },
+      "prepare": {
+        "n": 10,
+        "medianMs": 26.7095,
+        "maxMs": 34.553
+      },
+      "ready": {
+        "n": 10,
+        "medianMs": 24.2215,
+        "maxMs": 30.951
+      },
+      "first": {
+        "n": 10,
+        "medianMs": 2.3375000000000004,
+        "maxMs": 8.348
+      },
+      "worst": {
+        "n": 10,
+        "medianMs": 5.923500000000001,
+        "maxMs": 59.334
+      },
+      "response": {
+        "n": 10,
+        "medianMs": 5.673,
+        "maxMs": 59.334
+      },
+      "nativeChildHandler": {
+        "n": 10,
+        "medianMs": 2.88,
+        "maxMs": 33.173
+      },
+      "sendInput": {
+        "n": 10,
+        "medianMs": 1.4874999999999998,
+        "maxMs": 6.781
+      },
+      "serviceAdmission": {
+        "n": 10,
+        "medianMs": 0.148,
+        "maxMs": 24.498
+      },
+      "serviceNativeExchange": {
+        "n": 10,
+        "medianMs": 3.9675000000000002,
+        "maxMs": 48.716
+      }
+    }
+  },
+  "inputHistogram": {
+    "frames": 2329,
+    "buckets": [
+      "<1ms",
+      "1..<10ms",
+      "10..<100ms",
+      "100..<1000ms",
+      ">=1000ms"
+    ],
+    "counts": [
+      4,
+      2311,
+      14,
+      0,
+      0
+    ]
+  },
+  "preparationReuse": [
+    {
+      "summaryTime": "2026-11-03T09:19:18.2221281Z",
+      "prepareMs": 27.733,
+      "preparedAgeSeconds": 367.450769,
+      "decision": 1,
+      "nativeBindReadyMs": 12.082
+    },
+    {
+      "summaryTime": "2026-11-03T09:20:18.6263037Z",
+      "prepareMs": 25.895,
+      "preparedAgeSeconds": 101.50503,
+      "decision": 1,
+      "nativeBindReadyMs": 11.125
+    },
+    {
+      "summaryTime": "2026-11-03T09:20:19.4181767Z",
+      "prepareMs": 23.357,
+      "preparedAgeSeconds": 0.747915,
+      "decision": 1,
+      "nativeBindReadyMs": 10.4
+    },
+    {
+      "summaryTime": "2026-11-03T09:20:20.794927Z",
+      "prepareMs": 27.839,
+      "preparedAgeSeconds": 0.906543,
+      "decision": 1,
+      "nativeBindReadyMs": 11.777
+    },
+    {
+      "summaryTime": "2026-11-03T09:20:21.7809934Z",
+      "prepareMs": 34.553,
+      "preparedAgeSeconds": 0.959491,
+      "decision": 1,
+      "nativeBindReadyMs": 12.403
+    },
+    {
+      "summaryTime": "2026-11-03T09:20:22.622961Z",
+      "prepareMs": 26.575,
+      "preparedAgeSeconds": 0.714151,
+      "decision": 1,
+      "nativeBindReadyMs": 10.162
+    },
+    {
+      "summaryTime": "2026-11-03T09:21:08.8024437Z",
+      "prepareMs": 27.023,
+      "preparedAgeSeconds": 45.882157,
+      "decision": 1,
+      "nativeBindReadyMs": 9.771
+    },
+    {
+      "summaryTime": "2026-11-03T09:21:10.1218042Z",
+      "prepareMs": 26.844,
+      "preparedAgeSeconds": 1.178352,
+      "decision": 1,
+      "nativeBindReadyMs": 9.919
+    },
+    {
+      "summaryTime": "2026-11-03T09:21:10.9445339Z",
+      "prepareMs": 23.897,
+      "preparedAgeSeconds": 0.673446,
+      "decision": 1,
+      "nativeBindReadyMs": 9.119
+    },
+    {
+      "summaryTime": "2026-11-03T09:21:11.6371282Z",
+      "prepareMs": 26.535,
+      "preparedAgeSeconds": 0.56475,
+      "decision": 1,
+      "nativeBindReadyMs": 10.991
+    }
+  ],
+  "runtime": {
+    "A": {
+      "summaryIntervals": 3,
+      "maxLivenessTimerLateMs": 21.002,
+      "maxSamplerTimerLateMs": 117.986,
+      "gcPauseEventsPerInterval": [
+        {
+          "time": "2026-11-03T09:19:21.1998173Z",
+          "intervalSeconds": 59.998151,
+          "pauseEvents": 10,
+          "allocatedMiB": 39.378089904785156
+        },
+        {
+          "time": "2026-11-03T09:20:21.1994588Z",
+          "intervalSeconds": 59.999641,
+          "pauseEvents": 10,
+          "allocatedMiB": 38.647682189941406
+        },
+        {
+          "time": "2026-11-03T09:21:21.2022253Z",
+          "intervalSeconds": 60.002766,
+          "pauseEvents": 10,
+          "allocatedMiB": 39.80757141113281
+        }
+      ],
+      "observations": [
+        {
+          "time": "2026-11-03T09:19:31.2350668Z",
+          "reason": "os_read_slow",
+          "fault": "",
+          "maxOSReadMs": 129.831,
+          "maxSamplerLateMs": 6.052
+        }
+      ]
+    },
+    "B": {
+      "summaryIntervals": 3,
+      "maxLivenessTimerLateMs": 2.896,
+      "maxSamplerTimerLateMs": 3.927,
+      "gcPauseEventsPerInterval": [
+        {
+          "time": "2026-11-03T09:19:25.3029418Z",
+          "intervalSeconds": 59.999792,
+          "pauseEvents": 14,
+          "allocatedMiB": 52.416114807128906
+        },
+        {
+          "time": "2026-11-03T09:20:25.3028418Z",
+          "intervalSeconds": 59.9999,
+          "pauseEvents": 10,
+          "allocatedMiB": 41.53572082519531
+        },
+        {
+          "time": "2026-11-03T09:21:25.3030278Z",
+          "intervalSeconds": 60.000186,
+          "pauseEvents": 12,
+          "allocatedMiB": 42.970428466796875
+        }
+      ],
+      "observations": []
+    }
+  },
+  "baselineTimer": {
+    "ACombinedMaximumMs": 1852.582,
+    "comparison": "The g521 combined diagnostic/liveness maximum is compared with the new sampler maximum, not with the liveness-only maximum. Summary intervals overlap the trial and include idle time."
+  },
+  "remainingInputTail": {
+    "summaryTime": "2026-11-03T09:19:18.2221281Z",
+    "totalDispatchMs": 59.334,
+    "serviceAdmissionMs": 9.653,
+    "serviceNativeExchangeMs": 48.716,
+    "serviceWriteMs": 0.016,
+    "appResumeMs": 0.837,
+    "native": {
+      "executorAdmissionMs": 0.027,
+      "requestToChildReadMs": 11.406,
+      "childAdmissionMs": 0.003,
+      "childHandlerMs": 33.173,
+      "replyReadyToFirstReadReturnMs": 4.02,
+      "matchedDecodeMs": 0.011
+    },
+    "sendInputMs": 6.781,
+    "note": "Native handler index is 3; index 1 is request-to-child-read. SendInput is nested and must not be added. Request transit/receiver scheduling and child handling remain observable tails; this does not prove pipe, network, or mutex contention."
+  },
+  "conclusions": [
+    "All 10 complete matched A-source/B-receiver leases ended OK. Both services remain READY on the original installation connection with no new current-build fault/reconnect/disconnect/timeout/poison event in retained records.",
+    "B maximum preparation fell from 219.995ms to 34.553ms, and grant from 236.176ms to 57.395ms. All 10 entries reused prepared candidates, including ages 367.450769s and 101.505030s: the new longer unbound reservation is exercised, not merely inferred.",
+    "A maximum diagnostic sampler lateness in overlapping trial summaries is 117.986ms versus the old combined 1852.582ms maximum; liveness-only lateness is 21.002ms. No repeated second-scale stall is seen in this sample.",
+    "A still has a nonfatal 129.831ms OS observation read with saturated system CPU. This can stall diagnostics independently of liveness and is not a recovery failure.",
+    "B per-lease worst-input maximum rose from 18.739ms to 59.334ms while the median stayed near 6ms. All 2329 profiled frames are below 100ms. Better preparation does not establish that every input tail improved.",
+    "GC pause histogram observations in the A trial intervals are 10 per minute. These are pause events, not NumGC cycles; host load, allocation volume and trial populations differ, so this is not a controlled causal comparison."
+  ],
+  "validation": [
+    "Live doctor healthy/exact g522 revision; both protected services/input health READY and original connection identity matched.",
+    "Sanitized support-file SHA256, current-build event deduplication and historical lastFailure timestamps checked.",
+    "10 matched complete leases, all preparation decisions and 2329-frame histogram sum/bounds verified.",
+    "Native stage labels checked against internal/handoff/native_ipc.go; nested SendInput durations not summed."
+  ],
+  "skipped": "Read-only runtime inspection and evidence documentation only. No source modification, rebuild, reinstallation, unit/race rerun, push or remote CI; no code change requires them.",
+  "limits": "Different populations (g521 15 leases, g522 10), physical motion and host load prevent guarantees or causal attribution for every latency change. Current retained records and a short successful trial do not prove permanent recovery-error resolution.",
+  "sourceOfTruthChanged": "Evidence report only; prepared-worker policy and runtime contracts unchanged.",
+  "apiDBRunner": "No API, control/input protocol, DB, dependency, runner or repository hygiene rule changes."
+}

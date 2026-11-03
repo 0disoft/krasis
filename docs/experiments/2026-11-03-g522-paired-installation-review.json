@@ -33,11 +33,11 @@
         "summaries": 2,
         "maxLivenessTimerLateMs": 12.426,
         "maxSamplerTimerLateMs": 19.975,
-        "gcCycles": [
+        "frameDispatches": 0,
+        "gcPauseEvents": [
           16,
           8
-        ],
-        "frameDispatches": 0
+        ]
       }
     },
     "B": {
@@ -66,10 +66,10 @@
         "summaries": 1,
         "maxLivenessTimerLateMs": 1.02,
         "maxSamplerTimerLateMs": 22.019,
-        "gcCycles": [
+        "frameDispatches": 3,
+        "gcPauseEvents": [
           18
-        ],
-        "frameDispatches": 3
+        ]
       }
     }
   },
