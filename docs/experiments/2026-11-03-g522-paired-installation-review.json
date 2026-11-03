@@ -1,0 +1,127 @@
+{
+  "schema": "krasis.paired-installation-review/v1",
+  "generation": 522,
+  "revision": "cd8f524623b4ffd7451279e42f821f034e3c957d",
+  "baselineGeneration": 521,
+  "baselineCollection": "c6f0d2ece711fe0b0631c17c3e28a667",
+  "beforeInstallCollection": "2cea234bb817d288b07331e640a18a2f",
+  "collection": "f5b2b8f911c9b6dc7286b7b632e716a1",
+  "devices": {
+    "A": {
+      "created": "2026-11-03T09:14:23Z",
+      "sha256": "ba99cd8dae0e21210d13c14b0e4b87651710cc3f7b2eae6319b31dce5b058364",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "installation": {
+        "time": "2026-11-03T09:11:17.3596997Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "connectedAt": "2026-11-03T09:12:26.5550886Z",
+      "faultsSinceConnection": [],
+      "uiLaunchRecordCurrentRevision": true,
+      "initialObservation": {
+        "summaries": 2,
+        "maxLivenessTimerLateMs": 12.426,
+        "maxSamplerTimerLateMs": 19.975,
+        "gcCycles": [
+          16,
+          8
+        ],
+        "frameDispatches": 0
+      }
+    },
+    "B": {
+      "created": "2026-11-03T09:14:23Z",
+      "sha256": "ab6bb07fcfe97f42f8d4670886e9b83dcbe767f147a79427b932363c4443548c",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "installation": {
+        "time": "2026-11-03T09:12:05.9312781Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "connectedAt": "2026-11-03T09:12:25.3335889Z",
+      "faultsSinceConnection": [],
+      "uiLaunchRecordCurrentRevision": true,
+      "initialObservation": {
+        "summaries": 1,
+        "maxLivenessTimerLateMs": 1.02,
+        "maxSamplerTimerLateMs": 22.019,
+        "gcCycles": [
+          18
+        ],
+        "frameDispatches": 3
+      }
+    }
+  },
+  "peerUpdate": {
+    "code": "updated",
+    "requestID": "f92b392f41ad0b8f83b30bb7650682f0",
+    "bytes": 29013018,
+    "total": 29013018
+  },
+  "connection": {
+    "state": "CONNECTED",
+    "sharedConnectionMatched": true,
+    "requestID": "2e7ff4d1be9c011d6b62389909ef4e34",
+    "method": "krasis-cli --json app connect B connected receipt"
+  },
+  "changes": [
+    "One unbound console/native pair retained for a fixed 15 minutes rather than 15 seconds; no lease authority or expiry renewal; exact retirement preserved.",
+    "Resident-only default GOGC=300, with explicit GOGC and GOMEMLIMIT preserved; fewer GC stops trade for larger heap.",
+    "Diagnostic sampler timer lateness separated from actual liveness timer observations; bounded trace triggering retained."
+  ],
+  "validation": [
+    "Six affected Go package suites passed against the packaged runtime overlay, count=1.",
+    "Selected race tests passed for cmd/krasis-agent, residentagent, productlog and inputworker with the portable compiler.",
+    "Vet passed for six affected packages; git diff --check passed.",
+    "Frontend tests/native build, package transfer smoke, icon/archive validation and application setup validation passed.",
+    "Both installed agent revisions, UI launch records, protected input READY, install stage complete/result zero and shared connection verified from actual diagnostics."
+  ],
+  "benchmark": {
+    "kind": "synthetic fixed-allocation GC pacing, packaged runtime overlay",
+    "retainedHeapMiB": 2,
+    "allocatedMiB": 128,
+    "defaultCycles": 26,
+    "residentCycles": 12,
+    "reductionPercent": 53.8,
+    "defaultFinalHeapMiB": 7.755,
+    "residentFinalHeapMiB": 14.01,
+    "physicalInputLatencyMeasured": false
+  },
+  "limits": [
+    "No controlled physical crossing trial was performed after installation; no measured crossing-latency or long-term recovery claim.",
+    "Initial idle timer values are descriptive; host load differs from g521. Old combined maxima must be compared with samplerTimerLateMicros, not the new liveness-only field.",
+    "Host CPU saturation and one long GC interval correlate with stalls, but causality for the entire 1.852582s interval is unproven.",
+    "Cold startup or entries after 15 minutes can still require native construction. Standby retains memory/image pins longer.",
+    "An initial unmodified 20ms native writer-admission timing test missed its wall-clock threshold; subsequent complete stock and overlay suites passed.",
+    "Raw A setup stdout was unavailable. Installation success is independently verified from its current installation complete/result-zero record and exact installed revision, not a synthesized stdout receipt."
+  ],
+  "sourceOfTruth": [
+    "internal/handoff/startup.go",
+    "docs/experiments/prepared-worker-selection.md",
+    "docs/experiments/2026-11-03-g522-latency-changes.md"
+  ],
+  "apiDBRunner": "One optional additive diagnostic JSON field; no control/input wire, DB, dependency, runner or repository hygiene rule changes.",
+  "push": "Not requested; not performed",
+  "remoteCI": "Not run; locally verified paired installation"
+}
