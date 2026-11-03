@@ -252,7 +252,10 @@ func pointerMoveEvent(deltaX, deltaY int32) (input, error) {
 	if deltaX == 0 && deltaY == 0 {
 		return input{}, fmt.Errorf("%w: pointer move requires a non-zero delta", ErrUnsupportedInput)
 	}
-	return mouseEvent(mouseEventMove|mouseEventMoveNoCoalesce, 0, deltaX, deltaY), nil
+	// Preserve every relative injection and native cursor readback, while allowing
+	// Windows to coalesce WM_MOUSEMOVE notifications for a busy destination app.
+	// NOCOALESCE remains reserved for diagnostic nudges that require both messages.
+	return mouseEvent(mouseEventMove, 0, deltaX, deltaY), nil
 }
 
 func wheelEvents(deltaX, deltaY int32) ([]input, error) {

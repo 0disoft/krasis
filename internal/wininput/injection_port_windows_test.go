@@ -21,7 +21,7 @@ func TestInjectionPortMoveDoesNotRepeatResidentCursorTracking(t *testing.T) {
 	calls := 0
 	callSendInput = func(count uintptr, event *input, size uintptr) (uintptr, uintptr, error) {
 		calls++
-		if count != 1 || event.Type != inputMouse || event.Mouse.Flags != mouseEventMove|mouseEventMoveNoCoalesce || event.Mouse.DX != 1 || event.Mouse.DY != -1 {
+		if count != 1 || event.Type != inputMouse || event.Mouse.Flags != mouseEventMove || event.Mouse.DX != 1 || event.Mouse.DY != -1 {
 			t.Fatal("native move encoding changed")
 		}
 		return count, 0, nil
@@ -29,6 +29,33 @@ func TestInjectionPortMoveDoesNotRepeatResidentCursorTracking(t *testing.T) {
 	port := NewInjectionPort()
 	if err := port.Move(context.Background(), 1, -1); err != nil || calls != 1 {
 		t.Fatal("successful injection changed outcome or was replayed", err, calls)
+	}
+}
+
+func TestInjectionPortMoveCoalescesOnlyWindowNotifications(t *testing.T) {
+	previous := callSendInput
+	t.Cleanup(func() { callSendInput = previous })
+	// Reversals and large deltas must stay separate and ordered: combining them
+	// before SendInput could change Windows acceleration, clipping or return logic.
+	moves := [][2]int32{{1, -1}, {-1, 1}, {32767, -32767}, {-32767, 32767}, {0, 1}, {1, 0}}
+	calls := 0
+	callSendInput = func(count uintptr, event *input, size uintptr) (uintptr, uintptr, error) {
+		if calls >= len(moves) || count != 1 || event.Type != inputMouse ||
+			event.Mouse.Flags != mouseEventMove || event.Mouse.ExtraInfo != krasisInjectedExtraInfo ||
+			event.Mouse.DX != moves[calls][0] || event.Mouse.DY != moves[calls][1] {
+			t.Fatal("window message policy changed input order, deltas or injection identity", calls, event)
+		}
+		calls++
+		return count, 0, nil
+	}
+	port := NewInjectionPort()
+	for _, move := range moves {
+		if err := port.Move(context.Background(), move[0], move[1]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if calls != len(moves) {
+		t.Fatal("native movements were merged or dropped", calls)
 	}
 }
 

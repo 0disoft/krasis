@@ -1,0 +1,33 @@
+{
+  "schema": "krasis.native-movement-policy-review/v1",
+  "generation": 521,
+  "baselineGeneration": 520,
+  "baselineEvidence": "2026-11-03-g520-paired-crossing-review.json; matching B attempt 12, 217.431ms dispatch, 203.518ms outer service processing, 182.252ms native child handler and nested 69.919ms SendInput wall time.",
+  "analysis": [
+    "Native worker timing reports service proof 37ms and desktop scope 42ms for that sample. These can overlap and are nested observations, not additional disjoint time to add to the child or outer service span.",
+    "Fresh service proof uses a pinned SCM service handle and QueryServiceStatusEx; desktop admission revalidates the authenticated console logon. These checks can incur RPC/scheduling waits. They are preserved rather than cached or bypassed.",
+    "SendInput timing begins in Go immediately before the call and ends after return. It includes Windows/hook waits and possible caller resumption delay, not exclusively kernel CPU time. No trace proves which accounts for the 69.919ms.",
+    "Ordinary relative movements forcibly disabled Windows WM_MOUSEMOVE coalescing. This imposes avoidable destination notification pressure; it is a source-confirmed policy, but its contribution to the measured stall remains a hypothesis."
+  ],
+  "change": "Remove MOVE_NOCOALESCE from ordinary relative movement encoding. Keep every relative native injection in order with unchanged deltas, tag and one submission per command. Windows may coalesce only the destination application's WM_MOUSEMOVE notifications. Self-test/wheel-surface diagnostic nudges keep both movement notifications.",
+  "quantitativeScope": "For N accepted movements, native SendInput calls, ACKs and authorization checks remain N. The former flag forbade application notification merging; the new default permits redundant WM_MOUSEMOVE notifications to be merged when the destination lags. The number avoided and latency benefit are not measured yet; no native-call or network-I/O reduction is claimed.",
+  "regressionsCovered": [
+    "One native call for every movement, preserving reversal order, +/-32767 deltas, zero single axes and injected identity.",
+    "Zero-delta rejection, cancellation before native dispatch and partial/unknown outcomes remain unretried.",
+    "Existing cursor readback/return, pressed-state release, wheel surface and diagnostic nudge tests run with the wininput suite.",
+    "Existing native proof overlap, expiry, cancellation, late-proof fencing and no-replay tests run unchanged."
+  ],
+  "validation": [
+    "Full wininput/inputworker/handoff/productlog/residentagent/localapi suites passed with count=1.",
+    "Selected injection/native execution/proof tests passed under -race in wininput and inputworker.",
+    "Default go vet passed for inputworker/handoff/productlog/residentagent/localapi. Default wininput vet reports eight existing native callback unsafe.Pointer warnings in unchanged files; wininput vet with unsafeptr=false passed. This exception does not establish a clean default wininput vet result.",
+    "git diff --check passed. Package/setup and paired installed-build/service/CLI connection verification are recorded separately after packaging."
+  ],
+  "remainingRisk": "This does not identify a unique cause or promise elimination of the 182ms/70ms tail. Busy applications can receive fewer intermediate WM_MOUSEMOVE notifications by design. Physical cursor, drag/menu and latency comparison are pending.",
+  "rollback": "Restore MOVE_NOCOALESCE for ordinary relative movements in a new committed build if attended cursor/drawing behavior regresses. Use the normal paired installer flow; do not replay an input or bypass retirement.",
+  "sources": [
+    "https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-mouseinput",
+    "https://learn.microsoft.com/en-us/windows/win32/winmsg/lowlevelmouseproc"
+  ],
+  "apiDBRunner": "No public API, private wire size, DB, dependency, CI runner or repository hygiene rule change. Local generation/paired installation changes only; no push requested."
+}

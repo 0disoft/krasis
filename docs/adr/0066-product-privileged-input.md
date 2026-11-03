@@ -941,3 +941,24 @@ OVERLAPPED, not all duplex operations. Join the cancellation callback before
 unpinning its buffer/event; an already-completed successful kernel operation
 keeps its actual bytes/result. Generic streams retain deadline interruption.
 Preparation/input deadlines, warm-child lifetime and lease authority are unchanged.
+
+## Native movement notification policy (g521)
+
+Ordinary relative moves use `MOUSEEVENTF_MOVE` without `MOVE_NOCOALESCE`.
+Windows may merge `WM_MOUSEMOVE` notifications for a busy destination application,
+as with its default mouse handling. This does not combine the relative deltas
+submitted to SendInput: each accepted command still submits once, in order, and
+the worker/resident reads the actual cursor for return tracking. Authority,
+desktop admission, discrete input, uncertain outcomes and exact retirement keep
+their existing contracts. This is distinct from merging peer input frames.
+
+Self-test and wheel-surface diagnostic nudges retain NOCOALESCE because they
+need to observe both halves of their tagged movement pair. Applications relying
+on every intermediate WM_MOUSEMOVE notification may observe fewer notifications;
+cursor/drag/menu compatibility and latency improvement require attended trials.
+The g520 182.252ms child-handler/69.919ms SendInput sample motivates removing this
+forced notification pressure, but does not prove it caused either duration.
+Native-call wall time also includes Windows/hook and caller resumption waits.
+
+References: [MOUSEINPUT](https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-mouseinput),
+[LowLevelMouseProc](https://learn.microsoft.com/en-us/windows/win32/winmsg/lowlevelmouseproc).
