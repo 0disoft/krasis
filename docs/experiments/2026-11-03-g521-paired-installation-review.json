@@ -1,0 +1,61 @@
+{
+  "schema": "krasis.paired-installation-review/v1",
+  "generation": 521,
+  "revision": "0407726f713dfa037dfeaac48ba45c2da969bd3a",
+  "baselineGeneration": 520,
+  "collection": "2031298a7714ea98ecb089b2c42646e4",
+  "devices": {
+    "A": {
+      "created": "2026-11-03T08:28:52Z",
+      "sha256": "1a1973cddf18af68e922b0064a3b421e118f718e728a4cb04bdaa5d12f1049e0",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "connectedAt": "2026-11-03T08:28:24.1606512Z",
+      "installation": "complete",
+      "recovery": "not_needed",
+      "faultsSinceConnected": []
+    },
+    "B": {
+      "created": "2026-11-03T08:28:52Z",
+      "sha256": "154d80df738604eb5f28cfa94b4cb013bb30a6692d5ee3ca3b0f0b757ce895c1",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "connectedAt": "2026-11-03T08:28:22.9847661Z",
+      "installation": "complete",
+      "recovery": "not_needed",
+      "faultsSinceConnected": []
+    }
+  },
+  "peerUpdate": {
+    "code": "updated",
+    "requestID": "d2397fd13fb34c561cc3a33cccb97a1b",
+    "bytes": 29011375,
+    "total": 29011375
+  },
+  "connection": {
+    "state": "CONNECTED",
+    "sharedConnectionMatched": true,
+    "requestID": "6176e7c614ba2cf4da41b43d428b5745",
+    "method": "krasis-cli --json app connect B exact connected receipt"
+  },
+  "change": "Ordinary relative movement permits default Windows WM_MOUSEMOVE notification coalescing; all accepted native movements, ordering, deltas, authorization and cursor readback remain unchanged.",
+  "validation": [
+    "Full wininput/inputworker/handoff/productlog/residentagent/localapi suites passed with count=1",
+    "Selected injection/native execution/proof tests passed with -race",
+    "Default vet passed for five packages; wininput vet with unsafeptr=false passed",
+    "Frontend tests/native build, workspace transfer/package checks and setup verification passed",
+    "Both exact installed revisions and protected input READY verified; same connection and no new fault since connection"
+  ],
+  "exceptions": [
+    "Default wininput vet has eight existing unsafe.Pointer callback warnings in unchanged files; these were not fixed or claimed clean.",
+    "Physical latency benefit and cursor/drag/menu compatibility are pending. No claim that the g520 182.252ms/69.919ms tail is resolved.",
+    "Windows may deliver fewer intermediate WM_MOUSEMOVE notifications to busy apps; native input submissions are not merged.",
+    "Short installation observation is not long-term stability evidence. Historical failures and update-time disconnects are excluded from post-connection faults."
+  ],
+  "sourceOfTruth": "docs/adr/0066-product-privileged-input.md, native movement notification policy",
+  "push": "Not requested; not performed",
+  "remoteCI": "Not run; locally validated paired installation",
+  "apiDBRunner": "No API, wire size, DB, dependency, runner or repository hygiene rule changes."
+}
