@@ -1,0 +1,398 @@
+{
+  "schema": "krasis.paired-crossing-review/v1",
+  "generation": 523,
+  "revision": "0af2c8f63228129cb8596cd2535c8ef07571ba7b",
+  "collection": "1dc9d64feac633e712c5f4d0c61e63ad",
+  "baselineGeneration": 522,
+  "baselineCollection": "3fa56959eb86b67e539a62746ae2470c",
+  "sides": {
+    "A": {
+      "created": "2026-11-03T10:25:07Z",
+      "sha256": "b92d0a19e39b995e937c11870ec0e2f400ab495f4592f1ce9285ac7874eb3305",
+      "service": "READY",
+      "inputHealth": "READY",
+      "originalConnectionMatched": true,
+      "failureEvents": [],
+      "recovery": {
+        "time": "2026-11-03T10:24:31.9724005Z",
+        "code": "agent_present",
+        "agentState": "CONNECTED",
+        "lastFailure": {
+          "time": "2026-11-02T16:52:31.951536Z",
+          "code": "agent_faulted",
+          "agentState": "FAULTED"
+        }
+      },
+      "logs": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false,
+          "events": 1840,
+          "from": "2026-11-03T08:53:27.5825017Z",
+          "to": "2026-11-03T09:32:41.0201023Z"
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false,
+          "events": 2212,
+          "from": "2026-11-03T09:32:41.0201023Z",
+          "to": "2026-11-03T10:24:59.6154314Z"
+        }
+      ]
+    },
+    "B": {
+      "created": "2026-11-03T10:25:07Z",
+      "sha256": "0fa3ac74645a7eb2b88bb56e2374099c38fbd965536964d0311beedf514dc45c",
+      "service": "READY",
+      "inputHealth": "READY",
+      "originalConnectionMatched": true,
+      "failureEvents": [],
+      "recovery": {
+        "time": "2026-11-03T10:24:08.7430997Z",
+        "code": "agent_present",
+        "agentState": "CONNECTED",
+        "lastFailure": {
+          "time": "2026-11-01T08:50:08.5779933Z",
+          "code": "agent_faulted",
+          "agentState": "FAULTED"
+        }
+      },
+      "logs": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false,
+          "events": 2492,
+          "from": "2026-11-03T08:50:36.7479032Z",
+          "to": "2026-11-03T09:46:14.1132685Z"
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false,
+          "events": 1842,
+          "from": "2026-11-03T09:46:14.1132685Z",
+          "to": "2026-11-03T10:25:06.7757357Z"
+        }
+      ]
+    }
+  },
+  "pairs": {
+    "matched": 12,
+    "complete": 12
+  },
+  "timezone": "Asia/Seoul",
+  "summaryCompletionWindowUTC": {
+    "from": "2026-11-03T10:24:10.9136103Z",
+    "to": "2026-11-03T10:24:33.1512904Z"
+  },
+  "userTrial": "Completed with no subjective issue reported after requested slow/rapid crossings and B window drag. Summary completion times are not exact crossing initiation times.",
+  "metrics": {
+    "g522": {
+      "grant": {
+        "n": 10,
+        "medianMs": 39.7725,
+        "maxMs": 57.395
+      },
+      "capture": {
+        "n": 10,
+        "medianMs": 13.736,
+        "maxMs": 31.56
+      },
+      "prepare": {
+        "n": 10,
+        "medianMs": 26.7095,
+        "maxMs": 34.553
+      },
+      "ready": {
+        "n": 10,
+        "medianMs": 24.2215,
+        "maxMs": 30.951
+      },
+      "first": {
+        "n": 10,
+        "medianMs": 2.3375000000000004,
+        "maxMs": 8.348
+      },
+      "worst": {
+        "n": 10,
+        "medianMs": 5.923500000000001,
+        "maxMs": 59.334
+      },
+      "response": {
+        "n": 10,
+        "medianMs": 5.673,
+        "maxMs": 59.334
+      },
+      "nativeChildHandler": {
+        "n": 10,
+        "medianMs": 2.88,
+        "maxMs": 33.173
+      },
+      "requestToChildRead": {
+        "n": 10,
+        "medianMs": 0.1335,
+        "maxMs": 11.406
+      },
+      "requestWrite": {
+        "n": 0
+      },
+      "sendInput": {
+        "n": 10,
+        "medianMs": 1.4874999999999998,
+        "maxMs": 6.781
+      },
+      "serviceAdmission": {
+        "n": 10,
+        "medianMs": 0.148,
+        "maxMs": 24.498
+      }
+    },
+    "g523": {
+      "grant": {
+        "n": 12,
+        "medianMs": 45.852000000000004,
+        "maxMs": 73.953
+      },
+      "capture": {
+        "n": 12,
+        "medianMs": 27.694499999999998,
+        "maxMs": 104.998
+      },
+      "prepare": {
+        "n": 12,
+        "medianMs": 26.8715,
+        "maxMs": 36.673
+      },
+      "ready": {
+        "n": 12,
+        "medianMs": 24.463,
+        "maxMs": 33.471
+      },
+      "first": {
+        "n": 12,
+        "medianMs": 1.7835,
+        "maxMs": 3.158
+      },
+      "worst": {
+        "n": 12,
+        "medianMs": 3.2355,
+        "maxMs": 29.717
+      },
+      "response": {
+        "n": 12,
+        "medianMs": 2.8005,
+        "maxMs": 29.204
+      },
+      "nativeChildHandler": {
+        "n": 12,
+        "medianMs": 1.9899999999999998,
+        "maxMs": 21.781
+      },
+      "requestToChildRead": {
+        "n": 12,
+        "medianMs": 0.0805,
+        "maxMs": 16.263
+      },
+      "requestWrite": {
+        "n": 12,
+        "medianMs": 0.021,
+        "maxMs": 0.044
+      },
+      "sendInput": {
+        "n": 12,
+        "medianMs": 1.221,
+        "maxMs": 6.736
+      },
+      "serviceAdmission": {
+        "n": 12,
+        "medianMs": 0.267,
+        "maxMs": 2.076
+      }
+    }
+  },
+  "inputHistogram": {
+    "frames": 1009,
+    "buckets": [
+      "<1ms",
+      "1..<10ms",
+      "10..<100ms",
+      "100..<1000ms",
+      ">=1000ms"
+    ],
+    "counts": [
+      6,
+      995,
+      8,
+      0,
+      0
+    ]
+  },
+  "preparationReuse": {
+    "used": 12,
+    "total": 12,
+    "maxPreparedAgeSeconds": 276.281345
+  },
+  "runtime": {
+    "A": {
+      "summaryIntervals": 1,
+      "maxLivenessTimerLateMs": 25.735,
+      "maxSamplerTimerLateMs": 37.05,
+      "gcPauseEvents": [
+        {
+          "time": "2026-11-03T10:24:42.9447074Z",
+          "intervalSeconds": 59.999874,
+          "count": 10
+        }
+      ],
+      "observations": []
+    },
+    "B": {
+      "summaryIntervals": 1,
+      "maxLivenessTimerLateMs": 0.975,
+      "maxSamplerTimerLateMs": 8.993,
+      "gcPauseEvents": [
+        {
+          "time": "2026-11-03T10:24:31.4843414Z",
+          "intervalSeconds": 59.999622,
+          "count": 12
+        }
+      ],
+      "observations": []
+    }
+  },
+  "requestDeliveryOutlier": {
+    "summaryTime": "2026-11-03T10:24:21.5666531Z",
+    "totalDispatchMs": 25.893,
+    "requestToChildReadMs": 16.263,
+    "parentWriteMs": 0.02,
+    "childHandlerMs": 6.425,
+    "sendInputMs": 0.779,
+    "interpretation": "Parent Write completed in 20us while request-to-child-read took 16263us. The long local interval remains after the short write; kernel delivery, child read/execution resumption and scheduling are not separated further. This is not a measured pure-network or pipe-throughput bottleneck. Write wall time can overlap child read and is not blindly subtracted."
+  },
+  "largestSourceCapture": {
+    "summaryTime": "2026-11-03T10:24:14.6983821Z",
+    "captureActivationMs": 104.998,
+    "grantWaitMs": 73.953,
+    "preparation": {
+      "micros": [
+        190071,
+        0,
+        1513,
+        73953,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        104998,
+        997,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        53468,
+        0,
+        736234
+      ],
+      "measured": 343601315855,
+      "worker": [
+        0,
+        0,
+        0
+      ],
+      "workerMillis": [
+        0,
+        0,
+        0
+      ],
+      "workerMeasured": 0,
+      "authorityMicros": [
+        0,
+        0,
+        0
+      ],
+      "authorityMeasured": 0,
+      "outcome": "ok"
+    },
+    "note": "These are phases of one successful entry, not timer lateness or a fault. Capture activation is the largest remaining individual handoff phase in this trial."
+  },
+  "worstInput": {
+    "time": "2026-11-03T10:24:33.1512904Z",
+    "attempt": 12,
+    "kind": "worst",
+    "dispatch": 29.717,
+    "response": 29.204,
+    "outer": [
+      0,
+      1.553,
+      26.459,
+      0.014,
+      1.466,
+      0.009
+    ],
+    "outerTotal": 29.501,
+    "inner": {
+      "micros": [
+        15,
+        1701,
+        2,
+        21781,
+        2882,
+        8
+      ],
+      "parentMicros": [
+        8,
+        2,
+        27
+      ],
+      "parentMeasured": true,
+      "requestWriteMicros": 25,
+      "requestWriteMeasured": true
+    },
+    "apply": 26.652,
+    "submission": 6.736,
+    "workerMillis": [
+      2,
+      6,
+      26
+    ]
+  },
+  "conclusions": [
+    "All 12 complete matched A-source/B-receiver leases ended OK. Both protected services and input health remain READY on the original installation connection; retained current-build events show no new reconnect, disconnect, timeout, poison or recovery fault.",
+    "Per-lease worst B input maximum fell from 59.334ms to 29.717ms and median from 5.9235ms to 3.2355ms. Native child handler maximum fell from 33.173ms to 21.781ms and median from 2.88ms to 1.99ms. All 1009 profiled input frames were below 100ms.",
+    "Request-to-child-read median fell from 0.1335ms to 0.0805ms but maximum rose from 11.406ms to 16.263ms. All 12 worst-input profiles carry the new write measurement: median 0.021ms, maximum 0.044ms. The 16.263ms sample has a 0.020ms parent write, locating its remaining wait after a short write rather than inside a slow parent write.",
+    "All 12 entries reused prepared candidates, including one aged 276.281345s; B preparation remains bounded in this trial at maximum 36.673ms.",
+    "A capture activation maximum rose from 31.56ms to 104.998ms while maximum grant wait rose from 57.395ms to 73.953ms. These tails did not become connection/recovery failures, but not all handoff phases improved.",
+    "The overlapping trial runtime summary records A liveness timer maximum 25.735ms and diagnostic sampler maximum 37.05ms; no second-scale timer stall was observed in this short sample."
+  ],
+  "validation": [
+    "Live doctor healthy and exact g523 revision matched; both protected services/input health READY and original connection identity checked.",
+    "Sanitized support-file SHA256, current-build event deduplication, expanded failure-code scan and historical lastFailure timestamps checked.",
+    "12 matched complete leases, preparation decisions and 1009-frame histogram sums/bounds verified.",
+    "All 12 worst profiles include requestWriteMeasured; native handler index 3, request-to-read index 1 and nested SendInput labels checked against source."
+  ],
+  "skipped": "Runtime inspection and evidence documentation only; no source edit, rebuild, reinstallation, unit/race rerun, push or remote CI was needed.",
+  "limits": "g522 has 10 complete leases versus g523 12, with different movement mix, host load and observation duration. These results are observed comparisons, not controlled proof of causality or permanent recovery stability. Request-to-read includes unseparated local kernel/receiver scheduling. Only one minute summary per side overlaps this trial.",
+  "sourceOfTruthChanged": "Evidence report only; runtime/authority policy unchanged.",
+  "apiDBRunner": "No API, input/control protocol, DB, dependency, runner or repository hygiene rule change."
+}
