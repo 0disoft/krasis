@@ -5,8 +5,6 @@ import (
 	"errors"
 	"sync/atomic"
 	"time"
-
-	"github.com/0disoft/krasis/internal/inputdesktop"
 )
 
 const nativeProofReplyReserve = 250 * time.Millisecond
@@ -18,6 +16,10 @@ var errNativeProofPending = errors.New("native service proof did not finish befo
 // still pins handles until the native query returns; exact process/IPC
 // retirement remains mandatory before recovery or a replacement worker starts.
 func nativeInputExecutor(desktop executor, service func() error, parent func() bool, expires time.Time, releaseOnly bool, timings ...*workerTiming) executor {
+	return nativeInputExecutorWithProof(desktop, service, parent, expires, releaseOnly, nil, timings...)
+}
+
+func nativeInputExecutorWithProof(desktop executor, service func() error, parent func() bool, expires time.Time, releaseOnly bool, start nativeProofStarter, timings ...*workerTiming) executor {
 	var fenced atomic.Bool
 	return func(ctx context.Context, work func() error) error {
 		if ctx == nil || work == nil || desktop == nil || service == nil || parent == nil || fenced.Load() {
@@ -42,7 +44,7 @@ func nativeInputExecutor(desktop executor, service func() error, parent func() b
 		if len(timings) == 1 {
 			timing = timings[0]
 		}
-		err := overlapNativeProof(ctx, service, checkedDesktop, work, timing)
+		err := overlapNativeProof(ctx, service, checkedDesktop, work, timing, start)
 		if errors.Is(err, errNativeProofPending) {
 			fenced.Store(true)
 		}
@@ -68,32 +70,27 @@ func nativeProofDeadline(ctx context.Context) time.Time {
 // Fresh service and desktop proofs overlap. A pending service query cannot
 // hold an unapplied command's negative ACK hostage. Its goroutine publishes
 // only to its own buffered result slot, never timing memory or an input callback.
-func overlapNativeProof(ctx context.Context, service func() error, desktop executor, work func() error, timing *workerTiming) error {
+func overlapNativeProof(ctx context.Context, service func() error, desktop executor, work func() error, timing *workerTiming, starters ...nativeProofStarter) error {
 	if timing != nil {
 		*timing = workerTiming{}
 	}
 	proofDeadline := nativeProofDeadline(ctx)
-	type proofResult struct {
-		err     error
-		elapsed time.Duration
+	var done <-chan nativeProofResult
+	var finish func(bool)
+	if len(starters) == 1 && starters[0] != nil {
+		done, finish = starters[0](ctx)
+	} else {
+		reply := make(chan nativeProofResult, 1)
+		go runNativeProof(service, reply)
+		done = reply
 	}
-	done := make(chan proofResult, 1)
-	go func() {
-		started := time.Now()
-		result := proofResult{}
-		defer func() {
-			if recover() != nil {
-				result.err = errors.Join(ErrAuthority, inputdesktop.ErrCallbackPanic)
-			}
-			result.elapsed = time.Since(started)
-			done <- result
-		}()
-		result.err = service()
-	}()
-	var proof proofResult
+	var proof nativeProofResult
 	joined := false
 	var scopeElapsed, applied time.Duration
 	defer func() {
+		if finish != nil {
+			finish(joined)
+		}
 		if timing != nil {
 			if joined {
 				timing.record(0, proof.elapsed)

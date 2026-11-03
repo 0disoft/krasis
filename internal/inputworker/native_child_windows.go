@@ -115,6 +115,8 @@ func runInstalledNativeInput(ctx context.Context, installation *Installation, re
 	if releaseOnly {
 		serviceCheck = func() error { return checkNativeRecoveryService(recoveryService, proof) }
 	}
+	proofWorker := newNativeProofWorker(ctx, serviceCheck)
+	defer proofWorker.close() // Join before the deferred authority/handle cleanup.
 	started = time.Now()
 	return inputdesktop.RunInteractive(ctx, func() error { return authority.check(releaseOnly) }, func(scope *inputdesktop.Scope) error {
 		nativeProfile.Record(handoff.WorkerDesktopReady, time.Since(started))
@@ -122,7 +124,7 @@ func runInstalledNativeInput(ctx context.Context, installation *Installation, re
 			return err
 		}
 		timing := &workerTiming{}
-		execute := nativeInputExecutor(scope.Do, serviceCheck, func() bool { return nativeParentAlive(handles[3]) }, lease.ExpiresAt, releaseOnly, timing)
+		execute := nativeInputExecutorWithProof(scope.Do, serviceCheck, func() bool { return nativeParentAlive(handles[3]) }, lease.ExpiresAt, releaseOnly, proofWorker.start, timing)
 		if releaseOnly {
 			// Guard-side commands have no native release capability. Only the
 			// release-only framed handler executes within fresh authority/scope.
