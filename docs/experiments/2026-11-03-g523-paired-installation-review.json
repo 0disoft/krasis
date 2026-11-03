@@ -1,0 +1,108 @@
+{
+  "schema": "krasis.paired-installation-review/v1",
+  "generation": 523,
+  "revision": "0af2c8f63228129cb8596cd2535c8ef07571ba7b",
+  "baselineGeneration": 522,
+  "baselineCollection": "3fa56959eb86b67e539a62746ae2470c",
+  "beforeInstallCollection": "79e7fa46f6cd0a9bc86345258a1344cf",
+  "collection": "fef4059994fa9e148041eb80ad0833e7",
+  "devices": {
+    "A": {
+      "created": "2026-11-03T10:19:37Z",
+      "sha256": "0b4b9e30aaf39a1be7d73afa02711203688db0b252f771d1715827bfcd3d2e43",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "installation": {
+        "time": "2026-11-03T10:18:40.8600502Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "uiLaunchRecordCurrentRevision": true,
+      "connectedAt": "2026-11-03T10:19:32.8096985Z",
+      "failuresSinceConnection": []
+    },
+    "B": {
+      "created": "2026-11-03T10:19:37Z",
+      "sha256": "98c0278838d3d8592e89d413f6736a8220462cdad04bb7c7de4311112be738c4",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "installation": {
+        "time": "2026-11-03T10:19:09.6860353Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "uiLaunchRecordCurrentRevision": true,
+      "connectedAt": "2026-11-03T10:19:31.5192388Z",
+      "failuresSinceConnection": []
+    }
+  },
+  "connection": {
+    "state": "CONNECTED",
+    "sharedConnectionMatched": true,
+    "method": "krasis-cli --json app connect B connected receipt",
+    "requestID": "3281fb9a575aa8e1cb03441e9106499e"
+  },
+  "peerUpdate": {
+    "requestID": "31a0dba148f0d7fab26eafce2140f3df",
+    "bytes": 28866912,
+    "total": 28866912,
+    "code": "updated"
+  },
+  "changes": [
+    "One reusable native service proof worker and reply slot; every command still receives a fresh service query. Timeout permanently fences unconsumed replies; exact query/handle retirement is joined.",
+    "Native request write duration recorded using reserved bytes in the existing 68-byte diagnostic suffix; no extra input/network exchange. Parent Write completion can overlap child read and is not a disjoint phase.",
+    "Panic and Goexit cannot publish a successful proof; authority, desktop freshness, uncertainty and no-replay rules preserved."
+  ],
+  "benchmark": {
+    "kind": "synthetic 20000-call proof dispatch on packaged runtime; not physical input latency",
+    "spawned": {
+      "bytesPerOp": 160,
+      "allocationsPerOp": 3,
+      "nanosecondsPerOp": 2213
+    },
+    "reused": {
+      "bytesPerOp": 0,
+      "allocationsPerOp": 0,
+      "nanosecondsPerOp": 2094
+    }
+  },
+  "validation": [
+    "Full inputworker, handoff, crashguard, inputdesktop, residentagent, productlog and localapi suites passed against the packaged runtime overlay, count=1.",
+    "Selected inputworker native proof/execution/request-write/portable/IPC race tests passed. Other packages in the race command had no matching tests and are not claimed race-covered.",
+    "Vet passed for seven affected packages; git diff --check passed.",
+    "Frontend tests/native build, update-transfer smoke, icon/archive validation and app setup verification passed.",
+    "Actual A setup installed/result-zero receipt, both exact installed revisions/UI launch records, protected input READY, complete installations and same peer connection verified."
+  ],
+  "limits": [
+    "No controlled post-install physical trial yet: neither the 33.173ms child handler nor 11.406ms request-to-read tail is claimed resolved.",
+    "Existing timings cannot distinguish scheduler delay from native call time precisely. New request-write metadata is needed to assess the next slow delivery sample; it does not prove kernel arrival or pure network delay.",
+    "One proof goroutine and fixed reply slot remain resident per bound native child; no new input authority is granted. A genuinely blocked native query still requires exact retirement.",
+    "Initial connected observation excludes installation-time disconnections and historical failures; it is not long-term recovery stability evidence."
+  ],
+  "sourceOfTruth": [
+    "docs/experiments/2026-11-03-g523-native-proof-dispatch.md",
+    "internal/inputworker/native_proof_worker.go",
+    "internal/handoff/native_ipc.go"
+  ],
+  "apiDBRunner": "Optional JSON/native diagnostic fields and local diagnostic tag/flag variants only; suffix size and input/control command semantics unchanged. No API endpoint, DB, dependency, runner or repository hygiene rule change.",
+  "push": "Not requested; not performed",
+  "remoteCI": "Not run; locally verified paired installation"
+}
