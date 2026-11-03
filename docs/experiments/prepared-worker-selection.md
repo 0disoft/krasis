@@ -1,5 +1,29 @@
 # Prepared worker selection diagnostics
 
+## g522: bounded multi-minute native standby
+
+The unbound reservation expires 15 minutes after construction, previously 15
+seconds. g521's 219.995ms entry had a console candidate only 5.297ms old and
+waited for native readiness after a multi-minute gap. Retaining the already
+loaded spare avoids that reconstruction when entry falls inside the new window.
+This is not a measured post-change latency result or a guarantee for cold entry.
+
+The service still owns one speculative console slot with its two unbound native
+children. They retain memory/image pins longer; neither input nor a lease is
+granted while waiting. Hints do not extend the original expiry, periodic idle
+rebuilding is prohibited, and session/image/desktop authentication at binding,
+one-shot claim, cancellation and exact retirement fences remain unchanged.
+Expiry and diagnostic age validation share `handoff.PreparedLifetime`. Existing
+lease and optional request deadlines are unchanged. Shutdown/update still retires
+the exact owner; the reservation lifetime is not a shutdown waiting budget.
+
+Virtual-clock tests cover six-minute retention, exact expiry, ownership transfer,
+expired leases, cancellation and failed retirement. Long-active-lease fixtures
+outlive the reservation explicitly rather than assuming a one-minute fixture
+always exceeds the reservation policy.
+
+## Original diagnostic contract
+
 g174 has one 113ms receiver readiness wait without the prepared-worker marker,
 while eleven marked profiles wait 6..9ms. A missing marker does not identify why
 the service used a fresh child. g175 adds a service-owned selection diagnostic

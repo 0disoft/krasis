@@ -296,7 +296,7 @@ func TestPreparationHintReceiptDoesNotJoinNativeConstruction(t *testing.T) {
 func TestPreparationHintRetirementFailureStillFencesNextLease(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		now := time.Now()
-		slot := serviceInputPreparation{next: &preparedConsole{worker: failedConsoleCloseForTest(), preparedAt: now.Add(-time.Minute)}}
+		slot := serviceInputPreparation{next: &preparedConsole{worker: failedConsoleCloseForTest(), preparedAt: now.Add(-preparedConsoleWindow)}}
 		started := slot.hint(context.Background(), time.Time{}, now, func(context.Context) (*preparedConsole, error) {
 			t.Error("replacement started before old child retirement was confirmed")
 			return nil, nil

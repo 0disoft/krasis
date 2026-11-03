@@ -50,13 +50,32 @@ func TestReentryOpportunityRetainsOriginalSpareAcrossFiveSecondPause(t *testing.
 	})
 }
 
+func TestReentrySpareRetainsNativeReservationAcrossSixMinuteIdle(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		child := reentrySpare()
+		slot := serviceInputPreparation{next: child}
+		defer slot.close()
+		time.Sleep(6 * time.Minute) // g521's slow entry followed a multi-minute gap.
+		if child.retired() {
+			t.Fatal("idle discarded a still-bounded native reservation")
+		}
+		got, err := slot.take(&Channel{}, Lease{})
+		if err != nil || got != child || slot.next != nil {
+			t.Fatal("idle entry lost the existing exact owner", err)
+		}
+		if err := got.close(); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
 func TestReentryOpportunityNeverRetiresTheInitialSpareEarly(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		var slot serviceInputPreparation
 		defer slot.close()
 		var builds atomic.Int32
 		var first atomic.Pointer[preparedConsole]
-		if err := slot.reenter(context.Background(), Lease{ExpiresAt: time.Now().Add(time.Minute)}, nil, func(context.Context) (*preparedConsole, error) {
+		if err := slot.reenter(context.Background(), Lease{ExpiresAt: time.Now().Add(preparedConsoleWindow + time.Minute)}, nil, func(context.Context) (*preparedConsole, error) {
 			n := builds.Add(1)
 			time.Sleep(150 * time.Millisecond)
 			p := reentrySpare()
@@ -138,7 +157,7 @@ func TestReentryOpportunityKeepsUncertainRetirementTerminal(t *testing.T) {
 		slot := serviceInputPreparation{next: old}
 		defer slot.close()
 		builds := 0
-		if err := slot.reenter(context.Background(), Lease{ExpiresAt: time.Now().Add(time.Minute)}, nil, func(context.Context) (*preparedConsole, error) { builds++; return reentrySpare(), nil }); err != nil {
+		if err := slot.reenter(context.Background(), Lease{ExpiresAt: time.Now().Add(preparedConsoleWindow + time.Minute)}, nil, func(context.Context) (*preparedConsole, error) { builds++; return reentrySpare(), nil }); err != nil {
 			t.Fatal(err)
 		}
 		time.Sleep(preparedConsoleWindow + time.Second)

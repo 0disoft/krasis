@@ -7,7 +7,9 @@ import (
 
 // PreparedLifetime bounds only an unbound process reservation, never a lease
 // or cached authority. Runtime expiry and diagnostic validation share one limit.
-const PreparedLifetime = 15 * time.Second
+// Keep the single spare across ordinary multi-minute work on the other PC.
+// Expiry remains fixed at construction; fresh hints never renew it.
+const PreparedLifetime = 15 * time.Minute
 
 // StartupStage spans are local to the service or child, not cross-process
 // timestamps. ServiceBootstrapReady contains child work and must not be added

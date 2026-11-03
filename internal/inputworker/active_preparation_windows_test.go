@@ -45,7 +45,7 @@ func TestActivePreparationExpiresWithoutRefreshThenReplacesAfterReturn(t *testin
 		t.Run(map[bool]string{false: "clean", true: "uncertain retirement"}[cleanupFailure], func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				ctx := context.Background()
-				lease := Lease{ExpiresAt: time.Now().Add(time.Minute)}
+				lease := Lease{ExpiresAt: time.Now().Add(preparedConsoleWindow + time.Minute)}
 				var slot serviceInputPreparation
 				old := &preparedConsole{preparedAt: time.Now()}
 				if cleanupFailure {

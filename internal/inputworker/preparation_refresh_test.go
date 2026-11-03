@@ -16,6 +16,7 @@ func TestPreparationFreshHintReplacesOnlyExpiredChild(t *testing.T) {
 	}{
 		{"retain warm child across renewal", now.Add(-2257 * time.Millisecond), now.Add(-2107 * time.Millisecond), now, false},
 		{"recent reentry preparation", now.Add(-time.Minute), now.Add(-100 * time.Millisecond), now, false},
+		{"g521 six-minute idle retains native spare", now.Add(-time.Minute), now.Add(-6 * time.Minute), now, false},
 		{"750ms remains", now.Add(-time.Minute), now.Add(-2250 * time.Millisecond), now, false},
 		{"approach with 600ms remaining", now.Add(-time.Minute), now.Add(-2400 * time.Millisecond), now, false},
 		{"last live instant", now.Add(-time.Minute), now.Add(-preparedConsoleWindow + time.Nanosecond), now, false},
