@@ -30,6 +30,10 @@ func (p *nativeIPCWire) encode(data []byte) {
 			if p.profile.ParentMeasured {
 				data[1] |= 2
 			}
+			if p.profile.RequestWriteMeasured {
+				data[1] |= 8
+				binary.BigEndian.PutUint32(data[4:8], p.profile.RequestWriteMicros)
+			}
 			encodeNormalizedIPC(data, p.profile)
 		}
 		for i, n := range p.outer {
@@ -41,6 +45,13 @@ func (p *nativeIPCWire) encode(data []byte) {
 		data[0] = 2
 		if p.profile.ParentMeasured {
 			data[0] = 3
+		}
+		if p.profile.RequestWriteMeasured {
+			data[0] = 5
+			if p.profile.ParentMeasured {
+				data[1] = 1
+			}
+			binary.BigEndian.PutUint32(data[4:8], p.profile.RequestWriteMicros)
 		}
 		encodeNormalizedIPC(data, p.profile)
 		return
@@ -67,7 +78,11 @@ func decodeNativeIPC(data []byte) *nativeIPCWire {
 		return nil
 	}
 	if data[0] == 4 {
-		if !zeroBytes(data[2:8]) || data[1] > 7 || data[1]&3 == 2 || data[1]&2 == 0 && !zeroBytes(data[32:44]) || data[1]&1 == 0 && !zeroBytes(data[8:44]) {
+		if !zeroBytes(data[2:4]) || data[1] > 15 || data[1]&8 == 0 && !zeroBytes(data[4:8]) || data[1]&8 != 0 && data[1]&1 == 0 || data[1]&3 == 2 || data[1]&2 == 0 && !zeroBytes(data[32:44]) || data[1]&1 == 0 && !zeroBytes(data[8:44]) {
+			return nil
+		}
+	} else if data[0] == 5 {
+		if data[1] > 1 || !zeroBytes(data[2:4]) || !zeroBytes(data[44:]) || data[1] == 0 && !zeroBytes(data[32:44]) {
 			return nil
 		}
 	} else if !zeroBytes(data[1:8]) || !zeroBytes(data[44:]) || data[0] != 3 && !zeroBytes(data[32:44]) {
@@ -88,16 +103,20 @@ func decodeNativeIPC(data []byte) *nativeIPCWire {
 		for i := range p.stamps {
 			p.stamps[i] = binary.BigEndian.Uint64(data[8+i*8:])
 		}
-	case 2, 3, 4:
+	case 2, 3, 4, 5:
 		profile := &handoff.NativeIPCProfile{}
 		for i := range profile.Micros {
 			profile.Micros[i] = binary.BigEndian.Uint32(data[8+i*4:])
 		}
-		if data[0] == 3 || data[0] == 4 && data[1]&2 != 0 {
+		if data[0] == 3 || data[0] == 4 && data[1]&2 != 0 || data[0] == 5 && data[1] == 1 {
 			profile.ParentMeasured = true
 			for i := range profile.ParentMicros {
 				profile.ParentMicros[i] = binary.BigEndian.Uint32(data[32+i*4:])
 			}
+		}
+		if data[0] == 5 || data[0] == 4 && data[1]&8 != 0 {
+			profile.RequestWriteMeasured = true
+			profile.RequestWriteMicros = binary.BigEndian.Uint32(data[4:8])
 		}
 		if !profile.Valid() {
 			return nil
@@ -107,6 +126,17 @@ func decodeNativeIPC(data []byte) *nativeIPCWire {
 		return nil
 	}
 	return p
+}
+
+func recordNativeIPCWrite(p *handoff.NativeIPCProfile, submitted, written, complete uint64) {
+	if p == nil || submitted == 0 || written < submitted || complete < written || complete-submitted > uint64(handoff.Window.Microseconds()) {
+		return
+	}
+	copy := *p
+	copy.RequestWriteMeasured, copy.RequestWriteMicros = true, uint32(written-submitted)
+	if copy.Valid() {
+		*p = copy
+	}
 }
 
 // All stamps belong to this synchronous exchange. Invalid/over-budget parent

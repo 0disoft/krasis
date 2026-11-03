@@ -12,10 +12,17 @@ type NativeIPCProfile struct {
 	// These contain scheduler delays; they are not proof of mutex contention.
 	ParentMicros   [3]uint32 `json:"parentMicros,omitzero"`
 	ParentMeasured bool      `json:"parentMeasured,omitempty"`
+	// Nested in the IPC envelope, not an additional disjoint phase. Write
+	// completion can follow the child's read if the parent resumes late.
+	RequestWriteMicros   uint32 `json:"requestWriteMicros,omitempty"`
+	RequestWriteMeasured bool   `json:"requestWriteMeasured,omitempty"`
 }
 
 func (p NativeIPCProfile) Valid() bool {
 	if !p.ParentMeasured && p.ParentMicros != ([3]uint32{}) {
+		return false
+	}
+	if !p.RequestWriteMeasured && p.RequestWriteMicros != 0 || uint64(p.RequestWriteMicros) > p.total() {
 		return false
 	}
 	total := p.total()

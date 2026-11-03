@@ -116,6 +116,22 @@ func TestNativeProofGoexitCannotBecomeSuccessfulInput(t *testing.T) {
 	}
 }
 
+func TestNativeProofLateReplyCannotEnterNextRequest(t *testing.T) {
+	release, entered := make(chan struct{}), make(chan struct{})
+	w := newNativeProofWorker(context.Background(), func() error { close(entered); <-release; return nil })
+	defer w.close()
+	reply, finish := w.start(context.Background())
+	<-entered
+	finish(false) // The caller returned without consuming this exact reply.
+	close(release)
+	if late := <-reply; late.err != nil {
+		t.Fatal(late.err)
+	}
+	if next := takeNativeProof(w, context.Background()); !errors.Is(next.err, errNativeProofPending) {
+		t.Fatal("late success was reused", next.err)
+	}
+}
+
 func BenchmarkNativeProofDispatch(b *testing.B) {
 	for _, reused := range []bool{false, true} {
 		name := "spawned"

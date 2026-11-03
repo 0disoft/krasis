@@ -118,6 +118,10 @@ func (client *Client) performPortable(ctx context.Context, process portableTrans
 		if n, err := writer.Write(data[:]); err != nil || n != len(data) {
 			return errors.Join(ErrProtocol, err)
 		}
+		written := uint64(0)
+		if command.ipcDetail {
+			written = workerIPCTick()
+		}
 		var err error
 		if command.ipcDetail {
 			observed := &nativeIPCReader{Reader: reader}
@@ -125,6 +129,7 @@ func (client *Client) performPortable(ctx context.Context, process portableTrans
 			complete := workerIPCTick()
 			if err == nil && ack.sequence == command.sequence && ack.op == command.op {
 				ipcProfile = normalizeNativeIPC(started, admitted, submitted, ack.ipc, observed.first, complete)
+				recordNativeIPCWrite(ipcProfile, submitted, written, complete)
 				decoded = complete
 			}
 		} else {
