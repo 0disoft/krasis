@@ -40,6 +40,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "invalid agent arguments")
 		os.Exit(2)
 	}
+	configureResidentGC()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	if err := residentagent.Run(ctx, os.Getenv("LOCALAPPDATA"), recovery...); err != nil {

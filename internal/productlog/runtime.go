@@ -33,6 +33,7 @@ type RuntimeSummary struct {
 	CPUMicros                 uint64          `json:"cpuMicros"`
 	CPUKnown                  bool            `json:"cpuKnown"`
 	TimerLateMicros           int64           `json:"timerLateMicros"`
+	SamplerTimerLateMicros    int64           `json:"samplerTimerLateMicros,omitempty"`
 	ReadAgeMicros             int64           `json:"readAgeMicros"`
 	DispatchAgeMicros         int64           `json:"dispatchAgeMicros"`
 	DispatchKind              string          `json:"dispatchKind"`
@@ -57,7 +58,7 @@ func (s RuntimeSummary) valid() bool {
 			return false
 		}
 	}
-	if s.HookMaxMicros < 0 || s.HookActiveMicros < 0 || s.LastHookAgeMicros < 0 || s.QueueMaxResidenceMicros < 0 {
+	if s.HookMaxMicros < 0 || s.HookActiveMicros < 0 || s.LastHookAgeMicros < 0 || s.QueueMaxResidenceMicros < 0 || s.SamplerTimerLateMicros < 0 {
 		return false
 	}
 	if s.IntervalMicros <= 0 || s.TimerLateMicros < 0 || s.ReadAgeMicros < 0 || s.LastReadByteAgeMicros < 0 || s.DispatchAgeMicros < 0 || s.DispatchMaxMicros < 0 || s.InjectionAgeMicros < 0 || s.InjectionMaxMicros < 0 || s.HeartbeatSendAgeMicros < 0 || s.HeartbeatReceiveAgeMicros < 0 {

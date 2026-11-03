@@ -26,7 +26,7 @@ type runtimeDiagnostics struct {
 	readStart, lastReadByte, dispatchStart, send, receive   atomic.Int64
 	kind                                                    atomic.Uint32
 	frames, frameReadBytes, dispatches                      atomic.Uint64
-	dispatchMax, timerMax                                   atomic.Int64
+	dispatchMax, timerMax, samplerTimerMax                  atomic.Int64
 	injectionStart, injectionMax                            atomic.Int64
 	injections                                              atomic.Uint64
 	queueHigh, queueEnqueued, queueDequeued, queueCoalesced atomic.Uint64
@@ -119,6 +119,17 @@ func (d *runtimeDiagnostics) ObserveHeartbeatReceived(_ string, t time.Time) {
 }
 func (d *runtimeDiagnostics) ObserveTimerLateness(delay time.Duration) {
 	observeMaximum(&d.timerMax, max(0, delay.Microseconds()))
+	d.traceTimerLateness(delay)
+}
+
+// Diagnostic sampling may itself wait on OS queries. Never classify its
+// delayed tick as a measured heartbeat/liveness timer delay.
+func (d *runtimeDiagnostics) observeSamplerLateness(delay time.Duration) {
+	observeMaximum(&d.samplerTimerMax, max(0, delay.Microseconds()))
+	d.traceTimerLateness(delay)
+}
+
+func (d *runtimeDiagnostics) traceTimerLateness(delay time.Duration) {
 	if delay >= time.Second && d.sampleTrace != nil {
 		d.sampleTrace()
 	}
@@ -171,6 +182,7 @@ func (d *runtimeDiagnostics) snapshot(now time.Time) productlog.RuntimeSummary {
 		return max(0, stamp-start)
 	}
 	s := productlog.RuntimeSummary{DispatchKind: "idle", ReadAgeMicros: age(d.readStart.Load()), FrameReadBytes: d.frameReadBytes.Swap(0), FramesReceived: d.frames.Swap(0), Dispatches: d.dispatches.Swap(0), DispatchMaxMicros: d.dispatchMax.Swap(0), TimerLateMicros: d.timerMax.Swap(0)}
+	s.SamplerTimerLateMicros = d.samplerTimerMax.Swap(0)
 	s.InjectionAgeMicros = age(d.injectionStart.Load())
 	s.InjectionMaxMicros = d.injectionMax.Swap(0)
 	s.Injections = d.injections.Swap(0)
@@ -343,7 +355,7 @@ func (d *runtimeDiagnostics) run(ctx context.Context, log runtimeDiagnosticSink)
 			flushFailure(t)
 		case scheduled := <-gcTicker.C:
 			late := time.Since(scheduled)
-			d.ObserveTimerLateness(late)
+			d.observeSamplerLateness(late)
 			w := sampleGC(late)
 			if reason := gcObservationReason(w); reason != "" && observations.admit(previousGC.at) {
 				heartbeat := d.heartbeatSnapshot()
@@ -353,7 +365,7 @@ func (d *runtimeDiagnostics) run(ctx context.Context, log runtimeDiagnosticSink)
 				log.GCTrail(ring.snapshot(t, observations.skipped))
 			}
 		case scheduled := <-ticker.C:
-			d.ObserveTimerLateness(time.Since(scheduled))
+			d.observeSamplerLateness(time.Since(scheduled))
 			current := read()
 			log.Runtime(d.sample(current, previous))
 			previous = current

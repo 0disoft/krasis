@@ -45,6 +45,19 @@ func TestRuntimeDiagnosticsSeparatesReadDispatchAndValidatedHeartbeat(t *testing
 	}
 }
 
+func TestDiagnosticTimerCannotBecomeLivenessLateness(t *testing.T) {
+	d := newRuntimeDiagnostics()
+	d.observeSamplerLateness(1852582 * time.Microsecond)
+	d.ObserveTimerLateness(15 * time.Millisecond)
+	s := d.snapshot(time.Now())
+	if s.TimerLateMicros != 15000 || s.SamplerTimerLateMicros != 1852582 {
+		t.Fatal("diagnostic wait was attributed to liveness", s)
+	}
+	if next := d.snapshot(time.Now()); next.TimerLateMicros != 0 || next.SamplerTimerLateMicros != 0 {
+		t.Fatal("timer interval measurements were reused", next)
+	}
+}
+
 func TestRuntimeTraceOnlyRequestedForLongTimerLateness(t *testing.T) {
 	d := newRuntimeDiagnostics()
 	requests := 0
