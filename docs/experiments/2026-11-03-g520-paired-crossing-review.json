@@ -1,0 +1,552 @@
+{
+  "schema": "krasis.paired-crossing-review/v1",
+  "generation": 520,
+  "revision": "65659a5161f94e59e903b6185739edfb793e02d4",
+  "collection": "88b945e3a6a9b2002b89c1b1c125f133",
+  "summaryCompletionWindowUTC": {
+    "from": "2026-11-03T08:01:00.7082575Z",
+    "to": "2026-11-03T08:02:23.9879186Z"
+  },
+  "timezone": "Asia/Seoul",
+  "localTrialDescription": "2026-11-03 approximately 17:01-17:02 KST; collection at 17:02:44 KST",
+  "sides": {
+    "A": {
+      "created": "2026-11-03T08:02:44Z",
+      "sha256": "9de5658fbb785e33104408071d93aab745c4bf88bec80b7b27ba4bc4167a77b8",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "originalConnectionMatched": true,
+      "retainedAgentLogs": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false,
+          "events": 2881,
+          "from": "2026-11-03T04:56:11.619903Z",
+          "to": "2026-11-03T06:37:48.8875753Z"
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false,
+          "events": 2509,
+          "from": "2026-11-03T06:37:48.8875753Z",
+          "to": "2026-11-03T08:02:36.2390718Z"
+        }
+      ],
+      "retainedFailureEvents": [],
+      "recovery": {
+        "time": "2026-11-03T08:02:31.7724491Z",
+        "code": "agent_present",
+        "agentState": "CONNECTED",
+        "lastFailure": {
+          "time": "2026-11-02T16:52:31.951536Z",
+          "code": "agent_faulted",
+          "agentState": "FAULTED"
+        }
+      },
+      "sourceExitTotal": 12,
+      "nonOKSourceExits": []
+    },
+    "B": {
+      "created": "2026-11-03T08:02:44Z",
+      "sha256": "330353551d5fd56deb7dccd2efd8d2b87f14c171e9d566623869e0ba6fd57a43",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "originalConnectionMatched": true,
+      "retainedAgentLogs": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false,
+          "events": 2919,
+          "from": "2026-11-03T06:29:02.4518468Z",
+          "to": "2026-11-03T08:01:00.6346894Z"
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false,
+          "events": 320,
+          "from": "2026-11-03T08:01:00.7062455Z",
+          "to": "2026-11-03T08:02:43.0379905Z"
+        }
+      ],
+      "retainedFailureEvents": [],
+      "recovery": {
+        "time": "2026-11-03T08:02:08.8904707Z",
+        "code": "agent_present",
+        "agentState": "CONNECTED",
+        "lastFailure": {
+          "time": "2026-11-01T08:50:08.5779933Z",
+          "code": "agent_faulted",
+          "agentState": "FAULTED"
+        }
+      },
+      "sourceExitTotal": 12,
+      "nonOKSourceExits": [
+        {
+          "time": "2026-11-03T00:25:34.0278258Z",
+          "command": "ok",
+          "reader": "authority",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "clean_sent",
+          "report": "failed",
+          "failure": {
+            "operation": "source-service-query-deadline-admission",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "heartbeatStage": "service_presence",
+          "heartbeatSlowStage": "service_presence",
+          "heartbeatSlowBucket": 3,
+          "withinTrial": false
+        }
+      ]
+    }
+  },
+  "pairs": {
+    "matched": 12,
+    "complete": 12
+  },
+  "crossingStats": {
+    "grant": {
+      "n": 12,
+      "medianMs": 38.976,
+      "maxMs": 166.182
+    },
+    "capture": {
+      "n": 12,
+      "medianMs": 13.927499999999998,
+      "maxMs": 23.327
+    },
+    "prepare": {
+      "n": 12,
+      "medianMs": 26.973,
+      "maxMs": 147.041
+    },
+    "ready": {
+      "n": 12,
+      "medianMs": 24.357999999999997,
+      "maxMs": 144.599
+    },
+    "first": {
+      "n": 12,
+      "medianMs": 2.283,
+      "maxMs": 5.955
+    },
+    "worst": {
+      "n": 12,
+      "medianMs": 10.189499999999999,
+      "maxMs": 217.431
+    },
+    "response": {
+      "n": 12,
+      "medianMs": 9.758,
+      "maxMs": 217.431
+    }
+  },
+  "servicePhaseNames": [
+    "zero",
+    "app-write-to-journal-read",
+    "journal-read-through-reply-ready",
+    "reply-ready-to-native-submission",
+    "native-submission-to-app-first-read",
+    "remaining-decode"
+  ],
+  "serviceStats": {
+    "first": [
+      {
+        "n": 12,
+        "medianMs": 0,
+        "maxMs": 0
+      },
+      {
+        "n": 12,
+        "medianMs": 0.088,
+        "maxMs": 0.202
+      },
+      {
+        "n": 12,
+        "medianMs": 1.7255,
+        "maxMs": 5.061
+      },
+      {
+        "n": 12,
+        "medianMs": 0.010499999999999999,
+        "maxMs": 0.053
+      },
+      {
+        "n": 12,
+        "medianMs": 0.07,
+        "maxMs": 0.749
+      },
+      {
+        "n": 12,
+        "medianMs": 0.011,
+        "maxMs": 0.041
+      }
+    ],
+    "worst": [
+      {
+        "n": 12,
+        "medianMs": 0,
+        "maxMs": 0
+      },
+      {
+        "n": 12,
+        "medianMs": 0.28,
+        "maxMs": 2.837
+      },
+      {
+        "n": 12,
+        "medianMs": 6.832000000000001,
+        "maxMs": 203.518
+      },
+      {
+        "n": 12,
+        "medianMs": 0.010499999999999999,
+        "maxMs": 1.937
+      },
+      {
+        "n": 12,
+        "medianMs": 0.9215,
+        "maxMs": 12.152
+      },
+      {
+        "n": 12,
+        "medianMs": 0.01,
+        "maxMs": 0.016
+      }
+    ],
+    "entry": [
+      {
+        "n": 12,
+        "medianMs": 0,
+        "maxMs": 0
+      },
+      {
+        "n": 12,
+        "medianMs": 0.16249999999999998,
+        "maxMs": 0.647
+      },
+      {
+        "n": 12,
+        "medianMs": 3.2925,
+        "maxMs": 6.189
+      },
+      {
+        "n": 12,
+        "medianMs": 0.021,
+        "maxMs": 0.046
+      },
+      {
+        "n": 12,
+        "medianMs": 0.0605,
+        "maxMs": 0.147
+      },
+      {
+        "n": 12,
+        "medianMs": 0.009,
+        "maxMs": 0.049
+      }
+    ]
+  },
+  "samplePopulation": "12 complete A-source/B-receiver exchanges matched by exchangeTag. The service table uses one worst input per lease (n=12), not every input. First input and cursor entry each have 12 separate summaries. All 36 outer profiles have serviceNativeWrite=true and matched ACK progress.",
+  "inputHistogram": {
+    "frames": 407,
+    "buckets": [
+      "<1ms",
+      "1..<10ms",
+      "10..<100ms",
+      "100..<1000ms",
+      ">=1000ms"
+    ],
+    "counts": [
+      11,
+      376,
+      17,
+      3,
+      0
+    ]
+  },
+  "slowestInput": {
+    "time": "2026-11-03T08:02:22.8502123Z",
+    "attempt": 12,
+    "kind": "worst",
+    "dispatch": 217.431,
+    "response": 217.431,
+    "outer": [
+      0,
+      0.687,
+      203.518,
+      1.937,
+      10.773,
+      0.01
+    ],
+    "outerTotal": 216.925,
+    "inner": {
+      "micros": [
+        27,
+        6425,
+        3,
+        182252,
+        14718,
+        9
+      ],
+      "parentMicros": [
+        8,
+        2,
+        39
+      ],
+      "parentMeasured": true
+    },
+    "apply": 203.679,
+    "submission": 69.919,
+    "workerMillis": [
+      37,
+      42,
+      203
+    ]
+  },
+  "conclusion": "The largest remaining B response delay in this trial is service-side processing, not outer pipe writer admission or app resumption. The slowest 217.431ms dispatch contains outer processing 203.518ms, write admission 1.937ms and submission-to-app-read 10.773ms. Independent per-phase maxima can belong to different commands.",
+  "deeperObservation": {
+    "nativeChildHandlerMs": 182.252,
+    "nativeSendInputSubmissionMs": 69.919,
+    "note": "Native child handler 182.252ms and its nested measured SendInput submission 69.919ms are inside the outer service processing. Do not add them to each other or to outer durations. Child authority/desktop checks and scheduling remain mixed with work outside SendInput; these data do not prove GC or lock contention as root cause."
+  },
+  "baseline": {
+    "generation": 518,
+    "completePairs": 14,
+    "worstInputMaxMs": 1469.05,
+    "responseWaitMaxMs": 1468.149,
+    "interpretation": "The prior 1468.149ms ACK wait was not reproduced; current maximum is 217.431ms. Trials differ in sample count, movement and host load, so this is an observed reduction, not proof of causal improvement or permanent resolution."
+  },
+  "runtime": {
+    "A": {
+      "summaries": [
+        {
+          "time": "2026-11-03T08:01:19.062603Z",
+          "hookCalls": 0,
+          "rawInputs": 0,
+          "queueHighWatermark": 1,
+          "queueEnqueued": 223,
+          "queueDequeued": 223,
+          "queueCoalesced": 0,
+          "queueStaleDiscards": 0,
+          "queueMaxResidenceMicros": 1011,
+          "frameReadBytes": 1360,
+          "lastReadByteAgeMicros": 13630312,
+          "readByteObserved": true,
+          "hookMaxMicros": 0,
+          "hookActiveMicros": 0,
+          "lastHookAgeMicros": 0,
+          "hookObserved": false,
+          "intervalMicros": 59999763,
+          "heapBytes": 2013264,
+          "allocatedBytes": 39273768,
+          "gcPauses": [
+            73,
+            15,
+            4,
+            2,
+            0,
+            0
+          ],
+          "runnableDelays": [
+            2148,
+            47,
+            20,
+            7,
+            0,
+            0
+          ],
+          "workingSetBytes": 248176640,
+          "workingSetKnown": true,
+          "cpuMicros": 4171875,
+          "cpuKnown": true,
+          "timerLateMicros": 273461,
+          "readAgeMicros": 13624346,
+          "dispatchAgeMicros": 0,
+          "dispatchKind": "idle",
+          "framesReceived": 17,
+          "dispatches": 17,
+          "dispatchMaxMicros": 23872,
+          "injectionAgeMicros": 0,
+          "injectionMaxMicros": 0,
+          "injections": 0,
+          "heartbeatSendAgeMicros": 14377126,
+          "heartbeatReceiveAgeMicros": 14370755,
+          "heartbeatSent": true,
+          "heartbeatReceived": true
+        },
+        {
+          "time": "2026-11-03T08:02:19.0634759Z",
+          "hookCalls": 0,
+          "rawInputs": 0,
+          "queueHighWatermark": 1,
+          "queueEnqueued": 11,
+          "queueDequeued": 11,
+          "queueCoalesced": 0,
+          "queueStaleDiscards": 0,
+          "queueMaxResidenceMicros": 556,
+          "frameReadBytes": 116,
+          "lastReadByteAgeMicros": 98748,
+          "readByteObserved": true,
+          "hookMaxMicros": 0,
+          "hookActiveMicros": 0,
+          "lastHookAgeMicros": 0,
+          "hookObserved": false,
+          "intervalMicros": 60000872,
+          "heapBytes": 1971832,
+          "allocatedBytes": 41336928,
+          "gcPauses": [
+            77,
+            15,
+            4,
+            1,
+            0,
+            0
+          ],
+          "runnableDelays": [
+            2459,
+            75,
+            35,
+            6,
+            0,
+            0
+          ],
+          "workingSetBytes": 249114624,
+          "workingSetKnown": true,
+          "cpuMicros": 4609375,
+          "cpuKnown": true,
+          "timerLateMicros": 339095,
+          "readAgeMicros": 79907,
+          "dispatchAgeMicros": 0,
+          "dispatchKind": "idle",
+          "framesReceived": 1,
+          "dispatches": 1,
+          "dispatchMaxMicros": 18841,
+          "injectionAgeMicros": 0,
+          "injectionMaxMicros": 0,
+          "injections": 0,
+          "heartbeatSendAgeMicros": 74377999,
+          "heartbeatReceiveAgeMicros": 74371628,
+          "heartbeatSent": true,
+          "heartbeatReceived": true
+        }
+      ],
+      "trails": []
+    },
+    "B": {
+      "summaries": [
+        {
+          "time": "2026-11-03T08:01:50.518848Z",
+          "hookCalls": 0,
+          "rawInputs": 0,
+          "queueHighWatermark": 0,
+          "queueEnqueued": 0,
+          "queueDequeued": 0,
+          "queueCoalesced": 0,
+          "queueStaleDiscards": 0,
+          "queueMaxResidenceMicros": 0,
+          "frameReadBytes": 24652,
+          "lastReadByteAgeMicros": 491996,
+          "readByteObserved": true,
+          "hookMaxMicros": 0,
+          "hookActiveMicros": 0,
+          "lastHookAgeMicros": 0,
+          "hookObserved": false,
+          "intervalMicros": 60000954,
+          "heapBytes": 2109744,
+          "allocatedBytes": 49631208,
+          "gcPauses": [
+            96,
+            12,
+            3,
+            1,
+            0,
+            0
+          ],
+          "runnableDelays": [
+            2026,
+            53,
+            5,
+            2,
+            0,
+            0
+          ],
+          "workingSetBytes": 244654080,
+          "workingSetKnown": true,
+          "cpuMicros": 7781250,
+          "cpuKnown": true,
+          "timerLateMicros": 204206,
+          "readAgeMicros": 491996,
+          "dispatchAgeMicros": 0,
+          "dispatchKind": "idle",
+          "framesReceived": 250,
+          "dispatches": 210,
+          "dispatchMaxMicros": 197959,
+          "injectionAgeMicros": 0,
+          "injectionMaxMicros": 197386,
+          "injections": 178,
+          "heartbeatSendAgeMicros": 46974166,
+          "heartbeatReceiveAgeMicros": 46973742,
+          "heartbeatSent": true,
+          "heartbeatReceived": true,
+          "slowDispatch": [
+            {
+              "kind": "control",
+              "startedMicros": 44948945054,
+              "durationMicros": 159309,
+              "readMeasured": true
+            },
+            {
+              "kind": "input",
+              "startedMicros": 44949620212,
+              "durationMicros": 197959,
+              "readMeasured": true,
+              "afterCoordinatorMicros": 197386,
+              "coordinatorMeasured": true,
+              "injectionMicros": 197386,
+              "injectionMaxMicros": 197386,
+              "injections": 1
+            },
+            {
+              "kind": "",
+              "startedMicros": 0,
+              "durationMicros": 0
+            },
+            {
+              "kind": "",
+              "startedMicros": 0,
+              "durationMicros": 0
+            },
+            {
+              "kind": "",
+              "startedMicros": 0,
+              "durationMicros": 0
+            }
+          ]
+        }
+      ],
+      "trails": []
+    }
+  },
+  "recurrence": "No fault/timeout/poison/reconnect/disconnect events in retained g520 agent logs; both current connections match the installation connection and both services/input are READY. All 12 paired summaries ended ok. B has one non-ok source exit at 2026-11-03 09:25:34 KST, before this trial: source-service-query-deadline-admission. Capture/sender/interrupt joined and clean retirement was sent; do not classify it as a new trial failure or assert no g520 historical anomalies.",
+  "limitations": [
+    "Agent logs rotate: retained A agent coverage begins at 13:56 KST and B at 15:29 KST. Control.previous is unavailable; absence of retained errors does not prove every hour since installation was error-free.",
+    "Outer phase 4 includes pipe delivery and app scheduling together; it is not a network RTT measurement.",
+    "Runtime summaries contain 204.206ms B and 339.095ms A timer lateness during nearby intervals, not a timestamp-matched proof of a particular native-child stall. The last worst input occurs after the latest B interval summary.",
+    "Cross-host wall clocks are not subtracted to derive latency. Same-host QPC spans and matching tags are used."
+  ],
+  "validation": [
+    "Both live generation/revision checks and A doctor passed",
+    "Raw support-file SHA256 recorded; rotated logs deduplicated by run/sequence/code",
+    "12 matching complete pairs, 36 native-submission profiles and histogram sum 407 asserted",
+    "Historical recovery/source failures separated from current physical trial"
+  ],
+  "skipped": "No source change, rebuild, unit/race rerun, installation or CI run: this request is inspection and evidence analysis only.",
+  "nextTarget": "The native child execution path containing authority/desktop admission and SendInput; instrument or optimize within that boundary without weakening authorization, exact acknowledgements or retirement.",
+  "apiDBRunner": "No API, DB, dependency, runner or repository hygiene rule changes; analysis evidence only. No push."
+}
