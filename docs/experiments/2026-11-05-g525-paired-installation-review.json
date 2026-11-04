@@ -1,0 +1,101 @@
+{
+  "schema": "krasis.paired-installation-review/v1",
+  "generation": 525,
+  "revision": "8a3c8db6554690a9a89f62a4835cffb2fedc7af2",
+  "date": "2026-11-05",
+  "beforeInstallCollection": "a3a7f738b3ab43b2fbbb716bad5f466b",
+  "collection": "4ea7920a92b73a26e2df935dc7896898",
+  "devices": {
+    "A": {
+      "created": "2026-11-04T20:05:57Z",
+      "sha256": "2f9a94eb4d78d20ac05ea9a5586cc960df1ec5f14346597d4452c527a0c4028f",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "installation": {
+        "time": "2026-11-04T20:04:32.6191346Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "uiLaunchRecordCurrentRevision": true,
+      "connectedAt": "2026-11-04T20:05:09.6085094Z",
+      "failuresSinceConnection": [],
+      "activationIPC": []
+    },
+    "B": {
+      "created": "2026-11-04T20:05:54Z",
+      "sha256": "ad7a18f629fdb81149d11636ed170258aecb2a5ac79772608c5f68028384e879",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "installation": {
+        "time": "2026-11-04T20:04:56.0725276Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "uiLaunchRecordCurrentRevision": true,
+      "connectedAt": "2026-11-04T20:05:05.2027534Z",
+      "failuresSinceConnection": [],
+      "activationIPC": []
+    }
+  },
+  "connection": {
+    "state": "CONNECTED",
+    "sharedConnectionMatched": true,
+    "method": "CLI app connect B, independently matched authenticated connection in both support bundles",
+    "cliReceipt": {
+      "schemaVersion": "krasis.cli.peer-connect/v1",
+      "code": "connected",
+      "peerAlias": "B",
+      "id": "a6360ce7749c2908c22e68b578e533b8"
+    }
+  },
+  "peerUpdate": {
+    "requestID": "c5ec5365a30bf9e55421faf2bbf36282",
+    "code": "updated",
+    "bytes": 29036098,
+    "total": 29036098
+  },
+  "changes": [
+    "Partition matching source activation request/ACK/caller resumption into eight adjacent same-PC QPC spans. Preserve nested native buckets and exact foreground spans.",
+    "Send six worker ticks in one optional 48-byte suffix in the existing authenticated activation ACK write; no extra write/RPC/roundtrip. Legacy frames accepted, truncated suffix rejected, failed clocks drop only diagnostics.",
+    "Remove the unbuffered dispatcher completion rendezvous using one completion slot; serial reader still waits for actual completion before next command admission.",
+    "Diagnostic arrays allocated only for activation, never normal pointer/input frames. Authority, desktop/generation admission, deadlines, uncertain outcome no-replay and exact retirement unchanged."
+  ],
+  "validation": [
+    "Five related package suites passed once after final source edits: handoff, inputworker, residentagent, productlog, localapi.",
+    "Vet passed for all five packages. Selected activation/IPC/completion/reply/command/heartbeat/gate tests passed with race detection in handoff and inputworker.",
+    "Legacy/extended adjacent framing, all 48 truncated suffix lengths, invalid clocks, measured zero, 120-second boundary, matching/frozen profiles, single-write ACK and serial cancel covered.",
+    "Workspace/frontend tests/build and setup package verification passed.",
+    "Exact g525 A CLI/UI/agent/installed build and peer g525 build verified; both protected services/input health READY, same authenticated connected session."
+  ],
+  "limits": [
+    "The previous 211.696ms activation sample cannot be retrospectively subdivided with new timestamps.",
+    "Write-entry to decoded-reply receipt includes native write, IPC, framing and app-reader scheduling; it does not isolate kernel write completion.",
+    "Removing one possible rendezvous per completed native command is a structural reduction, not a measured millisecond improvement.",
+    "Installation baseline is not an attended CPU-pressure crossing/endurance trial. A new user trial is required to identify the largest remaining span and establish tail latency or recurrence improvements."
+  ],
+  "sourceOfTruth": [
+    "docs/adr/0066-product-privileged-input.md",
+    "docs/experiments/2026-11-05-g525-source-activation-ipc.md"
+  ],
+  "apiDBRunner": "Private same-version source activation ACK optional suffix and optional capture JSON only. No public API, peer input/control protocol, DB, dependency or runner change.",
+  "push": "Not requested; not performed",
+  "remoteCI": "Not requested; not run"
+}
