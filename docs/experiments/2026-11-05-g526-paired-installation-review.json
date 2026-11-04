@@ -1,0 +1,172 @@
+{
+  "schema": "krasis.paired-installation-review/v1",
+  "generation": 526,
+  "revision": "f4bd8856f6a821045a853e73f16b6a25598d72a2",
+  "date": "2026-11-05",
+  "beforeInstallCollection": "7ce22c07c24058054e26763e91ae5a6b",
+  "collection": "2ec85a7859161f620d2cca6a351357f6",
+  "devices": {
+    "A": {
+      "created": "2026-11-04T20:28:51Z",
+      "sha256": "303eaf7581425714c0865690841e0a29aac9f941c783a14c09ef94eb508dbc20",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "installation": {
+        "time": "2026-11-04T20:26:32.7244117Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "uiLaunchRecordCurrentRevision": true,
+      "connectedAt": "2026-11-04T20:27:55.6507608Z",
+      "failuresSinceConnection": [],
+      "activationIPC": [
+        {
+          "time": "2026-11-04T20:28:47.6740135Z",
+          "role": "source",
+          "exchange": "6742682c835ef34e9b7a50db8add545fbbe7e9ba5d60624c8726f4876769168f",
+          "ipc": {
+            "measured": true,
+            "requestDeliveryMicros": 73,
+            "readAuthorizationMicros": 98,
+            "dispatchMicros": 46,
+            "activationMicros": 25040,
+            "replyAdmissionMicros": 107,
+            "replyEncodeMicros": 2,
+            "replyDeliveryMicros": 158,
+            "callerResumeMicros": 49
+          }
+        }
+      ]
+    },
+    "B": {
+      "created": "2026-11-04T20:28:48Z",
+      "sha256": "23db1e4fdc036e87063515adbbdb182b58271258a72ee924d9a751d1a2b68fea",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "installation": {
+        "time": "2026-11-04T20:27:41.9987132Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "uiLaunchRecordCurrentRevision": true,
+      "connectedAt": "2026-11-04T20:27:51.2240193Z",
+      "failuresSinceConnection": [],
+      "activationIPC": []
+    }
+  },
+  "connection": {
+    "state": "CONNECTED",
+    "sharedConnectionMatched": true,
+    "method": "CLI app connect B; independently matched authenticated connection in both support bundles",
+    "cliReceipt": {
+      "schemaVersion": "krasis.cli.peer-connect/v1",
+      "code": "connected",
+      "peerAlias": "B",
+      "id": "6802d039de53738b24a5f687e2f1f287"
+    }
+  },
+  "peerUpdate": {
+    "requestID": "eca8bec4faaf697ceb8031f574411ac5",
+    "code": "updated",
+    "bytes": 28916035,
+    "total": 28916035
+  },
+  "changes": [
+    "Only NORMAL priority of the three dedicated locked source-input OS threads receives a best-effort ABOVE_NORMAL (+1) hint at thread startup.",
+    "Explicit lower/higher priority, native lookup/set failures and original owner completion are preserved. No new recovery error, process priority, dynamic boost, affinity, timeout or foreground proof change.",
+    "Each OS thread stays locked through goroutine exit and is retired, so elevated priority cannot leak to the general Go thread pool."
+  ],
+  "validation": [
+    "Six related suites passed: wininput, handoff, inputworker, residentagent, productlog, localapi.",
+    "Five related packages passed standard vet; wininput passed the existing CI policy vet -unsafeptr=false. Full wininput vet has eight pre-existing unsafe.Pointer warnings in unchanged callback files; no new warning suppressed.",
+    "Selected owner priority, source activation/completion/reply/shutdown/heartbeat tests passed with race detection in wininput and inputworker.",
+    "Real Windows owner-thread test observed +1 priority for all three owner variants and preserved original nil/error completion; policy tests cover eight priorities and native failure.",
+    "Workspace/frontend tests/build and setup bundle verification passed.",
+    "Exact A CLI/UI/agent/installed and B peer g526 revisions verified, both protected services/input health READY, and same authenticated connected session.",
+    "Live A protected source child has exactly three thread base priorities of 9, versus zero before install; both protected process base priorities remain 8. No B thread-priority proof is claimed."
+  ],
+  "sourceOfTruth": [
+    "docs/adr/0066-product-privileged-input.md",
+    "docs/experiments/2026-11-05-g526-source-input-scheduling.md"
+  ],
+  "limits": [
+    "g525 had 15 complete pairs, an 808.306ms tail and correlated A CPU saturation. Scheduling mitigation is not yet an observed g526 latency improvement.",
+    "Native window/foreground operations may still block on another process or the OS even after input owner priority rises.",
+    "Best-effort hint failure preserves normal functionality; successful startup does not alone prove that priority was elevated on every device.",
+    "Initial connection observation does not establish CPU-pressure/endurance or recurrence prevention."
+  ],
+  "apiDBRunner": "No API, private/peer wire format, JSON schema, DB, dependency or runner changes. Source thread scheduling and generation only.",
+  "push": "Not requested; not performed",
+  "remoteCI": "Not requested; not run",
+  "localThreadPriorityObservation": {
+    "method": "Read-only Windows ProcessThread.BasePriority snapshot; public process/thread information, no privilege change",
+    "scope": "A only; B native thread priority was not inspected",
+    "beforeGeneration": 525,
+    "afterGeneration": 526,
+    "normalProcessBasePriority": 8,
+    "beforeThreadBase9Count": 0,
+    "afterThreadBase9Count": 3,
+    "beforeProcessThreadGroups": [
+      {
+        "processBasePriority": 8,
+        "groups": [
+          {
+            "Name": "8",
+            "Count": 18
+          }
+        ]
+      },
+      {
+        "processBasePriority": 8,
+        "groups": [
+          {
+            "Name": "8",
+            "Count": 20
+          }
+        ]
+      }
+    ],
+    "afterProcessThreadGroups": [
+      {
+        "processBasePriority": 8,
+        "groups": [
+          {
+            "Name": "8",
+            "Count": 16
+          }
+        ]
+      },
+      {
+        "processBasePriority": 8,
+        "groups": [
+          {
+            "Name": "8",
+            "Count": 18
+          },
+          {
+            "Name": "9",
+            "Count": 3
+          }
+        ]
+      }
+    ]
+  }
+}
