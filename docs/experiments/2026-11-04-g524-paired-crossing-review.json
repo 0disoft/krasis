@@ -1,0 +1,677 @@
+{
+  "schema": "krasis.paired-crossing-review/v1",
+  "generation": 524,
+  "revision": "24efab297c14452935ee928b9e7a74c3b9029bd3",
+  "collection": "a112d31f9aa0b1206495aaf601f12aaf",
+  "baselineGeneration": 523,
+  "baselineCollection": "1dc9d64feac633e712c5f4d0c61e63ad",
+  "installationBaselineCollection": "6729dfb59244e8f23f2ca8d4f72be7ff",
+  "timezone": "Asia/Seoul",
+  "userTrial": "User completed requested idle and rapid crossings and reported stutter.",
+  "selection": {
+    "rule": "Exclude exchange tags already present in either installation-baseline support file; match remaining A-source/B-receiver tags.",
+    "excludedInstallationLeases": 1,
+    "pairs": {
+      "matched": 7,
+      "complete": 7
+    },
+    "summaryCompletionWindowUTC": {
+      "from": "2026-11-04T14:08:46.1217034Z",
+      "to": "2026-11-04T14:10:29.2443054Z"
+    },
+    "note": "Summary completion timestamps are not crossing start times. No cross-device wall-clock subtraction is used."
+  },
+  "sides": {
+    "A": {
+      "created": "2026-11-04T14:10:54Z",
+      "sha256": "e9ee61d0b6c41be4d68f31ba11c37c6876a1dd3afb8b47cdeb1456bfe934d691",
+      "service": "READY",
+      "inputHealth": "READY",
+      "originalConnectionMatched": true,
+      "failureEvents": [],
+      "recovery": {
+        "time": "2026-11-04T14:10:32.112097Z",
+        "code": "agent_present",
+        "agentState": "CONNECTED",
+        "lastFailure": {
+          "time": "2026-11-04T13:49:32.1562048Z",
+          "code": "agent_faulted",
+          "agentState": "FAULTED"
+        }
+      },
+      "logs": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false,
+          "events": 1550,
+          "from": "2026-11-04T13:12:08.3249318Z",
+          "to": "2026-11-04T13:50:55.5310906Z"
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false,
+          "events": 1439,
+          "from": "2026-11-04T13:50:56.2737711Z",
+          "to": "2026-11-04T14:10:54.0030762Z"
+        }
+      ]
+    },
+    "B": {
+      "created": "2026-11-04T14:10:51Z",
+      "sha256": "b1f9976c212686095a2aa663635fd6b1d4d344b6fc5262f27c5e733c7af9e162",
+      "service": "READY",
+      "inputHealth": "READY",
+      "originalConnectionMatched": true,
+      "failureEvents": [],
+      "recovery": {
+        "time": "2026-11-04T14:10:08.3724346Z",
+        "code": "agent_present",
+        "agentState": "CONNECTED",
+        "lastFailure": {
+          "time": "2026-11-04T08:21:08.3372368Z",
+          "code": "agent_faulted",
+          "agentState": "FAULTED"
+        }
+      },
+      "logs": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false,
+          "events": 1874,
+          "from": "2026-11-04T12:22:54.9187224Z",
+          "to": "2026-11-04T13:28:25.4062202Z"
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false,
+          "events": 1279,
+          "from": "2026-11-04T13:28:33.273051Z",
+          "to": "2026-11-04T14:10:50.2882654Z"
+        }
+      ]
+    }
+  },
+  "metrics": {
+    "g523": {
+      "grant": {
+        "n": 12,
+        "medianMs": 45.852000000000004,
+        "maxMs": 73.953
+      },
+      "capture": {
+        "n": 12,
+        "medianMs": 27.694499999999998,
+        "maxMs": 104.998
+      },
+      "prepare": {
+        "n": 12,
+        "medianMs": 26.8715,
+        "maxMs": 36.673
+      },
+      "ready": {
+        "n": 12,
+        "medianMs": 24.463,
+        "maxMs": 33.471
+      },
+      "first": {
+        "n": 12,
+        "medianMs": 1.7835,
+        "maxMs": 3.158
+      },
+      "worst": {
+        "n": 12,
+        "medianMs": 3.2355,
+        "maxMs": 29.717
+      },
+      "response": {
+        "n": 12,
+        "medianMs": 2.8005,
+        "maxMs": 29.204
+      }
+    },
+    "g524": {
+      "grant": {
+        "n": 7,
+        "medianMs": 39.73,
+        "maxMs": 44.227
+      },
+      "capture": {
+        "n": 7,
+        "medianMs": 110.562,
+        "maxMs": 211.696
+      },
+      "prepare": {
+        "n": 7,
+        "medianMs": 26.639,
+        "maxMs": 27.042
+      },
+      "ready": {
+        "n": 7,
+        "medianMs": 24.116,
+        "maxMs": 25.274
+      },
+      "first": {
+        "n": 7,
+        "medianMs": 1.968,
+        "maxMs": 7.837
+      },
+      "worst": {
+        "n": 7,
+        "medianMs": 7.768,
+        "maxMs": 21.332
+      },
+      "response": {
+        "n": 7,
+        "medianMs": 7.354,
+        "maxMs": 21.332
+      }
+    }
+  },
+  "inputHistogram": {
+    "frames": 567,
+    "counts": [
+      1,
+      555,
+      11,
+      0,
+      0
+    ],
+    "buckets": [
+      "<1ms",
+      "1..<10ms",
+      "10..<100ms",
+      "100..<1000ms",
+      ">=1000ms"
+    ]
+  },
+  "preparationReuse": {
+    "used": 7,
+    "total": 7
+  },
+  "runtime": {
+    "A": {
+      "summaryIntervals": 2,
+      "maxLivenessTimerLateMs": 131.407,
+      "maxSamplerTimerLateMs": 640.663,
+      "observations": [
+        {
+          "time": "2026-11-04T14:09:48.8133752Z",
+          "reason": "os_read_slow",
+          "fault": "",
+          "systemCPUWindows": 64,
+          "systemCPUWindowsAtLeast95": 15,
+          "maxOSReadMs": 165.043,
+          "maxTimerLateMs": 12.657
+        },
+        {
+          "time": "2026-11-04T14:10:22.3560966Z",
+          "reason": "os_read_slow",
+          "fault": "",
+          "systemCPUWindows": 64,
+          "systemCPUWindowsAtLeast95": 64,
+          "maxOSReadMs": 180.013,
+          "maxTimerLateMs": 115.862
+        },
+        {
+          "time": "2026-11-04T14:10:52.3655227Z",
+          "reason": "timer_late",
+          "fault": "",
+          "systemCPUWindows": 64,
+          "systemCPUWindowsAtLeast95": 64,
+          "maxOSReadMs": 758,
+          "maxTimerLateMs": 282.21
+        }
+      ]
+    },
+    "B": {
+      "summaryIntervals": 2,
+      "maxLivenessTimerLateMs": 6.071,
+      "maxSamplerTimerLateMs": 36.969,
+      "observations": [
+        {
+          "time": "2026-11-04T14:09:50.304009Z",
+          "reason": "os_read_slow",
+          "fault": "",
+          "systemCPUWindows": 64,
+          "systemCPUWindowsAtLeast95": 1,
+          "maxOSReadMs": 127.453,
+          "maxTimerLateMs": 9.516
+        }
+      ]
+    }
+  },
+  "rebindEvents": {
+    "A": [],
+    "B": []
+  },
+  "captures": [
+    {
+      "time": "2026-11-04T14:10:33.5149151Z",
+      "activationMs": 211.696,
+      "grantWaitMs": 37.624,
+      "ipcReplyMs": 209.692,
+      "workerBuckets": [
+        0,
+        3,
+        3
+      ],
+      "nativeBuckets": [
+        1,
+        1,
+        1,
+        2,
+        2,
+        1,
+        2,
+        1,
+        3,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        3
+      ],
+      "exact": {
+        "queueToHandleMicros": 4469,
+        "foregroundRequestMicros": 29951,
+        "measured": 7
+      },
+      "tcp": {
+        "schema": 1,
+        "rttMicros": [
+          4136,
+          4391
+        ],
+        "minRttMicros": [
+          2175,
+          2175
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      }
+    },
+    {
+      "time": "2026-11-04T14:10:31.569213Z",
+      "activationMs": 176.501,
+      "grantWaitMs": 42.102,
+      "ipcReplyMs": 174.401,
+      "workerBuckets": [
+        0,
+        3,
+        4
+      ],
+      "nativeBuckets": [
+        1,
+        1,
+        1,
+        2,
+        2,
+        1,
+        2,
+        2,
+        3,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        3
+      ],
+      "exact": {
+        "queueToHandleMicros": 5887,
+        "foregroundRequestMicros": 22974,
+        "measured": 7
+      },
+      "tcp": {
+        "schema": 1,
+        "rttMicros": [
+          5114,
+          4959
+        ],
+        "minRttMicros": [
+          2175,
+          2175
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      }
+    },
+    {
+      "time": "2026-11-04T14:10:27.7227416Z",
+      "activationMs": 128.503,
+      "grantWaitMs": 44.227,
+      "ipcReplyMs": 125.618,
+      "workerBuckets": [
+        0,
+        1,
+        3
+      ],
+      "nativeBuckets": [
+        1,
+        1,
+        1,
+        2,
+        2,
+        1,
+        2,
+        2,
+        3,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        3
+      ],
+      "exact": {
+        "queueToHandleMicros": 3997,
+        "foregroundRequestMicros": 16241,
+        "measured": 7
+      },
+      "tcp": {
+        "schema": 1,
+        "rttMicros": [
+          5389,
+          5169
+        ],
+        "minRttMicros": [
+          2175,
+          2175
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      }
+    },
+    {
+      "time": "2026-11-04T14:10:29.0704283Z",
+      "activationMs": 110.562,
+      "grantWaitMs": 39.006,
+      "ipcReplyMs": 109.297,
+      "workerBuckets": [
+        0,
+        3,
+        3
+      ],
+      "nativeBuckets": [
+        1,
+        1,
+        1,
+        2,
+        2,
+        1,
+        2,
+        1,
+        3,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        3
+      ],
+      "exact": {
+        "queueToHandleMicros": 1667,
+        "foregroundRequestMicros": 18281,
+        "measured": 7
+      },
+      "tcp": {
+        "schema": 1,
+        "rttMicros": [
+          9509,
+          8889
+        ],
+        "minRttMicros": [
+          2175,
+          2175
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      }
+    },
+    {
+      "time": "2026-11-04T14:10:30.22301Z",
+      "activationMs": 70.632,
+      "grantWaitMs": 37.857,
+      "ipcReplyMs": 69.44,
+      "workerBuckets": [
+        0,
+        3,
+        3
+      ],
+      "nativeBuckets": [
+        1,
+        1,
+        1,
+        2,
+        2,
+        1,
+        2,
+        2,
+        3,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        2
+      ],
+      "exact": {
+        "queueToHandleMicros": 5708,
+        "foregroundRequestMicros": 21166,
+        "measured": 7
+      },
+      "tcp": {
+        "schema": 1,
+        "rttMicros": [
+          5991,
+          6298
+        ],
+        "minRttMicros": [
+          2175,
+          2175
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      }
+    },
+    {
+      "time": "2026-11-04T14:09:53.9187713Z",
+      "activationMs": 54.612,
+      "grantWaitMs": 39.73,
+      "ipcReplyMs": 52.023,
+      "workerBuckets": [
+        0,
+        1,
+        3
+      ],
+      "nativeBuckets": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        2,
+        2,
+        3,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        1
+      ],
+      "exact": {
+        "queueToHandleMicros": 585,
+        "foregroundRequestMicros": 19351,
+        "measured": 7
+      },
+      "tcp": {
+        "schema": 1,
+        "rttMicros": [
+          10059,
+          9702
+        ],
+        "minRttMicros": [
+          2175,
+          2175
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      }
+    },
+    {
+      "time": "2026-11-04T14:08:50.2055025Z",
+      "activationMs": 29.527,
+      "grantWaitMs": 40.425,
+      "ipcReplyMs": 28.937,
+      "workerBuckets": [
+        0,
+        1,
+        3
+      ],
+      "nativeBuckets": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        2,
+        1,
+        3,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        1
+      ],
+      "exact": {
+        "foregroundRequestMicros": 16062,
+        "measured": 7
+      },
+      "tcp": {
+        "schema": 1,
+        "rttMicros": [
+          22398,
+          20172
+        ],
+        "minRttMicros": [
+          2175,
+          2175
+        ],
+        "queryMicros": [
+          549,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      }
+    }
+  ],
+  "worstReceiver": {
+    "time": "2026-11-04T14:09:49.8364281Z",
+    "attempt": 2,
+    "kind": "worst",
+    "dispatch": 21.332,
+    "response": 21.332,
+    "outer": [
+      0,
+      0.286,
+      19.169,
+      0.01,
+      0.067,
+      0.069
+    ],
+    "outerTotal": 19.601,
+    "inner": {
+      "micros": [
+        47,
+        95,
+        2,
+        18731,
+        53,
+        8
+      ],
+      "parentMicros": [
+        21,
+        2,
+        108
+      ],
+      "parentMeasured": true,
+      "requestWriteMicros": 26,
+      "requestWriteMeasured": true
+    },
+    "apply": 19.3,
+    "submission": 18.191,
+    "workerMillis": [
+      0,
+      0,
+      19
+    ]
+  },
+  "conclusions": [
+    "All seven new matched leases ended OK. Both protected input services remain READY and the original g524 connection remains shared. No new reconnect, timeout, poison or recovery fault was found in retained current-build events.",
+    "Largest remaining measured phase is A capture activation: median 110.562ms and maximum 211.696ms. In its largest sample, local source activation IPC reply span is 209.692ms; native queue-to-handler is 4.469ms and foreground request 29.951ms, with measured zero foreground verification. These are nested scopes, not terms to sum or blindly subtract.",
+    "B preparation maximum is 27.042ms, first input maximum 7.837ms and active input dispatch maximum 21.332ms. All seven entries reused prepared workers; all 567 input frames were below 100ms.",
+    "Two A runtime trails contain 64 of 64 system CPU windows at least 95 percent busy. A sampler lateness reaches 640.663ms in overlapping minute summaries. This correlates with local A scheduling/native/IPC delay but does not identify the CPU-consuming process or fully separate source worker processing from reply resumption.",
+    "No rebind-wait/readiness event appeared. This trial confirms no observed recurrence, but did not exercise the new delayed endpoint retry path.",
+    "Installation baseline contained a separate 195.263ms B input sample and 102.613ms preparation sample before this attended trial. They are excluded from trial maxima, not erased or attributed to the new crossings."
+  ],
+  "validation": [
+    "Current doctor healthy and exact g524 revision checked; both READY states and unchanged matching connection verified.",
+    "Deduplicated current-build events, historical lastFailure timestamps, support SHA256 checksums and installation-baseline exchange exclusion checked.",
+    "Seven complete pairs, preparation reuse and 567-frame histogram totals checked. Native exact timing measured mask checked against CaptureStage and CaptureExactStage definitions."
+  ],
+  "skipped": "No source edit, build, install, unit/race repeat, push or remote CI: diagnostic analysis and evidence documentation only.",
+  "limits": "g523 has 12 leases versus 7 new g524 leases on another day with different load/movements. Observed differences are not a controlled causal comparison. Individual timings are local; device clocks differ. CPU ownership and native activation/reply subdivisions remain unresolved.",
+  "sourceOfTruthChanged": "Evidence report only; runtime/authority policy unchanged.",
+  "apiDBRunner": "No API, input/control protocol, DB, dependency or runner change."
+}
