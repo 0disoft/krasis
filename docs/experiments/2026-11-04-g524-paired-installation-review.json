@@ -1,0 +1,109 @@
+{
+  "schema": "krasis.paired-installation-review/v1",
+  "generation": 524,
+  "revision": "24efab297c14452935ee928b9e7a74c3b9029bd3",
+  "date": "2026-11-04",
+  "timezone": "Asia/Seoul",
+  "incidentCollection": "84538fa8fe5ce30ec6f36630fad9ecb3",
+  "beforeInstallCollection": "78d890ebcc68dc8afe6dffedd1dd27b1",
+  "collection": "6729dfb59244e8f23f2ca8d4f72be7ff",
+  "devices": {
+    "A": {
+      "created": "2026-11-04T14:07:56Z",
+      "sha256": "1c633859307622f9af35b5dda6c5ff1ca257da538f2a567b179415ebaafb9879",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "installation": {
+        "time": "2026-11-04T14:06:08.6871005Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "uiLaunchRecordCurrentRevision": true,
+      "connectedAt": "2026-11-04T14:06:46.1755234Z",
+      "failuresSinceConnection": [],
+      "rebindEvents": []
+    },
+    "B": {
+      "created": "2026-11-04T14:07:52Z",
+      "sha256": "fb7689f2b5ddf0b6e9ec6bf8c87307fcc1af7397fd879e28d86cb2cfffff85f8",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "installation": {
+        "time": "2026-11-04T14:06:32.2682381Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "uiLaunchRecordCurrentRevision": true,
+      "connectedAt": "2026-11-04T14:06:42.1019026Z",
+      "failuresSinceConnection": [],
+      "rebindEvents": []
+    }
+  },
+  "connection": {
+    "state": "CONNECTED",
+    "sharedConnectionMatched": true,
+    "method": "A CLI listener connect and B existing resume/delegated CLI request; shared authenticated connection independently verified",
+    "cliReceipt": {
+      "schemaVersion": "krasis.cli.peer-connect/v1",
+      "code": "connected",
+      "peerAlias": "B",
+      "id": "8d708725d5d813187d28509881630f77"
+    }
+  },
+  "peerUpdate": {
+    "requestID": "c9fb13c416c58940b303664a0a6917bd",
+    "bytes": 28874042,
+    "total": 28874042,
+    "code": "updated"
+  },
+  "changes": [
+    "Arm one-use source rebind only after exact clean retirement and successful local reader/handle cleanup; require inactive source and no physical held inputs.",
+    "After that proof, retry only known pre-lease pipe_open missing/busy/attempt deadline errors within one 10-second receive-only budget, retaining 2-second attempts and capped 50/100/200ms cancellable backoff.",
+    "Initial startup, active input/query deadlines, authority denials, emergency, unconfirmed cleanup and no-replay behavior remain unchanged. Add two fixed rebind diagnostics."
+  ],
+  "regression": {
+    "kind": "Deterministic virtual-time delayed endpoint; not measured physical latency",
+    "endpointReadyAtMs": 3000,
+    "existingAttemptLimitMs": 2000,
+    "newCompletionMs": 3000,
+    "openAttempts": 2,
+    "allRebindAttemptsMaxBudgetMs": 10000
+  },
+  "validation": [
+    "Full inputworker, residentagent, productlog and localapi suites passed, count=1.",
+    "Vet passed for those four packages. Selected source rebind, native pipe rebind, close, query and retirement tests passed with race detection in inputworker. Other selected race packages had no matching tests and are not claimed covered.",
+    "Virtual-time tests cover delayed service publication, budget exhaustion, shorter deadlines, cancellation, initial/no-retirement behavior, denied or joined causes, malformed success and failed/late channel cleanup.",
+    "Frontend tests/build, workspace update-transfer smoke, icon/archive checks and setup verification passed.",
+    "Installer A returned installed/result zero; live exact A CLI/UI/agent/installed revision, B generation/revision, matching new shared connection and both protected services/input health READY verified."
+  ],
+  "sourceOfTruth": [
+    "docs/adr/0066-product-privileged-input.md",
+    "docs/experiments/2026-11-04-g524-source-rebind.md"
+  ],
+  "limits": [
+    "CPU-pressure correlation does not identify the expensive process or separate native GetNamedPipeServerProcessId wall time from caller scheduling/resumption. Source checking is a pinned pipe-owner check, not the full SCM input query.",
+    "This fixes the fatal cascade after confirmed source retirement and delayed endpoint publication. A truly stuck native check, failed cleanup, authentication denial or total rebind timeout still fails closed.",
+    "Initial post-install connected observation is not a new attended crossing or CPU-saturation endurance test; recurrence prevention is not yet established on devices."
+  ],
+  "apiDBRunner": "No API endpoint, input/control wire format, DB, dependency or runner change. Two fixed diagnostic codes and product generation only.",
+  "push": "Not requested; not performed",
+  "remoteCI": "Not run; validated locally and installed on both laptops"
+}
