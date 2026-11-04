@@ -29,6 +29,7 @@ type CaptureSource struct {
 	service *AgentService
 	mu      sync.Mutex
 	current *sourceClient
+	rebind  bool         // Armed only after authenticated retirement and client handle cleanup.
 	observe func(string) // configured before Run; fixed timing/route codes only.
 }
 type sourceClient struct {
@@ -440,7 +441,14 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 	if err != nil {
 		return err
 	}
-	channel, err := connectInstalledNamed(ctx, c.service.digest, c.service.installation, sourcePipeName)
+	c.mu.Lock()
+	rebind := c.rebind && !session.Active() && session.PhysicalPressCount() == 0
+	c.rebind = false
+	c.mu.Unlock()
+	connect := func(run context.Context) (*Channel, error) {
+		return connectInstalledNamed(run, c.service.digest, c.service.installation, sourcePipeName)
+	}
+	channel, err := connectSourceRebind(ctx, rebind, connect, c.observe)
 	if err != nil {
 		if c.observe != nil {
 			c.observe("installed_source_connect_failed")
@@ -465,6 +473,11 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 		} else {
 			result = live.closeResult(result)
 		}
+		// Do not arm on cancellation, emergency, failed Stop/Close or unknown
+		// native cleanup. A new endpoint still requires fresh authentication.
+		c.mu.Lock()
+		c.rebind = CleanSourceRetirement(result)
+		c.mu.Unlock()
 	}()
 	startup, stopStartup := context.WithTimeout(ctx, startupTimeout)
 	stopPipe := context.AfterFunc(startup, func() { _ = channel.Close() })

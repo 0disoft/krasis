@@ -962,3 +962,16 @@ Native-call wall time also includes Windows/hook and caller resumption waits.
 
 References: [MOUSEINPUT](https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-mouseinput),
 [LowLevelMouseProc](https://learn.microsoft.com/en-us/windows/win32/winmsg/lowlevelmouseproc).
+
+## g524 confirmed source retirement and endpoint reacquisition
+
+An authenticated clean source retirement can precede the service's final report
+and endpoint republication. After that exact proof and successful client handle
+cleanup, an inactive source with no physical held inputs may reacquire the fixed
+source endpoint within one 10-second budget. Only pre-lease pipe-open missing,
+busy and per-attempt timeout errors receive capped cancellable backoff. The first
+connection and all active input/query deadlines retain their existing bounds.
+Every new connection still performs full service authentication; no lease or
+input command is replayed. Unknown/denied authentication, emergency, cleanup
+failure and cancellation cannot arm or consume this retry policy. Late successful
+opens are closed on cancellation. Diagnostics distinguish rebind wait/readiness.
