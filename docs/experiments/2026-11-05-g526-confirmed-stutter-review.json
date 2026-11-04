@@ -1,0 +1,1074 @@
+{
+  "schema": "krasis.confirmed-source-activation-review/v1",
+  "date": "2026-11-05",
+  "generation": 526,
+  "revision": "f4bd8856f6a821045a853e73f16b6a25598d72a2",
+  "userResult": "Seems improved?",
+  "collection": "f46ad91f3830ade013079bdf48785afd",
+  "baselineCollection": "2ec85a7859161f620d2cca6a351357f6",
+  "selection": "Exclude baseline exchange tags from either installed-device support file, deduplicate current-build run/sequence/code, and match complete OK A-source/B-receiver exchange tags. No cross-device clock subtraction.",
+  "pairs": {
+    "matched": 14,
+    "complete": 14
+  },
+  "devices": {
+    "A": {
+      "created": "2026-11-04T20:38:23Z",
+      "sha256": "b63c4334abcb5eafcfc001965d40fc5285fdcb60d08016416e921dd8e5925c57",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "originalConnectionPreserved": true,
+      "newFailures": [],
+      "historicalLastFailure": {
+        "time": "2026-11-04T13:49:32.1562048Z",
+        "code": "agent_faulted",
+        "agentState": "FAULTED"
+      },
+      "profileCompletionTimes": {
+        "from": "2026-11-04T20:32:21.5953436Z",
+        "to": "2026-11-04T20:37:59.1866782Z"
+      },
+      "profileHistogramTotals": {
+        "frames": 1433,
+        "buckets": [
+          1395,
+          37,
+          1,
+          0,
+          0
+        ]
+      }
+    },
+    "B": {
+      "created": "2026-11-04T20:38:20Z",
+      "sha256": "305031843fa612c0e57a0899907e812dda5f8d1d7410875dcae4289db332ea83",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "originalConnectionPreserved": true,
+      "newFailures": [],
+      "historicalLastFailure": {
+        "time": "2026-11-04T08:21:08.3372368Z",
+        "code": "agent_faulted",
+        "agentState": "FAULTED"
+      },
+      "profileCompletionTimes": {
+        "from": "2026-11-04T20:32:17.1593702Z",
+        "to": "2026-11-04T20:37:54.746167Z"
+      },
+      "profileHistogramTotals": {
+        "frames": 1323,
+        "buckets": [
+          2,
+          1320,
+          1,
+          0,
+          0
+        ]
+      }
+    }
+  },
+  "comparison": {
+    "aCapture": {
+      "g525": {
+        "n": 15,
+        "medianMs": 45.087,
+        "maxMs": 808.306
+      },
+      "g526": {
+        "n": 14,
+        "medianMs": 60.1245,
+        "maxMs": 114.197
+      }
+    },
+    "aIPCWait": {
+      "g525": {
+        "n": 15,
+        "medianMs": 44.543,
+        "maxMs": 806.782
+      },
+      "g526": {
+        "n": 14,
+        "medianMs": 59.2555,
+        "maxMs": 103.907
+      }
+    },
+    "aGrant": {
+      "g525": {
+        "n": 15,
+        "medianMs": 43.424,
+        "maxMs": 80.149
+      },
+      "g526": {
+        "n": 14,
+        "medianMs": 44.931,
+        "maxMs": 58.446
+      }
+    },
+    "bPreparation": {
+      "g525": {
+        "n": 15,
+        "medianMs": 25.85,
+        "maxMs": 32.532
+      },
+      "g526": {
+        "n": 14,
+        "medianMs": 26.701500000000003,
+        "maxMs": 32.414
+      }
+    },
+    "bInput": {
+      "g525": {
+        "n": 15,
+        "medianMs": 5.501,
+        "maxMs": 26.928
+      },
+      "g526": {
+        "n": 14,
+        "medianMs": 4.487,
+        "maxMs": 15.657
+      }
+    }
+  },
+  "ipc": {
+    "samples": 14,
+    "stats": {
+      "requestDeliveryMicros": {
+        "n": 14,
+        "medianMs": 0.11800000000000001,
+        "maxMs": 40.572
+      },
+      "readAuthorizationMicros": {
+        "n": 14,
+        "medianMs": 0.0675,
+        "maxMs": 0.254
+      },
+      "dispatchMicros": {
+        "n": 14,
+        "medianMs": 0.037,
+        "maxMs": 1.827
+      },
+      "activationMicros": {
+        "n": 14,
+        "medianMs": 50.623000000000005,
+        "maxMs": 95.191
+      },
+      "replyAdmissionMicros": {
+        "n": 14,
+        "medianMs": 0.517,
+        "maxMs": 2.789
+      },
+      "replyEncodeMicros": {
+        "n": 14,
+        "medianMs": 0.003,
+        "maxMs": 0.012
+      },
+      "replyDeliveryMicros": {
+        "n": 14,
+        "medianMs": 0.4665,
+        "maxMs": 8.696
+      },
+      "callerResumeMicros": {
+        "n": 14,
+        "medianMs": 0.2955,
+        "maxMs": 15.184
+      }
+    }
+  },
+  "slowest": [
+    {
+      "time": "2026-11-04T20:37:43.5214225Z",
+      "tag": "317c0dfc4010c4378b76f4f0808e7b134335537f2631165400b7d2008799df53",
+      "captureMs": 114.197,
+      "ipcWaitMs": 75.01,
+      "ipc": {
+        "measured": true,
+        "requestDeliveryMicros": 40572,
+        "readAuthorizationMicros": 79,
+        "dispatchMicros": 1827,
+        "activationMicros": 64183,
+        "replyAdmissionMicros": 764,
+        "replyEncodeMicros": 3,
+        "replyDeliveryMicros": 303,
+        "callerResumeMicros": 41
+      },
+      "native": [
+        1,
+        1,
+        2,
+        2,
+        2,
+        1,
+        2,
+        2,
+        3,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        2
+      ],
+      "exact": {
+        "queueToHandleMicros": 1001,
+        "foregroundRequestMicros": 23705,
+        "measured": 7
+      }
+    },
+    {
+      "time": "2026-11-04T20:37:44.5543315Z",
+      "tag": "17afea18e421d6f7e54dd74a2eed73de9ce973d338fb507c2e1b790094cf61b1",
+      "captureMs": 109.404,
+      "ipcWaitMs": 99.767,
+      "ipc": {
+        "measured": true,
+        "requestDeliveryMicros": 2118,
+        "readAuthorizationMicros": 59,
+        "dispatchMicros": 558,
+        "activationMicros": 84509,
+        "replyAdmissionMicros": 1554,
+        "replyEncodeMicros": 3,
+        "replyDeliveryMicros": 8696,
+        "callerResumeMicros": 2831
+      },
+      "native": [
+        1,
+        1,
+        1,
+        2,
+        2,
+        1,
+        2,
+        1,
+        3,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        2
+      ],
+      "exact": {
+        "queueToHandleMicros": 3164,
+        "foregroundRequestMicros": 42025,
+        "measured": 7
+      }
+    },
+    {
+      "time": "2026-11-04T20:37:42.3891923Z",
+      "tag": "db2580d7dd76de48d182dc6b2c2a96ee4a1cd2e321badb8ff785987c61dd7786",
+      "captureMs": 104.415,
+      "ipcWaitMs": 103.907,
+      "ipc": {
+        "measured": true,
+        "requestDeliveryMicros": 432,
+        "readAuthorizationMicros": 23,
+        "dispatchMicros": 28,
+        "activationMicros": 95191,
+        "replyAdmissionMicros": 2745,
+        "replyEncodeMicros": 4,
+        "replyDeliveryMicros": 4956,
+        "callerResumeMicros": 526
+      },
+      "native": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        2,
+        1,
+        3,
+        0,
+        2,
+        3,
+        3,
+        0,
+        3,
+        0,
+        3
+      ],
+      "exact": {
+        "foregroundRequestMicros": 42670,
+        "measured": 7
+      }
+    },
+    {
+      "time": "2026-11-04T20:37:47.9501329Z",
+      "tag": "9fb0452b3808e16a33c669512f79a28720053bfc8c371c3a2d2147c0817bafbb",
+      "captureMs": 76.987,
+      "ipcWaitMs": 68.983,
+      "ipc": {
+        "measured": true,
+        "requestDeliveryMicros": 166,
+        "readAuthorizationMicros": 28,
+        "dispatchMicros": 35,
+        "activationMicros": 50154,
+        "replyAdmissionMicros": 2586,
+        "replyEncodeMicros": 3,
+        "replyDeliveryMicros": 980,
+        "callerResumeMicros": 15184
+      },
+      "native": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        2,
+        1,
+        3,
+        0,
+        2,
+        3,
+        3,
+        0,
+        3,
+        0,
+        2
+      ],
+      "exact": {
+        "foregroundRequestMicros": 27242,
+        "measured": 7
+      }
+    }
+  ],
+  "runtime": {
+    "A": {
+      "trails": [
+        {
+          "time": "2026-11-04T20:27:06.2549762Z",
+          "triggerObservedAt": "2026-11-05T05:27:06.0619635+09:00",
+          "observation": "os_read_slow",
+          "samples": 64,
+          "cpuMedianPercent": 80.15873015873015,
+          "cpu95plus": 22,
+          "cpuSamples": 64,
+          "lateMaxMicros": 7122,
+          "osReadMaxMicros": 272145,
+          "gcCycles": 1,
+          "gcCPU": 2777,
+          "gcPauses": [
+            2,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "time": "2026-11-04T20:32:27.4973905Z",
+          "triggerObservedAt": "2026-11-05T05:32:27.4973905+09:00",
+          "observation": "os_read_slow",
+          "samples": 64,
+          "cpuMedianPercent": 76.28968253968253,
+          "cpu95plus": 20,
+          "cpuSamples": 64,
+          "lateMaxMicros": 14960,
+          "osReadMaxMicros": 111265,
+          "gcCycles": 1,
+          "gcCPU": 10596,
+          "gcPauses": [
+            2,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "time": "2026-11-04T20:33:05.5307938Z",
+          "triggerObservedAt": "2026-11-05T05:33:05.5297038+09:00",
+          "observation": "os_read_slow",
+          "samples": 64,
+          "cpuMedianPercent": 100,
+          "cpu95plus": 63,
+          "cpuSamples": 64,
+          "lateMaxMicros": 20971,
+          "osReadMaxMicros": 126036,
+          "gcCycles": 1,
+          "gcCPU": 256124,
+          "gcPauses": [
+            1,
+            0,
+            0,
+            1,
+            0,
+            0
+          ]
+        },
+        {
+          "time": "2026-11-04T20:33:35.5403525Z",
+          "triggerObservedAt": "2026-11-05T05:33:35.5397247+09:00",
+          "observation": "os_read_slow",
+          "samples": 64,
+          "cpuMedianPercent": 80.75396825396825,
+          "cpu95plus": 19,
+          "cpuSamples": 64,
+          "lateMaxMicros": 27842,
+          "osReadMaxMicros": 145193,
+          "gcCycles": 0,
+          "gcCPU": 0,
+          "gcPauses": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "time": "2026-11-04T20:36:36.4248896Z",
+          "triggerObservedAt": "2026-11-05T05:36:36.4248896+09:00",
+          "observation": "os_read_slow",
+          "samples": 64,
+          "cpuMedianPercent": 88.88888888888889,
+          "cpu95plus": 18,
+          "cpuSamples": 64,
+          "lateMaxMicros": 26678,
+          "osReadMaxMicros": 234407,
+          "gcCycles": 1,
+          "gcCPU": 2227,
+          "gcPauses": [
+            2,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "time": "2026-11-04T20:37:09.1228292Z",
+          "triggerObservedAt": "2026-11-05T05:37:09.1228292+09:00",
+          "observation": "os_read_slow",
+          "samples": 64,
+          "cpuMedianPercent": 100,
+          "cpu95plus": 52,
+          "cpuSamples": 64,
+          "lateMaxMicros": 30364,
+          "osReadMaxMicros": 137021,
+          "gcCycles": 1,
+          "gcCPU": 3819,
+          "gcPauses": [
+            2,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "time": "2026-11-04T20:37:42.1073796Z",
+          "triggerObservedAt": "2026-11-05T05:37:42.1073796+09:00",
+          "observation": "os_read_slow",
+          "samples": 64,
+          "cpuMedianPercent": 98.7878342638848,
+          "cpu95plus": 46,
+          "cpuSamples": 64,
+          "lateMaxMicros": 155077,
+          "osReadMaxMicros": 225789,
+          "gcCycles": 0,
+          "gcCPU": 0,
+          "gcPauses": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "time": "2026-11-04T20:38:14.9397044Z",
+          "triggerObservedAt": "2026-11-05T05:38:14.9397044+09:00",
+          "observation": "gc_stopping_bucket",
+          "samples": 64,
+          "cpuMedianPercent": 91.66666666666667,
+          "cpu95plus": 29,
+          "cpuSamples": 64,
+          "lateMaxMicros": 56210,
+          "osReadMaxMicros": 67676,
+          "gcCycles": 0,
+          "gcCPU": 929804,
+          "gcPauses": [
+            0,
+            0,
+            0,
+            0,
+            1,
+            0
+          ]
+        }
+      ],
+      "summaries": [
+        {
+          "time": "2026-11-04T20:27:36.9835543Z",
+          "timerLateMicros": 0,
+          "samplerTimerLateMicros": 651441,
+          "intervalMicros": 60001703,
+          "cpuMicros": 7218750,
+          "gcPauses": [
+            9,
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          "runnableDelays": [
+            1106,
+            24,
+            26,
+            1,
+            0,
+            0
+          ],
+          "dispatchMaxMicros": 0,
+          "slowDispatch": null
+        },
+        {
+          "time": "2026-11-04T20:28:36.9833187Z",
+          "timerLateMicros": 16789,
+          "samplerTimerLateMicros": 17039,
+          "intervalMicros": 59999764,
+          "cpuMicros": 4437500,
+          "gcPauses": [
+            8,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "runnableDelays": [
+            2151,
+            52,
+            5,
+            0,
+            0,
+            0
+          ],
+          "dispatchMaxMicros": 0,
+          "slowDispatch": null
+        },
+        {
+          "time": "2026-11-04T20:29:36.9831676Z",
+          "timerLateMicros": 54796,
+          "samplerTimerLateMicros": 19033,
+          "intervalMicros": 59999848,
+          "cpuMicros": 6296875,
+          "gcPauses": [
+            12,
+            3,
+            1,
+            0,
+            0,
+            0
+          ],
+          "runnableDelays": [
+            2986,
+            91,
+            19,
+            1,
+            0,
+            0
+          ],
+          "dispatchMaxMicros": 26096,
+          "slowDispatch": null
+        },
+        {
+          "time": "2026-11-04T20:30:36.9832309Z",
+          "timerLateMicros": 2004,
+          "samplerTimerLateMicros": 12643,
+          "intervalMicros": 60000063,
+          "cpuMicros": 5515625,
+          "gcPauses": [
+            10,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "runnableDelays": [
+            3039,
+            95,
+            15,
+            1,
+            0,
+            0
+          ],
+          "dispatchMaxMicros": 0,
+          "slowDispatch": null
+        },
+        {
+          "time": "2026-11-04T20:31:36.9833187Z",
+          "timerLateMicros": 3046,
+          "samplerTimerLateMicros": 4581,
+          "intervalMicros": 60000087,
+          "cpuMicros": 4171875,
+          "gcPauses": [
+            14,
+            2,
+            0,
+            0,
+            0,
+            0
+          ],
+          "runnableDelays": [
+            2131,
+            71,
+            5,
+            0,
+            0,
+            0
+          ],
+          "dispatchMaxMicros": 0,
+          "slowDispatch": null
+        },
+        {
+          "time": "2026-11-04T20:32:36.9858962Z",
+          "timerLateMicros": 19960,
+          "samplerTimerLateMicros": 30337,
+          "intervalMicros": 60002577,
+          "cpuMicros": 5046875,
+          "gcPauses": [
+            7,
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          "runnableDelays": [
+            2137,
+            74,
+            37,
+            1,
+            0,
+            0
+          ],
+          "dispatchMaxMicros": 13846,
+          "slowDispatch": null
+        },
+        {
+          "time": "2026-11-04T20:33:36.9979521Z",
+          "timerLateMicros": 54248,
+          "samplerTimerLateMicros": 277356,
+          "intervalMicros": 60012055,
+          "cpuMicros": 5093750,
+          "gcPauses": [
+            6,
+            1,
+            1,
+            2,
+            0,
+            0
+          ],
+          "runnableDelays": [
+            1475,
+            108,
+            98,
+            8,
+            0,
+            0
+          ],
+          "dispatchMaxMicros": 0,
+          "slowDispatch": null
+        },
+        {
+          "time": "2026-11-04T20:34:36.9832936Z",
+          "timerLateMicros": 619580,
+          "samplerTimerLateMicros": 902514,
+          "intervalMicros": 59985341,
+          "cpuMicros": 4890625,
+          "gcPauses": [
+            6,
+            2,
+            0,
+            1,
+            1,
+            0
+          ],
+          "runnableDelays": [
+            2411,
+            79,
+            25,
+            2,
+            0,
+            0
+          ],
+          "dispatchMaxMicros": 0,
+          "slowDispatch": null
+        },
+        {
+          "time": "2026-11-04T20:35:36.9913359Z",
+          "timerLateMicros": 5654,
+          "samplerTimerLateMicros": 9620,
+          "intervalMicros": 60008042,
+          "cpuMicros": 4328125,
+          "gcPauses": [
+            9,
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          "runnableDelays": [
+            2304,
+            51,
+            6,
+            0,
+            0,
+            0
+          ],
+          "dispatchMaxMicros": 12365,
+          "slowDispatch": null
+        },
+        {
+          "time": "2026-11-04T20:36:37.0607339Z",
+          "timerLateMicros": 60713,
+          "samplerTimerLateMicros": 264528,
+          "intervalMicros": 60069398,
+          "cpuMicros": 5468750,
+          "gcPauses": [
+            10,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "runnableDelays": [
+            2778,
+            106,
+            31,
+            2,
+            0,
+            0
+          ],
+          "dispatchMaxMicros": 0,
+          "slowDispatch": null
+        },
+        {
+          "time": "2026-11-04T20:37:37.1620992Z",
+          "timerLateMicros": 115797,
+          "samplerTimerLateMicros": 285712,
+          "intervalMicros": 60101365,
+          "cpuMicros": 5390625,
+          "gcPauses": [
+            7,
+            1,
+            0,
+            1,
+            1,
+            0
+          ],
+          "runnableDelays": [
+            1468,
+            99,
+            84,
+            6,
+            1,
+            0
+          ],
+          "dispatchMaxMicros": 0,
+          "slowDispatch": null
+        }
+      ]
+    },
+    "B": {
+      "trails": [],
+      "summaries": [
+        {
+          "time": "2026-11-04T20:28:51.1935352Z",
+          "timerLateMicros": 1494,
+          "samplerTimerLateMicros": 4062,
+          "intervalMicros": 60005373,
+          "cpuMicros": 6625000,
+          "gcPauses": [
+            17,
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          "runnableDelays": [
+            1487,
+            51,
+            6,
+            0,
+            0,
+            0
+          ],
+          "dispatchMaxMicros": 35419,
+          "slowDispatch": null
+        },
+        {
+          "time": "2026-11-04T20:29:51.1934093Z",
+          "timerLateMicros": 978,
+          "samplerTimerLateMicros": 41167,
+          "intervalMicros": 59999874,
+          "cpuMicros": 5937500,
+          "gcPauses": [
+            6,
+            3,
+            1,
+            0,
+            0,
+            0
+          ],
+          "runnableDelays": [
+            1360,
+            28,
+            2,
+            0,
+            0,
+            0
+          ],
+          "dispatchMaxMicros": 0,
+          "slowDispatch": null
+        },
+        {
+          "time": "2026-11-04T20:30:51.1935349Z",
+          "timerLateMicros": 2953,
+          "samplerTimerLateMicros": 8186,
+          "intervalMicros": 60000125,
+          "cpuMicros": 6328125,
+          "gcPauses": [
+            12,
+            4,
+            0,
+            0,
+            0,
+            0
+          ],
+          "runnableDelays": [
+            1403,
+            45,
+            2,
+            0,
+            0,
+            0
+          ],
+          "dispatchMaxMicros": 0,
+          "slowDispatch": null
+        },
+        {
+          "time": "2026-11-04T20:31:51.1937848Z",
+          "timerLateMicros": 4013,
+          "samplerTimerLateMicros": 7459,
+          "intervalMicros": 60000249,
+          "cpuMicros": 5718750,
+          "gcPauses": [
+            9,
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          "runnableDelays": [
+            1375,
+            35,
+            2,
+            0,
+            0,
+            0
+          ],
+          "dispatchMaxMicros": 0,
+          "slowDispatch": null
+        },
+        {
+          "time": "2026-11-04T20:32:51.1932915Z",
+          "timerLateMicros": 1011,
+          "samplerTimerLateMicros": 27680,
+          "intervalMicros": 59999506,
+          "cpuMicros": 6421875,
+          "gcPauses": [
+            10,
+            2,
+            0,
+            0,
+            0,
+            0
+          ],
+          "runnableDelays": [
+            1623,
+            49,
+            2,
+            0,
+            0,
+            0
+          ],
+          "dispatchMaxMicros": 34906,
+          "slowDispatch": null
+        },
+        {
+          "time": "2026-11-04T20:33:51.1939068Z",
+          "timerLateMicros": 1031,
+          "samplerTimerLateMicros": 924,
+          "intervalMicros": 60000615,
+          "cpuMicros": 5562500,
+          "gcPauses": [
+            9,
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          "runnableDelays": [
+            1383,
+            32,
+            3,
+            0,
+            0,
+            0
+          ],
+          "dispatchMaxMicros": 0,
+          "slowDispatch": null
+        },
+        {
+          "time": "2026-11-04T20:34:51.1933089Z",
+          "timerLateMicros": 3343,
+          "samplerTimerLateMicros": 11361,
+          "intervalMicros": 59999402,
+          "cpuMicros": 5718750,
+          "gcPauses": [
+            7,
+            3,
+            0,
+            0,
+            0,
+            0
+          ],
+          "runnableDelays": [
+            1360,
+            36,
+            3,
+            0,
+            0,
+            0
+          ],
+          "dispatchMaxMicros": 0,
+          "slowDispatch": null
+        },
+        {
+          "time": "2026-11-04T20:35:51.1932452Z",
+          "timerLateMicros": 1000,
+          "samplerTimerLateMicros": 17449,
+          "intervalMicros": 59999936,
+          "cpuMicros": 5593750,
+          "gcPauses": [
+            9,
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          "runnableDelays": [
+            1480,
+            46,
+            1,
+            0,
+            0,
+            0
+          ],
+          "dispatchMaxMicros": 35429,
+          "slowDispatch": null
+        },
+        {
+          "time": "2026-11-04T20:36:51.1933884Z",
+          "timerLateMicros": 1200,
+          "samplerTimerLateMicros": 29407,
+          "intervalMicros": 60000143,
+          "cpuMicros": 5234375,
+          "gcPauses": [
+            5,
+            5,
+            0,
+            0,
+            0,
+            0
+          ],
+          "runnableDelays": [
+            1391,
+            26,
+            1,
+            0,
+            0,
+            0
+          ],
+          "dispatchMaxMicros": 0,
+          "slowDispatch": null
+        },
+        {
+          "time": "2026-11-04T20:37:51.1935952Z",
+          "timerLateMicros": 9561,
+          "samplerTimerLateMicros": 19735,
+          "intervalMicros": 60000206,
+          "cpuMicros": 6562500,
+          "gcPauses": [
+            10,
+            2,
+            0,
+            0,
+            0,
+            0
+          ],
+          "runnableDelays": [
+            1996,
+            64,
+            5,
+            0,
+            0,
+            0
+          ],
+          "dispatchMaxMicros": 39962,
+          "slowDispatch": null
+        }
+      ]
+    }
+  },
+  "conclusions": [
+    "All 14 new matched pairs ended OK. Both protected services/input health remain READY on the original shared connection; no new reconnect, fault, poison, timeout or recovery event in retained g526 events. Historical lastFailure entries predate this build.",
+    "Observed A capture maximum decreased from 808.306ms (15 g525 complete pairs) to 114.197ms (14 g526 complete pairs); worker activation maximum decreased from 711.814ms to 95.191ms. No >200ms A capture appears in these 14 g526 pairs.",
+    "A capture median increased from 45.087ms to 60.1245ms; worker activation median increased from 40.391ms to 50.623ms. This is an observed reduction of the extreme tail, not a general median latency improvement.",
+    "B preparation remains similar (maximum 32.532ms ->32.414ms); B worst input dispatch maximum is 26.928ms ->15.657ms.",
+    "The largest g526 capture sample includes 40.572ms request delivery, 64.183ms worker activation, 0.303ms reply delivery and 0.041ms caller resumption. These are same-PC adjacent spans; the total capture scope also includes caller-side work outside the clock chain.",
+    "The separate largest worker activation sample is 95.191ms, including a measured 42.670ms foreground request. Across this trial the largest foreground request is 55.822ms. Native window/foreground work and occasional caller request scheduling remain targets.",
+    "A continues to show CPU pressure: a nearby 64-window trail has a 98.788 percent median and 46/64 >=95 percent busy. The g525 worst-near trail had 64/64 >=95 percent busy. Neither CPU load nor foreground application/movement is controlled.",
+    "A later agent GC observation records one >100ms and <=1s GC-pause bucket. It is separate from measured capture maxima and does not establish a worker GC cause; no connection failure accompanied it."
+  ],
+  "limits": [
+    "Small unequal samples and different foreground/CPU load prevent attributing the entire maximum reduction to the +1 source input-thread hint.",
+    "Complete profile timestamps mark lease completion, not activation start. Runtime GC/CPU trails are interval observations; they cannot prove exact OS ready-versus-blocked time inside a native API.",
+    "Median did not improve. The original 808ms tail did not recur in this trial, which does not prove it cannot recur in longer use.",
+    "No new source edit or notebook update was made in this read-only analysis. Existing g526 scheduling mitigation remains applied."
+  ],
+  "validation": [
+    "Live doctor exact g526 revision and both READY states verified.",
+    "Original matching connection verified against installation baseline. Current-build deduplication and historical-vs-new failure times verified.",
+    "Fourteen complete exchange pairs, measured eight-part IPC clocks and profile frame/histogram totals verified.",
+    "Local evidence JSON parses successfully and git diff --check passed."
+  ],
+  "skipped": "Unit tests, race, vet, rebuild, reinstall, push and remote CI were not repeated: runtime source is unchanged; this commit records observed diagnostics only.",
+  "sourceOfTruthChanged": "This experiment evidence report only; architecture and runtime/authority policy unchanged.",
+  "apiDBRunner": "No API, wire, schema, DB, dependency or runner changes."
+}
