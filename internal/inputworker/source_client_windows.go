@@ -302,6 +302,10 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 	stage = "write"
 	started = time.Now()
 	requestStarted := started
+	var activationSent uint64
+	if op == sourceActivate {
+		activationSent = workerIPCTick()
+	}
 	writeErr := writeSourceCommand(c.channel.stream, data[:], limit)
 	sample[2] = timingBucket(time.Since(started))
 	if op == sourceActivate {
@@ -334,6 +338,10 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 	stage = "response"
 	started = time.Now()
 	reply, known, observed := waitSourceReplyObserved(ctx, timer.C, c.replies, c.done)
+	var activationResumed uint64
+	if op == sourceActivate {
+		activationResumed = workerIPCTick()
+	}
 	replyOutcome = observed
 	sample[3] = timingBucket(time.Since(started))
 	if op == sourceActivate {
@@ -345,6 +353,12 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 			copy(sample[4:], reply.timing[:])
 			if op == sourceActivate {
 				handoff.RecordCaptureWorkerExactDetails(ctx, reply.timing, reply.capture, reply.captureExact)
+				clocks := [handoff.CaptureIPCStageCount + 1]uint64{activationSent}
+				if reply.captureIPC != nil {
+					copy(clocks[1:7], reply.captureIPC.clocks[:])
+					clocks[7], clocks[8] = reply.captureIPC.received, activationResumed
+					handoff.RecordCaptureIPC(ctx, handoff.CaptureIPCFromClocks(clocks))
+				}
 			}
 		}
 		if err == ErrProtocol {
@@ -536,6 +550,9 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 		reader := newSourcePacketReader(channel.stream)
 		for {
 			p, err := readSourcePacket(reader)
+			if err == nil && p.captureIPC != nil {
+				p.captureIPC.received = workerIPCTick()
+			}
 			if err != nil {
 				live.err = err
 				return

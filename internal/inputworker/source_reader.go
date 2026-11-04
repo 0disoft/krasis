@@ -66,8 +66,14 @@ func readSourceCommandAuthorized(reader io.Reader, local context.Context, bindin
 	if p.kind != sourceCommand || p.binding != binding || p.sequence != previous+1 {
 		return sourcePacket{}, &sourceReaderFailure{operation: "source-reader-invalid", cause: ErrProtocol}
 	}
+	if p.op == sourceActivate {
+		p.captureIPC = &sourceActivationTrace{clocks: sourceActivationClocks{workerIPCTick()}}
+	}
 	if err := authorize(p.op); err != nil {
 		return sourcePacket{}, &sourceReaderFailure{operation: "source-reader-authority", cause: err}
+	}
+	if p.op == sourceActivate {
+		p.captureIPC.clocks[1] = workerIPCTick()
 	}
 	return p, nil
 }

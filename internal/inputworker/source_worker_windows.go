@@ -92,6 +92,10 @@ func (w *sourceWriter) writePacketContextChecked(ctx context.Context, p sourcePa
 	}
 	w.gateStage(origin, sourceGatePrepare)
 	defer w.unlockGate()
+	var activationGate uint64
+	if p.kind == sourceReply && p.op == sourceActivate {
+		activationGate = workerIPCTick()
+	}
 	if !w.started.Load() && (p.kind == sourceAction || p.kind == sourceBoundary || p.kind == sourceReturn) {
 		return nil
 	}
@@ -119,7 +123,11 @@ func (w *sourceWriter) writePacketContextChecked(ctx context.Context, p sourcePa
 		writeDone = progress.measure(heartbeatReplyWrite)
 	}
 	w.gateStage(origin, sourceGateWrite)
-	err = w.writeSequenced(ctx, data[:], p.sequence, origin)
+	wire := data[:]
+	if p.kind == sourceReply && p.op == sourceActivate && p.captureIPC != nil {
+		wire = appendSourceActivationIPC(data, p.captureIPC.clocks, activationGate, workerIPCTick())
+	}
+	err = w.writeSequenced(ctx, wire, p.sequence, origin)
 	writeDone()
 	if progress != nil && err == nil {
 		progress.stage = heartbeatReplied
@@ -357,7 +365,10 @@ func runSourceCapture(ctx context.Context, channel, service *Channel, lease Leas
 	}()
 	exit.Command = "ok"
 	requests := make(chan sourcePacket, 1)
-	completed := make(chan struct{})
+	// Retain ordered reader admission without forcing the dispatcher to wait
+	// for the reader to be scheduled after every completed ACK. At most one
+	// command is outstanding, so a single completion slot is sufficient.
+	completed := make(chan struct{}, 1)
 	readDone := make(chan error, 1)
 	go func() {
 		readDone <- pumpSourceCommandsOrdered(run, read, requests, cancel, completed, writer.handleSourceMaintenance)
@@ -394,6 +405,11 @@ func runSourceCapture(ctx context.Context, channel, service *Channel, lease Leas
 				response := sourcePacket{kind: sourceReply, op: p.op, reply: p.sequence}
 				var activation *sourceActivationFence
 				if p.op == sourceActivate {
+					response.captureIPC = &sourceActivationTrace{}
+					if p.captureIPC != nil {
+						response.captureIPC.clocks = p.captureIPC.clocks
+					}
+					response.captureIPC.clocks[2] = workerIPCTick()
 					activation = writer.beginActivation(p.sequence)
 				}
 				operation := func() error {
@@ -463,6 +479,9 @@ func runSourceCapture(ctx context.Context, channel, service *Channel, lease Leas
 				// State retirement operates on the existing native owner. It must
 				// remain available while the desktop is between Default/Winlogon.
 				timing, err := executeSourceCommand(commandContext, p.op, hook.ExecuteSourceDesktop, operation)
+				if p.op == sourceActivate {
+					response.captureIPC.clocks[3] = workerIPCTick()
+				}
 				response.timing = timing
 				err = sourceCommandFailed(p.op, err)
 				if exit.Command == "not_started" || exit.Command == "ok" {

@@ -975,3 +975,27 @@ Every new connection still performs full service authentication; no lease or
 input command is replayed. Unknown/denied authentication, emergency, cleanup
 failure and cancellation cannot arm or consume this retry policy. Late successful
 opens are closed on cancellation. Diagnostics distinguish rebind wait/readiness.
+
+## g525 matching source activation IPC observations
+
+Source activation ACKs may carry one optional 48-byte suffix, flagged by the
+otherwise unused activation pressed-evidence byte (0x80). The original 64-byte
+header and suffix are submitted in one write under the same owner proof, gate,
+sequence and deadline. All other frames remain 64 bytes. New readers accept
+legacy ACKs; old readers reject the extension, so installed worker/app revision
+matching remains mandatory. A truncated suffix fails framing; zero/reversed
+clocks discard diagnostics only and cannot change an authenticated outcome.
+
+Six same-PC QPC observations cover command read, read-side owner admission,
+dispatcher entry, activation execution return, reply gate admission and write
+entry. The app adds request-write entry, decoded-reply receipt and caller
+resumption, producing eight adjacent spans in the matching capture profile.
+The write-entry/decoded-receipt span includes native write, local transport,
+decoding and reader scheduling; it is not a pure kernel write-duration metric.
+No cross-device clocks are subtracted and raw QPC values are not exported.
+
+The serial reader still waits for each native command's completion before
+reading another command. A single buffered completion slot lets the dispatcher
+publish that completion without a second rendezvous with the reader's scheduler.
+There is still at most one outstanding command; heartbeat ordering, authority,
+epoch fencing, uncertain-write no-replay and exact retirement are unchanged.

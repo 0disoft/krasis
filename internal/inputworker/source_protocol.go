@@ -48,9 +48,13 @@ type sourcePacket struct {
 	timing           [3]byte               // Activation or heartbeat reply; fixed operation-specific buckets.
 	capture          handoff.CaptureNative // Only an activation reply; never input or authority.
 	captureExact     handoff.CaptureNativeExact
+	captureIPC       *sourceActivationTrace // Only activation; never input or authority.
 }
 
 func (p sourcePacket) valid() bool {
+	if p.captureIPC != nil && (p.op != sourceActivate || p.kind != sourceReply && p.kind != sourceCommand) {
+		return false
+	}
 	if p.sequence == 0 || p.binding == (Binding{}) || p.status > 1 &&
 		!(p.status == sourceCursorUnavailable && p.kind == sourceReply && p.op == sourceCursorPrepare) {
 		return false
@@ -139,6 +143,10 @@ func readSourcePacket(r io.Reader) (sourcePacket, error) {
 	}
 	p := sourcePacket{kind: data[4], op: data[5], status: data[6], sequence: binary.BigEndian.Uint64(data[8:16]), reply: binary.BigEndian.Uint64(data[32:40]), x: int32(binary.BigEndian.Uint32(data[52:56]))}
 	activationReply := p.kind == sourceReply && p.op == sourceActivate
+	extended := activationReply && data[56] == sourceActivationIPCFlag
+	if extended {
+		data[56] = 0
+	}
 	if activationReply && data[7] != 0 {
 		return sourcePacket{}, ErrProtocol
 	}
@@ -178,6 +186,19 @@ func readSourcePacket(r io.Reader) (sourcePacket, error) {
 	}
 	if !p.valid() {
 		return sourcePacket{}, ErrProtocol
+	}
+	if extended {
+		var tail [sourceActivationIPCSize]byte
+		if _, err := io.ReadFull(r, tail[:]); err != nil {
+			return sourcePacket{}, err
+		}
+		var clocks sourceActivationClocks
+		for i := range clocks {
+			clocks[i] = binary.BigEndian.Uint64(tail[i*8:])
+		}
+		if clocks.usable() {
+			p.captureIPC = &sourceActivationTrace{clocks: clocks}
+		}
 	}
 	return p, nil
 }

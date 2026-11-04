@@ -41,10 +41,11 @@ type CaptureProfile struct {
 	Worker   [3]byte                   `json:"worker"`          // Matching activation ACK buckets; 0 is unobserved.
 	Native   CaptureNative             `json:"native,omitzero"` // Matching owner-thread stages, separate from agent spans.
 	Exact    CaptureNativeExact        `json:"exact,omitzero"`  // Three matching owner spans; independent of the bucket mask.
+	IPC      CaptureIPC                `json:"ipc,omitzero"`
 }
 
 func (p CaptureProfile) Valid() bool {
-	if p.Schema != 1 || p.Measured>>CaptureStageCount != 0 {
+	if p.Schema != 1 || p.Measured>>CaptureStageCount != 0 || !p.IPC.Valid() || p.IPC.Measured && p.Measured&(1<<CaptureIPCResponse) == 0 {
 		return false
 	}
 	if p.Worker[0] != 0 || !p.Native.Valid() || !p.Exact.Valid() || (p.Worker != ([3]byte{}) || p.Native != (CaptureNative{})) && p.Measured&(1<<CaptureIPCResponse) == 0 {
