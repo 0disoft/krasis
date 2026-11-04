@@ -303,10 +303,16 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 	started = time.Now()
 	requestStarted := started
 	var activationSent uint64
+	var activationSubmitted, activationReturned uint64
+	var submission *uint64
 	if op == sourceActivate {
 		activationSent = workerIPCTick()
+		submission = &activationSubmitted
 	}
-	writeErr := writeSourceCommand(c.channel.stream, data[:], limit)
+	writeErr := writeSourceCommand(c.channel.stream, data[:], limit, submission)
+	if op == sourceActivate {
+		activationReturned = workerIPCTick()
+	}
 	sample[2] = timingBucket(time.Since(started))
 	if op == sourceActivate {
 		handoff.RecordCapture(ctx, handoff.CaptureIPCWrite, time.Since(started))
@@ -357,7 +363,11 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 				if reply.captureIPC != nil {
 					copy(clocks[1:7], reply.captureIPC.clocks[:])
 					clocks[7], clocks[8] = reply.captureIPC.received, activationResumed
-					handoff.RecordCaptureIPC(ctx, handoff.CaptureIPCFromClocks(clocks))
+					ipc := handoff.CaptureIPCFromClocks(clocks)
+					if ipc.Measured {
+						ipc.Request = handoff.CaptureRequestFromClocks(activationSent, activationSubmitted, activationReturned, clocks[1])
+					}
+					handoff.RecordCaptureIPC(ctx, ipc)
 				}
 			}
 		}

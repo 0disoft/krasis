@@ -632,12 +632,10 @@ func (current *sourceWheelCaptureRun) activateWindowProfile(profile context.Cont
 	if err := current.err(); err != nil {
 		return err
 	}
-	stopUpdate := handoff.CaptureSpan(profile, handoff.CaptureUpdate)
-	procUpdateWindowTouchpad.Call(current.window)
-	stopUpdate()
-	if err := current.err(); err != nil {
-		return err
-	}
+	// Let the owner message loop paint normally. Forcing WM_PAINT here adds
+	// synchronous window work before focus, although this layered popup needs
+	// no rendered content to own touchpad input. Foreground is still freshly
+	// verified below before capture becomes active; alpha/hit testing is unchanged.
 	if sourceWheelCaptureGetForeground() == 0 && missingForegroundStage == nil {
 		missingForegroundStage = ErrSourceForegroundMissingAfterShow
 	}

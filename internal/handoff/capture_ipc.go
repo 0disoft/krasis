@@ -11,15 +11,16 @@ import (
 const CaptureIPCStageCount = 8
 
 type CaptureIPC struct {
-	Measured                bool   `json:"measured"`
-	RequestDeliveryMicros   uint32 `json:"requestDeliveryMicros"`
-	ReadAuthorizationMicros uint32 `json:"readAuthorizationMicros"`
-	DispatchMicros          uint32 `json:"dispatchMicros"`
-	ActivationMicros        uint32 `json:"activationMicros"`
-	ReplyAdmissionMicros    uint32 `json:"replyAdmissionMicros"`
-	ReplyEncodeMicros       uint32 `json:"replyEncodeMicros"`
-	ReplyDeliveryMicros     uint32 `json:"replyDeliveryMicros"`
-	CallerResumeMicros      uint32 `json:"callerResumeMicros"`
+	Measured                bool           `json:"measured"`
+	RequestDeliveryMicros   uint32         `json:"requestDeliveryMicros"`
+	ReadAuthorizationMicros uint32         `json:"readAuthorizationMicros"`
+	DispatchMicros          uint32         `json:"dispatchMicros"`
+	ActivationMicros        uint32         `json:"activationMicros"`
+	ReplyAdmissionMicros    uint32         `json:"replyAdmissionMicros"`
+	ReplyEncodeMicros       uint32         `json:"replyEncodeMicros"`
+	ReplyDeliveryMicros     uint32         `json:"replyDeliveryMicros"`
+	CallerResumeMicros      uint32         `json:"callerResumeMicros"`
+	Request                 CaptureRequest `json:"request,omitzero"`
 }
 
 func (p CaptureIPC) Valid() bool {
@@ -30,7 +31,7 @@ func (p CaptureIPC) Valid() bool {
 	for _, n := range [...]uint32{p.RequestDeliveryMicros, p.ReadAuthorizationMicros, p.DispatchMicros, p.ActivationMicros, p.ReplyAdmissionMicros, p.ReplyEncodeMicros, p.ReplyDeliveryMicros, p.CallerResumeMicros} {
 		total += uint64(n)
 	}
-	return total <= uint64(Window.Microseconds())
+	return total <= uint64(Window.Microseconds()) && p.Request.valid(p.RequestDeliveryMicros)
 }
 
 // Clocks are observations only. Missing/reversed/out-of-window clocks discard
@@ -46,7 +47,7 @@ func CaptureIPCFromClocks(clocks [CaptureIPCStageCount + 1]uint64) CaptureIPC {
 		}
 		spans[i] = uint32(clocks[i+1] - clocks[i])
 	}
-	return CaptureIPC{true, spans[0], spans[1], spans[2], spans[3], spans[4], spans[5], spans[6], spans[7]}
+	return CaptureIPC{Measured: true, RequestDeliveryMicros: spans[0], ReadAuthorizationMicros: spans[1], DispatchMicros: spans[2], ActivationMicros: spans[3], ReplyAdmissionMicros: spans[4], ReplyEncodeMicros: spans[5], ReplyDeliveryMicros: spans[6], CallerResumeMicros: spans[7]}
 }
 
 func RecordCaptureIPC(ctx context.Context, ipc CaptureIPC) {

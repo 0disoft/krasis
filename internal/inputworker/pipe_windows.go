@@ -273,7 +273,11 @@ func (pipe *pipeConn) writeServiceResponse(data []byte, offset int) (int, error)
 	return pipe.write(data, offset)
 }
 
-func (pipe *pipeConn) write(data []byte, serviceOffset int) (int, error) {
+func (pipe *pipeConn) writeSourceActivation(data []byte, submitted *uint64) (int, error) {
+	return pipe.write(data, -1, submitted)
+}
+
+func (pipe *pipeConn) write(data []byte, serviceOffset int, submitted ...*uint64) (int, error) {
 	pipe.writeMu.Lock()
 	defer pipe.writeMu.Unlock()
 	if err := pipe.start(); err != nil {
@@ -288,6 +292,14 @@ func (pipe *pipeConn) write(data []byte, serviceOffset int) (int, error) {
 		if serviceOffset >= 0 {
 			stampServiceSubmission(data, serviceOffset, workerIPCTick())
 			if deadline := pipe.deadline(false); !deadline.IsZero() && !time.Now().Before(deadline) {
+				return pipeAdmissionFailure(false, os.ErrDeadlineExceeded)
+			}
+		}
+		if len(submitted) > 0 && submitted[0] != nil {
+			*submitted[0] = workerIPCTick()
+			// Timing is best effort; it cannot extend admission past the budget.
+			if deadline := pipe.deadline(false); !deadline.IsZero() && !time.Now().Before(deadline) {
+				*submitted[0] = 0
 				return pipeAdmissionFailure(false, os.ErrDeadlineExceeded)
 			}
 		}

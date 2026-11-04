@@ -37,17 +37,30 @@ type sourceIOFailure struct {
 func (e *sourceIOFailure) Error() string { return "source command write failed" }
 func (e *sourceIOFailure) Unwrap() error { return e.cause }
 
-func writeSourceCommand(stream net.Conn, data []byte, deadline time.Time) error {
+func writeSourceCommand(stream net.Conn, data []byte, deadline time.Time, submitted ...*uint64) error {
 	if err := stream.SetWriteDeadline(deadline); err != nil {
 		return &sourceIOFailure{stage: "deadline", cause: errors.Join(ErrAuthority, err)}
 	}
-	return writeSourceBytes(stream, data)
+	return writeSourceBytes(stream, data, submitted...)
 }
 
 // The caller has configured its deadline and owns the serial write gate.
-func writeSourceBytes(stream net.Conn, data []byte) error {
+func writeSourceBytes(stream net.Conn, data []byte, submitted ...*uint64) error {
 	unsubmitted := false
-	n, err := stream.Write(data)
+	var n int
+	var err error
+	if len(submitted) > 0 && submitted[0] != nil {
+		*submitted[0] = 0
+		if native, ok := stream.(interface {
+			writeSourceActivation([]byte, *uint64) (int, error)
+		}); ok {
+			n, err = native.writeSourceActivation(data, submitted[0])
+		} else {
+			n, err = stream.Write(data)
+		}
+	} else {
+		n, err = stream.Write(data)
+	}
 	partial := n > 0 && n < len(data)
 	if n == 0 && err != nil {
 		var proof *unsubmittedPipeWrite
