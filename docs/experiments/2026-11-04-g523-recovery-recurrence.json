@@ -1,0 +1,139 @@
+{
+  "schema": "krasis.incident-review/v1",
+  "generation": 523,
+  "revision": "0af2c8f63228129cb8596cd2535c8ef07571ba7b",
+  "date": "2026-11-04",
+  "timezone": "Asia/Seoul",
+  "beforeCollection": "84538fa8fe5ce30ec6f36630fad9ecb3",
+  "restoredCollection": "9f9f2f5379967e2c6c7be1c682e34204",
+  "before": {
+    "A": {
+      "created": "2026-11-04T13:46:49Z",
+      "sha256": "21f71ad750aa1ba8b85dd30d34b9deaa156529b397138133013186101dc1c019",
+      "service": "READY",
+      "inputHealth": "READY",
+      "recovery": {
+        "time": "2026-11-04T13:46:34.7426738Z",
+        "code": "agent_faulted",
+        "agentState": "FAULTED",
+        "lastFailure": {
+          "time": "2026-11-04T13:46:34.7426738Z",
+          "code": "agent_faulted",
+          "agentState": "FAULTED"
+        }
+      },
+      "logs": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false,
+          "from": "2026-11-04T12:08:08.2830387Z",
+          "to": "2026-11-04T13:12:02.8214151Z"
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false,
+          "from": "2026-11-04T13:12:08.3249318Z",
+          "to": "2026-11-04T13:23:09.9125675Z"
+        }
+      ]
+    },
+    "B": {
+      "created": "2026-11-04T13:46:47Z",
+      "sha256": "d3d1e684f1cab330735ce4e7ba34acfaa50b06dea92e83b94dd7aa0249d5a2bb",
+      "service": "READY",
+      "inputHealth": "READY",
+      "recovery": {
+        "time": "2026-11-04T13:46:08.8375685Z",
+        "code": "agent_present",
+        "agentState": "RECONNECTING",
+        "lastFailure": {
+          "time": "2026-11-04T08:21:08.3372368Z",
+          "code": "agent_faulted",
+          "agentState": "FAULTED"
+        }
+      },
+      "logs": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false,
+          "from": "2026-11-04T12:22:54.9187224Z",
+          "to": "2026-11-04T13:28:25.4062202Z"
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false,
+          "from": "2026-11-04T13:28:33.273051Z",
+          "to": "2026-11-04T13:46:37.9622444Z"
+        }
+      ]
+    }
+  },
+  "failure": {
+    "timeUTC": "2026-11-04T13:23:09.3042395Z",
+    "timeKST": "2026-11-04 22:23:09",
+    "sourceExit": {
+      "time": "2026-11-04T13:23:09.3042395Z",
+      "command": "ok",
+      "reader": "authority",
+      "capture": "joined",
+      "sender": "joined",
+      "interrupt": "joined",
+      "retirement": "clean_sent",
+      "report": "failed",
+      "failure": {
+        "operation": "source-service-query-deadline-checking",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "heartbeatStage": "replied",
+      "heartbeatSlowStage": "reply_gate",
+      "heartbeatSlowBucket": 3
+    },
+    "agentFault": "fault_source_hook_failed",
+    "sourcePresenceDeadlineSeconds": 1,
+    "finalTrailTime": "2026-11-04T13:23:09.6758451Z",
+    "cpuSamples": 64,
+    "cpuSamplesAtLeast95Percent": 61,
+    "maxTrailTimerLateMs": 685.582,
+    "maxSummarySamplerLateMs": 875.613
+  },
+  "diagnosis": [
+    "A source service-presence query expired while its native check was in progress. The source worker retired; the agent then failed to reopen the source pipe and latched FAULTED. B continued reconnecting while A no longer accepted its input connection.",
+    "Both services and input health were READY, and all three capture/sender/interrupt joins completed. This incident does not show recurrence of an unjoined capture thread or stopped SCM service with exit 1066.",
+    "61 of 64 final A system CPU windows are at least 95 percent busy. Host CPU pressure plausibly delayed authority queries and source rebinding, but these records cannot distinguish native query blocking from scheduler delay or identify the process consuming CPU."
+  ],
+  "recovery": {
+    "method": "CLI safe-stop, verified A UI process restart through registered relaunch, CLI connect B, existing B reconnect resumed. No elevated repair, service restart, source edit or reinstall.",
+    "initialDirectConnect": "REJECTED session_failed",
+    "peerConnectRequests": "busy because B already owned an active reconnect session",
+    "doctor": "healthy",
+    "connectionMatched": true,
+    "devices": {
+      "A": {
+        "created": "2026-11-04T13:51:01Z",
+        "sha256": "9e8db338b7cf24c1132a0d6fa2acb4479779fc46b9c7c83c925b8a10b6fa329d",
+        "service": "READY",
+        "inputHealth": "READY",
+        "connectedAt": "2026-11-04T13:50:40.0797115Z",
+        "failuresAfterConnect": []
+      },
+      "B": {
+        "created": "2026-11-04T13:50:57Z",
+        "sha256": "015d1859fde6248e18d483d1196300ad636c928eb31fef1e86cdcec53d870df1",
+        "service": "READY",
+        "inputHealth": "READY",
+        "connectedAt": "2026-11-04T13:50:36.0211587Z",
+        "failuresAfterConnect": []
+      }
+    }
+  },
+  "validation": [
+    "Both sanitized diagnostic collections saved with SHA256 checksums.",
+    "Exact current generation/revision and healthy doctor checked; both protected services/input health READY and shared CONNECTED identity verified.",
+    "Native query deadline and agent fault latch verified in source_read_authority.go and residentagent/operations.go. System CPU calculation checked in runtime_gc_os.go."
+  ],
+  "skipped": "No unit/race/build/installation/remote CI rerun: runtime inspection and operational recovery only. No new physical crossing trial.",
+  "limits": "Connection restoration is verified, recurrence prevention is not. CPU ownership and exact native check substage require further tracing. No timeout increase or authority bypass applied.",
+  "sourceOfTruthChanged": "This incident evidence report only.",
+  "apiDBRunner": "No API, protocol, DB, dependency or runner change. No push or release."
+}
