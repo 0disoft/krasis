@@ -1,0 +1,225 @@
+{
+  "schema": "krasis.source-activation-partition-review/v1",
+  "date": "2026-11-05",
+  "generation": 525,
+  "revision": "8a3c8db6554690a9a89f62a4835cffb2fedc7af2",
+  "collection": "8b7fea75488c5b39dac694b6b4eae768",
+  "baselineCollection": "4ea7920a92b73a26e2df935dc7896898",
+  "selection": "Exclude installation baseline tags. Match exact A-source/B-receiver exchange tags. Use only both-complete OK pairs for comparative latency statistics.",
+  "userCompletionReceiptReceived": false,
+  "pairs": {
+    "matched": 3,
+    "complete": 2
+  },
+  "excludedIncompletePairs": 1,
+  "devices": {
+    "A": {
+      "created": "2026-11-04T20:09:33Z",
+      "sha256": "56b697515096a244252959d792bf162ecbaebea38afde6515853d1bc789c4a99",
+      "lastFailure": {
+        "time": "2026-11-04T13:49:32.1562048Z",
+        "code": "agent_faulted",
+        "agentState": "FAULTED"
+      },
+      "service": "READY",
+      "inputHealth": "READY",
+      "failuresSinceInstalledConnection": [],
+      "connectedAt": "2026-11-04T20:05:09.6085094Z"
+    },
+    "B": {
+      "created": "2026-11-04T20:09:30Z",
+      "sha256": "c7726871e8a01d2028432eb3a6b92f00172578f66bc73c503e524f495bfb4305",
+      "lastFailure": {
+        "time": "2026-11-04T08:21:08.3372368Z",
+        "code": "agent_faulted",
+        "agentState": "FAULTED"
+      },
+      "service": "READY",
+      "inputHealth": "READY",
+      "failuresSinceInstalledConnection": [],
+      "connectedAt": "2026-11-04T20:05:05.2027534Z"
+    }
+  },
+  "sharedConnectionMatched": true,
+  "metrics": {
+    "aCapture": {
+      "n": 2,
+      "medianMs": 91.5935,
+      "maxMs": 138.1
+    },
+    "aIPCWait": {
+      "n": 2,
+      "medianMs": 91.0665,
+      "maxMs": 137.59
+    },
+    "aGrant": {
+      "n": 2,
+      "medianMs": 57.8855,
+      "maxMs": 60.247
+    },
+    "bPreparation": {
+      "n": 2,
+      "medianMs": 29.694499999999998,
+      "maxMs": 32.532
+    },
+    "bInput": {
+      "n": 2,
+      "medianMs": 20.645,
+      "maxMs": 26.928
+    }
+  },
+  "ipc": {
+    "samples": 2,
+    "stats": {
+      "requestDeliveryMicros": {
+        "n": 2,
+        "medianMs": 0.8155,
+        "maxMs": 1.558
+      },
+      "readAuthorizationMicros": {
+        "n": 2,
+        "medianMs": 0.14150000000000001,
+        "maxMs": 0.194
+      },
+      "dispatchMicros": {
+        "n": 2,
+        "medianMs": 0.1245,
+        "maxMs": 0.218
+      },
+      "activationMicros": {
+        "n": 2,
+        "medianMs": 86.34450000000001,
+        "maxMs": 128.489
+      },
+      "replyAdmissionMicros": {
+        "n": 2,
+        "medianMs": 0.68,
+        "maxMs": 1.284
+      },
+      "replyEncodeMicros": {
+        "n": 2,
+        "medianMs": 0.0025,
+        "maxMs": 0.003
+      },
+      "replyDeliveryMicros": {
+        "n": 2,
+        "medianMs": 1.102,
+        "maxMs": 2.091
+      },
+      "callerResumeMicros": {
+        "n": 2,
+        "medianMs": 1.8704999999999998,
+        "maxMs": 3.667
+      }
+    }
+  },
+  "slowest": [
+    {
+      "time": "2026-11-04T20:08:17.0216393Z",
+      "tag": "c80aebb24c0c5680a1110138488cbc5e8614590ee9081abd2386567c99bde24d",
+      "captureMs": 138.1,
+      "ipcWaitMs": 137.59,
+      "ipc": {
+        "measured": true,
+        "requestDeliveryMicros": 1558,
+        "readAuthorizationMicros": 194,
+        "dispatchMicros": 218,
+        "activationMicros": 128489,
+        "replyAdmissionMicros": 1284,
+        "replyEncodeMicros": 3,
+        "replyDeliveryMicros": 2091,
+        "callerResumeMicros": 3667
+      },
+      "native": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        3,
+        1,
+        3,
+        0,
+        2,
+        3,
+        4,
+        0,
+        4,
+        0,
+        3
+      ],
+      "exact": {
+        "foregroundRequestMicros": 72162,
+        "measured": 7
+      }
+    },
+    {
+      "time": "2026-11-04T20:07:23.8308169Z",
+      "tag": "67881fbe28913b948934b22b0c299434a076d398182f5987b6d0f4d914907181",
+      "captureMs": 45.087,
+      "ipcWaitMs": 44.543,
+      "ipc": {
+        "measured": true,
+        "requestDeliveryMicros": 73,
+        "readAuthorizationMicros": 89,
+        "dispatchMicros": 31,
+        "activationMicros": 44200,
+        "replyAdmissionMicros": 76,
+        "replyEncodeMicros": 2,
+        "replyDeliveryMicros": 113,
+        "callerResumeMicros": 74
+      },
+      "native": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        2,
+        1,
+        3,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        1
+      ],
+      "exact": {
+        "foregroundRequestMicros": 39006,
+        "measured": 7
+      }
+    }
+  ],
+  "previousG524": {
+    "completePairs": 7,
+    "captureMedianMs": 110.562,
+    "captureMaxMs": 211.696,
+    "ipcWaitMaxMs": 209.692,
+    "source": "2026-11-04-g524-paired-crossing-review.json"
+  },
+  "conclusions": [
+    "At the current largest complete sample (138.100ms capture, 137.590ms response wait), source worker activation takes 128.489ms, including 72.162ms measured foreground request. Reply delivery takes 2.091ms and waiting caller resumption 3.667ms.",
+    "Worker activation is 93.4 percent of this same-PC clock chain (137.504ms from command-write entry through caller resumption); the old aggregate response wait should not be interpreted as network latency.",
+    "This sample localizes the dominant current delay inside A native/desktop activation, not reply admission/transport or app-waiter resumption. Native Show and after-boundary buckets also contain >=10ms spans; exact attribution beyond the foreground request is not available.",
+    "Both services/input health remain READY and share the same installed connection. No retained new-build reconnect, fault, poison, timeout or recovery event after installation connection was found. LastFailure timestamps precede the g525 install."
+  ],
+  "limits": [
+    "Only two complete pairs; a third matched incomplete pair is excluded, not erased or labeled a fault. The user has not yet sent a trial-completion receipt.",
+    "The previous 211.696ms tail was not reproduced. Different movement/foreground-app/CPU load prevents a controlled causal or percentage-improvement claim.",
+    "Native API wall time includes execution and scheduling/resumption; 72.162ms does not prove 72.162ms of CPU work inside SetForegroundWindow.",
+    "One possible completion rendezvous per command was removed, but its individual millisecond gain is not established by these samples.",
+    "No further focus/suppression policy change was made on two samples; early capture ACKs or skipped foreground verification would change precision-wheel guarantees."
+  ],
+  "validation": [
+    "Exact installed revision and current-build, deduplicated support analysis verified.",
+    "Optional IPC measured presence, eight nonnegative integer durations and <=120-second sum verified.",
+    "No cross-device wall-clock subtraction. Old recovery.lastFailure entries distinguished from current faults."
+  ],
+  "push": "Not performed; not requested",
+  "remoteCI": "Not run; local tests/vet/race/build/install completed"
+}
