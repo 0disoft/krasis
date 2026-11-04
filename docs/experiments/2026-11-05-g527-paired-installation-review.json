@@ -1,0 +1,93 @@
+{
+  "schema": "krasis.paired-installation-review/v1",
+  "generation": 527,
+  "revision": "259b1923f763e5c6cd5fe5e8857332191f591b7a",
+  "date": "2026-11-05",
+  "beforeInstallCollection": "d8f8d22385911fd1ee0bd5010c6d3fb4",
+  "collection": "9d7a11c4a41c38b33ef00b759e5a84bb",
+  "devices": {
+    "A": {
+      "created": "2026-11-04T21:01:25Z",
+      "sha256": "51a07e2ddd2493854acb3ae71147e2e52d185d27d70051bf87c9346018526192",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "connectedAt": "2026-11-04T21:00:40.9907049Z",
+      "failuresSinceConnection": [],
+      "installation": {
+        "time": "2026-11-04T20:59:56.5496247Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "uiLaunchRecordCurrentRevision": true
+    },
+    "B": {
+      "created": "2026-11-04T21:01:22Z",
+      "sha256": "2d39248ec030195b9ab4b7c90e3bd968ff69c3bcc2b9f7a111b8172e448d63ca",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "connectedAt": "2026-11-04T21:00:36.5312233Z",
+      "failuresSinceConnection": [],
+      "installation": {
+        "time": "2026-11-04T21:00:28.1577739Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "uiLaunchRecordCurrentRevision": true
+    }
+  },
+  "connection": {
+    "state": "CONNECTED",
+    "sharedConnectionMatched": true,
+    "method": "CLI app connect B, matched both authenticated support bundles"
+  },
+  "peerUpdate": {
+    "requestID": "c9dc35f0a4043bee9e3d154ab605ff19",
+    "code": "updated",
+    "bytes": 29030986,
+    "total": 29030986
+  },
+  "changes": [
+    "Remove one forced synchronous UpdateWindow dispatch before capture foreground request; ordinary owner message-loop paint, alpha, hit testing, foreground proof, fallback, rollback and cursor hiding remain.",
+    "Partition source request delivery at native write submission checkpoint; separately record write completion without assuming it precedes worker receipt. Fixed optional JSON metadata; no new wire bytes or roundtrip.",
+    "Clock failures and non-native streams omit only optional details. Existing timeout, authentication, fencing and uncertain-write no-replay rules remain."
+  ],
+  "validation": [
+    "Six related package test suites passed.",
+    "Five related packages passed standard vet; wininput passed its existing -unsafeptr=false policy.",
+    "Selected native submission, activation, focus/window, completion and heartbeat tests passed with race detection.",
+    "12 clock ordering and limit scenarios, nested/outer consistency, four uncertain-write fallback cases and actual Windows pipe frame/expiry behavior passed.",
+    "Workspace frontend tests, build, package and setup verification passed.",
+    "Both installed generations/revisions, protected services and input health READY, same CLI-connected session verified from independent diagnostics."
+  ],
+  "sourceOfTruth": [
+    "docs/adr/0066-product-privileged-input.md",
+    "docs/experiments/2026-11-05-g527-source-activation.md"
+  ],
+  "limits": [
+    "Pre-install g526 collection includes one source heartbeat response failure followed by worker refresh and READY; authenticated connection remained unchanged and no new recovery fault was recorded.",
+    "g526 forced paint buckets were mostly below 1ms, with two 1..<10ms samples. This bounded optimization does not establish that the 55.822ms foreground-request tail or 40.572ms request-delivery tail is solved.",
+    "No attended g527 crossing trial yet. Fresh activation traces are required to quantify submission/reader waits and improvement.",
+    "Underlying foreground API may still block on OS scheduling or another application."
+  ],
+  "apiDBRunner": "Additive fixed nested capture.ipc.request JSON only. No public API signature, DB, dependency, CI runner, private IPC or peer wire change.",
+  "push": "Not requested; not performed",
+  "remoteCI": "Not requested; not run"
+}
