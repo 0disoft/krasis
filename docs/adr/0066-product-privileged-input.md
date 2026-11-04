@@ -999,3 +999,23 @@ reading another command. A single buffered completion slot lets the dispatcher
 publish that completion without a second rendezvous with the reader's scheduler.
 There is still at most one outstanding command; heartbeat ordering, authority,
 epoch fencing, uncertain-write no-replay and exact retirement are unchanged.
+
+## g526 dedicated source-input thread scheduling
+
+The three already locked source OS threads (low-level hooks, Raw Input and
+wheel-capture window) apply a best-effort NORMAL -> ABOVE_NORMAL (+1) thread
+priority hint at startup. These event-driven owners share CPU-saturated desktops
+with ordinary computational work; unlike general interchangeable Go threads,
+their role remains input handling for the full OS-thread lifetime. The Go Windows
+runtime disables dynamic process boosts, so no GUI/I/O boost is assumed here.
+
+Only an observed NORMAL priority is changed. Explicitly lower/higher priorities,
+failed lookup and failed native set preserve existing behavior. The hint is not
+an input authority or readiness/retirement check and introduces no recovery error.
+The existing outer LockOSThread is held until goroutine exit, so Windows retires
+the elevated OS thread rather than returning it to the Go worker pool. Process
+priority, CPU affinity, other workloads, deadlines and focus proof are unchanged.
+
+This mitigates ready-thread competition, not blocked native calls. Reduction of
+the g525 808.306ms capture tail needs an attended CPU-pressure comparison.
+Policy follows [Windows input-thread scheduling guidance](https://learn.microsoft.com/en-us/windows/win32/procthread/scheduling-priorities).

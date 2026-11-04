@@ -209,6 +209,13 @@ func (hook *SourceHook) runWithBoundary(ctx context.Context, session *SourceSess
 func startSourceInputThread(results chan<- sourceInputThreadResult, component string, run func() error) {
 	go func() {
 		runtime.LockOSThread()
+		// These three threads own only low-level input, Raw Input or the capture
+		// window; ordinary Go work never reuses them. Retaining the OS-thread
+		// lock through goroutine exit retires this priority with that thread.
+		// The Go runtime disables dynamic process priority boosts on Windows.
+		// Give these event-driven owners one level over normal CPU work; a
+		// failed hint must not become another source/service recovery failure.
+		promoteSourceInputThread(currentSourceThreadPriority, setSourceThreadPriority)
 		err := run()
 		results <- sourceInputThreadResult{component: component, err: err, finished: time.Now()}
 	}()

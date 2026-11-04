@@ -1,0 +1,390 @@
+{
+  "schema": "krasis.confirmed-source-activation-review/v1",
+  "date": "2026-11-05",
+  "generation": 525,
+  "revision": "8a3c8db6554690a9a89f62a4835cffb2fedc7af2",
+  "userResult": "Stutter reported after requested trial",
+  "collection": "92b96e0f1a54d2505baef687871a247c",
+  "selection": "Exclude installation baseline exchange tags; match deduplicated current-build A-source/B-receiver tags. Retain incomplete pair count; compute statistics on both-complete OK pairs.",
+  "pairs": {
+    "matched": 16,
+    "complete": 15
+  },
+  "excludedIncompletePairs": 1,
+  "devices": {
+    "A": {
+      "created": "2026-11-04T20:12:22Z",
+      "sha256": "9b292df53f1c04ca2083f7ba55468a218cfc01270f366613d480787a458f4c5d",
+      "service": "READY",
+      "inputHealth": "READY",
+      "newFailures": [],
+      "lastFailure": {
+        "time": "2026-11-04T13:49:32.1562048Z",
+        "code": "agent_faulted",
+        "agentState": "FAULTED"
+      }
+    },
+    "B": {
+      "created": "2026-11-04T20:12:18Z",
+      "sha256": "322eb390b6dbec138d2738ea18a16b3b14e436acc9afeb6ee017b81c093b7fdc",
+      "service": "READY",
+      "inputHealth": "READY",
+      "newFailures": [],
+      "lastFailure": {
+        "time": "2026-11-04T08:21:08.3372368Z",
+        "code": "agent_faulted",
+        "agentState": "FAULTED"
+      }
+    }
+  },
+  "sharedConnectionMatched": true,
+  "metrics": {
+    "aCapture": {
+      "n": 15,
+      "medianMs": 45.087,
+      "maxMs": 808.306
+    },
+    "aIPCWait": {
+      "n": 15,
+      "medianMs": 44.543,
+      "maxMs": 806.782
+    },
+    "aGrant": {
+      "n": 15,
+      "medianMs": 43.424,
+      "maxMs": 80.149
+    },
+    "bPreparation": {
+      "n": 15,
+      "medianMs": 25.85,
+      "maxMs": 32.532
+    },
+    "bInput": {
+      "n": 15,
+      "medianMs": 5.501,
+      "maxMs": 26.928
+    }
+  },
+  "ipc": {
+    "samples": 15,
+    "stats": {
+      "requestDeliveryMicros": {
+        "n": 15,
+        "medianMs": 0.169,
+        "maxMs": 1.558
+      },
+      "readAuthorizationMicros": {
+        "n": 15,
+        "medianMs": 0.079,
+        "maxMs": 0.246
+      },
+      "dispatchMicros": {
+        "n": 15,
+        "medianMs": 0.065,
+        "maxMs": 21.871
+      },
+      "activationMicros": {
+        "n": 15,
+        "medianMs": 40.391,
+        "maxMs": 711.814
+      },
+      "replyAdmissionMicros": {
+        "n": 15,
+        "medianMs": 0.521,
+        "maxMs": 51
+      },
+      "replyEncodeMicros": {
+        "n": 15,
+        "medianMs": 0.003,
+        "maxMs": 0.004
+      },
+      "replyDeliveryMicros": {
+        "n": 15,
+        "medianMs": 0.502,
+        "maxMs": 36.931
+      },
+      "callerResumeMicros": {
+        "n": 15,
+        "medianMs": 0.412,
+        "maxMs": 25.271
+      }
+    }
+  },
+  "slowest": [
+    {
+      "time": "2026-11-04T20:12:03.9317535Z",
+      "tag": "87c71276513f847944325fdce6e532ea0bd398fd7407557cbcfb1cd9d9adec23",
+      "captureMs": 808.306,
+      "ipcWaitMs": 806.782,
+      "ipc": {
+        "measured": true,
+        "requestDeliveryMicros": 215,
+        "readAuthorizationMicros": 79,
+        "dispatchMicros": 21871,
+        "activationMicros": 711814,
+        "replyAdmissionMicros": 36128,
+        "replyEncodeMicros": 4,
+        "replyDeliveryMicros": 11297,
+        "callerResumeMicros": 25271
+      },
+      "native": [
+        1,
+        1,
+        1,
+        3,
+        3,
+        2,
+        4,
+        2,
+        4,
+        0,
+        1,
+        4,
+        4,
+        0,
+        4,
+        0,
+        3
+      ],
+      "exact": {
+        "queueToHandleMicros": 26053,
+        "foregroundRequestMicros": 260631,
+        "measured": 7
+      }
+    },
+    {
+      "time": "2026-11-04T20:11:39.1580202Z",
+      "tag": "a784a0e0a04dd35ba30cee460b0a4bc4a5b8eba7e02e16425e30a1cd54bbd12a",
+      "captureMs": 290.252,
+      "ipcWaitMs": 275.199,
+      "ipc": {
+        "measured": true,
+        "requestDeliveryMicros": 55,
+        "readAuthorizationMicros": 65,
+        "dispatchMicros": 17460,
+        "activationMicros": 202915,
+        "replyAdmissionMicros": 51000,
+        "replyEncodeMicros": 3,
+        "replyDeliveryMicros": 1015,
+        "callerResumeMicros": 3484
+      },
+      "native": [
+        1,
+        1,
+        1,
+        2,
+        2,
+        1,
+        3,
+        1,
+        3,
+        0,
+        3,
+        4,
+        4,
+        0,
+        4,
+        0,
+        3
+      ],
+      "exact": {
+        "queueToHandleMicros": 2804,
+        "foregroundRequestMicros": 87522,
+        "measured": 7
+      }
+    },
+    {
+      "time": "2026-11-04T20:11:40.8524917Z",
+      "tag": "676a31f18faaf03206f34ec1cb9b23790227dc34e396bf9bbd9a2ec4973aa7c9",
+      "captureMs": 145.606,
+      "ipcWaitMs": 144.831,
+      "ipc": {
+        "measured": true,
+        "requestDeliveryMicros": 282,
+        "readAuthorizationMicros": 64,
+        "dispatchMicros": 9392,
+        "activationMicros": 75761,
+        "replyAdmissionMicros": 3827,
+        "replyEncodeMicros": 4,
+        "replyDeliveryMicros": 36931,
+        "callerResumeMicros": 18691
+      },
+      "native": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        2,
+        1,
+        3,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        3
+      ],
+      "exact": {
+        "queueToHandleMicros": 3890,
+        "foregroundRequestMicros": 27558,
+        "measured": 7
+      }
+    },
+    {
+      "time": "2026-11-04T20:08:17.0216393Z",
+      "tag": "c80aebb24c0c5680a1110138488cbc5e8614590ee9081abd2386567c99bde24d",
+      "captureMs": 138.1,
+      "ipcWaitMs": 137.59,
+      "ipc": {
+        "measured": true,
+        "requestDeliveryMicros": 1558,
+        "readAuthorizationMicros": 194,
+        "dispatchMicros": 218,
+        "activationMicros": 128489,
+        "replyAdmissionMicros": 1284,
+        "replyEncodeMicros": 3,
+        "replyDeliveryMicros": 2091,
+        "callerResumeMicros": 3667
+      },
+      "native": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        3,
+        1,
+        3,
+        0,
+        2,
+        3,
+        4,
+        0,
+        4,
+        0,
+        3
+      ],
+      "exact": {
+        "foregroundRequestMicros": 72162,
+        "measured": 7
+      }
+    }
+  ],
+  "runtimeTrails": {
+    "A": [
+      {
+        "time": "2026-11-04T20:10:31.2108088Z",
+        "observation": "timer_late",
+        "samples": 64,
+        "cpuMedianPercent": 100,
+        "cpu95plus": 50,
+        "cpuSamples": 64,
+        "lateMaxMicros": 114109,
+        "osReadMaxMicros": 59305,
+        "gcCycles": 1,
+        "gcCPU": 14763,
+        "gcPauses": [
+          1,
+          1,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "time": "2026-11-04T20:11:02.597969Z",
+        "observation": "os_read_slow",
+        "samples": 64,
+        "cpuMedianPercent": 100,
+        "cpu95plus": 61,
+        "cpuSamples": 64,
+        "lateMaxMicros": 36019,
+        "osReadMaxMicros": 190733,
+        "gcCycles": 0,
+        "gcCPU": 0,
+        "gcPauses": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "time": "2026-11-04T20:11:37.4391235Z",
+        "observation": "os_read_slow",
+        "samples": 64,
+        "cpuMedianPercent": 100,
+        "cpu95plus": 51,
+        "cpuSamples": 64,
+        "lateMaxMicros": 146300,
+        "osReadMaxMicros": 177172,
+        "gcCycles": 1,
+        "gcCPU": 319440,
+        "gcPauses": [
+          0,
+          1,
+          0,
+          1,
+          0,
+          0
+        ]
+      },
+      {
+        "time": "2026-11-04T20:12:08.114112Z",
+        "observation": "os_read_slow",
+        "samples": 64,
+        "cpuMedianPercent": 100,
+        "cpu95plus": 64,
+        "cpuSamples": 64,
+        "lateMaxMicros": 469644,
+        "osReadMaxMicros": 533911,
+        "gcCycles": 1,
+        "gcCPU": 17258,
+        "gcPauses": [
+          2,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    ],
+    "B": []
+  },
+  "conclusions": [
+    "Fifteen complete pairs confirm ongoing stutter: capture median 45.087ms and maximum 808.306ms. Earlier two-pair observations are not representative of this tail.",
+    "Worst clock chain totals 806.679ms; worker activation occupies 88.2 percent. Native foreground request is 260.631ms and native window Show bucket is 100..<1000ms.",
+    "The worst sample also has 21.871ms dispatch, 36.128ms reply admission, 11.297ms reply delivery and 25.271ms caller-resumption waits; the delay is not a single 806.782ms network read.",
+    "A nearby 64-sample OS trail reports all 64 system CPU windows >=95 percent busy, up to 533.911ms OS-counter read time and 469.644ms timer lateness. GC pause observations in that trail remain in the smallest bucket. CPU pressure is correlated; exact responsible processes and OS blocked-versus-ready times were not captured at the incident.",
+    "Both protected services remain READY on the same authenticated connection. No new reconnect, poison, timeout or recovery fault in retained g525 events. Historical lastFailure predates this build."
+  ],
+  "implementationCandidate": {
+    "generation": 526,
+    "scope": "Only the three dedicated source-input OS threads",
+    "change": "Best-effort NORMAL(0) -> ABOVE_NORMAL(+1) at locked-thread startup. Keep explicitly lower/higher priorities and lookup/set failure; retire elevated threads at existing locked goroutine exit.",
+    "rationale": "The inspected Go 1.27.3 Windows runtime disables dynamic process priority boosts because general Go threads mix workloads. Krasis input owners are already dedicated locked OS threads, but currently retain normal base priority while sharing saturated CPUs with computation.",
+    "limits": "This addresses scheduling competition, not Windows foreground-owner blocking; no guarantee or measured gain is claimed before a g526 attended trial."
+  },
+  "sources": [
+    "docs/adr/0066-product-privileged-input.md",
+    "internal/wininput/source_hook_windows.go",
+    "inspected Go 1.27.3 runtime/os_windows.go osinit SetProcessPriorityBoost",
+    "https://learn.microsoft.com/en-us/windows/win32/procthread/scheduling-priorities"
+  ],
+  "limits": [
+    "The 64 OS intervals overlap and do not represent 64 independent experiments. GC data is from the medium agent, not the protected child.",
+    "Different foreground windows, motion and CPU load make direct g524/g525 maximum-ratio attribution invalid.",
+    "Current process CPU inspection occurs after the trial and cannot identify the earlier saturation owner. No unrelated workload was stopped or reprioritized."
+  ],
+  "push": "Not requested; not performed",
+  "remoteCI": "Not run; evidence analysis only"
+}
