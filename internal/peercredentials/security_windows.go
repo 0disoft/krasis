@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"unsafe"
 
@@ -395,7 +396,39 @@ func rejectReparseComponents(path string) error {
 	return nil
 }
 
+type userSIDCache struct {
+	mu  sync.Mutex
+	sid string
+}
+
+// The application retains its primary TokenUser identity for its lifetime.
+// OpenCurrentProcessToken reads that process token, so thread impersonation is
+// not consulted here. Cache only the identity after a successful lookup; every
+// consumer still queries and validates the ACL on its current object handle.
+func (cache *userSIDCache) get(load func() (string, error)) (string, error) {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	if cache.sid != "" {
+		return cache.sid, nil
+	}
+	sid, err := load()
+	if err != nil {
+		return "", err
+	}
+	if sid == "" {
+		return "", errors.New("current process user SID is empty")
+	}
+	cache.sid = sid
+	return sid, nil
+}
+
+var processUserSID userSIDCache
+
 func currentUserSIDString() (string, error) {
+	return processUserSID.get(loadCurrentUserSIDString)
+}
+
+func loadCurrentUserSIDString() (string, error) {
 	token, err := syscall.OpenCurrentProcessToken()
 	if err != nil {
 		return "", err
