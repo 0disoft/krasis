@@ -1,0 +1,219 @@
+{
+  "schema": "krasis.paired-installation-review/v1",
+  "generation": 528,
+  "revision": "3ae32a1699ffb3105810f72a5a3a704b4f5cc19c",
+  "date": "2026-11-05",
+  "beforeInstallCollection": "1657dd04e156b4ebb4bb408762d03da5",
+  "collection": "9128f45aae25fe21dcddf84c59822355",
+  "devices": {
+    "A": {
+      "created": "2026-11-05T09:46:56Z",
+      "sha256": "97912b6624af15cc3c21f14ab267c04162b93134a071ed8411ff78ff7f41cb73",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "connectedAt": "2026-11-05T09:45:43.929993Z",
+      "observedAfterConnectionMillis": 72071,
+      "failuresSinceConnection": [],
+      "earlierCurrentBuildResponseTimeouts": [
+        {
+          "time": "2026-11-05T09:44:50.0830282Z",
+          "code": "installed_source_response_timeout"
+        }
+      ],
+      "earlierCurrentBuildSessionTriggers": [
+        {
+          "time": "2026-11-05T09:39:03.7470638Z",
+          "observedAt": "2026-11-05T09:39:03.7470638Z",
+          "trigger": true,
+          "component": "unknown",
+          "fault": "fault_session_unknown",
+          "canceled": false,
+          "timeout": false,
+          "closed": false,
+          "nativeError": 0,
+          "nativeKnown": false,
+          "networkError": "not_observed",
+          "networkPolicy": "unknown",
+          "lastLifecycle": "unknown",
+          "lifecycleAgeMicros": 0,
+          "captureMode": "unknown"
+        },
+        {
+          "time": "2026-11-05T09:40:00.3659833Z",
+          "observedAt": "2026-11-05T09:40:00.3659833Z",
+          "trigger": true,
+          "component": "unknown",
+          "fault": "fault_session_unknown",
+          "canceled": false,
+          "timeout": false,
+          "closed": false,
+          "nativeError": 0,
+          "nativeKnown": false,
+          "networkError": "not_observed",
+          "networkPolicy": "unknown",
+          "lastLifecycle": "unknown",
+          "lifecycleAgeMicros": 0,
+          "captureMode": "protected"
+        },
+        {
+          "time": "2026-11-05T09:44:51.0745655Z",
+          "observedAt": "2026-11-05T09:44:51.0745655Z",
+          "trigger": true,
+          "component": "source-hook",
+          "fault": "fault_source_hook_failed",
+          "canceled": false,
+          "timeout": false,
+          "closed": false,
+          "nativeError": 0,
+          "nativeKnown": false,
+          "networkError": "not_observed",
+          "networkPolicy": "unknown",
+          "lastLifecycle": "unknown",
+          "lifecycleAgeMicros": 0,
+          "captureMode": "protected"
+        }
+      ],
+      "currentBuildTrustExpiries": [],
+      "installation": {
+        "time": "2026-11-05T09:35:15.5891173Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      }
+    },
+    "B": {
+      "created": "2026-11-05T09:46:55Z",
+      "sha256": "04c81479a1ab3c2b156ff5e02ec0047a3f8b628627dba84a0f4ed92928e11779",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "connectedAt": "2026-11-05T09:45:38.756839Z",
+      "observedAfterConnectionMillis": 76244,
+      "failuresSinceConnection": [],
+      "earlierCurrentBuildResponseTimeouts": [],
+      "earlierCurrentBuildSessionTriggers": [
+        {
+          "time": "2026-11-05T09:38:58.6048408Z",
+          "observedAt": "2026-11-05T09:38:58.6048408Z",
+          "trigger": true,
+          "component": "peer-session",
+          "fault": "fault_peer_session_failed",
+          "canceled": false,
+          "timeout": false,
+          "closed": false,
+          "nativeError": 0,
+          "nativeKnown": false,
+          "networkError": "not_observed",
+          "networkPolicy": "unknown",
+          "lastLifecycle": "unknown",
+          "lifecycleAgeMicros": 0,
+          "captureMode": "protected"
+        },
+        {
+          "time": "2026-11-05T09:39:55.2193201Z",
+          "observedAt": "2026-11-05T09:39:55.2193201Z",
+          "trigger": true,
+          "component": "peer-session",
+          "fault": "fault_peer_session_failed",
+          "canceled": false,
+          "timeout": false,
+          "closed": false,
+          "nativeError": 0,
+          "nativeKnown": false,
+          "networkError": "not_observed",
+          "networkPolicy": "unknown",
+          "lastLifecycle": "unknown",
+          "lifecycleAgeMicros": 0,
+          "captureMode": "protected"
+        },
+        {
+          "time": "2026-11-05T09:44:45.9235271Z",
+          "observedAt": "2026-11-05T09:44:45.9235271Z",
+          "trigger": true,
+          "component": "peer-session",
+          "fault": "fault_remote_eof",
+          "canceled": false,
+          "timeout": false,
+          "closed": false,
+          "nativeError": 0,
+          "nativeKnown": false,
+          "networkError": "not_observed",
+          "networkPolicy": "unknown",
+          "lastLifecycle": "unknown",
+          "lifecycleAgeMicros": 0,
+          "captureMode": "protected"
+        }
+      ],
+      "currentBuildTrustExpiries": [],
+      "installation": {
+        "time": "2026-11-05T09:33:12.7620901Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      }
+    }
+  },
+  "connection": {
+    "state": "CONNECTED",
+    "sharedConnectionMatched": true,
+    "method": "CLI app connect B, matched both authenticated support bundles",
+    "receipt": {
+      "code": "connected",
+      "id": "df974b6531d5d1804c651616c4f56303"
+    }
+  },
+  "peerUpdate": {
+    "requestID": "d9aa92200abbf8316548f6d5edea7ba1",
+    "code": "updated",
+    "bytes": 29055309,
+    "total": 29055309
+  },
+  "changes": [
+    "Run both authenticated source-stream IPC readers on dedicated OS threads at best-effort +1 priority; restore original priority before returning the thread to the Go pool, or retain the lock if native restoration fails.",
+    "Reuse only the successful nonempty primary process-user SID. File ACLs, object ownership/principal checks, trust/certificate verdicts, reparse/hardlink checks and the five-second trust freshness bound remain fresh and unchanged."
+  ],
+  "validation": [
+    "Eight related package suites passed: wininput, handoff, inputworker, peercredentials, truststore, residentagent, productlog, localapi.",
+    "Seven packages passed normal vet; wininput passed its existing -unsafeptr=false policy.",
+    "Selected source reader, foreground, IPC, completion and heartbeat race tests passed; SID concurrency and native-equivalence race tests also passed.",
+    "Real Windows API test verified +1 source reader priority, callback completion and restoration before pool reuse. Policy cases cover explicit priorities, promotion failure and restoration failure.",
+    "SID tests verify 32 concurrent readers load once, native equivalence, failure/empty retry and warm reuse. Local 100ms benchmark: cache 20.46ns/op and 0 allocations vs native 7104ns/op and 2 allocations (112 bytes).",
+    "Workspace/frontend build, package, setup verification and paired exact revision/READY/CLI connection validation passed."
+  ],
+  "sourceOfTruth": [
+    "docs/adr/0066-product-privileged-input.md",
+    "docs/experiments/2026-11-05-g528-source-ipc-readers.md",
+    "docs/experiments/2026-11-05-g528-trust-identity-reuse.md"
+  ],
+  "limits": [
+    "No attended g528 crossing latency comparison yet. Priority hint is a scheduling mitigation, not proof that kernel/reader/Go execution stalls are eliminated.",
+    "SID lookup precedes the g527 stalled GetSecurityInfo trace stage. This bounded optimization removes repeated identity work but does not demonstrate that ACL query stalls or trust-expiry reconnects are solved. The five-second fail-closed bound is retained.",
+    "Go GC/runtime-processor availability, Windows scheduling and native/external-application waits can remain. Initial READY/connection is not a recurrence or endurance test.",
+    "Current-build failures before the latest connection are retained above, not counted as a clean full-generation trial. During installation verification A had a heartbeat response timeout at 09:44:50Z and source-hook session failure at 09:44:51Z; B observed remote EOF. A was subsequently restarted through the app startup path, both services are READY, and CLI connection is confirmed. The initial native cause of that timeout is not yet established."
+  ],
+  "apiDBRunner": "No wire, API route, diagnostic JSON, DB, dependency or CI runner changes. Internal Windows source-reader startup helper added; generation 528.",
+  "push": "Not requested; not performed",
+  "remoteCI": "Not requested; not run",
+  "runtime": {
+    "A": {
+      "agentLocation": "PROTECTED",
+      "protectedInput": "CONFIGURED",
+      "doctor": "healthy"
+    }
+  }
+}
