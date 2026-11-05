@@ -370,9 +370,9 @@ func runSourceCapture(ctx context.Context, channel, service *Channel, lease Leas
 	// command is outstanding, so a single completion slot is sufficient.
 	completed := make(chan struct{}, 1)
 	readDone := make(chan error, 1)
-	go func() {
+	wininput.StartSourceIPCReader(func() {
 		readDone <- pumpSourceCommandsOrdered(run, read, requests, cancel, completed, writer.handleSourceMaintenance)
-	}()
+	})
 	// Retire only this read; the final native response still needs the writer.
 	defer func() {
 		cancel()

@@ -548,7 +548,7 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 	live.timing = timingSampler{emit: c.observe, source: true}
 	live.heartbeatTiming = timingSampler{emit: c.observe, source: true, heartbeat: true}
 	boundaryAcks := make(chan uint64, 1)
-	go func() {
+	wininput.StartSourceIPCReader(func() {
 		defer func() {
 			code := sourceClientReaderCode(live.err, live.retired.Load())
 			close(live.done) // Observability must not delay the terminal signal.
@@ -618,7 +618,7 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 				return
 			}
 		}
-	}()
+	})
 	if _, err = live.call(ctx, sourceStart); err != nil {
 		if CleanSourceRetirement(err) && c.observe != nil {
 			c.observe("installed_source_startup_retired")
