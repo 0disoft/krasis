@@ -1,0 +1,690 @@
+{
+  "schema": "krasis.confirmed-source-activation-review/v1",
+  "date": "2026-11-05",
+  "generation": 527,
+  "revision": "259b1923f763e5c6cd5fe5e8857332191f591b7a",
+  "collection": "b6e69c37eceb1d1e1495a9268998d7ef",
+  "baselineCollection": "9d7a11c4a41c38b33ef00b759e5a84bb",
+  "selection": "Deduplicate current-build run/sequence/code; exclude installation baseline exchange tags; match complete A-source/B-receiver exchange tags. Only same-PC duration clocks are subtracted. g526 has 14 pairs, g527 has 13. Trials are observational with uncontrolled workloads.",
+  "pairs": {
+    "matched": 13,
+    "complete": 13
+  },
+  "devices": {
+    "A": {
+      "created": "2026-11-05T09:00:57Z",
+      "sha256": "4072bde67721a186fc2693cb2d21047262dabb442aa51126b82fb61c3712e55e",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "originalConnectionPreserved": false,
+      "currentConnection": "821aee4041e1cf8cf0b9a9fc7572ddd287af7137173c47221e1df26a2b91b9ba",
+      "reconnectedAt": "2026-11-05T08:31:46.840001Z",
+      "retainedAgentRange": {
+        "from": "2026-11-05T07:59:08.7869707Z",
+        "to": "2026-11-05T09:00:55.2081413Z"
+      },
+      "newFailureLabels": [
+        {
+          "time": "2026-11-05T08:31:38.1269937Z",
+          "code": "installed_source_failure_context"
+        },
+        {
+          "time": "2026-11-05T08:31:38.1269937Z",
+          "code": "installed_source_command_failed_deactivate"
+        },
+        {
+          "time": "2026-11-05T08:31:38.6013962Z",
+          "code": "DISCONNECTING"
+        },
+        {
+          "time": "2026-11-05T08:31:39.3715784Z",
+          "code": "session_trust_reconnecting"
+        },
+        {
+          "time": "2026-11-05T08:58:53.1494079Z",
+          "code": "installed_source_failure_response"
+        },
+        {
+          "time": "2026-11-05T08:58:53.1494079Z",
+          "code": "installed_source_command_failed_heartbeat"
+        }
+      ],
+      "triggeredSessionEnds": [
+        {
+          "time": "2026-11-05T08:31:37.8249886Z",
+          "observedAt": "2026-11-05T08:31:37.8244773Z",
+          "trigger": true,
+          "component": "unknown",
+          "fault": "fault_trust_freshness_expired",
+          "canceled": false,
+          "timeout": false,
+          "closed": false,
+          "nativeError": 0,
+          "nativeKnown": false,
+          "networkError": "not_observed",
+          "networkPolicy": "unknown",
+          "lastLifecycle": "unknown",
+          "lifecycleAgeMicros": 0,
+          "captureMode": "protected"
+        }
+      ],
+      "newServiceFaultLabels": [],
+      "historicalLastFailure": {
+        "time": "2026-11-04T13:49:32.1562048Z",
+        "code": "agent_faulted",
+        "agentState": "FAULTED"
+      },
+      "frameTotals": {
+        "frames": 723,
+        "buckets": [
+          719,
+          4,
+          0,
+          0,
+          0
+        ]
+      },
+      "recentRuntime": [
+        {
+          "time": "2026-11-05T08:58:45.0636134Z",
+          "timerLateMicros": 15824,
+          "samplerTimerLateMicros": 43208,
+          "runnableDelays": [
+            2812,
+            61,
+            36,
+            0,
+            0,
+            0
+          ],
+          "gcPauses": [
+            9,
+            1,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "time": "2026-11-05T08:59:45.02086Z",
+          "timerLateMicros": 108473,
+          "samplerTimerLateMicros": 674367,
+          "runnableDelays": [
+            2469,
+            101,
+            73,
+            9,
+            0,
+            0
+          ],
+          "gcPauses": [
+            7,
+            2,
+            3,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "time": "2026-11-05T09:00:45.020687Z",
+          "timerLateMicros": 20882,
+          "samplerTimerLateMicros": 146053,
+          "runnableDelays": [
+            2323,
+            105,
+            65,
+            4,
+            0,
+            0
+          ],
+          "gcPauses": [
+            8,
+            2,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "profileTimes": [
+        "2026-11-05T08:55:52.9621121Z",
+        "2026-11-05T08:59:28.8642376Z",
+        "2026-11-05T08:59:32.6500989Z",
+        "2026-11-05T08:59:34.5056908Z",
+        "2026-11-05T08:59:45.138679Z",
+        "2026-11-05T08:59:46.1046269Z",
+        "2026-11-05T08:59:46.7228071Z",
+        "2026-11-05T08:59:47.3714904Z",
+        "2026-11-05T08:59:48.0917008Z",
+        "2026-11-05T08:59:48.8287817Z",
+        "2026-11-05T08:59:49.8245263Z",
+        "2026-11-05T08:59:50.6262366Z",
+        "2026-11-05T08:59:52.5558134Z"
+      ]
+    },
+    "B": {
+      "created": "2026-11-05T09:00:52Z",
+      "sha256": "87d46c14db363c7b1ad702ce47b6602e38a8e7032d9551ffb2d638b60ce29a35",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "originalConnectionPreserved": false,
+      "currentConnection": "821aee4041e1cf8cf0b9a9fc7572ddd287af7137173c47221e1df26a2b91b9ba",
+      "reconnectedAt": "2026-11-05T08:31:41.7479956Z",
+      "retainedAgentRange": {
+        "from": "2026-11-05T07:23:28.8711912Z",
+        "to": "2026-11-05T09:00:48.5941318Z"
+      },
+      "newFailureLabels": [
+        {
+          "time": "2026-11-05T08:31:32.7422647Z",
+          "code": "reconnect_remote_eof"
+        },
+        {
+          "time": "2026-11-05T08:31:32.7422647Z",
+          "code": "RECONNECTING"
+        },
+        {
+          "time": "2026-11-05T08:31:34.5929168Z",
+          "code": "reconnect_acquire_network_reset"
+        },
+        {
+          "time": "2026-11-05T08:31:37.865894Z",
+          "code": "reconnect_acquire_network_reset"
+        },
+        {
+          "time": "2026-11-05T08:31:38.4374277Z",
+          "code": "reconnect_acquire_network_reset"
+        },
+        {
+          "time": "2026-11-05T08:31:39.4448276Z",
+          "code": "reconnect_acquire_network_reset"
+        }
+      ],
+      "triggeredSessionEnds": [
+        {
+          "time": "2026-11-05T08:31:32.7281718Z",
+          "observedAt": "2026-11-05T08:31:32.7281718Z",
+          "trigger": true,
+          "component": "peer-session",
+          "fault": "fault_remote_eof",
+          "canceled": false,
+          "timeout": false,
+          "closed": false,
+          "nativeError": 0,
+          "nativeKnown": false,
+          "networkError": "not_observed",
+          "networkPolicy": "unknown",
+          "lastLifecycle": "unknown",
+          "lifecycleAgeMicros": 0,
+          "captureMode": "protected"
+        }
+      ],
+      "newServiceFaultLabels": [],
+      "historicalLastFailure": {
+        "time": "2026-11-04T08:21:08.3372368Z",
+        "code": "agent_faulted",
+        "agentState": "FAULTED"
+      },
+      "frameTotals": {
+        "frames": 628,
+        "buckets": [
+          3,
+          620,
+          4,
+          1,
+          0
+        ]
+      },
+      "recentRuntime": [
+        {
+          "time": "2026-11-05T08:58:36.4869374Z",
+          "timerLateMicros": 1031,
+          "samplerTimerLateMicros": 13924,
+          "runnableDelays": [
+            1413,
+            42,
+            0,
+            0,
+            0,
+            0
+          ],
+          "gcPauses": [
+            7,
+            3,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "time": "2026-11-05T08:59:36.486863Z",
+          "timerLateMicros": 1030,
+          "samplerTimerLateMicros": 13715,
+          "runnableDelays": [
+            1644,
+            42,
+            2,
+            0,
+            0,
+            0
+          ],
+          "gcPauses": [
+            9,
+            3,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "time": "2026-11-05T09:00:36.4866768Z",
+          "timerLateMicros": 6659,
+          "samplerTimerLateMicros": 6944,
+          "runnableDelays": [
+            1915,
+            49,
+            6,
+            0,
+            0,
+            0
+          ],
+          "gcPauses": [
+            10,
+            2,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "profileTimes": [
+        "2026-11-05T08:55:47.8331449Z",
+        "2026-11-05T08:59:23.6993906Z",
+        "2026-11-05T08:59:27.496869Z",
+        "2026-11-05T08:59:29.3628786Z",
+        "2026-11-05T08:59:40.0190109Z",
+        "2026-11-05T08:59:40.9821476Z",
+        "2026-11-05T08:59:41.6031094Z",
+        "2026-11-05T08:59:42.2513886Z",
+        "2026-11-05T08:59:42.9262109Z",
+        "2026-11-05T08:59:43.7033201Z",
+        "2026-11-05T08:59:44.7003149Z",
+        "2026-11-05T08:59:45.5008744Z",
+        "2026-11-05T08:59:47.4341445Z"
+      ]
+    }
+  },
+  "comparison": {
+    "aCapture": {
+      "g526": {
+        "n": 14,
+        "medianMs": 60.1245,
+        "maxMs": 114.197
+      },
+      "g527": {
+        "n": 13,
+        "medianMs": 33.467,
+        "maxMs": 201.411
+      }
+    },
+    "aWorkerActivation": {
+      "g526": {
+        "n": 14,
+        "medianMs": 50.623000000000005,
+        "maxMs": 95.191
+      },
+      "g527": {
+        "n": 13,
+        "medianMs": 25.193,
+        "maxMs": 123.334
+      }
+    },
+    "aForegroundRequest": {
+      "g526": {
+        "n": 14,
+        "medianMs": 26.8565,
+        "maxMs": 55.822
+      },
+      "g527": {
+        "n": 13,
+        "medianMs": 13.465,
+        "maxMs": 59.564
+      }
+    },
+    "aRequestDelivery": {
+      "g526": {
+        "n": 14,
+        "medianMs": 0.11800000000000001,
+        "maxMs": 40.572
+      },
+      "g527": {
+        "n": 13,
+        "medianMs": 0.09,
+        "maxMs": 46.75
+      }
+    },
+    "aReplyDelivery": {
+      "g526": {
+        "n": 14,
+        "medianMs": 0.4665,
+        "maxMs": 8.696
+      },
+      "g527": {
+        "n": 13,
+        "medianMs": 0.126,
+        "maxMs": 58.697
+      }
+    },
+    "bPreparation": {
+      "g526": {
+        "n": 14,
+        "medianMs": 26.701500000000003,
+        "maxMs": 32.414
+      },
+      "g527": {
+        "n": 13,
+        "medianMs": 25.488,
+        "maxMs": 127.34
+      }
+    },
+    "bWorstInput": {
+      "g526": {
+        "n": 14,
+        "medianMs": 4.487,
+        "maxMs": 15.657
+      },
+      "g527": {
+        "n": 13,
+        "medianMs": 3.279,
+        "maxMs": 151.942
+      }
+    }
+  },
+  "request": {
+    "samples": 13,
+    "stats": {
+      "submitMicros": {
+        "n": 13,
+        "medianMs": 0.008,
+        "maxMs": 0.012
+      },
+      "receiveMicros": {
+        "n": 13,
+        "medianMs": 0.079,
+        "maxMs": 46.74
+      },
+      "writeCompletionMicros": {
+        "n": 13,
+        "medianMs": 0.014,
+        "maxMs": 0.02
+      }
+    }
+  },
+  "ipc": {
+    "samples": 13,
+    "stats": {
+      "requestDeliveryMicros": {
+        "n": 13,
+        "medianMs": 0.09,
+        "maxMs": 46.75
+      },
+      "readAuthorizationMicros": {
+        "n": 13,
+        "medianMs": 0.079,
+        "maxMs": 0.195
+      },
+      "dispatchMicros": {
+        "n": 13,
+        "medianMs": 0.036,
+        "maxMs": 5.367
+      },
+      "activationMicros": {
+        "n": 13,
+        "medianMs": 25.193,
+        "maxMs": 123.334
+      },
+      "replyAdmissionMicros": {
+        "n": 13,
+        "medianMs": 0.076,
+        "maxMs": 2.228
+      },
+      "replyEncodeMicros": {
+        "n": 13,
+        "medianMs": 0.002,
+        "maxMs": 0.003
+      },
+      "replyDeliveryMicros": {
+        "n": 13,
+        "medianMs": 0.126,
+        "maxMs": 58.697
+      },
+      "callerResumeMicros": {
+        "n": 13,
+        "medianMs": 0.08,
+        "maxMs": 1.631
+      }
+    }
+  },
+  "slowest": [
+    {
+      "time": "2026-11-05T08:59:28.8642376Z",
+      "tag": "926d169c8cece8163660c889f3c7abfe95c7b8fc4fac9f140639bd5b0c4c24f7",
+      "captureMs": 201.411,
+      "ipcWaitMs": 170.578,
+      "ipc": {
+        "measured": true,
+        "requestDeliveryMicros": 46750,
+        "readAuthorizationMicros": 195,
+        "dispatchMicros": 2431,
+        "activationMicros": 120656,
+        "replyAdmissionMicros": 421,
+        "replyEncodeMicros": 2,
+        "replyDeliveryMicros": 79,
+        "callerResumeMicros": 54,
+        "request": {
+          "measured": true,
+          "submitMicros": 10,
+          "receiveMicros": 46740,
+          "writeCompletionMicros": 12
+        }
+      },
+      "native": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        2,
+        0,
+        3,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        1
+      ],
+      "exact": {
+        "queueToHandleMicros": 756,
+        "foregroundRequestMicros": 59564,
+        "measured": 7
+      }
+    },
+    {
+      "time": "2026-11-05T08:59:32.6500989Z",
+      "tag": "9f8af683897f92a32a924dbe22b79b3b771e2775b52fd27c6a4bfcb3fc3627f8",
+      "captureMs": 190.523,
+      "ipcWaitMs": 189.896,
+      "ipc": {
+        "measured": true,
+        "requestDeliveryMicros": 90,
+        "readAuthorizationMicros": 66,
+        "dispatchMicros": 5367,
+        "activationMicros": 123334,
+        "replyAdmissionMicros": 2228,
+        "replyEncodeMicros": 3,
+        "replyDeliveryMicros": 58697,
+        "callerResumeMicros": 111,
+        "request": {
+          "measured": true,
+          "submitMicros": 11,
+          "receiveMicros": 79,
+          "writeCompletionMicros": 14
+        }
+      },
+      "native": [
+        1,
+        1,
+        1,
+        2,
+        2,
+        1,
+        2,
+        0,
+        3,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        2
+      ],
+      "exact": {
+        "queueToHandleMicros": 2680,
+        "foregroundRequestMicros": 13465,
+        "measured": 7
+      }
+    },
+    {
+      "time": "2026-11-05T08:59:49.8245263Z",
+      "tag": "857aa89d754fbb24f1e715301bc263c0bb4a781eb3ef3119e5123a28e26bdc4c",
+      "captureMs": 65.284,
+      "ipcWaitMs": 58.922,
+      "ipc": {
+        "measured": true,
+        "requestDeliveryMicros": 7649,
+        "readAuthorizationMicros": 85,
+        "dispatchMicros": 36,
+        "activationMicros": 48807,
+        "replyAdmissionMicros": 379,
+        "replyEncodeMicros": 3,
+        "replyDeliveryMicros": 142,
+        "callerResumeMicros": 1631,
+        "request": {
+          "measured": true,
+          "submitMicros": 11,
+          "receiveMicros": 7638,
+          "writeCompletionMicros": 14
+        }
+      },
+      "native": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        2,
+        0,
+        3,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        2
+      ],
+      "exact": {
+        "foregroundRequestMicros": 25321,
+        "measured": 7
+      }
+    },
+    {
+      "time": "2026-11-05T08:59:48.0917008Z",
+      "tag": "4268102666f8a2c4f4be3884b230be8cde4c9b9a850dc8cf9905cf16432984d2",
+      "captureMs": 54.137,
+      "ipcWaitMs": 53.428,
+      "ipc": {
+        "measured": true,
+        "requestDeliveryMicros": 1210,
+        "readAuthorizationMicros": 64,
+        "dispatchMicros": 3850,
+        "activationMicros": 47500,
+        "replyAdmissionMicros": 68,
+        "replyEncodeMicros": 2,
+        "replyDeliveryMicros": 158,
+        "callerResumeMicros": 386,
+        "request": {
+          "measured": true,
+          "submitMicros": 8,
+          "receiveMicros": 1202,
+          "writeCompletionMicros": 13
+        }
+      },
+      "native": [
+        1,
+        1,
+        1,
+        2,
+        2,
+        1,
+        2,
+        0,
+        3,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        2
+      ],
+      "exact": {
+        "queueToHandleMicros": 2113,
+        "foregroundRequestMicros": 19184,
+        "measured": 7
+      }
+    }
+  ],
+  "conclusions": [
+    "A capture median decreases 60.1245 ->33.467ms and worker activation median 50.623 ->25.193ms; foreground request median decreases 26.8565 ->13.465ms. This is not a controlled causal estimate.",
+    "Tails are not fixed: capture maximum 114.197 ->201.411ms, worker activation 95.191 ->123.334ms, foreground request 55.822 ->59.564ms, request delivery 40.572 ->46.750ms, reply delivery 8.696 ->58.697ms.",
+    "All 13 new request traces are present. Submission checkpoint maximum is 0.012ms and write-completion duration maximum 0.020ms; receive maximum is 46.740ms. The slowest request has submit 0.010ms, completion 0.012ms and receive 46.740ms. The remaining request stall is after submission/rapid writer completion, including pipe transit, worker reader scheduling and decode, not app write-lock admission. No network traversal is involved in this local pipe span.",
+    "The 201.411ms capture sample includes 120.656ms worker activation, 59.564ms foreground request nested inside activation and 46.740ms request receive. A separate 190.523ms capture has 123.334ms activation and 58.697ms reply delivery. Do not add nested foreground timing to activation.",
+    "A nearby one-minute runtime summary records timer lateness 108.473ms, sampler lateness 674.367ms and nine runnable-delay samples in the >10ms..<=100ms bucket. This supports scheduling pressure as a remaining risk, but does not prove the exact OS/API stall cause.",
+    "One reconnect episode is retained. A explicitly records trigger fault_trust_freshness_expired while trust_active_prelock_lockfile_acl_query is in progress; B records trigger fault_remote_eof and four network-reset acquisition attempts. The shared connection changed and then recovered automatically. Exact cross-PC event order cannot be inferred from wall clocks; the matched profiles show about a five-second wall-clock offset.",
+    "A trust-expiry disconnect is the direct recorded trigger; whether the ACL syscall itself or execution scheduling consumed the freshness budget is not yet isolated.",
+    "No new protected-service FAULTED/poison/recovery-required label is retained, and both service/input states are READY. Recovery lastFailure entries are historical and predate g527. A later heartbeat response failure is followed by refresh_joined and protected_ready about 0.849s later without another peer reconnect.",
+    "B tails also increased: preparation maximum 32.414 ->127.340ms and worst input maximum 15.657 ->151.942ms. Do not describe this trial as globally smooth or recurrence-free."
+  ],
+  "validation": [
+    "Both exact g527 revisions, live healthy doctor, both service/input READY and shared current connection verified.",
+    "13 matched complete OK pairs; fixed request partition sums, removed-update unobserved native slot, frame histogram sums and original-vs-current connection validated.",
+    "Evidence JSON parses; git diff --check."
+  ],
+  "limits": [
+    "Rotated agent logs retain A roughly 07:59..09:00Z and B 07:23..09:00Z; no claim of zero failures across the entire roughly 12 hours since installation.",
+    "control.previous.jsonl is marked incomplete; current recovery and retained agent logs provide evidence but are not an exhaustive lifetime service history.",
+    "The 13 retained matched profiles include one earlier entry around 08:55Z and 12 around 08:59Z; no explicit new trial-start marker exists.",
+    "No source edit, rebuild, reinstall or reconnect was initiated during this inspection. Unit tests, race, vet and remote CI were skipped because runtime source is unchanged."
+  ],
+  "sourceOfTruthChanged": "This observed experiment report only.",
+  "apiDBRunner": "No API, wire, schema, DB, dependency, repository-hygiene or runner changes.",
+  "push": "Not requested; not performed"
+}
