@@ -143,7 +143,8 @@ func readSourcePacket(r io.Reader) (sourcePacket, error) {
 	}
 	p := sourcePacket{kind: data[4], op: data[5], status: data[6], sequence: binary.BigEndian.Uint64(data[8:16]), reply: binary.BigEndian.Uint64(data[32:40]), x: int32(binary.BigEndian.Uint32(data[52:56]))}
 	activationReply := p.kind == sourceReply && p.op == sourceActivate
-	extended := activationReply && data[56] == sourceActivationIPCFlag
+	extendedAuthority := activationReply && data[56] == sourceActivationAuthorityFlag
+	extended := activationReply && (data[56] == sourceActivationIPCFlag || extendedAuthority)
 	if extended {
 		data[56] = 0
 	}
@@ -196,8 +197,22 @@ func readSourcePacket(r io.Reader) (sourcePacket, error) {
 		for i := range clocks {
 			clocks[i] = binary.BigEndian.Uint64(tail[i*8:])
 		}
+		var authority handoff.CaptureAuthorityProfile
+		if extendedAuthority {
+			var detail [sourceActivationAuthoritySize]byte
+			if _, err := io.ReadFull(r, detail[:]); err != nil {
+				return sourcePacket{}, err
+			}
+			wait, native := binary.BigEndian.Uint32(detail[:4]), binary.BigEndian.Uint32(detail[4:])
+			if wait != 0 && native != 0 {
+				authority = handoff.CaptureAuthorityProfile{Measured: true, WaitMicros: wait - 1, NativeMicros: native - 1}
+				if !authority.Valid() {
+					authority = handoff.CaptureAuthorityProfile{}
+				}
+			}
+		}
 		if clocks.usable() {
-			p.captureIPC = &sourceActivationTrace{clocks: clocks}
+			p.captureIPC = &sourceActivationTrace{clocks: clocks, readAuthority: authority}
 		}
 	}
 	return p, nil

@@ -11,16 +11,17 @@ import (
 const CaptureIPCStageCount = 8
 
 type CaptureIPC struct {
-	Measured                bool           `json:"measured"`
-	RequestDeliveryMicros   uint32         `json:"requestDeliveryMicros"`
-	ReadAuthorizationMicros uint32         `json:"readAuthorizationMicros"`
-	DispatchMicros          uint32         `json:"dispatchMicros"`
-	ActivationMicros        uint32         `json:"activationMicros"`
-	ReplyAdmissionMicros    uint32         `json:"replyAdmissionMicros"`
-	ReplyEncodeMicros       uint32         `json:"replyEncodeMicros"`
-	ReplyDeliveryMicros     uint32         `json:"replyDeliveryMicros"`
-	CallerResumeMicros      uint32         `json:"callerResumeMicros"`
-	Request                 CaptureRequest `json:"request,omitzero"`
+	Measured                bool                    `json:"measured"`
+	RequestDeliveryMicros   uint32                  `json:"requestDeliveryMicros"`
+	ReadAuthorizationMicros uint32                  `json:"readAuthorizationMicros"`
+	DispatchMicros          uint32                  `json:"dispatchMicros"`
+	ActivationMicros        uint32                  `json:"activationMicros"`
+	ReplyAdmissionMicros    uint32                  `json:"replyAdmissionMicros"`
+	ReplyEncodeMicros       uint32                  `json:"replyEncodeMicros"`
+	ReplyDeliveryMicros     uint32                  `json:"replyDeliveryMicros"`
+	CallerResumeMicros      uint32                  `json:"callerResumeMicros"`
+	Request                 CaptureRequest          `json:"request,omitzero"`
+	ReadAuthority           CaptureAuthorityProfile `json:"readAuthority,omitzero"`
 }
 
 func (p CaptureIPC) Valid() bool {
@@ -31,7 +32,7 @@ func (p CaptureIPC) Valid() bool {
 	for _, n := range [...]uint32{p.RequestDeliveryMicros, p.ReadAuthorizationMicros, p.DispatchMicros, p.ActivationMicros, p.ReplyAdmissionMicros, p.ReplyEncodeMicros, p.ReplyDeliveryMicros, p.CallerResumeMicros} {
 		total += uint64(n)
 	}
-	return total <= uint64(Window.Microseconds()) && p.Request.valid(p.RequestDeliveryMicros)
+	return total <= uint64(Window.Microseconds()) && p.Request.valid(p.RequestDeliveryMicros) && p.ReadAuthority.Valid()
 }
 
 // Clocks are observations only. Missing/reversed/out-of-window clocks discard

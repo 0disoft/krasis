@@ -125,7 +125,7 @@ func (w *sourceWriter) writePacketContextChecked(ctx context.Context, p sourcePa
 	w.gateStage(origin, sourceGateWrite)
 	wire := data[:]
 	if p.kind == sourceReply && p.op == sourceActivate && p.captureIPC != nil {
-		wire = appendSourceActivationIPC(data, p.captureIPC.clocks, activationGate, workerIPCTick())
+		wire = appendSourceActivationIPC(data, p.captureIPC.clocks, activationGate, workerIPCTick(), p.captureIPC.readAuthority)
 	}
 	err = w.writeSequenced(ctx, wire, p.sequence, origin)
 	writeDone()
@@ -229,9 +229,6 @@ func runSourceCapture(ctx context.Context, channel, service *Channel, lease Leas
 	defer cancel()
 	authorize := sourceCaptureAuthorization(run, service, channel)
 	var heartbeat sourceHeartbeatProgress
-	authorizeCommand := func(op byte) error {
-		return authorizeSourceReadProgress(run, service, channel, op, &heartbeat)
-	}
 	hook, err := wininput.NewProtectedSourceHook(authorize)
 	if err != nil {
 		return err
@@ -322,6 +319,15 @@ func runSourceCapture(ctx context.Context, channel, service *Channel, lease Leas
 	reader := sourceContextReader{ctx: readContext, read: pipe.readContext}
 	var cursorPending atomic.Bool
 	read := func() (sourcePacket, error) {
+		var detail *sourcePresenceTiming
+		authorizeCommand := func(op byte) error {
+			ctx := run
+			if op == sourceActivate {
+				detail = &sourcePresenceTiming{}
+				ctx = detail.context(ctx)
+			}
+			return authorizeSourceReadProgress(ctx, service, channel, op, &heartbeat)
+		}
 		deadline := time.Now().Add(sourceReadTimeout(writer.started.Load(), session.Active() || cursorPending.Load()))
 		if err := channel.stream.SetReadDeadline(deadline); err != nil {
 			return sourcePacket{}, sourceTransportFailure(errors.Join(ErrAuthority, err))
@@ -330,6 +336,9 @@ func runSourceCapture(ctx context.Context, channel, service *Channel, lease Leas
 		p, err := readSourceCommandAuthorized(frame, readContext, lease.Binding, sequence, authorizeCommand)
 		if err == nil {
 			sequence = p.sequence
+			if p.captureIPC != nil && detail != nil {
+				p.captureIPC.readAuthority = detail.detail()
+			}
 		}
 		return p, err
 	}
@@ -408,6 +417,7 @@ func runSourceCapture(ctx context.Context, channel, service *Channel, lease Leas
 					response.captureIPC = &sourceActivationTrace{}
 					if p.captureIPC != nil {
 						response.captureIPC.clocks = p.captureIPC.clocks
+						response.captureIPC.readAuthority = p.captureIPC.readAuthority
 					}
 					response.captureIPC.clocks[2] = workerIPCTick()
 					activation = writer.beginActivation(p.sequence)

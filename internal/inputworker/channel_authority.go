@@ -115,7 +115,7 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 	}
 	var profile *sourcePresenceTiming
 	var admitted time.Time
-	if kind == sourcePresenceAuthorityQuery {
+	if kind == sourcePresenceAuthorityQuery || ctx.Value(sourceCommandAuthorityKey{}) == true {
 		profile, _ = ctx.Value(sourcePresenceTimingKey{}).(*sourcePresenceTiming)
 		if profile != nil {
 			admitted = time.Now()

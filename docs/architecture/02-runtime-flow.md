@@ -511,6 +511,19 @@ These elapsed spans mix work and scheduling. Matching pipe delivery is only
 0.097/0.062ms. Correcting these priority dependencies targets a structural source
 of CPU contention but does not prove the cause of every elapsed microsecond.
 
+Activation's `capture.authority` and `capture.ipc.readAuthority` split agent
+preflight and the worker's matching read admission into query execution
+(`nativeMicros`) and the remaining admission/start/publication/resumption
+(`waitMicros`). Native query elapsed can itself include scheduling; it is not CPU
+time. Queries publish private timestamps, and only a completed, joined caller
+merges them. Timeout or late results cannot mutate the attempt or its successor.
+The read-side profile covers both fresh service and agent presence queries;
+execution still performs its independent full authorization on the desktop owner.
+The optional private ACK flag `0x81` adds eight bytes to the existing 112-byte
+activation reply, within the same single authenticated pipe write. Legacy 64-byte
+and 112-byte replies remain readable. Invalid diagnostic values are discarded,
+truncated frames fail closed, and no extra RPC, proof query or retry is added.
+
 ### g511 source capture timing detail
 
 The g531+ capture path sends its first foreground request to the existing,

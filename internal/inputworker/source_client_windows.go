@@ -229,6 +229,9 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 	sample[1] = timingBucket(authorityElapsed)
 	if op == sourceActivate {
 		handoff.RecordCapture(ctx, handoff.CaptureIPCAuthority, authorityElapsed)
+		if detail, _ := ctx.Value(sourcePresenceTimingKey{}).(*sourcePresenceTiming); detail != nil {
+			handoff.RecordCaptureAuthority(ctx, detail.detail())
+		}
 	}
 	if authorityErr != nil {
 		if ctx.Err() != nil {
@@ -369,6 +372,7 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 					ipc := handoff.CaptureIPCFromClocks(clocks)
 					if ipc.Measured {
 						ipc.Request = handoff.CaptureRequestFromClocks(activationSent, activationSubmitted, activationReturned, clocks[1])
+						ipc.ReadAuthority = reply.captureIPC.readAuthority
 					}
 					handoff.RecordCaptureIPC(ctx, ipc)
 				}
