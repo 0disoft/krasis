@@ -10,8 +10,9 @@ import (
 )
 
 var (
-	ErrUnsafePath = errors.New("secure file path is unsafe")
-	ErrHardLink   = errors.New("secure file has multiple hard links")
+	ErrUnsafePath          = errors.New("secure file path is unsafe")
+	ErrHardLink            = errors.New("secure file has multiple hard links")
+	ErrUnsupportedPlatform = errors.New("secure filesystem is only supported on Windows")
 )
 
 func validateLeaf(name string) error {

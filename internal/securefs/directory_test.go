@@ -9,6 +9,9 @@ import (
 )
 
 func TestDirectoryCreateAndPromoteNoReplace(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("secure filesystem supports Windows only")
+	}
 	path := t.TempDir()
 	directory, err := OpenDirectory(path)
 	if err != nil {
@@ -78,6 +81,9 @@ func TestDirectoryHandleSurvivesParentPathReplacement(t *testing.T) {
 }
 
 func TestDirectoryRejectsHardLinkedRenameSource(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("secure filesystem supports Windows only")
+	}
 	path := t.TempDir()
 	directory, err := OpenDirectory(path)
 	if err != nil {
