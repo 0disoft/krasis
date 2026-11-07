@@ -21,6 +21,14 @@ func TestCaptureForegroundNativeExchange(t *testing.T) {
 	if os.Getenv("KRASIS_NATIVE_FOREGROUND_SMOKE") != "1" {
 		t.Skip("requires an interactive desktop and explicit native smoke opt-in")
 	}
+	originalRequest := sourceWheelCaptureSetForeground
+	t.Cleanup(func() { sourceWheelCaptureSetForeground = originalRequest })
+	sourceWheelCaptureSetForeground = func(window uintptr) error {
+		started := time.Now()
+		err := originalRequest(window)
+		t.Logf("native request elapsed=%s rejected=%t owned-at-return=%t", time.Since(started), err != nil, sourceWheelCaptureGetForeground() == window)
+		return err
+	}
 	session, err := NewSourceSession(1, &recordingSourceSink{})
 	if err != nil {
 		t.Fatal(err)
@@ -75,15 +83,68 @@ func TestCaptureForegroundNativeExchange(t *testing.T) {
 		if err := capture.ActivateProfile(profile); err != nil {
 			t.Fatal(err)
 		}
-		_, exact := probe.FinishDetailed()
+		native, exact := probe.FinishDetailed()
 		if !capture.Active() || !capture.OwnsWheel() {
 			t.Fatal("activation acknowledged without native foreground ownership")
 		}
-		t.Logf("native activation=%s foreground request (including exchange)=%dus", time.Since(started), exact.ForegroundRequestMicros)
+		t.Logf("native activation=%s foreground request (including exchange)=%dus fallback=%d rejected=%d pending=%d transition=%d attach=%d", time.Since(started), exact.ForegroundRequestMicros, native[handoff.CaptureFallback], native[handoff.CaptureFallbackRejected], native[handoff.CaptureFallbackPending], native[handoff.CaptureFallbackTransition], native[handoff.CaptureFallbackAttach])
 		capture.Deactivate()
 		if capture.Active() {
 			t.Fatal("deactivation retained native capture")
 		}
+	}
+}
+
+func TestCaptureForegroundExchangeServicesInternalActivationAfterEarlyReply(t *testing.T) {
+	for _, stage := range []string{"live", "cancelled", "expired", "terminal", "dispatch-cancelled"} {
+		t.Run(stage, func(t *testing.T) {
+			restore := stubSourceWheelCaptureActivation(t)
+			t.Cleanup(restore)
+			previousWait := sourceForegroundExchangeWait
+			t.Cleanup(func() { sourceForegroundExchangeWait = previousWait })
+			exchange := newSourceForegroundExchange()
+			exchange.ready = make(chan *sourceForegroundRequest, 1)
+			current := &sourceWheelCaptureRun{window: 10}
+			pending, owned, dispatches := false, false, 0
+			sourceForegroundTransitionDispatch = func(window uintptr) {
+				dispatches++
+				if pending {
+					if window != 10 {
+						t.Fatal("dispatch escaped capture owner")
+					}
+					owned = true
+					if stage == "dispatch-cancelled" {
+						current.setError(context.Canceled)
+					}
+				}
+			}
+			var accepted *sourceForegroundRequest
+			sourceForegroundExchangeWait = func(windows.Handle) error {
+				accepted = <-exchange.ready
+				pending = true // Windows queues activation only after the first peek.
+				accepted.complete(current, nil)
+				switch stage {
+				case "cancelled":
+					close(exchange.cancelled)
+				case "expired":
+					exchange.deadline = time.Now()
+				case "terminal":
+					current.setError(context.Canceled)
+				}
+				return nil
+			}
+			err := exchange.request(current)
+			want := error(nil)
+			if stage == "cancelled" || stage == "expired" {
+				want = ErrSourceCaptureCommandTimeout
+			}
+			if stage == "terminal" || stage == "dispatch-cancelled" {
+				want = context.Canceled
+			}
+			if !errors.Is(err, want) || owned != (stage == "live" || stage == "dispatch-cancelled") || accepted.refs.Load() != 0 || current.active.Load() {
+				t.Fatalf("early reply skipped activation or admitted a late owner: err=%v owned=%t dispatches=%d", err, owned, dispatches)
+			}
+		})
 	}
 }
 

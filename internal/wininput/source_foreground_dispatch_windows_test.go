@@ -7,6 +7,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"github.com/0disoft/krasis/internal/handoff"
 )
 
 func TestCaptureActivationCompletesSentForegroundRequestWithoutClick(t *testing.T) {
@@ -74,8 +76,8 @@ func TestForegroundDispatchDoesNotRemoveOrDispatchQueuedMessages(t *testing.T) {
 	calls := 0
 	callSourceForegroundMessages = func(args ...uintptr) (uintptr, uintptr, error) {
 		calls++
-		if len(args) != 5 || args[0] == 0 || args[1] != 10 || args[2] != 0 || args[3] != 0 || args[4] != 0x00400000 {
-			t.Fatal("foreground wait admitted queued input or removed shutdown/commands")
+		if len(args) != 5 || args[0] == 0 || args[1] != 10 || args[2] != 0 || args[3] != 0 || args[4] != 0 {
+			t.Fatal("foreground wait excluded internal activation or removed shutdown/commands")
 		}
 		return 0, 0, nil // No queued message is not an API failure.
 	}
@@ -83,6 +85,64 @@ func TestForegroundDispatchDoesNotRemoveOrDispatchQueuedMessages(t *testing.T) {
 	sourceForegroundTransitionDispatch(10)
 	if calls != 1 {
 		t.Fatal("dispatch used an unknown owner or repeated the native call")
+	}
+}
+
+func TestCaptureInternalActivationDoesNotRequireThreadAttachment(t *testing.T) {
+	dispatch := sourceForegroundTransitionDispatch
+	restore := stubSourceWheelCaptureActivation(t)
+	defer restore()
+	previous := callSourceForegroundMessages
+	defer func() { callSourceForegroundMessages = previous }()
+	sourceForegroundTransitionDispatch = dispatch
+	foreground, pending := uintptr(20), false
+	sourceWheelCaptureGetForeground = func() uintptr { return foreground }
+	sourceWheelCaptureSetForeground = func(uintptr) error { pending = true; return nil }
+	callSourceForegroundMessages = func(args ...uintptr) (uintptr, uintptr, error) {
+		if pending && args[4] == 0 {
+			foreground = 10 // The native activation nudge is not QS_SENDMESSAGE.
+		}
+		return 1, 0, nil // A posted item is returned but must never be dispatched.
+	}
+	sourceWheelCaptureAttachThreads = func(uint32, uint32, bool) error {
+		t.Fatal("an accepted internal activation unnecessarily joined input queues")
+		return nil
+	}
+	profile, probe := handoff.WithCaptureProbe(context.Background())
+	current := &sourceWheelCaptureRun{window: 10}
+	if err := current.activateWindowProfile(profile); err != nil || !current.active.Load() {
+		t.Fatal("internal activation did not commit after verification", err)
+	}
+	if native := probe.Finish(); native[handoff.CaptureFallback] != 0 {
+		t.Fatal("accepted activation was classified as fallback", native)
+	}
+}
+
+func TestCaptureFallbackDistinguishesRejectionFromPendingOwnership(t *testing.T) {
+	for _, rejected := range []bool{false, true} {
+		t.Run(map[bool]string{false: "pending", true: "rejected"}[rejected], func(t *testing.T) {
+			restore := stubSourceWheelCaptureActivation(t)
+			t.Cleanup(restore)
+			foreground := uintptr(20)
+			sourceWheelCaptureGetForeground = func() uintptr { return foreground }
+			sourceWheelCaptureCurrentThread = func() uint32 { return 1 }
+			sourceWheelCaptureWindowThread = func(uintptr) (uint32, error) { return 2, nil }
+			sourceWheelCaptureSetForeground = func(window uintptr) error { foreground = window; return nil }
+			sourceWheelCaptureAttachThreads = func(uint32, uint32, bool) error { return nil }
+			profile, probe := handoff.WithCaptureProbe(context.Background())
+			current := &sourceWheelCaptureRun{window: 10}
+			err := current.activateWindowWithForeground(profile, func(uintptr) error {
+				if rejected {
+					return errors.New("initial native rejection")
+				}
+				return nil
+			})
+			native := probe.Finish()
+			if err != nil || !current.active.Load() || native[handoff.CaptureFallbackTransition] == 0 || native[handoff.CaptureFallbackAttach] == 0 ||
+				(native[handoff.CaptureFallbackRejected] != 0) != rejected || (native[handoff.CaptureFallbackPending] != 0) == rejected {
+				t.Fatal("fallback lost its cause or substage, or changed activation", err, native)
+			}
+		})
 	}
 }
 

@@ -87,7 +87,26 @@ func (exchange *sourceForegroundExchange) request(current *sourceWheelCaptureRun
 	for {
 		select {
 		case reply := <-request.reply:
-			return reply
+			if reply != nil {
+				return reply
+			}
+			select {
+			case <-exchange.cancelled:
+				return ErrSourceCaptureCommandTimeout
+			default:
+			}
+			if !time.Now().Before(exchange.deadline) {
+				current.fail(ErrSourceCaptureCommandTimeout)
+				return ErrSourceCaptureCommandTimeout
+			}
+			if err := current.err(); err != nil {
+				return err
+			}
+			// The request event proves only that SetForegroundWindow returned.
+			// Service its pending internal activation even if the reply won the
+			// race with our message wait. The caller still verifies actual ownership.
+			sourceForegroundTransitionDispatch(current.window)
+			return current.err()
 		case <-exchange.cancelled:
 			return ErrSourceCaptureCommandTimeout
 		default:

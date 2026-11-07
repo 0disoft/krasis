@@ -27,6 +27,11 @@ const (
 	CaptureTotal
 	CaptureBoundaryBefore
 	CaptureBoundaryAfter
+	// Fallback cause and substages travel in the remaining activation ACK bits.
+	CaptureFallbackRejected
+	CaptureFallbackPending
+	CaptureFallbackTransition
+	CaptureFallbackAttach
 	CaptureIPCLock
 	CaptureIPCAuthority
 	CaptureIPCWrite

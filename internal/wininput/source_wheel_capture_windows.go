@@ -709,7 +709,13 @@ func (current *sourceWheelCaptureRun) activateWindowWithForeground(profile conte
 	finishForeground()
 	if foregroundErr != nil || verificationLost {
 		stopFallback := handoff.CaptureSpan(profile, handoff.CaptureFallback)
-		fallbackResult, fallbackErr := current.activateForegroundFallback()
+		cause := handoff.CaptureFallbackPending
+		if foregroundErr != nil {
+			cause = handoff.CaptureFallbackRejected
+		}
+		stopCause := handoff.CaptureSpan(profile, cause)
+		fallbackResult, fallbackErr := current.activateForegroundFallbackProfile(profile)
+		stopCause()
 		stopFallback()
 		if current.observer != nil {
 			current.observer.ObserveWheelForegroundFallback(fallbackResult)
@@ -768,14 +774,22 @@ func (current *sourceWheelCaptureRun) hideActiveCursor() bool {
 }
 
 func (current *sourceWheelCaptureRun) activateForegroundFallback() (SourceForegroundFallbackResult, error) {
+	return current.activateForegroundFallbackProfile(nil)
+}
+
+func (current *sourceWheelCaptureRun) activateForegroundFallbackProfile(profile context.Context) (SourceForegroundFallbackResult, error) {
+	stopTransition := handoff.CaptureSpan(profile, handoff.CaptureFallbackTransition)
 	foreground, foregroundErr := current.foregroundAfterTransition()
+	stopTransition()
 	if foregroundErr != nil {
 		return SourceForegroundFallbackAttachFailed, errors.Join(ErrSourceCaptureThreadAttachFailed, foregroundErr)
 	}
 	if foreground == current.window && foreground != 0 {
 		return SourceForegroundFallbackSucceeded, nil
 	}
+	stopAttach := handoff.CaptureSpan(profile, handoff.CaptureFallbackAttach)
 	result, err := current.setForegroundWithThreadAttach(current.window, foreground)
+	stopAttach()
 	switch result {
 	case foregroundThreadFallbackSucceeded:
 		return SourceForegroundFallbackSucceeded, nil

@@ -2,7 +2,7 @@ package inputworker
 
 import "github.com/0disoft/krasis/internal/handoff"
 
-// Seventeen three-bit stages use 51 previously reserved bits of the fixed
+// Twenty-one three-bit stages use 63 previously reserved bits of the fixed
 // activation ACK. No additional pipe frame or input/authority field is sent.
 func packSourceCapture(p handoff.CaptureNative) uint64 {
 	var bits uint64

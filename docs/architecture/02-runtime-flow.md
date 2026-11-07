@@ -456,10 +456,10 @@ A successful native constructor can remain unbound after its construction contex
 
 ### g511 source capture timing detail
 
-The g531 capture path sends its first foreground request to the existing,
+The g531+ capture path sends its first foreground request to the existing,
 window-free source monitor on that monitor's bound OS thread. The command caller
 continues to enforce its original two-second budget independently. The window
-owner prepares the surface, services only sent activation messages while waiting
+owner prepares the surface, services sent messages and internal activation while waiting
 on a per-attempt native reply event, and freshly verifies foreground before
 committing capture. It never dispatches posted input, commands or WM_QUIT inside
 this wait. One event has two exact owners (capture and the accepted requester);
@@ -476,6 +476,22 @@ Moving a wait to another thread must not make it disappear from this measurement
 The existing subsequent verification interval and private packet layout remain
 unchanged. Native interactive smoke can compare this interval with the original
 owner-thread request; full crossing improvement requires a new paired sample.
+
+g532 uses `PeekMessageW(PM_NOREMOVE)` without the previous sent-message-only
+category filter: the cross-queue foreground nudge is an internal input event.
+Returned posted messages, input, commands and WM_QUIT are never removed or
+dispatched here. A successful requester reply still services pending activation
+before final ownership verification, including when that reply beats the native
+wait. Expired, cancelled or terminal replies cannot start this final service.
+Actual rejection retains the existing verified fallback and detach behavior.
+
+Four appended native timing buckets separate fallback after first-request API
+rejection from accepted-but-unverified activation, and transition recovery from
+thread attachment. Twenty-one three-bit buckets occupy 63 bits in the same
+64-byte activation ACK; there is no extra packet. Existing native stage indices
+are unchanged; agent IPC indices in diagnostic capture arrays move by four in
+g532. Compare historical arrays with their original generation's stage map.
+This remains same-installation IPC, guarded by matching agent/service generation.
 
 The existing matching 64-byte activation response carries three optional bounded microsecond measurements: post-to-owner handling, direct foreground request, and subsequent foreground verification. The prior queue bucket also includes command admission and remains unchanged for comparison. Exact observations preserve measured zero, first observation, negative acknowledgements and sealed-attempt ownership. Non-activation packets cannot carry these details. Old all-zero activation replies remain unobserved; this is a same-installation IPC detail and agent/input-service generations must match before physical comparison.
 

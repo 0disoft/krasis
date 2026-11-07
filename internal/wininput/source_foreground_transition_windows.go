@@ -12,7 +12,7 @@ const sourceForegroundTransitionInterval = 10 * time.Millisecond
 
 var sourceForegroundTransitionPause = time.Sleep
 
-const sourceForegroundSentMessages = 0x00400000 // PM_QS_SENDMESSAGE | PM_NOREMOVE
+const sourceForegroundActivationMessages = 0 // PM_NOREMOVE, without a queue-category filter
 
 var callSourceForegroundMessages = procPeekMessageW.Call
 
@@ -29,10 +29,12 @@ var sourceForegroundTransitionDispatch = func(window uintptr) {
 		return
 	}
 	var pending message
-	// PeekMessage services sent messages/internal activation events on this
-	// owner thread. Never remove or dispatch queued input, commands or WM_QUIT
-	// inside an activation command. Zero is normal when no posted item exists.
-	callSourceForegroundMessages(uintptr(unsafe.Pointer(&pending)), window, 0, 0, sourceForegroundSentMessages)
+	// Cross-queue foreground activation is an internal input-queue event, not
+	// just a sent message. A sent-only filter can leave that nudge pending and
+	// force thread attachment on every handoff. Service internal events without
+	// a queue-category filter, but never remove or dispatch the returned message,
+	// queued input, commands or WM_QUIT. Zero is normal when no posted item exists.
+	callSourceForegroundMessages(uintptr(unsafe.Pointer(&pending)), window, 0, 0, sourceForegroundActivationMessages)
 }
 
 // GetForegroundWindow may temporarily return NULL while activation changes.
