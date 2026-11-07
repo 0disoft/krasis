@@ -62,6 +62,14 @@ func newSourceLowLevelCallbacks(session *SourceSession, boundary BoundaryObserve
 				}
 				return next(code, wParam, lParam)
 			}
+			if message == wmMouseMove && !isInjectedMouse(data) {
+				if local, err := observeInactiveHookMove(session, pointerState, shield, data.Point); local {
+					if err != nil {
+						session.Abort(err)
+					}
+					return next(code, wParam, lParam)
+				}
+			}
 			if err := check(); err != nil {
 				session.Abort(err)
 				return next(code, wParam, lParam)
@@ -110,4 +118,23 @@ func newSourceLowLevelCallbacks(session *SourceSession, boundary BoundaryObserve
 		return next(code, wParam, lParam)
 	}
 	return &sourceHookCallbacks{keyboard: keyboardCallback, mouse: mouseCallback}
+}
+
+// A local movement only observes coordinates: it emits no action and suppresses
+// nothing. Serialize that decision with activation without waiting on its gate.
+// Raw Input forwarding, active suppression and visible cursor changes retain
+// their fresh desktop/authority checks. Only the hook thread owns shield state.
+func observeInactiveHookMove(session *SourceSession, pointer *sourcePointerState, shield *returnCursorShield, position point) (bool, error) {
+	if session == nil || (shield != nil && shield.visible) || !session.physicalMu.TryLock() {
+		return false, nil
+	}
+	defer session.physicalMu.Unlock()
+	if session.Active() {
+		return false, nil
+	}
+	if err := shield.beforeMouseInput(wmMouseMove, position); err != nil {
+		return true, err
+	}
+	pointer.observe(position)
+	return true, nil
 }
