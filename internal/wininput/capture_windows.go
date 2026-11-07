@@ -4,6 +4,7 @@ package wininput
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"runtime"
 	"sync/atomic"
@@ -11,7 +12,6 @@ import (
 	"unsafe"
 
 	"github.com/0disoft/krasis/internal/lab"
-	"github.com/0disoft/krasis/internal/winmessage"
 )
 
 const (
@@ -198,56 +198,51 @@ func captureOnDedicatedThread(ctx context.Context, options lab.CaptureOptions, r
 		}
 	}()
 
-	stopMessageLoop := make(chan struct{})
-	stopMessageLoopDone := make(chan struct{})
-	go func() {
-		defer close(stopMessageLoopDone)
-		select {
-		case <-ctx.Done():
-			procPostThreadMessageW.Call(threadID, wmQuit, 0, 0)
-		case <-stopMessageLoop:
-		}
-	}()
-
-	loopErr := runMessageLoop(options.Ready)
+	loopErr := runMessageLoop(ctx, options.Ready)
 	unhookErr := cleanupHooks()
-	close(stopMessageLoop)
-	<-stopMessageLoopDone
 	close(stopReporter)
 	<-reporterDone
 	report(counters.snapshot(time.Since(started)))
 
-	if loopErr != nil {
-		return loopErr
-	}
-	if unhookErr != nil {
+	// Capture callers treat cancellation as normal. A failed unhook must not
+	// be hidden by that classification when cancellation stopped the loop.
+	if unhookErr != nil && cancellationOnly(loopErr) {
 		return unhookErr
+	}
+	if loopErr != nil || unhookErr != nil {
+		return errors.Join(loopErr, unhookErr)
 	}
 	return ctx.Err()
 }
 
-func runMessageLoop(ready func()) error {
-	var msg message
-	for {
-		result, callErr := winmessage.Get((*winmessage.Message)(unsafe.Pointer(&msg)))
-		signedResult := int32(result)
-		switch signedResult {
-		case -1:
-			return fmt.Errorf("GetMessageW failed: %w", callErr)
-		case 0:
-			return nil
-		default:
-			if msg.Message == wmCaptureReady {
-				if ready != nil {
-					ready()
-					ready = nil
-				}
-				continue
-			}
-			procTranslateMessage.Call(uintptr(unsafe.Pointer(&msg)))
-			procDispatchMessageW.Call(uintptr(unsafe.Pointer(&msg)))
+func runMessageLoop(ctx context.Context, ready func()) error {
+	err := sourceMessageLoop(ctx, func(msg message) error {
+		if msg.Message == wmCaptureReady && ready != nil {
+			ready()
+			ready = nil
 		}
+		return nil
+	})
+	if failure := captureLoopFailure(err); failure != nil {
+		return failure
 	}
+	return err
+}
+
+// Lab callers treat cancellation as a normal outcome. Preserve independent
+// wake-event failures without letting a joined cancellation hide them.
+func captureLoopFailure(err error) error {
+	if err == nil || cancellationOnly(err) {
+		return nil
+	}
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		var failures []error
+		for _, child := range joined.Unwrap() {
+			failures = append(failures, captureLoopFailure(child))
+		}
+		return errors.Join(failures...)
+	}
+	return err
 }
 
 func (c *captureCounters) observeKeyboard(message uint32, injected bool) {
