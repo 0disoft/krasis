@@ -100,6 +100,9 @@ func LayoutStatus(ctx context.Context, open func() (Client, error), fingerprint 
 	if got.Status != "COMPLETED" || got.Profile == nil || (got.Profile.Edge != "LEFT" && got.Profile.Edge != "RIGHT") {
 		return layoutFailure("rejected")
 	}
+	if got.Profile.Fingerprint != fingerprint {
+		return layoutFailure("invalid_peer")
+	}
 	return LayoutSnapshot{Edge: got.Profile.Edge, Rearm: got.Profile.Rearm(), Code: "ok"}
 }
 

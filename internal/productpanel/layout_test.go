@@ -71,6 +71,19 @@ func TestNativeLayoutOmitsAddressAndRequiresLocalWrites(t *testing.T) {
 	}
 }
 
+func TestLayoutStatusRejectsProfileFromDifferentPeer(t *testing.T) {
+	selected := strings.Repeat("a", 64)
+	c := &layoutClient{
+		fakeClient: fakeClient{state: "LOCAL", peers: []localapi.TrustedPeer{{Alias: "peer", Fingerprint: selected}}},
+		profile: truststore.ConnectionProfile{SchemaVersion: truststore.ConnectionSchemaVersion,
+			Fingerprint: strings.Repeat("b", 64), ConnectionSettings: truststore.ConnectionSettings{Address: "192.168.1.9:45872", Edge: "LEFT", RearmDistance: 128}},
+	}
+	got := LayoutStatus(context.Background(), func() (Client, error) { return c, nil }, selected)
+	if got.Code != "invalid_peer" {
+		t.Fatalf("displayed a different peer's layout: %+v", got)
+	}
+}
+
 func TestRearmRequestPreservesOtherSettings(t *testing.T) {
 	id := strings.Repeat("a", 64)
 	for _, distance := range []int32{32, 64, 128, 0, 33} {
