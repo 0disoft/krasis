@@ -1,0 +1,267 @@
+{
+  "schemaVersion": "krasis.g533-paired-installation-review/v1",
+  "date": "2026-11-08",
+  "generation": 533,
+  "revision": "2ff01c325d501743f18d9d4b72ba874013376a83",
+  "commits": [
+    "f10e4d72",
+    "2ff01c325d501743f18d9d4b72ba874013376a83"
+  ],
+  "installation": {
+    "A": {
+      "state": "installed",
+      "method": "Diagnostic helper invoked appinstall.InstallWithShutdown and launchrecord.StartAfterInstall with the exact verified g533 payload and installer. Original startup fence, ownership preflight and protected service update were retained.",
+      "priorSetupResults": [
+        {
+          "schema": "krasis.setup-result/v1",
+          "code": 1,
+          "state": "shutdown_failed",
+          "shutdownStage": "UI exit",
+          "installStage": "shutdown"
+        },
+        {
+          "schema": "krasis.setup-result/v1",
+          "code": 1,
+          "state": "shutdown_failed",
+          "shutdownStage": "UI exit",
+          "installStage": "shutdown"
+        }
+      ],
+      "limit": "Both setup executable attempts reported UI exit failure without exposing the cause. The later direct public-API invocation succeeded; the exact earlier UI failure is not established."
+    },
+    "B": {
+      "code": "updated",
+      "generation": 533,
+      "revision": "2ff01c325d501743f18d9d4b72ba874013376a83",
+      "bytes": 29019728,
+      "total": 29019728
+    },
+    "cliConnect": "connected",
+    "doctor": "healthy",
+    "sameAuthenticatedConnection": true,
+    "connectionStartup": {
+      "local": "CLI connect B started the missing A listener; B retained its existing bounded retry loop.",
+      "priorPeerRequest": "busy",
+      "finalPeerRequest": "connected"
+    }
+  },
+  "devices": {
+    "A": {
+      "created": "2026-11-07T20:44:41Z",
+      "supportSha256": "608074caadcec00f758c09e60d5efa58079c6fa8b859f7df78cbca5128443b85",
+      "service": "READY",
+      "input": "READY",
+      "grant": "PRESENT",
+      "serviceStartedAt": "2026-11-07T20:42:13.802557Z",
+      "connectedAt": "2026-11-07T20:44:04.9529853Z",
+      "observedAfterConnectionMillis": 36048,
+      "failuresAfterConnection": [],
+      "reconnectsAfterConnection": [],
+      "preparationAfterConnection": [
+        {
+          "time": "2026-11-07T20:44:04.963135Z",
+          "code": "installed_input_preparation_acknowledged"
+        }
+      ],
+      "preConnectionFailures": [],
+      "logCompleteness": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": true
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false
+        }
+      ]
+    },
+    "B": {
+      "created": "2026-11-07T20:44:40Z",
+      "supportSha256": "d2299d20cdddd059c072bb6617f5228f850654d81dfcafabf8f6a5214cc1bcd7",
+      "service": "READY",
+      "input": "READY",
+      "grant": "PRESENT",
+      "serviceStartedAt": "2026-11-07T20:38:02.8947784Z",
+      "connectedAt": "2026-11-07T20:44:03.6086134Z",
+      "observedAfterConnectionMillis": 36392,
+      "failuresAfterConnection": [],
+      "reconnectsAfterConnection": [],
+      "preparationAfterConnection": [
+        {
+          "time": "2026-11-07T20:44:03.6219487Z",
+          "code": "installed_input_preparation_acknowledged"
+        },
+        {
+          "time": "2026-11-07T20:44:25.413941Z",
+          "code": "installed_input_preparation_acknowledged"
+        },
+        {
+          "time": "2026-11-07T20:44:27.517237Z",
+          "code": "installed_input_preparation_acknowledged"
+        },
+        {
+          "time": "2026-11-07T20:44:29.5940351Z",
+          "code": "installed_input_preparation_acknowledged"
+        },
+        {
+          "time": "2026-11-07T20:44:31.7214405Z",
+          "code": "installed_input_preparation_acknowledged"
+        },
+        {
+          "time": "2026-11-07T20:44:34.0595878Z",
+          "code": "installed_input_preparation_acknowledged"
+        },
+        {
+          "time": "2026-11-07T20:44:39.2628087Z",
+          "code": "installed_input_preparation_acknowledged"
+        }
+      ],
+      "preConnectionFailures": [
+        {
+          "time": "2026-11-07T20:38:15.8021711Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T20:38:21.0777847Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T20:38:26.5267083Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T20:38:33.8474898Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T20:38:41.0896922Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T20:38:52.1864004Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T20:39:04.5817827Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T20:39:28.0935267Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T20:40:04.5590205Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T20:40:41.0764524Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T20:41:17.3907652Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T20:41:53.907092Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T20:42:26.267866Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T20:43:02.7881105Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T20:43:35.6653888Z",
+          "code": "reconnect_acquire_network_timeout"
+        }
+      ],
+      "logCompleteness": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false
+        }
+      ]
+    }
+  },
+  "validation": {
+    "test": "Uncached agent, residentagent, peer, transport, wininput, inputworker and handoff passed",
+    "race": "Uncached wininput and agent race/checkptr passed",
+    "vet": "The same seven packages passed with the existing -unsafeptr=false policy",
+    "frontend": "111 tests and native build passed",
+    "package": "8-file update integrity/integration and setup verification passed",
+    "native": "First uncontrolled run rejected a foreground request after the previous application exceeded the bounded response probe. No bypass added. Second run passed five actual activation/ownership/retirement cycles, including above-normal requester priority; activation 32.7224..90.113ms with legitimate API-rejection fallbacks. This is not a paired latency comparison.",
+    "logs": {
+      "test": {
+        "sha256": "5eee46618b62a5801bf16e8d5a901b413a2928b8ba578f8d542af8e7623ccd0c",
+        "bytes": 394,
+        "result": "passed"
+      },
+      "vet": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0,
+        "result": "passed"
+      },
+      "race": {
+        "sha256": "74065e216fc88c39d16775a2b8c753450e2a16ccea16529efbfa27de0aed6adc",
+        "bytes": 109,
+        "result": "passed"
+      },
+      "native": {
+        "sha256": "656862892b5c0572676f649378ae52f66ab0080d3098ea91f8f3a6860619d38f",
+        "bytes": 3284,
+        "result": "passed"
+      },
+      "package": {
+        "sha256": "ffafd5fba6a7c4650d7b64f58e806818b11358e736b20df56ae9e0d951df5b93",
+        "bytes": 11718,
+        "result": "passed"
+      },
+      "setup-build": {
+        "sha256": "7d4293381a578df744388d5012c05c400a94a544cb7fd7a6348fc206905d8c3c",
+        "bytes": 220,
+        "result": "passed"
+      },
+      "native-uncontrolled-first": {
+        "sha256": "a3ebd17fdca72f504c411a3fd1d0e3fdaf75640186d956de72821277d835becc",
+        "bytes": 1303,
+        "result": "failed"
+      }
+    }
+  },
+  "sourceOfTruthChanged": [
+    "docs/architecture/02-runtime-flow.md"
+  ],
+  "changes": "One connection-start preparation target and one source-monitor scheduling target. No public API/command, DB, dependency, protocol, hygiene or runner change.",
+  "limits": [
+    "No new paired physical crossing latency sample yet. Neither the B 267.456ms nor A 123.413ms maximum is claimed fixed.",
+    "B prewarming remains one bounded demand with the original cooldown and 15-minute candidate expiry; immediate entry or later expiry can still need construction.",
+    "Monitor promotion is best effort and does not preempt Win32 calls. The g532 request span does not isolate scheduling from native execution.",
+    "Readiness and bounded retained logs are not a long-duration recovery guarantee.",
+    "Full repository and non-Windows checks skipped; the affected seven packages, race and normal package checks were used."
+  ],
+  "push": "not requested; not performed",
+  "remoteCI": "not requested; not run"
+}
