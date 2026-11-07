@@ -1,0 +1,189 @@
+{
+  "schemaVersion": "krasis.g534-paired-installation-review/v1",
+  "date": "2026-11-08",
+  "generation": 534,
+  "revision": "752cddaefd1a0a782c20cb21993a97355168a4fe",
+  "installation": {
+    "A": {
+      "schema": "krasis.setup-result/v1",
+      "code": 0,
+      "state": "installed"
+    },
+    "B": {
+      "code": "updated",
+      "generation": 534,
+      "revision": "752cddaefd1a0a782c20cb21993a97355168a4fe",
+      "bytes": 28946487,
+      "total": 28946487
+    },
+    "cliListen": "connect_started",
+    "cliConnect": "connected",
+    "doctor": "healthy",
+    "sameAuthenticatedConnection": true,
+    "connectionStartup": {
+      "local": "CLI connect B started the A listener; B completed its existing connection attempt.",
+      "initialPeerRequest": "busy",
+      "finalPeerRequest": "connected",
+      "limit": "The first peer request overlapped B connection startup and returned busy. A subsequent doctor already showed CONNECTED; the later peer confirmation returned connected without a manual button."
+    }
+  },
+  "devices": {
+    "A": {
+      "created": "2026-11-07T21:15:47Z",
+      "supportSha256": "a36b2508f2c6b3b9189915bb4607dbe53fc01d44b6dac9f66b45a33a6edb4040",
+      "service": "READY",
+      "input": "READY",
+      "grant": "PRESENT",
+      "serviceStartedAt": "2026-11-07T21:15:10.9889132Z",
+      "connectedAt": "2026-11-07T21:15:18.2620653Z",
+      "observedAfterConnectionMillis": 28738,
+      "failuresAfterConnection": [],
+      "reconnectsAfterConnection": [],
+      "preConnectionFailures": [],
+      "logCompleteness": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false
+        }
+      ]
+    },
+    "B": {
+      "created": "2026-11-07T21:15:47Z",
+      "supportSha256": "36310c78fe96a946216eaaaff714f8db627a3b50634104e480ae5b8211421e2e",
+      "service": "READY",
+      "input": "READY",
+      "grant": "PRESENT",
+      "serviceStartedAt": "2026-11-07T21:14:44.3471279Z",
+      "connectedAt": "2026-11-07T21:15:16.8861587Z",
+      "observedAfterConnectionMillis": 30114,
+      "failuresAfterConnection": [],
+      "reconnectsAfterConnection": [],
+      "preConnectionFailures": [
+        {
+          "time": "2026-11-07T21:14:56.5786158Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T21:15:01.8615982Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T21:15:07.2696267Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T21:15:14.711083Z",
+          "code": "reconnect_acquire_network_timeout"
+        }
+      ],
+      "logCompleteness": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false
+        }
+      ]
+    }
+  },
+  "baseline": {
+    "source": "docs/experiments/2026-11-08-g533-paired-crossing-review.json",
+    "completeMatchingAttempts": 11,
+    "aCaptureMedianMs": 33.709,
+    "aCaptureMaxMs": 86.205,
+    "slowestAttempt": {
+      "agentAuthorityMs": 16.412,
+      "workerReadAuthorizationMs": 19.05,
+      "dispatchMs": 21.404,
+      "activationMs": 23.65,
+      "requestDeliveryMs": 0.097,
+      "replyDeliveryMs": 0.062
+    }
+  },
+  "validation": {
+    "test": "Seven affected Go packages passed uncached",
+    "race": "Uncached wininput, inputworker and agent race/checkptr passed",
+    "vet": "Seven affected packages passed with the existing -unsafeptr=false policy",
+    "native": {
+      "result": "passed",
+      "cycles": 5,
+      "minActivationMs": 19.3381,
+      "maxActivationMs": 44.9469,
+      "limit": "Actual native smoke with foreground ownership and retirement checks; not a paired latency comparison."
+    },
+    "frontend": "Existing frontend unit suite and native build passed",
+    "package": "Update integrity/integration and embedded setup verification passed",
+    "boundary": "Measured-zero, maximum window, overflowing diagnostic sums, legacy and extended frame alignment, truncated/unknown extensions, single ACK write, fresh queries, native-denial projection, cancellation and late completion covered",
+    "logs": {
+      "test": {
+        "sha256": "828a9c9231ae37544c1663a26cc03b53da1b767e0d77330484e7966d79ac7449",
+        "bytes": 394,
+        "result": "passed"
+      },
+      "vet": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0,
+        "result": "passed"
+      },
+      "race": {
+        "sha256": "afc47bbb5351658bd8d681a4016882f6508a7ae169ecee41899784b6aae0e833",
+        "bytes": 169,
+        "result": "passed"
+      },
+      "native": {
+        "sha256": "9ccc5e619291b0a18d31c728761bb29ae81d1deecad9d81808c9bdc30f8ae0f4",
+        "bytes": 2592,
+        "result": "passed"
+      },
+      "package": {
+        "sha256": "2af7bd6efa5f4b2a1403a2d30b74e44a812187ee539cb7fc4636a3af5c69aad6",
+        "bytes": 11700,
+        "result": "passed"
+      },
+      "setup-build": {
+        "sha256": "219e904677c1945a35a2849c6c00e44fc9dc814b2c4fe8096d35937d112c085d",
+        "bytes": 220,
+        "result": "passed"
+      }
+    }
+  },
+  "sourceOfTruthChanged": [
+    "docs/architecture/02-runtime-flow.md"
+  ],
+  "changes": "Align mandatory source query and actual desktop dispatcher scheduling; split matching agent preflight and worker read authority into query elapsed and remaining wait. The private activation ACK gains an optional eight-byte extension without another write/RPC. Public API/CLI, DB, dependencies, repository hygiene and tracked runners unchanged.",
+  "limits": [
+    "No new g534 paired physical crossing latency sample yet; the 86.205ms maximum is not claimed resolved.",
+    "Native elapsed can itself include scheduling; priority is best effort and cannot preempt blocked Win32 calls.",
+    "Retained readiness and logs cover only the post-install observation interval, not a long-duration recovery guarantee.",
+    "Full repository and non-Windows checks skipped in favor of seven affected packages, three race packages, native smoke and package checks."
+  ],
+  "push": "not requested; not performed",
+  "remoteCI": "not requested; not run",
+  "commits": [
+    "c8b9d182",
+    "03961127",
+    "752cddaefd1a0a782c20cb21993a97355168a4fe"
+  ]
+}
