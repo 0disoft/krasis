@@ -27,6 +27,10 @@ type authorityQuery struct {
 
 type authorityQueryKind uint8
 
+// Only a local capture activation marks its preflight. This is a scheduling
+// hint, never a proof, cached result or change to query admission/retirement.
+type sourceCommandAuthorityKey struct{}
+
 const (
 	inputAuthorityQuery authorityQueryKind = iota
 	presenceAuthorityQuery
@@ -177,7 +181,7 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 		}
 		*current = query
 		queryCtx, merge := handoff.ForkAuthority(ctx)
-		go func() {
+		startAuthorityQuery(ctx, kind, func() {
 			released := false
 			defer func() {
 				if !released {
@@ -233,7 +237,7 @@ func (channel *Channel) queryAuthority(ctx context.Context, observed bool, kind 
 			released = true
 			close(query.done)
 			channel.queryMu.Unlock()
-		}()
+		})
 		channel.queryMu.Unlock()
 		select {
 		case <-query.done:

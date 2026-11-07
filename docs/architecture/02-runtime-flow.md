@@ -488,6 +488,29 @@ g532 123.413ms capture sample contains 98.908ms of worker activation and 35.305m
 of foreground request/exchange. It does not isolate monitor scheduling from
 Windows execution; a paired physical trial is still required to quantify benefit.
 
+### g534 source command dependency scheduling
+
+The protected command dispatcher's callback uses the actual desktop owner's
+thread at the input owners' best-effort ABOVE_NORMAL priority. Raising only the
+reader and foreground monitor leaves this synchronous dispatch dependency at
+normal priority. The input desktop's original binding, fresh per-command
+authorization and cleanup remain independently owned by its scope.
+
+Mandatory source proof/presence queries and an activation's agent preflight use
+the same bounded priority scope. Capacity is reserved before starting their
+native owner: the existing four-query maximum and three-proof limit still
+reserve a presence slot. Advisory/preparation work and high-rate input writes
+retain their previous scheduling policy. Every check is fresh; no authority is
+cached or skipped, and native completion still owns query/handle retirement
+after cancellation. Explicit priority policy is preserved and changed priority
+is restored before pool reuse; failed restoration retains the OS-thread lock.
+
+The g533 86.205ms activation outlier contains 16.412ms agent authority admission,
+19.050ms worker read validation and 21.404ms dispatch before 23.650ms activation.
+These elapsed spans mix work and scheduling. Matching pipe delivery is only
+0.097/0.062ms. Correcting these priority dependencies targets a structural source
+of CPU contention but does not prove the cause of every elapsed microsecond.
+
 ### g511 source capture timing detail
 
 The g531+ capture path sends its first foreground request to the existing,

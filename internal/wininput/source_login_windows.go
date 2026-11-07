@@ -56,7 +56,12 @@ func (hook *SourceHook) WithSourceCommandDesktop(ctx context.Context, callback f
 	}
 	return sourceCommandOwnerDesktop(context.Background(), hook.loginAuthorize, func(scope *inputdesktop.Scope) error {
 		owned := context.WithValue(ctx, sourceCommandDesktopKey{}, sourceCommandScope{owner: hook, scope: scope})
-		return callback(owned)
+		var result error
+		// Run on the actual desktop owner's thread, not its waiting caller.
+		// Otherwise the promoted reader still dispatches to a normal-priority
+		// dependency when CPU work competes with capture activation.
+		RunSourceInputTask(func() { result = callback(owned) })
+		return result
 	})
 }
 

@@ -14,6 +14,11 @@ func StartSourceIPCReader(read func()) {
 	go runSourceIPCReader(read)
 }
 
+// RunSourceInputTask keeps a bounded source-command dependency on one thread
+// with the same best-effort priority as the native input owners. The caller
+// retains its deadline, admission limit and native resource lifetime.
+func RunSourceInputTask(work func()) { runSourceIPCReader(work) }
+
 func runSourceIPCReader(read func()) {
 	runtime.LockOSThread()
 	restore := sourceInputThreadPriorityScope(currentSourceThreadPriority, setSourceThreadPriority)

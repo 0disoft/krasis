@@ -51,6 +51,9 @@ func (c *sourceClient) call(ctx context.Context, op byte, reference ...uint64) (
 	}
 	ctx, cancel := context.WithTimeout(ctx, budget)
 	defer cancel()
+	if op == sourceActivate {
+		ctx = context.WithValue(ctx, sourceCommandAuthorityKey{}, true)
+	}
 	// Stop owns pending-reply draining and retirement, including an already
 	// retired owner whose live authority is no longer queryable.
 	if op == sourceStop {
