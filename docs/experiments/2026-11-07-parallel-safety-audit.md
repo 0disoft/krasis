@@ -57,6 +57,7 @@ Ten complete package suites passed race detection: inputdesktop, inputworker,
 productpanel, netobserve, agentlifecycle, securefs, peercredentials,
 productidentity, truststore and peerprobe. Selected wininput, residentagent and
 winlifecycle cancellation/reader/retirement tests also passed with race detection.
+Desktop-tag workspacehost shutdown and UI-replacement race tests passed too.
 The full wininput race suite stopped in the pre-existing direct Go invocation
 of a Win32 hook callback (`source_low_level_callbacks_windows_test.go`) with a
 checkptr pointer-arithmetic failure; it is not reported as a passing full suite.
@@ -70,7 +71,7 @@ lifecycle resource-count assertion failure; three isolated repeats passed.
 This observation must be distinguished from proven per-owner resource leakage.
 
 The pre-install paired collection request is recorded in the final installation
-receipt with its actual support-bundle paths and identifiers.
+receipt with its actual request identifier and support-bundle hashes.
 Both protected services and input-health states were READY; A was CONNECTING,
 not a verified connected session. Historical B session failures are preserved
 in the support bundle and are not reclassified as current-build successes.
@@ -83,6 +84,14 @@ line-by-line proof for every source file. Some laboratory, bootstrap/login,
 Windows UI and packaging paths remain without complete manual review.
 Successful startup/connection does not prove attended crossing latency or
 long-duration absence of reconnection/recovery failures.
+
+The installed g529 observation retained the same authenticated connection and
+READY services for approximately 99 seconds. A nevertheless reported two
+source heartbeat failures, with source-service-query-cancelled and
+hook-callback-stalled exits. All native owners joined and retirement completed
+with clean_sent. The scheduling/native-query cause remains unresolved; these
+events are preserved in the installation receipt rather than counted as a
+failure-free trial.
 
 Lock-sharing upgrades should stop old product processes before starting the
 new bundle. An old writer holding DELETE access can make a new lock open fail

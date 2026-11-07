@@ -1,0 +1,259 @@
+{
+  "schema": "krasis.paired-installation-review/v1",
+  "date": "2026-11-07",
+  "generation": 529,
+  "revision": "ceafd5043c88a81fbeea182b52444229c16c1dc4",
+  "audit": "docs/experiments/2026-11-07-parallel-safety-audit.md",
+  "auditFindings": 21,
+  "agents": {
+    "count": 5,
+    "model": "gpt-6.1-terra",
+    "reasoning": "high"
+  },
+  "beforeCollection": "c2e4284168855298b9f392d67d9f3198",
+  "collection": "9fb267df4dde01777b11ef2e9f0ac5e1",
+  "devices": {
+    "A": {
+      "created": "2026-11-07T09:46:54Z",
+      "sha256": "ac04e2ec7f92d5f4df31d643a49b3f19f951a8dffe7276d88b77b11540bc7849",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "installation": {
+        "time": "2026-11-07T09:44:06.6608281Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "connectedAt": "2026-11-07T09:45:15.3373853Z",
+      "observedAfterConnectionMillis": 98663,
+      "observedFailureEventsAfterConnection": [
+        {
+          "time": "2026-11-07T09:46:22.5128369Z",
+          "code": "installed_source_command_failed_heartbeat"
+        },
+        {
+          "time": "2026-11-07T09:46:27.6773823Z",
+          "code": "installed_source_command_failed_heartbeat"
+        }
+      ],
+      "sessionFaultsAfterConnection": [],
+      "reconnectsAfterConnection": [],
+      "sourceWorkerExits": [
+        {
+          "time": "2026-11-07T09:46:22.6023495Z",
+          "command": "ok",
+          "reader": "authority",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "clean_sent",
+          "report": "failed",
+          "failure": {
+            "operation": "source-service-query-cancelled",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "heartbeatStage": "replied",
+          "heartbeatSlowStage": "service_presence",
+          "heartbeatSlowBucket": 3
+        },
+        {
+          "time": "2026-11-07T09:46:27.911738Z",
+          "command": "ok",
+          "reader": "cancelled",
+          "capture": "joined",
+          "sender": "joined",
+          "interrupt": "joined",
+          "retirement": "clean_sent",
+          "report": "failed",
+          "failure": {
+            "operation": "hook-callback-stalled",
+            "win32Error": 0,
+            "win32Known": false
+          },
+          "heartbeatStage": "replied",
+          "heartbeatSlowStage": "service_presence",
+          "heartbeatSlowBucket": 3
+        }
+      ],
+      "earlierCurrentBuildFindings": []
+    },
+    "B": {
+      "created": "2026-11-07T09:46:54Z",
+      "sha256": "f076c2ca430f848931dc0a59ffa0c16267de88be98f69e6a0dab53416ed8d979",
+      "service": "READY",
+      "inputHealth": "READY",
+      "grant": "PRESENT",
+      "installation": {
+        "time": "2026-11-07T09:43:22.3161668Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "connectedAt": "2026-11-07T09:45:14.5585979Z",
+      "observedAfterConnectionMillis": 99442,
+      "observedFailureEventsAfterConnection": [],
+      "sessionFaultsAfterConnection": [],
+      "reconnectsAfterConnection": [],
+      "sourceWorkerExits": [],
+      "earlierCurrentBuildFindings": [
+        {
+          "time": "2026-11-07T09:43:38.1625891Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T09:43:43.4472711Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T09:43:49.0374419Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T09:43:56.5010475Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T09:44:03.25749Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T09:44:13.2573116Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T09:44:25.4527346Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T09:44:45.3500588Z",
+          "code": "reconnect_acquire_network_timeout"
+        }
+      ]
+    }
+  },
+  "connection": {
+    "state": "CONNECTED",
+    "sharedConnectionMatched": true,
+    "method": "Local CLI connect B followed by authenticated CLI app connect B",
+    "receipt": "09d4eb438b850ed9f89e237d5f1f4cdd",
+    "firstRemoteConnectCode": "busy"
+  },
+  "update": {
+    "code": "updated",
+    "id": "0d51eb9e0cd0791a0573579c0288dfa6",
+    "generation": 529,
+    "revision": "ceafd5043c88a81fbeea182b52444229c16c1dc4",
+    "bytes": 29035522,
+    "total": 29035522
+  },
+  "validation": {
+    "wholeRepository": {
+      "passedPackages": 56,
+      "packagesWithoutTests": 8,
+      "command": "go test -p 2 -timeout 3m ./..."
+    },
+    "vet": "Passed; existing wininput -unsafeptr=false policy retained",
+    "desktop": "Workspacehost and desktop product entry-point tests passed",
+    "frontend": {
+      "tests": 111,
+      "passed": 111,
+      "failed": 0,
+      "nativeBuild": "passed"
+    },
+    "race": {
+      "completePackages": [
+        "inputdesktop",
+        "inputworker",
+        "productpanel",
+        "netobserve",
+        "agentlifecycle",
+        "securefs",
+        "peercredentials",
+        "productidentity",
+        "truststore",
+        "peerprobe"
+      ],
+      "selectedPackages": [
+        "wininput",
+        "residentagent",
+        "winlifecycle",
+        "workspacehost"
+      ],
+      "fullWininput": "Not passed: existing direct Win32 hook callback invocation in source_low_level_callbacks_windows_test.go stops at checkptr pointer-arithmetic check. Selected changed paths passed without disabling checkptr."
+    },
+    "archive": "Normal, tampered-verifier and oversized probe-kit cases passed",
+    "workspace": "Build and 8-file package verified",
+    "setup": "Verified and installed on both devices",
+    "diffCheck": "passed",
+    "logs": {
+      "test": {
+        "sha256": "51ea2790863edd4c493203298c25169312725ead08e30902574298bb87deb011",
+        "bytes": 3821
+      },
+      "vet": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "vet-wininput": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "desktop": {
+        "sha256": "45fa26e449f76f613022c0151ad8d9afc2e1ee9a73f20c7d183d04a93d046097",
+        "bytes": 244
+      },
+      "race": {
+        "sha256": "bc49240fe4b97552659e4ed192b4c1cf5e6e3db77dcce47997cbce3fd33fa280",
+        "bytes": 22759
+      },
+      "race-selected": {
+        "sha256": "f6ca9caf3ff23eaf92b3541e19ad8499d83b3956e93d6f22d32ef0530fcd4cf7",
+        "bytes": 177
+      },
+      "race-desktop": {
+        "sha256": "b71dac37f558633a60cbeb38508ffcdc32ecfd8afd38959c7514c88bb53c8be2",
+        "bytes": 61
+      },
+      "build": {
+        "sha256": "1b3167e5f8e9bc888dd042d43c0354ed5a939afaee7016302ba55505b7ae81c1",
+        "bytes": 11699
+      },
+      "setup-build": {
+        "sha256": "1506ba3b0501f567158c16cebf0e44928958db734ea9faaecce92f9c7db9c4fe",
+        "bytes": 220
+      }
+    }
+  },
+  "sourceOfTruthChanged": [],
+  "documentationAdded": [
+    "docs/experiments/2026-11-07-parallel-safety-audit.md",
+    "docs/experiments/2026-11-07-g529-paired-installation-review.json"
+  ],
+  "apiDBRunner": "No public API route/signature, private IPC/peer wire format, database, dependency or CI runner changes. Internal protected-directory and lock-handle APIs added. Unsupported securefs platforms fail explicitly.",
+  "limits": [
+    "Not a line-by-line proof or guarantee that all latent bugs are removed; reviewed production groups and remaining manual-review areas are recorded in the audit.",
+    "A has two current-connection installed_source_command_failed_heartbeat events, with source-service-query-cancelled and hook-callback-stalled worker exits. Native owners joined and retirement was clean_sent; service/input READY and the authenticated connection were retained. Their original scheduling/native-query cause is not established; these are not erased from the observation record.",
+    "No attended crossing trial or long-duration recovery recurrence/latency comparison for g529 yet. This receipt verifies installed versions, service/input health and the connected observation interval only.",
+    "No real non-Windows operating-system execution; unsupported-platform guard logic tested with explicit source selection.",
+    "OS scheduling, syscall stalls, trust-freshness expiry and cross-application focus behavior may still cause latency or session failure. No fail-closed deadline or cleanup fence was weakened.",
+    "Initial suite included overlapping-edit compile failures and a privacy-test regression, both corrected before the final passing full run. Native process-wide resource fluctuation was replaced by mandatory exact-owner thread/window/class/hook retirement assertions, not a raised resource threshold."
+  ],
+  "push": "Not requested; not performed",
+  "remoteCI": "Not requested; not run"
+}
