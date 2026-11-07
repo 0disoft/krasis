@@ -5,7 +5,6 @@ package wininput
 import (
 	"testing"
 	"time"
-	"unsafe"
 )
 
 func TestPhysicalMouseSuppressionDoesNotWaitForSessionStateMutex(t *testing.T) {
@@ -21,9 +20,10 @@ func TestPhysicalMouseSuppressionDoesNotWaitForSessionStateMutex(t *testing.T) {
 		}
 	}()
 	done := make(chan uintptr, 1)
+	data := mouseHookData{Point: point{X: 90}}
+	payload := nativeHookPayload(t, data)
 	go func() {
-		data := mouseHookData{Point: point{X: 90}}
-		done <- callbacks.mouse(hcAction, wmMouseMove, uintptr(unsafe.Pointer(&data)))
+		done <- callbacks.mouse(hcAction, wmMouseMove, payload)
 	}()
 	select {
 	case result := <-done:
@@ -42,8 +42,8 @@ func TestPhysicalMouseSuppressionDoesNotWaitForSessionStateMutex(t *testing.T) {
 	// Retirement must win even when the prior active bit remains published
 	// until the ordinary worker obtains the state transaction lock.
 	s.retireHookFailure(errHookCallbackStalled)
-	data := mouseHookData{}
-	if callbacks.mouse(hcAction, wmMouseMove, uintptr(unsafe.Pointer(&data))) != 42 || s.Active() {
+	data = mouseHookData{}
+	if callbacks.mouse(hcAction, wmMouseMove, nativeHookPayload(t, data)) != 42 || s.Active() {
 		t.Fatal("retired source still suppressed input")
 	}
 }
