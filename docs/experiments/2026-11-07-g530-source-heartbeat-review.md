@@ -5,7 +5,7 @@
 Fresh paired diagnostics found three A `installed_source_command_failed_heartbeat`
 events, one more than the preceding installation receipt:
 
-| UTC | Final operation |
+| Worker exit report UTC | Final operation |
 | --- | --- |
 | 09:46:22.602 | source-service-query-cancelled |
 | 09:46:27.911 | hook-callback-stalled |
@@ -70,3 +70,10 @@ and public release are not part of this follow-up. Installation health and a
 short connected observation are not a replacement for attended crossings or
 long-duration testing under CPU load. Recovery or reconnect freedom must not
 be inferred beyond the recorded observation interval.
+
+Final paired diagnostics confirmed the same g530 authenticated connection and
+READY service/input on both notebooks for approximately 287 seconds, with no
+new heartbeat failure, reconnect or recovery event after connection. B's seven
+network acquire timeouts before that connection, during update/disconnect and
+installation, are retained in the receipt. No attended g530 crossing sample was
+collected in this observation.

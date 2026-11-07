@@ -1,0 +1,269 @@
+{
+  "schemaVersion": "krasis.g530-paired-installation-review/v1",
+  "generation": 530,
+  "revision": "f3839c2f382db47b21dbda4140291f318258e4ee",
+  "baseline": {
+    "generation": 529,
+    "heartbeatFailures": [
+      {
+        "time": "2026-11-07T09:46:22.5128369Z",
+        "code": "installed_source_command_failed_heartbeat"
+      },
+      {
+        "time": "2026-11-07T09:46:27.6773823Z",
+        "code": "installed_source_command_failed_heartbeat"
+      },
+      {
+        "time": "2026-11-07T09:53:22.6928708Z",
+        "code": "installed_source_command_failed_heartbeat"
+      }
+    ],
+    "finalOperations": [
+      "source-service-query-cancelled",
+      "hook-callback-stalled",
+      "source-agent-query-capacity"
+    ],
+    "initialCause": "Not established for all three events. Cancelled source authority work can be secondary to capture shutdown. Prior aggregate worker timings are not individual failed-attempt measurements."
+  },
+  "changes": {
+    "inactivePhysicalHookMoves": {
+      "guardCallsBeforeFor1000Moves": 1000,
+      "guardCallsAfterFor1000Moves": 0,
+      "scope": "Only inactive physical WM_MOUSEMOVE observation with an uncontended activation gate and no visible return cursor; active capture, Raw Input forwarding, keys/buttons/wheels and native presentation remain guarded."
+    },
+    "failedHeartbeatTiming": "Separate fixed-label attempt sample; unmeasured/untrusted fields unavailable; preceding maximum window preserved.",
+    "raceFailure": "Tests used Go-owned memory through uintptr on ordinary Go calls. Native LocalAlloc fixtures and native trampoline coverage now pass full wininput race with checkptr enabled.",
+    "nativeWriterTimingTest": "QPC deadline replaces an assumed Sleep lower bound; original 20000us assertion retained."
+  },
+  "installation": {
+    "A": {
+      "schema": "krasis.setup-result/v1",
+      "code": 0,
+      "state": "installed"
+    },
+    "B": {
+      "code": "updated",
+      "generation": 530,
+      "revision": "f3839c2f382db47b21dbda4140291f318258e4ee",
+      "bytes": 28931083,
+      "total": 28931083
+    },
+    "cliConnect": "connected",
+    "sameAuthenticatedConnection": true
+  },
+  "devices": {
+    "A": {
+      "created": "2026-11-07T10:25:54Z",
+      "supportSha256": "d90ffbab0506b628bd7ee6534abe6cdcc68df470f8e5b7b7a6a62e213519d36d",
+      "service": "READY",
+      "input": "READY",
+      "grant": "PRESENT",
+      "installation": {
+        "time": "2026-11-07T10:20:28.0387041Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "connectedAt": "2026-11-07T10:21:06.8246024Z",
+      "observedAfterConnectionMillis": 287176,
+      "failureEventsAfterConnection": [],
+      "reconnectEventsAfterConnection": [],
+      "earlierGeneration530FailureEvents": [],
+      "heartbeatTimingCodes": [
+        "installed_source_heartbeat_timing_client_lock_lt1ms",
+        "installed_source_heartbeat_timing_client_authority_lt1ms",
+        "installed_source_heartbeat_timing_client_write_lt1ms",
+        "installed_source_heartbeat_timing_client_response_lt100ms",
+        "installed_source_heartbeat_timing_worker_presence_wait_lt10ms",
+        "installed_source_heartbeat_timing_worker_presence_native_lt10ms",
+        "installed_source_heartbeat_timing_worker_reply_gate_lt1ms",
+        "installed_source_heartbeat_timing_worker_presence_native_lt1ms",
+        "installed_source_heartbeat_timing_client_response_lt10ms",
+        "installed_source_heartbeat_timing_worker_presence_wait_lt1ms",
+        "installed_source_heartbeat_timing_client_response_lt1ms"
+      ],
+      "currentBuildLogs": [
+        {
+          "source": "agent.jsonl",
+          "events": 208
+        },
+        {
+          "source": "control.jsonl",
+          "events": 1
+        }
+      ]
+    },
+    "B": {
+      "created": "2026-11-07T10:25:54Z",
+      "supportSha256": "62ca7a1d1310e81bbf62d7e9cd8b1078b73d58dd16e3cb49485bbc2605e289e0",
+      "service": "READY",
+      "input": "READY",
+      "grant": "PRESENT",
+      "installation": {
+        "time": "2026-11-07T10:19:43.8650465Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "connectedAt": "2026-11-07T10:21:06.0477989Z",
+      "observedAfterConnectionMillis": 287953,
+      "failureEventsAfterConnection": [],
+      "reconnectEventsAfterConnection": [],
+      "earlierGeneration530FailureEvents": [
+        {
+          "time": "2026-11-07T10:20:02.6843044Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T10:20:07.9436077Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T10:20:13.488065Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T10:20:21.0514519Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T10:20:27.8052486Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T10:20:37.9436114Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T10:20:49.8257777Z",
+          "code": "reconnect_acquire_network_timeout"
+        }
+      ],
+      "heartbeatTimingCodes": [
+        "installed_source_heartbeat_timing_client_lock_lt1ms",
+        "installed_source_heartbeat_timing_client_authority_lt1ms",
+        "installed_source_heartbeat_timing_client_write_lt1ms",
+        "installed_source_heartbeat_timing_client_response_lt10ms",
+        "installed_source_heartbeat_timing_worker_presence_wait_lt1ms",
+        "installed_source_heartbeat_timing_worker_presence_native_lt1ms",
+        "installed_source_heartbeat_timing_worker_reply_gate_lt1ms",
+        "installed_source_heartbeat_timing_worker_presence_wait_lt10ms",
+        "installed_source_heartbeat_timing_client_authority_lt10ms",
+        "installed_source_heartbeat_timing_client_response_lt1ms"
+      ],
+      "currentBuildLogs": [
+        {
+          "source": "agent.previous.jsonl",
+          "events": 5
+        },
+        {
+          "source": "agent.jsonl",
+          "events": 234
+        },
+        {
+          "source": "control.jsonl",
+          "events": 1
+        }
+      ]
+    }
+  },
+  "validation": {
+    "go": {
+      "passedPackages": 56,
+      "packagesWithoutTests": 8,
+      "command": "go test -p 2 -timeout 3m ./..."
+    },
+    "vet": "Passed; existing wininput -unsafeptr=false policy retained",
+    "desktop": "Passed workspacehost and desktop product entry-point tests",
+    "frontend": {
+      "tests": 111,
+      "passed": 111,
+      "failed": 0,
+      "nativeBuild": "passed"
+    },
+    "race": {
+      "fullWininput": "passed, final uncached run",
+      "fullCorePackages": [
+        "inputdesktop",
+        "inputworker",
+        "wininput",
+        "productpanel",
+        "netobserve",
+        "agentlifecycle",
+        "securefs",
+        "peercredentials",
+        "productidentity",
+        "truststore",
+        "peerprobe"
+      ],
+      "targetedFinalHeartbeatAndProductlog": "passed",
+      "targetedDesktopLifecycle": "passed"
+    },
+    "package": "8-file update bundle and application setup verified; both installations confirmed",
+    "diffCheck": "passed",
+    "logEvidence": {
+      ".cache/g530-test.log": {
+        "sha256": "186fa929393521633f7bc07bd708fbcd89421b9feeedfab608d38396d1e17ea2",
+        "bytes": 3866
+      },
+      ".cache/g530-vet.log": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      ".cache/g530-vet-wininput.log": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      ".cache/g530-desktop.log": {
+        "sha256": "e108eb09ddc620afad807f08c14955f467d64ad7b4f752aeeec02b551305d9ea",
+        "bytes": 248
+      },
+      ".cache/g530-race.log": {
+        "sha256": "bacd1fca3a778c10504ba83e07077396db99a91c27a122915d8a1db1f1473e82",
+        "bytes": 671
+      },
+      ".cache/g530-race-desktop.log": {
+        "sha256": "6fb6137a7a11267bf76f8b129e06ef4f7f00cc4eb72059ccf4b42802703018dd",
+        "bytes": 61
+      },
+      ".cache/g530-wininput-race-final.log": {
+        "sha256": "2eb83d9d3ae536dba36fa50aee529cbf6b4726a074e6569cf5adc7d4f0b9b00f",
+        "bytes": 56
+      },
+      ".cache/g530-diagnostic-race.log": {
+        "sha256": "237d25ef71f283a775f776cfa5cfd590eb5253ac3fc72054b005322679bf763f",
+        "bytes": 117
+      }
+    }
+  },
+  "sourceOfTruthChanged": [],
+  "documentationAdded": [
+    "docs/experiments/2026-11-07-g530-source-heartbeat-review.md",
+    "docs/experiments/2026-11-07-g530-paired-installation-review.json"
+  ],
+  "apiDBRunner": "No public API, DB, dependency, private IPC/peer wire, repository hygiene or CI runner changes.",
+  "limits": [
+    "No attended g530 crossings or long-duration/loaded-machine recurrence test. The connected interval above is health/idle observation only.",
+    "Eliminating unnecessary callback queries does not prove that all three historical heartbeat failures had this cause. Full authority/native work and OS scheduling may still stall guarded active capture.",
+    "B network acquire timeouts before the confirmed connection occurred during the update/disconnect/install sequence and are preserved above; they are not silently counted as a failure-free full-generation trial.",
+    "Existing LL/Raw activation timing is not replaced by a new event-generation protocol.",
+    "An initial full run failed the existing QPC/Sleep assertion at 19627us. The test was corrected and the full run passed; no production deadline or assertion threshold was relaxed.",
+    "Non-Windows execution and public release signing/publication were not performed; this is the Windows paired development bundle."
+  ],
+  "push": "Not requested; not performed",
+  "remoteCI": "Not requested; not run"
+}
