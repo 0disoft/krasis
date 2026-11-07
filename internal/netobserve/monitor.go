@@ -79,9 +79,9 @@ type Monitor struct {
 }
 
 func Start(ctx context.Context, emit func(string), report ...func(WiFiObservation)) *Monitor {
-	return start(ctx, func() Snapshot { return platformProbe.read(ctx, Sample) }, emit, report...)
+	return start(ctx, func(ctx context.Context) Snapshot { return platformProbe.read(ctx, Sample) }, emit, report...)
 }
-func start(ctx context.Context, sample func() Snapshot, emit func(string), report ...func(WiFiObservation)) *Monitor {
+func start(ctx context.Context, sample func(context.Context) Snapshot, emit func(string), report ...func(WiFiObservation)) *Monitor {
 	m := newMonitor(ctx, emit)
 	if len(report) > 0 {
 		m.wifiReport = report[0]
@@ -94,7 +94,11 @@ func start(ctx context.Context, sample func() Snapshot, emit func(string), repor
 			if m.ctx.Err() != nil {
 				return
 			}
-			m.observe(sample(), time.Now())
+			snapshot := sample(m.ctx)
+			if m.ctx.Err() != nil {
+				return
+			}
+			m.observe(snapshot, time.Now())
 			select {
 			case <-m.ctx.Done():
 				return

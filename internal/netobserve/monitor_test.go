@@ -89,7 +89,7 @@ func TestUnknownProviderValuesCannotInventObservations(t *testing.T) {
 func TestMonitorCloseJoinsSamplerAndCancelsExternalWait(t *testing.T) {
 	var samples atomic.Int32
 	first := make(chan struct{}, 1)
-	m := start(context.Background(), func() Snapshot { samples.Add(1); first <- struct{}{}; return Snapshot{} }, nil)
+	m := start(context.Background(), func(context.Context) Snapshot { samples.Add(1); first <- struct{}{}; return Snapshot{} }, nil)
 	<-first
 	m.Close()
 	m.Close()
@@ -98,6 +98,27 @@ func TestMonitorCloseJoinsSamplerAndCancelsExternalWait(t *testing.T) {
 	}
 	if err := m.Wait(context.Background(), time.Hour); !errors.Is(err, context.Canceled) {
 		t.Fatal("closed monitor granted retry", err)
+	}
+}
+
+func TestMonitorCloseCancelsPendingNativeSample(t *testing.T) {
+	g := &sampleGate{}
+	entered, release := make(chan struct{}), make(chan struct{})
+	defer close(release)
+	var events atomic.Int32
+	m := start(context.Background(), func(ctx context.Context) Snapshot {
+		return g.read(ctx, func() Snapshot { close(entered); <-release; return Snapshot{Power: PowerAC} })
+	}, func(string) { events.Add(1) })
+	<-entered
+	closed := make(chan struct{})
+	go func() { m.Close(); close(closed) }()
+	select {
+	case <-closed:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("monitor close waited for the native probe timeout")
+	}
+	if events.Load() != 0 {
+		t.Fatal("cancelled sample emitted observations")
 	}
 }
 
