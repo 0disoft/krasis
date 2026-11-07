@@ -13,13 +13,11 @@ func (s *WorkspaceService) scheduledRecoverAsync(token string) {
 	if s.managed == nil || s.ctx.Err() != nil {
 		return
 	}
-	s.jobs.Add(1)
-	go func() {
-		defer s.jobs.Done()
+	s.startJob(func() {
 		startup, err := productpanel.NewStartup(s.control, token)
 		if err != nil {
 			return
 		}
 		s.managed.ScheduledRecover(func() bool { return appsettings.RecoveryCurrent(os.Getenv("LOCALAPPDATA"), token) }, startup.Ensure, s.resumeSavedConnection)
-	}()
+	})
 }

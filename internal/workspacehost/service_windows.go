@@ -50,6 +50,8 @@ type WorkspaceService struct {
 	quit             func()
 	done             chan struct{}
 	jobs             sync.WaitGroup
+	jobsMu           sync.Mutex
+	jobsClosed       bool
 	prepareRecovery  func() error
 	prepareStartMenu func() error
 	prepareSettings  func() error
@@ -140,9 +142,12 @@ func (s *WorkspaceService) ServiceStartup(context.Context, application.ServiceOp
 func (s *WorkspaceService) ServiceShutdown() error {
 	// App.Run can shut services down even when normal OnShutdown hooks did not
 	// run. Cancel our own workers before waiting for them in either exit path.
+	s.jobsMu.Lock()
+	s.jobsClosed = true
 	if s.cancel != nil {
 		s.cancel()
 	}
+	s.jobsMu.Unlock()
 	if s.done != nil {
 		<-s.done
 	}
@@ -151,8 +156,20 @@ func (s *WorkspaceService) ServiceShutdown() error {
 	return nil
 }
 func (s *WorkspaceService) disconnectAsync() {
+	s.startJob(func() { s.Disconnect() })
+}
+
+// Admission and shutdown share one lock so a callback cannot add work after
+// the shutdown waiter has observed an empty group and closed shared resources.
+func (s *WorkspaceService) startJob(run func()) bool {
+	s.jobsMu.Lock()
+	defer s.jobsMu.Unlock()
+	if s.jobsClosed || s.ctx != nil && s.ctx.Err() != nil {
+		return false
+	}
 	s.jobs.Add(1)
-	go func() { defer s.jobs.Done(); s.Disconnect() }()
+	go func() { defer s.jobs.Done(); run() }()
+	return true
 }
 func (s *WorkspaceService) Refresh() productpanel.BridgeSnapshot {
 	if s.managed != nil {

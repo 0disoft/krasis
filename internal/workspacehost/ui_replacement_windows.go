@@ -62,22 +62,23 @@ func (s *WorkspaceService) RetryUIReplacement() UIReplacementSnapshot {
 		return value
 	}
 	s.uiReplacement.state = "PREPARING"
+	if !s.queueUIReplacementPreparation() {
+		s.uiReplacement.state = "FAILED"
+	}
 	value := s.uiReplacementStatus()
-	s.queueUIReplacementPreparation()
 	s.uiReplacement.gate.Unlock()
 	return value
 }
 
 // Caller owns the request gate. Count the admitted worker before returning so
 // shutdown waits for preparation, without holding up the window-show callback.
-func (s *WorkspaceService) queueUIReplacementPreparation() {
+func (s *WorkspaceService) queueUIReplacementPreparation() bool {
 	source, revision, generation := s.uiReplacement.source, s.uiReplacement.revision, s.uiReplacement.generation
 	prepare := s.uiReplacement.prepare
 	if prepare == nil {
 		prepare = s.stageUIReplacement
 	}
-	s.jobs.Add(1)
-	go func() { defer s.jobs.Done(); prepare(source, revision, generation) }()
+	return s.startJob(func() { prepare(source, revision, generation) })
 }
 
 // Only a complete newer product bundle is staged. IPC arguments never become
@@ -97,7 +98,9 @@ func (s *WorkspaceService) requestUIReplacement(args []string, data map[string]s
 	}
 	s.uiReplacement.source, s.uiReplacement.revision, s.uiReplacement.generation = args[0], data["revision"], generation
 	s.uiReplacement.state = "PREPARING"
-	s.queueUIReplacementPreparation()
+	if !s.queueUIReplacementPreparation() {
+		s.uiReplacement.state = "FAILED"
+	}
 	s.uiReplacement.gate.Unlock()
 	return true
 }
