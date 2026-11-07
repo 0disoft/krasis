@@ -178,15 +178,37 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, deps depe
 }
 
 func writeOutput(stdout, stderr io.Writer, value any, code int, jsonOutput bool) int {
+	output := &checkedOutput{writer: stdout}
 	if jsonOutput {
-		if err := json.NewEncoder(stdout).Encode(value); err != nil {
+		if err := json.NewEncoder(output).Encode(value); err != nil {
 			fmt.Fprintln(stderr, "internal_error: write output")
 			return ExitInternal
 		}
 	} else {
-		writeHuman(stdout, value)
+		writeHuman(output, value)
+	}
+	if output.err != nil {
+		fmt.Fprintln(stderr, "internal_error: write output")
+		return ExitInternal
 	}
 	return code
+}
+
+type checkedOutput struct {
+	writer io.Writer
+	err    error
+}
+
+func (output *checkedOutput) Write(p []byte) (int, error) {
+	if output.err != nil {
+		return 0, output.err
+	}
+	n, err := output.writer.Write(p)
+	if err == nil && n != len(p) {
+		err = io.ErrShortWrite
+	}
+	output.err = err
+	return n, err
 }
 
 func dispatch(ctx context.Context, client apiClient, args []string, executable string) (any, int, error) {
