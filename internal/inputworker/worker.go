@@ -195,7 +195,7 @@ func serve(ctx context.Context, stream net.Conn, input application.InputPort, le
 		})
 		if recoveryErr != nil {
 			report.Recovery.Remaining = pressed.Count()
-			err = errors.Join(err, ErrRecovery)
+			err = errors.Join(err, ErrRecovery, recoveryErr)
 		}
 	}()
 	// Read on the desktop-owning thread: a separate reader and rendezvous

@@ -117,6 +117,19 @@ func TestEOFRecoversHeldInput(t *testing.T) {
 	}
 }
 
+func TestRecoveryPreservesReleaseFailure(t *testing.T) {
+	failure := errors.New("native release failed")
+	input := &recordingInput{releaseErr: failure}
+	lease := testLease()
+	client, done := startWorker(t, context.Background(), input, lease)
+	send(t, client, request{op: opPress, sequence: 1, binding: lease.Binding, token: control.PressedToken{Kind: control.PressedKeyboardKey, Code: 0x1e}})
+	_ = client.Close()
+	result := await(t, done)
+	if !errors.Is(result.err, ErrRecovery) || !errors.Is(result.err, failure) || result.report.Recovery.Remaining != 1 || input.released != 1 {
+		t.Fatalf("release failure was lost: %+v", result)
+	}
+}
+
 func TestCancellationUsesIndependentRecoveryContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
