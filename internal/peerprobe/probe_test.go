@@ -5,17 +5,113 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"math/big"
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/0disoft/krasis/internal/peercredentials"
+	"github.com/0disoft/krasis/internal/transport"
 )
+
+func TestListenerTimeoutInterruptsAuthenticatedIdlePeer(t *testing.T) {
+	fixture := writeTLSFixture(t)
+	ready := make(chan string, 1)
+	done := make(chan error, 1)
+	go func() {
+		_, err := Run(context.Background(), Config{
+			Role: RoleListen, Address: "127.0.0.1:0", CAPath: fixture.ca,
+			CertificatePath: fixture.serverCert, PrivateKeyPath: fixture.serverKey,
+			Timeout: time.Second, Ready: func(address string) { ready <- address },
+		})
+		done <- err
+	}()
+	identity, roots, err := peercredentials.Load(fixture.ca, fixture.clientCert, fixture.clientKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config, err := transport.NewClientTLSConfig(identity, roots, "peer.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := net.DialTimeout("tcp", <-ready, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer raw.Close()
+	conn := tls.Client(raw, config)
+	if err := conn.Handshake(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("idle session unexpectedly succeeded")
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("probe did not stop after its timeout")
+	}
+}
+
+func TestConnectorTimeoutInterruptsAuthenticatedIdlePeer(t *testing.T) {
+	fixture := writeTLSFixture(t)
+	identity, roots, err := peercredentials.Load(fixture.ca, fixture.serverCert, fixture.serverKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config, err := transport.NewServerTLSConfig(identity, roots)
+	if err != nil {
+		t.Fatal(err)
+	}
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	peerDone := make(chan struct{})
+	go func() {
+		defer close(peerDone)
+		raw, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		defer raw.Close()
+		conn := tls.Server(raw, config)
+		if conn.Handshake() != nil {
+			return
+		}
+		// Drain the request and then keep the authenticated connection idle.
+		var b [1024]byte
+		for {
+			if _, err := conn.Read(b[:]); err != nil {
+				return
+			}
+		}
+	}()
+	done := make(chan error, 1)
+	go func() {
+		_, err := Run(context.Background(), Config{
+			Role: RoleConnect, Address: listener.Addr().String(), ExpectedServerName: "peer.test",
+			CAPath: fixture.ca, CertificatePath: fixture.clientCert, PrivateKeyPath: fixture.clientKey, Timeout: time.Second,
+		})
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("idle session unexpectedly succeeded")
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("probe did not stop after its timeout")
+	}
+	<-peerDone
+}
 
 func TestRunCompletesTwoAuthenticatedFreshSessions(t *testing.T) {
 	fixture := writeTLSFixture(t)

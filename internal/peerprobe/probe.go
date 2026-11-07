@@ -149,7 +149,9 @@ func runListener(ctx context.Context, config Config, identity tls.Certificate, r
 			return peerErr
 		}
 		applyTLSState(result)
+		stopSession := context.AfterFunc(ctx, func() { _ = peerConnection.Close() })
 		outbound, sessionErr := serveSession(ctx, peerConnection, result)
+		stopSession()
 		_ = peerConnection.Close()
 		if sessionErr != nil {
 			result.FailureCode = "session_failed"
@@ -207,7 +209,10 @@ func runConnector(ctx context.Context, config Config, identity tls.Certificate, 
 			return peerErr
 		}
 		applyTLSState(result)
-		if sessionErr := requestSession(ctx, peerConnection, outbound, result); sessionErr != nil {
+		stopSession := context.AfterFunc(ctx, func() { _ = peerConnection.Close() })
+		sessionErr := requestSession(ctx, peerConnection, outbound, result)
+		stopSession()
+		if sessionErr != nil {
 			_ = peerConnection.Close()
 			result.FailureCode = "session_failed"
 			return sessionErr
