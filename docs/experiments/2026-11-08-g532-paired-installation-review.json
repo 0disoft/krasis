@@ -1,0 +1,164 @@
+{
+  "schemaVersion": "krasis.g532-paired-installation-review/v1",
+  "date": "2026-11-08",
+  "generation": 532,
+  "revision": "e2d454fb9502fc7488b27bb5fd0abda8b615b14f",
+  "installation": {
+    "A": {
+      "schema": "krasis.setup-result/v1",
+      "code": 0,
+      "state": "installed"
+    },
+    "B": {
+      "code": "updated",
+      "generation": 532,
+      "revision": "e2d454fb9502fc7488b27bb5fd0abda8b615b14f",
+      "bytes": 29022045,
+      "total": 29022045
+    },
+    "cliConnect": "connected",
+    "doctor": "healthy",
+    "sameAuthenticatedConnection": true
+  },
+  "devices": {
+    "A": {
+      "created": "2026-11-07T19:58:02Z",
+      "supportSha256": "0777d0a66a534f86acf5d4d5a8e55fb433da98d0d5c8a19b0dcc491fbc10b7c9",
+      "service": "READY",
+      "input": "READY",
+      "grant": "PRESENT",
+      "connectedAt": "2026-11-07T19:57:03.177361Z",
+      "observedAfterConnectionMillis": 58823,
+      "failuresAfterConnection": [],
+      "reconnectsAfterConnection": [],
+      "heartbeatFailuresAfterConnection": 0,
+      "preConnectionFailures": [],
+      "logCompleteness": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": true
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": true
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false
+        }
+      ]
+    },
+    "B": {
+      "created": "2026-11-07T19:58:02Z",
+      "supportSha256": "eebfb3d1a22b5c6e3e786e9229ebfd34695200617a4ab17b156438ffde0da5a9",
+      "service": "READY",
+      "input": "READY",
+      "grant": "PRESENT",
+      "connectedAt": "2026-11-07T19:57:01.8808889Z",
+      "observedAfterConnectionMillis": 60120,
+      "failuresAfterConnection": [],
+      "reconnectsAfterConnection": [],
+      "heartbeatFailuresAfterConnection": 0,
+      "preConnectionFailures": [
+        {
+          "time": "2026-11-07T19:56:17.8796116Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T19:56:23.1386362Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T19:56:28.6146221Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T19:56:35.958623Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T19:56:43.1415577Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T19:56:53.6617821Z",
+          "code": "reconnect_acquire_network_timeout"
+        }
+      ],
+      "logCompleteness": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false
+        }
+      ]
+    }
+  },
+  "validation": {
+    "go": "Full uncached wininput, inputworker and handoff passed",
+    "race": "Full uncached wininput race/checkptr passed",
+    "vet": "Relevant packages passed with existing -unsafeptr=false policy",
+    "frontend": "111 tests passed; native build passed",
+    "package": "8-file update integrity/integration and setup verification passed",
+    "native": "Actual ownership and retirement passed; accepted-but-pending first request completed without fallback. Four later API-rejected requests still used attach; max 254.367ms under uncontrolled local load.",
+    "logEvidence": {
+      "test": {
+        "sha256": "bdb7b67cbed55689519cf96247fca3e0b94d33846625c5ebad24d05785b6c999",
+        "bytes": 171
+      },
+      "vet": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "race": {
+        "sha256": "c4fe99582f8eb2c18a4174332408d77d8eac71d1ee15781d765e8ec135be5694",
+        "bytes": 56
+      },
+      "native": {
+        "sha256": "8bc66cbe0f9f5a4d3835c76efefbd18dfa1013c17faf02b018034a2cb72b7714",
+        "bytes": 2854
+      },
+      "package": {
+        "sha256": "b447954657c552711539862a91978521c242afbf2586c36a399b6ef4afaafd0e",
+        "bytes": 11708
+      },
+      "setup-build": {
+        "sha256": "3d401487a2aac6c0a10bf857b42f65b7eaf6f547e34fa3a9c9c76c598fcbbba3",
+        "bytes": 220
+      }
+    }
+  },
+  "sourceOfTruthChanged": [
+    "docs/architecture/02-runtime-flow.md"
+  ],
+  "documentation": [
+    "docs/experiments/2026-11-08-g532-foreground-completion-review.md"
+  ],
+  "changes": "One capture activation target. No public commands, DB, dependencies or runner changes. Four fallback timing buckets use remaining bits of the same 64-byte local ACK; agent IPC diagnostic indices move by four.",
+  "limits": [
+    "Post-install readiness and connected idle observation are not a paired physical crossing latency trial.",
+    "No guaranteed reduction of g531 maximum 72.027ms or elimination of legitimate API-rejection fallback.",
+    "Native calls are not preemptible; original authority, command deadline and uncertain-retirement fences remain.",
+    "Initial native checks with installed sharing still connected failed foreground/attachment access; logs retained.",
+    "Full repository and non-Windows tests not run; focused affected packages, race and normal package checks used.",
+    "B had six preconnection network-acquire timeouts during listener startup. Initial peer CLI connect returned busy until the local listener started; the final authenticated connection and healthy doctor were verified.",
+    "Some exported A agent/control logs are marked incomplete. Zero post-connect failures means none in the retained records, not a complete long-duration recurrence guarantee."
+  ],
+  "push": "not requested; not performed",
+  "remoteCI": "not requested; not run"
+}
