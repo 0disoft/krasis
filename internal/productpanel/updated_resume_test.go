@@ -25,6 +25,29 @@ type stagedResumeClient struct {
 	failStatus, failTrust   int
 }
 
+type acceptedLocalResumeClient struct{ *resumeTestClient }
+
+func (c *acceptedLocalResumeClient) ResumeConnection(context.Context, string) (localapi.OperationResult, error) {
+	c.connects++
+	return localapi.OperationResult{Status: "COMPLETED", Code: "connect_started"}, nil
+}
+
+func TestUpdateResumeDoesNotReplayAcceptedConnectionAfterLocalObservation(t *testing.T) {
+	b, base, now := newResumeTest(t, nil)
+	c := &acceptedLocalResumeClient{base}
+	b.open = func() (Client, error) { return c, nil }
+	b.tick(now)
+	if base.connects != 1 || b.updatedResume == nil || !b.updatedResume.accepted {
+		t.Fatal("accepted request was not retained", base.connects, b.Refresh())
+	}
+	for _, delay := range []time.Duration{6 * time.Second, 12 * time.Second, 91 * time.Second, 100 * time.Second} {
+		b.tick(now.Add(delay))
+	}
+	if base.connects != 1 || !b.recovery.uncertain || b.Refresh().Code != "outcome_unknown" {
+		t.Fatal("accepted request was replayed or uncertainty was lost", base.connects, b.Refresh())
+	}
+}
+
 func (c *stagedResumeClient) Status(ctx context.Context) (localapi.Status, error) {
 	c.statusCalls++
 	if c.statusCalls == c.failStatus {
@@ -335,6 +358,15 @@ func TestUpdateResumeHonorsCLIStopAndStopBetweenReadAndConnect(t *testing.T) {
 		before := c.connects
 		b.tick(now.Add(6 * time.Second))
 		b.tick(now.Add(12 * time.Second))
+		if !racing {
+			// A CLI stop after an accepted request is not observable from LOCAL
+			// alone. Do not send another request merely to probe the stop latch.
+			b.tick(now.Add(91 * time.Second))
+			if c.connects != before || b.updatedResume != nil || !b.recovery.uncertain {
+				t.Fatal("accepted request was replayed after CLI stop", c.connects, b.Refresh())
+			}
+			continue
+		}
 		if c.connects != before || b.updatedResume != nil || !b.recovery.blocked {
 			t.Fatal("manual stop was overwritten", racing, c.connects, b.Refresh())
 		}

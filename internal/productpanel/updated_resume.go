@@ -16,6 +16,7 @@ type updatedWorkspaceResume struct {
 	attempts       int
 	next, deadline time.Time
 	uncertain      bool
+	accepted       bool
 }
 
 func (b *DesktopLifecycle) SetUpdatedWorkspaceResume(v WorkspaceUpdateLaunch) error {
@@ -107,7 +108,7 @@ func (b *DesktopLifecycle) resumeUpdatedConnection(ctx context.Context, now time
 		return stop("agent_busy") // Never interrupt pairing.
 	}
 	if !now.Before(r.deadline) {
-		if r.uncertain {
+		if r.uncertain || r.accepted && (value.State == "LOCAL" || value.State == "UNKNOWN") {
 			// Keep the no-replay fence when the bounded update monitor ends.
 			b.recovery.Alias, b.recovery.Fingerprint = r.launch.Alias, r.launch.Fingerprint
 			b.recovery.uncertain = true
@@ -123,7 +124,7 @@ func (b *DesktopLifecycle) resumeUpdatedConnection(ctx context.Context, now time
 	if value.State != "LOCAL" && value.State != "UNKNOWN" {
 		return value, true
 	}
-	if r.uncertain {
+	if r.uncertain || r.accepted {
 		value.Code = "outcome_unknown"
 		return value, true
 	}
@@ -188,6 +189,8 @@ func (b *DesktopLifecycle) resumeUpdatedConnection(ctx context.Context, now time
 	}
 	value = bridge.Resume(r.launch.Alias, r.launch.Fingerprint)
 	switch value.Code {
+	case "ok":
+		r.accepted = true
 	case "outcome_unknown":
 		r.uncertain = true
 	case "cancelled":
