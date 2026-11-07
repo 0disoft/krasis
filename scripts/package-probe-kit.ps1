@@ -54,26 +54,65 @@ function Assert-ProbeKitArchiveMatches {
     $verificationRoot = Join-Path $TemporaryParent ('.krasis-probe-kit-verify-' + [Guid]::NewGuid().ToString('N'))
     try {
         $null = New-Item -ItemType Directory -Path $verificationRoot
-        Expand-Archive -LiteralPath $ArchivePath -DestinationPath $verificationRoot
-
-        $verifier = Join-Path $verificationRoot 'verify-kit.ps1'
-        if (-not (Test-Path -LiteralPath $verifier -PathType Leaf)) {
-            throw "Existing package does not contain verify-kit.ps1: $ArchivePath"
-        }
-        & $verifier | Out-Null
-
-        $buildPath = Join-Path $verificationRoot 'BUILD.json'
-        $build = Get-Content -LiteralPath $buildPath -Raw | ConvertFrom-Json
-        if ($build.schemaVersion -ne 'krasis.build/v1') {
-            throw "Existing package has an unsupported BUILD.json schema: $ArchivePath"
-        }
-        if ([string]$build.commit -ne $ExpectedCommit) {
-            throw "Existing package commit does not match the requested revision: $ArchivePath"
-        }
+        $required = @('krasis-lab.exe', 'krasis-launcher.exe', 'collect-probe.ps1',
+            'check-phase0.ps1', 'verify-kit.ps1', 'README.md', 'BUILD.json')
+        $allowed = @($required) + 'SHA256SUMS.txt'
+        $expectedRoot = Split-Path -Parent $ExpectedManifestPath
+        $zip = [IO.Compression.ZipFile]::OpenRead($ArchivePath)
+        try {
+            if ($zip.Entries.Count -ne $allowed.Count) { throw 'Unexpected archive entry count.' }
+            $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+            foreach ($entry in $zip.Entries) {
+                if ($allowed -cnotcontains $entry.FullName -or -not $seen.Add($entry.FullName)) {
+                    throw 'Unexpected or duplicate archive entry.'
+                }
+                $expectedSize = (Get-Item -LiteralPath (Join-Path $expectedRoot $entry.FullName)).Length
+                if ($entry.Length -ne $expectedSize) { throw 'Archive entry size differs from the prepared payload.' }
+                $inputStream = $entry.Open()
+                try {
+                    $outputStream = [IO.File]::Open((Join-Path $verificationRoot $entry.FullName), [IO.FileMode]::CreateNew)
+                    try {
+                        $buffer = [byte[]]::new(65536)
+                        $total = 0L
+                        while (($read = $inputStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
+                            $total += $read
+                            if ($total -gt $expectedSize) { throw 'Archive entry exceeded the prepared payload size.' }
+                            $outputStream.Write($buffer, 0, $read)
+                        }
+                        if ($total -ne $expectedSize) { throw 'Archive entry was truncated.' }
+                    } finally { $outputStream.Dispose() }
+                } finally { $inputStream.Dispose() }
+            }
+        } finally { $zip.Dispose() }
 
         $existingManifestPath = Join-Path $verificationRoot 'SHA256SUMS.txt'
         if ((Get-Sha256 -Path $existingManifestPath) -ne (Get-Sha256 -Path $ExpectedManifestPath)) {
             throw "Package output exists but does not match the current build payload: $ArchivePath"
+        }
+        # The extracted verifier is untrusted until its hash is checked. Verify
+        # every entry here against the locally prepared manifest; never execute
+        # code from an existing archive as part of deciding whether to trust it.
+        $entries = @(Get-ChildItem -LiteralPath $verificationRoot -Force)
+        if ($entries.Count -ne $required.Count + 1) {
+            throw "Existing package contains unexpected entries: $ArchivePath"
+        }
+        foreach ($entry in $entries) {
+            if ($entry.PSIsContainer -or ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+                (@($required) + 'SHA256SUMS.txt') -cnotcontains $entry.Name) {
+                throw "Existing package contains an unsafe entry: $ArchivePath"
+            }
+        }
+        foreach ($line in Get-Content -LiteralPath $ExpectedManifestPath) {
+            if ($line -cnotmatch '^([0-9a-f]{64})  ([^/\\]+)$' -or $required -cnotcontains $Matches[2]) {
+                throw 'Invalid prepared checksum manifest.'
+            }
+            if ((Get-Sha256 -Path (Join-Path $verificationRoot $Matches[2])) -cne $Matches[1]) {
+                throw "Existing package has changed bytes: $ArchivePath"
+            }
+        }
+        $build = Get-Content -LiteralPath (Join-Path $verificationRoot 'BUILD.json') -Raw | ConvertFrom-Json
+        if ($build.schemaVersion -ne 'krasis.build/v1' -or [string]$build.commit -ne $ExpectedCommit) {
+            throw "Existing package has invalid build metadata: $ArchivePath"
         }
     }
     finally {
