@@ -37,3 +37,11 @@ func promoteSourceInputThread(get func() int32, set func(int32) bool) bool {
 	}
 	return set(sourceInputPriorityAboveNormal)
 }
+
+// False means that we changed the thread but cannot prove restoration. That
+// thread must remain locked rather than returning to unrelated Go work.
+func sourceInputThreadPriorityScope(get func() int32, set func(int32) bool) func() bool {
+	before := get()
+	raised := promoteSourceInputThread(func() int32 { return before }, set)
+	return func() bool { return !raised || set(before) }
+}

@@ -470,6 +470,24 @@ join inside a 267.456ms ready wait. Connection-start demand moves optional
 construction ahead of an ordinary first approach. It cannot guarantee immediate
 readiness for an entry arriving during startup or after candidate expiry.
 
+### g533 foreground requester scheduling
+
+The existing window-free source monitor now uses the same best-effort
+ABOVE_NORMAL priority as the three native input owners. It is already bound to
+one OS thread; no new thread, native work queue or per-crossing allocation is
+introduced. The foreground requester must wake before a capture can acknowledge
+activation, so leaving this one dependency at normal priority permits priority
+inversion under competing CPU work. Existing explicitly lower/higher priorities
+are preserved. A successful promotion is restored before releasing the thread;
+failed restoration keeps it locked so the Go pool cannot inherit it.
+
+This is a scheduling hint, never authorization or foreground ownership proof.
+The fresh desktop/agent checks, two-second command deadline, native ownership
+verification, bounded fallback and fail-closed cleanup remain unchanged. The
+g532 123.413ms capture sample contains 98.908ms of worker activation and 35.305ms
+of foreground request/exchange. It does not isolate monitor scheduling from
+Windows execution; a paired physical trial is still required to quantify benefit.
+
 ### g511 source capture timing detail
 
 The g531+ capture path sends its first foreground request to the existing,

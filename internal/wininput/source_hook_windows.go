@@ -108,7 +108,15 @@ func (hook *SourceHook) runWithBoundary(ctx context.Context, session *SourceSess
 	// window/hook owners stay separate; command timeout observation stays on
 	// the command caller rather than inside SetForegroundWindow.
 	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
+	// Foreground activation also depends on this monitor waking and servicing
+	// its request. Match the three native owners rather than queueing that
+	// dependency behind normal-priority CPU work. Restore before pool reuse.
+	restorePriority := sourceInputThreadPriorityScope(currentSourceThreadPriority, setSourceThreadPriority)
+	defer func() {
+		if restorePriority() {
+			runtime.UnlockOSThread()
+		}
+	}()
 	ctx = context.WithValue(ctx, sourceShutdownKey{}, evidence)
 	defer func() { resultErr = errors.Join(resultErr, evidence.snapshot()) }()
 	releaseHookSession, err := acquireHookSession(ctx)

@@ -64,7 +64,7 @@ func TestSourceIPCReaderRestorePolicyAndFailure(t *testing.T) {
 		for _, raiseOK := range []bool{false, true} {
 			for _, restoreOK := range []bool{false, true} {
 				var calls []int32
-				restore := sourceIPCReaderPriority(func() int32 { return before }, func(p int32) bool {
+				restore := sourceInputThreadPriorityScope(func() int32 { return before }, func(p int32) bool {
 					calls = append(calls, p)
 					if len(calls) == 1 {
 						return raiseOK

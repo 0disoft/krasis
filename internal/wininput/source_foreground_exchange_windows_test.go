@@ -24,6 +24,9 @@ func TestCaptureForegroundNativeExchange(t *testing.T) {
 	originalRequest := sourceWheelCaptureSetForeground
 	t.Cleanup(func() { sourceWheelCaptureSetForeground = originalRequest })
 	sourceWheelCaptureSetForeground = func(window uintptr) error {
+		if priority := currentSourceThreadPriority(); priority != sourceInputPriorityAboveNormal {
+			t.Errorf("foreground requester priority=%d, want above normal", priority)
+		}
 		started := time.Now()
 		err := originalRequest(window)
 		t.Logf("native request elapsed=%s rejected=%t owned-at-return=%t", time.Since(started), err != nil, sourceWheelCaptureGetForeground() == window)

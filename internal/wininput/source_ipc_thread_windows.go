@@ -16,19 +16,11 @@ func StartSourceIPCReader(read func()) {
 
 func runSourceIPCReader(read func()) {
 	runtime.LockOSThread()
-	restore := sourceIPCReaderPriority(currentSourceThreadPriority, setSourceThreadPriority)
+	restore := sourceInputThreadPriorityScope(currentSourceThreadPriority, setSourceThreadPriority)
 	defer func() {
 		if restore() {
 			runtime.UnlockOSThread()
 		}
 	}()
 	read()
-}
-
-// False means that we changed the thread but cannot prove restoration. That
-// thread must never be unlocked for unrelated Go work.
-func sourceIPCReaderPriority(get func() int32, set func(int32) bool) func() bool {
-	before := get()
-	raised := promoteSourceInputThread(func() int32 { return before }, set)
-	return func() bool { return !raised || set(before) }
 }
