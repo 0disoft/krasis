@@ -22,6 +22,10 @@ func (b *interactiveBinding) active() error {
 	if b.current != nil {
 		if err := b.current.active(); err == nil {
 			return nil
+		} else if err != ErrInactive {
+			// A failed native activity query is not evidence of a desktop
+			// switch. Preserve it and reject this operation without reopening.
+			return err
 		}
 		if err := b.current.close(); err != nil {
 			b.fenced = true

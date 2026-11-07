@@ -6,16 +6,35 @@ import (
 )
 
 type switchingDesktop struct {
-	inactive bool
-	closeErr error
-	closes   int
+	inactive  bool
+	activeErr error
+	closeErr  error
+	closes    int
 }
 
 func (d *switchingDesktop) active() error {
+	if d.activeErr != nil {
+		return d.activeErr
+	}
 	if d.inactive {
 		return ErrInactive
 	}
 	return nil
+}
+
+func TestInteractiveDesktopPreservesActivityQueryFailure(t *testing.T) {
+	nativeErr := errors.New("activity query failed")
+	old := &switchingDesktop{activeErr: errors.Join(ErrInactive, nativeErr)}
+	b := &interactiveBinding{current: old, authorize: func() error { return nil }, open: func() (binding, error) {
+		t.Fatal("reopened desktop after failed activity query")
+		return nil, nil
+	}}
+	if err := b.active(); !errors.Is(err, nativeErr) || old.closes != 0 || b.current != old {
+		t.Fatal("activity query failure lost", err)
+	}
+	if err := b.close(); err != nil || old.closes != 1 {
+		t.Fatal("cleanup after query failure", err)
+	}
 }
 func (d *switchingDesktop) close() error { d.closes++; return d.closeErr }
 
