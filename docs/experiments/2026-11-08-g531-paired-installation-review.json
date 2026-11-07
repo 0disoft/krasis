@@ -1,0 +1,282 @@
+{
+  "schemaVersion": "krasis.g531-paired-installation-review/v1",
+  "date": "2026-11-08",
+  "generation": 531,
+  "revision": "518cd5ea52407f9701e23683bb6771a1c416b5a2",
+  "sourceCommit": "be847c31",
+  "target": "A first native foreground request: reuse existing source monitor, service sent activation messages on capture owner, preserve independent command timeout and verified ownership.",
+  "installation": {
+    "A": {
+      "schema": "krasis.setup-result/v1",
+      "code": 0,
+      "state": "installed"
+    },
+    "B": {
+      "code": "updated",
+      "generation": 531,
+      "revision": "518cd5ea52407f9701e23683bb6771a1c416b5a2",
+      "bytes": 28954842,
+      "total": 28954842
+    },
+    "cli": {
+      "initialPeerConnect": "busy",
+      "localConnect": "connect_started",
+      "finalDoctor": "healthy",
+      "connection": "CONNECTED"
+    },
+    "sameAuthenticatedConnection": true
+  },
+  "devices": {
+    "A": {
+      "created": "2026-11-07T19:26:54Z",
+      "supportSha256": "5b6b82bbaac2f407438f5719375421619eb6a1d6b81705bdf1b7fd501f7db8f1",
+      "service": "READY",
+      "input": "READY",
+      "grant": "PRESENT",
+      "installed": {
+        "time": "2026-11-07T19:24:57.5741034Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "connectedAt": "2026-11-07T19:26:30.7315214Z",
+      "observedAfterConnectionMillis": 23269,
+      "heartbeatFailuresAfterConnection": 0,
+      "failuresAfterConnection": [],
+      "reconnectsAfterConnection": [],
+      "earlierGenerationFailureEvents": [],
+      "sourceReady": 0,
+      "logCompleteness": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false
+        }
+      ]
+    },
+    "B": {
+      "created": "2026-11-07T19:26:54Z",
+      "supportSha256": "23590cf8609eed4a0912268a2196af49c527d96ed6add1dae004a74796a62615",
+      "service": "READY",
+      "input": "READY",
+      "grant": "PRESENT",
+      "installed": {
+        "time": "2026-11-07T19:24:00.2825408Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "connectedAt": "2026-11-07T19:26:29.4661368Z",
+      "observedAfterConnectionMillis": 24534,
+      "heartbeatFailuresAfterConnection": 0,
+      "failuresAfterConnection": [],
+      "reconnectsAfterConnection": [],
+      "earlierGenerationFailureEvents": [
+        {
+          "time": "2026-11-07T19:24:15.9993004Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T19:24:21.2375183Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T19:24:26.7953688Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T19:24:34.471942Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T19:24:41.2204884Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T19:24:51.4726338Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T19:25:03.4930111Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T19:25:23.4177755Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-07T19:25:59.4193256Z",
+          "code": "reconnect_acquire_network_timeout"
+        }
+      ],
+      "sourceReady": 0,
+      "logCompleteness": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false
+        }
+      ]
+    }
+  },
+  "localNativeComparison": {
+    "samples": [
+      {
+        "path": "baseline",
+        "activationMs": 145.441,
+        "foregroundRequestMs": 14.78
+      },
+      {
+        "path": "native",
+        "activationMs": 35.8418,
+        "foregroundRequestMs": 8.951
+      },
+      {
+        "path": "baseline",
+        "activationMs": 53.6358,
+        "foregroundRequestMs": 1.641
+      },
+      {
+        "path": "native",
+        "activationMs": 47.5072,
+        "foregroundRequestMs": 0
+      },
+      {
+        "path": "baseline",
+        "activationMs": 78.6199,
+        "foregroundRequestMs": 12.221
+      },
+      {
+        "path": "native",
+        "activationMs": 62.1868,
+        "foregroundRequestMs": 0.553
+      },
+      {
+        "path": "baseline",
+        "activationMs": 82.2181,
+        "foregroundRequestMs": 13.157
+      },
+      {
+        "path": "native",
+        "activationMs": 111.8951,
+        "foregroundRequestMs": 1.454
+      },
+      {
+        "path": "baseline",
+        "activationMs": 70.4263,
+        "foregroundRequestMs": 9.345
+      },
+      {
+        "path": "native",
+        "activationMs": 102.4153,
+        "foregroundRequestMs": 0.542
+      }
+    ],
+    "summary": {
+      "baseline": {
+        "activation": {
+          "n": 5,
+          "medianMs": 78.6199,
+          "maxMs": 145.441
+        },
+        "foregroundRequest": {
+          "n": 5,
+          "medianMs": 12.221,
+          "maxMs": 14.78
+        }
+      },
+      "native": {
+        "activation": {
+          "n": 5,
+          "medianMs": 62.1868,
+          "maxMs": 111.8951
+        },
+        "foregroundRequest": {
+          "n": 5,
+          "medianMs": 0.553,
+          "maxMs": 8.951
+        }
+      }
+    },
+    "limits": "Five alternating local interactive requests through real SourceHook. CPU load uncontrolled; no protected-service authority I/O or physical paired notebook crossing sample. No guarantee of overall speedup or recurrence freedom."
+  },
+  "validation": {
+    "go": "wininput, inputworker and handoff package tests passed",
+    "race": "Full uncached wininput race passed; checkptr enabled",
+    "vet": "Passed relevant packages with existing wininput -unsafeptr=false policy",
+    "frontend": "111/111 tests; native build passed",
+    "package": "Verified 8-file update bundle and app setup; exact source builds confirmed on both devices",
+    "diff": "git diff --check passed",
+    "logEvidence": {
+      "test": {
+        "sha256": "fb31bf108487dd31d05b2fa71fea148451daa59e644b247b0f6c66b546762380",
+        "bytes": 171
+      },
+      "vet": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "race": {
+        "sha256": "158b94d754d9102d748b4e2c48989de2057ab6134b064d8a4d6db22260546cb8",
+        "bytes": 56
+      },
+      "native": {
+        "sha256": "f7b6c61a4963ecac5de0bc48ec718f9211a4d059d766f1ec4560fc4c1ed1dd42",
+        "bytes": 1326
+      }
+    },
+    "knownInitialTestFailure": "Unchanged service IPC test expected >=12000 QPC us after Sleep(12ms), observed 11622us during concurrent validation. Final sequential run passed; no unrelated test/threshold modified."
+  },
+  "sourceOfTruthChanged": [
+    "docs/architecture/02-runtime-flow.md"
+  ],
+  "documentation": [
+    "docs/experiments/2026-11-08-g531-foreground-activation-review.md"
+  ],
+  "publicAPI_DB_Dependency_IPC_RunnerChanges": "None",
+  "limits": [
+    "This post-install observation is connected health/idle time, not an attended g531 crossing test.",
+    "The entire historical 170.544ms request is not attributed to one internal Windows operation; native callbacks and scheduling remain contributors.",
+    "Earlier update-window B dial/discovery timeouts and initial peer-connect busy are preserved above. The A listener was then started through local CLI and final matching connection confirmed.",
+    "Native Win32 calls are not preemptible. Late completion does not restore authority; uncertain retirement retains existing worker fences.",
+    "Non-Windows runs, remote CI, push and public release were not performed."
+  ],
+  "push": "not requested; not performed",
+  "remoteCI": "not requested; not run"
+}
