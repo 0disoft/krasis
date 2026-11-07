@@ -45,7 +45,7 @@ func readOwnerTransport(localAppData, owner string, role transport.Authenticated
 		return PublicIdentity{}, tls.Certificate{}, err
 	}
 	defer dir.Close()
-	lock, err := dir.Open(lockFile)
+	lock, err := dir.OpenLock(lockFile, true)
 	if err != nil {
 		return PublicIdentity{}, tls.Certificate{}, err
 	}

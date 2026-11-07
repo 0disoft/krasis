@@ -17,11 +17,11 @@ func (store *Store) openTransportReadLocked() (*securefs.Directory, func(), erro
 	if err := store.prepareDirectory(false); err != nil {
 		return nil, nil, err
 	}
-	dir, err := securefs.OpenReadDirectory(store.directory)
+	dir, err := peercredentials.OpenProtectedDirectory(store.directory, true)
 	if err != nil {
 		return nil, nil, err
 	}
-	lock, err := dir.Open(lockFile)
+	lock, err := dir.OpenLock(lockFile, true)
 	if err != nil {
 		return nil, nil, errors.Join(err, dir.Close())
 	}

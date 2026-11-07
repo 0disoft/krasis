@@ -190,12 +190,31 @@ func (directory *Directory) OpenReadWrite(name string) (*os.File, error) {
 	return directory.openExisting(name, fileGenericRead|fileGenericWrite|deleteAccess)
 }
 
+// Lock handles never request DELETE or share it. This pins the lock file's
+// namespace entry until every reader and writer has released its handle.
+func (directory *Directory) OpenLock(name string, readOnly bool) (*os.File, error) {
+	access := uint32(fileGenericRead)
+	if !readOnly {
+		access |= fileGenericWrite
+	}
+	return directory.openExistingWithShare(name, access, fileShareRead|fileShareWrite, nil)
+}
+
+func (directory *Directory) CreateLock(name string, mode os.FileMode) (*os.File, error) {
+	return directory.createExclusiveWithShare(name, mode, fileGenericRead|fileGenericWrite|writeDAC, fileShareRead|fileShareWrite)
+}
+
 func (directory *Directory) CreateExclusive(name string, mode os.FileMode) (*os.File, error) {
-	handle, err := directory.openChild(
+	return directory.createExclusiveWithShare(name, mode, fileGenericRead|fileGenericWrite|deleteAccess|writeDAC, fileShareRead|fileShareWrite|fileShareDelete)
+}
+
+func (directory *Directory) createExclusiveWithShare(name string, mode os.FileMode, access, share uint32) (*os.File, error) {
+	handle, err := directory.openChildWithShare(
 		name,
-		fileGenericRead|fileGenericWrite|deleteAccess|writeDAC,
+		access,
 		fileCreate,
 		fileNonDirectoryFile|fileOpenReparsePoint|fileSynchronousNonAlert|fileWriteThrough,
+		share,
 		nil,
 	)
 	if err != nil {
@@ -249,11 +268,16 @@ func (directory *Directory) openExisting(name string, access uint32) (*os.File, 
 }
 
 func (directory *Directory) openExistingObserved(name string, access uint32, observe func(string)) (*os.File, error) {
-	handle, err := directory.openChild(
+	return directory.openExistingWithShare(name, access, fileShareRead|fileShareWrite|fileShareDelete, observe)
+}
+
+func (directory *Directory) openExistingWithShare(name string, access, share uint32, observe func(string)) (*os.File, error) {
+	handle, err := directory.openChildWithShare(
 		name,
 		access|fileReadAttributes|synchronizeAccess,
 		fileOpen,
 		fileNonDirectoryFile|fileOpenReparsePoint|fileSynchronousNonAlert,
+		share,
 		observe,
 	)
 	if err != nil {
@@ -400,6 +424,10 @@ func (directory *Directory) pin() (syscall.Handle, error) {
 }
 
 func (directory *Directory) openChild(name string, access, disposition, options uint32, observe func(string)) (syscall.Handle, error) {
+	return directory.openChildWithShare(name, access, disposition, options, fileShareRead|fileShareWrite|fileShareDelete, observe)
+}
+
+func (directory *Directory) openChildWithShare(name string, access, disposition, options, share uint32, observe func(string)) (syscall.Handle, error) {
 	if err := validateLeaf(name); err != nil {
 		return syscall.InvalidHandle, err
 	}
@@ -411,10 +439,14 @@ func (directory *Directory) openChild(name string, access, disposition, options 
 	if observe != nil {
 		observe("native")
 	}
-	return ntCreate(root, name, access, disposition, options)
+	return ntCreateWithShare(root, name, access, disposition, options, share)
 }
 
 func ntCreate(root syscall.Handle, name string, access, disposition, options uint32) (syscall.Handle, error) {
+	return ntCreateWithShare(root, name, access, disposition, options, fileShareRead|fileShareWrite|fileShareDelete)
+}
+
+func ntCreateWithShare(root syscall.Handle, name string, access, disposition, options, share uint32) (syscall.Handle, error) {
 	buffer, err := syscall.UTF16FromString(name)
 	if err != nil || len(buffer)*2 > int(^uint16(0)) {
 		return syscall.InvalidHandle, ErrUnsafePath
@@ -441,7 +473,7 @@ func ntCreate(root syscall.Handle, name string, access, disposition, options uin
 		uintptr(unsafe.Pointer(&iosb)),
 		0,
 		uintptr(syscall.FILE_ATTRIBUTE_NORMAL),
-		uintptr(fileShareRead|fileShareWrite|fileShareDelete),
+		uintptr(share),
 		uintptr(disposition),
 		uintptr(options),
 		0,

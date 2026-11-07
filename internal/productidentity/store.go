@@ -191,7 +191,7 @@ func (store *Store) openLocked(create bool) (*securefs.Directory, func(), error)
 	if err := store.prepareDirectory(create); err != nil {
 		return nil, nil, err
 	}
-	directory, err := securefs.OpenDirectory(store.directory)
+	directory, err := peercredentials.OpenProtectedDirectory(store.directory, false)
 	if err != nil {
 		return nil, nil, fmt.Errorf("open product identity directory: %w", err)
 	}
@@ -225,14 +225,14 @@ func (store *Store) openLocked(create bool) (*securefs.Directory, func(), error)
 }
 
 func openLockFile(directory *securefs.Directory) (*os.File, bool, error) {
-	file, err := directory.CreateExclusive(lockFile, 0o600)
+	file, err := directory.CreateLock(lockFile, 0o600)
 	if err == nil {
 		return file, true, nil
 	}
 	if !errors.Is(err, os.ErrExist) {
 		return nil, false, fmt.Errorf("create product identity lock: %w", err)
 	}
-	file, err = directory.OpenReadWrite(lockFile)
+	file, err = directory.OpenLock(lockFile, false)
 	if err != nil {
 		return nil, false, fmt.Errorf("open product identity lock: %w", err)
 	}
@@ -348,7 +348,9 @@ func (document identityDocument) validate() error {
 	if len(document.PublicKey) != ed25519.PublicKeySize || len(document.PrivateKey) != ed25519.PrivateKeySize {
 		return errors.New("product identity key material is invalid")
 	}
-	if !bytes.Equal(ed25519.PrivateKey(document.PrivateKey).Public().(ed25519.PublicKey), document.PublicKey) {
+	derived := ed25519.NewKeyFromSeed(document.PrivateKey[:ed25519.SeedSize])
+	defer clear(derived)
+	if !bytes.Equal(derived, document.PrivateKey) || !bytes.Equal(derived[ed25519.SeedSize:], document.PublicKey) {
 		return errors.New("product identity public and private keys do not match")
 	}
 	if document.Generation == 0 || document.CreatedAt.IsZero() {

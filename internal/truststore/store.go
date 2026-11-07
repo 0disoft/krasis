@@ -390,7 +390,7 @@ func (store *Store) openLockedMode(create, shared bool, trace *ReadTrace) (Docum
 	} else {
 		if err = store.prepareDirectoryTraced(create, trace); err == nil {
 			trace.enterStep("prelock_directory_open")
-			directory, err = securefs.OpenDirectory(store.directory)
+			directory, err = peercredentials.OpenProtectedDirectory(store.directory, false)
 		}
 	}
 	if err != nil {
@@ -581,10 +581,7 @@ func openLockFile(directory *securefs.Directory) (*os.File, bool, error) {
 }
 
 func openLockFileMode(directory *securefs.Directory, shared bool) (*os.File, bool, error) {
-	open := directory.OpenReadWrite
-	if shared {
-		open = directory.Open
-	}
+	open := func(name string) (*os.File, error) { return directory.OpenLock(name, shared) }
 	// Existing stores need neither a create attempt nor write/delete rights
 	// for observation. The returned handle is still ACL-checked and locked.
 	file, err := open(lockFilename)
@@ -594,7 +591,10 @@ func openLockFileMode(directory *securefs.Directory, shared bool) (*os.File, boo
 	if !errors.Is(err, os.ErrNotExist) {
 		return nil, false, fmt.Errorf("open trust store lock: %w", err)
 	}
-	file, err = directory.CreateExclusive(lockFilename, 0o600)
+	if shared {
+		return nil, false, fmt.Errorf("open trust store lock: %w", err)
+	}
+	file, err = directory.CreateLock(lockFilename, 0o600)
 	if err == nil {
 		return file, true, nil
 	}

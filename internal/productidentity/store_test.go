@@ -90,6 +90,19 @@ func TestStoreCreatesLoadsAndRotatesIdentity(t *testing.T) {
 	}
 }
 
+func TestIdentityRejectsPrivateSeedMismatchWithUnchangedPublicSuffix(t *testing.T) {
+	document, err := generateDocument(1, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Ed25519 PrivateKey.Public returns the embedded suffix without deriving it
+	// from the seed. A corrupt seed must not pass the identity consistency check.
+	document.PrivateKey[0] ^= 1
+	if err := document.validate(); err == nil {
+		t.Fatal("accepted private seed that does not match the public key")
+	}
+}
+
 func TestStoreRejectsCorruptionUnknownFieldsAndKeyMismatch(t *testing.T) {
 	store := testStore(t)
 	identity, _, err := store.OpenOrCreate(time.Now().UTC())

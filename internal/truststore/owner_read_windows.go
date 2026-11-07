@@ -47,7 +47,7 @@ func readOwnerConnection(localAppData, owner, alias, fingerprint string, now tim
 		return deny(err)
 	}
 	defer dir.Close()
-	lock, err := dir.Open(lockFilename)
+	lock, err := dir.OpenLock(lockFilename, true)
 	if err != nil {
 		return deny(err)
 	}

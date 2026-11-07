@@ -64,3 +64,20 @@ func TestStoreReadWorksWithReadOnlySharing(t *testing.T) {
 		})
 	}
 }
+
+func TestStoreReadDoesNotRecreateMissingLock(t *testing.T) {
+	store := mustStore(t)
+	if _, err := store.Import(testPeer(), "peer", true, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(store.directory, lockFilename)
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.List(); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("List with missing lock = %v", err)
+	}
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("read recreated missing lock: %v", err)
+	}
+}
