@@ -31,3 +31,27 @@ func TestDirectoryHandleValidationRejectsUnsafeACLAndReparseAncestors(t *testing
 		t.Fatal("accepted a reparse ancestor leading to an otherwise secure directory")
 	}
 }
+
+func TestOpenProtectedDirectoryChecksOpenedHandle(t *testing.T) {
+	root := t.TempDir()
+	protected := filepath.Join(root, "protected")
+	if err := os.Mkdir(protected, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ProtectSecurityDirectory(protected); err != nil {
+		t.Fatal(err)
+	}
+	for _, readOnly := range []bool{false, true} {
+		dir, err := OpenProtectedDirectory(protected, readOnly)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := dir.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if dir, err := OpenProtectedDirectory(root, readOnly); err == nil {
+			_ = dir.Close()
+			t.Fatal("accepted directory with inherited unsafe ACL")
+		}
+	}
+}

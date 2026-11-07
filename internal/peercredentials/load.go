@@ -5,7 +5,9 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"io"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -52,10 +54,16 @@ func loadAt(caPath, certificatePath, privateKeyPath string, now time.Time) (tls.
 	if now.IsZero() {
 		return tls.Certificate{}, nil, errors.New("credential validation time is required")
 	}
-	if err := ValidatePrivateKeySecurity(privateKeyPath); err != nil {
+	keyPEM, err := readPrivateKey(privateKeyPath, nil)
+	if err != nil {
 		return tls.Certificate{}, nil, fmt.Errorf("validate private key security: %w", err)
 	}
-	identity, err := tls.LoadX509KeyPair(certificatePath, privateKeyPath)
+	defer clear(keyPEM)
+	certificatePEM, err := os.ReadFile(certificatePath)
+	if err != nil {
+		return tls.Certificate{}, nil, fmt.Errorf("read identity certificate: %w", err)
+	}
+	identity, err := tls.X509KeyPair(certificatePEM, keyPEM)
 	if err != nil {
 		return tls.Certificate{}, nil, fmt.Errorf("load identity: %w", err)
 	}
@@ -79,4 +87,33 @@ func loadAt(caPath, certificatePath, privateKeyPath string, now time.Time) (tls.
 		return tls.Certificate{}, nil, errors.New("CA file contains no certificates")
 	}
 	return identity, roots, nil
+}
+
+// Validate and read the same file handle so a path replacement cannot change
+// the key between the security check and the TLS key-pair load.
+func readPrivateKey(path string, observe func(string)) ([]byte, error) {
+	if path == "" {
+		return nil, errors.New("private key path is required")
+	}
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := ValidateSecurityDirectory(filepath.Dir(absolute)); err != nil {
+		return nil, err
+	}
+	dir, err := OpenProtectedDirectory(filepath.Dir(absolute), true)
+	if err != nil {
+		return nil, err
+	}
+	defer dir.Close()
+	file, err := dir.OpenObserved(filepath.Base(absolute), observe)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	if err := ValidateSecurityFileHandle(file); err != nil {
+		return nil, err
+	}
+	return io.ReadAll(file)
 }
