@@ -176,16 +176,43 @@ func run(ctx context.Context, localAppData string, dependencies runDependencies)
 	}
 	server, err := dependencies.listen(paths.Control, operations)
 	if err != nil {
-		return err
-	}
-	defer func() {
 		shutdown, cancel := context.WithTimeout(context.Background(), DefaultSessionStopTimeout)
 		defer cancel()
-		err = errors.Join(err, server.Close(shutdown), operations.Close(shutdown))
-	}()
+		return errors.Join(err, operations.Close(shutdown))
+	}
 	dependencies.log.Event("agent_ready")
-	if err := server.Run(operations.Context()); err != nil && !errors.Is(err, context.Canceled) {
+	if err := serveUntilInputRetired(operations.Context(), server, operations.Close); err != nil {
 		return fmt.Errorf("run resident agent local API: %w", err)
 	}
 	return nil
+}
+
+// Input workers still authenticate the agent while releasing their native
+// owners. Cancel the operation root first, but keep its API/credentials alive
+// until cleanup finishes (or its existing budget expires). Passing that root
+// directly to Server.Run closes the API before this cleanup can start.
+func serveUntilInputRetired(ctx context.Context, server apiServer, retire func(context.Context) error) error {
+	serving, stop := context.WithCancel(context.WithoutCancel(ctx))
+	defer stop()
+	done := make(chan error, 1)
+	go func() { done <- server.Run(serving) }()
+	var serveErr error
+	finished := false
+	select {
+	case serveErr = <-done:
+		finished = true
+	case <-ctx.Done():
+	}
+	shutdown, cancel := context.WithTimeout(context.Background(), DefaultSessionStopTimeout)
+	defer cancel()
+	retireErr := retire(shutdown)
+	stop()
+	closeErr := server.Close(shutdown)
+	if !finished {
+		serveErr = <-done
+	}
+	if cancellationOnly(serveErr, context.Canceled) {
+		serveErr = nil
+	}
+	return errors.Join(serveErr, retireErr, closeErr)
 }
