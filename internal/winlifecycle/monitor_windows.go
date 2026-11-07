@@ -34,6 +34,8 @@ var (
 	procPostMessageW                     = user32.NewProc("PostMessageW")
 	procPostThreadMessageW               = user32.NewProc("PostThreadMessageW")
 	procPostQuitMessage                  = user32.NewProc("PostQuitMessage")
+	procPeekLifecycleMessage             = user32.NewProc("PeekMessageW")
+	procWaitLifecycleMessage             = user32.NewProc("MsgWaitForMultipleObjectsEx")
 	procGetModuleHandleW                 = kernel32.NewProc("GetModuleHandleW")
 	procGetCurrentThreadID               = kernel32.NewProc("GetCurrentThreadId")
 	procWTSRegisterSessionNotification   = wtsapi32.NewProc("WTSRegisterSessionNotification")
@@ -45,14 +47,16 @@ type Monitor struct {
 	events chan agentlifecycle.Event
 	done   chan struct{}
 	ready  chan error
+	stop   chan struct{}
 
 	window          atomic.Uintptr
 	thread          atomic.Uint32
 	close           sync.Once
 	mu              sync.Mutex
 	runErr          error
-	windowDestroyed bool // accessed only on the native owner thread
-	tearingDown     bool // suppress a new WM_QUIT after the message loop has exited
+	windowDestroyed bool                        // accessed only on the native owner thread
+	tearingDown     bool                        // suppress a new WM_QUIT after the message loop has exited
+	postStop        func(uintptr, uint32) error // Immutable optional test seam.
 }
 
 type windowClass struct {
@@ -75,6 +79,7 @@ func StartMonitor() (agentlifecycle.Monitor, error) {
 		events: make(chan agentlifecycle.Event, 1),
 		done:   make(chan struct{}),
 		ready:  make(chan error, 1),
+		stop:   make(chan struct{}),
 	}
 	go monitor.run()
 	if err := <-monitor.ready; err != nil {
@@ -99,14 +104,15 @@ func (monitor *Monitor) Close() error {
 		}
 		window := monitor.window.Load()
 		if window != 0 {
-			if result, _, callErr := procPostMessageW.Call(window, wmLifecycleStop, 0, 0); result == 0 {
-				monitor.setRunError(win32Error("PostMessageW(lifecycle stop)", callErr))
-				thread := monitor.thread.Load()
-				if posted, _, postErr := procPostThreadMessageW.Call(uintptr(thread), wmQuit, 0, 0); posted == 0 {
-					monitor.setRunError(win32Error("PostThreadMessageW(WM_QUIT)", postErr))
-				}
+			post := postLifecycleStop
+			if monitor.postStop != nil {
+				post = monitor.postStop
 			}
+			monitor.setRunError(post(window, monitor.thread.Load()))
 		}
+		// Attempt the wake before releasing the independent stop signal: the
+		// owner must not destroy its window underneath our normal PostMessage.
+		close(monitor.stop)
 		<-monitor.done
 	})
 	monitor.mu.Lock()
@@ -195,18 +201,42 @@ func (monitor *Monitor) run() {
 	defer stopDesktopWatch()
 	monitor.ready <- nil
 
+	monitor.setRunError(monitor.messageLoop())
+}
+
+func postLifecycleStop(window uintptr, thread uint32) error {
+	if result, _, callErr := procPostMessageW.Call(window, wmLifecycleStop, 0, 0); result == 0 {
+		failure := win32Error("PostMessageW(lifecycle stop)", callErr)
+		if posted, _, postErr := procPostThreadMessageW.Call(uintptr(thread), wmQuit, 0, 0); posted == 0 {
+			failure = errors.Join(failure, win32Error("PostThreadMessageW(WM_QUIT)", postErr))
+		}
+		return failure
+	}
+	return nil
+}
+
+// Stop does not depend on either posted message reaching the queue. Check it
+// between messages and bounded waits, then clean up on this native owner.
+func (monitor *Monitor) messageLoop() error {
 	var message windowMessage
 	for {
-		result, getErr := winmessage.Get(&message)
-		switch int32(result) {
-		case -1:
-			monitor.setRunError(win32Error("GetMessageW", getErr))
-			return
-		case 0:
-			return
+		select {
+		case <-monitor.stop:
+			return nil
 		default:
+		}
+		available, _, _ := procPeekLifecycleMessage.Call(uintptr(unsafe.Pointer(&message)), 0, 0, 0, 1)
+		if available != 0 {
+			if message.Message == wmQuit {
+				return nil
+			}
 			procTranslateMessage.Call(uintptr(unsafe.Pointer(&message)))
 			procDispatchMessageW.Call(uintptr(unsafe.Pointer(&message)))
+			continue
+		}
+		state, _, callErr := procWaitLifecycleMessage.Call(0, 0, winmessage.MaximumWaitMillis, 0x04ff, 0x0004)
+		if state != 0 && state != 258 { // Message available or WAIT_TIMEOUT.
+			return win32Error("MsgWaitForMultipleObjectsEx(lifecycle)", callErr)
 		}
 	}
 }
