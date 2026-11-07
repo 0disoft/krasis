@@ -454,6 +454,22 @@ Service authentication and native construction retain their original five-second
 
 A successful native constructor can remain unbound after its construction context expires; an incomplete or late constructor still fails its original budget. This prevents increasing the reservation timer from silently creating dead five-second candidates. Maximum spare residency rises by twelve seconds; no periodic keepalive or process replacement loop is added. The previous 273-275ms expired-preparation cases motivate this change but are not a measurement of the new build.
 
+### g533 first-connection input preparation
+
+After an authenticated peer connection negotiates input preparation, the
+receiver offers exactly one initial local preparation demand before waiting for
+physical movement hints. This uses the same fresh inbound trust/role/permission
+check, LOCAL-state gate, 750ms timeout and two-second cooldown as later hints.
+It sends no new peer frame, grants no lease and transfers no input handles.
+The receiver goroutine is independent of capture and liveness. No periodic idle
+renewal is added; the single candidate retains its original 15-minute expiry and
+the service's retirement fences. Unsupported connections do not start this work.
+
+The g532 first-entry readiness outlier contains 149.213ms of remaining builder
+join inside a 267.456ms ready wait. Connection-start demand moves optional
+construction ahead of an ordinary first approach. It cannot guarantee immediate
+readiness for an entry arriving during startup or after candidate expiry.
+
 ### g511 source capture timing detail
 
 The g531+ capture path sends its first foreground request to the existing,

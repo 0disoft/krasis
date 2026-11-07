@@ -248,7 +248,7 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 				return runPreparationSender(runContext, preparationHints, runtime, coordinator)
 			}},
 			component{name: "preparation-receiver", run: func() error {
-				return runPreparationReceiver(runContext, incoming, runtime, preparer, authenticatedPeer)
+				return runPreparationReceiver(runContext, incoming, runtime, preparer, authenticatedPeer, true)
 			}},
 		)
 	}

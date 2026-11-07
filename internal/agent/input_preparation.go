@@ -122,21 +122,31 @@ func runPreparationSender(ctx context.Context, hints <-chan time.Time, runtime *
 	}
 }
 
-func runPreparationReceiver(ctx context.Context, hints <-chan time.Time, runtime *application.SessionRuntime, preparer inputPreparer, authenticated transport.AuthenticatedPeerContext) error {
+func runPreparationReceiver(ctx context.Context, hints <-chan time.Time, runtime *application.SessionRuntime, preparer inputPreparer, authenticated transport.AuthenticatedPeerContext, prepareOnConnect ...bool) error {
 	var last time.Time
+	prepare := func(at time.Time) {
+		now := time.Now()
+		if ctx.Err() != nil || preparer == nil || !freshPreparationHint(at, now) || (!last.IsZero() && now.Sub(last) < 2*time.Second) || runtime.LeaseWatch().State != control.StateLocal {
+			return
+		}
+		last = now
+		prepareCtx, cancel := context.WithTimeout(ctx, InputPreparationTimeout)
+		defer cancel()
+		preparer.PrepareInput(prepareCtx, authenticated, now)
+	}
+	// The negotiated authenticated connection is one bounded demand. Starting
+	// before physical approach keeps first entry from racing the initial builder.
+	// Use the same fresh policy check, cooldown and timeout as movement hints;
+	// this grants no lease and adds no periodic renewal or peer frame.
+	if len(prepareOnConnect) > 0 && prepareOnConnect[0] {
+		prepare(time.Now())
+	}
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case at := <-hints:
-			now := time.Now()
-			if preparer == nil || !freshPreparationHint(at, now) || (!last.IsZero() && now.Sub(last) < 2*time.Second) || runtime.LeaseWatch().State != control.StateLocal {
-				continue
-			}
-			last = now
-			prepareCtx, cancel := context.WithTimeout(ctx, InputPreparationTimeout)
-			preparer.PrepareInput(prepareCtx, authenticated, now)
-			cancel()
+			prepare(at)
 		}
 	}
 }
