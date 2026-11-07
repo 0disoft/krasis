@@ -111,30 +111,57 @@ func (owner *Owner) watch(parent context.Context) {
 				owner.stopForMonitorExit(parent)
 				return
 			}
-			if event.Validate() != nil {
-				owner.cancel(ErrMonitorStopped)
+			monitorStopped := false
+			select {
+			case <-owner.monitor.Done():
+				monitorStopped = true
+			default:
+			}
+			if owner.handleEvent(event, monitorStopped) {
 				return
 			}
-			owner.mu.Lock()
-			handler := owner.transition
-			owner.mu.Unlock()
-			if (event == EventSessionLock || event == EventDesktopSwitch) && handler != nil && handler(event) {
-				continue
-			}
-			owner.mu.Lock()
-			if owner.event == "" {
-				owner.event = event
-			}
-			owner.mu.Unlock()
-			owner.cancel(&TransitionError{Event: event})
-			return
 		case <-owner.monitor.Done():
+			// The monitor can publish its last event immediately before closing
+			// Done. Drain already-published events before classifying the exit.
+			for {
+				select {
+				case event, ok := <-owner.monitor.Events():
+					if ok {
+						if owner.handleEvent(event, true) {
+							return
+						}
+						continue
+					}
+				default:
+				}
+				break
+			}
 			owner.stopForMonitorExit(parent)
 			return
 		case <-parent.Done():
 			return
 		}
 	}
+}
+
+func (owner *Owner) handleEvent(event Event, monitorStopped bool) bool {
+	if event.Validate() != nil {
+		owner.cancel(ErrMonitorStopped)
+		return true
+	}
+	owner.mu.Lock()
+	handler := owner.transition
+	owner.mu.Unlock()
+	if !monitorStopped && (event == EventSessionLock || event == EventDesktopSwitch) && handler != nil && handler(event) {
+		return false
+	}
+	owner.mu.Lock()
+	if owner.event == "" {
+		owner.event = event
+	}
+	owner.mu.Unlock()
+	owner.cancel(&TransitionError{Event: event})
+	return true
 }
 
 func (owner *Owner) stopForMonitorExit(parent context.Context) {

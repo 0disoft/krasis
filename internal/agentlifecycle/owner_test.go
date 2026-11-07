@@ -52,6 +52,41 @@ func TestOwnerTreatsUnexpectedMonitorExitAsFailure(t *testing.T) {
 	}
 }
 
+func TestOwnerPreservesEventPublishedBeforeMonitorExit(t *testing.T) {
+	for i := 0; i < 100; i++ {
+		monitor := newFakeMonitor()
+		monitor.events <- EventSuspend
+		monitor.stop()
+		owner, err := Start(context.Background(), func() (Monitor, error) { return monitor, nil })
+		if err != nil {
+			t.Fatal(err)
+		}
+		<-owner.Context().Done()
+		var transition *TransitionError
+		if !errors.As(context.Cause(owner.Context()), &transition) || transition.Event != EventSuspend || owner.Event() != EventSuspend {
+			t.Fatalf("published event lost on monitor exit: event=%q cause=%v", owner.Event(), context.Cause(owner.Context()))
+		}
+		if err := owner.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestOwnerFailsClosedWhenHandledEventPrecedesMonitorExit(t *testing.T) {
+	monitor := newFakeMonitor()
+	monitor.events <- EventSessionLock
+	monitor.stop()
+	ctx, cancel := context.WithCancelCause(context.Background())
+	defer cancel(context.Canceled)
+	called := false
+	owner := &Owner{context: ctx, cancel: cancel, monitor: monitor, done: make(chan struct{}), transition: func(Event) bool { called = true; return true }}
+	owner.watch(context.Background())
+	var transition *TransitionError
+	if called || !errors.As(context.Cause(ctx), &transition) || transition.Event != EventSessionLock {
+		t.Fatalf("stopped monitor allowed transition handler: called=%v cause=%v", called, context.Cause(ctx))
+	}
+}
+
 func TestOwnerCloseIsIdempotentAndDoesNotInventLifecycleEvent(t *testing.T) {
 	monitor := newFakeMonitor()
 	owner, err := Start(context.Background(), func() (Monitor, error) { return monitor, nil })
