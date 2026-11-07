@@ -11,6 +11,11 @@ func serviceRecoveryFailure(cause, closeErr error) error {
 	return nil
 }
 
+// A rejected request does not relax the channel's independent cleanup fence.
+func closeInputServiceChannel(channel *Channel, cause error) error {
+	return serviceRecoveryFailure(cause, channel.Close())
+}
+
 // Fixed endpoint classification survives service joins and native errors. No
 // peer data, process identity, paths or raw error text enter runtime receipts.
 type serviceEndpointError struct {

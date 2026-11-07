@@ -162,9 +162,8 @@ func runInputServiceLoop(ctx context.Context, installation *Installation, ready 
 			if admit != nil {
 				started := time.Now()
 				if err = admit(ctx); err != nil {
-					_ = channel.Close()
-					if errors.Is(err, ErrRecovery) {
-						return err
+					if failure := closeInputServiceChannel(channel, err); failure != nil {
+						return failure
 					}
 					continue
 				}
@@ -189,14 +188,18 @@ func runInputServiceLoop(ctx context.Context, installation *Installation, ready 
 			}
 			if leaseErr == nil {
 				if lease.Capture {
-					_ = channel.Close()
+					if failure := closeInputServiceChannel(channel, ErrProtocol); failure != nil {
+						return failure
+					}
 					continue
 				}
 				var agentPID uint32
 				pipe, ok := channel.stream.(*pipeConn)
 				if !ok || windows.GetNamedPipeClientProcessId(pipe.handle, &agentPID) != nil ||
 					(lease.Presentation && !returned.take(lease, agentPID, channel.authority.agentStarted, time.Now())) {
-					_ = channel.Close()
+					if failure := closeInputServiceChannel(channel, ErrAuthority); failure != nil {
+						return failure
+					}
 					continue
 				}
 				if !lease.Presentation {
@@ -233,9 +236,8 @@ func runInputServiceLoop(ctx context.Context, installation *Installation, ready 
 			} else {
 				err = leaseErr
 			}
-			if closeErr := channel.Close(); closeErr != nil && err == nil {
-				returned = presentationReturn{}
-				err = closeErr
+			if failure := closeInputServiceChannel(channel, err); failure != nil {
+				return failure
 			}
 		}
 		// Recovery and the owned worker have already finished. A clean lease

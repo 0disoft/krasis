@@ -4,12 +4,32 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"net"
 	"syscall"
 	"testing"
 
 	"github.com/0disoft/krasis/internal/application"
 	"github.com/0disoft/krasis/internal/logindiag"
 )
+
+type failingServiceClose struct{ net.Conn }
+
+func (c failingServiceClose) Close() error {
+	_ = c.Conn.Close()
+	return errors.New("channel close failed")
+}
+
+func TestInputServiceRejectedRequestCannotHideChannelCloseFailure(t *testing.T) {
+	for _, cause := range []error{nil, ErrProtocol, ErrAuthority} {
+		server, peer := net.Pipe()
+		channel := clientChannel(failingServiceClose{server}, authorityAgent)
+		failure := closeInputServiceChannel(channel, cause)
+		_ = peer.Close()
+		if !errors.Is(failure, ErrRecovery) || !errors.Is(failure, ErrAuthority) || cause != nil && !errors.Is(failure, cause) {
+			t.Fatalf("request %v hid uncertain channel retirement: %v", cause, failure)
+		}
+	}
+}
 
 func TestServiceRecoveryRetainsWorkerAndConcurrentCloseFailure(t *testing.T) {
 	worker := &workerReportFailure{operation: "cursor-restore", cause: errors.Join(ErrRecovery, syscall.Errno(5))}
