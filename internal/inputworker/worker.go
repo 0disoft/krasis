@@ -30,6 +30,12 @@ var (
 	ErrRecovery  = errors.New("input worker release recovery failed")
 )
 
+// Keep native failure classification without exposing input-port error text.
+type recoveryFailure struct{ cause error }
+
+func (e *recoveryFailure) Error() string { return ErrRecovery.Error() }
+func (e *recoveryFailure) Unwrap() error { return e.cause }
+
 // Binding is an unpredictable per-lease channel identity. It never substitutes
 // for Windows process authentication or the resident agent's mTLS authorization.
 type Binding [16]byte
@@ -195,7 +201,7 @@ func serve(ctx context.Context, stream net.Conn, input application.InputPort, le
 		})
 		if recoveryErr != nil {
 			report.Recovery.Remaining = pressed.Count()
-			err = errors.Join(err, ErrRecovery, recoveryErr)
+			err = errors.Join(err, &recoveryFailure{cause: errors.Join(ErrRecovery, recoveryErr)})
 		}
 	}()
 	// Read on the desktop-owning thread: a separate reader and rendezvous
