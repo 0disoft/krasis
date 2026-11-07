@@ -104,6 +104,11 @@ func (hook *SourceHook) runWithBoundary(ctx context.Context, session *SourceSess
 		return err
 	}
 	evidence := &sourceShutdownEvidence{}
+	// Reuse the existing monitor as a window-free foreground requester. Native
+	// window/hook owners stay separate; command timeout observation stays on
+	// the command caller rather than inside SetForegroundWindow.
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 	ctx = context.WithValue(ctx, sourceShutdownKey{}, evidence)
 	defer func() { resultErr = errors.Join(resultErr, evidence.snapshot()) }()
 	releaseHookSession, err := acquireHookSession(ctx)
@@ -184,6 +189,8 @@ func (hook *SourceHook) runWithBoundary(ctx context.Context, session *SourceSess
 	defer watch.Stop()
 	for {
 		select {
+		case request := <-hook.capture.foregroundRequests:
+			request.complete(request.current, request.current.requestForegroundOnMonitorThread(ctx, request.deadline))
 		case <-watch.C:
 			if err := progress.failure(time.Now()); err != nil {
 				session.retireHookFailure(err)

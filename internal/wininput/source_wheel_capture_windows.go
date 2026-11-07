@@ -156,6 +156,7 @@ type sourceWheelCapture struct {
 	opOnce             sync.Once
 	opGate             chan struct{}
 	run                atomic.Pointer[sourceWheelCaptureRun]
+	foregroundRequests chan *sourceForegroundRequest
 }
 
 type sourceWheelCaptureRun struct {
@@ -180,15 +181,16 @@ type sourceWheelCaptureRun struct {
 }
 
 type sourceWheelCaptureCommand struct {
-	message  uint32
-	result   chan error
-	profile  context.Context
-	queuedAt time.Time
-	postedAt <-chan time.Time
+	message    uint32
+	result     chan error
+	profile    context.Context
+	queuedAt   time.Time
+	postedAt   <-chan time.Time
+	foreground *sourceForegroundExchange
 }
 
 func newSourceWheelCapture(observer SourcePipelineObserver) *sourceWheelCapture {
-	return &sourceWheelCapture{observer: observer}
+	return &sourceWheelCapture{observer: observer, foregroundRequests: make(chan *sourceForegroundRequest)}
 }
 
 func (capture *sourceWheelCapture) Activate() error {
@@ -241,6 +243,7 @@ func (capture *sourceWheelCapture) execute(message uint32, allowMissing bool) er
 func (capture *sourceWheelCapture) executeProfile(profile context.Context, message uint32, allowMissing bool) error {
 	stopTotal := handoff.CaptureSpan(profile, handoff.CaptureTotal)
 	defer stopTotal()
+	deadline := time.Now().Add(sourceWheelCaptureTimeout)
 	timer := time.NewTimer(sourceWheelCaptureTimeout)
 	defer timer.Stop()
 	capture.opOnce.Do(func() { capture.opGate = make(chan struct{}, 1) })
@@ -273,6 +276,12 @@ func (capture *sourceWheelCapture) executeProfile(profile context.Context, messa
 		postedAt = make(chan time.Time, 1)
 	}
 	command := sourceWheelCaptureCommand{message: message, result: make(chan error, 1), profile: profile, postedAt: postedAt}
+	if message == wmSourceWheelCaptureActivate {
+		command.foreground = newSourceForegroundExchange()
+		command.foreground.ready = capture.foregroundRequests
+		command.foreground.deadline = deadline
+		defer close(command.foreground.cancelled)
+	}
 	if profile != nil {
 		command.queuedAt = time.Now()
 	}
@@ -547,7 +556,11 @@ func (current *sourceWheelCaptureRun) handleCommand(message uint32) uintptr {
 	}
 	switch message {
 	case wmSourceWheelCaptureActivate:
-		err = current.activateWindowProfile(command.profile)
+		request := sourceWheelCaptureSetForeground
+		if command.foreground != nil {
+			request = func(uintptr) error { return command.foreground.request(current) }
+		}
+		err = current.activateWindowWithForeground(command.profile, request)
 	case wmSourceWheelCaptureDeactivate:
 		err = current.deactivateWindowProfile(command.profile)
 	}
@@ -566,6 +579,10 @@ func (current *sourceWheelCaptureRun) activateWindow() (activationErr error) {
 }
 
 func (current *sourceWheelCaptureRun) activateWindowProfile(profile context.Context) (activationErr error) {
+	return current.activateWindowWithForeground(profile, sourceWheelCaptureSetForeground)
+}
+
+func (current *sourceWheelCaptureRun) activateWindowWithForeground(profile context.Context, request func(uintptr) error) (activationErr error) {
 	if err := sourceLoginDesktopCheck(current.loginContext); err != nil {
 		return err
 	}
@@ -647,7 +664,7 @@ func (current *sourceWheelCaptureRun) activateWindowProfile(profile context.Cont
 	if profile != nil {
 		requestStarted = time.Now()
 	}
-	foregroundErr := sourceWheelCaptureSetForeground(current.window)
+	foregroundErr := request(current.window)
 	if !requestStarted.IsZero() {
 		handoff.RecordCaptureExact(profile, handoff.CaptureExactForegroundRequest, time.Since(requestStarted))
 	}

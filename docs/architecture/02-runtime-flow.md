@@ -456,6 +456,27 @@ A successful native constructor can remain unbound after its construction contex
 
 ### g511 source capture timing detail
 
+The g531 capture path sends its first foreground request to the existing,
+window-free source monitor on that monitor's bound OS thread. The command caller
+continues to enforce its original two-second budget independently. The window
+owner prepares the surface, services only sent activation messages while waiting
+on a per-attempt native reply event, and freshly verifies foreground before
+committing capture. It never dispatches posted input, commands or WM_QUIT inside
+this wait. One event has two exact owners (capture and the accepted requester);
+the final owner closes it even after cancellation or a late native return. No
+extra process, persistent thread or peer/IPC exchange is introduced. Fresh monitor
+desktop checks, absolute request expiry, owner terminal checks, guarded activation,
+ACK-before-input, fallback attach/detach, rollback and focus restoration remain.
+An uninterruptible Windows call cannot authorize late capture or justify reusing
+unjoined native owners; existing retirement fencing still applies.
+
+`foregroundRequestMicros` retains the complete owner request interval, including
+requester scheduling, desktop validation, sent-message service and reply wait.
+Moving a wait to another thread must not make it disappear from this measurement.
+The existing subsequent verification interval and private packet layout remain
+unchanged. Native interactive smoke can compare this interval with the original
+owner-thread request; full crossing improvement requires a new paired sample.
+
 The existing matching 64-byte activation response carries three optional bounded microsecond measurements: post-to-owner handling, direct foreground request, and subsequent foreground verification. The prior queue bucket also includes command admission and remains unchanged for comparison. Exact observations preserve measured zero, first observation, negative acknowledgements and sealed-attempt ownership. Non-activation packets cannot carry these details. Old all-zero activation replies remain unobserved; this is a same-installation IPC detail and agent/input-service generations must match before physical comparison.
 
 The g510 160.287ms capture tail had a 156.487ms matching response wait, but only 10-100ms native buckets for queue and foreground work. These observations do not identify one blocking Windows call. g511 adds detail without bypassing live authority, ACK-before-input, foreground/wheel ownership or rollback. No claim of a measured A capture latency reduction is made by adding diagnostics.
