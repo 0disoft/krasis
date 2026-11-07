@@ -87,6 +87,23 @@ func (sampler *timingSampler) flush(now time.Time) {
 	sampler.started = now
 }
 
+// emitSourceHeartbeatFailureTiming emits this attempt only, independently of
+// the 15-second maximum. Zero means no trustworthy measurement was received.
+func emitSourceHeartbeatFailureTiming(emit func(string), sample [7]byte) {
+	if emit == nil {
+		return
+	}
+	stages := [...]string{"client_lock", "client_authority", "client_write", "client_response", "worker_presence_wait", "worker_presence_native", "worker_reply_gate"}
+	buckets := [...]string{"unavailable", "lt1ms", "lt10ms", "lt100ms", "lt1s", "ge1s"}
+	for i, stage := range stages {
+		bucket := sample[i]
+		if int(bucket) >= len(buckets) {
+			bucket = 0
+		}
+		emitTiming(emit, "installed_source_heartbeat_failure_timing_"+stage+"_"+buckets[bucket])
+	}
+}
+
 func emitTiming(emit func(string), code string) {
 	// Diagnostics must not turn an acknowledged input into an apparent failure.
 	defer func() { _ = recover() }()

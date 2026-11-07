@@ -84,6 +84,13 @@ func init() {
 			}
 		}
 	}
+	// Per-failure samples are separate from the 15-second maximum. Values are
+	// limited to fixed stages and coarse buckets, including unmeasured stages.
+	for _, stage := range []string{"client_lock", "client_authority", "client_write", "client_response", "worker_presence_wait", "worker_presence_native", "worker_reply_gate"} {
+		for _, bucket := range []string{"unavailable", "lt1ms", "lt10ms", "lt100ms", "lt1s", "ge1s"} {
+			allowed["installed_source_heartbeat_failure_timing_"+stage+"_"+bucket] = true
+		}
+	}
 	for _, phase := range []string{"presence_wait", "presence_native", "reply_gate"} {
 		for _, bucket := range []string{"lt1ms", "lt10ms", "lt100ms", "lt1s", "ge1s"} {
 			allowed["installed_source_heartbeat_timing_worker_"+phase+"_"+bucket] = true

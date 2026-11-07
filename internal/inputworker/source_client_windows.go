@@ -142,6 +142,9 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 			sampler.flush(now)
 		}
 		if result != nil && sampler.emit != nil {
+			if op == sourceHeartbeat {
+				emitSourceHeartbeatFailureTiming(sampler.emit, sample)
+			}
 			emitTiming(sampler.emit, "installed_source_failure_"+stage)
 			emitTiming(sampler.emit, sourceCommandFailureCode(op))
 			var write *sourceIOFailure
