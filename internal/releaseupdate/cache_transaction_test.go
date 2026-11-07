@@ -12,12 +12,38 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/0disoft/krasis/internal/productidentity"
 	"github.com/0disoft/krasis/internal/securefs"
 	"github.com/0disoft/krasis/internal/updatebundle"
 )
+
+func TestMergeReadyRejectsUnreadableOrInvalidReceipt(t *testing.T) {
+	id := strings.Repeat("a", 32)
+	oldID := strings.Repeat("b", 32)
+	old := readyReceipt{Folders: []string{oldID}, History: map[string][]byte{oldID: []byte("old")}}
+	fault := errors.New("receipt read failed")
+	for _, err := range []error{fault, ErrInvalid} {
+		if _, got := mergeReady(id, []byte("new"), readyReceipt{}, err); !errors.Is(got, err) {
+			t.Fatalf("receipt error lost: %v", got)
+		}
+	}
+	if r, err := mergeReady(id, []byte("new"), readyReceipt{}, os.ErrNotExist); err != nil || len(r.Folders) != 1 {
+		t.Fatalf("first publication: %+v, %v", r, err)
+	}
+	r, err := mergeReady(id, []byte("new"), old, nil)
+	if err != nil || len(r.Folders) != 2 || r.Folders[1] != oldID || string(r.History[oldID]) != "old" {
+		t.Fatalf("history lost: %+v, %v", r, err)
+	}
+	for i := 0; i < 63; i++ {
+		old.Folders = append(old.Folders, fmt.Sprintf("%032x", i))
+	}
+	if _, err := mergeReady(id, []byte("new"), old, nil); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("oversized history accepted: %v", err)
+	}
+}
 
 func packagedReadyArchive(t *testing.T) []byte {
 	t.Helper()

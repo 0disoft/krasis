@@ -151,6 +151,11 @@ func saveReady(base string, envelope, archive []byte, key string, write func(*se
 	}
 	defer dir.Close()
 	id := m.SHA256[:32]
+	old, loadErr := loadReady(dir)
+	r, err := mergeReady(id, envelope, old, loadErr)
+	if err != nil {
+		return "", m, err
+	}
 	directory, err := stage(base, b, id)
 	if errors.Is(err, os.ErrExist) {
 		paths, _ := productidentity.ResolveWindowsPaths(base)
@@ -165,18 +170,6 @@ func saveReady(base string, envelope, archive []byte, key string, write func(*se
 	if err != nil {
 		return "", m, err
 	}
-	r := readyReceipt{Envelope: envelope, Folders: []string{id}, History: map[string][]byte{id: envelope}}
-	if old, e := loadReady(dir); e == nil {
-		for _, entry := range old.Folders {
-			if !slices.Contains(r.Folders, entry) {
-				r.Folders = append(r.Folders, entry)
-				r.History[entry] = old.History[entry]
-			}
-		}
-	}
-	if len(r.Folders) > 64 {
-		return "", m, ErrInvalid
-	}
 	if err = write(dir, archiveName(m), archive); err != nil {
 		return "", m, err
 	}
@@ -185,6 +178,23 @@ func saveReady(base string, envelope, archive []byte, key string, write func(*se
 		return "", m, err
 	}
 	return directory, m, nil
+}
+
+func mergeReady(id string, envelope []byte, old readyReceipt, loadErr error) (readyReceipt, error) {
+	if loadErr != nil && !errors.Is(loadErr, os.ErrNotExist) {
+		return readyReceipt{}, loadErr
+	}
+	r := readyReceipt{Envelope: envelope, Folders: []string{id}, History: map[string][]byte{id: envelope}}
+	for _, entry := range old.Folders {
+		if !slices.Contains(r.Folders, entry) {
+			r.Folders = append(r.Folders, entry)
+			r.History[entry] = old.History[entry]
+		}
+	}
+	if len(r.Folders) > 64 {
+		return readyReceipt{}, ErrInvalid
+	}
+	return r, nil
 }
 
 func RestoreReady(base, key string, current int) (string, Manifest, error) {
