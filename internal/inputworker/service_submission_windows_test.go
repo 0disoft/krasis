@@ -39,7 +39,13 @@ func TestNativeServiceSubmissionSeparatesWriterAdmissionFromDelivery(t *testing.
 			ipc: &nativeIPCWire{outer: [3]uint64{workerIPCTick(), 0, 0}}})
 	}()
 	<-w.entered
-	time.Sleep(20 * time.Millisecond)
+	// The assertion measures QPC microseconds. Windows timer delivery can
+	// resume Sleep slightly early, so hold admission until that same clock
+	// actually covers the requested interval rather than assuming Sleep did.
+	releaseAt := workerIPCTick() + 20_000
+	for workerIPCTick() < releaseAt {
+		time.Sleep(time.Millisecond)
+	}
 	server.writeMu.Unlock()
 	if err := <-done; err != nil {
 		t.Fatal(err)
