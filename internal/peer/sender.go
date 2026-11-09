@@ -91,27 +91,40 @@ func BeginOutboundSessionObserved(
 	}
 	queued := time.Now()
 	return coordinator.Execute(ctx, func(writer FrameWriter) error {
-		handoff.Record(ctx, handoff.RequestCoordinator, time.Since(queued))
-		if _, err := runtime.BeginOutbound(ctx, sessionID, epoch); err != nil {
-			return fmt.Errorf("%w: %w", ErrOutboundBegin, err)
-		}
-		started := time.Now()
-		err := writeControlOrFail(ctx, writer, runtime, transport.ControlCommand{
-			Kind:      transport.ControlLeaseRequest,
-			SessionID: sessionID,
-			Epoch:     epoch,
-			Edge:      edge,
-		})
-		writtenAt := time.Now()
-		handoff.Record(ctx, handoff.RequestWrite, writtenAt.Sub(started))
-		if err != nil {
-			observeControlFlow(observer, ControlFlowRequestWriteOutcomeUnknown)
-			return fmt.Errorf("%w: %w", ErrOutboundRequestWrite, err)
-		}
-		handoff.RequestWritten(ctx, writtenAt)
-		observeControlFlow(observer, ControlFlowRequestWriteCompleted)
-		return nil
+		return beginOutboundSessionAcquired(ctx, writer, runtime, sessionID, epoch, edge, observer, queued)
 	})
+}
+
+func beginOutboundSessionAcquired(
+	ctx context.Context,
+	writer FrameWriter,
+	runtime *application.SessionRuntime,
+	sessionID string,
+	epoch string,
+	edge control.ScreenEdge,
+	observer ControlFlowObserver,
+	queued time.Time,
+) error {
+	handoff.Record(ctx, handoff.RequestCoordinator, time.Since(queued))
+	if _, err := runtime.BeginOutbound(ctx, sessionID, epoch); err != nil {
+		return fmt.Errorf("%w: %w", ErrOutboundBegin, err)
+	}
+	started := time.Now()
+	err := writeControlOrFail(ctx, writer, runtime, transport.ControlCommand{
+		Kind:      transport.ControlLeaseRequest,
+		SessionID: sessionID,
+		Epoch:     epoch,
+		Edge:      edge,
+	})
+	writtenAt := time.Now()
+	handoff.Record(ctx, handoff.RequestWrite, writtenAt.Sub(started))
+	if err != nil {
+		observeControlFlow(observer, ControlFlowRequestWriteOutcomeUnknown)
+		return fmt.Errorf("%w: %w", ErrOutboundRequestWrite, err)
+	}
+	handoff.RequestWritten(ctx, writtenAt)
+	observeControlFlow(observer, ControlFlowRequestWriteCompleted)
+	return nil
 }
 
 func SendInputAction(

@@ -62,7 +62,17 @@ func (controller *OutboundController) Begin(
 	if !controller.Ready() {
 		return ErrOutboundNotReady
 	}
-	return BeginOutboundSessionObserved(ctx, controller.Coordinator, controller.Runtime, sessionID, epoch, edge, controller.Observer)
+	queued := time.Now()
+	return controller.Coordinator.Execute(ctx, func(writer FrameWriter) error {
+		// Readiness was observed before waiting for the shared semantic writer.
+		// A receiver may have prepared an inbound lease while this request was
+		// queued, so admit outbound intent only against the state observed while
+		// the writer is held.
+		if !controller.Ready() {
+			return ErrOutboundNotReady
+		}
+		return beginOutboundSessionAcquired(ctx, writer, controller.Runtime, sessionID, epoch, edge, controller.Observer, queued)
+	})
 }
 
 func (controller *OutboundController) Ready() bool {
