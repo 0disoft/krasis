@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/0disoft/krasis/internal/application"
+	"github.com/0disoft/krasis/internal/cleanupresult"
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/handoff"
 	"github.com/0disoft/krasis/internal/transport"
@@ -129,13 +130,25 @@ func runSession(
 		}
 		if err != nil {
 			_ = ownedConnection.Close()
+			var cause error
 			if ctxErr := ctx.Err(); ctxErr != nil {
-				ctxErr = errors.Join(ctxErr, abortPendingLease(ctx, requests))
-				return failSessionWithLifecycle(ctx, coordinator, runtime, outbound, ctxErr)
+				cause = ctxErr
+			} else {
+				cause = classifyPeerReadFailure(connection, err)
 			}
-			err = classifyPeerReadFailure(connection, err)
-			err = errors.Join(err, abortPendingLease(ctx, requests))
-			return failSessionWithLifecycle(ctx, coordinator, runtime, outbound, err)
+			abortErr := abortPendingLease(ctx, requests)
+			stopCause := cause
+			if abortErr != nil {
+				stopCause = errors.Join(cause, abortErr)
+			}
+			result := failSessionWithLifecycle(ctx, coordinator, runtime, outbound, stopCause)
+			if result == nil {
+				result = stopCause
+			}
+			if abortErr == nil && cleanupresult.OnlyCause(result, stopCause) {
+				return cleanupresult.Confirm(result)
+			}
+			return result
 		}
 		controlCtx := ctx
 		readCompleted := time.Now()

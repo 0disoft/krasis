@@ -488,6 +488,24 @@ g532 123.413ms capture sample contains 98.908ms of worker activation and 35.305m
 of foreground request/exchange. It does not isolate monitor scheduling from
 Windows execution; a paired physical trial is still required to quantify benefit.
 
+### g535 verified shutdown and boundary contention
+
+Terminal source cleanup and peer read recovery retain their stop cause separately
+from local confirmation that their cleanup completed. Multiple component wrappers
+for one socket failure must not by themselves make recovery unverified. Source
+confirmation requires the sender and interrupt to join and the runtime Fail
+result to contain only its supplied cause. Peer read confirmation also requires
+pending-lease rollback to succeed; close errors appended by its owner invalidate
+confirmation. Timeout, additional cleanup failures, unverified native hook exit,
+non-LOCAL runtime and pressed-ledger failures retain the original fail-closed
+behavior. Confirmation is local control flow, never wire data or input authority.
+
+OutboundController rechecks source readiness and LOCAL state after acquiring the
+shared coordinator. If inbound preparation won while the local request waited,
+only that local intent returns ErrOutboundNotReady; the inbound grant and native
+owners stay intact. The shared request writer preserves actual validation and
+write errors. No protocol, lease ordering, retry or query-capacity change is made.
+
 ### g534 source command dependency scheduling
 
 The protected command dispatcher's callback uses the actual desktop owner's

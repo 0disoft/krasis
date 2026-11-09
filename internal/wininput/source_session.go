@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/0disoft/krasis/internal/cleanupresult"
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/handoff"
 )
@@ -549,13 +550,21 @@ func (session *SourceSession) cleanupSession(
 		}
 	}
 	if !fail {
-		return errors.Join(cause, interruptErr, senderErr)
+		result := errors.Join(cause, interruptErr, senderErr)
+		if interruptErr == nil {
+			return cleanupresult.Confirm(result)
+		}
+		return result
 	}
 	failDone := make(chan error, 1)
 	go func() { failDone <- session.sink.Fail(cleanupCtx, cause) }()
 	select {
 	case failErr := <-failDone:
-		return errors.Join(cause, interruptErr, senderErr, failErr)
+		result := errors.Join(cause, interruptErr, senderErr, failErr)
+		if interruptErr == nil && cleanupresult.OnlyCause(failErr, cause) {
+			return cleanupresult.Confirm(result)
+		}
+		return result
 	case <-cleanupCtx.Done():
 		return errors.Join(cause, interruptErr, senderErr, ErrSourceCleanupIncomplete, cleanupCtx.Err())
 	}

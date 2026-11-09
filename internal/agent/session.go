@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/0disoft/krasis/internal/application"
+	"github.com/0disoft/krasis/internal/cleanupresult"
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/handoff"
 	"github.com/0disoft/krasis/internal/peer"
@@ -322,6 +323,13 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 			continue
 		}
 		if outcome != nil && !expectedWorkerCancellation(outcome, runContext.Err()) {
+			// Completed source cleanup and peer read recovery carry independent
+			// evidence. Their different stop causes do not imply cleanup failed.
+			if (components[index].name == "source-session" || components[index].name == "peer-session") &&
+				cleanupresult.Confirmed(outcome.(*sessionComponentError).cause) {
+				cause = errors.Join(cause, outcome)
+				continue
+			}
 			if components[index].name == "source-session" &&
 				errors.Is(cause, wininput.ErrSourceCaptureLostForeground) &&
 				foregroundLossCleanupOnly(outcome, false) {
