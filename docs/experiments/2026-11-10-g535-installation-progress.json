@@ -1,0 +1,175 @@
+{
+  "schemaVersion": "krasis.g535-installation-progress/v1",
+  "date": "2026-11-10",
+  "generation": 535,
+  "revision": "ea987dcf3cbf868c07d0fecb8daf5de126540681",
+  "commits": [
+    "c174f539",
+    "20866c15",
+    "ea987dcf3cbf868c07d0fecb8daf5de126540681"
+  ],
+  "changes": [
+    "Verified source shutdown and peer read recovery separate communication stop causes from completed cleanup; actual cleanup failures still require recovery.",
+    "OutboundController rechecks readiness under the coordinator; inbound contention returns ErrOutboundNotReady without another request or terminating the accepted inbound lease."
+  ],
+  "validation": {
+    "regressions": "Both bugs failed against prior source using overlays; fixed regressions pass. Read-first fixture also proves native owner and connection close failures stay unverified.",
+    "test": "Eight affected packages pass uncached with one named live-owner fixture excluded.",
+    "race": "agent, peer, wininput, inputworker and cleanupresult pass uncached with the same fixture excluded.",
+    "vet": "Eight affected packages pass using existing -unsafeptr=false policy.",
+    "native": "Five actual Windows foreground/capture/retirement cycles pass; not a paired latency comparison.",
+    "frontendAndPackage": "Frontend unit suite, native build, 8-file update integration/integrity and embedded setup validation pass.",
+    "skipped": {
+      "test": "TestPortablePairRetainsIndependentRecoveryAfterInputFailure",
+      "reason": "A running real portable owner held the fixed crash-guard ownership fence; initial full suite rejected the fixture. No force kill or bypass. Full repository and other OS tests out of scope."
+    },
+    "logs": {
+      "test": {
+        "sha256": "8a570bac0ad9fe0e7edf577406fe61b0a8c9ef01611bbf49404c49325b68b1d1",
+        "bytes": 455
+      },
+      "vet": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "race": {
+        "sha256": "5b9caca7254708558b189bf890228c61a20cb1b3d7373d289b54a5531eeddcb8",
+        "bytes": 282
+      },
+      "native": {
+        "sha256": "6ab52c73c939e17a53fdb40b6bcdfe653bdaef20729b449966d1563c5acba6f2",
+        "bytes": 3176
+      },
+      "package": {
+        "sha256": "4806543ab1c366f3099d117a6f47ba38bf035787d1983997671c1f415469b878",
+        "bytes": 11710
+      },
+      "setup-build": {
+        "sha256": "9b1b6cd40084beadf11e0781f0df1cf05197759505559fddd3072f518305f790",
+        "bytes": 220
+      },
+      "recovery-red": {
+        "sha256": "300aaf391c852f6a3f8f468102d532a6f8fe9a06d06a37de33c1be0e142d3577",
+        "bytes": 1753
+      },
+      "recovery-green": {
+        "sha256": "48bb65f7c53635516b3a120445a144d641cec5ff0247d0ee542b11222ab5098b",
+        "bytes": 982
+      },
+      "contention-red": {
+        "sha256": "fe918f3505d673a7bd8beaa4e58e2308ec40cb1c77031e0d6bc066b24eeebfce",
+        "bytes": 423
+      },
+      "test-live-owner-blocked": {
+        "sha256": "e40dad3daf3ee0a6cd3c32151b49eac6581f3fa044ace6a8dab5d82498d1eace",
+        "bytes": 738
+      }
+    }
+  },
+  "installation": {
+    "A": {
+      "schema": "krasis.setup-result/v1",
+      "code": 0,
+      "state": "installed"
+    },
+    "B": {
+      "schemaVersion": "krasis.cli.update-wait/v1",
+      "peerAlias": "B",
+      "id": "9741f9843f0f6ee8a7f178a695fe18b8",
+      "code": "updated",
+      "transferState": "UPDATED",
+      "generation": 535,
+      "revision": "ea987dcf3cbf868c07d0fecb8daf5de126540681",
+      "bytes": 28968160,
+      "total": 28968160
+    },
+    "cliConnect": {
+      "schemaVersion": "krasis.cli.peer-connect/v1",
+      "code": "connected",
+      "peerAlias": "B",
+      "id": "c7143ce85b0c223fe409cbf69ec8e4bb"
+    },
+    "peerGeneration": 535,
+    "doctorCode": "installed_agent_version_mismatch",
+    "protectedInputA": "PORTABLE",
+    "installedProtectedBuildA": "752cddaefd1a0a782c20cb21993a97355168a4fe"
+  },
+  "devices": {
+    "A": {
+      "created": "2026-11-09T20:48:38Z",
+      "supportSha256": "49bcfbcd4f77d867d1af160b5f014b4fbfc123739176c62f696f787d59905ae5",
+      "service": "FAILED",
+      "input": "SERVICE_RECOVERY_REQUIRED",
+      "grant": "PRESENT",
+      "lastFailure": {
+        "time": "2026-11-09T10:08:47.5168104Z",
+        "stage": "service",
+        "reason": "capture",
+        "operation": "worker-report-eof",
+        "win32Error": 0,
+        "win32Known": false,
+        "workerExit": {
+          "state": "RUNNING",
+          "code": 0,
+          "known": false
+        }
+      },
+      "installation": {
+        "time": "2026-11-07T21:15:10.1281361Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "connectedAt": "2026-11-09T20:48:25.0006739Z",
+      "connection": "15e2b1dc99ed9d1c8d45468a4b0d1fc61b5c015f54a4154eb15d7976991f2121",
+      "postConnectionFailures": []
+    },
+    "B": {
+      "created": "2026-11-09T20:48:42Z",
+      "supportSha256": "e3c9c4e1ce6276dfc74741207ec233d9cbb491b6fd20ffc13f3fab0bf94abe64",
+      "service": "READY",
+      "input": "READY",
+      "grant": "PRESENT",
+      "installation": {
+        "time": "2026-11-09T20:47:55.8870172Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "connectedAt": "2026-11-09T20:48:26.949016Z",
+      "connection": "15e2b1dc99ed9d1c8d45468a4b0d1fc61b5c015f54a4154eb15d7976991f2121",
+      "postConnectionFailures": []
+    }
+  },
+  "pending": {
+    "device": "A",
+    "required": "Windows administrator confirmation through the g535 protected input refresh/recovery button",
+    "reason": "The existing g534 service had already stopped with worker-report-eof before this change. g535 UI and ordinary agent are installed and connected, but the protected service/install remains g534.",
+    "afterConfirmation": "Verify matching installed build and READY on both notebooks, reconnect by CLI as needed, collect final diagnostics."
+  },
+  "sourceOfTruthChanged": [
+    "docs/architecture/02-runtime-flow.md"
+  ],
+  "contracts": "No public API, wire protocol, DB, dependency, repository hygiene or tracked runner change.",
+  "push": "not requested; not performed",
+  "remoteCI": "not requested; not run",
+  "limits": [
+    "A is currently on ordinary portable input; do not claim protected input READY.",
+    "No new g535 physical crossing trial or latency improvement claim.",
+    "The two regression fixes do not establish a fix for the pre-existing worker-report-eof native-service failure."
+  ]
+}
