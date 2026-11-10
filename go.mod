@@ -9,6 +9,8 @@ require (
 	github.com/wailsapp/wails/v3 v3.0.0-beta.23
 )
 
+require github.com/jezek/xgb v1.3.1 // indirect
+
 require (
 	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/adrg/xdg v0.5.3 // indirect
