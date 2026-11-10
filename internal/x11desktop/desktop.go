@@ -272,10 +272,14 @@ func (d *Desktop) Grab(ctx context.Context) error {
 		if g.Status != xproto.GrabStatusSuccess {
 			return errors.New("X11 pointer is already grabbed")
 		}
-		if err = xfixes.HideCursorChecked(d.c.x, d.c.root).Check(); err != nil {
-			return err
+		// XFIXES counts hide requests per client. A return presentation may
+		// already own one; do not leave an extra hide after the capture retires.
+		if !d.hidden {
+			if err = xfixes.HideCursorChecked(d.c.x, d.c.root).Check(); err != nil {
+				return err
+			}
+			d.hidden = true
 		}
-		d.hidden = true
 		if err = xproto.WarpPointerChecked(d.c.x, 0, d.c.root, 0, 0, 0, 0, int16(d.geometry.Width/2), int16(d.geometry.Height/2)).Check(); err != nil {
 			return err
 		}
