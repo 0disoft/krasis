@@ -1,0 +1,87 @@
+# Linux 개발 빌드
+
+Windows↔Linux 및 Linux↔Linux는 **X11 사용자 세션**을 대상으로 한다.
+Windows의 입력·보호 서비스·설치 경로와 기존 mTLS/PIN/리스 프로토콜을 유지한다.
+Linux에는 Windows SYSTEM 서비스와 동일한 권한을 부여하지 않는다.
+
+## 지원 범위
+
+| 항목 | Linux |
+| --- | --- |
+| 키보드·상대 마우스·버튼·휠 | X11 XTEST로 주입, grab으로 로컬 입력 억제 |
+| 좌우 경계 전환·귀환 | 각 PC 활성 모니터 하나, 기존 리스·누름 상태 복구 사용 |
+| 키보드 배열 | XKB 물리 키 이름을 기존 Windows set-1 코드로 변환 |
+| 클립보드 | 명시적으로 켠 peer에 텍스트·PNG 공유; 기존 내용은 켠 것만으로 전송하지 않음 |
+| 실행·연결 | CLI, 사용자별 에이전트 자동 시작, XDG 데이터 경로 |
+| 잠금·절전·로그아웃 | systemd-logind 감시로 세션 종료·입력 정리 |
+| 파일·폴더 클립보드 | Linux 데스크톱 브리지에서 미지원 |
+| GUI·보호 입력·로그인 전 입력·peer 자동 업데이트 | Linux 빌드에서 미지원 |
+| native Wayland | 미지원. XWayland 접속 성공을 전체 데스크톱 제어로 간주하지 않음 |
+
+Wayland는 compositor가 허용하는 InputCapture/RemoteDesktop portal 및 EIS
+입력 경로가 필요하다. X11 grab이나 XTEST를 Wayland 지원으로 대체 보고하지 않는다.
+Ubuntu 등에서 이 빌드를 사용할 때는 로그인 화면에서 Xorg/X11 세션을 선택한다.
+
+필수 조건: Go 모듈에 지정된 도구 체인, Linux kernel 5.6 이상(`openat2`),
+systemd-logind, 로컬 X11 세션, XTEST·XFIXES 4 이상·XKB 확장, 활성 모니터 하나.
+최소 화면 크기는 3×3, 각 축 최대 32767픽셀이다. 루트 실행이나 `/dev/input`,
+`/dev/uinput` 권한은 요구하지 않는다. 현재 사용자의 `DISPLAY`와 `XAUTHORITY`를 사용하며
+`xhost +`로 접근 제어를 해제하지 않는다. 세션/화면이 바뀌면 다시 시작해야 한다.
+
+## 빌드·시작
+
+```sh
+sh scripts/build-linux.sh
+cd dist/linux/$(go env GOARCH)
+./krasis-cli start
+./krasis-cli --json doctor
+```
+
+네 실행 파일은 같은 디렉터리에 둔다. `start`/`listen`은 같은 사용자 에이전트를
+준비하며, `connect`, `pair listen`/`pair dial`은 필요할 때 자동으로 준비한다.
+데이터는 `$XDG_DATA_HOME/Krasis`, 미설정이면 `$HOME/.local/share/Krasis`에 둔다.
+같은 UID의 두 에이전트가 다른 HOME으로 단일 인스턴스 잠금을 우회할 수 없다.
+
+PIN 등록과 명시적 양방향 입력 승인은 기존 [CLI 계약](cli/command-contract.md)을 따른다.
+등록 후 각 PC에서 상대 주소와 **자신이 나가는 경계**를 설정한다. 예를 들어
+Linux가 오른쪽이면 왼쪽 Windows의 상대 경계는 RIGHT, Linux의 상대 경계는 LEFT다.
+
+```sh
+./krasis-cli connection set OTHER OTHER_IP:PORT LEFT
+./krasis-cli connect OTHER
+./krasis-cli clipboard on OTHER
+```
+
+클립보드 브리지는 Linux 에이전트가 자동 실행한다. `krasis-clipboard`는 독립
+진단 실행용이며, 에이전트 브리지와 동시에 같은 세션에서 실행하지 않는다.
+중단은 `disconnect`, 에이전트 종료는 `safe-stop`을 사용한다. 원격 입력 중
+Ctrl+Alt+Shift+F12는 로컬 귀환을 요청하며, 대상에 남은 누름 상태는 기존 복구 경로가 해제한다.
+
+## 검증과 한계
+
+2026-11-11에 Debian 13 가상 머신과 격리된 Xvfb 두 개에서 다음을 확인했다.
+
+- 실제 에이전트·CLI를 서로 다른 두 UID와 PAM/logind 세션에서 실행하고,
+  PIN 등록·mTLS 연결·경계 진입·상대 이동·키·버튼·양방향 휠·귀환을 확인했다.
+  키와 버튼을 누른 채 연결을 종료한 뒤 해제되는 것과 양쪽 `LOCAL` 복귀도 확인했다.
+- Linux 파일 보안·실행·CLI·세션 감시·peer 테스트와 입력·클립보드 race 검사,
+  Linux/Windows 관련 패키지의 `go vet`, Windows 입력·agent·CLI 회귀 테스트를 통과했다.
+- 네 Linux 명령을 CGO 없이 빌드하고 `krasis-linux-amd64.tar.gz`로 묶었다.
+
+물리 Windows↔Linux 조합, 실제 X11 window manager의 팝업/grab 경합,
+실제 시스템 절전·로그아웃은 이번 환경에서 실행하지 않았다.
+잠금·비활성화·절전·종료의 이벤트 분기는 단위 테스트로 검증했다.
+
+일반 단위 테스트는 입력을 만들지 않는다. 다음 smoke는 **격리된 Xvfb**에서만
+실행한다. 실제 작업 중인 X11 화면에 적용하면 키·마우스가 움직인다.
+
+```sh
+DISPLAY=:91 KRASIS_X11_TEST=1 go test -race -count=1 ./internal/x11desktop ./internal/wininput
+DISPLAY=:91 KRASIS_X11_TEST=1 go test -count=1 -timeout=3m ./internal/residentagent -run '^TestLinuxX11CLIInteroperability$' -v
+```
+
+Xvfb 검증은 실제 compositor·로그인 화면·물리 장비 조합의 검증을 대체하지 않는다.
+Linux 포인터 감시는 4ms 주기로 경계 위치를 확인한다. 지원하지 않는 물리 키,
+키맵/화면 변경, grab 충돌, X 서버 통신 실패는 조용히 무시하거나 재주입하지 않고
+기존 세션 실패·정리 경로로 전달한다. 파일 접근은 dirfd와 `openat2`를 사용하며,
+커널 지원이 없으면 경로 기반 대체 구현으로 보안을 낮추지 않는다.

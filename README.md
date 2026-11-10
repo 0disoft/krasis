@@ -5,7 +5,7 @@
 - Repository Type: desktop-app
 - Addons: cli-tool
 
-Krasis는 Windows 노트북 두 대 사이에서 키보드와 마우스 입력을 넘기는 개발 단계 제품이다.
+Krasis는 Windows 및 Linux X11 기기 두 대 사이에서 키보드와 마우스 입력을 넘기는 개발 단계 제품이다.
 Go/Win32 입력 core, mTLS, crash guard, 상주 agent, 장기 기기 신뢰 저장소와 CLI를 구현했다.
 제품용 `krasis.exe`는 agent 자동 준비, PIN 등록, 좌우 배치, 연결 관리와 클립보드 공유를
 제공한다. `krasis-cli.exe`는 같은 agent를 터미널에서 조작한다.
@@ -19,6 +19,7 @@ Go/Win32 입력 core, mTLS, crash guard, 상주 agent, 장기 기기 신뢰 저�
 | 설치·복구·업데이트·보호 입력 | 구현, 검증 진행 중 | 사용자별 설치와 별도 보호 입력 설치 경로 제공. 서명된 공개 릴리스와 반복 사용의 안정성 검증은 미완료 |
 | 로그인 전 연결·Winlogon 입력 | 실험 구현 | 서비스 연결과 입력 경로 연결 완료. 재부팅·잠금·로그인·로그인 후 인계·승인 철회의 공식 지원 검증은 미완료 |
 | 다중 모니터·상하 배치·세 대 이상 | 미지원 | 현재 연결 경로는 각 PC의 활성 디스플레이 하나와 좌우 배치로 제한 |
+| Windows↔Linux·Linux↔Linux | X11 개발 백엔드 | Linux CLI·사용자 세션 입력·텍스트/PNG 클립보드. native Wayland·Linux GUI·보호 서비스는 미지원. [Linux 안내](docs/linux.md) |
 
 ## 주요 경로
 

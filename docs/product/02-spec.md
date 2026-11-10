@@ -28,7 +28,7 @@
 - 인터넷 중계, 클라우드 계정, 원격 측정
 - 로그인 화면과 Windows 보안 데스크톱
 - portable 입력 경로에서 관리자 프로그램·Windows PIN 창의 입력 보장
-- Windows 이외 운영체제
+- Linux X11 이외의 비-Windows 운영체제와 native Wayland (Linux 개발 백엔드는 [Linux 안내](../linux.md) 참조)
 
 ## 핵심 동작
 

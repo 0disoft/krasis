@@ -5,8 +5,13 @@
 ## 시작
 
 1. 단일 agent 인스턴스가 로컬 신원, 신뢰 peer와 설정을 읽는다.
-2. Windows 입력 adapter와 로컬 projection API를 시작한다.
+2. Windows 또는 Linux X11 입력 adapter와 로컬 projection API를 시작한다.
 3. 연결이 없거나 peer 인증이 끝나지 않으면 `LOCAL`을 유지한다.
+
+Linux X11 사용자 세션 백엔드는 [ADR 0073](../adr/0073-linux-x11-user-session-backend.md)을
+따른다. 연결·PIN·리스·입력 ACK 순서는 Windows와 같으며 native I/O만 플랫폼별로 선택한다.
+Linux 에이전트는 XDG 경로와 사용자별 단일 인스턴스를 사용하고, 독립 crashguard가
+누름 상태를 복구한다. native Wayland는 X11 성공으로 대체하지 않는다.
 
 g478의 상대 관리 창 열기는 에이전트와 실행 기록의 generation/revision을 함께
 확인한다. 불일치하면 로컬 peer-update staging에서 정확히 같은 빌드만 전체 검증하고
