@@ -43,6 +43,10 @@ func TestX11NativeRoundTrip(t *testing.T) {
 		if err = d.Button(ctx, code, true); err != nil {
 			t.Fatal(err)
 		}
+		held, err = d.AnyPressed(ctx)
+		if err != nil || !held {
+			t.Fatalf("button %d admission missed held state: %v", code, err)
+		}
 		if err = d.Button(ctx, code, false); err != nil {
 			t.Fatal(err)
 		}

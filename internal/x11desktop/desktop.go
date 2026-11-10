@@ -35,6 +35,8 @@ type Desktop struct {
 	geometry         Geometry
 	keys             map[byte]uint32
 	codes            map[uint32]byte
+	xiOpcode         byte
+	pointerDevice    uint16
 	closeOnce        sync.Once
 	wheelX, wheelY   int64 // c.mu
 	grabbed, hidden  bool  // c.mu
@@ -69,7 +71,10 @@ func Open(ctx context.Context) (*Desktop, error) {
 			return errors.New("one X11 monitor with dimensions 3..32767 is required")
 		}
 		d.keys, d.codes, err = readPhysicalKeys(c.x)
-		return err
+		if err != nil {
+			return err
+		}
+		return d.initPointerState()
 	})
 	if err != nil {
 		c.close()
@@ -231,12 +236,8 @@ func (d *Desktop) AnyPressed(ctx context.Context) (held bool, err error) {
 				return nil
 			}
 		}
-		p, e := xproto.QueryPointer(d.c.x, d.c.root).Reply()
-		if e != nil {
-			return e
-		}
-		held = p.Mask&0x1f00 != 0
-		return nil
+		held, e = d.pointerPressed()
+		return e
 	})
 	return
 }
