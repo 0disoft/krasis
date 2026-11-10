@@ -12,7 +12,7 @@ import (
 var (
 	ErrUnsafePath          = errors.New("secure file path is unsafe")
 	ErrHardLink            = errors.New("secure file has multiple hard links")
-	ErrUnsupportedPlatform = errors.New("secure filesystem is only supported on Windows")
+	ErrUnsupportedPlatform = errors.New("secure filesystem requires Windows or Linux with openat2 support")
 )
 
 func validateLeaf(name string) error {

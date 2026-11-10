@@ -1,10 +1,10 @@
-//go:build !windows
+//go:build !windows && !linux
 
 package securefs
 
 import "os"
 
-// The product supports Windows only. A pathname-based fallback cannot uphold
+// Unsupported operating systems fail closed. A pathname-based fallback cannot uphold
 // the handle-relative, no-reparse and atomic no-replace security guarantees.
 type Directory struct{}
 

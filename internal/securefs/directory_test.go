@@ -9,8 +9,8 @@ import (
 )
 
 func TestDirectoryCreateAndPromoteNoReplace(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.Skip("secure filesystem supports Windows only")
+	if runtime.GOOS != "windows" && runtime.GOOS != "linux" {
+		t.Skip("secure filesystem supports Windows and Linux")
 	}
 	path := t.TempDir()
 	directory, err := OpenDirectory(path)
@@ -45,8 +45,8 @@ func TestDirectoryCreateAndPromoteNoReplace(t *testing.T) {
 }
 
 func TestDirectoryHandleSurvivesParentPathReplacement(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.Skip("Windows handle-relative behavior")
+	if runtime.GOOS != "windows" && runtime.GOOS != "linux" {
+		t.Skip("requires handle-relative filesystem support")
 	}
 	root := t.TempDir()
 	original := filepath.Join(root, "owned")
@@ -81,8 +81,8 @@ func TestDirectoryHandleSurvivesParentPathReplacement(t *testing.T) {
 }
 
 func TestDirectoryRejectsHardLinkedRenameSource(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.Skip("secure filesystem supports Windows only")
+	if runtime.GOOS != "windows" && runtime.GOOS != "linux" {
+		t.Skip("secure filesystem supports Windows and Linux")
 	}
 	path := t.TempDir()
 	directory, err := OpenDirectory(path)
@@ -106,8 +106,8 @@ func TestDirectoryRejectsHardLinkedRenameSource(t *testing.T) {
 }
 
 func TestOpenDirectoryRejectsReparseTraversal(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.Skip("Windows reparse behavior")
+	if runtime.GOOS != "windows" && runtime.GOOS != "linux" {
+		t.Skip("requires secure directory traversal")
 	}
 	root := t.TempDir()
 	target := filepath.Join(root, "target")
