@@ -113,8 +113,9 @@ func TestRunMapsUnavailableAndOperationOutcomes(t *testing.T) {
 		})
 	}
 	var stdout, stderr bytes.Buffer
-	secretPath := `C:\Users\secret-user\AppData\Local\Krasis\control`
-	deps := dependencies{localAppData: `C:\Users\test\AppData\Local`, openClient: func(string) (apiClient, error) { return nil, localapi.ErrUnavailable }}
+	base := t.TempDir()
+	secretPath := filepath.Join(base, "secret-user", "Krasis", "control")
+	deps := dependencies{localAppData: base, openClient: func(string) (apiClient, error) { return nil, localapi.ErrUnavailable }}
 	if code := run(context.Background(), []string{"status", "--control-dir", secretPath}, &stdout, &stderr, deps); code != ExitAgentUnavailable || strings.Contains(stderr.String(), secretPath) || strings.Contains(stderr.String(), "secret-user") {
 		t.Fatalf("redacted failure code=%d stderr=%q", code, stderr.String())
 	}

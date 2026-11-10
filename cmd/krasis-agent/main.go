@@ -7,6 +7,7 @@ import (
 	"os/signal"
 
 	"github.com/0disoft/krasis/internal/crashguard"
+	"github.com/0disoft/krasis/internal/productpath"
 	"github.com/0disoft/krasis/internal/residentagent"
 	"github.com/0disoft/krasis/internal/wininput"
 )
@@ -41,9 +42,16 @@ func main() {
 		os.Exit(2)
 	}
 	configureResidentGC()
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	localData, err := productpath.PrepareLocalData()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "agent_error: user data directory unavailable")
+		os.Exit(1)
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), residentSignals()...)
 	defer stop()
-	if err := residentagent.Run(ctx, os.Getenv("LOCALAPPDATA"), recovery...); err != nil {
+	stopDesktop := startDesktopServices(ctx, localData)
+	defer stopDesktop()
+	if err := residentagent.Run(ctx, localData, recovery...); err != nil {
 		fmt.Fprintln(os.Stderr, "agent_error: resident agent stopped")
 		os.Exit(1)
 	}
