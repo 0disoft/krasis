@@ -27,6 +27,8 @@ func main() {
 		os.Exit(code)
 	}
 	if len(os.Args) == 2 && os.Args[1] == "product-crash-guard-internal" {
+		stopRecoverySignals := preserveRecoveryUntilParentEOF()
+		defer stopRecoverySignals()
 		_, err := crashguard.ServeWithResult(os.Stdin, os.Stdout, wininput.NewInputAdapter())
 		if err != nil {
 			os.Exit(1)
