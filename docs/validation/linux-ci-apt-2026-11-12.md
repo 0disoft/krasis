@@ -46,3 +46,23 @@ failure; signature or HTTPS validation is never disabled.
 Reference: Ubuntu's [APT source and signature policy](https://manpages.ubuntu.com/manpages/noble/man5/sources.list.5.html),
 [APT directory overrides](https://manpages.ubuntu.com/manpages/noble/man5/apt.conf.5.html),
 and [update error handling](https://manpages.ubuntu.com/manpages/noble/man8/apt-get.8.html).
+
+## Follow-up: cold PAM fixture admission
+
+Run [43068044839](https://github.com/0disoft/krasis/actions/runs/43068044839)
+passed package acquisition in 13 seconds, all Linux packages/vet and the
+ordinary X11 input/clipboard tests. It then failed starting the first persistent
+PAM login fixture after the eight-second startup budget. The quiet/collected
+unit left insufficient diagnostics to classify its underlying PAM failure.
+
+A newly created UID on the Debian TCG VM took eight seconds for its first real
+PAM exec, including starting `user@UID.service`; after manager preparation the
+same real PAM exec took two seconds. This probe passed and removed the created
+user/session afterwards; it is not claimed as a reproduction of the Ubuntu
+failure. The fixture now provisions the cold user manager before the bounded
+PAM exec, without changing its eight-second limit, enabling linger or replacing
+PAM/logind with synthetic state. Only managers started by this fixture are
+stopped on cleanup; existing graphical users' managers remain untouched.
+Manager/PAM startup failures now print the relevant journal before failing.
+Bash syntax, workflow actionlint and whitespace checks cover this script change;
+the full remote lifecycle run remains the acceptance check.
