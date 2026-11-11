@@ -82,7 +82,7 @@ func startFakeLoginMonitor(t *testing.T, b *fakeLoginBus, id string) *LinuxMonit
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	m, err := startLinuxMonitor(ctx, b, id, 123, 1000)
+	m, err := startLinuxMonitor(ctx, b, id, 123, 1000, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +155,7 @@ func TestLinuxSessionProbeUsesAuthoritativeInitialState(t *testing.T) {
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
-			ready, err := probeLinuxSession(ctx, ctx, bus, "c1", 123, 1000)
+			ready, err := probeLinuxSession(ctx, ctx, bus, "c1", 123, 1000, "")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -163,6 +163,23 @@ func TestLinuxSessionProbeUsesAuthoritativeInitialState(t *testing.T) {
 				t.Fatalf("ready=%t want=%t", ready, test.ready)
 			}
 		})
+	}
+}
+
+func TestLinuxSessionReadyRequiresGraphicalSessionBus(t *testing.T) {
+	t.Setenv("DBUS_SESSION_BUS_ADDRESS", "")
+	ready, err := LinuxSessionReady(context.Background())
+	if err == nil || ready {
+		t.Fatalf("headless watcher probe = %v, %v", ready, err)
+	}
+}
+
+func TestLinuxMonitorFailsClosedWhenSessionBusIsInvalid(t *testing.T) {
+	bus := newFakeLoginBus()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if _, err := startLinuxMonitor(ctx, bus, "c1", 123, 1000, "tcp:host=127.0.0.1,port=1234"); err == nil {
+		t.Fatal("monitor ignored an unsafe graphical session bus")
 	}
 }
 
@@ -174,7 +191,7 @@ func TestLinuxLogindRejectsForeignOrIncompleteInitialState(t *testing.T) {
 			delete(b.properties, key)
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
-			if _, err := startLinuxMonitor(ctx, b, "c1", 123, 1000); err == nil {
+			if _, err := startLinuxMonitor(ctx, b, "c1", 123, 1000, ""); err == nil {
 				t.Fatal("incomplete initial state accepted")
 			}
 		})
@@ -184,7 +201,7 @@ func TestLinuxLogindRejectsForeignOrIncompleteInitialState(t *testing.T) {
 	b.properties["User"] = dbus.MakeVariant([]any{uint32(1001), dbus.ObjectPath("/other")})
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	if _, err := startLinuxMonitor(ctx, b, "c1", 123, 1000); err == nil {
+	if _, err := startLinuxMonitor(ctx, b, "c1", 123, 1000, ""); err == nil {
 		t.Fatal("foreign user session accepted")
 	}
 }
@@ -293,7 +310,7 @@ func TestLinuxLogindCloseAndSignalOverflowAreBounded(t *testing.T) {
 	b.block = true
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
-	if _, err := startLinuxMonitor(ctx, b, "c1", 123, 1000); !errors.Is(err, context.DeadlineExceeded) {
+	if _, err := startLinuxMonitor(ctx, b, "c1", 123, 1000, ""); !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("blocked logind lookup=%v", err)
 	}
 }

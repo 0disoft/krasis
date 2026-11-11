@@ -40,6 +40,7 @@ type loginBus interface {
 // unmonitored fallback for headless hosts or other session managers.
 type LinuxMonitor struct {
 	bus              loginBus
+	locker           *desktopLocker
 	owner, sessionID string
 	session          dbus.ObjectPath
 	uid              uint32
@@ -59,7 +60,7 @@ func StartMonitor() (agentlifecycle.Monitor, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Linux lifecycle requires the system logind bus: %w", err)
 	}
-	monitor, err := startLinuxMonitor(ctx, bus, os.Getenv("XDG_SESSION_ID"), uint32(os.Getpid()), uint32(os.Geteuid()))
+	monitor, err := startLinuxMonitor(ctx, bus, os.Getenv("XDG_SESSION_ID"), uint32(os.Getpid()), uint32(os.Geteuid()), os.Getenv("DBUS_SESSION_BUS_ADDRESS"))
 	if err != nil {
 		_ = bus.close()
 		return nil, err
@@ -67,10 +68,17 @@ func StartMonitor() (agentlifecycle.Monitor, error) {
 	return monitor, nil
 }
 
-func startLinuxMonitor(ctx context.Context, bus loginBus, sessionID string, pid, uid uint32) (*LinuxMonitor, error) {
+func startLinuxMonitor(ctx context.Context, bus loginBus, sessionID string, pid, uid uint32, sessionBusAddress string) (*LinuxMonitor, error) {
 	m := &LinuxMonitor{bus: bus, uid: uid, events: make(chan agentlifecycle.Event, 16), done: make(chan struct{})}
 	m.ctx, m.cancel = context.WithCancel(context.Background())
-	fail := func(err error) (*LinuxMonitor, error) { m.cancel(); return nil, err }
+	fail := func(err error) (*LinuxMonitor, error) {
+		m.cancel()
+		if m.locker != nil {
+			err = errors.Join(err, m.locker.close())
+			m.locker = nil
+		}
+		return nil, err
+	}
 	// Subscribe before resolving the unique owner; service replacement during
 	// setup must be visible, not mistaken for continuity of the old monitor.
 	if err := bus.match(ctx, dbus.WithMatchSender(busName), dbus.WithMatchObjectPath(busPath), dbus.WithMatchInterface(busName), dbus.WithMatchMember("NameOwnerChanged"), dbus.WithMatchArg(0, loginName)); err != nil {
@@ -121,6 +129,11 @@ func startLinuxMonitor(ctx context.Context, bus loginBus, sessionID string, pid,
 	} else if sleeping {
 		state = agentlifecycle.EventSuspend
 	}
+	locker, err := startDesktopLocker(ctx, sessionBusAddress)
+	if err != nil {
+		return fail(err)
+	}
+	m.locker = locker
 	if state != "" {
 		m.initial = state
 		m.events <- state
@@ -129,10 +142,10 @@ func startLinuxMonitor(ctx context.Context, bus loginBus, sessionID string, pid,
 	return m, nil
 }
 
-// LinuxSessionReady takes one authoritative logind snapshot for a separate
-// supervisor. It never starts or resumes a product session. Callers must run it
-// again immediately before a side effect and wait for a later safe transition
-// after any failure.
+// LinuxSessionReady takes authoritative logind and desktop-locker snapshots for
+// the opt-in graphical supervisor. It never starts or resumes a product session.
+// Callers must run it again immediately before a side effect and wait for a
+// later safe transition after any failure.
 func LinuxSessionReady(ctx context.Context) (bool, error) {
 	if ctx == nil {
 		return false, errors.New("Linux lifecycle context is required")
@@ -140,27 +153,37 @@ func LinuxSessionReady(ctx context.Context) (bool, error) {
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}
+	sessionBusAddress := os.Getenv("DBUS_SESSION_BUS_ADDRESS")
+	if sessionBusAddress == "" {
+		return false, errors.New("Linux watch requires a graphical session bus")
+	}
 	bounded, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	bus, err := connectLoginBus(bounded)
 	if err != nil {
 		return false, fmt.Errorf("Linux lifecycle requires the system logind bus: %w", err)
 	}
-	return probeLinuxSession(bounded, ctx, bus, os.Getenv("XDG_SESSION_ID"), uint32(os.Getpid()), uint32(os.Geteuid()))
+	return probeLinuxSession(bounded, ctx, bus, os.Getenv("XDG_SESSION_ID"), uint32(os.Getpid()), uint32(os.Geteuid()), sessionBusAddress)
 }
 
-func probeLinuxSession(startContext, cancelContext context.Context, bus loginBus, sessionID string, pid, uid uint32) (bool, error) {
-	monitor, err := startLinuxMonitor(startContext, bus, sessionID, pid, uid)
+func probeLinuxSession(startContext, cancelContext context.Context, bus loginBus, sessionID string, pid, uid uint32, sessionBusAddress string) (bool, error) {
+	monitor, err := startLinuxMonitor(startContext, bus, sessionID, pid, uid, sessionBusAddress)
 	if err != nil {
 		_ = bus.close()
 		return false, err
 	}
 	ready := monitor.initial == ""
 	if ready {
+		var lockerDone <-chan struct{}
+		if monitor.locker != nil {
+			lockerDone = monitor.locker.done()
+		}
 		select {
 		case <-monitor.events:
 			ready = false
 		case <-monitor.done:
+			ready = false
+		case <-lockerDone:
 			ready = false
 		case <-cancelContext.Done():
 			_ = monitor.Close()
@@ -262,10 +285,19 @@ func (m *LinuxMonitor) run() {
 	defer close(m.events)
 	defer m.cancel()
 	defer func() { m.err = errors.Join(m.err, m.bus.close()) }()
+	if m.locker != nil {
+		defer func() { m.err = errors.Join(m.err, m.locker.close()) }()
+	}
 	// Signals provide immediate revocation; periodic authoritative reads also
 	// catch invalidated properties and a session silently disappearing.
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
+	var lockerSignals <-chan *dbus.Signal
+	var lockerDone <-chan struct{}
+	if m.locker != nil {
+		lockerSignals = m.locker.signals()
+		lockerDone = m.locker.done()
+	}
 	for {
 		var event agentlifecycle.Event
 		var err error
@@ -277,14 +309,30 @@ func (m *LinuxMonitor) run() {
 				m.err = errors.New("logind monitoring connection stopped")
 			}
 			return
+		case <-lockerDone:
+			if m.ctx.Err() == nil {
+				m.err = errors.New("desktop locker monitoring connection stopped")
+			}
+			return
 		case signal, ok := <-m.bus.signals():
 			if !ok {
 				m.err = errors.New("logind signal stream closed")
 				return
 			}
 			event, err = m.signalEvent(signal)
+		case signal, ok := <-lockerSignals:
+			if !ok {
+				m.err = errors.New("desktop locker signal stream closed")
+				return
+			}
+			event, err = m.locker.signalEvent(signal)
 		case <-ticker.C:
 			event, err = m.sessionState(m.ctx)
+			if err == nil && event == "" {
+				// A locker can stall while acquiring its grab, before publishing
+				// ActiveChanged. A failed bounded read must also revoke input.
+				event, err = m.locker.state(m.ctx)
+			}
 		}
 		if err != nil {
 			if m.ctx.Err() == nil {

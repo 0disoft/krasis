@@ -83,6 +83,13 @@ Terminal=false
 로그인 전에는 실행하지 않으며, 기본 자동 시작 설정을 변경하지 않는다.
 감시는 systemd-logind가 현재 UID의 세션을 활성·잠금 해제 상태로 확인하고
 절전·종료 준비가 아닌 경우에만 동작한다. 버스/상태 조회 실패 시 대기한다.
+그래픽 로그인 세션의 `DBUS_SESSION_BUS_ADDRESS`도 필요하다. 현재 UID가 소유한
+Unix 세션 버스에서 Xfce·freedesktop·GNOME ScreenSaver API 중 실행 중인 서비스를
+확인한다. `GetActive`가 true이면 `LockedHint`가 false여도 입력·자동 복귀를 막는다.
+화면 보호기의 단순 활성화도 보수적으로 잠금으로 취급한다. 서비스 부재·교체,
+버스 단절·조회 오류도 안전하다고 추정하지 않는다. TCP나 복수 버스 주소는 거부한다.
+GUI 세션 버스를 상속한 메인 에이전트도 같은 감시를 유지한다. 버스가 없는 전용
+headless X11/PAM 실행은 기존 logind 감시를 유지하지만 `watch`에는 사용할 수 없다.
 저장된 alias와 fingerprint가 현재 신뢰 목록과 일치해야 자동 연결하며,
 `disconnect`의 수동 중지, `safe-stop`의 복구 일시 중지, 신뢰 철회를 우회하지 않는다.
 정상 확인 간격은 2초이며 실패 시 최대 10초까지 간격을 늘린다.
