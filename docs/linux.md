@@ -66,8 +66,29 @@ Linux 전체 패키지 테스트·`go vet`·배포용 번들 빌드를 검사한
 입력·클립보드 race 검사와 fixture 프로세스 사이의 인증·경계 왕복을 검증한다.
 기존 디스플레이가 있으면 실패하며, 종료·취소 시 서버와 임시 인증 파일을 정리한다.
 기본 번호는 `:91`, `:92`이고 `KRASIS_X11_DISPLAY_BASE`로 변경할 수 있다.
-별도 두 UID·PAM/logind 세션이 필요한 `TestLinuxX11ActualCLIInteroperability`는
-이 CI에서 실행하지 않으며, 실제 절전·로그아웃과 물리 기기 검증도 대체하지 않는다.
+CI는 전용 사용자 두 개를 새로 만들고 실제 PAM/logind 세션의 에이전트도 검증한다.
+각 UID에는 자기 디스플레이의 X11 인증 쿠키만 개인 디렉터리로 전달한다.
+`TestLinuxX11ActualCLIInteroperability`는 실제 에이전트 연결을,
+`TestLinuxX11ActualLifecycle`는 출발지·수신지 각각의 Lock 요청·LockedHint 변경·
+세션 종료를 검사한다. 물리 소스의 키·버튼은 계속 누른 상태로 두어,
+일반적인 key-up 전달이 복구 성공으로 오인되지 않도록 한다.
+위험 세션의 API 종료, 원격 누름·grab 해제, 같은 신원·신뢰 데이터로 새 PAM 세션에서
+재연결하는 것까지 확인한다. CI는 기존 사용자를 재사용하지 않으며,
+테스트에 지정한 UID의 PAM 세션만 조작한다.
+
+로컬에서 전용 사용자 두 개를 별도로 준비한 뒤 다음처럼 실행할 수 있다.
+`sudo -n`, 실제 systemd-logind, Xvfb·xauth·busctl이 필요하다.
+
+```sh
+KRASIS_X11_ACTUAL_LIFECYCLE=1 \
+KRASIS_X11_TEST_LOCAL_USER=DEDICATED_A \
+KRASIS_X11_TEST_PEER_USER=DEDICATED_B \
+bash scripts/test-linux-x11.sh
+```
+
+`KRASIS_X11_TEST_SCOPE=logind`는 실제 세션 테스트만 실행한다. CI는 기본 `all`로
+입력·클립보드 검사도 유지한다. 이 검사는 실제 화면 잠금 UI·시스템 절전·전원 종료나
+물리 기기 검증을 대체하지 않는다.
 
 2026-11-11에 Debian 13 가상 머신과 격리된 Xvfb 두 개에서 다음을 확인했다.
 
@@ -79,7 +100,7 @@ Linux 전체 패키지 테스트·`go vet`·배포용 번들 빌드를 검사한
 - 네 Linux 명령을 CGO 없이 빌드하고 `krasis-linux-amd64.tar.gz`로 묶었다.
 
 물리 Windows↔Linux 조합, 실제 X11 window manager의 팝업/grab 경합,
-실제 시스템 절전·로그아웃은 이번 환경에서 실행하지 않았다.
+실제 시스템 절전·전원 종료와 화면 잠금 UI는 이번 환경에서 실행하지 않았다.
 잠금·비활성화·절전·종료의 이벤트 분기는 단위 테스트로 검증했다.
 
 일반 단위 테스트는 입력을 만들지 않는다. 다음 smoke는 **격리된 Xvfb**에서만

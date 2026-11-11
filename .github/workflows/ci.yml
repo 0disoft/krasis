@@ -188,7 +188,23 @@ jobs:
       - name: Vet Linux packages
         run: go vet ./...
 
+      - name: Prepare disposable PAM and logind test users
+        run: |
+          sudo systemctl start systemd-logind
+          systemctl is-active --quiet systemd-logind
+          for user in krasis-ci-a krasis-ci-b; do
+            if getent passwd "$user" > /dev/null; then
+              echo "Refusing to reuse an existing user: $user" >&2
+              exit 1
+            fi
+            sudo useradd --create-home --shell /bin/bash --no-log-init "$user"
+          done
+
       - name: Test X11 input, clipboard and authenticated handoffs
+        env:
+          KRASIS_X11_ACTUAL_LIFECYCLE: '1'
+          KRASIS_X11_TEST_LOCAL_USER: krasis-ci-a
+          KRASIS_X11_TEST_PEER_USER: krasis-ci-b
         run: bash scripts/test-linux-x11.sh
 
       - name: Build Linux bundle
