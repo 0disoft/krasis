@@ -13,7 +13,7 @@ import (
 )
 
 func validName(name string) bool {
-	return strings.HasPrefix(name, `Local\Krasis-Agent-Test-`) || name == productionName || name == controlName || name == `Local\Krasis-Control-Startup-v1` || name == `Local\Krasis-Log-agent-v1` || name == `Local\Krasis-Log-control-v1`
+	return strings.HasPrefix(name, `Local\Krasis-Agent-Test-`) || name == productionName || name == controlName || name == `Local\Krasis-Control-Startup-v1` || name == `Local\Krasis-Log-agent-v1` || name == `Local\Krasis-Log-control-v1` || name == watchName
 }
 
 func acquire(name string) (*Lease, error) {

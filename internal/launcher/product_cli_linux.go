@@ -13,11 +13,30 @@ import (
 )
 
 func RunProductCLI(ctx context.Context, args []string, stdout, stderr io.Writer, localData string) int {
-	return runProductCLI(ctx, args, stdout, stderr, localData, EnsureAgent)
+	return runProductCLIWithWatch(ctx, args, stdout, stderr, localData, EnsureAgent, runLinuxWatch)
 }
 
 func runProductCLI(ctx context.Context, args []string, stdout, stderr io.Writer, localData string, ensure func(context.Context, string, string) error) int {
+	return runProductCLIWithWatch(ctx, args, stdout, stderr, localData, ensure, runLinuxWatch)
+}
+
+func runProductCLIWithWatch(ctx context.Context, args []string, stdout, stderr io.Writer, localData string, ensure func(context.Context, string, string) error, watch func(context.Context, string, bool, func(context.Context, string, string) error) error) int {
 	command, jsonOutput, override := linuxCLICommand(args)
+	if len(command) == 1 && command[0] == "watch" {
+		if override {
+			fmt.Fprintln(stderr, "config_error: agent watch does not use --control-dir")
+			return productcli.ExitUsage
+		}
+		if watch == nil {
+			fmt.Fprintln(stderr, "agent_unavailable: Linux session watcher is unavailable")
+			return productcli.ExitAgentUnavailable
+		}
+		if err := watch(ctx, localData, jsonOutput, ensure); err != nil {
+			fmt.Fprintln(stderr, "agent_unavailable: Linux session watcher failed")
+			return productcli.ExitUnsafeState
+		}
+		return productcli.ExitOK
+	}
 	explicit := len(command) == 1 && (command[0] == "start" || command[0] == "listen") || len(command) == 2 && command[0] == "agent" && command[1] == "start"
 	if explicit {
 		if override {

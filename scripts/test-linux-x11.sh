@@ -79,7 +79,8 @@ fi
 # Serialize packages: input/grab and CLIPBOARD tests share a server.
 if [[ $scope == all ]]; then
   go test -race -p 1 -count=1 -timeout 3m -v \
-    ./internal/x11desktop ./internal/x11registry ./internal/wininput ./internal/linuxclipboard
+    ./internal/x11desktop ./internal/x11registry ./internal/wininput ./internal/linuxclipboard \
+    ./internal/launcher ./internal/winlifecycle ./internal/agentinstance
   # Fixture processes use the real product runner, TLS and independent crashguard.
   go test -count=1 -timeout 3m -v ./internal/residentagent \
     -run '^TestLinuxX11CLIInteroperability$'

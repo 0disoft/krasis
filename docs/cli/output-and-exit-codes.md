@@ -1,5 +1,12 @@
 # 출력과 exit code
 
+## Linux 세션 감시
+
+`watch`는 계속 실행되는 감독 명령으로 주기적인 JSON 결과를 출력하지 않는다.
+SIGINT/SIGTERM 취소로 정상 종료하면 0, 잘못된 `--control-dir` 사용은 usage 코드,
+중복 감시 프로세스 등 시작 실패는 기존 unsafe-state 코드를 반환한다.
+연결 복원에는 기존 local API 응답과 오류 체계를 그대로 사용한다.
+
 ## 로그인 전 설정 준비 설치기
 
 `krasis-install --prepare-login PEER`와 `--disable-login`은 JSON

@@ -57,6 +57,36 @@ Linux가 오른쪽이면 왼쪽 Windows의 상대 경계는 RIGHT, Linux의 상�
 중단은 `disconnect`, 에이전트 종료는 `safe-stop`을 사용한다. 원격 입력 중
 Ctrl+Alt+Shift+F12는 로컬 귀환을 요청하며, 대상에 남은 누름 상태는 기존 복구 경로가 해제한다.
 
+## 로그인 이후 자동 복귀 (선택)
+
+기본 에이전트는 잠금·절전·로그아웃 때 종료한다. 로그인한 X11 세션에서
+`krasis-cli watch`를 별도로 실행하면 잠금 해제·절전 재개 뒤 에이전트와 저장된
+연결을 복원한다. 먼저 PIN 등록과 `connection set`, 최초 연결을 완료해야 한다.
+감시 프로세스는 사용자별 하나이며 agent의 단일 인스턴스 잠금과 별개다.
+
+```sh
+./krasis-cli watch
+```
+
+재부팅 후에도 사용하려면 데스크톱의 시작 프로그램에 이 명령을 등록한다.
+예를 들어 `~/.config/autostart/krasis-watch.desktop`에 다음을 저장한다.
+`Exec`는 같은 디렉터리의 신뢰된 agent를 실행할 수 있는 설치 경로로 바꾼다.
+
+```ini
+[Desktop Entry]
+Type=Application
+Name=Krasis session watch
+Exec=/absolute/install/path/krasis-cli watch
+Terminal=false
+```
+
+로그인 전에는 실행하지 않으며, 기본 자동 시작 설정을 변경하지 않는다.
+감시는 systemd-logind가 현재 UID의 세션을 활성·잠금 해제 상태로 확인하고
+절전·종료 준비가 아닌 경우에만 동작한다. 버스/상태 조회 실패 시 대기한다.
+저장된 alias와 fingerprint가 현재 신뢰 목록과 일치해야 자동 연결하며,
+`disconnect`의 수동 중지, `safe-stop`의 복구 일시 중지, 신뢰 철회를 우회하지 않는다.
+정상 확인 간격은 2초이며 실패 시 최대 10초까지 간격을 늘린다.
+
 ## 검증과 한계
 
 원격 CI는 기존 Windows 작업과 별도로 `ubuntu-latest` 작업 하나를 실행한다.

@@ -43,6 +43,7 @@ type LinuxMonitor struct {
 	owner, sessionID string
 	session          dbus.ObjectPath
 	uid              uint32
+	initial          agentlifecycle.Event
 	events           chan agentlifecycle.Event
 	done             chan struct{}
 	ctx              context.Context
@@ -121,10 +122,56 @@ func startLinuxMonitor(ctx context.Context, bus loginBus, sessionID string, pid,
 		state = agentlifecycle.EventSuspend
 	}
 	if state != "" {
+		m.initial = state
 		m.events <- state
 	}
 	go m.run()
 	return m, nil
+}
+
+// LinuxSessionReady takes one authoritative logind snapshot for a separate
+// supervisor. It never starts or resumes a product session. Callers must run it
+// again immediately before a side effect and wait for a later safe transition
+// after any failure.
+func LinuxSessionReady(ctx context.Context) (bool, error) {
+	if ctx == nil {
+		return false, errors.New("Linux lifecycle context is required")
+	}
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
+	bounded, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	bus, err := connectLoginBus(bounded)
+	if err != nil {
+		return false, fmt.Errorf("Linux lifecycle requires the system logind bus: %w", err)
+	}
+	return probeLinuxSession(bounded, ctx, bus, os.Getenv("XDG_SESSION_ID"), uint32(os.Getpid()), uint32(os.Geteuid()))
+}
+
+func probeLinuxSession(startContext, cancelContext context.Context, bus loginBus, sessionID string, pid, uid uint32) (bool, error) {
+	monitor, err := startLinuxMonitor(startContext, bus, sessionID, pid, uid)
+	if err != nil {
+		_ = bus.close()
+		return false, err
+	}
+	ready := monitor.initial == ""
+	if ready {
+		select {
+		case <-monitor.events:
+			ready = false
+		case <-monitor.done:
+			ready = false
+		case <-cancelContext.Done():
+			_ = monitor.Close()
+			return false, cancelContext.Err()
+		default:
+		}
+	}
+	if err := monitor.Close(); err != nil {
+		return false, err
+	}
+	return ready, nil
 }
 
 func (m *LinuxMonitor) Events() <-chan agentlifecycle.Event { return m.events }

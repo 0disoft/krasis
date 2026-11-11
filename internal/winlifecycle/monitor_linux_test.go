@@ -133,6 +133,39 @@ func TestLinuxLogindInitialStateAndSessionLookup(t *testing.T) {
 	}
 }
 
+func TestLinuxSessionProbeUsesAuthoritativeInitialState(t *testing.T) {
+	for _, test := range []struct {
+		name, key string
+		value     any
+		ready     bool
+	}{
+		{"active", "Active", true, true},
+		{"inactive", "Active", false, false},
+		{"locked", "LockedHint", true, false},
+		{"closing", "State", "closing", false},
+		{"sleeping", "PreparingForSleep", true, false},
+		{"shutdown", "PreparingForShutdown", true, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			bus := newFakeLoginBus()
+			if _, ok := bus.manager[test.key]; ok {
+				bus.manager[test.key] = dbus.MakeVariant(test.value)
+			} else {
+				bus.properties[test.key] = dbus.MakeVariant(test.value)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			ready, err := probeLinuxSession(ctx, ctx, bus, "c1", 123, 1000)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if ready != test.ready {
+				t.Fatalf("ready=%t want=%t", ready, test.ready)
+			}
+		})
+	}
+}
+
 func TestLinuxLogindRejectsForeignOrIncompleteInitialState(t *testing.T) {
 	for _, key := range []string{"User", "Id", "Active", "LockedHint", "State"} {
 		t.Run(key, func(t *testing.T) {
