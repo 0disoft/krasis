@@ -396,7 +396,7 @@ func productRenewalFlow(t *testing.T, both, allowInbound bool) {
 		conn, err := source.Next(handshake)
 		accepted <- acceptedPeer{conn, err}
 	}()
-	conn, err := dial.Next(handshake)
+	conn, err := dialBeforeListenRound(handshake, dial.Next, source.PreAuthMetrics)
 	// Server-side completion does not prove the client has consumed and
 	// verified the final TLS flight. Keep both endpoints until both finish.
 	serverPeer := <-accepted

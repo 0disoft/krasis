@@ -145,3 +145,22 @@ Runtime API/DB contracts, installed runtime code, Windows CI, CI job count,
 eight-second cursor checks, 110-second scenario budgets, and the eight-minute
 Go suite timeout are unchanged. Revert the two test-infrastructure files to undo
 this change. Remote CI on the resulting commit is the final acceptance check.
+
+### Remote acceptance: initial TLS round registration race
+
+Run [43090802221](https://github.com/0disoft/krasis/actions/runs/43090802221)
+passed Windows but failed the ordinary Linux package suite before X11 began.
+`TestProductCLIPairsNewDevicesAndPreparedTransportConnects/both_sides_renewal`
+reported client EOF, a ten-second server wait, and all pre-auth counters zero.
+`ListenSource.acceptLoop` intentionally closes connections arriving before
+`Next` registers an admission round, without incrementing admission counters.
+Starting Next in a goroutine does not establish that readiness barrier.
+
+The test now retries only an initial TLS EOF while every pre-auth counter is
+still zero, using the unchanged parent deadline. Any admission, rejection,
+authentication failure, other error, or cancellation stops that retry. The
+listener/dialer, actual certificate/trust validation and both endpoint completion
+checks remain. No production retry, write, input or authentication policy changes.
+Deterministic cases cover the pre-round EOF, all eight nonzero counters, original
+error identity and cancellation before/during retry. The real three pairing and
+renewal scenarios plus these cases passed on Windows and the two-vCPU TCG guest.
