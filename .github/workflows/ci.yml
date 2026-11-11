@@ -178,9 +178,7 @@ jobs:
           cache: false
 
       - name: Install isolated X11 test dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends xvfb xauth x11-utils
+        run: bash scripts/install-linux-ci-x11-deps.sh
 
       - name: Test Linux packages
         run: go test -p 2 -count=1 -timeout 3m ./...
