@@ -92,8 +92,56 @@ are preserved. This only changes test infrastructure, not installed agents.
 The current-source TCG receiver termination/recovery regression passed in
 43.12 seconds: both UIDs entered real PAM sessions, held input and grabs were
 released, the unsafe API stopped, and the same identities reconnected from a
-new session. A broader current-source TCG trial failed its second cursor-entry
-budget after PAM admission had passed; it is not counted as a full-suite pass.
+new session. The initial broader TCG trial failed its second cursor-entry budget after
+PAM admission had passed. The full-suite follow-up below supersedes that result.
 An earlier trial accidentally used stale prepared product binaries and was
 aborted/excluded. Linux cross-compilation, actionlint and whitespace checks
 passed. Remote CI remains the acceptance check for the entire Linux suite.
+
+## Follow-up: full TCG cursor re-entry and fixture resource contention
+
+The entry probe queried diagnostics by launching a Go CLI on every 10 ms
+observation, including before checking the native input echo. Under TCG this
+competes with both real agents and Xvfb on the same CPUs. The successful path now
+checks actual native cursor movement first; only declined-intent diagnosis polls
+the real authenticated CLI, at most once per 250 ms. The deterministic scheduling
+regression covers 800 observations in eight seconds: 32 scheduled counter reads
+instead of 800, plus the separate initial baseline. It also tests immediately
+before/at the interval and a backwards clock observation. No read is retried as a
+mutation, and the existing declined-intent-only edge-warp rule is preserved.
+
+Large build/test/product copies use a private directory on `/var/tmp`, instead
+of consuming the guest's small RAM-backed `/tmp`. A direct VM probe confirmed
+that sudo strips TMPDIR even with preserve-env; the actual test runner therefore
+sets it using env after sudo. Only public executables are traversable by both
+UIDs; identities and X11 cookies keep their existing private ownership/modes.
+The disposable peer data directories remain small private `/tmp` directories.
+
+Current-source Linux/amd64 products and the test binary passed on the existing
+Debian 13 TCG VM (2 vCPUs, 2 GiB), using two real UIDs, PAM/logind, and independent
+1280x720 and 1024x768 Xvfb displays:
+
+- Full actual-agent CLI interoperability: 14.19 seconds, including cursor entry,
+  relative motion, keyboard, buttons, all four wheel directions, return,
+  re-entry, and held-input cleanup. Entry/re-entry took 1.109/0.637 seconds.
+- All six actual lifecycle cases: 139.10 seconds total. Lock-session, lock-hint,
+  and terminate-session each release input/grabs, retire the unsafe API, and
+  reconnect the same identities in a new PAM session, on both source and receiver.
+- Lifecycle cursor entries: 1.019-1.271 seconds. No scenario or cursor timeout
+  was increased. This is emulated test execution, not a real-laptop latency result.
+- The existing 1-vCPU/1-GiB TCG guest also passed full actual-agent CLI
+  interoperability in 29.59 seconds, including re-entry and normal disconnect,
+  using the corrected post-sudo disk temporary directory.
+- Interval boundary regression, Bash syntax, workflow actionlint and whitespace
+  checks and Linux residentagent vet passed. An isolated sudo/env temporary-file probe used the disk fixture
+  and removed its file/directory.
+
+The experimental persistent CLI poller was removed: it did not establish a fix.
+SIGQUIT stack captures and failed exploratory trials remain ignored under
+`.cache/linux-validation/desktop/`; they are not acceptance passes or source
+artifacts. The captured stacks did not establish an Operations mutex deadlock.
+
+Runtime API/DB contracts, installed runtime code, Windows CI, CI job count,
+eight-second cursor checks, 110-second scenario budgets, and the eight-minute
+Go suite timeout are unchanged. Revert the two test-infrastructure files to undo
+this change. Remote CI on the resulting commit is the final acceptance check.

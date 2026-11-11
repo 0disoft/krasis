@@ -685,6 +685,7 @@ func linuxX11Enter(t *testing.T, ctx context.Context, peer linuxX11Peer, source,
 	var before map[string]uint64
 	seeded := false
 	var entryX, entryY int32
+	var lastCounters time.Time
 	linuxX11Wait(t, ctx, "cursor enters remote left edge", func(ctx context.Context) bool {
 		x, y, e := destination.Position(ctx)
 		sx, sy, se := source.Position(ctx)
@@ -692,7 +693,6 @@ func linuxX11Enter(t *testing.T, ctx context.Context, peer linuxX11Peer, source,
 			return e == nil && se == nil && x == entryX+1 && y == entryY && sx == width/2 && sy == source.Dimensions().Height/2
 		}
 		if before != nil {
-			current := linuxX11EntryCounters(t, ctx, peer)
 			// The cursor is centered BEFORE the physical-hold check finishes.
 			// A key here can abort capture. A single harmless physical move
 			// cannot change pressed state; its remote echo proves commit AND
@@ -705,6 +705,15 @@ func linuxX11Enter(t *testing.T, ctx context.Context, peer linuxX11Peer, source,
 				seeded = true
 				return false
 			}
+			// A Go CLI subprocess per 10ms observation competes with the
+			// agents and X server on a one-vCPU TCG guest. Native echo remains
+			// the fast path; only declined-intent diagnosis needs a CLI read.
+			now := time.Now()
+			if !linuxX11CounterPollDue(now, lastCounters) {
+				return false
+			}
+			lastCounters = now
+			current := linuxX11EntryCounters(t, ctx, peer)
 			if !linuxX11EntryRetry(before, current) {
 				return false
 			}
@@ -716,11 +725,37 @@ func linuxX11Enter(t *testing.T, ctx context.Context, peer linuxX11Peer, source,
 			t.Fatal(err)
 		}
 		before = linuxX11EntryCounters(t, ctx, peer)
+		lastCounters = time.Now()
 		if err := source.SetPosition(ctx, width-1, source.Dimensions().Height/2); err != nil {
 			t.Fatal(err)
 		}
 		return false
 	})
+}
+
+const linuxX11CounterPollInterval = 250 * time.Millisecond
+
+func linuxX11CounterPollDue(now, last time.Time) bool {
+	return last.IsZero() || now.Sub(last) >= linuxX11CounterPollInterval
+}
+
+func TestLinuxX11CounterPollingDoesNotFloodTheGuest(t *testing.T) {
+	start := time.Unix(100, 0)
+	last, reads := time.Time{}, 0
+	for step := 0; step < 800; step++ {
+		now := start.Add(time.Duration(step) * 10 * time.Millisecond)
+		if linuxX11CounterPollDue(now, last) {
+			last, reads = now, reads+1
+		}
+	}
+	if reads != 32 {
+		t.Fatalf("eight-second observation generated %d CLI reads, want 32", reads)
+	}
+	if linuxX11CounterPollDue(start.Add(250*time.Millisecond-time.Nanosecond), start) ||
+		!linuxX11CounterPollDue(start.Add(250*time.Millisecond), start) ||
+		linuxX11CounterPollDue(start.Add(-time.Nanosecond), start) {
+		t.Fatal("counter poll interval boundary violated")
+	}
 }
 
 func linuxX11EntryCounters(t *testing.T, ctx context.Context, peer linuxX11Peer) map[string]uint64 {

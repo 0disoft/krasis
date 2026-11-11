@@ -41,8 +41,12 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 # Compile once, before starting displays or timed input/lifecycle scenarios.
 # Only public executables are shared; identities and X11 cookies stay private.
-binwork=$(mktemp -d /tmp/krasis-x11-products-XXXXXXXXXX)
+# /tmp may be a small RAM-backed filesystem on desktop/TCG guests. Keep large
+# Go build files, test executables and per-scenario product copies on disk.
+# The public parent remains traversable by the two disposable peer UIDs.
+binwork=$(mktemp -d /var/tmp/krasis-x11-products-XXXXXXXXXX)
 chmod 755 "$binwork"
+export TMPDIR=$binwork
 build_started=$SECONDS
 # Match the shipped Linux bundle; race-instrumented test packages still use CGO.
 CGO_ENABLED=0 go build -o "$binwork/" ./cmd/krasis-agent ./cmd/krasis-cli
@@ -129,7 +133,9 @@ if [[ ${KRASIS_X11_ACTUAL_LIFECYCLE:-0} == 1 ]]; then
   echo "X11 login fixtures: $((SECONDS - login_started))s"
   # Elevate the test runner once; each CLI still runs as its dedicated UID.
   # Preserve only this fixture's display/binary/session selection, not -E.
-  go test -exec 'sudo -n --preserve-env=DISPLAY,XAUTHORITY,XDG_SESSION_TYPE,KRASIS_X11_TEST,KRASIS_X11_TEST_BIN_DIR,KRASIS_X11_TEST_OTHER_DISPLAY,KRASIS_X11_TEST_LOCAL_USER,KRASIS_X11_TEST_PEER_USER,KRASIS_X11_TEST_PAM_SERVICE' \
+  # sudo strips TMPDIR even when requested in preserve-env. Set it after the
+  # privilege transition so the actual test's large binary copies stay on disk.
+  go test -exec "sudo -n --preserve-env=DISPLAY,XAUTHORITY,XDG_SESSION_TYPE,KRASIS_X11_TEST,KRASIS_X11_TEST_BIN_DIR,KRASIS_X11_TEST_OTHER_DISPLAY,KRASIS_X11_TEST_LOCAL_USER,KRASIS_X11_TEST_PEER_USER,KRASIS_X11_TEST_PAM_SERVICE env TMPDIR=$binwork" \
     -count=1 -timeout 8m -v ./internal/residentagent \
     -run '^TestLinuxX11Actual(CLIInteroperability|Lifecycle)$'
 fi
