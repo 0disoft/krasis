@@ -67,6 +67,13 @@ Linux 전체 패키지 테스트·`go vet`·배포용 번들 빌드를 검사한
 기존 디스플레이가 있으면 실패하며, 종료·취소 시 서버와 임시 인증 파일을 정리한다.
 기본 번호는 `:91`, `:92`이고 `KRASIS_X11_DISPLAY_BASE`로 변경할 수 있다.
 CI는 전용 사용자 두 개를 새로 만들고 실제 PAM/logind 세션의 에이전트도 검증한다.
+호스트의 로그인 설정을 바꾸는 대신 전용 `krasis-ci` PAM 프로파일을 만들며,
+`pam_systemd`가 `Type=x11`, `Class=user`로 등록했는지 실제 logind 속성도 검사한다.
+프로파일의 인증 단계는 `pam_deny`를 유지하고 root의 테스트 유닛 생성에만 사용한다.
+Linux 복구 자식은 SIGTERM·SIGHUP·SIGINT에 먼저 종료되지 않고 부모 파이프의
+EOF까지 저널을 유지한다. 부모가 아직 입력을 보낼 수 있는 동안에는 신호만 보고
+해제를 시작하지 않는다. EOF 뒤 해제는 기존 2초 복구 예산을 사용한다.
+SIGKILL로 부모와 복구 자식이 함께 제거되는 경우까지 보장하지는 않는다.
 각 UID에는 자기 디스플레이의 X11 인증 쿠키만 개인 디렉터리로 전달한다.
 `TestLinuxX11ActualCLIInteroperability`는 실제 에이전트 연결을,
 `TestLinuxX11ActualLifecycle`는 출발지·수신지 각각의 Lock 요청·LockedHint 변경·
@@ -77,12 +84,14 @@ CI는 전용 사용자 두 개를 새로 만들고 실제 PAM/logind 세션의 �
 테스트에 지정한 UID의 PAM 세션만 조작한다.
 
 로컬에서 전용 사용자 두 개를 별도로 준비한 뒤 다음처럼 실행할 수 있다.
-`sudo -n`, 실제 systemd-logind, Xvfb·xauth·busctl이 필요하다.
+`sudo -n`, 실제 systemd-logind, Xvfb·xauth·busctl, 별도로 준비한 그래픽 테스트용
+PAM 프로파일이 필요하다. CI의 프로파일 내용은 워크플로에서 확인할 수 있다.
 
 ```sh
 KRASIS_X11_ACTUAL_LIFECYCLE=1 \
 KRASIS_X11_TEST_LOCAL_USER=DEDICATED_A \
 KRASIS_X11_TEST_PEER_USER=DEDICATED_B \
+KRASIS_X11_TEST_PAM_SERVICE=krasis-ci \
 bash scripts/test-linux-x11.sh
 ```
 

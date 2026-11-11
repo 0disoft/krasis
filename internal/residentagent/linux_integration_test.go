@@ -578,7 +578,16 @@ func linuxX11LaunchActualPeer(t *testing.T, ctx context.Context, root, name, age
 	}
 	// PAM supplies the authoritative XDG_SESSION_ID to this service. Preserve
 	// that generated environment, rather than inheriting the SSH caller's ID.
-	args := []string{"-n", "systemd-run", "--quiet", "--collect", "--wait", "--pipe", "--unit=" + unit, "--uid=" + serviceUser, "--property=PAMName=login", "--", "env"}
+	pamService := os.Getenv("KRASIS_X11_TEST_PAM_SERVICE")
+	if pamService == "" {
+		pamService = "login"
+	}
+	for _, ch := range pamService {
+		if !(ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9' || ch == '-' || ch == '_') {
+			t.Fatal("invalid test PAM service name")
+		}
+	}
+	args := []string{"-n", "systemd-run", "--quiet", "--collect", "--wait", "--pipe", "--unit=" + unit, "--uid=" + serviceUser, "--property=PAMName=" + pamService, "--", "env"}
 	args = append(args, peer.env...)
 	command := exec.CommandContext(ctx, "sudo", append(args, agent)...)
 	logPath := filepath.Join(root, name+".log")

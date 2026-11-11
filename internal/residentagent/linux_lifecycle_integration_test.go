@@ -45,9 +45,18 @@ func TestLinuxX11ActualLifecycle(t *testing.T) {
 					}
 					// Keep physical source tokens held until recovery is proven;
 					// an ordinary forwarded key-up must not make this test pass.
+					var lastHeld, lastGrab bool
+					var lastRead error
+					t.Cleanup(func() {
+						if t.Failed() {
+							t.Logf("last native cleanup: remoteHeld=%v sourceGrabAvailable=%v readError=%v", lastHeld, lastGrab, lastRead)
+						}
+					})
 					linuxX11Wait(t, ctx, "lifecycle releases remote holds and source grabs", func() bool {
 						held, err := destination.AnyPressed(ctx)
-						return err == nil && !held && linuxX11CanGrab(os.Getenv("DISPLAY"))
+						lastHeld, lastRead = held, err
+						lastGrab = linuxX11CanGrab(os.Getenv("DISPLAY"))
+						return err == nil && !held && lastGrab
 					})
 					if err := source.Key(ctx, 0x1e, false); err != nil {
 						t.Fatal(err)
@@ -134,6 +143,12 @@ func linuxX11ActualSession(t *testing.T, ctx context.Context, peer linuxX11Peer)
 	owner, err := exec.CommandContext(ctx, "loginctl", "show-session", session, "--property=User", "--value").Output()
 	if err != nil || strings.TrimSpace(string(owner)) != strings.TrimSpace(string(uid)) {
 		t.Fatal("refusing lifecycle action on a foreign login session", err)
+	}
+	for key, want := range map[string]string{"Type": "x11", "Class": "user"} {
+		value, err := exec.CommandContext(ctx, "loginctl", "show-session", session, "--property="+key, "--value").Output()
+		if err != nil || strings.TrimSpace(string(value)) != want {
+			t.Fatalf("actual session %s is %s=%s, want %s: %v", session, key, strings.TrimSpace(string(value)), want, err)
+		}
 	}
 	// Protect the test runner even if a fixture accidentally inherits its ID.
 	if session == os.Getenv("XDG_SESSION_ID") {
