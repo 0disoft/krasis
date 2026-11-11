@@ -7,6 +7,7 @@ import (
 	"github.com/0disoft/krasis/internal/x11desktop"
 	"github.com/jezek/xgb"
 	"github.com/jezek/xgb/xproto"
+	"net"
 	"sync"
 	"time"
 )
@@ -70,7 +71,7 @@ func (h *SourceHook) deactivateLocked() {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), SourceCleanupTimeout)
 	defer cancel()
-	if err := h.desktop.Ungrab(ctx); err != nil && h.session != nil {
+	if err := h.desktop.Ungrab(ctx); err != nil && h.session != nil && !linuxSourceCancellationOnly(err, h.root.Err()) {
 		h.session.Abort(err)
 	}
 	h.active = false
@@ -123,6 +124,13 @@ func (h *SourceHook) RunWithBoundary(ctx context.Context, s *SourceSession, b Bo
 		cleanup, cancel := context.WithTimeout(context.Background(), SourceCleanupTimeout)
 		result = errors.Join(result, d.ShowCursor(cleanup, true))
 		cancel()
+		// X11 releases this client's grabs and cursor visibility on close.
+		// Cancellation may have already closed an in-flight query's socket.
+		// Confirm the owner is closed before treating that closure as expected.
+		_ = d.Close()
+		if linuxSourceCancellationOnly(result, ctx.Err()) {
+			result = ctx.Err()
+		}
 		h.desktop = nil
 		h.session = nil
 		h.mu.Unlock()
@@ -159,6 +167,29 @@ func (h *SourceHook) RunWithBoundary(ctx context.Context, s *SourceSession, b Bo
 				geometryTick = time.Now()
 			}
 		}
+	}
+}
+
+// Do not let a closed cancellation hide an independent native/cleanup error.
+func linuxSourceCancellationOnly(err, canceled error) bool {
+	if canceled == nil {
+		return false
+	}
+	if err == nil || err == canceled || err == net.ErrClosed {
+		return true
+	}
+	switch wrapped := err.(type) {
+	case interface{ Unwrap() []error }:
+		for _, child := range wrapped.Unwrap() {
+			if !linuxSourceCancellationOnly(child, canceled) {
+				return false
+			}
+		}
+		return true
+	case interface{ Unwrap() error }:
+		return linuxSourceCancellationOnly(wrapped.Unwrap(), canceled)
+	default:
+		return false
 	}
 }
 func (h *SourceHook) tickLocked(ctx context.Context, s *SourceSession, b BoundaryObserver) error {
