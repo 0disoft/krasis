@@ -23,13 +23,9 @@ work=$(mktemp -d)
 binwork=''
 pids=()
 login_units=()
-manager_units=()
 cleanup() {
   if (( ${#login_units[@]} )); then
     sudo -n systemctl stop "${login_units[@]}" || true
-  fi
-  if (( ${#manager_units[@]} )); then
-    sudo -n systemctl stop "${manager_units[@]}" || true
   fi
   if (( ${#pids[@]} )); then
     kill "${pids[@]}" 2>/dev/null || true
@@ -109,29 +105,23 @@ fi
 if [[ ${KRASIS_X11_ACTUAL_LIFECYCLE:-0} == 1 ]]; then
   # Never skip silently if the runner cannot provide real session authority.
   systemctl is-active --quiet systemd-logind
+  systemd --version
   # Model logged-in desktop users. Keep their real user managers alive while
   # each scenario creates, locks/terminates, and replaces separate PAM sessions.
   # No input, Xauthority, linger setting or synthetic logind state is involved.
   login_started=$SECONDS
   for user in "$KRASIS_X11_TEST_LOCAL_USER" "$KRASIS_X11_TEST_PEER_USER"; do
-    manager_started=$SECONDS
     uid=$(id -u "$user")
     manager="user@$uid.service"
-    # Provision the cold user manager independently of the bounded PAM exec.
-    # Existing graphical users keep their original manager/lifetime.
-    if ! systemctl is-active --quiet "$manager"; then
-      manager_units+=("$manager")
-      if ! sudo -n systemctl start "$manager"; then
-        sudo -n journalctl -b --no-pager -n 80 -u "$manager" -u "user-runtime-dir@$uid.service" || true
-        exit 1
-      fi
-    fi
-    echo "X11 user manager $uid ready: $((SECONDS - manager_started))s"
     unit="$(basename "$binwork")-login-${#login_units[@]}.service"
     login_units+=("$unit")
-    if ! sudo -n systemd-run --quiet --collect --service-type=exec --unit="$unit" \
+    # Old systemd PAM helpers can retain Type=exec's completion fd. Notify
+    # from the actual main PID after PAM, then exec sleep without changing PID.
+    if ! sudo -n systemd-run --quiet --collect --service-type=notify --unit="$unit" \
       --uid="$user" --property="PAMName=${KRASIS_X11_TEST_PAM_SERVICE:-login}" \
-      --property=TimeoutStartSec=8s /usr/bin/sleep infinity; then
+      --property=NotifyAccess=main --property=TimeoutStartSec=8s \
+      /usr/bin/systemd-notify --pid=self --ready --exec ';' /usr/bin/sleep infinity \
+      || ! systemctl is-active --quiet "$unit"; then
       sudo -n journalctl -b --no-pager -n 100 -u "$unit" -u "$manager" -u systemd-logind.service || true
       exit 1
     fi
