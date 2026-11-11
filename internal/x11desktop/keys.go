@@ -22,6 +22,8 @@ var physicalKeys = map[string]uint32{
 	"TLDE": 41, "AB11": 0x73, "HENK": 0x79, "MUHE": 0x7b,
 	"HKTG": 0x70, "HIRA": 0x77, "KATA": 0x78, "AE13": 0x7d,
 	"HNGL": 0xf2, "HJCV": 0xf1,
+	"KP7": 71, "KP8": 72, "KP9": 73, "KP4": 75, "KP5": 76,
+	"KP6": 77, "KP1": 79, "KP2": 80, "KP3": 81, "KP0": 82, "KPDL": 83,
 }
 
 func scanForName(name string) (uint32, bool) {
@@ -29,23 +31,39 @@ func scanForName(name string) (uint32, bool) {
 	if code, ok := physicalKeys[name]; ok {
 		return code, true
 	}
-	rows := []struct {
-		prefix            string
-		first, last, scan int
-	}{
-		{"AE", 1, 12, 2}, {"AD", 1, 12, 16}, {"AC", 1, 11, 30},
-		{"AB", 1, 10, 44}, {"FK", 1, 10, 59}, {"FK", 11, 12, 87},
+	if len(name) != 4 || name[2] < '0' || name[2] > '9' || name[3] < '0' || name[3] > '9' {
+		return 0, false
 	}
-	for _, row := range rows {
-		for n := row.first; n <= row.last; n++ {
-			if name == fmt.Sprintf("%s%02d", row.prefix, n) {
-				return uint32(row.scan + n - row.first), true
-			}
+	n := uint32(name[2]-'0')*10 + uint32(name[3]-'0')
+	if n == 0 {
+		return 0, false
+	}
+	switch name[:2] {
+	case "AE":
+		if n <= 12 {
+			return 1 + n, true
+		}
+	case "AD":
+		if n <= 12 {
+			return 15 + n, true
+		}
+	case "AC":
+		if n <= 11 {
+			return 29 + n, true
+		}
+	case "AB":
+		if n <= 10 {
+			return 43 + n, true
+		}
+	case "FK":
+		if n <= 10 {
+			return 58 + n, true
+		}
+		if n <= 12 {
+			return 76 + n, true
 		}
 	}
-	keypad := map[string]uint32{"KP7": 71, "KP8": 72, "KP9": 73, "KP4": 75, "KP5": 76, "KP6": 77, "KP1": 79, "KP2": 80, "KP3": 81, "KP0": 82, "KPDL": 83}
-	code, ok := keypad[name]
-	return code, ok
+	return 0, false
 }
 
 func keyMaps(first int, names []byte) (map[byte]uint32, map[uint32]byte, error) {
