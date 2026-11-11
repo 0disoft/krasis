@@ -3,11 +3,49 @@ package transport
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"net"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
 )
+
+type countedPeerClose struct {
+	net.Conn
+	calls atomic.Int32
+	err   error
+}
+
+func (c *countedPeerClose) Close() error {
+	if c.calls.Add(1) != 1 {
+		return net.ErrClosed
+	}
+	_ = c.Conn.Close()
+	return c.err
+}
+
+func TestPeerCloseIsOneOwnedOperationAndPreservesFailure(t *testing.T) {
+	for _, failure := range []error{nil, errors.New("native socket close failed")} {
+		left, right := net.Pipe()
+		t.Cleanup(func() { _ = left.Close(); _ = right.Close() })
+		wire := &countedPeerClose{Conn: left, err: failure}
+		peer := &PeerConnection{connection: tls.Client(wire, &tls.Config{})}
+		var workers sync.WaitGroup
+		for range 8 {
+			workers.Go(func() {
+				if err := peer.Close(); err != failure {
+					t.Errorf("close outcome changed: %v, want %v", err, failure)
+				}
+			})
+		}
+		workers.Wait()
+		if wire.calls.Load() != 1 {
+			t.Fatalf("socket closed %d times", wire.calls.Load())
+		}
+	}
+}
 
 func TestPeerCloseInterruptsIOWithoutWaitingForRemoteRead(t *testing.T) {
 	for _, state := range []string{"idle", "reading", "writing", "disconnect_sent"} {

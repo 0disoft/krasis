@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"errors"
+	"sync"
 	"time"
 )
 
@@ -19,6 +20,8 @@ type PeerConnection struct {
 	diagnosticID    string
 	keepAlivePolicy string
 	ackPolicy       string
+	closeOnce       sync.Once
+	closeErr        error
 }
 
 const FrameWriteTimeout = 2 * time.Second
@@ -147,7 +150,7 @@ func (connection *PeerConnection) WriteFrameContext(ctx context.Context, frame F
 	deadline, hasDeadline := ctx.Deadline()
 	if hasDeadline {
 		if err := connection.connection.SetWriteDeadline(deadline); err != nil {
-			_ = connection.connection.NetConn().Close()
+			_ = connection.Close()
 			return failure("deadline", err)
 		}
 	}
@@ -173,7 +176,7 @@ func (connection *PeerConnection) WriteFrameContext(ctx context.Context, frame F
 	if err != nil {
 		// Failed TLS writes cannot be reused. Close the socket directly rather
 		// than spending another TLS close-notify timeout on an unusable stream.
-		_ = connection.connection.NetConn().Close()
+		_ = connection.Close()
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return failure("io", errors.Join(ctxErr, err))
 		}
@@ -206,5 +209,8 @@ func (connection *PeerConnection) Close() error {
 	// TLS close_notify (tls.Conn.Close can spend another five seconds on it).
 	// User-stop intent is carried by the bounded MessageDisconnect write before
 	// this terminal close; transport EOF never authorizes a successful operation.
-	return connection.connection.NetConn().Close()
+	connection.closeOnce.Do(func() {
+		connection.closeErr = connection.connection.NetConn().Close()
+	})
+	return connection.closeErr
 }

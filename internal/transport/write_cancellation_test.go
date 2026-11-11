@@ -20,7 +20,8 @@ func TestTimedOutTLSWriteClosesUnusableConnection(t *testing.T) {
 					left, right := net.Pipe()
 					t.Cleanup(func() { _ = left.Close(); _ = right.Close() })
 					serverTLS := tls.Server(left, mustServerTLSConfig(t, fixture.serverIdentity, fixture.roots))
-					clientTLS := tls.Client(right, mustClientTLSConfig(t, fixture.clientIdentity, fixture.roots, fixture.serverName))
+					wire := &countedPeerClose{Conn: right}
+					clientTLS := tls.Client(wire, mustClientTLSConfig(t, fixture.clientIdentity, fixture.roots, fixture.serverName))
 					_, client, serverErr, clientErr := authenticateConnectionPair(t, serverTLS, clientTLS)
 					if serverErr != nil || clientErr != nil {
 						t.Fatalf("authentication: %v / %v", serverErr, clientErr)
@@ -42,6 +43,9 @@ func TestTimedOutTLSWriteClosesUnusableConnection(t *testing.T) {
 					}
 					if err := client.WriteFrameContext(context.Background(), frame); err == nil {
 						t.Fatal("reused TLS connection after failed write")
+					}
+					if err := client.Close(); err != nil || wire.calls.Load() != 1 {
+						t.Fatalf("failed write and teardown did not share close ownership: calls=%d err=%v", wire.calls.Load(), err)
 					}
 				})
 			})
