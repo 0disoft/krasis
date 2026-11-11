@@ -63,11 +63,15 @@ func TestLinuxX11ActualCLIInteroperability(t *testing.T) {
 
 type linuxX11Peer struct {
 	flowNode
-	cli, user string
-	env       []string
+	cli, user          string
+	env                []string
+	unit               string
+	expectedSystemStop *bool
 }
 
-func linuxX11Interoperability(t *testing.T, actual bool) {
+type linuxX11End func(context.Context, linuxX11Peer, linuxX11Peer, *x11desktop.Desktop, *x11desktop.Desktop)
+
+func linuxX11Interoperability(t *testing.T, actual bool, ending ...linuxX11End) {
 	if os.Getenv("KRASIS_X11_TEST") != "1" {
 		t.Skip("set KRASIS_X11_TEST=1 with two disposable Xvfb displays")
 	}
@@ -116,6 +120,8 @@ func linuxX11Interoperability(t *testing.T, actual bool) {
 		defer stop()
 		_ = source.Key(cleanup, 0x1e, false)
 		_ = source.Button(cleanup, 1, false)
+		_ = destination.Key(cleanup, 0x1e, false)
+		_ = destination.Button(cleanup, 1, false)
 	})
 	t.Setenv("DISPLAY", sourceDisplay)
 	width := source.Dimensions().Width
@@ -214,6 +220,12 @@ func linuxX11Interoperability(t *testing.T, actual bool) {
 		if e == nil && se == nil && x < 100 && sx == width/2 && sy == source.Dimensions().Height/2 {
 			return true
 		}
+		// Once either side has entered its handoff position, do not inject
+		// another edge warp while the other process finishes activation. That
+		// would become real remote motion under slow PAM/VM scheduling.
+		if !lastAttempt.IsZero() && (e == nil && x < 100 || se == nil && sx == width/2 && sy == source.Dimensions().Height/2) {
+			return false
+		}
 		// CONNECTED precedes source readiness. Repeat a real center-to-edge
 		// movement if the first movement occurred before capture started.
 		if time.Since(lastAttempt) > 100*time.Millisecond {
@@ -228,112 +240,116 @@ func linuxX11Interoperability(t *testing.T, actual bool) {
 		}
 		return false
 	})
-	x, y, err := destination.Position(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, _, err := source.Move(ctx, 60, 15); err != nil {
-		t.Fatal(err)
-	}
-	linuxX11Wait(t, ctx, "remote relative motion", func() bool {
-		xx, yy, e := destination.Position(ctx)
-		return e == nil && xx == x+60 && yy == y+15
-	})
-	seen := map[string]int{}
-	drain := func() {
-		t.Helper()
-		for {
-			event, e := observer.PollForEvent()
-			if e != nil {
-				t.Fatal(e)
-			}
-			if event == nil {
-				return
-			}
-			switch v := event.(type) {
-			case xproto.KeyPressEvent:
-				seen["key-down"]++
-			case xproto.KeyReleaseEvent:
-				seen["key-up"]++
-			case xproto.ButtonPressEvent:
-				seen[fmt.Sprintf("button-%d-down", v.Detail)]++
-			case xproto.ButtonReleaseEvent:
-				seen[fmt.Sprintf("button-%d-up", v.Detail)]++
-			}
-		}
-	}
-	// Physical scan code 0x1e is A. Assert destination server state as well as
-	// observed events; a transport acknowledgement alone does not prove injection.
-	if err := source.Key(ctx, 0x1e, true); err != nil {
-		t.Fatal(err)
-	}
-	linuxX11Wait(t, ctx, "remote keyboard down", func() bool {
-		drain()
-		held, e := destination.AnyPressed(ctx)
-		return e == nil && held && seen["key-down"] > 0
-	})
-	if err := source.Key(ctx, 0x1e, false); err != nil {
-		t.Fatal(err)
-	}
-	linuxX11Wait(t, ctx, "remote keyboard up", func() bool {
-		drain()
-		held, e := destination.AnyPressed(ctx)
-		return e == nil && !held && seen["key-up"] > 0
-	})
-	if err := source.Button(ctx, 1, true); err != nil {
-		t.Fatal(err)
-	}
-	linuxX11Wait(t, ctx, "remote mouse down", func() bool {
-		drain()
-		p, e := xproto.QueryPointer(observer, xroot).Reply()
-		return e == nil && p.Mask&xproto.KeyButMaskButton1 != 0 && seen["button-1-down"] > 0
-	})
-	if err := source.Button(ctx, 1, false); err != nil {
-		t.Fatal(err)
-	}
-	linuxX11Wait(t, ctx, "remote mouse up", func() bool {
-		drain()
-		p, e := xproto.QueryPointer(observer, xroot).Reply()
-		return e == nil && p.Mask&xproto.KeyButMaskButton1 == 0 && seen["button-1-up"] > 0
-	})
-	for _, wheel := range []struct {
-		dx, dy int32
-		button int
-	}{{0, 120, 4}, {0, -120, 5}, {-120, 0, 6}, {120, 0, 7}} {
-		if err := source.Wheel(ctx, wheel.dx, wheel.dy); err != nil {
+	// The ordinary interoperability test covers motion, wheel and re-entry.
+	// Lifecycle cases need one established handoff with held tokens only.
+	if len(ending) == 0 {
+		x, y, err := destination.Position(ctx)
+		if err != nil {
 			t.Fatal(err)
 		}
-		linuxX11Wait(t, ctx, fmt.Sprintf("remote wheel %d", wheel.button), func() bool {
+		if _, _, err := source.Move(ctx, 60, 15); err != nil {
+			t.Fatal(err)
+		}
+		linuxX11Wait(t, ctx, "remote relative motion", func() bool {
+			xx, yy, e := destination.Position(ctx)
+			return e == nil && xx == x+60 && yy == y+15
+		})
+		seen := map[string]int{}
+		drain := func() {
+			t.Helper()
+			for {
+				event, e := observer.PollForEvent()
+				if e != nil {
+					t.Fatal(e)
+				}
+				if event == nil {
+					return
+				}
+				switch v := event.(type) {
+				case xproto.KeyPressEvent:
+					seen["key-down"]++
+				case xproto.KeyReleaseEvent:
+					seen["key-up"]++
+				case xproto.ButtonPressEvent:
+					seen[fmt.Sprintf("button-%d-down", v.Detail)]++
+				case xproto.ButtonReleaseEvent:
+					seen[fmt.Sprintf("button-%d-up", v.Detail)]++
+				}
+			}
+		}
+		// Physical scan code 0x1e is A. Assert destination server state as well as
+		// observed events; a transport acknowledgement alone does not prove injection.
+		if err := source.Key(ctx, 0x1e, true); err != nil {
+			t.Fatal(err)
+		}
+		linuxX11Wait(t, ctx, "remote keyboard down", func() bool {
 			drain()
-			return seen[fmt.Sprintf("button-%d-down", wheel.button)] > 0 && seen[fmt.Sprintf("button-%d-up", wheel.button)] > 0
+			held, e := destination.AnyPressed(ctx)
+			return e == nil && held && seen["key-down"] > 0
+		})
+		if err := source.Key(ctx, 0x1e, false); err != nil {
+			t.Fatal(err)
+		}
+		linuxX11Wait(t, ctx, "remote keyboard up", func() bool {
+			drain()
+			held, e := destination.AnyPressed(ctx)
+			return e == nil && !held && seen["key-up"] > 0
+		})
+		if err := source.Button(ctx, 1, true); err != nil {
+			t.Fatal(err)
+		}
+		linuxX11Wait(t, ctx, "remote mouse down", func() bool {
+			drain()
+			p, e := xproto.QueryPointer(observer, xroot).Reply()
+			return e == nil && p.Mask&xproto.KeyButMaskButton1 != 0 && seen["button-1-down"] > 0
+		})
+		if err := source.Button(ctx, 1, false); err != nil {
+			t.Fatal(err)
+		}
+		linuxX11Wait(t, ctx, "remote mouse up", func() bool {
+			drain()
+			p, e := xproto.QueryPointer(observer, xroot).Reply()
+			return e == nil && p.Mask&xproto.KeyButMaskButton1 == 0 && seen["button-1-up"] > 0
+		})
+		for _, wheel := range []struct {
+			dx, dy int32
+			button int
+		}{{0, 120, 4}, {0, -120, 5}, {-120, 0, 6}, {120, 0, 7}} {
+			if err := source.Wheel(ctx, wheel.dx, wheel.dy); err != nil {
+				t.Fatal(err)
+			}
+			linuxX11Wait(t, ctx, fmt.Sprintf("remote wheel %d", wheel.button), func() bool {
+				drain()
+				return seen[fmt.Sprintf("button-%d-down", wheel.button)] > 0 && seen[fmt.Sprintf("button-%d-up", wheel.button)] > 0
+			})
+		}
+		// Returning across the left edge must ungrab the source and restore local
+		// input. Poll actual grab ownership instead of a fixed handoff delay.
+		if _, _, err := source.Move(ctx, -int32(x+61), 0); err != nil {
+			t.Fatal(err)
+		}
+		linuxX11Wait(t, ctx, "return releases source grab", func() bool { return linuxX11CanGrab(sourceDisplay) })
+		if err := source.SetPosition(ctx, width/2, source.Dimensions().Height/2); err != nil {
+			t.Fatal(err)
+		}
+		// Inactive capture samples position every 4ms. Let it observe the rearm
+		// position before the next edge warp; two immediate warps may coalesce.
+		select {
+		case <-time.After(30 * time.Millisecond):
+		case <-ctx.Done():
+			t.Fatal(ctx.Err())
+		}
+		// Exercise cancellation while two remote tokens are still held: cleanup
+		// must release them and retire the real independent crashguard child.
+		if err := source.SetPosition(ctx, width-1, source.Dimensions().Height/2); err != nil {
+			t.Fatal(err)
+		}
+		linuxX11Wait(t, ctx, "second cursor entry", func() bool {
+			xx, _, e := destination.Position(ctx)
+			sx, sy, se := source.Position(ctx)
+			return e == nil && se == nil && xx < 100 && sx == width/2 && sy == source.Dimensions().Height/2
 		})
 	}
-	// Returning across the left edge must ungrab the source and restore local
-	// input. Poll actual grab ownership instead of a fixed handoff delay.
-	if _, _, err := source.Move(ctx, -int32(x+61), 0); err != nil {
-		t.Fatal(err)
-	}
-	linuxX11Wait(t, ctx, "return releases source grab", func() bool { return linuxX11CanGrab(sourceDisplay) })
-	if err := source.SetPosition(ctx, width/2, source.Dimensions().Height/2); err != nil {
-		t.Fatal(err)
-	}
-	// Inactive capture samples position every 4ms. Let it observe the rearm
-	// position before the next edge warp; two immediate warps may coalesce.
-	select {
-	case <-time.After(30 * time.Millisecond):
-	case <-ctx.Done():
-		t.Fatal(ctx.Err())
-	}
-	// Exercise cancellation while two remote tokens are still held: cleanup
-	// must release them and retire the real independent crashguard child.
-	if err := source.SetPosition(ctx, width-1, source.Dimensions().Height/2); err != nil {
-		t.Fatal(err)
-	}
-	linuxX11Wait(t, ctx, "second cursor entry", func() bool {
-		xx, _, e := destination.Position(ctx)
-		sx, sy, se := source.Position(ctx)
-		return e == nil && se == nil && xx < 100 && sx == width/2 && sy == source.Dimensions().Height/2
-	})
 	if err := source.Key(ctx, 0x1e, true); err != nil {
 		t.Fatal(err)
 	}
@@ -353,6 +369,10 @@ func linuxX11Interoperability(t *testing.T, actual bool) {
 		}
 		return false
 	})
+	if len(ending) != 0 {
+		ending[0](ctx, a, b, source, destination)
+		return
+	}
 	linuxX11CLI(t, ctx, a, "disconnect")
 	// The source still owns the simulated physical holds; release those locally.
 	_ = source.Key(ctx, 0x1e, false)
@@ -528,8 +548,31 @@ func linuxX11StartActualPeer(t *testing.T, ctx context.Context, root, name, disp
 		}
 	})
 	peer := linuxX11Peer{flowNode: flowNode{control: filepath.Join(dir, "Krasis", "control")}, cli: cli, user: user, env: []string{"DISPLAY=" + display, "HOME=" + dir, "XDG_DATA_HOME=" + dir, "XDG_CONFIG_HOME=" + dir, "XDG_SESSION_TYPE=x11"}}
+	// Each UID gets only its own display cookie in its private data directory.
+	// Never relax X server access control or share the test runner's authority file.
+	if authority := os.Getenv("XAUTHORITY"); authority != "" {
+		extract := exec.CommandContext(ctx, "xauth", "-f", authority, "nextract", "-", display)
+		cookie, err := extract.Output()
+		if err != nil || len(bytes.TrimSpace(cookie)) == 0 {
+			t.Fatal("extract private X11 authority for peer", err)
+		}
+		peerAuthority := filepath.Join(dir, "Xauthority")
+		merge := linuxX11UserCommand(ctx, user, "xauth", "-f", peerAuthority, "nmerge", "-")
+		merge.Stdin = bytes.NewReader(cookie)
+		if err := merge.Run(); err != nil {
+			t.Fatal("install private X11 authority for peer", err)
+		}
+		peer.env = append(peer.env, "XAUTHORITY="+peerAuthority)
+	}
+	return linuxX11LaunchActualPeer(t, ctx, root, name, agent, peer)
+}
+
+func linuxX11LaunchActualPeer(t *testing.T, ctx context.Context, root, name, agent string, peer linuxX11Peer) linuxX11Peer {
+	t.Helper()
 	unit := filepath.Base(root) + "-" + name + ".service"
-	serviceUser := user
+	peer.unit = unit
+	peer.expectedSystemStop = new(bool)
+	serviceUser := peer.user
 	if serviceUser == "" {
 		serviceUser = fmt.Sprint(os.Geteuid())
 	}
@@ -557,7 +600,7 @@ func linuxX11StartActualPeer(t *testing.T, ctx context.Context, root, name, disp
 		_ = exec.CommandContext(stop, "sudo", "-n", "systemctl", "kill", "--kill-whom=main", "--signal=SIGINT", unit).Run()
 		select {
 		case err := <-done:
-			if err != nil {
+			if err != nil && !*peer.expectedSystemStop {
 				t.Errorf("actual peer %s exit: %v", name, err)
 			}
 		case <-time.After(8 * time.Second):
@@ -571,7 +614,7 @@ func linuxX11StartActualPeer(t *testing.T, ctx context.Context, root, name, disp
 			data, _ := os.ReadFile(logPath)
 			t.Logf("actual peer %s diagnostics:\n%s", name, data)
 			// Read as the owning UID; do not relax identity/control permissions.
-			data, _ = linuxX11UserCommand(context.Background(), user, "find", filepath.Join(dir, "Krasis", "diagnostics"), "-maxdepth", "1", "-name", "agent.jsonl", "-exec", "cat", "{}", "+").CombinedOutput()
+			data, _ = linuxX11UserCommand(context.Background(), peer.user, "find", filepath.Join(filepath.Dir(peer.control), "diagnostics"), "-maxdepth", "1", "-name", "agent.jsonl", "-exec", "cat", "{}", "+").CombinedOutput()
 			t.Logf("actual peer %s product log:\n%s", name, data)
 		}
 	})
