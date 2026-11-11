@@ -562,7 +562,14 @@ func linuxX11LaunchActualPeer(t *testing.T, ctx context.Context, root, name, age
 	}
 	// These private Xvfb sessions have no desktop locker. PAM may export a
 	// user-manager bus; do not mistake it for an actual graphical desktop bus.
-	args := []string{"--quiet", "--collect", "--wait", "--pipe", "--service-type=exec", "--unit=" + unit, "--uid=" + serviceUser, "--property=PAMName=" + pamService, "--", "env", "-u", "DBUS_SESSION_BUS_ADDRESS"}
+	// PAM helpers on systemd v255 can retain Type=exec's completion fd even
+	// after the agent has started. Notify from the main PID after PAM instead;
+	// exec preserves that PID through env and the actual agent.
+	args := []string{
+		"--quiet", "--collect", "--wait", "--pipe", "--service-type=notify", "--unit=" + unit, "--uid=" + serviceUser,
+		"--property=PAMName=" + pamService, "--property=NotifyAccess=main", "--property=TimeoutStartSec=8s",
+		"--", "systemd-notify", "--pid=self", "--ready", "--exec", ";", "--", "env", "-u", "DBUS_SESSION_BUS_ADDRESS",
+	}
 	args = append(args, peer.env...)
 	command := linuxX11SystemCommand(ctx, "systemd-run", append(args, agent)...)
 	logPath := filepath.Join(root, name+".log")
@@ -602,10 +609,10 @@ func linuxX11LaunchActualPeer(t *testing.T, ctx context.Context, root, name, age
 			t.Logf("actual peer %s product log:\n%s", name, data)
 		}
 	})
-	// Type=exec becomes active only after PAM and exec succeed. Keep OS session
-	// admission distinct from API readiness; both retain eight-second checks
+	// READY confirms PAM admission; the separate CLI probe confirms agent exec
+	// and API readiness. Both retain eight-second checks
 	// inside the unchanged 110-second end-to-end scenario budget.
-	linuxX11Wait(t, ctx, "actual peer "+name+" PAM exec", func(ctx context.Context) bool {
+	linuxX11Wait(t, ctx, "actual peer "+name+" PAM readiness", func(ctx context.Context) bool {
 		return linuxX11SystemCommand(ctx, "systemctl", "is-active", "--quiet", unit).Run() == nil
 	})
 	probes := 0

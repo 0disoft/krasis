@@ -76,3 +76,24 @@ UID and an actual sleep main executable. A process without READY was rejected.
 Bash syntax, workflow actionlint and whitespace checks passed; full remote
 lifecycle execution remains the acceptance check. The notify/exec operation is
 [documented for Ubuntu's systemd](https://manpages.ubuntu.com/manpages/noble/man1/systemd-notify.1.html).
+
+Run [43072398757](https://github.com/0disoft/krasis/actions/runs/43072398757)
+passed acquisition in 10 seconds and started both notified PAM fixtures. It
+exposed the same inherited-exec-fd dependency in the Go integration suite's
+actual agent launcher: product logs reached `agent_ready` in 9-39 ms while
+the Type=exec unit remained activating until the eight-second test failure.
+The launcher now uses main-PID notification too, with an explicit eight-second
+unit startup timeout. Notification proves PAM admission, and the unchanged
+separate CLI status probe proves the agent actually executed and is ready.
+An explicit `--` keeps the agent's `env -u` options out of systemd-notify's
+option parser. Process ownership, real sessions, scenario budgets and cleanup
+are preserved. This only changes test infrastructure, not installed agents.
+
+The current-source TCG receiver termination/recovery regression passed in
+43.12 seconds: both UIDs entered real PAM sessions, held input and grabs were
+released, the unsafe API stopped, and the same identities reconnected from a
+new session. A broader current-source TCG trial failed its second cursor-entry
+budget after PAM admission had passed; it is not counted as a full-suite pass.
+An earlier trial accidentally used stale prepared product binaries and was
+aborted/excluded. Linux cross-compilation, actionlint and whitespace checks
+passed. Remote CI remains the acceptance check for the entire Linux suite.
