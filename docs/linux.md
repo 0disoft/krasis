@@ -59,6 +59,16 @@ Ctrl+Alt+Shift+F12는 로컬 귀환을 요청하며, 대상에 남은 누름 상
 
 ## 검증과 한계
 
+원격 CI는 기존 Windows 작업과 별도로 `ubuntu-latest` 작업 하나를 실행한다.
+Go 도구 체인은 Windows와 같은 `scripts/runtime/stw-retake.json`에서 선택하며,
+Linux 전체 패키지 테스트·`go vet`·배포용 번들 빌드를 검사한다.
+`bash scripts/test-linux-x11.sh`는 인증 쿠키가 필요한 Xvfb 두 개를 띄워
+입력·클립보드 race 검사와 fixture 프로세스 사이의 인증·경계 왕복을 검증한다.
+기존 디스플레이가 있으면 실패하며, 종료·취소 시 서버와 임시 인증 파일을 정리한다.
+기본 번호는 `:91`, `:92`이고 `KRASIS_X11_DISPLAY_BASE`로 변경할 수 있다.
+별도 두 UID·PAM/logind 세션이 필요한 `TestLinuxX11ActualCLIInteroperability`는
+이 CI에서 실행하지 않으며, 실제 절전·로그아웃과 물리 기기 검증도 대체하지 않는다.
+
 2026-11-11에 Debian 13 가상 머신과 격리된 Xvfb 두 개에서 다음을 확인했다.
 
 - 실제 에이전트·CLI를 서로 다른 두 UID와 PAM/logind 세션에서 실행하고,

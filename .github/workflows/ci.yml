@@ -147,3 +147,49 @@ jobs:
           name: krasis-probe-kit-windows-amd64-${{ github.sha }}
           path: dist/krasis-probe-kit-windows-amd64-${{ github.sha }}.zip
           if-no-files-found: error
+
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Select verified runtime toolchain
+        id: runtime-toolchain
+        shell: bash
+        run: |
+          version=$(python3 - <<'PY'
+          import json, re
+          with open('scripts/runtime/stw-retake.json') as source:
+              toolchain = json.load(source)['toolchain']
+          if not re.fullmatch(r'go1\.\d+\.\d+', toolchain):
+              raise SystemExit('Invalid verified runtime toolchain')
+          print(toolchain[2:])
+          PY
+          )
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ steps.runtime-toolchain.outputs.version }}
+          check-latest: false
+          cache: false
+
+      - name: Install isolated X11 test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb xauth x11-utils
+
+      - name: Test Linux packages
+        run: go test -p 2 -count=1 -timeout 3m ./...
+
+      - name: Vet Linux packages
+        run: go vet ./...
+
+      - name: Test X11 input, clipboard and authenticated handoffs
+        run: bash scripts/test-linux-x11.sh
+
+      - name: Build Linux bundle
+        run: sh scripts/build-linux.sh
