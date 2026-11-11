@@ -7,7 +7,6 @@ import (
 	"github.com/0disoft/krasis/internal/x11desktop"
 	"github.com/jezek/xgb"
 	"github.com/jezek/xgb/xproto"
-	"net"
 	"sync"
 	"time"
 )
@@ -71,8 +70,13 @@ func (h *SourceHook) deactivateLocked() {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), SourceCleanupTimeout)
 	defer cancel()
-	if err := h.desktop.Ungrab(ctx); err != nil && h.session != nil && !linuxSourceCancellationOnly(err, h.root.Err()) {
-		h.session.Abort(err)
+	if err := h.desktop.Ungrab(ctx); err != nil && h.session != nil {
+		if h.root.Err() != nil {
+			_ = h.desktop.Close()
+		}
+		if !linuxSourceCancellationOnly(err, h.root.Err()) {
+			h.session.Abort(err)
+		}
 	}
 	h.active = false
 	for i := 0; i < linuxEventBatch; i++ {
@@ -170,28 +174,6 @@ func (h *SourceHook) RunWithBoundary(ctx context.Context, s *SourceSession, b Bo
 	}
 }
 
-// Do not let a closed cancellation hide an independent native/cleanup error.
-func linuxSourceCancellationOnly(err, canceled error) bool {
-	if canceled == nil {
-		return false
-	}
-	if err == nil || err == canceled || err == net.ErrClosed {
-		return true
-	}
-	switch wrapped := err.(type) {
-	case interface{ Unwrap() []error }:
-		for _, child := range wrapped.Unwrap() {
-			if !linuxSourceCancellationOnly(child, canceled) {
-				return false
-			}
-		}
-		return true
-	case interface{ Unwrap() error }:
-		return linuxSourceCancellationOnly(wrapped.Unwrap(), canceled)
-	default:
-		return false
-	}
-}
 func (h *SourceHook) tickLocked(ctx context.Context, s *SourceSession, b BoundaryObserver) error {
 	if h.active && !s.Active() {
 		h.deactivateLocked()
