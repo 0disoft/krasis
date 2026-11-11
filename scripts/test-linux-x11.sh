@@ -20,17 +20,34 @@ if (( base < 1 || base > 9998 )); then
   exit 2
 fi
 work=$(mktemp -d)
+binwork=''
 pids=()
+login_units=()
 cleanup() {
+  if (( ${#login_units[@]} )); then
+    sudo -n systemctl stop "${login_units[@]}" || true
+  fi
   if (( ${#pids[@]} )); then
     kill "${pids[@]}" 2>/dev/null || true
     wait "${pids[@]}" 2>/dev/null || true
   fi
   rm -rf -- "$work"
+  if [[ -n $binwork ]]; then
+    rm -rf -- "$binwork"
+  fi
 }
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
+# Compile once, before starting displays or timed input/lifecycle scenarios.
+# Only public executables are shared; identities and X11 cookies stay private.
+binwork=$(mktemp -d /tmp/krasis-x11-products-XXXXXXXXXX)
+chmod 755 "$binwork"
+build_started=$SECONDS
+# Match the shipped Linux bundle; race-instrumented test packages still use CGO.
+CGO_ENABLED=0 go build -o "$binwork/" ./cmd/krasis-agent ./cmd/krasis-cli
+export KRASIS_X11_TEST_BIN_DIR=$binwork
+echo "X11 product build: $((SECONDS - build_started))s (one agent + CLI build)"
 export XAUTHORITY="$work/Xauthority"
 touch "$XAUTHORITY"
 chmod 600 "$XAUTHORITY"
@@ -88,6 +105,21 @@ fi
 if [[ ${KRASIS_X11_ACTUAL_LIFECYCLE:-0} == 1 ]]; then
   # Never skip silently if the runner cannot provide real session authority.
   systemctl is-active --quiet systemd-logind
-  go test -count=1 -timeout 8m -v ./internal/residentagent \
+  # Model logged-in desktop users. Keep their real user managers alive while
+  # each scenario creates, locks/terminates, and replaces separate PAM sessions.
+  # No input, Xauthority, linger setting or synthetic logind state is involved.
+  login_started=$SECONDS
+  for user in "$KRASIS_X11_TEST_LOCAL_USER" "$KRASIS_X11_TEST_PEER_USER"; do
+    unit="$(basename "$binwork")-login-${#login_units[@]}.service"
+    login_units+=("$unit")
+    sudo -n systemd-run --quiet --collect --service-type=exec --unit="$unit" \
+      --uid="$user" --property="PAMName=${KRASIS_X11_TEST_PAM_SERVICE:-login}" \
+      --property=TimeoutStartSec=8s /usr/bin/sleep infinity
+  done
+  echo "X11 login fixtures: $((SECONDS - login_started))s"
+  # Elevate the test runner once; each CLI still runs as its dedicated UID.
+  # Preserve only this fixture's display/binary/session selection, not -E.
+  go test -exec 'sudo -n --preserve-env=DISPLAY,XAUTHORITY,XDG_SESSION_TYPE,KRASIS_X11_TEST,KRASIS_X11_TEST_BIN_DIR,KRASIS_X11_TEST_OTHER_DISPLAY,KRASIS_X11_TEST_LOCAL_USER,KRASIS_X11_TEST_PEER_USER,KRASIS_X11_TEST_PAM_SERVICE' \
+    -count=1 -timeout 8m -v ./internal/residentagent \
     -run '^TestLinuxX11Actual(CLIInteroperability|Lifecycle)$'
 fi

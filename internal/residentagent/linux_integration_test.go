@@ -132,10 +132,16 @@ func linuxX11Interoperability(t *testing.T, actual bool, ending ...linuxX11End) 
 		t.Fatal(err)
 	}
 	agent := filepath.Join(root, "krasis-agent")
-	build := exec.CommandContext(ctx, "go", "build", "-o", agent, "./cmd/krasis-agent")
-	build.Dir = filepath.Join("..", "..")
-	if output, err := build.CombinedOutput(); err != nil {
-		t.Fatalf("build real crashguard agent: %v\n%s", err, output)
+	if prepared := os.Getenv("KRASIS_X11_TEST_BIN_DIR"); prepared != "" {
+		if err := linuxX11CopyBinaries(prepared, root, actual); err != nil {
+			t.Fatal("prepare X11 product binaries:", err)
+		}
+	} else {
+		build := exec.CommandContext(ctx, "go", "build", "-o", root+string(os.PathSeparator), "./cmd/krasis-agent", "./cmd/krasis-cli")
+		build.Dir = filepath.Join("..", "..")
+		if output, err := build.CombinedOutput(); err != nil {
+			t.Fatalf("build X11 product binaries: %v\n%s", err, output)
+		}
 	}
 	var a, b linuxX11Peer
 	if actual {
@@ -151,11 +157,6 @@ func linuxX11Interoperability(t *testing.T, actual bool, ending ...linuxX11End) 
 			t.Fatal("actual agents require different UIDs")
 		}
 		cli := filepath.Join(root, "krasis-cli")
-		build := exec.CommandContext(ctx, "go", "build", "-o", cli, "./cmd/krasis-cli")
-		build.Dir = filepath.Join("..", "..")
-		if output, err := build.CombinedOutput(); err != nil {
-			t.Fatalf("build actual CLI: %v\n%s", err, output)
-		}
 		a = linuxX11StartActualPeer(t, ctx, root, "a", sourceDisplay, agent, cli, os.Getenv("KRASIS_X11_TEST_LOCAL_USER"))
 		b = linuxX11StartActualPeer(t, ctx, root, "b", otherDisplay, agent, cli, os.Getenv("KRASIS_X11_TEST_PEER_USER"))
 	} else {
@@ -181,7 +182,7 @@ func linuxX11Interoperability(t *testing.T, actual bool, ending ...linuxX11End) 
 	first := linuxX11CLI(t, ctx, a, "pair", "listen", "b", address, "--allow-inbound-control")
 	second := linuxX11CLI(t, ctx, b, "pair", "dial", "a", address, "--allow-inbound-control")
 	var confirmation string
-	linuxX11Wait(t, ctx, "mutual pairing confirmation", func() bool {
+	linuxX11Wait(t, ctx, "mutual pairing confirmation", func(ctx context.Context) bool {
 		x := linuxX11CLI(t, ctx, a, "pair", "status", first.PairingID)
 		y := linuxX11CLI(t, ctx, b, "pair", "status", second.PairingID)
 		confirmation = x.Confirmation
@@ -189,7 +190,7 @@ func linuxX11Interoperability(t *testing.T, actual bool, ending ...linuxX11End) 
 	})
 	linuxX11CLI(t, ctx, a, "pair", "confirm", first.PairingID, confirmation)
 	linuxX11CLI(t, ctx, b, "pair", "confirm", second.PairingID, confirmation)
-	linuxX11Wait(t, ctx, "both identities committed", func() bool {
+	linuxX11Wait(t, ctx, "both identities committed", func(ctx context.Context) bool {
 		return linuxX11CLI(t, ctx, a, "pair", "status", first.PairingID).Code == "pairing_completed" && linuxX11CLI(t, ctx, b, "pair", "status", second.PairingID).Code == "pairing_completed"
 	})
 	address = linuxX11FreeAddress(t)
@@ -197,7 +198,7 @@ func linuxX11Interoperability(t *testing.T, actual bool, ending ...linuxX11End) 
 	linuxX11CLI(t, ctx, b, "connection", "set", "a", address, "LEFT")
 	linuxX11CLI(t, ctx, a, "connect", "b")
 	linuxX11CLI(t, ctx, b, "connect", "a")
-	linuxX11Wait(t, ctx, "authenticated product connection", func() bool {
+	linuxX11Wait(t, ctx, "authenticated product connection", func(ctx context.Context) bool {
 		return linuxX11Status(t, ctx, a).State == "CONNECTED" && linuxX11Status(t, ctx, b).State == "CONNECTED"
 	})
 	if linuxX11Status(t, ctx, a).DeviceFingerprint == linuxX11Status(t, ctx, b).DeviceFingerprint {
@@ -213,33 +214,7 @@ func linuxX11Interoperability(t *testing.T, actual bool, ending ...linuxX11End) 
 		t.Fatal(err)
 	}
 	// Entry must be caused by a physical-source event, never direct session calls.
-	lastAttempt := time.Time{}
-	linuxX11Wait(t, ctx, "cursor enters remote left edge", func() bool {
-		x, _, e := destination.Position(ctx)
-		sx, sy, se := source.Position(ctx)
-		if e == nil && se == nil && x < 100 && sx == width/2 && sy == source.Dimensions().Height/2 {
-			return true
-		}
-		// Once either side has entered its handoff position, do not inject
-		// another edge warp while the other process finishes activation. That
-		// would become real remote motion under slow PAM/VM scheduling.
-		if !lastAttempt.IsZero() && (e == nil && x < 100 || se == nil && sx == width/2 && sy == source.Dimensions().Height/2) {
-			return false
-		}
-		// CONNECTED precedes source readiness. Repeat a real center-to-edge
-		// movement if the first movement occurred before capture started.
-		if time.Since(lastAttempt) > 100*time.Millisecond {
-			if err := source.SetPosition(ctx, width/2, source.Dimensions().Height/2); err != nil {
-				t.Fatal(err)
-			}
-			time.Sleep(20 * time.Millisecond)
-			if err := source.SetPosition(ctx, width-1, source.Dimensions().Height/2); err != nil {
-				t.Fatal(err)
-			}
-			lastAttempt = time.Now()
-		}
-		return false
-	})
+	linuxX11Enter(t, ctx, a, source, destination)
 	// The ordinary interoperability test covers motion, wheel and re-entry.
 	// Lifecycle cases need one established handoff with held tokens only.
 	if len(ending) == 0 {
@@ -250,7 +225,7 @@ func linuxX11Interoperability(t *testing.T, actual bool, ending ...linuxX11End) 
 		if _, _, err := source.Move(ctx, 60, 15); err != nil {
 			t.Fatal(err)
 		}
-		linuxX11Wait(t, ctx, "remote relative motion", func() bool {
+		linuxX11Wait(t, ctx, "remote relative motion", func(ctx context.Context) bool {
 			xx, yy, e := destination.Position(ctx)
 			return e == nil && xx == x+60 && yy == y+15
 		})
@@ -282,7 +257,7 @@ func linuxX11Interoperability(t *testing.T, actual bool, ending ...linuxX11End) 
 		if err := source.Key(ctx, 0x1e, true); err != nil {
 			t.Fatal(err)
 		}
-		linuxX11Wait(t, ctx, "remote keyboard down", func() bool {
+		linuxX11Wait(t, ctx, "remote keyboard down", func(ctx context.Context) bool {
 			drain()
 			held, e := destination.AnyPressed(ctx)
 			return e == nil && held && seen["key-down"] > 0
@@ -290,7 +265,7 @@ func linuxX11Interoperability(t *testing.T, actual bool, ending ...linuxX11End) 
 		if err := source.Key(ctx, 0x1e, false); err != nil {
 			t.Fatal(err)
 		}
-		linuxX11Wait(t, ctx, "remote keyboard up", func() bool {
+		linuxX11Wait(t, ctx, "remote keyboard up", func(ctx context.Context) bool {
 			drain()
 			held, e := destination.AnyPressed(ctx)
 			return e == nil && !held && seen["key-up"] > 0
@@ -298,7 +273,7 @@ func linuxX11Interoperability(t *testing.T, actual bool, ending ...linuxX11End) 
 		if err := source.Button(ctx, 1, true); err != nil {
 			t.Fatal(err)
 		}
-		linuxX11Wait(t, ctx, "remote mouse down", func() bool {
+		linuxX11Wait(t, ctx, "remote mouse down", func(ctx context.Context) bool {
 			drain()
 			p, e := xproto.QueryPointer(observer, xroot).Reply()
 			return e == nil && p.Mask&xproto.KeyButMaskButton1 != 0 && seen["button-1-down"] > 0
@@ -306,7 +281,7 @@ func linuxX11Interoperability(t *testing.T, actual bool, ending ...linuxX11End) 
 		if err := source.Button(ctx, 1, false); err != nil {
 			t.Fatal(err)
 		}
-		linuxX11Wait(t, ctx, "remote mouse up", func() bool {
+		linuxX11Wait(t, ctx, "remote mouse up", func(ctx context.Context) bool {
 			drain()
 			p, e := xproto.QueryPointer(observer, xroot).Reply()
 			return e == nil && p.Mask&xproto.KeyButMaskButton1 == 0 && seen["button-1-up"] > 0
@@ -318,7 +293,7 @@ func linuxX11Interoperability(t *testing.T, actual bool, ending ...linuxX11End) 
 			if err := source.Wheel(ctx, wheel.dx, wheel.dy); err != nil {
 				t.Fatal(err)
 			}
-			linuxX11Wait(t, ctx, fmt.Sprintf("remote wheel %d", wheel.button), func() bool {
+			linuxX11Wait(t, ctx, fmt.Sprintf("remote wheel %d", wheel.button), func(ctx context.Context) bool {
 				drain()
 				return seen[fmt.Sprintf("button-%d-down", wheel.button)] > 0 && seen[fmt.Sprintf("button-%d-up", wheel.button)] > 0
 			})
@@ -328,27 +303,13 @@ func linuxX11Interoperability(t *testing.T, actual bool, ending ...linuxX11End) 
 		if _, _, err := source.Move(ctx, -int32(x+61), 0); err != nil {
 			t.Fatal(err)
 		}
-		linuxX11Wait(t, ctx, "return releases source grab", func() bool { return linuxX11CanGrab(sourceDisplay) })
-		if err := source.SetPosition(ctx, width/2, source.Dimensions().Height/2); err != nil {
+		linuxX11Wait(t, ctx, "return releases source grab", func(ctx context.Context) bool { return linuxX11CanGrab(sourceDisplay) })
+		// Reset the local destination before repeating the same observed native
+		// entry flow. A fixed 30ms center dwell can be missed by a busy VM.
+		if err := destination.SetPosition(ctx, destination.Dimensions().Width/2, destination.Dimensions().Height/2); err != nil {
 			t.Fatal(err)
 		}
-		// Inactive capture samples position every 4ms. Let it observe the rearm
-		// position before the next edge warp; two immediate warps may coalesce.
-		select {
-		case <-time.After(30 * time.Millisecond):
-		case <-ctx.Done():
-			t.Fatal(ctx.Err())
-		}
-		// Exercise cancellation while two remote tokens are still held: cleanup
-		// must release them and retire the real independent crashguard child.
-		if err := source.SetPosition(ctx, width-1, source.Dimensions().Height/2); err != nil {
-			t.Fatal(err)
-		}
-		linuxX11Wait(t, ctx, "second cursor entry", func() bool {
-			xx, _, e := destination.Position(ctx)
-			sx, sy, se := source.Position(ctx)
-			return e == nil && se == nil && xx < 100 && sx == width/2 && sy == source.Dimensions().Height/2
-		})
+		linuxX11Enter(t, ctx, a, source, destination)
 	}
 	if err := source.Key(ctx, 0x1e, true); err != nil {
 		t.Fatal(err)
@@ -356,7 +317,7 @@ func linuxX11Interoperability(t *testing.T, actual bool, ending ...linuxX11End) 
 	if err := source.Button(ctx, 1, true); err != nil {
 		t.Fatal(err)
 	}
-	linuxX11Wait(t, ctx, "held remote tokens before disconnect", func() bool {
+	linuxX11Wait(t, ctx, "held remote tokens before disconnect", func(ctx context.Context) bool {
 		p, e := xproto.QueryPointer(observer, xroot).Reply()
 		keys, ke := xproto.QueryKeymap(observer).Reply()
 		if e != nil || ke != nil || p.Mask&xproto.KeyButMaskButton1 == 0 {
@@ -377,7 +338,7 @@ func linuxX11Interoperability(t *testing.T, actual bool, ending ...linuxX11End) 
 	// The source still owns the simulated physical holds; release those locally.
 	_ = source.Key(ctx, 0x1e, false)
 	_ = source.Button(ctx, 1, false)
-	linuxX11Wait(t, ctx, "disconnect releases remote tokens and source grab", func() bool {
+	linuxX11Wait(t, ctx, "disconnect releases remote tokens and source grab", func(ctx context.Context) bool {
 		held, e := destination.AnyPressed(ctx)
 		return e == nil && !held && linuxX11CanGrab(sourceDisplay)
 	})
@@ -388,7 +349,7 @@ func linuxX11Interoperability(t *testing.T, actual bool, ending ...linuxX11End) 
 	if err := json.Unmarshal(data, &stopped); err != nil || (exit != 0 && stopped.Code != "no_active_session") {
 		t.Fatalf("remote disconnect exit=%d decode=%v stdout=%s stderr=%s", exit, err, data, stderr)
 	}
-	linuxX11Wait(t, ctx, "both peers retire to local", func() bool {
+	linuxX11Wait(t, ctx, "both peers retire to local", func(ctx context.Context) bool {
 		return linuxX11Status(t, ctx, a).State == "LOCAL" && linuxX11Status(t, ctx, b).State == "LOCAL"
 	})
 	t.Log("CLI mutual pairing, authenticated product sessions, entry/motion/key/button/four wheel directions/return and held-input cleanup passed")
@@ -472,7 +433,7 @@ func linuxX11StartPeer(t *testing.T, ctx context.Context, root, name, display, a
 		}
 	})
 	var control string
-	linuxX11Wait(t, ctx, "peer "+name+" API readiness", func() bool {
+	linuxX11Wait(t, ctx, "peer "+name+" API readiness", func(ctx context.Context) bool {
 		data, e := os.ReadFile(filepath.Join(dir, "ready"))
 		control = string(data)
 		return e == nil && control != ""
@@ -527,6 +488,18 @@ func linuxX11Status(t *testing.T, ctx context.Context, node linuxX11Peer) locala
 // Always use argv, never a shell: users, paths and CLI values cannot become code.
 func linuxX11UserCommand(ctx context.Context, user string, args ...string) *exec.Cmd {
 	if user != "" {
+		// The actual-suite runner enters sudo once. Inspection commands switch
+		// to the real peer UID/groups without opening another sudo/PAM session
+		// for every readiness poll. Agents still get their own real PAM session.
+		if os.Geteuid() == 0 {
+			command := exec.CommandContext(ctx, "env", append([]string{"-i", "PATH=/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin"}, args...)...)
+			credential, err := linuxX11UserCredential(user)
+			if err != nil {
+				command.Err = err
+			}
+			command.SysProcAttr = &syscall.SysProcAttr{Credential: credential}
+			return command
+		}
 		return exec.CommandContext(ctx, "sudo", append([]string{"-n", "-u", user, "--", "env", "-i", "PATH=/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin"}, args...)...)
 	}
 	return exec.CommandContext(ctx, "env", append([]string{"-i", "PATH=/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin"}, args...)...)
@@ -589,9 +562,9 @@ func linuxX11LaunchActualPeer(t *testing.T, ctx context.Context, root, name, age
 	}
 	// These private Xvfb sessions have no desktop locker. PAM may export a
 	// user-manager bus; do not mistake it for an actual graphical desktop bus.
-	args := []string{"-n", "systemd-run", "--quiet", "--collect", "--wait", "--pipe", "--unit=" + unit, "--uid=" + serviceUser, "--property=PAMName=" + pamService, "--", "env", "-u", "DBUS_SESSION_BUS_ADDRESS"}
+	args := []string{"--quiet", "--collect", "--wait", "--pipe", "--service-type=exec", "--unit=" + unit, "--uid=" + serviceUser, "--property=PAMName=" + pamService, "--", "env", "-u", "DBUS_SESSION_BUS_ADDRESS"}
 	args = append(args, peer.env...)
-	command := exec.CommandContext(ctx, "sudo", append(args, agent)...)
+	command := linuxX11SystemCommand(ctx, "systemd-run", append(args, agent)...)
 	logPath := filepath.Join(root, name+".log")
 	log, err := os.Create(logPath)
 	if err != nil {
@@ -608,14 +581,14 @@ func linuxX11LaunchActualPeer(t *testing.T, ctx context.Context, root, name, age
 		// Stop the service owner, not only systemd-run's waiting client.
 		stop, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
-		_ = exec.CommandContext(stop, "sudo", "-n", "systemctl", "kill", "--kill-whom=main", "--signal=SIGINT", unit).Run()
+		_ = linuxX11SystemCommand(stop, "systemctl", "kill", "--kill-whom=main", "--signal=SIGINT", unit).Run()
 		select {
 		case err := <-done:
 			if err != nil && !*peer.expectedSystemStop {
 				t.Errorf("actual peer %s exit: %v", name, err)
 			}
 		case <-time.After(8 * time.Second):
-			_ = exec.Command("sudo", "-n", "systemctl", "kill", "--kill-whom=all", "--signal=SIGKILL", unit).Run()
+			_ = linuxX11SystemCommand(context.Background(), "systemctl", "kill", "--kill-whom=all", "--signal=SIGKILL", unit).Run()
 			_ = command.Process.Kill()
 			<-done
 			t.Errorf("actual peer %s failed to retire", name)
@@ -629,23 +602,43 @@ func linuxX11LaunchActualPeer(t *testing.T, ctx context.Context, root, name, age
 			t.Logf("actual peer %s product log:\n%s", name, data)
 		}
 	})
-	linuxX11Wait(t, ctx, "actual peer "+name+" readiness", func() bool { _, _, code := linuxX11Call(ctx, peer, "status"); return code == 0 })
+	// Type=exec becomes active only after PAM and exec succeed. Keep OS session
+	// admission distinct from API readiness; both retain eight-second checks
+	// inside the unchanged 110-second end-to-end scenario budget.
+	linuxX11Wait(t, ctx, "actual peer "+name+" PAM exec", func(ctx context.Context) bool {
+		return linuxX11SystemCommand(ctx, "systemctl", "is-active", "--quiet", unit).Run() == nil
+	})
+	probes := 0
+	defer func() { t.Logf("actual peer %s readiness CLI probes: %d", name, probes) }()
+	linuxX11Wait(t, ctx, "actual peer "+name+" readiness", func(ctx context.Context) bool {
+		// A missing endpoint cannot answer status yet. Do not repeatedly start
+		// Go CLI processes while PAM/logind and the agent compete for one CPU.
+		// File presence is only a gate: readiness still requires the real CLI.
+		if os.Geteuid() == 0 {
+			if _, err := os.Stat(filepath.Join(peer.control, "endpoint.json")); err != nil {
+				return false
+			}
+		}
+		probes++
+		_, _, code := linuxX11Call(ctx, peer, "status")
+		return code == 0
+	})
 	return peer
 }
 
-func linuxX11Wait(t *testing.T, ctx context.Context, description string, check func() bool) {
+func linuxX11Wait(t *testing.T, ctx context.Context, description string, check func(context.Context) bool) {
 	t.Helper()
-	deadline := time.NewTimer(8 * time.Second)
-	defer deadline.Stop()
+	started := time.Now()
+	defer func() { t.Logf("X11 phase %s: %s", description, time.Since(started).Round(time.Millisecond)) }()
+	bounded, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
 	for {
-		if check() {
+		if check(bounded) && bounded.Err() == nil {
 			return
 		}
 		select {
-		case <-ctx.Done():
-			t.Fatalf("%s: %v", description, ctx.Err())
-		case <-deadline.C:
-			t.Fatalf("timed out: %s", description)
+		case <-bounded.Done():
+			t.Fatalf("%s: %v", description, bounded.Err())
 		case <-time.After(10 * time.Millisecond):
 		}
 	}
@@ -677,4 +670,80 @@ func linuxX11CanGrab(display string) bool {
 	}
 	keyboard, err := xproto.GrabKeyboard(conn, false, root, 0, xproto.GrabModeAsync, xproto.GrabModeAsync).Reply()
 	return err == nil && keyboard.Status == xproto.GrabStatusSuccess
+}
+
+func linuxX11Enter(t *testing.T, ctx context.Context, peer linuxX11Peer, source, destination *x11desktop.Desktop) {
+	t.Helper()
+	width := source.Dimensions().Width
+	var before map[string]uint64
+	seeded := false
+	var entryX, entryY int32
+	linuxX11Wait(t, ctx, "cursor enters remote left edge", func(ctx context.Context) bool {
+		x, y, e := destination.Position(ctx)
+		sx, sy, se := source.Position(ctx)
+		if seeded {
+			return e == nil && se == nil && x == entryX+1 && y == entryY && sx == width/2 && sy == source.Dimensions().Height/2
+		}
+		if before != nil {
+			current := linuxX11EntryCounters(t, ctx, peer)
+			// The cursor is centered BEFORE the physical-hold check finishes.
+			// A key here can abort capture. A single harmless physical move
+			// cannot change pressed state; its remote echo proves commit AND
+			// real input dispatch before any key/button assertion is attempted.
+			if e == nil && se == nil && x < 100 && sx == width/2 && sy == source.Dimensions().Height/2 {
+				entryX, entryY = x, y
+				if _, _, err := source.Move(ctx, 1, 0); err != nil {
+					t.Fatal(err)
+				}
+				seeded = true
+				return false
+			}
+			if !linuxX11EntryRetry(before, current) {
+				return false
+			}
+		}
+		// A pair of position reads cannot exclude activation BETWEEN reads.
+		// Retry only after the product positively declined the previous intent;
+		// otherwise another edge warp becomes spurious remote pointer input.
+		if err := source.SetPosition(ctx, width/2, source.Dimensions().Height/2); err != nil {
+			t.Fatal(err)
+		}
+		before = linuxX11EntryCounters(t, ctx, peer)
+		if err := source.SetPosition(ctx, width-1, source.Dimensions().Height/2); err != nil {
+			t.Fatal(err)
+		}
+		return false
+	})
+}
+
+func linuxX11EntryCounters(t *testing.T, ctx context.Context, peer linuxX11Peer) map[string]uint64 {
+	t.Helper()
+	data, stderr, code := linuxX11Call(ctx, peer, "diagnostics")
+	var diagnostics localapi.Diagnostics
+	if err := json.Unmarshal(data, &diagnostics); code != 0 || err != nil {
+		t.Fatalf("entry diagnostics exit=%d decode=%v stderr=%s", code, err, stderr)
+	}
+	if diagnostics.Counters == nil {
+		return map[string]uint64{}
+	}
+	return diagnostics.Counters
+}
+
+func linuxX11EntryRetry(before, current map[string]uint64) bool {
+	return current["boundary_dropped_not_ready"] > before["boundary_dropped_not_ready"] &&
+		current["boundary_admitted"] == before["boundary_admitted"] &&
+		current["boundary_request_written"] == before["boundary_request_written"]
+}
+
+func TestLinuxX11EntryRetriesOnlyDeclinedRequests(t *testing.T) {
+	before := map[string]uint64{"boundary_dropped_not_ready": 1, "boundary_admitted": 3, "boundary_request_written": 3}
+	for _, tc := range []struct {
+		dropped, admitted, written uint64
+		retry                      bool
+	}{{1, 3, 3, false}, {2, 3, 3, true}, {2, 4, 3, false}, {2, 3, 4, false}, {0, 3, 3, false}} {
+		current := map[string]uint64{"boundary_dropped_not_ready": tc.dropped, "boundary_admitted": tc.admitted, "boundary_request_written": tc.written}
+		if got := linuxX11EntryRetry(before, current); got != tc.retry {
+			t.Fatalf("retry=%v want=%v counters=%v", got, tc.retry, current)
+		}
+	}
 }

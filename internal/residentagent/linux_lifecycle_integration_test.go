@@ -38,7 +38,7 @@ func TestLinuxX11ActualLifecycle(t *testing.T) {
 					if action == "lock-hint" {
 						linuxX11SetLockHint(t, ctx, target, session)
 					} else {
-						command := exec.CommandContext(ctx, "sudo", "-n", "loginctl", action, session)
+						command := linuxX11SystemCommand(ctx, "loginctl", action, session)
 						if output, err := command.CombinedOutput(); err != nil {
 							t.Fatalf("real logind %s: %v %s", action, err, output)
 						}
@@ -52,7 +52,7 @@ func TestLinuxX11ActualLifecycle(t *testing.T) {
 							t.Logf("last native cleanup: remoteHeld=%v sourceGrabAvailable=%v readError=%v", lastHeld, lastGrab, lastRead)
 						}
 					})
-					linuxX11Wait(t, ctx, "lifecycle releases remote holds and source grabs", func() bool {
+					linuxX11Wait(t, ctx, "lifecycle releases remote holds and source grabs", func(ctx context.Context) bool {
 						held, err := destination.AnyPressed(ctx)
 						lastHeld, lastRead = held, err
 						lastGrab = linuxX11CanGrab(os.Getenv("DISPLAY"))
@@ -64,13 +64,13 @@ func TestLinuxX11ActualLifecycle(t *testing.T) {
 					if err := source.Button(ctx, 1, false); err != nil {
 						t.Fatal(err)
 					}
-					linuxX11Wait(t, ctx, "unsafe session stops its local API", func() bool {
+					linuxX11Wait(t, ctx, "unsafe session stops its local API", func(ctx context.Context) bool {
 						_, _, code := linuxX11Call(ctx, target, "status")
 						return code != 0
 					})
 					// Prove the unaffected UID remains usable after the event.
 					linuxX11Call(ctx, survivor, "disconnect")
-					linuxX11Wait(t, ctx, "surviving agent returns LOCAL", func() bool {
+					linuxX11Wait(t, ctx, "surviving agent returns LOCAL", func(ctx context.Context) bool {
 						return linuxX11Status(t, ctx, survivor).State == "LOCAL"
 					})
 					// Start a new PAM session with the SAME identity/trust/data.
@@ -86,7 +86,7 @@ func TestLinuxX11ActualLifecycle(t *testing.T) {
 					}
 					linuxX11CLI(t, ctx, restarted, "connect", alias)
 					linuxX11CLI(t, ctx, survivor, "connect", survivorAlias)
-					linuxX11Wait(t, ctx, "same identities reconnect after lifecycle stop", func() bool {
+					linuxX11Wait(t, ctx, "same identities reconnect after lifecycle stop", func(ctx context.Context) bool {
 						return linuxX11Status(t, ctx, restarted).State == "CONNECTED" && linuxX11Status(t, ctx, survivor).State == "CONNECTED"
 					})
 					linuxX11CLI(t, ctx, restarted, "disconnect")
@@ -117,7 +117,7 @@ func linuxX11SetLockHint(t *testing.T, ctx context.Context, peer linuxX11Peer, s
 
 func linuxX11ActualSession(t *testing.T, ctx context.Context, peer linuxX11Peer) string {
 	t.Helper()
-	pidText, err := exec.CommandContext(ctx, "sudo", "-n", "systemctl", "show", peer.unit, "--property=MainPID", "--value").Output()
+	pidText, err := linuxX11SystemCommand(ctx, "systemctl", "show", peer.unit, "--property=MainPID", "--value").Output()
 	pid, parseErr := strconv.ParseUint(strings.TrimSpace(string(pidText)), 10, 32)
 	if err != nil || parseErr != nil || pid < 2 {
 		t.Fatal("resolve actual agent PID", err, parseErr)
