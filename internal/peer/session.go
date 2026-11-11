@@ -128,10 +128,11 @@ func runSession(
 		} else {
 			frame, err = ownedConnection.ReadFrame()
 		}
-		if err != nil {
+		ctxErr := ctx.Err()
+		if err != nil || ctxErr != nil {
 			_ = ownedConnection.Close()
 			var cause error
-			if ctxErr := ctx.Err(); ctxErr != nil {
+			if ctxErr != nil {
 				cause = ctxErr
 			} else {
 				cause = classifyPeerReadFailure(connection, err)
@@ -302,9 +303,21 @@ func runSession(
 			progress.ObserveDispatchCompleted(dispatchCompleted)
 		}
 		if err != nil {
-			_ = ownedConnection.Close()
-			err = errors.Join(err, abortPendingLease(ctx, requests))
-			return failSessionWithLifecycle(ctx, coordinator, runtime, outbound, err)
+			// Retire an authenticated stop's lease under its writer coordinator
+			// before deferred socket closure. A heartbeat must not see an active
+			// lease on a transport this dispatcher has already closed.
+			if err != ErrPeerDisconnectRequested {
+				_ = ownedConnection.Close()
+			}
+			abortErr := abortPendingLease(ctx, requests)
+			cause := errors.Join(err, abortErr)
+			result := failSessionWithLifecycle(ctx, coordinator, runtime, outbound, cause)
+			// Dispatch can race another component retiring the lease. Retain
+			// its failure while distinguishing completed cleanup from failure.
+			if abortErr == nil && cleanupresult.OnlyCause(result, cause) {
+				return cleanupresult.Confirm(result)
+			}
+			return result
 		}
 		if frame.Kind == transport.MessageHeartbeat && !heartbeatObserved && observer != nil {
 			observer.ObserveHeartbeatReceived(heartbeat.SessionID, heartbeat.ObservedAt)
