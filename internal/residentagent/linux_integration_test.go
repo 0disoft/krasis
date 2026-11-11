@@ -587,7 +587,9 @@ func linuxX11LaunchActualPeer(t *testing.T, ctx context.Context, root, name, age
 			t.Fatal("invalid test PAM service name")
 		}
 	}
-	args := []string{"-n", "systemd-run", "--quiet", "--collect", "--wait", "--pipe", "--unit=" + unit, "--uid=" + serviceUser, "--property=PAMName=" + pamService, "--", "env"}
+	// These private Xvfb sessions have no desktop locker. PAM may export a
+	// user-manager bus; do not mistake it for an actual graphical desktop bus.
+	args := []string{"-n", "systemd-run", "--quiet", "--collect", "--wait", "--pipe", "--unit=" + unit, "--uid=" + serviceUser, "--property=PAMName=" + pamService, "--", "env", "-u", "DBUS_SESSION_BUS_ADDRESS"}
 	args = append(args, peer.env...)
 	command := exec.CommandContext(ctx, "sudo", append(args, agent)...)
 	logPath := filepath.Join(root, name+".log")

@@ -149,9 +149,11 @@ bash scripts/test-linux-x11.sh
   Linux/Windows 관련 패키지의 `go vet`, Windows 입력·agent·CLI 회귀 테스트를 통과했다.
 - 네 Linux 명령을 CGO 없이 빌드하고 `krasis-linux-amd64.tar.gz`로 묶었다.
 
-물리 Windows↔Linux 조합, 실제 X11 window manager의 팝업/grab 경합,
-실제 시스템 절전·전원 종료와 화면 잠금 UI는 이번 환경에서 실행하지 않았다.
-잠금·비활성화·절전·종료의 이벤트 분기는 단위 테스트로 검증했다.
+위 Xvfb 검사는 물리 Windows↔Linux 조합이나 실제 window manager의 팝업/grab
+경합을 검증하지 않는다. 별도의 Debian 데스크톱 VM에서 실제 잠금 UI·PAM 인증,
+S3 deep 절전·재개, 재부팅 후 그래픽 로그인과 자동 재연결을 확인했다.
+환경·발견한 결함·재현 절차·한계는 [VM 검증 기록](validation/linux-desktop-vm-2026-11-11.md)에 있다.
+물리 기기 절전·전원 손실·Wayland 검증은 포함하지 않는다.
 
 일반 단위 테스트는 입력을 만들지 않는다. 다음 smoke는 **격리된 Xvfb**에서만
 실행한다. 실제 작업 중인 X11 화면에 적용하면 키·마우스가 움직인다.
