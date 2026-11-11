@@ -10,8 +10,10 @@ func TestControlQueueMatchesRequestOrGrantAndKeepsExchangeBoundary(t *testing.T)
 	for _, role := range []string{"source", "receiver"} {
 		t.Run(role, func(t *testing.T) {
 			_, ctx, out := collected(t)
-			base := time.Now()
-			p := Begin(ctx, role, "session", "epoch", base)
+			p := Begin(ctx, role, "session", "epoch", time.Now())
+			// Begin records the actual request time independently of its start
+			// argument. A timestamp sampled before Begin can precede that gate.
+			base := getAttempt(p).request
 			read := WithControlQueue(WithControlRead(ctx, base.Add(90*time.Millisecond)), base.Add(10*time.Millisecond), base.Add(90*time.Millisecond))
 			matched := Matching(read, role, "session", "epoch")
 			if role == "source" {

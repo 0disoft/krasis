@@ -17,6 +17,7 @@ func TestServiceIPCKeepsInnerProfileAndNextACKAligned(t *testing.T) {
 		{Micros: [6]uint32{1, 2, 3, 4, 5, 6}, ParentMeasured: true, ParentMicros: [3]uint32{7, 8, 9}},
 	} {
 		var wire bytes.Buffer
+		hasNativeClock := workerIPCTick() != 0
 		ack := response{sequence: 1, op: opMove, applyDetail: &handoff.WorkerApplyProfile{Measured: 1, Micros: [2]uint32{100, 0}, NativeIPC: inner},
 			ipc: &nativeIPCWire{profile: inner, outer: [3]uint64{100, 110, 0}}}
 		if err := writeResponse(&wire, ack); err != nil {
@@ -27,8 +28,13 @@ func TestServiceIPCKeepsInnerProfileAndNextACKAligned(t *testing.T) {
 		}
 		r := newACKReader(&wire)
 		got, err := readResponse(r)
-		if err != nil || got.ipc == nil || got.ipc.outer[0] != 100 || got.ipc.outer[1] == 0 || got.applyDetail == nil {
+		if err != nil || got.ipc == nil || got.ipc.outer[0] != 100 || got.applyDetail == nil {
 			t.Fatal("outer exchange displaced inner detail", got, err)
+		}
+		// The io.Writer path stamps both endpoints with QPC on Windows and
+		// leaves them unmeasured on hosts without a native IPC clock.
+		if (got.ipc.outer[1] != 0) != hasNativeClock || got.ipc.outer[2] != got.ipc.outer[1] {
+			t.Fatal("outer submission clock availability changed", got.ipc)
 		}
 		if inner != nil && (got.applyDetail.NativeIPC == nil || *got.applyDetail.NativeIPC != *inner) {
 			t.Fatal("inner timing changed")
@@ -75,7 +81,7 @@ func TestServiceIPCSeparatesHandlerFromAppReadResumption(t *testing.T) {
 			return
 		}
 		at := workerIPCTick()
-		time.Sleep(12 * time.Millisecond)
+		waitServiceIPCDuration(at, 12*time.Millisecond)
 		result <- writeResponse(server, response{sequence: command.sequence, op: command.op,
 			applyDetail: &handoff.WorkerApplyProfile{Measured: 1}, ipc: &nativeIPCWire{outer: [3]uint64{at, at, 0}}})
 	}()
@@ -102,9 +108,20 @@ type serviceReadDelay struct{ net.Conn }
 func (r *serviceReadDelay) Read(data []byte) (int, error) {
 	n, err := r.Conn.Read(data)
 	if n > 0 {
-		time.Sleep(18 * time.Millisecond)
+		waitServiceIPCDuration(workerIPCTick(), 18*time.Millisecond)
 	}
 	return n, err
+}
+
+// The assertions use QPC spans, so wait on that same clock. A Go timer can
+// reach its deadline while QPC still reports slightly less than the threshold.
+// Keep a separate wall-clock bound so a broken clock cannot hang the suite.
+func waitServiceIPCDuration(start uint64, delay time.Duration) {
+	deadline := time.Now().Add(time.Second)
+	target := start + uint64(delay.Microseconds())
+	for workerIPCTick() < target && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
 }
 
 var _ io.Reader = (*serviceReadDelay)(nil)

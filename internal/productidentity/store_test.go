@@ -16,11 +16,12 @@ import (
 )
 
 func TestResolveWindowsPathsSeparatesDataClasses(t *testing.T) {
-	paths, err := ResolveWindowsPaths(`C:\Users\zero\AppData\Local`)
+	localAppData := t.TempDir()
+	paths, err := ResolveWindowsPaths(localAppData)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if paths.Root != `C:\Users\zero\AppData\Local\Krasis` || paths.Identity == paths.Trust || paths.Trust == paths.Control || paths.Control == paths.Diagnostics {
+	if paths.Root != filepath.Join(localAppData, "Krasis") || paths.Identity == paths.Trust || paths.Trust == paths.Control || paths.Control == paths.Diagnostics {
 		t.Fatalf("paths = %+v", paths)
 	}
 }
