@@ -137,5 +137,16 @@ type markerReleasePort struct {
 
 func (port markerReleasePort) Release(_ context.Context, token control.PressedToken) error {
 	payload := fmt.Sprintf("%s:%d", token.Kind, token.Code)
-	return os.WriteFile(port.path, []byte(payload), 0o600)
+	// File existence is the subprocess completion barrier. Do not expose the
+	// zero-length interval between creating a marker and writing its payload.
+	marker, err := os.CreateTemp(filepath.Dir(port.path), ".recovered-*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(marker.Name())
+	_, writeErr := marker.Write([]byte(payload))
+	if err := errors.Join(writeErr, marker.Close()); err != nil {
+		return err
+	}
+	return os.Rename(marker.Name(), port.path)
 }
