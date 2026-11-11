@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/0disoft/krasis/internal/cleanupresult"
 	"github.com/0disoft/krasis/internal/syncgate"
 	"github.com/jezek/xgb"
 	"github.com/jezek/xgb/xproto"
@@ -72,17 +73,19 @@ func openConnection(ctx context.Context) (*connection, error) {
 	if err != nil {
 		return nil, fmt.Errorf("connect X11: %w", err)
 	}
+	c := &connection{wire: wire}
 	deadline := time.Now().Add(operationTimeout)
 	if d, ok := ctx.Deadline(); ok && d.Before(deadline) {
 		deadline = d
 	}
 	_ = wire.SetDeadline(deadline)
-	stop := context.AfterFunc(ctx, func() { _ = wire.Close() })
+	stop := context.AfterFunc(ctx, func() { _ = c.close() })
 	cookie, err := authorityCookie(display)
 	if err != nil {
-		stop()
-		_ = wire.Close()
-		return nil, err
+		if !stop() {
+			_ = c.close()
+		}
+		return nil, retiredOpenFailure(c, err)
 	}
 	var x *xgb.Conn
 	if cookie != "" {
@@ -90,24 +93,34 @@ func openConnection(ctx context.Context) (*connection, error) {
 	} else {
 		x, err = xgb.NewConnNet(wire)
 	}
-	stop()
-	if err != nil {
-		_ = wire.Close()
-		return nil, err
+	if !stop() {
+		_ = c.close()
+	} // join cancellation before publishing x
+	if err != nil || ctx.Err() != nil {
+		failure := retiredOpenFailure(c, errors.Join(err, ctx.Err()))
+		if x != nil {
+			x.Close()
+		}
+		return nil, failure
 	}
+	c.x = x // startup cancellation callback is now stopped/joined
 	_ = wire.SetDeadline(time.Time{})
 	setup := xproto.Setup(x)
 	if screen >= len(setup.Roots) {
-		_ = wire.Close()
-		x.Close()
-		return nil, errors.New("X11 screen unavailable")
+		return nil, retiredOpenFailure(c, errors.New("X11 screen unavailable"))
 	}
-	c := &connection{x: x, wire: wire, root: setup.Roots[screen].Root}
+	c.root = setup.Roots[screen].Root
 	if err = ctx.Err(); err != nil {
-		c.close()
-		return nil, err
+		return nil, retiredOpenFailure(c, err)
 	}
 	return c, nil
+}
+
+func retiredOpenFailure(c *connection, cause error) error {
+	if closeErr := c.close(); closeErr != nil {
+		return errors.Join(cause, closeErr)
+	}
+	return cleanupresult.Confirm(cause)
 }
 
 func (c *connection) close() error {

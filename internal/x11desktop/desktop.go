@@ -78,8 +78,7 @@ func Open(ctx context.Context) (*Desktop, error) {
 		return d.initPointerState()
 	})
 	if err != nil {
-		c.close()
-		return nil, err
+		return nil, retiredOpenFailure(c, err)
 	}
 	return d, nil
 }

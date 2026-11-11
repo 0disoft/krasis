@@ -3,6 +3,7 @@ package wininput
 import (
 	"context"
 	"errors"
+	"github.com/0disoft/krasis/internal/cleanupresult"
 	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/x11desktop"
 	"github.com/jezek/xgb"
@@ -21,6 +22,7 @@ type SourceHook struct {
 	session                *SourceSession
 	root                   context.Context
 	active                 bool
+	running                bool
 	lastX, lastY           int32
 	returnHidden           bool
 	presentationGeneration uint64
@@ -99,11 +101,32 @@ func (h *SourceHook) RunWithBoundary(ctx context.Context, s *SourceSession, b Bo
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	h.mu.Lock()
+	if h.running || h.desktop != nil {
+		h.mu.Unlock()
+		return errors.New("source hook already running")
+	}
+	h.running = true
+	h.mu.Unlock()
+	defer func() { h.mu.Lock(); h.running = false; h.mu.Unlock() }()
 	d, err := x11desktop.Open(ctx)
 	if err != nil {
+		if cleanupresult.Confirmed(err) && linuxSourceCancellationOnly(err, ctx.Err()) {
+			return ctx.Err()
+		}
 		return err
 	}
-	defer d.Close()
+	defer func() {
+		closeErr := d.Close()
+		result = errors.Join(result, closeErr)
+		if closeErr == nil && linuxSourceCancellationOnly(result, ctx.Err()) {
+			result = ctx.Err()
+		} else if closeErr == nil {
+			// This also covers cancellation before Position/setup/ready. A
+			// failed query is retained, but this X client cannot own more input.
+			result = cleanupresult.Confirm(result)
+		}
+	}()
 	x, y, err := d.Position(ctx)
 	if err != nil {
 		return err
@@ -131,10 +154,6 @@ func (h *SourceHook) RunWithBoundary(ctx context.Context, s *SourceSession, b Bo
 		// X11 releases this client's grabs and cursor visibility on close.
 		// Cancellation may have already closed an in-flight query's socket.
 		// Confirm the owner is closed before treating that closure as expected.
-		_ = d.Close()
-		if linuxSourceCancellationOnly(result, ctx.Err()) {
-			result = ctx.Err()
-		}
 		h.desktop = nil
 		h.session = nil
 		h.mu.Unlock()

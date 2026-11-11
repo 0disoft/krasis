@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/0disoft/krasis/internal/agent"
+	"github.com/0disoft/krasis/internal/agentlifecycle"
 	"github.com/0disoft/krasis/internal/peer"
 	"github.com/0disoft/krasis/internal/productlog"
 	"github.com/0disoft/krasis/internal/wininput"
@@ -63,12 +64,41 @@ func peerDisconnectOnly(err error) bool {
 }
 
 func cancellationOnly(err, cause error) bool {
+	transition, lifecycleStop := cause.(*agentlifecycle.TransitionError)
+	if lifecycleStop && transition != nil && transition.Event.Validate() == nil {
+		_, clean := recoveredLifecycleOnly(err, cause)
+		return clean
+	}
+	return unprovenCancellationOnly(err, cause)
+}
+
+// Proof can be a direct node or a join child, never hidden by an unrelated
+// semantic wrapper. Every sibling is checked without generic unwrapping.
+func recoveredLifecycleOnly(err, cause error) (seen, clean bool) {
+	if agent.RecoveredParentCancellation(err, cause) {
+		return true, true
+	}
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		clean = len(joined.Unwrap()) > 0
+		for _, child := range joined.Unwrap() {
+			s, c := recoveredLifecycleOnly(child, cause)
+			seen, clean = seen || s, clean && child != nil && c
+		}
+		return seen, clean
+	}
+	return false, err == nil || err == cause || err == context.Canceled
+}
+
+func unprovenCancellationOnly(err, cause error) bool {
 	if err == nil {
 		return true
 	}
+	if agent.RecoveredParentCancellation(err, cause) {
+		return false // never rediscover proof through generic unwrap below
+	}
 	if joined, ok := err.(interface{ Unwrap() []error }); ok {
 		for _, child := range joined.Unwrap() {
-			if !cancellationOnly(child, cause) {
+			if !unprovenCancellationOnly(child, cause) {
 				return false
 			}
 		}
@@ -76,7 +106,7 @@ func cancellationOnly(err, cause error) bool {
 	}
 	if wrapped, ok := err.(interface{ Unwrap() error }); ok {
 		if child := wrapped.Unwrap(); child != nil {
-			return cancellationOnly(child, cause)
+			return unprovenCancellationOnly(child, cause)
 		}
 	}
 	return err == cause || err == context.Canceled

@@ -309,10 +309,11 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	go func() { workers.Wait(); close(joined) }()
 	expired := awaitRecovery(joined, 2*wininput.SourceCleanupTimeout, config.RecoveryObserver)
 	cause := context.Cause(runContext)
+	firstCause := cause
 	if expired {
 		cause = errors.Join(cause, ErrRecoveryUnverified)
 	}
-	foregroundOwnerReleased := false
+	sourceHookRetired := false
 	// Wait establishes that every slot is final. Cancellation selects the first
 	// cause; it must not discard errors produced later by native/input cleanup.
 	for index, outcome := range outcomes {
@@ -325,9 +326,12 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 		if outcome != nil && !expectedWorkerCancellation(outcome, runContext.Err()) {
 			// Completed source cleanup and peer read recovery carry independent
 			// evidence. Their different stop causes do not imply cleanup failed.
-			if (components[index].name == "source-session" || components[index].name == "peer-session") &&
+			if (components[index].name == "source-session" || components[index].name == "peer-session" || components[index].name == "source-hook") &&
 				cleanupresult.Confirmed(outcome.(*sessionComponentError).cause) {
 				cause = errors.Join(cause, outcome)
+				if components[index].name == "source-hook" {
+					sourceHookRetired = true
+				}
 				continue
 			}
 			if components[index].name == "source-session" &&
@@ -344,7 +348,7 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 				// The capture owner exited after foreground loss. Its joined
 				// cancellation is expected; keep the cause for reconnect telemetry.
 				cause = errors.Join(cause, outcome)
-				foregroundOwnerReleased = true
+				sourceHookRetired = true
 				continue
 			}
 			if components[index].name == "peer-session" &&
@@ -370,7 +374,7 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	}
 	snapshot := runtime.Snapshot()
 	for index, current := range components {
-		if current.name == "source-hook" && (foregroundOwnerReleased || expectedWorkerCancellation(outcomes[index], runContext.Err())) {
+		if current.name == "source-hook" && (sourceHookRetired || expectedWorkerCancellation(outcomes[index], runContext.Err())) {
 			recovery.NativeOwnersReleased = RecoveryConfirmed
 		}
 	}
@@ -384,7 +388,7 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	if snapshot.PressedCount != 0 {
 		return result, errors.Join(cause, ErrRecoveryUnverified)
 	}
-	return result, cause
+	return result, recoveredParentCancellation(ctx, firstCause, result, cause)
 }
 
 // A foreground-loss owner exit may contain only its cause and cancellation.
