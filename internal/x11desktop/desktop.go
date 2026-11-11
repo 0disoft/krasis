@@ -38,6 +38,7 @@ type Desktop struct {
 	xiOpcode         byte
 	pointerDevice    uint16
 	closeOnce        sync.Once
+	closeErr         error
 	wheelX, wheelY   int64 // c.mu
 	grabbed, hidden  bool  // c.mu
 	beforeX, beforeY int16
@@ -85,7 +86,8 @@ func Open(ctx context.Context) (*Desktop, error) {
 
 func (d *Desktop) Close() error {
 	if d != nil {
-		d.closeOnce.Do(d.c.close)
+		d.closeOnce.Do(func() { d.closeErr = d.c.close() })
+		return d.closeErr
 	}
 	return nil
 }

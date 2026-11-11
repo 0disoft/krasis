@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/0disoft/krasis/internal/syncgate"
@@ -24,10 +25,12 @@ const operationTimeout = 750 * time.Millisecond
 var ErrWayland = errors.New("native Wayland input requires an InputCapture/RemoteDesktop portal backend; select an X11 session")
 
 type connection struct {
-	x    *xgb.Conn
-	wire net.Conn
-	mu   syncgate.Mutex
-	root xproto.Window
+	x         *xgb.Conn
+	wire      net.Conn
+	mu        syncgate.Mutex
+	root      xproto.Window
+	closeOnce sync.Once
+	closeErr  error
 }
 
 // Only the current local X server is accepted. No unbounded TCP dial, root
@@ -107,7 +110,20 @@ func openConnection(ctx context.Context) (*connection, error) {
 	return c, nil
 }
 
-func (c *connection) close() { _ = c.wire.Close(); c.x.Close() }
+func (c *connection) close() error {
+	c.closeOnce.Do(func() {
+		c.closeErr = c.wire.Close()
+		// XGB's read loop can have already closed the same Unix socket.
+		// That proves retirement; any other first close failure is retained.
+		if errors.Is(c.closeErr, net.ErrClosed) {
+			c.closeErr = nil
+		}
+		if c.x != nil {
+			c.x.Close()
+		}
+	})
+	return c.closeErr
+}
 
 // One bounded operation owns both the socket deadline and cancellation. A
 // canceled/failed request closes this native owner; it is never replayed.
@@ -129,14 +145,14 @@ func (c *connection) do(ctx context.Context, fn func() error) error {
 	if err := c.wire.SetDeadline(deadline); err != nil {
 		return err
 	}
-	stop := context.AfterFunc(ctx, func() { _ = c.wire.Close() })
+	stop := context.AfterFunc(ctx, func() { _ = c.close() })
 	err := fn()
 	if !stop() {
 		return errors.Join(err, ctx.Err())
 	}
 	_ = c.wire.SetDeadline(time.Time{})
 	if err != nil {
-		_ = c.wire.Close()
+		_ = c.close()
 	}
 	return errors.Join(err, ctx.Err())
 }

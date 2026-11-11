@@ -12,9 +12,10 @@ import (
 // The guard child opens its recovery connection lazily. The resident opens
 // before admission and closes its native owner after the guard has joined.
 type linuxInjection struct {
-	mu      sync.Mutex
-	desktop *x11desktop.Desktop
-	closed  bool
+	mu             sync.Mutex
+	desktop        *x11desktop.Desktop
+	releaseDesktop *x11desktop.Desktop // recovery only; never admits new input
+	closed         bool
 }
 
 func (p *linuxInjection) get(ctx context.Context) (*x11desktop.Desktop, error) {
@@ -37,7 +38,11 @@ func (p *linuxInjection) Close() error {
 	defer p.mu.Unlock()
 	p.closed = true
 	if p.desktop != nil {
-		return p.desktop.Close()
+		err := p.desktop.Close()
+		if p.releaseDesktop != nil {
+			err = errors.Join(err, p.releaseDesktop.Close())
+		}
+		return err
 	}
 	return nil
 }
@@ -45,7 +50,8 @@ func (p *linuxInjection) Press(c context.Context, t control.PressedToken) error 
 	return p.discrete(c, t, true)
 }
 func (p *linuxInjection) Release(c context.Context, t control.PressedToken) error {
-	return p.discrete(c, t, false)
+	err := p.discrete(c, t, false)
+	return p.recoverRelease(c, t, err)
 }
 func (p *linuxInjection) discrete(ctx context.Context, t control.PressedToken, down bool) error {
 	if err := t.Validate(); err != nil {
