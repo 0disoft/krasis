@@ -495,6 +495,18 @@ join inside a 267.456ms ready wait. Connection-start demand moves optional
 construction ahead of an ordinary first approach. It cannot guarantee immediate
 readiness for an entry arriving during startup or after candidate expiry.
 
+### g538 foreground transition waits
+
+The capture owner waits for Windows input/system activation events instead of
+sleeping through NULL-foreground transitions. Each of the existing five retries
+retains an absolute 10ms wait budget; unrelated messages cannot extend it or
+prematurely consume all retries. New input wakes the owner to service internal
+activation with the existing PM_NOREMOVE pump. Previously seen queued messages
+do not cause continuous wakeups, and queued input, commands and WM_QUIT remain
+untouched. The main request exchange retains its native reply event and 10ms
+cancellation cap using the same wait. Fresh authority/desktop checks, actual
+foreground ownership and the outer two-second command timeout remain required.
+
 ### g533 foreground requester scheduling
 
 The existing window-free source monitor now uses the same best-effort

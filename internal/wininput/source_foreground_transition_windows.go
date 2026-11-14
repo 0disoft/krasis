@@ -10,7 +10,35 @@ import (
 const sourceForegroundTransitionAttempts = 5
 const sourceForegroundTransitionInterval = 10 * time.Millisecond
 
-var sourceForegroundTransitionPause = time.Sleep
+var sourceForegroundTransitionPause = waitSourceForegroundTransition
+var sourceForegroundTransitionClock = time.Now
+
+func waitSourceForegroundTransition(current *sourceWheelCaptureRun, interval time.Duration) error {
+	deadline := sourceForegroundTransitionClock().Add(interval)
+	for {
+		if err := current.err(); err != nil {
+			return err
+		}
+		remaining := deadline.Sub(sourceForegroundTransitionClock())
+		if remaining <= 0 {
+			return nil
+		}
+		if err := waitSourceForegroundMessages(0, remaining); err != nil {
+			return err
+		}
+		if err := current.err(); err != nil {
+			return err
+		}
+		sourceForegroundTransitionDispatch(current.window)
+		if err := current.err(); err != nil {
+			return err
+		}
+		if sourceWheelCaptureGetForeground() != 0 {
+			return nil
+		}
+		// Unrelated input does not consume a retry or renew its 10ms budget.
+	}
+}
 
 const sourceForegroundActivationMessages = 0 // PM_NOREMOVE, without a queue-category filter
 
@@ -97,7 +125,9 @@ func (current *sourceWheelCaptureRun) foregroundAfterTransition() (uintptr, erro
 			foreground = sourceWheelCaptureGetForeground()
 		}
 		if foreground == 0 {
-			sourceForegroundTransitionPause(sourceForegroundTransitionInterval)
+			if err := sourceForegroundTransitionPause(current, sourceForegroundTransitionInterval); err != nil {
+				return 0, err
+			}
 			if err := current.err(); err != nil {
 				return 0, err
 			}

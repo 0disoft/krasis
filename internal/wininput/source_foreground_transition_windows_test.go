@@ -12,7 +12,10 @@ import (
 
 func stubForegroundTransitionPause(t *testing.T, pause func(time.Duration)) {
 	previous := sourceForegroundTransitionPause
-	sourceForegroundTransitionPause = pause
+	sourceForegroundTransitionPause = func(_ *sourceWheelCaptureRun, interval time.Duration) error {
+		pause(interval)
+		return nil
+	}
 	t.Cleanup(func() { sourceForegroundTransitionPause = previous })
 }
 

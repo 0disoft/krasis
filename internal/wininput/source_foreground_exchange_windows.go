@@ -13,17 +13,32 @@ import (
 )
 
 var procSourceForegroundWait = user32.NewProc("MsgWaitForMultipleObjectsEx")
+var callSourceForegroundWait = procSourceForegroundWait.Call
 
-var sourceForegroundExchangeWait = func(event windows.Handle) error {
-	// Wake for synchronous activation only, never dispatch queued input,
-	// commands or WM_QUIT inside an activation command. The short cap also
-	// observes cancellation. The reply event wakes immediately, avoiding a
-	// polling delay rounded to the system timer resolution on every handoff.
-	result, _, err := procSourceForegroundWait.Call(1, uintptr(unsafe.Pointer(&event)), 10, 0x0040, 0x0004) // QS_SENDMESSAGE, MWMO_INPUTAVAILABLE
+func waitSourceForegroundMessages(event windows.Handle, interval time.Duration) error {
+	var count uintptr
+	var handles *windows.Handle
+	if event != 0 {
+		count, handles = 1, &event
+	}
+	// PeekMessage marks old queued input as seen without removing it. Wake only
+	// for new input/system activation, not continuously for that old input. The
+	// owner still pumps only nonqueued/internal events; queued commands and input
+	// must remain for its outer message loop.
+	millis := (interval + time.Millisecond - 1) / time.Millisecond
+	result, _, err := callSourceForegroundWait(count, uintptr(unsafe.Pointer(handles)), uintptr(millis), 0x04ff, 0) // QS_ALLINPUT, no MWMO_INPUTAVAILABLE
 	if uint32(result) == ^uint32(0) {
 		return touchpadWin32Error("MsgWaitForMultipleObjectsEx(source foreground)", err)
 	}
 	return nil
+}
+
+var sourceForegroundExchangeWait = func(event windows.Handle) error {
+	// Wake for pending activation, never dispatch queued input,
+	// commands or WM_QUIT inside an activation command. The short cap also
+	// observes cancellation. The reply event wakes immediately, avoiding a
+	// polling delay rounded to the system timer resolution on every handoff.
+	return waitSourceForegroundMessages(event, sourceForegroundTransitionInterval)
 }
 
 // One exchange per activation, owned by executeProfile. No background request
