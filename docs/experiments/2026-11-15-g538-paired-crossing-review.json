@@ -1,0 +1,1880 @@
+{
+  "schema": "krasis.g538-crossing-review/v1",
+  "generation": 538,
+  "revision": "59f58658c1f35bb2aa15170bb81000072e0a0ba1",
+  "collection": "72c9b868099934d3e5a23e2199cd10cc",
+  "selection": "latest shared authenticated connection; all retained earlier g538 faults separately included",
+  "connection": "97ef136fd0483c16496b6b1281eec8f7ecd619b1774594653ac08549825eafad",
+  "pairs": {
+    "source": 21,
+    "receiver": 21,
+    "matched": 21,
+    "complete": 20,
+    "incomplete": [
+      {
+        "time": "2026-11-14T19:33:06.6323639Z",
+        "a": "incomplete",
+        "b": "incomplete"
+      }
+    ],
+    "unmatchedSource": 0,
+    "unmatchedReceiver": 0
+  },
+  "devices": {
+    "A": {
+      "created": "2026-11-14T19:34:58Z",
+      "sha256": "4921cc7c38a4f692b1b6623eccc82054c6fbc9d4c903f454658ce7732117f060",
+      "service": "READY",
+      "input": "READY",
+      "grant": "PRESENT",
+      "serviceStart": "2026-11-14T10:04:25.3053235Z",
+      "serviceStartUnchanged": true,
+      "recovery": {
+        "time": "2026-11-14T19:34:31.2410278Z",
+        "code": "agent_present",
+        "agentState": "CONNECTED",
+        "lastFailure": {
+          "time": "2026-11-14T09:25:31.8613193Z",
+          "code": "agent_faulted",
+          "agentState": "FAULTED"
+        }
+      },
+      "connectedAt": "2026-11-14T19:04:30.7444264Z",
+      "connection": "97ef136fd0483c16496b6b1281eec8f7ecd619b1774594653ac08549825eafad",
+      "observedSeconds": 1827.256,
+      "retainedFaults": [
+        {
+          "time": "2026-11-14T19:04:18.1822255Z",
+          "code": "session_end_detail",
+          "sessionEnd": {
+            "observedAt": "2026-11-14T19:04:18.1822255Z",
+            "trigger": true,
+            "component": "source-hook",
+            "fault": "fault_source_hook_failed",
+            "canceled": false,
+            "timeout": false,
+            "closed": false,
+            "nativeError": 0,
+            "nativeKnown": false,
+            "networkError": "not_observed",
+            "networkPolicy": "unknown",
+            "lastLifecycle": "unknown",
+            "lifecycleAgeMicros": 0,
+            "captureMode": "protected"
+          }
+        },
+        {
+          "time": "2026-11-14T19:04:18.1833624Z",
+          "code": "fault_source_hook_failed"
+        },
+        {
+          "time": "2026-11-14T19:04:18.191143Z",
+          "code": "session_failed"
+        }
+      ],
+      "retainedReconnects": [
+        {
+          "time": "2026-11-14T19:04:18.1833624Z",
+          "code": "DISCONNECTING",
+          "connection": "1afdc7ee8476996d64adfeeee19b97b028957239cb2678f2c2d12aafa70c6c81"
+        }
+      ],
+      "currentFaults": [],
+      "currentReconnects": [],
+      "heartbeatBuckets": {
+        "installed_source_heartbeat_timing_client_lock_lt1ms": 119,
+        "installed_source_heartbeat_timing_client_authority_lt1ms": 113,
+        "installed_source_heartbeat_timing_client_write_lt1ms": 114,
+        "installed_source_heartbeat_timing_client_response_lt1ms": 77,
+        "installed_source_heartbeat_timing_worker_presence_wait_lt1ms": 82,
+        "installed_source_heartbeat_timing_worker_presence_native_lt1ms": 118,
+        "installed_source_heartbeat_timing_worker_reply_gate_lt1ms": 118,
+        "installed_source_heartbeat_timing_client_response_lt10ms": 28,
+        "installed_source_heartbeat_timing_worker_presence_wait_lt10ms": 30,
+        "installed_source_heartbeat_timing_client_authority_lt10ms": 6,
+        "installed_source_heartbeat_timing_client_write_lt10ms": 4,
+        "installed_source_heartbeat_timing_client_response_lt100ms": 14,
+        "installed_source_heartbeat_timing_worker_presence_wait_lt100ms": 7,
+        "installed_source_heartbeat_timing_client_write_lt100ms": 1,
+        "installed_source_heartbeat_timing_worker_presence_native_lt10ms": 1,
+        "installed_source_heartbeat_timing_worker_reply_gate_lt100ms": 1
+      },
+      "runtime": {
+        "timerLateMs": {
+          "n": 30,
+          "min": 0.839,
+          "median": 2.75,
+          "max": 62.098
+        },
+        "samplerTimerLateMs": {
+          "n": 30,
+          "min": 2.47,
+          "median": 7.7044999999999995,
+          "max": 2533.549
+        },
+        "dispatchMaxMs": {
+          "n": 30,
+          "min": 0,
+          "median": 0,
+          "max": 74.205
+        },
+        "injectionMaxMs": {
+          "n": 30,
+          "min": 0,
+          "median": 0,
+          "max": 0
+        },
+        "queueMaxResidenceMs": {
+          "n": 30,
+          "min": 0,
+          "median": 0,
+          "max": 24.006
+        }
+      },
+      "sourceExits": {
+        "total": 9,
+        "exits": [
+          {
+            "time": "2026-11-14T11:04:26.1081435Z",
+            "command": "ok",
+            "reader": "cancelled",
+            "capture": "joined",
+            "sender": "joined",
+            "interrupt": "joined",
+            "retirement": "clean_sent",
+            "report": "ok",
+            "heartbeatStage": "replied",
+            "heartbeatSlowStage": "service_presence",
+            "heartbeatSlowBucket": 3
+          },
+          {
+            "time": "2026-11-14T12:04:25.1151653Z",
+            "command": "ok",
+            "reader": "cancelled",
+            "capture": "joined",
+            "sender": "joined",
+            "interrupt": "joined",
+            "retirement": "clean_sent",
+            "report": "ok",
+            "heartbeatStage": "replied",
+            "heartbeatSlowStage": "reply_presence",
+            "heartbeatSlowBucket": 2
+          },
+          {
+            "time": "2026-11-14T13:04:24.1219469Z",
+            "command": "ok",
+            "reader": "cancelled",
+            "capture": "joined",
+            "sender": "joined",
+            "interrupt": "joined",
+            "retirement": "clean_sent",
+            "report": "ok",
+            "heartbeatStage": "replied",
+            "heartbeatSlowStage": "reply_presence",
+            "heartbeatSlowBucket": 3
+          },
+          {
+            "time": "2026-11-14T14:04:23.1282893Z",
+            "command": "ok",
+            "reader": "cancelled",
+            "capture": "joined",
+            "sender": "joined",
+            "interrupt": "joined",
+            "retirement": "clean_sent",
+            "report": "ok",
+            "heartbeatStage": "replied",
+            "heartbeatSlowStage": "service_presence",
+            "heartbeatSlowBucket": 2
+          },
+          {
+            "time": "2026-11-14T15:04:22.1403263Z",
+            "command": "ok",
+            "reader": "cancelled",
+            "capture": "joined",
+            "sender": "joined",
+            "interrupt": "joined",
+            "retirement": "clean_sent",
+            "report": "ok",
+            "heartbeatStage": "replied",
+            "heartbeatSlowStage": "service_presence",
+            "heartbeatSlowBucket": 2
+          },
+          {
+            "time": "2026-11-14T16:04:21.1459484Z",
+            "command": "ok",
+            "reader": "cancelled",
+            "capture": "joined",
+            "sender": "joined",
+            "interrupt": "joined",
+            "retirement": "clean_sent",
+            "report": "ok",
+            "heartbeatStage": "replied",
+            "heartbeatSlowStage": "service_presence",
+            "heartbeatSlowBucket": 2
+          },
+          {
+            "time": "2026-11-14T17:04:20.1559082Z",
+            "command": "ok",
+            "reader": "cancelled",
+            "capture": "joined",
+            "sender": "joined",
+            "interrupt": "joined",
+            "retirement": "clean_sent",
+            "report": "ok",
+            "heartbeatStage": "replied",
+            "heartbeatSlowStage": "service_presence",
+            "heartbeatSlowBucket": 2
+          },
+          {
+            "time": "2026-11-14T18:04:19.1647984Z",
+            "command": "ok",
+            "reader": "cancelled",
+            "capture": "joined",
+            "sender": "joined",
+            "interrupt": "joined",
+            "retirement": "clean_sent",
+            "report": "ok",
+            "heartbeatStage": "replied",
+            "heartbeatSlowStage": "reply_presence",
+            "heartbeatSlowBucket": 2
+          },
+          {
+            "time": "2026-11-14T19:04:18.194987Z",
+            "command": "ok",
+            "reader": "cancelled",
+            "capture": "joined",
+            "sender": "joined",
+            "interrupt": "joined",
+            "retirement": "clean_sent",
+            "report": "ok",
+            "heartbeatStage": "replied",
+            "heartbeatSlowStage": "reply_presence",
+            "heartbeatSlowBucket": 3
+          }
+        ]
+      },
+      "logs": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false,
+          "events": 2540,
+          "first": "2026-11-14T17:46:14.7827778Z",
+          "last": "2026-11-14T19:11:24.8725803Z"
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false,
+          "events": 1013,
+          "first": "2026-11-14T19:11:24.8725803Z",
+          "last": "2026-11-14T19:34:58.838944Z"
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true,
+          "events": 0
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false,
+          "events": 718,
+          "first": "2026-09-14T14:39:09.3760101Z",
+          "last": "2026-11-14T10:04:26.2419502Z"
+        }
+      ]
+    },
+    "B": {
+      "created": "2026-11-14T19:34:51Z",
+      "sha256": "8d304a67828e9c6236ab984a86cf2b58cabfc52e499d671b410143412ad1a369",
+      "service": "READY",
+      "input": "READY",
+      "grant": "PRESENT",
+      "serviceStart": "2026-11-14T10:03:37.164928Z",
+      "serviceStartUnchanged": true,
+      "recovery": {
+        "time": "2026-11-14T19:34:08.1986363Z",
+        "code": "agent_present",
+        "agentState": "CONNECTED",
+        "lastFailure": {
+          "time": "2026-11-04T08:21:08.3372368Z",
+          "code": "agent_faulted",
+          "agentState": "FAULTED"
+        }
+      },
+      "connectedAt": "2026-11-14T19:04:21.4639682Z",
+      "connection": "97ef136fd0483c16496b6b1281eec8f7ecd619b1774594653ac08549825eafad",
+      "observedSeconds": 1829.537,
+      "retainedFaults": [
+        {
+          "time": "2026-11-14T19:04:08.9119542Z",
+          "code": "session_end_detail",
+          "sessionEnd": {
+            "observedAt": "2026-11-14T19:04:08.9119542Z",
+            "trigger": true,
+            "component": "peer-session",
+            "fault": "fault_remote_eof",
+            "canceled": false,
+            "timeout": false,
+            "closed": false,
+            "nativeError": 0,
+            "nativeKnown": false,
+            "networkError": "not_observed",
+            "networkPolicy": "unknown",
+            "lastLifecycle": "unknown",
+            "lifecycleAgeMicros": 0,
+            "captureMode": "protected"
+          }
+        },
+        {
+          "time": "2026-11-14T19:04:15.7039921Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-14T19:04:20.9256583Z",
+          "code": "reconnect_acquire_network_timeout"
+        }
+      ],
+      "retainedReconnects": [
+        {
+          "time": "2026-11-14T19:04:08.9234978Z",
+          "code": "RECONNECTING",
+          "connection": "1afdc7ee8476996d64adfeeee19b97b028957239cb2678f2c2d12aafa70c6c81"
+        }
+      ],
+      "currentFaults": [],
+      "currentReconnects": [],
+      "heartbeatBuckets": {
+        "installed_source_heartbeat_timing_client_lock_lt1ms": 119,
+        "installed_source_heartbeat_timing_client_authority_lt1ms": 115,
+        "installed_source_heartbeat_timing_client_write_lt1ms": 116,
+        "installed_source_heartbeat_timing_client_response_lt10ms": 98,
+        "installed_source_heartbeat_timing_worker_presence_wait_lt1ms": 74,
+        "installed_source_heartbeat_timing_worker_presence_native_lt1ms": 115,
+        "installed_source_heartbeat_timing_worker_reply_gate_lt1ms": 119,
+        "installed_source_heartbeat_timing_worker_presence_wait_lt10ms": 38,
+        "installed_source_heartbeat_timing_client_authority_lt10ms": 4,
+        "installed_input_heartbeat_timing_client_lock_lt1ms": 10,
+        "installed_input_heartbeat_timing_client_authority_lt1ms": 10,
+        "installed_input_heartbeat_timing_client_write_lt1ms": 10,
+        "installed_input_heartbeat_timing_client_response_lt1ms": 7,
+        "installed_input_heartbeat_timing_worker_apply_lt1ms": 10,
+        "installed_source_heartbeat_timing_client_response_lt1ms": 11,
+        "installed_source_heartbeat_timing_worker_presence_native_lt10ms": 4,
+        "installed_source_heartbeat_timing_client_response_lt100ms": 9,
+        "installed_source_heartbeat_timing_worker_presence_wait_lt100ms": 6,
+        "installed_input_heartbeat_timing_client_response_lt100ms": 2,
+        "installed_source_heartbeat_timing_client_response_lt1s": 1,
+        "installed_source_heartbeat_timing_worker_presence_wait_lt1s": 1,
+        "installed_source_heartbeat_timing_client_write_lt10ms": 3,
+        "installed_input_heartbeat_timing_client_response_lt10ms": 1
+      },
+      "runtime": {
+        "timerLateMs": {
+          "n": 31,
+          "min": 1.339,
+          "median": 2.153,
+          "max": 57.655
+        },
+        "samplerTimerLateMs": {
+          "n": 31,
+          "min": 1.611,
+          "median": 3.351,
+          "max": 188.159
+        },
+        "dispatchMaxMs": {
+          "n": 31,
+          "min": 0,
+          "median": 0,
+          "max": 393.157
+        },
+        "injectionMaxMs": {
+          "n": 31,
+          "min": 0,
+          "median": 0,
+          "max": 393.157
+        },
+        "queueMaxResidenceMs": {
+          "n": 31,
+          "min": 0,
+          "median": 0,
+          "max": 0
+        }
+      },
+      "sourceExits": {
+        "total": 9,
+        "exits": [
+          {
+            "time": "2026-11-14T11:04:18.7105511Z",
+            "command": "ok",
+            "reader": "cancelled",
+            "capture": "joined",
+            "sender": "joined",
+            "interrupt": "joined",
+            "retirement": "clean_sent",
+            "report": "ok",
+            "heartbeatStage": "replied",
+            "heartbeatSlowStage": "service_presence",
+            "heartbeatSlowBucket": 2
+          },
+          {
+            "time": "2026-11-14T12:04:17.7305892Z",
+            "command": "ok",
+            "reader": "cancelled",
+            "capture": "joined",
+            "sender": "joined",
+            "interrupt": "joined",
+            "retirement": "clean_sent",
+            "report": "ok",
+            "heartbeatStage": "replied",
+            "heartbeatSlowStage": "service_presence",
+            "heartbeatSlowBucket": 2
+          },
+          {
+            "time": "2026-11-14T13:04:16.7421834Z",
+            "command": "ok",
+            "reader": "cancelled",
+            "capture": "joined",
+            "sender": "joined",
+            "interrupt": "joined",
+            "retirement": "clean_sent",
+            "report": "ok",
+            "heartbeatStage": "replied",
+            "heartbeatSlowStage": "reply_presence",
+            "heartbeatSlowBucket": 2
+          },
+          {
+            "time": "2026-11-14T14:04:15.758689Z",
+            "command": "ok",
+            "reader": "cancelled",
+            "capture": "joined",
+            "sender": "joined",
+            "interrupt": "joined",
+            "retirement": "clean_sent",
+            "report": "ok",
+            "heartbeatStage": "replied",
+            "heartbeatSlowStage": "agent_presence",
+            "heartbeatSlowBucket": 3
+          },
+          {
+            "time": "2026-11-14T15:04:13.4151479Z",
+            "command": "ok",
+            "reader": "cancelled",
+            "capture": "joined",
+            "sender": "joined",
+            "interrupt": "joined",
+            "retirement": "clean_sent",
+            "report": "ok",
+            "heartbeatStage": "replied",
+            "heartbeatSlowStage": "agent_presence",
+            "heartbeatSlowBucket": 2
+          },
+          {
+            "time": "2026-11-14T16:04:12.4361606Z",
+            "command": "ok",
+            "reader": "cancelled",
+            "capture": "joined",
+            "sender": "joined",
+            "interrupt": "joined",
+            "retirement": "clean_sent",
+            "report": "ok",
+            "heartbeatStage": "replied",
+            "heartbeatSlowStage": "reply_presence",
+            "heartbeatSlowBucket": 2
+          },
+          {
+            "time": "2026-11-14T17:04:11.444013Z",
+            "command": "ok",
+            "reader": "cancelled",
+            "capture": "joined",
+            "sender": "joined",
+            "interrupt": "joined",
+            "retirement": "clean_sent",
+            "report": "ok",
+            "heartbeatStage": "replied",
+            "heartbeatSlowStage": "service_presence",
+            "heartbeatSlowBucket": 2
+          },
+          {
+            "time": "2026-11-14T18:04:10.4606414Z",
+            "command": "ok",
+            "reader": "cancelled",
+            "capture": "joined",
+            "sender": "joined",
+            "interrupt": "joined",
+            "retirement": "clean_sent",
+            "report": "ok",
+            "heartbeatStage": "replied",
+            "heartbeatSlowStage": "service_presence",
+            "heartbeatSlowBucket": 2
+          },
+          {
+            "time": "2026-11-14T19:04:08.9348561Z",
+            "command": "ok",
+            "reader": "stopped",
+            "capture": "joined",
+            "sender": "joined",
+            "interrupt": "joined",
+            "retirement": "clean_sent",
+            "report": "ok",
+            "heartbeatStage": "replied",
+            "heartbeatSlowStage": "reply_presence",
+            "heartbeatSlowBucket": 3
+          }
+        ]
+      },
+      "logs": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false,
+          "events": 2385,
+          "first": "2026-11-14T18:45:36.2137474Z",
+          "last": "2026-11-14T19:34:00.3096795Z"
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false,
+          "events": 183,
+          "first": "2026-11-14T19:34:01.6717463Z",
+          "last": "2026-11-14T19:34:50.1226567Z"
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true,
+          "events": 0
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false,
+          "events": 570,
+          "first": "2026-09-14T14:40:24.8089173Z",
+          "last": "2026-11-14T10:03:39.7341184Z"
+        }
+      ]
+    }
+  },
+  "metricsMs": {
+    "aCaptureMs": {
+      "n": 20,
+      "min": 8.985,
+      "median": 13.39,
+      "max": 61.325
+    },
+    "aForegroundRequestMs": {
+      "n": 20,
+      "min": 3.807,
+      "median": 7.785,
+      "max": 36.725
+    },
+    "aForegroundVerifyMs": {
+      "n": 20,
+      "min": 0,
+      "median": 0,
+      "max": 0
+    },
+    "aQueueHandleMs": {
+      "n": 20,
+      "min": 0,
+      "median": 0,
+      "max": 1.908
+    },
+    "aGrantMs": {
+      "n": 20,
+      "min": 33.773,
+      "median": 43.9685,
+      "max": 213.021
+    },
+    "aFirstOfferMs": {
+      "n": 20,
+      "min": 51.804,
+      "median": 69.1395,
+      "max": 241.139
+    },
+    "bPrepareMs": {
+      "n": 20,
+      "min": 0,
+      "median": 0,
+      "max": 0
+    },
+    "bReadyWaitMs": {
+      "n": 20,
+      "min": 20.883,
+      "median": 26.592,
+      "max": 81.909
+    },
+    "bFirstInputMs": {
+      "n": 20,
+      "min": 1.704,
+      "median": 2.292,
+      "max": 6.739
+    },
+    "bWorstInputMs": {
+      "n": 20,
+      "min": 4.035,
+      "median": 19.75,
+      "max": 393.157
+    },
+    "aIPC_requestDeliveryMs": {
+      "n": 20,
+      "min": 0.045,
+      "median": 0.0655,
+      "max": 0.173
+    },
+    "aIPC_readAuthorizationMs": {
+      "n": 20,
+      "min": 0.167,
+      "median": 0.2005,
+      "max": 1.566
+    },
+    "aIPC_dispatchMs": {
+      "n": 20,
+      "min": 0.034,
+      "median": 0.057,
+      "max": 0.089
+    },
+    "aIPC_activationMs": {
+      "n": 20,
+      "min": 7.641,
+      "median": 12.279499999999999,
+      "max": 52.381
+    },
+    "aIPC_replyAdmissionMs": {
+      "n": 20,
+      "min": 0.054,
+      "median": 0.0995,
+      "max": 1.493
+    },
+    "aIPC_replyEncodeMs": {
+      "n": 20,
+      "min": 0.001,
+      "median": 0.002,
+      "max": 0.003
+    },
+    "aIPC_replyDeliveryMs": {
+      "n": 20,
+      "min": 0.058,
+      "median": 0.1,
+      "max": 1.481
+    },
+    "aIPC_callerResumeMs": {
+      "n": 20,
+      "min": 0.035,
+      "median": 0.126,
+      "max": 7.572
+    },
+    "tcpRTT": {
+      "n": 40,
+      "min": 4.5,
+      "median": 5.997,
+      "max": 8.24
+    }
+  },
+  "allMatchedMeasuredMs": {
+    "aCaptureMs": {
+      "n": 21,
+      "min": 8.985,
+      "median": 13.406,
+      "max": 73.523
+    },
+    "aForegroundRequestMs": {
+      "n": 21,
+      "min": 3.807,
+      "median": 7.807,
+      "max": 56.859
+    },
+    "aForegroundVerifyMs": {
+      "n": 21,
+      "min": 0,
+      "median": 0,
+      "max": 0
+    },
+    "aQueueHandleMs": {
+      "n": 21,
+      "min": 0,
+      "median": 0,
+      "max": 1.908
+    },
+    "aGrantMs": {
+      "n": 21,
+      "min": 33.773,
+      "median": 45.345,
+      "max": 213.021
+    },
+    "aFirstOfferMs": {
+      "n": 21,
+      "min": 51.804,
+      "median": 70.591,
+      "max": 241.139
+    },
+    "bPrepareMs": {
+      "n": 21,
+      "min": 0,
+      "median": 0,
+      "max": 0
+    },
+    "bReadyWaitMs": {
+      "n": 21,
+      "min": 20.883,
+      "median": 27.608,
+      "max": 81.909
+    },
+    "bFirstInputMs": {
+      "n": 21,
+      "min": 1.704,
+      "median": 2.35,
+      "max": 6.739
+    },
+    "bWorstInputMs": {
+      "n": 21,
+      "min": 4.035,
+      "median": 19.852,
+      "max": 393.157
+    }
+  },
+  "baseline": {
+    "generation": 537,
+    "samples": 14,
+    "captureMs": {
+      "n": 14,
+      "min": 12.261,
+      "median": 18.8875,
+      "max": 236.627
+    },
+    "foregroundRequestMs": {
+      "n": 14,
+      "min": 6.114,
+      "median": 11.61,
+      "max": 95.86
+    },
+    "bWorstInputMs": {
+      "n": 14,
+      "min": 2.719,
+      "median": 4.6205,
+      "max": 144.752
+    },
+    "aGrantMs": {
+      "n": 14,
+      "min": 33.838,
+      "median": 38.619,
+      "max": 63.96
+    }
+  },
+  "sourceFrames": 6145,
+  "receiverFrames": 4961,
+  "slowestCapture": {
+    "timeA": "2026-11-14T19:33:06.6323639Z",
+    "timeB": "2026-11-14T19:32:57.3312143Z",
+    "tag": "83aa2f06388b1f8be012ca248241243a90b80529ee491aed9180540349b04f9e",
+    "aEnd": "incomplete",
+    "bEnd": "incomplete",
+    "complete": false,
+    "aCaptureMs": 73.523,
+    "aForegroundRequestMs": 56.859,
+    "aForegroundVerifyMs": 0,
+    "aQueueHandleMs": 1.001,
+    "aGrantMs": 51.448,
+    "aFirstOfferMs": 135.799,
+    "bPrepareMs": 0,
+    "bReadyWaitMs": 31.968,
+    "bFirstInputMs": 3.659,
+    "bWorstInputMs": 206.601,
+    "aCapture": {
+      "schema": 1,
+      "micros": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        73523
+      ],
+      "measured": 31457280,
+      "worker": [
+        0,
+        2,
+        3
+      ],
+      "native": [
+        1,
+        1,
+        1,
+        2,
+        2,
+        1,
+        2,
+        0,
+        3,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        2,
+        0,
+        0,
+        0,
+        0
+      ],
+      "exact": {
+        "queueToHandleMicros": 1001,
+        "foregroundRequestMicros": 56859,
+        "measured": 7
+      },
+      "ipc": {
+        "measured": true,
+        "requestDeliveryMicros": 74,
+        "readAuthorizationMicros": 187,
+        "dispatchMicros": 39,
+        "activationMicros": 72355,
+        "replyAdmissionMicros": 167,
+        "replyEncodeMicros": 2,
+        "replyDeliveryMicros": 99,
+        "callerResumeMicros": 381,
+        "request": {
+          "measured": true,
+          "submitMicros": 10,
+          "receiveMicros": 64,
+          "writeCompletionMicros": 24
+        },
+        "readAuthority": {
+          "measured": true,
+          "waitMicros": 0,
+          "nativeMicros": 0
+        }
+      },
+      "authority": {
+        "measured": true,
+        "waitMicros": 0,
+        "nativeMicros": 0
+      }
+    },
+    "bWorst": {
+      "micros": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        206601,
+        0,
+        206601,
+        0,
+        0,
+        0,
+        206601,
+        0,
+        0,
+        0,
+        0
+      ],
+      "measured": 68518150144,
+      "worker": [
+        3,
+        3,
+        4
+      ],
+      "workerMillis": [
+        34,
+        57,
+        202
+      ],
+      "workerMeasured": 7,
+      "authorityMicros": [
+        0,
+        0,
+        0
+      ],
+      "authorityMeasured": 0,
+      "workerApply": {
+        "nativeIPC": {
+          "micros": [
+            15,
+            4018,
+            2,
+            184661,
+            13569,
+            7
+          ],
+          "parentMicros": [
+            8,
+            2,
+            27
+          ],
+          "parentMeasured": true,
+          "requestWriteMicros": 21,
+          "requestWriteMeasured": true
+        },
+        "micros": [
+          202365,
+          0
+        ],
+        "measured": 1,
+        "submissionMicros": 72296,
+        "submissionCalls": 1
+      },
+      "ackRead": {
+        "serviceIPC": {
+          "micros": [
+            0,
+            2705,
+            202341,
+            11,
+            1365,
+            10
+          ]
+        },
+        "serviceNativeWrite": true,
+        "micros": [
+          206601,
+          0,
+          0
+        ],
+        "measured": 7,
+        "progress": 4
+      },
+      "outcome": "ok"
+    },
+    "aExchange": {
+      "schema": 1,
+      "micros": [
+        51448,
+        0,
+        0,
+        0
+      ],
+      "measured": 3
+    },
+    "bExchange": {
+      "schema": 1,
+      "micros": [
+        0,
+        0,
+        0,
+        45379
+      ],
+      "measured": 12
+    },
+    "tcp": {
+      "schema": 1,
+      "rttMicros": [
+        5613,
+        5642
+      ],
+      "minRttMicros": [
+        2023,
+        2023
+      ],
+      "queryMicros": [
+        0,
+        0
+      ],
+      "retransmittedBytes": 0,
+      "timeoutEpisodes": 0,
+      "counterDeltasKnown": true
+    },
+    "aFrames": 324,
+    "bFrames": 297,
+    "aHistogram": [
+      315,
+      9,
+      0,
+      0,
+      0
+    ],
+    "bHistogram": [
+      1,
+      278,
+      17,
+      1,
+      0
+    ]
+  },
+  "slowestCompleteCapture": {
+    "timeA": "2026-11-14T19:31:16.4813397Z",
+    "timeB": "2026-11-14T19:31:07.1699596Z",
+    "tag": "dc1b912c1e7f413a54acedccec17e7b7cabd5d73613f8fe7cd3444dec7778355",
+    "aEnd": "ok",
+    "bEnd": "ok",
+    "complete": true,
+    "aCaptureMs": 61.325,
+    "aForegroundRequestMs": 36.725,
+    "aForegroundVerifyMs": 0,
+    "aQueueHandleMs": 0,
+    "aGrantMs": 51.819,
+    "aFirstOfferMs": 112.117,
+    "bPrepareMs": 0,
+    "bReadyWaitMs": 33.603,
+    "bFirstInputMs": 2.415,
+    "bWorstInputMs": 17.507,
+    "aCapture": {
+      "schema": 1,
+      "micros": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        767,
+        0,
+        60557
+      ],
+      "measured": 31457280,
+      "worker": [
+        0,
+        1,
+        3
+      ],
+      "native": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        2,
+        0,
+        3,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        2,
+        0,
+        0,
+        0,
+        0
+      ],
+      "exact": {
+        "foregroundRequestMicros": 36725,
+        "measured": 7
+      },
+      "ipc": {
+        "measured": true,
+        "requestDeliveryMicros": 166,
+        "readAuthorizationMicros": 257,
+        "dispatchMicros": 51,
+        "activationMicros": 52381,
+        "replyAdmissionMicros": 188,
+        "replyEncodeMicros": 3,
+        "replyDeliveryMicros": 89,
+        "callerResumeMicros": 7572,
+        "request": {
+          "measured": true,
+          "submitMicros": 8,
+          "receiveMicros": 158,
+          "writeCompletionMicros": 19
+        },
+        "readAuthority": {
+          "measured": true,
+          "waitMicros": 547,
+          "nativeMicros": 0
+        }
+      },
+      "authority": {
+        "measured": true,
+        "waitMicros": 767,
+        "nativeMicros": 0
+      }
+    },
+    "bWorst": {
+      "micros": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        17507,
+        0,
+        17507,
+        0,
+        518,
+        0,
+        16988,
+        0,
+        0,
+        0,
+        0
+      ],
+      "measured": 34158411776,
+      "worker": [
+        1,
+        1,
+        3
+      ],
+      "workerMillis": [
+        0,
+        0,
+        16
+      ],
+      "workerMeasured": 7,
+      "authorityMicros": [
+        0,
+        0,
+        0
+      ],
+      "authorityMeasured": 0,
+      "workerApply": {
+        "nativeIPC": {
+          "micros": [
+            33,
+            57,
+            2,
+            16254,
+            164,
+            115
+          ],
+          "parentMicros": [
+            17,
+            2,
+            18
+          ],
+          "parentMeasured": true,
+          "requestWriteMicros": 28,
+          "requestWriteMeasured": true
+        },
+        "micros": [
+          16354,
+          0
+        ],
+        "measured": 1,
+        "submissionMicros": 15748,
+        "submissionCalls": 1
+      },
+      "ackRead": {
+        "serviceIPC": {
+          "micros": [
+            0,
+            182,
+            16760,
+            23,
+            83,
+            13
+          ]
+        },
+        "serviceNativeWrite": true,
+        "micros": [
+          16988,
+          0,
+          0
+        ],
+        "measured": 7,
+        "progress": 4
+      },
+      "outcome": "ok"
+    },
+    "aExchange": {
+      "schema": 1,
+      "micros": [
+        51256,
+        0,
+        0,
+        0
+      ],
+      "measured": 3
+    },
+    "tcp": {
+      "schema": 1,
+      "rttMicros": [
+        6310,
+        6022
+      ],
+      "minRttMicros": [
+        2678,
+        2678
+      ],
+      "queryMicros": [
+        0,
+        0
+      ],
+      "retransmittedBytes": 0,
+      "timeoutEpisodes": 0,
+      "counterDeltasKnown": true
+    },
+    "aFrames": 508,
+    "bFrames": 469,
+    "aHistogram": [
+      495,
+      13,
+      0,
+      0,
+      0
+    ],
+    "bHistogram": [
+      2,
+      466,
+      1,
+      0,
+      0
+    ]
+  },
+  "slowestInput": {
+    "timeA": "2026-11-14T19:28:30.3619298Z",
+    "timeB": "2026-11-14T19:28:21.0618982Z",
+    "tag": "91b7e4bc41ddc56027f59548d5388b24d9578d9a1923a66ff2fea29c8f9471de",
+    "aEnd": "ok",
+    "bEnd": "ok",
+    "complete": true,
+    "aCaptureMs": 15.888,
+    "aForegroundRequestMs": 8.275,
+    "aForegroundVerifyMs": 0,
+    "aQueueHandleMs": 0,
+    "aGrantMs": 34.243,
+    "aFirstOfferMs": 51.804,
+    "bPrepareMs": 0,
+    "bReadyWaitMs": 20.883,
+    "bFirstInputMs": 1.824,
+    "bWorstInputMs": 393.157,
+    "aCapture": {
+      "schema": 1,
+      "micros": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        15348
+      ],
+      "measured": 31457280,
+      "worker": [
+        0,
+        1,
+        3
+      ],
+      "native": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        2,
+        0,
+        2,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "exact": {
+        "foregroundRequestMicros": 8275,
+        "measured": 7
+      },
+      "ipc": {
+        "measured": true,
+        "requestDeliveryMicros": 54,
+        "readAuthorizationMicros": 182,
+        "dispatchMicros": 57,
+        "activationMicros": 14517,
+        "replyAdmissionMicros": 102,
+        "replyEncodeMicros": 2,
+        "replyDeliveryMicros": 98,
+        "callerResumeMicros": 56,
+        "request": {
+          "measured": true,
+          "submitMicros": 9,
+          "receiveMicros": 45,
+          "writeCompletionMicros": 15
+        },
+        "readAuthority": {
+          "measured": true,
+          "waitMicros": 0,
+          "nativeMicros": 0
+        }
+      },
+      "authority": {
+        "measured": true,
+        "waitMicros": 0,
+        "nativeMicros": 0
+      }
+    },
+    "bWorst": {
+      "micros": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        393157,
+        0,
+        393157,
+        0,
+        1019,
+        0,
+        392137,
+        0,
+        0,
+        0,
+        0
+      ],
+      "measured": 34158411776,
+      "worker": [
+        1,
+        2,
+        4
+      ],
+      "workerMillis": [
+        0,
+        3,
+        379
+      ],
+      "workerMeasured": 7,
+      "authorityMicros": [
+        0,
+        0,
+        0
+      ],
+      "authorityMeasured": 0,
+      "workerApply": {
+        "nativeIPC": {
+          "micros": [
+            24,
+            16266,
+            4,
+            26968,
+            337190,
+            41
+          ],
+          "parentMicros": [
+            9,
+            2,
+            21
+          ],
+          "parentMeasured": true,
+          "requestWriteMicros": 22,
+          "requestWriteMeasured": true
+        },
+        "micros": [
+          379701,
+          0
+        ],
+        "measured": 1,
+        "submissionMicros": 23335,
+        "submissionCalls": 1
+      },
+      "ackRead": {
+        "serviceIPC": {
+          "micros": [
+            0,
+            8551,
+            380566,
+            16,
+            3107,
+            10
+          ]
+        },
+        "serviceNativeWrite": true,
+        "micros": [
+          392137,
+          0,
+          0
+        ],
+        "measured": 7,
+        "progress": 4
+      },
+      "outcome": "ok"
+    },
+    "aExchange": {
+      "schema": 1,
+      "micros": [
+        33685,
+        0,
+        0,
+        0
+      ],
+      "measured": 3
+    },
+    "tcp": {
+      "schema": 1,
+      "rttMicros": [
+        6184,
+        5863
+      ],
+      "minRttMicros": [
+        2747,
+        2747
+      ],
+      "queryMicros": [
+        0,
+        0
+      ],
+      "retransmittedBytes": 0,
+      "timeoutEpisodes": 0,
+      "counterDeltasKnown": true
+    },
+    "aFrames": 1491,
+    "bFrames": 1231,
+    "aHistogram": [
+      1479,
+      12,
+      0,
+      0,
+      0
+    ],
+    "bHistogram": [
+      3,
+      1156,
+      65,
+      7,
+      0
+    ]
+  },
+  "samples": [
+    {
+      "timeA": "2026-11-14T19:18:34.8976536Z",
+      "timeB": "2026-11-14T19:18:25.5996529Z",
+      "exchangeTag": "ea802576098360839186213b139346b930e07c4e9ed2603417cf1cdb4210f1fc",
+      "complete": true,
+      "aEnd": "ok",
+      "bEnd": "ok",
+      "captureMs": 26.791,
+      "foregroundRequestMs": 19.047,
+      "grantMs": 34.237,
+      "firstOfferMs": 63.219,
+      "bReadyMs": 22.272,
+      "bFirstInputMs": 2.234,
+      "bWorstInputMs": 109.164
+    },
+    {
+      "timeA": "2026-11-14T19:20:52.261487Z",
+      "timeB": "2026-11-14T19:20:42.9587005Z",
+      "exchangeTag": "8a6e3d6ab28bcdb3a30be38b59047737d65a9fc22f326d018c059c7b954de487",
+      "complete": true,
+      "aEnd": "ok",
+      "bEnd": "ok",
+      "captureMs": 9.449,
+      "foregroundRequestMs": 4.984,
+      "grantMs": 40.244,
+      "firstOfferMs": 51.882,
+      "bReadyMs": 22.463,
+      "bFirstInputMs": 1.704,
+      "bWorstInputMs": 6.248
+    },
+    {
+      "timeA": "2026-11-14T19:25:30.4044319Z",
+      "timeB": "2026-11-14T19:25:21.094507Z",
+      "exchangeTag": "070752f1446a47a23551f5cd6d3793b519e4f14a058cbd056ed537fa35f5d4e5",
+      "complete": true,
+      "aEnd": "ok",
+      "bEnd": "ok",
+      "captureMs": 12.767,
+      "foregroundRequestMs": 7.878,
+      "grantMs": 36.872,
+      "firstOfferMs": 52.45,
+      "bReadyMs": 22.984,
+      "bFirstInputMs": 1.821,
+      "bWorstInputMs": 19.648
+    },
+    {
+      "timeA": "2026-11-14T19:27:02.5055365Z",
+      "timeB": "2026-11-14T19:26:53.1992093Z",
+      "exchangeTag": "bd3a661cdde16ed54a5af9c76d2bb7a12044a4c30930e1b9bd557c72f3eea0ec",
+      "complete": true,
+      "aEnd": "ok",
+      "bEnd": "ok",
+      "captureMs": 9.335,
+      "foregroundRequestMs": 4.979,
+      "grantMs": 33.773,
+      "firstOfferMs": 96.302,
+      "bReadyMs": 21.447,
+      "bFirstInputMs": 2.37,
+      "bWorstInputMs": 4.442
+    },
+    {
+      "timeA": "2026-11-14T19:28:30.3619298Z",
+      "timeB": "2026-11-14T19:28:21.0618982Z",
+      "exchangeTag": "91b7e4bc41ddc56027f59548d5388b24d9578d9a1923a66ff2fea29c8f9471de",
+      "complete": true,
+      "aEnd": "ok",
+      "bEnd": "ok",
+      "captureMs": 15.888,
+      "foregroundRequestMs": 8.275,
+      "grantMs": 34.243,
+      "firstOfferMs": 51.804,
+      "bReadyMs": 20.883,
+      "bFirstInputMs": 1.824,
+      "bWorstInputMs": 393.157
+    },
+    {
+      "timeA": "2026-11-14T19:31:16.4813397Z",
+      "timeB": "2026-11-14T19:31:07.1699596Z",
+      "exchangeTag": "dc1b912c1e7f413a54acedccec17e7b7cabd5d73613f8fe7cd3444dec7778355",
+      "complete": true,
+      "aEnd": "ok",
+      "bEnd": "ok",
+      "captureMs": 61.325,
+      "foregroundRequestMs": 36.725,
+      "grantMs": 51.819,
+      "firstOfferMs": 112.117,
+      "bReadyMs": 33.603,
+      "bFirstInputMs": 2.415,
+      "bWorstInputMs": 17.507
+    },
+    {
+      "timeA": "2026-11-14T19:31:48.2018893Z",
+      "timeB": "2026-11-14T19:31:38.8611601Z",
+      "exchangeTag": "90074e2acb76a2a5b88af6e01559e7651d21bc5fbd4ef44d07df3637dff437be",
+      "complete": true,
+      "aEnd": "ok",
+      "bEnd": "ok",
+      "captureMs": 42.484,
+      "foregroundRequestMs": 28.647,
+      "grantMs": 42.583,
+      "firstOfferMs": 89.484,
+      "bReadyMs": 25.167,
+      "bFirstInputMs": 1.762,
+      "bWorstInputMs": 4.035
+    },
+    {
+      "timeA": "2026-11-14T19:32:00.1125359Z",
+      "timeB": "2026-11-14T19:31:50.7985541Z",
+      "exchangeTag": "2de1703933463c065e72cc0cfc23b16096f98a754fb5ac83b5e897de4fc317cd",
+      "complete": true,
+      "aEnd": "ok",
+      "bEnd": "ok",
+      "captureMs": 43.577,
+      "foregroundRequestMs": 19.017,
+      "grantMs": 37.245,
+      "firstOfferMs": 90.196,
+      "bReadyMs": 25.359,
+      "bFirstInputMs": 2.514,
+      "bWorstInputMs": 91.372
+    },
+    {
+      "timeA": "2026-11-14T19:32:29.4084885Z",
+      "timeB": "2026-11-14T19:32:20.0949458Z",
+      "exchangeTag": "de2146a698770241e779b9208fbefd40dbfa9d11a7ece0f82943ca61105f04e8",
+      "complete": true,
+      "aEnd": "ok",
+      "bEnd": "ok",
+      "captureMs": 14.491,
+      "foregroundRequestMs": 7.763,
+      "grantMs": 39.42,
+      "firstOfferMs": 59.992,
+      "bReadyMs": 27.652,
+      "bFirstInputMs": 2.693,
+      "bWorstInputMs": 379.07
+    },
+    {
+      "timeA": "2026-11-14T19:32:52.9698103Z",
+      "timeB": "2026-11-14T19:32:43.654595Z",
+      "exchangeTag": "86c52e7566ffbd06d500cd1384aa5547e0d4b748e884f32979ead1a1d68ee7c9",
+      "complete": true,
+      "aEnd": "ok",
+      "bEnd": "ok",
+      "captureMs": 24.446,
+      "foregroundRequestMs": 13.302,
+      "grantMs": 213.021,
+      "firstOfferMs": 241.139,
+      "bReadyMs": 81.909,
+      "bFirstInputMs": 2.35,
+      "bWorstInputMs": 329.388
+    },
+    {
+      "timeA": "2026-11-14T19:33:06.6323639Z",
+      "timeB": "2026-11-14T19:32:57.3312143Z",
+      "exchangeTag": "83aa2f06388b1f8be012ca248241243a90b80529ee491aed9180540349b04f9e",
+      "complete": false,
+      "aEnd": "incomplete",
+      "bEnd": "incomplete",
+      "captureMs": 73.523,
+      "foregroundRequestMs": 56.859,
+      "grantMs": 51.448,
+      "firstOfferMs": 135.799,
+      "bReadyMs": 31.968,
+      "bFirstInputMs": 3.659,
+      "bWorstInputMs": 206.601
+    },
+    {
+      "timeA": "2026-11-14T19:33:43.3095592Z",
+      "timeB": "2026-11-14T19:33:33.9844189Z",
+      "exchangeTag": "c58dea8744c6bd83c69ce83ea3beeff3bbd4ab1f7c5cc139dabcfe6d3f1a2645",
+      "complete": true,
+      "aEnd": "ok",
+      "bEnd": "ok",
+      "captureMs": 10.498,
+      "foregroundRequestMs": 4.958,
+      "grantMs": 47.723,
+      "firstOfferMs": 192.089,
+      "bReadyMs": 27.608,
+      "bFirstInputMs": 1.849,
+      "bWorstInputMs": 13.442
+    },
+    {
+      "timeA": "2026-11-14T19:34:17.7713347Z",
+      "timeB": "2026-11-14T19:34:08.4523136Z",
+      "exchangeTag": "a75eea5bd20268802a684651f0471db0c6dbdb918df4d90b33e2f99536bacf1e",
+      "complete": true,
+      "aEnd": "ok",
+      "bEnd": "ok",
+      "captureMs": 20.488,
+      "foregroundRequestMs": 10.767,
+      "grantMs": 41.175,
+      "firstOfferMs": 63.966,
+      "bReadyMs": 23.076,
+      "bFirstInputMs": 2.029,
+      "bWorstInputMs": 6.243
+    },
+    {
+      "timeA": "2026-11-14T19:34:18.6198246Z",
+      "timeB": "2026-11-14T19:34:09.3059531Z",
+      "exchangeTag": "2576f431a4ea134be6aad1638ade5dccd757e0eaea21b85d0c232ea5051aa579",
+      "complete": true,
+      "aEnd": "ok",
+      "bEnd": "ok",
+      "captureMs": 13.32,
+      "foregroundRequestMs": 7.213,
+      "grantMs": 55.439,
+      "firstOfferMs": 70.993,
+      "bReadyMs": 36.167,
+      "bFirstInputMs": 2.22,
+      "bWorstInputMs": 5.109
+    },
+    {
+      "timeA": "2026-11-14T19:34:22.3694116Z",
+      "timeB": "2026-11-14T19:34:13.0608828Z",
+      "exchangeTag": "7ad60b8480b00d7006976319967faeebdd2f86e4be6b909ae520bb072ead4374",
+      "complete": true,
+      "aEnd": "ok",
+      "bEnd": "ok",
+      "captureMs": 13.406,
+      "foregroundRequestMs": 7.254,
+      "grantMs": 85.009,
+      "firstOfferMs": 101.326,
+      "bReadyMs": 48.207,
+      "bFirstInputMs": 6.739,
+      "bWorstInputMs": 246.758
+    },
+    {
+      "timeA": "2026-11-14T19:34:27.2927339Z",
+      "timeB": "2026-11-14T19:34:17.976834Z",
+      "exchangeTag": "5679f12137faa20d827125e7e74c3d20f94df93c6318909c570304c6cde318fa",
+      "complete": true,
+      "aEnd": "ok",
+      "bEnd": "ok",
+      "captureMs": 12.645,
+      "foregroundRequestMs": 6.018,
+      "grantMs": 49.492,
+      "firstOfferMs": 64.908,
+      "bReadyMs": 33.439,
+      "bFirstInputMs": 1.795,
+      "bWorstInputMs": 19.852
+    },
+    {
+      "timeA": "2026-11-14T19:34:28.925708Z",
+      "timeB": "2026-11-14T19:34:19.6225344Z",
+      "exchangeTag": "7983b15baaf1553f773c9c603823156f22a290d99a651d17e9ce29a0bbff493d",
+      "complete": true,
+      "aEnd": "ok",
+      "bEnd": "ok",
+      "captureMs": 8.985,
+      "foregroundRequestMs": 3.807,
+      "grantMs": 45.345,
+      "firstOfferMs": 56.593,
+      "bReadyMs": 23.627,
+      "bFirstInputMs": 1.771,
+      "bWorstInputMs": 33.224
+    },
+    {
+      "timeA": "2026-11-14T19:34:29.7004362Z",
+      "timeB": "2026-11-14T19:34:20.3844592Z",
+      "exchangeTag": "a85679eba7a38fb7afa256443f6d91d45755444444a9ec78707784ddc68fe909",
+      "complete": true,
+      "aEnd": "ok",
+      "bEnd": "ok",
+      "captureMs": 11.79,
+      "foregroundRequestMs": 6.059,
+      "grantMs": 42.592,
+      "firstOfferMs": 56.117,
+      "bReadyMs": 25.576,
+      "bFirstInputMs": 5.213,
+      "bWorstInputMs": 19.318
+    },
+    {
+      "timeA": "2026-11-14T19:34:30.3530739Z",
+      "timeB": "2026-11-14T19:34:21.0423637Z",
+      "exchangeTag": "178599f1c6a5df7f317f436872d1c6859da3fc0b89846360ac58f059bffd8155",
+      "complete": true,
+      "aEnd": "ok",
+      "bEnd": "ok",
+      "captureMs": 16.863,
+      "foregroundRequestMs": 9.462,
+      "grantMs": 50.971,
+      "firstOfferMs": 70.591,
+      "bReadyMs": 30.5,
+      "bFirstInputMs": 5.908,
+      "bWorstInputMs": 18.978
+    },
+    {
+      "timeA": "2026-11-14T19:34:31.0458961Z",
+      "timeB": "2026-11-14T19:34:21.7358163Z",
+      "exchangeTag": "54adbd91b2ca9bf7c7644fb69a02c5a8ffc75a1265155282a94d787592e26183",
+      "complete": true,
+      "aEnd": "ok",
+      "bEnd": "ok",
+      "captureMs": 13.374,
+      "foregroundRequestMs": 7.807,
+      "grantMs": 63.953,
+      "firstOfferMs": 79.537,
+      "bReadyMs": 42.582,
+      "bFirstInputMs": 2.368,
+      "bWorstInputMs": 23.945
+    },
+    {
+      "timeA": "2026-11-14T19:34:31.7709889Z",
+      "timeB": "2026-11-14T19:34:22.469323Z",
+      "exchangeTag": "a969e895c3f368a0ab826ac8928802881ffc934a2db20ae5d9a2926cae8e8e70",
+      "complete": true,
+      "aEnd": "ok",
+      "bEnd": "ok",
+      "captureMs": 12.92,
+      "foregroundRequestMs": 6.668,
+      "grantMs": 53.011,
+      "firstOfferMs": 67.688,
+      "bReadyMs": 33.283,
+      "bFirstInputMs": 2.953,
+      "bWorstInputMs": 38.02
+    }
+  ],
+  "limits": [
+    "Different workloads, sample counts and observation windows; descriptive maxima are not causal improvement proof.",
+    "Latest connection excludes an earlier g538 source-reader failure from trial metrics only; retained failures are explicitly included.",
+    "Rotated logs do not cover the full nine-hour installation period.",
+    "Incomplete profiles are excluded from complete-pair statistics but included separately in measured-value statistics.",
+    "Do not subtract A and B wall clocks or add nested spans."
+  ]
+}
