@@ -33,6 +33,7 @@ type sourceWriter struct {
 	heartbeat    *sourceHeartbeatProgress
 	activation   atomic.Pointer[sourceActivationFence]
 	boundary     *sourceBoundaryWindow
+	actions      *sourceActionWindow
 }
 
 func (w *sourceWriter) send(p sourcePacket, current func() bool) error {
@@ -57,6 +58,53 @@ func (w *sourceWriter) writePacketContextChecked(ctx context.Context, p sourcePa
 	if !w.started.Load() && (p.kind == sourceAction || p.kind == sourceBoundary || p.kind == sourceReturn) {
 		return nil
 	}
+	if p.kind == sourceAction && !retirement && !completedReply && w.actions != nil {
+		// Backpressure belongs outside the shared writer and its I/O budget,
+		// just like boundary credit. Both caller and capture-owner cancellation
+		// stop this wait; no authority proof survives it.
+		if err := w.reserveAction(ctx); err != nil {
+			return sourceTransportFailure(err)
+		}
+		retained := false
+		defer func() {
+			if !retained {
+				w.actions.credit <- struct{}{}
+			}
+		}()
+		// Keep the reservation until a successfully submitted frame is consumed.
+		return w.writePacketAdmitted(ctx, p, current, false, false, pointer, &retained)
+	}
+	return w.writePacketAdmitted(ctx, p, current, retirement, completedReply, pointer, nil)
+}
+
+func (w *sourceWriter) reserveAction(ctx context.Context) error {
+	// Normal input adds no timer, context or callback. The operation below
+	// still checks both lifetimes before authority or bytes can escape.
+	select {
+	case <-w.actions.credit:
+		return nil
+	default:
+	}
+	if ctx == nil {
+		ctx = w.ctx
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if w.ctx == nil || ctx == w.ctx {
+		return w.actions.acquire(ctx)
+	}
+	wait, stop := context.WithCancel(ctx)
+	defer stop()
+	unlink := context.AfterFunc(w.ctx, stop)
+	defer unlink()
+	if w.ctx.Err() != nil {
+		stop()
+	}
+	return w.actions.acquire(wait)
+}
+
+func (w *sourceWriter) writePacketAdmitted(ctx context.Context, p sourcePacket, current func() bool, retirement, completedReply, pointer bool, retained *bool) error {
 	ctx, cancel := w.operation(ctx, retirement || completedReply)
 	defer cancel()
 	var progress *sourceHeartbeatProgress
@@ -127,7 +175,17 @@ func (w *sourceWriter) writePacketContextChecked(ctx context.Context, p sourcePa
 	if p.kind == sourceReply && p.op == sourceActivate && p.captureIPC != nil {
 		wire = appendSourceActivationIPC(data, p.captureIPC.clocks, activationGate, workerIPCTick(), p.captureIPC.readAuthority)
 	}
+	if retained != nil {
+		w.actions.append(p.sequence)
+	}
 	err = w.writeSequenced(ctx, wire, p.sequence, origin)
+	if retained != nil {
+		if err == nil {
+			*retained = true
+		} else {
+			*retained = !w.actions.rollback(p.sequence)
+		}
+	}
 	writeDone()
 	if progress != nil && err == nil {
 		progress.stage = heartbeatReplied
@@ -235,7 +293,7 @@ func runSourceCapture(ctx context.Context, channel, service *Channel, lease Leas
 	}
 	var pressedEvidence atomic.Uint32
 	hook.SetAdmissionReporter(func(code string) { pressedEvidence.Store(uint32(sourcePressedEvidence(code))) })
-	writer := &sourceWriter{ctx: run, channel: channel, binding: lease.Binding, heartbeat: &heartbeat, boundary: newSourceBoundaryWindow()}
+	writer := &sourceWriter{ctx: run, channel: channel, binding: lease.Binding, heartbeat: &heartbeat, boundary: newSourceBoundaryWindow(), actions: newSourceActionWindow()}
 	session, err := wininput.NewSourceSession(1024, writer)
 	if err != nil {
 		return err

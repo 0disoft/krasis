@@ -554,7 +554,9 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 	live = &sourceClient{channel: channel, binding: binding, replies: make(chan sourcePacket, 1), done: make(chan struct{}), failed: make(chan struct{})}
 	live.timing = timingSampler{emit: c.observe, source: true}
 	live.heartbeatTiming = timingSampler{emit: c.observe, source: true, heartbeat: true}
-	boundaryAcks := make(chan uint64, 1)
+	// At most one boundary batch and two eight-action receipt groups are in
+	// flight. One sender drains them in wire order without blocking this reader.
+	boundaryAcks := make(chan uint64, sourceReceiptQueueCapacity)
 	wininput.StartSourceIPCReader(func() {
 		defer func() {
 			code := sourceClientReaderCode(live.err, live.retired.Load())
@@ -564,6 +566,7 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 			}
 		}()
 		var sequence uint64
+		var actionsRead int
 		reader := newSourcePacketReader(channel.stream)
 		for {
 			p, err := readSourcePacket(reader)
@@ -605,6 +608,16 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 			case sourceAction:
 				if ctx.Err() == nil && p.reply == live.epoch.Load() {
 					session.Offer(p.action)
+				}
+				actionsRead++
+				if actionsRead == sourceActionReceiptEvery {
+					actionsRead = 0
+					select {
+					case boundaryAcks <- p.sequence:
+					default:
+						live.err = ErrProtocol
+						return
+					}
 				}
 			case sourceReturn:
 				if ctx.Err() == nil && p.reply == live.epoch.Load() {

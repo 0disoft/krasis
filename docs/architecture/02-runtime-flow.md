@@ -451,6 +451,26 @@ replayed, and the existing bounded observation queue may still drop on overflow.
 This contains advisory backpressure; it does not prove the A runtime stopping
 delay is fixed or prevent all active-input stalls during process-wide pauses.
 
+### g537 active-input pipe backpressure
+
+The protected source writer now also bounds unread actions to 16 frames (1KiB).
+The medium-agent reader returns one presence-authorized, one-way consumption
+receipt per eight action frames using the existing private sourceBoundaryAck
+command. Action counting spans epochs and includes discarded old-epoch frames:
+consumption returns capacity, never certifies delivery to the remote peer.
+The existing one-boundary-batch window remains separate. Exact ending sequences
+identify receipt owners; future, partial-group, foreign and duplicate references
+remain protocol failures. No public protocol or peer capability changes.
+
+After 16 actions, further input waits outside the wire gate and the one-second
+proof/write budget, honoring caller and capture-owner cancellation. A fresh
+authority check and current-generation check follow admission. Input ordering,
+key/button transitions, attempted/partial-write failure policy and native join
+requirements are unchanged. Pointer coalescing remains in the existing bounded
+SourceSession queue. The shared 4KiB pipe retains room for heartbeat, command
+outcome and retirement frames even while the agent stops reading input.
+This bounds pipe pressure; it cannot prevent arbitrary process-wide CPU pauses.
+
 ### Bounded unbound reservation after g510
 
 Prepared console reservations now retain their exact unbound owner for 15 seconds instead of 3 seconds. Runtime admission and startup-profile validation use the same `handoff.PreparedLifetime` ceiling; the instant at the ceiling is expired. Hints cannot renew that original timer. There is still at most one spare and one single delayed reentry construction opportunity, with exact retirement joined before replacement.
