@@ -64,3 +64,22 @@ containing the previous source; never overwrite an existing generation artifact.
 
 Windows semantics: [MsgWaitForMultipleObjectsEx](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-msgwaitformultipleobjectsex)
 and [PeekMessageW](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-peekmessagew).
+
+## Paired installation
+
+Generation 538 revision `59f58658c1f35bb2aa15170bb81000072e0a0ba1` is installed
+on both notebooks. The normal build passed 111 frontend tests, native UI build,
+update-package integration, eight-file bundle integrity and setup verification.
+B received exactly one update request and acknowledged all 29,051,355 bytes;
+A's verified setup reported installed/code 0. CLI doctor is healthy/CONNECTED,
+all A UI/agent/launch/protected-installation versions match, and B reports the
+same generation/revision with transfer IDLE. No public release or push was made.
+
+Saved profiles restored the connection automatically. A direct CLI connect
+reported already_active; delegated CLI app connect B then confirmed connected.
+Fresh paired support collection `a35da0eb695a3aa5063d8a1e9fa41f42` confirms
+both services/inputs READY, grants PRESENT and the same authenticated connection.
+The retained postconnection windows (A 11.910s, B 12.310s) contain no failure or
+reconnect event. This is short installation health evidence, not a physical
+crossing or long-duration stability result. See the adjacent
+`2026-11-14-g538-paired-installation-review.json` receipt.

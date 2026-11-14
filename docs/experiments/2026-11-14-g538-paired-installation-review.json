@@ -1,0 +1,70 @@
+{
+  "schema": "krasis.g538-installation-review/v1",
+  "generation": 538,
+  "revision": "59f58658c1f35bb2aa15170bb81000072e0a0ba1",
+  "update": {
+    "schemaVersion": "krasis.cli.update-wait/v1",
+    "peerAlias": "B",
+    "id": "fb463b7ba09e903672f61f8175170d4d",
+    "code": "updated",
+    "transferState": "UPDATED",
+    "generation": 538,
+    "revision": "59f58658c1f35bb2aa15170bb81000072e0a0ba1",
+    "bytes": 29051355,
+    "total": 29051355
+  },
+  "localInstall": {
+    "schema": "krasis.setup-result/v1",
+    "code": 0,
+    "state": "installed"
+  },
+  "collection": "a35da0eb695a3aa5063d8a1e9fa41f42",
+  "cliConnect": {
+    "schemaVersion": "krasis.cli.peer-connect/v1",
+    "code": "connected",
+    "peerAlias": "B",
+    "id": "95844f94714f52f49354d103fcb67db1"
+  },
+  "doctor": {
+    "code": "healthy",
+    "connection": "CONNECTED",
+    "generation": 538
+  },
+  "peerStatus": {
+    "generation": 538,
+    "build": "59f58658c1f35bb2aa15170bb81000072e0a0ba1",
+    "state": "ONLINE",
+    "transferState": "IDLE"
+  },
+  "devices": {
+    "A": {
+      "created": "2026-11-14T10:04:39Z",
+      "sha256": "e0ea7701430c6b11ce2de999aee02aea0099102568c3d2832917154f812fc047",
+      "service": "READY",
+      "input": "READY",
+      "grant": "PRESENT",
+      "connectedAt": "2026-11-14T10:04:27.0900798Z",
+      "connection": "1afdc7ee8476996d64adfeeee19b97b028957239cb2678f2c2d12aafa70c6c81",
+      "observedSeconds": 11.91,
+      "faults": [],
+      "reconnects": []
+    },
+    "B": {
+      "created": "2026-11-14T10:04:32Z",
+      "sha256": "2595c8a7e5e21ba81449d1390eadd3e4e9196f646d19d7f01804d3c369c0c8a9",
+      "service": "READY",
+      "input": "READY",
+      "grant": "PRESENT",
+      "connectedAt": "2026-11-14T10:04:19.6908953Z",
+      "connection": "1afdc7ee8476996d64adfeeee19b97b028957239cb2678f2c2d12aafa70c6c81",
+      "observedSeconds": 12.31,
+      "faults": [],
+      "reconnects": []
+    }
+  },
+  "limits": [
+    "Installation checks are separate from a new physical crossing trial.",
+    "No paired latency reduction or long-duration recovery guarantee is established.",
+    "Do not subtract A and B wall clocks."
+  ]
+}
