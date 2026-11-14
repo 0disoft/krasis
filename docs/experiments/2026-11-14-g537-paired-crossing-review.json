@@ -1,0 +1,600 @@
+{
+  "schema": "krasis.g537-paired-crossing-review/v1",
+  "generation": 537,
+  "revision": "548204dc691fe001abef38d2b46fd72f44ac6137",
+  "collection": "354b4d94aad3b6b195621ba4e084cba2",
+  "selection": {
+    "connection": "5bea48aa9601c3806a202047c82423adb571e41d073cbafad5c7881791f63723",
+    "method": "Exact build; deduplicate run/sequence/code; match exchangeTag; local measured spans only.",
+    "coverage": "15 entry requests/admissions and ready leases; 14 matched complete profiles. Latest entry has no detailed profile after the second window reached attempt 12 (handoff.Limit). Do not infer its latency.",
+    "clock": "A and B wall clocks differ; no cross-device wall-clock subtraction. Nested durations are not additive.",
+    "baseline": "g536 retained pre-failure export has 38 complete matched profiles and different workload/window. No controlled speedup claim."
+  },
+  "pairs": {
+    "source": 14,
+    "receiver": 14,
+    "matched": 14,
+    "complete": 14,
+    "incomplete": [],
+    "unmatchedSource": 0,
+    "unmatchedReceiver": 0
+  },
+  "devices": {
+    "A": {
+      "created": "2026-11-14T09:31:47Z",
+      "supportSha256": "2ed98ff174fdcb9b56bf2edf43f23bc9eb5761ce817c89b1deb7670382d4f976",
+      "service": "READY",
+      "input": "READY",
+      "grant": "PRESENT",
+      "serviceStartUnchanged": true,
+      "connectedAt": "2026-11-14T09:26:23.4278051Z",
+      "observedSeconds": 323.573,
+      "faultsAfterConnection": [],
+      "reconnectsAfterConnection": [],
+      "preconnectionFailures": [],
+      "heartbeatBuckets": {
+        "installed_source_heartbeat_timing_client_lock_lt1ms": 21,
+        "installed_source_heartbeat_timing_client_authority_lt1ms": 19,
+        "installed_source_heartbeat_timing_client_write_lt10ms": 6,
+        "installed_source_heartbeat_timing_client_response_lt100ms": 11,
+        "installed_source_heartbeat_timing_worker_presence_wait_lt100ms": 7,
+        "installed_source_heartbeat_timing_worker_presence_native_lt1ms": 20,
+        "installed_source_heartbeat_timing_worker_reply_gate_lt1ms": 21,
+        "installed_source_heartbeat_timing_client_write_lt1ms": 14,
+        "installed_source_heartbeat_timing_worker_presence_wait_lt10ms": 10,
+        "installed_source_heartbeat_timing_client_response_lt1ms": 4,
+        "installed_source_heartbeat_timing_worker_presence_wait_lt1ms": 4,
+        "installed_source_heartbeat_timing_client_response_lt10ms": 6,
+        "installed_source_heartbeat_timing_client_authority_lt10ms": 2,
+        "installed_source_heartbeat_timing_client_write_lt100ms": 1,
+        "installed_source_heartbeat_timing_worker_presence_native_lt10ms": 1
+      },
+      "runtime": {
+        "timerLateMs": {
+          "n": 5,
+          "min": 3.805,
+          "median": 19.299,
+          "max": 142.231
+        },
+        "samplerTimerLateMs": {
+          "n": 5,
+          "min": 13.432,
+          "median": 146.169,
+          "max": 373.34
+        },
+        "dispatchMaxMs": {
+          "n": 5,
+          "min": 0,
+          "median": 51.394,
+          "max": 294.737
+        },
+        "injectionMaxMs": {
+          "n": 5,
+          "min": 0,
+          "median": 0,
+          "max": 0
+        },
+        "queueMaxResidenceMs": {
+          "n": 5,
+          "min": 0,
+          "median": 0.552,
+          "max": 21.392
+        }
+      },
+      "entryRequests": 15,
+      "admissions": 15,
+      "inputLeasesReady": 0,
+      "logCompleteness": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false
+        }
+      ]
+    },
+    "B": {
+      "created": "2026-11-14T09:31:40Z",
+      "supportSha256": "0f8e5bfdad56c6537be441b3a4808ce2ca63d87396f2e6b2e4678db1d9ee0c8e",
+      "service": "READY",
+      "input": "READY",
+      "grant": "PRESENT",
+      "serviceStartUnchanged": true,
+      "connectedAt": "2026-11-14T09:26:16.0581999Z",
+      "observedSeconds": 323.942,
+      "faultsAfterConnection": [],
+      "reconnectsAfterConnection": [],
+      "preconnectionFailures": [
+        {
+          "time": "2026-11-14T09:25:54.6807093Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-14T09:25:54.6807093Z",
+          "code": "RECONNECTING"
+        },
+        {
+          "time": "2026-11-14T09:25:59.9273176Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-14T09:26:05.4451831Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-14T09:26:13.0055348Z",
+          "code": "reconnect_acquire_network_timeout"
+        }
+      ],
+      "heartbeatBuckets": {
+        "installed_source_heartbeat_timing_client_lock_lt1ms": 20,
+        "installed_source_heartbeat_timing_client_authority_lt1ms": 20,
+        "installed_source_heartbeat_timing_client_write_lt1ms": 20,
+        "installed_source_heartbeat_timing_client_response_lt1ms": 17,
+        "installed_source_heartbeat_timing_worker_presence_wait_lt1ms": 20,
+        "installed_source_heartbeat_timing_worker_presence_native_lt1ms": 20,
+        "installed_source_heartbeat_timing_worker_reply_gate_lt1ms": 20,
+        "installed_source_heartbeat_timing_client_response_lt10ms": 3,
+        "installed_input_heartbeat_timing_client_lock_lt1ms": 1,
+        "installed_input_heartbeat_timing_client_authority_lt1ms": 1,
+        "installed_input_heartbeat_timing_client_write_lt1ms": 1,
+        "installed_input_heartbeat_timing_client_response_lt1ms": 1,
+        "installed_input_heartbeat_timing_worker_apply_lt1ms": 1
+      },
+      "runtime": {
+        "timerLateMs": {
+          "n": 5,
+          "min": 0.787,
+          "median": 2.065,
+          "max": 18.212
+        },
+        "samplerTimerLateMs": {
+          "n": 5,
+          "min": 6.736,
+          "median": 8.811,
+          "max": 197.149
+        },
+        "dispatchMaxMs": {
+          "n": 5,
+          "min": 0,
+          "median": 2.432,
+          "max": 144.753
+        },
+        "injectionMaxMs": {
+          "n": 5,
+          "min": 0,
+          "median": 0,
+          "max": 144.753
+        },
+        "queueMaxResidenceMs": {
+          "n": 5,
+          "min": 0,
+          "median": 0,
+          "max": 0
+        }
+      },
+      "entryRequests": 0,
+      "admissions": 0,
+      "inputLeasesReady": 15,
+      "logCompleteness": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false
+        }
+      ]
+    }
+  },
+  "metricsMs": {
+    "aCaptureMs": {
+      "n": 14,
+      "min": 12.261,
+      "median": 18.8875,
+      "max": 236.627
+    },
+    "aGrantMs": {
+      "n": 14,
+      "min": 33.838,
+      "median": 38.619,
+      "max": 63.96
+    },
+    "aBoundaryMs": {
+      "n": 14,
+      "min": 1.642,
+      "median": 2.8395,
+      "max": 37.925
+    },
+    "aFirstOfferMs": {
+      "n": 14,
+      "min": 50.966,
+      "median": 62.2825,
+      "max": 340.683
+    },
+    "aWorstDispatchMs": {
+      "n": 14,
+      "min": 0.567,
+      "median": 1.0154999999999998,
+      "max": 3.33
+    },
+    "aQueueMs": {
+      "n": 14,
+      "min": 0,
+      "median": 0,
+      "max": 0.763
+    },
+    "bPrepareMs": {
+      "n": 14,
+      "min": 0,
+      "median": 0,
+      "max": 0
+    },
+    "bAuthorizeMs": {
+      "n": 14,
+      "min": 24.631,
+      "median": 27.8235,
+      "max": 29.45
+    },
+    "bReadyWaitMs": {
+      "n": 14,
+      "min": 21.766,
+      "median": 24.113500000000002,
+      "max": 25.766
+    },
+    "bEntryPrepareMs": {
+      "n": 14,
+      "min": 2.877,
+      "median": 3.5869999999999997,
+      "max": 4.874
+    },
+    "bFirstInputMs": {
+      "n": 14,
+      "min": 1.067,
+      "median": 1.855,
+      "max": 4.1
+    },
+    "bWorstInputMs": {
+      "n": 14,
+      "min": 2.719,
+      "median": 4.6205,
+      "max": 144.752
+    },
+    "aIPC_requestDeliveryMs": {
+      "n": 14,
+      "min": 0.042,
+      "median": 0.065,
+      "max": 5.555
+    },
+    "aIPC_readAuthorizationMs": {
+      "n": 14,
+      "min": 0.172,
+      "median": 0.211,
+      "max": 18.201
+    },
+    "aIPC_dispatchMs": {
+      "n": 14,
+      "min": 0.04,
+      "median": 0.056,
+      "max": 1.162
+    },
+    "aIPC_activationMs": {
+      "n": 14,
+      "min": 11.138,
+      "median": 16.719,
+      "max": 230.481
+    },
+    "aIPC_replyAdmissionMs": {
+      "n": 14,
+      "min": 0.072,
+      "median": 0.1565,
+      "max": 10.257
+    },
+    "aIPC_replyEncodeMs": {
+      "n": 14,
+      "min": 0.002,
+      "median": 0.003,
+      "max": 0.008
+    },
+    "aIPC_replyDeliveryMs": {
+      "n": 14,
+      "min": 0.072,
+      "median": 0.13,
+      "max": 0.263
+    },
+    "aIPC_callerResumeMs": {
+      "n": 14,
+      "min": 0.035,
+      "median": 0.3305,
+      "max": 6.627
+    },
+    "tcpRTT": {
+      "n": 28,
+      "min": 4.578,
+      "median": 5.5504999999999995,
+      "max": 16.201
+    }
+  },
+  "sourceFrames": 1747,
+  "receiverFrames": 1617,
+  "slowestCapture": {
+    "time": "2026-11-14T09:31:05.0212726Z",
+    "totalMs": 236.627,
+    "firstOfferMs": 340.683,
+    "grantMs": 63.96,
+    "ipc": {
+      "measured": true,
+      "requestDeliveryMicros": 66,
+      "readAuthorizationMicros": 4090,
+      "dispatchMicros": 492,
+      "activationMicros": 230481,
+      "replyAdmissionMicros": 76,
+      "replyEncodeMicros": 3,
+      "replyDeliveryMicros": 79,
+      "callerResumeMicros": 793,
+      "request": {
+        "measured": true,
+        "submitMicros": 11,
+        "receiveMicros": 55,
+        "writeCompletionMicros": 23
+      },
+      "readAuthority": {
+        "measured": true,
+        "waitMicros": 5058,
+        "nativeMicros": 0
+      }
+    },
+    "exact": {
+      "queueToHandleMicros": 603,
+      "foregroundRequestMicros": 95860,
+      "measured": 7
+    },
+    "nativeBuckets": [
+      1,
+      1,
+      1,
+      1,
+      3,
+      1,
+      3,
+      0,
+      3,
+      3,
+      1,
+      4,
+      4,
+      0,
+      4,
+      0,
+      2,
+      0,
+      3,
+      3,
+      0
+    ]
+  },
+  "slowestInput": {
+    "time": "2026-11-14T09:30:44.1627126Z",
+    "dispatchMs": 144.752,
+    "workerMillis": [
+      6,
+      19,
+      114
+    ],
+    "apply": {
+      "nativeIPC": {
+        "micros": [
+          22,
+          26968,
+          3,
+          35073,
+          10361,
+          9
+        ],
+        "parentMicros": [
+          9,
+          2,
+          42748
+        ],
+        "parentMeasured": true,
+        "requestWriteMicros": 26,
+        "requestWriteMeasured": true
+      },
+      "micros": [
+        114444,
+        0
+      ],
+      "measured": 1,
+      "submissionMicros": 15583,
+      "submissionCalls": 1
+    },
+    "ackRead": {
+      "serviceIPC": {
+        "micros": [
+          0,
+          4750,
+          115237,
+          10,
+          25225,
+          10
+        ]
+      },
+      "serviceNativeWrite": true,
+      "micros": [
+        144752,
+        0,
+        0
+      ],
+      "measured": 7,
+      "progress": 4
+    }
+  },
+  "samples": [
+    {
+      "time": "2026-11-14T09:28:35.3756263Z",
+      "exchangeTag": "614101050d1f170aad38ea3522cf779d9e138e4faba3e60194ab021c21186974",
+      "captureMs": 50.274,
+      "grantMs": 42.02,
+      "firstOfferMs": 95.097,
+      "bReadyMs": 24.385,
+      "bFirstInputMs": 2.375,
+      "bWorstInputMs": 3.662
+    },
+    {
+      "time": "2026-11-14T09:30:16.9488662Z",
+      "exchangeTag": "eb6be4cc4d8f6d61786336c9bd1c4a23f530584cbbeaaac475f70608e4735c1a",
+      "captureMs": 52.343,
+      "grantMs": 49.245,
+      "firstOfferMs": 103.571,
+      "bReadyMs": 25.063,
+      "bFirstInputMs": 3.061,
+      "bWorstInputMs": 3.934
+    },
+    {
+      "time": "2026-11-14T09:30:45.613517Z",
+      "exchangeTag": "1ae2a9a3fd5574bfda636f57af168bf678e10cb4b3dbd0a613c09790fd005580",
+      "captureMs": 12.261,
+      "grantMs": 38.009,
+      "firstOfferMs": 51.395,
+      "bReadyMs": 25.766,
+      "bFirstInputMs": 1.707,
+      "bWorstInputMs": 10.841
+    },
+    {
+      "time": "2026-11-14T09:30:46.5123446Z",
+      "exchangeTag": "6eaf38ca6ebd6fc7b0ef22a68de8eaed3dd3641a023c8db4a7781bd263976a74",
+      "captureMs": 17.126,
+      "grantMs": 38.049,
+      "firstOfferMs": 58.663,
+      "bReadyMs": 21.985,
+      "bFirstInputMs": 2.4,
+      "bWorstInputMs": 4.292
+    },
+    {
+      "time": "2026-11-14T09:30:47.4034292Z",
+      "exchangeTag": "44b7783ab62e5dc9a726c2647bd36af2bfc73926efbbb95dc34569e6566cdacb",
+      "captureMs": 14.112,
+      "grantMs": 39.968,
+      "firstOfferMs": 55.744,
+      "bReadyMs": 24.688,
+      "bFirstInputMs": 1.747,
+      "bWorstInputMs": 2.719
+    },
+    {
+      "time": "2026-11-14T09:30:48.1580954Z",
+      "exchangeTag": "80a7e8eb106df1844093f7d8ab1d7d5192a00617f1d2eb4df23bde15f79a4265",
+      "captureMs": 20.02,
+      "grantMs": 38.851,
+      "firstOfferMs": 61.025,
+      "bReadyMs": 23.067,
+      "bFirstInputMs": 4.1,
+      "bWorstInputMs": 5.949
+    },
+    {
+      "time": "2026-11-14T09:30:48.9807578Z",
+      "exchangeTag": "8f133cdefadcd45a288c4afaa846f92f785a9e7d6472377e771e3f7bf193d0f4",
+      "captureMs": 17.755,
+      "grantMs": 34.557,
+      "firstOfferMs": 54.974,
+      "bReadyMs": 22.118,
+      "bFirstInputMs": 1.918,
+      "bWorstInputMs": 3.511
+    },
+    {
+      "time": "2026-11-14T09:30:49.9871435Z",
+      "exchangeTag": "493beeb060910262189ab4a44641acb24c35371ef018f761e37c5385a16ecac5",
+      "captureMs": 15.703,
+      "grantMs": 38.387,
+      "firstOfferMs": 59.284,
+      "bReadyMs": 24.905,
+      "bFirstInputMs": 1.745,
+      "bWorstInputMs": 3.383
+    },
+    {
+      "time": "2026-11-14T09:30:50.7628224Z",
+      "exchangeTag": "47dee54f9baea5dd91d0a6c512dc8e6c069a0b3dcfd3bc0520354dd03002daca",
+      "captureMs": 14.326,
+      "grantMs": 33.838,
+      "firstOfferMs": 50.966,
+      "bReadyMs": 21.766,
+      "bFirstInputMs": 1.792,
+      "bWorstInputMs": 3.859
+    },
+    {
+      "time": "2026-11-14T09:30:51.5334739Z",
+      "exchangeTag": "71482e789c2ac79c69e1333dbca2a4adfe5cbdd447f8bee3155275272e75bd92",
+      "captureMs": 16.634,
+      "grantMs": 41.969,
+      "firstOfferMs": 63.54,
+      "bReadyMs": 24.606,
+      "bFirstInputMs": 3.342,
+      "bWorstInputMs": 144.752
+    },
+    {
+      "time": "2026-11-14T09:30:58.5387883Z",
+      "exchangeTag": "21a54d9572b171828709b6950131490849cc8937d39fe077e5d8a4ce4dab9a02",
+      "captureMs": 31.329,
+      "grantMs": 40.813,
+      "firstOfferMs": 76.169,
+      "bReadyMs": 24.951,
+      "bFirstInputMs": 1.587,
+      "bWorstInputMs": 4.949
+    },
+    {
+      "time": "2026-11-14T09:31:05.0212726Z",
+      "exchangeTag": "8d5394c714b7cba56b8365b3d2340489c08cab52791c1f31e5fda8af29e6de81",
+      "captureMs": 236.627,
+      "grantMs": 63.96,
+      "firstOfferMs": 340.683,
+      "bReadyMs": 23.765,
+      "bFirstInputMs": 1.399,
+      "bWorstInputMs": 5.072
+    },
+    {
+      "time": "2026-11-14T09:31:11.8181782Z",
+      "exchangeTag": "4cb8fe2f9ba5fd38a185d9e9426b00cfe9bee8aa36d03638bccb4e0008fcbc78",
+      "captureMs": 97.068,
+      "grantMs": 37.317,
+      "firstOfferMs": 174.764,
+      "bReadyMs": 23.842,
+      "bFirstInputMs": 1.947,
+      "bWorstInputMs": 6.442
+    },
+    {
+      "time": "2026-11-14T09:31:26.9912705Z",
+      "exchangeTag": "54472042139cc69ccbdd5f992fc34e45ede2a7914ae570c60a55a45782c3a03f",
+      "captureMs": 72.666,
+      "grantMs": 36.98,
+      "firstOfferMs": 128.061,
+      "bReadyMs": 23.472,
+      "bFirstInputMs": 1.067,
+      "bWorstInputMs": 7.647
+    }
+  ],
+  "limits": [
+    "Different workloads and observation windows; no controlled aggregate speedup claim.",
+    "Do not subtract A and B wall clocks; all durations are local and nested spans are not additive.",
+    "Handoff profiles are bounded; entry coverage must be checked against event counters.",
+    "Heartbeat timing events are sampled closed buckets, not a continuous latency trace.",
+    "Source credit wait itself has no dedicated production timing metric."
+  ]
+}
