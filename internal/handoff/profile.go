@@ -224,6 +224,7 @@ type session struct {
 	lastClose        time.Time
 	reader           grantReader
 	pendingGrant     atomic.Pointer[attempt]
+	socketWake       chan struct{}
 }
 type sample struct {
 	vector                                    Vector

@@ -19,16 +19,17 @@ const (
 const maxProgressCount = uint32(1<<32 - 1)
 
 type GrantProgressProfile struct {
-	Schema               uint8     `json:"schema"`
-	Micros               [3]uint32 `json:"micros"`
-	ElapsedMicros        uint32    `json:"elapsedMicros"`
-	ByteReads            uint32    `json:"byteReads"`
-	Bytes                uint32    `json:"bytes"`
-	Frames               uint32    `json:"frames"`
-	MaxByteGapMicros     uint32    `json:"maxByteGapMicros"`
-	ByteProgressMeasured bool      `json:"byteProgressMeasured"`
-	Complete             bool      `json:"complete"`
-	Saturated            bool      `json:"saturated"`
+	Schema               uint8              `json:"schema"`
+	Micros               [3]uint32          `json:"micros"`
+	ElapsedMicros        uint32             `json:"elapsedMicros"`
+	ByteReads            uint32             `json:"byteReads"`
+	Bytes                uint32             `json:"bytes"`
+	Frames               uint32             `json:"frames"`
+	MaxByteGapMicros     uint32             `json:"maxByteGapMicros"`
+	ByteProgressMeasured bool               `json:"byteProgressMeasured"`
+	Complete             bool               `json:"complete"`
+	Saturated            bool               `json:"saturated"`
+	SocketQueue          SocketQueueProfile `json:"socketQueue"`
 }
 
 func (p GrantProgressProfile) Valid(role string) bool {
@@ -45,7 +46,7 @@ func (p GrantProgressProfile) Valid(role string) bool {
 	if p.Saturated && p.ByteReads != maxProgressCount && p.Bytes != maxProgressCount && p.Frames != maxProgressCount {
 		return false
 	}
-	return p.ByteProgressMeasured || (p.ByteReads == 0 && p.Bytes == 0 && p.MaxByteGapMicros == 0 && !p.Saturated)
+	return p.SocketQueue.valid(p.ElapsedMicros) && (p.ByteProgressMeasured || (p.ByteReads == 0 && p.Bytes == 0 && p.MaxByteGapMicros == 0 && !p.Saturated))
 }
 
 type grantReader struct {
@@ -54,13 +55,15 @@ type grantReader struct {
 }
 
 type grantProgress struct {
-	profile  GrantProgressProfile
-	start    time.Time
-	last     time.Time
-	lastByte time.Time
-	spans    [3]time.Duration
-	phase    ReadPhase
-	ended    bool
+	profile       GrantProgressProfile
+	start         time.Time
+	last          time.Time
+	lastByte      time.Time
+	spans         [3]time.Duration
+	phase         ReadPhase
+	ended         bool
+	socketSamples [socketProbeLimit]socketSample
+	socketCount   int
 }
 
 // StartGrantProgress runs before the session's reader goroutine. Only a source
@@ -82,6 +85,12 @@ func beginGrantProgress(s *session, a *attempt, at time.Time) {
 	if a.summary.Role == "source" && s.reader.ready {
 		a.progress = &grantProgress{profile: GrantProgressProfile{Schema: 1, ByteProgressMeasured: s.reader.bytes}, start: at, last: at, lastByte: at, phase: ReadPhase(s.reader.phase.Load())}
 		s.pendingGrant.Store(a)
+		if s.socketWake != nil {
+			select {
+			case s.socketWake <- struct{}{}:
+			default:
+			}
+		}
 	}
 }
 
@@ -178,6 +187,7 @@ func finishGrantProgressAt(a *attempt, phase ReadPhase, at time.Time, complete b
 		p.profile.Micros[i] = uint32(elapsed.Microseconds())
 	}
 	p.profile.Complete, p.ended = complete, true
+	p.profile.SocketQueue = p.socketSnapshot(at)
 	if p.profile.Valid("source") {
 		profile := p.profile
 		a.summary.GrantProgress = &profile

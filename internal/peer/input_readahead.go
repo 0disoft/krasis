@@ -49,31 +49,33 @@ func startInputReadAheadWithHeartbeat(ctx context.Context, connection SessionCon
 	}
 	go func() {
 		defer close(r.done)
-		defer close(r.frames)
-		for {
-			readRegion := trace.StartRegion(ctx, "krasis.peer.wire_read")
-			frame, err := connection.ReadFrame()
-			readRegion.End()
-			p := queuedSessionFrame{frame: frame, err: err}
-			if err == nil && frame.Kind == transport.MessageHeartbeat && heartbeat != nil {
-				p.heartbeatObserved, p.err = heartbeat(frame)
-				err = p.err
+		runNetworkReader(func() {
+			defer close(r.frames)
+			for {
+				readRegion := trace.StartRegion(ctx, "krasis.peer.wire_read")
+				frame, err := connection.ReadFrame()
+				readRegion.End()
+				p := queuedSessionFrame{frame: frame, err: err}
+				if err == nil && frame.Kind == transport.MessageHeartbeat && heartbeat != nil {
+					p.heartbeatObserved, p.err = heartbeat(frame)
+					err = p.err
+				}
+				if err == nil && frame.Kind == transport.MessageControl {
+					// Capture before the bounded channel can block. Dequeue time
+					// alone misclassifies dispatch backlog as network wait.
+					p.controlReadAt = time.Now()
+				}
+				queueRegion := trace.StartRegion(ctx, "krasis.peer.read_enqueue")
+				enqueued := r.enqueue(p, stop)
+				queueRegion.End()
+				if !enqueued {
+					return
+				}
+				if err != nil {
+					return
+				}
 			}
-			if err == nil && frame.Kind == transport.MessageControl {
-				// Capture before the bounded channel can block. Dequeue time
-				// alone misclassifies dispatch backlog as network wait.
-				p.controlReadAt = time.Now()
-			}
-			queueRegion := trace.StartRegion(ctx, "krasis.peer.read_enqueue")
-			enqueued := r.enqueue(p, stop)
-			queueRegion.End()
-			if !enqueued {
-				return
-			}
-			if err != nil {
-				return
-			}
-		}
+		})
 	}()
 	return r
 }

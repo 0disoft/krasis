@@ -11,6 +11,8 @@ import (
 func TestGrantProgressExportPreservesNumbersAndRejectsUnboundedEvidence(t *testing.T) {
 	p := &handoff.GrantProgressProfile{Schema: 1, Micros: [3]uint32{60000, 15000, 5000}, ElapsedMicros: 80000,
 		ByteReads: 2, Bytes: 80, Frames: 2, MaxByteGapMicros: 50000, ByteProgressMeasured: true, Complete: true}
+	p.SocketQueue = handoff.SocketQueueProfile{Samples: 2, PositiveSamples: 1, FirstQueuedMicros: 15000, LastEmptyMicros: 10000,
+		MaxQueuedBytes: 116, MaxSampleGapMicros: 65000, MaxQueryMicros: 3}
 	s := handoff.Summary{Schema: 1, Attempt: 1, Role: "source", Backend: "none", End: "ok", GrantProgress: p}
 	r := record{Time: "2026-10-05T00:00:00Z", Code: "handoff_profile", Handoff: &s}
 	data, _ := json.Marshal(r)

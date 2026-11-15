@@ -88,6 +88,8 @@ func RunSession(ctx context.Context, config Config, dependencies Dependencies) (
 	defer handoff.EndSession(ctx)
 	if config.HandoffProfiles != nil {
 		configureHandoffCorrelation(ctx, dependencies.Connection)
+		stopSocketProbe := configureSocketReceiveProbe(ctx, dependencies.Connection)
+		defer stopSocketProbe()
 		configureGrantReadProgress(ctx, dependencies.Connection)
 		configureTCPInfo(ctx, dependencies.Connection)
 	}
