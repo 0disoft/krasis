@@ -68,3 +68,22 @@ passed after fetching the existing go.mod/go.sum-pinned X11 dependency that
 was missing from the local offline cache. No dependency version changed.
 Cross-build is not native Linux testing. Paired Windows installation and fresh
 physical crossings are separate rollout/measurement stages.
+
+## Paired installation
+
+Code commit: `9b1aeaef4b95c11b951be0c8f82548359b5b4407`.
+UI tests passed 111/111; package/archive verification passed. FuzzStartupReady
+completed its seven baseline cases and 77 fuzz executions with one worker,
+without failure. Native Linux execution was not performed.
+
+The g546 archive verified as 29,244,301 bytes. One B send produced receipt
+`2b575978a8e8679002d6d8d6783d63f0`, UPDATED with the exact byte total.
+A setup returned installed/code=0. Doctor verifies A CLI, agent, UI, launch
+record and protected installed agent on that revision, healthy/CONNECTED;
+B is ONLINE at the same generation/revision and transfers are IDLE.
+CLI app connect returned connected. Collection
+`7ab946fb4f2c22cb54a635ce8497a1c5` confirms both service starts were renewed,
+both installation results were zero, input/service READY, and the same connection.
+No post-connect fault/recovery-required event was retained in this short
+post-install sample. The companion installation JSON records the receipts.
+Fresh physical crossing latency remains unmeasured for g546.
