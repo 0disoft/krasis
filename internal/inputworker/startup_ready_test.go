@@ -87,6 +87,7 @@ func TestStartupReadyInvalidLocalProfileFallsBackAndChildCannotOverwriteService(
 
 func FuzzStartupReady(f *testing.F) {
 	f.Add(readyFrame[:])
+	f.Add(startupBatchPacket(f))
 	var profile handoff.StartupProfile
 	profile.Record(handoff.ServiceLaunch, time.Millisecond)
 	var buffer bytes.Buffer
@@ -116,7 +117,7 @@ func FuzzStartupReady(f *testing.F) {
 		if profile != nil && (err != nil || !profile.Valid() || profile.Measured == 0) {
 			t.Fatal("unvalidated diagnostic escaped parser")
 		}
-		if len(data)-reader.Len() > startupReadyServiceSize {
+		if len(data)-reader.Len() > startupReadyImageHashSize {
 			t.Fatal("unbounded readiness read")
 		}
 	})

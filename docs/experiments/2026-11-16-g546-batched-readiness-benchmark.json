@@ -1,0 +1,13 @@
+{
+  "schema": "krasis.readiness-batch-benchmark/v1",
+  "sourceBefore": "95092878",
+  "toolchain": "go1.27.3 with repository runtime overlay",
+  "benchtime": "250ms",
+  "repetitions": 2,
+  "before": "goos: windows\ngoarch: amd64\npkg: github.com/0disoft/krasis/internal/inputworker\ncpu: AMD Ryzen 5 7430U with Radeon Graphics         \nBenchmarkStartupReadyBatch-12         \t   57171\t      7386 ns/op\t         9.000 reads/op\t     560 B/op\t      16 allocs/op\nBenchmarkStartupReadyBatch-12         \t   86877\t      4156 ns/op\t         9.000 reads/op\t     560 B/op\t      16 allocs/op\nBenchmarkStartupReadyNativePipe-12    \t    4804\t     57075 ns/op\t         9.000 reads/op\t     808 B/op\t      24 allocs/op\nBenchmarkStartupReadyNativePipe-12    \t    4746\t    197050 ns/op\t         9.000 reads/op\t     808 B/op\t      24 allocs/op\nPASS\nok  \tgithub.com/0disoft/krasis/internal/inputworker\t2.659s\n",
+  "after": "goos: windows\ngoarch: amd64\npkg: github.com/0disoft/krasis/internal/inputworker\ncpu: AMD Ryzen 5 7430U with Radeon Graphics         \nBenchmarkStartupReadyBatch-12         \t  147452\t      3445 ns/op\t         2.000 reads/op\t     544 B/op\t       9 allocs/op\nBenchmarkStartupReadyBatch-12         \t  128485\t      3623 ns/op\t         2.000 reads/op\t     544 B/op\t       9 allocs/op\nBenchmarkStartupReadyNativePipe-12    \t    6736\t     39199 ns/op\t         2.000 reads/op\t     569 B/op\t      10 allocs/op\nBenchmarkStartupReadyNativePipe-12    \t   14491\t     33325 ns/op\t         2.000 reads/op\t     568 B/op\t      10 allocs/op\nPASS\nok  \tgithub.com/0disoft/krasis/internal/inputworker\t2.078s\n",
+  "limits": [
+    "Windows native pipe microbenchmark; no physical crossing speed claim.",
+    "Host scheduler was not controlled."
+  ]
+}

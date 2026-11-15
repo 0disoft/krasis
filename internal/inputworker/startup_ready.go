@@ -105,19 +105,47 @@ func readStartupReady(reader io.Reader) (*handoff.StartupProfile, error) {
 	if (!load && (string(header[:4]) != "KRD2" || header[4] != 2)) || !zeroBytes(header[6:]) {
 		return nil, ErrProtocol
 	}
-	var payload [startupReadySize - 8]byte
-	if _, err := io.ReadFull(reader, payload[:]); err != nil {
+	// The version fixes the entire bounded receipt size. Read that body once;
+	// per-field reads otherwise submit nine separate overlapped pipe reads for
+	// KRD9. Never buffer beyond this receipt into the following input/report.
+	size := startupReadySize
+	switch {
+	case imageHash:
+		size = startupReadyImageHashSize
+	case native:
+		size = startupReadyNativeSize
+	case service:
+		size = startupReadyServiceSize
+	case wait:
+		size = startupReadyWaitSize
+	case decision:
+		size = startupReadyDecisionSize
+	case prepared:
+		size = startupReadyPreparedSize
+	case load:
+		size = startupReadyLoadSize
+	}
+	var body [startupReadyImageHashSize - 8]byte
+	if n, err := io.ReadFull(reader, body[:size-8]); err != nil {
+		// Preserve EOF at former field boundaries, versus UnexpectedEOF in
+		// a partial field. Native deadline/cancellation errors pass unchanged.
+		if err == io.ErrUnexpectedEOF {
+			switch n + len(header) {
+			case startupReadySize, startupReadyLoadSize, startupReadyPreparedSize,
+				startupReadyDecisionSize, startupReadyWaitSize, startupReadyServiceSize,
+				startupReadyNativeSize:
+				err = io.EOF
+			}
+		}
 		return nil, errors.Join(ErrProtocol, err)
 	}
+	payload := body[:startupReadySize-8]
 	profile := &handoff.StartupProfile{Schema: 1, Measured: header[5]}
 	for i := range profile.Micros {
 		profile.Micros[i] = binary.BigEndian.Uint32(payload[i*4 : i*4+4])
 	}
 	if load {
-		var detail [8]byte
-		if _, err := io.ReadFull(reader, detail[:]); err != nil {
-			return nil, errors.Join(ErrProtocol, err)
-		}
+		detail := body[startupReadySize-8 : startupReadyLoadSize-8]
 		if detail[4] > 1 || !zeroBytes(detail[5:]) {
 			return nil, ErrProtocol
 		}
@@ -125,30 +153,21 @@ func readStartupReady(reader io.Reader) (*handoff.StartupProfile, error) {
 		profile.LoadMeasured = detail[4] == 1
 	}
 	if prepared {
-		var detail [8]byte
-		if _, err := io.ReadFull(reader, detail[:]); err != nil {
-			return nil, errors.Join(ErrProtocol, err)
-		}
+		detail := body[startupReadyLoadSize-8 : startupReadyPreparedSize-8]
 		if detail[4] > 1 || (!decision && detail[4] != 1) || !zeroBytes(detail[5:]) {
 			return nil, ErrProtocol
 		}
 		profile.Prepared, profile.PreparedAgeMicros = detail[4] == 1, binary.BigEndian.Uint32(detail[:4])
 	}
 	if decision {
-		var detail [8]byte
-		if _, err := io.ReadFull(reader, detail[:]); err != nil {
-			return nil, errors.Join(ErrProtocol, err)
-		}
+		detail := body[startupReadyPreparedSize-8 : startupReadyDecisionSize-8]
 		if !zeroBytes(detail[1:]) {
 			return nil, ErrProtocol
 		}
 		profile.PreparationDecision = handoff.PreparationDecision(detail[0])
 	}
 	if wait {
-		var detail [8]byte
-		if _, err := io.ReadFull(reader, detail[:]); err != nil {
-			return nil, errors.Join(ErrProtocol, err)
-		}
+		detail := body[startupReadyDecisionSize-8 : startupReadyWaitSize-8]
 		if detail[4] > 1 || !zeroBytes(detail[5:]) {
 			return nil, ErrProtocol
 		}
@@ -156,10 +175,7 @@ func readStartupReady(reader io.Reader) (*handoff.StartupProfile, error) {
 		profile.PreparationWaitMeasured = detail[4] == 1
 	}
 	if service {
-		var detail [startupReadyServiceSize - startupReadyWaitSize]byte
-		if _, err := io.ReadFull(reader, detail[:]); err != nil {
-			return nil, errors.Join(ErrProtocol, err)
-		}
+		detail := body[startupReadyWaitSize-8 : startupReadyServiceSize-8]
 		if !zeroBytes(detail[1:8]) {
 			return nil, ErrProtocol
 		}
@@ -169,10 +185,7 @@ func readStartupReady(reader io.Reader) (*handoff.StartupProfile, error) {
 		}
 	}
 	if native {
-		var detail [48]byte
-		if _, err := io.ReadFull(reader, detail[:]); err != nil {
-			return nil, errors.Join(ErrProtocol, err)
-		}
+		detail := body[startupReadyServiceSize-8 : startupReadyNativeSize-8]
 		for i := range profile.Native {
 			offset := i * 24
 			if !zeroBytes(detail[offset+1 : offset+4]) {
@@ -185,10 +198,7 @@ func readStartupReady(reader io.Reader) (*handoff.StartupProfile, error) {
 		}
 	}
 	if imageHash {
-		var detail [36]byte
-		if _, err := io.ReadFull(reader, detail[:]); err != nil {
-			return nil, errors.Join(ErrProtocol, err)
-		}
+		detail := body[startupReadyNativeSize-8 : startupReadyImageHashSize-8]
 		for i, p := range [3]*handoff.ImageHashProfile{&profile.ImageHash, &profile.Native[0].ImageHash, &profile.Native[1].ImageHash} {
 			offset := i * 12
 			if !zeroBytes(detail[offset+1 : offset+4]) {
