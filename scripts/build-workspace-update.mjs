@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { verifyExecutableIcon } from './check-windows-icon.mjs';
 import { signExecutable, signingEnabled } from './authenticode.mjs';
 import { offlineGo } from './offline-go.mjs';
+import { tryRetainArtifacts } from './run-artifact-retention.mjs';
 
 // The experimental probe is an optional, atomic pair. A normal product update
 // must not require new test-signing evidence for a probe that is not deployed.
@@ -139,3 +140,4 @@ if (uiAccessTest) {
 }
 fs.writeFileSync(path.join(directory,'SHA256SUMS.txt'),names.map(name=>crypto.createHash('sha256').update(fs.readFileSync(path.join(directory,name))).digest('hex')+'  '+name).join('\n')+'\n');
 execFileSync(go.command,['test','-v','-count=1','-timeout','60s','-run','^TestWorkspaceUpdatePackage$','./internal/productpanel'],{stdio:'inherit',env:{...go.env,KRASIS_WORKSPACE_UPDATE:path.resolve(directory),KRASIS_UPDATE_REVISION:revision}});
+tryRetainArtifacts([directory]);

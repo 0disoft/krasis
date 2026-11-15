@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { verifyExecutableIcon } from './check-windows-icon.mjs';
 import { signExecutable, signingEnabled } from './authenticode.mjs';
 import { offlineGo } from './offline-go.mjs';
+import { tryRetainArtifacts } from './run-artifact-retention.mjs';
 
 assert.equal(process.argv.length,2,'Run from the checkout without arguments.');
 const git=args=>execFileSync('git',args,{encoding:'utf8'}).trim();
@@ -44,3 +45,4 @@ try {
   assert.equal(git(['status','--porcelain']),'','Setup builder changed source.');
   console.log(`Application setup verified, not installed: ${exe}`);
 } finally { if(fs.existsSync(resource))fs.unlinkSync(resource); }
+tryRetainArtifacts([output, source]);

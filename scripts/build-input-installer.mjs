@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { verifyExecutableIcon } from './check-windows-icon.mjs';
 import { signExecutable, signingEnabled } from './authenticode.mjs';
 import { offlineGo } from './offline-go.mjs';
+import { tryRetainArtifacts } from './run-artifact-retention.mjs';
 
 // Build only: no elevation, SCM changes, installer execution or certificates.
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -72,6 +73,8 @@ try {
   // A requireAdministrator resource must not leak into ordinary go test builds.
   if (fs.existsSync(resource)) fs.unlinkSync(resource);
 }
+
+tryRetainArtifacts([output]);
 
 function readManifest(bytes) {
   const pe = bytes.readUInt32LE(0x3c), optional = pe + 24;

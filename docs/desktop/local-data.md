@@ -73,6 +73,11 @@ Phase 0 reports are local aggregate evidence and are not automatically deleted b
 
 Repository build caches, `build/`, `dist/`, downloaded workflow artifacts, and local smoke reports are generated developer output, not product data or source truth.
 
+Windows workspace/setup/input-installer outputs use the separate
+[developer artifact retention policy](../ops/artifact-retention.md): 48-hour grace, two valid
+builds per category, explicit generation pins, live/recovery references and transitive installer
+dependencies. This tooling does not prune installed applications or product data.
+
 ## Recovery
 
 Corrupt, unknown-schema, overly permissive, reparse-backed, or lock-contended identity and trust data fails closed. It is not converted into an empty trusted set or a successful reset.
