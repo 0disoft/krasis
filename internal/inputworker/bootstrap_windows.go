@@ -422,6 +422,13 @@ func runInstalledConsoleInputMode(ctx context.Context, agentDigest, serviceDiges
 		})
 		return finishWorkerReport(control, Report{}, result)
 	}
+	if installation != nil {
+		// Both role branches above returned. This installed input parent has
+		// authenticated the service, agent and lease before starting native
+		// input/release children. Cover its IPC/proof scheduler dependencies.
+		restoreScheduling := leaseWorkerProcessSchedulingScope()
+		defer restoreScheduling()
+	}
 	desktop := desktopRunner(inputdesktop.Run)
 	if installation != nil {
 		desktop = func(ctx context.Context, callback func(*inputdesktop.Scope) error) error {

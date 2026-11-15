@@ -8,11 +8,15 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// Only the authenticated, single-lease capture child may enter this scope.
-// Its Go scheduler/query-start dependencies otherwise remain NORMAL even when
-// the native capture/IPC owner threads have been individually promoted.
-// Never apply this to the service, GUI, network agent or other worker modes.
+// Only authenticated, single-lease capture/input children enter this scope.
+// Their Go scheduler/query-start dependencies otherwise remain NORMAL even when
+// native owners have individually promoted threads. Never apply to the service,
+// GUI, network agent, presentation or unauthenticated/prepared-only children.
 func sourceCaptureProcessSchedulingScope() func() {
+	return leaseWorkerProcessSchedulingScope()
+}
+
+func leaseWorkerProcessSchedulingScope() func() {
 	return sourceProcessPriorityScope(func() uint32 {
 		priority, err := windows.GetPriorityClass(windows.CurrentProcess())
 		if err != nil {

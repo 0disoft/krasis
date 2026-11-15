@@ -88,13 +88,15 @@ func TestSourceProcessPriorityNative(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer windows.SetPriorityClass(process, before)
-	release := sourceCaptureProcessSchedulingScope()
-	defer release()
-	if current, err := windows.GetPriorityClass(process); err != nil || current != windows.ABOVE_NORMAL_PRIORITY_CLASS {
-		t.Fatalf("promotion: class=%x err=%v", current, err)
-	}
-	release()
-	if current, err := windows.GetPriorityClass(process); err != nil || current != windows.NORMAL_PRIORITY_CLASS {
-		t.Fatalf("restoration: class=%x err=%v", current, err)
+	for _, scope := range []func() func(){sourceCaptureProcessSchedulingScope, leaseWorkerProcessSchedulingScope} {
+		release := scope()
+		defer release()
+		if current, err := windows.GetPriorityClass(process); err != nil || current != windows.ABOVE_NORMAL_PRIORITY_CLASS {
+			t.Fatalf("promotion: class=%x err=%v", current, err)
+		}
+		release()
+		if current, err := windows.GetPriorityClass(process); err != nil || current != windows.NORMAL_PRIORITY_CLASS {
+			t.Fatalf("restoration: class=%x err=%v", current, err)
+		}
 	}
 }

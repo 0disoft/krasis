@@ -110,6 +110,11 @@ func runInstalledNativeInput(ctx context.Context, installation *Installation, re
 	if err != nil || lease.Capture || lease.Presentation || startup.Err() != nil || wininput.InitializePhysicalCoordinates() != nil {
 		return ErrAuthority
 	}
+	// Full installed service/agent/parent/lease validation precedes scheduling.
+	// Both the input and release-only child retain the scope through joined
+	// proof-owner cleanup; no authority or deadline is changed by promotion.
+	restoreScheduling := leaseWorkerProcessSchedulingScope()
+	defer restoreScheduling()
 	input := wininput.NewInjectionPort()
 	serviceCheck := func() error { return proof.check(false) }
 	if releaseOnly {

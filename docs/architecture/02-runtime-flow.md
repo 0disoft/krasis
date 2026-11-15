@@ -635,6 +635,19 @@ before final ownership verification, including when that reply beats the native
 wait. Expired, cancelled or terminal replies cannot start this final service.
 Actual rejection retains the existing verified fallback and detach behavior.
 
+g543 extends the existing best-effort NORMAL-to-ABOVE_NORMAL process scheduling
+scope to the installed, authenticated input parent and its separate native
+input/release children. The input parent enters only after capture/presentation
+branches returned and service/agent/lease validation succeeded. Native children
+enter only after their independent service/agent/parent/lease checks. Prepared
+unbound candidates, presentation, GUI, network agent and service are excluded.
+Each child restores its prior NORMAL class once; explicit priorities and later
+observed external changes remain untouched. Failed promotion/restoration grants
+no authority and requests no repair. No extra per-input calls, deadline changes
+or detached cleanup are introduced. Under CPU pressure this is a scheduling
+mitigation, not proof that all native/API waits are runnable starvation; fixed
+process-count capacity and postinstallation physical comparisons remain needed.
+
 g542 adds fixed runtime/trace regions for the actual wire-reader goroutine,
 its enqueue, semantic writer permit/operation and each decoded lease control
 kind. The GC sampler separately marks metrics.Read and OS counter collection.
