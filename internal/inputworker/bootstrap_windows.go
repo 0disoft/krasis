@@ -397,6 +397,11 @@ func runInstalledConsoleInputMode(ctx context.Context, agentDigest, serviceDiges
 		<-readerDone
 	}()
 	if lease.Capture {
+		// This branch follows authenticated bootstrap and fresh lease/service
+		// validation. Only this isolated capture child needs its scheduler and
+		// query-start dependencies to share the native owners' responsive class.
+		restoreScheduling := sourceCaptureProcessSchedulingScope()
+		defer restoreScheduling()
 		var exit logindiag.SourceExit
 		result := runSourceCapture(run, channel, queryService, lease, func() error {
 			if err := control.SetWriteDeadline(time.Now().Add(startupTimeout)); err != nil {

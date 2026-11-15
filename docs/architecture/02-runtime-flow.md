@@ -635,6 +635,22 @@ before final ownership verification, including when that reply beats the native
 wait. Expired, cancelled or terminal replies cannot start this final service.
 Actual rejection retains the existing verified fallback and detach behavior.
 
+g541 also gives only the authenticated capture child's process a best-effort
+NORMAL to ABOVE_NORMAL priority-class scope. Previously a critical authority
+query was marked scheduled before creating a goroutine; that goroutine had to
+run at the normal process base before it could raise its individual thread
+priority. A `source-service-query-deadline-scheduled` result therefore identifies
+pre-callback scheduling expiry, not an SCM query duration. The new scope covers
+these scheduler dependencies and capture owner wakeups without changing the
+GUI, service, network agent, other child roles, authority checks or deadlines.
+Existing non-normal policy and later observed external policy changes are
+preserved; normal priority is restored once on return. API failures are merely
+unavailable scheduling hints, never authority success or service-repair errors.
+The scope adds two priority queries/two writes per capture child lifetime,
+zero additional per-command calls, and requires paired measurements before
+claiming a latency improvement. A same-value external policy write cannot be
+distinguished from the scope's setting; Windows offers no priority-class CAS.
+
 g540 consumes a requester reply that arrives during internal message service
 before entering another native message wait. On successful completion it samples
 `GetForegroundWindow` and skips another `PeekMessageW` only if this capture HWND
