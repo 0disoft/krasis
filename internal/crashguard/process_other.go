@@ -2,7 +2,15 @@
 
 package crashguard
 
-import "os/exec"
+import (
+	"io"
+	"os/exec"
+)
+
+func configureStdout(command *exec.Cmd) (io.ReadCloser, func(), error) {
+	reader, err := command.StdoutPipe()
+	return reader, func() {}, err
+}
 
 func confirmedExitAbort(err error, _ bool) error { return err }
 

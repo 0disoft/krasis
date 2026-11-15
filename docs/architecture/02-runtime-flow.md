@@ -495,6 +495,18 @@ join inside a 267.456ms ready wait. Connection-start demand moves optional
 construction ahead of an ordinary first approach. It cannot guarantee immediate
 readiness for an entry arriving during startup or after candidate expiry.
 
+### Windows native-child reply pipe
+
+The native input/guardian parent reads child stdout through a private overlapped
+named pipe registered with Go's IOCP poller, rather than an anonymous synchronous
+StdoutPipe. The read owner yields without parking a dedicated OS thread in a
+synchronous ReadFile. The same single buffered reader still owns guard and input
+ACK framing. The parent closes its duplicate child writer immediately after
+Start (including failures); child exit then produces EOF. Exact-process abort,
+client sequence/binding validation, uncertain-outcome fencing and joined handle
+cleanup remain unchanged. The pipe uses the existing private user/SYSTEM ACL,
+random name and remote-client rejection. Linux retains its existing StdoutPipe.
+
 ### Joined source retirement during an outbound lease
 
 The protected capture lease remains bounded to at most one hour. Its verified

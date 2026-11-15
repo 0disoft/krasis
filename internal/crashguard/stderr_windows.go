@@ -32,6 +32,10 @@ func configureStderr(command *exec.Cmd, sink *limitedBuffer) (func(), func() err
 }
 
 func overlappedGuardPipe() (*os.File, *os.File, error) {
+	return newOverlappedGuardPipe("stderr")
+}
+
+func newOverlappedGuardPipe(purpose string) (*os.File, *os.File, error) {
 	user, err := windows.GetCurrentProcessToken().GetTokenUser()
 	if err != nil {
 		return nil, nil, err
@@ -44,7 +48,7 @@ func overlappedGuardPipe() (*os.File, *os.File, error) {
 	if _, err := rand.Read(nonce[:]); err != nil {
 		return nil, nil, err
 	}
-	name, err := windows.UTF16PtrFromString(`\\.\pipe\Krasis.Guard.Stderr.` + hex.EncodeToString(nonce[:]))
+	name, err := windows.UTF16PtrFromString(`\\.\pipe\Krasis.Guard.` + purpose + `.` + hex.EncodeToString(nonce[:]))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -67,5 +71,5 @@ func overlappedGuardPipe() (*os.File, *os.File, error) {
 		_ = windows.CloseHandle(readHandle)
 		return nil, nil, err
 	}
-	return os.NewFile(uintptr(readHandle), "guard-stderr-read"), os.NewFile(uintptr(writeHandle), "guard-stderr-write"), nil
+	return os.NewFile(uintptr(readHandle), "guard-"+purpose+"-read"), os.NewFile(uintptr(writeHandle), "guard-"+purpose+"-write"), nil
 }

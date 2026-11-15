@@ -155,11 +155,12 @@ func startCommand(command *exec.Cmd) (*Process, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create crash guard input pipe: %w", err)
 	}
-	stdout, err := command.StdoutPipe()
+	stdout, outputStarted, err := configureStdout(command)
 	if err != nil {
 		_ = stdin.Close()
 		return nil, fmt.Errorf("create crash guard output pipe: %w", err)
 	}
+	defer outputStarted() // Also closes the unstarted writer on every early failure.
 	stderr := &limitedBuffer{remaining: maxStderrBytes}
 	started, finishStderr, err := configureStderr(command, stderr)
 	if err != nil {
@@ -170,6 +171,7 @@ func startCommand(command *exec.Cmd) (*Process, error) {
 	client, err := NewClient(stdin, stdout)
 	if err != nil {
 		_ = stdin.Close()
+		_ = stdout.Close()
 		started()
 		_ = finishStderr()
 		return nil, err
@@ -181,6 +183,7 @@ func startCommand(command *exec.Cmd) (*Process, error) {
 		_ = finishStderr()
 		return nil, fmt.Errorf("start crash guard: %w", err)
 	}
+	outputStarted() // Close only our duplicate; os/exec gave the child its own handle.
 	started()
 	process := &Process{
 		client: client, stdin: stdin, stdout: stdout, process: command.Process,
