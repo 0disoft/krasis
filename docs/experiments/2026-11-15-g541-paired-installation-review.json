@@ -1,0 +1,248 @@
+{
+  "schema": "krasis.g541-installation-review/v1",
+  "generation": 541,
+  "revision": "05ef45d41bdbe2fc23558e11ef8481a0d93f6bfb",
+  "collection": "3784da1a82508f78be5ec098ef619126",
+  "update": {
+    "schemaVersion": "krasis.cli.update-wait/v1",
+    "peerAlias": "B",
+    "id": "f627867c37239293a64795839dae48f6",
+    "code": "updated",
+    "transferState": "UPDATED",
+    "generation": 541,
+    "revision": "05ef45d41bdbe2fc23558e11ef8481a0d93f6bfb",
+    "bytes": 29089880,
+    "total": 29089880
+  },
+  "setup": {
+    "schema": "krasis.setup-result/v1",
+    "code": 0,
+    "state": "installed"
+  },
+  "cliConnect": {
+    "schemaVersion": "krasis.cli.peer-connect/v1",
+    "code": "connected",
+    "peerAlias": "B",
+    "id": "22c91f25841725dc1373dc80a3908155"
+  },
+  "peerWindow": {
+    "schemaVersion": "krasis.cli.app-open/v1",
+    "code": "window_ready",
+    "peerAlias": "B",
+    "id": "3ad9297158e4b2782d6b6c5cdfcd0d21"
+  },
+  "doctor": {
+    "schemaVersion": "krasis.cli.doctor/v1",
+    "agent": "RUNNING",
+    "connection": "CONNECTED",
+    "peerAlias": "B",
+    "cliGeneration": 541,
+    "agentGeneration": 541,
+    "protocol": "COMPATIBLE",
+    "code": "healthy",
+    "cliBuild": "05ef45d41bdbe2fc23558e11ef8481a0d93f6bfb",
+    "agentBuild": "05ef45d41bdbe2fc23558e11ef8481a0d93f6bfb",
+    "ui": {
+      "state": "RUNNING",
+      "generation": 541,
+      "build": "05ef45d41bdbe2fc23558e11ef8481a0d93f6bfb",
+      "pathStatus": "MATCHED"
+    },
+    "launchRecord": {
+      "state": "VERIFIED",
+      "generation": 541,
+      "build": "05ef45d41bdbe2fc23558e11ef8481a0d93f6bfb",
+      "pathStatus": "MATCHED"
+    },
+    "installedAgent": {
+      "state": "VERIFIED",
+      "build": "05ef45d41bdbe2fc23558e11ef8481a0d93f6bfb"
+    },
+    "service": {
+      "state": "RUNNING",
+      "pathStatus": "MATCHED"
+    },
+    "agentLocation": "PROTECTED",
+    "protectedInput": "CONFIGURED",
+    "checks": [
+      {
+        "name": "agent",
+        "state": "RUNNING"
+      },
+      {
+        "name": "connection",
+        "state": "CONNECTED"
+      },
+      {
+        "name": "protocol",
+        "state": "COMPATIBLE"
+      },
+      {
+        "name": "cli_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "ui_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "installed_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "ui",
+        "state": "RUNNING"
+      },
+      {
+        "name": "launch_record",
+        "state": "VERIFIED"
+      },
+      {
+        "name": "installed_agent",
+        "state": "VERIFIED"
+      },
+      {
+        "name": "service",
+        "state": "RUNNING"
+      },
+      {
+        "name": "update_stage_cleanup",
+        "state": "COMPLETED"
+      }
+    ],
+    "nextActions": []
+  },
+  "peer": {
+    "schemaVersion": "krasis.cli.update-status/v1",
+    "peerAlias": "B",
+    "localGeneration": 541,
+    "localBuild": "05ef45d41bdbe2fc23558e11ef8481a0d93f6bfb",
+    "peerState": "ONLINE",
+    "peerGeneration": 541,
+    "peerBuild": "05ef45d41bdbe2fc23558e11ef8481a0d93f6bfb",
+    "peerAllowsUpdate": true,
+    "receiveAllowed": true,
+    "transferState": "IDLE"
+  },
+  "devices": {
+    "A": {
+      "created": "2026-11-15T12:16:44Z",
+      "sha256": "020f9e8fb443f30f7049b4977f9428216ff775cf61445d75ee2de8f969d33d99",
+      "service": "READY",
+      "input": "READY",
+      "grant": "PRESENT",
+      "serviceStart": "2026-11-15T12:16:19.2657419Z",
+      "connectedAt": "2026-11-15T12:16:23.7257245Z",
+      "connection": "7d26d966284333e70fd3e68d3df252e7e3a55af7de00700260454a0729af1076",
+      "observedSeconds": 20.275,
+      "failures": [],
+      "reconnects": [],
+      "preconnectionEvents": [],
+      "launchRecord": [
+        {
+          "time": "2026-11-15T12:16:21.6282473Z",
+          "code": "launch_record_ready"
+        }
+      ],
+      "captureReady": [
+        {
+          "time": "2026-11-15T12:16:24.1248209Z",
+          "code": "installed_source_capture_protected_ready"
+        }
+      ],
+      "logCompleteness": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false
+        }
+      ]
+    },
+    "B": {
+      "created": "2026-11-15T12:16:34Z",
+      "sha256": "15e6bee11e463af98dbdf1962cb4da2922b7c7072af6dfb45f8c702c44a73d83",
+      "service": "READY",
+      "input": "READY",
+      "grant": "PRESENT",
+      "serviceStart": "2026-11-15T12:15:30.8351067Z",
+      "connectedAt": "2026-11-15T12:16:13.3981794Z",
+      "connection": "7d26d966284333e70fd3e68d3df252e7e3a55af7de00700260454a0729af1076",
+      "observedSeconds": 20.602,
+      "failures": [],
+      "reconnects": [],
+      "preconnectionEvents": [
+        {
+          "time": "2026-11-15T12:15:43.8825865Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-15T12:15:43.8825865Z",
+          "code": "RECONNECTING"
+        },
+        {
+          "time": "2026-11-15T12:15:49.1431207Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-15T12:15:54.6468703Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-15T12:16:02.344179Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-15T12:16:09.0966084Z",
+          "code": "reconnect_acquire_network_timeout"
+        }
+      ],
+      "launchRecord": [
+        {
+          "time": "2026-11-15T12:15:33.5309226Z",
+          "code": "launch_record_ready"
+        }
+      ],
+      "captureReady": [
+        {
+          "time": "2026-11-15T12:16:13.6316309Z",
+          "code": "installed_source_capture_protected_ready"
+        }
+      ],
+      "logCompleteness": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false
+        }
+      ]
+    }
+  },
+  "limits": [
+    "Short postinstallation interval; no new physical crossing trial or controlled CPU contention measurement.",
+    "Scheduler dispatch expiry is proven by its phase; CPU causation and the complete native activation tail are not proven.",
+    "Windows priority policy changes are best effort and have no compare-and-swap API.",
+    "Remote CI and Linux testing skipped for this Windows-only change; no API, DB, dependency, hygiene or runner changes."
+  ]
+}

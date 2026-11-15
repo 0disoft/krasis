@@ -74,3 +74,31 @@ Send B once, retain its exact update receipt, install A, then verify matched
 CLI/agent/UI/launch/protected installation, READY and CLI connection on both.
 Rollback uses a new generation from the previous source through this same
 installer process. Push and public release are outside the current request.
+
+## Installed result
+
+Workspace packaging passed 111 UI tests, the native UI build, real update-archive
+roundtrip and eight-file/icon validation. Offline update verify accepted
+29,089,880 bytes; setup verification passed. All binaries are bound to
+`05ef45d41bdbe2fc23558e11ef8481a0d93f6bfb`.
+
+B receipt `f627867c37239293a64795839dae48f6` confirmed UPDATED for all bytes.
+A setup returned installed/code 0. CLI connection receipt
+`22c91f25841725dc1373dc80a3908155` confirmed connected; B app-open receipt
+`3ad9297158e4b2782d6b6c5cdfcd0d21` confirmed window_ready. A doctor is healthy,
+CONNECTED and CONFIGURED with matched CLI/agent/UI/launch/protected install.
+B is ONLINE on the same g541 revision, transfer IDLE, with matching-build
+launch_record_ready. Both diagnostics show service/input READY and grant PRESENT.
+
+Collection `3784da1a82508f78be5ec098ef619126` covers 20.275s on A and 20.602s on B
+after their local CONNECTED events on the same connection. No matching-build
+postconnection failure, reconnect or recovery is retained. B's five acquisition
+timeouts preceded that connection during A installation and are listed separately.
+The retained old recovery.lastFailure entries are from earlier dates, not g541
+incidents. Each interval uses its own device clock; no A/B clock subtraction.
+
+A read-only Win32_Process snapshot observed service base priority 8, one capture
+child at 10, and the other worker processes still at 8. This confirms the isolated
+class scope is active in the installed runtime, not a measured latency reduction.
+New physical crossings and controlled scheduling measurements remain unverified.
+The installation JSON retains receipt details, evidence digests and log completeness.
