@@ -1,0 +1,221 @@
+{
+  "schema": "krasis.paired-installation/v1",
+  "generation": 547,
+  "revision": "7671397cf4f786f1ed873e65c886a165710f55cb",
+  "receipt": {
+    "schemaVersion": "krasis.cli.update-wait/v1",
+    "peerAlias": "B",
+    "id": "c41d14f5352408cc60a04fa74f4fc63e",
+    "code": "updated",
+    "transferState": "UPDATED",
+    "generation": 547,
+    "revision": "7671397cf4f786f1ed873e65c886a165710f55cb",
+    "bytes": 29251555,
+    "total": 29251555
+  },
+  "doctor": {
+    "schemaVersion": "krasis.cli.doctor/v1",
+    "agent": "RUNNING",
+    "connection": "CONNECTED",
+    "peerAlias": "B",
+    "cliGeneration": 547,
+    "agentGeneration": 547,
+    "protocol": "COMPATIBLE",
+    "code": "healthy",
+    "cliBuild": "7671397cf4f786f1ed873e65c886a165710f55cb",
+    "agentBuild": "7671397cf4f786f1ed873e65c886a165710f55cb",
+    "ui": {
+      "state": "RUNNING",
+      "generation": 547,
+      "build": "7671397cf4f786f1ed873e65c886a165710f55cb",
+      "pathStatus": "MATCHED"
+    },
+    "launchRecord": {
+      "state": "VERIFIED",
+      "generation": 547,
+      "build": "7671397cf4f786f1ed873e65c886a165710f55cb",
+      "pathStatus": "MATCHED"
+    },
+    "installedAgent": {
+      "state": "VERIFIED",
+      "build": "7671397cf4f786f1ed873e65c886a165710f55cb"
+    },
+    "service": {
+      "state": "RUNNING",
+      "pathStatus": "MATCHED"
+    },
+    "agentLocation": "PROTECTED",
+    "protectedInput": "CONFIGURED",
+    "checks": [
+      {
+        "name": "agent",
+        "state": "RUNNING"
+      },
+      {
+        "name": "connection",
+        "state": "CONNECTED"
+      },
+      {
+        "name": "protocol",
+        "state": "COMPATIBLE"
+      },
+      {
+        "name": "cli_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "ui_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "installed_agent_version",
+        "state": "MATCHED"
+      },
+      {
+        "name": "ui",
+        "state": "RUNNING"
+      },
+      {
+        "name": "launch_record",
+        "state": "VERIFIED"
+      },
+      {
+        "name": "installed_agent",
+        "state": "VERIFIED"
+      },
+      {
+        "name": "service",
+        "state": "RUNNING"
+      },
+      {
+        "name": "update_stage_cleanup",
+        "state": "COMPLETED"
+      }
+    ],
+    "nextActions": []
+  },
+  "peer": {
+    "schemaVersion": "krasis.cli.update-status/v1",
+    "peerAlias": "B",
+    "localGeneration": 547,
+    "localBuild": "7671397cf4f786f1ed873e65c886a165710f55cb",
+    "peerState": "ONLINE",
+    "peerGeneration": 547,
+    "peerBuild": "7671397cf4f786f1ed873e65c886a165710f55cb",
+    "peerAllowsUpdate": true,
+    "receiveAllowed": true,
+    "transferState": "IDLE"
+  },
+  "connect": {
+    "schemaVersion": "krasis.cli.peer-connect/v1",
+    "code": "connected",
+    "peerAlias": "B",
+    "id": "5efa321ea0bb9f94d12ca7944fba2086"
+  },
+  "collection": "43b42227aa365aef7126c863c0864130",
+  "devices": {
+    "A": {
+      "created": "2026-11-15T19:57:06Z",
+      "input": {
+        "time": "2026-11-15T19:56:39.7042413Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "installation": {
+        "time": "2026-11-15T19:56:38.3476199Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "connection": "85870da506c7431181ce2982ad6b50e127ef6f203e308d5452690419e3669eca",
+      "connectedAt": "2026-11-15T19:56:47.4436237Z",
+      "postConnectErrors": [],
+      "coverage": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false
+        }
+      ]
+    },
+    "B": {
+      "created": "2026-11-15T19:56:57Z",
+      "input": {
+        "time": "2026-11-15T19:56:26.2897002Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "installation": {
+        "time": "2026-11-15T19:55:50.581436Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "connection": "85870da506c7431181ce2982ad6b50e127ef6f203e308d5452690419e3669eca",
+      "connectedAt": "2026-11-15T19:56:36.6214554Z",
+      "postConnectErrors": [],
+      "coverage": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false
+        }
+      ]
+    }
+  },
+  "validation": {
+    "packageBytes": 29251555,
+    "uiTests": 111,
+    "affectedPackageTests": true,
+    "focusedWindowsRace": true,
+    "vet": true,
+    "linuxCrossBuild": true,
+    "nativeLinux": false,
+    "remoteCI": false
+  },
+  "limits": [
+    "Short post-install observation only; physical crossing latency requires fresh samples.",
+    "The old 325ms wait cannot be retrospectively separated into network and Go scheduling.",
+    "A opt-in runtime tracing is enabled for a bounded follow-up capture."
+  ]
+}

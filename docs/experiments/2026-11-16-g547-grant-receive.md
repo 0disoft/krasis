@@ -91,3 +91,36 @@ backlog evidence, but zero samples still leave network versus IOCP/Go wakeup
 unresolved. Existing opt-in Go execution tracing (wire_read regions and
 Waiting-to-Runnable-to-Running transitions) is required for exact Go resume
 time; it must not be presented as a hardware packet timestamp.
+
+## Paired installation
+
+Code commit `7671397cf4f786f1ed873e65c886a165710f55cb` was packaged after
+111/111 UI tests, the native UI build, executable/icon checks, the workspace
+archive test and offline update verification passed. Archive: 29,251,555 bytes.
+B was sent once, receipt `c41d14f5352408cc60a04fa74f4fc63e`, UPDATED for
+the exact revision and byte total. A setup returned installed/code=0.
+
+Doctor confirms A CLI, agent, UI, launch record and protected installed agent
+at that revision, healthy/CONNECTED. B is ONLINE on the same generation and
+revision; transfers are IDLE. CLI app-connect receipt
+`5efa321ea0bb9f94d12ca7944fba2086` is connected. Collection
+`43b42227aa365aef7126c863c0864130` confirms input READY, installation result
+zero and the same connection on both devices. No post-connect timeout, fault,
+poison, recovery-required or reconnect event appears in this short collection.
+B's acquisition timeout/RECONNECTING precedes the final connection, while A
+was being updated. Stored recovery lastFailure entries predate g547.
+Agent current/previous log coverage is complete; control.previous coverage
+is incomplete. The companion installation JSON records these limits.
+
+A trace-enabled launch is confirmed by runtime_trace_enabled on the new run.
+The existing recorder expires after 15 minutes and saves a bounded trace on a
+slow handoff; a fresh physical crossing trial has been requested. Normal
+packet timestamps and exact historical 325 ms network/Go attribution remain
+unmeasured. This rollout does not establish a measured latency reduction.
+
+Before installation, 30 separate warm ICMP probes succeeded with Windows RTT
+rounded to 0 ms. The first managed caller took 51.078 ms wall time, subsequent
+calls were at most 2.575 ms. This is a different, warm sample with managed startup
+overhead, not the g546 grant exchange or a TCP transit measurement. It cannot
+rule out earlier network jitter. No continuous ping runs during physical
+crossings, to avoid changing wireless idle behavior.
