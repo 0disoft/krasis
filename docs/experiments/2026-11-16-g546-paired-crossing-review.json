@@ -1,0 +1,2911 @@
+{
+  "schema": "krasis.g546-paired-crossing/v1",
+  "generation": 546,
+  "revision": "9b1aeaef4b95c11b951be0c8f82548359b5b4407",
+  "collection": "831297fcefb3fb7a7b0358bb6f84f155",
+  "devices": {
+    "A": {
+      "created": "2026-11-15T18:56:59Z",
+      "connectedAt": "2026-11-15T18:53:26.3305442Z",
+      "connection": "0875845240911e6d442b39aeb89890f22b03867c5cf79d7f7b6299becc36a33b",
+      "run": "031d386b63db394aec5cac15eb709af2",
+      "observationSeconds": 212.67,
+      "logCoverage": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false,
+          "events": 2497
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false,
+          "events": 649
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true,
+          "events": 0
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false,
+          "events": 727
+        }
+      ],
+      "input": {
+        "time": "2026-11-15T18:56:52.9492354Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "service": {
+        "startedAt": "2026-11-15T18:53:16.0870157Z",
+        "time": "2026-11-15T18:53:16.220514Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      },
+      "recovery": {
+        "time": "2026-11-15T18:56:31.7485451Z",
+        "code": "agent_present",
+        "agentState": "CONNECTED",
+        "lastFailure": {
+          "time": "2026-11-15T14:48:31.5080778Z",
+          "code": "agent_faulted",
+          "agentState": "FAULTED"
+        }
+      },
+      "lastFailurePredatesService": true,
+      "connectedEvents": 1,
+      "preConnectAlarms": [],
+      "postConnectAlarms": [],
+      "runtimeMetricsMs": {
+        "timerLateMs": {
+          "n": 3,
+          "min": 51.655,
+          "median": 488.564,
+          "max": 3593.797
+        },
+        "samplerTimerLateMs": {
+          "n": 3,
+          "min": 421.302,
+          "median": 685.254,
+          "max": 4336.108
+        },
+        "dispatchMaxMs": {
+          "n": 3,
+          "min": 0,
+          "median": 0,
+          "max": 59.001
+        },
+        "injectionMaxMs": {
+          "n": 3,
+          "min": 0,
+          "median": 0,
+          "max": 0
+        },
+        "queueMaxResidenceMs": {
+          "n": 3,
+          "min": 0,
+          "median": 0,
+          "max": 24.76
+        }
+      },
+      "sha256": "d495ed171db4247de8d18c324cf208e281641a023da72f851ce02fe307b34567",
+      "serviceStartUnchanged": true,
+      "largestSamplerDelay": [
+        {
+          "time": "2026-11-15T18:54:21.0323633Z",
+          "samplerMs": 4336.108,
+          "mainTimerMs": 3593.797,
+          "dispatches": 0,
+          "dispatchMaxMs": 0
+        }
+      ]
+    },
+    "B": {
+      "created": "2026-11-15T18:56:50Z",
+      "connectedAt": "2026-11-15T18:53:15.5710181Z",
+      "connection": "0875845240911e6d442b39aeb89890f22b03867c5cf79d7f7b6299becc36a33b",
+      "run": "df51dabe1838387f7fa1dd2cecc46aef",
+      "observationSeconds": 214.429,
+      "logCoverage": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false,
+          "events": 2680
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false,
+          "events": 2367
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true,
+          "events": 0
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false,
+          "events": 579
+        }
+      ],
+      "input": {
+        "time": "2026-11-15T18:56:26.7713072Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "service": {
+        "startedAt": "2026-11-15T18:52:18.1527847Z",
+        "time": "2026-11-15T18:52:18.1984701Z",
+        "service": "READY",
+        "console": "USER_SESSION",
+        "grant": "PRESENT",
+        "lastWorker": "NONE"
+      },
+      "recovery": {
+        "time": "2026-11-15T18:56:08.2100482Z",
+        "code": "agent_present",
+        "agentState": "CONNECTED",
+        "lastFailure": {
+          "time": "2026-11-04T08:21:08.3372368Z",
+          "code": "agent_faulted",
+          "agentState": "FAULTED"
+        }
+      },
+      "lastFailurePredatesService": true,
+      "connectedEvents": 1,
+      "preConnectAlarms": [
+        {
+          "time": "2026-11-15T18:52:31.4226559Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-15T18:52:31.4226559Z",
+          "code": "RECONNECTING"
+        },
+        {
+          "time": "2026-11-15T18:52:36.64147Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-15T18:52:42.074534Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-15T18:52:49.7906915Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-15T18:52:57.1250702Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-15T18:53:07.8390512Z",
+          "code": "reconnect_acquire_network_timeout"
+        }
+      ],
+      "postConnectAlarms": [],
+      "runtimeMetricsMs": {
+        "timerLateMs": {
+          "n": 4,
+          "min": 0.704,
+          "median": 8.416500000000001,
+          "max": 32.742
+        },
+        "samplerTimerLateMs": {
+          "n": 4,
+          "min": 5.195,
+          "median": 7.1355,
+          "max": 196.57
+        },
+        "dispatchMaxMs": {
+          "n": 4,
+          "min": 0,
+          "median": 0.2285,
+          "max": 36.302
+        },
+        "injectionMaxMs": {
+          "n": 4,
+          "min": 0,
+          "median": 0,
+          "max": 3.589
+        },
+        "queueMaxResidenceMs": {
+          "n": 4,
+          "min": 0,
+          "median": 0,
+          "max": 0
+        }
+      },
+      "sha256": "d041eddbfd29f5750a02f4bbcba224571969a8386c6a3c1ef50580daf5cc15d8",
+      "serviceStartUnchanged": true,
+      "largestSamplerDelay": [
+        {
+          "time": "2026-11-15T18:54:24.9087098Z",
+          "samplerMs": 196.57,
+          "mainTimerMs": 32.742,
+          "dispatches": 10,
+          "dispatchMaxMs": 0
+        }
+      ]
+    }
+  },
+  "pairs": {
+    "source": 8,
+    "receiver": 8,
+    "matched": 8,
+    "complete": 8,
+    "incomplete": 0,
+    "unmatchedSource": 0,
+    "unmatchedReceiver": 0
+  },
+  "metricsMs": {
+    "aBoundaryMs": {
+      "n": 8,
+      "min": 1.643,
+      "median": 5.0495,
+      "max": 29.925
+    },
+    "aGrantMs": {
+      "n": 8,
+      "min": 42.756,
+      "median": 49.016000000000005,
+      "max": 325.072
+    },
+    "aCaptureMs": {
+      "n": 8,
+      "min": 23.991,
+      "median": 34.924,
+      "max": 60.45
+    },
+    "aDeactivateMs": {
+      "n": 8,
+      "min": 9.478,
+      "median": 11.500499999999999,
+      "max": 22.206
+    },
+    "bAuthorizeMs": {
+      "n": 8,
+      "min": 25.957,
+      "median": 27.7085,
+      "max": 125.033
+    },
+    "bReadyMs": {
+      "n": 8,
+      "min": 22.51,
+      "median": 24.2655,
+      "max": 119.843
+    },
+    "bEntryMs": {
+      "n": 8,
+      "min": 2.95,
+      "median": 3.65,
+      "max": 4.699
+    },
+    "bFirstInputMs": {
+      "n": 8,
+      "min": 1.648,
+      "median": 1.813,
+      "max": 2.312
+    },
+    "bWorstInputMs": {
+      "n": 8,
+      "min": 2.621,
+      "median": 3.4269999999999996,
+      "max": 4.678
+    },
+    "bNativeHandlerMs": {
+      "n": 8,
+      "min": 1.053,
+      "median": 1.472,
+      "max": 2.432
+    },
+    "bSendInputMs": {
+      "n": 8,
+      "min": 0.556,
+      "median": 0.5914999999999999,
+      "max": 1.733
+    },
+    "bServiceReplyToAppMs": {
+      "n": 8,
+      "min": 0.059,
+      "median": 0.552,
+      "max": 1.752
+    }
+  },
+  "captureIPCMs": {
+    "requestDeliveryMicros": {
+      "n": 8,
+      "min": 0.063,
+      "median": 0.07150000000000001,
+      "max": 0.181
+    },
+    "readAuthorizationMicros": {
+      "n": 8,
+      "min": 0.221,
+      "median": 0.2465,
+      "max": 0.454
+    },
+    "dispatchMicros": {
+      "n": 8,
+      "min": 0.052,
+      "median": 0.059,
+      "max": 0.069
+    },
+    "activationMicros": {
+      "n": 8,
+      "min": 17.288,
+      "median": 24.380000000000003,
+      "max": 42.608
+    },
+    "replyAdmissionMicros": {
+      "n": 8,
+      "min": 0.081,
+      "median": 0.10200000000000001,
+      "max": 0.285
+    },
+    "replyEncodeMicros": {
+      "n": 8,
+      "min": 0.002,
+      "median": 0.003,
+      "max": 0.006
+    },
+    "replyDeliveryMicros": {
+      "n": 8,
+      "min": 0.116,
+      "median": 1.4095,
+      "max": 14.167
+    },
+    "callerResumeMicros": {
+      "n": 8,
+      "min": 0.099,
+      "median": 2.452,
+      "max": 7.932
+    }
+  },
+  "captureExactMs": {
+    "queueToHandleMicros": {
+      "n": 8,
+      "min": 0,
+      "median": 0,
+      "max": 0.577
+    },
+    "foregroundRequestMicros": {
+      "n": 8,
+      "min": 9.5,
+      "median": 16.6795,
+      "max": 35.446
+    }
+  },
+  "tcp": {
+    "estimatesMs": {
+      "n": 16,
+      "min": 10.292,
+      "median": 13.232,
+      "max": 71.838
+    },
+    "knownCounters": 8,
+    "retransmittedBytes": 0,
+    "timeoutEpisodes": 0
+  },
+  "preparationMs": {
+    "A": {
+      "BoundaryToBegin": {
+        "n": 8,
+        "min": 1.643,
+        "median": 5.0495,
+        "max": 29.925
+      },
+      "RequestCoordinator": {
+        "n": 8,
+        "min": 0,
+        "median": 0,
+        "max": 0
+      },
+      "RequestWrite": {
+        "n": 8,
+        "min": 0,
+        "median": 0.276,
+        "max": 2.776
+      },
+      "RequestToGrant": {
+        "n": 8,
+        "min": 42.756,
+        "median": 49.016000000000005,
+        "max": 325.072
+      },
+      "GrantCoordinator": {
+        "n": 8,
+        "min": 0,
+        "median": 0,
+        "max": 0
+      },
+      "SourceActivate": {
+        "n": 8,
+        "min": 0,
+        "median": 0,
+        "max": 0
+      },
+      "CaptureActivate": {
+        "n": 8,
+        "min": 23.991,
+        "median": 34.924,
+        "max": 60.45
+      },
+      "CommitWrite": {
+        "n": 8,
+        "min": 0,
+        "median": 0.531,
+        "max": 3.332
+      },
+      "SourceDeactivate": {
+        "n": 8,
+        "min": 9.478,
+        "median": 11.500499999999999,
+        "max": 22.206
+      },
+      "ReentryGap": {
+        "n": 7,
+        "min": 148.273,
+        "median": 3368.02,
+        "max": 3699.464
+      }
+    },
+    "B": {
+      "RequestCoordinator": {
+        "n": 8,
+        "min": 0,
+        "median": 0,
+        "max": 0
+      },
+      "PeerAuthorize": {
+        "n": 8,
+        "min": 1.02,
+        "median": 1.1925,
+        "max": 2.076
+      },
+      "AuthorizeTotal": {
+        "n": 8,
+        "min": 25.957,
+        "median": 27.7085,
+        "max": 125.033
+      },
+      "OpenLock": {
+        "n": 8,
+        "min": 0,
+        "median": 0,
+        "max": 0
+      },
+      "ConnectTotal": {
+        "n": 8,
+        "min": 24.622,
+        "median": 26.554499999999997,
+        "max": 124.013
+      },
+      "PipeOpen": {
+        "n": 8,
+        "min": 0,
+        "median": 0,
+        "max": 1
+      },
+      "ServiceAuth": {
+        "n": 8,
+        "min": 1.21,
+        "median": 1.822,
+        "max": 2.579
+      },
+      "ServiceImagePin": {
+        "n": 8,
+        "min": 0,
+        "median": 0,
+        "max": 0
+      },
+      "LeaseWrite": {
+        "n": 8,
+        "min": 0,
+        "median": 0,
+        "max": 0.602
+      },
+      "ReadyWait": {
+        "n": 8,
+        "min": 22.51,
+        "median": 24.2655,
+        "max": 119.843
+      },
+      "NewClientCheck": {
+        "n": 8,
+        "min": 0,
+        "median": 0.2615,
+        "max": 0.59
+      },
+      "ReturnArm": {
+        "n": 8,
+        "min": 0,
+        "median": 0,
+        "max": 0
+      },
+      "EntryPrepare": {
+        "n": 8,
+        "min": 2.95,
+        "median": 3.65,
+        "max": 4.699
+      },
+      "PrepareInbound": {
+        "n": 8,
+        "min": 0,
+        "median": 0,
+        "max": 0.588
+      },
+      "GrantWrite": {
+        "n": 8,
+        "min": 0,
+        "median": 0,
+        "max": 0.711
+      },
+      "CommitCoordinator": {
+        "n": 8,
+        "min": 0,
+        "median": 0,
+        "max": 0
+      },
+      "CommitApply": {
+        "n": 8,
+        "min": 0,
+        "median": 0,
+        "max": 0
+      },
+      "InputClose": {
+        "n": 8,
+        "min": 0,
+        "median": 0.297,
+        "max": 0.646
+      },
+      "ReentryGap": {
+        "n": 7,
+        "min": 168.834,
+        "median": 3404.337,
+        "max": 3720.42
+      }
+    }
+  },
+  "samples": [
+    {
+      "tag": "a217e4a10a2f49d0ab2f873c3c65ceebe0eb3b8142c02e836d426d848837e52d",
+      "timeA": "2026-11-15T18:56:14.7385233Z",
+      "timeB": "2026-11-15T18:56:03.9660949Z",
+      "complete": true,
+      "aBoundaryMs": 4.991,
+      "aGrantMs": 325.072,
+      "aCaptureMs": 55.668,
+      "aDeactivateMs": 12.968,
+      "bAuthorizeMs": 30.22,
+      "bReadyMs": 25.216,
+      "bEntryMs": 4.247,
+      "bFirstInputMs": 2.207,
+      "bWorstInputMs": 3.12,
+      "bNativeHandlerMs": 1.174,
+      "bSendInputMs": 0.588,
+      "bServiceReplyToAppMs": 0.434,
+      "aCaptureIPC": {
+        "measured": true,
+        "requestDeliveryMicros": 146,
+        "readAuthorizationMicros": 305,
+        "dispatchMicros": 69,
+        "activationMicros": 42608,
+        "replyAdmissionMicros": 81,
+        "replyEncodeMicros": 2,
+        "replyDeliveryMicros": 2080,
+        "callerResumeMicros": 7932,
+        "request": {
+          "measured": true,
+          "submitMicros": 15,
+          "receiveMicros": 131,
+          "writeCompletionMicros": 21
+        },
+        "readAuthority": {
+          "measured": true,
+          "waitMicros": 0,
+          "nativeMicros": 0
+        }
+      },
+      "aCaptureExact": {
+        "foregroundRequestMicros": 35446,
+        "measured": 7
+      },
+      "aCaptureNative": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        2,
+        0,
+        3,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "aTCP": {
+        "schema": 1,
+        "rttMicros": [
+          18105,
+          71838
+        ],
+        "minRttMicros": [
+          5206,
+          5206
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "bStartup": {
+        "schema": 1,
+        "micros": [
+          31942,
+          144266,
+          19400,
+          77758,
+          0,
+          2746,
+          5009,
+          11242
+        ],
+        "measured": 255,
+        "loadMicros": 77214,
+        "loadMeasured": true,
+        "prepared": true,
+        "preparedAgeMicros": 164791497,
+        "preparationDecision": 1,
+        "serviceReadiness": {
+          "micros": [
+            583,
+            5262,
+            1821,
+            0,
+            0
+          ],
+          "measured": 31
+        },
+        "native": [
+          {
+            "micros": [
+              64484,
+              2934,
+              4612,
+              0,
+              1155
+            ],
+            "measured": 31,
+            "imageHash": {
+              "micros": [
+                5942,
+                56288
+              ],
+              "backend": 1
+            }
+          },
+          {
+            "micros": [
+              66778,
+              2338,
+              4034,
+              0,
+              1357
+            ],
+            "measured": 31,
+            "imageHash": {
+              "micros": [
+                5654,
+                59381
+              ],
+              "backend": 1
+            }
+          }
+        ],
+        "imageHash": {
+          "micros": [
+            4375,
+            71130
+          ],
+          "backend": 1
+        }
+      },
+      "aPreparation": {
+        "BoundaryToBegin": 4.991,
+        "RequestCoordinator": 0,
+        "RequestWrite": 0.552,
+        "RequestToGrant": 325.072,
+        "GrantCoordinator": 0,
+        "SourceActivate": 0,
+        "CaptureActivate": 55.668,
+        "CommitWrite": 3.332,
+        "SourceDeactivate": 12.968
+      },
+      "bPreparation": {
+        "RequestCoordinator": 0,
+        "PeerAuthorize": 2.076,
+        "AuthorizeTotal": 30.22,
+        "OpenLock": 0,
+        "ConnectTotal": 28.143,
+        "PipeOpen": 0,
+        "ServiceAuth": 2.404,
+        "ServiceImagePin": 0,
+        "LeaseWrite": 0,
+        "ReadyWait": 25.216,
+        "NewClientCheck": 0.523,
+        "ReturnArm": 0,
+        "EntryPrepare": 4.247,
+        "PrepareInbound": 0,
+        "GrantWrite": 0,
+        "CommitCoordinator": 0,
+        "CommitApply": 0,
+        "InputClose": 0.594
+      }
+    },
+    {
+      "tag": "d6a68d4ebefd69a5e7b5eadd0f291d90c4d63d7c643e904ef2959be14df0826f",
+      "timeA": "2026-11-15T18:56:21.2525506Z",
+      "timeB": "2026-11-15T18:56:10.4835643Z",
+      "complete": true,
+      "aBoundaryMs": 1.643,
+      "aGrantMs": 44.434,
+      "aCaptureMs": 31.7,
+      "aDeactivateMs": 9.478,
+      "bAuthorizeMs": 27.057,
+      "bReadyMs": 23.013,
+      "bEntryMs": 3.467,
+      "bFirstInputMs": 1.673,
+      "bWorstInputMs": 3.433,
+      "bNativeHandlerMs": 2.291,
+      "bSendInputMs": 1.733,
+      "bServiceReplyToAppMs": 0.447,
+      "aCaptureIPC": {
+        "measured": true,
+        "requestDeliveryMicros": 69,
+        "readAuthorizationMicros": 454,
+        "dispatchMicros": 53,
+        "activationMicros": 25319,
+        "replyAdmissionMicros": 94,
+        "replyEncodeMicros": 2,
+        "replyDeliveryMicros": 1259,
+        "callerResumeMicros": 2798,
+        "request": {
+          "measured": true,
+          "submitMicros": 12,
+          "receiveMicros": 57,
+          "writeCompletionMicros": 24
+        },
+        "readAuthority": {
+          "measured": true,
+          "waitMicros": 564,
+          "nativeMicros": 0
+        }
+      },
+      "aCaptureExact": {
+        "foregroundRequestMicros": 17786,
+        "measured": 7
+      },
+      "aCaptureNative": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        2,
+        0,
+        3,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        2,
+        0,
+        0,
+        0,
+        0
+      ],
+      "aTCP": {
+        "schema": 1,
+        "rttMicros": [
+          13072,
+          12714
+        ],
+        "minRttMicros": [
+          5206,
+          5206
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "bStartup": {
+        "schema": 1,
+        "micros": [
+          22924,
+          116110,
+          16843,
+          59287,
+          0,
+          1983,
+          4209,
+          10823
+        ],
+        "measured": 255,
+        "loadMicros": 58787,
+        "loadMeasured": true,
+        "prepared": true,
+        "preparedAgeMicros": 6683081,
+        "preparationDecision": 1,
+        "serviceReadiness": {
+          "micros": [
+            716,
+            5588,
+            1336,
+            0,
+            581
+          ],
+          "measured": 31
+        },
+        "native": [
+          {
+            "micros": [
+              71225,
+              2901,
+              4391,
+              0,
+              567
+            ],
+            "measured": 31,
+            "imageHash": {
+              "micros": [
+                3313,
+                65599
+              ],
+              "backend": 1
+            }
+          },
+          {
+            "micros": [
+              81253,
+              2901,
+              4391,
+              0,
+              1163
+            ],
+            "measured": 31,
+            "imageHash": {
+              "micros": [
+                2355,
+                75918
+              ],
+              "backend": 1
+            }
+          }
+        ],
+        "imageHash": {
+          "micros": [
+            7446,
+            49567
+          ],
+          "backend": 1
+        }
+      },
+      "aPreparation": {
+        "BoundaryToBegin": 1.643,
+        "RequestCoordinator": 0,
+        "RequestWrite": 0,
+        "RequestToGrant": 44.434,
+        "GrantCoordinator": 0,
+        "SourceActivate": 0,
+        "CaptureActivate": 31.7,
+        "CommitWrite": 0.598,
+        "SourceDeactivate": 9.478,
+        "ReentryGap": 3395.728
+      },
+      "bPreparation": {
+        "RequestCoordinator": 0,
+        "PeerAuthorize": 1.418,
+        "AuthorizeTotal": 27.057,
+        "OpenLock": 0,
+        "ConnectTotal": 25.066,
+        "PipeOpen": 0,
+        "ServiceAuth": 2.053,
+        "ServiceImagePin": 0,
+        "LeaseWrite": 0,
+        "ReadyWait": 23.013,
+        "NewClientCheck": 0,
+        "ReturnArm": 0,
+        "EntryPrepare": 3.467,
+        "PrepareInbound": 0,
+        "GrantWrite": 0,
+        "CommitCoordinator": 0,
+        "CommitApply": 0,
+        "InputClose": 0,
+        "ReentryGap": 3420.376
+      }
+    },
+    {
+      "tag": "e8e020fcd435a21e736eb1b3fd1c44fc37a648f5234523250a00106bb140c552",
+      "timeA": "2026-11-15T18:56:27.4177805Z",
+      "timeB": "2026-11-15T18:56:16.6380642Z",
+      "complete": true,
+      "aBoundaryMs": 18.776,
+      "aGrantMs": 52.481,
+      "aCaptureMs": 60.45,
+      "aDeactivateMs": 22.206,
+      "bAuthorizeMs": 25.957,
+      "bReadyMs": 22.823,
+      "bEntryMs": 2.95,
+      "bFirstInputMs": 1.855,
+      "bWorstInputMs": 3.421,
+      "bNativeHandlerMs": 2.432,
+      "bSendInputMs": 1.693,
+      "bServiceReplyToAppMs": 0.375,
+      "aCaptureIPC": {
+        "measured": true,
+        "requestDeliveryMicros": 65,
+        "readAuthorizationMicros": 226,
+        "dispatchMicros": 52,
+        "activationMicros": 19844,
+        "replyAdmissionMicros": 110,
+        "replyEncodeMicros": 4,
+        "replyDeliveryMicros": 1537,
+        "callerResumeMicros": 2106,
+        "request": {
+          "measured": true,
+          "submitMicros": 10,
+          "receiveMicros": 55,
+          "writeCompletionMicros": 19
+        },
+        "readAuthority": {
+          "measured": true,
+          "waitMicros": 0,
+          "nativeMicros": 0
+        }
+      },
+      "aCaptureExact": {
+        "foregroundRequestMicros": 12171,
+        "measured": 7
+      },
+      "aCaptureNative": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        2,
+        0,
+        3,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "aTCP": {
+        "schema": 1,
+        "rttMicros": [
+          13261,
+          13278
+        ],
+        "minRttMicros": [
+          5206,
+          5206
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "bStartup": {
+        "schema": 1,
+        "micros": [
+          26606,
+          146112,
+          16761,
+          82157,
+          0,
+          3545,
+          4875,
+          9345
+        ],
+        "measured": 255,
+        "loadMicros": 81594,
+        "loadMeasured": true,
+        "prepared": true,
+        "preparedAgeMicros": 6431413,
+        "preparationDecision": 1,
+        "serviceReadiness": {
+          "micros": [
+            549,
+            4828,
+            1250,
+            633,
+            0
+          ],
+          "measured": 31
+        },
+        "native": [
+          {
+            "micros": [
+              67212,
+              2888,
+              3624,
+              0,
+              1142
+            ],
+            "measured": 31,
+            "imageHash": {
+              "micros": [
+                3462,
+                61002
+              ],
+              "backend": 1
+            }
+          },
+          {
+            "micros": [
+              61960,
+              2849,
+              3567,
+              639,
+              1142
+            ],
+            "measured": 31,
+            "imageHash": {
+              "micros": [
+                3971,
+                56243
+              ],
+              "backend": 1
+            }
+          }
+        ],
+        "imageHash": {
+          "micros": [
+            8761,
+            70619
+          ],
+          "backend": 1
+        }
+      },
+      "aPreparation": {
+        "BoundaryToBegin": 18.776,
+        "RequestCoordinator": 0,
+        "RequestWrite": 1.115,
+        "RequestToGrant": 52.481,
+        "GrantCoordinator": 0,
+        "SourceActivate": 0,
+        "CaptureActivate": 60.45,
+        "CommitWrite": 0,
+        "SourceDeactivate": 22.206,
+        "ReentryGap": 3504.746
+      },
+      "bPreparation": {
+        "RequestCoordinator": 0,
+        "PeerAuthorize": 1.335,
+        "AuthorizeTotal": 25.957,
+        "OpenLock": 0,
+        "ConnectTotal": 24.622,
+        "PipeOpen": 0,
+        "ServiceAuth": 1.799,
+        "ServiceImagePin": 0,
+        "LeaseWrite": 0,
+        "ReadyWait": 22.823,
+        "NewClientCheck": 0,
+        "ReturnArm": 0,
+        "EntryPrepare": 2.95,
+        "PrepareInbound": 0,
+        "GrantWrite": 0.619,
+        "CommitCoordinator": 0,
+        "CommitApply": 0,
+        "InputClose": 0,
+        "ReentryGap": 3525.501
+      }
+    },
+    {
+      "tag": "7d839b76bf71ff60d62ccb7c6a738a7a39d9abd6063c7c99686b854b3d0513f9",
+      "timeA": "2026-11-15T18:56:32.0417698Z",
+      "timeB": "2026-11-15T18:56:21.2749129Z",
+      "complete": true,
+      "aBoundaryMs": 2.794,
+      "aGrantMs": 45.551,
+      "aCaptureMs": 42.83,
+      "aDeactivateMs": 10.622,
+      "bAuthorizeMs": 26.146,
+      "bReadyMs": 22.51,
+      "bEntryMs": 4.644,
+      "bFirstInputMs": 1.648,
+      "bWorstInputMs": 3.589,
+      "bNativeHandlerMs": 1.45,
+      "bSendInputMs": 0.574,
+      "bServiceReplyToAppMs": 1.047,
+      "aCaptureIPC": {
+        "measured": true,
+        "requestDeliveryMicros": 181,
+        "readAuthorizationMicros": 223,
+        "dispatchMicros": 61,
+        "activationMicros": 27352,
+        "replyAdmissionMicros": 88,
+        "replyEncodeMicros": 3,
+        "replyDeliveryMicros": 14167,
+        "callerResumeMicros": 152,
+        "request": {
+          "measured": true,
+          "submitMicros": 8,
+          "receiveMicros": 173,
+          "writeCompletionMicros": 11
+        },
+        "readAuthority": {
+          "measured": true,
+          "waitMicros": 0,
+          "nativeMicros": 561
+        }
+      },
+      "aCaptureExact": {
+        "foregroundRequestMicros": 18954,
+        "measured": 7
+      },
+      "aCaptureNative": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        2,
+        0,
+        3,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        2,
+        0,
+        0,
+        0,
+        0
+      ],
+      "aTCP": {
+        "schema": 1,
+        "rttMicros": [
+          22674,
+          21840
+        ],
+        "minRttMicros": [
+          5206,
+          5206
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "bStartup": {
+        "schema": 1,
+        "micros": [
+          21506,
+          130931,
+          16090,
+          74832,
+          0,
+          2919,
+          3607,
+          10584
+        ],
+        "measured": 255,
+        "loadMicros": 74237,
+        "loadMeasured": true,
+        "prepared": true,
+        "preparedAgeMicros": 5863751,
+        "preparationDecision": 1,
+        "serviceReadiness": {
+          "micros": [
+            634,
+            5174,
+            1774,
+            632,
+            613
+          ],
+          "measured": 31
+        },
+        "native": [
+          {
+            "micros": [
+              63470,
+              2873,
+              3592,
+              570,
+              1183
+            ],
+            "measured": 31,
+            "imageHash": {
+              "micros": [
+                4970,
+                56794
+              ],
+              "backend": 1
+            }
+          },
+          {
+            "micros": [
+              67976,
+              2873,
+              3592,
+              570,
+              1183
+            ],
+            "measured": 31,
+            "imageHash": {
+              "micros": [
+                4445,
+                61345
+              ],
+              "backend": 1
+            }
+          }
+        ],
+        "imageHash": {
+          "micros": [
+            9146,
+            63914
+          ],
+          "backend": 1
+        }
+      },
+      "aPreparation": {
+        "BoundaryToBegin": 2.794,
+        "RequestCoordinator": 0,
+        "RequestWrite": 0.556,
+        "RequestToGrant": 45.551,
+        "GrantCoordinator": 0,
+        "SourceActivate": 0,
+        "CaptureActivate": 42.83,
+        "CommitWrite": 0.561,
+        "SourceDeactivate": 10.622,
+        "ReentryGap": 3368.02
+      },
+      "bPreparation": {
+        "RequestCoordinator": 0,
+        "PeerAuthorize": 1.227,
+        "AuthorizeTotal": 26.146,
+        "OpenLock": 0,
+        "ConnectTotal": 24.918,
+        "PipeOpen": 0,
+        "ServiceAuth": 1.805,
+        "ServiceImagePin": 0,
+        "LeaseWrite": 0.602,
+        "ReadyWait": 22.51,
+        "NewClientCheck": 0,
+        "ReturnArm": 0,
+        "EntryPrepare": 4.644,
+        "PrepareInbound": 0,
+        "GrantWrite": 0,
+        "CommitCoordinator": 0,
+        "CommitApply": 0,
+        "InputClose": 0,
+        "ReentryGap": 3404.337
+      }
+    },
+    {
+      "tag": "bc0d3438f38f745e35b4bb4f4fd3901d1f732b1cdaa524fada873fc9210a0abb",
+      "timeA": "2026-11-15T18:56:37.1474954Z",
+      "timeB": "2026-11-15T18:56:26.3793032Z",
+      "complete": true,
+      "aBoundaryMs": 29.925,
+      "aGrantMs": 78.079,
+      "aCaptureMs": 30.657,
+      "aDeactivateMs": 12.352,
+      "bAuthorizeMs": 27.24,
+      "bReadyMs": 24.465,
+      "bEntryMs": 3.618,
+      "bFirstInputMs": 2.312,
+      "bWorstInputMs": 2.621,
+      "bNativeHandlerMs": 1.053,
+      "bSendInputMs": 0.557,
+      "bServiceReplyToAppMs": 0.059,
+      "aCaptureIPC": {
+        "measured": true,
+        "requestDeliveryMicros": 63,
+        "readAuthorizationMicros": 221,
+        "dispatchMicros": 54,
+        "activationMicros": 17288,
+        "replyAdmissionMicros": 285,
+        "replyEncodeMicros": 2,
+        "replyDeliveryMicros": 7438,
+        "callerResumeMicros": 3461,
+        "request": {
+          "measured": true,
+          "submitMicros": 11,
+          "receiveMicros": 52,
+          "writeCompletionMicros": 22
+        },
+        "readAuthority": {
+          "measured": true,
+          "waitMicros": 0,
+          "nativeMicros": 0
+        }
+      },
+      "aCaptureExact": {
+        "foregroundRequestMicros": 9500,
+        "measured": 7
+      },
+      "aCaptureNative": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        2,
+        0,
+        2,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "aTCP": {
+        "schema": 1,
+        "rttMicros": [
+          13574,
+          13251
+        ],
+        "minRttMicros": [
+          5206,
+          5206
+        ],
+        "queryMicros": [
+          551,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "bStartup": {
+        "schema": 1,
+        "micros": [
+          24678,
+          135220,
+          17144,
+          76031,
+          0,
+          2786,
+          4005,
+          10384
+        ],
+        "measured": 255,
+        "loadMicros": 76031,
+        "loadMeasured": true,
+        "prepared": true,
+        "preparedAgeMicros": 4776386,
+        "preparationDecision": 1,
+        "serviceReadiness": {
+          "micros": [
+            1079,
+            5568,
+            1122,
+            579,
+            0
+          ],
+          "measured": 31
+        },
+        "native": [
+          {
+            "micros": [
+              80449,
+              2805,
+              4103,
+              0,
+              1224
+            ],
+            "measured": 31,
+            "imageHash": {
+              "micros": [
+                4553,
+                74205
+              ],
+              "backend": 1
+            }
+          },
+          {
+            "micros": [
+              76324,
+              2805,
+              4103,
+              557,
+              1230
+            ],
+            "measured": 31,
+            "imageHash": {
+              "micros": [
+                6869,
+                66585
+              ],
+              "backend": 1
+            }
+          }
+        ],
+        "imageHash": {
+          "micros": [
+            4173,
+            68982
+          ],
+          "backend": 1
+        }
+      },
+      "aPreparation": {
+        "BoundaryToBegin": 29.925,
+        "RequestCoordinator": 0,
+        "RequestWrite": 0,
+        "RequestToGrant": 78.079,
+        "GrantCoordinator": 0,
+        "SourceActivate": 0,
+        "CaptureActivate": 30.657,
+        "CommitWrite": 0,
+        "SourceDeactivate": 12.352,
+        "ReentryGap": 3699.464
+      },
+      "bPreparation": {
+        "RequestCoordinator": 0,
+        "PeerAuthorize": 1.15,
+        "AuthorizeTotal": 27.24,
+        "OpenLock": 0,
+        "ConnectTotal": 26.09,
+        "PipeOpen": 0,
+        "ServiceAuth": 1.625,
+        "ServiceImagePin": 0,
+        "LeaseWrite": 0,
+        "ReadyWait": 24.465,
+        "NewClientCheck": 0,
+        "ReturnArm": 0,
+        "EntryPrepare": 3.618,
+        "PrepareInbound": 0,
+        "GrantWrite": 0,
+        "CommitCoordinator": 0,
+        "CommitApply": 0,
+        "InputClose": 0.6,
+        "ReentryGap": 3720.42
+      }
+    },
+    {
+      "tag": "63632a2bdfed2a05b60d1bc5e6e12c7ec6d141007b5dfebcaec66944734348d4",
+      "timeA": "2026-11-15T18:56:38.0562735Z",
+      "timeB": "2026-11-15T18:56:27.2890888Z",
+      "complete": true,
+      "aBoundaryMs": 9.4,
+      "aGrantMs": 42.756,
+      "aCaptureMs": 26.568,
+      "aDeactivateMs": 10.649,
+      "bAuthorizeMs": 28.565,
+      "bReadyMs": 25.03,
+      "bEntryMs": 3.682,
+      "bFirstInputMs": 2.202,
+      "bWorstInputMs": 3.546,
+      "bNativeHandlerMs": 1.494,
+      "bSendInputMs": 0.595,
+      "bServiceReplyToAppMs": 1.142,
+      "aCaptureIPC": {
+        "measured": true,
+        "requestDeliveryMicros": 73,
+        "readAuthorizationMicros": 248,
+        "dispatchMicros": 58,
+        "activationMicros": 24315,
+        "replyAdmissionMicros": 117,
+        "replyEncodeMicros": 6,
+        "replyDeliveryMicros": 116,
+        "callerResumeMicros": 827,
+        "request": {
+          "measured": true,
+          "submitMicros": 10,
+          "receiveMicros": 63,
+          "writeCompletionMicros": 22
+        },
+        "readAuthority": {
+          "measured": true,
+          "waitMicros": 553,
+          "nativeMicros": 0
+        }
+      },
+      "aCaptureExact": {
+        "queueToHandleMicros": 577,
+        "foregroundRequestMicros": 17529,
+        "measured": 7
+      },
+      "aCaptureNative": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        2,
+        0,
+        3,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "aTCP": {
+        "schema": 1,
+        "rttMicros": [
+          10707,
+          10292
+        ],
+        "minRttMicros": [
+          5206,
+          5206
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "bStartup": {
+        "schema": 1,
+        "micros": [
+          25738,
+          122680,
+          18730,
+          69756,
+          0,
+          2931,
+          4166,
+          12821
+        ],
+        "measured": 255,
+        "loadMicros": 69177,
+        "loadMeasured": true,
+        "prepared": true,
+        "preparedAgeMicros": 1624993,
+        "preparationDecision": 1,
+        "serviceReadiness": {
+          "micros": [
+            560,
+            5160,
+            1279,
+            557,
+            582
+          ],
+          "measured": 31
+        },
+        "native": [
+          {
+            "micros": [
+              58377,
+              4141,
+              5190,
+              0,
+              1148
+            ],
+            "measured": 31,
+            "imageHash": {
+              "micros": [
+                1552,
+                54039
+              ],
+              "backend": 1
+            }
+          },
+          {
+            "micros": [
+              60034,
+              4141,
+              5190,
+              0,
+              1148
+            ],
+            "measured": 31,
+            "imageHash": {
+              "micros": [
+                2832,
+                53997
+              ],
+              "backend": 1
+            }
+          }
+        ],
+        "imageHash": {
+          "micros": [
+            2837,
+            64592
+          ],
+          "backend": 1
+        }
+      },
+      "aPreparation": {
+        "BoundaryToBegin": 9.4,
+        "RequestCoordinator": 0,
+        "RequestWrite": 0,
+        "RequestToGrant": 42.756,
+        "GrantCoordinator": 0,
+        "SourceActivate": 0,
+        "CaptureActivate": 26.568,
+        "CommitWrite": 0.532,
+        "SourceDeactivate": 10.649,
+        "ReentryGap": 388.818
+      },
+      "bPreparation": {
+        "RequestCoordinator": 0,
+        "PeerAuthorize": 1.139,
+        "AuthorizeTotal": 28.565,
+        "OpenLock": 0,
+        "ConnectTotal": 27.425,
+        "PipeOpen": 0,
+        "ServiceAuth": 1.839,
+        "ServiceImagePin": 0,
+        "LeaseWrite": 0,
+        "ReadyWait": 25.03,
+        "NewClientCheck": 0.555,
+        "ReturnArm": 0,
+        "EntryPrepare": 3.682,
+        "PrepareInbound": 0,
+        "GrantWrite": 0,
+        "CommitCoordinator": 0,
+        "CommitApply": 0,
+        "InputClose": 0.646,
+        "ReentryGap": 409.123
+      }
+    },
+    {
+      "tag": "6b1edcc0cfdb90b46ac54736ccff488e8d982c11c7ade0d240ccf517fe734b2a",
+      "timeA": "2026-11-15T18:56:38.5309247Z",
+      "timeB": "2026-11-15T18:56:27.756235Z",
+      "complete": true,
+      "aBoundaryMs": 5.108,
+      "aGrantMs": 43.601,
+      "aCaptureMs": 23.991,
+      "aDeactivateMs": 18.048,
+      "bAuthorizeMs": 28.177,
+      "bReadyMs": 24.066,
+      "bEntryMs": 2.957,
+      "bFirstInputMs": 1.771,
+      "bWorstInputMs": 2.977,
+      "bNativeHandlerMs": 1.155,
+      "bSendInputMs": 0.556,
+      "bServiceReplyToAppMs": 0.657,
+      "aCaptureIPC": {
+        "measured": true,
+        "requestDeliveryMicros": 70,
+        "readAuthorizationMicros": 273,
+        "dispatchMicros": 60,
+        "activationMicros": 22586,
+        "replyAdmissionMicros": 90,
+        "replyEncodeMicros": 3,
+        "replyDeliveryMicros": 356,
+        "callerResumeMicros": 99,
+        "request": {
+          "measured": true,
+          "submitMicros": 17,
+          "receiveMicros": 53,
+          "writeCompletionMicros": 56
+        },
+        "readAuthority": {
+          "measured": true,
+          "waitMicros": 0,
+          "nativeMicros": 0
+        }
+      },
+      "aCaptureExact": {
+        "foregroundRequestMicros": 13918,
+        "measured": 7
+      },
+      "aCaptureNative": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        2,
+        0,
+        3,
+        0,
+        2,
+        3,
+        3,
+        0,
+        3,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "aTCP": {
+        "schema": 1,
+        "rttMicros": [
+          11478,
+          11077
+        ],
+        "minRttMicros": [
+          5206,
+          5206
+        ],
+        "queryMicros": [
+          551,
+          554
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "bStartup": {
+        "schema": 1,
+        "micros": [
+          28897,
+          156086,
+          15943,
+          71137,
+          0,
+          2356,
+          3565,
+          9395
+        ],
+        "measured": 255,
+        "loadMicros": 70479,
+        "loadMeasured": true,
+        "prepared": true,
+        "preparedAgeMicros": 466997,
+        "preparationDecision": 1,
+        "serviceReadiness": {
+          "micros": [
+            563,
+            7497,
+            1246,
+            625,
+            0
+          ],
+          "measured": 31
+        },
+        "native": [
+          {
+            "micros": [
+              72328,
+              2873,
+              3594,
+              0,
+              1209
+            ],
+            "measured": 31,
+            "imageHash": {
+              "micros": [
+                6993,
+                62481
+              ],
+              "backend": 1
+            }
+          },
+          {
+            "micros": [
+              70617,
+              2873,
+              3594,
+              581,
+              1155
+            ],
+            "measured": 31,
+            "imageHash": {
+              "micros": [
+                2794,
+                65530
+              ],
+              "backend": 1
+            }
+          }
+        ],
+        "imageHash": {
+          "micros": [
+            7003,
+            61760
+          ],
+          "backend": 1
+        }
+      },
+      "aPreparation": {
+        "BoundaryToBegin": 5.108,
+        "RequestCoordinator": 0,
+        "RequestWrite": 2.776,
+        "RequestToGrant": 43.601,
+        "GrantCoordinator": 0,
+        "SourceActivate": 0,
+        "CaptureActivate": 23.991,
+        "CommitWrite": 0.53,
+        "SourceDeactivate": 18.048,
+        "ReentryGap": 148.273
+      },
+      "bPreparation": {
+        "RequestCoordinator": 0,
+        "PeerAuthorize": 1.158,
+        "AuthorizeTotal": 28.177,
+        "OpenLock": 0,
+        "ConnectTotal": 27.019,
+        "PipeOpen": 0.584,
+        "ServiceAuth": 1.21,
+        "ServiceImagePin": 0,
+        "LeaseWrite": 0,
+        "ReadyWait": 24.066,
+        "NewClientCheck": 0.558,
+        "ReturnArm": 0,
+        "EntryPrepare": 2.957,
+        "PrepareInbound": 0.588,
+        "GrantWrite": 0,
+        "CommitCoordinator": 0,
+        "CommitApply": 0,
+        "InputClose": 0.605,
+        "ReentryGap": 168.834
+      }
+    },
+    {
+      "tag": "12063ddac41be074ed869c90d426bc6a2d35cc74214424ef3617df32d12cc8be",
+      "timeA": "2026-11-15T18:56:39.6649141Z",
+      "timeB": "2026-11-15T18:56:28.8971586Z",
+      "complete": true,
+      "aBoundaryMs": 3.334,
+      "aGrantMs": 161.24,
+      "aCaptureMs": 38.148,
+      "aDeactivateMs": 10.645,
+      "bAuthorizeMs": 125.033,
+      "bReadyMs": 119.843,
+      "bEntryMs": 4.699,
+      "bFirstInputMs": 1.735,
+      "bWorstInputMs": 4.678,
+      "bNativeHandlerMs": 1.906,
+      "bSendInputMs": 1.167,
+      "bServiceReplyToAppMs": 1.752,
+      "aCaptureIPC": {
+        "measured": true,
+        "requestDeliveryMicros": 86,
+        "readAuthorizationMicros": 245,
+        "dispatchMicros": 65,
+        "activationMicros": 24445,
+        "replyAdmissionMicros": 142,
+        "replyEncodeMicros": 4,
+        "replyDeliveryMicros": 1282,
+        "callerResumeMicros": 3978,
+        "request": {
+          "measured": true,
+          "submitMicros": 21,
+          "receiveMicros": 65,
+          "writeCompletionMicros": 23
+        },
+        "readAuthority": {
+          "measured": true,
+          "waitMicros": 0,
+          "nativeMicros": 0
+        }
+      },
+      "aCaptureExact": {
+        "foregroundRequestMicros": 15830,
+        "measured": 7
+      },
+      "aCaptureNative": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        2,
+        0,
+        3,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "aTCP": {
+        "schema": 1,
+        "rttMicros": [
+          12198,
+          13213
+        ],
+        "minRttMicros": [
+          5206,
+          5206
+        ],
+        "queryMicros": [
+          0,
+          0
+        ],
+        "retransmittedBytes": 0,
+        "timeoutEpisodes": 0,
+        "counterDeltasKnown": true
+      },
+      "bStartup": {
+        "schema": 1,
+        "micros": [
+          22602,
+          139210,
+          104375,
+          67775,
+          0,
+          3447,
+          28790,
+          54760
+        ],
+        "measured": 255,
+        "loadMicros": 67072,
+        "loadMeasured": true,
+        "prepared": true,
+        "preparedAgeMicros": 351882,
+        "preparationDecision": 1,
+        "serviceReadiness": {
+          "micros": [
+            3121,
+            6360,
+            1134,
+            7430,
+            0
+          ],
+          "measured": 31
+        },
+        "native": [
+          {
+            "micros": [
+              89837,
+              9671,
+              5145,
+              541,
+              2228
+            ],
+            "measured": 31,
+            "imageHash": {
+              "micros": [
+                10267,
+                76054
+              ],
+              "backend": 1
+            }
+          },
+          {
+            "micros": [
+              88110,
+              43101,
+              5727,
+              789,
+              1530
+            ],
+            "measured": 31,
+            "imageHash": {
+              "micros": [
+                4072,
+                81688
+              ],
+              "backend": 1
+            }
+          }
+        ],
+        "imageHash": {
+          "micros": [
+            7496,
+            57337
+          ],
+          "backend": 1
+        }
+      },
+      "aPreparation": {
+        "BoundaryToBegin": 3.334,
+        "RequestCoordinator": 0,
+        "RequestWrite": 0,
+        "RequestToGrant": 161.24,
+        "GrantCoordinator": 0,
+        "SourceActivate": 0,
+        "CaptureActivate": 38.148,
+        "CommitWrite": 0,
+        "SourceDeactivate": 10.645,
+        "ReentryGap": 189.261
+      },
+      "bPreparation": {
+        "RequestCoordinator": 0,
+        "PeerAuthorize": 1.02,
+        "AuthorizeTotal": 125.033,
+        "OpenLock": 0,
+        "ConnectTotal": 124.013,
+        "PipeOpen": 1,
+        "ServiceAuth": 2.579,
+        "ServiceImagePin": 0,
+        "LeaseWrite": 0,
+        "ReadyWait": 119.843,
+        "NewClientCheck": 0.59,
+        "ReturnArm": 0,
+        "EntryPrepare": 4.699,
+        "PrepareInbound": 0,
+        "GrantWrite": 0.711,
+        "CommitCoordinator": 0,
+        "CommitApply": 0,
+        "InputClose": 0,
+        "ReentryGap": 230.35
+      }
+    }
+  ],
+  "limits": [
+    "Per-exchange local monotonic durations only; no cross-host timestamp subtraction.",
+    "Nested spans and independent maxima must not be added to estimate full input-to-display latency.",
+    "B-to-A natural return is represented by A SourceDeactivate, not an independent B-source lease.",
+    "Pre-connect acquisition retries during installation are separated from established-connection failures.",
+    "No instrumented physical-input-to-display measurement or controlled performance experiment.",
+    "Both agent logs are complete, but control.previous is incomplete on both devices.",
+    "Eight g546 versus eleven g545 uncontrolled pairs do not isolate decoder effect.",
+    "Startup profiles include earlier prewarming spans; they are not all entry-critical."
+  ],
+  "prepared": {
+    "used": 8,
+    "total": 8
+  },
+  "userFeedback": "Completed trial, stutter remains",
+  "baseline": {
+    "generation": 545,
+    "collection": "157ad7e500be6c4189724ae0dfdb151d",
+    "pairs": {
+      "source": 11,
+      "receiver": 11,
+      "matched": 11,
+      "complete": 11,
+      "incomplete": 0,
+      "unmatchedSource": 0,
+      "unmatchedReceiver": 0
+    },
+    "metricsMs": {
+      "aBoundaryMs": {
+        "n": 11,
+        "min": 1.615,
+        "median": 2.216,
+        "max": 5.652
+      },
+      "aGrantMs": {
+        "n": 11,
+        "min": 35.265,
+        "median": 39.552,
+        "max": 61.972
+      },
+      "aCaptureMs": {
+        "n": 11,
+        "min": 16.041,
+        "median": 20.527,
+        "max": 47.237
+      },
+      "aDeactivateMs": {
+        "n": 11,
+        "min": 7.164,
+        "median": 10.644,
+        "max": 13.494
+      },
+      "bAuthorizeMs": {
+        "n": 11,
+        "min": 26.1,
+        "median": 29.454,
+        "max": 49.463
+      },
+      "bReadyMs": {
+        "n": 11,
+        "min": 23.232,
+        "median": 25.395,
+        "max": 36.337
+      },
+      "bEntryMs": {
+        "n": 11,
+        "min": 2.969,
+        "median": 3.573,
+        "max": 4.223
+      },
+      "bFirstInputMs": {
+        "n": 11,
+        "min": 1.17,
+        "median": 1.88,
+        "max": 2.866
+      },
+      "bWorstInputMs": {
+        "n": 11,
+        "min": 2.485,
+        "median": 2.952,
+        "max": 7.126
+      },
+      "bNativeHandlerMs": {
+        "n": 11,
+        "min": 0.899,
+        "median": 1.743,
+        "max": 4.052
+      },
+      "bSendInputMs": {
+        "n": 11,
+        "min": 0.554,
+        "median": 1.089,
+        "max": 2.901
+      },
+      "bServiceReplyToAppMs": {
+        "n": 11,
+        "min": 0.046,
+        "median": 0.091,
+        "max": 2.847
+      }
+    },
+    "captureIPCMs": {
+      "requestDeliveryMicros": {
+        "n": 11,
+        "min": 0.027,
+        "median": 0.063,
+        "max": 0.111
+      },
+      "readAuthorizationMicros": {
+        "n": 11,
+        "min": 0.157,
+        "median": 0.231,
+        "max": 0.291
+      },
+      "dispatchMicros": {
+        "n": 11,
+        "min": 0.046,
+        "median": 0.061,
+        "max": 0.072
+      },
+      "activationMicros": {
+        "n": 11,
+        "min": 14.667,
+        "median": 17.807,
+        "max": 45.918
+      },
+      "replyAdmissionMicros": {
+        "n": 11,
+        "min": 0.079,
+        "median": 0.094,
+        "max": 0.172
+      },
+      "replyEncodeMicros": {
+        "n": 11,
+        "min": 0.001,
+        "median": 0.002,
+        "max": 0.017
+      },
+      "replyDeliveryMicros": {
+        "n": 11,
+        "min": 0.065,
+        "median": 0.095,
+        "max": 0.9
+      },
+      "callerResumeMicros": {
+        "n": 11,
+        "min": 0.012,
+        "median": 0.052,
+        "max": 2.021
+      }
+    },
+    "tcp": {
+      "estimatesMs": {
+        "n": 22,
+        "min": 4.557,
+        "median": 5.264,
+        "max": 8.242
+      },
+      "knownCounters": 11,
+      "retransmittedBytes": 0,
+      "timeoutEpisodes": 0
+    }
+  },
+  "extended": [
+    {
+      "tag": "a217e4a10a2f49d0ab2f873c3c65ceebe0eb3b8142c02e836d426d848837e52d",
+      "aCaptureMicros": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        53333
+      ],
+      "aCaptureMeasured": 31457280,
+      "aCaptureAuthority": {
+        "measured": true,
+        "waitMicros": 0,
+        "nativeMicros": 0
+      },
+      "aGrantProgress": {
+        "schema": 1,
+        "micros": [
+          325072,
+          0,
+          0
+        ],
+        "elapsedMicros": 325072,
+        "byteReads": 2,
+        "bytes": 116,
+        "frames": 1,
+        "maxByteGapMicros": 325072,
+        "byteProgressMeasured": true,
+        "complete": true,
+        "saturated": false
+      },
+      "aExchange": {
+        "schema": 1,
+        "micros": [
+          324519,
+          0,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "bExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          660,
+          36302
+        ],
+        "measured": 12
+      },
+      "bReadPredecessor": {
+        "schema": 1,
+        "kind": 1,
+        "micros": [
+          0,
+          0,
+          96718
+        ]
+      }
+    },
+    {
+      "tag": "d6a68d4ebefd69a5e7b5eadd0f291d90c4d63d7c643e904ef2959be14df0826f",
+      "aCaptureMicros": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        552,
+        0,
+        30042
+      ],
+      "aCaptureMeasured": 31457280,
+      "aCaptureAuthority": {
+        "measured": true,
+        "waitMicros": 0,
+        "nativeMicros": 552
+      },
+      "aGrantProgress": {
+        "schema": 1,
+        "micros": [
+          44434,
+          0,
+          0
+        ],
+        "elapsedMicros": 44434,
+        "byteReads": 2,
+        "bytes": 116,
+        "frames": 1,
+        "maxByteGapMicros": 44434,
+        "byteProgressMeasured": true,
+        "complete": true,
+        "saturated": false
+      },
+      "aExchange": {
+        "schema": 1,
+        "micros": [
+          43865,
+          0,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "bExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          0,
+          31698
+        ],
+        "measured": 12
+      },
+      "bReadPredecessor": {
+        "schema": 1,
+        "kind": 1,
+        "micros": [
+          0,
+          0,
+          133620
+        ]
+      }
+    },
+    {
+      "tag": "e8e020fcd435a21e736eb1b3fd1c44fc37a648f5234523250a00106bb140c552",
+      "aCaptureMicros": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        554,
+        0,
+        23508
+      ],
+      "aCaptureMeasured": 31457280,
+      "aCaptureAuthority": {
+        "measured": true,
+        "waitMicros": 0,
+        "nativeMicros": 554
+      },
+      "aGrantProgress": {
+        "schema": 1,
+        "micros": [
+          51929,
+          551,
+          0
+        ],
+        "elapsedMicros": 52481,
+        "byteReads": 2,
+        "bytes": 116,
+        "frames": 1,
+        "maxByteGapMicros": 51929,
+        "byteProgressMeasured": true,
+        "complete": true,
+        "saturated": false
+      },
+      "aExchange": {
+        "schema": 1,
+        "micros": [
+          50814,
+          551,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "bExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          0,
+          30698
+        ],
+        "measured": 12
+      },
+      "bReadPredecessor": {
+        "schema": 1,
+        "kind": 1,
+        "micros": [
+          0,
+          0,
+          1657329
+        ]
+      }
+    },
+    {
+      "tag": "7d839b76bf71ff60d62ccb7c6a738a7a39d9abd6063c7c99686b854b3d0513f9",
+      "aCaptureMicros": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        42277
+      ],
+      "aCaptureMeasured": 31457280,
+      "aCaptureAuthority": {
+        "measured": true,
+        "waitMicros": 0,
+        "nativeMicros": 0
+      },
+      "aGrantProgress": {
+        "schema": 1,
+        "micros": [
+          45551,
+          0,
+          0
+        ],
+        "elapsedMicros": 45551,
+        "byteReads": 2,
+        "bytes": 116,
+        "frames": 1,
+        "maxByteGapMicros": 45551,
+        "byteProgressMeasured": true,
+        "complete": true,
+        "saturated": false
+      },
+      "aExchange": {
+        "schema": 1,
+        "micros": [
+          44994,
+          0,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "bExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          0,
+          31946
+        ],
+        "measured": 12
+      },
+      "bReadPredecessor": {
+        "schema": 1,
+        "kind": 1,
+        "micros": [
+          0,
+          0,
+          139519
+        ]
+      }
+    },
+    {
+      "tag": "bc0d3438f38f745e35b4bb4f4fd3901d1f732b1cdaa524fada873fc9210a0abb",
+      "aCaptureMicros": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        2408,
+        0,
+        28249
+      ],
+      "aCaptureMeasured": 31457280,
+      "aCaptureAuthority": {
+        "measured": true,
+        "waitMicros": 1877,
+        "nativeMicros": 530
+      },
+      "aGrantProgress": {
+        "schema": 1,
+        "micros": [
+          78079,
+          0,
+          0
+        ],
+        "elapsedMicros": 78079,
+        "byteReads": 2,
+        "bytes": 116,
+        "frames": 1,
+        "maxByteGapMicros": 78079,
+        "byteProgressMeasured": true,
+        "complete": true,
+        "saturated": false
+      },
+      "aExchange": {
+        "schema": 1,
+        "micros": [
+          77528,
+          0,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "bExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          0,
+          32595
+        ],
+        "measured": 12
+      },
+      "bReadPredecessor": {
+        "schema": 1,
+        "kind": 1,
+        "micros": [
+          0,
+          0,
+          150061
+        ]
+      }
+    },
+    {
+      "tag": "63632a2bdfed2a05b60d1bc5e6e12c7ec6d141007b5dfebcaec66944734348d4",
+      "aCaptureMicros": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        26013
+      ],
+      "aCaptureMeasured": 31457280,
+      "aCaptureAuthority": {
+        "measured": true,
+        "waitMicros": 0,
+        "nativeMicros": 0
+      },
+      "aGrantProgress": {
+        "schema": 1,
+        "micros": [
+          42756,
+          0,
+          0
+        ],
+        "elapsedMicros": 42756,
+        "byteReads": 2,
+        "bytes": 116,
+        "frames": 1,
+        "maxByteGapMicros": 42756,
+        "byteProgressMeasured": true,
+        "complete": true,
+        "saturated": false
+      },
+      "aExchange": {
+        "schema": 1,
+        "micros": [
+          42189,
+          0,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "bExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          0,
+          33450
+        ],
+        "measured": 12
+      },
+      "bReadPredecessor": {
+        "schema": 1,
+        "kind": 2,
+        "micros": [
+          0,
+          0,
+          400879
+        ]
+      }
+    },
+    {
+      "tag": "6b1edcc0cfdb90b46ac54736ccff488e8d982c11c7ade0d240ccf517fe734b2a",
+      "aCaptureMicros": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        572,
+        0,
+        23419
+      ],
+      "aCaptureMeasured": 31457280,
+      "aCaptureAuthority": {
+        "measured": true,
+        "waitMicros": 0,
+        "nativeMicros": 572
+      },
+      "aGrantProgress": {
+        "schema": 1,
+        "micros": [
+          43601,
+          0,
+          0
+        ],
+        "elapsedMicros": 43601,
+        "byteReads": 2,
+        "bytes": 116,
+        "frames": 1,
+        "maxByteGapMicros": 43601,
+        "byteProgressMeasured": true,
+        "complete": true,
+        "saturated": false
+      },
+      "aExchange": {
+        "schema": 1,
+        "micros": [
+          40273,
+          0,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "bExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          0,
+          32903
+        ],
+        "measured": 12
+      },
+      "bReadPredecessor": {
+        "schema": 1,
+        "kind": 2,
+        "micros": [
+          0,
+          0,
+          167601
+        ]
+      }
+    },
+    {
+      "tag": "12063ddac41be074ed869c90d426bc6a2d35cc74214424ef3617df32d12cc8be",
+      "aCaptureMicros": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        577,
+        0,
+        30394
+      ],
+      "aCaptureMeasured": 31457280,
+      "aCaptureAuthority": {
+        "measured": true,
+        "waitMicros": 0,
+        "nativeMicros": 577
+      },
+      "aGrantProgress": {
+        "schema": 1,
+        "micros": [
+          161240,
+          0,
+          0
+        ],
+        "elapsedMicros": 161240,
+        "byteReads": 2,
+        "bytes": 116,
+        "frames": 1,
+        "maxByteGapMicros": 161240,
+        "byteProgressMeasured": true,
+        "complete": true,
+        "saturated": false
+      },
+      "aExchange": {
+        "schema": 1,
+        "micros": [
+          160682,
+          0,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "bExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          0,
+          135707
+        ],
+        "measured": 12
+      },
+      "bReadPredecessor": {
+        "schema": 1,
+        "kind": 2,
+        "micros": [
+          0,
+          0,
+          224051
+        ]
+      }
+    }
+  ]
+}
