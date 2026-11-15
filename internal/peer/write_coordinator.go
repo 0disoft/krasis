@@ -3,6 +3,7 @@ package peer
 import (
 	"context"
 	"errors"
+	"runtime/trace"
 )
 
 type WriteOperation func(FrameWriter) error
@@ -30,14 +31,19 @@ func (coordinator *SessionWriteCoordinator) Execute(ctx context.Context, operati
 	if ctx == nil || operation == nil {
 		return errors.New("session write context and operation are required")
 	}
+	waitRegion := trace.StartRegion(ctx, "krasis.peer.coordinator_wait")
 	select {
 	case <-ctx.Done():
+		waitRegion.End()
 		return ctx.Err()
 	case <-coordinator.permit:
 	}
+	waitRegion.End()
 	defer func() { coordinator.permit <- struct{}{} }()
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	operationRegion := trace.StartRegion(ctx, "krasis.peer.coordinator_operation")
+	defer operationRegion.End()
 	return operation(coordinator.writer)
 }

@@ -3,6 +3,7 @@ package peer
 import (
 	"context"
 	"errors"
+	"runtime/trace"
 	"time"
 
 	"github.com/0disoft/krasis/internal/application"
@@ -87,6 +88,13 @@ func dispatchControlFrame(
 		return failControlDispatch(ctx, runtime, err, deferFailure)
 	}
 	kind = command.Kind
+	// Fixed decoded kinds only; never annotate payloads or session/peer IDs.
+	traceCtx := ctx
+	if traceCtx == nil {
+		traceCtx = context.Background()
+	}
+	region := trace.StartRegion(traceCtx, controlTraceName(kind))
+	defer region.End()
 	switch command.Kind {
 	case transport.ControlPrepareInput:
 		// The hint carries no lease and must never mutate the runtime or

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"runtime/trace"
 	"time"
 
 	"github.com/0disoft/krasis/internal/application"
@@ -50,7 +51,9 @@ func startInputReadAheadWithHeartbeat(ctx context.Context, connection SessionCon
 		defer close(r.done)
 		defer close(r.frames)
 		for {
+			readRegion := trace.StartRegion(ctx, "krasis.peer.wire_read")
 			frame, err := connection.ReadFrame()
+			readRegion.End()
 			p := queuedSessionFrame{frame: frame, err: err}
 			if err == nil && frame.Kind == transport.MessageHeartbeat && heartbeat != nil {
 				p.heartbeatObserved, p.err = heartbeat(frame)
@@ -61,7 +64,10 @@ func startInputReadAheadWithHeartbeat(ctx context.Context, connection SessionCon
 				// alone misclassifies dispatch backlog as network wait.
 				p.controlReadAt = time.Now()
 			}
-			if !r.enqueue(p, stop) {
+			queueRegion := trace.StartRegion(ctx, "krasis.peer.read_enqueue")
+			enqueued := r.enqueue(p, stop)
+			queueRegion.End()
+			if !enqueued {
 				return
 			}
 			if err != nil {

@@ -1,8 +1,10 @@
 package residentagent
 
 import (
+	"context"
 	"math"
 	"runtime/metrics"
+	"runtime/trace"
 	"time"
 
 	"github.com/0disoft/krasis/internal/productlog"
@@ -54,7 +56,9 @@ func newGCSampler() func() gcMetricSample {
 	}
 	return func() gcMetricSample {
 		started := time.Now()
+		metricRegion := trace.StartRegion(context.Background(), "krasis.runtime.gc_metrics")
 		metrics.Read(samples)
+		metricRegion.End()
 		s := gcMetricSample{}
 		for i := 0; i < 3; i++ {
 			if samples[i].Value.Kind() == metrics.KindFloat64Histogram {
@@ -76,7 +80,9 @@ func newGCSampler() func() gcMetricSample {
 			}
 		}
 		s.read = time.Since(started)
+		osRegion := trace.StartRegion(context.Background(), "krasis.runtime.os_counters")
 		s.os = processGCOSCounters()
+		osRegion.End()
 		s.at = time.Now()
 		return s
 	}

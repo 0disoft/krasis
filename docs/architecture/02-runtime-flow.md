@@ -635,6 +635,19 @@ before final ownership verification, including when that reply beats the native
 wait. Expired, cancelled or terminal replies cannot start this final service.
 Actual rejection retains the existing verified fallback and detach behavior.
 
+g542 adds fixed runtime/trace regions for the actual wire-reader goroutine,
+its enqueue, semantic writer permit/operation and each decoded lease control
+kind. The GC sampler separately marks metrics.Read and OS counter collection.
+An opt-in flight trace can now separate blocked I/O, runnable-to-running delay,
+GC stopping and local processing in these regions. No region contains peer,
+session, clipboard, key/button, payload or credential values. Existing JSON
+timing boundaries and error/authority/cleanup behavior are unchanged; trace
+annotations do not activate recording. Disabled writer-region tests assert
+zero allocations. Runtime trail microseconds use runtimeDiagnostics.started,
+while event elapsedMicros uses Logger.started: these origins must not be
+subtracted directly. GCTrail.TriggerObservedAt/TriggerMicros provide a local
+wall/relative anchor; use a single trace clock for precise scheduling analysis.
+
 g541 also gives only the authenticated capture child's process a best-effort
 NORMAL to ABOVE_NORMAL priority-class scope. Previously a critical authority
 query was marked scheduled before creating a goroutine; that goroutine had to
