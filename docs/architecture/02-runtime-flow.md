@@ -635,6 +635,18 @@ before final ownership verification, including when that reply beats the native
 wait. Expired, cancelled or terminal replies cannot start this final service.
 Actual rejection retains the existing verified fallback and detach behavior.
 
+g540 consumes a requester reply that arrives during internal message service
+before entering another native message wait. On successful completion it samples
+`GetForegroundWindow` and skips another `PeekMessageW` only if this capture HWND
+already owns foreground. `PM_NOREMOVE` can still execute sent callbacks, so that
+redundant pump is not free. Pending activation still receives message service;
+the activation caller independently checks foreground before commit and retains
+fallback on a changed owner. Cancellation, expiry, errors, native reply joining
+and the two-reference event lifetime remain unchanged. No timing packet, cached
+authority or input ownership changes. This removes up to one native wait and
+one redundant pump when completion arrives during pumping; it does not bound
+Windows scheduling or establish that all prior 47ms foreground delay was there.
+
 Four appended native timing buckets separate fallback after first-request API
 rejection from accepted-but-unverified activation, and transition recovery from
 thread attachment. Twenty-one three-bit buckets occupy 63 bits in the same

@@ -102,26 +102,7 @@ func (exchange *sourceForegroundExchange) request(current *sourceWheelCaptureRun
 	for {
 		select {
 		case reply := <-request.reply:
-			if reply != nil {
-				return reply
-			}
-			select {
-			case <-exchange.cancelled:
-				return ErrSourceCaptureCommandTimeout
-			default:
-			}
-			if !time.Now().Before(exchange.deadline) {
-				current.fail(ErrSourceCaptureCommandTimeout)
-				return ErrSourceCaptureCommandTimeout
-			}
-			if err := current.err(); err != nil {
-				return err
-			}
-			// The request event proves only that SetForegroundWindow returned.
-			// Service its pending internal activation even if the reply won the
-			// race with our message wait. The caller still verifies actual ownership.
-			sourceForegroundTransitionDispatch(current.window)
-			return current.err()
+			return exchange.finish(current, reply)
 		case <-exchange.cancelled:
 			return ErrSourceCaptureCommandTimeout
 		default:
@@ -136,11 +117,51 @@ func (exchange *sourceForegroundExchange) request(current *sourceWheelCaptureRun
 		if err := current.err(); err != nil {
 			return err
 		}
+		// The native requester may complete while PeekMessage services internal
+		// activation. Consume its reply before entering another native wait.
+		select {
+		case reply := <-request.reply:
+			return exchange.finish(current, reply)
+		case <-exchange.cancelled:
+			return ErrSourceCaptureCommandTimeout
+		default:
+		}
 		if err := sourceForegroundExchangeWait(request.event); err != nil {
 			current.setError(err)
 			return err
 		}
 	}
+}
+
+func (exchange *sourceForegroundExchange) finish(current *sourceWheelCaptureRun, reply error) error {
+	if reply != nil {
+		return reply
+	}
+	select {
+	case <-exchange.cancelled:
+		return ErrSourceCaptureCommandTimeout
+	default:
+	}
+	if !time.Now().Before(exchange.deadline) {
+		current.fail(ErrSourceCaptureCommandTimeout)
+		return ErrSourceCaptureCommandTimeout
+	}
+	if err := current.err(); err != nil {
+		return err
+	}
+	// The reply proves only native completion. A fresh foreground observation
+	// can prove that no activation nudge remains to service. PeekMessage can run
+	// sent callbacks even with PM_NOREMOVE; do not repeat it for an owned window.
+	foreground := sourceWheelCaptureGetForeground()
+	if err := current.err(); err != nil {
+		return err
+	}
+	if foreground != current.window || current.window == 0 {
+		sourceForegroundTransitionDispatch(current.window)
+	}
+	// activateWindowWithForeground still independently verifies ownership before
+	// committing capture; an intervening focus change retains the fallback.
+	return current.err()
 }
 
 func (current *sourceWheelCaptureRun) requestForegroundOnMonitorThread(ctx context.Context, deadline time.Time) error {
