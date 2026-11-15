@@ -1,0 +1,153 @@
+{
+  "sync": [
+    "M=-1 P=-1 G=-1 Sync Time=606577009185872 N=1 Trace=606578271271354 Mono=608410607212900 Wall=2026-11-15T22:32:27.7532228+09:00",
+    "M=-1 P=-1 G=-1 Sync Time=606599522534639 N=2"
+  ],
+  "traceEnd": 606599522534639,
+  "regions": {
+    "krasis.peer.coordinator_operation": {
+      "n": 50,
+      "medianMs": 0.003112,
+      "maxMs": 759.902517,
+      "worst": {
+        "gid": 519,
+        "name": "krasis.peer.coordinator_operation",
+        "start": 606597577022158,
+        "end": 606598336924675,
+        "ms": 759.902517,
+        "statesMs": {
+          "Running": 0.155756,
+          "Waiting:select": 751.664008,
+          "Runnable": 0.06859,
+          "Waiting:sync": 8.013052,
+          "Syscall": 0.001111
+        }
+      }
+    },
+    "krasis.peer.coordinator_wait": {
+      "n": 50,
+      "medianMs": 0.004113,
+      "maxMs": 0.006559,
+      "worst": {
+        "gid": 524,
+        "name": "krasis.peer.coordinator_wait",
+        "start": 606579993048456,
+        "end": 606579993055015,
+        "ms": 0.006559,
+        "statesMs": {
+          "Running": 0.006559
+        }
+      }
+    },
+    "krasis.peer.read_enqueue": {
+      "n": 1,
+      "medianMs": 0.004558,
+      "maxMs": 0.004558,
+      "worst": {
+        "gid": 499,
+        "name": "krasis.peer.read_enqueue",
+        "start": 606597565569401,
+        "end": 606597565573959,
+        "ms": 0.004558,
+        "statesMs": {
+          "Running": 0.004558
+        }
+      }
+    },
+    "krasis.runtime.gc_metrics": {
+      "n": 37,
+      "medianMs": 0.016232,
+      "maxMs": 0.728995,
+      "worst": {
+        "gid": 87,
+        "name": "krasis.runtime.gc_metrics",
+        "start": 606581114306533,
+        "end": 606581115035528,
+        "ms": 0.728995,
+        "statesMs": {
+          "Running": 0.728995
+        }
+      }
+    },
+    "krasis.runtime.os_counters": {
+      "n": 37,
+      "medianMs": 300.621492,
+      "maxMs": 7192.05388,
+      "worst": {
+        "gid": 87,
+        "name": "krasis.runtime.os_counters",
+        "start": 606590369351440,
+        "end": 606597561405320,
+        "ms": 7192.05388,
+        "statesMs": {
+          "Running": 0.014118,
+          "Syscall": 370.423476,
+          "Runnable": 6821.616286
+        }
+      }
+    }
+  },
+  "longGC": [
+    {
+      "name": "stop-the-world (GC sweep termination)",
+      "start": 606590459518912,
+      "end": 606597555332131,
+      "ms": 7095.813219
+    },
+    {
+      "name": "stop-the-world (GC mark termination)",
+      "start": 606597589362246,
+      "end": 606597594427074,
+      "ms": 5.064828
+    }
+  ],
+  "unfinished": [],
+  "schema": "krasis.g542-main-runtime-trace/v1",
+  "generation": 542,
+  "revision": "cb12c135432f88668e4bfcdc5b40d4db7ad1fc08",
+  "tracedRun": "99c5fdc3038c59bc56ed4419b72ce7dd",
+  "traceSha256": "7ac673c8a07f75dbcf8dea85fca59b29fd774d47caeddea569281bb131c83d5d",
+  "observation": "Opt-in traced failure; not an untraced physical crossing latency comparison.",
+  "lastObservedProcessorToStop": {
+    "processor": 8,
+    "goroutine": 54,
+    "runnableNs": 606597554291477,
+    "idleNs": 606597554295368,
+    "stack": [
+      "runtime.(*inlineUnwinder).next",
+      "runtime.fpunwindExpand",
+      "runtime.dumpStacksRec",
+      "runtime.(*traceStackTable).dump",
+      "runtime.traceAdvance"
+    ]
+  },
+  "installation": {
+    "B": {
+      "id": "4cd835bb9bc1ffac3faa7118684ddf00",
+      "bytes": 29230102,
+      "generation": 542,
+      "revision": "cb12c135432f88668e4bfcdc5b40d4db7ad1fc08",
+      "sendResponse": "lost; not repeated",
+      "confirmation": "UPDATED before A install; ONLINE exact revision IDLE after A restart"
+    },
+    "A": {
+      "result": 0,
+      "stage": "complete",
+      "recovery": "not_needed"
+    },
+    "reinstallAttempt": {
+      "state": "install_failed",
+      "stage": "recovery_registration",
+      "beforeProductShutdown": true
+    },
+    "recovery": "Normal CLI/UI relaunch and safe stop of traced process; service stayed READY; no administrator repair."
+  },
+  "untraced": {
+    "run": "542cc6d679c0cb72359437266453407f",
+    "startedAt": "2026-11-15T13:39:08Z",
+    "connectedAt": "2026-11-15T13:40:46.579928Z",
+    "collection": "283f697f9f62000473ae160a287f5399",
+    "observedAt": "2026-11-15T13:41:24Z",
+    "physicalCrossingComparison": "pending"
+  }
+}
