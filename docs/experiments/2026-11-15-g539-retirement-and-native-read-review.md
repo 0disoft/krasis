@@ -77,7 +77,36 @@ excluded while the installed paired service is live; real child ACK/guardian
 retirement and parent-death fixtures in crashguard were included. No physical
 input is synthesized by those fixtures. Native stdout tests separately passed.
 
-Paired installation and remaining delivery limits are recorded below when
-complete. Rollback uses the verified installer workflow
+Linux/amd64 crashguard cross-compilation passed; it is not a native Linux run.
+The workspace build passed all 111 frontend tests, native UI build, update
+integration and eight-file package verification; setup verification passed.
+Remote CI, full Linux/VM tests and an actual one-hour active-expiry trial were
+not run. The focused active-retirement integration test exercises the existing
+authenticated clean-retirement result without waiting one hour.
+
+Rollback uses the verified installer workflow
 with a new generation containing the previous source; existing generations are
 never overwritten. No public release, remote push or CI runner change is needed.
+
+## Paired delivery and live verification
+
+Both notebooks run g539 revision `d9cb745a38d0126e27e71f8195d8817b6211faad`.
+B received one request `28d69adf464c231240c4ade0dc0d6cf5` and confirmed UPDATED
+for all 29,070,212 bytes. A's verified setup returned installed/code 0.
+CLI doctor reports healthy/CONNECTED, with matching A CLI, UI, agent, launch
+record and protected installation. B reports the same build, ONLINE and IDLE.
+Delegated CLI app connect B returned connected without manual UI interaction.
+
+Fresh paired collection `3daeb9d3452e59035bb7ffcc08d2961c` confirms the same
+authenticated connection, both service/input states READY and grants PRESENT.
+The postconnection observation is A 62.146s and B 63.380s; neither retains a new
+failure/reconnect in that interval. B's five acquisition timeouts/RECONNECTING
+occurred before this connection during the paired update, while A was not yet
+installed; they are retained separately in the adjacent installation receipt.
+This is installation health evidence, not a physical latency comparison or a
+long-duration guarantee against recurrence.
+
+Source-of-truth update: `docs/architecture/02-runtime-flow.md`. No external API,
+wire frame, DB, dependency, repository hygiene rule or CI runner changed. Public
+release and push were not requested. Further physical crossings are needed to
+measure B's reply delivery/read-resumption tail on this exact installed build.

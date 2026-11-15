@@ -1,0 +1,135 @@
+{
+  "schema": "krasis.g539-installation-review/v1",
+  "generation": 539,
+  "revision": "d9cb745a38d0126e27e71f8195d8817b6211faad",
+  "collection": "3daeb9d3452e59035bb7ffcc08d2961c",
+  "update": {
+    "schemaVersion": "krasis.cli.update-wait/v1",
+    "peerAlias": "B",
+    "id": "28d69adf464c231240c4ade0dc0d6cf5",
+    "code": "updated",
+    "transferState": "UPDATED",
+    "generation": 539,
+    "revision": "d9cb745a38d0126e27e71f8195d8817b6211faad",
+    "bytes": 29070212,
+    "total": 29070212
+  },
+  "setup": {
+    "schema": "krasis.setup-result/v1",
+    "code": 0,
+    "state": "installed"
+  },
+  "cliConnect": {
+    "schemaVersion": "krasis.cli.peer-connect/v1",
+    "code": "connected",
+    "peerAlias": "B",
+    "id": "bde60c3bf4db79c9e4d3a2a6d8e81821"
+  },
+  "doctor": {
+    "code": "healthy",
+    "connection": "CONNECTED",
+    "protectedInput": "CONFIGURED"
+  },
+  "peer": {
+    "generation": 539,
+    "revision": "d9cb745a38d0126e27e71f8195d8817b6211faad",
+    "state": "ONLINE",
+    "transferState": "IDLE"
+  },
+  "devices": {
+    "A": {
+      "created": "2026-11-15T10:50:44Z",
+      "sha256": "679df69d70d109db14bf20a0efe50186993275d76bbd7429c0ee2ff8917d7a04",
+      "service": "READY",
+      "input": "READY",
+      "grant": "PRESENT",
+      "serviceStart": "2026-11-15T10:49:39.9603753Z",
+      "connectedAt": "2026-11-15T10:49:41.8546358Z",
+      "connection": "b96004de0478b91d03a1aea6670bce10302713c328f3ebcff868ccefe40a50f4",
+      "observedSeconds": 62.146,
+      "failures": [],
+      "reconnects": [],
+      "preconnectionEvents": [],
+      "logCompleteness": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false
+        }
+      ]
+    },
+    "B": {
+      "created": "2026-11-15T10:50:35Z",
+      "sha256": "02a978fac9698127db1f804d459687b70170b1483921a7c095e6eff445e631c8",
+      "service": "READY",
+      "input": "READY",
+      "grant": "PRESENT",
+      "serviceStart": "2026-11-15T10:48:48.1401184Z",
+      "connectedAt": "2026-11-15T10:49:31.620054Z",
+      "connection": "b96004de0478b91d03a1aea6670bce10302713c328f3ebcff868ccefe40a50f4",
+      "observedSeconds": 63.38,
+      "failures": [],
+      "reconnects": [],
+      "preconnectionEvents": [
+        {
+          "time": "2026-11-15T10:49:01.9564356Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-15T10:49:01.9564356Z",
+          "code": "RECONNECTING"
+        },
+        {
+          "time": "2026-11-15T10:49:07.214428Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-15T10:49:12.8103855Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-15T10:49:20.1447426Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-15T10:49:27.0306302Z",
+          "code": "reconnect_acquire_network_timeout"
+        }
+      ],
+      "logCompleteness": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false
+        }
+      ]
+    }
+  },
+  "limits": [
+    "Short postinstallation observation, not a new physical crossing trial.",
+    "No controlled latency reduction or actual one-hour active expiry trial is claimed.",
+    "A missing revoke or uncertain native cleanup remains fail-closed."
+  ]
+}
