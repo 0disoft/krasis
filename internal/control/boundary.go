@@ -26,6 +26,7 @@ type BoundaryConfig struct {
 type BoundaryIntent struct {
 	Edge      ScreenEdge
 	X         int32
+	Height    EdgeHeight
 	DecidedAt time.Time `json:"-"`
 }
 

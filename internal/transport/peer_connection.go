@@ -27,7 +27,11 @@ type PeerConnection struct {
 const FrameWriteTimeout = 2 * time.Second
 
 func (connection *PeerConnection) SupportsInputPreparation() bool {
-	return connection != nil && connection.connection != nil && connection.connection.ConnectionState().NegotiatedProtocol == ALPNInputPreparation
+	return connection.SupportsCursorHeight() || connection != nil && connection.connection != nil && connection.connection.ConnectionState().NegotiatedProtocol == ALPNInputPreparation
+}
+
+func (connection *PeerConnection) SupportsCursorHeight() bool {
+	return connection != nil && connection.connection != nil && connection.connection.ConnectionState().NegotiatedProtocol == ALPNCursorHeight
 }
 
 func NewPeerConnection(ctx context.Context, connection *tls.Conn, anchors ...*x509.Certificate) (*PeerConnection, error) {
@@ -48,7 +52,7 @@ func NewPeerConnection(ctx context.Context, connection *tls.Conn, anchors ...*x5
 		err = connection.HandshakeContext(ctx)
 		if err == nil {
 			state := connection.ConnectionState()
-			if state.NegotiatedProtocol != ALPNProtocol && state.NegotiatedProtocol != ALPNInputPreparation {
+			if state.NegotiatedProtocol != ALPNProtocol && state.NegotiatedProtocol != ALPNInputPreparation && state.NegotiatedProtocol != ALPNCursorHeight {
 				err = ErrPeerALPN
 			} else {
 				peer, err = AuthenticateProductKey(state, anchor, time.Now())

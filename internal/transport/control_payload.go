@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 
@@ -38,23 +39,32 @@ type ControlCommand struct {
 	LeaseID   string
 	Epoch     string
 	Edge      control.ScreenEdge
+	Height    control.EdgeHeight
 }
 
 func EncodeControlPayload(command ControlCommand) ([]byte, error) {
 	if err := command.Validate(); err != nil {
 		return nil, errors.Join(ErrInvalidControlPayload, err)
 	}
-	payload := make([]byte, controlHeaderSize+len(command.SessionID)+len(command.LeaseID)+len(command.Epoch))
+	headerSize := controlHeaderSize
+	if command.Height != 0 {
+		headerSize += 4
+	}
+	payload := make([]byte, headerSize+len(command.SessionID)+len(command.LeaseID)+len(command.Epoch))
 	payload[0] = ControlPayloadVersion
 	if command.Kind == ControlPrepareInput {
 		payload[0] = 4
+	}
+	if command.Height != 0 {
+		payload[0] = 5
+		binary.BigEndian.PutUint32(payload[8:12], uint32(command.Height))
 	}
 	payload[1] = byte(command.Kind)
 	payload[2] = byte(len(command.SessionID))
 	payload[3] = byte(len(command.LeaseID))
 	payload[4] = byte(len(command.Epoch))
 	payload[5] = encodeControlEdge(command.Edge)
-	offset := controlHeaderSize
+	offset := headerSize
 	copy(payload[offset:], command.SessionID)
 	offset += len(command.SessionID)
 	copy(payload[offset:], command.LeaseID)
@@ -67,7 +77,7 @@ func DecodeControlPayload(payload []byte) (ControlCommand, error) {
 	if len(payload) < controlHeaderSize {
 		return ControlCommand{}, errors.Join(ErrInvalidControlPayload, errors.New("payload is truncated"))
 	}
-	if payload[0] != ControlPayloadVersion && !(payload[0] == 4 && ControlCommandKind(payload[1]) == ControlPrepareInput) {
+	if payload[0] != ControlPayloadVersion && payload[0] != 5 && !(payload[0] == 4 && ControlCommandKind(payload[1]) == ControlPrepareInput) {
 		return ControlCommand{}, fmt.Errorf("%w: control payload version", ErrUnsupportedControlPayload)
 	}
 	if payload[6] != 0 || payload[7] != 0 {
@@ -80,17 +90,30 @@ func DecodeControlPayload(payload []byte) (ControlCommand, error) {
 	if err != nil {
 		return ControlCommand{}, err
 	}
+	headerSize := controlHeaderSize
+	var height control.EdgeHeight
+	if payload[0] == 5 {
+		headerSize += 4
+		if len(payload) < headerSize {
+			return ControlCommand{}, ErrInvalidControlPayload
+		}
+		height = control.EdgeHeight(binary.BigEndian.Uint32(payload[8:12]))
+		if height == 0 {
+			return ControlCommand{}, ErrInvalidControlPayload
+		}
+	}
 	sessionSize := int(payload[2])
 	leaseSize := int(payload[3])
 	epochSize := int(payload[4])
-	if len(payload) != controlHeaderSize+sessionSize+leaseSize+epochSize {
+	if len(payload) != headerSize+sessionSize+leaseSize+epochSize {
 		return ControlCommand{}, errors.Join(ErrInvalidControlPayload, errors.New("identifier lengths do not match payload"))
 	}
-	offset := controlHeaderSize
+	offset := headerSize
 	command := ControlCommand{
 		Kind:      ControlCommandKind(payload[1]),
 		SessionID: string(payload[offset : offset+sessionSize]),
 		Edge:      edge,
+		Height:    height,
 	}
 	offset += sessionSize
 	command.LeaseID = string(payload[offset : offset+leaseSize])
@@ -106,6 +129,9 @@ func DecodeControlPayload(payload []byte) (ControlCommand, error) {
 }
 
 func (command ControlCommand) Validate() error {
+	if !command.Height.Valid() || command.Height != 0 && command.Kind != ControlLeaseRequest && command.Kind != ControlLeaseRevoke {
+		return errors.New("only lease requests and revocations may carry a valid edge height")
+	}
 	if !command.Kind.Valid() {
 		return fmt.Errorf("control command kind %d is not supported", command.Kind)
 	}
