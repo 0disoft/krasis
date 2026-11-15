@@ -358,6 +358,11 @@ func (connection *supervisedConnection) SupportsInputPreparation() bool {
 	return ok && capability.SupportsInputPreparation()
 }
 
+func (connection *supervisedConnection) SupportsCursorHeight() bool {
+	capability, ok := connection.Connection.(interface{ SupportsCursorHeight() bool })
+	return ok && capability.SupportsCursorHeight()
+}
+
 func (connection *supervisedConnection) ReadFrame() (transport.Frame, error) {
 	frame, err := connection.Connection.ReadFrame()
 	if err == nil && frame.Kind == transport.MessageDisconnect && len(frame.Payload) == 0 {

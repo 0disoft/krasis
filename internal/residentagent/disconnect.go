@@ -48,6 +48,11 @@ func (connection *disconnectConnection) SupportsInputPreparation() bool {
 	return ok && capability.SupportsInputPreparation()
 }
 
+func (connection *disconnectConnection) SupportsCursorHeight() bool {
+	capability, ok := connection.Connection.(interface{ SupportsCursorHeight() bool })
+	return ok && capability.SupportsCursorHeight()
+}
+
 func (connection *disconnectConnection) DiagnosticID() string {
 	if diagnostic, ok := connection.Connection.(interface{ DiagnosticID() string }); ok {
 		return diagnostic.DiagnosticID()

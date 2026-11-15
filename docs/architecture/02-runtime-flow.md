@@ -136,6 +136,12 @@ session/lease/epoch를 확인한 뒤 기존 캡처 비활성화 명령 안에서
 revoke, abort, planned retirement, shutdown과 데스크톱 교체에는 위치를 적용하지 않는다.
 높이는 표시용 메타데이터이며 리스 인증, 입력 검증과 cursor entry rollback을 대체하지 않는다.
 
+g545는 이 선택적 capability를 product disconnect wrapper → supervisor wrapper → session
+evidence wrapper 전체에서 보존한다. 각 래퍼는 실제 하위 연결의 협상 결과를 전달하며, 메서드가
+없는 이전 연결이나 false 응답을 true로 승격하지 않는다. g544는 앞의 두 래퍼에서 이 전달이
+누락돼 최신 피어끼리도 높이 없는 v3 메시지로 되돌아갔다. 회귀 검증은 helper만 호출하는 대신
+실제 `RunSession`과 supervisor wrapper를 지나 기록된 lease request의 높이까지 확인한다.
+
 제어권 반환 시 destination의 커서 숨김은 네이티브 소유 스레드의 같은 메시지 큐에 snapshot과 show를
 순서대로 게시한다. show는 revoke 전송 성공 후에만 게시한다. peer 스레드는 snapshot을 기다리지 않으며,
 20ms 지연만으로 숨김 요청을 버리지 않는다. 최신 요청 ID, 입력 generation, 현재 데스크톱과 좌표를
