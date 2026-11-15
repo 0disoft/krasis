@@ -72,6 +72,10 @@ func NewEmergencyBoundaryObserver(session *SourceSession, next BoundaryObserver)
 }
 
 func (observer *EmergencyBoundaryObserver) Observe(action control.InputAction, pointerX int32) error {
+	return observer.ObserveHeight(action, pointerX, 0)
+}
+
+func (observer *EmergencyBoundaryObserver) ObserveHeight(action control.InputAction, pointerX int32, height control.EdgeHeight) error {
 	if observer == nil || observer.detector == nil || observer.session == nil || observer.next == nil {
 		return errors.New("emergency boundary observer is not initialized")
 	}
@@ -79,5 +83,5 @@ func (observer *EmergencyBoundaryObserver) Observe(action control.InputAction, p
 		observer.session.Abort(ErrEmergencyRelease)
 		return ErrEmergencyRelease
 	}
-	return observer.next.Observe(action, pointerX)
+	return ObserveBoundaryHeight(observer.next, action, pointerX, height)
 }

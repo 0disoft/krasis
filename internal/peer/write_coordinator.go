@@ -4,9 +4,18 @@ import (
 	"context"
 	"errors"
 	"runtime/trace"
+
+	"github.com/0disoft/krasis/internal/control"
 )
 
 type WriteOperation func(FrameWriter) error
+
+func cursorHeightForWriter(writer FrameWriter, height control.EdgeHeight) control.EdgeHeight {
+	if capability, ok := writer.(interface{ SupportsCursorHeight() bool }); ok && capability.SupportsCursorHeight() {
+		return height
+	}
+	return 0
+}
 
 // SessionWriteCoordinator serializes runtime decisions with their semantic
 // frame writes for one authenticated peer connection.

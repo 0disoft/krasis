@@ -45,14 +45,15 @@ type cursorEntryState struct {
 }
 
 type returnBoundaryState struct {
-	mu            sync.Mutex
-	intent        control.ReturnIntent
-	sourceEdge    control.ScreenEdge
-	armed         bool
-	returnReady   bool
-	rearmDistance int32
-	pressed       control.PressedState
-	intents       chan control.ReturnIntent
+	mu                      sync.Mutex
+	intent                  control.ReturnIntent
+	sourceEdge              control.ScreenEdge
+	armed                   bool
+	returnReady             bool
+	rearmDistance           int32
+	screenTop, screenHeight int32
+	pressed                 control.PressedState
+	intents                 chan control.ReturnIntent
 }
 
 func newInputAdapter() *InputAdapter {
@@ -145,7 +146,7 @@ func (adapter *InputAdapter) RearmReturn(intent control.ReturnIntent) {
 		return
 	}
 	state.mu.Lock()
-	if state.intent == intent {
+	if state.intent.SessionID == intent.SessionID && state.intent.Epoch == intent.Epoch {
 		state.armed = true
 	}
 	state.mu.Unlock()
@@ -157,7 +158,7 @@ func (adapter *InputAdapter) DisarmReturn(intent control.ReturnIntent) {
 		return
 	}
 	state.mu.Lock()
-	if state.intent == intent {
+	if state.intent.SessionID == intent.SessionID && state.intent.Epoch == intent.Epoch {
 		state.armed = false
 		state.returnReady = false
 		state.intent = control.ReturnIntent{}
@@ -192,7 +193,17 @@ func (adapter *InputAdapter) recordReturnInput(token control.PressedToken, press
 	return err
 }
 
-func (adapter *InputAdapter) observeReturnPosition(pointerX, screenLeft, screenWidth int32) error {
+func (adapter *InputAdapter) setReturnGeometry(top, height int32) {
+	if adapter == nil || adapter.returns == nil {
+		return
+	}
+	state := adapter.returns
+	state.mu.Lock()
+	state.screenTop, state.screenHeight = top, height
+	state.mu.Unlock()
+}
+
+func (adapter *InputAdapter) observeReturnPosition(pointerX, screenLeft, screenWidth int32, pointerY ...int32) error {
 	state, err := adapter.returnState()
 	if err != nil {
 		return err
@@ -227,8 +238,12 @@ func (adapter *InputAdapter) observeReturnPosition(pointerX, screenLeft, screenW
 		return nil
 	}
 	state.armed = false
+	intent := state.intent
+	if len(pointerY) != 0 {
+		intent.Height = control.NormalizeEdgeHeight(pointerY[0], state.screenTop, state.screenHeight)
+	}
 	select {
-	case state.intents <- state.intent:
+	case state.intents <- intent:
 	default:
 	}
 	return nil

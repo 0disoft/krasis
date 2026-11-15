@@ -532,12 +532,22 @@ func (activation *combinedSourceActivation) observe(event peer.ControlFlowEvent)
 }
 
 func (activation *combinedSourceActivation) Deactivate() {
+	activation.DeactivateProfile(nil)
+}
+
+func (activation *combinedSourceActivation) DeactivateProfile(ctx context.Context) {
 	if activation == nil {
 		return
 	}
 	activation.profileMu.Lock()
 	profile := activation.activeProfile
 	activation.profileMu.Unlock()
+	if height := control.EdgeHeightFromContext(ctx); height != 0 {
+		if profile == nil {
+			profile = context.Background()
+		}
+		profile = control.WithEdgeHeight(profile, height)
+	}
 	started := time.Now()
 	defer func() { handoff.Record(profile, handoff.SourceDeactivate, time.Since(started)) }()
 	if activation.source != nil {

@@ -44,7 +44,11 @@ type preparationBoundary struct {
 }
 
 func (p *preparationBoundary) Observe(action control.InputAction, x int32) error {
-	if err := p.next.Observe(action, x); err != nil {
+	return p.ObserveHeight(action, x, 0)
+}
+
+func (p *preparationBoundary) ObserveHeight(action control.InputAction, x int32, height control.EdgeHeight) error {
+	if err := wininput.ObserveBoundaryHeight(p.next, action, x, height); err != nil {
 		return err
 	}
 	if action.Kind != control.InputPointerMove {

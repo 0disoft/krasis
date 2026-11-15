@@ -29,7 +29,7 @@ func TestSourcePacketsRejectIdleKeysAndMalformedAuthority(t *testing.T) {
 		if err != nil || got != p {
 			t.Fatal("invalid roundtrip", err)
 		}
-		for _, offset := range []int{0, 56, 63} {
+		for _, offset := range []int{0, 56, 60} {
 			bad := data
 			bad[offset] = 255
 			if _, err := readSourcePacket(bytes.NewReader(bad[:])); err == nil {

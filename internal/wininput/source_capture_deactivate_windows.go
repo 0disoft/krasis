@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/0disoft/krasis/internal/control"
 	"github.com/0disoft/krasis/internal/handoff"
 )
 
@@ -21,7 +22,20 @@ func (current *sourceWheelCaptureRun) retireWindow() error {
 }
 
 func (current *sourceWheelCaptureRun) deactivateWindowProfile(profile context.Context) error {
-	return current.deactivateWindowWithFocus(profile, true)
+	wasActive := current.active.Load()
+	if err := current.deactivateWindowWithFocus(profile, true); err != nil {
+		return err
+	}
+	height := control.EdgeHeightFromContext(profile)
+	if !wasActive || height == 0 {
+		return nil
+	}
+	// This runs on the existing native desktop owner, after suppression ends.
+	// Never reposition on shutdown/abort or after a desktop/login transition.
+	if err := sourceLoginDesktopCheck(current.loginContext); err != nil {
+		return nil // Cleanup already succeeded; never move on a replacement desktop.
+	}
+	return restoreCursorHeight(context.Background(), nativeInjectionPort{}, height, systemMetric(smYVIRTUALSCREEN), systemMetric(smCYVIRTUALSCREEN))
 }
 
 func (current *sourceWheelCaptureRun) deactivateWindowWithFocus(profile context.Context, restoreFocus bool) error {

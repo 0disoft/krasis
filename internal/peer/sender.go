@@ -115,6 +115,7 @@ func beginOutboundSessionAcquired(
 		SessionID: sessionID,
 		Epoch:     epoch,
 		Edge:      edge,
+		Height:    cursorHeightForWriter(writer, control.EdgeHeightFromContext(ctx)),
 	})
 	writtenAt := time.Now()
 	handoff.Record(ctx, handoff.RequestWrite, writtenAt.Sub(started))
@@ -335,7 +336,7 @@ func (responder *LeaseResponder) HandleLeaseRequest(
 		started = time.Now()
 		stage = "entry"
 		entryCtx, completeEntry := handoff.Entry(ctx)
-		entryErr := responder.Entry.PrepareEntry(entryCtx, command.Edge)
+		entryErr := responder.Entry.PrepareEntry(control.WithEdgeHeight(entryCtx, command.Height), command.Edge)
 		completeEntry(entryErr)
 		handoff.Record(ctx, handoff.EntryPrepare, time.Since(started))
 		if err := entryErr; err != nil {

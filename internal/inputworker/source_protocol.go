@@ -43,6 +43,7 @@ type sourcePacket struct {
 	reply            uint64
 	action           control.InputAction
 	x                int32
+	height           control.EdgeHeight
 	decision         peer.BoundaryAdmissionDecision
 	pressedEvidence  byte
 	timing           [3]byte               // Activation or heartbeat reply; fixed operation-specific buckets.
@@ -52,6 +53,9 @@ type sourcePacket struct {
 }
 
 func (p sourcePacket) valid() bool {
+	if !p.height.Valid() || p.height != 0 && p.kind != sourceBoundary && !(p.kind == sourceCommand && p.op == sourceDeactivate) {
+		return false
+	}
 	if p.captureIPC != nil && (p.op != sourceActivate || p.kind != sourceReply && p.kind != sourceCommand) {
 		return false
 	}
@@ -121,6 +125,9 @@ func encodeSourcePacket(p sourcePacket) ([sourcePacketSize]byte, error) {
 	binary.BigEndian.PutUint32(data[52:56], uint32(p.x))
 	data[56] = p.pressedEvidence
 	copy(data[57:60], p.timing[:])
+	if p.kind == sourceBoundary || p.kind == sourceCommand && p.op == sourceDeactivate {
+		binary.BigEndian.PutUint32(data[60:64], uint32(p.height))
+	}
 	if p.kind == sourceReply && p.op == sourceActivate {
 		bits := packSourceCapture(p.capture)
 		binary.BigEndian.PutUint32(data[52:56], uint32(bits>>32))
@@ -168,6 +175,8 @@ func readSourcePacket(r io.Reader) (sourcePacket, error) {
 			return sourcePacket{}, ErrProtocol
 		}
 		p.x = 0
+	} else if p.kind == sourceBoundary || p.kind == sourceCommand && p.op == sourceDeactivate {
+		p.height = control.EdgeHeight(binary.BigEndian.Uint32(data[60:64]))
 	} else if !zeroBytes(data[60:]) {
 		return sourcePacket{}, ErrProtocol
 	}

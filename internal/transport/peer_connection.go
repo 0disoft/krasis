@@ -105,7 +105,11 @@ func (connection *PeerConnection) ReadFrame() (Frame, error) {
 	if connection == nil || connection.reader == nil {
 		return Frame{}, errors.New("peer connection is not initialized")
 	}
-	return connection.reader.ReadFrame()
+	frame, err := connection.reader.ReadFrame()
+	if err == nil && frame.Kind == MessageControl && len(frame.Payload) > 0 && frame.Payload[0] == 5 && !connection.SupportsCursorHeight() {
+		return Frame{}, ErrUnsupportedControlPayload
+	}
+	return frame, err
 }
 
 // SetReadProgressObserver is configured before the session reader starts.

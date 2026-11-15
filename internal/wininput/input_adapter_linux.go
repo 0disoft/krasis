@@ -168,11 +168,12 @@ func (a *InputAdapter) PrepareEntry(ctx context.Context, edge control.ScreenEdge
 	if !g.Valid() {
 		return ErrDisplayGeometryChanged
 	}
-	tx, ty, err := cursorEntryPoint(edge, g.Left, g.Top, g.Width, g.Height)
+	tx, ty, err := cursorEntryPoint(edge, g.Left, g.Top, g.Width, g.Height, control.EdgeHeightFromContext(ctx))
 	if err != nil {
 		return err
 	}
 	s.pending = true
+	a.setReturnGeometry(g.Top, g.Height)
 	s.previousX, s.previousY = x, y
 	if err = p.SetCursorPosition(ctx, tx, ty); err != nil {
 		return err
@@ -257,7 +258,7 @@ func (a *InputAdapter) Move(ctx context.Context, x, y int32) error {
 	if !ok {
 		return ErrInputInjection
 	}
-	px, _, err := p.MoveWithPosition(ctx, x, y)
+	px, py, err := p.MoveWithPosition(ctx, x, y)
 	if err != nil {
 		return err
 	}
@@ -268,7 +269,7 @@ func (a *InputAdapter) Move(ctx context.Context, x, y int32) error {
 	if !g.Valid() {
 		return ErrDisplayGeometryChanged
 	}
-	return a.observeReturnPosition(px, g.Left, g.Width)
+	return a.observeReturnPosition(px, g.Left, g.Width, py)
 }
 
 // Reuse the pinned native owner's session geometry on the motion hot path.

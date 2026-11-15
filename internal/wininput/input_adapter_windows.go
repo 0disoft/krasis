@@ -66,16 +66,19 @@ func (adapter *InputAdapter) PrepareEntry(ctx context.Context, sourceEdge contro
 		}
 	}
 	stage = "geometry"
+	top, height := systemMetric(smYVIRTUALSCREEN), systemMetric(smCYVIRTUALSCREEN)
 	x, y, err := cursorEntryPoint(
 		sourceEdge,
 		systemMetric(smXVIRTUALSCREEN),
-		systemMetric(smYVIRTUALSCREEN),
+		top,
 		systemMetric(smCXVIRTUALSCREEN),
-		systemMetric(smCYVIRTUALSCREEN),
+		height,
+		control.EdgeHeightFromContext(ctx),
 	)
 	if err != nil {
 		return err
 	}
+	adapter.setReturnGeometry(top, height)
 	if adapter.injection != nil {
 		// A lost worker ACK may follow an applied cursor write. Preserve a
 		// pending, unverified entry instead of claiming rollback was unnecessary.
@@ -231,7 +234,7 @@ func (adapter *InputAdapter) Move(ctx context.Context, deltaX, deltaY int32) err
 			return err
 		}
 	}
-	return adapter.observeReturnPosition(position.X, systemMetric(smXVIRTUALSCREEN), systemMetric(smCXVIRTUALSCREEN))
+	return adapter.observeReturnPosition(position.X, systemMetric(smXVIRTUALSCREEN), systemMetric(smCXVIRTUALSCREEN), position.Y)
 }
 
 func (adapter *InputAdapter) Wheel(ctx context.Context, deltaX, deltaY int32) error {

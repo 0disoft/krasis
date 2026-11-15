@@ -17,6 +17,7 @@ func routePhysicalAction(
 	boundary BoundaryObserver,
 	action control.InputAction,
 	pointerX int32,
+	height ...control.EdgeHeight,
 ) bool {
 	if session == nil {
 		return false
@@ -27,7 +28,11 @@ func routePhysicalAction(
 	defer session.physicalMu.Unlock()
 	session.observePhysicalPress(action)
 	if boundary != nil {
-		if err := observeBoundary(boundary, action, pointerX); err != nil {
+		var h control.EdgeHeight
+		if len(height) != 0 {
+			h = height[0]
+		}
+		if err := ObserveBoundaryHeight(boundary, action, pointerX, h); err != nil {
 			if errors.Is(err, ErrBoundaryObserverPanic) {
 				session.Abort(err)
 				return false
@@ -42,10 +47,20 @@ func routePhysicalAction(
 }
 
 func observeBoundary(boundary BoundaryObserver, action control.InputAction, pointerX int32) (err error) {
+	return ObserveBoundaryHeight(boundary, action, pointerX, 0)
+}
+
+// ObserveBoundaryHeight preserves legacy observers and the panic boundary.
+func ObserveBoundaryHeight(boundary BoundaryObserver, action control.InputAction, pointerX int32, height control.EdgeHeight) (err error) {
 	defer func() {
 		if recover() != nil {
 			err = ErrBoundaryObserverPanic
 		}
 	}()
+	if positioned, ok := boundary.(interface {
+		ObserveHeight(control.InputAction, int32, control.EdgeHeight) error
+	}); ok {
+		return positioned.ObserveHeight(action, pointerX, height)
+	}
 	return boundary.Observe(action, pointerX)
 }

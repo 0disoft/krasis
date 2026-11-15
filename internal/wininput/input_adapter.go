@@ -42,6 +42,7 @@ func cursorEntryPoint(
 	top int32,
 	width int32,
 	height int32,
+	entryHeight ...control.EdgeHeight,
 ) (int32, int32, error) {
 	if sourceEdge != control.ScreenEdgeLeft && sourceEdge != control.ScreenEdgeRight {
 		return 0, 0, fmt.Errorf("%w: source edge must be LEFT or RIGHT", ErrUnsupportedInput)
@@ -59,7 +60,14 @@ func cursorEntryPoint(
 	if sourceEdge == control.ScreenEdgeLeft {
 		x = int32(right) - cursorEntryInset
 	}
-	y := int32(int64(top) + int64(height)/2)
+	var anchor control.EdgeHeight
+	if len(entryHeight) != 0 {
+		anchor = entryHeight[0]
+	}
+	y, err := anchor.Coordinate(top, height)
+	if err != nil {
+		return 0, 0, fmt.Errorf("%w: %w", ErrUnsupportedInput, err)
+	}
 	return x, y, nil
 }
 

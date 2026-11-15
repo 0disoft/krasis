@@ -58,13 +58,14 @@ func (actions *rawMouseActions) append(action control.InputAction) error {
 }
 
 type sourcePointerState struct {
-	progress *sourceHookProgress
-	x        atomic.Int32
-	known    atomic.Bool
+	progress    *sourceHookProgress
+	position    atomic.Uint64
+	top, height int32
+	known       atomic.Bool
 }
 
 func newSourcePointerState(position point) *sourcePointerState {
-	state := &sourcePointerState{}
+	state := &sourcePointerState{top: systemMetric(smYVIRTUALSCREEN), height: systemMetric(smCYVIRTUALSCREEN)}
 	state.observe(position)
 	return state
 }
@@ -73,7 +74,7 @@ func (state *sourcePointerState) observe(position point) {
 	if state == nil {
 		return
 	}
-	state.x.Store(position.X)
+	state.position.Store(uint64(uint32(position.X))<<32 | uint64(uint32(position.Y)))
 	state.known.Store(true)
 }
 
@@ -81,7 +82,7 @@ func (state *sourcePointerState) pointerX() (int32, bool) {
 	if state == nil || !state.known.Load() {
 		return 0, false
 	}
-	return state.x.Load(), true
+	return int32(state.position.Load() >> 32), true
 }
 
 func isInjectedMouse(data mouseHookData) bool {
@@ -227,7 +228,14 @@ func routeRawMouse(
 	if actions.count == 0 || session == nil {
 		return nil
 	}
-	pointerX, known := state.pointerX()
+	var pointerX int32
+	var height control.EdgeHeight
+	known := state != nil && state.known.Load()
+	if known {
+		position := state.position.Load()
+		pointerX = int32(position >> 32)
+		height = control.NormalizeEdgeHeight(int32(position), state.top, state.height)
+	}
 	for index := 0; index < actions.count; index++ {
 		action := actions.values[index]
 		// Button ownership is decided synchronously by the low-level hook.
@@ -241,7 +249,7 @@ func routeRawMouse(
 			}
 			continue
 		}
-		routePhysicalAction(session, boundary, action, pointerX)
+		routePhysicalAction(session, boundary, action, pointerX, height)
 	}
 	return nil
 }

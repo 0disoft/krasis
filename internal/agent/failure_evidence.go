@@ -204,6 +204,11 @@ func newSessionConnectionEvidence(connection Connection, observer peer.ControlFl
 	return &sessionConnectionEvidence{Connection: connection, observer: observer}
 }
 
+func (connection *sessionConnectionEvidence) SupportsCursorHeight() bool {
+	capability, ok := connection.Connection.(interface{ SupportsCursorHeight() bool })
+	return ok && capability.SupportsCursorHeight()
+}
+
 func (connection *sessionConnectionEvidence) InterruptLocal(cause error) error {
 	connection.mu.Lock()
 	first := connection.localCause == nil

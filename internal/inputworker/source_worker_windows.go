@@ -252,6 +252,10 @@ type sourcePointerQueue struct {
 }
 
 func (q *sourcePointerQueue) Observe(a control.InputAction, x int32) error {
+	return q.ObserveHeight(a, x, 0)
+}
+
+func (q *sourcePointerQueue) ObserveHeight(a control.InputAction, x int32, height control.EdgeHeight) error {
 	if q.emergency.Observe(a) {
 		q.session.Abort(wininput.ErrEmergencyRelease)
 		return wininput.ErrEmergencyRelease
@@ -262,7 +266,7 @@ func (q *sourcePointerQueue) Observe(a control.InputAction, x int32) error {
 	// edge/rearm samples immediately when local control returns.
 	if a.Kind == control.InputPointerMove && !q.session.Active() {
 		select {
-		case q.events <- sourcePacket{kind: sourceBoundary, action: a, x: x}:
+		case q.events <- sourcePacket{kind: sourceBoundary, action: a, x: x, height: height}:
 		default:
 		}
 	}
@@ -506,7 +510,11 @@ func runSourceCapture(ctx context.Context, channel, service *Channel, lease Leas
 					case sourceDeactivate:
 						session.Deactivate()
 						writer.epoch.Store(0)
-						hook.SourceCapture().Deactivate()
+						if capture, ok := hook.SourceCapture().(wininput.SourceProfiledDeactivation); ok {
+							capture.DeactivateProfile(control.WithEdgeHeight(commandContext, p.height))
+						} else {
+							hook.SourceCapture().Deactivate()
+						}
 						if hook.SourceCapture().Active() {
 							return ErrRecovery
 						}

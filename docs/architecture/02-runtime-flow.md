@@ -119,6 +119,23 @@ destination의 cursor entry는 return detector arm 뒤 `PrepareEntry`로 이동 
 취소를 상속하지 않는 bounded cleanup에서 `RollbackEntry`를 호출하며, 현재 cursor가 확인된 entry 좌표에
 그대로 있을 때만 이전 좌표로 복원한다. 이미 움직인 cursor는 오래된 snapshot으로 덮어쓰지 않는다.
 
+g544부터 수평 경계를 넘는 순간의 세로 위치는 `EdgeHeight`로 전달한다. `0`은 좌표 정보 없음,
+`1..65536`은 화면 위끝부터 아래끝까지의 정규화 비율이다. 목적지의 해상도·DPI가 달라도
+`top + round((heightAnchor-1)*(screenHeight-1)/65535)`로 변환한다. Windows는 기존 hook 좌표의
+X/Y를 하나의 atomic snapshot으로 유지하고, Linux는 기존 X11 위치 표본을 사용한다. 이동마다
+커서 조회나 RPC를 추가하지 않으며, 준비 힌트에는 좌표·리스 권한을 넣지 않는다.
+
+양쪽 product endpoint가 `krasis/1.height` ALPN을 협상한 경우에만 lease request/revoke의
+control v5에 4-byte 높이 필드를 보낸다. 이전 피어는 `krasis/1.prepare` 또는 `krasis/1`로
+협상해 기존 v3 리스 형식을 사용한다. 준비 힌트 v4는 그대로다. 잘린 payload, 범위 밖 높이와
+다른 명령의 높이는 거절한다. 좌표가 없는 기존 요청은 기존 중앙 배치·복귀 동작을 유지한다.
+
+자연 복귀는 수신측이 경계에 도달한 현재 Y를 revoke에 담는다. 출발측은 정확한 outbound
+session/lease/epoch를 확인한 뒤 기존 캡처 비활성화 명령 안에서 세로 위치만 바꾼다. Windows
+위치 변경은 같은 보호 워커·native desktop owner에서 수행하며 추가 RPC가 없다. stale/inbound
+revoke, abort, planned retirement, shutdown과 데스크톱 교체에는 위치를 적용하지 않는다.
+높이는 표시용 메타데이터이며 리스 인증, 입력 검증과 cursor entry rollback을 대체하지 않는다.
+
 제어권 반환 시 destination의 커서 숨김은 네이티브 소유 스레드의 같은 메시지 큐에 snapshot과 show를
 순서대로 게시한다. show는 revoke 전송 성공 후에만 게시한다. peer 스레드는 snapshot을 기다리지 않으며,
 20ms 지연만으로 숨김 요청을 버리지 않는다. 최신 요청 ID, 입력 generation, 현재 데스크톱과 좌표를

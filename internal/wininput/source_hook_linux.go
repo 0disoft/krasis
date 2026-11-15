@@ -66,6 +66,29 @@ func (h *SourceHook) ActivateProfile(ctx context.Context) error {
 	return nil
 }
 func (h *SourceHook) Deactivate() { h.mu.Lock(); defer h.mu.Unlock(); h.deactivateLocked() }
+func (h *SourceHook) DeactivateProfile(profile context.Context) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	wasActive := h.active
+	h.deactivateLocked()
+	height := control.EdgeHeightFromContext(profile)
+	if !wasActive || height == 0 || h.desktop == nil || h.root.Err() != nil {
+		return
+	}
+	g := h.desktop.Dimensions()
+	y, err := height.Coordinate(0, g.Height)
+	if err == nil {
+		ctx, cancel := context.WithTimeout(h.root, SourceCleanupTimeout)
+		defer cancel()
+		err = h.desktop.SetPosition(ctx, h.lastX, y)
+		if err == nil {
+			h.lastY = y
+		}
+	}
+	if err != nil && h.session != nil {
+		h.session.Abort(err)
+	}
+}
 func (h *SourceHook) deactivateLocked() {
 	if h.desktop == nil {
 		return
@@ -226,7 +249,8 @@ func (h *SourceHook) tickLocked(ctx context.Context, s *SourceSession, b Boundar
 				}
 				h.returnHidden = false
 			}
-			routePhysicalAction(s, b, control.InputAction{Kind: control.InputPointerMove, DeltaX: dx, DeltaY: dy}, x)
+			g := h.desktop.Dimensions()
+			routePhysicalAction(s, b, control.InputAction{Kind: control.InputPointerMove, DeltaX: dx, DeltaY: dy}, x, control.NormalizeEdgeHeight(y, 0, g.Height))
 		}
 		return nil
 	}

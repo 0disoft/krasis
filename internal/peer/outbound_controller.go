@@ -85,10 +85,11 @@ func (controller *OutboundController) BeginBoundary(
 	intent control.BoundaryIntent,
 	identity OutboundIdentity,
 ) error {
-	if intent.Edge != control.ScreenEdgeLeft && intent.Edge != control.ScreenEdgeRight {
+	if !intent.Height.Valid() || intent.Edge != control.ScreenEdgeLeft && intent.Edge != control.ScreenEdgeRight {
 		return errors.New("outbound boundary intent requires a LEFT or RIGHT edge")
 	}
 	ctx = handoff.Begin(ctx, "source", identity.SessionID, identity.Epoch, intent.DecidedAt)
+	ctx = control.WithEdgeHeight(ctx, intent.Height)
 	if !intent.DecidedAt.IsZero() {
 		handoff.Record(ctx, handoff.BoundaryToBegin, time.Since(intent.DecidedAt))
 	}
@@ -220,7 +221,16 @@ func (controller *OutboundController) RevokePeer(ctx context.Context, command tr
 			return err
 		}
 		inbound := snapshot.Control.State == control.StateInboundActive
-		controller.Source.Deactivate()
+		// Placement belongs only to the exact outbound lease being returned.
+		// An inbound, stale, planned or legacy revoke must not move the cursor.
+		matched := !inbound && snapshot.Control.State == control.StateOutboundActive &&
+			snapshot.Control.SessionID == command.SessionID && snapshot.Control.LeaseID == command.LeaseID &&
+			snapshot.HasOutboundStream && snapshot.OutboundStream.Epoch == command.Epoch
+		if profiled, ok := controller.Source.(interface{ DeactivateProfile(context.Context) }); ok && matched && command.Height != 0 {
+			profiled.DeactivateProfile(control.WithEdgeHeight(ctx, command.Height))
+		} else {
+			controller.Source.Deactivate()
+		}
 		_, err = controller.Runtime.RevokePeer(ctx, command.SessionID, command.LeaseID, command.Epoch)
 		if err == nil {
 			role := "source"

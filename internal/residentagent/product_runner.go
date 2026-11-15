@@ -86,7 +86,7 @@ func prepareProductConnection(identities *productidentity.Store, trust *truststo
 	if err != nil {
 		return productConnection{}, err
 	}
-	transport.EnableInputPreparation(config)
+	transport.EnableCursorHeight(config)
 	return productConnection{profile: profile, peer: peer, tls: config, anchor: leaf, localKey: localKey}, nil
 }
 

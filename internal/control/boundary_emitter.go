@@ -34,6 +34,10 @@ func NewBoundaryIntentEmitterObserved(detector *BoundaryDetector, observer func(
 }
 
 func (emitter *BoundaryIntentEmitter) Observe(action InputAction, pointerX int32) error {
+	return emitter.ObserveHeight(action, pointerX, 0)
+}
+
+func (emitter *BoundaryIntentEmitter) ObserveHeight(action InputAction, pointerX int32, height EdgeHeight) error {
 	if emitter == nil || emitter.detector == nil || emitter.intents == nil {
 		return errors.New("boundary intent emitter is not initialized")
 	}
@@ -43,6 +47,7 @@ func (emitter *BoundaryIntentEmitter) Observe(action InputAction, pointerX int32
 	}
 	// Preserve the local monotonic decision time before the consumer can run.
 	intent.DecidedAt = time.Now()
+	intent.Height = height
 	select {
 	case emitter.intents <- intent:
 		if emitter.observer != nil {

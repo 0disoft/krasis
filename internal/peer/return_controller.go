@@ -85,6 +85,7 @@ func (controller *ReturnController) revoke(ctx context.Context, intent control.R
 			SessionID: identity.SessionID,
 			LeaseID:   identity.LeaseID,
 			Epoch:     identity.Epoch,
+			Height:    cursorHeightForWriter(writer, intent.Height),
 		})
 		if encodeErr != nil {
 			return encodeErr

@@ -9,6 +9,26 @@ import (
 	"github.com/0disoft/krasis/internal/control"
 )
 
+func TestLinuxEntryPreservesCrossingHeight(t *testing.T) {
+	for _, edge := range []control.ScreenEdge{control.ScreenEdgeLeft, control.ScreenEdgeRight} {
+		for _, h := range []control.EdgeHeight{1, 32769, 65536} {
+			p := &linuxTestPort{x: 25, y: 30}
+			a, err := NewInputAdapterWithInjection(10, 100, p)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := a.PrepareEntry(control.WithEdgeHeight(context.Background(), h), edge); err != nil {
+				t.Fatal(err)
+			}
+			want, _ := h.Coordinate(0, 80)
+			if p.y != want || p.writes != 1 {
+				t.Fatal("Linux entry still centered", p.y, want, p.writes)
+			}
+			a.CommitEntry()
+		}
+	}
+}
+
 type linuxTestPort struct {
 	x, y   int32
 	writes int

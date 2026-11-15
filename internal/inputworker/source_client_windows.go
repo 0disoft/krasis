@@ -79,13 +79,17 @@ func (c *CaptureSource) ActivateProfile(profile context.Context) error {
 	return err
 }
 func (c *CaptureSource) Deactivate() {
+	c.DeactivateProfile(context.Background())
+}
+
+func (c *CaptureSource) DeactivateProfile(profile context.Context) {
 	live := c.client()
 	if live == nil {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	if _, err := live.call(ctx, sourceDeactivate); err != nil {
+	if _, err := live.call(ctx, sourceDeactivate, uint64(control.EdgeHeightFromContext(profile))); err != nil {
 		if !live.retiring.Load() {
 			_ = live.channel.Close()
 		}
@@ -298,6 +302,12 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 		c.epoch.Store(0)
 	}
 	p := sourcePacket{kind: sourceCommand, op: op, sequence: c.sequence, binding: c.binding}
+	if op == sourceDeactivate && len(reference) == 1 {
+		if reference[0] > 65536 {
+			return sourcePacket{}, ErrProtocol
+		}
+		p.height = control.EdgeHeight(reference[0])
+	}
 	if (op == sourceCursorShow || op == sourceBoundaryAck) && len(reference) == 1 {
 		p.reply = reference[0]
 	}
@@ -592,7 +602,7 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 				}
 			case sourceBoundary:
 				if ctx.Err() == nil {
-					if err := boundary.Observe(p.action, p.x); err != nil && !errors.Is(err, control.ErrBoundaryIntentQueueFull) {
+					if err := wininput.ObserveBoundaryHeight(boundary, p.action, p.x, p.height); err != nil && !errors.Is(err, control.ErrBoundaryIntentQueueFull) {
 						live.err = err
 						return
 					}

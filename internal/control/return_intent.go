@@ -14,8 +14,11 @@ type ReturnIntent struct {
 }
 
 func (intent ReturnIntent) Validate() error {
-	if intent.SessionID == "" || intent.Epoch == "" || !intent.Height.Valid() {
+	if intent.SessionID == "" || intent.Epoch == "" {
 		return fmt.Errorf("%w: session and epoch are required", ErrInvalidReturnIntent)
+	}
+	if !intent.Height.Valid() {
+		return fmt.Errorf("%w: invalid crossing height", ErrInvalidReturnIntent)
 	}
 	return nil
 }
