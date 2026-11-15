@@ -68,3 +68,27 @@ previous source through the same verified installer workflow. Push, public
 release and remote CI are outside this request. Source of truth updated:
 docs/architecture/02-runtime-flow.md. No API, DB, dependency, hygiene or runner
 changes.
+
+## Paired installation outcome
+
+Workspace packaging passed all 111 frontend tests and the native UI build.
+The real update archive integration, eight-file/icon bundle check, offline
+update verify and setup --verify all passed on revision
+`f2dfd5d4552d65e2715ddadc4694a449277b2fb6`.
+
+B update `50bf9210dda042ab3806b08ac605de91` confirmed UPDATED for all
+29,069,351 bytes; A setup returned installed/code 0. CLI connect receipt
+`303fb357df36e9f72ed9de50f9bba418` is connected. An earlier connect request
+returned busy during automatic reconnect; it was a confirmed refusal rather
+than an unknown request, and is not represented as the successful receipt.
+Doctor confirms healthy/CONNECTED, matching CLI/agent/UI/launch/protected
+installation, and CONFIGURED protected input. B is ONLINE on the same g540
+revision and its transfer is IDLE.
+
+Paired collection `926c4a8ec86fb130f4d13b9c549e6328` shows both service/input
+states READY and grants PRESENT on one shared authenticated connection. The
+postconnection interval is only A 10.151s/B 11.420s, with no retained new fault
+or reconnect. B's six acquisition timeouts preceded this connection while A was
+being installed; they are retained separately in the installation receipt.
+No new physical crossing latency or long-duration stability claim is made.
+The final installation receipt records evidence hashes and bounded coverage.

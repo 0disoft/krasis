@@ -1,0 +1,139 @@
+{
+  "schema": "krasis.g540-installation-review/v1",
+  "generation": 540,
+  "revision": "f2dfd5d4552d65e2715ddadc4694a449277b2fb6",
+  "collection": "926c4a8ec86fb130f4d13b9c549e6328",
+  "update": {
+    "schemaVersion": "krasis.cli.update-wait/v1",
+    "peerAlias": "B",
+    "id": "50bf9210dda042ab3806b08ac605de91",
+    "code": "updated",
+    "transferState": "UPDATED",
+    "generation": 540,
+    "revision": "f2dfd5d4552d65e2715ddadc4694a449277b2fb6",
+    "bytes": 29069351,
+    "total": 29069351
+  },
+  "setup": {
+    "schema": "krasis.setup-result/v1",
+    "code": 0,
+    "state": "installed"
+  },
+  "cliConnect": {
+    "schemaVersion": "krasis.cli.peer-connect/v1",
+    "code": "connected",
+    "peerAlias": "B",
+    "id": "303fb357df36e9f72ed9de50f9bba418"
+  },
+  "doctor": {
+    "code": "healthy",
+    "connection": "CONNECTED",
+    "protectedInput": "CONFIGURED"
+  },
+  "peer": {
+    "generation": 540,
+    "revision": "f2dfd5d4552d65e2715ddadc4694a449277b2fb6",
+    "state": "ONLINE",
+    "transferState": "IDLE"
+  },
+  "devices": {
+    "A": {
+      "created": "2026-11-15T11:21:47Z",
+      "sha256": "dbc0b502bfb6da87aadf5243586f2b76079a1e848864dbaed97ff7a6de0f9238",
+      "service": "READY",
+      "input": "READY",
+      "grant": "PRESENT",
+      "serviceStart": "2026-11-15T11:21:23.3901751Z",
+      "connectedAt": "2026-11-15T11:21:36.8495534Z",
+      "connection": "7ec0dbec041c7cf7c9f691c33865435bd3480236a0fabbf44fa312361dcf716d",
+      "observedSeconds": 10.151,
+      "failures": [],
+      "reconnects": [],
+      "preconnectionEvents": [],
+      "logCompleteness": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false
+        }
+      ]
+    },
+    "B": {
+      "created": "2026-11-15T11:21:38Z",
+      "sha256": "8a2dbcc3e6fad01d531b3eafc11fcb44acdedd99e069110a568d333a9e5e15ad",
+      "service": "READY",
+      "input": "READY",
+      "grant": "PRESENT",
+      "serviceStart": "2026-11-15T11:20:29.543511Z",
+      "connectedAt": "2026-11-15T11:21:26.5803876Z",
+      "connection": "7ec0dbec041c7cf7c9f691c33865435bd3480236a0fabbf44fa312361dcf716d",
+      "observedSeconds": 11.42,
+      "failures": [],
+      "reconnects": [],
+      "preconnectionEvents": [
+        {
+          "time": "2026-11-15T11:20:42.4971705Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-15T11:20:42.4971705Z",
+          "code": "RECONNECTING"
+        },
+        {
+          "time": "2026-11-15T11:20:47.7125288Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-15T11:20:53.14078Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-15T11:21:00.5660689Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-15T11:21:07.3540344Z",
+          "code": "reconnect_acquire_network_timeout"
+        },
+        {
+          "time": "2026-11-15T11:21:17.8736783Z",
+          "code": "reconnect_acquire_network_timeout"
+        }
+      ],
+      "logCompleteness": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false
+        }
+      ]
+    }
+  },
+  "limits": [
+    "Short postinstallation observation, not a new physical crossing trial.",
+    "No controlled latency reduction or actual one-hour active expiry trial is claimed.",
+    "A missing revoke or uncertain native cleanup remains fail-closed."
+  ]
+}
