@@ -10,7 +10,8 @@ wait is 1354.679, 688.870, 764.125, 1194.833 and 759.368ms. A capture activation
 is 13.496..30.722ms. These are local, nested measurements, not cross-PC wall
 clock subtraction.
 
-For the worst 2103.088ms entry, B's same-process control dispatch is 2051.220ms,
+For the worst 2103.088ms entry, B authorization/connect setup is 1923.893ms.
+The overlapping B diagnostic minute records control dispatch up to 2051.220ms,
 while A's request-written-to-grant-read is 2102.533ms and read-to-dispatch is
 0.555ms. Sampled TCP smoothed RTT is 24.792/24.289ms with no observed retransmit
 or timeout delta. Network and A read-resumption uncertainty remain, but they
@@ -77,3 +78,53 @@ entrypoints and restoration. Diff checks pass. The scope adds no new shared
 mutable state; the existing concurrent-once cleanup policy tests remain in the
 package suite. A new race-toolchain build was not needed for unchanged cleanup
 synchronization. These tests confirm scheduling policy, not a latency gain.
+
+## Paired installation and physical result
+
+Built c3ab4f7e7192c7ef89b80148c291b6efbdc40df3 as g543. Packaging passed all
+111 frontend tests, native UI build, input installer build, productpanel wire
+transfer test, icon/single-copy verification and setup verification. Exactly one
+B send, ID 0e2d03be818997242b014e33a2f77e35, completed UPDATED with all 29230198
+bytes and the exact revision. A setup exited 0 / installed, protected installation
+stage complete, recovery not_needed. CLI app-connect receipt
+424e199120dfeb95547c7467b7a90f4d confirmed connected. Installation collection
+a8bc18cc6d67b166d3a792f506f541b4 verified both services/input READY, matching
+builds and a shared connection, with tracing disabled in both active runs.
+
+The user reports that lag appears gone. Collection
+747628d80d2db9591bcabd6a7d40b5b6 contains 12 uniquely matched complete/OK
+source/receiver profiles and no incomplete pair in the current connection.
+
+| Process-local span | g542 severe trial median / max ms (5) | g543 median / max ms (12) |
+| --- | ---: | ---: |
+| A request to grant | 1377.583 / 2103.088 | 41.211 / 98.619 |
+| B authorization/connect total | 1230.495 / 1923.893 | 25.774 / 36.396 |
+| B worker readiness | 764.125 / 1354.679 | 22.283 / 32.520 |
+| B first input dispatch | 73.694 / 331.702 | 1.798 / 4.000 |
+| B worst input dispatch per entry | 280.557 / 526.585 | 3.503 / 5.813 |
+| Inner native handler | 146.460 / 253.475 | 1.643 / 4.449 |
+| SendInput | 62.924 / 143.839 | 1.151 / 3.503 |
+| Service reply-ready to app read-return | 36.257 / 323.964 | 1.070 / 2.358 |
+| A capture activation | 20.760 / 30.722 | 16.115 / 41.616 |
+
+This compares the five severe untraced entries after 13:46Z with the g543
+trial, not every earlier g542 entry. Earlier mild g542 entries were already
+40..112ms request-to-grant. The new result returns to that range, rather than
+proving a permanent 20x improvement under all CPU workloads. Sample counts,
+polling, system workload and observation duration differ; no causal effect size
+is established by this uncontrolled before/after comparison. A capture maximum
+has not improved against the selected severe-trial baseline.
+
+Both sides preserve the same connection for about 122s after installation.
+There are no new postconnection faults, reconnects, poisonings or repair-required
+events. Both services and input remain READY and service start timestamps match
+the immediate installation collection. A B startup reconnect before the final
+shared connection is retained in logs and excluded from trial recurrence, not
+hidden as a successful trial event. Two minutes and twelve capped profiles do
+not establish long-duration stability or zero remaining stutter. Exact hashes,
+selection and local software intervals are in g543-paired-crossing-review.json.
+
+No further source change is justified by this short successful trial. Leave the
+flight recorder disabled. No push/public release/remote CI was performed, as not
+requested. Linux UI and a controlled CPU-contention experiment were not run for
+this Windows-only change; native policy and physical product use were checked.
