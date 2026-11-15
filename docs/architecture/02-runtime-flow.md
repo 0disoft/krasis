@@ -495,6 +495,19 @@ join inside a 267.456ms ready wait. Connection-start demand moves optional
 construction ahead of an ordinary first approach. It cannot guarantee immediate
 readiness for an entry arriving during startup or after candidate expiry.
 
+### Joined source retirement during an outbound lease
+
+The protected capture lease remains bounded to at most one hour. Its verified
+final retirement can occur during an outbound lease, not just while idle. After
+the native owners and client handles have joined, the resident atomically pauses
+capture, invalidates queued forwarding and requests the existing local-return
+revoke. It waits at most SourceCleanupTimeout for that return owner to complete
+before selecting a replacement. Grants remain fenced after revoke completion
+until the replacement announces readiness. No TLS reconnect or lease extension
+is needed for a clean retirement. Cleanup/protocol/emergency errors, held local
+presses, missing revoke completion and cancellation still fail closed. Ordinary
+desktop refresh continues to refuse replacement of a live native capture owner.
+
 ### g538 foreground transition waits
 
 The capture owner waits for Windows input/system activation events instead of

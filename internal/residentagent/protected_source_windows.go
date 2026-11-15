@@ -151,8 +151,10 @@ func (h *protectedSource) RunWithBoundary(ctx context.Context, session *wininput
 		// Native Run must join every hook/window owner before returning. Only
 		// our idle-owner cancellation may continue; cleanup failures stay fatal.
 		cleanRetirement := usingSecure && inputworker.CleanSourceRetirement(err)
-		if cleanRetirement && session.Active() {
-			return wininput.ErrProtectedInput
+		if cleanRetirement {
+			if err := settleRetiredSource(ctx, session); err != nil {
+				return err
+			}
 		}
 		retired := cleanRetirement && !session.Active()
 		if (!refresh || !errors.Is(err, context.Canceled) || !cancellationOnly(err, context.Canceled)) && !retired {
