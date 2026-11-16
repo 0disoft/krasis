@@ -86,3 +86,11 @@ connection on both devices. No post-connect timeout/fault/poison/reconnect or
 recovery-required event appears in those short retained g548 runs. Physical
 idle/fast crossing results and long-term recurrence remain unverified; the user
 has been asked for the next trial. No execution tracing is enabled by this fix.
+
+The subsequent user trial is recorded in
+[the paired crossing review](2026-11-16-g548-paired-crossing-review.md): B
+readiness max 28.489ms across twelve matched exchanges, no post-connect fault
+in approximately 170 seconds, but stutter remains with A capture/resume and an
+unresolved grant-wait residual. That review supersedes the pending-trial status
+above; it does not turn the original persistence hypothesis into proven timing
+attribution for the historical 582.901ms sample.

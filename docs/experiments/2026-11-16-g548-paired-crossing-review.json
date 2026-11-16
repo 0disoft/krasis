@@ -1,0 +1,890 @@
+{
+  "schema": "krasis.g548-paired-crossing/v1",
+  "generation": 548,
+  "revision": "0d5553df9a661fb0784b697082177a6da74af3af",
+  "collection": "057a0b9fffa601a12441bafb6b5bfa29",
+  "userReport": "completed; stutter remains",
+  "inputs": {
+    "A": {
+      "file": "support-request-057a0b9fffa601a12441bafb6b5bfa29-local.json",
+      "sha256": "98188910f985ef287c90daa359775f6bf08ac2557f4044e91f06983cdf654309"
+    },
+    "B": {
+      "file": "support-request-057a0b9fffa601a12441bafb6b5bfa29-peer-1aeff94249a3a7a76cfa2765948a731e4b57cc898da1ab79f1bd64fa2583e3f0.json",
+      "sha256": "f4ee31aca436b305db0e111fb0b70756a4043e67666184cb59befff00af28bdb"
+    }
+  },
+  "devices": {
+    "A": {
+      "created": "2026-11-16T12:23:45Z",
+      "input": {
+        "time": "2026-11-16T12:23:35.3034148Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "installation": {
+        "time": "2026-11-16T12:18:45.9011586Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "connection": "479072e718d60c7fd333dd7a93551257bea766c8a4cdcaa0216b442cf4e51baf",
+      "connectedAt": "2026-11-16T12:20:56.057996Z",
+      "observationSeconds": 168.943,
+      "errors": [],
+      "coverage": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false,
+          "events": 2772
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false,
+          "events": 1296
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true,
+          "events": 0
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false,
+          "events": 730
+        }
+      ],
+      "traceEnabled": false
+    },
+    "B": {
+      "created": "2026-11-16T12:23:35Z",
+      "input": {
+        "time": "2026-11-16T12:23:13.9828258Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "installation": {
+        "time": "2026-11-16T12:20:34.1394919Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "connection": "479072e718d60c7fd333dd7a93551257bea766c8a4cdcaa0216b442cf4e51baf",
+      "connectedAt": "2026-11-16T12:20:44.2383943Z",
+      "observationSeconds": 170.762,
+      "errors": [],
+      "coverage": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false,
+          "events": 2745
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false,
+          "events": 1345
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true,
+          "events": 0
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false,
+          "events": 581
+        }
+      ],
+      "traceEnabled": false
+    }
+  },
+  "matchedExchanges": 12,
+  "completeInputExchanges": 10,
+  "metricsMs": {
+    "aBoundary": {
+      "n": 12,
+      "min": 2.761,
+      "median": 9.341000000000001,
+      "max": 39.074
+    },
+    "aGrant": {
+      "n": 12,
+      "min": 37.681,
+      "median": 47.9905,
+      "max": 131.379
+    },
+    "aCapture": {
+      "n": 12,
+      "min": 16.589,
+      "median": 36.8815,
+      "max": 68.816
+    },
+    "aDeactivate": {
+      "n": 12,
+      "min": 14.729,
+      "median": 19.4155,
+      "max": 61.779
+    },
+    "bReady": {
+      "n": 12,
+      "min": 21.102,
+      "median": 22.701500000000003,
+      "max": 28.489
+    },
+    "bAuthorize": {
+      "n": 12,
+      "min": 24.19,
+      "median": 26.0145,
+      "max": 33.294
+    },
+    "bEntry": {
+      "n": 12,
+      "min": 2.928,
+      "median": 3.5475000000000003,
+      "max": 4.771
+    },
+    "bAdmission": {
+      "n": 12,
+      "min": 4.479,
+      "median": 4.9635,
+      "max": 6.679
+    },
+    "bGateWait": {
+      "n": 12,
+      "min": 0,
+      "median": 0,
+      "max": 0
+    },
+    "bConsole": {
+      "n": 12,
+      "min": 4.479,
+      "median": 4.9635,
+      "max": 6.679
+    },
+    "bWorkerReady": {
+      "n": 12,
+      "min": 9.265,
+      "median": 10.257000000000001,
+      "max": 11.99
+    },
+    "bBootstrapReady": {
+      "n": 12,
+      "min": 14.621,
+      "median": 16.808,
+      "max": 20.629
+    },
+    "bFirstInput": {
+      "n": 10,
+      "min": 1.082,
+      "median": 1.711,
+      "max": 4.117
+    },
+    "bWorstInput": {
+      "n": 10,
+      "min": 2.492,
+      "median": 3.6425,
+      "max": 6.846
+    }
+  },
+  "baseline": {
+    "generation": 547,
+    "n": 11,
+    "maxMs": {
+      "bReady": 582.901,
+      "bAdmission": 219.744,
+      "aGrant": 612.465,
+      "aCapture": 25.621,
+      "bWorstInput": 40.086
+    }
+  },
+  "matches": [
+    {
+      "tag": "23c1f48572b23f0e5a74623f15184d2ee2f444140e064d9a2aacc069e6e8340e",
+      "timeA": "2026-11-16T12:23:01.2327807Z",
+      "timeB": "2026-11-16T12:22:49.3988443Z",
+      "endA": "ok",
+      "endB": "ok",
+      "incompleteA": false,
+      "incompleteB": false,
+      "aBoundary": 7.188,
+      "aGrant": 45.165,
+      "aCapture": 57.715,
+      "aDeactivate": 15.356,
+      "bReady": 24.266,
+      "bAuthorize": 27.149,
+      "bEntry": 2.931,
+      "bAdmission": 4.857,
+      "bGateWait": 0,
+      "bConsole": 4.857,
+      "bWorkerReady": 11.086,
+      "bBootstrapReady": 18.111,
+      "bFirstInput": 4.117,
+      "bWorstInput": 6.846,
+      "aExchange": {
+        "schema": 1,
+        "micros": [
+          44059,
+          550,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "bExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          540,
+          32437
+        ],
+        "measured": 12
+      }
+    },
+    {
+      "tag": "d02e15fc50c4bea8ef861e7c5489ac2ffc913f2798016054710d7769edcb67e0",
+      "timeA": "2026-11-16T12:23:02.9217589Z",
+      "timeB": "2026-11-16T12:22:51.0918483Z",
+      "endA": "ok",
+      "endB": "ok",
+      "incompleteA": false,
+      "incompleteB": false,
+      "aBoundary": 13.905,
+      "aGrant": 44.009,
+      "aCapture": 36.732,
+      "aDeactivate": 14.729,
+      "bReady": 24.164,
+      "bAuthorize": 27.049,
+      "bEntry": 3.563,
+      "bAdmission": 5.851,
+      "bGateWait": 0,
+      "bConsole": 5.851,
+      "bWorkerReady": 9.984,
+      "bBootstrapReady": 17.202,
+      "bFirstInput": 1.671,
+      "bWorstInput": 3.633,
+      "aExchange": {
+        "schema": 1,
+        "micros": [
+          43450,
+          0,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "bExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          0,
+          31782
+        ],
+        "measured": 12
+      }
+    },
+    {
+      "tag": "01a165dec1863a0fb84b48a62cce487a1ce9a923588d994aa6c9e1d6cac9f2e1",
+      "timeA": "2026-11-16T12:23:04.1102382Z",
+      "timeB": "2026-11-16T12:22:52.270832Z",
+      "endA": "ok",
+      "endB": "ok",
+      "incompleteA": false,
+      "incompleteB": false,
+      "aBoundary": 3.344,
+      "aGrant": 46.095,
+      "aCapture": 47.111,
+      "aDeactivate": 23.951,
+      "bReady": 21.902,
+      "bAuthorize": 25.662,
+      "bEntry": 3.511,
+      "bAdmission": 4.983,
+      "bGateWait": 0,
+      "bConsole": 4.983,
+      "bWorkerReady": 9.874,
+      "bBootstrapReady": 15.693,
+      "bFirstInput": 1.768,
+      "bWorstInput": 3.268,
+      "aExchange": {
+        "schema": 1,
+        "micros": [
+          46095,
+          0,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "bExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          514,
+          30845
+        ],
+        "measured": 12
+      }
+    },
+    {
+      "tag": "f5232cf833937ec91f51f010ea8a0f89ccdff0da5d7f37f6276860564ed2f844",
+      "timeA": "2026-11-16T12:23:04.9618845Z",
+      "timeB": "2026-11-16T12:22:53.1535186Z",
+      "endA": "ok",
+      "endB": "ok",
+      "incompleteA": false,
+      "incompleteB": true,
+      "aBoundary": 22.43,
+      "aGrant": 57.311,
+      "aCapture": 68.816,
+      "aDeactivate": 18.823,
+      "bReady": 21.102,
+      "bAuthorize": 24.19,
+      "bEntry": 3.544,
+      "bAdmission": 4.613,
+      "bGateWait": 0,
+      "bConsole": 4.613,
+      "bWorkerReady": 9.265,
+      "bBootstrapReady": 14.621,
+      "bFirstInput": null,
+      "bWorstInput": null,
+      "aExchange": {
+        "schema": 1,
+        "micros": [
+          56762,
+          0,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "bExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          0,
+          28871
+        ],
+        "measured": 12
+      }
+    },
+    {
+      "tag": "8a144be8416f8f1120cffc313f7bb4b89f7c14ac14e7398051d6ebf295b7ec74",
+      "timeA": "2026-11-16T12:23:06.0365565Z",
+      "timeB": "2026-11-16T12:22:54.1570214Z",
+      "endA": "ok",
+      "endB": "ok",
+      "incompleteA": false,
+      "incompleteB": false,
+      "aBoundary": 6.079,
+      "aGrant": 49.886,
+      "aCapture": 19.599,
+      "aDeactivate": 61.779,
+      "bReady": 28.489,
+      "bAuthorize": 33.294,
+      "bEntry": 3.563,
+      "bAdmission": 6.679,
+      "bGateWait": 0,
+      "bConsole": 6.679,
+      "bWorkerReady": 11.99,
+      "bBootstrapReady": 20.629,
+      "bFirstInput": 1.676,
+      "bWorstInput": 3.384,
+      "aExchange": {
+        "schema": 1,
+        "micros": [
+          49339,
+          0,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "bExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          0,
+          38040
+        ],
+        "measured": 12
+      }
+    },
+    {
+      "tag": "8bc32b4c5f4ba83968ed4c0942bbc9cb6cc3eeb6fff8420cd9487cd6952d9f29",
+      "timeA": "2026-11-16T12:23:07.0415291Z",
+      "timeB": "2026-11-16T12:22:55.1860548Z",
+      "endA": "ok",
+      "endB": "ok",
+      "incompleteA": false,
+      "incompleteB": false,
+      "aBoundary": 8.282,
+      "aGrant": 42.6,
+      "aCapture": 42.188,
+      "aDeactivate": 16.073,
+      "bReady": 25.984,
+      "bAuthorize": 28.815,
+      "bEntry": 3.678,
+      "bAdmission": 5.325,
+      "bGateWait": 0,
+      "bConsole": 5.325,
+      "bWorkerReady": 11.155,
+      "bBootstrapReady": 18.835,
+      "bFirstInput": 1.082,
+      "bWorstInput": 3.652,
+      "aExchange": {
+        "schema": 1,
+        "micros": [
+          42044,
+          0,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "bExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          0,
+          33633
+        ],
+        "measured": 12
+      }
+    },
+    {
+      "tag": "11c131508ec21cea213be2cb00dad14f68fc7c175c6b674c43af6d0d6083aa40",
+      "timeA": "2026-11-16T12:23:07.7788803Z",
+      "timeB": "2026-11-16T12:22:55.9320465Z",
+      "endA": "ok",
+      "endB": "ok",
+      "incompleteA": false,
+      "incompleteB": false,
+      "aBoundary": 39.074,
+      "aGrant": 52.389,
+      "aCapture": 16.589,
+      "aDeactivate": 24.304,
+      "bReady": 23.047,
+      "bAuthorize": 26.077,
+      "bEntry": 3.671,
+      "bAdmission": 4.479,
+      "bGateWait": 0,
+      "bConsole": 4.479,
+      "bWorkerReady": 11.383,
+      "bBootstrapReady": 17.963,
+      "bFirstInput": 1.691,
+      "bWorstInput": 6.594,
+      "aExchange": {
+        "schema": 1,
+        "micros": [
+          51412,
+          0,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "bExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          0,
+          30886
+        ],
+        "measured": 12
+      }
+    },
+    {
+      "tag": "fa7aacf83c3858d28053f01347807503b36ade78fde09887184c3a6ca4b616c7",
+      "timeA": "2026-11-16T12:23:08.2937157Z",
+      "timeB": "2026-11-16T12:22:56.4850986Z",
+      "endA": "ok",
+      "endB": "ok",
+      "incompleteA": true,
+      "incompleteB": true,
+      "aBoundary": 4.51,
+      "aGrant": 57.105,
+      "aCapture": 37.031,
+      "aDeactivate": 51.705,
+      "bReady": 21.176,
+      "bAuthorize": 25.2,
+      "bEntry": 4.771,
+      "bAdmission": 4.803,
+      "bGateWait": 0,
+      "bConsole": 4.803,
+      "bWorkerReady": 9.404,
+      "bBootstrapReady": 15.782,
+      "bFirstInput": null,
+      "bWorstInput": null,
+      "aExchange": {
+        "schema": 1,
+        "micros": [
+          56543,
+          0,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "bExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          593,
+          31191
+        ],
+        "measured": 12
+      }
+    },
+    {
+      "tag": "36510b8d119dc1e7d971bfd9d554129392f2bee4e6c838c22ddf2568fc563e41",
+      "timeA": "2026-11-16T12:23:10.2098424Z",
+      "timeB": "2026-11-16T12:22:58.3760071Z",
+      "endA": "ok",
+      "endB": "ok",
+      "incompleteA": false,
+      "incompleteB": false,
+      "aBoundary": 20.279,
+      "aGrant": 40.911,
+      "aCapture": 58.813,
+      "aDeactivate": 17.388,
+      "bReady": 23.646,
+      "bAuthorize": 28.173,
+      "bEntry": 3.13,
+      "bAdmission": 5.171,
+      "bGateWait": 0,
+      "bConsole": 5.171,
+      "bWorkerReady": 10.528,
+      "bBootstrapReady": 17.133,
+      "bFirstInput": 1.731,
+      "bWorstInput": 2.492,
+      "aExchange": {
+        "schema": 1,
+        "micros": [
+          40911,
+          0,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "bExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          0,
+          32511
+        ],
+        "measured": 12
+      }
+    },
+    {
+      "tag": "7e136845f7811541055ba27c4c2bc76ab647bb9174724227192b6212297dd576",
+      "timeA": "2026-11-16T12:23:11.0690891Z",
+      "timeB": "2026-11-16T12:22:59.2384607Z",
+      "endA": "ok",
+      "endB": "ok",
+      "incompleteA": false,
+      "incompleteB": false,
+      "aBoundary": 14.554,
+      "aGrant": 37.681,
+      "aCapture": 19.931,
+      "aDeactivate": 15.76,
+      "bReady": 21.77,
+      "bAuthorize": 24.795,
+      "bEntry": 3.551,
+      "bAdmission": 4.944,
+      "bGateWait": 0,
+      "bConsole": 4.944,
+      "bWorkerReady": 9.986,
+      "bBootstrapReady": 15.706,
+      "bFirstInput": 2.284,
+      "bWorstInput": 5.949,
+      "aExchange": {
+        "schema": 1,
+        "micros": [
+          36056,
+          0,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "bExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          0,
+          29523
+        ],
+        "measured": 12
+      }
+    },
+    {
+      "tag": "5bd4686cc805c10c43b7f99def290cbfd5fdab9bde3be27ca994f1e4f41e421f",
+      "timeA": "2026-11-16T12:23:12.3120183Z",
+      "timeB": "2026-11-16T12:23:00.4745489Z",
+      "endA": "ok",
+      "endB": "ok",
+      "incompleteA": false,
+      "incompleteB": false,
+      "aBoundary": 10.4,
+      "aGrant": 131.379,
+      "aCapture": 34.398,
+      "aDeactivate": 20.008,
+      "bReady": 22.356,
+      "bAuthorize": 25.843,
+      "bEntry": 2.928,
+      "bAdmission": 4.764,
+      "bGateWait": 0,
+      "bConsole": 4.764,
+      "bWorkerReady": 10.591,
+      "bBootstrapReady": 16.483,
+      "bFirstInput": 2.372,
+      "bWorstInput": 5.854,
+      "aExchange": {
+        "schema": 1,
+        "micros": [
+          130869,
+          0,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "bExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          0,
+          30521
+        ],
+        "measured": 12
+      }
+    },
+    {
+      "tag": "03871ee46342786312b109ff790db0f5981b25a0f2be26cfb8d573cab69a8edc",
+      "timeA": "2026-11-16T12:23:13.6451433Z",
+      "timeB": "2026-11-16T12:23:01.8042459Z",
+      "endA": "ok",
+      "endB": "ok",
+      "incompleteA": false,
+      "incompleteB": false,
+      "aBoundary": 2.761,
+      "aGrant": 72.206,
+      "aCapture": 33.379,
+      "aDeactivate": 20.113,
+      "bReady": 22.326,
+      "bAuthorize": 25.952,
+      "bEntry": 3.511,
+      "bAdmission": 5.432,
+      "bGateWait": 0,
+      "bConsole": 5.432,
+      "bWorkerReady": 9.835,
+      "bBootstrapReady": 16.328,
+      "bFirstInput": 1.673,
+      "bWorstInput": 3.604,
+      "aExchange": {
+        "schema": 1,
+        "micros": [
+          71642,
+          0,
+          0,
+          0
+        ],
+        "measured": 3
+      },
+      "bExchange": {
+        "schema": 1,
+        "micros": [
+          0,
+          0,
+          0,
+          31226
+        ],
+        "measured": 12
+      }
+    }
+  ],
+  "worstGrant": {
+    "tag": "5bd4686cc805c10c43b7f99def290cbfd5fdab9bde3be27ca994f1e4f41e421f",
+    "aWrittenToGrantReadMs": 130.869,
+    "bRequestReadToGrantWrittenMs": 30.521,
+    "residualMs": 100.348,
+    "tcpInfo": {
+      "schema": 1,
+      "rttMicros": [
+        7579,
+        17871
+      ],
+      "minRttMicros": [
+        3207,
+        3207
+      ],
+      "queryMicros": [
+        0,
+        0
+      ],
+      "retransmittedBytes": 0,
+      "timeoutEpisodes": 0,
+      "counterDeltasKnown": true
+    },
+    "grantProgress": {
+      "schema": 1,
+      "micros": [
+        131379,
+        0,
+        0
+      ],
+      "elapsedMicros": 131379,
+      "byteReads": 2,
+      "bytes": 116,
+      "frames": 1,
+      "maxByteGapMicros": 128656,
+      "byteProgressMeasured": true,
+      "complete": true,
+      "saturated": false,
+      "socketQueue": {
+        "samples": 9,
+        "positiveSamples": 0,
+        "failures": 0,
+        "firstQueuedMicros": 0,
+        "lastEmptyMicros": 103772,
+        "maxQueuedBytes": 0,
+        "maxSampleGapMicros": 27606,
+        "maxQueryMicros": 556
+      }
+    },
+    "controlQueue": {
+      "schema": 1,
+      "micros": 2722
+    }
+  },
+  "worstCapture": {
+    "tag": "f5232cf833937ec91f51f010ea8a0f89ccdff0da5d7f37f6276860564ed2f844",
+    "totalMs": 68.816,
+    "profile": {
+      "schema": 1,
+      "micros": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        536,
+        0,
+        67195
+      ],
+      "measured": 31457280,
+      "worker": [
+        0,
+        1,
+        3
+      ],
+      "native": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        2,
+        0,
+        2,
+        0,
+        1,
+        3,
+        3,
+        0,
+        3,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "exact": {
+        "foregroundRequestMicros": 7368,
+        "measured": 7
+      },
+      "ipc": {
+        "measured": true,
+        "requestDeliveryMicros": 62,
+        "readAuthorizationMicros": 224,
+        "dispatchMicros": 69,
+        "activationMicros": 14694,
+        "replyAdmissionMicros": 93,
+        "replyEncodeMicros": 3,
+        "replyDeliveryMicros": 10967,
+        "callerResumeMicros": 41354,
+        "request": {
+          "measured": true,
+          "submitMicros": 8,
+          "receiveMicros": 54,
+          "writeCompletionMicros": 21
+        },
+        "readAuthority": {
+          "measured": true,
+          "waitMicros": 0,
+          "nativeMicros": 0
+        }
+      },
+      "authority": {
+        "measured": true,
+        "waitMicros": 0,
+        "nativeMicros": 536
+      }
+    }
+  },
+  "limits": [
+    "Independent A/B clocks are not subtracted.",
+    "Nested startup spans can overlap prewarming; do not sum them.",
+    "Uncontrolled different trials cannot establish a fixed performance guarantee.",
+    "No long-term recurrence guarantee."
+  ]
+}
