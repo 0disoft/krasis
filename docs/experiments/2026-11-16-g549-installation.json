@@ -1,0 +1,125 @@
+{
+  "generation": 549,
+  "revision": "5fac17a214bfcb1cf6e4fbbefc28cede96301408",
+  "receipt": {
+    "id": "6f3e4b5ef87340edf785ac9daec89c7c",
+    "state": "updated",
+    "bytes": 29235124
+  },
+  "setup": {
+    "schema": "krasis.setup-result/v1",
+    "code": 0,
+    "state": "installed"
+  },
+  "setupExit": 0,
+  "connect": {
+    "id": "3b6e4539a34cde3964b4ec16f48594b8",
+    "code": "connected"
+  },
+  "peerWindow": {
+    "id": "7ab71c507998f9440d6dca49bf242971",
+    "code": "window_ready"
+  },
+  "collection": "c1b98fae983ef103a92af469c57524f6",
+  "devices": {
+    "A": {
+      "created": "2026-11-16T13:20:37Z",
+      "input": {
+        "time": "2026-11-16T13:20:23.8209281Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "installation": {
+        "time": "2026-11-16T13:20:22.513419Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "connection": "89a5837cfb0e4c039c8ace1ec43d45e0fd1b2bc04dcd5e623dbcf04fad046813",
+      "connectedAt": "2026-11-16T13:20:27.870401Z",
+      "observationSeconds": 9.13,
+      "supportSHA256": "74c029b9f79eaaa35b8c52f86a2fb95959fc8c42a26b51071064c6a50da4028e",
+      "postConnectFailures": [],
+      "traceEnabled": false,
+      "coverage": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false
+        }
+      ]
+    },
+    "B": {
+      "created": "2026-11-16T13:20:27Z",
+      "input": {
+        "time": "2026-11-16T13:20:04.7859377Z",
+        "state": "READY",
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false
+      },
+      "installation": {
+        "time": "2026-11-16T13:19:29.5015163Z",
+        "action": "install",
+        "result": 0,
+        "stage": "complete",
+        "win32Error": 0,
+        "win32Known": false,
+        "recovery": "not_needed",
+        "recoveryWin32Error": 0,
+        "recoveryWin32Known": false,
+        "closeWin32Error": 0,
+        "closeWin32Known": false
+      },
+      "connection": "89a5837cfb0e4c039c8ace1ec43d45e0fd1b2bc04dcd5e623dbcf04fad046813",
+      "connectedAt": "2026-11-16T13:20:15.9929203Z",
+      "observationSeconds": 11.008,
+      "supportSHA256": "3fcd24a9816d1ff7e9d1ee39af442358077e1e1c2283742493907746c9e04fd0",
+      "postConnectFailures": [],
+      "traceEnabled": false,
+      "coverage": [
+        {
+          "source": "agent.previous.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "agent.jsonl",
+          "incomplete": false
+        },
+        {
+          "source": "control.previous.jsonl",
+          "incomplete": true
+        },
+        {
+          "source": "control.jsonl",
+          "incomplete": false
+        }
+      ]
+    }
+  },
+  "limits": [
+    "Short post-install observation, not a physical latency comparison or long-term recurrence guarantee.",
+    "Agent current/previous logs are complete; control.previous has incomplete coverage.",
+    "No remote CI or native Linux test repeated for this Windows change."
+  ]
+}

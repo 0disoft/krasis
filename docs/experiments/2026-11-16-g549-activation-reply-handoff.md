@@ -100,3 +100,24 @@ No peer/native wire format, business API, DB, dependencies, repository hygiene
 or CI runner policy changes. Diagnostic JSON has optional additive fields.
 Linux source-capture scheduling is unchanged. Remote CI and native Linux VM
 validation are outside this Windows-specific rollout; no such result is claimed.
+
+## Paired installation
+
+Build revision `5fac17a214bfcb1cf6e4fbbefc28cede96301408` passed 111/111 UI tests,
+the native UI build, icon/single-copy bundle checks, the real workspace archive
+test and offline update verification. The 29,235,124-byte archive was sent to B
+once, receipt `6f3e4b5ef87340edf785ac9daec89c7c`; its exact receipt is UPDATED
+on generation 549 and that revision. A setup returned `installed`, code 0,
+process exit 0. Both installation records report completion with result 0.
+
+A doctor confirms CLI, agent, UI, launch record and installed protected agent
+on that revision, healthy/CONNECTED. B reports ONLINE on the same build and
+IDLE transfers. CLI connect receipt `3b6e4539a34cde3964b4ec16f48594b8` is
+connected, and B window receipt `7ab71c507998f9440d6dca49bf242971` is window_ready.
+Collection `c1b98fae983ef103a92af469c57524f6` confirms both inputs READY on the
+same connection, with runtime tracing off. Its short 9.130s/11.008s observation
+has no post-connect failure; this is not a recurrence or latency guarantee.
+Agent current/previous coverage is complete; control.previous is incomplete.
+The installation JSON records hashes and exact observations. A fresh physical
+crossing comparison has been requested and remains pending; no paired latency
+improvement is claimed from the mechanism probe alone.
