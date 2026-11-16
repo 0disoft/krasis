@@ -16,15 +16,16 @@ const startupReadyLoadSize = startupReadySize + 8
 const startupReadyPreparedSize = startupReadyLoadSize + 8
 const startupReadyDecisionSize = startupReadyPreparedSize + 8
 const startupReadyWaitSize = startupReadyDecisionSize + 8
-const startupReadyServiceSize = startupReadyWaitSize + 8 + int(handoff.ServiceReadinessStageCount)*4
+const startupReadyServiceSize = startupReadyWaitSize + 8 + int(handoff.ServiceReadinessLegacyStageCount)*4
 const startupReadyNativeSize = startupReadyServiceSize + 48
 const startupReadyImageHashSize = startupReadyNativeSize + 36
+const startupReadyAdmissionSize = startupReadyImageHashSize + 16
 
 func writeStartupReady(writer io.Writer, profile handoff.StartupProfile) error {
 	if !profile.Valid() || profile.Measured == 0 {
 		return writeFrame(writer, readyFrame[:])
 	}
-	var data [startupReadyImageHashSize]byte
+	var data [startupReadyAdmissionSize]byte
 	copy(data[:5], []byte{'K', 'R', 'D', '2', 2})
 	size := startupReadySize
 	if profile.LoadMeasured {
@@ -53,8 +54,8 @@ func writeStartupReady(writer io.Writer, profile handoff.StartupProfile) error {
 	if profile.ServiceReadiness.Measured != 0 {
 		copy(data[:5], []byte{'K', 'R', 'D', '7', 7})
 		size = startupReadyServiceSize
-		data[startupReadyWaitSize] = profile.ServiceReadiness.Measured
-		for i, n := range profile.ServiceReadiness.Micros {
+		data[startupReadyWaitSize] = profile.ServiceReadiness.Measured & ((1 << handoff.ServiceReadinessLegacyStageCount) - 1)
+		for i, n := range profile.ServiceReadiness.Micros[:handoff.ServiceReadinessLegacyStageCount] {
 			binary.BigEndian.PutUint32(data[startupReadyWaitSize+8+i*4:], n)
 		}
 	}
@@ -84,6 +85,14 @@ func writeStartupReady(writer io.Writer, profile handoff.StartupProfile) error {
 			}
 		}
 	}
+	if profile.ServiceReadiness.Measured>>handoff.ServiceReadinessLegacyStageCount != 0 {
+		copy(data[:5], []byte{'K', 'R', 'D', 'A', 10})
+		size = startupReadyAdmissionSize
+		data[startupReadyImageHashSize] = profile.ServiceReadiness.Measured >> handoff.ServiceReadinessLegacyStageCount
+		for i, n := range profile.ServiceReadiness.Micros[handoff.ServiceReadinessLegacyStageCount:] {
+			binary.BigEndian.PutUint32(data[startupReadyImageHashSize+8+i*4:], n)
+		}
+	}
 	return writeFrame(writer, data[:size])
 }
 
@@ -95,7 +104,8 @@ func readStartupReady(reader io.Reader) (*handoff.StartupProfile, error) {
 	if header == readyFrame {
 		return nil, nil
 	}
-	imageHash := string(header[:4]) == "KRD9" && header[4] == 9
+	admission := string(header[:4]) == "KRDA" && header[4] == 10
+	imageHash := admission || string(header[:4]) == "KRD9" && header[4] == 9
 	native := imageHash || string(header[:4]) == "KRD8" && header[4] == 8
 	service := native || string(header[:4]) == "KRD7" && header[4] == 7
 	wait := service || (string(header[:4]) == "KRD6" && header[4] == 6)
@@ -110,6 +120,8 @@ func readStartupReady(reader io.Reader) (*handoff.StartupProfile, error) {
 	// KRD9. Never buffer beyond this receipt into the following input/report.
 	size := startupReadySize
 	switch {
+	case admission:
+		size = startupReadyAdmissionSize
 	case imageHash:
 		size = startupReadyImageHashSize
 	case native:
@@ -125,7 +137,7 @@ func readStartupReady(reader io.Reader) (*handoff.StartupProfile, error) {
 	case load:
 		size = startupReadyLoadSize
 	}
-	var body [startupReadyImageHashSize - 8]byte
+	var body [startupReadyAdmissionSize - 8]byte
 	if n, err := io.ReadFull(reader, body[:size-8]); err != nil {
 		// Preserve EOF at former field boundaries, versus UnexpectedEOF in
 		// a partial field. Native deadline/cancellation errors pass unchanged.
@@ -133,7 +145,7 @@ func readStartupReady(reader io.Reader) (*handoff.StartupProfile, error) {
 			switch n + len(header) {
 			case startupReadySize, startupReadyLoadSize, startupReadyPreparedSize,
 				startupReadyDecisionSize, startupReadyWaitSize, startupReadyServiceSize,
-				startupReadyNativeSize:
+				startupReadyNativeSize, startupReadyImageHashSize:
 				err = io.EOF
 			}
 		}
@@ -174,13 +186,15 @@ func readStartupReady(reader io.Reader) (*handoff.StartupProfile, error) {
 		profile.PreparationWaitMicros = binary.BigEndian.Uint32(detail[:4])
 		profile.PreparationWaitMeasured = detail[4] == 1
 	}
+	invalidLegacyServiceMask := false
 	if service {
 		detail := body[startupReadyWaitSize-8 : startupReadyServiceSize-8]
 		if !zeroBytes(detail[1:8]) {
 			return nil, ErrProtocol
 		}
 		profile.ServiceReadiness.Measured = detail[0]
-		for i := range profile.ServiceReadiness.Micros {
+		invalidLegacyServiceMask = detail[0]>>handoff.ServiceReadinessLegacyStageCount != 0
+		for i := range profile.ServiceReadiness.Micros[:handoff.ServiceReadinessLegacyStageCount] {
 			profile.ServiceReadiness.Micros[i] = binary.BigEndian.Uint32(detail[8+i*4:])
 		}
 	}
@@ -210,9 +224,19 @@ func readStartupReady(reader io.Reader) (*handoff.StartupProfile, error) {
 			}
 		}
 	}
+	if admission {
+		detail := body[startupReadyImageHashSize-8 : startupReadyAdmissionSize-8]
+		if !zeroBytes(detail[1:8]) || detail[0] == 0 || detail[0]>>2 != 0 {
+			return nil, ErrProtocol
+		}
+		profile.ServiceReadiness.Measured |= detail[0] << handoff.ServiceReadinessLegacyStageCount
+		for i := range profile.ServiceReadiness.Micros[handoff.ServiceReadinessLegacyStageCount:] {
+			profile.ServiceReadiness.Micros[int(handoff.ServiceReadinessLegacyStageCount)+i] = binary.BigEndian.Uint32(detail[8+i*4:])
+		}
+	}
 	// Numeric diagnostics are not readiness proof. Consume the fixed payload,
 	// but drop invalid/missing measurements without changing a valid receipt.
-	if !profile.Valid() || profile.Measured == 0 || decision && !service && profile.PreparationDecision == handoff.PreparationUnobserved || service && !native && profile.ServiceReadiness.Measured == 0 {
+	if invalidLegacyServiceMask || !profile.Valid() || profile.Measured == 0 || decision && !service && profile.PreparationDecision == handoff.PreparationUnobserved || service && !native && profile.ServiceReadiness.Measured == 0 {
 		return nil, nil
 	}
 	return profile, nil

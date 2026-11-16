@@ -9,10 +9,12 @@ import (
 )
 
 type loginRuntimeRecorder struct {
-	mu      sync.Mutex
-	value   logindiag.Runtime
-	persist func(logindiag.Runtime) error
-	source  atomic.Pointer[logindiag.SourceHistory]
+	mu              sync.Mutex
+	value           logindiag.Runtime
+	persist         func(logindiag.Runtime) error
+	source          atomic.Pointer[logindiag.SourceHistory]
+	console         atomic.Pointer[loginConsoleObservation]
+	observedConsole *loginConsoleObservation // Protected by mu; advances only after persistence.
 }
 
 func newLoginRuntimeRecorder(persist func(logindiag.Runtime) error) *loginRuntimeRecorder {
@@ -25,6 +27,13 @@ func (r *loginRuntimeRecorder) record(stage, value string, cause error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	next := r.value
+	console := r.console.Load()
+	if console != nil {
+		next.Console = console.state
+		if console.failure != nil && (r.observedConsole == nil || console.failure != r.observedConsole.failure) {
+			next.LastFailure = console.failure
+		}
+	}
 	if source := r.source.Load(); source != nil {
 		next.Source = source
 	}
@@ -76,5 +85,6 @@ func (r *loginRuntimeRecorder) record(stage, value string, cause error) {
 	}
 	if r.persist(next) == nil {
 		r.value = next
+		r.observedConsole = console
 	}
 }

@@ -21,6 +21,24 @@ g478의 상대 관리 창 열기는 에이전트와 실행 기록의 generation/
 
 ## 경계 전환
 
+g548 separates fresh login admission from diagnostic file persistence. The
+serialized console reader publishes an immutable, bounded latest observation;
+the existing policy recorder and final service record persist it. A successful
+observation retains an unpublished failure, failed persistence is retried on the
+next policy record, and an old console failure cannot overwrite a subsequently
+saved worker failure. Console observation never waits for the persistence mutex.
+No cached observation authorizes input: WTS queries, login-owner retirement,
+post-retirement session rechecks and process/image authentication remain fresh.
+The diagnostic file can lag until the next policy pass; abrupt process death can
+lose a pending snapshot, just as for the existing source-exit snapshot.
+
+KRDA (version 10) appends 16 bounded local diagnostic bytes to KRD9. Service
+readiness indices 5 and 6 measure login-gate mutex wait and total fresh console
+query duration (including a required post-retirement recheck). They are sub-spans
+of index 1, login admission, not additive stages. KRD1--KRD9 lengths remain
+unchanged; the reader consumes exactly the versioned receipt and rejects unknown
+sub-stage/reserved bits. No peer network protocol or authority rule changes.
+
 The native input dispatcher bounds its fresh service-proof wait to one second
 and the original caller deadline minus min(250ms, 25% of its initial remaining
 budget). Desktop acquisition consumes that same budget. A still-pending service

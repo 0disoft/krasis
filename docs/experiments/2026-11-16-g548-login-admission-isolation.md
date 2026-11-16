@@ -1,0 +1,51 @@
+# g548 login admission and diagnostic persistence
+
+The g547 matched outlier had B ReadyWait 582.901ms, login admission
+219.744ms and request-read-to-grant-written 599.315ms. A's corresponding
+written-to-grant-read interval was 611.914ms; the 12.599ms residual is not pure
+network RTT. The final A reader runnable delay was 0.032477ms. See the
+g547 paired-crossing report for the exact exchange and observation limits.
+
+The login service's fresh console callback synchronously called
+loginRuntimeRecorder.record. That method owns its mutex throughout protected
+file validation, write and atomic replacement. Even an unchanged console state
+could wait behind another record's persistence before deduplication. The
+policy's grant read already runs outside the login gate, but its recorder can
+still hold this separate mutex. This is a reproducible unnecessary dependency;
+the historical profile did not separate mutex wait, WTS RPC and persistence,
+so it does not establish which one consumed the original 219.744ms.
+
+The callback now publishes one immutable latest console observation. The
+existing policy record and final service record save it; no additional writer,
+queue, periodic timer or retry loop is introduced. Success does not erase an
+unpublished console failure. A failed save does not mark the snapshot persisted,
+and a previously persisted console failure cannot overwrite a newer worker
+failure. Fresh WTS observation, login-owner retirement and the required second
+console observation after actual retirement remain synchronous and unchanged.
+
+A virtual-time regression holds persistence for 220ms and verifies admission
+completes with zero simulated elapsed time while the write remains outstanding.
+It also rejects a failed fresh console query and checks the final persisted
+failure. Other tests cover save retry and failure ordering. This is an isolated
+dependency test, not a measured reduction of the physical 582.901ms tail.
+
+Service-readiness indices 5/6 now separate login-gate lock wait from fresh
+console observation, within the existing total admission stage at index 1.
+The deterministic contention test uses an explicit test clock: 180ms gate
+wait and 40ms observation remain distinct. An initial synctest-clock version
+timed out because a mutex waiter is not durably blocked for virtual-time
+advancement; the corrected test uses clock/barrier injection, not a larger
+timeout. KRDA adds 16 bytes; legacy KRD1--KRD9 receipt lengths remain fixed.
+Tests cover roundtrip, all truncation positions, reserved bits and the following
+protocol frame. The existing readiness fuzz seeds include KRDA.
+
+Native validation still hashes every image byte through protected pins. Native
+startup spans can overlap prewarming and must not be summed. No hash backend,
+digest cache, input authority, worker retirement or preparation lifetime change
+is included. Remaining OS query and native readiness delays require fresh
+g548 physical crossings; no unit test establishes their end-to-end improvement.
+
+The runtime source of truth is updated in docs/architecture/02-runtime-flow.md.
+Local readiness diagnostics are extended; no public CLI/API command, peer wire
+protocol, DB, dependency, repository hygiene or CI runner configuration changes.
+Rollback is a paired reinstall of the retained g547 setup and CLI reconnection.

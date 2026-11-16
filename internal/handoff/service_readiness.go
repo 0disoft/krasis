@@ -13,8 +13,14 @@ const (
 	ServiceLeaseReceive
 	ServiceBootstrapValidation
 	ServiceReadyAuthorization
+	ServiceLoginGateWait
+	ServiceLoginConsoleRead
 	ServiceReadinessStageCount
 )
+
+// KRD7--KRD9 retain their fixed five-stage ABI. New sub-stages are carried
+// only by the extended readiness receipt, never by lengthening legacy frames.
+const ServiceReadinessLegacyStageCount = ServiceReadyAuthorization + 1
 
 type ServiceReadinessProfile struct {
 	Micros   [ServiceReadinessStageCount]uint32 `json:"micros"`

@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/0disoft/krasis/internal/handoff"
 	"github.com/0disoft/krasis/internal/loginagent"
 )
 
@@ -16,7 +17,10 @@ type loginServiceGate struct {
 	owner     *loginagent.Owner
 	console   func() (loginagent.Console, error)
 	selection func() (loginagent.Selection, error)
+	now       func() time.Time // Optional test clock; production uses time.Now.
 }
+
+type loginAdmissionProfileKey struct{}
 
 func (g *loginServiceGate) reconcile(ctx context.Context) error {
 	// The single policy poller reads protected metadata without owning input
@@ -33,9 +37,24 @@ func (g *loginServiceGate) reconcile(ctx context.Context) error {
 }
 
 func (g *loginServiceGate) admit(ctx context.Context) error {
+	profile, _ := ctx.Value(loginAdmissionProfileKey{}).(*handoff.ServiceReadinessProfile)
+	now := g.now
+	if now == nil {
+		now = time.Now
+	}
+	started := now()
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	before, err := g.console()
+	profile.Record(handoff.ServiceLoginGateWait, now().Sub(started))
+	var consoleElapsed time.Duration
+	defer func() { profile.Record(handoff.ServiceLoginConsoleRead, consoleElapsed) }()
+	read := func() (loginagent.Console, error) {
+		started := now()
+		console, err := g.console()
+		consoleElapsed += now().Sub(started)
+		return console, err
+	}
+	before, err := read()
 	if err != nil || before.State != loginagent.UserSession || before.Session == 0 || before.Session == ^uint32(0) {
 		return ErrAuthority
 	}
@@ -48,7 +67,7 @@ func (g *loginServiceGate) admit(ctx context.Context) error {
 	// g.mu excludes policy reconciliation/starts until admission returns.
 	// Actual retirement can take seconds and always requires a new observation.
 	if retired {
-		after, err := g.console()
+		after, err := read()
 		if err != nil || after != before {
 			return ErrAuthority
 		}

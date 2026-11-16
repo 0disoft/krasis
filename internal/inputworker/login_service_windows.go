@@ -31,7 +31,7 @@ func runInstalledLoginService(ctx context.Context, installation *Installation, r
 		case loginagent.Unavailable:
 			state = "UNAVAILABLE"
 		}
-		recorder.record("console", state, err)
+		recorder.observeConsole(state, err)
 		return console, err
 	}
 	owner, err := loginagent.New(loginagent.Dependencies{

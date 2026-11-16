@@ -161,7 +161,7 @@ func runInputServiceLoop(ctx context.Context, installation *Installation, ready 
 			}
 			if admit != nil {
 				started := time.Now()
-				if err = admit(ctx); err != nil {
+				if err = admit(context.WithValue(ctx, loginAdmissionProfileKey{}, &channel.serviceReadiness)); err != nil {
 					if failure := closeInputServiceChannel(channel, err); failure != nil {
 						return failure
 					}

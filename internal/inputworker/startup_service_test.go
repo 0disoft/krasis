@@ -55,7 +55,7 @@ func TestServiceReadinessReceiptBoundedAndPreservesNextFrame(t *testing.T) {
 				t.Fatal("reserved service byte accepted", offset)
 			}
 		}
-		for _, mask := range []byte{0, 1 << handoff.ServiceReadinessStageCount, 1} {
+		for _, mask := range []byte{0, 1 << handoff.ServiceReadinessStageCount, 1 << handoff.ServiceReadinessLegacyStageCount, 1} {
 			bad := append([]byte(nil), packet...)
 			bad[startupReadyWaitSize] = mask
 			check(bad, true) // Includes unmeasured nonzero admission time.
