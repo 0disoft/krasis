@@ -49,3 +49,40 @@ The runtime source of truth is updated in docs/architecture/02-runtime-flow.md.
 Local readiness diagnostics are extended; no public CLI/API command, peer wire
 protocol, DB, dependency, repository hygiene or CI runner configuration changes.
 Rollback is a paired reinstall of the retained g547 setup and CLI reconnection.
+
+## Validation and paired rollout
+
+Source revision: `0d5553df9a661fb0784b697082177a6da74af3af`, generation 548.
+All inputworker/loginagent/handoff/localapi package tests passed after stopping
+the live agent, including the portable recovery ownership fixture. Its first
+live-session run was rejected by the real ownership fence; no fence was bypassed.
+Targeted inputworker race tests, vet (`-unsafeptr=false`, matching the native
+interop check), diff whitespace checks and all 111 frontend tests passed.
+Native UI build, embedded input installer, eight-file/icon check, archive
+roundtrip, offline update verification and setup self-verification passed.
+Remote CI and Linux VM testing were not run for this Windows admission change.
+
+Before rollout, collection `6c1382d7fa5f606305e576bed8ec986f` found A's old g547
+service stopped with error 1066; its protected runtime record reports a capture
+worker missing final report (`worker-report-timeout`). That failure predates
+g548 and is not claimed fixed by this diagnostic-persistence change. The record
+was preserved. The exact new input installer's attended repair exited 0.
+A's app was then installed first because its old management agent was unavailable.
+The GUI setup's stdout/exit receipt was not retained by the launching shell;
+post-install checks verified the intended app, UI, launch record, protected
+agent revision and running service instead. Both protected-install diagnostics
+report result 0, stage complete.
+
+B was sent the update once: receipt `23a7d16cbb48204a4cd2d11499067e81` reached
+UPDATED with exactly 29,238,025 / 29,238,025 bytes. CLI connect receipt
+`1ece2268cf90ddfec6f5dcdf60609cbf` reports connected; B app-open receipt
+`7fc62098d85a9e304fe275ffbb15d2e8` reports window_ready. A doctor is healthy,
+CONNECTED and CONFIGURED with matching CLI/agent/UI/launch/installed revision.
+Both devices advertise g548 at the intended revision. UPDATED is a completed
+sender receipt, not an in-progress transfer; it was retained rather than reset.
+
+Fresh collection `2fc97df951ecbce6b4078d254216a9f0` confirms READY and the same
+connection on both devices. No post-connect timeout/fault/poison/reconnect or
+recovery-required event appears in those short retained g548 runs. Physical
+idle/fast crossing results and long-term recurrence remain unverified; the user
+has been asked for the next trial. No execution tracing is enabled by this fix.
