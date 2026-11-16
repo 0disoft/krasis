@@ -22,6 +22,7 @@ type CaptureIPC struct {
 	CallerResumeMicros      uint32                  `json:"callerResumeMicros"`
 	Request                 CaptureRequest          `json:"request,omitzero"`
 	ReadAuthority           CaptureAuthorityProfile `json:"readAuthority,omitzero"`
+	Reply                   CaptureReply            `json:"reply,omitzero"`
 }
 
 func (p CaptureIPC) Valid() bool {
@@ -32,7 +33,7 @@ func (p CaptureIPC) Valid() bool {
 	for _, n := range [...]uint32{p.RequestDeliveryMicros, p.ReadAuthorizationMicros, p.DispatchMicros, p.ActivationMicros, p.ReplyAdmissionMicros, p.ReplyEncodeMicros, p.ReplyDeliveryMicros, p.CallerResumeMicros} {
 		total += uint64(n)
 	}
-	return total <= uint64(Window.Microseconds()) && p.Request.valid(p.RequestDeliveryMicros) && p.ReadAuthority.Valid()
+	return total <= uint64(Window.Microseconds()) && p.Request.valid(p.RequestDeliveryMicros) && p.ReadAuthority.Valid() && p.Reply.valid(p.CallerResumeMicros)
 }
 
 // Clocks are observations only. Missing/reversed/out-of-window clocks discard

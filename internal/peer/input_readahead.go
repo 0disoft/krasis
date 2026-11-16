@@ -64,6 +64,7 @@ func startInputReadAheadWithHeartbeat(ctx context.Context, connection SessionCon
 					// Capture before the bounded channel can block. Dequeue time
 					// alone misclassifies dispatch backlog as network wait.
 					p.controlReadAt = time.Now()
+					traceControlRead(ctx, frame.Payload)
 				}
 				queueRegion := trace.StartRegion(ctx, "krasis.peer.read_enqueue")
 				enqueued := r.enqueue(p, stop)

@@ -19,7 +19,8 @@ func (c *traceReadConnection) ReadFrame() (transport.Frame, error) {
 		return transport.Frame{}, io.EOF
 	}
 	c.sent = true
-	return transport.Frame{Kind: transport.MessageControl}, nil
+	payload, err := transport.EncodeControlPayload(transport.ControlCommand{Kind: transport.ControlPrepareInput})
+	return transport.Frame{Kind: transport.MessageControl, Payload: payload}, err
 }
 func (*traceReadConnection) Close() error { return nil }
 
@@ -63,12 +64,16 @@ func TestPeerTraceRegionsPreserveResultsAndUseFixedLabels(t *testing.T) {
 	if err := DispatchControlFrame(ctx, transport.Frame{Kind: transport.MessageControl, Payload: payload}, time.Now(), newLocalRuntime(t), nil); err != nil {
 		t.Fatal(err)
 	}
+	traceControlRead(ctx, []byte("private-payload-not-a-trace-label"))
 	trace.Stop()
 	tracing = false
-	for _, label := range []string{"krasis.peer.wire_read", "krasis.peer.read_enqueue", "krasis.peer.coordinator_wait", "krasis.peer.coordinator_operation", "krasis.peer.prepare_input"} {
+	for _, label := range []string{"krasis.peer.wire_read", "krasis.peer.read_enqueue", "krasis.peer.coordinator_wait", "krasis.peer.coordinator_operation", "krasis.peer.prepare_input", "krasis.peer.control_read", "krasis.peer.control_unknown"} {
 		if !bytes.Contains(output.Bytes(), []byte(label)) {
 			t.Error("missing trace label", label)
 		}
+	}
+	if bytes.Contains(output.Bytes(), []byte("private-payload-not-a-trace-label")) {
+		t.Fatal("wire payload leaked into trace")
 	}
 	if got := controlTraceName(transport.ControlCommandKind(255)); got != "krasis.peer.control_unknown" {
 		t.Fatal("trace leaked an untrusted label", got)

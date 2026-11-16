@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"os"
+	"runtime"
+	"runtime/trace"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -359,7 +361,9 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 	defer timer.Stop()
 	stage = "response"
 	started = time.Now()
+	replyRegion := trace.StartRegion(ctx, "krasis.source.reply_wait")
 	reply, known, observed := waitSourceReplyObserved(ctx, timer.C, c.replies, c.done)
+	replyRegion.End()
 	var activationResumed uint64
 	if op == sourceActivate {
 		activationResumed = workerIPCTick()
@@ -383,6 +387,7 @@ func (c *sourceClient) callLockedAuthorized(ctx context.Context, op byte, heartb
 					if ipc.Measured {
 						ipc.Request = handoff.CaptureRequestFromClocks(activationSent, activationSubmitted, activationReturned, clocks[1])
 						ipc.ReadAuthority = reply.captureIPC.readAuthority
+						ipc.Reply = handoff.CaptureReplyFromClocks(clocks[7], reply.captureIPC.published, clocks[8])
 					}
 					handoff.RecordCaptureIPC(ctx, ipc)
 				}
@@ -594,9 +599,10 @@ func (c *CaptureSource) RunWithBoundary(ctx context.Context, session *wininput.S
 			sequence = p.sequence
 			switch p.kind {
 			case sourceReply:
-				select {
-				case live.replies <- p:
-				default:
+				if p.captureIPC != nil {
+					p.captureIPC.published = workerIPCTick()
+				}
+				if !publishSourceReply(live.replies, p, runtime.Gosched) {
 					live.err = ErrProtocol
 					return
 				}

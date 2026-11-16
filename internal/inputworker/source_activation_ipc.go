@@ -20,6 +20,7 @@ type sourceActivationClocks [6]uint64
 type sourceActivationTrace struct {
 	clocks        sourceActivationClocks
 	received      uint64
+	published     uint64 // Local only; never encoded in the native ACK.
 	readAuthority handoff.CaptureAuthorityProfile
 }
 

@@ -5,8 +5,8 @@ Collection `057a0b9fffa601a12441bafb6b5bfa29` contains twelve uniquely matched
 g548 source/receiver exchanges on revision
 `0d5553df9a661fb0784b697082177a6da74af3af`, with no unmatched exchanges. All
 ended `ok`; ten have complete input measurements. Two receiver profiles have
-zero input frames and `incomplete: true`; their measured preparation stages are
-retained, but they are not counted as complete input samples. The JSON companion
+zero input frames and `incomplete: false`; their measured preparation stages are
+retained, but they are not counted as measured input samples. The JSON companion
 records matching tags, field presence, input hashes and exact local durations.
 
 Both devices remain READY on the same connection. A's observation window is
@@ -67,7 +67,7 @@ with the user's remaining stutter. This review makes no additional runtime
 change and does not claim the entire user-visible stutter resolved.
 
 Validation: exact revision/connection identity, measured-field presence, twelve
-unique matched exchanges, two incomplete-input flags, error/log coverage,
+unique matched exchanges, two zero-input profiles, error/log coverage,
 causal local-duration arithmetic and JSON/report consistency were checked.
 No source tests, remote CI or Linux VM test was repeated for this evidence-only
 review. No API, DB, dependencies, repository hygiene or runner changes.

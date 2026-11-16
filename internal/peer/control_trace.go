@@ -1,6 +1,24 @@
 package peer
 
-import "github.com/0disoft/krasis/internal/transport"
+import (
+	"context"
+	"runtime/trace"
+
+	"github.com/0disoft/krasis/internal/transport"
+)
+
+// This marker follows the complete TLS read, not NIC/kernel arrival. Decode
+// only while tracing; invalid frames keep their original dispatch/error path.
+func traceControlRead(ctx context.Context, payload []byte) {
+	if !trace.IsEnabled() {
+		return
+	}
+	var kind transport.ControlCommandKind
+	if command, err := transport.DecodeControlPayload(payload); err == nil {
+		kind = command.Kind
+	}
+	trace.Log(ctx, "krasis.peer.control_read", controlTraceName(kind))
+}
 
 // All trace labels are fixed program vocabulary, never untrusted wire values.
 func controlTraceName(kind transport.ControlCommandKind) string {
